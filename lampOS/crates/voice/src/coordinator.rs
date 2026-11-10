@@ -176,6 +176,7 @@ fn second_playout_start_from(value: Option<&str>) -> Option<PlayoutStart> {
 /// [`SECOND_PLAYOUT_START_ENVIRONMENT`] in this process's environment, read
 /// once: the coordinator is one a process.
 fn second_playout_start() -> Option<PlayoutStart> {
+    // Process ownership: written and read in serve/coordinator; this static is not IPC.
     static READ: std::sync::OnceLock<Option<PlayoutStart>> = std::sync::OnceLock::new();
     *READ.get_or_init(|| {
         second_playout_start_from(
@@ -2239,6 +2240,7 @@ impl WaitCalls {
 thread_local! {
     /// A wait test's slow checks (#4332): each of the gate's four stretches
     /// between its renewals first sleeps this long.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_WAIT_CHECK: std::cell::Cell<Duration> =
         const { std::cell::Cell::new(Duration::ZERO) };
 }
@@ -4138,6 +4140,9 @@ fn observe_provider_output(
     // Keep match borrowing explicit: only this request's source receipt may
     // change its delivery evidence; cancelled old owners are already terminal.
     match event {
+        ProviderOutput::ConversationState { .. } | ProviderOutput::MachineNames { .. } => {
+            cloud.observe_state(event, monotonic_us())?;
+        }
         // Evidence about input of a request that is already retired: it
         // changes no request's delivery state.
         ProviderOutput::Ready { .. }
@@ -4368,6 +4373,13 @@ impl StartupEvents {
         for _ in 0..16 {
             match role {
                 "provider" | "second" => match channels.data.receive::<ProviderOutput>()? {
+                    Some(
+                        event @ (ProviderOutput::ConversationState { .. }
+                        | ProviderOutput::MachineNames { .. }),
+                    ) => {
+                        self.output_flow.received()?;
+                        self.cloud.observe_state(&event, monotonic_us())?;
+                    }
                     // A provider can recover while later children are still
                     // starting. Count its repeated Ready against the original
                     // capacity sequence; it does not admit input by itself.
@@ -5611,97 +5623,129 @@ fn said_close(
 thread_local! {
     /// A loop test's full look, in place of the environment: the still's
     /// file. Thread-local, so no other test's loop takes it.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_FULL_LOOK: std::cell::RefCell<Option<std::path::PathBuf>> =
         const { std::cell::RefCell::new(None) };
     /// A loop test's eyes, with no eyes' link: each still asked for is
     /// written at once to `TEST_FULL_LOOK`'s file, with its ask's id.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_EYES_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's slow startup prologue (#4332): each stretch between
     /// two of its lease keeps takes this many 2 ms scenario steps.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_PROLOGUE_STEPS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// And how many it took in all.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_PROLOGUE_STEPPED: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// A loop test's slow pass (#4332, Sixth on #5104): the first pass
     /// whose reply has had audio is held up this many 2 ms scenario steps
     /// at its end, after its capture drain, its peers read at each.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_PASS_HELD_STEPS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// And how many it was held up.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_PASS_HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// A loop test's `LAMP_UNCLEAR_HUM=on` (#1421), as `TEST_FULL_LOOK`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_PRIVACY_GAP_RIDE=on` (#2602), as `TEST_FULL_LOOK`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_PRIVACY_GAP_RIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_PRIVACY_RIDES_STALL=on` (#5611), as `TEST_FULL_LOOK`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_PRIVACY_RIDES_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's stall inside a pass (#5633): at the first time, on the
     /// scenario clock, the pass after its top is held this many
     /// microseconds with nothing read, as a page fault in running code is.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_STALL_IN_PASS: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
     /// A loop test's `LAMP_MISHEARD_HUM=on` (#828), as `TEST_FULL_LOOK`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_HOLDING_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_SECOND_LOOK_NOTE=on`, as `TEST_HOLDING_ANSWER`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_LOOK_NOTE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_SECOND_LOOK_WALK=on`, as `TEST_LOOK_NOTE`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_LOOK_WALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's skills, in place of lamp-skills' socket, for the
     /// walk's calls: taken by the loop as it starts.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_WALK_SKILL: std::cell::RefCell<Option<look_note::SkillCaller>> =
         const { std::cell::RefCell::new(None) };
     /// A loop test's task news, in place of the tasks part, as
     /// `TEST_FULL_LOOK`: taken by the loop as it starts.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_TASK_NEWS: std::cell::RefCell<Option<crate::task_news::TaskNews>> =
         const { std::cell::RefCell::new(None) };
     /// A loop test's `LAMP_TASK_NEWS_AT_PAUSE=on` (#560), as `TEST_FULL_LOOK`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_NEWS_AT_PAUSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's speech cache for the hold's sleep line (#3748), as
     /// `TEST_TASK_NEWS`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_SPEECH_CACHE: std::cell::RefCell<Option<std::sync::Arc<crate::say::tts_cache::TtsCache>>> =
         const { std::cell::RefCell::new(None) };
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
     /// A loop test's eyes link, as `TEST_TASK_NEWS`, with its
     /// `LAMP_CAMERA_FOLLOWS_EYES=on` (#2233).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_EYES: std::cell::RefCell<Option<crate::body_link::EyesLink>> =
         const { std::cell::RefCell::new(None) };
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_CAMERA_FOLLOWS_EYES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_WAIT_KEEPS_ANSWER=on` (#1123), as
     /// `TEST_CAMERA_FOLLOWS_EYES`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_WAIT_KEEPS_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's room busy with other people's talk, for the busy-room
     /// hold, as `TEST_CAMERA_FOLLOWS_EYES`: the fixture plays no three
     /// unanswered lines.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_ROOM_BUSY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_OWN_LINE_OVER_TALK=on`, as `TEST_ROOM_BUSY`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_OWN_LINE_OVER_TALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_VOICE_TONE=on`, as `TEST_CAMERA_FOLLOWS_EYES`.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_VOICE_TONE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's known person at the lamp for the voice's tone, by
     /// memory id, in place of the eyes' file.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_TONE_PERSON: std::cell::RefCell<Option<String>> =
         const { std::cell::RefCell::new(None) };
     /// A loop test's near-call try (#1803), in place of onboarding's own.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_NEAR: std::cell::RefCell<Option<crate::onboarding::near::NearFlow>> =
         const { std::cell::RefCell::new(None) };
     /// How many times a loop test's call lines were told ended to its
     /// near-call try (`near_call_line_ended`).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_LINE_ENDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// A loop test's open sentence window (#1803), in the scenario's
     /// monotonic microseconds, in place of onboarding's own.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_SENTENCE_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
         const { std::cell::Cell::new(None) };
     /// A loop test's forgets from memory (`memory/forgot`), one for each
     /// End in turn, told just before it: `None`, nothing at that End.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_TONE_FORGOT: std::cell::RefCell<VecDeque<Option<String>>> =
         const { std::cell::RefCell::new(VecDeque::new()) };
     /// A loop test's reader of memory's forgets on a bus of its own, in
     /// place of the environment's (`memory/forgot`).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     pub(super) static TEST_FORGOT_IN: std::cell::RefCell<Option<crate::bus_out::ForgotIn>> =
         const { std::cell::RefCell::new(None) };
     /// A loop test's reader of the body's pushes on a bus of its own, in
     /// place of the environment's (`body/hand`).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     pub(super) static TEST_HAND_IN: std::cell::RefCell<Option<crate::search_pushed::HandIn>> =
         const { std::cell::RefCell::new(None) };
 }
@@ -6186,6 +6230,7 @@ fn conversation_with_gate_inner(
     let mut leases = PrologueLeases::default();
     leases.keep(rig, owner, &mut stalls)?;
     let mut cloud = startup.cloud;
+    let mut active_names = cloud::ActiveNames::default();
     let mut output_flow = startup.output_flow;
     let requested_audio =
         crate::requested_audio::Service::from_environment().unwrap_or_else(|error| {
@@ -8606,7 +8651,10 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 // Put on its turn by `observe_provider_output`.
-                ProviderOutput::NewsAnswered { .. } | ProviderOutput::OwnWordsSaid { .. } => {}
+                ProviderOutput::NewsAnswered { .. }
+                | ProviderOutput::OwnWordsSaid { .. }
+                | ProviderOutput::ConversationState { .. }
+                | ProviderOutput::MachineNames { .. } => {}
                 // Put on its turn by `observe_provider_output` too. A call's
                 // line the slow chat answered with its down line (#5563):
                 // its try is the provider's, never the person's miss.
@@ -12810,10 +12858,7 @@ fn conversation_with_gate_inner(
                 ("a computer's turn", control_turns.going_on() && !own_turn),
                 (
                     "the thread",
-                    !own_turn
-                        && crate::thread::THREAD
-                            .lock()
-                            .is_ok_and(|thread| thread.going_on(std::time::Instant::now())),
+                    !own_turn && conversation_going_on(&cloud, monotonic_us()),
                 ),
                 (
                     "a person's answer",
@@ -12922,6 +12967,7 @@ fn conversation_with_gate_inner(
             let at_us = monotonic_us();
             let now_is = skill_sound_now(
                 SoundGates {
+                    cloud: &cloud,
                     at_us,
                     paused,
                     snapshot: &snapshot,
@@ -13531,6 +13577,7 @@ fn conversation_with_gate_inner(
         // News whose turn was cut short since the last tick: with
         // `LAMP_TASK_NEWS_RETELL=on`, told once more at the next quiet
         // pause (#4342).
+        active_names.sync(rig.provider.boot, &cloud);
         let cut = crate::task_news::take_cut_short();
         if !cut.is_empty()
             && let Some(news) = task_news.as_mut()
@@ -14310,8 +14357,14 @@ fn decide_prospective_input(
     accepted_decision(admission.decide(evidence, context, at_us)?, trace)
 }
 
+/// The conversation decision shared by computer starts and skill sounds.
+fn conversation_going_on(cloud: &CloudAvailability, now_us: u64) -> bool {
+    cloud.conversation.going_on(now_us)
+}
+
 /// What the say service's gates read for a skill's sound (#938).
 struct SoundGates<'a> {
+    cloud: &'a CloudAvailability,
     at_us: u64,
     paused: bool,
     snapshot: &'a Snapshot,
@@ -14354,9 +14407,7 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
         playing: gates.reply.is_some()
             || gates.speaker_pending.is_some()
             || !gates.playback_mask.available(gates.at_us),
-        conversing: crate::thread::THREAD
-            .lock()
-            .is_ok_and(|thread| thread.going_on(std::time::Instant::now())),
+        conversing: conversation_going_on(gates.cloud, gates.at_us),
     }
 }
 
@@ -15059,6 +15110,7 @@ fn cycle_controller(boot: BootId) -> Controller {
     Controller::new(boot, now())
 }
 
+// Process ownership: written and read in serve/coordinator; this static is not IPC.
 worker_global! {
     /// The newest turn the lamp wrote itself (`commit_written_turn`), as the
     /// provider worker's `attention::own_request` is for its requests.
@@ -18050,6 +18102,46 @@ mod tests {
     }
 
     #[test]
+    fn startup_retains_worker_state_before_any_input_is_admitted() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut provider) = pair(&dir, "provider");
+        let at = monotonic_us();
+        provider
+            .data
+            .send(ProviderOutput::ConversationState {
+                snapshot: crate::provider_state::conversation::Snapshot {
+                    observed_at_us: at,
+                    until_us: Some(at + 1_000_000),
+                },
+            })
+            .unwrap();
+        provider
+            .data
+            .send(ProviderOutput::MachineNames {
+                chunk: crate::provider_state::names::NamesChunk {
+                    revision: 1,
+                    index: 0,
+                    count: 1,
+                    enabled: true,
+                    pairs: vec![("office".into(), "Synthetic Laptop".into())],
+                },
+            })
+            .unwrap();
+        let mut startup = StartupEvents::default();
+        startup.poll(&mut parent, "provider").unwrap();
+        assert!(conversation_going_on(&startup.cloud, at));
+        assert_eq!(startup.cloud.ready_session(), None);
+        assert!(
+            startup.events.is_empty(),
+            "private names must not enter startup traces"
+        );
+        assert!(matches!(
+            provider.control.receive::<Control>().unwrap(),
+            Some(Control::ProviderOutputCapacity { through: 4 })
+        ));
+    }
+
+    #[test]
     fn startup_consumes_provider_ready_before_later_worker_exceeds_packet_age() {
         let dir = SessionDirectory::create().unwrap();
         let (mut parent, mut provider) = pair(&dir, "provider");
@@ -20703,3 +20795,410 @@ mod ring_trace_tests;
 #[cfg(test)]
 #[path = "coordinator/optional_ring_tests.rs"]
 mod optional_ring_tests;
+
+// Exercise real worker output across the process boundary.
+// The parent observes the production conversation consumer.
+#[cfg(test)]
+mod second_thread_process_boundary {
+    use super::*;
+    use crate::second_provider::{Engine, Listener, Services, Told, net};
+    use crate::transport::WorkerChannels;
+    use crate::wire::{Control, WorkerEvent};
+    use futures_util::{future::BoxFuture, stream::BoxStream};
+    use std::process::{Child, Command, Stdio};
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    const TEST: &str = "coordinator::second_thread_process_boundary::worker_thread_reaches_the_real_conversation_consumer";
+    const MODE: &str = "SECOND_THREAD_BOUNDARY_MODE";
+    const ROOT: &str = "SECOND_THREAD_BOUNDARY_ROOT";
+    struct Reap(Child);
+    impl Drop for Reap {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    struct Directory(std::path::PathBuf);
+    impl Drop for Directory {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    fn spawn(mode: &str, root: &std::path::Path) -> Reap {
+        Reap(
+            Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", TEST, "--nocapture", "--test-threads=1"])
+                .env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .env(MODE, mode)
+                .env(ROOT, root)
+                .stdin(Stdio::null())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .unwrap(),
+        )
+    }
+    fn wait(child: &mut Reap, within: Duration) {
+        let end = Instant::now() + within;
+        loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                assert!(status.success(), "subprocess failed: {status}");
+                return;
+            }
+            assert!(Instant::now() < end, "subprocess deadline elapsed");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+    struct NoNetwork;
+    impl Services for NoNetwork {
+        fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            panic!("no spoken request in this fixture")
+        }
+        fn chat(&self, _: Vec<net::Message>) -> BoxStream<'static, net::Result<net::ChatEvent>> {
+            panic!("no model request in this fixture")
+        }
+        fn speak(&self, _: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+            // Startup fixed-line rendering is allowed, entirely synthetic.
+            Box::pin(futures_util::stream::empty())
+        }
+    }
+    #[test]
+    fn worker_thread_reaches_the_real_conversation_consumer() {
+        let mode = std::env::var(MODE).unwrap_or_default();
+        if mode.is_empty() {
+            let root = Directory(std::env::temp_dir().join(format!(
+                "thread-ipc-{}-{}",
+                std::process::id(),
+                lamp_ipc::monotonic_us()
+            )));
+            std::fs::create_dir(&root.0).unwrap();
+            std::fs::set_permissions(
+                &root.0,
+                <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700),
+            )
+            .unwrap();
+            let mut driver = spawn("driver", &root.0);
+            wait(&mut driver, Duration::from_secs(8));
+            return;
+        }
+        let root = std::path::PathBuf::from(std::env::var_os(ROOT).unwrap());
+        let parent_boot = lamp_turn_owner::BootId::new([71; 16]).unwrap();
+        let worker_boot = lamp_turn_owner::BootId::new([72; 16]).unwrap();
+        if mode == "worker" {
+            let mut worker =
+                WorkerChannels::bind(&root, "second", parent_boot, worker_boot, true).unwrap();
+            worker.connect(&root, "second", true).unwrap();
+            {
+                let mut thread = crate::thread::THREAD.lock().unwrap();
+                thread.lamp_for(1, "Synthetic answer.", Instant::now(), None);
+                assert!(thread.going_on(Instant::now()));
+            }
+            std::fs::write(root.join("seeded"), b"ready").unwrap();
+            let engine = Engine::new(
+                Arc::new(NoNetwork),
+                Told::default,
+                Arc::new(|_, _, _, _| Box::pin(async { panic!("no tool request") })),
+            );
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async {
+                tokio::time::timeout(
+                    Duration::from_secs(4),
+                    crate::second_provider::worker::run(worker, parent_boot, engine, None, None),
+                )
+                .await
+                .expect("worker deadline")
+                .unwrap();
+            });
+            return;
+        }
+        assert_eq!(mode, "driver");
+        let mut cloud = CloudAvailability::default();
+        assert!(
+            !conversation_going_on(&cloud, lamp_ipc::monotonic_us()),
+            "fresh coordinator process has no conversation"
+        );
+        let mut parent =
+            WorkerChannels::bind(&root, "second", parent_boot, worker_boot, false).unwrap();
+        let mut worker = spawn("worker", &root);
+        let ready_by = Instant::now() + Duration::from_secs(2);
+        while !root.join("seeded").exists() {
+            assert!(
+                Instant::now() < ready_by,
+                "child never seeded its real Thread"
+            );
+            assert!(
+                worker.0.try_wait().unwrap().is_none(),
+                "child exited before handshake"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        parent.connect(&root, "second", false).unwrap();
+        let mut owner = lamp_turn_owner::Controller::new(
+            parent_boot,
+            lamp_turn_owner::MonoTime::from_micros(lamp_ipc::monotonic_us()),
+        );
+        let mut reply = None;
+        let mut flow = crate::provider_flow::OutputReceiver::default();
+        let mut ready = false;
+        let mut observed = false;
+        let until = Instant::now() + Duration::from_secs(1);
+        while Instant::now() < until {
+            let now = lamp_turn_owner::MonoTime::from_micros(lamp_ipc::monotonic_us());
+            parent
+                .control
+                .send(Control::Authority {
+                    snapshot: owner.snapshot(now).unwrap(),
+                })
+                .unwrap();
+
+            while let Some(event) = parent.control.receive::<WorkerEvent>().unwrap() {
+                ready |= matches!(event, WorkerEvent::Ready);
+            }
+            while let Some(event) = parent.data.receive::<ProviderOutput>().unwrap() {
+                flow.received().unwrap();
+                observe_provider_output(&mut cloud, &mut reply, &event).unwrap();
+            }
+            flow.replenish(0, &mut parent.control).unwrap();
+            observed = conversation_going_on(&cloud, lamp_ipc::monotonic_us());
+            if ready && observed {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        parent.control.send(Control::Stop).unwrap();
+        wait(&mut worker, Duration::from_secs(2));
+        assert!(ready, "actual worker::run did not announce Ready");
+        assert!(
+            observed,
+            "child Thread is active but actual coordinator consumer stayed false"
+        );
+    }
+}
+// Exercise the actual tasks reader and worker output across processes.
+// The parent observes the production task-news name lookup.
+#[cfg(test)]
+mod second_names_process_boundary {
+    use super::*;
+    use crate::second_provider::{Engine, Listener, Services, Told, net};
+    use crate::transport::WorkerChannels;
+    use crate::wire::{Control, WorkerEvent};
+    use futures_util::{future::BoxFuture, stream::BoxStream};
+    use std::process::{Child, Command, Stdio};
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    const TEST: &str =
+        "coordinator::second_names_process_boundary::worker_names_reach_the_real_news_consumer";
+    const MODE: &str = "SECOND_NAMES_BOUNDARY_MODE";
+    const ROOT: &str = "SECOND_NAMES_BOUNDARY_ROOT";
+    struct Reap(Child);
+    impl Drop for Reap {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    struct Directory(std::path::PathBuf);
+    impl Drop for Directory {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    fn spawn(mode: &str, root: &std::path::Path) -> Reap {
+        Reap(
+            Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", TEST, "--nocapture", "--test-threads=1"])
+                .env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .env(MODE, mode)
+                .env(ROOT, root)
+                .stdin(Stdio::null())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .unwrap(),
+        )
+    }
+    fn wait(child: &mut Reap, within: Duration) {
+        let end = Instant::now() + within;
+        loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                assert!(status.success(), "subprocess failed: {status}");
+                return;
+            }
+            assert!(Instant::now() < end, "subprocess deadline elapsed");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+    struct NoNetwork;
+    impl Services for NoNetwork {
+        fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            panic!("no spoken request in this fixture")
+        }
+        fn chat(&self, _: Vec<net::Message>) -> BoxStream<'static, net::Result<net::ChatEvent>> {
+            panic!("no model request in this fixture")
+        }
+        fn speak(&self, _: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+            // Startup fixed-line rendering is allowed, entirely synthetic.
+            Box::pin(futures_util::stream::empty())
+        }
+    }
+    #[test]
+    fn worker_names_reach_the_real_news_consumer() {
+        let mode = std::env::var(MODE).unwrap_or_default();
+        if mode.is_empty() {
+            let root = Directory(std::env::temp_dir().join(format!(
+                "thread-ipc-{}-{}",
+                std::process::id(),
+                lamp_ipc::monotonic_us()
+            )));
+            std::fs::create_dir(&root.0).unwrap();
+            std::fs::set_permissions(
+                &root.0,
+                <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700),
+            )
+            .unwrap();
+            let mut driver = spawn("driver", &root.0);
+            wait(&mut driver, Duration::from_secs(8));
+            return;
+        }
+        let root = std::path::PathBuf::from(std::env::var_os(ROOT).unwrap());
+        let parent_boot = lamp_turn_owner::BootId::new([71; 16]).unwrap();
+        let worker_boot = lamp_turn_owner::BootId::new([72; 16]).unwrap();
+        if mode == "worker" {
+            let mut worker =
+                WorkerChannels::bind(&root, "second", parent_boot, worker_boot, true).unwrap();
+            worker.connect(&root, "second", true).unwrap();
+            use std::io::{BufRead, Write};
+            let listener =
+                std::os::unix::net::UnixListener::bind(root.join("request.sock")).unwrap();
+            let server = std::thread::spawn(move || {
+                let (mut socket, _) = listener.accept().unwrap();
+                socket
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&socket)
+                    .read_line(&mut line)
+                    .unwrap();
+                assert_eq!(
+                    serde_json::from_str::<serde_json::Value>(&line).unwrap()["op"],
+                    "targets"
+                );
+                writeln!(socket, "{}", serde_json::json!({"ok":true,"targets":[{"alias":"office","engine":"claude","name":"Synthetic Laptop"}]})).unwrap();
+            });
+            crate::agent_tasks::start(&crate::agent_tasks::Place {
+                directory: root.clone(),
+                target: "office".into(),
+                machine_names: true,
+                who: false,
+                lead_in: false,
+                asked: false,
+                accounts: false,
+                needs: None,
+                staff_note: false,
+                named_only: false,
+                correct: false,
+                sign_in: false,
+                sign_in_app: false,
+                questions: false,
+                now: false,
+                one_yes: false,
+            });
+            server.join().unwrap();
+            assert_eq!(
+                crate::agent_tasks::machine_name("office").as_deref(),
+                Some("Synthetic Laptop")
+            );
+            std::fs::write(root.join("seeded"), b"ready").unwrap();
+            let engine = Engine::new(
+                Arc::new(NoNetwork),
+                Told::default,
+                Arc::new(|_, _, _, _| Box::pin(async { panic!("no tool request") })),
+            );
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async {
+                tokio::time::timeout(
+                    Duration::from_secs(4),
+                    crate::second_provider::worker::run(worker, parent_boot, engine, None, None),
+                )
+                .await
+                .expect("worker deadline")
+                .unwrap();
+            });
+            return;
+        }
+        assert_eq!(mode, "driver");
+        let mut cloud = CloudAvailability::default();
+        assert!(
+            crate::agent_tasks::machine_name("office").is_none(),
+            "fresh coordinator process has no names"
+        );
+        let mut parent =
+            WorkerChannels::bind(&root, "second", parent_boot, worker_boot, false).unwrap();
+        let mut worker = spawn("worker", &root);
+        let ready_by = Instant::now() + Duration::from_secs(2);
+        while !root.join("seeded").exists() {
+            assert!(
+                Instant::now() < ready_by,
+                "child never seeded its real Thread"
+            );
+            assert!(
+                worker.0.try_wait().unwrap().is_none(),
+                "child exited before handshake"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        parent.connect(&root, "second", false).unwrap();
+        let mut owner = lamp_turn_owner::Controller::new(
+            parent_boot,
+            lamp_turn_owner::MonoTime::from_micros(lamp_ipc::monotonic_us()),
+        );
+        let mut reply = None;
+        let mut flow = crate::provider_flow::OutputReceiver::default();
+        let mut ready = false;
+        let mut observed = false;
+        let until = Instant::now() + Duration::from_secs(1);
+        while Instant::now() < until {
+            let now = lamp_turn_owner::MonoTime::from_micros(lamp_ipc::monotonic_us());
+            parent
+                .control
+                .send(Control::Authority {
+                    snapshot: owner.snapshot(now).unwrap(),
+                })
+                .unwrap();
+
+            while let Some(event) = parent.control.receive::<WorkerEvent>().unwrap() {
+                ready |= matches!(event, WorkerEvent::Ready);
+            }
+            while let Some(event) = parent.data.receive::<ProviderOutput>().unwrap() {
+                flow.received().unwrap();
+                observe_provider_output(&mut cloud, &mut reply, &event).unwrap();
+            }
+            flow.replenish(0, &mut parent.control).unwrap();
+            cloud::ActiveNames::default().sync(worker_boot, &cloud);
+            observed = crate::task_news::their_computer(&serde_json::json!({
+                "target_alias":"office", "target":{"engine":"claude"}
+            })) == "their Synthetic Laptop";
+            if ready && observed {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        parent.control.send(Control::Stop).unwrap();
+        wait(&mut worker, Duration::from_secs(2));
+        assert!(ready, "actual worker::run did not announce Ready");
+        assert!(
+            observed,
+            "child read its real tasks socket but parent task news never received its name"
+        );
+    }
+}

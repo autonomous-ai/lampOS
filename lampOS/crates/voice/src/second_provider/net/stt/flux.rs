@@ -77,6 +77,7 @@ pub(super) fn url(proxy: Option<&str>, key_terms: &[String], eager: bool) -> Res
     super::secure(reqwest::Url::parse_with_params(&base, query).map_err(|_| Error::Url)?)
 }
 
+// Process ownership: written and read in second provider worker; this static is not IPC.
 static NOT_USED: Once = Once::new();
 
 /// Whether `config`'s lines go to Flux: its switch on

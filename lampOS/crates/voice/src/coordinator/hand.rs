@@ -87,7 +87,9 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         ProviderOutput::Transcript { request, .. }
         | ProviderOutput::OwnershipAssumed { request, .. } => *request,
         // Times only, for the records: never anything to schedule.
-        ProviderOutput::Ready { .. }
+        ProviderOutput::ConversationState { .. }
+        | ProviderOutput::MachineNames { .. }
+        | ProviderOutput::Ready { .. }
         | ProviderOutput::Ended { .. }
         | ProviderOutput::Stages { .. } => None,
     };

@@ -94,6 +94,8 @@ const FOR_LEAST: Duration = Duration::from_secs(1);
 const FOR_MOST: Duration = Duration::from_secs(15);
 
 /// The window the worker was given, in ms ([`FOLLOW_UP_FOR`] until then).
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static FOR_MS: AtomicU64 = AtomicU64::new(FOLLOW_UP_FOR.as_millis() as u64);
 
 /// The worker's flags for the switch, from the coordinator's environment.
@@ -101,6 +103,8 @@ pub fn arguments_from_environment() -> Vec<String> {
     let value = std::env::var(ENVIRONMENT).ok();
     let window = std::env::var(FOR_ENVIRONMENT).ok();
     // Said once by the coordinator, not at each worker start.
+    // Process ownership: serve sets and checks this once-only diagnostic while constructing
+    // worker arguments; workers receive the parsed window separately.
     static SAID: std::sync::Once = std::sync::Once::new();
     if value.as_deref() == Some("on")
         && let Some(window) = window.as_deref()

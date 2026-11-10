@@ -314,8 +314,9 @@ struct Pending {
     note: String,
 }
 
-/// This process's one thread. The provider worker is one process with one
-/// session supervisor.
+/// The provider worker owns this process-local conversation and its session
+/// supervisor reads and updates it. The coordinator runs in another process;
+/// it must receive a content-free deadline rather than read this static.
 pub static THREAD: Mutex<Thread> = Mutex::new(Thread::new());
 
 /// [`Thread::unsay`] on this process's thread.
@@ -1559,12 +1560,24 @@ impl Thread {
         (said, people.len() + room)
     }
 
+    /// The last instant at which this conversation counts as going on. The
+    /// deadline is inclusive and is based on the exchange's start, not when a
+    /// reader asks. An expired deadline stays available until the thread changes,
+    /// so a process receiving it can expire it without another worker message.
+    /// Future-dated exchanges count as going on, as in [`Self::going_on`].
+    pub fn conversation_deadline(&self) -> Option<Instant> {
+        self.exchanges
+            .iter()
+            .filter(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+            .filter(|exchange| self.after_close(exchange))
+            .map(|exchange| exchange.at)
+            .max()
+            .map(|at| at + GOING_ON_FOR)
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
-        self.exchanges.iter().any(|exchange| {
-            now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
-                && exchange.lamp.chars().any(char::is_alphanumeric)
-                && self.after_close(exchange)
-        })
+        self.conversation_deadline()
+            .is_some_and(|until| now <= until)
     }
 
     /// What a name is kept from ([`crate::known_faces::name_heard`]): the
@@ -1986,6 +1999,7 @@ pub fn take_file(flags: &[String]) -> std::io::Result<(Option<std::path::PathBuf
 /// Each thread file a set-aside line was said for, so a test can count the
 /// lines for its own file while others run beside it.
 #[cfg(test)]
+// Test process only: set_aside writes; file-recovery fixtures read their own paths.
 static SET_ASIDE_SAID: std::sync::Mutex<Vec<std::path::PathBuf>> =
     std::sync::Mutex::new(Vec::new());
 
@@ -2060,6 +2074,7 @@ pub fn close_now(request: Option<u64>) {
 #[cfg(test)]
 mod test_closes {
     std::thread_local! {
+        // Test thread only: Closes toggles; close_now reads this thread-local gate.
         pub(super) static ON: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     }
 }
@@ -3972,6 +3987,50 @@ mod tests {
             opening_for(&unscoped, 3, Some(&a), next),
             Err("another person is in the conversation")
         );
+    }
+
+    #[test]
+    fn conversation_deadline_is_inclusive_and_keeps_future_exchange_semantics() {
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        assert_eq!(thread.conversation_deadline(), None);
+        thread.lamp_for(1, "...?!", now, None);
+        assert_eq!(thread.conversation_deadline(), None);
+        let future = now + Duration::from_secs(10);
+        thread.lamp_for(2, "Yes.", future, None);
+        let until = future + GOING_ON_FOR;
+        assert_eq!(thread.conversation_deadline(), Some(until));
+        assert!(thread.going_on(now));
+        assert!(thread.going_on(until));
+        assert!(!thread.going_on(until + Duration::from_nanos(1)));
+        assert_eq!(thread.conversation_deadline(), Some(until));
+        // Insertion order and a newer punctuation-only exchange cannot move it.
+        thread.lamp_for(3, "Earlier.", now, None);
+        thread.lamp_for(4, "...", future + Duration::from_secs(1), None);
+        assert_eq!(thread.conversation_deadline(), Some(until));
+    }
+
+    #[test]
+    fn conversation_deadline_tracks_close_unsay_and_forget() {
+        let now = Instant::now();
+        let later = now + Duration::from_secs(1);
+        let mut thread = Thread::new();
+        thread.lamp_for(1, "First.", now, None);
+        thread.lamp_for(2, "Second.", later, None);
+        assert_eq!(thread.conversation_deadline(), Some(later + GOING_ON_FOR));
+        thread.unsay(2);
+        assert_eq!(thread.conversation_deadline(), Some(now + GOING_ON_FOR));
+        thread.close_conversation(now);
+        assert_eq!(thread.conversation_deadline(), None);
+        // A close excludes its own request even if its answer arrives later.
+        thread.close_conversation_with(3, now);
+        thread.lamp_for(3, "Stopped.", later, None);
+        assert_eq!(thread.conversation_deadline(), None);
+        thread.lamp_for(4, "New conversation.", later, None);
+        assert_eq!(thread.conversation_deadline(), Some(later + GOING_ON_FOR));
+        thread.forget();
+        assert_eq!(thread.conversation_deadline(), None);
+        assert!(!thread.going_on(later));
     }
 
     /// One person alone, known or not, still gets the note; a person who

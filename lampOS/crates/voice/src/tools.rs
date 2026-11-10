@@ -130,6 +130,8 @@ const MAX_ANSWER_BYTES: u64 = 8_192;
 /// mouth seen speaking (the memory owner, 16:49 on #5385: "tạm thời chưa
 /// cho xóa nếu ko detect đc mở miệng"), so nothing is forgotten and the
 /// lamp asks them to look at it ([`ONE_FACE_JUST_KEPT`]).
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static ONE_FACE_KEPT: std::sync::Mutex<Vec<(crate::memory_scope::RequestKey, String, Instant)>> =
     std::sync::Mutex::new(Vec::new());
 const ONE_FACE_KEPT_SESSIONS: usize = 4;
@@ -777,6 +779,8 @@ pub fn fit_within(
 // ponytail: one process-wide last cut; a cut that changes and changes
 // back is said again, which is then a start of its own.
 fn said_cut(left: &[String], bound: usize) -> Option<String> {
+    // Process ownership: written and read in provider worker (Live or second); this static is
+    // not IPC.
     static LAST: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
     let mut last = LAST.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if left.is_empty() || *last == left {
@@ -3105,6 +3109,7 @@ mod tests {
         // both ask for "audio-scope", and on a Mac, whose wall clock reads
         // in whole microseconds, two that started together got one name and
         // the second `create_dir` failed `AlreadyExists` (#1569).
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let base = if Path::new("/private/tmp").is_dir() {
             PathBuf::from("/private/tmp")

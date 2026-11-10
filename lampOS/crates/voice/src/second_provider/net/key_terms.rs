@@ -30,6 +30,8 @@ pub const MOST_CHARS: usize = 64;
 /// How often the names are read again.
 pub const READ_EVERY: Duration = Duration::from_secs(60);
 
+// Process ownership: written and read in second provider worker and its refresh thread; this
+// static is not IPC.
 static NAMES: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 
 /// The names the lamp knows, as last read; none until

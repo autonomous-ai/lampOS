@@ -42,6 +42,7 @@ pub(crate) mod fixture_capture_clock {
     use std::{cell::RefCell, marker::PhantomData, rc::Rc, sync::Arc, time::Instant};
 
     thread_local! {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static CLOCK: RefCell<Option<Arc<dyn CaptureClock>>> = const { RefCell::new(None) };
     }
 
@@ -111,10 +112,12 @@ const BARRIER: BarrierPolicy = BarrierPolicy::Require;
 /// (see `thread::GOING_ON_FOR`).
 const RENEW_AFTER_UNANSWERED: u32 = 8;
 const RENEW_AT_MOST_EVERY: Duration = Duration::from_secs(900);
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 worker_global! {
     /// Requests the service has left unanswered since it last answered one.
     fn unanswered_requests() -> std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 }
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 worker_global! {
     /// A face turned to the lamp lets no line out alone, and a conversation
     /// goes on only shortly after the lamp's own words
@@ -122,6 +125,7 @@ worker_global! {
     /// attention rule.
     fn name_or_follow_up() -> std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 }
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 worker_global! {
     /// When the lamp's words handed on so far will have been played, by
     /// this process's clock, as if each packet plays as it is handed on,
@@ -241,46 +245,62 @@ fn follows_up_at(until_us: u64, began_us: u64) -> bool {
         )))
 }
 /// Where the eyes keep their newest frame, when the lamp may take a look.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static LOOK_FILE: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 /// A look is a full look (`--eyes-look-full`): its still may be older.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static LOOK_FULL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Where the conversation's thread is kept across a restart, if anywhere.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static THREAD_FILE: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 /// Where the room is kept across a restart, if anywhere, and the boot it
 /// is kept for (#1465).
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static ROOM_FILE: std::sync::OnceLock<(std::path::PathBuf, String)> = std::sync::OnceLock::new();
 /// Whether a new session is told how things stand.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static SESSION_FACT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether the session is told how busy the room is.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static ROOM_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether a stuffy room is told beside what a person says.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static AIR_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether an unwell part is told beside what a person says.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static HEALTH_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether the model is told, while a person is still speaking, that the
 /// lamp's name was heard (`crate::called`).
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static NAME_NOTE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether, in a busy room, the note waits for someone turned to the lamp
 /// (`crate::called::BUSY_ENVIRONMENT`).
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static NAME_NOTE_BUSY_FACE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 /// Whether the note says the name may have sounded like another word
 /// (`crate::called::HEARD_AS_ENVIRONMENT`, #829).
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static NAME_NOTE_HEARD_AS: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 /// Whether the rule for whom the lamp answers is in its busy form
 /// (`crate::attention::BUSY_FLAG`).
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static ATTENTION_BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether the name is held to the day's own bars
 /// (`crate::attention::BY_DAY_FLAG`). Only with the switch.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static SPOKEN_TO_BY_DAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether a tap on the lamp's head counts as a call (`--head-touch`, #711).
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static HEAD_TOUCH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether a name heard close to the lamp counts as a call
 /// (`crate::attention::NEAR_FLAG`).
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static ATTENTION_NEAR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether requests are judged said to the lamp from close to it
 /// (`crate::addressed`): only with the rule that follows them.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static ADDRESSED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Files the provider worker is told of by its flags.
@@ -460,8 +480,10 @@ pub struct Files {
 }
 
 /// The bus's root for this worker, if it publishes.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static BUS_ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 /// The directory whom it answered is recorded in, if any.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static FIRST_OUTPUT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 /// The provider worker's flag for a link that is never given up. A service
 /// that runs all day passes it; a bounded run keeps the bounded policy, so
@@ -617,12 +639,15 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
 }
 /// The eyes' known face as the voice started, before its first session:
 /// that session's person, and where the switch's count starts.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static KNOWN_AT_START: std::sync::OnceLock<(String, Instant)> = std::sync::OnceLock::new();
 /// When the lamp last looked (a picture went into this session), and when
 /// anything was last submitted. A picture in a session's history makes
 /// every later answer about half a second slower ([eyes.md]), so once the
 /// conversation has paused the session is renewed without it.
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static LOOKED_AT_US: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static SUBMITTED_AT_US: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 const RENEW_AFTER_LOOK_QUIET_US: u64 = 20_000_000;
 
@@ -714,6 +739,7 @@ const ROOM_WAIT_US: u64 = 250_000;
 const PATIENT_ROOM_WAIT_US: u64 = 1_050_000;
 /// The wait in force: [`PATIENT_ROOM_WAIT_US`] once the worker takes patient
 /// writes, otherwise [`ROOM_WAIT_US`].
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 static ROOM_WAIT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(ROOM_WAIT_US);
 /// The room wait for a worker with patient writes or without.
 fn room_wait_us(patient_writes: bool) -> u64 {
@@ -1035,6 +1061,14 @@ pub struct SearchCall {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderOutput {
+    /// Content-free conversation deadline for this worker boot, not a request.
+    ConversationState {
+        snapshot: crate::provider_state::conversation::Snapshot,
+    },
+    /// A bounded part of the worker's current computer-name snapshot.
+    MachineNames {
+        chunk: crate::provider_state::names::NamesChunk,
+    },
     Ready {
         setup_us: u64,
     },
@@ -1553,7 +1587,9 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             return true;
         };
         let request = match event {
-            ProviderOutput::Ready { .. }
+            ProviderOutput::ConversationState { .. }
+            | ProviderOutput::MachineNames { .. }
+            | ProviderOutput::Ready { .. }
             | ProviderOutput::TurnFailed { .. }
             | ProviderOutput::ReminderDeferred { .. }
             // About a retired request by definition, and still owed.
@@ -1953,6 +1989,7 @@ async fn serve_with_visual<C: Connect>(
     let mut link_clock = coordinated.then(LinkClock::sample).transpose()?;
     let mut link_status = PendingLink::default();
     let mut upstream_ended = false;
+    let mut worker_state = crate::provider_state::Source::default();
     let mut intake = ProviderIntake::new(boot, monotonic_us());
     intake.handoff.tolerate_outage = typed;
     intake.handoff.wait_for_room = options.wait_for_room;
@@ -3027,6 +3064,12 @@ async fn serve_with_visual<C: Connect>(
                 queue_undelivered(&mut intake.handoff, &mut output);
                 // receive_inputs can observe a newer authority too.
                 prune_retired_output(&mut output, intake.handoff.retired_through);
+                if coordinated {
+                    // Read the shared clock first: a scheduling pause between
+                    // samples may shorten a deadline, never extend it.
+                    let observed_at_us = monotonic_us();
+                    worker_state.publish(&mut intake.output_flow, &mut channels.data, Instant::now(), observed_at_us)?;
+                }
                 for _ in 0..8 {
                     // Link status goes first; it still needs capacity like
                     // every other packet.
@@ -3038,7 +3081,11 @@ async fn serve_with_visual<C: Connect>(
                         crate::sign_in::leaving(event);
                     }
                     let front = &*front;
-                    if send_or_discard_output(&intake.handoff, &mut intake.output_flow, front, monotonic_us(), |item| channels.data.send(item))? {
+                    if send_or_discard_output(&intake.handoff, &mut intake.output_flow, front, monotonic_us(), |item| {
+                        channels.data.send(item)?;
+                        if let Outbound::Output(event) = item { worker_state.output_sent(event); }
+                        Ok(())
+                    })? {
                         // The lamp's own news is news once its sound has been
                         // handed on, owner-checked and credited (#829, #918):
                         // not when it was heard from the service, nor sound
@@ -7044,7 +7091,9 @@ fn push_text(
 pub(crate) mod seen_in_tests {
     use std::sync::Mutex;
 
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TOLD_ANSWERED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static HELD_DONE: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
     pub(super) fn told_answered(id: &str) {
@@ -10269,10 +10318,12 @@ pub(crate) mod tests {
         _lock: Option<std::sync::MutexGuard<'static, ()>>,
     }
 
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ONE_THREAD: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     thread_local! {
         /// How many of this thread's tests' holds are open.
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     }
 
@@ -10525,12 +10576,27 @@ pub(crate) mod tests {
         /// One packet, if one has arrived, counted against output capacity
         /// and its capacity returned as an empty reply buffer would.
         fn take(&mut self) -> Option<Wire> {
-            let wire = self.parent.data.receive::<Wire>().unwrap()?;
-            self.output_flow.received().unwrap();
-            self.output_flow
-                .replenish(0, &mut self.parent.control)
-                .unwrap();
-            Some(wire)
+            for _ in 0..8 {
+                let wire = self.parent.data.receive::<Wire>().unwrap()?;
+                self.output_flow.received().unwrap();
+                self.output_flow
+                    .replenish(0, &mut self.parent.control)
+                    .unwrap();
+                // These tests inspect request/link behavior. State snapshots
+                // are separate credited output, covered through real workers
+                // by the coordinator process-boundary regressions.
+                if matches!(
+                    wire,
+                    Wire::Output(
+                        ProviderOutput::ConversationState { .. }
+                            | ProviderOutput::MachineNames { .. }
+                    )
+                ) {
+                    continue;
+                }
+                return Some(wire);
+            }
+            None
         }
         async fn wire(&mut self) -> Wire {
             let deadline = Instant::now() + Duration::from_secs(5);

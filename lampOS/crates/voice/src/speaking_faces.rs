@@ -100,6 +100,7 @@ pub struct LineSeen {
 /// before its call reads it (El on #3038).
 const MOST_LINES_SEEN: usize = 64;
 
+// Process ownership: written and read in second provider worker; this static is not IPC.
 static LINES_SEEN: Mutex<VecDeque<LineSeen>> = Mutex::new(VecDeque::new());
 
 /// Keeps what the eyes saw saying a line, for its calls ([`line_seen`]).

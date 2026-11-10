@@ -29,6 +29,8 @@ const HERE_DEADLINE: Duration = Duration::from_millis(300);
 /// The name asked about, in the coordinator's process: so it is asked once.
 /// The answer runs in the provider's worker and takes its face from the
 /// eyes.
+// Process ownership: serve owns this Watch cache. A provider answer clears only its own copy;
+// the parent learns changes from the eyes, not that store.
 static ASKED: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn on() -> bool {
@@ -271,6 +273,7 @@ mod tests {
     use super::*;
 
     /// The asked name is one for the process: its tests take turns.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
     /// A test's look at the eyes: every pass of the watch (100 ms), not the
     /// lamp's 2 s (#1806).
@@ -463,6 +466,7 @@ mod tests {
     #[test]
     fn a_face_added_again_under_the_same_name_is_asked_again() {
         use std::sync::atomic::{AtomicBool, Ordering};
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static ASKED_IN_EYES: AtomicBool = AtomicBool::new(false);
         let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
         ASKED_IN_EYES.store(false, Ordering::SeqCst);

@@ -12,6 +12,7 @@ const SHIPPED: &str = include_str!("../../../../../skills/onboarding/skill.toml"
 struct Folder(std::path::PathBuf);
 impl Folder {
     fn new() -> Self {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let path = std::env::temp_dir().join(format!(
             "onboarding-skill-{}-{}",

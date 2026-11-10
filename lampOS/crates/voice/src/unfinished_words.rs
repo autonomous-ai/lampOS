@@ -28,6 +28,7 @@ pub const ENVIRONMENT: &str = "LAMP_SECOND_UNFINISHED_WAIT";
 
 /// Whether the switch is on for this process; read once.
 pub fn on() -> bool {
+    // Process ownership: written and read in serve/coordinator; this static is not IPC.
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var(ENVIRONMENT).ok().as_deref() == Some("on"))
 }

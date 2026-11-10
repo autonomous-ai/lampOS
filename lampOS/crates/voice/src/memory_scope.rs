@@ -569,6 +569,7 @@ const KEEPER_POLL: Duration = Duration::from_millis(50);
 /// lines than run at once, each a number, an id, and whether its exchange
 /// is journalled in their record (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
 /// [`one_face_record`]).
+// Process ownership: written and read in second provider worker; this static is not IPC.
 static ONE_FACE_LINES: Mutex<std::collections::VecDeque<(u64, String, bool)>> =
     Mutex::new(std::collections::VecDeque::new());
 const ONE_FACE_LINES_MOST: usize = 64;
@@ -1951,6 +1952,7 @@ mod tests {
     /// The known face as the eyes' file gives it, and its last fresh moment.
     fn seen(cache: &FaceCache, name: &str, faces_in_view: Option<usize>) -> Instant {
         // One file a call: the tests run at once.
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let path = std::env::temp_dir().join(format!(
             "memory-scope-gap-{}-{}",

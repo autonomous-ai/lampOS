@@ -1121,3 +1121,42 @@ lamp.
 Ý tưởng quan sát có liên kết nguồn, chép đúng lời của người nói, là sự thật
 kèm trích dẫn nguyên văn của thiết kế Tiers
 ([memory-tiers.md](../memory-tiers.md)), ở đây không dùng mô hình.
+
+## Trạng thái qua ranh giới tiến trình provider
+
+Worker provider sở hữu luồng hội thoại và bộ nhớ đệm tên máy tính; biến static
+của Rust không được chia sẻ với bộ điều phối serve. Bộ điều phối nhận trạng thái
+worker tường minh qua kênh đầu ra provider hiện có, có thứ tự và cấp hạn mức
+([provider-flow-control.md](../provider-flow-control.md)). Không thêm công tắc
+tính năng hay kết nối mạng.
+
+`ConversationState` chỉ mang thời điểm quan sát và hạn chót đơn điệu tùy chọn,
+không mang lời nói hay tên người. Bản sao ở tiến trình cha tự hết hạn tại hạn
+chót trong cửa sổ hội thoại 45 giây hiện có; không cần một gói báo hết hoạt động
+sau đó để ngừng coi hội thoại là đang diễn ra. Trạng thái thuộc một lần khởi
+động worker, không thuộc một yêu cầu hay phiên mô hình.
+
+`MachineNames` chuyển cờ bật và tên máy tính thành một phiên bản nhất quán.
+Mỗi mảnh sau khi tuần tự hóa tối đa 6.000 byte, tối đa 16 mảnh, và toàn bộ bản
+chụp tối đa 65.536 byte. Bên nhận chỉ thay bản chụp hoàn chỉnh gần nhất sau khi
+ghép đủ một phiên bản hợp lệ; bản truyền dở dang hay không hợp lệ không công
+bố bản đồ tên trộn lẫn. Đầu ra debug chỉ ghi số đếm và siêu dữ liệu, không ghi
+các tên riêng tư.
+
+Cả worker Live và tuyến thứ hai công bố tối đa một gói trạng thái mỗi nhịp
+worker 2 ms hiện có, dùng chung hạn mức đầu ra với âm thanh và sự kiện vòng
+đời. Khóa nguồn được thử mà không chờ, và không giữ khóa nguồn qua I/O truyền
+tải. Tranh chấp khóa hoặc thiếu hạn mức làm hoãn công bố; đây không phải bảo
+đảm độ trễ đầu cuối. Mỗi worker dự phòng giữ trạng thái nhận được của riêng nó,
+nhưng chỉ bản chụp của worker đang hoạt động được sao vào tên máy tính cho tin
+tác vụ ở serve và dùng để quyết định hội thoại. Thay lần khởi động worker xóa
+bản sao của nó; đổi phiên thông thường trong cùng lần khởi động vẫn giữ lại.
+Các gói trạng thái thuộc worker, không thuộc yêu cầu.
+
+Bản chụp hoàn chỉnh dùng một kiểu riêng chỉ được tạo sau khi kiểm tra hợp lệ:
+việc cài đặt trong serve không nhận bản đồ thô và không tuần tự hóa lại toàn bộ
+bản chụp. Kiểm thử bao phủ đầu ra từ tiến trình worker con thực và nơi sử dụng
+trong mã sản phẩm, khởi động, đổi tuyến, truyền chưa đủ, hủy yêu cầu và hết hạn.
+Phép đo trên máy phát triển tách riêng việc chuẩn bị phát, xử lý datagram cục
+bộ và cài đặt tên của worker đang hoạt động; không phép đo nào xác nhận độ trễ
+âm thanh hay trên thiết bị.

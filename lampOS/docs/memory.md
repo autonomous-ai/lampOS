@@ -4386,3 +4386,41 @@ network I/O and no waiting for the cache mutex. Privacy invalidation is atomic
 and an in-flight refresh cannot restore an invalidated observation. This is a
 design target, not a measured lamp latency result; target-hardware first-use
 and repeated-admission measurements remain outstanding.
+
+## State across the provider process boundary
+
+The provider worker owns its conversation thread and computer-name cache;
+Rust statics are not shared with the serve coordinator. The coordinator reads
+explicit worker state on the existing ordered, credited provider-output channel
+([provider-flow-control.md](provider-flow-control.md)). This adds no feature
+switch or network connection.
+
+`ConversationState` carries only an observation timestamp and an optional
+monotonic deadline, never words or person names. The parent mirror expires
+locally at the deadline within the existing 45-second conversation window;
+it does not need a later inactive packet to stop treating the conversation as
+ongoing. It belongs to one worker boot, not a request or model session.
+
+`MachineNames` transfers the enabled flag and computer labels as one coherent
+revision. Each serialized chunk is at most 6,000 bytes, with at most 16 chunks
+and a 65,536-byte limit on the complete snapshot. The receiver replaces its
+last complete snapshot only after a valid revision has been assembled; a
+partial or invalid transfer does not publish a mixed map. Debug output reports
+counts and metadata, not the private labels.
+
+Both Live and second-route workers publish at most one state packet per
+existing 2 ms worker tick, using the same output credits as audio and lifecycle
+events. Source locks are tried without waiting, and no source lock is held
+across transport I/O. Contention or unavailable credits defer publication;
+this is not an end-to-end latency guarantee. Each standby worker retains its
+own received state, but only the active worker's snapshot is mirrored into
+serve's task-news computer names and used for conversation decisions. Replacing
+a worker boot clears its mirror; an ordinary session change in the same boot
+retains it. These state packets are worker-scoped rather than request-scoped.
+
+Completed snapshots have a private validated type: installation in serve
+cannot accept a raw map or repeat serialization of the whole snapshot. Tests
+cover real child-worker output and production consumers, startup, route swaps,
+partial transfers, cancellation and expiry. Host diagnostics separately measure
+publication preparation, local datagram handling and active-name installation;
+none establishes acoustic or device latency.

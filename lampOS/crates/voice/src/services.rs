@@ -398,12 +398,18 @@ mod kept {
     use serde_json::Value;
     use std::{collections::VecDeque, sync::Mutex};
     /// The one write waiting for its "send", for both voice routes.
+    // Process ownership: written and read in provider worker (Live or second); this static is
+    // not IPC.
     static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
     /// The newest requests a read answered in.
+    // Process ownership: written and read in provider worker (Live or second); this static is
+    // not IPC.
     static READ_IN: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
     /// The newest send tries past the gate or refused, by the voice's
     /// attempt id, each with what it was told once it was
     /// ([`super::send_state`]).
+    // Process ownership: written and read in provider worker (Live or second); this static is
+    // not IPC.
     static SENT: Mutex<VecDeque<(u64, Option<Value>)>> = Mutex::new(VecDeque::new());
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         f(&mut PENDING
@@ -428,8 +434,11 @@ mod kept {
     use serde_json::Value;
     use std::{cell::RefCell, collections::VecDeque};
     thread_local! {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static PENDING: RefCell<Option<Pending>> = const { RefCell::new(None) };
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static READ_IN: RefCell<VecDeque<u64>> = const { RefCell::new(VecDeque::new()) };
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static SENT: RefCell<VecDeque<(u64, Option<Value>)>> = const { RefCell::new(VecDeque::new()) };
     }
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
@@ -1324,10 +1333,13 @@ pub enum VoiceAsk {
 pub type VoiceJudge = std::sync::Arc<dyn Fn(VoiceAsk) -> Option<f32> + Send + Sync>;
 
 #[cfg(not(test))]
+// Process ownership: the second worker installs this judge. Service calls read their own worker
+// copy; Live has no installed judge and follows the unavailable path.
 static JUDGE: std::sync::OnceLock<VoiceJudge> = std::sync::OnceLock::new();
 
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static JUDGE: std::cell::RefCell<Option<VoiceJudge>> = const { std::cell::RefCell::new(None) };
 }
 

@@ -28,6 +28,7 @@ const WALL: i64 = 1_761_000_000_000;
 const WITHIN: Duration = Duration::from_secs(20);
 // The production claim is per UID, not per ledger directory. Even an explicit
 // ignored run with parallel test threads must not start competing consumers.
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static SERIAL: Mutex<()> = Mutex::new(());
 
 #[derive(Clone, Copy)]

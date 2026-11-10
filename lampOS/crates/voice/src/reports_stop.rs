@@ -96,6 +96,7 @@ pub struct Bus(pub Option<lamp_bus::Bus>);
 /// A bus of a test's own, in place of the lamp's, for the worker's tests
 /// that run the call through its loop.
 #[cfg(test)]
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 pub(crate) static TEST_ROOT: std::sync::Mutex<Option<std::path::PathBuf>> =
     std::sync::Mutex::new(None);
 

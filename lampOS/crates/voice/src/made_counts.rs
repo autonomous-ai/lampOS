@@ -56,8 +56,12 @@ pub const FLUSH_EVERY: Duration = Duration::from_secs(60);
 const MOST_SEEN: usize = 32;
 
 /// Refused asks by voice in this process not yet in [`FILE`].
+// Process ownership: voice maker in the second worker and app maker in serve have separate
+// copies. Each flushes locally; the locked counts file combines totals.
 static REFUSED_VOICE: AtomicU64 = AtomicU64::new(0);
 /// Refused asks from the app in this process not yet in [`FILE`].
+// Process ownership: voice maker in the second worker and app maker in serve have separate
+// copies. Each flushes locally; the locked counts file combines totals.
 static REFUSED_APP: AtomicU64 = AtomicU64::new(0);
 
 /// `maker`'s refused asks not yet in [`FILE`].
@@ -68,6 +72,8 @@ fn refused_of(maker: Maker) -> &'static AtomicU64 {
     }
 }
 /// The folder this process's flush writes to, once it has begun.
+// Process ownership: voice maker in the second worker and app maker in serve have separate
+// copies. Each flushes locally; the locked counts file combines totals.
 static FLUSHING: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
 
 /// One maker's four running totals.
@@ -271,6 +277,7 @@ mod tests {
     use super::*;
 
     /// The refused count is the process's: one test at a time reads it.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
     fn folder(name: &str) -> PathBuf {

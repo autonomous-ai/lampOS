@@ -1223,10 +1223,13 @@ pub fn own_words(note: &str) -> Option<&str> {
 /// Whether the walk is under way, as the coordinator last read it
 /// ([`Onboarding::under_way`]).
 #[cfg(not(test))]
+// Process ownership: serve and the second worker write their own process-local copies;
+// WalkUnderWay IPC updates the worker copy read by its reply formatter (#5995).
 static UNDER_WAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 // Per test thread, so a test's walk never reaches another test's replies.
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static UNDER_WAY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -5200,6 +5203,8 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
 /// while the runner keeps the order it loaded; pass the runner's order to the
 /// worker if that drift matters.
 pub(crate) fn installed_order() -> Option<&'static [Step]> {
+    // Process ownership: each provider worker loads this in tools::take and reads it in
+    // onboarding::run. The coordinator keeps its own skill order, not this cache.
     static ORDER: std::sync::OnceLock<Option<Vec<Step>>> = std::sync::OnceLock::new();
     ORDER
         .get_or_init(|| {

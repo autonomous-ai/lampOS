@@ -2812,12 +2812,16 @@ impl FaceObservation {
 /// Whether memory is keyed on the eyes' stable id
 /// ([`lamp_msgs::known::ENVIRONMENT`]), read once for the process.
 fn stable_ids() -> bool {
+    // Process ownership: written and read in independent provider workers and some serve
+    // readers; this static is not IPC.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(lamp_msgs::known::stable_ids)
 }
 
 /// Whether the voice's switch and the eyes' disagree, said in the journal
 /// once for the process.
+// Process ownership: written and read in independent provider workers and some serve readers;
+// this static is not IPC.
 static SAID_DISAGREE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// The journal line, the first time only, when the voice's own
@@ -2888,6 +2892,8 @@ impl SeenIds {
     }
 }
 
+// Process ownership: written and read in independent provider workers and some serve readers;
+// this static is not IPC.
 static SEEN_IDS: std::sync::Mutex<SeenIds> = std::sync::Mutex::new(SeenIds(Vec::new()));
 
 fn note_seen(name: &str, id: Option<&str>) {
@@ -2970,11 +2976,14 @@ pub const OWNER_EVERY: Duration = Duration::from_secs(10);
 /// The owner as [`keep_owner_fresh`] last found them, and how many forgets
 /// there have been, so a refresh begun before a forget never brings back
 /// the name it cleared.
+// Process ownership: provider-worker face tools and, on the second route, its local owner
+// watcher share this state within that worker.
 static OWNER_NOW: std::sync::Mutex<(Option<String>, u64)> = std::sync::Mutex::new((None, 0));
 
 #[cfg(test)]
 thread_local! {
     /// [`owner_for_test`]'s owner, this thread's only.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static OWNER_FOR_TEST: std::cell::RefCell<Option<Option<String>>> =
         const { std::cell::RefCell::new(None) };
 }
@@ -3012,6 +3021,8 @@ pub fn owner_forgotten() {
 /// Renames of the owner's face under way ([`OwnerRename`]), by onboarding
 /// file: how many are in flight, and how many have ended, so a refresh that
 /// overlapped one never drops the owner it was moving ([`refresh_owner`]).
+// Process ownership: provider-worker face tools and, on the second route, its local owner
+// watcher share this state within that worker.
 static OWNER_RENAMES: std::sync::Mutex<std::collections::BTreeMap<PathBuf, (u32, u64)>> =
     std::sync::Mutex::new(std::collections::BTreeMap::new());
 
@@ -3143,6 +3154,8 @@ impl Drop for OwnerRename {
 /// Started once per process, however many parts ask for it (the by-default
 /// name and the connected services).
 pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
+    // Process ownership: the second worker and its local owner/face watcher threads write and
+    // read this cache; serve has a separate copy.
     static STARTED: std::sync::Once = std::sync::Once::new();
     STARTED.call_once(|| keep_owner_fresh_now(file, socket));
 }
@@ -3287,6 +3300,8 @@ pub const AT_DESK_TALLEST: f32 = 0.6;
 
 /// Whether [`AT_DESK_ENVIRONMENT`] is exactly `on`, read once.
 pub fn at_desk_only() -> bool {
+    // Process ownership: written and read in independent provider workers and some serve
+    // readers; this static is not IPC.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var(AT_DESK_ENVIRONMENT).ok().as_deref() == Some("on"))
 }
@@ -3515,6 +3530,8 @@ impl FacesLately {
     }
 }
 
+// Process ownership: the second worker and its local owner/face watcher threads write and read
+// this cache; serve has a separate copy.
 static FACES_LATELY: std::sync::Mutex<FacesLately> =
     std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new(), None, None));
 
@@ -3525,6 +3542,8 @@ static FACES_LATELY: std::sync::Mutex<FacesLately> =
 pub fn keep_faces_counted(bus: lamp_bus::Bus) {
     // Once per process: the by-default name and the connected services
     // both count faces.
+    // Process ownership: the second worker and its local owner/face watcher threads write and
+    // read this cache; serve has a separate copy.
     static STARTED: std::sync::Once = std::sync::Once::new();
     STARTED.call_once(|| keep_faces_counted_now(bus));
 }
@@ -4849,6 +4868,7 @@ mod tests {
     /// An onboarding file whose setup owner is `owner`, beside a fresh
     /// folder, and its mailbox read.
     fn owner_file(owner: &str) -> (PathBuf, impl Fn() -> String) {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let directory = std::env::temp_dir().join(format!(
             "lamp-voice-owner-{}-{}",
@@ -5419,6 +5439,7 @@ mod tests {
         use std::io::{BufRead, BufReader, Write};
         // One folder per call (#3792's P3: two tests with as many answers
         // shared a socket).
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let directory = std::env::temp_dir().join(format!(
             "lamp-voice-names-{}-{}-{}",

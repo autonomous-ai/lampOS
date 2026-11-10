@@ -11,6 +11,7 @@ const START: u64 = 1_000_000;
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = PathBuf::from(format!(
             "/tmp/lamp-hand-{}-{}",

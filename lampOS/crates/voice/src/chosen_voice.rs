@@ -23,7 +23,9 @@ use std::{
 const FILE_MOST: u64 = 1_024;
 
 /// Each file's unfit value is said once a process.
+// Process ownership: written and read in independent calling processes; this static is not IPC.
 static VOICE_SAID: AtomicBool = AtomicBool::new(false);
+// Process ownership: written and read in independent calling processes; this static is not IPC.
 static CHARACTER_SAID: AtomicBool = AtomicBool::new(false);
 
 /// Whether the switch is on, as `var` says.

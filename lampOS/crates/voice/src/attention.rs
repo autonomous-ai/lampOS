@@ -68,6 +68,8 @@ pub const CUT_KEEPS_NAME_ENVIRONMENT: &str = "LAMP_CUT_KEEPS_NAME";
 
 /// Whether the voice's environment says `LAMP_CUT_KEEPS_NAME=on`, read once.
 pub fn cut_keeps_name() -> bool {
+    // Process ownership: serve initializes and reads this environment cache; the worker gets
+    // the resulting option in its configuration.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| keeps_name(std::env::var(CUT_KEEPS_NAME_ENVIRONMENT).ok().as_deref()))
 }
@@ -76,6 +78,8 @@ fn keeps_name(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 worker_global! {
     /// The newest request the lamp began itself, in writing: a hello, a look.
     /// Nothing was said to it, so nothing can have been said to someone else.
@@ -154,6 +158,8 @@ pub const NEAR_READ_EVERY: std::time::Duration = std::time::Duration::from_secs(
 /// and reads it only when it has changed. The journal says the bar in use
 /// when it changes.
 pub fn near_rise_db() -> f32 {
+    // Process ownership: written and read in provider worker (Live or second); this static is
+    // not IPC.
     static BAR: std::sync::OnceLock<Option<std::sync::Mutex<NearBar>>> = std::sync::OnceLock::new();
     BAR.get_or_init(|| {
         (std::env::var(NEAR_CALIBRATED_ENVIRONMENT).ok().as_deref() == Some("on"))
@@ -1427,6 +1433,8 @@ const WOKEN_BY_NAME: &str = "its name woke it, and someone spoke before it went 
 /// The request the coordinator marked as begun in a wake by name's wait, and
 /// the wake's time (`ProviderInput::WokenByName`): one at a time, as requests
 /// are, kept for the second route's rule to read when it judges the line.
+// Process ownership: the second worker writes this from ProviderInput::WokenByName and reads it
+// in its own rule callback.
 static WOKEN_BY_NAME_MARK: std::sync::Mutex<Option<(u64, u64)>> = std::sync::Mutex::new(None);
 
 /// `request` began in the wait after a wake by name at `at_us`.

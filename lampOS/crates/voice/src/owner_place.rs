@@ -51,6 +51,8 @@ pub fn kept_now() -> Option<lamp_msgs::owner_place::Place> {
 /// reaches the next speech stream opened after it.
 pub const TERMS_EVERY: Duration = Duration::from_secs(10);
 
+// Process ownership: written and read in second provider worker and its refresh thread; this
+// static is not IPC.
 static TERMS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 
 /// What speech to text listens for of `place`: each part of its name

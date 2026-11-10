@@ -33,6 +33,8 @@ use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 /// Only the exact value `on`. Off, `remember` keeps the model's text.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_KEEP_HEARD";
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static ON: OnceLock<bool> = OnceLock::new();
 
 /// The memory's own cap on a kept text (`lamp_memory::store::TEXT_BYTES`).
@@ -44,6 +46,7 @@ pub(crate) const SAID: &str = "They said: ";
 thread_local! {
     /// The switch for one test's own thread ([`set_on_for_test`]): the
     /// process switch is read once, and other tests read it off.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 

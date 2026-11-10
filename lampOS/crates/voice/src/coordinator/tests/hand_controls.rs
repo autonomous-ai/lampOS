@@ -1150,45 +1150,58 @@ thread_local! {
     /// the switch is open every 5 ms, so a loop runs past the privacy
     /// freshness that otherwise ends it at 50 ms. Unset, it says nothing,
     /// as before (#1362's hold tests).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static PRIVACY_FRESH_UNTIL: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
     /// Within this span, on the scenario clock, the privacy worker kept
     /// fresh says nothing: a gap in the switch's readings (#2602).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static PRIVACY_SILENT: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
     /// The loop's rig on the Controls privacy route, where a gap may be
     /// ridden (#2602). Unset, the direct route, as before.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static RIG_PRIVACY_CONTROLS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// From this time, on the scenario clock, the privacy worker kept fresh
     /// says the switch is closed.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static PRIVACY_CLOSED_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
     /// The privacy worker fails once, 100 ms into its silent span (#2602).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static PRIVACY_FAULT_IN_GAP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Exercise the bus worker's production expiry state machine, rather
     /// than a silent mock that cannot fail at its own freshness deadline.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static PRIVACY_SOURCE_EXPIRY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The loop's rig with a camera of its own, whose side records each
     /// authority it is given (#2602, the first builder's P1 on #2623).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static RIG_CAMERA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The rig's speaker accepts each chunk and retires a sound once its
     /// last frame has played in real time (#3748). Unset, it only keeps
     /// them, as before.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static RIG_SPEAKER_PLAYS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Opt in to a capture peer that waits for Allowed and StartCapture, then
     /// returns fresh silent frames from this time. Other fixtures stay silent.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static WAKE_CAPTURE_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
     /// Before the first privacy reading, pause at the first time until the
     /// second. The initial closed-permission pass runs before this fault.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static WAKE_PRIVACY_START_PAUSE: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
     /// At the first time, on the scenario clock, the whole board stalls for
     /// the second's microseconds: the loop and every worker's side are held
     /// up together, as lamp-06c1's were during an SD log flush (#5611).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static BOARD_STALL: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
     /// The next loop's onboarding walk, its storage loaded, and its file
     /// (#3747). Unset, no walk, as before.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static RIG_ONBOARDING: RefCell<Option<(crate::onboarding::storage::ServiceStorage, PathBuf)>> =
         const { RefCell::new(None) };
     /// From this time, on the scenario clock, the sleep line is rendered
     /// into this speech cache, as the warm thread would after the loop
     /// started (#3748, the reviewer on #4478). Unset, nothing, as before.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static SPEECH_CACHE_WARMS_AT: RefCell<Option<(u64, std::sync::Arc<crate::say::tts_cache::TtsCache>)>> =
         const { RefCell::new(None) };
 }
@@ -3326,6 +3339,7 @@ fn held_run_kept_at(
     use std::os::unix::fs::PermissionsExt;
     RIG_SPEAKER_PLAYS.with(|plays| plays.set(sleep_line.is_some()));
     // One folder each: the stepped tests share their scenario clock's start.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let directory =
@@ -3667,6 +3681,7 @@ fn walk_for_the_next_loop(ended: &[&str]) -> PathBuf {
         Kept, Outcome, Progress,
         storage::{Paths, ServiceStorage},
     };
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static WALKS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let walk = WALKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let directory =

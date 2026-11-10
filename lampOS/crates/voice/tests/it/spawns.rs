@@ -16,6 +16,7 @@
 //! but it is built only on Linux, where this race does not happen.
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static SPAWNS: RwLock<()> = RwLock::new(());
 
 /// Held by a test that starts children, for as long as it may start one.

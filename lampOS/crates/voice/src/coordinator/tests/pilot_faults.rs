@@ -33,6 +33,7 @@ use std::{
 /// after every peer has run, so a loaded host cannot starve a peer past a
 /// lease (#973).
 /// Serialize sessions because SIGTERM is process-wide.
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static ONE_SESSION: Mutex<()> = Mutex::new(());
 
 pub(super) fn one_session() -> std::sync::MutexGuard<'static, ()> {

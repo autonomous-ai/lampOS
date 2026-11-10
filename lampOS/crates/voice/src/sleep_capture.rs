@@ -717,6 +717,7 @@ pub(crate) mod tests {
         assert_eq!(loudest_since(&levels, 400), SILENCE_DBFS);
     }
 
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT: AtomicU64 = AtomicU64::new(0);
 
     fn hit(began_s: f64, score: f32) -> Hit {

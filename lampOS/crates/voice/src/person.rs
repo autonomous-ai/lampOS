@@ -121,8 +121,10 @@ pub fn from_environment() -> Option<String> {
 
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static FILE_FOR_TEST: std::cell::RefCell<Option<std::path::PathBuf>> =
         const { std::cell::RefCell::new(None) };
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static OWNER_ONLY_FOR_TEST: std::cell::Cell<Option<bool>> =
         const { std::cell::Cell::new(None) };
 }
@@ -141,6 +143,7 @@ pub const PRIVATE_ROOM_ENVIRONMENT: &str = "LAMP_PRIVATE_ROOM";
 
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static PRIVATE_ROOM_FOR_TEST: std::cell::Cell<Option<bool>> =
         const { std::cell::Cell::new(None) };
 }
@@ -281,6 +284,8 @@ pub fn may_tell_now(name: &str, bus: Option<&lamp_bus::Bus>, person: Option<&str
     )
 }
 
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static OTHER_KNOWN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// A lone known face whose name isn't the typed one (the reviewer-lead's
@@ -328,9 +333,13 @@ struct LiveName {
 }
 
 thread_local! {
+    // Process ownership: the Live provider worker thread writes and reads this name/session
+    // state; no cross-process sharing.
     static LIVE: std::cell::Cell<LiveName> = const {
         std::cell::Cell::new(LiveName { open: None, ended: None, told: None, held: None })
     };
+    // Process ownership: the Live provider worker thread writes and reads this name/session
+    // state; no cross-process sharing.
     static FRESH_LIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -444,6 +453,7 @@ pub fn bus_root(product: Option<&Path>) -> Option<std::path::PathBuf> {
 
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static BUS_FOR_TEST: std::cell::RefCell<Option<std::path::PathBuf>> =
         const { std::cell::RefCell::new(None) };
 }

@@ -39,7 +39,9 @@ struct State {
 }
 
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ACTIVE: RefCell<Option<State>> = const { RefCell::new(None) };
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT_ID: Cell<u64> = const { Cell::new(1) };
 }
 

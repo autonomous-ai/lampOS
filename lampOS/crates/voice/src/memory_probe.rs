@@ -61,6 +61,8 @@ pub struct Clock {
     base_ms: u64,
 }
 
+// Process ownership: the test/debug memory-probe process and its local observer threads; absent
+// from product builds.
 static CLOCK: OnceLock<Clock> = OnceLock::new();
 
 /// The clock went back: a probe's time only goes forward.
@@ -134,6 +136,8 @@ impl DaysClient {
 
 /// Forgets asked through this process's Days clients (each `forget`,
 /// `forget_everything` and rule forget, done or refused).
+// Process ownership: the test/debug memory-probe process and its local observer threads; absent
+// from product builds.
 static FORGETS: AtomicU64 = AtomicU64::new(0);
 
 pub(super) fn forget_asked() {
@@ -214,7 +218,11 @@ pub struct Drained {
 /// The id a barrier on the observation thread carries; a job from the
 /// memory always has `"job"`, which a barrier never has.
 const OBSERVE_BARRIER: &str = "lamp_memory_probe_barrier";
+// Process ownership: the test/debug memory-probe process and its local observer threads; absent
+// from product builds.
 static OBSERVE_SENT: AtomicU64 = AtomicU64::new(0);
+// Process ownership: the test/debug memory-probe process and its local observer threads; absent
+// from product builds.
 static OBSERVE_DONE: AtomicU64 = AtomicU64::new(0);
 
 /// On the observation thread: whether `input` is a probe's barrier, marked

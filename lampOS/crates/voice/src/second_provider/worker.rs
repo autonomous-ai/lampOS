@@ -896,6 +896,7 @@ async fn ask_summary(chat: &crate::second_provider::net::Chat, input: &str) -> O
 
 /// The status the person's own DeepSeek key was last refused with, 0 while
 /// it never was in this run (#2094): what `voice-keys` tells lamp-health.
+// Second worker only: key-refusal handling writes; its health publisher reads.
 static OWN_KEY_REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 
 /// The health part that says whether the person's own key still works.
@@ -5237,9 +5238,11 @@ pub(crate) fn policy_verdicts(
 }
 
 /// Whether spoken turns are offered `heard_my_name` (`LAMP_NAME_SIGNAL=on`).
+// Second worker only: declaration setup writes; name-signal lookup reads.
 static NAME_SIGNAL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// The request whose model said last that it heard its name, and when, by
 /// this process's clock.
+// Second worker only: heard_my_name handling writes; name-signal lookup reads.
 static NAMED: Mutex<Option<(u64, u64)>> = Mutex::new(None);
 
 /// `declare`'s functions and `heard_my_name` (`LAMP_NAME_SIGNAL=on`), whose
@@ -12211,6 +12214,7 @@ fn thread_and_history(
 /// starts ([`serve`]): a person's turn is also given the room's exchanges of
 /// the same conversation, marked as the room's
 /// ([`crate::thread::Thread::recent_with_room_lines`]).
+// Second worker only: serve startup writes; conversation-history composition reads.
 pub(crate) static ROOM_LINES_TOLD: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -12464,6 +12468,7 @@ fn messages_told(exchange: crate::thread::Recent, keeps_calls: bool) -> Vec<Mess
 /// `volume_down` call, 4 of 14 action lines, and nothing changed; the
 /// history the model copied showed every earlier action as an ask answered
 /// in words only.
+// Second worker only: serve startup writes; model-history composition reads.
 pub(crate) static HISTORY_KEEPS_CALLS: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -12786,6 +12791,7 @@ pub async fn run(
     // for credit or a full socket.
     let mut retained: Option<ProviderInput> = None;
     let mut pending: Option<ProviderOutput> = None;
+    let mut state = crate::provider_state::Source::default();
     // The answer's sound as it goes out, for when the lamp has finished
     // saying it (`AnswerSound::ends`).
     let mut answer_sound = AnswerSound::default();
@@ -12938,9 +12944,19 @@ pub async fn run(
         if gate.holds(monotonic_us(), &mut engine) {
             continue;
         }
+        // Shared-clock sampling first keeps cross-clock skew conservative.
+        let observed_at_us = monotonic_us();
+        state.publish(
+            &mut gate.flow,
+            &mut channels.data,
+            Instant::now(),
+            observed_at_us,
+        )?;
         if let Some(event) = pending.take()
             && !gate.send_or_discard(&engine, monotonic_us(), &event, |event| {
-                channels.data.send(event)
+                channels.data.send(event)?;
+                state.output_sent(event);
+                Ok(())
             })?
         {
             pending = Some(event);

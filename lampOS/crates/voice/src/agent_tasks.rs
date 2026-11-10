@@ -94,10 +94,7 @@ use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::{
-        Mutex, OnceLock,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
 
@@ -256,6 +253,7 @@ struct Pending {
     correct: bool,
 }
 
+// Provider worker only: task prepare/confirm write and read this pending ask.
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
 
 /// An agent the tasks part can start: what the person calls it, how the
@@ -363,7 +361,9 @@ struct Member {
 }
 
 /// The staff as last read from the tasks part; empty until it answers.
+// Provider worker only: target reads write; task tools/session notes read.
 static STAFF: Mutex<Vec<Member>> = Mutex::new(Vec::new());
+// Provider worker only: start claims the one target-reader thread per process.
 static READING: OnceLock<()> = OnceLock::new();
 
 /// The functions a session is told of: with [`WHO_FLAG`], for the staff as
@@ -1043,6 +1043,7 @@ pub fn noted(told: Option<String>, place: Option<&Place>) -> Option<String> {
 /// note is the voice's own words and the staff's names, nothing a person
 /// said.
 fn journal_note(note: &str) {
+    // Provider worker only: session-note journalling reads/writes its dedup state.
     static LAST: Mutex<Option<String>> = Mutex::new(None);
     let Ok(mut last) = LAST.lock() else {
         return;
@@ -1368,10 +1369,127 @@ fn not_set_up(who: &str) -> Value {
     )})
 }
 
-/// The computers' own names by target alias, as last read from the tasks
-/// part ([`NAMES_FLAG`], #1676); said only while [`NAMES_ON`].
-static NAMES: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
-static NAMES_ON: AtomicBool = AtomicBool::new(false);
+/// A complete worker snapshot, mirrored only from the active worker in serve.
+/// Labels are private display data: never journal the map or its values.
+#[derive(Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MachineNames {
+    pub enabled: bool,
+    pub names: BTreeMap<String, String>,
+}
+
+impl std::fmt::Debug for MachineNames {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MachineNames")
+            .field("enabled", &self.enabled)
+            .field("names", &self.names.len())
+            .finish()
+    }
+}
+
+#[derive(Default)]
+struct NamesState {
+    snapshot: MachineNames,
+    revision: u64,
+}
+
+// Worker: start/read_staff/missing_target write; tool read-backs read.
+// Serve: the active worker's validated output writes; task_news reads.
+// These are separate process-local copies, never shared memory.
+static NAMES: Mutex<NamesState> = Mutex::new(NamesState {
+    snapshot: MachineNames {
+        enabled: false,
+        names: BTreeMap::new(),
+    },
+    revision: 0,
+});
+
+impl NamesState {
+    fn replace(&mut self, snapshot: MachineNames) {
+        if self.snapshot != snapshot {
+            self.snapshot = snapshot;
+            self.revision = self.revision.wrapping_add(1);
+        }
+    }
+}
+
+fn plain_machine_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name.trim() == name
+        && !name.chars().any(char::is_control)
+}
+
+impl MachineNames {
+    pub(crate) fn valid_pair(key: &str, name: &str) -> bool {
+        alias(key) && plain_machine_name(name)
+    }
+
+    pub(crate) fn valid(&self) -> bool {
+        // Source-sized snapshot; IPC must chunk/reassemble it before applying.
+        (self.enabled || self.names.is_empty())
+            && self
+                .names
+                .iter()
+                .all(|(key, name)| Self::valid_pair(key, name))
+            && serde_json::to_vec(self)
+                .is_ok_and(|bytes| bytes.len() <= crate::tools::MAX_TASKS_ANSWER_BYTES as usize)
+    }
+}
+
+/// None requests the initial state, including disabled/empty. Unchanged polls
+/// try the mutex without waiting; contention retries on the next tick.
+/// The map is cloned only when a snapshot is needed.
+pub(crate) fn machine_names_after(last: Option<u64>) -> Option<(u64, MachineNames)> {
+    let known = NAMES.try_lock().ok()?;
+    (last != Some(known.revision)).then(|| (known.revision, known.snapshot.clone()))
+}
+
+/// Install only a completely validated transfer from the active worker.
+/// Validation occurred during assembly; do not reserialize private names on
+/// the coordinator's input loop. The snapshot remains immutable to callers.
+pub(crate) fn install_parent_names(
+    snapshot: &crate::provider_state::names::ValidatedNames,
+) -> bool {
+    let snapshot = snapshot.snapshot().clone();
+    let Ok(mut known) = NAMES.lock() else {
+        return false;
+    };
+    known.replace(snapshot);
+    true
+}
+
+/// Serve calls this only for its active worker, after checking boot/revision.
+/// Refused snapshots cannot overwrite the last valid active snapshot.
+#[cfg(test)]
+pub(crate) fn apply_parent_snapshot(snapshot: &MachineNames) -> bool {
+    if !snapshot.valid() {
+        return false;
+    }
+    let Ok(mut known) = NAMES.lock() else {
+        return false;
+    };
+    known.replace(snapshot.clone());
+    true
+}
+
+#[cfg(test)]
+pub(crate) fn reset_parent_names() {
+    if let Ok(mut known) = NAMES.lock() {
+        known.replace(MachineNames::default());
+    }
+}
+
+fn enable_names(enabled: bool) {
+    if let Ok(mut known) = NAMES.lock() {
+        let names = if enabled {
+            known.snapshot.names.clone()
+        } else {
+            BTreeMap::new()
+        };
+        known.replace(MachineNames { enabled, names });
+    }
+}
 
 /// The names in the tasks part's answer to `targets`: each target's `name`,
 /// where it has one that is a plain label of at most 64 bytes with no
@@ -1387,10 +1505,7 @@ fn names_from(answer: &Value) -> Option<BTreeMap<String, String>> {
             .iter()
             .filter_map(|target| {
                 let (alias_, name) = (target["alias"].as_str()?, target["name"].as_str()?);
-                let plain = !name.is_empty()
-                    && name.len() <= 64
-                    && name.trim() == name
-                    && !name.chars().any(char::is_control);
+                let plain = plain_machine_name(name);
                 (alias(alias_) && plain).then(|| (alias_.to_owned(), name.to_owned()))
             })
             .collect(),
@@ -1400,24 +1515,33 @@ fn names_from(answer: &Value) -> Option<BTreeMap<String, String>> {
 /// The names as read now, kept. The journal says how many, never which: a
 /// computer's name may be its person's.
 fn keep_names(read: BTreeMap<String, String>) {
-    if let Ok(mut known) = NAMES.lock()
-        && *known != read
-    {
-        eprintln!(
-            "lamp-voice provider: {} computers known by name",
-            read.len()
-        );
-        *known = read;
+    if let Ok(mut known) = NAMES.lock() {
+        let snapshot = MachineNames {
+            enabled: known.snapshot.enabled,
+            names: if known.snapshot.enabled {
+                read
+            } else {
+                BTreeMap::new()
+            },
+        };
+        if snapshot.valid() && known.snapshot != snapshot {
+            eprintln!(
+                "lamp-voice provider: {} computers known by name",
+                snapshot.names.len()
+            );
+            known.replace(snapshot);
+        }
     }
 }
 
-/// The computer `alias` names, by its own name, with [`NAMES_FLAG`] and a
-/// name read for it; none otherwise.
+/// The computer's name, only when the coherent local snapshot is enabled.
 pub(crate) fn machine_name(alias: &str) -> Option<String> {
-    if !NAMES_ON.load(Ordering::Relaxed) {
-        return None;
-    }
-    NAMES.lock().ok()?.get(alias).cloned()
+    let known = NAMES.lock().ok()?;
+    known
+        .snapshot
+        .enabled
+        .then(|| known.snapshot.names.get(alias).cloned())
+        .flatten()
 }
 
 /// Where the read-back says the work goes: "your MacBook Air" for a
@@ -1473,6 +1597,7 @@ fn missing_line(
 
 /// The targets the reader last saw, so that a target the voice was set to
 /// and the tasks part lacks is said once per change (#1390).
+// Provider worker only: read_staff reads/writes missing-target journal dedup.
 static TARGETS_SEEN: Mutex<Option<Vec<(String, String)>>> = Mutex::new(None);
 
 /// Read the staff from the tasks part: once now, briefly, and then every
@@ -1483,7 +1608,7 @@ pub fn start(place: &Place) {
     if !(place.who || place.machine_names) || READING.set(()).is_err() {
         return;
     }
-    NAMES_ON.store(place.machine_names, Ordering::Relaxed);
+    enable_names(place.machine_names);
     let socket = place.directory.join("request.sock");
     let target = place.target.clone();
     let who = place.who;
@@ -5579,8 +5704,8 @@ pub(crate) mod tests {
             {"alias":"space","engine":"claude","name":" Pad"}]});
         let names = names_from(&answer).unwrap();
         assert_eq!(names.len(), 2, "{names:?}");
+        enable_names(true);
         keep_names(names);
-        NAMES_ON.store(true, Ordering::Relaxed);
         let mut on = place(Path::new("/run/t"), false);
         on.machine_names = true;
         for (target, said) in [
@@ -5604,7 +5729,7 @@ pub(crate) mod tests {
         let mut off = on.clone();
         off.machine_names = false;
         off.target = "macbook-air".into();
-        NAMES_ON.store(false, Ordering::Relaxed);
+        enable_names(false);
         assert_eq!(
             prepared_at("off", &off)["where"],
             "Claude Code on the office computer"
@@ -5614,6 +5739,71 @@ pub(crate) mod tests {
             "their computer"
         );
         keep_names(BTreeMap::new());
+    }
+
+    #[test]
+    fn machine_names_snapshots_are_coherent_validated_and_revisioned() {
+        let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|p| p.into_inner());
+        reset_parent_names();
+        {
+            let _held = NAMES.lock().unwrap();
+            assert!(
+                machine_names_after(None).is_none(),
+                "a refresh cannot block the provider tick"
+            );
+        }
+        let (first, off) = machine_names_after(None).unwrap();
+        assert_eq!(off, MachineNames::default());
+        assert!(machine_names_after(Some(first)).is_none());
+        enable_names(true);
+        keep_names(BTreeMap::from([(
+            "snapshot-fixture".into(),
+            "Synthetic Laptop".into(),
+        )]));
+        let (next, snapshot) = machine_names_after(Some(first)).unwrap();
+        assert_ne!(next, first);
+        assert_eq!(
+            machine_name("snapshot-fixture").as_deref(),
+            Some("Synthetic Laptop")
+        );
+        keep_names(snapshot.names.clone());
+        assert!(machine_names_after(Some(next)).is_none());
+        for invalid in [
+            MachineNames {
+                enabled: false,
+                names: snapshot.names.clone(),
+            },
+            MachineNames {
+                enabled: true,
+                names: BTreeMap::from([("bad alias".into(), "Label".into())]),
+            },
+            MachineNames {
+                enabled: true,
+                names: BTreeMap::from([("snapshot-fixture".into(), "bad\nlabel".into())]),
+            },
+            MachineNames {
+                enabled: true,
+                names: BTreeMap::from([("snapshot-fixture".into(), "x".repeat(65))]),
+            },
+            MachineNames {
+                enabled: true,
+                names: (0..2000)
+                    .map(|n| (format!("target-{n}"), "x".repeat(64)))
+                    .collect(),
+            },
+        ] {
+            assert!(!apply_parent_snapshot(&invalid));
+            assert_eq!(machine_names_after(None).unwrap(), (next, snapshot.clone()));
+        }
+        keep_names(BTreeMap::new());
+        assert!(machine_names_after(Some(next)).unwrap().1.names.is_empty());
+        assert!(apply_parent_snapshot(&snapshot));
+        reset_parent_names();
+        assert!(machine_name("snapshot-fixture").is_none());
+        assert_eq!(
+            machine_names_after(None).unwrap().1,
+            MachineNames::default()
+        );
     }
 
     /// The switch is its own: taken with or without the others, and off

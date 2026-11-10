@@ -27,6 +27,8 @@ macro_rules! worker_global {
         $(#[$meta])*
         #[cfg(not(test))]
         $vis fn $name() -> &'static $ty {
+            // Process ownership follows each worker_global invocation; the test copy is
+            // thread-local, never shared between processes.
             static VALUE: $ty = $init;
             &VALUE
         }
@@ -34,6 +36,8 @@ macro_rules! worker_global {
         #[cfg(test)]
         $vis fn $name() -> &'static $ty {
             thread_local! {
+                // Process ownership follows each worker_global invocation; the test copy is
+                // thread-local, never shared between processes.
                 static VALUE: &'static $ty = Box::leak(Box::new($init));
             }
             VALUE.with(|value| *value)
@@ -140,6 +144,7 @@ pub mod privacy_indicator;
 pub mod process;
 pub(crate) mod provider_flow;
 pub mod provider_link;
+pub mod provider_state;
 pub mod provider_worker;
 pub mod quiet_pace;
 pub mod reference;

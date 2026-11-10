@@ -1623,6 +1623,7 @@ fn waiting_with_a_due_reminder(
     use lamp_msgs::Diagnostic;
     // Named by a count, not the clock: two tests reached here in the same
     // microsecond, shared one bus and heard each other's reports (#1569).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let root = std::path::PathBuf::from(format!(
         "/tmp/lvo-{}-{}",

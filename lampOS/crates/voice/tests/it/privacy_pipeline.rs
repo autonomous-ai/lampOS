@@ -33,6 +33,7 @@ const START: u64 = 1_000_000;
 const FRESH_US: u64 = lamp_msgs::MICROPHONE_PRIVACY_FRESH_US;
 
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TIME: Cell<u64> = const { Cell::new(START) };
 }
 

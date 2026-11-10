@@ -13,6 +13,7 @@ pub const HEARD_BYTES: usize = 4_096;
 pub const FACE_BYTES: usize = 128;
 pub const NOT_SEEN: &str = "I could not be sure which face said that request, so I have not remembered anyone. They should look at me and say their name again.";
 
+// Process ownership: written and read in second provider worker; this static is not IPC.
 worker_global! {
     fn epoch() -> AtomicU64 = AtomicU64::new(0);
 }
@@ -133,6 +134,7 @@ mod tests {
 
     // These tests deliberately invalidate the process's enrollment epoch.
     // Keep those actions apart from each other's otherwise independent proof.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TESTS: Mutex<()> = Mutex::new(());
     const REQUEST: u64 = 3_298_500;
 

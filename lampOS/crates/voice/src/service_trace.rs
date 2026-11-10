@@ -25,6 +25,7 @@ pub(crate) const FINISH_WAIT: Duration = Duration::from_millis(500);
 
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_SEGMENT_BYTES: std::cell::Cell<u64> = const { std::cell::Cell::new(SEGMENT_BYTES) };
 }
 /// Exercise the actual startup and writer with small rolling files. This

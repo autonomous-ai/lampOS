@@ -145,15 +145,20 @@ pub const CLAUSE_WORDS: &[&str] = &[
 // in one test never clears another's.
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ROLES_FOR_TEST: std::cell::RefCell<BTreeMap<String, String>> =
         const { std::cell::RefCell::new(BTreeMap::new()) };
 }
 
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static ON: OnceLock<bool> = OnceLock::new();
 
 /// Each known person's role, by memory id, as their session's open read it
 /// or their own set or end changed it.
 #[cfg(not(test))]
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static ROLES: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
 
 #[cfg(not(test))]
@@ -168,6 +173,7 @@ fn with_roles<T>(f: impl FnOnce(&mut BTreeMap<String, String>) -> T) -> Option<T
 
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 

@@ -38,6 +38,8 @@ use std::{
 
 /// Only the exact value `on`, with the Days memory.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_FOLLOWS_FACE";
+// Process ownership: written and read in provider worker; second owns print/line history; this
+// static is not IPC.
 static ON: OnceLock<bool> = OnceLock::new();
 
 /// Whether the caller's own early lines may follow their face once known.
@@ -132,6 +134,8 @@ impl Lines {
 }
 
 /// This process's lines, kept by the second route's rule.
+// Process ownership: written and read in provider worker; second owns print/line history; this
+// static is not IPC.
 pub static LINES_HEARD: Mutex<Lines> = Mutex::new(Lines {
     kept: VecDeque::new(),
 });
@@ -148,9 +152,13 @@ pub fn mark(request: u64, print: Option<Vec<f32>>, faces: Vec<String>) {
 
 /// The forgets said in this process, of any kind: the writer drops a face
 /// saved before the last ([`forgot`]).
+// Process ownership: written and read in provider worker; second owns print/line history; this
+// static is not IPC.
 pub static FORGETS: AtomicU64 = AtomicU64::new(0);
 
 /// The eyes' known file, read for whose face is known now.
+// Process ownership: written and read in provider worker; second owns print/line history; this
+// static is not IPC.
 static KNOWN: OnceLock<std::path::PathBuf> = OnceLock::new();
 
 /// Read the eyes' known file at `known`, with its face beside it; the first
@@ -224,6 +232,8 @@ pub const PRINT_WAIT: Duration = Duration::from_secs(3);
 pub const PRINT_POLL: Duration = Duration::from_millis(100);
 
 type Fill = Box<dyn Fn(u64) -> bool + Send + Sync>;
+// Process ownership: written and read in provider worker; second owns print/line history; this
+// static is not IPC.
 static FILL: OnceLock<Fill> = OnceLock::new();
 
 /// The second route's `fill`: puts the prints come since into

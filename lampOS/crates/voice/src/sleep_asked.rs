@@ -26,6 +26,8 @@ pub const NOT_NOW: &str = "Not now: we are in the middle of getting to know each
 /// The request that began while onboarding was under way, as the
 /// coordinator marked it (`ProviderInput::Onboarding`): one at a time, as
 /// requests are, kept for the worker's two routes alike.
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static DURING_ONBOARDING: std::sync::Mutex<Option<u64>> = std::sync::Mutex::new(None);
 
 /// `request` began while onboarding was under way: its call is not now.

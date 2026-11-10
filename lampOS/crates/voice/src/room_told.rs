@@ -214,6 +214,7 @@ pub struct RoomTold {
     told: Option<(u64, Room)>,
 }
 
+// Process ownership: written and read in Live provider worker; this static is not IPC.
 worker_global! {
     /// This process's one room. The provider worker is one process.
     pub fn room() -> Mutex<RoomTold> = Mutex::new(RoomTold::new());

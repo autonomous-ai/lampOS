@@ -61,6 +61,7 @@ pub const CUT_HERE: &str = "(Your answer just above was cut off where it ends: t
 
 /// Whether the second route's worker marks cut answers in the history
 /// ([`cut_here`]): set once from `--cut-in-told` as the worker starts.
+// Process ownership: written and read in second provider worker; this static is not IPC.
 static MARKING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// The second route's worker with `--cut-in-told` marks cut answers.

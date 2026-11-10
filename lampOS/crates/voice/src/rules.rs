@@ -56,7 +56,11 @@ const QUIET_MORNINGS: &str = "[quiet_mornings] ";
 /// after any of the two above: `[unprompted <about> <limit>...] `.
 const TYPED: &str = "[unprompted ";
 
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static ON: OnceLock<bool> = OnceLock::new();
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static BUS: OnceLock<PathBuf> = OnceLock::new();
 
 pub fn from_environment() -> bool {
@@ -67,6 +71,7 @@ pub fn from_environment() -> bool {
 thread_local! {
     /// The switch for one test's own thread ([`on_for_test`]): the process
     /// switch is set once, and other tests read it off.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -845,6 +850,8 @@ pub fn publish(facts: &lamp_msgs::Rules) {
 
 /// Whether any fact has been given to the publisher since this process
 /// started.
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Whether a fact has been said since the start.
@@ -865,7 +872,11 @@ pub fn publish_first(facts: &lamp_msgs::Rules) {
 }
 
 /// The newest fact not yet said, and the publisher thread's wake-up.
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static WAITING: Mutex<Option<lamp_msgs::Rules>> = Mutex::new(None);
+// Process ownership: written and read in provider worker (Live or second); this static is not
+// IPC.
 static WAKE: OnceLock<SyncSender<()>> = OnceLock::new();
 
 fn publisher(root: &Path, woken: &Receiver<()>) {
@@ -909,6 +920,8 @@ fn publisher(root: &Path, woken: &Receiver<()>) {
 
 /// How many facts the publisher thread has handled, published or not: what
 /// a test waits on instead of the clock.
+// Process ownership: the worker publisher increments this local count in all builds; only
+// same-process test helpers read or wait on it.
 static HANDLED: (Mutex<u64>, Condvar) = (Mutex::new(0), Condvar::new());
 
 #[cfg(test)]
@@ -1449,6 +1462,7 @@ mod tests {
 
     /// What the publisher thread waits on while a test stands for a bus
     /// whose file work hangs (a declaration FIFO nobody writes, on the lamp).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     pub(super) static STALL: Mutex<()> = Mutex::new(());
 
     /// The only test that names a bus: [`BUS`] is set once per process.

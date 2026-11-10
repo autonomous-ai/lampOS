@@ -1554,6 +1554,8 @@ pub fn names_forget(said: &str, name: &str) -> bool {
     }
 }
 
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static FORGET_ALL: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` takes an id and `forget_everything` is offered.
@@ -1764,6 +1766,8 @@ pub fn switch_forget_all(on: bool) -> bool {
 /// and a day or span finds what was kept on it too. Off, recall is as
 /// before.
 pub const RECALL_V2_ENVIRONMENT: &str = "LAMP_MEMORY_RECALL_V2";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static RECALL_V2: OnceLock<bool> = OnceLock::new();
 
 /// Whether recall's second version is on ([`RECALL_V2_ENVIRONMENT`]).
@@ -1784,6 +1788,8 @@ pub fn switch_recall_v2(on: bool) -> bool {
 /// `tiers/recall-adapter`). Off, the request is as before. An older Days
 /// refuses the field, so upgrade the voice and the memory together.
 pub const NEWER_FIRST_ENVIRONMENT: &str = "LAMP_MEMORY_NEWER_FIRST";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static NEWER_FIRST: OnceLock<bool> = OnceLock::new();
 
 /// Whether a search asks for newer corrections first
@@ -1803,6 +1809,8 @@ pub fn switch_newer_first(on: bool) -> bool {
 /// the model does not take it as done or booked (3 Nov Tiers-ideas plan,
 /// P2; adapted from memory-tiers). Off, the requests are as before.
 pub const STRENGTH_ENVIRONMENT: &str = "LAMP_MEMORY_STRENGTH";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static STRENGTH: OnceLock<bool> = OnceLock::new();
 
 /// Whether a search and a session note ask for strength
@@ -1823,6 +1831,8 @@ pub fn switch_strength(on: bool) -> bool {
 /// plan, P3; the owner profile of memory-tiers). Off, the request is as
 /// before.
 pub const PROFILE_ENVIRONMENT: &str = "LAMP_MEMORY_PROFILE";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static PROFILE: OnceLock<bool> = OnceLock::new();
 
 /// Whether a session note asks for the profile band
@@ -1877,6 +1887,8 @@ fn tiers_ideas_fields(request: &mut Value, newer_first: bool, strength: bool, pr
 /// session's close. Off, every exchange is linked to every
 /// source the session was shown, as before.
 pub const LINK_USED_ENVIRONMENT: &str = "LAMP_MEMORY_LINK_USED";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static LINK_USED: OnceLock<bool> = OnceLock::new();
 
 /// Whether an exchange links only to what its turn used.
@@ -1901,6 +1913,8 @@ pub fn switch_link_used(on: bool) -> bool {
 /// says so. The id is never told to anyone nor used to pick what is said.
 /// Off, nothing new is sent.
 pub const ROOM_SPEAKER_ENVIRONMENT: &str = "LAMP_MEMORY_ROOM_SPEAKER";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static ROOM_SPEAKER: OnceLock<bool> = OnceLock::new();
 
 /// Whether the room's lines keep who said them ([`ROOM_SPEAKER_ENVIRONMENT`]).
@@ -2126,6 +2140,8 @@ pub const REMEMBER_ONCE_ENVIRONMENT: &str = "LAMP_MEMORY_REMEMBER_ONCE";
 /// lines of the second route carry each kept thing's id. Off, every function
 /// and answer is as before.
 pub const REPLACES_ENVIRONMENT: &str = "LAMP_MEMORY_REPLACES";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static REPLACES: OnceLock<bool> = OnceLock::new();
 
 /// What [`REPLACES_ENVIRONMENT`] adds to `remember`'s description.
@@ -2170,6 +2186,8 @@ pub fn switch_replaces(on: bool) -> bool {
 /// "plan" in 3 of 4 rounds, forgot nothing, and the lamp said so and
 /// stopped, the plant still kept. Off, every function is as before.
 pub const FORGET_ASKS_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ASKS";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static FORGET_ASKS: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` asks about a kept thing near misheard words
@@ -2198,6 +2216,8 @@ pub const FORGET_ASKS_DESCRIBED: &str = " If nothing was forgotten and their wor
 /// `forget_mark` request) is given when the forget used its deadline.
 const FORGET_MARK_WITHIN: Duration = Duration::from_millis(250);
 pub const FORGET_ABOUT_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ABOUT";
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static FORGET_ABOUT: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` takes what it is about.
@@ -2284,6 +2304,8 @@ pub const FOLLOW_UP_UNOFFERED: &str =
 pub const EVENT_HEADING: &str = "Something they mentioned";
 
 /// How many times [`THREAD_TOLD`] was said in this process: for its test.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static THREADS_TOLD: AtomicU64 = AtomicU64::new(0);
 
 /// Only the exact value `on`, with the Days client (#2176, the "Dylan"
@@ -2554,9 +2576,13 @@ pub fn observe_on() -> bool {
 /// it failed or took longer than [`OBSERVE_DEADLINE`]. Called on the
 /// observation thread alone, never on a turn's path.
 pub type Observer = Box<dyn Fn(&Value) -> Option<Value> + Send + Sync>;
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static OBSERVER: OnceLock<Observer> = OnceLock::new();
 /// The jobs waiting for the model, one at a time ([`observe_jobs`]), each
 /// with [`OBSERVE_FORGETS`] as it was at its conversation's first exchange.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static OBSERVING: OnceLock<SyncSender<ObserveJob>> = OnceLock::new();
 /// A job for the observation pass: whose, the frozen job, [`OBSERVE_FORGETS`]
 /// as its conversation began, and that person's kept things the session was
@@ -2576,6 +2602,8 @@ type ObserveJob = (
 /// before a forget is closed with nothing kept: its words are never sent,
 /// or its proposals never given, after the person asked for them to go
 /// (reviewer-two's P2 on #3450).
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static OBSERVE_FORGETS: AtomicU64 = AtomicU64::new(0);
 
 /// The journal's line for a job closed by a forget asked after its
@@ -3511,6 +3539,8 @@ fn about_same(one: &str, other: &str) -> bool {
 pub struct Carry(Mutex<Option<(Option<String>, String, Instant)>>);
 
 #[cfg(not(test))]
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static CARRY: OnceLock<Carry> = OnceLock::new();
 
 /// The process's [`Carry`]. A test's is its own thread's: tests run side by
@@ -3522,6 +3552,8 @@ fn carry() -> &'static Carry {
     #[cfg(test)]
     {
         thread_local! {
+            // Process ownership: this test process writes and reads this fixture state; not
+            // IPC.
             static CARRY: &'static Carry = Box::leak(Box::default());
         }
         CARRY.with(|carry| *carry)
@@ -4265,6 +4297,8 @@ thread_local! {
     /// it was asked in ([`nothing_in_scope`]): the explicit outcome
     /// [`theirs_then_rooms`] goes on to the room's by, never the reply's
     /// text (the Reviewer-lead's P2 on #5022).
+    // Process ownership: written and read in provider worker (Live or second) and its
+    // background threads; this static is not IPC.
     static NOTHING_IN_SCOPE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -4979,6 +5013,8 @@ enum Job {
 }
 
 /// The eyes' known file, when the voice has eyes that remember faces.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static KNOWN_FILE: OnceLock<PathBuf> = OnceLock::new();
 
 /// The memory's person id for a name the eyes know: `p-` and the first 16
@@ -5004,16 +5040,24 @@ pub const THEIRS: &str = " (What they ask you to keep, and what they say to you,
      marks \"theirs\" they told you themselves: with them you may say \"you told me\" about it, never about the rest.)";
 
 /// The writer thread's queue, once a memory has been named.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static JOBS: OnceLock<SyncSender<Job>> = OnceLock::new();
 /// What a new session is told of the things the lamp was asked to keep.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static NOTE: Mutex<String> = Mutex::new(String::new());
 /// Requests in which the lamp was asked to keep or forget something.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static KEPT_OUT: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
 /// Requests admitted held only by a known face's gap
 /// (`LAMP_FACE_GAP_HOLD`, [`held_by_gap`]): their line may be someone
 /// else's, so their reply never marks a dated follow-up (reviewer-two on
 /// #2894). Apart from [`KEPT_OUT`], which a remember or forget also sets
 /// and which must not stop a mark. The newest [`GAP_HELD_MOST`].
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static GAP_HELD: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
 const GAP_HELD_MOST: usize = 64;
 
@@ -5251,6 +5295,8 @@ pub fn name_with_face(name: &str) -> Option<ToolCall> {
 /// The memory ids [`keep_name_with_face`] kept a name for in this run, so a
 /// face saved twice in one "who you are" (a tester's 7071 lamp, 27 Oct)
 /// keeps it once.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static NAMES_KEPT: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// The name a face was saved under while "who you are" was not yet done
@@ -5312,6 +5358,8 @@ fn is_kept_out(request: u64) -> bool {
 /// (`LAMP_CONVERSATION_CARRIES`), each with that person, with
 /// `LAMP_CARRIED_LINES_KEEP_TALK` ([`carried_line`]). The newest
 /// [`GAP_HELD_MOST`].
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static CARRIED: Mutex<VecDeque<(u64, String)>> = Mutex::new(VecDeque::new());
 
 /// With `on` (`LAMP_CARRIED_LINES_KEEP_TALK`): request `request` was carried
@@ -6404,11 +6452,19 @@ pub fn days_from_environment() -> bool {
     std::env::var(DAYS_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static DAYS_MODE: OnceLock<bool> = OnceLock::new();
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static DAYS: OnceLock<Option<DaysClient>> = OnceLock::new();
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static FORGET_THREAD: AtomicBool = AtomicBool::new(false);
 /// The requests whose forget was done ([`forgetting_reply`]): at most
 /// [`FORGOTTEN_REPLIES`], the oldest let go first.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static FORGOTTEN_REPLY_REQUESTS: OnceLock<Mutex<BTreeSet<u64>>> = OnceLock::new();
 /// How many requests [`FORGOTTEN_REPLY_REQUESTS`] holds: a turn that is
 /// retired may never say it is over, and request ids only grow.
@@ -6477,8 +6533,14 @@ pub(crate) const OVERFLOW_CLOSED_LINE: &str = "lamp-voice provider: a conversati
 /// Since start: conversations closed at [`SOURCE_IDS`], ends the memory
 /// refused for its input bound, and passes closed unsent with the
 /// observation queue full. The journal gives them as running counts.
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static OVERFLOW_CLOSED: AtomicU64 = AtomicU64::new(0);
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static TOO_LARGE: AtomicU64 = AtomicU64::new(0);
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static OBSERVE_BUSY: AtomicU64 = AtomicU64::new(0);
 /// At most this many people's follow-ups wait for the lamp to ask
 /// ([`DaysContext::asking`]).
@@ -7566,6 +7628,8 @@ impl HitsPath {
 
 /// Turns whose hits told something, by [`HitsPath`], since the voice
 /// started: counts only, for the journal ([`hits_journal_line`]).
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static HITS_BY_PATH: [AtomicU64; 3] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
 
 /// What each person's memory has told in hits on one local day, for the
@@ -7625,6 +7689,8 @@ impl HitsDay {
 }
 
 /// Today's hits totals for the voice's journal ([`hits_journal_line`]).
+// Process ownership: written and read in provider worker (Live or second) and its background
+// threads; this static is not IPC.
 static HITS_DAY: Mutex<HitsDay> = Mutex::new(HitsDay {
     day: 0,
     people: Vec::new(),
@@ -7956,6 +8022,8 @@ fn hit_stop_words() -> &'static (
     std::collections::HashSet<String>,
     std::collections::HashSet<String>,
 ) {
+    // Process ownership: written and read in provider worker (Live or second) and its
+    // background threads; this static is not IPC.
     static FOLDED: OnceLock<(
         std::collections::HashSet<String>,
         std::collections::HashSet<String>,
@@ -11405,6 +11473,7 @@ thread_local! {
     /// [`heard_of`]'s answer on this test thread, when set, in place of the
     /// shared thread's: `Some(None)` is a thread busy or with nothing held.
     /// No test waits on or races the global lock.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_HEARD: std::cell::RefCell<Option<Option<String>>> =
         const { std::cell::RefCell::new(None) };
 }
@@ -18394,7 +18463,9 @@ mod tests {
     /// stays for the retry too.
     #[test]
     fn a_refused_forget_of_the_follow_up_is_retried_by_id_never_forget_last() {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static KEPT: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static FIRST: Mutex<Option<(&str, Value)>> = Mutex::new(None);
         let forget_once = json!({"op":"forget","id":12,"person":ASKED_OF,"selective":true});
         // Refused by the store, answered but not understood (lost: it may
@@ -22415,6 +22486,7 @@ mod tests {
         };
         // The first read, the keep's, has no light rule yet: one kept
         // already is not kept again (#4346).
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static ROOM_READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let (socket, served) = memory_lines("light-rule", 8, |request| {
             match (request["op"].as_str(), request["person"].as_str()) {
@@ -22654,6 +22726,7 @@ mod tests {
     #[test]
     fn a_repeat_in_the_same_session_is_told_kept_already_claiming_no_earlier_session() {
         const MAI: &str = "p-0123456789abcdef";
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static ASKED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let (socket, served) = memory("remember-once-same-session", 2, |request| {
             assert_eq!(request["once"], true, "{request}");
@@ -25047,6 +25120,7 @@ mod tests {
     /// after the forget, so the forgotten kept thing is never linked again.
     #[test]
     fn a_forget_about_then_a_fresh_session_resumes_without_the_forgotten_thing() {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static FORGOTTEN: AtomicBool = AtomicBool::new(false);
         let (socket, served) = memory("journal-resumes-about", 4, |request| {
             match request["op"].as_str() {
@@ -25622,6 +25696,7 @@ mod tests {
     /// active (no recall finds it). Kept already (`once`), the kept one's id.
     #[test]
     fn with_the_replaces_switch_a_thing_kept_this_session_is_told_by_id_and_replaced() {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static REPLACED: AtomicBool = AtomicBool::new(false);
         fn answer(request: &Value) -> Value {
             let shown = |id: u64| {

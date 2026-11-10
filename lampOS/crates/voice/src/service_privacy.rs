@@ -203,6 +203,7 @@ const UNAVAILABLE_WAIT: Duration = Duration::from_secs(1);
 #[cfg(test)]
 thread_local! {
     /// A test's own wait for the same rule, on its thread only (#1806).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_UNAVAILABLE_WAIT: std::cell::Cell<Option<Duration>> =
         const { std::cell::Cell::new(None) };
 }

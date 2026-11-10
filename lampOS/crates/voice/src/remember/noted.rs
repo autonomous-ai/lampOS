@@ -29,6 +29,8 @@ thread_local! {
     /// The store's answer kind for this thread's last `remember`, set as
     /// the answer comes ([`DaysClient::run_at_guarded`]); a call runs on the
     /// thread that asked it.
+    // Process ownership: written and read in provider worker calling thread; this static is not
+    // IPC.
     static ANSWERED: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 

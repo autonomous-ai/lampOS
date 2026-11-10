@@ -44,6 +44,7 @@ pub(crate) mod startup_clock {
     use std::{cell::Cell, time::Duration};
 
     thread_local! {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static MOVED: Cell<Duration> = const { Cell::new(Duration::ZERO) };
     }
 

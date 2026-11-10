@@ -310,6 +310,8 @@ enum PrintsFor {
 /// once a process (the provider's arguments are made again at each
 /// restart).
 fn prints_for(value: Option<&str>, journal: &Journal) -> PrintsFor {
+    // Process ownership: written and read in independent invoking processes; this static is not
+    // IPC.
     static SAID: std::sync::Once = std::sync::Once::new();
     match value {
         None => PrintsFor::Every,
