@@ -1481,7 +1481,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        gate (`voice/state`, `voice/heard`, `voice/said`, `voice/mute`,
        `voice/privacy`, `crates/update/src/quiet.rs`), heard by a thread
        of `serve` that listens from its start (subscribed as
-       `update-hermes`), so a stretch needs 10 min of listening;
+       `update_hermes`), so a stretch needs 10 min of listening;
      - and either right after the setup walk ended: the walk's
        `done_at_unix_ms` in the voice's onboarding file
        (`/var/lib/lampOS/voice/onboarding/progress.json`, or the file the
