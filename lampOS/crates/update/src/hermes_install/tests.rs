@@ -7,11 +7,36 @@ use std::{cell::RefCell, os::unix::fs::symlink, rc::Rc};
 struct Fake {
     asked: Vec<&'static str>,
     start: Option<Result<(), String>>,
+    /// Harness's one-shot's `ActiveState`, for the watch's acts; none: no
+    /// state is asked.
+    active: Option<&'static str>,
+    /// What freeze and thaw answer.
+    lever: Option<Result<(), String>>,
 }
 
 impl Systemd for Fake {
-    fn states(&mut self, _: &[String]) -> Result<Vec<UnitState>, String> {
-        unreachable!("Hermes asks no unit states")
+    fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
+        let active = self.active.expect("only the watch asks a unit's state");
+        assert_eq!(units, [harness_install::UNIT]);
+        self.asked.push("state");
+        Ok(vec![UnitState {
+            unit: harness_install::UNIT.to_owned(),
+            active: active.to_owned(),
+            ..UnitState::default()
+        }])
+    }
+    fn freeze_harness_unit(&mut self) -> Result<(), String> {
+        self.asked.push("freeze");
+        self.lever.clone().unwrap_or(Ok(()))
+    }
+    fn thaw_harness_unit(&mut self) -> Result<(), String> {
+        self.asked.push("thaw");
+        self.lever.clone().unwrap_or(Ok(()))
+    }
+    fn stop(&mut self, unit: &str) -> Result<(), String> {
+        assert_eq!(unit, harness_install::UNIT);
+        self.asked.push("stop");
+        Ok(())
     }
     fn self_recovery_ready(&mut self) -> Result<(), String> {
         unreachable!()
@@ -254,8 +279,28 @@ fn install(lamp: &Lamp, runs: &Runs, at: u64) -> Option<HermesInstall> {
     .unwrap()
 }
 
+/// A round in an open window: the quiet hour at night.
 fn round(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesInstall> {
-    after_round(lamp.root(), &lamp.records(), systemd, at, &mut quiet())
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        systemd,
+        at,
+        Ok(crate::hermes_schedule::Window::Night),
+        &mut quiet(),
+    )
+}
+
+/// A round whose window is closed, for `why`.
+fn closed_round(lamp: &Lamp, systemd: &mut Fake, at: u64, why: &str) -> Option<HermesInstall> {
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        systemd,
+        at,
+        Err(why.to_owned()),
+        &mut quiet(),
+    )
 }
 
 fn mode(path: &Path) -> u32 {
@@ -265,23 +310,21 @@ fn mode(path: &Path) -> u32 {
 const AS_LAMPOS: &str = "runuser -u lampos -- env HOME=/var/lib/lampos-hermes \
      HERMES_HOME=/var/lib/lampos-hermes/.hermes PATH=/usr/bin:/bin SHELL=/bin/sh ";
 
-/// Off by default on every lamp until the first builder's default-on
-/// read on the capped build's lamp-c0a4 numbers: unset on a product lamp
-/// is the build's default, off; unset on any other lamp is off; set, only
-/// `on` is on, so `off` keeps a product lamp off. A product default of on
-/// would still install on a product lamp alone. `serve` with it off takes
-/// an earlier record and ask away.
+/// On by default on a product lamp, the product owner's decision (10
+/// Nov), under the first builder's schedule: unset on a product lamp is
+/// the build's default, on; unset on any other lamp is off; set, only
+/// `on` is on, so `off` turns a product lamp off. `serve` with it off
+/// takes an earlier record and ask away.
 #[test]
-fn the_switch_is_off_by_default_on_every_lamp() {
-    const { assert!(!PRODUCT_DEFAULT) };
-    assert!(
-        !wanted(None, true, PRODUCT_DEFAULT),
-        "a product lamp, unset"
-    );
-    assert!(wanted(None, true, true), "a default of on: a product lamp");
-    assert!(!wanted(None, false, true), "a default of on: another lamp");
+fn the_switch_is_on_by_default_on_a_product_lamp_only() {
+    const { assert!(PRODUCT_DEFAULT) };
+    assert!(wanted(None, true, PRODUCT_DEFAULT), "a product lamp, unset");
     assert!(!wanted(None, false, PRODUCT_DEFAULT), "another lamp, unset");
     assert!(!wanted(Some("off"), true, PRODUCT_DEFAULT), "off wins");
+    assert!(
+        !wanted(None, true, false),
+        "a default of off: a product lamp"
+    );
     for value in ["off", "", "ON", "1"] {
         for product in [true, false] {
             assert!(!wanted(Some(value), product, true), "{value:?}");
@@ -1496,9 +1539,8 @@ fn too_little_free_space_is_no_space_and_nothing_is_made() {
 }
 
 /// The product units do not turn the lamp's Hermes on: lamp-update's own
-/// unit alone decides (`PRODUCT_DEFAULT` off until the first builder's
-/// default-on read on the capped build's lamp-c0a4 numbers), and neither
-/// lamp-cloud nor lamp-tasks sets the switch on.
+/// unit alone decides (by its `PRODUCT_DEFAULT`, on, with the schedule),
+/// and neither lamp-cloud nor lamp-tasks sets the switch on here.
 /// lamp-tasks' `--engines-from-machines` and `--reply-named` come with the
 /// routing that uses them (#6094), not here.
 #[test]
@@ -1553,4 +1595,143 @@ fn too_little_memory_is_no_memory_and_nothing_is_made() {
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
     assert!(runs.ran("df -Pk /var/lib"));
+}
+
+/// Outside its window (#5978's schedule) a round starts nothing and writes
+/// no ask, and takes back an install ask an earlier round left, so a
+/// one-shot started for Harness alone does not run Hermes's install now;
+/// an ask to take the entry points out is kept. Hermes already there is
+/// still recorded `installed`, whatever the window.
+#[test]
+fn a_closed_window_starts_nothing_and_takes_back_an_earlier_ask() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    assert_eq!(
+        closed_round(&lamp, &mut systemd, 5, "not a quiet stretch"),
+        None
+    );
+    assert!(systemd.asked.is_empty());
+    assert_eq!(lamp.asked(), None);
+    lamp.ask();
+    assert_eq!(
+        closed_round(&lamp, &mut systemd, 6, "the first round"),
+        None
+    );
+    assert_eq!(lamp.asked(), None, "an earlier install ask is taken back");
+    fs::write(lamp.records().join(ASK), "{\"version\":1,\"remove\":true}").unwrap();
+    assert_eq!(closed_round(&lamp, &mut systemd, 7, "night"), None);
+    assert!(lamp.asked().unwrap().remove, "an ask to remove is kept");
+    fs::remove_file(lamp.records().join(ASK)).unwrap();
+    // Open: the install starts.
+    assert_eq!(round(&lamp, &mut systemd, 8).unwrap().install, "installing");
+    assert_eq!(systemd.asked, ["reload", "show", "start"]);
+    let lamp = Lamp::new();
+    lamp.hermes_there();
+    let said = closed_round(&lamp, &mut Fake::default(), 9, "day").unwrap();
+    assert_eq!(said.install, "installed");
+}
+
+/// An install the watch stopped (`privacy_lost`, `interrupted`) is
+/// recorded so, its ask taken away, and tried again at the next round
+/// whose window is open, not a day later; a closed one waits.
+#[test]
+fn a_stopped_install_is_tried_again_at_the_next_open_window() {
+    for error in ["privacy_lost", "interrupted"] {
+        let lamp = Lamp::new();
+        lamp.harness_there();
+        lamp.ask();
+        let said = stopped(&lamp.records(), error, 100);
+        assert_eq!(
+            (said.install.as_str(), said.error.as_deref()),
+            ("failed", Some(error))
+        );
+        assert!(said.check());
+        assert_eq!(lamp.asked(), None);
+        let mut systemd = Fake::default();
+        assert_eq!(closed_round(&lamp, &mut systemd, 200, "day"), None);
+        assert!(systemd.asked.is_empty());
+        assert_eq!(
+            round(&lamp, &mut systemd, 300).unwrap().install,
+            "installing"
+        );
+    }
+}
+
+/// The watch's acts on Harness's one-shot, only while systemd says it
+/// runs: frozen and thawed with `systemctl freeze`/`thaw`; stopped (thawed
+/// first), recorded `failed` with the act's error and its ask taken away.
+/// A freeze or thaw refused stops it (`interrupted`), so it is never left
+/// frozen. Not running, nothing is done.
+#[test]
+fn the_watch_freezes_thaws_and_stops_only_a_running_one_shot() {
+    use crate::hermes_schedule::Act;
+    let lamp = Lamp::new();
+    let records = lamp.records();
+    let mut systemd = Fake {
+        active: Some("activating"),
+        ..Fake::default()
+    };
+    let mut lines = Vec::new();
+    let mut say = |line: &str| lines.push(line.to_owned());
+    assert_eq!(
+        carry_out(&Act::Nothing, &records, &mut systemd, 1, &mut say),
+        Carried::Done
+    );
+    assert!(systemd.asked.is_empty(), "nothing asked of systemd");
+    let freeze = Act::Freeze("the voice is hearing someone".into());
+    assert_eq!(
+        carry_out(&freeze, &records, &mut systemd, 1, &mut say),
+        Carried::Done
+    );
+    assert_eq!(
+        carry_out(&Act::Thaw, &records, &mut systemd, 2, &mut say),
+        Carried::Done
+    );
+    assert_eq!(systemd.asked, ["state", "freeze", "state", "thaw"]);
+    assert_eq!(lamp.said(), None);
+    lamp.ask();
+    let stop = Act::Stop {
+        error: "privacy_lost",
+        why: "the lease is gone".into(),
+    };
+    systemd.asked.clear();
+    assert_eq!(
+        carry_out(&stop, &records, &mut systemd, 3, &mut say),
+        Carried::Stopped
+    );
+    assert_eq!(systemd.asked, ["state", "thaw", "stop"]);
+    assert_eq!(lamp.said().unwrap().error.as_deref(), Some("privacy_lost"));
+    assert_eq!(lamp.asked(), None);
+    // A freeze refused: stopped, interrupted.
+    let mut refused = Fake {
+        active: Some("activating"),
+        lever: Some(Err("no".into())),
+        ..Fake::default()
+    };
+    assert_eq!(
+        carry_out(&freeze, &records, &mut refused, 4, &mut say),
+        Carried::Stopped
+    );
+    assert_eq!(refused.asked, ["state", "freeze", "thaw", "stop"]);
+    assert_eq!(lamp.said().unwrap().error.as_deref(), Some("interrupted"));
+    // Not running: nothing.
+    for active in ["inactive", "failed", "active"] {
+        let mut ended = Fake {
+            active: Some(active),
+            ..Fake::default()
+        };
+        assert_eq!(
+            carry_out(&stop, &records, &mut ended, 5, &mut say),
+            Carried::NotRunning
+        );
+        assert_eq!(ended.asked, ["state"]);
+    }
+    assert_eq!(lamp.said().unwrap().at_unix_ms, 4);
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("frozen while the voice is not quiet")),
+        "{lines:?}"
+    );
 }
