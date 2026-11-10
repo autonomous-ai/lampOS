@@ -1,3 +1,39 @@
+## 2026-11-10 — three current carries published; music HOLD cleared
+
+- #5975 is published at f75e3da9456a3b07b7cf4ecdbb2c467a1536ae49,
+  runtime 02432e3a5 on c29008d21. All eight earlier commits compare equal
+  over the rebase; final commit retains evidence only. Current fmt,
+  strict Voice all-target Clippy, 33 music tests (0.73 s) and 66
+  requested-audio tests / one ignored (6.83 s) pass. Docs 192/1900/0.
+  Second READ-OK 6760301741 independently clears the compound-object
+  HOLD with actual Engine fail-before/pass-after and repeated local gates.
+  Reviewer-lead remains the second reader; ARM 42764611606 runs.
+- #5969 published equal-patch rebase 5dcb60eecc0e2778295621c716895303a6e2fbe4
+  on c29008d21. Current fmt, strict Voice lint and 177 reminder tests /
+  three ignored pass (57.30 s); docs 192/1899/0. Twelve's carried read
+  is 6760291335; Reviewer-lead's identical-patch read remains. New ARM
+  42765411943 runs; prior 31933971d ARM 14,986/113 remains separate.
+- New draft #5997 published at 806b93e95ac6781f183a8a0a270140bcee940bc0,
+  carrying #5902. Runtime ebea47ed7 on c29008d21 has current fmt and
+  strict Skills lint green, plus four cut controls, seven resumed cases
+  including timing, and the exact late-word cancellation test. Current
+  host first/repeated cancellation 18.020/10.475 ms; no device claim.
+  Prior full Skills 675 pass / 10 ignored retained on train 768.
+  READ ASK 6760306655 names Second and Fourteen/El; original link
+  6760307166, Queue 6760307684. ARM 42765710152 runs. No activation.
+- Read #5993 docs at 4916d99fc: READ-OK 6760370540. Independently
+  recomputed 75 build rows (69.61 sum, 92.8%), 17 quality rows (11.70,
+  68.8%), and four deferred rows (1.87, 46.8%). Verified the changed
+  reminder row's cited fix and recorded lamp gate. P3: its first stable
+  date was 10538, though inclusion in 10686 is correct; truncated note
+  could name the 11264 journal evidence. No new lamp or broad score audit.
+- PM's process-static audit answered in 6760166775: music provenance
+  rides the worker output packet, joined state stays on its receipt, and
+  recovery reads bus state in Skills. No new parent-only static reader.
+- Archived and removed another ten old clean Third review checkouts to
+  maintain build space; commit refs retained, dirty/other work untouched.
+  Main checkout remains clean on third/touch-additive-fields.
+
 ## 2026-11-10 — speech recovery passes; compound music repair; resource failures
 
 - #5902 carry: six process/bus regressions failed first, then passed after
