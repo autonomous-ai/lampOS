@@ -2598,6 +2598,7 @@ EXAMPLE_RUNS = {
     "follow.py": ([], "arrived", ("lease.take", ("look", {"at": "face"})), "not now: refused: not in this release: look at a face or a name"),
     "follow_hand.py": ([], "hand", ("lease.take", ("look", {"at": "hand"}))),
     "greet.py": ([], "arrived", (("gesture", {"name": "greeting"}),)),
+    "notes.py": ([], None, (("notes.get", {"key": "runs"}), ("notes.set", {"key": "runs", "value": 1}), ("light", {"colour": "warm", "level": 1}))),
     "phrase.py": ([], "phrase", (("light", {"colour": "warm", "level": 2, "pattern": "breathe"}), ("gesture", {"name": "nod"}))),
     "pomodoro.py": ([], None, (("light", {"colour": "warm", "level": 2}),)),
     "push_skill.py": (["../examples/hello-skill"], None, ("skill.push",)),
