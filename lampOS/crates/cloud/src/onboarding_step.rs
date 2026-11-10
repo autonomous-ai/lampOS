@@ -115,6 +115,12 @@ impl Steps {
         (!due.is_empty()).then_some((walk_id, due))
     }
 
+    /// The connection went: looked at again on the next one, with
+    /// `onboarding_done`'s look.
+    pub fn lost(&mut self) {
+        self.looked = None;
+    }
+
     /// `ended`, of the walk `due` gave, was tried: `handed` to the client
     /// or not, never tried again. Kept in [`FILE`]. The journal's line.
     pub fn tried(&mut self, ended: &OnboardingStepEnded, handed: bool) -> String {
