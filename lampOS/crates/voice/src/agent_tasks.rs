@@ -396,9 +396,12 @@ fn lamp_there() -> bool {
 
 /// Whether a hand-over goes to the lamp's own Hermes (#5978): `where`
 /// `"lamp"`, or, while the lamp has its target, anything but `where`
-/// `"computer"` or an agent named (`who`), which go to a computer as
-/// before. Without the lamp's target, only `where` `"lamp"`, which the
-/// tasks part then refuses as no such target.
+/// `"computer"` or an agent on a computer named (`who`), which go to a
+/// computer as before. `who` naming the lamp ("the lamp") or, while the
+/// lamp has its target, Hermes is the lamp's own Hermes, never a
+/// computer's. Without the lamp's target, only `where` `"lamp"` or `who`
+/// the lamp, which the tasks part then refuses as no such target; Hermes
+/// named then is a computer's, as before.
 fn on_the_lamp_now(args: &Value, there: bool) -> bool {
     let said = |key: &str| {
         args.get(key)
@@ -409,7 +412,13 @@ fn on_the_lamp_now(args: &Value, there: bool) -> bool {
     match said("where") {
         Some(LAMP_TARGET) => true,
         Some(_) => false,
-        None => there && said("who").is_none(),
+        None => match said("who") {
+            None => there,
+            Some(who) => {
+                let who = who.trim_start_matches("the ").trim();
+                who.eq_ignore_ascii_case(LAMP_TARGET) || (there && who.eq_ignore_ascii_case(HERMES))
+            }
+        },
     }
 }
 
@@ -2528,21 +2537,27 @@ fn run_for(
                     true,
                 );
             }
-            // Who is settled before the tasks part is asked anything.
-            let member = match chosen(place, staff, &call.args) {
-                Ok(member) => member,
-                Err(told) => return (told, true),
+            // Who is settled before the tasks part is asked anything. The
+            // lamp's own Hermes (#5978): asked for on the lamp, by name, or
+            // by default while the tasks part has it, unless the person
+            // named their computer or an agent on it; never a staff member,
+            // so never looked for among them.
+            let on_the_lamp = on_the_lamp_now(&call.args, lamp_there());
+            let member = if on_the_lamp {
+                None
+            } else {
+                match chosen(place, staff, &call.args) {
+                    Ok(member) => member,
+                    Err(told) => return (told, true),
+                }
             };
-            let (mut target, mut who) = member
-                .map_or((place.target.as_str(), CLAUDE_CODE), |member| {
+            let (target, who) = if on_the_lamp {
+                (LAMP_TARGET, HERMES)
+            } else {
+                member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
                     (member.alias.as_str(), member.kind.name)
-                });
-            // The lamp's own Hermes (#5978): asked for on the lamp, or by
-            // default while the tasks part has it, unless the person named
-            // their computer or an agent on it.
-            if on_the_lamp_now(&call.args, lamp_there()) {
-                (target, who) = (LAMP_TARGET, HERMES);
-            }
+                })
+            };
             // Devin's cloud has no sessions of the person's to name (the
             // Reviewer-lead's P3 on #5784): refused, never sent.
             if session.is_some() && member.is_some_and(|member| member.kind.engine == "devin-cloud")
@@ -8566,6 +8581,12 @@ pub(crate) mod tests {
             (json!({"where":"lamp"}), true, true),
             (json!({"where":"computer"}), true, false),
             (json!({"who":"Codex"}), true, false),
+            (json!({"who":"Hermes"}), true, true),
+            (json!({"who":"hermes"}), true, true),
+            (json!({"who":"the lamp"}), true, true),
+            (json!({"who":"Hermes","where":"computer"}), true, false),
+            (json!({"who":"Hermes"}), false, false),
+            (json!({"who":"the lamp"}), false, true),
             (json!({}), false, false),
             (json!({"where":"lamp"}), false, true),
         ] {
@@ -8586,9 +8607,11 @@ pub(crate) mod tests {
                 ("request.sock", status.clone()),
                 ("request.sock", prepared.clone()),
                 ("request.sock", status.clone()),
-                ("request.sock", prepared),
-                ("request.sock", status),
+                ("request.sock", prepared.clone()),
+                ("request.sock", status.clone()),
                 ("request.sock", json!({"ok":false,"error":"target"})),
+                ("request.sock", status),
+                ("request.sock", prepared),
             ],
         );
         let at = place(&directory, false);
@@ -8617,7 +8640,10 @@ pub(crate) mod tests {
         );
         let none = run_with(false, json!({"task":"Write a poem","where":"lamp"}), 6);
         assert_eq!(none, json!({"error": LAMP_NOT_SET_UP}));
-        let targets: Vec<Value> = (0..8)
+        // Hermes named is the lamp's, never a computer's (the eval's find).
+        let named = run_with(true, json!({"task":"Write a poem","who":"Hermes"}), 7);
+        assert_eq!(named["where"], "Hermes on the lamp", "{named}");
+        let targets: Vec<Value> = (0..10)
             .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
             .filter(|line| line["op"] == "prepare")
             .map(|line| line["target"].clone())
@@ -8628,6 +8654,7 @@ pub(crate) mod tests {
                 json!("lamp"),
                 json!("office"),
                 json!("office"),
+                json!("lamp"),
                 json!("lamp")
             ]
         );
