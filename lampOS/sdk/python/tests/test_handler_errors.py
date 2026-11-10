@@ -53,3 +53,34 @@ def test_an_async_handler_that_raises_is_said_too(tmp_path, caplog):
     with caplog.at_level(logging.ERROR, logger="lampos"):
         run(go())
     assert any("my async bug" in str(r.exc_info) for r in caplog.records)
+
+
+def test_the_other_handlers_and_the_next_event_still_arrive(tmp_path, caplog):
+    """The case the fix exists for: a plain and a coroutine handler raise, a third handler and a second event still come."""
+
+    async def go():
+        async with FakeLamp(grants=("body", "light", "speak", "look")) as fake:
+            async with await connected(fake, tmp_path) as lamp:
+                seen = []
+
+                def plain(event):
+                    return event["no_such_key"]
+
+                async def coroutine(event):
+                    raise RuntimeError("my async bug")
+
+                await lamp.on("touch", plain)
+                await lamp.on("touch", coroutine)
+                await lamp.on("touch", lambda event: seen.append(event["kind"]))
+                await fake.emit("touch", kind="tap")
+                await fake.emit("touch", kind="pet")
+                for _ in range(100):
+                    if len(seen) == 2:
+                        break
+                    await asyncio.sleep(0.02)
+                await asyncio.sleep(0.1)
+                assert seen == ["tap", "pet"]
+
+    with caplog.at_level(logging.ERROR, logger="lampos"):
+        run(go())
+    assert len([r for r in caplog.records if "your handler for touch raised" in r.getMessage()]) == 4
