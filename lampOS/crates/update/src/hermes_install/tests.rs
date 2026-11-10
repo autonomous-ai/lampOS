@@ -265,20 +265,23 @@ fn mode(path: &Path) -> u32 {
 const AS_LAMPOS: &str = "runuser -u lampos -- env HOME=/var/lib/lampos-hermes \
      HERMES_HOME=/var/lib/lampos-hermes/.hermes PATH=/usr/bin:/bin SHELL=/bin/sh ";
 
-/// On by default on a product lamp, the product owner's decision (10
-/// Nov): unset on a product lamp is the build's default, on; unset on any
-/// other lamp is off; set, only `on` is on, so `off` turns a product lamp
-/// off. `serve` with it off takes an earlier record and ask away.
+/// Off by default on every lamp until the first builder's default-on
+/// read on the capped build's lamp-c0a4 numbers: unset on a product lamp
+/// is the build's default, off; unset on any other lamp is off; set, only
+/// `on` is on, so `off` keeps a product lamp off. A product default of on
+/// would still install on a product lamp alone. `serve` with it off takes
+/// an earlier record and ask away.
 #[test]
-fn the_switch_is_on_by_default_on_a_product_lamp_only() {
-    const { assert!(PRODUCT_DEFAULT) };
-    assert!(wanted(None, true, PRODUCT_DEFAULT), "a product lamp, unset");
+fn the_switch_is_off_by_default_on_every_lamp() {
+    const { assert!(!PRODUCT_DEFAULT) };
+    assert!(
+        !wanted(None, true, PRODUCT_DEFAULT),
+        "a product lamp, unset"
+    );
+    assert!(wanted(None, true, true), "a default of on: a product lamp");
+    assert!(!wanted(None, false, true), "a default of on: another lamp");
     assert!(!wanted(None, false, PRODUCT_DEFAULT), "another lamp, unset");
     assert!(!wanted(Some("off"), true, PRODUCT_DEFAULT), "off wins");
-    assert!(
-        !wanted(None, true, false),
-        "a default of off: a product lamp"
-    );
     for value in ["off", "", "ON", "1"] {
         for product in [true, false] {
             assert!(!wanted(Some(value), product, true), "{value:?}");
@@ -1564,9 +1567,9 @@ fn too_little_free_space_is_no_space_and_nothing_is_made() {
 }
 
 /// The product units do not turn the lamp's Hermes on: lamp-update's own
-/// unit and its build's default alone decide (`PRODUCT_DEFAULT` on since
-/// the product owner's decision, 10 Nov; `off` there turns it off), and
-/// neither lamp-cloud nor lamp-tasks sets the switch on.
+/// unit alone decides (`PRODUCT_DEFAULT` off until the first builder's
+/// default-on read on the capped build's lamp-c0a4 numbers), and neither
+/// lamp-cloud nor lamp-tasks sets the switch on.
 /// lamp-tasks' `--engines-from-machines` and `--reply-named` come with the
 /// routing that uses them (#6094), not here.
 #[test]

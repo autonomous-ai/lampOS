@@ -1424,10 +1424,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    **Hermes on the lamp** (#5978;
    `crates/update/src/hermes_install.rs`; `LAMP_HERMES_ON_LAMP` in
    `lamp-update.service`'s environment: set, on only when `on` exactly, so
-   any other value is off and `off` turns a product lamp off; unset, on on
-   a lamp installed as the product, the build's default `PRODUCT_DEFAULT`
-   being on (the product owner's decision, 10 Nov), and off on any other
-   lamp; no product unit sets it). Hermes (NousResearch
+   any other value is off; unset, off on every lamp: the build's default
+   `PRODUCT_DEFAULT` is off, and the product turns it on only after the
+   first builder's default-on read on the capped build's lamp-c0a4
+   numbers (privacy held through the install, first answers within
+   ~300 ms of rest, no ask lost); no product unit sets it). Hermes (NousResearch
    hermes-agent) is a coding agent Harness already knows as an engine.
    Harness finds an engine only by `command -v` in its user's login shell,
    so a `hermes` on `lampos`'s login `PATH` is all it needs: the wrapper
@@ -1711,13 +1712,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      yet, and moves it aside (or removes it) otherwise; a `/var/lib/lampos-hermes.old` set aside
      before the failure stays until a later install's new Hermes runs.
    - **The parts' units** (`deploy/product`): unchanged; none sets
-     `LAMP_HERMES_ON_LAMP` in this change: lamp-update installs the
-     product's Hermes by its own default (on since the product owner's
-     decision, 10 Nov), and `LAMP_HERMES_ON_LAMP=off` in its unit turns
-     that off. lamp-cloud's forwarder (`LAMP_HERMES_ON_LAMP=on` in
-     `lamp-cloud.service`, which writes only its own state folder, so it
-     needs no other path and no group) and lamp-tasks' side
-     (`lamp-tasks.service`) are turned on by the units' own change. lamp-tasks' `--engines-from-machines` (without
+     `LAMP_HERMES_ON_LAMP`, so the product's Hermes stays off until the
+     first builder's default-on read on the capped build's lamp-c0a4
+     numbers. Turning it on later means `LAMP_HERMES_ON_LAMP=on` in
+     lamp-update's unit (the install), in `lamp-cloud.service` (its
+     forwarder, which writes only its own state folder, so it needs no
+     other path and no group) and in `lamp-tasks.service`. lamp-tasks' `--engines-from-machines` (without
      it the lamp's own Hermes is never looked for, and the lamp is no
      target) and `--reply-named`, `LAMP_TASKS_REPLY_NAMED` (lamp-voice) and
      `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) come with the routing that
