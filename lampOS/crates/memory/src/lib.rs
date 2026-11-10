@@ -14,6 +14,7 @@ pub mod nightly;
 pub mod protocol;
 pub mod search;
 pub mod server;
+pub mod service_records;
 pub mod store;
 pub mod strength;
 pub mod taste_rules;
