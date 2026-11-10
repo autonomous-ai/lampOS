@@ -3259,9 +3259,14 @@ unset too: the build's `PRODUCT_DEFAULT`, on, #5229) and nothing at
 (`harness_install::TEXT`) beside the writer's, checks systemd's view of it
 the same way (`writer_unit::loaded_as`), and starts it with `--no-block`:
 the round never waits for Harness's download. Its sandbox differs:
-`ProtectSystem=full` with `/usr/local/bin` writable, since Harness's home
-may not exist yet under `/var/lib`; network on; 1500 s. It runs
-`lamp-update harness-install`. `check-units` compares it with its own text
+`ProtectSystem=full` with `/usr/local/bin` writable, and since #5978
+`/usr/local/lib/lampos` when it is there (Hermes's wrapper and its
+namespace script), since Harness's home may not exist yet under
+`/var/lib`; network on; 3600 s since #5978 (1500 before). It runs
+`lamp-update harness-install`, which also installs the pinned Hermes
+after Harness, as `lampos`, with `LAMP_HERMES_ON_LAMP=on` (install.md,
+"Hermes on the lamp"); a round with that switch on and Harness already
+there starts the same unit for Hermes. `check-units` compares it with its own text
 as "the updater's", and a round never takes it for a part's unit. Its
 record, `harness-install.json`, is said on `update/status` as `harness`.
 The same unit moves a Harness older than the build's pin to it, when
