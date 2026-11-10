@@ -114,8 +114,9 @@ YAMNet is one candidate: TensorFlow's maintained implementation classifies
 521 AudioSet classes with MobileNet-v1, accepting 16 kHz mono audio. The existing
 Rust inference stack and model/operator compatibility still need a concrete
 check. The switch-gated publisher pins Qualcomm AI Hub's YAMNet ONNX float
-export, release v0.59.0, for evaluation only; distribution review of its
-weights is outstanding, so they are not committed or deployed.
+export, release v0.59.0, for evaluation only. The weights' distribution
+review is below ("Where the weights come from"); until the first builder has
+read it they are not committed, released or deployed.
 
 Primary sources:
 - [TensorFlow YAMNet tutorial](https://www.tensorflow.org/hub/tutorials/yamnet)
@@ -176,7 +177,7 @@ case made of that run's own scores.
 
 The first of them, the music sway, is installed on in the product since
 #2834 (`skills/music-sway`), but the product's `lamp-ears.service` doesn't set
-`LAMP_EARS_CLASSES` until the weights' distribution review above is done, so
+`LAMP_EARS_CLASSES` until the weights' distribution review below (#5748) is read and released, so
 on a product lamp it has nothing to read and never sways; it reads
 `scores.music` and does nothing without this topic. It never sways to the
 lamp's own music (#2833): a requested recording (#1757) plays while
@@ -191,6 +192,78 @@ person addressing it. Departure is not inferred from sound classification.
 
 The offline voice-eval exporter recognizes `ears/classes` in its omitted-topic
 counts. It does not export score payloads or make them behavioral evidence.
+
+## Where the weights come from (#5748)
+
+The review the first builder asked for on #5748 before any release of the
+weights. Read on 10 November 2026 from each source's own page or licence file;
+where a source says nothing, it says so here.
+
+**The chain behind `yamnet-qai-v0.59.0`.**
+1. **Google's YAMNet.** Trained by Google on AudioSet. Its Keras weights are
+   `https://storage.googleapis.com/audioset/yamnet.h5`, the file
+   [tensorflow/models research/audioset/yamnet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet)'s
+   README downloads. That repository's
+   [LICENSE](https://github.com/tensorflow/models/blob/master/LICENSE) is
+   Apache 2.0 ("Copyright 2022 Google LLC") and names `/research` among the
+   folders it covers. The README states no separate terms for `yamnet.h5`.
+2. **A PyTorch port.** [w-hc/torch_audioset](https://github.com/w-hc/torch_audioset)
+   (MIT, "Copyright (c) 2021 Haochen"; master `daed697ddc`) converts
+   `yamnet.h5` with `tf_2_torch/convert_yamnet.py` and publishes the result as
+   `yamnet.pth` (release v0.1). Its model takes one mel patch, `[1, 1, 96, 64]`,
+   the input this publisher feeds.
+3. **Qualcomm's export.** [qai-hub-models](https://github.com/quic/ai-hub-models)
+   (BSD-3-Clause) v0.59.0, `models/yamnet/model.py`, loads that port
+   (`YAMNET_PROXY_REPOSITORY` torch_audioset, `DEFAULT_WEIGHTS = "yamnet.pth"`,
+   fetched from Qualcomm's own asset store) and exports the ONNX graph and its
+   `yamnet.data`. Its README's licence section points only to torch_audioset's
+   MIT licence. Qualcomm states no separate terms for the exported files, and
+   the conversion itself runs in their tooling, not in a command we can repeat.
+
+So the bytes we pin went through two conversions by others. Neither says
+which `yamnet.h5` it took, and Qualcomm's step has no recorded command we can
+repeat.
+
+**The class names.** `yamnet_class_map.csv` sits in the Apache 2.0 tree
+above. Its display names are AudioSet's ontology, which Google publishes under
+[CC BY-SA 4.0](https://research.google.com/audioset/download.html). The
+AudioSet labels and segments themselves are CC BY 4.0. The lamp ships no
+label file. It ships five class indices and their names in the code and in
+this document (Speech, Music, Laughter, Walk/footsteps, and the door group).
+
+**Recommended: we convert it ourselves, from Google's file.**
+- **Steps:** run torch_audioset's `convert_yamnet.py` at `daed697ddc` on
+  `yamnet.h5`, then `torch.onnx.export` the same `[1, 1, 96, 64]` → `[1, 521]`
+  model, with external data.
+- **What the release records:** the sha256 of `yamnet.h5` as downloaded, the
+  Python, TensorFlow, PyTorch and ONNX versions, and the exact commands.
+- **The output** is a new `yamnet.onnx` and `yamnet.data`. Their sizes and
+  sha256 replace the pins in `classes.rs` (`MODEL_ID` becomes ours) in the
+  switch-on PR.
+- **Equal or not:** `score_wav` runs on the 21 October clips (#1669) through
+  both models. The new one ships only if its scores match Qualcomm's to
+  within rounding. Otherwise the thresholds above were set on a different
+  model, and that is said rather than shipped.
+- **Why:** this takes Qualcomm's untraceable step out of the chain. Every
+  remaining link then has a written licence: Apache 2.0 for Google's weights
+  and code, and MIT for the conversion script.
+
+**What the `models-2026-11-xx` release carries beside the two files.**
+- Apache 2.0's text, with a NOTICE that says:
+  - the weights are Google's YAMNet, from `yamnet.h5` (link and sha256), and
+    converted by us to ONNX (the commands above);
+  - torch_audioset's MIT licence and copyright line, for the conversion
+    script.
+- The AudioSet attribution for the class names the lamp uses: "AudioSet
+  ontology by Google, CC BY-SA 4.0", with the link. If the release ever
+  carries `yamnet_class_map.csv`, that file keeps CC BY-SA 4.0.
+
+**Not answered by any source:**
+- whether Google's `yamnet.h5` download has terms of its own beyond the
+  repository's Apache 2.0 (the README states none);
+- what terms Qualcomm's asset store puts on its `yamnet.pth` and export.
+
+The recommendation above doesn't depend on either.
 
 ## The publisher behind LAMP_EARS_CLASSES
 
