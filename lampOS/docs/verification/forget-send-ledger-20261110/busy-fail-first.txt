@@ -1,0 +1,16 @@
+
+running 1 test
+
+thread 'second_provider::tests::sent_write::forget_admission_does_not_directly_wait_for_a_busy_receipt' (106438198) panicked at crates/voice/src/second_provider/tests/sent_write.rs:2011:5:
+admission waited for the receipt-content lock
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+second_provider::tests::sent_write::forget_admission_does_not_directly_wait_for_a_busy_receipt --- FAILED
+
+failures:
+
+failures:
+    second_provider::tests::sent_write::forget_admission_does_not_directly_wait_for_a_busy_receipt
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5498 filtered out; finished in 1.01s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

@@ -1940,7 +1940,27 @@ async fn forget_ledger_host_admission_latency_diagnostic() {
         let started = Instant::now();
         forget_carried_context(shared);
         full.push(started.elapsed());
-        // Verify the measured transition really did redact every fresh entry.
+        // Outside the timer, exercise recovery of every origin: the old
+        // payloads must not be published even though admission did not sweep
+        // them. Each confirmed send must still suppress a duplicate dispatch.
+        for origin in 1..=SENDS_KEPT as u64 {
+            let resumed = 1_000 + origin;
+            put_in_flight(
+                shared,
+                Carried::own(resumed, "My question".into(), Instant::now(), origin),
+            );
+            match sent_with_words(shared, &[origin], resumed).await {
+                SentWith::Told(note) => assert_eq!(note, Some(SENT_REDACTED_NOTE)),
+                _ => panic!("the saturated ledger lost its send accounting"),
+            }
+            assert!(carried_rounds(shared, resumed).is_empty());
+            assert_eq!(
+                sent_already(shared, resumed, crate::services::WRITE),
+                Some(json!({"error":ALREADY_SENT}))
+            );
+        }
+        *shared.in_flight.lock().unwrap() = None;
+        // Actual consumption scrubbed every entry without exposing its data.
         let ledger = shared.sent_write.lock().unwrap();
         assert_eq!(ledger.len(), entries);
         for sent in ledger.iter() {
@@ -1976,4 +1996,119 @@ async fn forget_redacts_an_old_contexts_send_started_after_admission() {
     let ledger = shared.sent_write.lock().unwrap();
     assert!(ledger[0].content.lock().unwrap().call.is_none());
     assert_eq!(*ledger[0].told.borrow(), Some(json!({"sent": true})));
+}
+
+/// Without a recovery already holding the publication lock, admission must
+/// not directly wait for a producer holding its private receipt-content lock.
+#[tokio::test]
+async fn forget_admission_does_not_directly_wait_for_a_busy_receipt() {
+    let engine = ledger_boundary_engine();
+    let shared = &engine.shared;
+    let call = ledger_boundary_call();
+    let (attempt, _) = send_attempt(shared, 150, &call);
+    sending(
+        shared,
+        (150, attempt),
+        &call,
+        Box::pin(async { json!({"sent":true,"detail":"busy-receipt-canary"}) }),
+        Value::clone,
+    )
+    .await;
+    let content = shared.sent_write.lock().unwrap()[0].content.clone();
+    let busy = content.lock().unwrap();
+    let admitted_before_release = std::thread::scope(|scope| {
+        let (done, received) = std::sync::mpsc::channel();
+        let admitting = scope.spawn(move || {
+            forget_carried_context(shared);
+            done.send(()).unwrap();
+        });
+        let admitted = received.recv_timeout(Duration::from_secs(1)).is_ok();
+        // Release even on failure, so the negative proof cannot hang its join.
+        drop(busy);
+        admitting.join().unwrap();
+        admitted
+    });
+    assert!(
+        admitted_before_release,
+        "admission waited for the receipt-content lock"
+    );
+    put_in_flight(
+        shared,
+        Carried::own(151, "My question".into(), Instant::now(), 150),
+    );
+    match sent_with_words(shared, &[150], 151).await {
+        SentWith::Told(note) => assert_eq!(note, Some(SENT_REDACTED_NOTE)),
+        _ => panic!("the earlier send lost its accounting"),
+    }
+    assert!(carried_rounds(shared, 151).is_empty());
+    assert_eq!(
+        sent_already(shared, 151, crate::services::WRITE),
+        Some(json!({"error":ALREADY_SENT}))
+    );
+}
+
+/// Recovery has already copied a completed raw receipt when another try makes
+/// it wait. Eviction and forget during that wait must still invalidate the
+/// copied completed receipt, including with no ledger entry left to sweep.
+#[tokio::test]
+async fn forget_fences_a_completed_evicted_receipt_already_copied_by_recovery() {
+    use std::future::Future;
+    let engine = ledger_boundary_engine();
+    let shared = &engine.shared;
+    let first = ledger_boundary_call();
+    let (attempt, _) = send_attempt(shared, 160, &first);
+    sending(
+        shared,
+        (160, attempt),
+        &first,
+        Box::pin(async { json!({"sent":true,"detail":"completed-evicted-canary"}) }),
+        Value::clone,
+    )
+    .await;
+    let completed = shared.sent_write.lock().unwrap()[0].told.clone();
+    assert_eq!(
+        completed.borrow().as_ref().unwrap()["detail"],
+        "completed-evicted-canary"
+    );
+    let mut second = ledger_boundary_call();
+    second.id = "later-pending-try".into();
+    let (attempt, _) = send_attempt(shared, 160, &second);
+    let (release, released) = tokio::sync::oneshot::channel::<Value>();
+    let pending = sending(
+        shared,
+        (160, attempt),
+        &second,
+        Box::pin(async move { released.await.unwrap() }),
+        Value::clone,
+    );
+    put_in_flight(
+        shared,
+        Carried::own(161, "My question".into(), Instant::now(), 160),
+    );
+    let origins = [160];
+    let recovery = sent_with_words(shared, &origins, 161);
+    tokio::pin!(recovery);
+    // Poll through the completed first receipt to the second receipt's wait.
+    std::future::poll_fn(|cx| {
+        assert!(recovery.as_mut().poll(cx).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop_sent_write(shared, Some(160));
+    assert!(shared.sent_write.lock().unwrap().is_empty());
+    forget_carried_context(shared);
+    release
+        .send(json!({"sent":false,"detail":"later-refusal-canary"}))
+        .unwrap();
+    pending.await;
+    match recovery.await {
+        SentWith::Told(note) => assert_eq!(note, Some(SENT_REDACTED_NOTE)),
+        _ => panic!("the completed send lost its accounting after eviction"),
+    }
+    assert!(carried_rounds(shared, 161).is_empty());
+    assert_eq!(*completed.borrow(), Some(json!({"sent":true})));
+    assert_eq!(
+        sent_already(shared, 161, crate::services::WRITE),
+        Some(json!({"error":ALREADY_SENT}))
+    );
 }
