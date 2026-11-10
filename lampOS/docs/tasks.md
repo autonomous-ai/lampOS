@@ -1585,7 +1585,12 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     the voice's `agent_tasks::tests::a_lamp_with_no_computer_still_hands_work_to_its_own_hermes`,
     `the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there`
     (off, Hermes missing, installed; a computer offline refused; the answer
-    shown on the lamp's machine), the voice's
+    shown on the lamp's machine),
+    `with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer`
+    (the PM's: the switch unset, `off`, empty or `ON`, the lamp listed as a
+    machine with Hermes installed, yet the targets are the office computer
+    alone, `lamp` is refused as no target, and work naming no machine is
+    started on the computer with Claude Code, as on stable), the voice's
     `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`
     and `task_news::tests::work_done_on_the_lamp_is_told_as_done_here`.
   - **Not yet shown on a lamp:** Hermes found by the lamp's Harness, a task

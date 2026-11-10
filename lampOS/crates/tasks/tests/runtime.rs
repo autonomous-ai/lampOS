@@ -10,7 +10,7 @@ use lamp_tasks::{
     progress::SETTLED_FOR_MS,
     readiness::{Computer, engines_path, read_engines},
     runtime::{
-        Adapter, Clock, Config, EnginesLane, LampSide, SetUpLater, WaitLane, request,
+        Adapter, Clock, Config, EnginesLane, LampSide, SetUpLater, WaitLane, lamp_side, request,
         serve_with_adapter,
     },
     store::Store,
@@ -2290,6 +2290,74 @@ fn a_lamp_with_no_computer_hands_work_to_its_own_hermes() {
         *s.counts.launched_on.lock().unwrap(),
         [("a".repeat(32), EngineKind::Hermes)]
     );
+}
+
+/// #5978, the PM: with `LAMP_HERMES_ON_LAMP` off (unset, `off`, or any
+/// value but `on`), routing is as on stable. The lamp is listed as a
+/// Harness machine with Hermes installed, yet it is no target: the targets
+/// are the office computer alone, work naming no machine (the voice's
+/// `prepare` for its place's target, `office`) is started on the office
+/// computer with Claude Code, and a `prepare` for `lamp` is refused as no
+/// such target, never moved anywhere.
+#[test]
+fn with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer() {
+    let home = tempfile::tempdir().unwrap();
+    for value in [None, Some("off"), Some(""), Some("ON")] {
+        let side = lamp_side(value, Some(home.path().to_owned()));
+        assert!(side.is_none(), "{value:?}");
+        let (mut s, path) = engines_running(true);
+        s.config.set_up_later.as_mut().unwrap().lamp = side;
+        office_engines(&s, Ok(vec![row("claude", Some(true), Some(true))]));
+        s.counts
+            .engines
+            .lock()
+            .unwrap()
+            .insert("a".repeat(32), Ok(vec![row("hermes", Some(true), None)]));
+        s.start();
+        let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
+        targets_until(&s, office.clone());
+        // Looked at again, the lamp is still left out.
+        let looks = s.counts.engine_looks.load(Ordering::SeqCst);
+        let start = Instant::now();
+        while s.counts.engine_looks.load(Ordering::SeqCst) < looks + 3 {
+            assert!(start.elapsed() < Duration::from_secs(5), "not looked again");
+            thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(s.ask(json!({"op":"targets"}))["targets"], office);
+        let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        let targets = written["targets"].as_object().unwrap();
+        assert_eq!(targets.len(), 1, "{value:?}: {written}");
+        assert!(!targets.contains_key("lamp"), "{value:?}: {written}");
+        assert!(
+            !home.path().join("harnesses/lamp-tasks/lamp").exists(),
+            "{value:?}"
+        );
+        // The lamp asked for: no such target, nothing prepared.
+        assert_eq!(
+            s.ask(json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"lamp"}))["error"],
+            "target",
+            "{value:?}"
+        );
+        // Work naming no machine: prepared and started on the computer.
+        let prepared = prepared_until(&s, None);
+        let id = prepared["id"].clone();
+        let task = s.ask(json!({"op":"get_task","id":id}));
+        assert_eq!(task["target"]["engine"], "claude", "{value:?}: {task}");
+        assert_eq!(task["target"]["machine_id"], "b".repeat(32));
+        assert_eq!(task["task"]["target_alias"], "office");
+        s.counts.idle.store(true, Ordering::SeqCst);
+        let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+        assert_eq!(s.trusted(confirm)["ok"], true, "{value:?}");
+        s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+        assert_eq!(
+            *s.counts.launched_on.lock().unwrap(),
+            [("b".repeat(32), EngineKind::Claude)],
+            "{value:?}"
+        );
+    }
+    // On, with a home: the lamp's side, as the on-case above.
+    assert!(lamp_side(Some("on"), Some(home.path().to_owned())).is_some());
+    assert!(lamp_side(Some("on"), None).is_none());
 }
 
 /// #5199: an engine not found on that computer (`installed` null with

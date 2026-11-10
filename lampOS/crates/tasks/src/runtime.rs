@@ -238,6 +238,26 @@ impl LampSide {
     }
 }
 
+/// The switch for the lamp's own Hermes (#5978), in lamp-tasks' unit.
+pub const HERMES_ON_LAMP: &str = "LAMP_HERMES_ON_LAMP";
+
+/// Whether [`HERMES_ON_LAMP`] is on: `on` exactly. Unset, `off` or any
+/// other value is off, and work naming no machine goes to a computer as
+/// before the switch.
+pub fn hermes_on_lamp(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// [`SetUpLater::lamp`] from [`HERMES_ON_LAMP`]'s `value` and `lampos`'s
+/// (Harness's) `home`: `None`, the lamp no target, unless the switch is on
+/// and there is a home.
+pub fn lamp_side(value: Option<&str>, home: Option<PathBuf>) -> Option<LampSide> {
+    hermes_on_lamp(value)
+        .then_some(home)
+        .flatten()
+        .map(LampSide::new)
+}
+
 /// `serve --targets-from-machines` asks Harness for the machines once in
 /// this many looks: every five minutes on a lamp.
 pub const MACHINES_EVERY_LOOKS: u32 = 5;
