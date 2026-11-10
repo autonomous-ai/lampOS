@@ -602,7 +602,7 @@ Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on
 # design of 6 Nov, #5545; switched on by their call on 9 Nov). Only a short name is kept, per known face, read once with
 # their session's open; a turn not placed as theirs is told only the role names of the known faces in view, never
 # whose. Private-room mode above does not hold names back; outside that mode a held-back name suppresses this note.
-# Second route and Days only; needs same-build lamp-memory (role_set, role_end), which a product install ships.
+# Second route and Days only; needs same-build lamp-memory (role_set_session, role_end_session), which a product install ships.
 Environment=LAMP_MEMORY_ROLE=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock

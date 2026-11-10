@@ -358,6 +358,10 @@ khi một tên đang được giữ lại (`someone_else_now`). Câu chỉ là c
 mặt họ một mình trong khung hình (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
 `forgets_need_mouth`) không đặt hay bỏ vai nào. Một `end_role` mà bộ nhớ
 không ghi được thì vai vẫn giữ và đèn nói là chưa bỏ được.
+Voice cũng kiểm tra phiên bản bộ nhớ tạm khi công bố vai sau thao tác đặt,
+bỏ hoặc quên; phản hồi phiên đến muộn không thể khôi phục vai đã quên.
+Các phản hồi ghi thành công nhưng xung đột sẽ loại bỏ vai chưa chắc chắn
+khỏi bộ nhớ tạm cho đến lần đọc phiên mới (xem [bộ nhớ](../memory.md)).
 
 ## Ghi chú cuộc trò chuyện (`talk_note`, `LAMP_CONVERSATION_SUMMARY`)
 
