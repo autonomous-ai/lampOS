@@ -163,6 +163,23 @@ pub fn switched_on(value: Option<&str>) -> bool {
 pub fn from_the_app(cgroup: &str) -> bool {
     crate::package::from_one_of(cgroup, &[crate::package::APP_LINK])
 }
+/// Whether `/proc/<pid>/cgroup`'s text puts the process in lamp-voice's
+/// unit ([`crate::package::VOICE_LINK`]), as [`from_the_app`] reads
+/// lamp-cloud's: the only peer whose requested-audio contexts and private
+/// audio ops the call socket takes (#6128). Any other peer (lamp-tasks'
+/// `skill call`, the lamp's Hermes) has its context dropped, its audio ops
+/// refused, and its calls refused while the lamp is private.
+pub fn from_the_voice(cgroup: &str) -> bool {
+    crate::package::from_one_of(cgroup, &[crate::package::VOICE_LINK])
+}
+/// The answer to an `audio_authorize` or `audio_finish` from a peer that is
+/// not lamp-voice's unit (#6128).
+pub const NOT_THE_VOICE: &str = "only the voice may authorize or finish requested audio";
+/// The start of the answer to a `call` from a peer that is not lamp-voice's
+/// unit while the lamp is private (`routine::kept_asleep`), followed by why
+/// (#6128).
+pub const PRIVATE_FOR_OTHERS: &str =
+    "the lamp's skills are not called for another program while the lamp is private";
 /// The skill the app's `guard.on` and `guard.off` turn.
 pub const GUARD: &str = "guard-mode";
 /// The app's two kinds, as the call socket's `guard` op names them to the
@@ -2579,6 +2596,29 @@ mod tests {
         assert!(switched_on(Some("on")));
         for off in [None, Some("1"), Some("ON"), Some("")] {
             assert!(!switched_on(off));
+        }
+    }
+
+    /// #6128: only lamp-voice's unit is the voice: not lamp-cloud,
+    /// lamp-tasks (whose Harness runs the lamp's Hermes), a person's
+    /// session, a unit whose name only begins the same, or nothing read.
+    #[test]
+    fn only_lamp_voices_unit_is_the_voice() {
+        assert!(from_the_voice(
+            "0::/lampos.slice/lampos-voice.slice/lamp-voice.service\n"
+        ));
+        assert!(from_the_voice(
+            "1:name=systemd:/lampos.slice/lampos-voice.slice/lamp-voice.service/sub\n"
+        ));
+        for other in [
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-tasks.service\n",
+            "0::/lampos.slice/lampos-voice.slice/lamp-voice.service-x\n",
+            "0::/user.slice/user-1000.slice/session-3.scope\n",
+            "4:cpu:/lampos.slice/lampos-voice.slice/lamp-voice.service\n",
+            "",
+        ] {
+            assert!(!from_the_voice(other), "{other}");
         }
     }
 

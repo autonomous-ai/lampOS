@@ -1099,6 +1099,36 @@ the model's answer begins with those words. A `tools.json` left by a `lamp-skill
 killed stays until it starts again; a call then is answered as not
 running. The test uses a folder of Desk tutor's shape.
 
+### The call socket tells its caller apart (#6128)
+
+`DIR/call.sock` is the voice's path to the skills, but any program that can
+reach the folder may connect: lamp-tasks' `skill call NAME` does, and so may
+the lamp's own Hermes, which lamp-update shows the folder with
+`LAMP_HERMES_SKILLS`, on by default on a product lamp ([install.md](install.md),
+"Hermes on the lamp"). These rules are what make that default safe. For each connection
+`lamp-skills` reads the peer's credentials (`SO_PEERCRED`) and its cgroup,
+as it does for lamp-cloud's `guard` op, and holds every peer but
+lamp-voice's unit (`/lampos.slice/lampos-voice.slice/lamp-voice.service`,
+`package::VOICE_LINK`) to three rules:
+
+- A `requested_audio_context` is the voice's socket receipt for a sound the
+  person asked for out loud, never another program's to make up: from
+  another peer it is dropped, so a requested-sound skill answers as it does
+  with no context ("Requested audio is disabled or has no spoken context.").
+- `audio_authorize` and `audio_finish` are refused
+  (`watch::NOT_THE_VOICE`: "only the voice may authorize or finish requested
+  audio").
+- While the lamp is private (the voice muted for privacy or asleep, or the
+  privacy switch closed on `voice/privacy`, as `routine::kept_asleep` reads
+  them), a `call` is refused with why (`watch::PRIVATE_FOR_OTHERS`: "the
+  lamp's skills are not called for another program while the lamp is
+  private: ..."). The voice's own calls are not held here: it holds its
+  turns to privacy itself.
+
+Peer credentials are read on Linux only; elsewhere no peer is the voice.
+`LAMP_SKILLS_ANY_ASKER=on` in lamp-skills' own environment (no unit sets
+it) takes any peer as the voice, for the tests that drive the socket.
+
 ### A watch
 
 Guard mode's kind (#1685, [guard-mode.md](guard-mode.md),
