@@ -685,24 +685,30 @@ change"). Any other 401 or 403 keeps its words.
 The model is told of `service_write`, first in its description
 (`WRITE_RULE`, then the rule every services function has, below):
 "Only when the person asks you, now, to send or post something; an ask to
-draft, write, compose or reply to a mail or message is one. No draft is
-saved; nothing goes before they say send: say so. Call it first without
-send_id: it sends nothing and gives a read_back. Say that read_back in full,
-word for word, then ask them to say "go ahead and send it" to send it. Call
-it again with its send_id only if their very next words are that; anything
-else cancels it. Never say a read-back yourself: only one this call gave in
-the same turn, and a new write, or the same one asked again, needs a new
-call. Never say you can't use their services: refuse only for a reason a
-call gave."
+draft, write or reply to a mail or message is one, never a remember. No
+draft yet: say "I can't save a draft yet. I can read it back and send it when
+you say 'send it'." Call it first without send_id: it sends nothing and gives
+a read_back. Say that read_back in full, word for word, then ask for "send
+it". Call it again with its send_id only if their very next words are that;
+anything else cancels it. Never say a read-back yourself: only one this call
+gave in this turn; a new write, or the same one again, needs a new call.
+Never say you can't use their services: refuse only for a reason a call
+gave."
 
-An ask to draft a mail is an ask to send it: Gmail has no draft (`send_mail`
-only), so such an ask is prepared and read back as any write, and nothing is
-saved as a draft. On lamp-29e7 on 9 Nov "Draft a new email for me" was refused
-with no call ("I cannot touch your mail") and, asked why, "Because I'm a
-lamp."; the rule said nothing of drafts, nor where a refusal's reason comes
-from. The whole rule with the shared one is 998 of the description's 1,024 bytes,
-which leaves 25 for `lamp-services`' own words for the write: whole sentences
-only, so its "action, by service: …" list is told on the `action` parameter.
+An ask to draft a mail is an ask to send it, and said plainly as no draft:
+Gmail has no draft here (`send_mail` only; a real draft needs the
+`gmail.compose` scope, a backend change taken up apart from #5962), so such an
+ask is prepared and read back as any write, nothing is saved as a draft, and
+the person is told "I can't save a draft yet. I can read it back and send it
+when you say 'send it'." It is never a `remember`: on lamp-3e83 on 10 Nov the
+model called `remember` three times for a draft before it wrote, and the
+draft ended in "shall I send it?". On lamp-29e7 on 9 Nov "Draft a new email
+for me" was refused with no call ("I cannot touch your mail") and, asked why,
+"Because I'm a lamp."; the rule said nothing of drafts, nor where a refusal's
+reason comes from. The whole rule with the shared one is 1,000 of the
+description's 1,024 bytes, which leaves 23 for `lamp-services`' own words
+for the write: whole sentences only, so its "action, by service: …" list is
+told on the `action` parameter.
 
 ### The voice's send gate
 
@@ -730,8 +736,8 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   write forgotten first. When the answer has a `read_back` and a `send_id`,
   that id is kept with the request it came in, the read-back, and the
   owner who asked, and the model is told "Nothing is sent yet. Say read_back
-  in full, word for word, leaving nothing out, then ask them to say "go
-  ahead and send it" (in Vietnamese "ừ, gửi đi giúp tôi") to send it. Send
+  in full, word for word, leaving nothing out, then ask them to say "send
+  it" (in Vietnamese "ừ, gửi đi giúp tôi") to send it. Send
   only if their next words are that."; an id with no read-back is dropped
   and never sent.
 - **What the lamp said of it:** every word the lamp says in that request
@@ -777,8 +783,15 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   read-back uncut, nothing the lamp answered between, and by the one who
   asked when the line's person is known (`speaker_of`: outside a private
   room the line's known face, the owner's or another's, so a known other's
-  "Cancel." is the model's; in a private room the owner); any other
-  "Cancel that." is the model's. On
+  "Cancel." or "go ahead" is the model's; in a private room the owner);
+  any other "Cancel that." is the model's. A forget (the thread's, by voice;
+  memory's `memory/forgot` for anyone, with the running summary on or off:
+  off, the worker's own reader, `memory_forgot_waiting`) or a privacy
+  change of the camera or the microphone drops the waiting write
+  (`forget_waiting`). A waiting-write note taken before it is let go at
+  every chat the engine asks, any round or try (`LettingGo`,
+  `waiting_note_stands`, which compares the note's text with the write
+  still waiting). On
   lamp-9adf on 10 Nov, "Lamp, cancel that." after a read-back was answered
   "Cancel what exactly? I have several things set", with no call: the model
   weighed it against the lamp's reminders. Now, while another request's
@@ -796,6 +809,29 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   bare "Cancel." while a write waits is the person's answer to the
   read-back, never held as a short sound (`services::cancel_awaited`, as for
   a plain send: only a line begun clear of the lamp's voice).
+- **A plain "go ahead" right after a read-back keeps the write** (#5962). On
+  lamp-3e83 on 10 Nov "ok, go ahead" after a read-back was neither a send nor
+  a cancel, the model answered "go ahead with what?", and the write was
+  lost. Now a line whose words are a plain agreement (`GO_AHEAD_WORDS`:
+  "go ahead", "do it", "sounds good", "that's right", "được rồi" and the
+  like, or fillers alone: "Yes.", "Okay."), the very next line after a
+  read-back said whole and uncut, its "send" still in time, keeps the write
+  waiting (`services::nudge_waiting`): the second route says the lamp's own
+  line, with no chat asked, "Say 'send it' to send it." (`SAY_SEND_IT`, or
+  "Nói 'gửi đi' để gửi nhé." for a Vietnamese one), and the "send" is timed
+  from it, as after the lamp asks once more. Once per write. It never sends:
+  "go ahead" alone is still no send. A bare one is the person's answer to the
+  read-back, as a bare cancel is (`services::cancel_awaited`). The journal
+  says "a go-ahead for the waiting write".
+- **Each later turn is told the waiting write** (#5962). History keeps a
+  call's name, never its answer, and the lamp's side only its first 400
+  bytes, so a long read-back's end was lost and the model asked again for
+  what it had been told. While a write waits (at most 2 minutes), each later
+  turn's notes carry it, in memory only, with the write
+  (`services::waiting_note`): its service and its whole read-back (at most
+  1,500 bytes), that only a plain "send it" sends it, and that a change is a
+  new `service_write` with the whole message changed, never an ask for
+  anything it holds. Read results stay private as before.
 - **The send's voice score is journaled**: "a send's voice beside request N's:
   cosine 0.64" (or "no print"), a score only, never a print.
 - **The read-back must have been heard in full.** The lamp's words must hold

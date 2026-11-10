@@ -5158,17 +5158,231 @@ async fn a_plain_cancel_of_a_waiting_write_is_said_by_the_lamp_with_no_chat() {
     assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
 }
 
+/// #5962: on lamp-3e83 on 10 Nov "ok, go ahead" after a read-back got "go
+/// ahead with what?". Right after a read-back said whole, the lamp asks for
+/// the plain send itself, the chat never asked, and the write keeps waiting.
+#[tokio::test]
+async fn a_go_ahead_after_a_read_back_is_asked_for_send_it_with_no_chat() {
+    let now = std::time::Instant::now();
+    let mut kept = crate::services::Pending {
+        began_clear: true,
+        service: "gmail".to_owned(),
+        ..crate::services::Pending::new("id", 8, now, "Send a mail.", "ann")
+    };
+    kept.spoken = "Send a mail. Say send it.".to_owned();
+    kept.spoken_from = Some(now - std::time::Duration::from_secs(4));
+    kept.spoken_at = Some(now - std::time::Duration::from_secs(3));
+    crate::services::pending_for_test(Some(kept));
+    let (labels, asked) = sound_turn(true, false, "Ok, go ahead.").await;
+    assert_eq!(asked, 0, "{labels:?}");
+    assert!(
+        labels.contains(&format!("said:{}", crate::services::SAY_SEND_IT)),
+        "{labels:?}"
+    );
+    assert!(
+        crate::services::waiting_note(9, Some("ann"), now).is_some(),
+        "still waits"
+    );
+    crate::services::pending_for_test(None);
+}
+
+/// Reviewer-two's HOLD on #5968 at `6be2fc0fc7`: every way the engine asks
+/// a chat (`chat`, `chat_only`, `chat_without`, `chat_watched`, and a
+/// delayed `chat_second_try` asked only after the first try waited) goes
+/// through [`super::LettingGo`], so a waiting write forgotten before that
+/// ask is never in it; a note whose write still waits is kept.
+#[test]
+fn every_way_of_asking_a_chat_lets_a_forgotten_waiting_note_go() {
+    struct Recording(Arc<Script>, Mutex<Vec<Vec<Message>>>);
+    impl Services for Recording {
+        fn listen(
+            &self,
+        ) -> futures_util::future::BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            self.0.listen()
+        }
+        fn chat(
+            &self,
+            messages: Vec<Message>,
+        ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+            self.1.lock().unwrap().push(messages);
+            futures_util::stream::empty().boxed()
+        }
+        fn chat_only(
+            &self,
+            messages: Vec<Message>,
+            _: &'static [&'static str],
+        ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+            self.chat(messages)
+        }
+        fn chat_second_try(
+            &self,
+            messages: Vec<Message>,
+            _: ChatTold,
+            _: net::Watch,
+        ) -> Option<futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>> {
+            Some(self.chat(messages))
+        }
+        fn speak(
+            &self,
+            text: String,
+        ) -> futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>> {
+            self.0.speak(text)
+        }
+    }
+    let now = Instant::now();
+    let pending = crate::services::Pending {
+        service: "gmail".to_owned(),
+        ..crate::services::Pending::new("id", 0, now, "Send a mail saying lunch at noon.", "ann")
+    };
+    crate::services::pending_for_test(Some(pending));
+    let note = crate::services::waiting_note(1, Some("ann"), now).unwrap();
+    let recording = Arc::new(Recording(Arc::default(), Mutex::default()));
+    let letting = super::LettingGo(recording.clone());
+    let ask = |letting: &super::LettingGo| {
+        let messages = vec![Message::system(note.clone()), Message::user("Hello.")];
+        drop(letting.chat(messages.clone()));
+        drop(letting.chat_only(messages.clone(), &[]));
+        drop(letting.chat_without(messages.clone(), &[]));
+        drop(letting.chat_watched(messages.clone(), ChatTold::Every, net::Watch::default()));
+        drop(letting.chat_second_try(messages, ChatTold::Every, net::Watch::default()));
+    };
+    // Still waiting: the note goes with every ask.
+    ask(&letting);
+    let asked = std::mem::take(&mut *recording.1.lock().unwrap());
+    assert_eq!(asked.len(), 5);
+    assert!(asked.iter().all(|messages| messages.len() == 2));
+    // Forgotten: no ask holds it, the person's words still go.
+    crate::thread::Thread::default().forget();
+    ask(&letting);
+    let asked = std::mem::take(&mut *recording.1.lock().unwrap());
+    assert_eq!(asked.len(), 5);
+    assert!(
+        asked
+            .iter()
+            .all(|messages| messages == &[Message::user("Hello.")]),
+        "{asked:?}"
+    );
+}
+
+/// Reviewer-two's HOLD on #5968 at `285f844b9e`: a forget between a
+/// turn's chat rounds (here while round 1's call runs) drops the waiting
+/// write, and round 2 is asked with no word of it.
+#[tokio::test]
+async fn a_forget_between_the_chats_rounds_keeps_the_waiting_note_from_the_next() {
+    let now = Instant::now();
+    crate::services::pending_for_test(Some(crate::services::Pending {
+        service: "gmail".to_owned(),
+        ..crate::services::Pending::new("id", 0, now, "Send a mail saying lunch at noon.", "ann")
+    }));
+    let note = crate::services::waiting_note(1, Some("ann"), now).unwrap();
+    let asked = call("c1", "set_timer", json!({"minutes": 5}));
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Set a five minute timer.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![Ok(ChatEvent::ToolCalls(vec![asked])), Ok(ChatEvent::Done)],
+                vec![text("Timer set."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let tools: ToolRunner = Arc::new(|_, _, _, _| {
+        Box::pin(async {
+            crate::thread::Thread::default().forget();
+            json!({"ok": true})
+        })
+    });
+    let told = note.clone();
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .noting_a_task_waiting(Arc::new(move |_| Some(told.clone())));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let labels = turn(&mut engine).await;
+    assert!(!crate::services::pending_for_test_is_some(), "{labels:?}");
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 2, "{labels:?}");
+    assert!(
+        format!("{:?}", asked[0]).contains("lunch at noon"),
+        "round 1 is told"
+    );
+    assert!(
+        !format!("{:?}", asked[1]).contains("lunch at noon"),
+        "the forgotten write's note reached round 2"
+    );
+}
+
+/// Reviewer-two's HOLD on #5968 at `e8d16c10d3`: a forget while the turn
+/// still waits (here on the event note's read, its last wait before the
+/// chat) drops the waiting write, and the note taken before it never
+/// reaches the chat.
+#[tokio::test]
+async fn a_forget_while_the_turn_waits_keeps_its_waiting_note_from_the_chat() {
+    let now = Instant::now();
+    crate::services::pending_for_test(Some(crate::services::Pending {
+        service: "gmail".to_owned(),
+        ..crate::services::Pending::new("id", 0, now, "Send a mail saying lunch at noon.", "ann")
+    }));
+    let note = crate::services::waiting_note(1, Some("ann"), now).unwrap();
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Hello there.".to_owned())].into()),
+        chats: Mutex::new([vec![text("Hi."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let (entered, entering) = tokio::sync::oneshot::channel::<()>();
+    let (release, released) = std::sync::mpsc::channel::<()>();
+    let (entered, released) = (Mutex::new(Some(entered)), Mutex::new(released));
+    let told = note.clone();
+    let mut engine = engine
+        .noting_a_task_waiting(Arc::new(move |_| Some(told.clone())))
+        .asking_after_events(
+            Arc::new(move |_, _, _| {
+                if let Some(entered) = entered.lock().unwrap().take() {
+                    let _ = entered.send(());
+                }
+                let _ = released.lock().unwrap().recv();
+                None
+            }),
+            Arc::new(|| None),
+        );
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let forget = async {
+        entering.await.unwrap();
+        assert!(script.asked.lock().unwrap().is_empty(), "no chat yet");
+        crate::thread::Thread::default().forget();
+        assert!(!crate::services::pending_for_test_is_some());
+        assert!(!crate::services::waiting_note_stands(&note));
+        release.send(()).unwrap();
+    };
+    let (labels, ()) = tokio::join!(turn(&mut engine), forget);
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 1, "{labels:?}");
+    assert!(
+        !format!("{:?}", asked[0]).contains("lunch at noon"),
+        "the forgotten write's note reached the chat"
+    );
+}
+
 /// Reviewer-two's HOLD on #5967 at `a0e82daeaf`: outside the private room
-/// a known other's "Lamp, cancel that." right after the
+/// a known other's "Lamp, cancel that." or "Ok, go ahead." right after the
 /// owner's read-back is the model's, through the actual Engine and its
 /// scope lease: no fixed words, and the owner's write still waits. A known
 /// other is never taken for an unknown speaker.
 #[tokio::test]
-async fn a_known_others_cancel_of_the_owners_write_is_the_models() {
+async fn a_known_others_cancel_or_go_ahead_of_the_owners_write_is_the_models() {
     use crate::memory_scope::{FaceCache, GAP, ScopeLease};
     crate::person::set_private_room_for_test(Some(false));
     let other = crate::remember::person_id("Bob");
-    for heard in ["Lamp, cancel that."] {
+    for heard in ["Lamp, cancel that.", "Ok, go ahead."] {
         let path = std::env::temp_dir().join(format!(
             "fourteen-known-other-{}-{}",
             std::process::id(),

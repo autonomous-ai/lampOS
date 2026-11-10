@@ -1849,13 +1849,19 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
 /// Memory's forgets (`memory/forgot`, from the app or by voice) reach the
 /// conversation's thread and running summary
 /// ([`crate::conversation_summary::memory_forgot`]), looked at every half
-/// second, off any turn's path (the reviewer-lead's P2 on #4479).
-async fn forgot_task(mut forgot: crate::bus_out::ForgotIn) {
+/// second, off any turn's path (the reviewer-lead's P2 on #4479). With the
+/// summary off (`summary` false) they still drop a write waiting for its
+/// send (`conversation_summary::memory_forgot_waiting`, #5968).
+async fn forgot_task(mut forgot: crate::bus_out::ForgotIn, summary: bool) {
     let mut every = tokio::time::interval(Duration::from_millis(500));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
         every.tick().await;
-        crate::conversation_summary::memory_forgot(&mut forgot, monotonic_us());
+        if summary {
+            crate::conversation_summary::memory_forgot(&mut forgot, monotonic_us());
+        } else {
+            crate::conversation_summary::memory_forgot_waiting(&mut forgot, monotonic_us());
+        }
     }
 }
 
@@ -4709,16 +4715,17 @@ pub fn serve(
         );
         runtime.spawn(seems_task(bus, told));
     }
-    // Memory's forgets, with the running summary on and the bus: a forget
-    // from the app drops the conversation's notes as one by voice does.
-    if crate::conversation_summary::on()
-        && let Some(forgot) = files
-            .bus_root
-            .as_deref()
-            .and_then(|root| lamp_bus::Bus::new(root).ok())
-            .and_then(|bus| crate::bus_out::ForgotIn::on(&bus).ok())
+    // Memory's forgets, with the bus: with the running summary on, a forget
+    // from the app drops the conversation's notes as one by voice does; on
+    // or off, it drops a write waiting for its send (Reviewer-two's HOLD on
+    // #5968 at `8c1cbd4268`).
+    if let Some(forgot) = files
+        .bus_root
+        .as_deref()
+        .and_then(|root| lamp_bus::Bus::new(root).ok())
+        .and_then(|bus| crate::bus_out::ForgotIn::on(&bus).ok())
     {
-        runtime.spawn(forgot_task(forgot));
+        runtime.spawn(forgot_task(forgot, crate::conversation_summary::on()));
     }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
