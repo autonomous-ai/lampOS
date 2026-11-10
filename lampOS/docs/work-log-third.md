@@ -1,3 +1,22 @@
+## 2026-11-10 — default sway repair verified; reminder train running
+
+- READ-OK #6002 7046b27a2, comment 6761669963, lifts Third's P2.
+  The unchanged independent default-yaw probe now passes 1/1, 0.04 s;
+  authored sway filter passes 7/7, 0.29 s. Fmt and strict Body/Control/Skills
+  all-target Clippy pass. Docs 192/1899/0. Temporary probe removed and
+  checkout clean. Initial bare exact-name invocation selected zero tests;
+  corrected filter ran one. Old full-suite failures remain separate.
+- Goal clamp, stall target and journal agree on max(yaw, 150); no-reach
+  preserves admitted 150 and configured 250 is unchanged. No physical
+  motion/clearance/heat proof; Second's motion review remains required.
+- #5969 is included in train 772 #6012. No own merge or promotion.
+- #5975 f725248cd current Linux Clippy and docs passed; ARM still running.
+  Reviewer-two took the delta read 6761605816. #5997 replacement behavior
+  reader requested again via Queue 6761611492 after Fourteen declined.
+- Took bounded #6013 onboarding face-question read at 09029af44,
+  comment 6761687513; testing translated fixed lines against the actual
+  face-question recognizer. No lamp action.
+
 ## 2026-11-10 — later music retractions repaired and published
 
 - #5975 f725248cd: exact whole-word scratch that / changed my mind now
