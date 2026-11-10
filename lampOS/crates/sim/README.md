@@ -52,7 +52,7 @@ a reply. The simulated servo answers the moment the body writes (it waits on
 the port, not a timer), and if the body ends all the same, `lamp-sim` says why
 on its stderr (the exit report's `stop`, also in `DIR/body.log`) and starts it
 again, on a fresh port under the same link (a body's exclusive open stays on a
-pty). Five ends in ten minutes, or `lamp-control` ending, end the lamp. A body restart is not invisible: a computer's body lease is lost (`lease_lost`) and a gesture in flight is dropped, so a program that sees that on a busy laptop knows why. Every exit report is kept in `DIR/body.log`, one after another.
+pty). A sixth end within ten minutes, or `lamp-control` ending, end the lamp. A body restart is not invisible: a computer's body lease is lost (`lease_lost`) and a gesture in flight is dropped, so a program that sees that on a busy laptop knows why. Every exit report is kept in `DIR/body.log`, one after another.
 
 ## A person in front of the lamp, by hand
 
