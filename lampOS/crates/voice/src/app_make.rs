@@ -731,19 +731,23 @@ pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
 /// The one unit the app-make socket answers (App Only's P2 on #5985).
 pub const APP_CALLER_UNIT: &str = "lamp-cloud.service";
 
+/// The user [`APP_CALLER_UNIT`] runs as (`deploy/product/lamp-cloud.service`).
+pub const APP_CALLER_USER: &str = "lampos";
+
 /// Whether a caller the kernel named may use the app-make socket: only
-/// [`APP_CALLER_UNIT`] run as `own_uid`, as the tasks part's app route
-/// holds it (#5379); a caller whose unit can't be read is refused.
-pub fn app_caller_may(caller: Option<&lamp_ipc::caller::Caller>, own_uid: u32) -> bool {
+/// [`APP_CALLER_UNIT`] run as `cloud_uid`, the uid of [`APP_CALLER_USER`]
+/// (the voice runs as root, so never its own uid: Thirteen's P1 on #5985);
+/// a caller whose unit can't be read, or no such user, is refused.
+pub fn app_caller_may(caller: Option<&lamp_ipc::caller::Caller>, cloud_uid: Option<u32>) -> bool {
     caller.is_some_and(|caller| {
-        caller.uid == own_uid && caller.unit.as_deref() == Some(APP_CALLER_UNIT)
+        Some(caller.uid) == cloud_uid && caller.unit.as_deref() == Some(APP_CALLER_UNIT)
     })
 }
 
-/// [`app_caller_may`] with this process's own uid: the socket's check on a
-/// lamp.
+/// [`app_caller_may`] with [`APP_CALLER_USER`]'s uid read now: the
+/// socket's check on a lamp.
 pub fn app_caller_is_lamp_cloud(caller: Option<&lamp_ipc::caller::Caller>) -> bool {
-    app_caller_may(caller, rustix::process::geteuid().as_raw())
+    app_caller_may(caller, lamp_ipc::caller::uid_named(APP_CALLER_USER))
 }
 
 /// Listen at `path`, opened to `group` if given, on a thread of its own:
@@ -892,20 +896,31 @@ mod tests {
             uid,
             unit: unit.map(str::to_owned),
         };
+        // lamp-cloud runs as `lampos` (990 here), the voice as root (0):
+        // taken by lampos's uid, never the voice's own (Thirteen's P1).
+        let lampos = lamp_ipc::caller::uid_in_passwd(
+            "root:x:0:0::/root:/bin/sh\nlampos:x:990:990::/var/lib/lampos:/usr/sbin/nologin\n",
+            APP_CALLER_USER,
+        );
+        assert_eq!(lampos, Some(990));
         assert!(app_caller_may(
             Some(&caller(Some(APP_CALLER_UNIT), 990)),
-            990
+            lampos
         ));
         assert!(!app_caller_may(
             Some(&caller(Some("lamp-tasks.service"), 990)),
-            990
+            lampos
         ));
-        assert!(!app_caller_may(
-            Some(&caller(Some(APP_CALLER_UNIT), 0)),
-            990
-        ));
-        assert!(!app_caller_may(Some(&caller(None, 990)), 990));
-        assert!(!app_caller_may(None, 990));
+        assert!(
+            !app_caller_may(Some(&caller(Some(APP_CALLER_UNIT), 0)), lampos),
+            "root"
+        );
+        assert!(!app_caller_may(Some(&caller(None, 990)), lampos));
+        assert!(!app_caller_may(None, lampos));
+        assert!(
+            !app_caller_may(Some(&caller(Some(APP_CALLER_UNIT), 990)), None),
+            "no lampos"
+        );
     }
 
     const NOW: u64 = 1_800_000_000_000;
