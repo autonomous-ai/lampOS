@@ -957,31 +957,33 @@ const WHO_ON_THE_LAMP: &str = " Only a name they said: never for work done here 
 /// what the lamp answers or does itself never is. Measured with
 /// `tools/task-pick-eval.sh` (`docs/tasks.md`).
 fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
-    let all = if staff.is_empty() {
-        CLAUDE_CODE.to_owned()
-    } else {
-        names(staff, "and")
-    };
     let with_who = if choosing(place, staff) {
         ", with who will do it,"
     } else {
         ""
     };
+    // With no computer target (a lamp with no computer paired, #5978),
+    // no computer is offered.
+    let or_computer = if staff.is_empty() {
+        String::new()
+    } else {
+        format!(
+            ", or {} on the person's {}",
+            names(staff, "and"),
+            computer(place)
+        )
+    };
     format!(
-        "Hand work to an agent: Hermes here on the lamp, or {all} on the person's {}. Call it \
-         for work that takes more than a quick answer: writing or changing code, files or \
-         documents, research written up, a job of several steps, and whenever they ask one of \
-         their agents to do something. Never for what you can answer in a few words, a story or \
-         joke told aloud, or what your own functions do (your light, reminders, the time, the \
-         weather). A session they name (\"the book program one\") gets `session`, never a recall, \
-         and `where` only if they name a machine (computer, Mac, laptop, PC). New work with no machine or agent named goes to \
-         Hermes here on the lamp: leave out `where` and `who`, even for code or a website. \
-         More work on a task already done or handed over (\"in the sea poem, add a line\") is a \
-         new call with `session`, made now, before you say it back: never answer it in words alone. \
-         Don't ask for details or who first. {} You can do this: \
-         never say you cannot open files or work on their computer; if they ask you to start an \
-         agent without saying what for, ask in a few words and call this with their answer.",
-        computer(place),
+        "Hand work to an agent: Hermes here on the lamp{or_computer}. Call it for more than a \
+         quick answer (code, files, research, a job of several steps) or asked of an agent. \
+         Never for what you can answer in a few words, a story or joke told aloud, or your own \
+         functions (your light, reminders, the time, the weather). New work goes to Hermes here \
+         on the lamp: leave out `where` and `who`, even for code or a website; `where` only if \
+         they name a machine (computer, Mac, laptop, PC). More on earlier work (\"in the sea \
+         poem, add a line\") is a new call with `session`, made now, before you say it back: \
+         never a recall or words alone. Don't ask for details or who first. {} You can do this: never say you cannot \
+         open files or do such work; asked to start an agent for nothing in particular, ask \
+         what for, then call this.",
         read_back(place.lead_in, with_who, place.one_yes)
     )
 }
@@ -3360,11 +3362,6 @@ fn nonce() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_nanos())
 }
-
-/// The request a spoken line makes with these functions, for
-/// `tools/task-pick-eval.sh` (#5978).
-#[cfg(test)]
-mod pick_dump;
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -5951,7 +5948,9 @@ pub(crate) mod tests {
                 name: CONFIRM.into(),
                 description: "Start the task you prepared with start_agent_task. Call it only right \
                               after the person has said yes to the task you read back; never on your \
-                              own, and not if they said no or something else."
+                              own, and not if they said no or something else. With nothing \
+                              prepared in this talk, call start_agent_task first. Never say the \
+                              work is given or started unless this call answered that it is."
                     .into(),
                 parameters: None,
                 silent: false,
@@ -8676,6 +8675,29 @@ pub(crate) mod tests {
         assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 8);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #5978, the owner's rule: a lamp with no computer paired works on
+    /// its own Hermes. The tasks part answers only `lamp`: no staff,
+    /// `start_agent_task` still declared, and a call naming no `where` and
+    /// no `who` goes to Hermes on the lamp, said with no computer.
+    #[test]
+    fn a_lamp_with_no_computer_still_hands_work_to_its_own_hermes() {
+        let answer = json!({"ok":true,"targets":[{"alias":"lamp","engine":"hermes"}]});
+        assert_eq!(staff_from(&answer).unwrap(), Vec::<Member>::new());
+        assert!(lamp_in(&answer));
+        let off = place(Path::new("/run/t"), false);
+        let start = declared_on(&off, &[], true)
+            .into_iter()
+            .find(|tool| tool.name == START)
+            .expect("start_agent_task declared");
+        assert!(start.validate().is_ok(), "{}", start.description.len());
+        assert!(
+            !start.description.contains("on the person's"),
+            "{}",
+            start.description
+        );
+        assert!(on_the_lamp_now(&json!({}), true));
     }
 
     /// #5978: the lamp's own target (`lamp`, Hermes) is never one of the

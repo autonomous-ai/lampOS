@@ -181,11 +181,46 @@ refusal), and nothing is started new in any case:
   one fits); `session_busy` (working, asking the person something, or
   still starting); `session_closed` (the reply's `NOT_RUNNING`: Harness
   says it was closed or stopped; nothing is started on its own, the first
-  builder's ruling on #5784's follow-up, until a released `harness resume`,
-  openharness#3606, is pinned by #5957); the reply's other refusals
+  builder's ruling on #5784's follow-up; with `LAMP_TASKS_RESUME_CLOSED`
+  it is reopened first, below); the reply's other refusals
   (`reply_off`, `reply_not_idle`, `reply_failed`); `sessions_failed` or
   `sessions_<code>` when the list can't be read, `sessions_timeout` too
   when it leaves the reply under 1 s of the launch bound (`REPLY_FLOOR`).
+- **Closed, reopened** (`LAMP_TASKS_RESUME_CLOSED=on` in lamp-tasks' own
+  unit, off unless set). It needs Harness CLI 0.5.98 or newer, the first
+  released CLI that lists `resume` in `harness --help` (openharness#3606,
+  PR #3808); the switch can be on once the lamp's pin reaches it (#5957).
+  A reply that says `NOT_RUNNING` is followed by `harness resume --machine
+  <id> <agent> --json` once, inside the same launch bound. Before the first
+  resume of a start, lamp-tasks asks whether the installed CLI has it
+  (`harness --help` lists `resume`, or else `harness resume --help` exits
+  0) and keeps the answer for the rest of the run (a look that can't
+  finish is not kept, and says no that time); a CLI without it is one
+  journal line, `Harness <version> has no resume` (from `harness
+  --version`), and `session_closed`. Only `ok`,
+  `id`, `resumed` and `state` are read, never `effect` (its words may
+  change); an answer for another session, or with no `resumed`, is a
+  failure. `idle` is typed into with `harness reply` again; `working` is
+  waited for first (`harness wait --machine <id> <agent> --timeout <s>s
+  --json`, leaving `REPLY_FLOOR`); anything else, or still working at the
+  bound, is `session_busy`. Typed into, it is `joined`, with
+  `dispatch.joined.resumed` (`true` with its earlier conversation, `false`
+  open again in a new one), and Task news adds `joined_reopened` ("I
+  reopened that session") or `joined_fresh` (it starts fresh, without the
+  earlier conversation). `RESUME_UNCONFIRMED` (Harness could not confirm
+  it yet; a second run joins the first) is `session_resume_unconfirmed`,
+  told with `failed_closed_soon`, the closed-session line and "try again
+  in a moment"; any other end (`NOT_YOURS`, `REPLY_OFF`, `UNKNOWN_HARNESS`,
+  `AGENT_BUSY`, a timeout, an unknown code or an answer it can't read) is
+  `session_closed`. Never resumed twice in one hand-over (a second
+  `NOT_RUNNING` is `session_closed`), never started new; under 1 s left
+  before the resume or the reply is `sessions_timeout`, nothing typed.
+  Off, a closed session is `session_closed` as above. Tests:
+  `tests/harness.rs`
+  `with_resume_closed_a_closed_named_session_is_reopened_once_and_typed_into`,
+  `with_resume_closed_a_resume_that_leaves_no_time_types_nothing`,
+  `with_resume_closed_an_older_harness_without_resume_is_told_closed`;
+  `task_news::tests::a_reopened_named_session_is_said_reopened_and_an_unconfirmed_one_closed`.
 - **Uncertain:** a reply that started and gave no answer, or one Harness
   took (exit 0) whose answer can't be read or names another session
   (`reply_uncertain`): the words may be there, so never sent again.
