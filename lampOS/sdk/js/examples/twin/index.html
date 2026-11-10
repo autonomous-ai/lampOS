@@ -34,6 +34,8 @@
   #speaking { display: none; margin-left: 8px; padding: 0 7px; border-radius: 9px; background: var(--accent, #e0902f); color: #111; font-size: 11px; animation: speak .8s ease-in-out infinite alternate; }
   #speaking.on { display: inline-block; }
   @keyframes speak { from { opacity: .45; } to { opacity: 1; } }
+  #sees img { width: 100%; border-radius: 4px; background: #000; display: block; margin-top: 6px; }
+  #sees .sub { margin: 6px 0 0; }
   #log { font-size: 12px; color: var(--soft); margin-top: 12px; white-space: pre-wrap; }
   @media (max-width: 720px) { body { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; } aside { border-left: 0; border-top: 1px solid var(--line); } }
 </style>
@@ -55,6 +57,13 @@
     <p class="sub">The model's zero and sign are the CAD's until measured. Hold the lamp in a known pose, set each joint so the twin matches, then copy the values into lamp.model.json.</p>
     <div id="cal"></div>
     <button id="copy">Copy as JSON</button>
+  </details>
+  <details id="sees">
+    <summary>What the lamp sees</summary>
+    <p class="sub">The lamp's own newest picture, asked of it about once a second: each ask lights the lamp's camera mark, and a private lamp gives none. It may show you; it stays on this page.</p>
+    <button id="seesButton">Show</button>
+    <img id="seesImage" alt="the lamp's camera" hidden>
+    <p class="sub" id="seesNote"></p>
   </details>
   <div id="log"></div>
 </aside>
@@ -209,6 +218,26 @@ document.getElementById('copy').addEventListener('click', async () => {
   const text = JSON.stringify(cal, null, 2);
   try { await navigator.clipboard.writeText(text); log('calibration copied'); } catch { log(text); }
 });
+
+// What the lamp sees: off until asked, then its newest picture about once a second.
+{
+  const [button, image, note] = ['seesButton', 'seesImage', 'seesNote'].map((id) => document.getElementById(id));
+  let timer = null;
+  let n = 0;
+  const ask = async () => {
+    try {
+      const response = await fetch(withToken(`/camera.jpg`) + `&n=${n++}`);
+      if (response.ok) { const old = image.src; image.src = URL.createObjectURL(await response.blob()); if (old.startsWith('blob:')) URL.revokeObjectURL(old); image.hidden = false; note.textContent = ''; }
+      else { image.hidden = true; note.textContent = decodeURIComponent(response.headers.get('x-reason') ?? 'no picture'); }
+    } catch { note.textContent = 'no answer'; }
+  };
+  button.addEventListener('click', () => {
+    if (timer) { clearInterval(timer); timer = null; button.textContent = 'Show'; image.hidden = true; note.textContent = ''; return; }
+    button.textContent = 'Hide';
+    ask();
+    timer = setInterval(ask, 1000);
+  });
+}
 
 // The live link.
 let ws;
