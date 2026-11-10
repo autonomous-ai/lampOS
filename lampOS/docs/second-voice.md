@@ -238,7 +238,7 @@ each line plays exactly as before.
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
-| The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
+| The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round (on in the product) | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
@@ -951,7 +951,8 @@ order is kept. A written turn is the same from the chat on.
   under 1 ms; the prompt's effect on the model and acoustic latency still
   need a lamp replay.
 - **With `LAMP_KEEP_ANSWERS_AT_ONCE=on` a plain keep is answered at once,
-  with no second chat round** (C59; off unless set, in no unit). On
+  with no second chat round** (C59, #5919; on in the product unit, off
+  unless set). On
   lamp-06c1 on 5 Nov (the batch-100 runs) 70 keep turns took 3804 ms at
   the median from the words heard to the answer's first audio, against
   1746 ms for 268 turns with no call: the memory answered in 39 ms, but
@@ -1046,8 +1047,9 @@ order is kept. A written turn is the same from the chat on.
     begins not modelled): a plain answer 1654 ms, a keep 3495 ms off and
     2157 ms on. That saves 1338 ms, the whole second round; what is left
     over a plain answer, +503 ms, is round 1's later first event (a call
-    starts about 406 ms later than words), the memory and the voice. Not
-    yet measured on a lamp.
+    starts about 406 ms later than words), the memory and the voice. On
+    lamp-06c1 on 10 Nov, behind a drop-in, the median keep turn went from
+    2807 ms off to 2056 ms on, 6 of 6 kept.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
