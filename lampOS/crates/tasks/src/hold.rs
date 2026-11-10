@@ -104,6 +104,20 @@ pub fn env_file(
     hold: bool,
     hermes_home: Option<&Path>,
 ) -> Result<PathBuf, String> {
+    env_file_changed(environment, hold, hermes_home).map(|(path, _)| path)
+}
+
+/// As [`env_file`], and whether the file now says something else than it
+/// did (or was not there): Harness's daemon reads [`ENV_FILE`] only when it
+/// starts, so a daemon already running keeps the old words until it is
+/// started again (lamp-c0a4, 10 Nov: `SHELL` and `HERMES_HOME` written
+/// while harnessd ran, and `harness new hermes` waited on "Waiting to read
+/// the engine's launch environment" until it was restarted by hand).
+pub fn env_file_changed(
+    environment: &mut BTreeMap<String, OsString>,
+    hold: bool,
+    hermes_home: Option<&Path>,
+) -> Result<(PathBuf, bool), String> {
     let home = environment
         .get("HOME")
         .map(PathBuf::from)
@@ -125,6 +139,7 @@ pub fn env_file(
         text.push_str(&format!("{HERMES_HOME}={hermes}\n{SHELL}={LAUNCH_SHELL}\n"));
     }
     let path = home.join(FILE);
+    let changed = !matches!(fs::read(&path), Ok(was) if was == text.as_bytes());
     write_whole(&path, text.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))?;
     environment.insert(ENV_FILE.into(), path.clone().into());
     if hold {
@@ -134,7 +149,7 @@ pub fn env_file(
         environment.insert(HERMES_HOME.into(), hermes.into());
         environment.insert(SHELL.into(), LAUNCH_SHELL.into());
     }
-    Ok(path)
+    Ok((path, changed))
 }
 
 fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -696,5 +711,22 @@ mod tests {
         assert!(!environment.contains_key(HERMES_HOME));
         assert!(!environment.contains_key(SHELL));
         assert!(env_file(&mut environment, false, Some(Path::new("relative"))).is_err());
+    }
+
+    /// #5978, lamp-c0a4 on 10 Nov: the file is said changed when it was not
+    /// there or said other words, and not when it is written again the
+    /// same, so Harness's daemon is started again only for new words.
+    #[test]
+    fn the_env_file_is_said_changed_only_when_its_words_change() {
+        let home = tempfile::tempdir().unwrap();
+        let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
+        let hermes = Some(Path::new("/var/lib/lampos-hermes/.hermes"));
+        let (path, changed) = env_file_changed(&mut environment, true, None).unwrap();
+        assert!(changed, "not there before");
+        assert!(!env_file_changed(&mut environment, true, None).unwrap().1);
+        assert!(env_file_changed(&mut environment, true, hermes).unwrap().1);
+        assert!(!env_file_changed(&mut environment, true, hermes).unwrap().1);
+        fs::write(&path, "SHELL=/usr/sbin/nologin\n").unwrap();
+        assert!(env_file_changed(&mut environment, true, hermes).unwrap().1);
     }
 }

@@ -501,6 +501,17 @@ pub trait Adapter: Send + 'static {
     fn start_daemon(&self) -> Result<(), String> {
         Err("unsupported".into())
     }
+    /// Whether Harness's daemon is to be started again once at this start:
+    /// its env file got other words while it ran (#5978). None without it.
+    fn restart_wanted(&self) -> bool {
+        false
+    }
+    /// Start Harness's daemon again (`harness start --restart`), once, when
+    /// [`Self::restart_wanted`] and no task is busy. An adapter without it
+    /// says so.
+    fn restart_daemon(&self) -> Result<(), String> {
+        Err("unsupported".into())
+    }
 }
 impl Adapter for Cli {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
@@ -570,6 +581,12 @@ impl Adapter for Cli {
     }
     fn start_daemon(&self) -> Result<(), String> {
         Cli::start_daemon(self)
+    }
+    fn restart_wanted(&self) -> bool {
+        Cli::restart_wanted(self)
+    }
+    fn restart_daemon(&self) -> Result<(), String> {
+        Cli::restart_daemon(self)
     }
 }
 
@@ -666,6 +683,18 @@ impl Adapter for Production {
     fn start_daemon(&self) -> Result<(), String> {
         match self {
             Self::Cli(cli) => Adapter::start_daemon(&**cli),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn restart_wanted(&self) -> bool {
+        match self {
+            Self::Cli(cli) => Adapter::restart_wanted(&**cli),
+            Self::Absent => false,
+        }
+    }
+    fn restart_daemon(&self) -> Result<(), String> {
+        match self {
+            Self::Cli(cli) => Adapter::restart_daemon(&**cli),
             Self::Absent => Err("no_harness".into()),
         }
     }
@@ -835,6 +864,8 @@ enum Job {
     Machines,
     /// `harness start` after a sign-in by code (openharness#1463).
     StartDaemon,
+    /// `harness start --restart` once, its env file changed (#5978).
+    RestartDaemon,
 }
 enum Outcome {
     Launch(u64, LaunchOutcome),
@@ -844,6 +875,7 @@ enum Outcome {
     SignIn(Result<SignIn, String>),
     Machines(Result<Vec<AccountMachine>, String>),
     StartDaemon(Result<(), String>),
+    RestartDaemon(Result<(), String>),
 }
 struct Binding {
     path: PathBuf,
@@ -975,6 +1007,8 @@ type Switches = (
     Duration,
     // The lane for the computers' engines (`--engines-from-machines`).
     Option<Arc<dyn EnginesLane>>,
+    // Harness's daemon to be started again once ([`Adapter::restart_wanted`]).
+    bool,
 );
 
 fn owner<C: Clock>(
@@ -995,6 +1029,7 @@ fn owner<C: Clock>(
         mut sign_in_starter,
         daemon_retry_after,
         engines_lane,
+        mut restart_due,
     ): Switches,
 ) -> io::Result<()> {
     let mut requests = 0u64;
@@ -1095,7 +1130,10 @@ fn owner<C: Clock>(
             if let Some(side) = later.lamp.as_ref()
                 && let Ok(mut machines) = side.machines.lock()
             {
+                // What the last machines' look said offline stays.
+                let offline = std::mem::take(&mut machines.offline);
                 *machines = SessionMachines::from_targets(engine.targets());
+                machines.offline = offline;
             }
             look_at_names(&mut engine, &later.targets, &mut names_said);
             if engines_on {
@@ -1117,9 +1155,12 @@ fn owner<C: Clock>(
                 // The lamp itself, with Hermes (#5978), as at the machines'
                 // look: without it, each look that comes back wrote the
                 // targets again without the lamp.
-                if later.lamp.is_some()
+                if let Some(side) = later.lamp.as_ref()
                     && let Some(lamp) = known.lamp_with_hermes(listed, unix_ms())
                 {
+                    // Its work folder too, as at the machines' look: the
+                    // lamp may first be found here (a fresh lamp, #5978).
+                    make_lamp_folder(&side.home);
                     chosen.insert(lamp, EngineKind::Hermes);
                 }
                 let said =
@@ -1216,6 +1257,14 @@ fn owner<C: Clock>(
                                         &mut engines_said,
                                         &mut targets_due,
                                     );
+                                    // The computers said offline, which a
+                                    // named hand-over to the lamp does not
+                                    // list (#5978).
+                                    if let Some(side) = later.lamp.as_ref()
+                                        && let Ok(mut machines) = side.machines.lock()
+                                    {
+                                        machines.offline = offline_machines(&listed);
+                                    }
                                     last_listed = Some(listed);
                                 }
                                 said
@@ -1247,6 +1296,17 @@ fn owner<C: Clock>(
                         Err(code) => eprintln!(
                             "tasks: Harness's daemon not started: {code}; \
                              {daemon_tries} tries, not tried again until the next sign-in or start"
+                        ),
+                    }
+                    Ok(())
+                }
+                Outcome::RestartDaemon(restarted) => {
+                    match restarted {
+                        Ok(()) => eprintln!(
+                            "tasks: Harness's daemon started again: its env file changed while it ran (#5978)"
+                        ),
+                        Err(code) => eprintln!(
+                            "tasks: Harness's daemon not started again: {code}; its env file changed while it ran (#5978)"
                         ),
                     }
                     Ok(())
@@ -1475,6 +1535,21 @@ fn owner<C: Clock>(
                     Some(Job::StartDaemon)
                 }
                 _ => None,
+            };
+            // Harness's env file got other words while its daemon ran
+            // (#5978): the daemon is started again once, never while a task
+            // is busy (watched), since a task's harness is the daemon's; a
+            // start due goes first.
+            let daemon = match daemon {
+                Some(job) => Some(job),
+                None if restart_due
+                    && start_daemon_due.is_none()
+                    && engine.watched(&now).is_empty() =>
+                {
+                    restart_due = false;
+                    Some(Job::RestartDaemon)
+                }
+                None => None,
             };
             let launch = match daemon {
                 Some(job) => Some(job),
@@ -3074,13 +3149,30 @@ pub fn serve<C: Clock>(
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
         switches.apply(&mut cli, &dir, from_machines);
+        // A closed named session reopened with `harness resume`, off unless
+        // set (`LAMP_TASKS_RESUME_CLOSED=on` in lamp-tasks' own unit).
+        cli.resume_closed = crate::harness::resume_closed_on(
+            std::env::var(crate::harness::RESUME_CLOSED_SWITCH)
+                .ok()
+                .as_deref(),
+        );
         // Harness held at the version installed (#5229), off unless set;
         // and where the lamp's own Hermes keeps its sessions (#5978).
         let held = crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref());
         let hermes = lamp_side.as_ref().map(|_| Path::new(HERMES_HOME));
         if held || hermes.is_some() {
-            match crate::hold::env_file(&mut cli.environment, held, hermes) {
-                Ok(path) => {
+            match crate::hold::env_file_changed(&mut cli.environment, held, hermes) {
+                Ok((path, changed)) => {
+                    // Read by the daemon only at its start: one already
+                    // running is started again once (#5978). Nothing
+                    // listening on its port: the next start reads it.
+                    cli.restart_daemon =
+                        changed && crate::hold::ask(crate::hold::port(&cli.environment)).is_ok();
+                    if cli.restart_daemon {
+                        eprintln!(
+                            "tasks: Harness's env file changed while its daemon runs: it is started again once no task is busy"
+                        );
+                    }
                     if held {
                         eprintln!(
                             "tasks: Harness's own updates held ({}=true, {}={})",
@@ -3104,6 +3196,18 @@ pub fn serve<C: Clock>(
         cli.session_machines = lamp_side.as_ref().map(|side| side.machines.clone());
         Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
     })
+}
+
+/// The machines a `harness machines` look said are offline (`status:
+/// offline`), the lamp itself left out: a named hand-over to the lamp does
+/// not list their sessions ([`SessionMachines::offline`]). A machine whose
+/// presence is `unknown` or not given is still listed.
+pub fn offline_machines(listed: &[AccountMachine]) -> BTreeSet<String> {
+    listed
+        .iter()
+        .filter(|machine| !machine.current && machine.status.as_deref() == Some("offline"))
+        .map(|machine| machine.machine_id.clone())
+        .collect()
 }
 
 /// Injection boundary for scripted host tests. Implementations must bound and
@@ -3145,6 +3249,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     if adapter.absent() {
         engine.no_harness();
     }
+    let restart_wanted = adapter.restart_wanted();
     let sign_in_starter = if config.sign_in_by_code {
         let starter = adapter.sign_in_starter();
         if starter.is_none() {
@@ -3255,6 +3360,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                             Job::SignIn => Outcome::SignIn(adapter.signed_in()),
                             Job::Machines => Outcome::Machines(adapter.machines()),
                             Job::StartDaemon => Outcome::StartDaemon(adapter.start_daemon()),
+                            Job::RestartDaemon => Outcome::RestartDaemon(adapter.restart_daemon()),
                         };
                         if outcomes_tx.try_send(result).is_err() {
                             break;
@@ -3297,6 +3403,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     sign_in_starter,
                     daemon_retry_after,
                     engines_lane,
+                    restart_wanted,
                 ),
             )
         })?;
