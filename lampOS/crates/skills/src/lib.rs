@@ -447,6 +447,15 @@ struct QuietFile {
     to: String,
 }
 
+/// A trigger's `days` (#6066): a list of day names, or one name alone
+/// (`days = "weekdays"`).
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum DaysFile {
+    One(String),
+    List(Vec<String>),
+}
+
 /// A trigger's `rearm`: a word, or a line its field must stay past for a
 /// while.
 #[derive(Deserialize)]
@@ -615,6 +624,8 @@ struct TriggerFile {
     present: Option<bool>,
     /// Local hours in which this trigger can hold.
     during: Option<QuietFile>,
+    /// The local days of the week its `during` opens on (#6066).
+    days: Option<DaysFile>,
     /// Consume at most one chance per local window, durably before acting.
     #[serde(default)]
     once_per_day: bool,
@@ -2224,7 +2235,18 @@ fn out_of_window(trigger: &Trigger, moment: Option<&daily::Moment>) -> Option<St
             window.opens(),
             window.closes()
         )),
-        Some(_) => None,
+        // The day its window opened is the one its `days` names (#6066):
+        // an overnight window's hours after midnight are the evening's.
+        Some(moment) => {
+            let days = trigger.days.as_ref()?;
+            let opened = window.occurrence_day(moment.day, moment.minute)?;
+            (!days.contains(opened)).then(|| {
+                format!(
+                    "not one of its days: its window opened on {}",
+                    daily::Weekdays::name(opened)
+                )
+            })
+        }
     }
 }
 
@@ -2310,6 +2332,10 @@ pub struct Trigger {
     /// talk ends. 0: a chance held back is spent.
     pub wait_us: u64,
     pub during: Option<daily::Window>,
+    /// The local days of the week `during` opens on (#6066); None, every
+    /// day. An overnight window's hours after midnight are the day it
+    /// opened's.
+    pub days: Option<daily::Weekdays>,
     pub once_per_day: bool,
     /// No chance once something was heard since `during` opened today; a
     /// daily trigger's day is spent then, said once.
@@ -2962,6 +2988,14 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         .map(|window| daily::Window::parse(&window.from, &window.to))
         .transpose()
         .map_err(|error| format!("during: {error}"))?;
+    let days = match file.days {
+        None => None,
+        Some(_) if during.is_none() => {
+            return Err("days goes with during: the days its window opens on".into());
+        }
+        Some(DaysFile::One(name)) => Some(daily::Weekdays::parse(&[name])?),
+        Some(DaysFile::List(names)) => Some(daily::Weekdays::parse(&names)?),
+    };
     if file.once_per_day && (during.is_none() || file.name.is_none() || file.each.is_some()) {
         return Err("once_per_day needs a named trigger with during, and no each".into());
     }
@@ -3191,6 +3225,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         wait_us,
         rise,
         during,
+        days,
         once_per_day: file.once_per_day,
         unless_heard: file.unless_heard,
         yields_to,
@@ -6086,19 +6121,21 @@ impl Engine {
         let Some(skill) = self.skills.iter().find(|skill| &skill.name == name) else {
             return Yield::No;
         };
-        let Some((index, window)) = skill
+        let Some((index, window, days)) = skill
             .triggers
             .iter()
             .enumerate()
             .find(|(_, other)| other.name.as_ref() == Some(trigger) && other.once_per_day)
-            .and_then(|(index, other)| Some((index, other.during.as_ref()?)))
+            .and_then(|(index, other)| Some((index, other.during.as_ref()?, other.days)))
         else {
             return Yield::No;
         };
+        // Not one of its days (#6066), its greeting does not come today.
         let Some(day) = window
             .contains(moment.minute)
             .then(|| window.occurrence_day(moment.day, moment.minute))
             .flatten()
+            .filter(|day| days.is_none_or(|days| days.contains(*day)))
         else {
             return Yield::No;
         };
@@ -7093,10 +7130,7 @@ impl Engine {
             if trigger.once_per_day && self.daily_faulted {
                 return false;
             }
-            if trigger.during.as_ref().is_some_and(|window| {
-                self.local_moment(now_us)
-                    .is_none_or(|moment| !window.contains(moment.minute))
-            }) {
+            if out_of_window(trigger, self.local_moment(now_us).as_ref()).is_some() {
                 return false;
             }
             rose(index, trigger)
