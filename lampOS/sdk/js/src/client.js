@@ -123,6 +123,27 @@ function hex(colour) {
 // MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 export const SAY_MAX_BYTES = 900;
 
+// The refusal for a name that is no event, with the event the name was meant
+// for when it is a lease's or a look's end (`lease.ended` is `lease`, state
+// `lost`); `lease` and `done` come with no subscription.
+function noEvent(name, on = false) {
+  if (name === 'lease' || name === 'done') {
+    return new LampError(`no event '${name}' to subscribe to: it comes without subscribing, hear it with lamp.on('${name}', handler)`, { code: 'bad_request' });
+  }
+  let hint;
+  if (name.startsWith('lease')) {
+    hint = "a lease's changes come as the event 'lease' (state held, suspended or lost, and why): lamp.on('lease', handler)";
+  } else if (name.startsWith('done')) {
+    hint = "the end of a look or a move comes as the event 'done': lamp.on('done', handler)";
+  } else {
+    // With `on`: what it takes: the schema's, the streams' and the two that come unasked.
+    hint = on
+      ? `one of ${[...new Set([...schema.events, ...CAMERA_EVENTS, ...MICROPHONE_EVENTS])].sort().join(', ')}, or 'lease' or 'done'`
+      : `one of ${[...schema.events].sort().join(', ')}`;
+  }
+  return new LampError(`no event '${name}': ${hint}`, { code: 'bad_request' });
+}
+
 function check(op, fields) {
   if (!schema.ops.includes(op)) throw new LampError(`no op ${op} in v${schema.VERSION}`, { code: 'bad_request' });
   if (op === 'say' && typeof fields.text === 'string') {
@@ -146,7 +167,7 @@ function check(op, fields) {
     }
   }
   for (const event of fields.events ?? []) {
-    if (!schema.events.includes(event)) throw new LampError(`no event ${event}`, { code: 'bad_request' });
+    if (!schema.events.includes(event)) throw noEvent(event);
   }
   // A lease's parts; a `sound.upload`'s or `skill.push`'s `parts` is a count.
   for (const part of op === 'lease.take' ? fields.parts ?? [] : []) {
@@ -542,7 +563,7 @@ export class Lamp {
   on(event, handler, { phrases } = {}) {
     if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)
       && !MICROPHONE_EVENTS.includes(event)) {
-      throw new LampError(`no event ${event}`, { code: 'bad_request' });
+      throw noEvent(event, true);
     }
     const short = shortPhrase(phrases);
     if (short) throw short;

@@ -351,7 +351,7 @@ And two that come by themselves, with no subscription:
 
 | event | fields | example | fires when |
 |---|---|---|---|
-| `lease` | `lease`, `state` (`held`, `suspended`, `lost`), `why` (`conversation`, `hand`, `stop_heard`, `private`, `paused`, `asleep`, `expired`, `taken_by_owner_app`, `revoked`, `released`, `slumped`) | `{"ev":"lease","lease":"l_3","state":"suspended","why":"conversation"}` | one of your leases changes: talking suspends it and resting holds it again; a hand on the body, a stop, a pause, privacy or sleep loses it |
+| `lease` | `lease`, `state` (`held`, `suspended`, `lost`), `why` (`conversation`, `hand`, `stop_heard`, `private`, `paused`, `asleep`, `expired`, `taken_by_owner_app`, `revoked`, `released`, `slumped`) | `{"ev":"lease","lease":"l_3","state":"suspended","why":"conversation"}` | one of your leases changes: talking suspends it and resting holds it again; a hand on the body, a stop, a pause, privacy or sleep loses it. Hear a lease end with `lamp.on('lease', handler)` and `state` `lost` (and its `why`); there is no event named `lease.ended`, and `lease` comes without subscribing |
 | `done` | `re` (your request's id), `how` (`finished`, `cut_short`, `dropped`), `why` | `{"ev":"done","re":14,"how":"finished"}` | an action that ends later has ended. Today that's `say`, `sound`, `start_turn`, a `look`, and a mute `set_listening(False)` the lamp lifted (`cut_short`, "a hand on the head") |
 
 ### States, with `get`
