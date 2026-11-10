@@ -1523,34 +1523,42 @@ impl Days {
             .collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
-    /// The role `person` asked the lamp to play (the voice's
-    /// `LAMP_MEMORY_ROLE`): the name it answers to with them, kept until they
-    /// end it ([`Self::role_end`]) or forget everything. A known person's
-    /// alone (`p-` ids): the room, a rules scope or a guest has none. One a
-    /// person: a new one replaces theirs. At most [`ROLE_BYTES`], tidied.
-    pub fn role_set(&mut self, person: &Person, name: &str) -> Result<()> {
+    /// A role write belongs to the exact session that admitted it. Check
+    /// under the write transaction, so a forget cannot slip between the
+    /// check and the mutation. Missing and invalidated sessions fail closed.
+    pub fn role_set_session(
+        &mut self,
+        person: &Person,
+        session: &str,
+        generation: u64,
+        name: &str,
+    ) -> Result<()> {
         known_only(person)?;
+        identifier(session)?;
         let name = store::tidy(name, ROLE_BYTES);
         if !name.chars().any(char::is_alphanumeric) {
             return Err(Error::new("empty", "there is no name for the role"));
         }
         let tx = self.db.transaction()?;
-        ensure_person(&tx, person)?;
-        tx.execute(
-            "INSERT INTO roles(person,name,at_unix_ms) VALUES(?1,?2,?3) ON CONFLICT(person) DO UPDATE SET name=excluded.name,at_unix_ms=excluded.at_unix_ms",
-            params![person.as_str(), name, self.now],
-        )?;
+        role_session(&tx, person, session, generation)?;
+        tx.execute("INSERT INTO roles(person,name,at_unix_ms) VALUES(?1,?2,?3) ON CONFLICT(person) DO UPDATE SET name=excluded.name,at_unix_ms=excluded.at_unix_ms", params![person.as_str(), name, self.now])?;
         tx.commit()?;
         Ok(())
     }
 
-    /// `person`'s role ended: whether they had one.
-    pub fn role_end(&mut self, person: &Person) -> Result<bool> {
+    pub fn role_end_session(
+        &mut self,
+        person: &Person,
+        session: &str,
+        generation: u64,
+    ) -> Result<bool> {
         known_only(person)?;
-        Ok(self
-            .db
-            .execute("DELETE FROM roles WHERE person=?1", [person.as_str()])?
-            > 0)
+        identifier(session)?;
+        let tx = self.db.transaction()?;
+        role_session(&tx, person, session, generation)?;
+        let ended = tx.execute("DELETE FROM roles WHERE person=?1", [person.as_str()])? > 0;
+        tx.commit()?;
+        Ok(ended)
     }
 
     /// `person`'s role, if they set one and have not ended it.
@@ -3413,6 +3421,22 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
     }
     Ok(())
 }
+/// Indexed session/person lookup; it never creates a person or a session.
+fn role_session(tx: &Transaction<'_>, person: &Person, session: &str, expected: u64) -> Result<()> {
+    let valid: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sessions s JOIN people p ON p.person=s.person WHERE s.person=?1 AND s.session=?2 AND s.invalidated=0 AND s.generation=?3 AND p.generation=?3)",
+        params![person.as_str(), session, expected], |row| row.get(0),
+    )?;
+    if valid {
+        Ok(())
+    } else {
+        Err(Error::new(
+            "stale_session",
+            "the role's session is no longer current",
+        ))
+    }
+}
+
 /// Every entry of `person`, or of every person for `None`, erased in the
 /// caller's transaction, with their session notes, jobs and skipped count.
 fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
@@ -3434,6 +3458,12 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         room_from_citing(tx, person)?;
         talk_with_doomed(tx)?;
     }
+    // erase advances people with doomed entries. Advance empty people too:
+    // closing/reopening the same session name cannot revive a pre-forget token.
+    tx.execute(
+        "UPDATE people SET generation=generation+1 WHERE (?1 IS NULL OR person=?1) AND NOT EXISTS(SELECT 1 FROM entries e JOIN doomed d ON d.rid=e.rid WHERE e.person=people.person)",
+        [person.map(Person::as_str)],
+    )?;
     let count = erase(tx)?;
     // Empty people also have job and snapshot metadata, but keep the high
     // water mark so a stale external reference can never name a new entry.
