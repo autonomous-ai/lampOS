@@ -1472,11 +1472,18 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `/var/lib/lampos-hermes/.local/bin/hermes`, on no `PATH`. No unit, no
      service, no gateway, nothing at boot: Harness starts `hermes` in a
      pane only when a task is sent to it.
-   - **In a namespace that hides the relay key.** As plain `lampos`, the
-     commands Hermes runs could read lamp-cloud's relay key (its systemd
-     credential under `/run/credentials`, and lamp-cloud's state folder).
-     So Hermes is never run but through two root-owned scripts, 0755, each
-     written whole beside and renamed in, never through a link:
+   - **In a namespace that shows Hermes only its own folders.** Hermes
+     runs shell commands the model chooses. As plain `lampos` they could
+     reach every lamp service run as `lampos`: lamp-cloud's relay key (its
+     systemd credential under `/run/credentials`, and lamp-cloud's state
+     folder), the eyes' `/run/lampos-eyes/permit.sock` (it turns the
+     camera on) and `/var/lib/lampos-eyes/people.json` (the face prints),
+     the body's motors under `/run/lampos-body`, the person's asks in
+     `/var/lib/lampos-tasks/store`, and, through `lampos`'s groups
+     (`video`, `audio`, `dialout`, `i2c`), the camera, mic and serial
+     ports themselves. So Hermes is never run but through two root-owned
+     scripts, 0755, each written whole beside and renamed in, never
+     through a link:
      - the wrapper `/usr/local/bin/hermes` reads lamp-cloud's local
        forwarder token, `/var/lib/lampos-cloud/hermes-token` (lamp-cloud
        makes it, 0600, with `LAMP_HERMES_ON_LAMP=on` in its unit). Missing
@@ -1494,26 +1501,68 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        process is there to open;
      - the namespace script `/usr/local/lib/lampos/hermes-ns` refuses to
        run in the lamp's own user namespace (its `uid_map` the whole
-       range), mounts an empty read-only tmpfs (`size=4k,mode=0555`) over
-       `/run/credentials` (when there) and over `/var/lib/lampos-cloud`,
-       and runs `unshare --user --map-user=<caller's uid>
-       --map-group=<caller's gid> /var/lib/lampos-hermes/.local/bin/hermes`.
+       range). Then, by an allow-list (`ALLOWED`), as root of that first
+       namespace:
+       1. an empty writable tmpfs of Hermes's own on `/tmp` (256 MB),
+          `/var/tmp` and `/dev/shm` (64 MB each), which are shared on the
+          lamp;
+       2. what stays visible staged on that new `/tmp`: Hermes's folder
+          `/var/lib/lampos-hermes`, its work folder
+          `/var/lib/lampos-tasks/harnesses/lamp-tasks` and the skills
+          `/var/lib/lampOS/skills` bound there (the last two only when
+          there), and the file `/etc/resolv.conf` resolves to when it is
+          under `/run` (such as `/run/systemd/resolve/stub-resolv.conf`),
+          so names still resolve for the web and the forwarder stays on
+          TCP `127.0.0.1:7741`. The work folder is Harness's project
+          `~/harnesses/lamp-tasks` in its home, not only its `lamp`
+          subfolder (where lamp-tasks puts `AGENTS.md` and Harness starts
+          Hermes), as Harness names the project and may start a task in
+          another folder of it; nothing else of lamp-tasks' state folder
+          (its `store`, Harness's own files) is shown;
+       3. an empty tmpfs over `/run`, `/var/lib` and `/etc/lampOS` (when
+          there), the mount points made in it and the staged mounts moved
+          back; the skills and `resolv.conf` remounted read-only (with the
+          flags they had, as a user namespace may only add flags); then
+          the three overlays remounted read-only;
+       4. `/dev/null` bound over every character device matching
+          `/dev/video*`, `/dev/media*`, `/dev/v4l-subdev*`, `/dev/snd/*`,
+          `/dev/ttyACM*`, `/dev/ttyUSB*`, `/dev/ttyS*`, `/dev/ttyAMA*`,
+          `/dev/i2c-*`, `/dev/spidev*`, `/dev/gpiochip*`, `/dev/hidraw*`,
+          `/dev/fb*` and `/dev/dri/*` (a missing one is fine): under
+          `--map-root-user` `setgroups` is denied, so `lampos`'s groups
+          can't be dropped, and the devices are hidden instead;
+       5. back into the folder it was started in through the new mounts
+          (the old one would reach the hidden folders by `..`); a folder
+          not shown ends it;
+       6. `HOME` set to `/var/lib/lampos-hermes` and `unshare --user
+          --map-user=<caller's uid> --map-group=<caller's gid>
+          /var/lib/lampos-hermes/.local/bin/hermes`.
        In that nested user namespace the mounts are locked: Hermes cannot
        take them off. Any step failing ends it before Hermes runs.
-     Shown on lamp-c0a4 by hand (10 Nov, the same scripts): the key hidden;
-     `umount` refused, nested too. As plain `lampos`, `ls /proc/<lamp-cloud
-     pid>/root/run/credentials/lamp-cloud.service/` lists `account build
-     key`; inside the wrapper's namespaces without the PID namespace it is
-     `Permission denied`, but `/proc/<pid>/fd` is still listable; with
-     `--pid --fork --mount-proc` the lamp-cloud pid does not exist there and
-     only 3 processes are visible. The relay
-     key never goes into Hermes's environment or its folder; only the
-     forwarder's token does (Hermes keeps snapshots of its shell's
-     environment under its home).
+     So Hermes sees its own folder, its work folder and the skills
+     (read-only), `resolv.conf`, its own `/tmp` and `/proc`, and the
+     lamp's programs (`/usr`, `/opt/lampOS`); no lamp service's `/run` or
+     `/var/lib` folder (no socket, no state, no credential), no
+     `/etc/lampOS`, no camera, mic, serial, I2C, SPI or GPIO device and no
+     lamp process. A test (`no_lampos_service_folder_is_visible_to_hermes`)
+     reads every `RuntimeDirectory=`, `StateDirectory=` and
+     `ReadWritePaths=` under `/run` or `/var/lib` of the product units run
+     as `lampos`, and the tmpfiles folders made `lampos`'s, and fails if
+     any of them is not hidden, so a new service is hidden with no change.
+     Shown on lamp-c0a4 by hand (10 Nov, the earlier deny-list scripts):
+     the key hidden; `umount` refused, nested too. As plain `lampos`, `ls
+     /proc/<lamp-cloud pid>/root/run/credentials/lamp-cloud.service/`
+     lists `account build key`; inside the wrapper's namespaces without
+     the PID namespace it is `Permission denied`, but `/proc/<pid>/fd` is
+     still listable; with `--pid --fork --mount-proc` the lamp-cloud pid
+     does not exist there and only 3 processes are visible. The allow-list
+     scripts are still to be shown there. The relay key never goes into
+     Hermes's environment or its folder; only the forwarder's token does
+     (Hermes keeps snapshots of its shell's environment under its home).
    - **User namespaces checked first:** before anything is made, `lampos`
      must be able to make that namespace: `runuser -u lampos --
-     /usr/bin/unshare --map-root-user --mount --propagation private
-     /usr/bin/unshare --user --map-user=<uid> --map-group=<gid> true`. It
+     /usr/bin/unshare --map-root-user --mount --pid --kill-child
+     --mount-proc --propagation private /usr/bin/unshare --user --map-user=<uid> --map-group=<gid> true`. It
      failing is `no_userns`, said with the reason, and nothing is
      installed: Hermes never runs where it could read the key. lamp-c0a4
      had kernel 5.15, `user.max_user_namespaces` 15294 and
