@@ -1135,6 +1135,7 @@ impl Peers {
         for _ in 0..packets {
             self.audio_sequence += 1;
             self.queued.push_back(ProviderOutput::Audio {
+                spoken: true,
                 request,
                 sequence: self.audio_sequence,
                 provider_event_at_us: monotonic_us(),

@@ -140,17 +140,19 @@ to the call asks to play something (#5764,
 start, past greetings and one lead-in such as "can you", "could I", "I'd like
 to" or "let's", with an ask: play, put on, put some or put something, turn
 on, start, hear, listen to, or Vietnamese "mở/bật/phát nhạc", "mở/bật/phát
-bài" or "cho tôi/mình/em nghe", and at or after the ask name a recording:
+bài" or "cho tôi/mình/em nghe". The immediate requested object must name
 music, a song, recording, sound, track, tune, playlist, melody, lullaby,
-"nhạc" or "bài", or "something" with relaxing, calm, quiet, soft,
-soothing, gentle, peaceful, chill, relax, unwind or sleep within four words
-after it: "Lamp, play me something to relax." and "Play something to help me
-sleep." ask (on lamp-52e6 on 10 Nov the first was refused while "something"
-counted only right before a calm word). "Lamp, turn on the light.", "Lamp,
-play chess with me." and "Play something with me." do not ask. A line with "don't", "not", "never", "no",
-"stop", "cancel", "actually", "wait", "maybe", "đừng" or "thôi" anywhere,
-in any sentence, does not ask: "Lamp, play some relaxing music. Actually,
-don't." is refused. Otherwise Voice drops the offer and
+"nhạc" or "bài". An optional recipient (me/us), determiner, and up to three
+calm-mood adjectives may precede that noun. A recording mentioned later in
+an unrelated clause does not count: "turn on the light so I can read sheet
+music" and "play chess while I listen to music" are refused.
+"Something" instead accepts a calm-mood adjective, "to relax/unwind/sleep",
+or "to help me relax/unwind/sleep", with only please/now/on afterward.
+"Lamp, play me something to relax." and "Play something to help me sleep."
+ask; "Play something like chess to relax." and "Play something with me to
+relax." do not. A line with "don't", "not", "never", "no", "stop", "cancel",
+"actually", "wait", "maybe", "đừng", "thôi" or the phrase "forget it"
+anywhere, in any sentence, does not ask. Otherwise Voice drops the offer and
 tells the model `{"error": NOT_ASKED_TO_PLAY}`: nothing plays, and it must
 not say it is playing. It is never told the skill's confirmation. This
 check is in code, so a skill's "only when explicitly asked" text is no longer
@@ -251,7 +253,20 @@ being read past the clash spin, the speaker was muted, silent or its state
 unknown, its state changed, was stale, or was read after the check's own
 time, its Skills lease lapsed, it was past its time, Skills refused its start or a renewal, or its recording
 couldn't be read or wasn't the one offered. It also comes when the turn's
-output settles and its confirmation failed, was empty or never retired. A
+output settles and its confirmation failed, contained no proven spoken PCM,
+or never retired. A wait cue or announcement is not confirmation, even if
+it retires or the model supplied transcript text without playable speech.
+The private Voice worker's audio packet carries a `spoken` flag; only
+validated, nonempty packets for the current request can establish that
+speech arrived. The second route sets it on real answer speech, never on
+its cue or announcement. Missing flags default to false. The parent and
+worker run the same versioned Voice executable; an old decoder does not
+accept a new packet with `spoken: true`, so this is not a cross-version
+public protocol. Live model audio remains answer output; it does not use the Second route's
+local cue or announcement path. This preserves Live recording playback.
+This adds one in-memory flag check, no polling, network call or delay.
+
+A
 playback gap in the confirmation does not end it: a gap is late words, not
 cut ones, and retirement means all of them played. On lamp-52e6 on 10 Nov
 (request 3) the wait sound played 1.5 s after the line and the two-piece
