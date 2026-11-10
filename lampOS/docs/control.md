@@ -71,6 +71,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `device` | `get` `device`: the lamp's own computer (processor load, memory, disk, its temperatures) |
 | `camera` | `camera.snapshot`, `camera.stream`: the camera's pictures, the eyes' own newest frame, never while the lamp is private ("The camera") |
 | `microphone` | `microphone.stream`: the room's sound as the ears hear it, 20 ms blocks, never while the lamp is private ("The microphone") |
+| `notes` | `notes.set`, `notes.get`, `notes.delete`, `notes.list`: its own small key/value notes kept on the lamp, which survive restarts and go with its revoke ("Notes" below) |
 
 **Events**, pushed to a client that subscribed:
 
@@ -107,6 +108,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `light` with `rgb` or `pixels` | `rgb` (`#rrggbb`), or `pixels` (one `#rrggbb` per pixel, hello's `limits.ring.pixels` of them), `brightness` 0–100, `fade_ms`, `for_ms` ≤ 30 s | `light/request` with `pixels`, at the same priority and claim as a named light, and the nearest named colour and level beside them for a ring that draws none ("The ring, pixel by pixel") | `light` | no |
 | `say` | `text`: words, at most 900 UTF-8 bytes, the voice's own cap (a longer one is refused at the door, not sent and dropped); optional `rephrase` | `say.sock` with `exact: true`: the words as sent, rendered straight through the voice's speech service (no model, no tools) and played as the lamp's own line once nobody is talking with the lamp (`say::may_play_exact`: it waits while a conversation with the lamp is going on, its speaker is busy, or an answer or reminder is owed, never for speech in the room that nobody addresses to the lamp; the keeper's pause and the privacy switch refuse it; no quiet gap or rarity). With `rephrase: true`, a written turn for the voice's model, through its quiet after a turn, privacy and busy gates, as before | `speak` | no |
 | `sound` | `name`: `hum`, the voice's built-in short hum (no file, no model), or one of the computer's own clips by name ("Sounds" below); the recorded notices are never a computer's, and no path is ever asked | `hum`: `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates. A clip: `say.sock` `{clip: PATH}`, its path in the clips folder, read by the voice with a skill sound's format and loudness checks and up to 30 s (`say::read_clip`) and played as an exact `say` is (`say::may_play_exact`). Its `done` follows | `speak` | no |
+| `notes.set`, `notes.get`, `notes.delete`, `notes.list` | a note of the computer's own, kept, read, dropped or listed ("Notes" below) | the state folder's `notes/` | `notes` |
 | `sound.upload`, `sound.list`, `sound.remove` | a clip of the computer's own, kept, listed or deleted ("Sounds" below) | the state folder's `sounds/` | `speak` | no |
 | `volume` | one of `to` (0–100), `step` (`up`, `down`) or `mute` (`true`, `false`) | lamp-actions' `call.sock` (`--actions-socket`): `volume_to`, `volume_step` or `volume_muted`, the speaker's only writer, so the person's own volume within its ceiling; the reply is the level it left, `{level, muted}` | `speak` | no |
 | `turn.start` | `prompt` (optional) | `say.sock` `{turn: "start"}`, with its prompt as `text` ("Turns and listening") | `speak`, `hear` | no |
@@ -615,6 +617,10 @@ which back. An SDK's wait for them returns at the answer.
 | `sound.upload` | `name` (a clip's, never `hum`), `sha256` (64 hex), `size` 1–1,444,140, `part` from 0, `parts` 1–64, `data` (base64, ≤ 49,152 chars) | `speak` | — |
 | `sound.list` | — | `speak` | — |
 | `sound.remove` | `name` | `speak` | — |
+| `notes.set` | `key` (1–64 bytes of letters, digits and `. _ : -`), `value` (any JSON, at most 16,384 bytes serialized) | `notes` | — |
+| `notes.get` | `key` | `notes` | — |
+| `notes.delete` | `key` | `notes` | — |
+| `notes.list` | optional `prefix` (0–64 of the same characters) | `notes` | — |
 | `volume` | exactly one of `to` 0–100, `step` `up`/`down`, `mute` `true`/`false` | `speak` | — |
 | `stop` | — | — | — |
 | `turn.start` | optional `prompt`: words said first, as `say`'s `text` (no control characters, at most 900 UTF-8 bytes) | `speak` + `hear` | — |
@@ -1018,6 +1024,64 @@ A paired computer keeps clips of its own on its lamp and plays them by name
   from #4958 does for every `say` (its `exact`). A product round ships both;
   a `lamp-try` of lamp-control alone needs the lamp-voice of the same
   round.
+
+## Notes
+
+A paired computer's own small memory on the lamp, so an app's state outlives
+its own restart and the lamp's. With the `notes` grant, `notes.set` keeps a
+JSON value under a key, `notes.get` reads it, `notes.delete` drops it and
+`notes.list` lists the computer's own keys (all, or those starting with a
+`prefix`). It is built like the computer's clips ("Sounds"): a folder for each
+computer in the state folder, caps that are the lamp's rather than a policy, and
+a revoke that deletes everything.
+
+- **Whose.** The computer is always the one the connection proved at `hello`
+  (its id), never a field of a request, so no computer can name another's keys,
+  and a re-paired computer is a new id that sees nothing of the old one's.
+- **The bounds, refused whole (nothing is partly kept).** A key is 1 to 64
+  bytes of `A-Z a-z 0-9 . _ : -` (`bad_request` otherwise; a prefix is up to 64
+  of them). A value is any JSON, at most 16,384 bytes serialized
+  (`bad_request`, "value: N bytes, over the 16384 one note may take"): what the
+  request itself holds past a bound (a key, a prefix, a value) is `bad_request`.
+  A computer keeps at most
+  256 keys and 262,144 bytes of keys and values in all; a `notes.set` past
+  either is `refused` ("this computer's notes are full …": it depends on what
+  the computer already keeps, not on the request), and replacing a key
+  counts only the difference. Hello's `limits.notes` tells all of these and the
+  rates.
+- **Rates.** `notes.set` and `notes.delete` (each a write to the lamp's disk, counted
+  whether or not it took): 30 a minute. `notes.get` and `notes.list`: 120 a minute. Over it: `rate`, with
+  `retry_ms`, as the others.
+- **Answers.** `notes.set`: `{key, bytes}` (the value serialized). `notes.get`:
+  `{key, found: true, value}`, or `{key, found: false}` for a key not kept (not an
+  error; a stored `null` is found). `notes.delete`: `{key, deleted}` (`false` when
+  it was not there). `notes.list`: `{keys: [{key, bytes}], count, total, bytes,
+  keys_max, bytes_max}`, the keys sorted; `count` is those listed, `total` all the
+  computer keeps, `bytes` what its keys and values take.
+- **A write is kept off the door's lock.** The checks are made at once, then the
+  file is written (two fsyncs, 11 to 15 ms on lamp-75c9) while the door goes on
+  with other computers' requests; the answer comes when it is kept, and what a
+  read sees changes then. One write of a computer at a time: another while one
+  is being kept is `busy` ("this computer's last note is still being kept").
+  A computer let go while its write runs keeps nothing. So a `notes.get`
+  or `notes.list` sent before the answer to a `notes.set` sees the old notes
+  (a program that pipelines them should wait for the answer), and a
+  `notes.delete` sent meanwhile is `busy` too. A busy refusal is not counted in
+  the write rate. The first read of a computer's notes loads its file (at most
+  about 256 KB) under the door's lock.
+- **Kept.** One file for each computer, `notes/<client>.json` in the state
+  folder (folder 0700, file 0600), `{"v":1,"keys":{…}}`. Each change is written
+  whole to a temporary file, synced, and renamed over the old, so a crash leaves
+  the old notes or the new, never half; a failed write changes nothing and is
+  refused ("the lamp could not keep the note"). They are read the first time a
+  computer uses them and kept in memory after. A file that cannot be read (or is
+  another version's) is set aside as `<client>.json.bad`, said once in the
+  journal without a word of it, and the notes start empty.
+- **A revoke deletes them**, file and memory (and a `.bad` or a `.tmp` beside it), with the computer's clips. A grant taken back by a re-pairing without `notes` does not: its ops are refused (`no_grant`) and its notes stay on the lamp, kept for if the grant comes back, until a revoke.
+- **The journal** says the op and counts and sizes, never a key or a value;
+  nothing else on the lamp reads the notes, and no event says they changed.
+- **Refused** with "this lamp keeps no computer's notes" where lamp-control runs
+  without a notes folder (the SDKs' fake lamps keep them in memory).
 
 ## Skills pushed from a computer (piece 7)
 

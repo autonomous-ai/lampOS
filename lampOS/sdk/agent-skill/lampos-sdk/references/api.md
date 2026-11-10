@@ -101,6 +101,10 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | keep a clip on the lamp | `await lamp.upload_sound(name, "chime.wav")` | `lamp.uploadSound(name, bytes)` | `lamp_upload_sound(name, path)` | speak |
 | your clips | `await lamp.sounds()` | `lamp.sounds()` | `lamp_sounds()` | speak |
 | delete a clip | `await lamp.remove_sound(name)` | `lamp.removeSound(name)` | `lamp_remove_sound(name)` | speak |
+| keep a note of your own (any JSON, small) | `await lamp.notes.set("mood", {"calm": True})` or `notes_set(key, value)` | `lamp.notes.set('mood', { calm: true })` or `notesSet(key, value)` | `lamp_notes_set(key, value)` | notes |
+| read a note | `await lamp.notes.get("mood", default=None)` or `notes_get(key)` | `lamp.notes.get('mood', fallback)` or `notesGet(key)` | `lamp_notes_get(key)` | notes |
+| drop a note | `await lamp.notes.delete("mood")` or `notes_delete(key)` | `lamp.notes.delete('mood')` or `notesDelete(key)` | `lamp_notes_delete(key)` | notes |
+| your note keys | `await lamp.notes.list("mo")` or `notes_list(prefix)` | `lamp.notes.list('mo')` or `notesList(prefix)` | `lamp_notes_list(prefix)` | notes |
 | the speaker's volume, the person's own (one of `to` 0–100, `step` `up`/`down`, `mute`) | `await lamp.volume(to=30)`, `volume(step="down")`, `volume(mute=True)` | `lamp.volume({ to: 30 })` | `lamp_volume(to, step, mute)`, `lamp://state/volume` | speak |
 | start a turn (the lamp asks, the person answers) | `await lamp.start_turn("Shall we start?", wait=True)` | `lamp.startTurn('Shall we start?', { wait: true })` | `lamp_start_turn(prompt, wait)` | speak and hear |
 | end the turn you started | `await lamp.end_turn()` | `lamp.endTurn()` | `lamp_end_turn()` | speak |
@@ -123,6 +127,12 @@ Ranges, from lamp-control and the body:
   then lowercase letters, digits, `_` or `-`, never `hum`. Up to 64 clips and
   20 MB a computer (`limits.sounds`); a revoke deletes them. A clip plays
   as an exact `say` does: once the person isn't talking.
+- **notes:** a key of 1 to 64 bytes of letters, digits and `. _ : -`; a value
+  of any JSON, at most 16384 bytes serialized; up to 256 keys and 256 KiB of
+  keys and values a computer (`limits.notes`), one past either refused
+  whole. Only yours (the lamp knows you by your pairing), kept across your
+  program's and the lamp's restarts, deleted by a revoke. 30 writes and 120
+  reads a minute.
 - **say:** at most 900 UTF-8 bytes (the voice's own cap), no control characters, said exactly as written since #4958;
   `rephrase=True` (`{ rephrase: true }`, `lamp_say(text, rephrase)`) for the
   model's own words, every say's behaviour before it. **look:** `yaw` and `pitch` in degrees,

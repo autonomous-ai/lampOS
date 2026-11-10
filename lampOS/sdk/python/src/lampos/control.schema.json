@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke.",
       "enum": [
         "body",
         "light",
@@ -39,7 +39,8 @@
         "air",
         "device",
         "camera",
-        "microphone"
+        "microphone",
+        "notes"
       ]
     },
     "part": {
@@ -208,6 +209,18 @@
         },
         {
           "$ref": "#/$defs/sound.remove"
+        },
+        {
+          "$ref": "#/$defs/notes.set"
+        },
+        {
+          "$ref": "#/$defs/notes.get"
+        },
+        {
+          "$ref": "#/$defs/notes.delete"
+        },
+        {
+          "$ref": "#/$defs/notes.list"
         },
         {
           "$ref": "#/$defs/volume"
@@ -977,6 +990,97 @@
       ],
       "additionalProperties": false
     },
+    "notes_key": {
+      "description": "A note's key: 1 to 64 bytes of letters, digits and . _ : -.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,64}$"
+    },
+    "notes.set": {
+      "description": "Keeps a note of this computer's own under a key, over one of the same key: the reply's key and bytes (the value serialized). The value is any JSON, at most 16384 bytes serialized; a computer keeps at most 256 keys and 262144 bytes of keys and values in all (hello's limits.notes). Needs the notes grant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.set"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        },
+        "value": {}
+      },
+      "required": [
+        "id",
+        "op",
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "notes.get": {
+      "description": "One of this computer's own notes: the reply's key, found and, when found, value. A key not kept is found false, not an error.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.get"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "notes.delete": {
+      "description": "One of this computer's own notes dropped: the reply's key and deleted (false when it was not kept).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.delete"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "notes.list": {
+      "description": "This computer's own keys that start with prefix (all when it is left out), sorted: the reply's keys (each key and the bytes of its value), count (those listed), total (all it keeps), bytes (all its keys and values take), keys_max and bytes_max.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.list"
+        },
+        "prefix": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{0,64}$"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
     "clip": {
       "description": "A clip of this computer's own, as sound.upload and sound.list say it.",
       "type": "object",
@@ -1175,7 +1279,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
           "type": "object",
           "properties": {
             "re": {
@@ -1477,6 +1581,46 @@
             },
             "removed": {
               "type": "string"
+            },
+            "key": {
+              "type": "string"
+            },
+            "found": {
+              "type": "boolean"
+            },
+            "value": {},
+            "deleted": {
+              "type": "boolean"
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "bytes": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "key",
+                  "bytes"
+                ]
+              }
+            },
+            "count": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "keys_max": {
+              "type": "integer"
+            },
+            "bytes_max": {
+              "type": "integer"
             },
             "turn": {
               "const": "ended"
@@ -1804,6 +1948,72 @@
             "parts_max",
             "clips_max",
             "store_max_bytes"
+          ]
+        },
+        "notes": {
+          "description": "A computer's own notes (notes.set): a key's and a value's largest, how many keys and bytes each computer keeps, and the rates of writes (set, delete) and reads (get, list).",
+          "type": "object",
+          "properties": {
+            "key_max_bytes": {
+              "type": "integer"
+            },
+            "value_max_bytes": {
+              "type": "integer"
+            },
+            "keys_max": {
+              "type": "integer"
+            },
+            "bytes_max": {
+              "type": "integer"
+            },
+            "writes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "most": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "within_ms": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "most",
+                  "within_ms"
+                ]
+              }
+            },
+            "reads": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "most": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "within_ms": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "most",
+                  "within_ms"
+                ]
+              }
+            }
+          },
+          "required": [
+            "key_max_bytes",
+            "value_max_bytes",
+            "keys_max",
+            "bytes_max",
+            "writes",
+            "reads"
           ]
         },
         "push": {

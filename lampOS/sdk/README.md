@@ -194,6 +194,7 @@ Python names first, JavaScript where it differs.
 |---|---|---|---|---|---|---|
 | Speak a line exactly as sent, or in the lamp's own words | `say`, `rephrase` | `say(text, rephrase=…)` / `say(text, { rephrase })` | `lamp_say` | done (≤ 900 UTF-8 bytes) | Eighth | 75c9, 2 Nov, by the local leader: exact, journal and done (finished in 6.1 s; 4 Nov, 5.1 s). Not confirmed by ear |
 | The lamp's hum, or a computer's own clips | `sound`, `sound.upload`, `sound.list`, `sound.remove` | `sound`, `upload_sound`, `sounds`, `remove_sound` / `uploadSound`, `removeSound` | `lamp_sound`, `lamp_sounds` | done | Eighth | 75c9, 4 Nov, build 10114, by the local leader: a clip uploaded, listed, played and removed |
+| A computer's own notes on the lamp (small key/value memory, kept across restarts) | `notes.set`, `notes.get`, `notes.delete`, `notes.list` | `notes.set`, `notes.get`, `notes.delete`, `notes.list` / `notesSet`, `notesGet`, `notesDelete`, `notesList` | `lamp_notes_set`, `lamp_notes_get`, `lamp_notes_delete`, `lamp_notes_list` | fake lamp, tests | Banana | not yet (lamp run pending) |
 | Speaker volume: a level, a step, mute | `volume`, `get volume`, `volume.changed` | `volume(to=…, step=…, mute=…)`, `get("volume")`, `on("volume.changed")` / `volume({ to, step, mute })` | `lamp_volume`, `lamp_state` | done | Eighth | 75c9, 4 Nov, build 10139, by the local leader |
 | Stop what it does | `stop` | `stop` | `lamp_stop` | done | Nine | not yet |
 

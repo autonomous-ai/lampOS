@@ -167,6 +167,14 @@ LIMITS = {
         "clips_max": 64,
         "store_max_bytes": 20_000_000,
     },
+    "notes": {
+        "key_max_bytes": 64,
+        "value_max_bytes": 16_384,
+        "keys_max": 256,
+        "bytes_max": 262_144,
+        "writes": [{"most": 30, "within_ms": 60_000}],
+        "reads": [{"most": 120, "within_ms": 60_000}],
+    },
     "ring": {"pixels": 32},
     "quiet_hours": "off",
 }
@@ -468,6 +476,10 @@ class FakeLamp:
         # flight: as lamp-control's sounds.rs, without its loudness check.
         self.clips: dict[str, dict[str, bytes]] = defaultdict(dict)
         self._uploads: dict[str, dict] = {}
+        # Each computer's notes (`notes.set`), as lamp-control's notes.rs keeps
+        # them: its keys and values, held to the same caps, and gone with a
+        # `revoke`.
+        self.notes: dict[str, dict[str, Any]] = {}
         # The newest light a computer asked for, and until when (the fake's
         # `clock`): what the ring shows while it lasts (`light_state`).
         self.shown: tuple[dict, float] | None = None
@@ -879,6 +891,10 @@ class FakeLamp:
             "sound.upload": ["speak"],
             "sound.list": ["speak"],
             "sound.remove": ["speak"],
+            "notes.set": ["notes"],
+            "notes.get": ["notes"],
+            "notes.delete": ["notes"],
+            "notes.list": ["notes"],
             "skill.push": ["skills"],
             "skill.list": ["skills"],
             "skill.remove": ["skills"],
@@ -889,6 +905,58 @@ class FakeLamp:
             "volume": ["speak"],
             "microphone.stream": ["microphone"],
         }.get(op, [])
+
+    def revoke(self, client: str) -> None:
+        """The owner lets `client` go, as lamp-control's revoke: its key, its
+        clips and its notes are gone."""
+        self.clients.pop(client, None)
+        self.clips.pop(client, None)
+        self.notes.pop(client, None)
+
+    async def _notes(self, ws, client: str, request: dict) -> None:
+        """One `notes.*` op, as lamp-control's notes.rs answers it: this
+        computer's own keys only, the value at most 16384 bytes serialized, 256
+        keys and 262144 bytes of keys and values in all."""
+        id_, op = request["id"], request["op"]
+        room = self.notes.get(client, {})
+
+        def size(value: Any) -> int:
+            return len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode())
+
+        def held(keys: dict) -> int:
+            return sum(len(k.encode()) + size(v) for k, v in keys.items())
+
+        if op == "notes.set":
+            key, value = request["key"], request["value"]
+            bytes_ = size(value)
+            if bytes_ > 16_384:
+                await self._refuse(ws, id_, "bad_request", f"value: {bytes_} bytes, over the 16384 one note may take")
+                return
+            after = {**room, key: value}
+            if len(after) > 256 or held(after) > 262_144:
+                await self._refuse(
+                    ws, id_, "refused",
+                    f"this computer's notes are full: it keeps 256 keys at most and 262144 bytes in all (now {len(room)} keys, {held(room)} bytes)",
+                )
+                return
+            self.notes[client] = after
+            await self._ok(ws, id_, key=key, bytes=bytes_)
+        elif op == "notes.get":
+            if request["key"] in room:
+                await self._ok(ws, id_, key=request["key"], found=True, value=room[request["key"]])
+            else:
+                await self._ok(ws, id_, key=request["key"], found=False)
+        elif op == "notes.delete":
+            deleted = request["key"] in room
+            if deleted:
+                del room[request["key"]]
+            await self._ok(ws, id_, key=request["key"], deleted=deleted)
+        else:
+            prefix = request.get("prefix", "")
+            keys = [{"key": k, "bytes": size(v)} for k, v in sorted(room.items()) if k.startswith(prefix)]
+            await self._ok(
+                ws, id_, keys=keys, count=len(keys), total=len(room), bytes=held(room), keys_max=256, bytes_max=262_144
+            )
 
     async def _upload(self, ws, client: str, request: dict) -> None:
         """One `sound.upload` part, as lamp-control's sounds.rs gathers it:
@@ -1153,6 +1221,8 @@ class FakeLamp:
                 return
             del self.pushed[request["name"]]
             await self._ok(ws, id_)
+        elif op.startswith("notes."):
+            await self._notes(ws, client, request)
         elif op == "sound.upload":
             await self._upload(ws, client, request)
         elif op == "sound.list":
