@@ -693,7 +693,7 @@ const TURNS_IT_ROUND_VI: &[&str] = &[
 /// không?") it is the "nhớ" right before "khuôn mặt", and the "không"
 /// that asks is after it; a "không" or "chưa" before it ("Mình nhớ tên
 /// thôi, không nhớ khuôn mặt nhé?") turns it round.
-fn asks_for_the_face(lamp: &str) -> bool {
+pub(crate) fn asks_for_the_face(lamp: &str) -> bool {
     let words = lower_words(lamp);
     if !lamp.contains('?') {
         return false;

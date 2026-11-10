@@ -1093,6 +1093,12 @@ pub(super) const LINES: &[Line] = &[
         "轻轻地，在我头顶上。",
         "부드럽게, 제 머리 맨 위를요.",
     ]),
+    ("May I remember your face, so I know you next time?", [
+        "Mình nhớ khuôn mặt bạn nhé, để lần sau mình nhận ra bạn?",
+        "次に会ったときにわかるように、顔を覚えてもいいですか？",
+        "我可以记住你的脸吗？这样下次就能认出你。",
+        "다음에 알아볼 수 있게 얼굴을 기억해도 될까요?",
+    ]),
     ("Mmm, that feels nice.", [
         "Ưm, dễ chịu quá.",
         "んー、気持ちいいです。",

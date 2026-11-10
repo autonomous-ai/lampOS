@@ -444,7 +444,15 @@ refused every time, #5415). It asks them to spell their name only if they
 say it is wrong or the model missed it, and only once, then says back the
 name the letters spell, never the letters (lamp-3e83, #5564: "Jane or
 J-A-N-E?"; nobody calls a person by the spelling of their name). Then it asks "May I remember your face, so I know you
-next time?". A face save refused for the read-back is held by the voice, and
+next time?". If the model has not asked it once a name and a yes are in,
+the walk asks it itself, once, after 3 s of quiet (`START_QUIET_US`): a
+fixed note the model says (`skill::FACE_ASK`, translated as the walk's other
+lines), so it is in the chat history, and its plain yes runs the save in the
+worker with no call (`yes_save`, #5684). The walk knows the question was
+said from the lamp's own words (`Onboarding::lamp_words`, by
+`known_faces::asks_for_the_face`, the worker's rule), and asks nothing after
+a no; the face wait runs from the question (#5931: on lamp-52e6 on 10 Nov two
+walks ended with the name only and the question never asked). A face save refused for the read-back is held by the voice, and
 the step stays open for it up to 45 s (`FACE_SAVE_HELD_US`) instead of ending
 15 s after the lamp's last words (`FACE_SAVE_WAIT_US`). Neither the step's give-up nor
 the model's own `setup_step` done ends it while the save is held: the model's
