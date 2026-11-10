@@ -226,6 +226,9 @@ pub struct Services<H, M> {
     /// `LAMP_SKILL_WRITES=on`: `lamp-skills` may make a made skill's
     /// fixed write the owner said yes to ([`Services::skill_write`]).
     pub skill_writes: bool,
+    /// The installed skills, where each one's package hash is read
+    /// ([`skill_writes::installed_package`]).
+    pub skills_dir: std::path::PathBuf,
     /// A skill's writes refused for content not approved, since start: the
     /// journal says this count, never the content.
     pub not_approved: AtomicUsize,
@@ -333,6 +336,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             write_on,
             skill_reads: false,
             skill_writes: false,
+            skills_dir: std::path::PathBuf::from(skill_writes::SKILLS_DIR),
             not_approved: AtomicUsize::new(0),
             signed_out: AtomicBool::new(false),
             skill_send: Mutex::new(()),
@@ -344,6 +348,39 @@ impl<H: Http, M: Mail> Services<H, M> {
     pub fn with_skill_writes(mut self, on: bool) -> Self {
         self.skill_writes = on;
         self
+    }
+
+    /// The installed skills in `dir`, in place of [`skill_writes::SKILLS_DIR`].
+    pub fn with_skills_dir(mut self, dir: std::path::PathBuf) -> Self {
+        self.skills_dir = dir;
+        self
+    }
+
+    /// Whether a GitHub write's repository is private, by GitHub's own
+    /// read of it with the link's token. One it can't read counts as
+    /// public (#6123: the owner allows public repositories, said as
+    /// "anyone can see it", but a yes to a private one never covers it
+    /// made public).
+    async fn private_repo(
+        &self,
+        service: &'static catalog::Service,
+        entry: &Entry,
+        repo: &str,
+    ) -> bool {
+        let Some((owner, name)) = repo.split_once('/') else {
+            return false;
+        };
+        let Some(url) = service
+            .api
+            .and_then(|base| reads::url(base, &["repos", owner, name], &[]).ok())
+        else {
+            return false;
+        };
+        self.call(service, entry, Method::Get, url, None, false)
+            .await
+            .ok()
+            .and_then(|body| serde_json::from_str::<Value>(&body).ok())
+            .is_some_and(|read| read["private"] == true)
     }
 
     /// Whether a peer in `cgroup` is `lamp-skills` on the tools' door with
@@ -400,6 +437,13 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             Admin::Remove(code) => {
                 self.desk.forget(Some(&code));
+                // Unlinking takes back every yes to a skill's write to it.
+                if skill_writes::Approvals::new(&self.store.0)
+                    .revoke_service(&code)
+                    .is_err()
+                {
+                    eprintln!("lamp-services: {code}'s skill approvals were not dropped");
+                }
                 match self.store.remove(&code) {
                     Ok(()) => (json!({"ok": true}), format!("{code} unlinked")),
                     Err(error) => (
@@ -550,7 +594,11 @@ impl<H: Http, M: Mail> Services<H, M> {
             .get("writes")
             .and_then(Value::as_array)
             .ok_or("writes is a list of the skill's writes")?;
+        let package = skill_writes::installed_package(&self.skills_dir, skill)
+            .ok_or("the skill is not on the lamp as a package: nothing was approved")?;
         let mut approved = Vec::new();
+        // The repositories anyone can see, for the voice to say so.
+        let mut public = Vec::new();
         for write in writes {
             skill_writes::check(write)
                 .map_err(|_| "a write is not one a skill makes: nothing was approved".to_owned())?;
@@ -566,14 +614,22 @@ impl<H: Http, M: Mail> Services<H, M> {
                     service.name
                 )
             })?;
-            approved.push((write.clone(), link_of));
+            let mut seen = false;
+            if let Some(repo) = skill_writes::github_repo(write) {
+                let (_, entry) = self.linked(write).await?;
+                if !self.private_repo(service, &entry, repo).await {
+                    seen = true;
+                    public.push(repo.to_owned());
+                }
+            }
+            approved.push((write.clone(), link_of, seen));
         }
-        skill_writes::Approvals::new(&self.store.0).approve(skill, &approved)?;
+        skill_writes::Approvals::new(&self.store.0).approve(skill, &package, &approved)?;
         eprintln!(
             "lamp-services: the owner approved {} write(s) of a made skill",
             approved.len()
         );
-        Ok(json!({"approved": approved.len()}))
+        Ok(json!({"approved": approved.len(), "public": public}))
     }
 
     /// A made skill's write (#6066, [`skill_writes`]): `{"skill", "write"}`,
@@ -609,7 +665,12 @@ impl<H: Http, M: Mail> Services<H, M> {
             return refused("not sent: the write names no skill".into());
         }
         let write = args.get("write").cloned().unwrap_or(Value::Null);
-        let approval = match skill_writes::Approvals::new(&self.store.0).find(skill, &write) {
+        let package = skill_writes::installed_package(&self.skills_dir, skill);
+        let approval = match skill_writes::Approvals::new(&self.store.0).find(
+            skill,
+            package.as_deref(),
+            &write,
+        ) {
             skill_writes::Found::Approved(approval) => approval,
             skill_writes::Found::Waiting => return refused(skill_writes::WAITING.into()),
             skill_writes::Found::Other => {
@@ -652,6 +713,14 @@ impl<H: Http, M: Mail> Services<H, M> {
         };
         if let Some(what) = writes::scope_missing(service.code, &write, &entry) {
             return refused(format!("not sent: {}", no_permission(service, what)));
+        }
+        // Still private now: a repository approved as private and public
+        // since (or unreadable) needs a new yes, which says so.
+        if let Some(repo) = skill_writes::github_repo(&write)
+            && !approval.public
+            && !self.private_repo(service, &entry, repo).await
+        {
+            return refused(skill_writes::WAITING.into());
         }
         let Ok(pending) = writes::prepare(service.code, &write, &entry) else {
             return refused("not sent: the write is not one the lamp makes".into());
@@ -1707,6 +1776,7 @@ mod tests {
             None,
             write_on,
         )
+        .with_skills_dir(dir.join("skills"))
     }
 
     fn set_line(code: &str, connector: Value) -> String {
@@ -2394,7 +2464,21 @@ mod tests {
 
     /// Services with a made skill's writes on, Gmail linked as
     /// me@home.test, and "arrive-mail"'s mail approved by the voice.
+    /// `skill` put on in `dir`'s skills folder as package `version`: its
+    /// installer's record, with a hash of its own.
+    fn put_on(dir: &std::path::Path, skill: &str, version: &str) {
+        let folder = dir.join("skills").join(skill);
+        std::fs::create_dir_all(&folder).unwrap();
+        let hash = skill_writes::hash(&json!([skill, version]));
+        std::fs::write(
+            folder.join(skill_writes::PACKAGE_FILE),
+            json!({"sha256": hash, "manifest": {}, "from_store": false}).to_string(),
+        )
+        .unwrap();
+    }
+
     fn approved(dir: &std::path::Path) -> Services<FakeHttp, FakeMail> {
+        put_on(dir, "arrive-mail", "1");
         let on = services(dir, "{}", true).with_skill_writes(true);
         run(on.admin(&app_password_gmail("me@home.test")));
         let yes = run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])));
@@ -2407,6 +2491,7 @@ mod tests {
     #[test]
     fn the_apps_yes_approves_a_skills_writes() {
         let dir = tempfile::tempdir().unwrap();
+        put_on(dir.path(), "arrive-mail", "1");
         let on = services(dir.path(), "{}", true).with_skill_writes(true);
         run(on.admin(&app_password_gmail("me@home.test")));
         let line = skill_write_line("arrive-mail", &arrival_mail());
@@ -2485,7 +2570,7 @@ mod tests {
         let sent = log["result"]["sent"].as_array().unwrap();
         assert_eq!(sent.len(), 3, "{log}");
         assert_eq!(sent[0]["skill"], "arrive-mail");
-        assert_eq!(sent[0]["to"], "boss@work.test");
+        assert_eq!(sent[0]["to"], "boss");
         assert!(!log.to_string().contains("desk"));
         assert_eq!(
             run(on.skill_tool(r#"{"op":"call","name":"skill_writes_sent"}"#))["error"],
@@ -2508,25 +2593,30 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let on = approved(dir.path());
         let line = skill_write_line("arrive-mail", &arrival_mail());
+        // Unlinking takes the yes back: the same account linked again is
+        // waiting for a new one (App Only's P2-1 on #6123).
         run(on.admin(r#"{"op":"remove","code":"gmail"}"#));
-        let gone = run(on.skill_tool(&line));
-        assert!(
-            gone["error"]
-                .as_str()
-                .unwrap()
-                .starts_with(skill_writes::STOPPED),
-            "{gone}"
-        );
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        run(on.admin(&app_password_gmail("me@home.test")));
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        // Linked over as another account: stopped.
+        let yes = run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])));
+        assert_eq!(yes["result"]["approved"], 1, "{yes}");
         run(on.admin(&app_password_gmail("someone@else.test")));
         let other = run(on.skill_tool(&line));
         assert!(
-            other["error"].as_str().unwrap().contains("link changed"),
+            other["error"]
+                .as_str()
+                .unwrap()
+                .starts_with(skill_writes::STOPPED)
+                && other["error"].as_str().unwrap().contains("link changed"),
             "{other}"
         );
         assert!(on.mail.sent.lock().unwrap().is_empty());
         run(on.admin(&app_password_gmail("me@home.test")));
         assert_eq!(run(on.skill_tool(&line))["result"]["sent"], true);
         // Nothing is approved for a service not linked.
+        put_on(dir.path(), "focus", "1");
         let event = json!({"service":"google_calendar","action":"create_event","title":"Focus","start":"2026-11-11T09:00:00+07:00","end":"2026-11-11T10:00:00+07:00"});
         let refused = run(on.tool(&approve_line("focus", &[event])));
         assert!(
@@ -2583,10 +2673,98 @@ mod tests {
         assert!(!services(dir.path(), "{}", true).skill_caller(Door::Tools, skills_cgroup));
     }
 
+    /// The yes is to the whole skill as put on, its trigger and manners
+    /// with its write (App Only's P2-2 on #6123): the skill updated (a
+    /// changed trigger is a new package), or removed, is waiting again.
+    #[test]
+    fn a_skills_yes_is_to_its_package() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = approved(dir.path());
+        let line = skill_write_line("arrive-mail", &arrival_mail());
+        put_on(dir.path(), "arrive-mail", "2");
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        // Put back as it was: the old yes was dropped, so still waiting.
+        put_on(dir.path(), "arrive-mail", "1");
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        let yes = run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])));
+        assert_eq!(yes["result"]["approved"], 1, "{yes}");
+        std::fs::remove_dir_all(dir.path().join("skills").join("arrive-mail")).unwrap();
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert!(on.mail.sent.lock().unwrap().is_empty());
+        // A skill not on as a package is never approved.
+        let refused = run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])));
+        assert!(
+            refused["error"].as_str().unwrap().contains("as a package"),
+            "{refused}"
+        );
+    }
+
+    /// A GitHub write's repository (the owner on #6123: public ones are
+    /// allowed): its visibility read at the yes, a public one named in the
+    /// yes's answer, and one approved as private but public at the send
+    /// waits for a new yes.
+    #[test]
+    fn a_skills_github_write_says_public_and_waits_if_made_public() {
+        let dir = tempfile::tempdir().unwrap();
+        put_on(dir.path(), "standup", "1");
+        let comment =
+            json!({"service":"github","action":"comment","repo":"o/r","number":3,"text":"In."});
+        let line = skill_write_line("standup", &comment);
+        let github = set_line(
+            "github",
+            // A token no answer's word holds: each answer is scrubbed of it.
+            json!({"auth_type":"oauth","access_token":"gh-token-0001","user_email":"me@home.test"}),
+        );
+        let yes = |services: &Services<FakeHttp, FakeMail>| {
+            run(services.tool(&approve_line("standup", std::slice::from_ref(&comment))))
+        };
+        // Public: approved, and said public; sent.
+        let public = services(dir.path(), r#"{"private":false}"#, true).with_skill_writes(true);
+        run(public.admin(&github));
+        let answer = yes(&public);
+        assert_eq!(answer["result"]["approved"], 1, "{answer}");
+        assert_eq!(answer["result"]["public"], json!(["o/r"]));
+        assert_eq!(run(public.skill_tool(&line))["result"]["sent"], true);
+        // Unreadable: counted public.
+        let unknown = services(dir.path(), "not json", true).with_skill_writes(true);
+        assert_eq!(yes(&unknown)["result"]["public"], json!(["o/r"]));
+        // Private: said so, and sent after GitHub's read of it.
+        let private = services(dir.path(), r#"{"private":true}"#, true).with_skill_writes(true);
+        let answer = yes(&private);
+        assert_eq!(answer["result"]["public"], json!([]), "{answer}");
+        assert_eq!(run(private.skill_tool(&line))["result"]["sent"], true);
+        let calls = private.http.calls.lock().unwrap().clone();
+        assert_eq!(
+            calls.last().unwrap().url,
+            "https://api.github.com/repos/o/r/issues/3/comments"
+        );
+        assert_eq!(
+            calls[calls.len() - 2].url,
+            "https://api.github.com/repos/o/r"
+        );
+        // Made public since the private yes: waiting, nothing posted.
+        let made_public =
+            services(dir.path(), r#"{"private":false}"#, true).with_skill_writes(true);
+        assert_eq!(
+            run(made_public.skill_tool(&line))["error"],
+            skill_writes::WAITING
+        );
+        assert!(
+            made_public
+                .http
+                .calls
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|call| call.method == Method::Get)
+        );
+    }
+
     /// A write no skill makes (a public post): never approved, never sent.
     #[test]
     fn a_skills_write_of_a_kind_no_skill_makes_is_refused() {
         let dir = tempfile::tempdir().unwrap();
+        put_on(dir.path(), "post", "1");
         let on = services(dir.path(), "{}", true).with_skill_writes(true);
         run(on.admin(&set_line(
             "facebook",
