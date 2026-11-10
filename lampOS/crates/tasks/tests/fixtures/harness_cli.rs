@@ -90,11 +90,14 @@ pub fn main() -> io::Result<()> {
         .append(true)
         .mode(0o600)
         .open(home.join("calls.jsonl"))?;
-    writeln!(
-        calls,
-        "{}",
+    // One write of the whole line: calls made together (the stopped rows'
+    // shows, #5978) append from several processes at once, and `writeln!`
+    // writes in pieces that interleave between them.
+    let line = format!(
+        "{}\n",
         json!({"args":args,"environment":environment,"pid":std::process::id()})
-    )?;
+    );
+    calls.write_all(line.as_bytes())?;
     calls.flush()?;
     if step["stdin_eof"] == true {
         let mut input = Vec::new();
