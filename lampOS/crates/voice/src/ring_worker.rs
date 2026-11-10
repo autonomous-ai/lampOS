@@ -76,6 +76,9 @@ pub struct Senses {
     /// `LAMP_SHUTDOWN=on`, held 5 to 15 s ([`lamp_msgs::shutdown_hold`]),
     /// the ring shows [`shutdown_warning`] in place of its face.
     pub button: Option<crate::ring_head::RingHead>,
+    /// The reset button held, for the reset's red (#5929): from 2 s it
+    /// blinks, from 5 s it stays ([`reset_warning`]), in place of the face.
+    pub reset: Option<crate::ring_head::RingHead>,
     /// A computer seeing or hearing through the lamp (`light/mark`): its
     /// mark over every frame drawn ([`crate::ring_mark`]).
     pub marks: Option<crate::ring_mark::Marks>,
@@ -89,6 +92,34 @@ pub struct Senses {
 pub fn shutdown_warning() -> [lamp_ring::Rgb; PIXEL_COUNT] {
     use lamp_ring::setup::{SetupLook, setup_pixels};
     setup_pixels(SetupLook::Failed, SetupLook::Failed, 1.0, 1.0)
+}
+
+/// The reset's red at full (#5929): the whole ring, no brighter than the
+/// setup light ([`lamp_ring::setup::PEAK_CHANNEL`]), and a colour the setup
+/// light never shows, so it is not read as setup.
+pub fn reset_warning_lit() -> [lamp_ring::Rgb; PIXEL_COUNT] {
+    [lamp_ring::Rgb::new(lamp_ring::setup::PEAK_CHANNEL, 0, 0); PIXEL_COUNT]
+}
+
+/// From the reset hold's 2 s the red blinks, this long lit then this long
+/// dark, counted on Controls' own `held_us`, so it needs no clock of its own.
+const RESET_BLINK_US: u64 = 500_000;
+/// When the red begins: the hold is counting toward a reset.
+const RESET_WARN_FROM_US: u64 = 2_000_000;
+
+/// While the reset button is held (`held`, as Controls last said; #5929):
+/// nothing under 2 s; from 2 s the red blinks, counting; from 5 s
+/// ([`lamp_controls::touch::RESET_HOLD_US`]) it stays lit: let go now and
+/// the lamp resets. Let go before, the red goes and nothing happens.
+pub fn reset_warning(held: Option<u64>) -> Option<[lamp_ring::Rgb; PIXEL_COUNT]> {
+    let held = held.filter(|&held| held >= RESET_WARN_FROM_US)?;
+    let lit = held >= lamp_controls::touch::RESET_HOLD_US
+        || ((held - RESET_WARN_FROM_US) / RESET_BLINK_US).is_multiple_of(2);
+    Some(if lit {
+        reset_warning_lit()
+    } else {
+        [lamp_ring::Rgb::new(0, 0, 0); PIXEL_COUNT]
+    })
 }
 
 /// Startup Ready is emitted only after the sink accepted its initial black frame.
@@ -281,6 +312,10 @@ pub fn run_continuous(
         .filter(|_| lamp_msgs::shutdown_switched_on())
         .map(|root| crate::ring_head::RingHead::on_source(root, lamp_msgs::TouchSource::Primary))
         .transpose()?;
+    // Whenever there is a bus: the reset button is on wherever it is wired.
+    let reset = bus_root
+        .map(|root| crate::ring_head::RingHead::on_source(root, lamp_msgs::TouchSource::Reset))
+        .transpose()?;
     // Whenever there is a bus: the mark is never behind a switch.
     let marks = bus_root.and_then(|root| {
         match boot_clock().and_then(|clock| crate::ring_mark::Marks::on(root, &clock)) {
@@ -296,6 +331,7 @@ pub fn run_continuous(
         unplug,
         night,
         button,
+        reset,
         marks,
         light,
         eye,
@@ -596,6 +632,7 @@ fn service(
         mut unplug,
         mut night,
         mut button,
+        mut reset,
         mut marks,
     } = senses;
     let mut light = light.map(|(light, begins)| {
@@ -726,7 +763,10 @@ fn service(
                         }
                         face.accent(frame.accent, frame.accent_at_us);
                         let at = monotonic_us();
-                        let warning = warning(button.as_mut().and_then(|button| button.tick(at)));
+                        let warning = warning(
+                            button.as_mut().and_then(|button| button.tick(at)),
+                            reset.as_mut().and_then(|reset| reset.tick(at)),
+                        );
                         let presentation = unplug
                             .as_ref()
                             .filter(|_| face.lit().on && warning.is_none())
@@ -811,7 +851,10 @@ fn service(
             rested_at = at;
             let ceiling = ChannelCeiling::new(u16::from(ceiling.get()).min(cap_ceiling))
                 .map_err(io::Error::other)?;
-            let warning = warning(button.as_mut().and_then(|button| button.tick(at)));
+            let warning = warning(
+                button.as_mut().and_then(|button| button.tick(at)),
+                reset.as_mut().and_then(|reset| reset.tick(at)),
+            );
             let presentation = unplug
                 .as_ref()
                 .filter(|_| face.lit().on && warning.is_none())
@@ -896,11 +939,14 @@ fn rest_wins(warning: Option<[lamp_ring::Rgb; PIXEL_COUNT]>, unplugging: bool) -
     }
 }
 
+/// [`reset_warning`] while the reset button is held (`reset`), else
 /// [`shutdown_warning`] while the primary button is held (`held`, as
 /// Controls last said) in the shutdown's window, or `None`.
-fn warning(held: Option<u64>) -> Option<[lamp_ring::Rgb; PIXEL_COUNT]> {
-    held.filter(|&held| lamp_msgs::shutdown_hold(held))
-        .map(|_| shutdown_warning())
+fn warning(held: Option<u64>, reset: Option<u64>) -> Option<[lamp_ring::Rgb; PIXEL_COUNT]> {
+    reset_warning(reset).or_else(|| {
+        held.filter(|&held| lamp_msgs::shutdown_hold(held))
+            .map(|_| shutdown_warning())
+    })
 }
 
 /// Late writes are said at most this often.
@@ -1348,7 +1394,7 @@ mod shutdown_warning_tests {
             (Some(15_000_001), false),
             (Some(20_000_000), false),
         ] {
-            assert_eq!(warning(held).is_some(), shows, "{held:?}");
+            assert_eq!(warning(held, None).is_some(), shows, "{held:?}");
         }
         // The setup light's amber, the whole ring, no brighter than it.
         let amber = shutdown_warning();
@@ -1402,9 +1448,129 @@ mod shutdown_warning_tests {
         let message = bus.latest(TouchState::TOPIC).unwrap().unwrap();
         let held = crate::ring_head::held_of(&message, TouchSource::Primary).map(|(held, _)| held);
         assert_eq!(held, Some(5_950_000));
-        assert!(warning(held).is_some());
+        assert!(warning(held, None).is_some());
         assert_eq!(crate::ring_head::held_of(&message, TouchSource::Head), None);
         drop(said);
         std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod reset_warning_tests {
+    use super::*;
+    use lamp_controls::{input::Level, touch::*};
+    use lamp_msgs::{ClockStamp, TouchSource, TouchState};
+
+    /// Nothing under 2 s; from 2 s the red blinks, half a second lit and half
+    /// dark by Controls' own count; from 5 s it stays lit, however long.
+    #[test]
+    fn the_reset_hold_blinks_red_from_two_seconds_and_holds_from_five() {
+        let red = reset_warning_lit();
+        assert!(
+            red.iter()
+                .all(|pixel| *pixel == lamp_ring::Rgb::new(24, 0, 0)),
+            "{:?}",
+            red[0]
+        );
+        let dark = [lamp_ring::Rgb::new(0, 0, 0); PIXEL_COUNT];
+        for (held, shown) in [
+            (None, None),
+            (Some(0), None),
+            (Some(1_999_999), None),
+            (Some(2_000_000), Some(red)),
+            (Some(2_499_999), Some(red)),
+            (Some(2_500_000), Some(dark)),
+            (Some(2_999_999), Some(dark)),
+            (Some(3_000_000), Some(red)),
+            (Some(4_999_999), Some(dark)),
+            (Some(5_000_000), Some(red)),
+            (Some(5_600_000), Some(red)),
+            (Some(60_000_000), Some(red)),
+        ] {
+            assert_eq!(warning(None, held), shown, "{held:?}");
+        }
+    }
+
+    /// Only one button is held at a time in practice; if both read held,
+    /// the reset's red is shown, the act that wipes.
+    #[test]
+    fn the_reset_red_wins_over_the_shutdown_amber() {
+        assert_eq!(
+            warning(Some(6_000_000), Some(6_000_000)),
+            Some(reset_warning_lit())
+        );
+        assert_eq!(
+            warning(Some(6_000_000), Some(1_000_000)),
+            Some(shutdown_warning())
+        );
+        assert_eq!(
+            rest_wins(warning(None, Some(5_000_000)), true),
+            RestWins::Warning(reset_warning_lit())
+        );
+    }
+
+    fn reset_state(pressed: impl Fn(u64) -> bool, until: u64) -> TouchState {
+        let mut engine = TouchEngine::new(
+            TouchConfig {
+                enabled: true,
+                reset: Some("reset100".into()),
+                ..TouchConfig::default()
+            },
+            "boot",
+            "controls",
+        )
+        .unwrap();
+        let mut state = None;
+        for (sequence, at) in (0..=until).step_by(50_000).enumerate() {
+            let sample = GpioSample {
+                stamp: ClockStamp {
+                    clock_id: "boot".into(),
+                    at_us: at,
+                    sequence: sequence as u64 + 1,
+                },
+                session_id: "gpio".into(),
+                primary: None,
+                reset: Some(pressed(at)),
+                head_pads: Vec::<Level>::new(),
+            };
+            engine.ingest_gpio(at, sample).unwrap();
+            state = Some(engine.tick(at).state);
+        }
+        state.unwrap()
+    }
+
+    fn reset_held(state: &TouchState, tag: &str) -> Option<u64> {
+        let root = std::path::PathBuf::from(format!("/tmp/lrr-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut said = bus
+            .publisher_declared(TouchState::TOPIC, &TouchState::declaration(), "controls")
+            .unwrap();
+        said.publish_json(1, state).unwrap();
+        let message = bus.latest(TouchState::TOPIC).unwrap().unwrap();
+        let held = crate::ring_head::held_of(&message, TouchSource::Reset).map(|(held, _)| held);
+        drop(said);
+        std::fs::remove_dir_all(root).unwrap();
+        held
+    }
+
+    /// The ring reads the reset button's time from Controls' touch state.
+    #[test]
+    fn the_reset_buttons_time_is_read_from_controls_touch_state() {
+        // Released 1.5 s (armed), then held 3 s.
+        let state = reset_state(|at| at >= 1_500_000, 4_500_000);
+        let held = reset_held(&state, "held");
+        assert_eq!(held, Some(3_000_000));
+        assert!(warning(None, held).is_some());
+    }
+
+    /// A reset line that rests pressed from the start never arms (#1167):
+    /// Controls gives it no time, so the ring shows no red.
+    #[test]
+    fn a_reset_line_resting_pressed_shows_no_red() {
+        let state = reset_state(|_| true, 6_000_000);
+        let held = reset_held(&state, "stuck");
+        assert_eq!(held, None);
+        assert_eq!(warning(None, held), None);
     }
 }
