@@ -497,6 +497,60 @@ pub fn has_secret_shape(text: &str) -> bool {
         || LINK_STARTS.iter().any(|link| text.contains(link))
 }
 
+/// Whether a short field kept from a read (a title, a sender) has a
+/// code's shape: a code number or a mixed code standing alone. This is
+/// [`has_secret_shape`] without its link rule, which every link meets.
+pub fn has_code_shape(text: &str) -> bool {
+    let text = text.to_lowercase();
+    has_code_number(&text) || has_mixed_code(&text)
+}
+
+/// Whether a sender kept from a read has a code's shape in its display
+/// name only, as [`masked_from`] reads it: the bare address ("bob42@x.com",
+/// or the part in `<…>`) is never checked, so an address with digits in
+/// it is kept.
+pub fn from_has_code_shape(from: &str) -> bool {
+    match from.find('<') {
+        Some(at) => has_code_shape(&from[..at]),
+        None if from.contains('@') => false,
+        None => has_code_shape(from),
+    }
+}
+
+/// Whether a link kept from a read signs in, verifies or resets
+/// ([`has_login_link`]), or carries a token, code or key in its query. A
+/// plain page or file link (a Drive `webViewLink`) is neither.
+pub fn is_secret_link(link: &str) -> bool {
+    let link = link.to_lowercase();
+    if has_login_link(&link) {
+        return true;
+    }
+    link.split_once('?').is_some_and(|(_, query)| {
+        query
+            .split(['&', '#'])
+            .filter_map(|pair| pair.split_once('='))
+            .any(|(key, value)| {
+                !value.is_empty()
+                    && SECRET_QUERY_KEYS
+                        .iter()
+                        .any(|secret| key == *secret || key.ends_with(&format!("_{secret}")))
+            })
+    })
+}
+
+/// Query keys whose value is a secret ([`is_secret_link`]).
+const SECRET_QUERY_KEYS: &[&str] = &[
+    "token",
+    "code",
+    "otp",
+    "key",
+    "sig",
+    "signature",
+    "auth",
+    "password",
+    "secret",
+];
+
 /// A code of letters and digits standing alone within `text`: a word of 4
 /// to 8 ASCII letters and digits with both in it ("F7K2Q").
 fn has_mixed_code(text: &str) -> bool {

@@ -384,6 +384,8 @@ pub fn memory_forgot_from(
     // A role went with its person's everything (`LAMP_MEMORY_ROLE`).
     for person in &forgotten {
         crate::remember::role::forgot(person.as_deref());
+        // And the service records the voice holds (`LAMP_SERVICE_RECORDS`).
+        crate::service_records::forgot(person.as_deref());
     }
     let forgets = forgotten
         .iter()

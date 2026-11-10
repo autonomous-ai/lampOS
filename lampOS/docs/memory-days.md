@@ -646,6 +646,50 @@ Most likely lamp differences are flash write delay, scheduling pressure,
 Memory's single-client queue, local-day configuration, and stale cloud
 context after forgetting. None of these scenes has been run for task 29.
 
+## Service records (`service_record`, the voice's `LAMP_SERVICE_RECORDS`)
+
+The voice's `LAMP_SERVICE_RECORDS` (off by default; the connector records
+plan, PR 1a, 10 Nov) keeps one record for each thing a known person asked of
+a linked service, in `service_records(person, key, service, action, status,
+reason, detail, result_id, asked_unix_ms, changed_unix_ms, links,
+replaced_by)`, keyed `(person, key)`, created `IF NOT EXISTS`, `user_version`
+unchanged.
+
+- `service_record {person, key, service, action, status, reason?, detail?,
+  result_id?, asked_unix_ms, changed_unix_ms, links?, replaced_by?}` puts
+  one: new, or the same key updated in place while it is `prepared`. A
+  status other than `prepared` is final: a later put keeps it and its
+  fields (only `replaced_by` may still be set), and the answer says the
+  status kept, `{ok:true,status}`. Statuses: `prepared`, `done`,
+  `cancelled`, `refused`, `failed`, `timed_out`, `no_result`. `key` and each
+  of `links` (at most 8) and `replaced_by` are 1 to 64 of `A-Za-z0-9_-`;
+  `detail` is an object of at most 16 KiB; `reason` is tidied to 200 bytes,
+  `result_id` (the service's id of what was made, an event id) to 512.
+- `service_records {person, limit?}` lists them, the latest change first,
+  at most 50.
+- `service_records_forget {person, about}` removes the records with every
+  key word of any subject of `about` (lists of words), compared lower case,
+  without accents and as singulars, in the service, action, reason, result
+  id and every text of the detail: `{ok:true,removed}`.
+- **A put asked before a forget is refused** `forgotten`: one whose
+  `asked_unix_ms` is before the person's latest `forget_all` or
+  `forget_person` (or everyone's `forget_all`), kept in
+  `service_records_forgot(person, at_unix_ms)` (`''` for everyone's: an id
+  and a time only, so it holds across a restart), or before a
+  `service_records_forget` whose subjects it matches (held in memory only,
+  the last 64, since its words say what was forgotten). So a change the voice
+  sent before a forget, taken after it, is never kept; one asked after it is.
+
+Only a known person (`p-` id) has records: the room, a rules scope or any
+other id is refused `bad_person`. They are kept until forgotten: the day's
+expiry, the unused-entry expiry, the tidy and the nightly pass work on
+`entries` and never read this table. `forget_all` and `forget_person` remove
+them with everything else (and count them in `removed`). At most 10,000 a
+person; past it the record changed longest ago goes. What a read found is
+stored by the voice as metadata and a masked excerpt only; the store keeps
+what it is given. An older memory answers `unknown_op` to the three
+operations, so the voice sends them only with its switch on.
+
 ## Storage and migration
 
 `<dir>/memory-days.sqlite3` holds raw exchanges, explicit kept facts,
