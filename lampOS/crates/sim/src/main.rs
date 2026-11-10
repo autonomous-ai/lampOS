@@ -1,6 +1,6 @@
 //! `lamp-sim`: the virtual desktop lamp's hardware edge (docs/simulator-lamp.md).
 //!
-//! lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera=always] [--microphone]
+//! lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always] [--microphone]
 //!     Starts everything in DIR (short, private, outside a world-writable
 //!     folder): the simulated servo bus, the real lamp-body on it, the ring,
 //!     the voice and the volume, and the real lamp-control; prints a pairing
@@ -16,7 +16,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera=always] [--microphone] | lamp-sim code DIR | lamp-sim servo DIR";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always] [--microphone] | lamp-sim code DIR | lamp-sim servo DIR";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -159,17 +159,17 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     let view = dir.join("ring.json");
     let sight = dir.join("sight.jpg");
     let mut camera = Camera::new(&sight);
-    // The host's camera opens only when asked for with `--camera=always`, and
-    // then stays open for the lamp's whole life, as the eyes' does (the host's
-    // camera light stays on). Each picture still goes only while the ring shows
-    // the camera's mark. Opening only for a computer's mark needs lamp-control's
-    // `--camera-opens-on-demand`, which comes separately.
+    // The host's camera is off unless asked for. `--camera=always`: open for the
+    // lamp's whole life, as the eyes' is (the host's camera light stays on).
+    // `--camera`: open while a computer's camera mark is on the ring (the ring
+    // renews it every 250 ms while it is held, and one seen in the last 1.5 s
+    // counts), and `Camera`'s own hold keeps it open 10 s after the last such
+    // moment: about 10 to 11.5 s after the mark is let go. So the host's camera
+    // light means someone is looking. It needs lamp-control's
+    // `--camera-opens-on-demand`, which is passed. Each picture still goes only
+    // while the ring shows the camera's mark.
     let camera_always = args.iter().any(|a| a == "--camera=always");
-    if args.iter().any(|a| a == "--camera") {
-        return Err(std::io::Error::other(
-            "--camera needs lamp-control's --camera-opens-on-demand, not in this build: use --camera=always",
-        ));
-    }
+    let camera_on_mark = !camera_always && args.iter().any(|a| a == "--camera");
     // The microphone the same way: only with --microphone. The ears' sound
     // still goes to a computer only while the ring shows its mark.
     let microphone_on = args.iter().any(|a| a == "--microphone");
@@ -187,7 +187,9 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             if ring.step(&clock_id).is_err() {
                 thread::sleep(Duration::from_millis(100));
             }
-            camera.step(camera_always);
+            let marked = ring.camera_marked_us != 0
+                && lamp_ipc::monotonic_us().saturating_sub(ring.camera_marked_us) < 1_500_000;
+            camera.step(camera_always || (camera_on_mark && marked));
             if tick.is_multiple_of(5) {
                 let _ = people.say();
             }
@@ -239,6 +241,7 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
                 &d("act.sock"),
             ])
             .args(["--sight-file", &d("sight.jpg")])
+            .args(camera_on_mark.then_some("--camera-opens-on-demand"))
             .args(["--microphone", if microphone_on { "on" } else { "off" }])
             .env("LAMP_BUS_AUDIO", "on")
             .process_group(0)
