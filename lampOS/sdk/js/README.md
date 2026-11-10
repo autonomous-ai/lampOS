@@ -58,7 +58,7 @@ LAMPOS_HOME=/tmp/lampos-try node examples/greet.js
 ```
 
 Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
-example runs this way: `tour.js` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `notes.js` (a run counter kept in a note on the lamp), `phrase.js`, `pomodoro.js`,
+example runs this way: `tour.js` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `heat-watch.js` (a pulsing orange light once when a joint runs hot: `body.state`'s `temp_c`), `notes.js` (a run counter kept in a note on the lamp), `phrase.js`, `pomodoro.js`,
 `ci-light.js`, `ask-the-person.js`, `camera.js` (needs a pairing with the `camera` grant, which the app does not offer yet: only a pairing code made on the lamp itself carries it, so on a lamp paired through the app the call is refused `no_grant`; saves `snapshot.jpg` and a stream's `last-frame.jpg`), `curious.js` (a move of your own from poses), `touch.js` (a tap lights the ring, a pet is answered with a feeling; a tap reaches a program from the next build), and `push-skill.js ../examples/hello-skill` (a pairing with `skills` and `speak`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
