@@ -11,6 +11,9 @@
 //!   OpenAI-compatible chat (`api_mode: chat_completions`), its key read from
 //!   [`TOKEN_ENV`];
 //! - `approvals.mode` = `manual`: Hermes asks before a dangerous command;
+//! - [`SKILLS_DIR`] in `skills.external_dirs`: Hermes reads the lamp's own
+//!   skills where they are, read-only, never copied into `HERMES_HOME`;
+//!   the dirs a person added there are kept;
 //! - `.env`'s [`TOKEN_ENV`] line: the forwarder's local token, never the
 //!   relay's key.
 //!
@@ -52,6 +55,9 @@ pub const DROPPED_KEYS: [&str; 5] = [
 ];
 /// Hermes' approval mode that asks before a dangerous command.
 pub const APPROVALS: &str = "manual";
+/// The lamp's own skills, the folder lamp-skills reads (`lamp-skills
+/// --dir`), given to Hermes in place through `skills.external_dirs`.
+pub const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
 
 /// The forwarder's base for Hermes, on `port`.
 pub fn base_url(port: u16) -> String {
@@ -169,6 +175,65 @@ fn parts(text: &str) -> Result<Vec<Part>, Refused> {
     Ok(parts)
 }
 
+/// The mapping `part`'s child indent, and where each of its children
+/// starts (index in `part.lines`, key). Refused when its lines are not a
+/// block mapping evenly indented.
+fn children(part: &Part, top: &str) -> Result<(usize, Vec<(usize, String)>), Refused> {
+    let body = &part.lines[1..];
+    let child_indent = body
+        .iter()
+        .find(|line| !is_blank_or_comment(line))
+        .map(|line| indent(line))
+        .unwrap_or(2);
+    if child_indent == 0 {
+        return Err(Refused(format!("`{top}` has nothing indented under it")));
+    }
+    let mut starts = Vec::new();
+    for (index, line) in part.lines.iter().enumerate().skip(1) {
+        if is_blank_or_comment(line) {
+            continue;
+        }
+        let at_indent = indent(line);
+        if at_indent < child_indent {
+            return Err(Refused(format!("`{top}`'s lines are not evenly indented")));
+        }
+        if at_indent == child_indent {
+            if line.trim_start().starts_with('-') {
+                // PyYAML writes a child's list at the child's own indent
+                // (`external_dirs:` then `- /path`): those items belong to
+                // the child above them.
+                if starts.is_empty() {
+                    return Err(Refused(format!("`{top}` is a list, not a mapping")));
+                }
+                continue;
+            }
+            let Some(key) = key_of(line) else {
+                return Err(Refused(format!("`{top}` has a line that is not a key")));
+            };
+            starts.push((index, key));
+        }
+    }
+    Ok((child_indent, starts))
+}
+
+/// Where the child at `position` of [`children`]'s `starts` runs in
+/// `part.lines`: to the next child, or to the mapping's last non-blank
+/// line, so a blank or comment after it stays.
+fn child_span(part: &Part, starts: &[(usize, String)], position: usize) -> (usize, usize) {
+    let begin = starts[position].0;
+    let end = match starts.get(position + 1) {
+        Some((next, _)) => *next,
+        None => {
+            let mut end = part.lines.len();
+            while end > begin + 1 && is_blank_or_comment(&part.lines[end - 1]) {
+                end -= 1;
+            }
+            end
+        }
+    };
+    (begin, end)
+}
+
 /// The child `child` of the mapping `top` set to `lines` (its `child:` line
 /// first, at indent 0; indented by the mapping's own child indent here), or
 /// removed with `None`. The mapping is made when missing; an inline value
@@ -210,35 +275,7 @@ fn set_child(
         part.lines.truncate(1);
         part.lines[0] = format!("{top}:");
     }
-    let body = &part.lines[1..];
-    let child_indent = body
-        .iter()
-        .find(|line| !is_blank_or_comment(line))
-        .map(|line| indent(line))
-        .unwrap_or(2);
-    if child_indent == 0 {
-        return Err(Refused(format!("`{top}` has nothing indented under it")));
-    }
-    // Where each child of the mapping starts, in `part.lines`.
-    let mut starts = Vec::new();
-    for (index, line) in part.lines.iter().enumerate().skip(1) {
-        if is_blank_or_comment(line) {
-            continue;
-        }
-        let at_indent = indent(line);
-        if at_indent < child_indent {
-            return Err(Refused(format!("`{top}`'s lines are not evenly indented")));
-        }
-        if at_indent == child_indent {
-            if line.trim_start().starts_with('-') {
-                return Err(Refused(format!("`{top}` is a list, not a mapping")));
-            }
-            let Some(key) = key_of(line) else {
-                return Err(Refused(format!("`{top}` has a line that is not a key")));
-            };
-            starts.push((index, key));
-        }
-    }
+    let (child_indent, starts) = children(part, top)?;
     let found: Vec<usize> = starts
         .iter()
         .enumerate()
@@ -256,19 +293,7 @@ fn set_child(
         .collect();
     match found.first() {
         Some(&position) => {
-            let begin = starts[position].0;
-            // The child runs to the next child, or to the mapping's last
-            // non-blank line: a blank or comment after it stays.
-            let end = match starts.get(position + 1) {
-                Some((next, _)) => *next,
-                None => {
-                    let mut end = part.lines.len();
-                    while end > begin + 1 && is_blank_or_comment(&part.lines[end - 1]) {
-                        end -= 1;
-                    }
-                    end
-                }
-            };
+            let (begin, end) = child_span(part, &starts, position);
             part.lines.splice(begin..end, new);
         }
         None => {
@@ -279,6 +304,153 @@ fn set_child(
             part.lines.splice(end..end, new);
         }
     }
+    Ok(())
+}
+
+/// A value that stands for nothing set yet: what a reset leaves.
+fn is_unset(value: &str) -> bool {
+    matches!(value, "{}" | "[]" | "null" | "~")
+}
+
+/// One plain list item's text as the path it names: quotes taken off, an
+/// inline comment of an unquoted one taken off. `None` for anything that
+/// is not a plain scalar (a mapping, a nested list, an anchor, alias or
+/// tag, a block scalar).
+fn plain_item(text: &str) -> Option<String> {
+    let text = text.trim();
+    if let Some(rest) = text.strip_prefix('"') {
+        let mut out = String::new();
+        let mut characters = rest.chars();
+        while let Some(character) = characters.next() {
+            match character {
+                '"' => return Some(out),
+                '\\' => out.push(characters.next()?),
+                other => out.push(other),
+            }
+        }
+        return None;
+    }
+    if let Some(rest) = text.strip_prefix('\'') {
+        return rest.find('\'').map(|end| rest[..end].to_owned());
+    }
+    let text = text.split(" #").next().unwrap_or_default().trim();
+    let first = text.chars().next()?;
+    if "{[&*!|>-#%@`".contains(first) || text.contains(": ") || text.ends_with(':') {
+        return None;
+    }
+    Some(text.to_owned())
+}
+
+fn same_path(left: &str, right: &str) -> bool {
+    let trim = |path: &str| path.trim_end_matches('/').to_owned();
+    trim(left) == trim(right)
+}
+
+/// `top.child`, a list of paths, with `item` in it: added last when it is
+/// not there, every other item kept as it was; nothing changed when it is.
+/// The mapping and the list are made when missing, and a value a reset
+/// left (`{}`, `[]`, `null`) takes the block. A flow list of plain items
+/// (`[a, b]`) or one plain path becomes a block list of the same items and
+/// `item`. Anything else there is refused, never rewritten.
+fn add_to_list(parts: &mut Vec<Part>, top: &str, child: &str, item: &str) -> Result<(), Refused> {
+    let entry = format!("- {}", quoted(item));
+    let fresh = [format!("{child}:"), entry.clone()];
+    let Some(at) = parts
+        .iter()
+        .position(|part| part.key.as_deref() == Some(top))
+    else {
+        return set_child(parts, top, child, Some(&fresh));
+    };
+    let top_value = inline_value(&parts[at].lines[0]);
+    if !top_value.is_empty() {
+        if is_unset(top_value) && top_value != "[]" {
+            return set_child(parts, top, child, Some(&fresh));
+        }
+        return Err(Refused(format!("`{top}` is not a block mapping")));
+    }
+    let part = &mut parts[at];
+    let (child_indent, starts) = children(part, top)?;
+    let found: Vec<usize> = starts
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, key))| key == child)
+        .map(|(position, _)| position)
+        .collect();
+    let position = match found.as_slice() {
+        [] => return set_child(parts, top, child, Some(&fresh)),
+        [position] => *position,
+        _ => return Err(Refused(format!("`{top}.{child}` is there twice"))),
+    };
+    let (begin, end) = child_span(part, &starts, position);
+    let pad = " ".repeat(child_indent);
+    let value = inline_value(&part.lines[begin]).to_owned();
+    let not_plain = || Refused(format!("`{top}.{child}` is not a list of plain paths"));
+    if value.is_empty() {
+        // A block list: its items, the last one's line, their indent.
+        let mut items = Vec::new();
+        let mut last = begin;
+        let mut item_pad = None;
+        for (index, line) in part.lines.iter().enumerate().take(end).skip(begin + 1) {
+            if is_blank_or_comment(line) {
+                continue;
+            }
+            let trimmed = line.trim_start();
+            let text = trimmed
+                .strip_prefix("- ")
+                .or_else(|| (trimmed == "-").then_some(""))
+                .ok_or_else(not_plain)?;
+            items.push(plain_item(text).ok_or_else(not_plain)?);
+            item_pad.get_or_insert_with(|| " ".repeat(indent(line)));
+            last = index;
+        }
+        if items.iter().any(|path| same_path(path, item)) {
+            return Ok(());
+        }
+        let line = format!("{}{entry}", item_pad.unwrap_or(pad));
+        part.lines.insert(last + 1, line);
+        return Ok(());
+    }
+    if part.lines[begin + 1..end]
+        .iter()
+        .any(|line| !is_blank_or_comment(line))
+    {
+        return Err(Refused(format!(
+            "`{top}.{child}` has a value and lines under it"
+        )));
+    }
+    let kept: Vec<String> = if is_unset(&value) {
+        Vec::new()
+    } else if let Some(inner) = value
+        .strip_prefix('[')
+        .and_then(|rest| rest.strip_suffix(']'))
+    {
+        if inner.contains(['[', ']', '{', '}', '"', '\'', '#']) {
+            return Err(not_plain());
+        }
+        inner
+            .split(',')
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(|text| {
+                plain_item(text)
+                    .map(|_| text.to_owned())
+                    .ok_or_else(not_plain)
+            })
+            .collect::<Result<_, _>>()?
+    } else {
+        plain_item(&value).ok_or_else(not_plain)?;
+        vec![value.clone()]
+    };
+    if kept
+        .iter()
+        .any(|text| plain_item(text).is_some_and(|path| same_path(&path, item)))
+    {
+        return Ok(());
+    }
+    let mut block = vec![format!("{pad}{child}:")];
+    block.extend(kept.iter().map(|text| format!("{pad}- {text}")));
+    block.push(format!("{pad}{entry}"));
+    part.lines.splice(begin..end, block);
     Ok(())
 }
 
@@ -328,6 +500,7 @@ pub fn merge_config(text: &str, port: u16) -> Result<String, Refused> {
         "mode",
         Some(&one("mode", APPROVALS)),
     )?;
+    add_to_list(&mut parts, "skills", "external_dirs", SKILLS_DIR)?;
     let mut out = String::new();
     for part in &parts {
         for line in &part.lines {
@@ -375,7 +548,7 @@ pub struct Written {
 
 /// `path`'s text, never through a link (`O_NOFOLLOW`), and only of a
 /// regular file; empty when there is none.
-fn read_or_empty(path: &Path) -> io::Result<String> {
+pub(crate) fn read_or_empty(path: &Path) -> io::Result<String> {
     let opened = fs::OpenOptions::new()
         .read(true)
         .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
@@ -398,7 +571,7 @@ fn read_or_empty(path: &Path) -> io::Result<String> {
 
 /// `text` in place of `path`, 0600, through a new file beside it renamed
 /// over it, so a reader never sees half a file.
-fn replace(path: &Path, text: &str) -> io::Result<()> {
+pub(crate) fn replace(path: &Path, text: &str) -> io::Result<()> {
     let dir = path.parent().unwrap_or(Path::new("."));
     let name = path
         .file_name()
@@ -448,6 +621,70 @@ pub fn write(hermes_home: &Path, port: u16, token: &str) -> io::Result<Written> 
         replace(&config_path, &merged_config)?;
     }
     Ok(written)
+}
+
+/// The lamp's guidance for Hermes, `AGENTS.md` in the lamp's work folder
+/// (`runtime::LAMP_PROJECT`): Hermes reads it from its working folder as
+/// the project's context. lampOS's own file, never one under
+/// `HERMES_HOME`.
+pub const GUIDANCE_FILE: &str = "AGENTS.md";
+
+/// What [`GUIDANCE_FILE`] says: where the lamp's skills are, how to run
+/// one's tool ([`crate::skill_call`]), and the owner's rules for them.
+pub fn guidance() -> String {
+    let program = crate::skill_call::PROGRAM;
+    format!(
+        "\
+# Working on the lamp
+
+You are Hermes, running on the lamp itself as the user `lampos`. The lamp's \
+voice (a fast model) hands you the longer tasks a person asks for; you work \
+on its behalf. lampOS writes this file; changes to it are written over.
+
+## The lamp's skills
+
+- The lamp's own skills are in `{SKILLS_DIR}/<name>/`: a `SKILL.md` (what it \
+does and when) and a `skill.toml` (its triggers, steps and tool). They are in \
+your skills list as external skills. The folder is read-only and owned by the \
+lamp: never edit, move or copy files there, and never copy them into \
+`~/.hermes` or anywhere else.
+- Skills with a tool can be run by you, the same way the voice runs them: \
+`{program} skill list` shows them as JSON, and \
+`{program} skill call NAME '{{\"choice\":\"value\"}}'` runs one and prints \
+the skill's answer as JSON (`ok` true or false). The arguments are the ones \
+the list gives for that tool, or none.
+- The lamp's skills service still applies its own checks (cooldowns, the \
+lamp's pause, its policy). If it refuses, tell the person why, and do not \
+retry it or try another way around it.
+- Run a skill only when the person's task asks for it (for example \"light the \
+desk while you work\" or \"dance when you're done\"). Never move, light up or \
+play sounds on your own.
+- Do not use any other socket under `/run/lampos-*`.
+- To write a new skill, read two or three existing ones for the format, write \
+it in this work folder, and tell the person where it is. Installing it on the \
+lamp is the person's step, never yours.
+"
+    )
+}
+
+/// [`guidance`] in `folder`'s [`GUIDANCE_FILE`], written only when what is
+/// there differs; `true` when it was written. Never through a link: a
+/// folder or a file that is a link, or a file that isn't a regular one, is
+/// refused and left as it is.
+pub fn write_guidance(folder: &Path) -> io::Result<bool> {
+    if !fs::symlink_metadata(folder)?.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the work folder is not a folder",
+        ));
+    }
+    let path = folder.join(GUIDANCE_FILE);
+    let text = guidance();
+    if read_or_empty(&path)? == text {
+        return Ok(false);
+    }
+    replace(&path, &text)?;
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -683,5 +920,141 @@ LAMP_HERMES_TOKEN=old
             "- not a mapping\n"
         );
         assert!(!home.path().join(".env").exists());
+    }
+
+    const SKILLS: &str = "skills:\n  external_dirs:\n  - \"/var/lib/lampOS/skills\"\n";
+
+    #[test]
+    fn the_lamps_skills_dir_is_added_once_and_hooks_are_kept() {
+        let merged = merge_config(HARNESS, 7741).unwrap();
+        assert!(merged.ends_with(SKILLS), "{merged}");
+        assert_eq!(hooks_block(&merged), hooks_block(HARNESS));
+        assert_eq!(merge_config(&merged, 7741).unwrap(), merged);
+        assert_eq!(merged.matches("/var/lib/lampOS/skills").count(), 1);
+        let reset = merge_config("skills: {}\n", 7741).unwrap();
+        assert!(reset.starts_with(SKILLS), "{reset}");
+    }
+
+    #[test]
+    fn a_persons_own_skills_dirs_and_keys_are_kept() {
+        let text = "\
+skills:
+  disabled:
+  - old
+  external_dirs:
+  - ~/my-skills   # mine
+  - '/srv/team skills'
+  creation_nudge_interval: 5
+";
+        let merged = merge_config(text, 7741).unwrap();
+        assert!(
+            merged.starts_with(
+                "skills:\n  disabled:\n  - old\n  external_dirs:\n  - ~/my-skills   # mine\n  \
+                 - '/srv/team skills'\n  - \"/var/lib/lampOS/skills\"\n  creation_nudge_interval: 5\n"
+            ),
+            "{merged}"
+        );
+        assert_eq!(merge_config(&merged, 7741).unwrap(), merged);
+        let deeper = "skills:\n    external_dirs:\n        - /a\n";
+        let merged = merge_config(deeper, 7741).unwrap();
+        assert!(
+            merged.starts_with(
+                "skills:\n    external_dirs:\n        - /a\n        - \"/var/lib/lampOS/skills\"\n"
+            ),
+            "{merged}"
+        );
+    }
+
+    #[test]
+    fn the_dir_already_there_in_any_spelling_is_left_as_it_is() {
+        for text in [
+            "skills:\n  external_dirs:\n  - /var/lib/lampOS/skills/\n",
+            "skills:\n  external_dirs:\n  - '/var/lib/lampOS/skills'\n",
+            "skills:\n  external_dirs: [/x, /var/lib/lampOS/skills]\n",
+            "skills:\n  external_dirs: /var/lib/lampOS/skills\n",
+        ] {
+            let merged = merge_config(text, 7741).unwrap();
+            assert!(merged.starts_with(text), "{merged}");
+            assert_eq!(merged.matches("lampOS/skills").count(), 1, "{merged}");
+        }
+    }
+
+    #[test]
+    fn a_flow_list_a_single_path_or_a_reset_becomes_a_block_list() {
+        for (text, want) in [
+            (
+                "skills:\n  external_dirs: [/a, ~/b]\n",
+                "skills:\n  external_dirs:\n  - /a\n  - ~/b\n  - \"/var/lib/lampOS/skills\"\n",
+            ),
+            (
+                "skills:\n  external_dirs: /a\n",
+                "skills:\n  external_dirs:\n  - /a\n  - \"/var/lib/lampOS/skills\"\n",
+            ),
+            ("skills:\n  external_dirs: []\n", SKILLS),
+            ("skills:\n  external_dirs: null\n", SKILLS),
+            ("skills:\n  external_dirs:\n", SKILLS),
+            ("skills:\n", SKILLS),
+        ] {
+            let merged = merge_config(text, 7741).unwrap();
+            assert!(merged.starts_with(want), "{text:?} gave {merged:?}");
+            assert_eq!(merge_config(&merged, 7741).unwrap(), merged);
+        }
+    }
+
+    #[test]
+    fn skills_that_cannot_be_merged_safely_are_refused() {
+        for text in [
+            "skills: [a]\n",
+            "skills: {external_dirs: [/a]}\n",
+            "skills:\n  external_dirs: &dirs\n",
+            "skills:\n  external_dirs: [[/a]]\n",
+            "skills:\n  external_dirs: [\"/a, b\"]\n",
+            "skills:\n  external_dirs:\n  - path: /a\n",
+            "skills:\n  external_dirs:\n  - /a\n    more: x\n",
+            "skills:\n  external_dirs: |\n    /a\n",
+            "skills:\n  external_dirs: []\n  external_dirs: []\n",
+            "skills:\n- /a\n",
+        ] {
+            assert!(merge_config(text, 7741).is_err(), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn the_guidance_is_written_once_never_through_a_link() {
+        let folder = tempfile::tempdir().unwrap();
+        assert!(write_guidance(folder.path()).unwrap());
+        let text = fs::read_to_string(folder.path().join(GUIDANCE_FILE)).unwrap();
+        assert_eq!(text, guidance());
+        assert!(!write_guidance(folder.path()).unwrap(), "unchanged");
+        let elsewhere = tempfile::tempdir().unwrap();
+        let target = elsewhere.path().join("AGENTS.md");
+        fs::write(&target, "theirs\n").unwrap();
+        let linked = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(&target, linked.path().join(GUIDANCE_FILE)).unwrap();
+        assert!(write_guidance(linked.path()).is_err());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "theirs\n");
+        let parent = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(folder.path(), parent.path().join("lamp")).unwrap();
+        assert!(write_guidance(&parent.path().join("lamp")).is_err());
+    }
+
+    #[test]
+    fn the_guidance_says_where_the_skills_are_how_to_run_one_and_the_rules() {
+        let text = guidance();
+        for words in [
+            "`/var/lib/lampOS/skills/<name>/`",
+            "/opt/lampOS/tasks/current/lamp-tasks skill list",
+            "/opt/lampOS/tasks/current/lamp-tasks skill call NAME '{\"choice\":\"value\"}'",
+            "never edit, move or copy files there",
+            "do not\nretry",
+            "Never move, light up or\nplay sounds on your own.",
+            "Installing it on the\nlamp is the person's step",
+        ] {
+            assert!(
+                text.replace('\n', " ").contains(&words.replace('\n', " ")),
+                "{words}"
+            );
+        }
+        assert!(!text.contains("~/.hermes/skills/<"), "never a copy");
     }
 }

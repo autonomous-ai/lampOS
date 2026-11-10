@@ -2001,18 +2001,25 @@ fn from_machines(
 /// The lamp's own work folder, [`LAMP_PROJECT`] under `home`, `lampos`'s
 /// (#5978): made here when it is not there, 0700, since Harness makes
 /// only a `~/harnesses/<name>` folder. A failure is said; the hand-over
-/// then says the folder is missing.
+/// then says the folder is missing. The lamp's guidance for Hermes, its
+/// `AGENTS.md` ([`crate::hermes_config::write_guidance`]), is written in
+/// it when what is there differs, with one journal line.
 fn make_lamp_folder(home: &Path) {
     let folder = home.join(LAMP_PROJECT.trim_start_matches("~/"));
-    if folder.is_dir() {
-        return;
+    if !folder.is_dir() {
+        let made = fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&folder);
+        if let Err(error) = made {
+            eprintln!("tasks: the lamp's own work folder not made: {error}");
+            return;
+        }
     }
-    let made = fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(&folder);
-    if let Err(error) = made {
-        eprintln!("tasks: the lamp's own work folder not made: {error}");
+    match crate::hermes_config::write_guidance(&folder) {
+        Ok(true) => eprintln!("tasks: the lamp's guidance for Hermes written"),
+        Ok(false) => {}
+        Err(error) => eprintln!("tasks: the lamp's guidance for Hermes not written: {error}"),
     }
 }
 
@@ -4454,11 +4461,33 @@ mod tests {
         );
         assert!(config.contains("127.0.0.1:7741/v1/deepseek"), "{config}");
         assert!(
+            config.contains("skills:\n  external_dirs:\n  - \"/var/lib/lampOS/skills\"\n"),
+            "{config}"
+        );
+        assert!(
             fs::read_to_string(hermes.join(".env"))
                 .unwrap()
                 .contains(&secret)
         );
         assert!(set_up_hermes(&hermes, &token).ends_with("config unchanged, env unchanged"));
+    }
+
+    #[test]
+    fn the_lamp_folder_gets_the_guidance_once_and_again_when_changed() {
+        let home = tempfile::tempdir().unwrap();
+        make_lamp_folder(home.path());
+        let folder = home.path().join("harnesses/lamp-tasks/lamp");
+        let guidance = folder.join(crate::hermes_config::GUIDANCE_FILE);
+        let written = fs::read_to_string(&guidance).unwrap();
+        assert_eq!(written, crate::hermes_config::guidance());
+        assert_eq!(
+            fs::metadata(&folder).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        fs::write(&guidance, "changed by hand\n").unwrap();
+        make_lamp_folder(home.path());
+        assert_eq!(fs::read_to_string(&guidance).unwrap(), written);
+        assert!(!crate::hermes_config::write_guidance(&folder).unwrap());
     }
 
     /// #1676: the part writes the targets file only where it is its own: none

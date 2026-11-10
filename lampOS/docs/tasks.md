@@ -1362,6 +1362,53 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     token from `/var/lib/lampos-cloud/hermes-token`, and says one journal
     line: written, unchanged, or "not written: no forwarder token yet",
     when the token is missing (then nothing is written).
+  - **The lamp's skills for Hermes.** With the switch on, Hermes acts for
+    the lamp's voice, so it sees the lamp's own skills and can run them:
+    - **Read in place.** The same settings merge adds
+      `/var/lib/lampOS/skills` (the folder lamp-skills reads) to Hermes'
+      `skills.external_dirs`, so Hermes lists the lamp's skills as
+      external, read-only skills. They are never copied into
+      `HERMES_HOME`. The merge keeps every other key under `skills:` and
+      every dir a person added there, adds the lamp's only when it is not
+      there already (a trailing `/` or quotes count as there), and leaves
+      Harness's `hooks:` block as it is. A flow list (`[a, b]`) or a single
+      path becomes a block list of the same items and the lamp's; a value a
+      reset left (`{}`, `[]`, `null`) takes the block. Anything else there
+      (a nested item, an anchor, a block scalar) refuses the whole merge,
+      as above, and the file is left as it is.
+    - **The guidance.** Each time the part keeps the lamp as a target, it
+      writes `AGENTS.md` in the lamp's work folder
+      (`~/harnesses/lamp-tasks/lamp`), which Hermes reads from its working
+      folder as the project's context; never a file under `HERMES_HOME`.
+      It says where the skills are and how to run one, and the owner's
+      rules: run a skill only when the person's task asks for it, never
+      move, light up or play sounds unprompted; if the lamp's skills
+      refuse, say why and don't retry around it; never edit or copy the
+      skills folder; a new skill goes in the work folder, and installing
+      it is the person's step. The file is lampOS's: it is written, 0600,
+      only when what is there differs (a hand edit is written over at the
+      next look), never through a link, and a work folder that is a link
+      is refused. One journal line when it is written or not written.
+    - **Calling a skill's tool.** `lamp-tasks skill list` prints the tools
+      in `/run/lampos-skills/tools.json` as one JSON line
+      (`{"ok":true,"tools":[...]}`). `lamp-tasks skill call NAME
+      ['{"key":"value"}']` sends the voice's own line,
+      `{"op":"call","name":NAME,"args":{...}}`, on
+      `/run/lampos-skills/call.sock` and prints the one line back as it
+      came (`{"ok":true,"result":{...}}` or `{"ok":false,"error":"..."}`).
+      The guidance names it by its path on the lamp,
+      `/opt/lampOS/tasks/current/lamp-tasks`. It waits at most 3 s,
+      connecting included. It refuses, without connecting, a name the
+      tools file doesn't list, arguments that are not a JSON object, and a
+      line over 8192 bytes; the folder is fixed (no option or variable
+      names another), and a socket that is a link is never followed.
+      Exit status: 0 for `ok:true`, 1 for the skills' `ok:false`, 2 for its
+      own refusal or no answer (also printed as `{"ok":false,"error":...}`).
+      The lamp's skills service applies its own checks to the call, as to
+      the voice's (cooldowns, the lamp's pause, its policy).
+    - **Without the switch** nothing of this is written: no
+      `external_dirs` line, no `AGENTS.md`. `lamp-tasks skill` is there
+      either way, and does only what is asked of it by hand.
   - **`HERMES_HOME` for Harness.** With the switch on, the env file the
     part writes for Harness (`HARNESS_ENV_FILE`, as for the hold above)
     names `HERMES_HOME` and `SHELL=/bin/sh`, and every Harness command the
@@ -1406,6 +1453,17 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `runtime::tests::hermes_settings_are_written_at_start_only_with_a_token`,
+    `runtime::tests::the_lamp_folder_gets_the_guidance_once_and_again_when_changed`,
+    `hermes_config::tests`: `the_lamps_skills_dir_is_added_once_and_hooks_are_kept`,
+    `a_persons_own_skills_dirs_and_keys_are_kept`,
+    `the_dir_already_there_in_any_spelling_is_left_as_it_is`,
+    `a_flow_list_a_single_path_or_a_reset_becomes_a_block_list`,
+    `skills_that_cannot_be_merged_safely_are_refused`,
+    `the_guidance_is_written_once_never_through_a_link`,
+    `the_guidance_says_where_the_skills_are_how_to_run_one_and_the_rules`,
+    `skill_call::tests` (the list, the voice's line and its answer, the
+    skills' refusal, a name not listed or bad arguments never reaching the
+    socket, a linked socket never followed, the deadline),
     `hold::tests::the_env_file_names_hermes_home_and_a_shell_with_or_without_the_hold`,
     `engine::tests::a_session_joined_on_another_machine_is_followed_there`,
     `tests/harness.rs`: `a_named_session_is_looked_for_on_the_lamp_first_then_the_computers`,
@@ -1418,7 +1476,11 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   - **Not yet shown on a lamp:** Hermes found by the lamp's Harness, a task
     run there with DeepSeek, its done line, the hooks block after a
     restart, the session in Harness Desktop, and the
-    voice staying responsive while it runs (#5978 part 4).
+    voice staying responsive while it runs (#5978 part 4); the lamp's
+    skills in Hermes' list through `external_dirs` with the hooks block
+    kept, `AGENTS.md` written in the work folder, and a skill's tool
+    (such as `dance`) called by `lamp-tasks skill call` from Hermes'
+    own namespace.
 
 Signing in a lamp with no screen is by a spoken code since Harness 0.4.23
 (openharness#1410; ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
