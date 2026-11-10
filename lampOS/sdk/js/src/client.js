@@ -567,7 +567,15 @@ export class Lamp {
     }
     const short = shortPhrase(phrases);
     if (short) throw short;
-    this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
+    // A handler given `phrases` hears only those; with none it hears every `phrase.heard`. The lamp is asked for
+    // all the connection's phrases once, so the filter is here.
+    let registered = handler;
+    if (phrases?.length && event === 'phrase.heard') {
+      const own = new Set(phrases.map((p) => p.toLowerCase()));
+      registered = (frame) => (typeof frame.phrase === 'string' && !own.has(frame.phrase.toLowerCase()) ? undefined : handler(frame));
+      registered.original = handler;
+    }
+    this.handlers.set(event, [...(this.handlers.get(event) ?? []), registered]);
     if (phrases) this.phrases = [...new Set([...this.phrases, ...phrases])].sort();
     if (!schema.events.includes(event)) return Promise.resolve();
     // A refused subscription takes its handler back off, so a later `on()`
@@ -576,7 +584,7 @@ export class Lamp {
       // Only the copy this call added: the same function may be there
       // already for a granted subscription.
       const left = [...(this.handlers.get(event) ?? [])];
-      const at = left.lastIndexOf(handler);
+      const at = left.lastIndexOf(registered);
       if (at >= 0) left.splice(at, 1);
       if (left.length) this.handlers.set(event, left);
       else this.handlers.delete(event);
@@ -587,7 +595,7 @@ export class Lamp {
   // Stop calling `handler` for `event`; with none left for an event the lamp
   // says, unsubscribe from it.
   off(event, handler) {
-    const left = (this.handlers.get(event) ?? []).filter((h) => h !== handler);
+    const left = (this.handlers.get(event) ?? []).filter((h) => h !== handler && h.original !== handler);
     if (left.length) {
       this.handlers.set(event, left);
       return Promise.resolve();

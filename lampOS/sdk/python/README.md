@@ -112,7 +112,16 @@ asyncio.run(main())
   `hear`. Not awaited, the refusal comes out of `wait_closed()` instead.
   `on()` returns an awaitable `Subscription`, not a future: to wait on
   several, `await asyncio.gather(lamp.on(...), lamp.on(...))`.
-  `lamp.off(name, handler)`. Each needs its grant:
+  `lamp.off(name, handler)`. A `phrase.heard` handler given `phrases=[...]`
+  hears only those; one given none hears every phrase the program listens for:
+
+  ```python
+  await lamp.on("phrase.heard", start, phrases=["start studying"])  # start() hears only this
+  await lamp.on("phrase.heard", stop, phrases=["all done here"])    # stop() hears only this
+  await lamp.on("phrase.heard", log)                                # log() hears both
+  ```
+
+  Each needs its grant:
 
   | event | fields | grant |
   |---|---|---|

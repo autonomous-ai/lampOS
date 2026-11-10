@@ -54,6 +54,29 @@ ENDS_AT_REPLY = frozenset({"gesture", "move", "express"})
 PHRASE_MIN_LETTERS = 8
 
 
+class _OnPhrases:
+    """A `phrase.heard` handler given `phrases=`: called only for those phrases, not for every phrase another
+    handler of the same connection listens for (the lamp is asked for all of them, once). Phrases compare
+    lowercased, as lamp-control lowercases them (`str::to_lowercase`, `protocol::phrase_words`) and as the JS SDK does
+    (`toLowerCase`), never case-folded: the same rule everywhere, so a handler never misses a phrase the lamp said. It compares equal to
+    the handler it wraps, so `off()` and a refused subscription take it back off by the handler itself."""
+
+    def __init__(self, handler: Handler, phrases: list[str]) -> None:
+        self.handler = handler
+        self.phrases = {phrase.lower() for phrase in phrases}
+
+    def __call__(self, event: dict) -> Any:
+        said = event.get("phrase")
+        if isinstance(said, str) and said.lower() not in self.phrases:
+            return None
+        return self.handler(event)
+
+    def __eq__(self, other: object) -> bool:
+        return other is self or other == self.handler
+
+    __hash__ = None  # type: ignore[assignment]
+
+
 def _short_phrase(phrases: list[str] | None) -> None:
     """Refuse a phrase under the lamp's floor before it leaves the computer,
     in the lamp's words; the lamp checks it again."""
@@ -769,7 +792,8 @@ class Lamp:
         if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS):
             raise _no_event(event, on=True)
         _short_phrase(phrases)
-        self._handlers[event].append(handler)
+        # A handler given `phrases` hears only those; with none it hears every `phrase.heard`.
+        self._handlers[event].append(_OnPhrases(handler, phrases) if phrases and event == "phrase.heard" else handler)
         if phrases:
             self._phrases = sorted(set(self._phrases) | set(phrases))
         if event not in schema.events():
