@@ -407,6 +407,12 @@ impl Lamp {
         self
     }
 
+    /// A camera that opens when asked (`--camera-opens-on-demand`).
+    pub fn camera_on_demand(mut self, yes: bool) -> Self {
+        self.camera = self.camera.map(|camera| camera.on_demand(yes));
+        self
+    }
+
     pub fn seeing(
         mut self,
         sight: PathBuf,
