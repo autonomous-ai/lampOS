@@ -428,15 +428,21 @@ account's identity and `gmail.send` only, no `gmail.readonly`.
 - **Reads:** none. A `service_read` of `gmail-app`, linked or not, answers
   "This Gmail link, made with Google sign-in, can only send mail. To read
   mail, link Gmail with an app password in the app: Skills, then
-  Connectors." Its read list is empty, so no read route is ever called with
-  its token.
+  Connectors.", unless `gmail` is linked with an app password (below). Its
+  read list is empty, so no read route is ever called with its token.
 - **Writes:** `send_mail`, read back and sent as `gmail`'s, on a spoken
   "send": one `POST /gmail/v1/users/me/messages/send` from the account
   itself, never SMTP. 401 or 403: "not sent: Google refused the Gmail
   sign-in".
 - **With both linked**, a send may go through either; a read only through
   `gmail`. The read function's description says `gmail-app: none, it only
-  sends: reads use gmail`.
+  sends: reads use gmail`. When `gmail` is an app password, every read
+  prefers it (`serve.rs`, `read_args`, the owner's ask of 10 Nov): a read
+  naming `gmail`, `gmail-app` or either one's name goes over IMAP with the
+  app password, and the sign-in's token is never sent for it. Only when no
+  app password is kept does a read use a Google sign-in's token (a `gmail`
+  link made with one); a read naming `gmail-app` then still reads nothing.
+  Writes are unchanged: each still goes through the link its name reaches.
 - **Either name reaches it** (`serve.rs`, `linked_code`): a call naming
   `gmail` when only `gmail-app` is linked uses the `gmail-app` link, and one
   naming `gmail-app` when only `gmail` is linked uses `gmail`, which also

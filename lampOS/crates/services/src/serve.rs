@@ -713,7 +713,29 @@ impl<H: Http, M: Mail> Services<H, M> {
         .await
     }
 
+    /// A read's arguments, a Gmail read's service `gmail` whenever that
+    /// link is an app password: a read naming either Gmail name goes over
+    /// IMAP with it, never with a Google sign-in's token kept beside it
+    /// (`gmail-app`), as the owner asked on 10 Nov. Without an app
+    /// password, as asked.
+    fn read_args(&self, args: &Value) -> Value {
+        let mut args = args.clone();
+        let gmail = args
+            .get("service")
+            .and_then(Value::as_str)
+            .and_then(|asked| self.named(asked))
+            .is_some_and(|service| service.code.starts_with("gmail"));
+        if gmail
+            && self.store.load("gmail").is_some_and(|entry| !entry.oauth())
+            && let Some(args) = args.as_object_mut()
+        {
+            args.insert("service".into(), json!("gmail"));
+        }
+        args
+    }
+
     async fn read(&self, args: &Value) -> Result<Value, String> {
+        let args = &self.read_args(args);
         // A send-only link is answered so whether or not it is linked, and
         // so is `gmail` when the lamp's one Gmail link is send-only.
         let asked = args.get("service").and_then(Value::as_str);
@@ -2315,6 +2337,57 @@ mod tests {
         let answer = run(services.tool(&read_line(json!({"service":"gmail","what":"recent"}))));
         assert_eq!(answer["error"], reads::GMAIL_APP_NO_READS, "{answer}");
         assert!(services.http.calls().is_empty());
+    }
+
+    /// With an app password and a Google sign-in both kept, a read naming
+    /// either Gmail name goes over IMAP with the app password; the
+    /// sign-in's token is never sent (the owner's ask, 10 Nov).
+    #[test]
+    fn with_both_gmail_links_a_read_uses_the_app_password() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        let (answer, _) = run(services.admin(&set_line(
+            "gmail",
+            json!({"connector":"gmail","auth_type":"pat","api_key":"good pass word",
+                   "credentials":{"email":"me@home.test"},"scopes":["mail"]}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        for asked in ["gmail", "gmail-app", "Gmail with Google sign-in"] {
+            let answer = run(services.tool(&read_line(json!({"service":asked,"what":"recent"}))));
+            assert_eq!(answer["ok"], true, "{asked}: {answer}");
+            assert_eq!(answer["result"]["source"], "Gmail", "{asked}");
+        }
+        assert!(services.http.calls().is_empty(), "the token was sent");
+    }
+
+    /// With no app password kept, a Gmail read uses the Google sign-in's
+    /// token, and a read naming the send-only link still reads nothing.
+    #[test]
+    fn with_no_app_password_a_gmail_read_uses_the_sign_in() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        run(services.admin(&oauth_gmail("planted-gmail-4710")));
+        run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        let before = services.http.calls().len();
+        let answer = run(services.tool(&read_line(json!({"service":"gmail","what":"recent"}))));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let calls = services.http.calls();
+        assert!(calls.len() > before);
+        assert!(calls[before..].iter().all(|call| {
+            call.headers
+                .contains(&("authorization".into(), "Bearer planted-gmail-4710".into()))
+        }));
+        assert_eq!(
+            run(services.tool(&read_line(json!({"service":"gmail-app","what":"recent"}))))["error"],
+            reads::GMAIL_APP_NO_READS
+        );
     }
 
     #[test]

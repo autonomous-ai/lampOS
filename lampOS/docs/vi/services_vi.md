@@ -444,15 +444,23 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
 - **Đọc:** không có. Một `service_read` của `gmail-app`, đã liên kết hay
   chưa, đều trả lời "This Gmail link, made with Google sign-in, can only send
   mail. To read mail, link Gmail with an app password in the app: Skills,
-  then Connectors." Danh sách đọc của nó rỗng, nên không route đọc nào được
-  gọi với token của nó.
+  then Connectors.", trừ khi `gmail` được liên kết bằng mật khẩu ứng dụng
+  (xem dưới). Danh sách đọc của nó rỗng, nên không route đọc nào được gọi
+  với token của nó.
 - **Ghi:** `send_mail`, được đọc lại và gửi như của `gmail`, khi có câu
   "send" nói ra: một `POST /gmail/v1/users/me/messages/send` từ chính tài
   khoản đó, không bao giờ qua SMTP. 401 hoặc 403: "not sent: Google refused
   the Gmail sign-in".
 - **Khi cả hai được liên kết**, một lần gửi có thể đi qua một trong hai; một
   lần đọc chỉ qua `gmail`. Mô tả của hàm đọc ghi `gmail-app: none, it only
-  sends: reads use gmail`.
+  sends: reads use gmail`. Khi `gmail` là mật khẩu ứng dụng, mọi lần đọc
+  đều ưu tiên nó (`serve.rs`, `read_args`, yêu cầu của chủ đèn ngày 10/11):
+  một lần đọc gọi tên `gmail`, `gmail-app` hay tên của một trong hai đều đi
+  qua IMAP bằng mật khẩu ứng dụng, và token của đăng nhập không bao giờ được
+  gửi cho nó. Chỉ khi không có mật khẩu ứng dụng nào được giữ thì lần đọc
+  mới dùng token của đăng nhập Google (một liên kết `gmail` tạo bằng đăng
+  nhập đó); khi ấy một lần đọc gọi tên `gmail-app` vẫn không đọc gì. Việc
+  ghi không đổi: mỗi lần ghi vẫn đi qua liên kết mà tên của nó dẫn đến.
 - **Tên nào cũng đến được nó** (`serve.rs`, `linked_code`): một lệnh gọi tên
   `gmail` khi chỉ `gmail-app` được liên kết thì dùng liên kết `gmail-app`, và
   một lệnh gọi tên `gmail-app` khi chỉ `gmail` được liên kết thì dùng
