@@ -115,8 +115,9 @@ ProtectSystem=strict
 # lamp-skills' call socket, for guard mode from the app with LAMP_GUARD_FROM_APP=on (#2562); and
 # lamp-voice's app-make socket, for a skill typed in the app with LAMP_APP_MAKE_SKILL=on (#2813);
 # lamp-tasks' app route, for Harness signed in from the app with LAMP_TASKS_SIGN_IN_APP=on (#5198);
-# and lamp-control's admin socket, while developer access is on.
-ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services -/run/lampos-tasks -/run/lampos-control
+# lamp-control's admin socket, while developer access is on; and lamp-voice's say socket, for
+# the app's onboarding pages said done (#6076).
+ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services -/run/lampos-tasks -/run/lampos-control -/run/lampos-say
 ProtectHome=yes
 PrivateTmp=yes
 # No capability is needed (Fourth on #1404): the broker, the ping and the bus. Netlink is for `iw`,
