@@ -265,23 +265,20 @@ fn mode(path: &Path) -> u32 {
 const AS_LAMPOS: &str = "runuser -u lampos -- env HOME=/var/lib/lampos-hermes \
      HERMES_HOME=/var/lib/lampos-hermes/.hermes PATH=/usr/bin:/bin SHELL=/bin/sh ";
 
-/// Off by default on every lamp until the lamp-c0a4 numbers are judged
-/// (the first builder, 10 Nov): unset on a product lamp is the build's
-/// default, off; unset on any other lamp is off; set, only `on` is on, so
-/// `off` keeps a product lamp off. A product default of on would still
-/// install on a product lamp alone. `serve` with it off takes an earlier
-/// record and ask away.
+/// On by default on a product lamp, the product owner's decision (10
+/// Nov): unset on a product lamp is the build's default, on; unset on any
+/// other lamp is off; set, only `on` is on, so `off` turns a product lamp
+/// off. `serve` with it off takes an earlier record and ask away.
 #[test]
-fn the_switch_is_off_by_default_on_every_lamp() {
-    const { assert!(!PRODUCT_DEFAULT) };
-    assert!(
-        !wanted(None, true, PRODUCT_DEFAULT),
-        "a product lamp, unset"
-    );
-    assert!(wanted(None, true, true), "a default of on: a product lamp");
-    assert!(!wanted(None, false, true), "a default of on: another lamp");
+fn the_switch_is_on_by_default_on_a_product_lamp_only() {
+    const { assert!(PRODUCT_DEFAULT) };
+    assert!(wanted(None, true, PRODUCT_DEFAULT), "a product lamp, unset");
     assert!(!wanted(None, false, PRODUCT_DEFAULT), "another lamp, unset");
     assert!(!wanted(Some("off"), true, PRODUCT_DEFAULT), "off wins");
+    assert!(
+        !wanted(None, true, false),
+        "a default of off: a product lamp"
+    );
     for value in ["off", "", "ON", "1"] {
         for product in [true, false] {
             assert!(!wanted(Some(value), product, true), "{value:?}");
@@ -516,7 +513,7 @@ fn the_wrapper_gives_hermes_its_own_pid_namespace_and_proc() {
 fn the_namespace_script_shows_only_what_is_allowed_and_refuses_outside_its_namespace() {
     assert!(NS_TEXT.starts_with("#!/bin/sh\n"));
     assert!(NS_TEXT.contains(&format!(
-        "H={PLACE} W={WORK} K={SKILLS} S=/tmp/.lampos-ns\n"
+        "H={PLACE} W={WORK} K={SKILLS} C={SKILLS_SOCKET} S=/tmp/.lampos-ns\n"
     )));
     assert_eq!(ALLOWED, [PLACE, WORK, SKILLS]);
     assert!(
@@ -618,6 +615,11 @@ fn the_namespace_script_hides_the_devices_and_gives_hermes_its_own_tmp() {
 /// here. A service folder above an allowed one (lamp-tasks' state folder,
 /// above [`WORK`]) shows Hermes only the empty read-only folders down to
 /// it. Hermes's own folder, its work folder and the skills are shown.
+/// One lamp service folder is shown, exactly: [`SKILLS_SOCKET`],
+/// lamp-skills' tools folder, read-only. It is the voice's own path to the
+/// lamp (its `LAMP_SKILLS_DIR`), and lamp-skills applies its cooldowns,
+/// pause and policy to each call, so Hermes reaches the lamp only as the
+/// voice's model does.
 #[test]
 fn no_lampos_service_folder_is_visible_to_hermes() {
     let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
@@ -664,12 +666,15 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
     }
     for wanted in [
         "/run/lampos-eyes",
-        "/var/lib/lampos-eyes",
+        // Spelled in two: the voice's reset census keeps the faces
+        // folder's whole name to the reset.
+        concat!("/var/lib/", "lampos-eyes"),
         "/run/lampos-body",
         "/var/lib/lampos-tasks",
         "/var/lib/lampos-cloud",
         "/run/lampos-bus",
         "/run/lampos-photos",
+        SKILLS_SOCKET,
     ] {
         assert!(folders.iter().any(|f| f == wanted), "{wanted} not read");
     }
@@ -684,7 +689,22 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
             !ALLOWED.iter().any(|allowed| under(folder, allowed)),
             "{folder}, a lampos service's, is visible to Hermes"
         );
+        assert!(
+            folder == SKILLS_SOCKET || !under(folder, SKILLS_SOCKET),
+            "{folder} is under the skills' socket folder"
+        );
     }
+    // Shown: only the skills' socket folder itself, nothing beside or
+    // above it under /run.
+    let shown: Vec<&String> = folders
+        .iter()
+        .filter(|folder| under(SKILLS_SOCKET, folder))
+        .collect();
+    assert!(
+        shown.iter().all(|folder| *folder == SKILLS_SOCKET),
+        "{shown:?}"
+    );
+    assert!(under(SKILLS_SOCKET, "/run") && NS_TEXT.contains(&format!("C={SKILLS_SOCKET} ")));
     for allowed in ALLOWED {
         assert!(
             OVERLAID.iter().any(|over| under(allowed, over)),
@@ -697,10 +717,11 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
 /// The namespace script run under `sh` with every mount stubbed, on a
 /// stand-in root: it makes Hermes's own `/tmp` first, stages what stays
 /// visible there, lays the overlays, moves the staged mounts back (the
-/// skills and `resolv.conf` read-only, with the flags they had), makes
-/// the overlays read-only, and only then runs Hermes with `HOME` its own
-/// folder. Nothing but [`ALLOWED`] and `resolv.conf` is put back. Any
-/// step failing ends it with Hermes not run.
+/// skills, the skills' socket folder and `resolv.conf` read-only, with the
+/// flags they had), makes the overlays read-only, and only then runs
+/// Hermes with `HOME` its own folder. Nothing but [`ALLOWED`],
+/// [`SKILLS_SOCKET`] and `resolv.conf` is put back; with no skills' socket
+/// folder, it is skipped. Any step failing ends it with Hermes not run.
 #[test]
 fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
     let folder = tempfile::tempdir().unwrap();
@@ -716,6 +737,7 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
         "/etc/lampOS",
         "/dev/shm",
         "/run/systemd/resolve",
+        SKILLS_SOCKET,
     ] {
         fs::create_dir_all(at(made)).unwrap();
     }
@@ -796,10 +818,11 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
             "mount -t tmpfs -o size=256m,mode=1777,nosuid,nodev none {}",
             at("/tmp")
         ),
-        format!("mkdir -m 0700 {stage} {stage}/h {stage}/w {stage}/k"),
+        format!("mkdir -m 0700 {stage} {stage}/h {stage}/w {stage}/k {stage}/c"),
         format!("mount --bind {} {stage}/h", at(PLACE)),
         format!("mount --bind {} {stage}/w", at(WORK)),
         format!("mount --bind {} {stage}/k", at(SKILLS)),
+        format!("mount --bind {} {stage}/c", at(SKILLS_SOCKET)),
         format!("mount --bind {resolv} {stage}/r"),
         format!(
             "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
@@ -820,9 +843,14 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
             "mount -o remount,bind,ro,nosuid,nodev,relatime {}",
             at(SKILLS)
         ),
+        format!("mount --move {stage}/c {}", at(SKILLS_SOCKET)),
+        format!(
+            "mount -o remount,bind,ro,nosuid,nodev,relatime {}",
+            at(SKILLS_SOCKET)
+        ),
         format!("mount --move {stage}/r {resolv}"),
         format!("mount -o remount,bind,ro,nosuid,nodev,relatime {resolv}"),
-        format!("rmdir {stage}/h {stage}/w {stage}/k {stage}"),
+        format!("rmdir {stage}/h {stage}/w {stage}/k {stage}/c {stage}"),
         format!(
             "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
             at("/run")
@@ -851,7 +879,7 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
     let allowed: Vec<String> = ALLOWED
         .iter()
         .map(|path| at(path))
-        .chain([resolv.clone()])
+        .chain([at(SKILLS_SOCKET), resolv.clone()])
         .collect();
     assert_eq!(
         shown,
@@ -865,6 +893,7 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
         format!("--bind {}", at(PLACE)),
         format!("--bind {}", at(WORK)),
         format!("--bind {}", at(SKILLS)),
+        format!("--bind {}", at(SKILLS_SOCKET)),
         format!("--bind {resolv}"),
         format!("none {}", at("/run")),
         format!("none {}", at("/var/lib")),
@@ -872,9 +901,15 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
         format!("mount --move {stage}/h"),
         format!("mount --move {stage}/w"),
         format!("mount --move {stage}/k"),
+        format!("mount --move {stage}/c"),
         format!("mount --move {stage}/r"),
         "findmnt".to_owned(),
+        format!("findmnt -no VFS-OPTIONS -M {}", at(SKILLS_SOCKET)),
         "remount,bind,ro".to_owned(),
+        format!(
+            "remount,bind,ro,nosuid,nodev,relatime {}",
+            at(SKILLS_SOCKET)
+        ),
         "rmdir".to_owned(),
         format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/run")),
         format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/var/lib")),
@@ -886,7 +921,42 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
             !lines.iter().any(|line| line.starts_with("unshare ")),
             "{fail_on}: Hermes ran"
         );
+        assert!(
+            lines.iter().any(|line| line.contains(fail_on.as_str())),
+            "{fail_on}: never reached"
+        );
     }
+    // A lamp with no skills' socket folder (no lamp-skills): skipped, and
+    // Hermes still runs; nothing else under /run is shown.
+    fs::remove_dir_all(at(SKILLS_SOCKET)).unwrap();
+    let (out, lines) = run("");
+    assert!(out.status.success(), "{out:?}");
+    assert!(
+        !lines.iter().any(|line| line.contains(&at(SKILLS_SOCKET))),
+        "{lines:#?}"
+    );
+    let shown: Vec<&str> = lines
+        .iter()
+        .filter_map(|line| line.strip_prefix("mount --move "))
+        .map(|line| line.rsplit(' ').next().unwrap())
+        .collect();
+    assert_eq!(
+        shown,
+        [at(PLACE), at(WORK), at(SKILLS), resolv.clone()]
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        lines.last().map(String::as_str),
+        Some(
+            format!(
+                "unshare --user --map-user=996 --map-group=994 {} chat -q a b",
+                at(HERMES)
+            )
+            .as_str()
+        )
+    );
 }
 
 /// Hermes's own update check, its plugins' and its language servers are
@@ -1494,8 +1564,9 @@ fn too_little_free_space_is_no_space_and_nothing_is_made() {
 }
 
 /// The product units do not turn the lamp's Hermes on: lamp-update's own
-/// unit alone decides (`PRODUCT_DEFAULT` off until the lamp-c0a4 numbers
-/// are judged), and neither lamp-cloud nor lamp-tasks sets the switch on.
+/// unit and its build's default alone decide (`PRODUCT_DEFAULT` on since
+/// the product owner's decision, 10 Nov; `off` there turns it off), and
+/// neither lamp-cloud nor lamp-tasks sets the switch on.
 /// lamp-tasks' `--engines-from-machines` and `--reply-named` come with the
 /// routing that uses them (#6094), not here.
 #[test]
