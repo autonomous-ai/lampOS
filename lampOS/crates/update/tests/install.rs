@@ -2351,6 +2351,26 @@ fn the_product_refences_a_ledger_ahead_of_its_store() {
     );
 }
 
+/// A lone known face's line is told and read as theirs, and a carried line
+/// recalls and keeps as its person's, never forgets (the memory owner's call,
+/// switched on 10 Nov after lamp-3e83 answered its known person from the
+/// room's memory).
+#[test]
+fn the_product_reads_a_lone_known_face_and_a_carried_line_as_theirs() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for switch in [
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE_READS=on",
+        "Environment=LAMP_CONVERSATION_CARRIED_MEMORY=on",
+    ] {
+        assert!(service.contains(&switch), "the voice lacks {switch}");
+    }
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.

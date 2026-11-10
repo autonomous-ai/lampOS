@@ -437,6 +437,13 @@ Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
 # 0, and their own reminder left out of the list). Memory's reads stay the room's. Known risk, accepted by the
 # memory owner on 4 Nov: a voice not seen saying it, with the person's face alone in view, hears their reminders.
 Environment=LAMP_ONE_FACE_REMINDERS=on
+# And such a line is told and read as theirs, not only kept (the memory owner's call, 6 Nov on #5385; switched on by
+# their call on 10 Nov, after lamp-3e83 answered a lone known face at the desk from the room's memory, "nothing from
+# before is kept", while their own held the answer): recall, hits, their note and thread, and its exchange journalled
+# in their record. Forgets, rule and correction calls still need their face seen speaking. Known risk, accepted by the
+# memory owner: a guest off camera, the person's face silent and alone in view and no other voice heard, is told the
+# person's recall, and the guest's words are filed as theirs.
+Environment=LAMP_PERSON_SCOPE_ONE_FACE_READS=on
 # And such a line's reply is told the person's name, only their name, when no face was seen speaking it, their own
 # known face was the one face in view through it (the mouth not read), it was not carried and no other voice was heard
 # (lamp-06c1 on 5 Nov, request 6: the test face alone in 11 of 11 looks, read still in 6, and "what's my name?" got
@@ -459,6 +466,10 @@ Environment=LAMP_CONVERSATION_CARRIES=on
 # it. Still no recall, note or hits on it, no forget and no yes, never another person's scope, and a line held only by
 # a face's gap holds nothing.
 Environment=LAMP_CONVERSATION_CARRIED_SAVES=on
+# And a carried line recalls and keeps as its person's, never forgets (#5842; the memory owner's call, switched on 10 Nov,
+# when lamp-3e83's carried "It's correct." was refused as unseen). Needs lamp-same-voice where the voice expects it;
+# without it the switch is said at start and does nothing.
+Environment=LAMP_CONVERSATION_CARRIED_MEMORY=on
 # And a silent face doesn't count (#4339, lamp-3e83 on 30 Oct: the known face in all 30 looks of a line, none with it
 # alone, so 4 lines carried while one conversation split in two): with no other face seen speaking a line and no other
 # voice in the conversation (the rule's sign of another person, kept for the cut words' join), other faces in view
