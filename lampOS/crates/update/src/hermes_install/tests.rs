@@ -355,7 +355,7 @@ fn on_with_harness_there_installs_the_pinned_hermes_as_lampos() {
     at(&format!("{AS_LAMPOS}sh -c command -v bash"));
     at("test -x /usr/bin/unshare");
     let userns = at(&format!(
-        "runuser -u lampos -- /usr/bin/unshare --map-root-user --mount --propagation private \
+        "runuser -u lampos -- /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --propagation private \
          /usr/bin/unshare --user --map-user={uid} --map-group={gid} true"
     ));
     let df = at("df -Pk /var/lib");
