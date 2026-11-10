@@ -17,7 +17,8 @@
 //!   The same write is sent only by a call with that `send_id` in the very
 //!   next turn, the owner's first line since, said once the lamp's words
 //!   held the whole read-back ([`read_back_said`]) uncut and not talked
-//!   over, and a plain "send" ([`says_send`]); anything else cancels it.
+//!   over, and a plain "send" ([`says_send`]); anything else cancels it,
+//!   and a plain cancel ([`cancel_waiting`]) is answered by the lamp itself.
 //!   One pending write at a time, dropped by any later line or turn. A line
 //!   held as the lamp's own words heard back is no line of the person's
 //!   ([`own_echo_held`]).
@@ -671,6 +672,114 @@ pub fn send_awaited(words: &str) -> bool {
                 .as_ref()
                 .is_some_and(|kept| !kept.cut && kept.began_clear && person_lines(kept) <= 1)
         })
+}
+
+/// The words, after fillers ([`FILLERS`] and [`CANCEL_FILLERS`]), that
+/// cancel a prepared write with no model choice (#5958): on lamp-9adf on
+/// 10 Nov, "Lamp, cancel that." after a read-back was answered "Cancel what
+/// exactly? I have several things set", with no call, as the model weighed
+/// it against the lamp's reminders.
+pub const CANCEL_WORDS: [&str; 22] = [
+    "cancel",
+    "cancel that",
+    "cancel it",
+    "cancel the message",
+    "cancel the email",
+    "never mind",
+    "nevermind",
+    "don't send",
+    "don't send it",
+    "don't send that",
+    "do not send it",
+    "stop don't send it",
+    "stop don't send",
+    "hủy",
+    "huỷ",
+    "hủy đi",
+    "huỷ đi",
+    "huy",
+    "huy di",
+    "đừng gửi",
+    "thôi đừng gửi",
+    "thôi khỏi gửi",
+];
+/// Words that open a cancel and change nothing: "No, cancel that."
+const CANCEL_FILLERS: [&str; 5] = ["no", "nope", "wait", "actually", "không"];
+/// What the lamp says itself, with no chat, once a cancel word cancelled the
+/// waiting write ([`cancel_waiting`]), in the language of the cancel word.
+pub const CANCELLED_SAID: &str = "Okay, cancelled. Nothing was sent.";
+/// [`CANCELLED_SAID`] in Vietnamese.
+pub const CANCELLED_SAID_VI: &str = "Vâng, đã hủy. Chưa gửi gì cả.";
+
+/// `words` as a plain cancel ([`CANCEL_WORDS`]), fillers aside: the line to
+/// say for it, in its language, or `None` for any other words.
+pub fn says_cancel(words: &str) -> Option<&'static str> {
+    let plain: String = words
+        .to_lowercase()
+        .replace('’', "'")
+        .chars()
+        .map(|letter| {
+            if letter.is_alphanumeric() || letter == '\'' {
+                letter
+            } else {
+                ' '
+            }
+        })
+        .collect();
+    let filler = |word: &&str| FILLERS.contains(word) || CANCEL_FILLERS.contains(word);
+    let mut words: Vec<&str> = plain.split_whitespace().collect();
+    while words.first().is_some_and(filler) {
+        words.remove(0);
+    }
+    while words.last().is_some_and(filler) {
+        words.pop();
+    }
+    let joined = words.join(" ");
+    CANCEL_WORDS.contains(&joined.as_str()).then(|| {
+        if !joined.is_ascii() || joined.starts_with("huy") {
+            CANCELLED_SAID_VI
+        } else {
+            CANCELLED_SAID
+        }
+    })
+}
+
+/// Whether `words` are a plain cancel while a write waits for its "send",
+/// prepared under [`PENDING_FOR`] ago: then a short line of them is the
+/// person's answer to the read-back, never a short sound the room made
+/// ("Cancel." on lamp-9adf on 10 Nov was held so). Only a line known to
+/// have begun clear of the lamp's words, as for [`send_awaited`].
+pub fn cancel_awaited(words: &str) -> bool {
+    says_cancel(words).is_some()
+        && kept::pending(|pending| {
+            pending.as_ref().is_some_and(|kept| {
+                kept.began_clear && kept.at.elapsed() <= PENDING_FOR && !kept.service.is_empty()
+            })
+        })
+}
+
+/// A plain cancel in `request` while another request's write waits for its
+/// "send" (#5958): the write is forgotten, so nothing can send it (a later
+/// `send_id` finds [`NOTHING_WAITING`]; `lamp-services` lets its own copy
+/// lapse after [`PENDING_FOR`]), and the line the lamp says for it is given,
+/// in the cancel word's language, said with no chat. `None`, and nothing
+/// changed, for any other line or with no write waiting: "cancel my 9
+/// o'clock reminder" is the model's, as before.
+pub fn cancel_waiting(request: u64, words: &str, now: Instant) -> Option<&'static str> {
+    let said = says_cancel(words)?;
+    kept::pending(|pending| {
+        let kept = pending.as_ref().filter(|kept| {
+            kept.request != request
+                && !kept.service.is_empty()
+                && now.saturating_duration_since(kept.at) <= PENDING_FOR
+        })?;
+        eprintln!(
+            "lamp-voice: request {request}: a waiting write cancelled by a plain cancel (#5958): the lamp says so itself, no chat asked (prepared in request {})",
+            kept.request
+        );
+        *pending = None;
+        Some(said)
+    })
 }
 
 /// What is known of the turn a call comes in.
@@ -2140,6 +2249,110 @@ mod tests {
             voice_began(11, over, in_tail, Instant::now());
             assert_eq!(send_awaited("Send."), awaited, "{over} {in_tail}");
         }
+        pending_for_test(None);
+    }
+
+    /// #5958: a plain cancel after a read-back cancels the waiting write with
+    /// no model choice, and says so in its own words; anything else, or no
+    /// write waiting, is the model's as before.
+    #[test]
+    fn a_plain_cancel_cancels_the_waiting_write_and_nothing_else_does() {
+        let waiting = || {
+            let mut kept = Pending::new("id", 10, Instant::now(), "Send an email.", "ann");
+            kept.service = "gmail".to_owned();
+            kept
+        };
+        for said in [
+            "Cancel.",
+            "Lamp, cancel that.",
+            "No, cancel it.",
+            "Never mind.",
+            "Don't send it.",
+            "Don’t send it.",
+            "Stop, don't send it.",
+            "Hey Lamp, never mind.",
+        ] {
+            pending_for_test(Some(waiting()));
+            assert_eq!(
+                cancel_waiting(11, said, Instant::now()),
+                Some(CANCELLED_SAID),
+                "{said}"
+            );
+            assert!(kept::pending(|pending| pending.is_none()), "{said}");
+            // A send after it finds nothing: never sent.
+            let mut pending = kept::pending(|pending| pending.clone());
+            let send = ToolCall {
+                id: "c".to_owned(),
+                name: WRITE.to_owned(),
+                args: json!({"service": "gmail", "send_id": "id"}),
+            };
+            let turn = Turn {
+                heard: true,
+                words: Some("send"),
+                previous: Some(11),
+                owner: Some("ann"),
+                sends: true,
+                alike: Some(1.0),
+                seen_owner: true,
+                other_seen: false,
+            };
+            assert_eq!(
+                gate(&mut pending, &send, 12, &turn, Instant::now()).unwrap_err()["error"],
+                NOTHING_WAITING
+            );
+        }
+        for said in ["Hủy đi.", "Thôi, đừng gửi.", "huy"] {
+            pending_for_test(Some(waiting()));
+            assert_eq!(
+                cancel_waiting(11, said, Instant::now()),
+                Some(CANCELLED_SAID_VI),
+                "{said}"
+            );
+        }
+        // Not a plain cancel, or in the write's own request: left as it is.
+        for (request, said) in [
+            (11, "Cancel my 9 o'clock reminder."),
+            (11, "Send it."),
+            (11, "No."),
+            (11, "What's the weather?"),
+            (10, "Cancel."),
+        ] {
+            pending_for_test(Some(waiting()));
+            assert_eq!(
+                cancel_waiting(request, said, Instant::now()),
+                None,
+                "{said}"
+            );
+            assert!(kept::pending(|pending| pending.is_some()), "{said}");
+        }
+        // No write waiting, or one past its two minutes: the model's.
+        pending_for_test(None);
+        assert_eq!(cancel_waiting(11, "Cancel that.", Instant::now()), None);
+        pending_for_test(Some(waiting()));
+        let late = Instant::now() + PENDING_FOR + Duration::from_secs(1);
+        assert_eq!(cancel_waiting(11, "Cancel that.", late), None);
+        pending_for_test(None);
+    }
+
+    /// #5958: a bare "Cancel." while a write waits is the person's answer to
+    /// the read-back, not a short sound; with none waiting, or begun over
+    /// the lamp's voice, it is judged as any line.
+    #[test]
+    fn a_bare_cancel_is_awaited_only_while_a_write_waits() {
+        pending_for_test(None);
+        assert!(!cancel_awaited("Cancel."));
+        let mut kept = Pending::new("id", 10, Instant::now(), "Send an email.", "ann");
+        kept.service = "gmail".to_owned();
+        pending_for_test(Some(kept.clone()));
+        assert!(!cancel_awaited("Cancel."));
+        voice_began(11, false, false, Instant::now());
+        for said in ["Cancel.", "Never mind.", "Hủy."] {
+            assert!(cancel_awaited(said), "{said}");
+        }
+        assert!(!cancel_awaited("Cancel my reminder."));
+        pending_for_test(Some(kept));
+        voice_began(11, true, false, Instant::now());
+        assert!(!cancel_awaited("Cancel."));
         pending_for_test(None);
     }
 
