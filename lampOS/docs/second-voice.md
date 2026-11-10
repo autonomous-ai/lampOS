@@ -2653,6 +2653,20 @@ When the coordinator switches (below):
   - **The name switch, not to be confused:** `LAMP_SECOND_KNOWN_NAMES` is the
     speech to text's listening for names; this one tells the model the face's
     name.
+  - **The face name, the only name** (#5484, `LAMP_SECOND_FACE_NAME_ONLY=on`,
+    off by default and in the product): the turn is told "(This person is B:
+    you know their face. Call them B, the only name you call them. ...)" in
+    place of the note above (`face_name_only::note`); a reply also told the
+    owner's typed name from the app is told both as theirs ("Their name in
+    the app is X") only if the face matches the typed name's memory id or
+    the saved owner's memory id. A known guest keeps only their face name,
+    even when the private-room rule discloses the owner's app name. A running summary's line giving the person's name is
+    told as "(a name said in the conversation, never what to call them)"
+    (`face_name_only::relabelled`), to a known face's turn and the room's
+    alike; a "call me A" fades so once folded, as meant. A summary or observation
+    never decides a name: on lamp-29e7 (build 10226, 4 Nov) a summary's "The
+    person's name is A" beat the face name B (U1 on #5385). The rename
+    confirm for a known face saying another name is #5485, not this switch.
 
 - **A role a person gave the lamp** (`LAMP_MEMORY_ROLE=on`, the memory
   owner's design, 6 Nov; off in every unit; [memory.md](memory.md) has the

@@ -801,6 +801,35 @@ conversation beyond its exchanges, and for how long:
   kept "is hosting a dinner on Friday", wrong when read on another day).
   Test:
   `conversation_summary::tests::the_job_carries_today_and_the_prompt_asks_for_whole_days`.
+- **Recognized name forms in it are not what the lamp calls them** (#5484, with
+  `LAMP_SECOND_FACE_NAME_ONLY=on`, off in the product until its lamp check):
+  each line matching a recognized person-name form is marked
+  (`face_name_only::names_the_person`; for example, "Their name is Ash",
+  "Their first name is Ash", "Their full name is Ash River", and
+  "They go by Ash"). Explicit pet references such as "Their dog's first
+  name is Biscuit" stay unmarked. These forms do not cover every possible
+  paraphrase. A matched line is told to the turn, and read by the
+  observation pass, marked "(a name said in the
+  conversation, never what to call them)", with a face or with none; the
+  note as kept is unchanged, and past the room its matched name lines are
+  left out, never the whole note. A known face's turn is told its face name as the
+  name to call them ("This person is B", `face_name_only::note`), with the
+  owner's typed name from the app beside it as theirs too only when the reply
+  is told it and the face matches that typed name's memory id or the saved
+  owner's memory id. A private room does not permit disclosing the owner's
+  app name to a guest. With `LAMP_PERSON_NAME_BY_DEFAULT=on`, the saved
+  owner's recognized face can still receive their different app name;
+  without that path, the typed-name disclosure requires its own matching
+  memory id. A "call me A" with no face is used while its line is in view and
+  marked once the summary folds it: meant, since a rename is #5485's
+  confirm. On lamp-29e7
+  (4 Nov) a summary's "The person's name is A" beat the face name B. Tests:
+  `worker::tests::a_known_face_is_called_its_face_name_whatever_the_summary_says`,
+  `worker::tests::with_no_face_the_summarys_name_is_not_what_they_are_called`,
+  `worker::tests::the_owners_face_and_typed_names_are_both_theirs_a_summarys_is_not`,
+  `worker::tests::prompt_name_composition_preserves_only_the_owners_disclosed_alias`
+  (the production name composition with by-default on/off, guest and unknown
+  controls; not full worker startup or a model response).
 - **The talk note:** at each conversation's end, that scope's running note
   (the rest of the conversation folded in) is **kept on disk** in the lamp's
   memory as the conversation's talk note, in the same scope: a known
