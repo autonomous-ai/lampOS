@@ -393,11 +393,17 @@ mod tests {
         assert!(refused(no_tool).contains("no tool"));
         let wider = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
                      [permissions]\nlight = true\nmessages = true\n[[do]]\nlight = { colour = \"cyan\" }\n";
-        assert!(refused(wider).contains("more than the light"));
-        let reads = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
-                     [permissions]\ntopics = [\"voice/heard\"]\n[[do]]\nlight = { colour = \"cyan\" }\n";
-        assert!(refused(reads).contains("read more"));
-        assert!(made_skill::entries(&keeping.directory).is_empty());
+        // Past the old cap (#6066): kept, its outbound grant said back.
+        let wide = "---\nname: glow-wide\ndescription: Glows.\n---\n";
+        let kept = take(&place, &keeping, Some(wider), wide, NOW - 1).unwrap();
+        assert!(kept.uses.messages);
+        assert!(
+            kept.description
+                .contains("and it may send a message to your phone"),
+            "{}",
+            kept.description
+        );
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
         // Within the cap, asked for only: kept, its light said plainly.
         let good = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
                     [permissions]\nlight = true\n[[do]]\nlight = { colour = \"cyan\", for = \"20s\" }\n";

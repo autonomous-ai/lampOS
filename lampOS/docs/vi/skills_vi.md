@@ -59,19 +59,64 @@ sau:
    năng chỉ chạy vào một giờ mỗi ngày bằng trigger đồng hồ; được nêu từng
    trigger và từng cử chỉ theo tên; và cách nó nói (dưới đây, #6055, #6062: `speak = true`, cooldown từ một giờ trở lên, và một `say = { text = "Welcome back!" }` đúng nguyên văn, bằng ngôn ngữ người dùng đã hỏi). Câu trả lời phải đúng hai khối có rào,
    `skill.toml` và `SKILL.md`, mỗi khối tối đa 8 KiB.
-4. **Giới hạn những gì kỹ năng tạo ra được dùng** (giới hạn của điều phối
-   viên, 19/10):
-   - `kind` là installable, có phiên bản;
-   - `[permissions]` chỉ có `light`, `body`, `speak`, và `topics` trong số
-     `voice/state`, `room/presence`, `humans/faces/tracked` và
-     `room/stood_up` (chỉ sự hiện diện, `lamp_skills::PRESENCE_TOPICS`:
-     trigger của kỹ năng tạo ra không đọc trường nào của khuôn mặt, nên
-     không bao giờ biết là ai) và `clock/local` (đồng hồ của chính
-     lamp-skills, `LOCAL_CLOCK_TOPIC`);
-   - không có hàm cho mô hình (`tool`);
-   - `[ask] policy` chỉ là `nudge`, không bao giờ là lời chào, tin tức hay lời nhắc;
-   - tin nhắn, cái nhìn, khuôn mặt quen, hành động và mọi chủ đề khác đều
-     bị từ chối.
+4. **Giới hạn những gì kỹ năng tạo ra được dùng: đã bỏ giới hạn** (#6066).
+   Giới hạn này có từ #1685 (deehw, 20/10): chỉ qua giọng nói, vào lúc
+   agent của máy tính viết kỹ năng. Nó giữ kỹ năng tạo ra ở `light`,
+   `body` và vài chủ đề hiện diện, `[ask] policy` chỉ `nudge`, và từ chối
+   nói, tin nhắn, cái nhìn, khuôn mặt quen, hành động và mọi chủ đề khác.
+   Trên #6066 giới hạn được bỏ theo nguyên tắc của trưởng nhóm, người xây
+   dựng đầu tiên xác nhận (19:44, 10/11): **kỹ năng một người tạo trên đèn
+   của chính họ được làm bất cứ gì đèn làm được.** Chia sẻ lên Store là nơi
+   nó được duyệt. Vì vậy `made_skill::capped` nay nhận:
+   - `kind` là installable, có phiên bản, và không có hàm cho mô hình
+     (`tool`): nó tự chạy;
+   - mọi `[permissions]` và `[ask]` mà bước kiểm tra đóng gói của chính
+     `lamp-skills` nhận cho một kỹ năng installable: `light`, `body`,
+     `speak`, mọi chủ đề, `messages`, `camera` (và `look` của format 1),
+     `known_faces`, `who`, `actions`, `output_limits`, việc đọc `services`
+     (khi `LAMP_SKILL_READS=on`), và policy `nudge`, `hello`, `reminder`
+     hay `news`. Quyền lõi, việc ghi vào dịch vụ hay bước mà runtime không
+     nhận bị bước kiểm tra đó từ chối, không phải giới hạn này.
+   - Chỉ quy tắc `say` của #6062 còn là của giới hạn này (dưới đây).
+   **Những gì còn giữ**, và chỉ những điều này:
+   - **An toàn phần cứng của đèn:** giới hạn của thân, ngắt khi nóng và
+     quá tải, tay đặt trên đầu, mức âm lượng tối đa. Chúng áp dụng cho mọi
+     thứ trên đèn, bên dưới mọi kỹ năng.
+   - **Nói lại trước khi bật** (`made_skill::plainly`): khi nào chạy và mọi
+     bước, cùng các bước gửi ra ngoài và việc dùng camera hay micro được nêu
+     trong cùng câu: "When someone pats its head, it nods, using the
+     camera.", "…, it nods, and it may send a message to your phone.",
+     "…, listening with the microphone." Nó kiểm tra kỹ năng khớp với yêu
+     cầu; đây không phải cổng cấp quyền.
+   - **Các quy tắc riêng tư:** việc đọc một dịch vụ liên kết vẫn chỉ dành
+     cho chủ đèn, sau cổng của nó ([services.md](../services.md)); kỹ năng
+     không bao giờ đọc ký ức của người này cho người khác; việc gửi hay ghi
+     đi qua bước đọc lại của cổng gửi, không bao giờ vòng qua nó.
+   - **Điều runtime chưa làm được** được trả lời "I can't do that yet:" và
+     điều đó, không bao giờ bị từ chối vì một quy tắc, và không bị sửa mất
+     (`made_skill::CANT_YET`; nói nguyên như vậy, không có "I couldn't make
+     that:"). Hiện nay: bước gửi tin nhắn hay ghi vào dịch vụ ("sending a
+     message or writing to a linked service"; chưa có bước nào gửi: tin
+     nhắn là của một watch, và lamp-skills chỉ nhận dịch vụ là `"read"`),
+     việc ghi trong `services` ("writing to a linked service"), một chuyển
+     động riêng ("a move of its own") hay âm thanh khác tiếng ngân (kỹ năng
+     tạo ra không mang tệp nào ngoài hai tệp của nó), khi tắt đọc thì mọi
+     dịch vụ ("reading your linked services"), và trigger theo điều nghe
+     thấy, lời nhắc đến hạn, tin về công việc, chạm, tâm trạng, tình trạng
+     các phần hay tạm dừng ("starting on words it hears", ...). Mỗi điều là
+     việc cần xây. Mô hình tạo kỹ năng được dặn như vậy, và trả lời yêu cầu
+     đó là `cannot: I can't do that yet: …`.
+   - **Được nói rõ** từ #6066, ngoài đèn, cử chỉ, `say`, tiếng ngân và
+     việc đọc: `dim` hay `out` (`over`) của đèn, `until = "ends"` ("while
+     that lasts"), `relative`, `pattern` (thở, ngọn nến, nhịp) và
+     `no_brighter`; `look_at = "face"` của thân và tư thế đọc với `for`;
+     `look = true` ("takes a look with the camera") và `stand`, mà bước
+     kiểm tra của lamp-skills chỉ nhận trong kỹ năng người dùng gọi bằng
+     hàm, nên từ chối chúng trong kỹ năng tạo ra; hello, reminder, news và
+     warning của `[ask]`; và các trigger theo cái vỗ đầu (`controls/pet`),
+     không khí ngột ngạt (`air/state` `co2_ppm` trên một mức) và việc người
+     ở bàn đang làm (`room/activity`: cúi đầu, ở bàn, nghiêng lại gần). Câu
+     nói lại được dài 240 ký tự (trước là 200).
    - **Kỹ năng được nói** (#6055, chủ ứng dụng, 10/11: "Say hello when I
      sit down at my desk", ví dụ của chính ứng dụng, bị từ chối hoặc bị sửa
      thành một lệnh đèn; #6062, đúng nguyên văn lời của nó). `speak = true`
@@ -147,15 +192,21 @@ sau:
      "hum" step, keeping its say or one hum"). Cue không có `speak = true`
      bị từ chối như `say`, và được giãn nhịp như `say` (`made_skill::paced`:
      cooldown từ một giờ trở lên, và khi đèn nghỉ chỉ từ 07:00 đến 22:00). Mọi
-     cue khác, đường dẫn hay tên tệp, hoặc bất kỳ bước `sound` nào đều bị
-     từ chối ("it would play a sound the lamp doesn't have; the one sound a
-     made skill plays is its soft hum", `made_skill::SOUND_NOT_SHIPPED`):
+     cue khác, đường dẫn hay tên tệp, hoặc bất kỳ bước `sound` nào là điều
+     đèn chưa làm được ("I can't do that yet: a sound other than its soft
+     hum", `made_skill::SOUND_NOT_SHIPPED`, không sửa từ #6066):
      âm thanh là danh sách cố định theo tên (`made_skill::SOUNDS`), mô hình
      không bao giờ đưa âm thanh hay đường dẫn, và không có gì được đóng gói
      cạnh `skill.toml`. Kiểm thử: `a_made_skill_may_play_the_lamps_soft_hum`,
      `a_sound_the_lamp_doesnt_ship_is_refused`, và trong `tests/it/made.rs`
      `lamp-skills pack` thật giữ một kỹ năng như vậy.
-   Mở rộng giới hạn này là quyết định của trưởng nhóm. Lần mở rộng duy nhất
+   - Kiểm thử cho giới hạn đã bỏ (#6066):
+     `a_made_skill_may_use_whatever_a_skill_can_declare`,
+     `every_kind_a_skill_can_declare_is_kept_and_said`,
+     và "can't yet" của
+     trigger `voice/heard` trong
+     `what_it_cant_say_is_refused_with_lines_for_a_repair`.
+   Việc đọc một dịch vụ liên kết
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
    `lamp-skills-manage@`, bật trong các unit sản phẩm): `services` nêu một dịch vụ
    liên kết có việc đọc cố định là `"read"`, cùng `speak` để nói nó. Không danh sách
@@ -181,7 +232,11 @@ sau:
    năng không dùng được dịch vụ liên kết nào, và một yêu cầu cần dịch vụ được
    trả lời `cannot: Not possible yet: a skill can't use your mail, calendar or
    other services, even ones already linked. You can ask me for it yourself
-   any time.` Dù thế nào, cap vẫn giữ những gì được giữ lại. Khi đã giữ, một kỹ năng có bước đọc một
+   any time.` Dù thế nào, bước kiểm tra của `lamp-skills` vẫn giữ những gì
+   được giữ lại ở việc đọc một dịch vụ có thể đọc; việc ghi trong
+   `services` được trả lời "I can't do that yet: writing to a linked
+   service", và khi tắt đọc thì mọi `services` là "I can't do that yet:
+   reading your linked services". Khi đã giữ, một kỹ năng có bước đọc một
    dịch vụ chưa liên kết lúc đó (`services_connected`, hỏi một lần, tối đa
    500 ms) vẫn được giữ, và việc tạo báo điều đó: tạo bằng giọng nói,
    `needs_link` trong câu trả lời của việc tạo, và sau câu báo đã bật, mô
