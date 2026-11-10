@@ -3789,7 +3789,16 @@ after a take-over, but now for every turn:
   light stays on until …", "I'll keep my light on until …", or "for" with
   a time after it: digits, a number word, "the night" or "tonight", so
   "I'll keep my light on for ten minutes." is one and "I left a light on
-  for you." is not; `action_claim::Claim::LightKept`, which a light call, a
+  for you." is not. State replies with "for" close at the duration and
+  optional unit: "It stays on for ten minutes." is a claim, while "It stays
+  on for ten minutes after a tap." is an explanation. Clock/decimal marks
+  stay inside the time in all worded runs; a trailing numeric mark waits
+  for lookahead or model completion. Generic end slots defer commas to the
+  sentence's end, so "Okay, louder, right?" is no claim. Bare keeping and
+  duration-state replies allow only "as you asked" or "as requested" after
+  a comma, and still reject a following question. "It remains on for half
+  an hour." remains a claim; "until" and "till" retain their word runs;
+  `action_claim::Claim::LightKept`, which a light call, a
   Schedule set or `keep_rule` makes). The sentence such a run opens must
   not end in a '?', and a step word after a lead-in must be followed by its
   end or a mark ("Okay, louder music it is." is no claim). Still no claim:
