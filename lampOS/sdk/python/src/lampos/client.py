@@ -16,6 +16,7 @@ import base64
 import hashlib
 import inspect
 import json
+import logging
 import os
 import re
 import socket
@@ -175,6 +176,15 @@ MICROPHONE_EVENTS = ("microphone.audio", "microphone.ended")
 # after a closed connection, then longer while the lamp can't be reached (a
 # restart takes a few seconds; an update about a minute).
 RECONNECT_PAUSES = (1.0, 2.0, 5.0, 10.0)
+
+_log = logging.getLogger("lampos")
+
+
+def _said(task: "asyncio.Future", name: str) -> None:
+    """Says an async handler's exception: nobody else awaits it."""
+    if not task.cancelled() and task.exception() is not None:
+        _log.error("your handler for %s raised", name, exc_info=task.exception())
+
 
 class Subscription:
     """What `Lamp.on` returns: an awaitable, not a future. Awaited, it raises
@@ -707,11 +717,18 @@ class Lamp:
             if future and not future.done():
                 future.set_result(event)
         for handler in self._handlers.get(name, []):
-            result = handler(event)
+            # A handler that raises must neither end the connection (this runs in the reader) nor vanish:
+            # it is said, with its traceback, on the `lampos` logger (stderr by default).
+            try:
+                result = handler(event)
+            except Exception:
+                _log.exception("your handler for %s raised", name)
+                continue
             if inspect.isawaitable(result):
                 task = asyncio.ensure_future(result)
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
+                task.add_done_callback(lambda done, name=name: _said(done, name))
 
     # Events and state.
 
