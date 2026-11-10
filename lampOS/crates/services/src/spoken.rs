@@ -97,6 +97,11 @@ pub fn not_readable(code: &str) -> Option<String> {
             "{code:?} is read only through its own tools, which a made skill can't read yet"
         ));
     }
+    if code == crate::spotify::CODE {
+        return Some(format!(
+            "{code:?} is read only by the owner's voice, which a made skill can't read yet"
+        ));
+    }
     if service.reads.is_empty() {
         return Some(format!("{code:?} has nothing to read"));
     }
@@ -359,6 +364,7 @@ mod tests {
             );
         }
         assert!(not_readable("ahrefs").unwrap().contains("free-form"));
+        assert!(not_readable("spotify").unwrap().contains("can't read yet"));
         // Every whole text names a read the service has.
         for (code, what) in WHOLE_TEXTS {
             let line = reads::WHATS.iter().find(|(c, _)| c == code).unwrap().1;

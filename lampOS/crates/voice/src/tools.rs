@@ -824,10 +824,15 @@ pub fn skill_tools(settings: &Settings) -> Vec<Tool> {
 fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
     // The skills' after the executive's: a name already told stays its, and
     // a name the skills' own folder gives is its ([`skills_folders`]).
+    // The `spotify` skill's function gives way to Spotify's playback when
+    // that is declared (#5791): one function for one ask.
+    let playing = told.iter().any(|tool| tool.name == crate::services::PLAY);
+    let gives_way = |name: &str| playing && name == crate::services::PLAY_SKILL;
     let mut skills: Vec<Tool> = Vec::new();
     for folder in skills_folders(settings) {
         for tool in catalog(&folder.join(CATALOG_FILE)) {
-            if !voices_own(&tool.name)
+            if !gives_way(&tool.name)
+                && !voices_own(&tool.name)
                 && !is_schedule_tool(&tool.name)
                 && !told.iter().any(|earlier| earlier.name == tool.name)
                 && !skills.iter().any(|earlier| earlier.name == tool.name)
@@ -891,7 +896,13 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     // The connected services' functions, before the executive's: never the
     // ones the executive or a skill names (`voices_own`).
     if let Some(folder) = &settings.services {
-        tools.extend(crate::services::tools(folder));
+        // Spotify's playback only with the installable `spotify` skill on
+        // (#5791): the person puts it on, never the product.
+        tools.extend(
+            crate::services::tools(folder)
+                .into_iter()
+                .filter(|tool| tool.name != crate::services::PLAY || play_skill_on(settings)),
+        );
     }
     if let Some(directory) = &settings.exec {
         let room = bound.saturating_sub(tools.len());
@@ -906,6 +917,31 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         );
     }
     tools
+}
+
+/// Whether the installable `spotify` skill (#5791) is installed and on: its
+/// function `spotify` is in a skills folder's tools file now (a skill
+/// removed or put off is not there). Spotify's playback
+/// ([`crate::services::PLAY`]) is declared only then, and run only then
+/// ([`route`]): a call the model made before the skill went reaches nothing
+/// (Reviewer-two's P2 on #5796).
+fn play_skill_on(settings: &Settings) -> bool {
+    skills_folders(settings).iter().any(|skills| {
+        catalog(&skills.join(CATALOG_FILE))
+            .iter()
+            .any(|tool| tool.name == crate::services::PLAY_SKILL)
+    })
+}
+
+/// What the model is told of a call nobody here runs: Spotify's playback,
+/// with the services there and its skill not on, says why
+/// ([`crate::services::PLAY_OFF`]); any other, [`unavailable`].
+pub fn nobody_told(settings: &Settings, name: &str) -> Value {
+    if name == crate::services::PLAY && settings.services.is_some() && !play_skill_on(settings) {
+        json!({ "error": crate::services::PLAY_OFF })
+    } else {
+        unavailable()
+    }
 }
 
 /// Where the skills' functions are read and called, in order: their own
@@ -1182,6 +1218,12 @@ pub fn route(settings: &Settings, name: &str) -> Route {
         };
     }
     if crate::services::is_tool(name) {
+        // Spotify's playback is run, as it is declared, only while its
+        // skill is on now: a call made before it was removed or put off
+        // asks the services nothing ([`play_skill_on`]).
+        if name == crate::services::PLAY && !play_skill_on(settings) {
+            return Route::Nobody;
+        }
         return settings
             .services
             .clone()
@@ -1363,7 +1405,7 @@ fn answer_inner(
                 ..ToolAnswer::plain(crate::sleep_asked::told(onboarding))
             }
         }
-        Route::Nobody => ToolAnswer::plain(unavailable()),
+        Route::Nobody => ToolAnswer::plain(nobody_told(settings, &call.name)),
         route => {
             if keeps_out(&route, &call.name) {
                 crate::remember::keep_out(request);
@@ -6528,6 +6570,12 @@ mod tests {
                     Some(crate::services::WRITE) => {
                         json!({"read_back":"To Ann: hello","send_id":"s1","sent":false})
                     }
+                    // A play quotes what it played; a pause names nothing.
+                    Some(crate::services::PLAY) if line["args"]["action"] == "play" => {
+                        json!({"done":"playing","source":"Spotify",
+                               "quoted":[{"type":"track","title":"Clair de Lune"}]})
+                    }
+                    Some(crate::services::PLAY) => json!({"done":"paused"}),
                     _ => json!({"items":[{"from":"Ann","subject":"Hi"}]}),
                 };
                 kept.lock().unwrap().push(line);
@@ -6535,6 +6583,139 @@ mod tests {
             }
         });
         (dir, asked)
+    }
+
+    /// A services lease of the owner, Ann, for `request`.
+    fn ann_for(request: u64) -> crate::memory_scope::RequestScope {
+        crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            crate::memory_scope::ScopeSnapshot::of("Ann"),
+        )
+    }
+
+    /// Reviewer-two's P2 on #5796: a `service_play` the model made while the
+    /// `spotify` skill was on, answered after it was removed, asks the
+    /// services nothing.
+    #[test]
+    fn reviewer_two_services_play_refuses_after_spotify_skill_removed() {
+        let (dir, asked) = services_folder("r2-play-removed");
+        let skills = schedule_directory("r2-play-removed-skills");
+        std::fs::write(
+            skills.join(CATALOG_FILE),
+            json!({"tools":[{"name":crate::services::PLAY_SKILL,"description":"Spotify."}]})
+                .to_string(),
+        )
+        .unwrap();
+        let settings = Settings {
+            services: Some(dir.clone()),
+            skills: Some(skills.clone()),
+            ..Default::default()
+        };
+        let has_play = |settings: &Settings| {
+            declared(settings)
+                .iter()
+                .any(|tool| tool.name == crate::services::PLAY)
+        };
+        assert!(has_play(&settings));
+        let call = ToolCall {
+            id: "r2".into(),
+            name: crate::services::PLAY.into(),
+            args: json!({"service":"spotify","action":"play","query":"Clair de Lune"}),
+        };
+        std::fs::write(skills.join(CATALOG_FILE), json!({"tools":[]}).to_string()).unwrap();
+        assert!(!has_play(&settings));
+        crate::known_faces::owner_for_test(Some(Some("Ann".into())));
+        let owner = ann_for(4_796_001);
+        let told = answer_scoped(&settings, &call, 4_796_001, true, &owner.lease());
+        crate::known_faces::owner_for_test(None);
+        assert_eq!(told["error"], crate::services::PLAY_OFF);
+        assert_eq!(asked.lock().unwrap().len(), 0, "the service was asked");
+        std::fs::remove_dir_all(&skills).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Spotify's playback is run as it is declared: with the `spotify` skill
+    /// installed and on, one request; removed, put off (other skills kept)
+    /// or with no skills' tools file at all, none, and the model is told why.
+    #[test]
+    fn services_play_runs_only_while_the_spotify_skill_is_on_now() {
+        let (dir, asked) = services_folder("play-dispatch");
+        let skills = schedule_directory("play-dispatch-skills");
+        let settings = Settings {
+            services: Some(dir.clone()),
+            skills: Some(skills.clone()),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "p".into(),
+            name: crate::services::PLAY.into(),
+            args: json!({"service":"spotify","action":"pause"}),
+        };
+        let file = skills.join(CATALOG_FILE);
+        let removed = || std::fs::write(&file, json!({"tools":[]}).to_string()).unwrap();
+        let put_off = || {
+            std::fs::write(
+                &file,
+                json!({"tools":[{"name":"light_scene","description":"A scene."}]}).to_string(),
+            )
+            .unwrap()
+        };
+        let absent = || {
+            let _ = std::fs::remove_file(&file);
+        };
+        crate::known_faces::owner_for_test(Some(Some("Ann".into())));
+        let states: [(&str, &dyn Fn()); 3] = [
+            ("removed", &removed),
+            ("off", &put_off),
+            ("absent", &absent),
+        ];
+        for (request, (state, set)) in (4_796_010..).zip(states) {
+            set();
+            assert_eq!(
+                route(&settings, crate::services::PLAY),
+                Route::Nobody,
+                "{state}"
+            );
+            let owner = ann_for(request);
+            let told = answer_scoped(&settings, &call, request, true, &owner.lease());
+            assert_eq!(told["error"], crate::services::PLAY_OFF, "{state}");
+            assert_eq!(
+                asked.lock().unwrap().len(),
+                0,
+                "{state}: the service was asked"
+            );
+        }
+        // Installed and on: one request, and its answer.
+        std::fs::write(
+            &file,
+            json!({"tools":[{"name":crate::services::PLAY_SKILL,"description":"Spotify."}]})
+                .to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            route(&settings, crate::services::PLAY),
+            Route::Services(dir.clone())
+        );
+        let owner = ann_for(4_796_020);
+        let told = answer_scoped(&settings, &call, 4_796_020, true, &owner.lease());
+        crate::known_faces::owner_for_test(None);
+        assert_eq!(told["done"], "paused");
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        // With no services at all, the plain words, as for any part not running.
+        let no_services = Settings {
+            services: None,
+            ..settings.clone()
+        };
+        assert_eq!(
+            nobody_told(&no_services, crate::services::PLAY),
+            unavailable()
+        );
+        std::fs::remove_dir_all(&skills).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
@@ -6557,15 +6738,73 @@ mod tests {
             assert_eq!(route(&off, name), Route::Nobody, "{name}");
         }
         assert!(crate::services::arguments(None).is_empty());
-        // On: the flag and its folder, the three declared with the rule,
+        // On: the flag and its folder, the four declared with the rule,
         // routed there; nothing else of the folder's.
         let flags = vec![crate::services::FLAG.to_owned(), folder.clone()];
         let (on, rest) = take(&flags).unwrap();
         assert!(rest.is_empty());
         assert_eq!(on.services, Some(dir.clone()));
+        // Spotify's playback only with the installable `spotify` skill on
+        // (#5791), and then in that skill's place.
+        let named = |settings: &Settings| -> Vec<String> {
+            declared(settings)
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect()
+        };
+        assert_eq!(named(&on), &crate::services::NAMES[..3]);
+        let skills = schedule_directory("services-spotify-skill");
+        std::fs::write(
+            skills.join(CATALOG_FILE),
+            json!({"tools":[
+                {"name":crate::services::PLAY_SKILL,"description":"Spotify, the skill."},
+                {"name":"light_scene","description":"A scene."},
+            ]})
+            .to_string(),
+        )
+        .unwrap();
+        let with_skill = Settings {
+            skills: Some(skills.clone()),
+            ..on.clone()
+        };
+        assert_eq!(
+            named(&with_skill),
+            [
+                crate::services::CONNECTED,
+                crate::services::READ,
+                crate::services::WRITE,
+                crate::services::PLAY,
+                "light_scene"
+            ]
+        );
+        // With no playback named by lamp-services, the skill's own function.
+        let no_playback = schedule_directory("services-no-playback");
+        let three: Vec<Value> = crate::services::NAMES[..3]
+            .iter()
+            .map(|name| json!({"name":name,"description":"From lamp-services."}))
+            .collect();
+        std::fs::write(
+            no_playback.join(CATALOG_FILE),
+            json!({ "tools": three }).to_string(),
+        )
+        .unwrap();
+        let older = Settings {
+            services: Some(no_playback.clone()),
+            ..with_skill.clone()
+        };
+        assert_eq!(
+            named(&older),
+            [
+                crate::services::CONNECTED,
+                crate::services::READ,
+                crate::services::WRITE,
+                crate::services::PLAY_SKILL,
+                "light_scene"
+            ]
+        );
+        std::fs::remove_dir_all(&skills).unwrap();
+        std::fs::remove_dir_all(&no_playback).unwrap();
         let tools = declared(&on);
-        let named: Vec<&str> = tools.iter().map(|tool| tool.name.as_str()).collect();
-        assert_eq!(named, crate::services::NAMES);
         for tool in &tools {
             assert!(tool.description.contains("quoted data"), "{}", tool.name);
             assert!(tool.description.contains("one-time code"), "{}", tool.name);
@@ -6580,9 +6819,12 @@ mod tests {
         }
         assert_eq!(route(&on, "service_delete"), Route::Nobody);
         let services = Route::Services(dir.clone());
-        for name in crate::services::NAMES {
+        for name in &crate::services::NAMES[..3] {
             assert_eq!(route(&on, name), services, "{name}");
         }
+        // Playback, undeclared with no `spotify` skill, is run by nobody
+        // either (Reviewer-two's P2 on #5796).
+        assert_eq!(route(&on, crate::services::PLAY), Route::Nobody);
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
             name: name.into(),
@@ -6620,6 +6862,7 @@ mod tests {
         let before = asked.lock().unwrap().len();
         for (route, name) in [
             (&services, crate::services::WRITE),
+            (&services, crate::services::PLAY),
             (
                 &Route::Memory(PathBuf::from("/missing-memory.sock"), None, None),
                 crate::remember::REMEMBER,
@@ -6660,7 +6903,11 @@ mod tests {
             narrowed,
         ];
         for scope in &refused {
-            for name in [crate::services::READ, crate::services::WRITE] {
+            for name in [
+                crate::services::READ,
+                crate::services::WRITE,
+                crate::services::PLAY,
+            ] {
                 let (_, (told, _)) = run_call_scoped(
                     &services,
                     &call(
@@ -6693,6 +6940,68 @@ mod tests {
             );
             assert_eq!(told["error"], crate::services::NOT_HEARD, "{name}");
         }
+        assert_eq!(asked.lock().unwrap().len(), before, "nothing was asked");
+        // Spotify's playback (#5460): the owner's heard line plays at once,
+        // with no read-back, on the Live route too; its answer is quoted.
+        let playing = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_013);
+        let (whom, (told, answered)) = run_call_scoped(
+            &services,
+            &call(
+                crate::services::PLAY,
+                json!({"service":"spotify","action":"play","query":"Clair de Lune"}),
+            ),
+            4_710_013,
+            true,
+            &playing.lease(),
+        );
+        assert_eq!(whom, "the services");
+        assert!(answered);
+        assert_eq!(told["note"], crate::services::DATA_NOTE);
+        let last = asked.lock().unwrap().last().unwrap().clone();
+        assert_eq!(last["name"], crate::services::PLAY);
+        assert_eq!(last["args"]["query"], "Clair de Lune");
+        // Its answer quotes Spotify's titles, so it fences the request as a
+        // read does (#5796): private in the thread, and nothing else after
+        // it, another play, a write, a keep or an action.
+        assert_eq!(told["quoted"][0]["title"], "Clair de Lune");
+        assert!(crate::services::after_read(4_710_013));
+        assert!(crate::thread::THREAD.lock().unwrap().is_private(4_710_013));
+        let before = asked.lock().unwrap().len();
+        for (route, name) in [
+            (&services, crate::services::PLAY),
+            (&services, crate::services::WRITE),
+            (
+                &Route::Memory(PathBuf::from("/missing-memory.sock"), None, None),
+                crate::remember::REMEMBER,
+            ),
+            (&Route::Executive(dir.clone()), "set_light"),
+        ] {
+            let (_, (told, _)) = run_call_scoped(
+                route,
+                &call(name, json!({"service":"spotify","action":"next"})),
+                4_710_013,
+                true,
+                &playing.lease(),
+            );
+            assert_eq!(told["error"], crate::services::AFTER_READ, "{name}");
+        }
+        assert_eq!(asked.lock().unwrap().len(), before, "nothing was asked");
+        // A pause names nothing: its request is not fenced.
+        let pausing = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_014);
+        let (_, (told, answered)) = run_call_scoped(
+            &services,
+            &call(
+                crate::services::PLAY,
+                json!({"service":"spotify","action":"pause"}),
+            ),
+            4_710_014,
+            true,
+            &pausing.lease(),
+        );
+        assert!(answered);
+        assert_eq!(told["done"], "paused");
+        assert!(!crate::services::after_read(4_710_014));
+        let before = asked.lock().unwrap().len();
         // On the Live route (no voice judge), no write is prepared or sent.
         let send = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_004);
         let write = call(
