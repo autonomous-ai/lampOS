@@ -11928,7 +11928,11 @@ fn conversation_with_gate_inner(
                     // "Where you sit": between turns the lamp looks at the
                     // person, its gaze turning the head to them, before it
                     // asks to be moved (#1722 row 10, rule 8).
-                    None if onboarding.as_ref().is_some_and(|walk| walk.looking()) => {
+                    // A walk not yet begun rises and looks too (#5931).
+                    None if onboarding
+                        .as_ref()
+                        .is_some_and(|walk| walk.looking() || walk.rising(clock)) =>
+                    {
                         Some(RingPhase::Listening)
                     }
                     Some(RingPhase::Speaking) if attending => Some(RingPhase::Listening),
