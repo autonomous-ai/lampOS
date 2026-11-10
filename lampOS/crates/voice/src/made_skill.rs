@@ -45,12 +45,14 @@ pub const DIRECTORY: &str = "/var/lib/lampOS/voice/made-skills";
 /// The program that checks and packs them: `lamp-skills`, as the product
 /// installs it.
 pub const PROGRAM: &str = "/opt/lampOS/skills/current/lamp-skills";
-/// The topics a made skill may read: whether the voice is talking,
-/// whether someone is at the lamp, whether a face is in view and someone
-/// stood up from the desk (`lamp_skills::PRESENCE_TOPICS`, presence alone:
-/// its trigger reads no field of the faces, so never who), and the local
-/// clock (`lamp_skills::LOCAL_CLOCK_TOPIC`, which lamp-skills makes itself).
-/// Nothing it reads is about a person's words, identity or picture.
+/// The topics a made skill's first triggers read: whether the voice is
+/// talking, whether someone is at the lamp, whether a face is in view and
+/// someone stood up from the desk (`lamp_skills::PRESENCE_TOPICS`,
+/// presence alone: its trigger reads no field of the faces, so never who),
+/// and the local clock (`lamp_skills::LOCAL_CLOCK_TOPIC`, which lamp-skills
+/// makes itself). No longer a cap (#6066): a made skill may read any topic
+/// lamp-skills takes, and [`plainly`] says the triggers it knows
+/// (`SAYABLE_TOPICS`).
 pub const TOPICS: [&str; 5] = [
     "voice/state",
     "room/presence",
@@ -213,11 +215,11 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
         "{BRIEF_HEAD} for the request. Reply with two fenced blocks: \
          ```skill.toml, ```SKILL.md. skill.toml: \
          kind = \"installable\", version = \"1.0.0\", no name key; [permissions] \
-         light/body/speak = true as used, its topic; one [trigger] as listed (coming to \
-         the desk is room/presence), with for, cooldown, rearm = \"ends\", \
+         light/body/speak = true, its topic, any other, as used; one [trigger] as listed \
+         (coming to the desk is room/presence), with for, cooldown, rearm = \"ends\", \
          during = {{ from = \"22:00\", to = \"22:30\" }}; \
-         [ask] policy = \"nudge\"; [[do]]: light = {{ colour, level 1-5, for }} or \
-         {{ dim = 1 }}, body = {{ gesture = \"nod\" }} or one listed, say = {{ text = \
+         [ask] policy = \"nudge\" or listed; [[do]] as listed: light = {{ colour, level \
+         1-5, for }}, body = {{ gesture = \"nod\" }}, say = {{ text = \
          \"Hi!\" }} (exact words, asker's language) or cue = \"hum\".{read} SKILL.md: \
          front matter name (lowercase, hyphens), description. \
          {REQUEST_MARK}{request}"
@@ -338,6 +340,13 @@ pub const NOT_PASSED: &str = "it didn't pass the lamp's own check of what a skil
 /// model's own `cannot:` sentence with what to ask instead.
 pub fn not_made_line(why: &str) -> String {
     let why = why.trim();
+    // What it can't do yet is said as itself (#6066).
+    if why.starts_with(CANT_YET) {
+        return match why.ends_with(['.', '!', '?']) {
+            true => why.to_owned(),
+            false => format!("{why}."),
+        };
+    }
     if why.ends_with(['.', '!', '?']) {
         format!("{NOT_MADE_HEAD} {why}")
     } else {
@@ -440,7 +449,25 @@ pub struct Uses {
     /// The linked service it reads to the owner alone, by its code, with
     /// [`READS_ENVIRONMENT`] on (#5288): never one it writes to.
     pub reads: Option<String>,
+    /// It may send a short text to the person's phone (`messages`): an
+    /// outbound step, named when it is said back (#6066).
+    pub messages: bool,
+    /// It may see the camera's picture (`camera`, or format 1's `look`):
+    /// named when it is said back (#6066).
+    pub camera: bool,
+    /// It may know whether a face is one the lamp knows (`known_faces`).
+    pub known_faces: bool,
+    /// Its note is told who is at the lamp (`who`).
+    pub who: bool,
+    /// The actions part's functions it may call by name (`actions`).
+    pub actions: Vec<String>,
+    /// It may set light and volume ceilings (`output_limits`).
+    pub output_limits: bool,
 }
+
+/// The topics that are what the microphone hears: words, its name, the
+/// sounds' classes. A skill reading one is said back as listening (#6066).
+const MICROPHONE_TOPICS: [&str; 3] = ["voice/heard", "name/heard", "ears/classes"];
 
 impl Uses {
     /// In plain words: "its light and its head", "whether someone is at the
@@ -458,6 +485,27 @@ impl Uses {
         }
         if self.body {
             parts.push("its head and arm".to_owned());
+        }
+        if self.camera {
+            parts.push("the camera".to_owned());
+        }
+        if self.listens() {
+            parts.push("the microphone".to_owned());
+        }
+        if self.messages {
+            parts.push("messages to your phone".to_owned());
+        }
+        if self.known_faces {
+            parts.push("whether it knows a face".to_owned());
+        }
+        if self.who {
+            parts.push("who is at the lamp".to_owned());
+        }
+        if self.output_limits {
+            parts.push("limits on its light and volume".to_owned());
+        }
+        for action in &self.actions {
+            parts.push(format!("its action {}", named(action)));
         }
         for topic in &self.topics {
             parts.push(
@@ -479,12 +527,60 @@ impl Uses {
         }
     }
 
+    /// Whether it reads what the microphone hears ([`MICROPHONE_TOPICS`]).
+    pub fn listens(&self) -> bool {
+        self.topics
+            .iter()
+            .any(|topic| MICROPHONE_TOPICS.contains(&topic.as_str()))
+    }
+
     fn json(&self) -> Value {
         let mut uses = json!({"light": self.light, "body": self.body, "topics": self.topics, "speak": self.speak});
         if let Some(service) = &self.reads {
             uses["reads"] = json!(service);
         }
+        // The grants beyond the light, the body and the voice, only when
+        // given, so an entry kept before #6066 reads the same.
+        for (key, given) in [
+            ("messages", self.messages),
+            ("camera", self.camera),
+            ("known_faces", self.known_faces),
+            ("who", self.who),
+            ("output_limits", self.output_limits),
+        ] {
+            if given {
+                uses[key] = json!(true);
+            }
+        }
+        if !self.actions.is_empty() {
+            uses["actions"] = json!(self.actions);
+        }
         uses
+    }
+
+    /// What [`Uses::json`] wrote, read back.
+    fn of_json(uses: &Value) -> Self {
+        let strings = |key: &str| -> Vec<String> {
+            uses[key]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|item| item.as_str().map(str::to_owned))
+                .collect()
+        };
+        Self {
+            light: uses["light"] == true,
+            body: uses["body"] == true,
+            topics: strings("topics"),
+            speak: uses["speak"] == true,
+            reads: uses["reads"].as_str().map(str::to_owned),
+            messages: uses["messages"] == true,
+            camera: uses["camera"] == true,
+            known_faces: uses["known_faces"] == true,
+            who: uses["who"] == true,
+            actions: strings("actions"),
+            output_limits: uses["output_limits"] == true,
+        }
     }
 }
 
@@ -543,15 +639,18 @@ pub fn needs_link_ask(needs: &[Value]) -> Option<String> {
     ))
 }
 
-/// A made skill's `skill.toml` held to what one may use (the coordinator's
-/// cap, 19 Oct): installable, with a version; `[permissions]` with only
-/// `light`, `body` and `topics` among [`TOPICS`]; no function for the
-/// model (`tool`). Speaking, messages, the look and every other topic are
-/// refused; widening this is a decision still to be taken. The one widening
-/// so far (#5288): with [`READS_ENVIRONMENT`] on, `services` naming one
-/// linked service with reads (`lamp_services::spoken::not_readable`) as
-/// `"read"`, with `speak` for saying it. What the skill
-/// does within it is checked by `lamp-skills pack` after.
+/// A made skill's `skill.toml` taken as one may be written: installable,
+/// with a version, and no function for the model (`tool`): it runs by
+/// itself. Since #6066 (the lead's principle: a skill a person makes on
+/// their own lamp may do whatever the lamp can do) its `[permissions]` and
+/// `[ask]` are whatever `lamp-skills` takes for an installable skill: the
+/// light, the body, the voice, any topic, messages, the camera, known
+/// faces, actions, and with [`READS_ENVIRONMENT`] on a linked service's
+/// reads. What it may declare and do is `lamp-skills pack`'s check after,
+/// which refuses a core grant, a write to a service or a step its runtime
+/// doesn't have. Only #6062's say stays this cap's: one say step, its
+/// words. What it does is then said back whole ([`plainly`]), any outbound
+/// step, the camera and the microphone named.
 pub fn capped(text: &str) -> Result<(String, Uses), Refused> {
     capped_with(text, reads_on())
 }
@@ -571,6 +670,10 @@ pub fn capped_with(text: &str, reads: bool) -> Result<(String, Uses), Refused> {
     // "re-run it yourself until it works"): the lamp's own reason, and
     // what a made skill may have.
     held.map_err(|Refused(why, _)| {
+        // What the lamp can't do yet is said, never repaired away.
+        if why.starts_with(CANT_YET) {
+            return Refused(why, None);
+        }
         let read = if reads { CAPPED_OR_READ } else { "" };
         let lines = format!("The lamp refused it: {why}. {CAPPED_ONLY}{read}");
         Refused(why, Some(lines))
@@ -579,9 +682,9 @@ pub fn capped_with(text: &str, reads: bool) -> Result<(String, Uses), Refused> {
 
 /// What a repair is told when [`capped`] refused.
 const CAPPED_ONLY: &str = "kind = \"installable\", version = \"1.0.0\", no [tool]; \
-                           [permissions] only light, body and speak = true as its steps use \
-                           them (speak for a say step or cue = \"hum\", its one sound), topics \
-                           only its trigger's; [ask] policy = \"nudge\"; a say is one \
+                           [permissions] as its steps and trigger use them: light, body, speak \
+                           (speak for a say step, cue = \"hum\" or a read), topics its \
+                           trigger's, any other a skill may declare; a say is one \
                            say = { text = \"the exact words\" }, in the request's language";
 
 /// The most of a made skill's say text ([`say_text`]): one or two short
@@ -872,8 +975,17 @@ const SOUNDS: [(&str, &str); 1] = [("hum", "hums softly")];
 
 /// Why a sound step the lamp doesn't have is refused: another cue, a
 /// `sound` file, a path.
-const SOUND_NOT_SHIPPED: &str = "it would play a sound the lamp doesn't have; the one sound a \
-                                 made skill plays is its soft hum";
+const SOUND_NOT_SHIPPED: &str = "I can't do that yet: a sound other than its soft hum";
+
+/// How the lamp answers what it can't do yet (#6066, the lead's principle):
+/// "I can't do that yet:" and what, never a refusal by a rule. Each one is
+/// build work.
+pub const CANT_YET: &str = "I can't do that yet:";
+
+/// [`CANT_YET`] with what: "I can't do that yet: sending a message".
+pub fn cant_yet(what: &str) -> String {
+    format!("{CANT_YET} {what}")
+}
 
 /// What a repair is told when a hum sits beside a say or another hum:
 /// `lamp-skills` plays one line or sound a run, so the extra hum goes.
@@ -943,70 +1055,67 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
     let Some(version) = table.get("version").and_then(|version| version.as_str()) else {
         return Err(Refused::new("it's missing its version number"));
     };
-    // Asked of the Policy as a nudge, never as a hello, news or a reminder
-    // (the reviewer on #2011): the act `lamp-skills` passes on.
-    if let Some(ask) = table.get("ask")
-        && ask.get("policy").and_then(|policy| policy.as_str()) != Some("nudge")
-    {
-        return Err(Refused::new(
-            "it would start in a way a made skill can't: a made skill only offers itself as a \
-             gentle nudge",
-        ));
-    }
+    // Its `[ask]`, as `lamp-skills` takes any (#6066): a nudge, a hello,
+    // news or a reminder, each said back ([`plainly`]).
     let mut uses = Uses::default();
     if let Some(permissions) = table.get("permissions") {
         let Some(permissions) = permissions.as_table() else {
             return Err(Refused::new("the lamp couldn't tell what it would use"));
         };
+        // Format 1's `look` gives the picture too, as `camera` does
+        // (`lamp_skills::Permissions::sees_picture`).
+        let format_2 = table.get("format").and_then(toml::Value::as_integer) == Some(2);
+        let strings = |list: &toml::Value| -> Option<Vec<String>> {
+            list.as_array()?
+                .iter()
+                .map(|item| item.as_str().map(str::to_owned))
+                .collect()
+        };
+        let unclear = || Refused::new("the lamp couldn't tell what it would use");
         for (key, value) in permissions {
-            match (key.as_str(), value) {
-                ("light", toml::Value::Boolean(on)) => uses.light = *on,
-                ("body", toml::Value::Boolean(on)) => uses.body = *on,
-                ("topics", toml::Value::Array(topics)) => {
-                    for topic in topics {
-                        match topic.as_str() {
-                            Some(topic) if TOPICS.contains(&topic) => {
-                                if !uses.topics.iter().any(|kept| kept == topic) {
-                                    uses.topics.push(topic.to_owned());
-                                }
-                            }
-                            _ => {
-                                return Err(Refused::new(
-                                    "it asks to read more than a made skill may",
-                                ));
-                            }
+            let on = value.as_bool();
+            match key.as_str() {
+                "light" => uses.light = on.ok_or_else(unclear)?,
+                "body" => uses.body = on.ok_or_else(unclear)?,
+                "topics" => {
+                    for topic in strings(value).ok_or_else(unclear)? {
+                        if !uses.topics.contains(&topic) {
+                            uses.topics.push(topic);
                         }
                     }
                 }
-                ("actions", toml::Value::Array(actions)) if actions.is_empty() => {}
-                ("speak", toml::Value::Boolean(_)) if added => {}
+                "actions" => uses.actions = strings(value).ok_or_else(unclear)?,
+                "speak" if added => {}
                 // Its voice: a read of a linked service said aloud
                 // (#5288), or its own `say` step (#6055), held below to a
                 // skill that has one.
-                ("speak", toml::Value::Boolean(on)) => uses.speak = *on,
-                // One linked service, read and never written (#5288).
-                ("services", toml::Value::Table(services)) if !added && reads => {
-                    let read = match services.iter().collect::<Vec<_>>().as_slice() {
-                        [(service, how)]
-                            if lamp_services::spoken::not_readable(service).is_none()
-                                && how.as_str() == Some("read") =>
-                        {
-                            service.to_string()
-                        }
-                        _ => {
-                            return Err(Refused::new(
-                                "it asks to use linked services other than by reading one that has something to read, which a made skill can't",
-                            ));
-                        }
-                    };
-                    uses.reads = Some(read);
+                "speak" => uses.speak = on.ok_or_else(unclear)?,
+                "messages" => uses.messages = on.ok_or_else(unclear)?,
+                "camera" => uses.camera |= on.ok_or_else(unclear)?,
+                "look" => uses.camera |= on.ok_or_else(unclear)? && !format_2,
+                "known_faces" => uses.known_faces = on.ok_or_else(unclear)?,
+                "who" => uses.who = on.ok_or_else(unclear)?,
+                "output_limits" => uses.output_limits = on.ok_or_else(unclear)?,
+                // A linked service: what lamp-skills' check takes, a read
+                // (#5288); a write it refuses. Off, the lamp can't yet.
+                "services" if !added && !reads => {
+                    return Err(Refused::new(cant_yet("reading your linked services")));
                 }
-                ("speak" | "look" | "messages" | "known_faces" | "actions" | "services", _) => {
-                    return Err(Refused::new(
-                        "it asks to use more than the light and the head, which a made skill can't",
-                    ));
+                "services" => {
+                    let services = value.as_table().ok_or_else(unclear)?;
+                    // A write: no step writes to a service yet (lamp-skills'
+                    // check takes only "read").
+                    if services.values().any(|how| how.as_str() != Some("read")) {
+                        return Err(Refused::new(cant_yet("writing to a linked service")));
+                    }
+                    uses.reads = services
+                        .iter()
+                        .find(|(_, how)| how.as_str() == Some("read"))
+                        .map(|(service, _)| service.clone());
                 }
-                _ => return Err(Refused::new("the lamp couldn't tell what it would use")),
+                // Any other key is lamp-skills' check's to take or refuse:
+                // a core grant, an add-on's, or a word it doesn't know.
+                _ => {}
             }
         }
     }
@@ -1025,13 +1134,17 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         if says.iter().any(|say| say_text(say).is_none()) {
             return Err(Refused::new(SAY_NOT_TEXT));
         }
-        // Its sound only the lamp's own, by name ([`SOUNDS`]).
-        let cues: Vec<&toml::Value> = steps().filter_map(|step| step.get("cue")).collect();
-        if cues.iter().any(|cue| sound_plainly(cue).is_none())
-            || steps().any(|step| step.get("sound").is_some())
-        {
-            return Err(Refused::new(SOUND_NOT_SHIPPED));
+        // A step the lamp can't do yet in a made skill, said so before the
+        // check refuses it (#6066): a send or a write, a move of its own, a
+        // sound other than the hum ([`SOUNDS`]: a made skill carries no
+        // audio).
+        if let Some(what) = steps().find_map(step_cant_yet) {
+            return Err(Refused::new(match what {
+                OTHER_SOUND => SOUND_NOT_SHIPPED.to_owned(),
+                what => cant_yet(what),
+            }));
         }
+        let cues: Vec<&toml::Value> = steps().filter_map(|step| step.get("cue")).collect();
         // One say or sound a run, as `lamp-skills` takes it.
         if says.len() > 1 {
             return Err(Refused::new(
@@ -1135,6 +1248,10 @@ pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
             "lamp-voice: a made skill can't be said plainly: {}",
             unsaid.part
         );
+        // What the lamp can't do yet is said so, with no repair (#6066).
+        if let Some(what) = &unsaid.cant {
+            return Refused(cant_yet(what), None);
+        }
         // Its lines go back to the model once, as the check's do, naming
         // what couldn't be said and how to write it so it can.
         Refused(UNSAID.into(), Some(unsaid.repair(reads)))
@@ -1148,6 +1265,9 @@ pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
 struct Unsaid {
     part: String,
     trigger: bool,
+    /// What the lamp can't do yet, said as [`cant_yet`] and never repaired
+    /// (#6066).
+    cant: Option<String>,
 }
 
 impl Unsaid {
@@ -1155,6 +1275,7 @@ impl Unsaid {
         Self {
             part: part.into(),
             trigger: false,
+            cant: None,
         }
     }
 
@@ -1162,6 +1283,16 @@ impl Unsaid {
         Self {
             part: part.into(),
             trigger: true,
+            cant: None,
+        }
+    }
+
+    fn cant(what: impl Into<String>) -> Self {
+        let what = what.into();
+        Self {
+            part: format!("can't yet: {}", named(&what)),
+            trigger: false,
+            cant: Some(what),
         }
     }
 
@@ -1305,13 +1436,25 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let said = format!(
-            "Only when you ask for it, it {}, and never on its own.",
-            steps.join(", then ")
+            "Only when you ask for it, it {}{}, and never on its own.",
+            steps.join(", then "),
+            reaches_plainly(table)
         );
         if said.chars().count() > MOST_PLAIN_CHARS {
             return Err(too_long());
         }
         return Ok(said);
+    }
+    // A trigger on a topic no saying here knows: the lamp can't start a
+    // made skill on it yet (#6066), said so, never repaired away.
+    if let Some(topic) = table
+        .get("trigger")
+        .and_then(|trigger| trigger.get("topic"))
+        .and_then(toml::Value::as_str)
+        && !SAYABLE_TOPICS.contains(&topic)
+        && let Some(what) = topic_cant_yet(topic)
+    {
+        return Err(Unsaid::cant(what));
     }
     // The trigger first, any part beside it named with it: a skill shaped
     // like a built-in one (a [[trigger]] on the faces, a [[while]]) is told
@@ -1339,7 +1482,12 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
         let steps = steps
             .iter()
             .enumerate()
-            .map(|(index, step)| step_plainly(step).ok_or_else(|| unsaid_step(index, step)))
+            .map(|(index, step)| {
+                step_plainly(step).ok_or_else(|| match step_cant_yet(step) {
+                    Some(what) => Unsaid::cant(what),
+                    None => unsaid_step(index, step),
+                })
+            })
             .collect::<Result<Vec<_>, _>>()?;
         said.push_str(&format!(", it {}", steps.join(", then ")));
     }
@@ -1353,12 +1501,134 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
             _ => format!(", at most once every {count} {unit}s"),
         });
     }
+    said.push_str(ask_plainly(table)?);
+    // The camera named once: a look step already says it.
+    let reach = reaches_plainly(table);
+    match said.contains("with the camera") {
+        true => said.push_str(&reach.replace(", using the camera", "")),
+        false => said.push_str(&reach),
+    }
     said.push('.');
     // Said whole or not at all: never cut before a step or the cooldown.
     if said.chars().count() > MOST_PLAIN_CHARS {
         return Err(too_long());
     }
     Ok(said)
+}
+
+/// The trigger topics [`plainly`] can say (#6066): [`TOPICS`], a pat on
+/// the head (`controls/pet`), the air (`air/state`) and what someone at the
+/// desk is doing (`room/activity`). A trigger on any other is what the lamp
+/// can't start a made skill on yet ([`topic_cant_yet`]).
+const SAYABLE_TOPICS: [&str; 8] = [
+    "voice/state",
+    "room/presence",
+    FACES_TOPIC,
+    STOOD_UP_TOPIC,
+    CLOCK_TOPIC,
+    PET_TOPIC,
+    AIR_TOPIC,
+    ACTIVITY_TOPIC,
+];
+/// A hand on the head's pads (`lamp_msgs` `controls/pet`).
+const PET_TOPIC: &str = "controls/pet";
+/// The air at the desk.
+const AIR_TOPIC: &str = "air/state";
+/// What someone at the desk is doing, as the eyes see it.
+const ACTIVITY_TOPIC: &str = "room/activity";
+
+/// What the lamp can't start a made skill on yet, by a real topic of the
+/// lamp's that no saying here knows, in plain words: "starting on words it
+/// hears". Any other topic is none: a slip the repair fixes.
+fn topic_cant_yet(topic: &str) -> Option<&'static str> {
+    Some(match topic {
+        "voice/heard" | "name/heard" => "starting on words it hears",
+        "ears/classes" => "starting on a sound it hears",
+        "schedule/due" => "starting when a reminder comes due",
+        "tasks/status" => "starting on the news of your work",
+        "controls/touch" | "controls/state" => "starting on a touch",
+        "mood/state" => "starting on its own mood",
+        "lamp/health" => "starting on how its parts are",
+        "lamp/pause" => "starting on a pause",
+        _ => return None,
+    })
+}
+
+/// What a `[[do]]` step asks that the lamp can't do yet in a made skill
+/// (#6066), in plain words: a message or a write sent out (no step sends
+/// one: a text is a watch's, and a service is only read), a move of its own
+/// or a sound it doesn't ship (a made skill carries no file but its two).
+fn step_cant_yet(step: &toml::Value) -> Option<&'static str> {
+    let step = step.as_table()?;
+    let sends = [
+        "text", "message", "messages", "send", "mail", "email", "post", "write", "notify",
+    ];
+    if step.keys().any(|key| sends.contains(&key.as_str())) {
+        return Some("sending a message or writing to a linked service");
+    }
+    if step.get("body").and_then(|body| body.get("move")).is_some() {
+        return Some("a move of its own");
+    }
+    let other_cue = step
+        .get("cue")
+        .is_some_and(|cue| sound_plainly(cue).is_none());
+    (other_cue || step.contains_key("sound")).then_some(OTHER_SOUND)
+}
+
+/// A sound a made skill can't play yet: one it would carry.
+const OTHER_SOUND: &str = "a sound other than its soft hum";
+
+/// How a made skill offers itself, its `[ask] policy`, as [`plainly`] adds
+/// it after the steps: nothing for a nudge or none, ", as a hello", ", as a
+/// reminder", ", as news", ", as a warning" (#6066). Another is unsaid.
+fn ask_plainly(table: &toml::Table) -> Result<&'static str, Unsaid> {
+    let Some(ask) = table.get("ask") else {
+        return Ok("");
+    };
+    match ask.get("policy").and_then(toml::Value::as_str) {
+        Some("nudge") => Ok(""),
+        Some("hello") => Ok(", as a hello"),
+        Some("reminder") => Ok(", as a reminder"),
+        Some("news") => Ok(", as news"),
+        Some("warning") => Ok(", as a warning"),
+        _ => Err(Unsaid::of(
+            "[ask] policy: nudge, hello, reminder, news or warning",
+        )),
+    }
+}
+
+/// What a made skill reaches beyond the lamp, or sees and hears, named
+/// after what it does (#6066, the lead's principle: said back before it goes
+/// on): ", using the camera", ", listening with the microphone", ", and it
+/// may send a message to your phone". From its `[permissions]`, so a grant
+/// is named whether or not a step uses it.
+fn reaches_plainly(table: &toml::Table) -> String {
+    let Some(permissions) = table.get("permissions").and_then(toml::Value::as_table) else {
+        return String::new();
+    };
+    let given = |key: &str| permissions.get(key).and_then(toml::Value::as_bool) == Some(true);
+    let format_2 = table.get("format").and_then(toml::Value::as_integer) == Some(2);
+    let listens = permissions
+        .get("topics")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|topics| {
+            topics.iter().any(|topic| {
+                topic
+                    .as_str()
+                    .is_some_and(|topic| MICROPHONE_TOPICS.contains(&topic))
+            })
+        });
+    let mut said = String::new();
+    if given("camera") || (given("look") && !format_2) {
+        said.push_str(", using the camera");
+    }
+    if listens {
+        said.push_str(", listening with the microphone");
+    }
+    if given("messages") {
+        said.push_str(", and it may send a message to your phone");
+    }
+    said
 }
 
 /// A trigger as the journal and a repair name it: its topic alone.
@@ -1464,9 +1734,15 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         trigger.get("equals").cloned(),
     );
     // `above` only on someone standing up, its one test.
-    if trigger.contains_key("above") && topic.0 != Some(STOOD_UP_TOPIC) {
+    if trigger.contains_key("above") && ![Some(STOOD_UP_TOPIC), Some(AIR_TOPIC)].contains(&topic.0)
+    {
         return Err(its("above"));
     }
+    let above = trigger.get("above").and_then(|line| match line {
+        toml::Value::Integer(line) => Some(*line as f64),
+        toml::Value::Float(line) => Some(*line),
+        _ => None,
+    });
     let mut said = match (lasting, absent) {
         // Each day at a time (lamp-skills' own clock, `clock/local`): the
         // built-in daily triggers' shape, known local time held once
@@ -1513,11 +1789,6 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         // message a departure, lasting 5 s): every departure, as Watch you
         // leave tests it (`sitting_s` above 0), never held a while.
         (None, None) if topic.0 == Some(STOOD_UP_TOPIC) => {
-            let above = trigger.get("above").and_then(|line| match line {
-                toml::Value::Integer(line) => Some(*line as f64),
-                toml::Value::Float(line) => Some(*line),
-                _ => None,
-            });
             if topic.1 != Some("sitting_s") || topic.2.is_some() || above != Some(0.0) {
                 return Err(its("field and above: sitting_s above 0"));
             }
@@ -1525,6 +1796,44 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         }
         (_, _) if topic.0 == Some(STOOD_UP_TOPIC) => {
             return Err(its("for or absent_for, which a getting up never lasts"));
+        }
+        // A pat on the head (#6066): Controls says `ended = false` while a
+        // hand is on the pads, so once a pet with `rearm`.
+        (None, None) if topic.0 == Some(PET_TOPIC) => {
+            if topic.1 != Some("ended") || topic.2 != Some(toml::Value::Boolean(false)) {
+                return Err(its("field and equals: ended, equals false"));
+            }
+            "When someone pats its head".to_owned()
+        }
+        // Stuffy air (#6066): CO2 above a line, as Stuffy air reads it.
+        (lasting, None) if topic.0 == Some(AIR_TOPIC) => {
+            let line = above
+                .filter(|line| topic.1 == Some("co2_ppm") && topic.2.is_none() && *line > 0.0)
+                .ok_or_else(|| its("field and above: co2_ppm above a level"))?;
+            let line = line as u64;
+            match lasting {
+                Some(lasting) => {
+                    format!("When the air has been stuffy, CO2 over {line} ppm, for {lasting}")
+                }
+                None => format!("When the air gets stuffy, CO2 over {line} ppm"),
+            }
+        }
+        // What someone at the desk is doing, as the eyes see it (#6066).
+        (lasting, None) if topic.0 == Some(ACTIVITY_TOPIC) => {
+            let doing = match (topic.1, topic.2.as_ref().and_then(toml::Value::as_str)) {
+                (Some("state"), Some("head_down")) => "someone is head down at the desk",
+                (Some("state"), Some("at_desk")) => "someone is at the desk, looking up",
+                (Some("state"), Some("leaning_in")) => "someone leans in close",
+                _ => {
+                    return Err(its(
+                        "field and equals: state, head_down, at_desk or leaning_in",
+                    ));
+                }
+            };
+            match lasting {
+                Some(lasting) => format!("When {doing} for {lasting}"),
+                None => format!("When {doing}"),
+            }
         }
         (lasting, None)
             if topic.0 == Some("voice/state")
@@ -1585,8 +1894,9 @@ fn one_minute(during: &toml::Value) -> Option<String> {
 }
 
 /// The longest [`plainly`] says: one breath, and with [`left_out`]'s
-/// words still within [`MOST_DESCRIPTION_CHARS`], so nothing is cut.
-const MOST_PLAIN_CHARS: usize = 200;
+/// words still within [`MOST_DESCRIPTION_CHARS`], so nothing is cut. 240
+/// since #6066, room for an outbound or camera step named after the steps.
+const MOST_PLAIN_CHARS: usize = 240;
 
 /// The triggers [`plainly`] says, each with what it means: in
 /// [`SAYABLE_TRIGGERS`] and [`TRIGGER_MEANINGS`] alike.
@@ -1604,16 +1914,30 @@ macro_rules! trigger_meanings {
 
 /// What a repair is told when [`plainly`] refused a part other than the
 /// trigger.
-const PLAIN_ONLY: &str = "Write only kind, version, needs, permissions, one [trigger], [ask] \
-                          and [[do]], and at most a few [[do]] steps, each one light, one \
-                          listed body gesture, one say = { text = \"the exact words\" } or \
+const PLAIN_ONLY: &str = "Write only kind, version, needs, format, permissions, one [trigger], \
+                          [ask] and [[do]], and at most a few [[do]] steps, each one light \
+                          (colour, dim, out or relative), one body (a listed gesture, \
+                          look_at = \"face\"), one say = { text = \"the exact words\" } or \
                           cue = \"hum\" (with speak = true), as the request names them";
+
+/// The triggers [`plainly`] says beyond [`trigger_meanings`]' (#6066): in
+/// [`TRIGGER_MEANINGS`] for the making model, and named by
+/// [`SAYABLE_TRIGGERS`] for a repair, which has no room for them whole.
+macro_rules! more_trigger_meanings {
+    () => {
+        " Also: a pat on the head: \"controls/pet\", \"ended\", equals false, rearm = \"ends\"; \
+         stuffy air: \"air/state\", \"co2_ppm\", above = 1200; someone head down, at the desk \
+         or leaning in: \"room/activity\", \"state\", equals \"head_down\", \"at_desk\" or \
+         \"leaning_in\"."
+    };
+}
 
 /// What a repair is told when [`plainly`] refused the trigger: the ones it
 /// says, each with what it means, so a request to "come back to my desk"
 /// is written on the desk's presence, not on the faces as the built-in
 /// welcome back's is (lamp-74ff, 10 Nov 17:39). `make_skill_local`'s
-/// system prompt tells the making model the same before it writes.
+/// system prompt tells the making model the same before it writes, with
+/// the pat, the air and the activity whole ([`TRIGGER_MEANINGS`]).
 pub const SAYABLE_TRIGGERS: &str = concat!(
     "One [trigger] table, one of: ",
     trigger_meanings!(),
@@ -1622,7 +1946,17 @@ pub const SAYABLE_TRIGGERS: &str = concat!(
 
 /// The triggers [`plainly`] says, each with what it means, for the making
 /// model's system prompt (`make_skill_local`).
-pub const TRIGGER_MEANINGS: &str = trigger_meanings!();
+pub const TRIGGER_MEANINGS: &str = concat!(trigger_meanings!(), more_trigger_meanings!());
+
+/// The steps, `[ask]` and grants a made skill may have beyond the light,
+/// gesture, say and hum the brief names (#6066), for the making model's
+/// system prompt (`make_skill_local`): each one [`plainly`] says.
+pub const MORE_STEPS: &str = "A light step may also be { dim = 1, until = \"ends\" }, \
+     { out = true }, { relative = { warmer = 1, dimmer = 1 } } or a colour with \
+     pattern = { kind = \"breathe\" } (or candle, pulse). A body step may be \
+     look_at = \"face\", or mood = \"reading\" with for. [ask] policy is \"nudge\", or \"hello\", \"reminder\" or \"news\" as the \
+     request means it. Any [permissions] a skill may have are fine as its steps use them: the \
+     lamp says each back to the person before it goes on.";
 
 /// What [`PLAIN_ONLY`] goes on to say with reads on: a skill that reads a
 /// linked service keeps its one read step. On lamp-9adf, 5 Nov 13:26, an
@@ -1693,38 +2027,149 @@ fn step_plainly(step: &toml::Value) -> Option<String> {
     if let Some(cue) = step.get("cue") {
         return sound_plainly(cue).map(str::to_owned);
     }
+    // The camera's look and a stand (#6066): said, and left to
+    // lamp-skills' check, which takes either only in a skill a person asks
+    // for by its function.
+    if let Some(look) = step.get("look") {
+        return look
+            .as_bool()?
+            .then(|| "takes a look with the camera".to_owned());
+    }
+    if let Some(stand) = step.get("stand") {
+        return Some(format!(
+            "stands at {} percent of its height",
+            stand.as_integer()?
+        ));
+    }
     if let Some(light) = step.get("light").and_then(|light| light.as_table()) {
-        if let Some(dim) = light.get("dim") {
-            return match (light.len(), dim.as_integer()?) {
-                (1, 1) => Some("dims the light a step".to_owned()),
-                (1, steps @ 2..) => Some(format!("dims the light {steps} steps")),
-                _ => None,
-            };
-        }
-        let known = ["colour", "level", "for"];
-        if light.keys().any(|key| !known.contains(&key.as_str())) {
+        return light_plainly(light);
+    }
+    body_plainly(step.get("body")?.as_table()?)
+}
+
+/// How long a light is held when its trigger's end gives it back
+/// (`until = "ends"`): " while that lasts".
+fn until_plainly(light: &toml::Table) -> Option<&'static str> {
+    match light.get("until") {
+        None => Some(""),
+        Some(until) if until.as_str() == Some("ends") => Some(" while that lasts"),
+        Some(_) => None,
+    }
+}
+
+/// A `light` step in plain words: a colour at a level for a while, how it
+/// moves, a dim, the light out, or a shade warmer or dimmer than the
+/// person's own (#6066), each as `lamp-skills` makes it. Any other key is
+/// none, so unsaid.
+fn light_plainly(light: &toml::Table) -> Option<String> {
+    let until = until_plainly(light)?;
+    let only = |known: &[&str]| light.keys().all(|key| known.contains(&key.as_str()));
+    if let Some(dim) = light.get("dim") {
+        if !only(&["dim", "until"]) {
             return None;
         }
-        let mut said = match light.get("colour") {
-            Some(colour) => format!("glows {}", colour.as_str()?),
-            None => "turns the light".to_owned(),
+        return match dim.as_integer()? {
+            1 => Some(format!("dims the light a step{until}")),
+            steps @ 2.. => Some(format!("dims the light {steps} steps{until}")),
+            _ => None,
         };
-        if let Some(level) = light.get("level") {
-            said.push_str(&format!(" at level {}", level.as_integer()?));
+    }
+    if let Some(out) = light.get("out") {
+        if !only(&["out", "over", "until"]) || out.as_bool() != Some(true) {
+            return None;
         }
+        let over = match light.get("over") {
+            Some(over) => format!(" slowly over {}", spell(over.as_str()?)?),
+            None => String::new(),
+        };
+        return Some(format!("turns the light off{over}{until}"));
+    }
+    if let Some(relative) = light.get("relative").and_then(toml::Value::as_table) {
+        if !only(&["relative", "for", "until"])
+            || relative
+                .keys()
+                .any(|key| !["warmer", "dimmer", "warm_at_dimmest"].contains(&key.as_str()))
+        {
+            return None;
+        }
+        let steps = |key: &str| match relative.get(key) {
+            None => Some(0),
+            Some(steps) => steps.as_integer(),
+        };
+        let (warmer, dimmer) = (steps("warmer")?, steps("dimmer")?);
+        let mut parts = Vec::new();
+        if warmer > 0 {
+            parts.push("a shade warmer".to_owned());
+        }
+        match dimmer {
+            0 => {}
+            1 => parts.push("a step dimmer".to_owned()),
+            steps => parts.push(format!("{steps} steps dimmer")),
+        }
+        if parts.is_empty() {
+            return None;
+        }
+        let mut said = format!("makes your light {}", parts.join(" and "));
         if let Some(lasting) = light.get("for") {
             said.push_str(&format!(" for {}", spell(lasting.as_str()?)?));
         }
-        return Some(said);
+        return Some(format!("{said}{until}"));
     }
-    let body = step.get("body").and_then(|body| body.as_table())?;
-    match (
-        body.len(),
-        body.get("gesture").and_then(|gesture| gesture.as_str()),
-    ) {
-        (1, Some(gesture)) => gesture_said(gesture).map(str::to_owned),
-        _ => None,
+    if !only(&["colour", "level", "for", "pattern", "until", "no_brighter"]) {
+        return None;
     }
+    let mut said = match light.get("colour") {
+        Some(colour) => format!("glows {}", colour.as_str()?),
+        None => "turns the light".to_owned(),
+    };
+    if let Some(level) = light.get("level") {
+        said.push_str(&format!(" at level {}", level.as_integer()?));
+    }
+    if let Some(lasting) = light.get("for") {
+        said.push_str(&format!(" for {}", spell(lasting.as_str()?)?));
+    }
+    said.push_str(until);
+    if let Some(pattern) = light.get("pattern") {
+        said.push_str(match pattern.get("kind").and_then(toml::Value::as_str)? {
+            "breathe" => ", breathing",
+            "candle" => ", flickering like a candle",
+            "pulse" => ", pulsing",
+            _ => return None,
+        });
+    }
+    if light.get("no_brighter").and_then(toml::Value::as_bool) == Some(true) {
+        said.push_str(", never brighter than your light");
+    }
+    Some(said)
+}
+
+/// A `body` step in plain words: a gesture by name ([`GESTURES`]), a turn
+/// to the face in view, and the reading pose held a while (#6066), each as
+/// `lamp-skills` makes them, in its order. Any other key is none.
+fn body_plainly(body: &toml::Table) -> Option<String> {
+    if body
+        .keys()
+        .any(|key| !["gesture", "look_at", "mood", "for"].contains(&key.as_str()))
+    {
+        return None;
+    }
+    let mut parts = Vec::new();
+    if let Some(look_at) = body.get("look_at") {
+        (look_at.as_str()? == "face").then_some(())?;
+        parts.push("turns to the face it sees".to_owned());
+    }
+    if let Some(gesture) = body.get("gesture") {
+        parts.push(gesture_said(gesture.as_str()?)?.to_owned());
+    }
+    match (body.get("mood"), body.get("for")) {
+        (None, None) => {}
+        (Some(mood), Some(lasting)) if mood.as_str() == Some("reading") => parts.push(format!(
+            "holds its reading pose for {}",
+            spell(lasting.as_str()?)?
+        )),
+        _ => return None,
+    }
+    (!parts.is_empty()).then(|| parts.join(" and "))
 }
 
 /// Each gesture a made skill may name, one a step, as the person hears it:
@@ -2694,18 +3139,7 @@ fn kept(directory: &Path, from: &str) -> Option<Made> {
                 version: entry["version"].as_str().unwrap_or_default().to_owned(),
                 sha256: entry["sha256"].as_str().unwrap_or_default().to_owned(),
                 description: entry["description"].as_str().unwrap_or_default().to_owned(),
-                uses: Uses {
-                    light: entry["uses"]["light"] == true,
-                    body: entry["uses"]["body"] == true,
-                    topics: entry["uses"]["topics"]
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|topic| topic.as_str().map(str::to_owned))
-                        .collect(),
-                    speak: entry["uses"]["speak"] == true,
-                    reads: entry["uses"]["reads"].as_str().map(str::to_owned),
-                },
+                uses: Uses::of_json(&entry["uses"]),
                 package,
             })
         })
@@ -3266,18 +3700,24 @@ light = { dim = 1 }
         );
         assert_eq!(uses.json()["reads"], "google_calendar");
         assert!(capped_with(READ_TOML, false).is_err());
-        for (from, to) in [
-            ("google_calendar = \"read\"", "google_calendar = \"write\""),
-            (
-                "google_calendar = \"read\"",
-                "google_calendar = \"read\", gmail = \"read\"",
-            ),
-            ("google_calendar = \"read\"", "\"gmail-app\" = \"read\""),
-            ("google_calendar = \"read\"", "dropbox = \"read\""),
-            ("services = { google_calendar = \"read\" }\n", ""),
+        // A write is what the lamp can't do yet (#6066); a second read, a
+        // service with nothing to read or none listed is lamp-skills'
+        // check's to refuse (`tests/it/made.rs`), no longer this cap's.
+        let write = READ_TOML.replace("google_calendar = \"read\"", "google_calendar = \"write\"");
+        assert_eq!(
+            capped_with(&write, true).unwrap_err().0,
+            cant_yet("writing to a linked service")
+        );
+        assert_eq!(
+            capped_with(READ_TOML, false).unwrap_err().0,
+            cant_yet("reading your linked services")
+        );
+        for to in [
+            "google_calendar = \"read\", gmail = \"read\"",
+            "\"gmail-app\" = \"read\"",
         ] {
-            let wider = READ_TOML.replace(from, to);
-            assert!(capped_with(&wider, true).is_err(), "{to}");
+            let wider = READ_TOML.replace("google_calendar = \"read\"", to);
+            assert!(capped_with(&wider, true).is_ok(), "{to}");
         }
         // Any other service with reads: a Drive list, said by name.
         let drive = READ_TOML
@@ -3398,12 +3838,12 @@ light = { dim = 1 }
         }
     }
 
-    /// The coordinator's cap (19 Oct): the light and the body, and only
-    /// voice/state and room/presence; speaking, messages, the look, any
-    /// other topic, a function for the model, a core kind and a missing
-    /// version are each refused.
+    /// The coordinator's cap (19 Oct) lifted on #6066: whatever a skill can
+    /// declare is kept, and lamp-skills' check judges it; only a function
+    /// for the model, a core kind and a missing version are refused here,
+    /// and a write to a service is what the lamp can't do yet.
     #[test]
-    fn a_made_skill_may_use_only_the_light_and_the_body() {
+    fn a_made_skill_may_use_whatever_a_skill_can_declare() {
         let (version, uses) = capped(TOML).unwrap();
         assert_eq!(version, "1.0.0");
         assert_eq!(
@@ -3414,22 +3854,37 @@ light = { dim = 1 }
                 topics: vec!["voice/state".into()],
                 speak: false,
                 reads: None,
+                ..Uses::default()
             }
         );
         assert_eq!(uses.spoken(), "its light and whether it is talking");
-        for (wider, why) in [
-            ("speak = true", "never says anything"),
-            ("look = true", "more than the light"),
-            ("messages = true", "more than the light"),
-            ("known_faces = true", "more than the light"),
-            ("actions = [\"volume_up\"]", "more than the light"),
-            ("frobs = true", "couldn't tell what it would use"),
+        // Each grant a skill can declare is kept, and named.
+        for (wider, spoken) in [
+            ("look = true", "the camera"),
+            ("camera = true", "the camera"),
+            ("messages = true", "messages to your phone"),
+            ("known_faces = true", "whether it knows a face"),
+            ("who = true", "who is at the lamp"),
+            ("actions = [\"volume_up\"]", "its action volume_up"),
+            ("output_limits = true", "limits on its light and volume"),
         ] {
             let text = TOML.replace("light = true\n", &format!("light = true\n{wider}\n"));
-            assert!(capped(&text).unwrap_err().0.contains(why), "{wider}");
+            let (_, uses) = capped(&text).unwrap_or_else(|why| panic!("{wider}: {why:?}"));
+            assert!(uses.spoken().contains(spoken), "{wider}: {}", uses.spoken());
+            assert_eq!(Uses::of_json(&uses.json()), uses, "{wider}");
         }
-        // Presence and the clock: a face in view, someone getting up, the
-        // time of day; never what is heard nor a picture.
+        // Format 2's look is presence alone, never the picture.
+        let presence_look = TOML
+            .replace("light = true\n", "light = true\nlook = true\n")
+            .replace("version = \"1.0.0\"\n", "version = \"1.0.0\"\nformat = 2\n");
+        assert!(!capped(&presence_look).unwrap().1.camera);
+        // A key no skill has, or a core grant, is lamp-skills' check's.
+        let frobs = TOML.replace("light = true\n", "light = true\nfrobs = true\n");
+        assert!(capped(&frobs).is_ok());
+        let unclear = TOML.replace("light = true\n", "light = \"yes\"\n");
+        assert!(capped(&unclear).unwrap_err().0.contains("couldn't tell"));
+        // Any topic: presence and the clock, and what is heard, named as
+        // the microphone.
         let presence = TOML.replace(
             "[\"voice/state\"]",
             "[\"humans/faces/tracked\", \"room/stood_up\", \"clock/local\"]",
@@ -3439,21 +3894,35 @@ light = { dim = 1 }
             "its light, whether it sees a face, someone getting up from the desk and the time \
              of day"
         );
-        for wider in ["camera/frame", "ears/classes", "name/heard"] {
+        for wider in ["air/state", "ears/classes", "name/heard", "voice/heard"] {
             let text = TOML.replace("[\"voice/state\"]", &format!("[\"{wider}\"]"));
-            assert!(
-                capped(&text).unwrap_err().0.contains("read more"),
-                "{wider}"
-            );
+            let (_, uses) = capped(&text).unwrap_or_else(|why| panic!("{wider}: {why:?}"));
+            assert_eq!(uses.listens(), wider != "air/state", "{wider}");
         }
-        let heard = TOML.replace("[\"voice/state\"]", "[\"voice/heard\"]");
-        assert!(capped(&heard).unwrap_err().0.contains("read more"));
+        // A write to a service is what the lamp can't do yet, never
+        // repaired away.
+        let write = TOML.replace(
+            "light = true\n",
+            "light = true\nservices = { gmail = \"write\" }\n",
+        );
+        assert_eq!(
+            capped_with(&write, true).unwrap_err(),
+            Refused(cant_yet("writing to a linked service"), None)
+        );
         let tool = format!("tool = \"dim_now\"\n{TOML}");
         assert!(capped(&tool).unwrap_err().0.contains("runs by itself"));
         let core = TOML.replace("installable", "core");
         assert!(capped(&core).unwrap_err().0.contains("installable"));
-        let reminder = TOML.replace("policy = \"nudge\"", "policy = \"reminder\"");
-        assert!(capped(&reminder).unwrap_err().0.contains("gentle nudge"));
+        // Any [ask]: a hello, news or a reminder, said back.
+        for (policy, said) in [
+            ("reminder", ", as a reminder."),
+            ("hello", ", as a hello."),
+            ("news", ", as news."),
+        ] {
+            let text = TOML.replace("policy = \"nudge\"", &format!("policy = \"{policy}\""));
+            assert!(capped(&text).is_ok(), "{policy}");
+            assert!(plainly(&text).unwrap().ends_with(said), "{policy}");
+        }
         let unversioned = TOML.replace("version = \"1.0.0\"\n", "");
         assert!(capped(&unversioned).unwrap_err().0.contains("version"));
         assert!(capped("not toml [").is_err());
@@ -3607,13 +4076,17 @@ say = { text = "Welcome back!" }
                 .0
                 .contains("never says anything")
         );
-        // The other limits hold beside a say.
-        for wider in ["look = true", "messages = true", "known_faces = true"] {
+        // Beside a say, any grant (#6066): kept, and named when said back.
+        for (wider, named) in [
+            ("camera = true", ", using the camera."),
+            (
+                "messages = true",
+                ", and it may send a message to your phone.",
+            ),
+        ] {
             let text = HELLO.replace("speak = true\n", &format!("speak = true\n{wider}\n"));
-            assert!(
-                capped(&text).unwrap_err().0.contains("more than the light"),
-                "{wider}"
-            );
+            assert!(capped(&text).is_ok(), "{wider}");
+            assert!(plainly(&text).unwrap().ends_with(named), "{wider}");
         }
     }
 
@@ -3766,11 +4239,16 @@ say = { text = "Welcome back!" }
         }
     }
 
-    /// A sound the lamp doesn't ship is refused, by name, path or file, with
-    /// lines for a repair; one sound and no say beside it, as `lamp-skills`
-    /// takes it, and its voice asked for.
+    /// A sound the lamp doesn't ship, by name, path or file, is what it
+    /// can't do yet (#6066), said so with no repair; one sound and no say
+    /// beside it, as `lamp-skills` takes it, and its voice asked for.
     #[test]
     fn a_sound_the_lamp_doesnt_ship_is_refused() {
+        assert_eq!(SOUND_NOT_SHIPPED, cant_yet(OTHER_SOUND));
+        assert_eq!(
+            not_made_line(SOUND_NOT_SHIPPED),
+            "I can't do that yet: a sound other than its soft hum."
+        );
         for step in [
             "cue = \"chime\"",
             "cue = \"Hum\"",
@@ -3782,22 +4260,9 @@ say = { text = "Welcome back!" }
             "sound = \"../hum.wav\"",
         ] {
             let text = HELLO.replace("say = { text = \"Welcome back!\" }", step);
-            match capped(&text) {
-                Err(Refused(why, Some(lines))) => {
-                    assert_eq!(why, SOUND_NOT_SHIPPED, "{step}");
-                    assert!(lines.contains("cue = \"hum\""), "{lines}");
-                    assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
-                }
-                other => panic!("{step}: {other:?}"),
-            }
-            match plainly_with(&text, false) {
-                Err(Refused(why, Some(lines))) => {
-                    assert_eq!(why, UNSAID);
-                    assert!(lines.contains(SOUND_PART), "{lines}");
-                    assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
-                }
-                other => panic!("{step}: {other:?}"),
-            }
+            let cant = Refused(SOUND_NOT_SHIPPED.into(), None);
+            assert_eq!(capped(&text).unwrap_err(), cant, "{step}");
+            assert_eq!(plainly_with(&text, false).unwrap_err(), cant, "{step}");
         }
         let hum = HELLO.replace("say = { text = \"Welcome back!\" }", "cue = \"hum\"");
         // A hum beside its line, or a second hum: the repair is told to
@@ -3960,8 +4425,18 @@ body = { gesture = "nod" }
         );
         refused(
             &TOML.replace("voice/state\"\nfield", "room/activity\"\nfield"),
-            "trigger topic room/activity, its field and equals",
+            "trigger topic room/activity, its field and equals: state, head_down, at_desk or leaning_in",
             true,
+        );
+        // A real topic of the lamp's that no saying knows is what it can't
+        // start a made skill on yet (#6066): said so, with no repair.
+        assert_eq!(
+            plainly_with(
+                &TOML.replace("voice/state\"\nfield", "voice/heard\"\nfield"),
+                false
+            )
+            .unwrap_err(),
+            Refused(cant_yet("starting on words it hears"), None)
         );
         refused(
             &TOML.replace("{ dim = 1 }", "{ dim = 1, for = \"1m\" }"),
@@ -4137,6 +4612,113 @@ light = { colour = "green", level = 3, for = "20s" }
         )
     }
 
+    /// #6066: each step and trigger kind a skill can declare is kept and
+    /// said back: a pat, stuffy air and what someone at the desk is doing;
+    /// a light's dim, out, shade and pattern, a turn to the face, the
+    /// reading pose, the camera's look and a stand; the camera and an
+    /// outbound grant named.
+    #[test]
+    fn every_kind_a_skill_can_declare_is_kept_and_said() {
+        let kept_and_said = |trigger: &str, step: &str, said: &str| {
+            let text = made_with(trigger, step);
+            assert!(capped_with(&text, false).is_ok(), "{text}");
+            assert_eq!(plainly_with(&text, false).unwrap(), said, "{step}");
+        };
+        let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"\n";
+        let air = "topic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\nfor = \"10m\"\n";
+        let down = "topic = \"room/activity\"\nfield = \"state\"\nequals = \"head_down\"\n\
+                    for = \"45m\"\n";
+        for (trigger, step, said) in [
+            (
+                pet,
+                "body = { gesture = \"happy\" }",
+                "When someone pats its head, it wiggles happily.",
+            ),
+            (
+                air,
+                "light = { dim = 1, until = \"ends\" }",
+                "When the air has been stuffy, CO2 over 1200 ppm, for 10 minutes, it dims the \
+                 light a step while that lasts.",
+            ),
+            (
+                down,
+                "light = { out = true, over = \"5s\" }",
+                "When someone is head down at the desk for 45 minutes, it turns the light off \
+                 slowly over 5 seconds.",
+            ),
+            (
+                pet,
+                "light = { relative = { warmer = 1, dimmer = 2 }, for = \"1m\" }",
+                "When someone pats its head, it makes your light a shade warmer and 2 steps \
+                 dimmer for a minute.",
+            ),
+            (
+                pet,
+                "light = { colour = \"amber\", level = 2, for = \"20s\", pattern = { kind = \
+                 \"breathe\", period = \"6s\" } }",
+                "When someone pats its head, it glows amber at level 2 for 20 seconds, \
+                 breathing.",
+            ),
+            (
+                pet,
+                "body = { look_at = \"face\", gesture = \"nod\" }",
+                "When someone pats its head, it turns to the face it sees and nods.",
+            ),
+            (
+                pet,
+                "body = { mood = \"reading\", for = \"1m\" }",
+                "When someone pats its head, it holds its reading pose for a minute.",
+            ),
+            (
+                pet,
+                "look = true",
+                "When someone pats its head, it takes a look with the camera.",
+            ),
+            (
+                pet,
+                "stand = 60",
+                "When someone pats its head, it stands at 60 percent of its height.",
+            ),
+        ] {
+            kept_and_said(trigger, step, said);
+        }
+        // The camera and an outbound grant, named in the said-back line.
+        let camera = made_with(pet, "body = { gesture = \"nod\" }")
+            .replace("body = true\n", "body = true\ncamera = true\n");
+        assert!(capped_with(&camera, false).unwrap().1.camera);
+        assert_eq!(
+            plainly_with(&camera, false).unwrap(),
+            "When someone pats its head, it nods, using the camera."
+        );
+        let looks = camera.replace("body = { gesture = \"nod\" }", "look = true");
+        assert_eq!(
+            plainly_with(&looks, false).unwrap(),
+            "When someone pats its head, it takes a look with the camera."
+        );
+        let sends = made_with(pet, "body = { gesture = \"nod\" }")
+            .replace("body = true\n", "body = true\nmessages = true\n");
+        assert!(capped_with(&sends, false).unwrap().1.messages);
+        assert_eq!(
+            plainly_with(&sends, false).unwrap(),
+            "When someone pats its head, it nods, and it may send a message to your phone."
+        );
+        // A step no runtime has yet: a send, a move of its own. Said as
+        // what the lamp can't do yet, before the check, never repaired.
+        for (step, what) in [
+            (
+                "text = \"I'm home\"",
+                "sending a message or writing to a linked service",
+            ),
+            ("body = { move = \"spin\" }", "a move of its own"),
+        ] {
+            let text = made_with(pet, step);
+            let cant = Refused(cant_yet(what), None);
+            assert_eq!(capped_with(&text, false).unwrap_err(), cant, "{step}");
+            assert_eq!(plainly_with(&text, false).unwrap_err(), cant, "{step}");
+            assert_eq!(not_made_line(&cant.0), format!("{CANT_YET} {what}."));
+        }
+    }
+
     /// A face coming into view (never whose), someone at the desk getting
     /// up, and a time each day are said as lamp-skills runs them, and kept.
     #[test]
@@ -4304,14 +4886,11 @@ light = { colour = "green", level = 3, for = "20s" }
             part("topic = \"humans/faces/tracked\"\nfor = \"5s\"\n")
                 .starts_with(&format!("{faces}, its when"))
         );
+        // Known faces may be declared (#6066), but no trigger here reads
+        // who: a face in view is said as any face.
         let known = made_with(face, "light = { dim = 1 }")
             .replace("body = true\n", "body = true\nknown_faces = true\n");
-        assert!(
-            capped_with(&known, false)
-                .unwrap_err()
-                .0
-                .contains("more than the light")
-        );
+        assert!(capped_with(&known, false).unwrap().1.known_faces);
         let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
         assert!(part(&format!("{stood}for = \"10s\"\n")).contains("its for or absent_for"));
         assert!(part(&stood.replace("above = 0", "above = 600")).contains("its field and above"));
@@ -4376,7 +4955,7 @@ light = { colour = "green", level = 3, for = "20s" }
                 Err(Refused(why, Some(lines))) => {
                     assert_eq!(why, UNSAID);
                     assert!(lines.starts_with("Can't be said plainly: [[do]] step 1, body"));
-                    assert!(lines.contains("listed body gesture"), "{lines}");
+                    assert!(lines.contains("a listed gesture"), "{lines}");
                 }
                 other => panic!("{refused}: {other:?}"),
             }
@@ -4444,7 +5023,8 @@ light = { colour = "green", level = 3, for = "20s" }
         );
         assert!(TRIGGER_MEANINGS.contains("someone comes or comes back to the desk"));
         assert!(TRIGGER_MEANINGS.contains("when = \"appears\", absent_for = \"5m\""));
-        assert!(SAYABLE_TRIGGERS.contains(TRIGGER_MEANINGS));
+        assert!(SAYABLE_TRIGGERS.contains(trigger_meanings!()));
+        assert!(TRIGGER_MEANINGS.contains("\"controls/pet\", \"ended\", equals false"));
     }
 
     /// The person hears why a make failed in plain words, with what to try:
@@ -4831,6 +5411,7 @@ light = { colour = "green", level = 3, for = "20s" }
                 topics: vec!["room/presence".into()],
                 speak: false,
                 reads: None,
+                ..Uses::default()
             },
             package,
         }
