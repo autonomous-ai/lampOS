@@ -19,7 +19,9 @@ import sys
 from typing import Any
 
 # Fields replaced wherever they appear in a frame.
-SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp"})
+# A note's key and value and a list's prefix are the program's own: `key` was
+# secret already (the pairing key), and `value` and `prefix` join it.
+SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix"})
 # Fields given only as a summary: a said text or a turn's prompt, a pushed
 # skill part's bytes, a camera picture.
 SUMMARISED = frozenset({"text", "prompt", "data", "jpeg"})
@@ -39,6 +41,11 @@ SHOWN = frozenset({
     "pm2_5", "pm4_0", "temperature", "temperature_c", "uptime_s",
     # A camera picture's size, age and a stream's rate (never the picture).
     "age_ms", "bytes", "fast", "fps", "fps_now", "stream",
+    # A computer's own notes (`notes.*`) and hello's limits for them: whether a
+    # key was found or deleted, how many it keeps and the bounds; a key, a
+    # value and a prefix are secret above, never shown.
+    "notes", "found", "deleted", "keys", "count", "total", "keys_max", "bytes_max", "key_max_bytes", "value_max_bytes",
+    "writes", "reads",
     # A computer's own clips (`sound.upload`, `sound.list`, `sound.remove`)
     # and hello's limits for them: names, sizes and lengths, never the bytes; a
     # pushed skill's whole hash and each part's number (`skill.push`).

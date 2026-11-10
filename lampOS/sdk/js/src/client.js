@@ -718,6 +718,36 @@ export class Lamp {
   async sounds() { return (await this.request('sound.list', {})).sounds ?? []; }
   // Delete one of this computer's clips from the lamp.
   removeSound(name) { return this.request('sound.remove', { name }); }
+  // Notes (the `notes` grant, docs/control.md "Notes"): this computer's own small key/value memory on the lamp. It
+  // outlives the program and the lamp's restart, belongs to this computer alone, and goes when the owner lets it go.
+  // `lamp.notes.get/set/delete/list` are the same as `notesGet/notesSet/notesDelete/notesList`.
+  get notes() {
+    return {
+      get: (key, fallback) => this.notesGet(key, fallback),
+      set: (key, value) => this.notesSet(key, value),
+      delete: (key) => this.notesDelete(key),
+      list: (prefix) => this.notesList(prefix),
+    };
+  }
+  // Keep `value` (any JSON, at most 16384 bytes serialized) under `key` (up to 64 of letters, digits and `. _ : -`):
+  // `{ key, bytes }`. A computer keeps 256 keys and 256 KiB at most (`lamp.limits.notes`).
+  async notesSet(key, value) {
+    const reply = await this.request('notes.set', { key, value });
+    return { key: reply.key, bytes: reply.bytes };
+  }
+  // The value under `key`, or `fallback` (undefined) when none is kept; a stored null comes back as null.
+  async notesGet(key, fallback = undefined) {
+    const reply = await this.request('notes.get', { key });
+    return reply.found ? reply.value : fallback;
+  }
+  // Drop `key`; whether it was kept.
+  async notesDelete(key) { return Boolean((await this.request('notes.delete', { key })).deleted); }
+  // This computer's keys that start with `prefix`, sorted: `keys` (each `{ key, bytes }`), `count`, `total`, `bytes`,
+  // `keys_max` and `bytes_max`.
+  async notesList(prefix = '') {
+    const { re: _re, ok: _ok, ...rest } = await this.request('notes.list', prefix ? { prefix } : {});
+    return rest;
+  }
   // Turns and listening (docs/control.md): the person wins over each.
   // Opens a conversation turn, as a tap on the head does: the person's next
   // line is answered as spoken to the lamp; with `prompt`, the lamp says it

@@ -687,6 +687,49 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             except LampError as error:
                 raise refused(error) from error
 
+    if allowed("notes"):
+        # This computer's own notes on the lamp (docs/control.md, "Notes"):
+        # small, kept across restarts, only this computer's, gone with a revoke.
+
+        @server.tool()
+        async def lamp_notes_set(key: str, value: Any) -> dict:
+            """Keep a note of this computer's own on the lamp under `key` (1 to 64 of letters, digits
+            and . _ : -): `value` is any JSON, at most 16384 bytes serialized. It replaces a note of the
+            same key and outlives this session and the lamp's restart; only this computer sees it, and
+            the owner letting this computer go deletes it. Each computer keeps up to 256 keys and 256 KiB.
+            Answers the key and the bytes the value took."""
+            try:
+                return await lamp.notes_set(key, value)
+            except LampError as error:
+                raise refused(error) from error
+
+        @server.tool()
+        async def lamp_notes_get(key: str) -> dict:
+            """One of this computer's own notes: `found` and, when it is, its `value`."""
+            try:
+                reply = await lamp.request("notes.get", key=key)
+            except LampError as error:
+                raise refused(error) from error
+            return {"found": True, "value": reply["value"]} if reply.get("found") else {"found": False}
+
+        @server.tool()
+        async def lamp_notes_delete(key: str) -> dict:
+            """Drop one of this computer's own notes: `deleted` says whether it was kept."""
+            try:
+                return {"deleted": await lamp.notes_delete(key)}
+            except LampError as error:
+                raise refused(error) from error
+
+        @server.tool()
+        async def lamp_notes_list(prefix: str = "") -> dict:
+            """This computer's own note keys that start with `prefix` (all when it is empty), sorted:
+            `keys` (each key and the bytes of its value), `count` listed, `total` kept, `bytes` they
+            take, and the most it may keep (`keys_max`, `bytes_max`)."""
+            try:
+                return await lamp.notes_list(prefix)
+            except LampError as error:
+                raise refused(error) from error
+
     if allowed("camera"):
 
         @server.tool()

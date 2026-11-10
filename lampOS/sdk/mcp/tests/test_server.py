@@ -34,6 +34,7 @@ NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release", "ca
 FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}
 # Offered only with hear (starting a turn with speak too).
 TURN = {"lamp_start_turn", "lamp_set_listening"}
+NOTES = {"lamp_notes_set", "lamp_notes_get", "lamp_notes_delete", "lamp_notes_list"}
 
 
 def run(coroutine):
@@ -133,6 +134,9 @@ def test_every_op_of_the_schema_is_sent_by_a_tool(tmp_path):
         "sound.upload": "lamp.upload_sound(",
         "sound.list": "lamp.sounds(",
         "sound.remove": "lamp.remove_sound(",
+        "notes.set": "lamp.notes_set(",
+        "notes.delete": "lamp.notes_delete(",
+        "notes.list": "lamp.notes_list(",
     }
     sent = set()
     for op in schema.ops():
@@ -915,7 +919,7 @@ def test_verbose_turns_the_sdks_debug_log_on_and_stdout_stays_the_mcp_stream(mon
     server_module.main(["--verbose"])
     assert seen["log"] == "debug"
     assert capsys.readouterr().out == ""
-EVERY_GRANT = ("body", "light", "speak", "look", "hear", "sound")
+EVERY_GRANT = ("body", "light", "speak", "look", "hear", "sound", "notes")
 
 
 def test_an_argument_a_tool_does_not_take_is_refused(tmp_path):
@@ -978,7 +982,7 @@ def test_the_readme_gives_every_tool_its_parameters_defaults_and_every_resource(
         readme = (Path(__file__).parents[1] / "README.md").read_text()
         async with connected(tmp_path, grants=EVERY_GRANT) as (_, _, session):
             listed = (await session.list_tools()).tools
-            assert {tool.name for tool in listed} == ALL | FOLLOW | TURN == set(rows)
+            assert {tool.name for tool in listed} == ALL | FOLLOW | TURN | NOTES == set(rows)
             for tool in listed:
                 by_parameter = {row[1].strip("`"): row for row in rows[tool.name]}
                 properties = tool.inputSchema.get("properties", {})
@@ -1144,7 +1148,7 @@ def test_a_second_follow_is_busy_and_follow_stop_ends_the_first(tmp_path):
     run(go())
 
 
-GRANT_WORDS = {"body", "light", "speak", "look", "hear", "sound"}
+GRANT_WORDS = {"body", "light", "speak", "look", "hear", "sound", "notes"}
 
 
 def readme_grants(cell: str) -> set[str]:
@@ -1264,6 +1268,36 @@ def test_a_clip_is_uploaded_from_a_file_played_listed_and_removed(tmp_path):
             assert gone.isError and "no clip named chime" in text(gone)
             missing = await session.call_tool("lamp_upload_sound", {"name": "a", "path": str(tmp_path / "none.wav")})
             assert missing.isError and "can't be read" in text(missing)
+
+    run(go())
+
+
+def test_the_notes_tools_keep_read_list_and_drop_this_computers_own_notes(tmp_path):
+    names = {"lamp_notes_set", "lamp_notes_get", "lamp_notes_delete", "lamp_notes_list"}
+
+    async def go():
+        # Offered with the notes grant only.
+        async with connected(tmp_path / "none", grants=("speak",)) as (_, _, session):
+            assert not names & {tool.name for tool in (await session.list_tools()).tools}
+        async with connected(tmp_path / "lamp", grants=("notes",)) as (fake, _, session):
+            assert names <= {tool.name for tool in (await session.list_tools()).tools}
+            kept = await session.call_tool("lamp_notes_set", {"key": "mood", "value": {"calm": [1, 2, 3]}})
+            assert not kept.isError, text(kept)
+            assert json.loads(text(kept)) == {"key": "mood", "bytes": 16}
+            got = await session.call_tool("lamp_notes_get", {"key": "mood"})
+            assert json.loads(text(got)) == {"found": True, "value": {"calm": [1, 2, 3]}}
+            missing = await session.call_tool("lamp_notes_get", {"key": "nope"})
+            assert json.loads(text(missing)) == {"found": False}
+            await session.call_tool("lamp_notes_set", {"key": "mode", "value": 7})
+            listed = json.loads(text(await session.call_tool("lamp_notes_list", {"prefix": "mo"})))
+            assert listed["keys"] == [{"key": "mode", "bytes": 1}, {"key": "mood", "bytes": 16}]
+            assert (listed["count"], listed["total"]) == (2, 2)
+            assert json.loads(text(await session.call_tool("lamp_notes_delete", {"key": "mood"}))) == {"deleted": True}
+            assert json.loads(text(await session.call_tool("lamp_notes_delete", {"key": "mood"}))) == {"deleted": False}
+            bad = await session.call_tool("lamp_notes_set", {"key": "a b", "value": 1})
+            assert bad.isError and "bad_request" in text(bad)
+            big = await session.call_tool("lamp_notes_set", {"key": "big", "value": "x" * 16_400})
+            assert big.isError and "bad_request" in text(big) and "16384" in text(big)
 
     run(go())
 

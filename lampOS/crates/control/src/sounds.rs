@@ -291,7 +291,7 @@ fn about(name: &str, bytes: u64, frames: u32) -> Value {
 
 /// A computer's id as a folder's name: lamp-control's own ids are `c_` and
 /// hex, never a path.
-fn safe_client(client: &str) -> bool {
+pub(crate) fn safe_client(client: &str) -> bool {
     !client.is_empty()
         && client.len() <= 64
         && client
