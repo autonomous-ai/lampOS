@@ -119,6 +119,26 @@ step needing a grant the lamp did not give is skipped. A look on a resting lamp
 ends `cut_short` on a real body, which the fake does not do, so that step is listed
 as an expected difference.
 
+## The virtual desktop lamp, in one command
+
+`examples/twin/virtual-lamp.js` starts `lamp-sim` (`crates/sim`) (the real `lamp-control` and
+`lamp-body` on a simulated body, [simulator-lamp.md](../docs/simulator-lamp.md)), pairs this computer
+with it in a keyring of its own, and opens the twin on it: a lamp on your desktop, drawn in 3D, that
+the SDK, lamp-mcp and your programs drive like a real one.
+
+```sh
+cargo build -p lamp-sim -p lamp-body -p lamp-control          # from lampOS/
+node examples/twin/virtual-lamp.js --lamp-sim ../../target/debug/lamp-sim
+# prints the twin's URL and opens it; Ctrl-C stops the twin and the lamp
+```
+
+Options: `--bin-dir DIR` (where `lamp-body` and `lamp-control` are, default beside `lamp-sim`),
+`--dir DIR` (the lamp's folder, short and private, default `~/.lampsim/virtual`), `--port N` (the
+lamp's door on 127.0.0.1, default 7731), `--twin-port N` (default 8737), `--camera=always` and
+`--microphone` (the host's, off unless given), `--no-open`. It pairs afresh under `DIR/sdk` at each
+start (the lamp makes a new certificate then); to drive the lamp from your own program too, run it
+with `LAMPOS_HOME=DIR/sdk`. Linux for now (the real `lamp-body` runs only there).
+
 ## Pair with a real lamp
 
 Run the command as `npx --no-install lampos …` (or from `node_modules/.bin`),
