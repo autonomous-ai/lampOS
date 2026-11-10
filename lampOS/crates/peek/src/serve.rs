@@ -565,7 +565,9 @@ fn now_unix_ms() -> u64 {
 
 /// The one page's stream: a push now, then every [`PUSH_EVERY`], for as
 /// long as the page is open; in monitor mode, only while the session that
-/// opened it lasts, read before each push as the guard reads it.
+/// opened it lasts, read before each push as the guard reads it. A push
+/// still reading when the session ends is dropped there, and what a push
+/// read is sent only if the session lasts once it is read.
 async fn events(
     State(served): State<Arc<Served>>,
     headers: HeaderMap,
@@ -577,12 +579,21 @@ async fn events(
             if count > 0 {
                 tokio::time::sleep(PUSH_EVERY).await;
             }
-            if let Some(monitor) = &served.peek.monitor
-                && !monitor.gate().admits(&session, Instant::now())
-            {
-                return None;
-            }
-            let events = push(&served, count).await;
+            let events = match &served.peek.monitor {
+                None => push(&served, count).await,
+                Some(monitor) => {
+                    let until = monitor.gate().lasts_until(&session, Instant::now())?;
+                    // Dropping the push is what closing the page does: the
+                    // reads it waits on keep their cache as they do then.
+                    let events = tokio::time::timeout_at(until.into(), push(&served, count))
+                        .await
+                        .ok()?;
+                    if !monitor.gate().admits(&session, Instant::now()) {
+                        return None;
+                    }
+                    events
+                }
+            };
             Some((
                 stream::iter(events.into_iter().map(Ok)),
                 (served, session, count.wrapping_add(1)),

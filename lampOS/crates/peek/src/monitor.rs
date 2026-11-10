@@ -82,8 +82,16 @@ impl Gate {
 
     /// Whether `session` is one this run opened and still lasts.
     pub fn admits(&mut self, session: &str, now: Instant) -> bool {
+        self.lasts_until(session, now).is_some()
+    }
+
+    /// When `session` ends, if it is one this run opened and still lasts.
+    pub fn lasts_until(&mut self, session: &str, now: Instant) -> Option<Instant> {
         self.prune(now);
-        self.sessions.iter().any(|(kept, _)| same(kept, session))
+        self.sessions
+            .iter()
+            .find(|(kept, _)| same(kept, session))
+            .map(|(_, at)| *at + SESSION_LASTS)
     }
 
     fn prune(&mut self, now: Instant) {
