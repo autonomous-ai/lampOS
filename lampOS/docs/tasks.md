@@ -1651,7 +1651,13 @@ forwarded on the lamp").
   by itself). The values are quoted: PyYAML would read a bare `off` or `on`
   as a boolean.
 - `.env`: one `LAMP_HERMES_TOKEN=<token>` line, the forwarder's local
-  token, never the relay's key; every other line kept.
+  token, never the relay's key. Provider keys are taken out
+  (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+  `AUTONOMOUS_API_KEY`, `OPENROUTER_API_KEY`); every other line kept.
+- **Who:** it must run as Hermes' own user (`lampos`), so both files stay
+  Hermes'. lamp-tasks (also `lampos`) reads the token from
+  `/var/lib/lampos-cloud/hermes-token`. Neither file is read through a link
+  (`O_NOFOLLOW`), and one that isn't a regular file is refused.
 - **Kept:** every other key and line, Harness's `hooks:` block above all
   (openharness `engines/hermes/contract.ts`), comments, and other providers.
   Running it again changes nothing, and a file already right is not

@@ -11,9 +11,10 @@
 //!   the answer streamed back as it comes (Server-Sent Events included);
 //! - `GET /v1/deepseek/models`: to `<relay>/models`.
 //!
-//! Anything else is 404, a wrong or missing token 401. A body is at most
-//! [`MOST_BODY`]; at most [`AT_ONCE`] requests run at once and
-//! [`PER_MINUTE`] start in a minute. No body, token or key is ever logged.
+//! Anything else is 404, a wrong or missing token 401, a chat for any
+//! model but [`MODEL`] 400. A body is at most [`MOST_BODY`]; at most
+//! [`AT_ONCE`] requests run at once and [`PER_MINUTE`] start in a minute,
+//! both taken before a body is read. No body, token or key is ever logged.
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::unix::fs::OpenOptionsExt;
@@ -22,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::Semaphore;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// The switch.
 pub const SWITCH: &str = "LAMP_HERMES_ON_LAMP";
@@ -49,11 +50,18 @@ const MOST_HEAD: usize = 16 * 1024;
 pub const AT_ONCE: usize = 4;
 /// Requests started in any minute.
 pub const PER_MINUTE: usize = 60;
+/// Connections accepted but not yet read through, so no more than this
+/// many bodies of [`MOST_BODY`] are ever held at once.
+pub const UNREAD_AT_ONCE: usize = 16;
+/// The only model asked: the voice's DeepSeek model, on the voice's key.
+pub const MODEL: &str = "deepseek-flash";
 /// The head, then the body, must arrive within these.
 const HEAD_WITHIN: Duration = Duration::from_secs(10);
 const BODY_WITHIN: Duration = Duration::from_secs(30);
 /// A refused request's unread rest is drained at most this long.
 const DRAIN_WITHIN: Duration = Duration::from_secs(1);
+/// Each write to the caller must be taken within this.
+const WRITE_WITHIN: Duration = Duration::from_secs(30);
 /// The relay: a connection, each read of its answer, and the whole answer.
 const CONNECT_WITHIN: Duration = Duration::from_secs(10);
 const READ_WITHIN: Duration = Duration::from_secs(120);
@@ -67,7 +75,8 @@ pub fn on_from_environment() -> bool {
 /// The relay's DeepSeek base from the voice's `second.json` text, as the
 /// voice works it out: its `deepseek_base_url`, else the company relay's
 /// DeepSeek under its `llm_base_url`. [`COMPANY_DEEPSEEK`] without either,
-/// or with no file.
+/// or with no file. Only ever on the company relay's host: a base on any
+/// other host is never given the voice's key, whatever the file says.
 pub fn relay_base(second_json: Option<&str>) -> String {
     #[derive(serde::Deserialize, Default)]
     struct Second {
@@ -82,15 +91,12 @@ pub fn relay_base(second_json: Option<&str>) -> String {
     if let Some(base) = second
         .deepseek_base_url
         .map(|base| base.trim().trim_end_matches('/').to_owned())
-        .filter(|base| base.starts_with("https://"))
+        .filter(|base| on_company_relay(base))
     {
         return base;
     }
     let llm = second.llm_base_url.trim();
-    let host = llm
-        .strip_prefix("https://")
-        .and_then(|rest| rest.split('/').next());
-    if host == Some(COMPANY_RELAY_HOST) {
+    if on_company_relay(llm) {
         let base = llm.trim_end_matches('/');
         return if base.ends_with("/ai") {
             format!("{base}/v1/deepseek")
@@ -99,6 +105,20 @@ pub fn relay_base(second_json: Option<&str>) -> String {
         };
     }
     COMPANY_DEEPSEEK.to_owned()
+}
+
+/// HTTPS on exactly [`COMPANY_RELAY_HOST`] (no port, no user part).
+fn on_company_relay(base: &str) -> bool {
+    base.strip_prefix("https://")
+        .and_then(|rest| rest.split('/').next())
+        == Some(COMPANY_RELAY_HOST)
+}
+
+/// `bytes` written to the caller within [`WRITE_WITHIN`].
+async fn send(stream: &mut TcpStream, bytes: &[u8]) -> io::Result<()> {
+    tokio::time::timeout(WRITE_WITHIN, stream.write_all(bytes))
+        .await
+        .map_err(|_| io::Error::from(io::ErrorKind::TimedOut))?
 }
 
 fn plain(token: &str) -> bool {
@@ -172,6 +192,7 @@ pub struct Forwarder {
     token: String,
     client: reqwest::Client,
     running: Arc<Semaphore>,
+    unread: Arc<Semaphore>,
     started: Mutex<Started>,
 }
 
@@ -186,11 +207,13 @@ impl std::fmt::Debug for Forwarder {
 }
 
 /// A request as read and let through: its method, path (no query) and
-/// body. The token is checked while the head is read and not kept.
+/// body, with its place among the [`AT_ONCE`]. The token is checked while
+/// the head is read and not kept.
 struct Request {
     method: String,
     path: String,
     body: Vec<u8>,
+    _running: OwnedSemaphorePermit,
 }
 
 /// Why a request is answered here, not by the relay.
@@ -204,6 +227,7 @@ enum Refusal {
     LengthRequired,
     TooMany,
     Unreachable,
+    NotThisModel,
 }
 
 impl Refusal {
@@ -217,6 +241,7 @@ impl Refusal {
             Self::LengthRequired => (411, "Length Required", "a Content-Length is needed"),
             Self::TooMany => (429, "Too Many Requests", "too many requests now"),
             Self::Unreachable => (502, "Bad Gateway", "the relay can't be reached now"),
+            Self::NotThisModel => (400, "Bad Request", "only the model deepseek-flash"),
         }
     }
 }
@@ -247,6 +272,7 @@ impl Forwarder {
             token: token.to_owned(),
             client,
             running: Arc::new(Semaphore::new(AT_ONCE)),
+            unread: Arc::new(Semaphore::new(UNREAD_AT_ONCE)),
             started: Mutex::new(Started::default()),
         })
     }
@@ -267,9 +293,13 @@ impl Forwarder {
             if !admits(peer) {
                 continue;
             }
+            // Past the most connections being read, a new one is closed.
+            let Ok(unread) = self.unread.clone().try_acquire_owned() else {
+                continue;
+            };
             let forwarder = self.clone();
             tokio::spawn(async move {
-                let _ = forwarder.answer(stream).await;
+                let _ = forwarder.answer(stream, unread).await;
             });
         }
     }
@@ -341,6 +371,7 @@ impl Forwarder {
             (_, CHAT_PATH | MODELS_PATH) => return Err(Refusal::NotAllowed),
             _ => return Err(Refusal::NotFound),
         }
+        let running = self.take_a_place()?;
         if chunked {
             return Err(Refusal::LengthRequired);
         }
@@ -352,7 +383,7 @@ impl Forwarder {
             return Err(Refusal::TooLarge);
         }
         if expects {
-            let _ = stream.write_all(b"HTTP/1.1 100 Continue\r\n\r\n").await;
+            let _ = send(stream, b"HTTP/1.1 100 Continue\r\n\r\n").await;
         }
         let mut body = bytes[head_end + 4..].to_vec();
         if body.len() > length {
@@ -370,11 +401,37 @@ impl Forwarder {
         })
         .await
         .map_err(|_| Refusal::Bad)??;
+        if method == "POST" {
+            // Only the voice's model, so nothing dearer goes on its key.
+            let asked: serde_json::Value =
+                serde_json::from_slice(&body).map_err(|_| Refusal::Bad)?;
+            if asked.get("model").and_then(|model| model.as_str()) != Some(MODEL) {
+                return Err(Refusal::NotThisModel);
+            }
+        }
         Ok(Request {
             method: method.to_owned(),
             path,
             body,
+            _running: running,
         })
+    }
+
+    /// A place among the [`AT_ONCE`], then one of the minute's
+    /// [`PER_MINUTE`]: a request refused for want of a place uses up no
+    /// minute's start.
+    fn take_a_place(&self) -> Result<OwnedSemaphorePermit, Refusal> {
+        let permit = self
+            .running
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Refusal::TooMany)?;
+        let started = self
+            .started
+            .lock()
+            .map(|mut started| started.take(Instant::now()))
+            .unwrap_or(false);
+        started.then_some(permit).ok_or(Refusal::TooMany)
     }
 
     async fn refuse(stream: &mut TcpStream, refusal: &Refusal) -> io::Result<()> {
@@ -388,8 +445,8 @@ impl Forwarder {
              Content-Length: {}\r\nConnection: close\r\n\r\n",
             body.len()
         );
-        stream.write_all(head.as_bytes()).await?;
-        stream.write_all(body.as_bytes()).await?;
+        send(stream, head.as_bytes()).await?;
+        send(stream, body.as_bytes()).await?;
         stream.shutdown().await?;
         // What the caller still sends is read and dropped, briefly, so the
         // close is not a reset that loses the answer before it is read.
@@ -401,21 +458,12 @@ impl Forwarder {
         Ok(())
     }
 
-    async fn answer(&self, mut stream: TcpStream) -> io::Result<()> {
-        let request = match self.read(&mut stream).await {
+    async fn answer(&self, mut stream: TcpStream, unread: OwnedSemaphorePermit) -> io::Result<()> {
+        let read = self.read(&mut stream).await;
+        drop(unread);
+        let request = match read {
             Ok(request) => request,
             Err(refusal) => return Self::refuse(&mut stream, &refusal).await,
-        };
-        let started = self
-            .started
-            .lock()
-            .map(|mut started| started.take(Instant::now()))
-            .unwrap_or(false);
-        let Some(_permit) = started
-            .then(|| self.running.clone().try_acquire_owned().ok())
-            .flatten()
-        else {
-            return Self::refuse(&mut stream, &Refusal::TooMany).await;
         };
         let upstream = match (request.method.as_str(), request.path.as_str()) {
             ("POST", CHAT_PATH) => self
@@ -443,7 +491,7 @@ impl Forwarder {
             status.as_u16(),
             status.canonical_reason().unwrap_or("Answer"),
         );
-        stream.write_all(head.as_bytes()).await?;
+        send(&mut stream, head.as_bytes()).await?;
         // Each piece as it comes, so an SSE stream reaches Hermes as the
         // relay sends it. A cut answer ends the connection without the
         // closing chunk, so Hermes sees it cut.
@@ -451,18 +499,15 @@ impl Forwarder {
             match answer.chunk().await {
                 Ok(Some(piece)) if piece.is_empty() => continue,
                 Ok(Some(piece)) => {
-                    stream
-                        .write_all(format!("{:x}\r\n", piece.len()).as_bytes())
-                        .await?;
-                    stream.write_all(&piece).await?;
-                    stream.write_all(b"\r\n").await?;
-                    stream.flush().await?;
+                    send(&mut stream, format!("{:x}\r\n", piece.len()).as_bytes()).await?;
+                    send(&mut stream, &piece).await?;
+                    send(&mut stream, b"\r\n").await?;
                 }
                 Ok(None) => break,
                 Err(_) => return Ok(()),
             }
         }
-        stream.write_all(b"0\r\n\r\n").await?;
+        send(&mut stream, b"0\r\n\r\n").await?;
         stream.shutdown().await
     }
 }

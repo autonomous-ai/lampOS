@@ -4,6 +4,7 @@ use tokio::sync::oneshot;
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const KEY: &str = "relay-key-for-the-test";
+const ASKED: &str = r#"{"model":"deepseek-flash","messages":[]}"#;
 
 /// A stand-in relay on loopback: one request, kept whole, answered with
 /// `answer` sent in two pieces.
@@ -221,7 +222,7 @@ async fn a_body_over_the_cap_is_refused_before_it_is_read() {
 #[tokio::test]
 async fn an_unreachable_relay_is_a_502_naming_no_key() {
     let address = forwarder("http://127.0.0.1:9/none").await;
-    let (status, _, body) = ask(address, &chat(Some(TOKEN), "{}")).await;
+    let (status, _, body) = ask(address, &chat(Some(TOKEN), ASKED)).await;
     assert_eq!(status, 502);
     assert!(!String::from_utf8_lossy(&body).contains(KEY));
 }
@@ -246,7 +247,20 @@ fn the_relay_is_the_voices_deepseek() {
         relay_base(Some(
             r#"{"deepseek_base_url":"https://near.invalid/deepseek/"}"#
         )),
-        "https://near.invalid/deepseek"
+        COMPANY_DEEPSEEK,
+        "a base on another host is never given the key"
+    );
+    assert_eq!(
+        relay_base(Some(
+            r#"{"deepseek_base_url":"https://campaign-api.autonomous.ai.invalid/deepseek"}"#
+        )),
+        COMPANY_DEEPSEEK
+    );
+    assert_eq!(
+        relay_base(Some(
+            r#"{"deepseek_base_url":"https://campaign-api.autonomous.ai/other/deepseek/"}"#
+        )),
+        "https://campaign-api.autonomous.ai/other/deepseek"
     );
     assert_eq!(
         relay_base(Some(r#"{"llm_base_url":"https://example.invalid/v1"}"#)),
@@ -278,4 +292,48 @@ fn the_debug_line_hides_the_key_and_token() {
     assert!(!shown.contains(KEY) && !shown.contains(TOKEN));
     assert!(Forwarder::new(COMPANY_DEEPSEEK, "", TOKEN).is_err());
     assert!(Forwarder::new(COMPANY_DEEPSEEK, KEY, "short").is_err());
+}
+
+#[tokio::test]
+async fn a_chat_for_another_model_or_none_is_refused_before_the_relay() {
+    let (base, mut seen) = relay("{}", "application/json").await;
+    let address = forwarder(&base).await;
+    for body in [
+        r#"{"model":"deepseek-v4-pro","messages":[]}"#,
+        r#"{"messages":[]}"#,
+        r#"{"model":7}"#,
+        "not json",
+    ] {
+        assert_eq!(
+            ask(address, &chat(Some(TOKEN), body)).await.0,
+            400,
+            "{body}"
+        );
+    }
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(seen.try_recv().is_err(), "the relay was never asked");
+}
+
+#[tokio::test]
+async fn with_no_place_free_it_is_429_and_no_minute_start_is_used() {
+    let listener = Forwarder::bind(0).await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let forwarder = Arc::new(Forwarder::new("http://127.0.0.1:9/none", KEY, TOKEN).unwrap());
+    let held = forwarder
+        .running
+        .clone()
+        .acquire_many_owned(AT_ONCE as u32)
+        .await
+        .unwrap();
+    tokio::spawn(forwarder.clone().serve(listener));
+    // A body over the cap: refused for want of a place before it is looked at.
+    let raw = format!(
+        "POST {CHAT_PATH} HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: {}\r\n\r\n",
+        MOST_BODY + 1
+    );
+    assert_eq!(ask(address, raw.as_bytes()).await.0, 429);
+    assert!(forwarder.started.lock().unwrap().0.is_empty());
+    drop(held);
+    assert_eq!(ask(address, &chat(Some(TOKEN), ASKED)).await.0, 502);
+    assert_eq!(forwarder.started.lock().unwrap().0.len(), 1);
 }
