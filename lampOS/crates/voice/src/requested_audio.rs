@@ -133,7 +133,8 @@ fn starts_with_words(words: &[String], prefix: &[&str]) -> bool {
 }
 
 /// A conservative object grammar: an optional recipient and determiner,
-/// then a recording noun (with at most three mood adjectives), or one of
+/// then a recording noun (with one position word and at most three mood
+/// adjectives), or one of
 /// the explicit "something ..." constructions heard on the lamp. Never
 /// skip an unrelated object, "with me", or "like chess" to find a mood.
 fn audio_object(mut words: &[String]) -> bool {
@@ -175,6 +176,16 @@ fn audio_object(mut words: &[String]) -> bool {
         return rest[used..]
             .iter()
             .all(|word| matches!(word.as_str(), "please" | "now" | "on"));
+    }
+    // A bounded position selects a recording, not an unrelated object
+    // followed later by music or a mood. It cannot qualify "something".
+    if words.first().is_some_and(|word| {
+        matches!(
+            word.as_str(),
+            "first" | "second" | "next" | "previous" | "last" | "another" | "different"
+        )
+    }) {
+        words = &words[1..];
     }
     for _ in 0..3 {
         if words
@@ -377,6 +388,9 @@ mod tests {
             "Can you play chess while I listen to music?",
             "Play something like chess to relax.",
             "Play something with me to relax.",
+            "Play the second game while I listen to music.",
+            "Play another game to relax.",
+            "Play the next something to relax.",
             "Lamp, play some music. Forget it.",
             "",
         ] {
@@ -392,6 +406,13 @@ mod tests {
             "I'm stressed. Play something quiet.",
             "Let's listen to some music.",
             "Please play a quiet recording.",
+            "Now play the second recording.",
+            "Play the first recording.",
+            "Play the next recording.",
+            "Play the previous recording.",
+            "Play the last recording.",
+            "Play another recording.",
+            "Play a different recording.",
             "Lamp, mở nhạc thư giãn đi.",
             "Bật nhạc cho mình nhé.",
             // #5802: lamp-52e6 on 10 Nov, clips relax and relax2.
