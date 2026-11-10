@@ -8315,7 +8315,6 @@ async fn a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_cal
 #[tokio::test(start_paused = true)]
 async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room() {
     let _one = crate::provider_worker::tests::one_thread();
-    let photo = crate::photo_faces::note("Lan");
     for (lamp_said, heard, called) in [
         (
             "Someone added your face from a photo, as Lan. Shall I remember you?",
@@ -8351,14 +8350,8 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
         };
         let script = Arc::new(Script {
             heard: Mutex::new([Ok(heard.to_owned())].into()),
-            chats: Mutex::new(
-                [
-                    vec![text(lamp_said), Ok(ChatEvent::Done)],
-                    answer,
-                    vec![text("Okay."), Ok(ChatEvent::Done)],
-                ]
-                .into(),
-            ),
+            // The ask is the lamp's own line: no chat for it (#5907).
+            chats: Mutex::new([answer, vec![text("Okay."), Ok(ChatEvent::Done)]].into()),
             ..Script::default()
         });
         let (engine, calls, _) = scripted(script.clone());
@@ -8380,7 +8373,12 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
             kept.lock().unwrap().push((request, verdict));
             verdict
         }));
-        // The lamp asks, as the coordinator has it say the photo's note.
+        // The lamp asks, as the coordinator has it say the photo's ask.
+        let photo = match called {
+            Some(_) => crate::photo_faces::turn("Lan", None),
+            None => crate::onboarding::said_as_is(lamp_said).unwrap(),
+        };
+        assert_eq!(crate::onboarding::own_words(&photo), Some(lamp_said));
         let drain = async |engine: &mut Engine| {
             while let Ok(event) = tokio::time::timeout(Duration::from_secs(3), engine.next()).await
             {
@@ -8418,6 +8416,115 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
+/// The words a turn's labels say.
+fn said_in(labels: &[String]) -> Vec<&str> {
+    labels
+        .iter()
+        .filter_map(|label| label.strip_prefix("said:"))
+        .collect()
+}
+
+/// lamp-52e6, 10 Nov, S3 (#5907): the photo's ask, a written turn the
+/// model wrote from the thread, came out as "I didn't catch that. Try once
+/// more when I stop talking.", naming neither the person nor the photo. The
+/// ask is the lamp's own line: said in its words, the chat never asked,
+/// however ready the model is with a line from before.
+#[tokio::test(start_paused = true)]
+async fn the_photo_ask_is_said_in_its_words_never_a_line_the_model_has_ready() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [vec![
+                text("I didn't catch that. Try once more when I stop talking."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, calls, _) = scripted(script.clone());
+    engine.submit(written(1, &crate::photo_faces::turn("Walter", None)));
+    let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+    assert_eq!(
+        said_in(&labels),
+        ["Someone added your face from a photo, as Walter. Shall I remember you?"],
+        "{labels:?}"
+    );
+    assert!(labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+    assert!(script.asked.lock().unwrap().is_empty());
+    assert!(calls.lock().unwrap().is_empty());
+}
+
+/// lamp-52e6, 10 Nov, S4 then S5 (#5907): a no let Walter's photo go; the
+/// same name's photo added again was asked as "I already asked, and you said
+/// no — so it's let go", and the yes after it was read against that no and
+/// never called `photo_face_yes`. A new photo is a new ask in its own words,
+/// with no chat, so the next yes answers it: no, then the second ask, then
+/// yes, call `photo_face_no` and `photo_face_yes` in that order.
+#[tokio::test(start_paused = true)]
+async fn a_photo_added_again_after_a_no_is_asked_anew_and_its_yes_is_taken() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("No, thank you.".to_owned()),
+                Ok("Yes, please.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        crate::photo_faces::NO,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Okay, I've let it go."), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        crate::photo_faces::YES,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Great, I'll know you now."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, calls, _) = scripted(script.clone());
+    let ask = "Someone added your face from a photo, as Walter. Shall I remember you?";
+    let mut asks = Vec::new();
+    for (written_at, spoken_at) in [(1, 2), (3, 4)] {
+        engine.submit(written(
+            written_at,
+            &crate::photo_faces::turn("Walter", None),
+        ));
+        let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+        asks.push(said_in(&labels).join(" "));
+        engine.submit(start(spoken_at));
+        engine.submit(audio(spoken_at, 1));
+        engine.submit(end(spoken_at));
+        turn_within(&mut engine, Duration::from_secs(10)).await;
+    }
+    assert_eq!(asks, [ask, ask]);
+    let names: Vec<String> = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(name, _, _)| name.clone())
+        .collect();
+    assert_eq!(names, [crate::photo_faces::NO, crate::photo_faces::YES]);
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        4,
+        "only the spoken turns ask"
+    );
 }
 
 /// Every function that keeps, reads, forgets or says yes for someone, the
