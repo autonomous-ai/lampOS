@@ -2171,17 +2171,26 @@ gone ([switches.md](switches.md)). What happens:
    the line is at most 200 characters (`made_skill::check_reason`; #2813's
    rerun on lamp-0c89 gave only `exit 1`). The check writes to a file in
    the private folder, read up to 8 KiB, so a long answer never holds it.
-   - **Repaired once** (#2813 piece 2, the first builder on #3126, 23 Oct
-     13:07). When the check refuses an answer, it goes back to the model
-     once, before anything is said: the same brief again with the check's
-     lines before the request, every line joined with " / ", the skill's
-     folder replaced by `<folder>`, cut to 600 bytes
+   - **Repaired up to three times** (#2813 piece 2, the first builder on
+     #3126, 23 Oct 13:07; three since the owner, 10 Nov: "re-run it
+     yourself until it works"). When the check refuses an answer, it goes
+     back to the model before anything is said: the same brief again with
+     the check's lines before the request, every line joined with " / ",
+     the skill's folder replaced by `<folder>`, cut to 560 bytes
      (`made_skill::repair_brief`). They are the model's own skill read
-     back to it, never the conversation. That answer is kept, or told as
-     not made; never a third. Only a refusal by the check is repaired, or
-     by the plain words below, or the example given back; a wrong format
-     or a skill asking for more than the light and the head is told as
-     not made at once.
+     back to it, never the conversation. Up to
+     `make_skill_local::MOST_REPAIRS` (3) times, each begun only while
+     one more answer (30 s) still ends within `MAKE_WITHIN` (120 s, the
+     longest a make with one repair could take before); the journal says
+     `a made skill's repair N of 3: <why>` each round. A refusal by the
+     check is repaired, by the plain words below, by the cap (a skill
+     asking for more than the light and the head: the cap's reason and
+     what a made skill may have, `CAPPED_ONLY`), TOML that can't be read,
+     or the example given back; a wrong format is told as not made at
+     once. What the person hears and the app shows is plain, with what to
+     try, never a file's or a part's name (`made_skill::NOT_PASSED`,
+     `NOT_READABLE`, `NOT_A_SKILLS_FORM`, `MODEL_CUT_OFF`, `UNSAID`); the
+     exact part is the journal's and the repair's.
    - **Never the example** (lamp-9adf, 3 Nov 16:15: "when I come back to
      my desk, glow warm" was answered with the example word for word, a
      cyan glow, kept and offered; a retry made the same bytes). An answer
@@ -2200,20 +2209,44 @@ gone ([switches.md](switches.md)). What happens:
      in the package (`SKILL.md`'s, in place of the one written, its
      continuation lines too), in `made.json`, in the app and in what the
      lamp says; the model is told to say it leaving nothing out, not to
-     sum it up. Refused, and repaired once as a check's refusal is
-     (`PLAIN_ONLY`'s line; with reads on it goes on with `PLAIN_OR_READ`:
-     for a read of a linked service, only one `[[do]]` step, that
-     service's read step exactly as the system prompt lists it. On lamp-9adf, 5 Nov 13:26,
-     an app make of "Read me my latest email when I sit down at my desk."
-     was refused twice, the repair told only lights and gestures):
+     sum it up. Refused, the person is told `made_skill::UNSAID` ("when it
+     would run and what it would do didn't come out in plain words; try
+     saying when it should run, like 'when I come to my desk', and what it
+     should do, like 'glow green'"), and it is repaired as a check's
+     refusal is. The repair names the part it couldn't say, by its keys
+     and the trigger's topic alone, never a value ("Can't be said
+     plainly: trigger topic humans/faces/tracked, keys gap, near",
+     "[[do]] step 1, light (dim, for)", "parts while"), and the journal
+     says the same: `lamp-voice: a made skill can't be said plainly:
+     <part>`. A trigger's refusal goes on with the triggers it can have,
+     each with what it means (`SAYABLE_TRIGGERS`): someone comes or comes
+     back to the desk is `room/presence`, `someone`, `true` (back after the
+     desk was empty a while: `when = "appears"`, `absent_for`); the desk
+     left, `false`; the lamp going quiet, `voice/state`, `state`,
+     `"resting"`. On lamp-74ff, 10 Nov 17:39, an app make of "glow green
+     when I come back to my desk" was written on the faces, as the built-in
+     welcome back is, and refused twice, its repair told only the keys a
+     trigger may have. The making model's system prompt says the same
+     meanings before it writes (`TRIGGER_MEANINGS`), and the brief says
+     "someone comes or comes back to the desk is room/presence". Any other
+     part's refusal goes on with `PLAIN_ONLY`; with reads on, with
+     `PLAIN_OR_READ` too: for a read of a linked service, only one `[[do]]`
+     step, that service's read step exactly as the system prompt lists
+     it. On lamp-9adf, 5 Nov 13:26, an app make of "Read me my latest
+     email when I sit down at my desk." was refused twice, the repair told
+     only lights and gestures. What it can't say:
      - any top-level part but `kind`, `version`, `needs`, `format`,
        `permissions`, one `[trigger]` table, `[ask]` and `[[do]]`, so a
        `[quiet]`, `[[while]]`, `most_a_day`, `[budget]` or `[rest]` that
        would run otherwise than the words is never kept (Thirteen's and
        Mobile's P2 on #5042);
-     - a trigger with any key but `topic`, `field`, `equals`, `for`,
-       `cooldown`, `rearm` and `during`, or other than resting or someone
-       being there or not;
+     - a trigger written as `[[trigger]]`, or with any key but `topic`,
+       `field`, `equals`, `for`, `cooldown`, `rearm`, `during`, `when` and
+       `absent_for`, or other than resting or someone being there or not;
+       `when` only `"present"` or `"appears"` (said as `rearm = "ends"`
+       is); `absent_for` only with `"appears"` on someone coming to the
+       desk, as `lamp-skills` counts it only then: "When someone comes
+       back to the desk after it was empty for 5 minutes";
      - a step other than one light (`colour`, `level`, `for`, or `dim`
        alone) or one gesture (`nod`, `curious`);
      - words over 200 characters: said whole or not at all, never cut
@@ -2319,9 +2352,10 @@ gone ([switches.md](switches.md)). What happens:
    `make_skill` is nobody's. Taking a made skill off (the app's remove, or
    `{"off": NAME}`) is unchanged.
 9. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
-   for up to 30 s an ask, and with the one more try after a failure and the
-   one repair after a refusal, two asks of two tries each: about 120 s at
-   the most (the Reviewer-lead's P3 on #4914, 16:24). The person hears
+   for up to 30 s an ask, with one more try after a failure; repairs after
+   a refusal are begun only while one more ask still ends within
+   `make_skill_local::MAKE_WITHIN`, 120 s (the Reviewer-lead's P3 on
+   #4914, 16:24). The person hears
    the model's few words that it is making it, said before the call, and
    then the voice's wait sound if `LAMP_SECOND_WAIT_CUE=on`; nothing else
    until the answer. Whether "Stop" ends the wait is measured in the played
@@ -2344,7 +2378,7 @@ Tests:
   journaled as `MODELS_CANNOT_JOURNALED`), and
   `the_system_prompt_carries_the_rules_of_a_read` (one service at most,
   read only, the listed steps, `cannot:` otherwise; off, none).
-- `made_skill::tests`: the brief within 1,300 bytes (so its repair fits the
+- `made_skill::tests`: the brief within 1,340 bytes (so its repair fits the
   tasks part's 2,000), `every_request_is_briefed_and_the_model_judges_it`
   (a service, a write or two services are briefed, never refused by a
   word list), `the_read_steps_are_the_catalogues_readable_services`,
@@ -2380,7 +2414,19 @@ to say aloud what it made; without either the app socket isn't started
 2. `{"make": {"words", "request_id"}}`: the words become the same brief
    (`made_skill::brief`, at most 480 bytes) and are made at once on a
    thread of their own by the lamp's own model, the same example, check
-   and one repair (`make_skill_local::make_kept`, `app_make::make_here`).
+   and up to three repairs (`make_skill_local::make_kept`,
+   `app_make::make_here`). Not made (or a written one not kept), the app
+   is told `not_kept` with the plain reason and the lamp says it too,
+   `made_skill::not_made_line` ("I couldn't make that: " and the reason
+   with what to try) as a say note in the conversation's language
+   (`not_made_in_their_language`). Every such note, made or not, begins
+   `made_skill::ALREADY_DONE` ("This has happened already and nothing is
+   left to do: call no tool, make_skill least of all; only speak"): on
+   lamp-74ff, 10 Nov 17:43, the model took a made line's note as an ask
+   and called `make_skill`. A line dropped once begun (17:40: talk cut it,
+   `user_interrupted`) is asked once more within what is left of its
+   hour (`app_make::say_line`); dropped again, the journal says it wasn't
+   said.
    Typing them in the app is the person's ask. The answer, before it is
    made: `{"making": true}`, or `{"refused": WHY}` in plain words (no
    request id, or one not 1 to 64 letters, digits, `-`, `_`, `.` or `:`;
