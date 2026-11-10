@@ -366,6 +366,10 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // yes after the lamp check on lamp-06c1 (29 Oct).
     "head-pat",
     "head-pat-wiggle",
+    // How to use the lamp (#5790): asked "how do I...", "what can you do",
+    // it answers from its own product knowledge (`knowledge.md`), reached
+    // through `use_skill`; it only tells, and changes nothing.
+    "faq",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
     "light-out",
     "light-scenes",
@@ -621,6 +625,9 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("light-scenes", "SKILL.md"),
     skill_file_off!("point-light"),
     skill_file!("point-light", "SKILL.md"),
+    skill_file!("faq", "skill.toml"),
+    skill_file!("faq", "SKILL.md"),
+    skill_file!("faq", "knowledge.md"),
     skill_file_off!("light-show"),
     skill_file!("light-show", "SKILL.md"),
     skill_file!("light-show", "shows/calm.toml"),

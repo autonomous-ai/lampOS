@@ -1,0 +1,235 @@
+# The FAQ's eval set (#5790): owner-style questions, each mapped to the
+# call the voice should make, `use_skill` with skill `lamp_help` and its
+# choice `topic`, and the words of the right answer that section holds.
+# An ask with `cannot = true` must get an honest "I can't do that yet":
+# its section names none of its `never` words, and the note tells the model
+# to say so when the notes don't. Held without a model by
+# `crates/skills/tests/it/faq.rs` (`every_eval_question_is_answered_by_its_section`).
+# An ask with `missing` names a skill the answer speaks of that is not on
+# this lamp: not installed, or installed disabled, as
+# `install::PRODUCT_SKILLS_OFF` leaves one (#5804's light skills). One with
+# `off` names a skill a person turned off. Either way the call is told so,
+# and the note tells the model to say it isn't on for this lamp.
+# Whether the model calls `use_skill` for each one is a played row's
+# (`calls=use_skill:1` on its `request N: tools:` journal line, not
+# `calls=none`). Not a recorded case: `lamp-skills test` runs only folders.
+
+[[ask]]
+said = "What can you do?"
+topic = "abilities"
+holds = ["timers", "light", "dance"]
+
+[[ask]]
+said = "Help. What are you able to help me with?"
+topic = "abilities"
+holds = ["reminders", "look things up"]
+
+[[ask]]
+said = "Can you check the weather for me tomorrow?"
+topic = "abilities"
+holds = ["weather"]
+
+[[ask]]
+said = "Can you hand a coding job to my computer?"
+topic = "abilities"
+holds = ["Claude Code", "Codex"]
+
+[[ask]]
+said = "Where do I link my Gmail?"
+topic = "connectors"
+holds = ["Skills, then Connectors", "Gmail"]
+
+[[ask]]
+said = "How do I connect my Google Calendar to you?"
+topic = "connectors"
+holds = ["Skills, then Connectors", "Google Calendar"]
+
+[[ask]]
+said = "Can my guest ask you to read my email?"
+topic = "connectors"
+holds = ["out loud at the lamp", "a text from the app can't"]
+
+[[ask]]
+said = "Can you send an email for me?"
+topic = "connectors"
+holds = ["read it back", "send"]
+
+[[ask]]
+said = "How do I unlink my Slack?"
+topic = "connectors"
+holds = ["Removing a link in the app", "remove access there"]
+
+[[ask]]
+said = "How do I link Spotify so you can play my music?"
+topic = "connectors"
+cannot = true
+holds = ["Spotify and other music services aren't among them yet"]
+never = ["play music", "Spotify is"]
+
+[[ask]]
+said = "Do you need my Google password?"
+topic = "connectors"
+holds = ["never ask for a password"]
+
+[[ask]]
+said = "What does the button do?"
+topic = "controls"
+holds = ["short press stops", "mute", "turn off"]
+
+[[ask]]
+said = "What happens if I touch your head?"
+topic = "controls"
+holds = ["a tap", "three seconds", "pet it"]
+
+[[ask]]
+said = "How do I turn off your microphone?"
+topic = "controls"
+holds = ["privacy switch", "microphones and my camera are off"]
+
+[[ask]]
+said = "How do I factory reset you?"
+topic = "controls"
+holds = ["RESET", "five seconds"]
+
+[[ask]]
+said = "How do I get a reading light?"
+topic = "light"
+holds = ["reading", "lean over the desk"]
+
+[[ask]]
+said = "Can you do a light show?"
+topic = "light"
+holds = ["party, music or calm"]
+
+[[ask]]
+said = "Put on a party light show!"
+topic = "light"
+holds = ["light show"]
+missing = "light-show"
+
+[[ask]]
+said = "Can you light up my book?"
+topic = "light"
+holds = ["light my book", "don't search"]
+off = "point-light"
+
+[[ask]]
+said = "Can you keep the light on until ten tonight?"
+topic = "light"
+cannot = true
+holds = ["can't yet keep the light on until a set time"]
+never = ["until ten"]
+
+[[ask]]
+said = "How do I set a reminder?"
+topic = "reminders"
+holds = ["remind me to call Mom at six"]
+
+[[ask]]
+said = "How do I see my reminders in the app?"
+topic = "reminders"
+cannot = true
+holds = ["aren't in the app yet"]
+never = ["in the app: skills, then reminders"]
+
+[[ask]]
+said = "Can a reminder repeat every hour?"
+topic = "reminders"
+holds = ["every 15 minutes up to once a day"]
+
+[[ask]]
+said = "Can you remind me every Monday to send the report?"
+topic = "reminders"
+holds = ["every week on a day you name"]
+
+[[ask]]
+said = "How do I stop the water reminders?"
+topic = "nudges"
+holds = ["not today", "snooze it until tomorrow morning"]
+
+[[ask]]
+said = "What's quiet focus?"
+topic = "nudges"
+holds = ["45 minutes head down", "nicely done"]
+
+[[ask]]
+said = "Why do you keep telling me to stretch?"
+topic = "nudges"
+holds = ["stretch after about 50 minutes", "stop all the nudges"]
+
+[[ask]]
+said = "How do I turn on guard mode?"
+topic = "guard_mode"
+holds = ["keep an eye on things while I'm out", "out loud"]
+missing = "guard-mode"
+
+[[ask]]
+said = "Will you send me a photo of who came to my desk?"
+topic = "guard_mode"
+cannot = true
+holds = ["no pictures"]
+never = ["send a photo", "sends a picture"]
+
+[[ask]]
+said = "How do I install a new skill?"
+topic = "skills"
+holds = ["Skills, then Store", "Add"]
+
+[[ask]]
+said = "Can I make my own skill?"
+topic = "skills"
+holds = ["make me a skill", "Skills, then Make a skill"]
+
+[[ask]]
+said = "How do I share a skill I made?"
+topic = "skills"
+holds = ["Share", "reviews"]
+
+[[ask]]
+said = "Can you delete a skill for me?"
+topic = "skills"
+cannot = true
+holds = ["can't remove a skill by voice"]
+never = ["I remove it", "say remove"]
+
+[[ask]]
+said = "How do I update you?"
+topic = "updates"
+holds = ["update myself", "Check for update"]
+
+[[ask]]
+said = "Will an update interrupt me while we talk?"
+topic = "updates"
+holds = ["never mid-conversation"]
+
+[[ask]]
+said = "Can I just unplug you?"
+topic = "unplug"
+holds = ["Turn me off before you unplug", "light turns green"]
+
+[[ask]]
+said = "Lamp, turn yourself off."
+topic = "unplug"
+cannot = true
+holds = ["can't turn myself off by voice yet"]
+never = ["say turn off"]
+
+[[ask]]
+said = "What do you remember about me?"
+topic = "memory"
+holds = ["journal", "no recordings"]
+
+[[ask]]
+said = "How do I make you forget something?"
+topic = "memory"
+holds = ["forget that", "forget everything about me"]
+
+[[ask]]
+said = "How do I redo the setup?"
+topic = "setup"
+holds = ["let's redo the setup"]
+
+[[ask]]
+said = "How do I connect you to a new Wi-Fi?"
+topic = "setup"
+holds = ["Add Lamp", "Changing my Wi-Fi from the app isn't there yet"]

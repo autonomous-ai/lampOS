@@ -73,6 +73,11 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,47}$"
     },
+    "knowledge": {
+      "description": "A file of the skill's folder told to the tool's call after its note, the section its choice names (#5790).",
+      "type": "string",
+      "pattern": "^[a-z0-9-]+\\.md$"
+    },
     "choice": {
       "type": "object",
       "additionalProperties": false,
