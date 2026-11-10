@@ -32,8 +32,12 @@ target/debug/lamp-sim run ~/.lampsim/b            # the whole lamp, on 127.0.0.1
 target/debug/lamp-sim code ~/.lampsim/b           # a pairing code and pin, then pair as for any lamp
 ```
 
-`DIR` must be private and outside a world-writable folder (`lamp-body` refuses
-a lock folder under `/tmp`), and short: Unix socket paths hold 103 bytes.
+`DIR` must be private and outside any folder that group or others can write to
+(`lamp-body` refuses a lock folder under `/tmp`, or under a home made with umask
+0002), and short: Unix socket paths hold 103 bytes. Make the parent yourself with
+`mkdir -m 700 ~/.lampsim`; `lamp-sim run` says which folder is the trouble before it
+starts, and, if the body still ends at start, prints its reason (the last line of
+`DIR/body.log`), not `null`.
 
 | Flag | What |
 |---|---|
