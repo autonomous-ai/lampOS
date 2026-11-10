@@ -9,7 +9,9 @@
 set -u
 BIN=${1:?usage: lamp-sim-check.sh BIN_DIR}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
-PORT=${LAMP_SIM_CHECK_PORT:-7739}
+# A free port from the kernel unless LAMP_SIM_CHECK_PORT names one, so two runs
+# on one machine do not collide (python3 is needed anyway).
+PORT=${LAMP_SIM_CHECK_PORT:-$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')}
 # Short and private (socket paths hold 103 bytes; lamp-body wants a private
 # folder outside any world-writable one).
 DIR=$HOME/.lampsim-check-$$
