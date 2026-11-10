@@ -63,8 +63,10 @@ harness-on puts Harness on a lamp lampOS is installed on: without Harness at
 harness-install run by lamp-update-harness.service, which a `serve` round starts with
         LAMP_HARNESS_AT_ONBOARDING=on while Harness is missing (#5197): harness-on's
         install alone, through the manifest the round pinned if it named one (its sha256
-        checked first), recorded for update/status; no Harness at boot, no daemon. With
-        LAMP_HERMES_ON_LAMP=on, Hermes after it, pinned, as lampos (#5978).
+        checked first), recorded for update/status; no Harness at boot, no daemon. Then
+        Hermes after it (on by default on a product lamp, LAMP_HERMES_ON_LAMP=off
+        turns it off), pinned, as lampos, only in its quiet window and watched by
+        serve while it runs (#5978).
 back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
         lamp-update.service's failure and its timer): when lamp-update switched to its own
         new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
@@ -890,7 +892,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     let hermes = {
         use lamp_update::{harness_install::product, hermes_install as hermes};
         let acts = config.apply && command == "serve";
-        // Off by this build's default (PRODUCT_DEFAULT false); only LAMP_HERMES_ON_LAMP=on turns it on.
+        // On by this build's default on a product lamp (PRODUCT_DEFAULT true, the product owner's
+        // decision, 10 Nov, with the first builder's schedule: crate::hermes_schedule);
+        // LAMP_HERMES_ON_LAMP=off turns it off, and another lamp needs `on`.
         let wanted = hermes::wanted(
             std::env::var(hermes::SWITCH).ok().as_deref(),
             acts && product::product_lamp(&config.root, &config.on(&config.units)),
@@ -907,6 +911,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // left for lampos to run (its wrapper and namespace script).
         acts.then_some(on)
     };
+    // Hermes's schedule (#5978): the voice heard from the start, so a round
+    // knows the quiet stretch, and each install watched while it runs.
+    let hermes_watch = (hermes == Some(true))
+        .then(|| lamp_update::hermes_schedule::Watcher::start(&bus_root, &records));
+    let local_time = hermes_watch
+        .as_ref()
+        .and_then(|_| lamp_local_time::LocalTime::zone("system").ok());
+    let mut rounds: u64 = 0;
     // `update/status` (#2194): where each round is, and how the last ended,
     // only for a round that acts; Harness's record looked at often only
     // with its switch on.
@@ -915,6 +927,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         lamp_update::status::Telling::start(&bus_root, &records, harness.is_some(), &mut say)
     }));
     loop {
+        rounds = rounds.saturating_add(1);
         let outcome = {
             let mut phase = |now: &'static str| {
                 if let Some(telling) = telling.borrow_mut().as_mut() {
@@ -962,12 +975,28 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 },
                 &mut say,
             );
-            if hermes == Some(true) {
-                lamp_update::hermes_install::after_round(
+            if let Some(watch) = &hermes_watch {
+                use lamp_update::{hermes_install, hermes_schedule};
+                let now_unix_ms = lamp_update::records::unix_ms();
+                let window = hermes_schedule::window(&hermes_schedule::Moment {
+                    round: rounds,
+                    quiet: watch.quiet(),
+                    walk_under_way: lamp_update::walk::under_way(&config),
+                    walk_ended_unix_ms: lamp_update::walk::ended_at_unix_ms(&config),
+                    tried_unix_ms: hermes_schedule::last_try_unix_ms(
+                        hermes_install::record(&records).as_ref(),
+                    ),
+                    now_unix_ms,
+                    local_minute: local_time
+                        .as_ref()
+                        .map(|local| local.minute_of_day(now_unix_ms)),
+                });
+                hermes_install::after_round(
                     &config.root,
                     &records,
                     &mut systemd,
-                    lamp_update::records::unix_ms(),
+                    now_unix_ms,
+                    window,
                     &mut say,
                 );
             }
