@@ -10,7 +10,7 @@ It runs on your computer, never on a lamp.
 
 **On a customer lamp today (stable 10824):** lamp-control is on every lamp,
 and answers once the owner turns on developer access in the app. Five gaps,
-and what to do ([more](../README.md#on-a-customer-lamp-today-stable-10824)):
+and what to do ([more](../README.md#on-a-customer-lamp-today)):
 - **Skill push** is not yet on customer lamps: every skill op is refused, "skill push is not on this lamp". Try it on `lamp fake`, or run the behaviour as a program on your computer. `lamp skill check` works anywhere.
 - **Joints and play:** `joints` takes `yaw` and `pitch` only; `roll`, `shoulder` and `elbow` are refused, and so is `play`. Use `look`, `gesture` or `move`.
 - **Limp and pose:** the body's limp and hold-a-pose can't be reached from a computer.
@@ -37,7 +37,8 @@ python3 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate
 pip install ./lampOS/sdk/python             # or -e, to work on it; '.[find]' to find lamps by mDNS
 ```
 
-`pip install lampos` from PyPI fails: install from the checkout, as above.
+Without a clone: `pip install "git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python"`.
+`pip install lampos` from PyPI fails: install from the checkout or that line.
 `[find]` finds no lamp yet: none announces itself on stable 10824.
 
 ## Try it with the fake lamp (no lamp needed)
@@ -56,7 +57,7 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
 example runs this way: `tour.py` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
-`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, `camera.py` (a pairing with `camera`: saves `snapshot.jpg` and a stream's `last-frame.jpg`), `curious.py` (a move of your own from poses), `touch.py` (a tap lights the ring, a pet is answered with a feeling; a tap reaches a program from the next build), and `push_skill.py ../examples/hello-skill` (a pairing with `skills` and `speak`).
+`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, `camera.py` (needs a pairing with the `camera` grant, which the app does not offer yet: only a pairing code made on the lamp itself carries it, so on a lamp paired through the app the call is refused `no_grant`; saves `snapshot.jpg` and a stream's `last-frame.jpg`), `curious.py` (a move of your own from poses), `touch.py` (a tap lights the ring, a pet is answered with a feeling; a tap reaches a program from the next build), and `push_skill.py ../examples/hello-skill` (a pairing with `skills` and `speak`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light, `say` and `sound`

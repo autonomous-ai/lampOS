@@ -13,7 +13,7 @@ claude mcp add lamp -- lamp-mcp
 
 **On a customer lamp today (stable 10824):** lamp-control is on every lamp,
 and answers once the owner turns on developer access in the app. Five gaps,
-and what to do ([more](../README.md#on-a-customer-lamp-today-stable-10824)):
+and what to do ([more](../README.md#on-a-customer-lamp-today)):
 - **Skill push** is not yet on customer lamps: `lamp_skill_push`, `lamp_skills` and `lamp_skill_remove` (offered with the `skills` grant) are refused, "skill push is not on this lamp". Try them against `lamp fake`.
 - **Joints and play:** `lamp_joints` takes `yaw` and `pitch` only; `roll`, `shoulder` and `elbow` are refused, and so is `lamp_play`. Use `lamp_look`, `lamp_gesture` or `lamp_move`.
 - **Limp and pose:** the body's limp and hold-a-pose can't be reached from a computer.

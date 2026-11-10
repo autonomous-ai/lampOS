@@ -8,7 +8,9 @@ This page maps each capability to its lamp-control op or event, its call in
 each SDK and in lamp-mcp, its status and its owner. Use it to find what is
 missing and who is building it.
 
-- Python: [`python/`](python/README.md), `pip install ./lampOS/sdk/python`
+- Python: [`python/`](python/README.md), `pip install ./lampOS/sdk/python`, or without a clone:
+  `pip install "git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python"`
+  (installed in a clean virtual environment on 10 Nov 2026; `lamp --help` runs)
 - JavaScript: [`js/`](js/README.md), `npm i --install-links /path/to/lampOS/lampOS/sdk/js`
 - MCP server for agents: [`mcp/`](mcp/README.md), `lamp-mcp`
   (`pip install ./lampOS/sdk/python ./lampOS/sdk/mcp`)
@@ -21,10 +23,11 @@ none): `git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.gi
 - The protocol: [`docs/control.md`](../docs/control.md) and
   [`docs/control.schema.json`](../docs/control.schema.json)
 
-## On a customer lamp today (stable 10824)
+## On a customer lamp today
 
-Customer lamps run the stable build, **10824** (lamp-voice `65991c7229`,
-stable since 9 Nov). This page and the SDK pages describe lamp-voice, which
+Customer lamps run the stable build, **11372** since 10 Nov, 16:40;
+this list was last checked line by line on **10824** (lamp-voice `65991c7229`),
+except row 1, which was checked on 11091 and the unit of 11308. This page and the SDK pages describe lamp-voice, which
 is newer; where stable does less, it is said here. Check again after the next
 stable: this list names the build so you can tell when it is old.
 
@@ -41,7 +44,7 @@ and quiet hours are off.
 
 | # | What | On stable 10824 | Do instead |
 |---|---|---|---|
-| 1 | Skill push (`lamp skill push/list/remove`, `push_skill`, `lamp_skill_push`) | Refused `refused`, "skill push is not on this lamp": the product unit doesn't start lamp-control with `--manage-socket`. Not yet on customer lamps | Try it on the fake lamp (`lamp fake`). On a real lamp, run the same behaviour as a program on your computer while it is connected. `lamp skill check` works anywhere, offline |
+| 1 | Skill push (`lamp skill push/list/remove`, `push_skill`, `lamp_skill_push`) | **Works on a stock lamp from 11091**, onto the developer's own lamp: the product unit passes `--manage-socket` (shown on a stock 11091 lamp, 9 Nov; the tag `lampos-lamp-voice-11308`'s `deploy/product/lamp-control.service` passes it too (line 31)). Only 10824 and older refuse it, "skill push is not on this lamp". This is the developer's own lamp: there is no route to the Store from the SDK yet (`lamp skill submit` waits for the Store's side) | Push, list and remove on the lamp (`lamp skill push NAME`; the owner says yes at the lamp). On 10824, use the fake lamp (`lamp fake`). `lamp skill check` works anywhere, offline |
 | 2 | `joints` beyond yaw and pitch; `play` | `roll`, `shoulder` and `elbow` are refused, "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now". `play` is refused, "not routed yet: waits for client packages". `sound` is served | Name only `yaw` and `pitch` (both, if the body hasn't said where it is in the last 15 s). For a whole-body motion, use `move` (your own frames of all 5 joints) or a built-in `gesture` |
 | 3 | Letting the base go limp, a holder's pose | Only in lamp-body's own lease socket; lamp-control sends neither, so no SDK call reaches them | None from a computer yet |
 | 4 | Finding the lamp by mDNS | Nothing on the lamp announces `_lampos._tcp`, so `lamp find` finds nothing, and `lamp pair` without `--host` finds nothing | Pass the lamp's address: `--host lamp-xxxx.local` (the lamp's own name) or its IP address. After pairing the address is kept |
@@ -134,7 +137,7 @@ time; a revoke closes its connections at once.
 
 - **done**: on lamp-voice, in lamp-control, both SDKs and lamp-mcp. Where
   stable 10824 (customer lamps) does less, the row says so; see
-  [On a customer lamp today](#on-a-customer-lamp-today-stable-10824).
+  [On a customer lamp today](#on-a-customer-lamp-today).
 - **SDK missing**: lamp-control has it, a client doesn't yet.
 - **PR #n**: open pull request; the call named is what it adds.
 - **missing**: nothing in lamp-control yet.
@@ -236,7 +239,7 @@ Python names first, JavaScript where it differs.
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done; on customer lamps from the next build (the product unit passes `--manage-socket`, #5819); stable 10824's unit doesn't, so it refuses "skill push is not on this lamp" (75c9, 9 Nov) | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove; 75c9, 9 Nov, 10824's lamp-control under the next build's unit: push, list, remove, push, revoke turned it off |
+| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done; on customer lamps from 11091 on (the product unit passes `--manage-socket`, #5819); stable 10824's unit didn't, so it refused "skill push is not on this lamp" (75c9, 9 Nov) | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove; 75c9, 9 Nov, 10824's lamp-control under the next build's unit: push, list, remove, push, revoke turned it off |
 | Check a skill folder before pushing | — | `lamp skill check` | — | done | blue | not yet |
 
 ## Never readable

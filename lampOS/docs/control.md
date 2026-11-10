@@ -1092,8 +1092,9 @@ below with `--manage-socket`, which the product unit passes; the manage
 helper's side is lamp-skills' (piece B). The schema has the three request ops, and both SDKs push, list
 and remove (`push_skill`/`pushSkill`, `lamp skill push|list|remove`).
 
-**Not yet on customer lamps.** The product unit passes no `--manage-socket`,
-so on a customer lamp (stable 10824 and lamp-voice alike) every skill op,
+**On customer lamps from 11091 on.** The product unit passes `--manage-socket`
+(#5819), so skill push works there. On stable 10824 and older, which pass no
+`--manage-socket`, every skill op,
 `skill.push`, `skill.list` and `skill.remove`, is refused `refused`, "skill
 push is not on this lamp". Try a push on the fake lamp (`lamp fake`), or run
 the same behaviour as a program on the computer while it is connected.
