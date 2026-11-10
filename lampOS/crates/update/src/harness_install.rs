@@ -107,10 +107,12 @@ pub const UNIT: &str = "lamp-update-harness.service";
 /// (#5978, [`crate::hermes_install`]; `-`: a lamp without that folder
 /// still installs Harness). Its bound is past Harness's installer
 /// ([`install::INSTALLER_WITHIN`]) and the steps around it, with Hermes
-/// after it: an hour. `MemoryHigh=1200M` (#5978): past it the kernel
-/// reclaims the one-shot's own memory and throttles it, never kills it,
-/// so a 4 GB lamp keeps about 1.2 GB available for its own parts (the
-/// `products` stage alone took `MemAvailable` down to about 868 MB).
+/// after it: an hour. `MemoryHigh=600M` and `CPUQuota=100%` (#5978): past
+/// the memory cap the kernel reclaims the one-shot's own memory and
+/// throttles it, never kills it. At 1200M and 150% the `products` stage took
+/// `MemAvailable` down to about 786 MB on lamp-c0a4 and the voice lost its
+/// privacy reading twice; at 600M and 100% it stayed above 1.4 GB and the
+/// privacy reading held through the whole install.
 pub const TEXT: &str = "\
 # lamp-update-harness: puts Harness on the lamp before its sign-in, with Harness's own installer, installed only
 # (lampOS/docs/install.md, \"Harness before the sign-in\", #5197). Written and started by a round of lamp-update
@@ -133,12 +135,12 @@ TimeoutStartSec=3600
 Nice=10
 IOSchedulingClass=idle
 CPUWeight=20
-CPUQuota=150%
+CPUQuota=100%
 IOWriteBandwidthMax=/var/lib 8M
 IOReadBandwidthMax=/var/lib 16M
 IOWriteIOPSMax=/var/lib 200
 IOReadIOPSMax=/var/lib 400
-MemoryHigh=1200M
+MemoryHigh=600M
 NoNewPrivileges=yes
 ProtectSystem=full
 ReadWritePaths=/usr/local/bin -/usr/local/lib/lampos

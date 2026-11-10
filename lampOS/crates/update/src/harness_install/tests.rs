@@ -2422,12 +2422,12 @@ fn the_one_shot_runs_below_the_lamps_services() {
         "Nice=10",
         "IOSchedulingClass=idle",
         "CPUWeight=20",
-        "CPUQuota=150%",
+        "CPUQuota=100%",
         "IOWriteBandwidthMax=/var/lib 8M",
         "IOReadBandwidthMax=/var/lib 16M",
         "IOWriteIOPSMax=/var/lib 200",
         "IOReadIOPSMax=/var/lib 400",
-        "MemoryHigh=1200M",
+        "MemoryHigh=600M",
     ] {
         assert!(
             lines.contains(&wanted),
