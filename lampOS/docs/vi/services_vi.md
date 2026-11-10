@@ -25,7 +25,10 @@ lúc 14:11 ngày 3 Nov 2026):
   nội dung), rồi đèn nói "Say 'yes, send it' to send it." ("Nói 'gửi đi' để
   gửi nhé."); mô hình quyết định câu trả lời là xác nhận hay huỷ, bằng bất kỳ
   lời nào (chủ đèn, 10/11), và gửi bằng `send_id` của lần ghi trong vòng hai
-  phút, dù ai nói; không danh sách từ nào trong đèn quyết định việc đó.
+  phút, dù ai nói; không danh sách từ nào trong đèn quyết định việc đó. Chỉ
+  một câu trả lời bắt đầu trong 1,5 s đuôi tiếng vọng của lời đèn, có chung
+  bất kỳ từ nào với lời đó, mới phải là giọng của người đã yêu cầu, nên chính
+  lời của đèn vọng lại không bao giờ gửi được.
 - **Các hàng rào**: chỉ câu nói được nghe của chính chủ đèn mới chạm đến một
   dịch vụ ("Ai dùng được chúng", bên dưới); token chỉ đi đến các host của
   chính dịch vụ của nó, qua HTTPS, không theo chuyển hướng; các lượt chạy
@@ -1248,7 +1251,10 @@ hay so khớp câu huỷ trơn nào trong đèn quyết định việc đó (`ag
 `says_cancel`, `CANCEL_WORDS`, `cancel_waiting` và câu "Okay, cancelled."
 của chính đèn đã bị bỏ). Đèn chỉ kiểm tra cấu trúc: đúng `send_id` của lần
 ghi, một yêu cầu sau yêu cầu đọc lại, tối đa hai phút, và phần đọc lại không
-bị cắt hay bị nói đè.
+bị cắt hay bị nói đè. Chỉ còn một phép kiểm tra giọng, cho một câu bắt đầu
+trong đuôi tiếng vọng của lời đèn và có chung bất kỳ từ nào với lời đó (phương
+án 1 của Thirteen trên #6009, bên dưới): ở đó phải là giọng của người đã yêu
+cầu; ở mọi chỗ khác, ai nói cũng được.
 
 - **Chỉ một câu được nghe** mới chạm đến một dịch vụ, dù đọc hay ghi; mọi
   trường hợp khác là `NOT_HEARD`, và mọi lần ghi đang chờ bị quên. **Chỉ câu
@@ -1256,7 +1262,8 @@ bị cắt hay bị nói đè.
   trên): mọi câu khác là `OWNER_ONLY`, và mọi lần ghi đang chờ bị quên. Ngoại
   lệ duy nhất là lần gửi của một lần ghi đã đang chờ: lệnh gọi của mô hình có
   `send_id` gửi nó dù ai trả lời (cả một người khác đã biết, hay một câu không
-  thuộc khuôn mặt đã biết nào).
+  thuộc khuôn mặt đã biết nào), trừ một câu bắt đầu trong đuôi tiếng vọng của
+  đèn có lời của nó, câu đó phải là giọng của người đã yêu cầu (bên dưới).
 - **Chỉ ghi trên tuyến thứ hai.** Ở đó một `service_write`, có hay không có
   `send_id`, được chuyển cho các luật dưới đây; trên tuyến Live nó được báo
   `NO_SEND_HERE`, "Not done: on this voice I don't send or post to linked
@@ -1306,7 +1313,8 @@ bị cắt hay bị nói đè.
   "Yes.", "ok send", "sure", "gửi đi" hay "send it to Bob" là do mô hình xét.
   Không quan trọng đó có phải câu ngay sau không (một câu đèn chưa trả lời
   có thể đến ở giữa), lời của đèn có chứa nguyên văn phần đọc lại không (`read_back_said`
-  giờ chỉ là phép kiểm tra của câu hỏi giọng chủ đèn), hay ai nói. Nếu không,
+  giờ chỉ là phép kiểm tra của câu hỏi giọng chủ đèn), hay ai nói, trừ trong
+  đuôi tiếng vọng của đèn (bên dưới). Nếu không,
   mô hình được báo `CANCELLED`, "Not sent, and cancelled: a send needs the
   waiting write's own send_id, in a later turn than its read-back, within two
   minutes. Say it was not sent." Nhật ký ghi tên từng điều kiện không đạt ("a
@@ -1324,6 +1332,34 @@ bị cắt hay bị nói đè.
   sent, and cancelled: the read-back was cut off before they agreed. Say it
   was not sent, and that they can ask again." Một lần gửi bị từ chối làm quên
   id trong mọi trường hợp.
+- **Trong đuôi tiếng vọng của đèn, phải là giọng người đã yêu cầu** (phương
+  án 1 của Thirteen trên #6009). Một lần gửi trong một câu bắt đầu đè lên
+  giọng đèn hoặc trong vòng 1,5 s (`own_echo::TAIL_US`) sau khi lời mới nhất
+  của đèn lẽ ra đã phát hết, và có chung ít nhất một từ với lời đó
+  (`own_echo::in_tail_with_its_words`, được xét trên tuyến thứ hai khi lời của
+  câu đến, dù `LAMP_SECOND_OWN_ECHO` bật hay không, và được giữ cùng lần ghi
+  đang chờ: `services::line_in_echo_tail`, `Pending.echo_tail`,
+  `Turn.in_echo_tail`), có thể là chính lời của đèn vọng lại, dù ngắn đến đâu:
+  "Yes." hay "Send it." quá ngắn để `own_echo` giữ lại (`HELD_LEAST`, 3). Lần
+  gửi đó chỉ đi khi giọng của câu là giọng người đã yêu cầu: `Turn.alike`, so
+  với bản in giọng đã đăng ký của người đó (`VoiceAsk::Owner`) hoặc nếu không
+  thì với câu đã chuẩn bị lần ghi (`VoiceAsk::Alike`), từ
+  `same_voice::SERVICES_SAME_FROM` (0,55) trở lên, chờ bản in tối đa 800 ms,
+  và không thấy khuôn mặt nào khác nói câu đó (`Turn.other_seen`). Một giọng
+  khác đã biết hay một khuôn mặt khác thì huỷ nó, `OTHER_VOICE`: "Not sent,
+  and cancelled: I send only when the voice saying "send" is the one that
+  asked for it. Say it was not sent." Khi chưa có bản in (câu quá ngắn), lần
+  ghi chờ thêm một lần thử, chỉ một lần: mô hình được báo `NO_PRINT_YET`,
+  "Not sent yet: I couldn't hear whose voice that was.", kèm `SAY_IT_LONGER`
+  là điều cần nói tiếp (nhờ họ nói "go ahead and send it", và chỉ gửi lại nếu
+  họ đồng ý); lời đèn hỏi lại không tính là một yêu cầu khác
+  (`Pending.asked_again`), và một lần gửi thứ hai vẫn không có bản in là
+  `OTHER_VOICE`. Trong phòng riêng, giọng được coi là của người đã yêu cầu
+  (`alike` 1,0, không hỏi giọng hay khuôn mặt nào), như chủ đèn đã chấp nhận
+  ngày 6/11. Một câu bắt đầu sau đuôi, hoặc không có từ nào của đèn, không gắn
+  với giọng nào: ai nói cũng đồng ý được, và không chờ bản in nào. Nhật ký ghi
+  "a send begun in the lamp's echo tail; its voice beside request N's: cosine
+  0.62" (hoặc "no print"), chỉ một điểm số.
 - **Một câu gửi khi không có lệnh ghi nào đang chờ** (chưa chuẩn bị, hoặc
   đã gửi hay đã huỷ) không gửi gì, và mô hình được báo `NOTHING_WAITING`,
   "Not sent: no write waits for a send. None was prepared, or it was already
@@ -1411,11 +1447,17 @@ bị cắt hay bị nói đè.
   ghi đang chờ được `own_echo` xét như mọi câu của đèn: trong 1,5 s đuôi của
   nó, "Yes, send it." do phòng vọng lại bị giữ, và "Um, yes, send it." (một
   từ đệm của ASR) bị bỏ đoạn lời của đèn, nên mô hình chỉ nhận "Um," và
-  không bao giờ nhận lời đồng ý của đèn; vì lần gửi không còn kiểm tra giọng,
-  chính điều này giữ đèn không gửi theo tiếng vọng của nó. Người nói đúng
-  từng chữ ngay khi đèn vừa dứt bị giữ một lần và nói lại (lamp-3e83,
-  10/11); người thêm một từ ("Okay, yes, send it.") đến mô hình là "Okay,",
-  và người bắt đầu sau đuôi thì như đã nói.
+  không bao giờ nhận lời đồng ý của đèn. Một tiếng vọng ngắn hơn, "Yes." hay
+  "Send it.", không bị giữ (`own_echo` giữ một câu có từ 3 từ của đèn trở
+  lên, `HELD_LEAST`, và bỏ các đoạn từ 2 từ trở lên, `STRIP_RUN`) và đến mô
+  hình nguyên vẹn; điều giữ đèn không gửi theo nó là phép kiểm tra giọng của
+  lần gửi trong đuôi ("Trong đuôi tiếng vọng của đèn, phải là giọng người đã
+  yêu cầu", ở trên): giọng của chính đèn không phải giọng người đã yêu cầu,
+  và hai lần không có bản in thì huỷ. Người nói đúng từng chữ ngay khi đèn
+  vừa dứt bị giữ một lần và nói lại (lamp-3e83, 10/11); người thêm một từ
+  ("Okay, yes, send it.") đến mô hình là "Okay,", và lần gửi khi đó đi nếu là
+  giọng người đã yêu cầu; người bắt đầu sau đuôi đến mô hình như đã nói, và
+  lần gửi đi dù ai nói.
 - **Sau một lần gửi** mô hình được báo một câu cố định: "Say only that it was
   sent, in the conversation's language." khi dịch vụ trả lời `sent: true`;
   "Say only that the file was made in their Google Drive, with its name from
@@ -1435,8 +1477,8 @@ bị cắt hay bị nói đè.
   bị bỏ trước, và ghi chú của một lượt bị cắt nói lời đồng ý "already sent
   the write they asked for (or, for a draft, saved it)". Chủ đèn
   không còn được hỏi, sau một lần gửi, đèn có được học giọng của họ không
-  (`owner_voice::ask_after_send` không còn được gọi): một lần gửi không gắn
-  với giọng nào.
+  (`owner_voice::ask_after_send` không còn được gọi): một lần gửi sau đuôi
+  tiếng vọng của đèn không gắn với giọng nào.
 - **Một lần gửi bị cắt khi còn đang chờ không bao giờ được trả lời như thể
   chưa làm gì** (#5853, lamp-9adf, 9/11). Trên tuyến thứ hai, lệnh gọi của
   một lần gửi vẫn chạy đến khi có câu trả lời dù một câu mới hơn cắt lượt,

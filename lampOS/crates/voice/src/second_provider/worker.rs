@@ -3840,13 +3840,15 @@ pub fn serve(
         }
         // The connected services ask whose voice a line is in
         // (`crate::services::VoiceAsk`): a read in full only in the
-        // conversation's or the owner's enrolled one.
+        // conversation's or the owner's enrolled one, and a send begun in
+        // the echo tail of the lamp's words only in the asker's.
         {
             let heeding = heeding.clone();
             crate::services::judging_voices(Arc::new(move |ask| {
                 let mut heeding = heeding.lock().ok()?;
                 let voices = heeding.kept_voices()?;
                 match ask {
+                    crate::services::VoiceAsk::Alike(a, b) => voices.alike(a, b),
                     crate::services::VoiceAsk::Conversation(request) => {
                         voices.likeness_so_far(request)
                     }
