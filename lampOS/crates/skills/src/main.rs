@@ -42,7 +42,7 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      lamp-skills remove [--dir DIR] [--state-dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
                      lamp-skills pack [--out DIR] [--key-file PRIVATE [--author]] SKILL_DIR\n       \
-                     lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH]";
+                     lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH] [--push-dir DIR] [--dev-dir DIR]";
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
 const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
@@ -347,6 +347,11 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
     // `asked`: the Store's public key a package must be
     // signed with. `pack`: the private key it is signed with, if any.
     let mut key_file: Option<PathBuf> = None;
+    // `asked`: where lamp-control keeps a pushed package for the helper and
+    // where a pushed skill is kept. A desktop lamp (lamp-sim) has neither
+    // `/var/lib` folder, so it names its own; the product unit never passes
+    // them, and with none they are the constants.
+    let (mut push_dir, mut dev_dir): (Option<PathBuf>, Option<PathBuf>) = (None, None);
     // `pack --author`: the signature carries the author's public key, for a
     // package they share (`package::author_signature_for`).
     let mut author = false;
@@ -357,6 +362,22 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
             "--state-dir" if matches!(command, "asked" | "remove" | "install") => &mut state,
+            "--push-dir" if command == "asked" => {
+                let Some(value) = given.next() else {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                };
+                push_dir = Some(value.into());
+                continue;
+            }
+            "--dev-dir" if command == "asked" => {
+                let Some(value) = given.next() else {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                };
+                dev_dir = Some(value.into());
+                continue;
+            }
             "--author" if command == "pack" => {
                 author = true;
                 continue;
@@ -447,6 +468,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                     None
                 }
             };
+            let (pushes_push, pushes_dev) = asked_folders(push_dir, dev_dir);
             let store = web.as_mut().map(|web| package::Store {
                 key_file,
                 channel: web,
@@ -458,8 +480,8 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                 package::ASKED_LOCK_WAIT,
                 store,
                 Some(package::Pushes {
-                    dev: Path::new(lamp_skills::PUSHED_DIR),
-                    push: Path::new(package::PUSH_DIR),
+                    dev: &pushes_dev,
+                    push: &pushes_push,
                     asker,
                     key_file: &store_key_file,
                 }),
@@ -507,6 +529,16 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// The folders the manage helper's pushed requests use: lamp-control's push
+/// and the pushed skills' own, or the product's when none is given
+/// (`asked --push-dir`, `--dev-dir`, for a desktop lamp only).
+fn asked_folders(push: Option<PathBuf>, dev: Option<PathBuf>) -> (PathBuf, PathBuf) {
+    (
+        push.unwrap_or_else(|| PathBuf::from(package::PUSH_DIR)),
+        dev.unwrap_or_else(|| PathBuf::from(lamp_skills::PUSHED_DIR)),
+    )
 }
 
 /// What the folder holds, to see that it changed: every file but the tests,
@@ -4975,6 +5007,45 @@ fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// No `--push-dir` or `--dev-dir` is today's paths; a given one is used.
+    #[test]
+    fn the_helpers_pushed_folders_are_the_products_unless_a_desktop_names_its_own() {
+        let (push, dev) = asked_folders(None, None);
+        assert_eq!(push, Path::new("/var/lib/lampos-control/push"));
+        assert_eq!(dev, Path::new("/var/lib/lampOS/skills-dev"));
+        let (push, dev) = asked_folders(Some("/a/push".into()), Some("/a/dev".into()));
+        assert_eq!((push, dev), ("/a/push".into(), "/a/dev".into()));
+    }
+
+    /// No file lampOS deploys passes `--push-dir` or `--dev-dir` (a desktop
+    /// lamp's own folders, for `lamp-skills asked`).
+    #[test]
+    fn nothing_deployed_passes_the_desktop_push_folders() {
+        let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy");
+        let (mut folders, mut files) = (vec![deploy], 0);
+        while let Some(folder) = folders.pop() {
+            for entry in std::fs::read_dir(&folder).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    folders.push(path);
+                } else if let Ok(text) = std::fs::read_to_string(&path) {
+                    files += 1;
+                    for flag in ["--push-dir", "--dev-dir"] {
+                        assert!(
+                            !text
+                                .lines()
+                                .any(|line| line.contains("lamp-skills asked")
+                                    && line.contains(flag)),
+                            "{} passes {flag} to the manage helper",
+                            path.display()
+                        );
+                    }
+                }
+            }
+        }
+        assert!(files > 0, "no file under deploy/");
+    }
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no
     /// latest of, reaches the read's gate as a voice heard just now
