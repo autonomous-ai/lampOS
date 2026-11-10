@@ -497,7 +497,8 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   says its quoted words as they are rather than nothing (journal: `the
   onboarding line's own words are said`; lamp-52e6, 28 Oct 16:42; `docs/onboarding.md`,
   "Exact lines"). One the walk marks as its own (`onboarding::own_words`,
-  how_you_sound's sentence prompts, #3769) asks no chat at all: its words are said at
+  how_you_sound's sentence prompts, #3769; a face from a photo's ask in
+  English, `photo_faces::turn`, #5907) asks no chat at all: its words are said at
   once. A full look
   (`LAMP_LOOK_FULL=on`) whose still never came arrives as the no-look note
   without `look`, and is a look all the same: 5 s, then the line.

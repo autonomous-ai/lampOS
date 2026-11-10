@@ -13519,7 +13519,8 @@ fn conversation_with_gate_inner(
             )?;
         }
         // A face added from a photo at the lamp, unconfirmed: asked once,
-        // gently, as the lamp's own written turn, while it is quiet (#1968).
+        // gently, as the lamp's own written turn, while it is quiet (#1968);
+        // in English its fixed words, never the model's (#5907).
         // The person's spoken yes or no is theirs to give; no answer in the
         // meeting is the eyes' to let go.
         if let Some(watch) = photo_faces.as_ref()
@@ -13538,7 +13539,7 @@ fn conversation_with_gate_inner(
                     owner,
                     reply,
                     &mut provider_queue,
-                    &crate::photo_faces::note(&name),
+                    &crate::photo_faces::turn(&name, crate::language::at_start()),
                     false,
                     "photo_face_ask",
                     provider_session,
