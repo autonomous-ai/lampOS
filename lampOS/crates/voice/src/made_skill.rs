@@ -2217,7 +2217,8 @@ fn not_on(directory: &Path, sha256: &str, why: &str) {
 /// "Shall I put it on the lamp?" any more): its name, then what it does as
 /// its description says and what it uses, so the person hears what went on
 /// with no yes asked (App Only's P1 on #5985, the 11:47 ruling's
-/// read-back), and how to take it off.
+/// read-back). No "say take it off" (the owner, 10 Nov: the person
+/// removes it in the app when they want).
 pub fn on_line(made: &Made) -> String {
     let name = spoken_name(&made.name);
     let does = made.description.trim().trim_end_matches(['.', '!', '?']);
@@ -2239,7 +2240,7 @@ pub fn on_line(made: &Made) -> String {
     } else {
         format!(", using {uses}")
     };
-    format!("I made {name}, and it's on: {does}{using}. Say \"take it off\" to take it off.")
+    format!("I made {name}, and it's on: {does}{using}.")
 }
 
 /// What the lamp says when a kept skill couldn't be put on: why, in the
@@ -3713,7 +3714,7 @@ body = { gesture = "nod" }
         });
         assert_eq!(
             line,
-            "I made evening dim, and it's on: dims the light at 10 pm, using its light. Say \"take it off\" to take it off."
+            "I made evening dim, and it's on: dims the light at 10 pm, using its light."
         );
         let _ = fs::remove_dir_all(&dir);
     }

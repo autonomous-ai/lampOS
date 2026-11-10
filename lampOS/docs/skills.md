@@ -2387,7 +2387,7 @@ to say aloud what it made; without either the app socket isn't started
    it is put on at once through the manage helper, as by voice
    (`made_skill::put_on`, "Made by voice", step 8), and the lamp says one
    short line through the say service's own asks at a good moment within
-   an hour (`app_make::say_line`): "I made evening dim, and it's on: <what it does>, using its light. Say \"take it off\" to take it off."
+   an hour (`app_make::say_line`): "I made evening dim, and it's on: <what it does>, using its light."
    (`made_skill::on_line`), or "I made it but couldn't put it on: <why>."
    (`made_skill::not_on_line`). Nothing is asked and nothing waits for a
    yes; what became of the line is only logged.
@@ -2484,7 +2484,7 @@ restart it is asked about again and the app is still told:
    `kept`, it is put on through the manage helper (`made_skill::put_on`),
    then said through the say service's own asks, at a good moment: "I
    added NAME from a file, not from the Skills Store, and it's on: WHAT IT
-   DOES, using WHAT IT USES. Say \"take it off\" to take it off."
+   DOES, using WHAT IT USES."
    (`upload_skill::on_line`), or "I added a skill from a file but couldn't
    put it on: <why>." (`upload_skill::not_on_line`).
 7. **The manage helper holds it again** (`install_made`): a card that says
@@ -2566,7 +2566,7 @@ rewrites a word of it (`made_skill::Written`, `made_skill::keep_written`,
    (`made_skill::put_on`), which holds it again to its cap
    (`made_skill::put_on_cap`: a written skill's when it has a function,
    else a made one's) and to `made: here`. Then the lamp says through the
-   say service's own asks, at a good moment, "I made NAME, and it's on: WHAT IT DOES, using WHAT IT USES. Say \"take it off\" to take it off."
+   say service's own asks, at a good moment, "I made NAME, and it's on: WHAT IT DOES, using WHAT IT USES."
    (`made_skill::on_line`), or why it couldn't. `skills.made` tells the
    app `making`, `on` or `not_kept` (with why, a taken name or a put-on
    that failed among them), with `"written": true`; the skills page shows it in "Made on this lamp" with
