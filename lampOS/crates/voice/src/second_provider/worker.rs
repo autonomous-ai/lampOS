@@ -33,6 +33,8 @@ use std::{
 mod carry_window;
 mod held_colleagues;
 #[cfg(test)]
+mod made_line;
+#[cfg(test)]
 mod memory_note_retries;
 
 /// The coordinator renews authority at least this often.
@@ -5171,7 +5173,8 @@ async fn run_call(
         }
         return ToolAnswer::plain(search.answer(&call.name, &call.args).await);
     }
-    tokio::task::spawn_blocking(move || {
+    let made = call.name == crate::made_skill::MAKE;
+    let running = move || {
         use crate::tools::Route;
         let route = crate::tools::route(&settings, &call.name);
         // The Live route's line for a call the Policy held and then
@@ -5215,9 +5218,72 @@ async fn run_call(
                 scope.as_ref(),
             )),
         }
-    })
-    .await
-    .unwrap_or_else(|_| ToolAnswer::plain(crate::tools::unavailable()))
+    };
+    // A skill made by voice goes on to the end if a cut ends its turn, and
+    // its line is then said through the say service ([`made_running`]), at
+    // the product's socket: a worker is given no `LAMP_SAY_SOCKET`.
+    if made {
+        return made_running(request, running, |line| {
+            crate::app_make::say_line_at(Path::new(crate::say::DEFAULT_SOCKET), &line);
+        })
+        .await;
+    }
+    tokio::task::spawn_blocking(running)
+        .await
+        .unwrap_or_else(|_| ToolAnswer::plain(crate::tools::unavailable()))
+}
+
+/// A voice [`crate::made_skill::MAKE`] of `request`, `work`, run on the
+/// blocking pool: its answer given to its turn while the turn waits for
+/// it, nothing else said. The model of its next round says the line. A
+/// turn cut while the skill is made (lamp-9adf, 11 Nov 02:16 and 02:19:
+/// the lamp's own echo cut "I'll make it", the skill was made and put on,
+/// and the person never heard so) gives that round no answer: the make
+/// goes on, and its line ([`crate::make_skill_local::take_said_line`]) is
+/// given to `say` on a thread of its own, once. Under way, and until that
+/// line is said, the make is [`crate::make_skill_local::Pending`].
+fn made_running(
+    request: u64,
+    work: impl FnOnce() -> crate::tools::ToolAnswer + Send + 'static,
+    say: impl FnOnce(String) + Send + 'static,
+) -> impl std::future::Future<Output = crate::tools::ToolAnswer> {
+    let pending = crate::make_skill_local::Pending::begin();
+    let (given, answered) = tokio::sync::oneshot::channel();
+    tokio::task::spawn_blocking(move || {
+        // Nothing an earlier call left on this thread is taken as this one's.
+        let _ = crate::make_skill_local::take_said_line();
+        let answer = work();
+        let line = crate::make_skill_local::take_said_line();
+        if given.send(answer).is_ok() {
+            drop(pending);
+            return;
+        }
+        let Some(line) = line else {
+            eprintln!(
+                "lamp-voice second: request {request}: its turn was cut while make_skill ran, and nothing was made to say"
+            );
+            return;
+        };
+        eprintln!(
+            "lamp-voice second: request {request}: its turn was cut while make_skill ran: the made skill's line is said through the say service"
+        );
+        let saying = std::thread::Builder::new()
+            .name("lamp-voice-made-line".into())
+            .spawn(move || {
+                say(line);
+                drop(pending);
+            });
+        if saying.is_err() {
+            eprintln!(
+                "lamp-voice second: request {request}: the made skill's line couldn't be said: no thread"
+            );
+        }
+    });
+    async move {
+        answered
+            .await
+            .unwrap_or_else(|_| crate::tools::ToolAnswer::plain(crate::tools::unavailable()))
+    }
 }
 
 /// The Policy's decisions for the lamp's actions on this route, when they
