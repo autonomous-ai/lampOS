@@ -12,10 +12,17 @@ use std::{
 /// The camera stays open this long after the last mark asked for it.
 const KEEP_OPEN: Duration = Duration::from_secs(10);
 
+/// A camera that ended is opened again no sooner than this.
+const RETRY_AFTER: Duration = Duration::from_secs(5);
+
 pub struct Camera {
     sight: PathBuf,
     child: Option<Child>,
     asked: Option<Instant>,
+    /// No new try to open before this: ffmpeg that ends at once (not
+    /// installed, the camera busy, a format refused) is tried again every
+    /// [`RETRY_AFTER`], not every tick.
+    retry_at: Option<Instant>,
 }
 
 impl Camera {
@@ -24,6 +31,7 @@ impl Camera {
             sight: sight.to_owned(),
             child: None,
             asked: None,
+            retry_at: None,
         }
     }
 
@@ -38,9 +46,15 @@ impl Camera {
             && matches!(child.try_wait(), Ok(Some(_)))
         {
             self.child = None;
+            self.retry_at = Some(Instant::now() + RETRY_AFTER);
+            eprintln!(
+                "lamp-sim: the host camera's ffmpeg ended (ffmpeg missing, camera busy or not allowed?); trying again in {} s",
+                RETRY_AFTER.as_secs()
+            );
         }
+        let may_try = self.retry_at.is_none_or(|at| Instant::now() >= at);
         match (wanted, self.child.is_some()) {
-            (true, false) => self.child = self.open(),
+            (true, false) if may_try => self.child = self.open(),
             (false, true) => self.close(),
             _ => {}
         }

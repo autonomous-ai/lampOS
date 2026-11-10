@@ -60,6 +60,8 @@ fn say(mut stream: UnixStream) -> std::io::Result<()> {
     let _turn = loop {
         match SPEAKING.try_lock() {
             Ok(guard) => break guard,
+            // A line that panicked while speaking left no state to protect.
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => break poisoned.into_inner(),
             Err(_) if cancelled.load(Ordering::SeqCst) => {
                 writeln!(
                     stream,
