@@ -2341,8 +2341,12 @@ to say aloud what it made; without either the app socket isn't started
 
 1. `lamp-voice` listens at `LAMP_APP_MAKE_SOCKET`
    (`/run/lampos-app-make/make.sock` unset), opened to
-   `LAMP_APP_MAKE_GROUP`, `lampos` unset, for `lamp-cloud`: one JSON line
-   in, one out. A group not known starts nothing (`app_make::group_named`).
+   `LAMP_APP_MAKE_GROUP`, `lampos` unset, for `lamp-cloud` alone: the
+   peer is read by `SO_PEERCRED`, and only `lamp-cloud.service` run as the
+   voice's own user is answered; any other caller is closed with no answer
+   (`app_make::app_caller_may`; App Only's P2 on #5985: with no spoken yes,
+   no other part in the group may put a skill on). One JSON line in, one
+   out. A group not known starts nothing (`app_make::group_named`).
 2. `{"make": {"words", "request_id"}}`: the words become the same brief
    (`made_skill::brief`, at most 480 bytes) and are made at once on a
    thread of their own by the lamp's own model, the same example, check
@@ -2382,7 +2386,7 @@ to say aloud what it made; without either the app socket isn't started
    it is put on at once through the manage helper, as by voice
    (`made_skill::put_on`, "Made by voice", step 8), and the lamp says one
    short line through the say service's own asks at a good moment within
-   an hour (`app_make::say_line`): "I made evening dim, and it's on."
+   an hour (`app_make::say_line`): "I made evening dim, and it's on: <what it does>, using its light. Say \"take it off\" to take it off."
    (`made_skill::on_line`), or "I made it but couldn't put it on: <why>."
    (`made_skill::not_on_line`). Nothing is asked and nothing waits for a
    yes; what became of the line is only logged.
@@ -2560,7 +2564,7 @@ rewrites a word of it (`made_skill::Written`, `made_skill::keep_written`,
    (`made_skill::put_on`), which holds it again to its cap
    (`made_skill::put_on_cap`: a written skill's when it has a function,
    else a made one's) and to `made: here`. Then the lamp says through the
-   say service's own asks, at a good moment, "I made NAME, and it's on."
+   say service's own asks, at a good moment, "I made NAME, and it's on: WHAT IT DOES, using WHAT IT USES. Say \"take it off\" to take it off."
    (`made_skill::on_line`), or why it couldn't. `skills.made` tells the
    app `making`, `on` or `not_kept` (with why, a taken name or a put-on
    that failed among them), with `"written": true`; the skills page shows it in "Made on this lamp" with
