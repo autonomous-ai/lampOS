@@ -83,7 +83,8 @@ The owner's steps in our app, today:
    - `sound`: can hear kinds of sound, never words;
    - `camera`: can see what the lamp's camera sees, never while it is private;
    - `microphone`: can hear what the lamp's microphone hears, never while it is
-     private (in development: the grant exists, its sound is not sent yet);
+     private (merged, off by default: only where the owner has switched
+     the room's sound on, which the customer build does not; see "The microphones");
    - `skills`: can put skills on the lamp that run on their own;
    - `air`: can read the air sensor: particles, carbon dioxide and humidity, which
      can show when someone is in the room;
@@ -304,7 +305,7 @@ computer on the lamp's own network.
 
 | Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
 |---|---|---|---|---|---|---|---|---|
-| — | — | — | The microphone's sound, never while the lamp is private, local network only | `microphone` (can be granted today) | — | — | — | in development (the grant exists; no op serves it yet) |
+| `await lamp.microphone_stream(True)` | `lamp.microphoneStream(true)` | — | Op `microphone.stream`: the room's sound as `microphone.audio` blocks (20 ms, 16 kHz, mono, signed 16-bit) until `on: false`, `stop`, or a `microphone.ended`; never while the lamp is private, local network only | `microphone` | off unless the owner switches it on; never with someone else in view or when the room isn't seen; the ring shows its mark first ("The microphones") | `{stream: "on", sample_rate, channels, format, block_ms, source}`, then the blocks | `refused` "the microphone stream is off on this lamp"; "someone else is here"; "the room isn't seen"; `private`; `no_grant` | merged, off by default (10 Nov 2026): on a test lamp with both switches on, not on the customer build |
 
 What a program hears today goes through events: its own phrases (`phrase.heard`), the
 lamp's name (`name.heard`), sound classes (`sound.heard`), and how a turn ended. No audio
@@ -627,7 +628,7 @@ The lamp hears its name and the person's words for its own conversation. A
 program gets only what the owner granted: its own registered phrases
 (`phrase.heard`), that the name was called (`name.heard`, works today: about
 1.9 s after the line ends), and kinds of sound (`sound.heard`, never words).
-The room's sound for a program is in development:
+The room's sound for a program is merged and off by default, with the owner's consent (the owner's switch, and the owner's grant at pairing); it is not on the customer build:
 
 | | |
 |---|---|
@@ -639,7 +640,7 @@ The room's sound for a program is in development:
 | **Returns** | `{"stream": "on", "sample_rate": 16000, "channels": 1, "format": "s16le", "block_ms": 20, "source": "mic1"}`; then one `microphone.audio` per 20 ms block: `sequence`, `lost` (blocks lost since the last one sent), `bytes` 640, and the samples as `data` (bytes in Python, a Buffer in JS), sent as a binary WebSocket message |
 | **Limits** | off unless the lamp's owner switches it on (`--microphone on`); local network only (one hop on the lamp's own wire, never a VPN or tunnel the owner didn't set up); the ring shows a small red mark before any sound goes; never while the lamp is private; never with someone else in view; never when the room isn't seen (no fresh word from the camera in 2 s); a stream with no sound for 2 s ends |
 | **Refusals and ends, in the lamp's words** | "the microphone stream is off on this lamp (LAMP_CONTROL_MICROPHONE)"; "the lamp's microphone isn't shared here"; "someone else is here"; "the room isn't seen"; "the ring is not showing the microphone's mark"; `private` while the lamp is private; `no_grant` without the grant |
-| **STATUS** | in development: built and tested, off by default, with the owner's consent. Not on the customer build (there the `microphone` grant exists but no sound is routed). Open question: product lamps share only the second microphone with the lamp's bus today, so the stream would end at once with "the lamp's microphone isn't shared here" until that is settled. |
+| **STATUS** | merged, off by default (10 Nov 2026), with the owner's consent; seen on a test lamp with both switches on, not on a customer build: the owner ticks `microphone` when pairing and switches the stream on (`lamp-control --microphone on`, and the ears sharing their sound, `LAMP_BUS_AUDIO=on`). Not on the customer build: there neither switch is on, the `microphone` grant exists but no sound is routed, and product lamps share only the second microphone with the lamp's bus today, so a stream would end at once with "the lamp's microphone isn't shared here" until the owner's switch is settled. On a test lamp (lamp-75c9) with both switches on (a lamp-built `lamp-control` of the patch merged as #5839, Python SDK from a paired laptop with the grants `light`, `camera` and `microphone`): the answer came in 3 ms; 47 to 52 blocks a second (50 expected), 2 lost in the first second and none after; the level followed the room (about −47 dBFS quiet, −42 dBFS while a line was said near the lamp); with the lamp's camera stopped for 6 s the stream ended at 21.9 s with `microphone.ended` "the room isn't seen" and a new stream was refused with the same words; a camera stream before it gave 11 frames each time and none after each `off`. Numbers only: no sound was kept. |
 
 ### The camera
 
@@ -812,7 +813,7 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 | Knowing when a motion ended (`wait=True`) | next build, lamp run pending | today it returns when the lamp takes it |
 | Reconnecting across the lamp's restarts | works today (9 Nov 2026) | `keep_connected`; on build 11048, Python and JS set up again 1.0–1.15 s after each restart |
 | `joints` for roll, shoulder, elbow | next build (in review; a test lamp, lamp-built, 9 Nov 2026) | refused "not routed yet" on the customer build; the lamp must be standing |
-| The microphone stream, with the owner's consent | in development (draft #5839) | built and tested off the lamp; its lamp check is pending |
+| The microphone stream, with the owner's consent | in development: merged, off by default (10 Nov 2026), seen on a test lamp with both switches on | #5839: on lamp-75c9 with `--microphone on` and `LAMP_BUS_AUDIO=on`, the answer came in 3 ms, 47 to 52 blocks a second (2 lost in the first second, none after), the level followed the room (about −47 dBFS quiet, −42 dBFS with a line said near the lamp), and the stream ended with "the room isn't seen" at 21.9 s when the lamp's camera was stopped. It counts as working only when the product turns it on, which is the owner's call ("The microphones") |
 | `look` and `joints` with `wait=True` return the body's own answer | works today (9 Nov 2026, 11048) | each of 5 looks and 2 joints on lamp-75c9 returned the body's `done`, `finished` with `yaw`, `pitch`, `clamped`; so a program sees when a conversation came first |
 | lamp-mcp's `lamp_say` waits until the line is said | works today (9 Nov 2026), on one connection | on build 11048, `said` came 6.0 s after asking for a 65-character line (without `wait`, `taken` in 15 ms). Across a reconnect, 11048 can still answer `said` wrongly; fixed in the next build (#5873) |
 | A brain hearing the person and owning the turn | planned | |
