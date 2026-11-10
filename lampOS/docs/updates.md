@@ -946,6 +946,16 @@ each under the quiet rule. A round
    every later build. `lamp-setup.service` keeps its own rules
    (`setup_lifecycle`): a completed setup restarted and skipped by its marker
    is still not well.
+   A part **held** (#6113): lamp-body after a failed unplug fold stays up
+   and still, ready to systemd, its `StatusText` `held, nothing moves: <why>`
+   (#5777, [unplug.md](unplug.md)), so systemd alone would call it well. The
+   round reads `StatusText` before the switch and at the watch's end
+   (`judge::UnitState::held`). Held before and after: not this build's doing,
+   and a put-back fixes nothing, so the build is **kept**, its own health not
+   asked, and the round ends `held` (`build N kept; held: …` in the journal).
+   Held only after the switch: not well, put back as any part is
+   (`… held, nothing moves: …, and was not before the switch`). A body that
+   says no status (a build before #5777) is judged as before.
 10. **Back.** A part not well: the journal's validated old startup order is
     used without rereading the installed dependency graph. Later changes or
     read failures in that graph cannot veto the saved restart order. Every
@@ -1281,6 +1291,7 @@ only a self-switch or a climb goes to the journal's form, before its `exec`.
 | `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, its updater put back before, or its updater not this channel's (each ends `…; waiting for a newer updater`); or the build carries none (`…; it carries no lamp-update, so waiting for a build that does`) |
 | `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, or `another lamp-update is at work` |
 | `switched to build N; every part is well` | `switched` | the parts switched and the watch passed |
+| `switched to build N and kept; held: <unit> held, nothing moves: <why>` | `held` | the parts switched and the watch passed, one unit held as it was before the switch (#6113, step 9): the build is kept, the hold needs a person (unplug.md); the cloud alert tells it as `done` |
 | `build N runs; lamp-update switches from its build A to B, which must confirm itself` | `self-switched` | a new updater, after the parts switched and their watch passed (or with none to change). That round writes this end instead of `switched to build N; every part is well`. It does so whenever the build carries a lamp-update other than the running one, as 8999 → 9063 did (lamp-9adf, 30 Oct): lamp-update's own code was unchanged, but it embeds the product's units, and `lamp-voice.service` changed. Builds are reproducible, so between builds whose lamp-update is the same (9101 to 9118) the end is `switched …`. A promote spans many builds, so it mostly ends this way: 9 of the 10 stable promotes since 8327 changed lamp-update, and 8545 kept 8525's |
 | `build N needs updater M; lamp-update switches from its build A to B, which the build carries, and takes nothing else of it until that one has confirmed itself` | `self-switched` | a **climb**: only the updater the build carries is taken |
 | `build N put back: …; the previous build is well`, or `…; the previous build is not well either: …` | `rolled-back` | the parts were put back (the watch, or a start that failed). The second ending, the old build failing its own check too, is the one to post at once; grep `build N put back:` for both |
@@ -1356,6 +1367,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
 | `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
+| `build N kept; held: <unit> held, nothing moves: …` | the watch passed with a unit held as before the switch (#6113, step 9): the round ends `held` |
 | **Putting a build back** | |
 | `putting build N back: …` | before a `put back` end, with why |
 | `the settings need no putting back: lamp-update-apply.service wrote nothing for build N` | the build's settings were never written, so none are put back |

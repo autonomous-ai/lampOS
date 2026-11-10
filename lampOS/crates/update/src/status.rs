@@ -82,6 +82,7 @@ pub fn ended(
 ) -> UpdateResult {
     let reason = match outcome {
         Outcome::Switched(_)
+        | Outcome::Held { .. }
         | Outcome::SelfSwitched { .. }
         | Outcome::Climbs { .. }
         | Outcome::UpToDate(_)
