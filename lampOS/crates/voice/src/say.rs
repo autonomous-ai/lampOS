@@ -1183,6 +1183,7 @@ impl Ticket {
             app,
             request: None,
             cut: false,
+            scope: None,
         })
     }
 
@@ -5409,6 +5410,7 @@ mod tests {
                 app: Some("desk-wave".into()),
                 request: None,
                 cut: false,
+                scope: None,
             })
         );
         // A computer that was not named: still a computer's.

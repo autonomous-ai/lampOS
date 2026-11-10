@@ -839,7 +839,13 @@ mod sleep_name {
             // Loosest limit first, strictest last (#912): the room (2 s),
             // the voice and the faces (500 ms), the joints (300 ms).
             self.room
-                .publish_json(987_654_321, &RoomState { state: Room::Quiet })
+                .publish_json(
+                    987_654_321,
+                    &RoomState {
+                        state: Room::Quiet,
+                        another_voice: None,
+                    },
+                )
                 .unwrap();
             self.voice
                 .publish_json(
