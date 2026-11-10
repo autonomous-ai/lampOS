@@ -105,12 +105,31 @@ const files = {
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
 };
+// What the lamp's camera sees now, for the page's "what the lamp sees" panel: the lamp's own newest
+// picture through the SDK (the `camera` grant), so the lamp's rules hold (never while private, the ring's
+// mark shown). One at a time, and the last one again if asked within 700 ms.
+let seeing = null;
+let seen = { at: 0, jpeg: null };
+function snapshot() {
+  if (Date.now() - seen.at < 700 && seen.jpeg) return Promise.resolve(seen.jpeg);
+  seeing ??= lamp.cameraSnapshot().then((jpeg) => { seen = { at: Date.now(), jpeg }; return jpeg; }).finally(() => { seeing = null; });
+  return seeing;
+}
+
 const server = createServer((request, response) => {
   if (!tokenOk(request.url, token)) {
     response.writeHead(403).end('the twin needs the URL it printed, with its token\n');
     return;
   }
-  const file = files[new URL(request.url, 'http://localhost').pathname];
+  const pathname = new URL(request.url, 'http://localhost').pathname;
+  if (pathname === '/camera.jpg') {
+    snapshot().then(
+      (jpeg) => response.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store' }).end(jpeg),
+      (why) => response.writeHead(503, { 'content-type': 'text/plain', 'x-reason': encodeURIComponent(String(why.message ?? why)) }).end(),
+    );
+    return;
+  }
+  const file = files[pathname];
   if (!file) {
     response.writeHead(404).end();
     return;
@@ -165,7 +184,7 @@ function parse(args) {
 // that eases each joint to where it was last sent, said 25 times a second
 // as lamp-control's `body.state` says it.
 async function fakeBody() {
-  const fakeLamp = await FakeLamp.start({ name: 'Fake lamp (twin)', grants: ['body', 'light', 'speak', 'look'] });
+  const fakeLamp = await FakeLamp.start({ name: 'Fake lamp (twin)', grants: ['body', 'light', 'speak', 'look', 'camera'] });
   // A keyring of its own, so the fake's pairing never sits beside a real lamp's.
   const folder = mkdtempSync(join(tmpdir(), 'lampos-twin-'));
   process.on('exit', () => rmSync(folder, { recursive: true, force: true }));
