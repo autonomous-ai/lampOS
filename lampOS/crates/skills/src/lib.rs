@@ -30,6 +30,7 @@ pub mod package;
 pub mod requested_audio;
 pub mod routine;
 pub mod service_read;
+pub mod service_write;
 pub mod unplug;
 pub mod usage;
 pub mod visits;
@@ -771,6 +772,9 @@ struct StepFile {
     /// A read of one of the owner's linked services, said to them alone
     /// ([`service_read`], #5288).
     read: Option<service_read::ReadFile>,
+    /// A fixed write to one of the owner's linked services, sent only as
+    /// the owner said yes to it ([`service_write`], #6066).
+    write: Option<service_write::WriteFile>,
 }
 
 /// `propose = { ... }`: what an add-on suggests, as its folder writes it.
@@ -1322,9 +1326,11 @@ pub struct Permissions {
     /// copy of the skill without the declaration gets nothing of it.
     #[serde(default)]
     pub core: Vec<String>,
-    /// The owner's linked services it may use, each with how: `"read"`,
-    /// the only value (#5288; writes are not ruled yet). A `read` step
-    /// reads only a service listed here ([`service_read`]).
+    /// The owner's linked services it may use, each with how: `"read"`
+    /// (#5288), or `"write"` with `LAMP_SKILL_WRITES=on` (#6066). A `read`
+    /// step reads only a service listed here as a read ([`service_read`]),
+    /// a `write` step writes only to one listed as a write
+    /// ([`service_write`]).
     #[serde(default)]
     pub services: BTreeMap<String, String>,
 }
@@ -1391,6 +1397,19 @@ impl Permissions {
             | Call::RequestedAudio(_) => ("speak", self.speak),
             Call::Look => ("camera", self.sees_picture()),
             Call::Text(_) => ("messages", self.messages),
+            // A write needs its service listed as a write, and the switch.
+            Call::ServiceWrite(write) => {
+                if self.services.get(&write.service).map(String::as_str) != Some("write") {
+                    return Some(format!(
+                        "write to {0} needs services = {{ {0} = \"write\" }} in [permissions], which it does not give",
+                        write.service
+                    ));
+                }
+                if !service_write::on() {
+                    return Some(service_write::OFF.into());
+                }
+                return None;
+            }
             // A read is said aloud: it needs its service listed as a read,
             // and the voice.
             Call::ServiceRead(read) => {
@@ -1550,17 +1569,34 @@ impl Permissions {
 
     /// Each list's entries well formed, once each.
     fn check(&self) -> Result<(), String> {
-        // A service a skill may read, and only read (#5288).
+        // A service a skill may read (#5288), or with the switch write to
+        // (#6066).
         for (service, how) in &self.services {
-            if let Some(why) = lamp_services::spoken::not_readable(service) {
-                return Err(format!(
-                    "[permissions] services: {why}, so a skill can't read it"
-                ));
-            }
-            if how != "read" {
-                return Err(format!(
-                    "[permissions] services: {service} = {how:?}: only \"read\"; a skill never writes to a service"
-                ));
+            match how.as_str() {
+                "read" => {
+                    if let Some(why) = lamp_services::spoken::not_readable(service) {
+                        return Err(format!(
+                            "[permissions] services: {why}, so a skill can't read it"
+                        ));
+                    }
+                }
+                "write" if !service_write::on() => {
+                    return Err(format!(
+                        "[permissions] services: {service} = \"write\": a skill's writes are off on this lamp ({} is not on)",
+                        service_write::ENVIRONMENT
+                    ));
+                }
+                "write" if !lamp_services::skill_writes::writable(service) => {
+                    return Err(format!(
+                        "[permissions] services: {service} = \"write\": a skill can't write to {service}"
+                    ));
+                }
+                "write" => {}
+                _ => {
+                    return Err(format!(
+                        "[permissions] services: {service} = {how:?}: only \"read\" or \"write\""
+                    ));
+                }
             }
         }
         for (what, list, ok) in [
@@ -2558,6 +2594,10 @@ pub enum Call {
     /// A read of one of the owner's linked services, said to them alone
     /// behind its gate ([`service_read`], #5288). Its skill's only step.
     ServiceRead(Box<service_read::ReadStep>),
+    /// A fixed write to one of the owner's linked services, sent as the
+    /// owner said yes to it ([`service_write`], #6066). Its skill's only
+    /// step.
+    ServiceWrite(Box<service_write::WriteStep>),
 }
 
 /// A say written as a table: `{ text = "..." }` or `{ note = "..." }`, with
@@ -2795,6 +2835,7 @@ impl Call {
             }
             Self::Ends => ("ends", json!({})),
             Self::ServiceRead(read) => ("read", read.named()),
+            Self::ServiceWrite(write) => ("write", write.named()),
         }
     }
 }
@@ -3977,9 +4018,14 @@ fn manifest(
     // A read of a linked service (#5288) is its skill's whole run: its one
     // step, alone in it, started by a trigger and never by the model, and
     // said by this program behind its gate ([`service_read`]).
-    if file.steps.iter().any(|step| step.read.is_some()) {
+    let writes = file.steps.iter().any(|step| step.write.is_some());
+    if writes && !service_write::on() {
+        return Err(service_write::OFF.into());
+    }
+    if writes || file.steps.iter().any(|step| step.read.is_some()) {
         let alone = |step: &StepFile| {
-            step.body.is_none()
+            (step.read.is_none() || step.write.is_none())
+                && step.body.is_none()
                 && step.light.is_none()
                 && step.say.is_none()
                 && step.sound.is_none()
@@ -3999,15 +4045,20 @@ fn manifest(
             || triggers.is_empty()
             || triggers.iter().any(|trigger| trigger.each.is_some())
         {
-            return Err(
-                "read is its skill's only step, alone in it, in a skill a trigger starts (no each) and with no tool"
-                    .into(),
-            );
+            return Err(format!(
+                "{} is its skill's only step, alone in it, in a skill a trigger starts (no each) and with no tool",
+                if writes { "write" } else { "read" }
+            ));
         }
     }
     for step in file.steps {
         if let Some(read) = step.read {
             steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
+            ons.resize(steps.len(), None);
+            continue;
+        }
+        if let Some(write) = step.write {
+            steps.push(Step::Call(Call::ServiceWrite(Box::new(write.step()?))));
             ons.resize(steps.len(), None);
             continue;
         }
@@ -9783,5 +9834,110 @@ mod tests {
         let why = package::install(&other, None, &folder).unwrap_err();
         assert!(why.contains(service_read::QUERY_NOT_AN_ORDER), "{why}");
         assert!(!other.join(name).exists());
+    }
+
+    /// A skill folder `name` in `dir` with `toml` as its skill.toml.
+    fn write_skill(dir: &std::path::Path, name: &str, toml: &str) -> std::path::PathBuf {
+        let folder = dir.join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Mails my boss when I arrive.\n---\n"),
+        )
+        .unwrap();
+        std::fs::write(folder.join("skill.toml"), toml).unwrap();
+        folder
+    }
+
+    const ARRIVAL_WRITE: &str = "version = \"1.0.0\"\n[trigger]\ntopic = \"room/presence\"\n\
+        field = \"present\"\nequals = true\n[ask]\npolicy = \"nudge\"\n[permissions]\n\
+        topics = [\"room/presence\"]\nservices = { gmail = \"write\" }\n[[do]]\n\
+        write = { service = \"gmail\", action = \"send_mail\", to = [\"boss@work.test\"], \
+        subject = \"In\", text = \"I'm at my desk.\" }\n";
+
+    /// #6066: a write step loads only with `LAMP_SKILL_WRITES` on and its
+    /// service listed as a write, every field fixed and checked as it loads,
+    /// alone in its skill; its content is what lamp-services hashes.
+    #[test]
+    fn a_write_step_loads_only_with_its_switch_and_permission() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = write_skill(dir.path(), "arrive-mail", ARRIVAL_WRITE);
+        service_write::set_on_here(Some(false));
+        let off = load(&folder).unwrap_err();
+        assert!(off.contains("LAMP_SKILL_WRITES"), "{off}");
+        service_write::set_on_here(Some(true));
+        let skill = load(&folder).unwrap();
+        let [(_, Step::Call(Call::ServiceWrite(write)))] = skill.steps.as_slice() else {
+            panic!("{:?}", skill.steps);
+        };
+        assert_eq!(
+            write.content(),
+            &json!({"service":"gmail","action":"send_mail","to":["boss@work.test"],"subject":"In","text":"I'm at my desk."})
+        );
+        assert_eq!(
+            skill
+                .permissions
+                .refuses(&Call::ServiceWrite(write.clone())),
+            None
+        );
+        let refused = |name: &str, toml: String, why: &str| {
+            let folder = write_skill(dir.path(), name, &toml);
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        };
+        // Its permission a read, or none.
+        refused(
+            "as-read",
+            ARRIVAL_WRITE.replace("gmail = \"write\"", "gmail = \"read\""),
+            "needs services = { gmail = \"write\" }",
+        );
+        refused(
+            "no-permission",
+            ARRIVAL_WRITE.replace("services = { gmail = \"write\" }\n", ""),
+            "needs services = { gmail = \"write\" }",
+        );
+        // A service no skill writes to.
+        refused(
+            "drive-write",
+            ARRIVAL_WRITE.replace(
+                "gmail = \"write\"",
+                "gmail = \"write\", google_drive = \"write\"",
+            ),
+            "a skill can't write to google_drive",
+        );
+        // A field filled at run time, a field it doesn't take, a bad one.
+        refused(
+            "filled",
+            ARRIVAL_WRITE.replace("text = \"I'm at my desk.\"", "text = { from = \"voice\" }"),
+            "skill.toml",
+        );
+        refused(
+            "send-id",
+            ARRIVAL_WRITE.replace(" }\n", ", send_id = \"x\" }\n"),
+            "unknown field",
+        );
+        refused(
+            "bad-address",
+            ARRIVAL_WRITE.replace("boss@work.test", "my boss"),
+            "not an email address",
+        );
+        // Not alone: with another step, or started by a tool.
+        refused(
+            "with-light",
+            format!("{ARRIVAL_WRITE}[[do]]\nlight = \"warm\"\n"),
+            "write is its skill's only step",
+        );
+        service_write::set_on_here(Some(false));
+        // Its permission listed with the switch off.
+        assert!(
+            Permissions {
+                services: [("gmail".to_owned(), "write".to_owned())].into(),
+                ..Permissions::default()
+            }
+            .check()
+            .unwrap_err()
+            .contains("LAMP_SKILL_WRITES")
+        );
+        service_write::set_on_here(None);
     }
 }

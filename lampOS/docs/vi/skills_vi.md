@@ -172,6 +172,29 @@ sau:
    có người đến thì dừng với "I'll tell you the rest later." Journal chỉ giữ
    số đếm và kết quả của cổng ([services_vi.md](services_vi.md), "Một kỹ năng
    tự tạo đọc dịch vụ").
+
+   Bước `write = { service, action, ... }` (`lamp-skills`, `service_write`;
+   #6066, `LAMP_SKILL_WRITES=on` trong `lamp-skills`, helper quản lý của nó
+   và `lamp-services`, tắt trong mọi unit sản phẩm): một thư (`send_mail`
+   của `gmail` hay `gmail-app`: `to`, `cc`, `subject`, `text`), một sự kiện
+   lịch (`create_event` của `google_calendar`), một issue hay bình luận
+   GitHub, một issue Linear, một task Asana hay một bình luận Figma
+   (`lamp_services::skill_writes::KINDS`); không bao giờ là bài đăng công
+   khai, bản nháp hay lệnh gọi tool MCP. Mọi trường cố định trong tệp và
+   được kiểm tra khi nạp, không gì được điền lúc chạy. Là bước duy nhất,
+   đứng một mình, trong kỹ năng do trigger khởi động, không có tool hay
+   `each`, với `[permissions] services = { <service> = "write" }`; khi công
+   tắc tắt, kỹ năng không được nạp. `lamp-skills` gửi đúng nội dung của bước
+   cùng tên kỹ năng trên socket tools của `lamp-services` (`skill_write`),
+   nơi chỉ gửi nếu chủ đèn đã đồng ý đúng nội dung đó cho kỹ năng đó dưới
+   cùng liên kết (do đường đồng ý của giọng nói hay ứng dụng, không bao giờ
+   do cài đặt: "not sent: waiting for the owner's yes"), không đã đăng xuất,
+   tối đa 3 lần mỗi kỹ năng và
+   10 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào. Liên kết mất hoặc thuộc
+   tài khoản khác thì dừng các lần ghi của kỹ năng cho đến khi `lamp-skills`
+   khởi động lại. Journal chỉ giữ kết quả, không bao giờ có người nhận hay
+   nội dung ([services_vi.md](services_vi.md), "Một kỹ năng tự tạo ghi vào
+   dịch vụ").
 5. **Kiểm tra.** Thẻ được đánh dấu `made: here` (nhóm "Tạo trên đèn này"
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi

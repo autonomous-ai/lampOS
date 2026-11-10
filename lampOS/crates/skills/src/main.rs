@@ -2497,6 +2497,23 @@ fn start(
         });
         return made_rx;
     }
+    // A write to a linked service (#6066) is its skill's whole run: on a
+    // thread of its own, as long as `lamp-services` takes to answer.
+    if let [Call::ServiceWrite(write)] = calls.as_slice() {
+        let write = (**write).clone();
+        let (sockets, finished) = (runner.sockets_for(&skill), runner.finished.clone());
+        let _ = made.send(());
+        std::thread::spawn(move || {
+            let why = write_service(&skill, &write, &sockets);
+            let _ = finished.send(SkillEvent {
+                skill,
+                stage: SkillStage::Done,
+                why,
+                allowed: None,
+            });
+        });
+        return made_rx;
+    }
     // An add-on's run proposes, and nothing else: written for the judge at
     // once, on this thread, as it holds no output to wait on.
     if !calls.is_empty() && calls.iter().all(|call| matches!(call, Call::Propose(_))) {
@@ -4615,6 +4632,58 @@ fn read_service(
     service_read::run(read, &mut room)
 }
 
+/// A skill's write to a linked service that came due (#6066,
+/// [`lamp_skills::service_write`]): held to its permissions and its switch,
+/// then sent as its exact content on `lamp-services`' tools socket, which
+/// sends it only as the owner said yes to it. The journal's words: the
+/// outcome only, never a recipient or a text. A refusal that says its link
+/// is gone or another's stops the skill's writes until this program starts
+/// again.
+fn write_service(
+    skill: &str,
+    write: &lamp_skills::service_write::WriteStep,
+    sockets: &Sockets,
+) -> String {
+    use lamp_skills::service_write;
+    if !service_write::on() {
+        return format!("not made: {} is not on", service_write::ENVIRONMENT);
+    }
+    if service_write::stopped(skill) {
+        return "not made: its writes are stopped: its link changed or is gone".into();
+    }
+    if let Some(why) = sockets
+        .may
+        .refuses(&Call::ServiceWrite(Box::new(write.clone())))
+    {
+        return why;
+    }
+    let services = std::env::var_os(SERVICES_SOCKET_ENVIRONMENT)
+        .map_or_else(|| PathBuf::from(SERVICES_SOCKET), PathBuf::from);
+    let asked = || -> io::Result<serde_json::Value> {
+        let mut stream = UnixStream::connect(&services)?;
+        stream.set_read_timeout(Some(SERVICES_TIMEOUT))?;
+        stream.set_write_timeout(Some(ACTIONS_TIMEOUT))?;
+        writeln!(stream, "{}", write.line(skill))?;
+        let mut line = String::new();
+        BufReader::new(stream.take(16 * 1_024)).read_line(&mut line)?;
+        serde_json::from_str(&line)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    };
+    let answer = match asked() {
+        Err(error) => Err(format!(
+            "not sent: the lamp's services were not reached ({})",
+            error.kind()
+        )),
+        Ok(answer) if answer["ok"] == true => Ok(answer["result"].clone()),
+        Ok(answer) => Err(answer["error"].as_str().unwrap_or("refused").to_owned()),
+    };
+    let (said, stops) = service_write::outcome(answer, &write.service);
+    if stops {
+        service_write::stop(skill);
+    }
+    said
+}
+
 /// The lamp as a skill's read sees it ([`lamp_skills::service_read::Room`]).
 struct LampRoom {
     skill: String,
@@ -4923,6 +4992,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Propose(_) => "propose: written by the run on addon/proposal".into(),
         Call::Ends => "its trigger ended".into(),
         Call::ServiceRead(_) => "read: made by its own run, behind its gate".into(),
+        Call::ServiceWrite(_) => "write: made by its own run, as the owner said yes".into(),
     }
 }
 
