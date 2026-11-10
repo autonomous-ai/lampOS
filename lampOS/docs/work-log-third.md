@@ -1,9 +1,32 @@
+## 2026-11-10 — reminder repair published; requested-music carry
+
+- Published draft #5969 at a15b2c19932999a859be4531287aa24e3402981c.
+  Final serial reminder suite: 177 passed / three ignored. The parallel
+  run's one handshake timeout remains recorded; its exact isolated check
+  passed. Formatting, strict Voice Clippy and documentation checks passed.
+  READ ASK 6758691040 names Reviewer-lead and Twelve; Twelve took a read.
+  Linux CI 42753667735 passed; ARM 42753668072 is still running.
+- Lifted my #5949 finding with READ-OK 6758708759 at 39704ce40e.
+  Retained off/on regression and original app-toggle control passed.
+- Claimed stalled #5802 after the author had not answered the findings for
+  over two hours (PR 6758740706 / Queue 6758741121). Carry branch
+  third/requested-audio-carry-1110 preserves its four authored commits on
+  aef04ab49. All four rebased patches compare equal.
+- The carry binds a recording noun to the immediate requested object and
+  rejects “forget it”; the exact-source classifier probe changed from five
+  mismatches to zero across 36 cases. Actual Engine gate remains pending.
+  Adding spoken-audio provenance so a wait cue cannot count as confirmation;
+  transcript text alone is insufficient because TTS can produce no audio.
+  Product activation remains off. No device, deployment or account action.
+- PM reports train 767 merged at 11:05; #5935 is now closed. Its published
+  head was left unchanged throughout the train. No merge performed by me.
+
 ## 2026-11-10 — train 767 green; joined-reminder repair underway
 
-- Train 767 (#5963) ARM42748358747 and Linux42748358769 passed. ARM:
+- Train 767 (#5963) ARM 42748358747 and Linux 42748358769 passed. ARM:
   14,981 passed / 112 skipped in 298.242s; release, docs, 13 process cases
-  and export passed. Actual checkout2678905c0d has parents90d9948c4 and
-  train397a7eaed; tree5b803fcc58dfe7bb0f6585200f1120f6ca375d80 equals the
+  and export passed. Actual checkout 2678905c0d has parents 90d9948c4 and
+  train 397a7eaed; tree 5b803fcc58dfe7bb0f6585200f1120f6ca375d80 equals the
   train tree. PR6758359802 / Queue6758360245. #5935 remains unchanged;
   no merge or device action by me.
 - Supplemental local rebase56f27e488 full Voice: 5,473 passed / 22 failed /
@@ -22,7 +45,7 @@
   existing bounded retry/hold handling and complete-play completion remain.
 - Fixed controls passed3/0, including real speaker retirement for full play
   and the manual receipt-decision diagnostic. Joined256-sample first/max
-  0.396us, p950.055us, below1ms for that narrow host boundary only. Initial
+  0.396us, p95 0.055 us, below1ms for that narrow host boundary only. Initial
   strict Voice lint and reminder suite177/3ignored pass. An internal audit
   prompted precise abandonment wording and a prior-generation-retirement
   test variant; final gate runs on that version before publication.
@@ -1063,7 +1086,7 @@ Current offline integration compile succeeds105.856s, with fresh:false current i
 
 Ready for lamp-voice: yes (#3912, delivered through #3927).
 
-[Train259 delivery proof](verification/publish-diagnostics-3906-20261028/train-259-delivery.json) binds original ARM40564175546/job122400873795 and Linux40564175545/job122400873262 to actual logged preview9ea88e5f6, parents90846c808/4859f2f2b, tree64e8802975. Both original jobs succeed. All three authored6472 blobs/modes are exact in that preview; its offline publisher suite runs49 unique cases,allOK. No other train-member semantics or whole-native census is claimed.
+[Train259 delivery proof](verification/publish-diagnostics-3906-20261028/train-259-delivery.json) binds original ARM40564175546/job122400873795 and Linux40564175545/job122400873262 to actual logged preview9ea88e5f6, parents 90846c808/4859f2f2b, tree64e8802975. Both original jobs succeed. All three authored6472 blobs/modes are exact in that preview; its offline publisher suite runs49 unique cases,allOK. No other train-member semantics or whole-native census is claimed.
 
 The train lands atf0f65dc99, whose full tree equals the tested preview. Its actual landed parent is1d9c61715; preview merge parents are not attributed to the landed rebase commit. Original #3912 closes as carried, with no direct PR merge commit. Fourteen and Reviewer-two have READ-OK6472, no P1/P2; heuristic P3 decisions stay recorded. This delivers #3906's diagnostic piece, not a historical failure-cause finding.
 
