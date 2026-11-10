@@ -378,7 +378,7 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
 
 - `welcome`: `nonce`, `lamp` (`id`, `name`, `v`). The lamp's first frame on every
   connection; the SDKs read it for you. No grant. Works today (9 Nov 2026).
-- `person.arrived`, `person.left`: `count`, `near` (0–1). Grant `look`. In today's build, lamp
+- `person.arrived`, `person.left`: `count`, `near` (0–1). Grant `look`. `person.left` comes after 5 s with no face, and only then can the next face be a `person.arrived`: someone who steps out and back in under 5 s is neither (the lamp's `LEFT_AFTER_US`, 5 s; its `ABSENT_FOR_US`, 3 s, only counts for a lamp that has not yet seen a face). On the virtual lamp, write people 0, wait more than 5 s, then people 1. In today's build, lamp
   run pending.
 - `person.stood_up`: `side` (`left`, `right`, `ahead`). Grant `look`. In today's build, lamp run
   pending.
