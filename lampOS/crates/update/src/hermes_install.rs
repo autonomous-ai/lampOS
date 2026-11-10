@@ -1,7 +1,8 @@
 //! Hermes put on the lamp after Harness (#5978; docs/install.md, "Hermes on
-//! the lamp"): on by default on a product lamp ([`PRODUCT_DEFAULT`], as
-//! Harness's), off on any other lamp unless `LAMP_HERMES_ON_LAMP=on` in
-//! lamp-update's own unit; `off` there turns it off on a product lamp too.
+//! the lamp"): off on every lamp unless `LAMP_HERMES_ON_LAMP=on` in
+//! lamp-update's own unit ([`PRODUCT_DEFAULT`] is off: the product turns
+//! it on only once its lamp-c0a4 numbers are judged, the first builder,
+//! 10 Nov); `off` there keeps it off.
 //! It rides on Harness before the sign-in ([`crate::harness_install`]):
 //! with that off, Hermes is off as well.
 //!
@@ -15,7 +16,9 @@
 //! Hermes runs shell commands, and as plain `lampos` they could read
 //! lamp-cloud's relay key (its systemd credential, and lamp-cloud's state
 //! folder). So [`WRAPPER`] never starts Hermes but through
-//! `unshare --map-root-user --mount` and [`NS`], which lays an empty
+//! `unshare --map-root-user --mount --pid --kill-child --mount-proc` (its
+//! own PID namespace and `/proc`, so no lamp process, lamp-cloud's
+//! `/proc/<pid>/root` among them, is visible) and [`NS`], which lays an empty
 //! read-only tmpfs over each of [`HIDDEN`] and then drops back to the
 //! caller's own ids in a nested user namespace, where those mounts are
 //! locked. Hermes is given only lamp-cloud's local forwarder token
@@ -74,9 +77,11 @@ use std::{
 /// The switch, in lamp-update's own unit: `on` exactly.
 pub const SWITCH: &str = "LAMP_HERMES_ON_LAMP";
 /// Whether a lamp installed as the product installs Hermes with [`SWITCH`]
-/// unset: on, the owner's call for #5978, right after Harness. Any other
-/// lamp with it unset is off.
-pub const PRODUCT_DEFAULT: bool = true;
+/// unset: off, until the lamp's Hermes numbers on lamp-c0a4 (RAM at rest
+/// and while running a task, CPU, the voice's first answer, free disk on
+/// 16 GB) are judged (the first builder, 10 Nov). Any other lamp with it
+/// unset is off too.
+pub const PRODUCT_DEFAULT: bool = false;
 
 /// Where the install is, in lamp-update's records (0600), next to
 /// Harness's [`harness_install::RECORD`]. lamp-update's own: not said on
@@ -133,15 +138,29 @@ pub const HIDDEN: [&str; 2] = ["/run/credentials", "/var/lib/lampos-cloud"];
 /// Free space `/var/lib` must hold before an install: Hermes v0.22.2 took
 /// 3.0 GB there on lamp-c0a4, with room to spare.
 pub const NEEDS_FREE_KB: u64 = 4 * 1024 * 1024;
+/// Memory the kernel says is available ([`MEMINFO`]'s `MemAvailable`)
+/// before an install: 1 GiB. From lamp-c0a4 on 10 Nov, which had about
+/// 2.1 GB available at rest with the voice running; the install's own peak
+/// is still to be measured. pip's `python-deps` stage is the heavy one, and
+/// a lamp under the floor would push the voice into swap or the OOM killer.
+pub const NEEDS_AVAILABLE_KB: u64 = 1024 * 1024;
+/// Where the available memory is read, under the lamp's root.
+pub const MEMINFO: &str = "/proc/meminfo";
 /// The `PATH` the installer and Hermes's setup run with.
 pub const INSTALL_PATH: &str = "/usr/bin:/bin";
 
 /// [`WRAPPER`]: reads the token, fails closed without it, and runs [`NS`]
-/// in a new user and mount namespace. Nothing else of the caller's changes.
+/// in a new user, mount and PID namespace with its own `/proc`
+/// (`--kill-child` forks, and killing the wrapper kills Hermes). Hermes
+/// shares `lampos`'s uid with lamp-cloud, so with the lamp's `/proc` it
+/// could open lamp-cloud's `/proc/<pid>/root` (its own mount view, the
+/// credentials there), `environ` and `fd`; in its own PID namespace no
+/// lamp process is there. Nothing else of the caller's changes.
 pub const WRAPPER_TEXT: &str = r#"#!/bin/sh
 # lampOS: Hermes on the lamp (#5978; lampOS/docs/install.md, "Hermes on the lamp"). Written by lamp-update.
-# Hermes runs as its caller (lampos, Harness's user), in a user and mount namespace where lamp-cloud's credentials
-# and state are hidden; it is given only lamp-cloud's local forwarder token. It is never run any other way.
+# Hermes runs as its caller (lampos, Harness's user), in a user, mount and PID namespace with its own /proc, where
+# lamp-cloud's credentials and state are hidden and no lamp process is visible; it is given only lamp-cloud's local
+# forwarder token. It is never run any other way.
 T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   echo "hermes: no forwarder token at /var/lib/lampos-cloud/hermes-token; lamp-cloud makes it with LAMP_HERMES_ON_LAMP=on" >&2
   exit 1
@@ -149,7 +168,7 @@ T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
 export LAMP_HERMES_TOKEN="$T" HERMES_HOME=/var/lib/lampos-hermes/.hermes LAMP_NS_UID LAMP_NS_GID
 unset T
-exec /usr/bin/unshare --map-root-user --mount --propagation private /usr/local/lib/lampos/hermes-ns "$@"
+exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/hermes-ns "$@"
 "#;
 
 /// [`NS`]: only inside a user namespace (refused in the lamp's own, where
@@ -262,7 +281,8 @@ impl HermesInstall {
     pub const INSTALL: [&str; 4] = ["absent", "installing", "installed", "failed"];
     /// Why the last try failed: the installer's bytes not the pinned ones,
     /// no `lampos` user, under [`NEEDS_FREE_KB`] free in `/var/lib`
-    /// (nothing changed then), no `git`, `curl`, `bash` or `unshare` on the
+    /// (nothing changed then), under [`NEEDS_AVAILABLE_KB`] of memory
+    /// available or it not read (nothing changed either), no `git`, `curl`, `bash` or `unshare` on the
     /// lamp (nothing is added to the system for them), no user namespace
     /// for `lampos` (nothing installed), one of lamp-update's own steps
     /// (the installer's file, moving an old Hermes aside, making
@@ -270,10 +290,11 @@ impl HermesInstall {
     /// or a `hermes` that does not run, the checkout not at [`COMMIT`],
     /// Hermes's config not set, the wrapper or its namespace script not
     /// written, the one-shot not started.
-    pub const ERRORS: [&str; 12] = [
+    pub const ERRORS: [&str; 13] = [
         "pin_mismatch",
         "no_user",
         "no_space",
+        "no_memory",
         "no_tools",
         "no_userns",
         "serve",
@@ -700,6 +721,18 @@ fn steps(
         && head(root).as_deref() == Some(kit.commit)
         && owner(root, PLACE).as_deref() == Some(uid.as_str());
     if !pinned_there {
+        match available_kb(root) {
+            Some(available) if available >= NEEDS_AVAILABLE_KB => {}
+            available => {
+                let why = match available {
+                    Some(available) => format!(
+                        "{available} KiB of memory available, under the {NEEDS_AVAILABLE_KB} KiB it needs"
+                    ),
+                    None => format!("MemAvailable not read from {MEMINFO}"),
+                };
+                return fail("no_memory", why, say);
+            }
+        }
         match free_kb(run) {
             Some(free) if free >= NEEDS_FREE_KB => {}
             free => {
@@ -899,6 +932,18 @@ fn remove_aside(root: &Path, say: &mut dyn FnMut(&str)) {
 fn free_kb(run: &mut Runner) -> Option<u64> {
     let text = run(&["df", "-Pk", "/var/lib"].map(str::to_owned)).ok()?;
     text.lines().nth(1)?.split_whitespace().nth(3)?.parse().ok()
+}
+
+/// The KiB of memory available, from [`MEMINFO`]'s `MemAvailable` line;
+/// none when the file or the line is not read.
+fn available_kb(root: &Path) -> Option<u64> {
+    let text = fs::read_to_string(on(root, MEMINFO)).ok()?;
+    let line = text
+        .lines()
+        .find_map(|line| line.strip_prefix("MemAvailable:"))?;
+    let mut words = line.split_whitespace();
+    let kb = words.next()?.parse().ok()?;
+    (words.next() == Some("kB") && words.next().is_none()).then_some(kb)
 }
 
 /// What the install needs on the lamp, each looked for as `lampos` with
