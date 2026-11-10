@@ -13,6 +13,11 @@ enum Lamp {
     Says(&'static str),
     Calls(&'static str, &'static str),
     CallsWithStale(&'static str, &'static str),
+    /// A `remember` of this text, then a line.
+    Keeps(&'static str, &'static str),
+    /// A `remember` of this text with a line in the same round, then the
+    /// line again.
+    KeepsAsking(&'static str, &'static str),
 }
 
 impl Lamp {
@@ -21,6 +26,7 @@ impl Lamp {
         match self {
             Lamp::Says(_) => "",
             Lamp::Calls(name, _) | Lamp::CallsWithStale(name, _) => name,
+            Lamp::Keeps(..) | Lamp::KeepsAsking(..) => crate::remember::REMEMBER,
         }
     }
 }
@@ -48,6 +54,9 @@ struct Ran {
     marked: Vec<(String, bool)>,
     /// Every call run, by name and arguments, in order.
     calls: Vec<(String, Value)>,
+    /// For each `remember` run, the words its scope was marked as a yes to
+    /// a held keep about ([`crate::memory_scope::ScopeLease::released_keep`]).
+    released: Vec<Option<String>>,
 }
 
 async fn run(turns: &[Turn]) -> Ran {
@@ -120,6 +129,20 @@ async fn run_full(
     for (who, _, lamp, _) in turns {
         match lamp {
             Lamp::Says(line) => chats.push_back(vec![text(line), Ok(ChatEvent::Done)]),
+            Lamp::Keeps(kept, line) => {
+                let calls = vec![call("c1", crate::remember::REMEMBER, json!({"text": kept}))];
+                chats.push_back(vec![Ok(ChatEvent::ToolCalls(calls)), Ok(ChatEvent::Done)]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+            }
+            Lamp::KeepsAsking(kept, line) => {
+                let calls = vec![call("c1", crate::remember::REMEMBER, json!({"text": kept}))];
+                chats.push_back(vec![
+                    text(line),
+                    Ok(ChatEvent::ToolCalls(calls)),
+                    Ok(ChatEvent::Done),
+                ]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+            }
             Lamp::Calls(name, line) | Lamp::CallsWithStale(name, line) => {
                 let mut calls = vec![call("c1", name, json!({"name": who}))];
                 if matches!(lamp, Lamp::CallsWithStale(_, _)) {
@@ -151,7 +174,15 @@ async fn run_full(
     let lines_seen = lines.clone();
     let marked = Arc::new(Mutex::new(Vec::new()));
     let marks = marked.clone();
+    let released = Arc::new(Mutex::new(Vec::new()));
+    let releases = released.clone();
     let runner: ScopedToolRunner = Arc::new(move |request, heard, name, args, scope| {
+        if name == crate::remember::REMEMBER {
+            releases
+                .lock()
+                .unwrap()
+                .push(scope.released_keep().map(str::to_owned));
+        }
         if crate::remember::is_forget(&name) {
             marks
                 .lock()
@@ -296,12 +327,14 @@ async fn run_full(
     let asked = script.asked.lock().unwrap().clone();
     let lines = lines.lock().unwrap().clone();
     let marked = marked.lock().unwrap().clone();
+    let released = released.lock().unwrap().clone();
     Ran {
         forgets,
         asked,
         lines,
         marked,
         calls,
+        released,
     }
 }
 
@@ -1656,6 +1689,133 @@ async fn a_keep_the_next_round_doubts_is_taken_back_until_their_yes() {
         .await;
         assert_eq!(ran.calls, *calls, "{case}");
     }
+}
+
+/// C37, the memory owner's call A (11 Nov). On lamp-06c1 on 10 Nov, twice,
+/// "ranunculus" was heard as "renunctinus", kept in round 1, and round 2
+/// asked "Kept as you said it … is that ranunculus?". That keep is taken
+/// back at once, nothing of the misheard word stays kept, and their yes
+/// keeps the word asked. A no keeps nothing; a reply asking nothing, or a
+/// keep someone else made, is never taken back.
+#[tokio::test]
+async fn a_keep_its_next_round_offers_another_word_for_waits_for_their_yes_to_that_word() {
+    const REMEMBER: &str = crate::remember::REMEMBER;
+    const FORGET: &str = crate::remember::FORGET;
+    const MISHEARD: &str = "Their favorite flower is a renunctinus.";
+    const SAID: &str = "Remember that my favorite flower is a renunctinus.";
+    let asks = Lamp::Keeps(MISHEARD, "Kept as you said it \u{2026} is that ranunculus?");
+    let a: Sight = (&["A"], true);
+    let b: Sight = (&["B"], true);
+    let keep = |text: &str| (REMEMBER.to_owned(), json!({ "text": text }));
+    let undo = (FORGET.to_owned(), json!({"source_id": 391}));
+    let kept_misheard = vec![keep(MISHEARD)];
+    let undone = vec![keep(MISHEARD), undo.clone()];
+    let kept_asked = vec![
+        keep(MISHEARD),
+        undo,
+        keep("Their favorite flower is a ranunculus."),
+    ];
+    /// The turns, their eyes, the calls run, and the case.
+    type Case<'a> = (&'a [Turn], &'a [Sight], &'a [(String, Value)], &'a str);
+    let cases: &[Case] = &[
+        (
+            &[("A", SAID, asks, 0)],
+            &[a],
+            &undone,
+            "the 06c1 sequence: renunctinus is not left kept",
+        ),
+        (
+            &[("A", SAID, asks, 0), ("A", "Yes.", Lamp::Says("Kept."), 5)],
+            &[a, a],
+            &kept_asked,
+            "their yes keeps ranunculus",
+        ),
+        (
+            &[
+                ("A", SAID, asks, 0),
+                ("A", "No.", Lamp::Says("Okay, how is it said?"), 5),
+            ],
+            &[a, a],
+            &undone,
+            "their no keeps nothing",
+        ),
+        (
+            &[
+                (
+                    "A",
+                    SAID,
+                    Lamp::Keeps(MISHEARD, "Kept: your favorite flower is a renunctinus."),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[a, a],
+            &kept_misheard,
+            "no confirm question: nothing undone",
+        ),
+        (
+            &[
+                ("B", SAID, Lamp::Keeps(MISHEARD, "Kept."), 0),
+                (
+                    "A",
+                    "What's my favorite flower?",
+                    Lamp::Says("Is that ranunculus?"),
+                    5,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[b, a, a],
+            &kept_misheard,
+            "another person's keep is never undone",
+        ),
+    ];
+    for (at, (turns, sight, calls, case)) in cases.iter().enumerate() {
+        let ran = run_full(
+            turns,
+            Some(sight),
+            9501 + 10 * at as u64,
+            (false, true),
+            json!({"ok": true}),
+        )
+        .await;
+        assert_eq!(ran.calls, *calls, "{case}");
+        // Their yes is a yes to the lamp's question about those words, so
+        // the memory's route keeps them for a line that is only "Yes."
+        // (`remember::heard::yes_alone`, `LAMP_MEMORY_KEEP_HEARD`).
+        if *calls == kept_asked {
+            assert_eq!(
+                ran.released,
+                [
+                    None,
+                    Some("Their favorite flower is a ranunculus.".to_owned())
+                ],
+                "{case}"
+            );
+        }
+    }
+}
+
+/// The same question beside the keep, in its own round: the keep is not
+/// run (#3504 finding N5), so nothing misheard is kept.
+#[tokio::test]
+async fn a_keep_beside_a_question_offering_another_word_is_not_run() {
+    let ran = run_full(
+        &[(
+            "A",
+            "Remember that my favorite flower is a renunctinus.",
+            Lamp::KeepsAsking(
+                "Their favorite flower is a renunctinus.",
+                "Is that ranunculus?",
+            ),
+            0,
+        )],
+        Some(&[(&["A"], true)]),
+        9601,
+        (false, true),
+        json!({"ok": true}),
+    )
+    .await;
+    assert_eq!(ran.calls, []);
 }
 
 /// Without the eyes' sight no yes could keep it again, so nothing is taken

@@ -1852,7 +1852,13 @@ fn run_call_with_scope(
                         // nothing saw the mouth say it (the memory owner,
                         // 16:49 on #5385). Read after the late look, which
                         // may take the line by the rule as it ends.
-                        if model.name == crate::remember::FORGET && lease.forgets_need_mouth() {
+                        // The one exception: the second route taking back
+                        // this request's own new keep on its own doubt
+                        // (`LAMP_MEMORY_DOUBT_UNDOES`, C37).
+                        if model.name == crate::remember::FORGET
+                            && lease.forgets_need_mouth()
+                            && !lease.undoes_own_keep(&call.args)
+                        {
                             eprintln!(
                                 "lamp-voice: request {request}: a forget on a line whose keep is the one known face's is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
                             );

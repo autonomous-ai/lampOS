@@ -465,6 +465,10 @@ struct RequestContext {
     /// This request's own ask for everything was shown for its
     /// `forget_everything` ([`ScopeLease::mark_everything_asked`]).
     everything: AtomicBool,
+    /// The id of this request's own new keep that the second route takes
+    /// back on its own doubt (`LAMP_MEMORY_DOUBT_UNDOES`, C37), 0 for none
+    /// ([`ScopeLease::mark_own_keep_undone`]).
+    own_keep_undone: AtomicU64,
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
@@ -712,6 +716,7 @@ impl RequestScope {
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
+                own_keep_undone: AtomicU64::new(0),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -767,6 +772,7 @@ impl RequestScope {
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
+                own_keep_undone: AtomicU64::new(0),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -1370,6 +1376,30 @@ impl ScopeLease {
         self.context.everything.store(true, Ordering::Release);
     }
 
+    /// The forget by id `id` that takes back this request's own new keep,
+    /// which this request's next round doubted (`LAMP_MEMORY_DOUBT_UNDOES`,
+    /// C37): run on a line its person's by their face alone in view too
+    /// ([`Self::forgets_need_mouth`]), as it only undoes what the lamp kept
+    /// for them a moment ago. Only the second route makes the
+    /// [`crate::second_provider::OwnKeepUndone`] it needs, and only for the
+    /// id of the keep it just ran. It lives with the request.
+    pub(crate) fn mark_own_keep_undone(
+        &self,
+        _undone: &crate::second_provider::OwnKeepUndone,
+        id: u64,
+    ) {
+        self.context.own_keep_undone.store(id, Ordering::Release);
+    }
+
+    /// Whether `args`, a `forget`'s, takes back exactly the keep marked by
+    /// [`Self::mark_own_keep_undone`]: its `source_id` alone.
+    pub(crate) fn undoes_own_keep(&self, args: &serde_json::Value) -> bool {
+        let marked = self.context.own_keep_undone.load(Ordering::Acquire);
+        marked != 0
+            && args["source_id"].as_u64() == Some(marked)
+            && args.as_object().is_some_and(|args| args.len() == 1)
+    }
+
     /// Whether [`Self::mark_everything_asked`] was marked for this request.
     pub(crate) fn everything_marked(&self) -> bool {
         self.context.everything.load(Ordering::Acquire)
@@ -1587,6 +1617,33 @@ mod tests {
     /// room's, keeps and forgets alike. A carried, held, revoked or
     /// nobody's line takes none. Without it (`take_by_one_face`) no forget
     /// is refused by this, as before.
+    /// C37, the memory owner's call A (11 Nov): only the forget by id of
+    /// the keep the second route marked as its own, taken back on its own
+    /// doubt, is that keep's undo; any other forget, or one with more than
+    /// that id, is not. Nothing is marked at first.
+    #[test]
+    fn only_the_marked_own_keeps_forget_undoes_it() {
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([56; 16]).unwrap(),
+            session: 1,
+            request: 1,
+        };
+        let scope = RequestScope::new(key, ScopeSnapshot::of("A"));
+        let lease = scope.lease();
+        let own = serde_json::json!({"source_id": 391});
+        assert!(!lease.undoes_own_keep(&own), "nothing marked");
+        lease.mark_own_keep_undone(&crate::second_provider::own_keep_undone_for_test(), 391);
+        assert!(lease.undoes_own_keep(&own));
+        for other in [
+            serde_json::json!({"source_id": 390}),
+            serde_json::json!({"source_id": 391, "about": "flowers"}),
+            serde_json::json!({"about": "flowers"}),
+            serde_json::json!({}),
+        ] {
+            assert!(!lease.undoes_own_keep(&other), "{other}");
+        }
+    }
+
     #[test]
     fn a_one_face_line_with_reads_is_read_as_its_persons_and_forgets_need_the_mouth() {
         let key = RequestKey {

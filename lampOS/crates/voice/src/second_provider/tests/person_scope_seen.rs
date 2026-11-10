@@ -37,6 +37,10 @@ thread_local! {
     /// `LAMP_PERSON_SCOPE_ONE_FACE_READS` ([`Engine::reading_by_one_face`])
     /// for the next [`lines_known`] on this thread, once.
     static ONE_FACE_READS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `LAMP_MEMORY_DOUBT_UNDOES` ([`Engine::undoing_doubted_keeps`]) for
+    /// the next [`lines_known`] on this thread, once: a `remember` is then
+    /// answered as a new keep with id 391, and a `forget` as forgotten.
+    static DOUBT_UNDOES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// `LAMP_CONVERSATION_CARRIED_MEMORY` ([`Engine::reading_carried`]) for
     /// the next [`lines_known`] on this thread, once.
     static CARRIED_MEMORY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -474,6 +478,7 @@ async fn lines_known(
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
+    let doubt_undoes = DOUBT_UNDOES.with(|on| on.replace(false));
     let script = Arc::new(Script {
         heard: Mutex::new(lines.iter().map(|(words, ..)| Ok(words.clone())).collect()),
         chats: Mutex::new(chats.into()),
@@ -545,6 +550,10 @@ async fn lines_known(
                         .1
                         .0
                 }
+                _ if doubt_undoes && name == crate::remember::REMEMBER => {
+                    json!({"remembered": true, "id": 391})
+                }
+                _ if doubt_undoes && name == crate::remember::FORGET => json!({"forgotten": true}),
                 _ => json!({"ok":true}),
             };
             Box::pin(async move { told })
@@ -571,6 +580,7 @@ async fn lines_known(
         failed_reader(engine, &path, seen)
     };
     let engine = engine
+        .undoing_doubted_keeps(doubt_undoes)
         .naming_by_one_face(name_one_face)
         .reading_by_one_face(ONE_FACE_READS.with(|reads| reads.replace(false)));
     let engine = if voice == Voice::Off {
@@ -3295,6 +3305,79 @@ async fn one_face_reading(
 ) -> Outcome {
     ONE_FACE_READS.with(|reads| reads.set(true));
     one_face_line(what, words, chats, in_view, going_on, voice).await
+}
+
+/// C37, the memory owner's call A (11 Nov), with
+/// `LAMP_PERSON_SCOPE_ONE_FACE_READS` and `LAMP_MEMORY_DOUBT_UNDOES`: A's
+/// known face alone in view, never read speaking, keeps "renunctinus" as
+/// A's, and the next round asks "is that ranunculus?". That line's own keep
+/// is taken back in A's scope, though no other forget runs on such a line.
+/// A forget the model calls there is still refused.
+#[tokio::test]
+async fn a_lone_known_faces_line_takes_back_its_own_keep_its_next_round_doubts() {
+    let a = crate::remember::person_id("A");
+    let flower = || {
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "m1",
+                    crate::remember::REMEMBER,
+                    json!({"text": "Their favorite flower is a renunctinus."}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![
+                text("Kept as you said it \u{2026} is that ranunculus?"),
+                Ok(ChatEvent::Done),
+            ],
+        ]
+    };
+    let lone = |what: &'static str, chats| async move {
+        ONE_FACE_READS.with(|reads| reads.set(true));
+        DOUBT_UNDOES.with(|on| on.set(true));
+        lines_saving(
+            what,
+            vec![(
+                "Remember that my favorite flower is a renunctinus.".to_owned(),
+                vec![("f1", false)],
+                0,
+            )],
+            chats,
+            BOOT,
+            true,
+            true,
+            None,
+            None,
+            true,
+            true,
+            Voice::One,
+        )
+        .await
+    };
+    let got = lone("one-face-doubt-undoes", flower()).await;
+    assert_eq!(got.lease, Some(a.clone()), "a lone known face's line");
+    assert_eq!(
+        got.calls,
+        [Some(a.clone()), Some(a.clone())],
+        "the keep, then its own undo, both in A's scope"
+    );
+    // The model's own forget on such a line is refused as before.
+    let got = lone(
+        "one-face-doubt-model-forget",
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "f1",
+                    crate::remember::FORGET,
+                    json!({"source_id": 391}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![text("Okay."), Ok(ChatEvent::Done)],
+        ],
+    )
+    .await;
+    assert_eq!(got.calls, [], "no forget runs on it");
 }
 
 /// Whether any chat round was told a memory call refused by the one-face
