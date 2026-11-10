@@ -664,14 +664,12 @@ pub fn say_text(say: &toml::Value) -> Option<String> {
 /// A trigger's cooldown in seconds, when it is one [`duration`].
 fn cooldown_secs(trigger: &toml::Table) -> Option<u64> {
     let (count, unit) = duration(trigger.get("cooldown")?.as_str()?)?;
-    Some(
-        count
-            * match unit {
-                "second" => 1,
-                "minute" => 60,
-                _ => 3_600,
-            },
-    )
+    // Too long to count is unreadable, so it is paced to an hour like one.
+    count.checked_mul(match unit {
+        "second" => 1,
+        "minute" => 60,
+        _ => 3_600,
+    })
 }
 
 /// Whether a trigger's `during` lies within [`SAY_HOURS`], never across
@@ -3584,6 +3582,9 @@ say = { text = "Welcome back!" }
             ("cooldown = \"1h30m\"\n", "1h"),
             ("cooldown = \"3h\"\n", "3h"),
             ("cooldown = \"90m\"\n", "90m"),
+            // Too long to count in seconds: unreadable, so an hour (#6070).
+            ("cooldown = \"18446744073709551615h\"\n", "1h"),
+            ("cooldown = \"18446744073709551615m\"\n", "1h"),
         ] {
             let text = HELLO.replace("cooldown = \"1h\"\n", cooldown);
             let paced = paced(&text);
@@ -3703,6 +3704,16 @@ say = { text = "Welcome back!" }
         let unpaced = hum.replace("cooldown = \"1h\"\n", "");
         assert!(paced(&unpaced).contains("cooldown = \"1h\""));
         capped(&paced(&unpaced)).unwrap();
+        // Too long to count is paced to an hour, never wrapped (#6070).
+        for unit in ["h", "m"] {
+            let huge = hum.replace(
+                "cooldown = \"1h\"",
+                &format!("cooldown = \"18446744073709551615{unit}\""),
+            );
+            let table: toml::Table = toml::from_str(&paced(&huge)).unwrap();
+            assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1h"));
+            capped(&paced(&huge)).unwrap();
+        }
     }
 
     /// A sound the lamp doesn't ship is refused, by name, path or file, with
