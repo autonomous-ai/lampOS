@@ -186,7 +186,7 @@ sau:
    `each`, với `[permissions] services = { <service> = "write" }`; khi công
    tắc tắt, kỹ năng không được nạp. `lamp-skills` gửi đúng nội dung của bước
    cùng tên kỹ năng trên socket tools của `lamp-services` (`skill_write`),
-   nơi chỉ gửi nếu chủ đèn đã đồng ý đúng nội dung đó cho kỹ năng đó dưới
+   nơi chỉ gửi nếu chủ đèn đã đồng ý đúng nội dung đó cho kỹ năng đó như đã cài (gói của nó: kỹ năng được cập nhật hay bị gỡ thì chờ lời đồng ý mới) dưới
    cùng liên kết (do đường đồng ý của giọng nói hay ứng dụng, không bao giờ
    do cài đặt: "not sent: waiting for the owner's yes"), không đã đăng xuất,
    tối đa 3 lần mỗi kỹ năng và

@@ -19,6 +19,18 @@
 //!   approved under ([`link_of`]: the account, or the link's own id, never
 //!   a token) in its own store folder ([`APPROVED_FILE`], root's, 0700),
 //!   which `lamp-skills` can't write.
+//! - **Bound to the installed package.** Each approval also keeps the
+//!   SHA-256 of the skill's installed package ([`installed_package`], its
+//!   `.package.json` under `/var/lib/lampOS/skills`, root's), which holds
+//!   its trigger, its manners and its write together: a skill updated,
+//!   removed and put on again, or another package of its name, is waiting
+//!   for a new yes, and its old approvals are dropped. Unlinking a service
+//!   drops every approval for it ([`Approvals::revoke_service`]).
+//! - **Public said at the yes.** A GitHub write's repository is read with
+//!   the link's token at the yes (one it can't read counts as public) and
+//!   the yes's answer names the public ones, for the voice to say "anyone
+//!   can see it". One approved as private is read again at each send: made
+//!   public since, or unreadable, it waits for a new yes.
 //! - **Checked at the send.** `lamp-skills` sends the content and the
 //!   skill's name ([`FUNCTION`]); it goes only if the content's hash is one
 //!   approved for that skill and the service is still linked under the
@@ -28,8 +40,9 @@
 //! - **Bounds** ([`Ledger`]): at most [`PER_SKILL`] sends a skill and
 //!   [`ALL_SKILLS`] across every skill in any 24 hours.
 //! - **The owner's sent-log** ([`SentLog`]): the last [`SENT_MOST`] sends,
-//!   each a skill, a service, a time and who it went to, never a text, for
-//!   the voice to tell the owner ([`SENT`]).
+//!   each a skill, a service, a time and who it went to (an address's
+//!   local part, never the whole address), never a text, for the voice to
+//!   tell the owner ([`SENT`]).
 //!
 //! Every file is in the store folder, so a wipe (a sign-out, an unpairing,
 //! a reset) deletes them with the tokens.
@@ -177,6 +190,46 @@ pub fn hash(write: &Value) -> String {
         .collect()
 }
 
+/// The installed skills, root's: where each one's package hash is read.
+pub const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
+/// In an installed skill's folder: its package's record (`lamp-skills`'
+/// `package::INSTALLED_FROM`), written by the installer.
+pub const PACKAGE_FILE: &str = ".package.json";
+/// The most bytes of [`PACKAGE_FILE`] read.
+const PACKAGE_FILE_MOST: u64 = 65_536;
+
+/// The SHA-256 of `skill`'s installed package in `skills`, as its
+/// installer recorded it; `None` for a skill put on with no package (a
+/// folder by hand, a developer's push) or not on the lamp.
+pub fn installed_package(skills: &Path, skill: &str) -> Option<String> {
+    use std::io::Read;
+    if !skill_name_ok(skill) {
+        return None;
+    }
+    let path = skills.join(skill).join(PACKAGE_FILE);
+    fs::symlink_metadata(&path)
+        .ok()
+        .filter(fs::Metadata::is_file)?;
+    let mut bytes = Vec::new();
+    fs::File::open(&path)
+        .ok()?
+        .take(PACKAGE_FILE_MOST)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    let record: Value = serde_json::from_slice(&bytes).ok()?;
+    record["sha256"]
+        .as_str()
+        .filter(|hash| hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .map(str::to_owned)
+}
+
+/// A GitHub write's repository, `owner/name`, when `write` is one.
+pub fn github_repo(write: &Value) -> Option<&str> {
+    (write["service"] == "github")
+        .then(|| write["repo"].as_str())
+        .flatten()
+}
+
 /// A step's content: `service` and `action` beside its fields.
 pub fn content(service: &str, action: &str, fields: &Map<String, Value>) -> Value {
     let mut content = fields.clone();
@@ -215,7 +268,19 @@ pub fn sent_to(write: &Value) -> String {
             _ => Vec::new(),
         }
     };
-    let people = |people: Vec<String>, none: &str| match people.as_slice() {
+    // An address's local part alone: a write's addresses are plain, with
+    // no display name to say instead.
+    let local = |address: String| -> String {
+        address
+            .split_once('@')
+            .map_or(address.clone(), |(local, _)| local.to_owned())
+    };
+    let people = |people: Vec<String>, none: &str| match people
+        .into_iter()
+        .map(local)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
         [] => none.to_owned(),
         [one] => one.clone(),
         [one, rest @ ..] => format!("{one} and {} more", rest.len()),
@@ -287,6 +352,13 @@ pub struct Approval {
     pub service: String,
     /// [`link_of`] when the owner said yes.
     pub link_of: String,
+    /// The skill's installed package when the owner said yes
+    /// ([`installed_package`]).
+    pub package: String,
+    /// Its destination was public at the yes (a GitHub repository anyone
+    /// can see, said so): a private one made public since needs a new yes.
+    #[serde(default)]
+    pub public: bool,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -319,8 +391,14 @@ impl Approvals {
     }
 
     /// `skill`'s approvals replaced by `approved` (each a write's content
-    /// and the link it is approved under); none takes them away.
-    pub fn approve(&self, skill: &str, approved: &[(Value, String)]) -> Result<(), String> {
+    /// the link it is approved under and whether its destination is
+    /// public), for its installed `package`; none takes them away.
+    pub fn approve(
+        &self,
+        skill: &str,
+        package: &str,
+        approved: &[(Value, String, bool)],
+    ) -> Result<(), String> {
         if approved.len() > STEPS_MOST {
             return Err(format!("a skill has at most {STEPS_MOST} writes"));
         }
@@ -332,30 +410,52 @@ impl Approvals {
             ));
         }
         file.approved
-            .extend(approved.iter().map(|(write, link_of)| Approval {
+            .extend(approved.iter().map(|(write, link_of, public)| Approval {
                 skill: skill.to_owned(),
                 sha256: hash(write),
                 service: write["service"].as_str().unwrap_or_default().to_owned(),
                 link_of: link_of.clone(),
+                package: package.to_owned(),
+                public: *public,
             }));
         keep(&self.path, &file)
             .map_err(|error| format!("the approval could not be kept ({})", error.kind()))
     }
 
-    /// What is approved for `skill`'s `write`.
-    pub fn find(&self, skill: &str, write: &Value) -> Found {
-        let file: ApprovedFile = read(&self.path);
+    /// What is approved for `skill`'s `write`, its installed package now
+    /// `package`. Approvals for another package of the skill (updated,
+    /// removed and put on again, or none on now) are dropped.
+    pub fn find(&self, skill: &str, package: Option<&str>, write: &Value) -> Found {
+        let mut file: ApprovedFile = read(&self.path);
+        let stale = |one: &Approval| one.skill == skill && Some(one.package.as_str()) != package;
+        if file.approved.iter().any(stale) {
+            file.approved.retain(|one| !stale(one));
+            if keep(&self.path, &file).is_err() {
+                eprintln!("lamp-services: a changed skill's approvals were not dropped");
+            }
+        }
         let wanted = hash(write);
         let mut mine = file
             .approved
             .into_iter()
-            .filter(|one| one.skill == skill)
+            .filter(|one| one.skill == skill && Some(one.package.as_str()) == package)
             .peekable();
         if mine.peek().is_none() {
             return Found::Waiting;
         }
         mine.find(|one| one.sha256 == wanted)
             .map_or(Found::Other, Found::Approved)
+    }
+
+    /// Every approval for a write to `code` dropped: the service unlinked.
+    pub fn revoke_service(&self, code: &str) -> io::Result<()> {
+        let mut file: ApprovedFile = read(&self.path);
+        let before = file.approved.len();
+        file.approved.retain(|one| one.service != code);
+        if file.approved.len() == before {
+            return Ok(());
+        }
+        keep(&self.path, &file)
     }
 }
 
@@ -391,8 +491,25 @@ impl Ledger {
     /// once never pass a bound together; a send that then fails still
     /// counts. Refused when the ledger can't be kept.
     pub fn take(&self, skill: &str, now: i64) -> Result<(usize, usize), String> {
-        let mut sent = read::<LedgerFile>(&self.path).sent;
-        sent.retain(|one| one.at > now - DAY_S && one.at <= now + 60);
+        // Unreadable, or a send after now (the clock went back): full,
+        // never empty, until the clock passes it again.
+        let full = || {
+            Err(format!(
+                "the day's sends can't be counted, so none goes (at most {ALL_SKILLS} a day)"
+            ))
+        };
+        let mut sent = match fs::read(&self.path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
+            Err(_) => return full(),
+            Ok(bytes) => match serde_json::from_slice::<LedgerFile>(&bytes) {
+                Ok(file) => file.sent,
+                Err(_) => return full(),
+            },
+        };
+        if sent.iter().any(|one| one.at > now) {
+            return full();
+        }
+        sent.retain(|one| one.at > now - DAY_S);
         let mine = sent.iter().filter(|one| one.skill == skill).count();
         if mine >= PER_SKILL {
             return Err(format!(
@@ -516,27 +633,103 @@ mod tests {
         }
     }
 
+    const PACKAGE: &str = "aa";
+
     #[test]
-    fn approvals_are_by_skill_content_and_link() {
+    fn approvals_are_by_skill_package_content_and_link() {
         let dir = tempfile::tempdir().unwrap();
         let approvals = Approvals::new(dir.path());
-        assert_eq!(approvals.find("arrive-mail", &mail()), Found::Waiting);
+        let find = |skill: &str, write: &Value| approvals.find(skill, Some(PACKAGE), write);
+        assert_eq!(find("arrive-mail", &mail()), Found::Waiting);
         approvals
-            .approve("arrive-mail", &[(mail(), "account:me@home.test".into())])
+            .approve(
+                "arrive-mail",
+                PACKAGE,
+                &[(mail(), "account:me@home.test".into(), false)],
+            )
             .unwrap();
-        let Found::Approved(approval) = approvals.find("arrive-mail", &mail()) else {
+        let Found::Approved(approval) = find("arrive-mail", &mail()) else {
             panic!("not approved");
         };
         assert_eq!(approval.link_of, "account:me@home.test");
         let mut changed = mail();
         changed["to"] = json!(["someone@else.test"]);
-        assert_eq!(approvals.find("arrive-mail", &changed), Found::Other);
-        assert_eq!(approvals.find("other", &mail()), Found::Waiting);
+        assert_eq!(find("arrive-mail", &changed), Found::Other);
+        assert_eq!(find("other", &mail()), Found::Waiting);
         // Approved again: replaced, never added to.
-        approvals.approve("arrive-mail", &[]).unwrap();
-        assert_eq!(approvals.find("arrive-mail", &mail()), Found::Waiting);
+        approvals.approve("arrive-mail", PACKAGE, &[]).unwrap();
+        assert_eq!(find("arrive-mail", &mail()), Found::Waiting);
         let kept = fs::read_to_string(dir.path().join(APPROVED_FILE)).unwrap();
         assert!(!kept.contains("desk"), "{kept}");
+        // Another package of the skill: waiting, and the old yes dropped.
+        approvals
+            .approve(
+                "arrive-mail",
+                PACKAGE,
+                &[(mail(), "account:a".into(), false)],
+            )
+            .unwrap();
+        assert_eq!(
+            approvals.find("arrive-mail", Some("bb"), &mail()),
+            Found::Waiting
+        );
+        assert_eq!(find("arrive-mail", &mail()), Found::Waiting);
+        approvals
+            .approve(
+                "arrive-mail",
+                PACKAGE,
+                &[(mail(), "account:a".into(), false)],
+            )
+            .unwrap();
+        assert_eq!(approvals.find("arrive-mail", None, &mail()), Found::Waiting);
+        // Unlinking the service drops its approvals.
+        approvals
+            .approve(
+                "arrive-mail",
+                PACKAGE,
+                &[(mail(), "account:a".into(), false)],
+            )
+            .unwrap();
+        approvals.revoke_service("gmail").unwrap();
+        assert_eq!(find("arrive-mail", &mail()), Found::Waiting);
+    }
+
+    #[test]
+    fn the_installed_package_is_read_from_its_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let hash = "ab".repeat(32);
+        fs::create_dir_all(dir.path().join("arrive-mail")).unwrap();
+        fs::write(
+            dir.path().join("arrive-mail").join(PACKAGE_FILE),
+            json!({"sha256": hash, "manifest": {}}).to_string(),
+        )
+        .unwrap();
+        assert_eq!(installed_package(dir.path(), "arrive-mail"), Some(hash));
+        assert_eq!(installed_package(dir.path(), "other"), None);
+        assert_eq!(installed_package(dir.path(), "../arrive-mail"), None);
+    }
+
+    /// An unreadable ledger, or one with a send after now (the clock went
+    /// back), counts as full.
+    #[test]
+    fn the_ledger_fails_closed() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger = Ledger::new(dir.path());
+        ledger.take("a", 5_000).unwrap();
+        assert!(
+            ledger
+                .take("b", 4_000)
+                .unwrap_err()
+                .contains("can't be counted")
+        );
+        assert!(ledger.take("b", 5_000).is_ok());
+        fs::write(dir.path().join(LEDGER_FILE), "not json").unwrap();
+        assert!(
+            ledger
+                .take("b", 6_000)
+                .unwrap_err()
+                .contains("can't be counted")
+        );
     }
 
     #[test]
@@ -580,9 +773,10 @@ mod tests {
         let sent = list["sent"].as_array().unwrap();
         assert_eq!(sent.len(), SENT_MOST);
         assert_eq!(sent[0]["at"], 5);
-        assert_eq!(sent[0]["to"], "boss@work.test");
+        assert_eq!(sent[0]["to"], "boss");
         assert!(!list.to_string().contains("desk"));
         let event = json!({"service":"google_calendar","action":"create_event","title":"Secret","attendees":["a@b.test","c@d.test"]});
-        assert_eq!(sent_to(&event), "a@b.test and 1 more");
+        assert_eq!(sent_to(&event), "a and 1 more");
+        assert!(!list.to_string().contains("work.test"));
     }
 }
