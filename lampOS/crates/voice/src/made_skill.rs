@@ -209,16 +209,16 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     }
     let read = if reads { " Or one read, as above." } else { "" };
     Ok(format!(
-        "{BRIEF_HEAD} for the request. Reply with only two fenced blocks, \
-         ```skill.toml and ```SKILL.md. skill.toml: \
+        "{BRIEF_HEAD} for the request. Reply with two fenced blocks: \
+         ```skill.toml, ```SKILL.md. skill.toml: \
          kind = \"installable\", version = \"1.0.0\", no name key; [permissions] \
-         light, body, speak = true as used, its topic; one [trigger] as listed (coming to \
-         the desk is room/presence), with for, cooldown, rearm = \"ends\"; window: \
+         light/body/speak = true as used, its topic; one [trigger] as listed (coming to \
+         the desk is room/presence), with for, cooldown, rearm = \"ends\", \
          during = {{ from = \"22:00\", to = \"22:30\" }}; \
          [ask] policy = \"nudge\"; [[do]]: light = {{ colour, level 1-5, for }} or \
          {{ dim = 1 }}, body = {{ gesture = \"nod\" }} or one listed, say = {{ text = \
-         \"Hi!\" }} (exact words, asker's language).{read} SKILL.md: \
-         front matter name (lowercase, hyphens) and description. \
+         \"Hi!\" }} (exact words, asker's language) or cue = \"hum\".{read} SKILL.md: \
+         front matter name (lowercase, hyphens), description. \
          {REQUEST_MARK}{request}"
     ))
 }
@@ -579,8 +579,8 @@ pub fn capped_with(text: &str, reads: bool) -> Result<(String, Uses), Refused> {
 /// What a repair is told when [`capped`] refused.
 const CAPPED_ONLY: &str = "kind = \"installable\", version = \"1.0.0\", no [tool]; \
                            [permissions] only light, body and speak = true as its steps use \
-                           them (speak for a say step), topics only its trigger's; [ask] \
-                           policy = \"nudge\"; a say is one \
+                           them (speak for a say step or cue = \"hum\", its one sound), topics \
+                           only its trigger's; [ask] policy = \"nudge\"; a say is one \
                            say = { text = \"the exact words\" }, in the request's language";
 
 /// The most of a made skill's say text ([`say_text`]): one or two short
@@ -734,12 +734,17 @@ fn hhmm(minutes: u32) -> String {
     format!("{:02}:{:02}", minutes / 60, minutes % 60)
 }
 
-/// Whether a made skill's table has a `say` step.
+/// Whether a made skill's table has a `say` step, or its hum (`cue`),
+/// paced as a say is.
 fn says_aloud(table: &toml::Table) -> bool {
     table
         .get("do")
         .and_then(|steps| steps.as_array())
-        .is_some_and(|steps| steps.iter().any(|step| step.get("say").is_some()))
+        .is_some_and(|steps| {
+            steps
+                .iter()
+                .any(|step| step.get("say").is_some() || step.get("cue").is_some())
+        })
 }
 
 /// A made skill's `skill.toml` with the limits on speaking set rather than
@@ -808,6 +813,32 @@ pub fn paced(text: &str) -> String {
         Ok(_) => paced,
         Err(_) => text.to_owned(),
     }
+}
+
+/// The sounds a made skill may play, by name, each as [`plainly`] says it:
+/// only what the lamp ships. No skill sound ships as a file (`sounds/`), so
+/// a made skill carries no audio and names no path: its one sound is the
+/// voice's built-in cue, `cue = "hum"`, which `lamp-skills` takes in a
+/// skill without a tool and the voice makes at its fixed quiet level.
+const SOUNDS: [(&str, &str); 1] = [("hum", "hums softly")];
+
+/// Why a sound step the lamp doesn't have is refused: another cue, a
+/// `sound` file, a path.
+const SOUND_NOT_SHIPPED: &str = "it would play a sound the lamp doesn't have; the one sound a \
+                                 made skill plays is its soft hum";
+
+/// What a repair is told when a hum sits beside a say or another hum:
+/// `lamp-skills` plays one line or sound a run, so the extra hum goes.
+const HUM_DROPPED: &str = "the lamp plays one line or hum a run, so leave out the extra cue = \
+                           \"hum\" step, keeping its say or one hum";
+
+/// A `cue` step's sound in plain words ([`SOUNDS`]), or none.
+fn sound_plainly(cue: &toml::Value) -> Option<&'static str> {
+    let name = cue.as_str()?;
+    SOUNDS
+        .iter()
+        .find(|(known, _)| *known == name)
+        .map(|(_, said)| *said)
 }
 
 /// What [`CAPPED_ONLY`] goes on to say with reads on.
@@ -935,38 +966,52 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
     // step (#6062): its exact words, said as written with no functions
     // ([`say_text`]), never a note, a list or what the voice keeps.
     if !added {
-        let says: Vec<&toml::Value> = table
-            .get("do")
-            .and_then(|steps| steps.as_array())
-            .into_iter()
-            .flatten()
-            .filter_map(|step| step.get("say"))
-            .collect();
+        let steps = || {
+            table
+                .get("do")
+                .and_then(|steps| steps.as_array())
+                .into_iter()
+                .flatten()
+        };
+        let says: Vec<&toml::Value> = steps().filter_map(|step| step.get("say")).collect();
         if says.iter().any(|say| say_text(say).is_none()) {
             return Err(Refused::new(SAY_NOT_TEXT));
         }
-        // One say a run, as `lamp-skills` takes it.
+        // Its sound only the lamp's own, by name ([`SOUNDS`]).
+        let cues: Vec<&toml::Value> = steps().filter_map(|step| step.get("cue")).collect();
+        if cues.iter().any(|cue| sound_plainly(cue).is_none())
+            || steps().any(|step| step.get("sound").is_some())
+        {
+            return Err(Refused::new(SOUND_NOT_SHIPPED));
+        }
+        // One say or sound a run, as `lamp-skills` takes it.
         if says.len() > 1 {
             return Err(Refused::new(
                 "it would say more than one line, and a made skill says one short line",
             ));
         }
-        if !says.is_empty() && !uses.speak {
+        // A hum beside its line, or a second hum: the repair drops it
+        // quietly, the line kept (the owner: lifting limits makes it
+        // simpler for the person, never a scolding).
+        if says.len() + cues.len() > 1 {
+            return Err(Refused::new(HUM_DROPPED));
+        }
+        if (!says.is_empty() || !cues.is_empty()) && !uses.speak {
             return Err(Refused::new(
                 "it would say something without asking for its voice (speak = true)",
             ));
         }
-        if uses.speak && says.is_empty() && uses.reads.is_none() {
+        if uses.speak && says.is_empty() && cues.is_empty() && uses.reads.is_none() {
             return Err(Refused::new(
                 "it asks for its voice but never says anything; a made skill asks for its voice \
-                 only with a say step",
+                 only with a say step or its hum",
             ));
         }
         // Paced as [`paced`] sets it (#6062): at most once an hour, and on
         // the lamp's resting never at night. Only a skill not paced so,
         // such as one whose window is all night, gets here.
         let trigger = table.get("trigger").and_then(|trigger| trigger.as_table());
-        if !says.is_empty()
+        if (!says.is_empty() || !cues.is_empty())
             && let Some(trigger) = trigger
         {
             if cooldown_secs(trigger).is_none_or(|secs| secs < LEAST_SAY_COOLDOWN_SECS) {
@@ -1100,6 +1145,9 @@ pub const UNSAID: &str = "when it would run and what it would do didn't come out
 const SAY_TEXT_PART: &str =
     ": say = { text = \"the exact words\" }, one or two short sentences, no quotes";
 
+/// What a repair is told after a sound step [`plainly`] couldn't say.
+const SOUND_PART: &str = ": its one sound is cue = \"hum\"";
+
 /// What a repair is told before the part [`plainly`] couldn't say.
 const UNSAID_PART: &str = "Can't be said plainly: ";
 
@@ -1177,7 +1225,11 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
             .ok_or_else(|| Unsaid::of("no [[do]] step"))
     };
     let unsaid_step = |index: usize, step: &toml::Value| {
-        let say = step.get("say").map_or("", |_| SAY_TEXT_PART);
+        let say = match (step.get("say"), step.get("cue").or(step.get("sound"))) {
+            (Some(_), _) => SAY_TEXT_PART,
+            (None, Some(_)) => SOUND_PART,
+            (None, None) => "",
+        };
         Unsaid::of(format!(
             "[[do]] step {}, {}{say}",
             index + 1,
@@ -1506,8 +1558,8 @@ macro_rules! trigger_meanings {
 /// trigger.
 const PLAIN_ONLY: &str = "Write only kind, version, needs, permissions, one [trigger], [ask] \
                           and [[do]], and at most a few [[do]] steps, each one light, one \
-                          listed body gesture or one say = { text = \"the exact words\" } (with \
-                          speak = true), as the request names them";
+                          listed body gesture, one say = { text = \"the exact words\" } or \
+                          cue = \"hum\" (with speak = true), as the request names them";
 
 /// What a repair is told when [`plainly`] refused the trigger: the ones it
 /// says, each with what it means, so a request to "come back to my desk"
@@ -1581,14 +1633,17 @@ fn read_plainly(step: &toml::Value) -> Option<String> {
     }
 }
 
-/// One `[[do]]` step in plain words: a light, a gesture or a say, as the
-/// brief names them. A say is its exact words, quoted whole, so no comma
-/// in them blurs into what is said after (the readers' P3 on #6062):
+/// One `[[do]]` step in plain words: a light, a gesture, a say or the hum,
+/// as the brief names them. A say is its exact words, quoted whole, so no
+/// comma in them blurs into what is said after (the readers' P3 on #6062):
 /// "says “Welcome back!”".
 fn step_plainly(step: &toml::Value) -> Option<String> {
     let step = step.as_table().filter(|step| step.len() == 1)?;
     if let Some(say) = step.get("say") {
         return say_text(say).map(|text| format!("says “{text}”"));
+    }
+    if let Some(cue) = step.get("cue") {
+        return sound_plainly(cue).map(str::to_owned);
     }
     if let Some(light) = step.get("light").and_then(|light| light.as_table()) {
         if let Some(dim) = light.get("dim") {
@@ -3611,6 +3666,99 @@ say = { text = "Welcome back!" }
                 }
             }
         }
+    }
+
+    /// A made skill may play a sound: only the lamp's own soft hum, the
+    /// voice's built-in cue, alone or with a light and a gesture, said
+    /// back plainly.
+    #[test]
+    fn a_made_skill_may_play_the_lamps_soft_hum() {
+        let hum = HELLO.replace("say = { text = \"Welcome back!\" }", "cue = \"hum\"");
+        for reads in [false, true] {
+            let (_, uses) = capped_with(&hum, reads).unwrap();
+            assert!(uses.speak && !uses.light && uses.reads.is_none());
+            assert_eq!(
+                plainly_with(&hum, reads).unwrap(),
+                "When someone has been at the desk for 5 seconds, it hums softly, at most once \
+                 an hour."
+            );
+        }
+        let both = hum
+            .replace(
+                "speak = true\n",
+                "speak = true\nlight = true\nbody = true\n",
+            )
+            .replace(
+                "[[do]]\n",
+                "[[do]]\nlight = { colour = \"warm\", level = 3, for = \"20s\" }\n\n\
+                 [[do]]\nbody = { gesture = \"nod\" }\n\n[[do]]\n",
+            );
+        capped(&both).unwrap();
+        assert_eq!(
+            plainly(&both).unwrap(),
+            "When someone has been at the desk for 5 seconds, it glows warm at level 3 for 20 \
+             seconds, then nods, then hums softly, at most once an hour."
+        );
+        // Paced as a say is (#6062): a missing cooldown is set to an hour.
+        let unpaced = hum.replace("cooldown = \"1h\"\n", "");
+        assert!(paced(&unpaced).contains("cooldown = \"1h\""));
+        capped(&paced(&unpaced)).unwrap();
+    }
+
+    /// A sound the lamp doesn't ship is refused, by name, path or file, with
+    /// lines for a repair; one sound and no say beside it, as `lamp-skills`
+    /// takes it, and its voice asked for.
+    #[test]
+    fn a_sound_the_lamp_doesnt_ship_is_refused() {
+        for step in [
+            "cue = \"chime\"",
+            "cue = \"Hum\"",
+            "cue = \"hum.wav\"",
+            "cue = \"sounds/hum.wav\"",
+            "cue = \"/opt/lampOS/voice/notices/wifi-lost.en-US.wav\"",
+            "cue = { name = \"hum\" }",
+            "sound = \"hum\"",
+            "sound = \"../hum.wav\"",
+        ] {
+            let text = HELLO.replace("say = { text = \"Welcome back!\" }", step);
+            match capped(&text) {
+                Err(Refused(why, Some(lines))) => {
+                    assert_eq!(why, SOUND_NOT_SHIPPED, "{step}");
+                    assert!(lines.contains("cue = \"hum\""), "{lines}");
+                    assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+                }
+                other => panic!("{step}: {other:?}"),
+            }
+            match plainly_with(&text, false) {
+                Err(Refused(why, Some(lines))) => {
+                    assert_eq!(why, UNSAID);
+                    assert!(lines.contains(SOUND_PART), "{lines}");
+                    assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+                }
+                other => panic!("{step}: {other:?}"),
+            }
+        }
+        let hum = HELLO.replace("say = { text = \"Welcome back!\" }", "cue = \"hum\"");
+        // A hum beside its line, or a second hum: the repair is told to
+        // leave the extra hum out, never a scolding.
+        for twice in ["cue = \"hum\"", "say = { text = \"How are you?\" }"] {
+            let text = format!("{hum}\n[[do]]\n{twice}\n");
+            match capped(&text) {
+                Err(Refused(why, Some(lines))) => {
+                    assert_eq!(why, HUM_DROPPED, "{twice}");
+                    assert!(lines.contains("leave out the extra cue"), "{lines}");
+                    assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+                }
+                other => panic!("{twice}: {other:?}"),
+            }
+        }
+        let unvoiced = hum.replace("speak = true\n", "");
+        assert!(
+            capped(&unvoiced)
+                .unwrap_err()
+                .0
+                .contains("without asking for its voice")
+        );
     }
 
     /// The card's name, `made: here` and its maker in its front matter,

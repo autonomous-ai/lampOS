@@ -137,7 +137,9 @@ fn system_with(reads: bool) -> String {
          one of the triggers below. To speak, a skill has speak = true in \
          [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
          \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
-         language the person asked in, said as written. When it runs is one \
+         language the person asked in, said as written. Its one sound is a soft hum: a [[do]] \
+         step cue = \"hum\", paced as a say, in place of a say; it has no other sound and no \
+         sound file. When it runs is one \
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
          faces): {triggers} A body step is one gesture, one of: {gestures}. A skill can't hear \
          what is said, nor who someone is: a request \
@@ -1386,6 +1388,17 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 )),
                 "{system}"
             );
+        }
+    }
+
+    /// The making model is told the lamp's one sound, its soft hum, and
+    /// that it has no other.
+    #[test]
+    fn the_system_prompt_names_the_one_sound() {
+        for reads in [true, false] {
+            let system = system_with(reads);
+            assert!(system.contains("a [[do]] step cue = \"hum\""), "{system}");
+            assert!(system.contains("no other sound and no sound file"));
         }
     }
 

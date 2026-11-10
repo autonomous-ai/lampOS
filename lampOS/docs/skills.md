@@ -2198,6 +2198,30 @@ gone ([switches.md](switches.md)). What happens:
      kept package that says anything else is never put on. A skill that
      reads a linked service keeps its own rule below: one read step and
      nothing else.
+   - **It may play a sound: only the lamp's own soft hum.** No skill sound
+     ships on the lamp as a file (no built-in skill has a `sounds/`
+     folder, and the image's WAVs are the voice's spoken notices, root's
+     alone), and the making model can't write audio. So a made skill's one
+     sound is the voice's built-in cue: a `[[do]]` step `cue = "hum"`
+     (`do.cue`, which `lamp-skills` takes in a skill without a tool, made
+     by the voice at its fixed quiet level through the say service's
+     gates), with `speak = true`, alone or beside light and gesture steps,
+     said "hums softly". It shares the one say slot, so a hum beside a say,
+     or a second hum, never scolds the person: the repair is told to leave
+     the extra hum out and keep the line (`made_skill::HUM_DROPPED`, "the
+     lamp plays one line or hum a run, so leave out the extra cue = "hum"
+     step, keeping its say or one hum"). A cue without `speak = true` is
+     refused as a say is, and it is paced as a say is (`made_skill::paced`:
+     a cooldown of an hour or more, and on the lamp's resting only between
+     07:00 and 22:00). Any
+     other cue, a path or file name, or a `sound` step at all is refused
+     ("it would play a sound the lamp doesn't have; the one sound a made
+     skill plays is its soft hum", `made_skill::SOUND_NOT_SHIPPED`): the
+     sounds are a fixed list by name (`made_skill::SOUNDS`), the model
+     never supplies audio or a path, and nothing is packed beside
+     `skill.toml`. Tests: `a_made_skill_may_play_the_lamps_soft_hum`,
+     `a_sound_the_lamp_doesnt_ship_is_refused`, and in `tests/it/made.rs`
+     the real `lamp-skills pack` keeping one.
    Widening this is the lead's call. The one widening (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
    `lamp-skills-manage@`, on in the product units): `services` naming one linked
@@ -2385,7 +2409,10 @@ gone ([switches.md](switches.md)). What happens:
        what a say is ("[[do]] step 1, say: say = { text = "the exact words"
        }, one or two short sentences, no quotes"), and `PLAIN_ONLY` says a
        step may be one `say = { text = "the exact words" }` with
-       `speak = true`;
+       `speak = true`; or the hum, `cue = "hum"`, said "hums softly" ("When someone has
+       been at the desk for 5 seconds, it hums softly, at most once an
+       hour."), any other sound step named in the repair with `its one
+       sound is cue = "hum"` (`made_skill::SOUND_PART`);
      - words over 200 characters: said whole or not at all, never cut
        before a step or the cooldown. On lamp-0c89 the lamp's model had
        kept "when someone says good night, dim the light slowly over a
