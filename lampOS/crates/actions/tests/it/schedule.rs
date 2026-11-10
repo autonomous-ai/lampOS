@@ -1559,3 +1559,190 @@ fn the_rooms_list_tells_only_how_many_belong_to_someone_with_the_switch_on() {
         theirs.to_string()
     );
 }
+
+// C68, lamp-06c1 on 11 Nov at 01:30 (stock 11450): "Call the plumber." was
+// said, "snooze it" came 9 s later, only list_reminders ran, and the lamp
+// said "Snoozing it for five minutes. Nothing is due right now, so there's
+// nothing to snooze."; the cancel after it found it "already gone". A
+// one-time reminder just said may be snoozed or cancelled by its own line
+// for two minutes after it was said.
+
+/// Ann's "Call the plumber" set for 08:15, said at 08:15:01: its id, as
+/// `list_reminders` names it among those just said.
+fn said_plumber(schedule: &Schedule, actions: &Actions) -> u64 {
+    let ann = caller(Some(ANN), false);
+    let set = actions.call_as(
+        "set_reminder",
+        json!({"text":"Call the plumber","time":"08:15"}),
+        ann.clone(),
+    );
+    assert_eq!(set["result"]["status"], "committed", "{set}");
+    *schedule.clock.0.lock().unwrap() = sample(901_000);
+    thread::sleep(Duration::from_millis(1_200));
+    ack_pending(schedule);
+    *schedule.clock.0.lock().unwrap() = sample(910_000);
+    let list = actions.call_as("list_reminders", json!({}), ann);
+    assert!(texts(&list).is_empty(), "{list}");
+    let said = &list["result"]["said_recently"][0];
+    assert_eq!(said["text"], "Call the plumber", "{list}");
+    assert_eq!(
+        list["result"]["said_note"],
+        lamp_actions::schedule::JUST_SAID,
+        "{list}"
+    );
+    said["id"]
+        .as_u64()
+        .unwrap_or_else(|| panic!("no id: {list}"))
+}
+
+#[test]
+fn a_reminder_just_said_is_snoozed_and_set_again_n_minutes_later() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let ann = caller(Some(ANN), false);
+    let id = said_plumber(&schedule, &actions);
+    let snoozed = actions.call_as(
+        "snooze_reminder",
+        json!({"id":id,"seconds":600}),
+        ann.clone(),
+    );
+    assert_eq!(snoozed["result"]["status"], "committed", "{snoozed}");
+    assert_eq!(snoozed["result"]["snoozed"], true);
+    assert_eq!(snoozed["result"]["clock"], "08:25");
+    let list = actions.call_as("list_reminders", json!({}), ann.clone());
+    assert_eq!(texts(&list), ["Call the plumber"], "{list}");
+    assert_eq!(list["result"]["items"][0]["snoozed"], true);
+    assert_eq!(list["result"]["items"][0]["clock"], "08:25");
+    // Said once more when due again.
+    *schedule.clock.0.lock().unwrap() = sample(1_510_000);
+    thread::sleep(Duration::from_millis(1_200));
+    let due = actions.call_as("list_reminders", json!({"pending_only":true}), ann);
+    assert_eq!(texts(&due), ["Call the plumber"], "{due}");
+}
+
+#[test]
+fn a_reminder_just_said_is_cancelled_for_good_by_id_or_by_its_words() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let ann = caller(Some(ANN), false);
+    let id = said_plumber(&schedule, &actions);
+    let cancelled = actions.call_as("cancel_reminder", json!({"id":id}), ann.clone());
+    assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+    // Ended: a snooze after it changes nothing, and says so.
+    let snoozed = actions.call_as(
+        "snooze_reminder",
+        json!({"id":id,"seconds":300}),
+        ann.clone(),
+    );
+    assert_eq!(snoozed["code"], "said_too_long_ago", "{snoozed}");
+    *schedule.clock.0.lock().unwrap() = sample(1_300_000);
+    thread::sleep(Duration::from_millis(1_200));
+    let list = actions.call_as("list_reminders", json!({}), ann.clone());
+    assert!(texts(&list).is_empty(), "{list}");
+    // By its words, as "cancel the plumber one" is asked.
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    said_plumber(&schedule, &actions);
+    let cancelled = actions.call_as("cancel_reminder", json!({"text":"plumber"}), ann);
+    assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+}
+
+#[test]
+fn a_snooze_after_the_window_does_nothing_and_says_so() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let ann = caller(Some(ANN), false);
+    let id = said_plumber(&schedule, &actions);
+    // Three minutes after it was said.
+    *schedule.clock.0.lock().unwrap() = sample(1_081_000);
+    let list = actions.call_as("list_reminders", json!({}), ann.clone());
+    assert!(
+        list["result"]["said_recently"][0].get("id").is_none(),
+        "{list}"
+    );
+    assert!(list["result"].get("said_note").is_none(), "{list}");
+    for (name, args) in [
+        ("snooze_reminder", json!({"id":id,"seconds":300})),
+        ("cancel_reminder", json!({"id":id})),
+    ] {
+        let told = actions.call_as(name, args, ann.clone());
+        assert_eq!(told["ok"], false, "{told}");
+        assert_eq!(told["code"], "said_too_long_ago", "{told}");
+        assert!(
+            told["error"]
+                .as_str()
+                .unwrap()
+                .contains("never that it is snoozed"),
+            "{told}"
+        );
+    }
+    let list = actions.call_as("list_reminders", json!({}), ann);
+    assert!(texts(&list).is_empty(), "{list}");
+}
+
+#[test]
+fn another_persons_line_never_snoozes_or_cancels_a_reminder_just_said() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let id = said_plumber(&schedule, &actions);
+    for other in [caller(Some(BO), false), caller(None, false)] {
+        let list = actions.call_as("list_reminders", json!({}), other.clone());
+        assert_eq!(list["result"]["said_recently"], json!([]), "{list}");
+        for (name, args) in [
+            ("snooze_reminder", json!({"id":id,"seconds":300})),
+            ("cancel_reminder", json!({"id":id})),
+        ] {
+            let told = actions.call_as(name, args, other.clone());
+            assert_eq!(told["code"], "not_found", "{told}");
+        }
+    }
+    // Still Ann's to snooze.
+    let snoozed = actions.call_as(
+        "snooze_reminder",
+        json!({"id":id,"seconds":300}),
+        caller(Some(ANN), false),
+    );
+    assert_eq!(snoozed["result"]["status"], "committed", "{snoozed}");
+}
+
+/// The 01:30 sequence replayed: set fourteen minutes ahead (req 128),
+/// listed (129), said (130), "snooze it" 9 s later (131), listed (132),
+/// then cancelled (133).
+#[test]
+fn the_0130_plumber_sequence_snoozes_then_cancels() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let ann = caller(Some(ANN), false);
+    *schedule.clock.0.lock().unwrap() = sample(60_000);
+    let set = actions.call_as(
+        "set_reminder",
+        json!({"text":"Call the plumber","time":"08:15"}),
+        ann.clone(),
+    );
+    assert_eq!(set["result"]["clock"], "08:15", "{set}");
+    let list = actions.call_as("list_reminders", json!({}), ann.clone());
+    assert_eq!(texts(&list), ["Call the plumber"]);
+    *schedule.clock.0.lock().unwrap() = sample(901_000);
+    thread::sleep(Duration::from_millis(1_200));
+    ack_pending(&schedule);
+    // 9 s on: the model lists, finds it just said, and snoozes it.
+    *schedule.clock.0.lock().unwrap() = sample(910_000);
+    let list = actions.call_as("list_reminders", json!({}), ann.clone());
+    assert!(texts(&list).is_empty(), "{list}");
+    let id = list["result"]["said_recently"][0]["id"].as_u64().unwrap();
+    let snoozed = actions.call_as(
+        "snooze_reminder",
+        json!({"id":id,"seconds":lamp_actions::schedule::SNOOZE_DEFAULT_SECONDS}),
+        ann.clone(),
+    );
+    assert_eq!(snoozed["result"]["status"], "committed", "{snoozed}");
+    assert_eq!(snoozed["result"]["clock"], "08:20");
+    let list = actions.call_as("list_reminders", json!({}), ann.clone());
+    assert_eq!(texts(&list), ["Call the plumber"], "{list}");
+    let cancelled = actions.call_as("cancel_reminder", json!({"text":"plumber"}), ann.clone());
+    assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+    *schedule.clock.0.lock().unwrap() = sample(1_210_000);
+    thread::sleep(Duration::from_millis(1_200));
+    let list = actions.call_as("list_reminders", json!({}), ann);
+    assert!(texts(&list).is_empty(), "{list}");
+}

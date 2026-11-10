@@ -24,6 +24,13 @@
 //!   remind me?", so a `list_reminders` call in the turn makes it stand
 //!   ([`Claim::ReminderTime`]); "Timer set." needs a set.
 //!
+//! - a reminder snoozed ([`SNOOZED`], C68: on lamp-06c1 at 11450, 11 Nov
+//!   01:30, "snooze it" got only `list_reminders` and "Snoozing it for five
+//!   minutes. Nothing is due right now, so there's nothing to snooze."):
+//!   "Snoozing it …", "Snoozed.", "I've snoozed it …", bare or after a
+//!   lead-in such as "Okay,", never a sentence ending in '?'. Only a
+//!   `snooze_reminder` makes it ([`Claim::Snoozed`]).
+//!
 //! Such a claim stands when its turn made a call of its kind
 //! ([`Claim::made_by`]); otherwise it is held, the model is asked once more
 //! with [`NOTE`], and a second claim with no call is said as
@@ -190,6 +197,9 @@ pub enum Claim {
     /// ([`forget_claim`]): only a forget that removed something
     /// ([`forgot_in`]) makes it, never a call by its name.
     Forgot,
+    /// A reminder snoozed ("Snoozing it for five minutes.", [`SNOOZED`]):
+    /// only `snooze_reminder` makes it.
+    Snoozed,
 }
 
 impl Claim {
@@ -211,6 +221,7 @@ impl Claim {
             // A forget makes it only by its outcome ([`forgot_in`]): a
             // refused or empty one removed nothing (Thirteen's P2-1 on #5942).
             Self::Forgot => false,
+            Self::Snoozed => name == "snooze_reminder",
         }
     }
 
@@ -223,6 +234,7 @@ impl Claim {
             Self::ReminderTime => "a reminder",
             Self::LightKept => "keeping the light on or off until a time",
             Self::Forgot => "a forget",
+            Self::Snoozed => "a reminder snoozed",
         }
     }
 
@@ -235,6 +247,7 @@ impl Claim {
             Self::ReminderTime => "reminder time",
             Self::LightKept => "light kept",
             Self::Forgot => "forget",
+            Self::Snoozed => "snooze",
         }
     }
 }
@@ -382,6 +395,11 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
     };
     if let Some(kind) = judge(found, Claim::ReminderTime) {
         return Some(Some(kind));
+    }
+    match runs_claim(&SNOOZED, &text, ended, true) {
+        Some(Some(kind)) => return Some(Some(kind)),
+        None => undecided = true,
+        Some(None) => {}
     }
     if undecided { None } else { Some(None) }
 }
@@ -1208,6 +1226,24 @@ const WORDED: [(&str, Claim); 53] = [
     ),
 ];
 
+/// A reminder said as snoozed (C68), read as [`WORDED`]'s runs are, bare or
+/// after one of [`LEAD_INS`], with the strict lines under
+/// [`ENVIRONMENT`] alone: "Snoozing it for five minutes.", "Okay, snoozed.",
+/// "I've snoozed your reminder." Each opens with the snooze or with "I", so a
+/// reply opening "The" or "It's" is decided as it streams, as before. Talk
+/// about snoozing ("Snoozing isn't
+/// possible now.") is none.
+const SNOOZED: [(&str, Claim); 5] = [
+    ("snoozing|snoozed it|that|this|your|the", Claim::Snoozed),
+    ("snoozed $", Claim::Snoozed),
+    ("i've|i snoozed", Claim::Snoozed),
+    ("i have snoozed", Claim::Snoozed),
+    (
+        "i'll|i'm snooze|snoozing it|that|this|your|the",
+        Claim::Snoozed,
+    ),
+];
+
 /// Words said before a worded claim, then a mark ("Okay, louder."). Never a
 /// '?'.
 const LEAD_INS: [&str; 5] = [
@@ -1385,13 +1421,31 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
 /// Whether `text` (already [`normalised`]) claims an action in other words
 /// ([`WORDED`]), as [`claim`] says it.
 fn worded_claim(text: &str, ended: bool) -> Option<Option<Claim>> {
+    runs_claim(&WORDED, text, ended, false)
+}
+
+/// Whether `text` (already [`normalised`]) opens with one of `runs`, bare
+/// or after one of [`LEAD_INS`], as [`claim`] says it. With `whole_lead`,
+/// a lead-in is read only once the first word is whole, so a reply still
+/// streaming "The" is decided no claim, as the strict lines decide it.
+fn runs_claim(
+    runs: &[(&str, Claim)],
+    text: &str,
+    ended: bool,
+    whole_lead: bool,
+) -> Option<Option<Claim>> {
     let tokens = tokens(text, ended);
     let more = !ended;
+    let leads: &[&str] = if whole_lead && matches!(tokens.first(), Some(Token::Part(_))) {
+        &[]
+    } else {
+        &LEAD_INS
+    };
     let mut undecided = false;
-    for (pattern, kind) in WORDED {
+    for &(pattern, kind) in runs {
         let run = slots(pattern);
         let bare = fits(&run, &tokens, 0, more);
-        let led = LEAD_INS.iter().map(|lead| {
+        let led = leads.iter().map(|lead| {
             let mut led = slots(lead);
             led.push(Slot::Mark);
             led.extend(run.iter().copied());
@@ -1585,6 +1639,54 @@ mod tests {
             ("I'll remind you at 9:39 am", Claim::ReminderTime),
         ] {
             assert_eq!(claim(reply, true), Some(Some(kind)), "{reply:?}");
+        }
+    }
+
+    /// C68, lamp-06c1 at 11450 (11 Nov 01:30): "snooze it" got only
+    /// `list_reminders` and "Snoozing it for five minutes. Nothing is due
+    /// right now, so there's nothing to snooze." A reply that says a
+    /// reminder is snoozed is a claim with the strict lines alone, and only
+    /// `snooze_reminder` backs it; talk about snoozing is none.
+    #[test]
+    fn a_reminder_said_snoozed_is_a_claim_only_a_snooze_backs() {
+        let replay = "Snoozing it for five minutes. Nothing is due right now, so there's nothing to snooze. Was it a reminder you set \u{2014} which one?";
+        for reply in [
+            replay,
+            "Snoozed.",
+            "Okay, snoozed.",
+            "Sure \u{2014} snoozing it for ten minutes.",
+            "I've snoozed it until 1:35.",
+            "I snoozed your reminder.",
+            "I'll snooze it for five minutes.",
+        ] {
+            assert_eq!(claim(reply, true), Some(Some(Claim::Snoozed)), "{reply:?}");
+            let none = serde_json::Value::Null;
+            assert!(!stands(
+                Claim::Snoozed,
+                reply,
+                false,
+                [("list_reminders", &none)]
+            ));
+            assert!(!stands(Claim::Snoozed, reply, true, std::iter::empty()));
+            assert!(stands(
+                Claim::Snoozed,
+                reply,
+                false,
+                [("list_reminders", &none), ("snooze_reminder", &none)]
+            ));
+        }
+        // Streaming: undecided until the words decide it.
+        assert_eq!(claim("Snoo", false), None);
+        assert_eq!(claim("Snoozing it", false), None);
+        for reply in [
+            "Snoozing isn't possible once it's gone.",
+            "Snoozed?",
+            "Do you want me to snooze it?",
+            "I can't snooze that one: it was said too long ago.",
+            "I didn't snooze it.",
+            "Snooze it for how long?",
+        ] {
+            assert_eq!(claim(reply, true), Some(None), "{reply:?}");
         }
     }
 
