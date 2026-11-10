@@ -157,6 +157,11 @@ pub enum Group {
     Installed,
     /// Made on this lamp by its person ([`MADE_HERE`]).
     MadeHere,
+    /// Pushed from a paired computer (`lamp skill push`), in the pushed
+    /// folder beside the lamp's own: its `.pushed.json` says so. Not
+    /// removed or turned off from the page; `camera_allowed` is the owner's
+    /// yes to its seeing the picture.
+    Pushed,
 }
 
 /// One thing a skill may use: a name the app keys on, and its line.
@@ -395,10 +400,55 @@ pub fn list(places: &Places) -> Result<Value, String> {
             listed
         })
         .collect();
+    // The skills a computer pushed, in their own group (never a name the
+    // lamp's own folder already has: a push never takes its place).
+    for listed in pushed_rows(places, off.as_ref()) {
+        if !rows.iter().any(|other| other.name == listed.name) {
+            rows.push(listed);
+        }
+    }
     rows.sort_by(|a, b| (a.group, &a.name).cmp(&(b.group, &b.name)));
     let left_out = rows.len().saturating_sub(MOST_SKILLS);
     rows.truncate(MOST_SKILLS);
     Ok(json!({"version": VERSION, "skills": rows, "left_out": left_out}))
+}
+
+/// The folder pushed skills are kept in: beside the lamp's own, as the
+/// product has them (`/var/lib/lampOS/skills-dev`, [`lamp_skills::PUSHED_DIR`]).
+pub(crate) fn pushed_dir(places: &Places) -> PathBuf {
+    places.folder.with_file_name("skills-dev")
+}
+
+/// The rows of the skills a computer pushed, as the page lists them and as
+/// `skills.share` judges them (one test for both, so the row and Share
+/// cannot disagree): each a real folder holding `.pushed.json`, never a
+/// link; `camera_allowed` is the owner's yes when it asks the picture.
+pub(crate) fn pushed_rows(places: &Places, off: Option<&BTreeSet<String>>) -> Vec<Listed> {
+    let dev = pushed_dir(places);
+    if !fs::symlink_metadata(&dev).is_ok_and(|dev| dev.is_dir()) {
+        return Vec::new();
+    }
+    let yes = lamp_skills::package::picture_yes(&dev);
+    lamp_skills::load_each(&dev)
+        .into_iter()
+        .filter(|(folder, _)| {
+            fs::symlink_metadata(folder).is_ok_and(|folder| folder.is_dir())
+                && lamp_skills::package::pushed_from(folder).is_some()
+        })
+        .map(|(folder, loaded)| {
+            let mut listed = row(&folder, loaded, off, places.addons);
+            listed.group = Group::Pushed;
+            listed.can_remove = false;
+            listed.can_turn_off = false;
+            listed.sha256 = None;
+            listed.camera_allowed = listed
+                .may_use
+                .iter()
+                .any(|used| used.name == "camera")
+                .then(|| yes.contains(&listed.name));
+            listed
+        })
+        .collect()
 }
 
 /// What `skills.remove` says of a `name` that is not a skill's: the name
@@ -738,7 +788,7 @@ fn read_small(path: &Path) -> Option<String> {
 
 /// The off file's names; an empty set when there is none (nothing is off),
 /// and nothing when it can't be read.
-fn read_off(path: &Path) -> Option<BTreeSet<String>> {
+pub(crate) fn read_off(path: &Path) -> Option<BTreeSet<String>> {
     match fs::metadata(path) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some(BTreeSet::new()),
         Err(_) => None,
@@ -924,6 +974,91 @@ pub mod tests {
                 "may_use": [{"name": "body", "says": "moves the lamp", "privacy": null}],
             }])
         );
+    }
+
+    #[test]
+    fn a_pushed_skill_is_listed_in_its_own_group_with_the_owners_yes_for_the_picture() {
+        let places = places("pushed-list");
+        skill(
+            &places,
+            "water",
+            "Water",
+            "made: here\n",
+            "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nbody = true",
+        );
+        let dev = places.folder.with_file_name("skills-dev");
+        let pushed_places = Places {
+            folder: dev.clone(),
+            ..places.clone()
+        };
+        for (name, toml) in [
+            (
+                "wave",
+                "kind = \"installable\"\nversion = \"0.1.0\"\n[permissions]\nbody = true",
+            ),
+            (
+                "watch",
+                "format = 2\nkind = \"installable\"\nversion = \"0.1.0\"\n[permissions]\nbody = true\ncamera = true",
+            ),
+        ] {
+            skill(&pushed_places, name, name, "", toml);
+            fs::write(
+                dev.join(name).join(".pushed.json"),
+                r#"{"computer":"laptop","client":"c_1","sha256":"ab","at_unix_ms":1}"#,
+            )
+            .unwrap();
+        }
+        // A folder with no `.pushed.json` in the pushed folder is no pushed
+        // skill, and a link to a folder elsewhere is not listed.
+        skill(
+            &pushed_places,
+            "stray",
+            "Stray",
+            "",
+            "kind = \"installable\"\n[permissions]\nbody = true",
+        );
+        let outside = places.folder.with_file_name("outside");
+        fs::create_dir_all(&outside).unwrap();
+        fs::copy(dev.join("wave/SKILL.md"), outside.join("SKILL.md")).unwrap();
+        fs::copy(dev.join("wave/skill.toml"), outside.join("skill.toml")).unwrap();
+        fs::copy(dev.join("wave/.pushed.json"), outside.join(".pushed.json")).unwrap();
+        std::os::unix::fs::symlink(&outside, dev.join("linked")).unwrap();
+        let rows = listed(&places);
+        let of = |name: &str| rows.iter().find(|row| row["name"] == name).cloned();
+        assert_eq!(of("water").unwrap()["group"], "made_here");
+        let wave = of("wave").unwrap();
+        assert_eq!(wave["group"], "pushed");
+        assert_eq!(
+            (
+                &wave["can_remove"],
+                &wave["can_turn_off"],
+                &wave["loads"],
+                &wave["camera_allowed"]
+            ),
+            (&json!(false), &json!(false), &json!(true), &json!(null))
+        );
+        // It asks the picture and the owner has not said yes: false; with
+        // their yes for these bytes: true.
+        assert_eq!(of("watch").unwrap()["camera_allowed"], false);
+        fs::write(
+            dev.join(".yes.json"),
+            r#"[{"name":"watch","client":"c_1","sha256":"ab"}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            listed(&places)
+                .iter()
+                .find(|row| row["name"] == "watch")
+                .unwrap()["camera_allowed"],
+            true
+        );
+        assert!(of("stray").is_none() && of("linked").is_none());
+        // Pushed come after the made-here ones.
+        let groups: Vec<_> = rows
+            .iter()
+            .map(|row| row["group"].as_str().unwrap())
+            .collect();
+        assert_eq!(groups, ["made_here", "pushed", "pushed"]);
     }
 
     #[test]
