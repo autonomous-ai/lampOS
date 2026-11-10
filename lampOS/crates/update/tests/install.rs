@@ -530,6 +530,22 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
     assert_eq!(state["installed"]["sequence"], 188, "{state}");
 }
 
+/// The fast camera stream (#5894): the eyes serve their frames to lamp-control
+/// only with `LAMP_EYES_FAST_STREAM=on`, so the product sets it in the eyes'
+/// unit.
+#[test]
+fn the_product_serves_the_fast_camera_stream_from_the_eyes() {
+    let unit = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-eyes.service")
+        .unwrap()
+        .1;
+    assert!(
+        section(unit, "Service").contains(&"Environment=LAMP_EYES_FAST_STREAM=on"),
+        "lamp-eyes.service lacks LAMP_EYES_FAST_STREAM=on"
+    );
+}
+
 /// The lines install said about the lamp-update running it (#3733).
 fn updater_said(lamp: &Lamp) -> Vec<&str> {
     lamp.said
