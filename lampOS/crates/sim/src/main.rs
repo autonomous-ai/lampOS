@@ -136,6 +136,24 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             let _ = voice::serve_actions(&act);
         }));
     }
+    // Skill push: the real `lamp-skills asked` on a socket of ours, as systemd's
+    // manage socket starts it on a lamp, if lamp-skills is beside the others;
+    // without it skill push is off, as on a lamp that has no helper.
+    let skills_bin = bin.join("lamp-skills");
+    let manage_on = skills_bin.is_file();
+    if manage_on {
+        let (socket, log) = (dir.join("manage.sock"), dir.join("skills.log"));
+        let folders = lamp_sim::manage::Folders::in_dir(dir);
+        threads.push(spawn_named("skills manage socket", move || {
+            if let Err(error) = lamp_sim::manage::serve(&socket, &skills_bin, folders, &log) {
+                // lamp-control is still given the socket: without a word here,
+                // a skill push would just fail (a long lamp folder path is the usual cause).
+                eprintln!("lamp-sim: the skills manage socket ended: {error}");
+            }
+        }));
+    } else {
+        eprintln!("lamp-sim: no lamp-skills beside lamp-sim: skill.push is off");
+    }
     // The ring, before lamp-control asks it anything.
     let bus = lamp_bus::Bus::new(&bus_root)?;
     // One boot id for the ring and lamp-control (macOS has no /proc).
@@ -242,6 +260,12 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             ])
             .args(["--sight-file", &d("sight.jpg")])
             .args(camera_on_mark.then_some("--camera-opens-on-demand"))
+            .args(
+                manage_on
+                    .then(|| ["--manage-socket".to_owned(), d("manage.sock")])
+                    .into_iter()
+                    .flatten(),
+            )
             .args(["--microphone", if microphone_on { "on" } else { "off" }])
             .env("LAMP_BUS_AUDIO", "on")
             .process_group(0)
