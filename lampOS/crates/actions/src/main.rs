@@ -25,6 +25,7 @@ const HELP: &str = "The lamp's executive: carries out what the voice's model ask
   LAMP_OUTPUT_CAPS_DIR is the same folder, as the product unit passes it; --caps-dir wins when both are given.\n\
   LAMP_OUTPUT_CAPS=on enables private caps_put/caps_remove/caps_get operations. Every other value leaves storage, hardware and bus behavior unchanged. No cap operations are model tools.\n\
   LAMP_SCHEDULE_TOOLS=on enables six reminder tools; LAMP_SCHEDULE_SOCKET is an absolute socket path (default /run/lampos-schedule/call.sock). Other switch values leave the old tool list unchanged.\n\
+  LAMP_VOLUME_KEPT=on keeps the person's volume in LAMP_OUTPUT_CAPS_DIR/kept-volume after each change (never a mute), and sets it back at the start.\n\
   LAMP_SHORT_DONE=on tells the model to say only a word or two after a light or volume change it asked for.\n\
   LAMP_REQUESTED_AUDIO=on publishes speaker mute generations and volume observations; requires --bus-root and the Linux host boot clock. Other values add no mixer polling or speaker topic.";
 
@@ -144,9 +145,48 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let sound = arguments
+    let mut sound = arguments
         .mixer
         .map(|(card, control)| Volume::new(Amixer { card, control }, arguments.ceiling));
+    // The person's level, kept across a power cut (#5551): set back before
+    // it serves, then each later change kept in the same durable folder.
+    if lamp_actions::kept_volume::on(
+        std::env::var_os(lamp_actions::kept_volume::ENVIRONMENT).as_deref(),
+    ) {
+        match (sound.take(), arguments.caps_dir.as_ref()) {
+            (Some(mut volume), Some(directory)) => {
+                use lamp_actions::kept_volume as kept;
+                if let Some(level) = kept::read(directory) {
+                    let mut restored = Err(String::new());
+                    for _ in 0..kept::RESTORE_TRIES {
+                        restored = volume.restore(level);
+                        if restored.is_ok() {
+                            break;
+                        }
+                        std::thread::sleep(kept::RESTORE_EVERY);
+                    }
+                    match restored {
+                        Ok(now) => {
+                            eprintln!("lamp-actions: the kept volume {level} is set back ({now})")
+                        }
+                        Err(why) => eprintln!(
+                            "lamp-actions: the kept volume {level} is not set back: {why}"
+                        ),
+                    }
+                }
+                eprintln!(
+                    "lamp-actions: the person's volume is kept across a power cut (LAMP_VOLUME_KEPT)"
+                );
+                sound = Some(volume.keeping(Box::new(kept::Keeper::start(directory.clone()))));
+            }
+            (volume, _) => {
+                eprintln!(
+                    "lamp-actions: LAMP_VOLUME_KEPT needs a mixer and LAMP_OUTPUT_CAPS_DIR; the volume is not kept"
+                );
+                sound = volume;
+            }
+        }
+    }
     let speaker =
         match lamp_actions::speaker_state::Service::from_environment(arguments.bus.as_deref()) {
             Ok(speaker) => speaker,

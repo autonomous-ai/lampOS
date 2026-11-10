@@ -25,6 +25,7 @@
 
 pub mod caps;
 pub mod caps_service;
+pub mod kept_volume;
 pub mod light;
 pub mod schedule;
 pub mod server;

@@ -55,6 +55,8 @@ pub struct Volume<M> {
     observation_sequence: Option<u64>,
     /// The raw level last read from the mixer, as it is (`heard`).
     heard_raw: Option<u8>,
+    /// Told each level a person's change left (`kept_volume`, #5551).
+    keeper: Option<Box<dyn crate::kept_volume::Keep + Send>>,
 }
 
 const UNREAD: &str = "I could not read my speaker's volume.";
@@ -73,7 +75,30 @@ impl<M: Mixer> Volume<M> {
             observation_revocation: Some(0),
             observation_sequence: Some(0),
             heard_raw: None,
+            keeper: None,
         }
+    }
+
+    /// Each level a person's change leaves is told to `keeper`; a mute and
+    /// a temporary limit are not (`kept_volume`, #5551).
+    pub fn keeping(mut self, keeper: Box<dyn crate::kept_volume::Keep + Send>) -> Self {
+        self.keeper = Some(keeper);
+        self
+    }
+
+    fn kept(&mut self, level: u8) {
+        if level > 0
+            && let Some(keeper) = self.keeper.as_mut()
+        {
+            keeper.keep(level);
+        }
+    }
+
+    /// At a start, the level kept from before, set back: never past the
+    /// ceiling and never silent. Read back, as any write.
+    pub fn restore(&mut self, kept: u8) -> Result<u8, String> {
+        let level = kept.clamp(1, self.ceiling());
+        self.write(level)
     }
 
     /// The volume as last read from the mixer, with no new read: what
@@ -201,7 +226,10 @@ impl<M: Mixer> Volume<M> {
     /// point either way is the level asked for.
     fn change(&mut self, from: u8, to: u8, said: impl Fn(u8) -> String) -> Outcome {
         match self.write(to) {
-            Ok(now) if now != from || to == from => Outcome::Done(said(now)),
+            Ok(now) if now != from || to == from => {
+                self.kept(now);
+                Outcome::Done(said(now))
+            }
             Ok(_) => {
                 self.record_observation(None);
                 Outcome::Failed(UNCONFIRMED.into())
@@ -329,6 +357,7 @@ impl<M: Mixer> Volume<M> {
         if now > 0 {
             self.before_mute = None;
         }
+        self.kept(now);
         Ok(self.level_at(now))
     }
 }
@@ -425,6 +454,61 @@ pub(crate) mod tests {
             Ok(())
         }
     }
+    /// Every level it is told, shared with the test.
+    #[derive(Clone, Default)]
+    struct Told(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+    impl crate::kept_volume::Keep for Told {
+        fn keep(&mut self, level: u8) {
+            self.0.lock().unwrap().push(level);
+        }
+    }
+
+    #[test]
+    fn a_persons_change_is_kept_and_a_mute_or_a_limit_never_is() {
+        let told = Told::default();
+        let mut volume = at(50, 100).keeping(Box::new(told.clone()));
+        let kept = || told.0.lock().unwrap().clone();
+        said(volume.up());
+        said(volume.down());
+        assert_eq!(volume.to_share(30).unwrap().raw, 30);
+        assert_eq!(kept(), [50 + STEP, 50, 30]);
+        said(volume.mute());
+        assert_eq!(volume.to_share(0).unwrap().raw, 0);
+        assert_eq!(kept(), [50 + STEP, 50, 30], "a mute is never kept");
+        said(volume.unmute());
+        assert_eq!(kept(), [50 + STEP, 50, 30, 30]);
+        volume.set_limit(Some(20)).unwrap();
+        volume.set_limit(None).unwrap();
+        assert_eq!(
+            kept(),
+            [50 + STEP, 50, 30, 30],
+            "a limit is not the person's"
+        );
+        // Nothing changed: nothing kept.
+        let mut quiet = at(100, 100).keeping(Box::new(told.clone()));
+        assert!(matches!(quiet.up(), Outcome::Already(_)));
+        assert_eq!(kept().len(), 4);
+    }
+
+    #[test]
+    fn a_kept_level_is_set_back_within_the_ceiling_and_never_silent() {
+        let mut volume = at(100, 100);
+        assert_eq!(volume.restore(56), Ok(56));
+        assert_eq!(volume.mixer.level, 56);
+        let mut lower = at(100, 40);
+        assert_eq!(lower.restore(90), Ok(40));
+        assert_eq!(lower.restore(0), Ok(1));
+        let mut broken = Volume::new(
+            Fake {
+                level: 100,
+                unwritable: true,
+                ..Fake::default()
+            },
+            100,
+        );
+        assert!(broken.restore(56).is_err());
+    }
+
     fn at(level: u8, ceiling: u8) -> Volume<Fake> {
         Volume::new(
             Fake {

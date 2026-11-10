@@ -273,6 +273,23 @@ what can't be read is said so, and what can't be confirmed within 0.6 s is
 said so. A ring really gone drops out after the grace. A light never seen
 is never offered.
 
+**The person's volume, kept across a power cut** (#5551, `LAMP_VOLUME_KEPT`,
+on in the product unit). A V2 lamp has no power button and is unplugged, so
+it almost never gets the clean shutdown at which `alsa-restore` stores the
+mixer: `/var/lib/alsa/asound.state` was never written on lamp-a63e, and the
+softvol `Speaker` control came back at 100 % at every boot, whatever the
+person had chosen. So this program keeps the level itself
+(`kept_volume.rs`): after each change a person asks for (louder, quieter,
+unmute, the app's slider), once changes stop for 1.5 s, the level is
+written to `kept-volume` in `LAMP_OUTPUT_CAPS_DIR` (synced, then renamed in
+place; the product reset wipes the folder). At its start, before it serves,
+it sets the control back to that level, within the ceiling, trying for up to
+5 s while the speaker's first open makes the control. A mute is never kept,
+so a lamp never comes back silent, and a temporary limit is not the
+person's choice, so it is not kept either. With no file nothing is set, and a
+new or reset lamp keeps its setup's level (#5576). The write is on its own
+thread: a change is answered before it.
+
 A light call is answered once the ring says it shows the light. The ring
 looks at what is asked on every pass of its 2 ms loop and says it at once,
 and the executive reads that every 2 ms. So a call takes a few milliseconds:
