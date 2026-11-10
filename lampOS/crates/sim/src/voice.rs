@@ -198,6 +198,9 @@ mod tests {
 
     #[test]
     fn a_text_that_starts_with_a_dash_reaches_the_engine_as_words_on_stdin() {
+        let _one_at_a_time = crate::FAKE_PROGRAM
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let dir = scratch("voice");
         std::fs::create_dir_all(&dir).unwrap();
         let engine = dir.join("engine.sh");
@@ -234,6 +237,9 @@ mod tests {
 
     #[test]
     fn a_cancel_cuts_the_speech_off_at_once() {
+        let _one_at_a_time = crate::FAKE_PROGRAM
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let dir = scratch("cancel");
         std::fs::create_dir_all(&dir).unwrap();
         let engine = dir.join("slow.sh");
