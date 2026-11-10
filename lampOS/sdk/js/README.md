@@ -74,7 +74,9 @@ answers `busy`). `--everything` answers every op instead.
 ## See the lamp as it stands: the twin
 
 `examples/twin/` draws the lamp in 3D from its rigged CAD and `model`, moving
-with `body.state`, the ring in the light's colour. Dragging a joint's slider
+with `body.state`, the ring as 32 lights round the head: each one pixel of
+`light.shows.pixels` when the lamp says them (32 of `#rrggbb`; no lamp does yet),
+else the light's colour on all 32. Dragging a joint's slider
 sends `joints` under a body lease, and the lamp follows.
 
 ```sh

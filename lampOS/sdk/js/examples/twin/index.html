@@ -104,6 +104,7 @@ const TINTS = { yellow: [1, 0.8, 0], red: [1, 0, 0], green: [0, 1, 0.12], blue: 
   purple: [0.62, 0, 1], orange: [1, 0.34, 0], pink: [1, 0.22, 0.42], white: [1, 0.88, 0.72], warm: [1, 0.55, 0] };
 const glow = new THREE.PointLight(0xffb060, 0, 0.6);
 const glowRange = (size) => (glow.distance = size);
+// `disc` is no longer drawn: it only carries the light's colour for the status swatch below.
 const disc = new THREE.Mesh(new THREE.SphereGeometry(0.012, 24, 16), new THREE.MeshBasicMaterial({ color: 0x222222 }));
 
 const bones = {};
@@ -128,7 +129,21 @@ floor.scale.setScalar(size * 2);
 floor.position.y = box.min.y;
 glowRange(size);
 const head = bones[model.chain[model.chain.length - 1]];
-if (head) { head.add(glow); head.add(disc); disc.position.set(0, 0.05, 0); glow.position.copy(disc.position); }
+// The ring: 32 small lights round the head's opening, in the head bone's own
+// frame (y along the shade's axis; measured from lamp.glb: the rim is at
+// y 0.07 to 0.08 m, 0.10 m out, so the ring sits just inside it). Each shows
+// one pixel of the ring when the lamp says them (`light.shows.pixels`, 32 of
+// `#rrggbb`), else the light's one colour on all 32.
+const RING = { pixels: 32, y: 0.072, radius: 0.072, centre: [0, -0.017] };
+const DOT_GAIN = 1.8;
+const pixelDots = [];
+for (let i = 0; i < RING.pixels; i++) {
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.0045, 12, 8), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+  const turn = (i / RING.pixels) * Math.PI * 2;
+  dot.position.set(RING.centre[0] + Math.cos(turn) * RING.radius, RING.y, RING.centre[1] + Math.sin(turn) * RING.radius);
+  pixelDots.push(dot);
+}
+if (head) { head.add(glow); glow.position.set(RING.centre[0], RING.y - 0.01, RING.centre[1]); for (const dot of pixelDots) head.add(dot); }
 status.textContent = `the lamp: ${model.hardware}, ${model.chain.join(' → ')}; origins ${model.measured.origins}`;
 
 // Each joint turns its bone about its axis by sign × (deg − zero), after rest.
@@ -219,6 +234,12 @@ function connect() {
     const share = on ? Math.min(5, Math.max(1, light.level ?? 3)) / 5 : 0;
     const tint = new THREE.Color(...(on ? TINTS[light.colour] : [0.13, 0.13, 0.13]));
     disc.material.color.copy(on ? tint.clone().multiplyScalar(0.4 + 0.6 * share) : tint);
+    const pixels = Array.isArray(lamp.light?.shows?.pixels) && lamp.light.shows.pixels.length === RING.pixels ? lamp.light.shows.pixels : null;
+    // The ring's pixels are capped (120 of 255) as the real ring's are, and a flat dot has no bloom, so
+    // the dots are drawn brighter than the lamp says (display only, like the glow).
+    pixelDots.forEach((dot, i) => { dot.material.color.set(pixels ? pixels[i] : disc.material.color); dot.material.color.multiplyScalar(DOT_GAIN); });
+    // Pixel by pixel, the glow on the floor is the ring's average, not the named colour.
+    if (pixels) { const sum = pixels.reduce((a, hex) => { const c = new THREE.Color(hex); return [a[0] + c.r, a[1] + c.g, a[2] + c.b]; }, [0, 0, 0]); tint.setRGB(sum[0] / pixels.length, sum[1] / pixels.length, sum[2] / pixels.length); }
     glow.color.copy(tint);
     glow.intensity = share * 2;
     document.getElementById('ring').style.background = `#${disc.material.color.getHexString()}`;
