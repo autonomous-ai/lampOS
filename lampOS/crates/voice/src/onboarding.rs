@@ -3289,7 +3289,9 @@ impl Onboarding {
                 self.invited = true;
                 self.records
                     .push(json!({"kind":"onboarding_invite","at_us":now_us}));
-                return Some(INVITE.to_owned());
+                // The walk's own line, said as it is with no chat asked
+                // (Third's P2 on #5937): never a note the model words.
+                return Some(own_line(INVITE.to_owned()));
             }
             return None;
         };
@@ -7221,7 +7223,13 @@ mod tests {
         let start = room.at;
         assert!(room.wait(19 * S, None).is_empty());
         assert!(room.walk.rising(room.at));
-        assert_eq!(room.wait(5 * S, None), [INVITE]);
+        let invite = own_line(INVITE.to_owned());
+        assert_eq!(room.wait(5 * S, None), [invite.clone()]);
+        // Its own line: the second route says these words, asking no chat.
+        assert_eq!(
+            own_words(&invite),
+            Some("Hi! I'm your lamp. Come sit in front of me, and we'll get to know each other.")
+        );
         assert_eq!(
             room.walk
                 .records
