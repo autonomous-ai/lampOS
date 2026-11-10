@@ -48,16 +48,40 @@ sau:
    chấp nhận (`make_skill_local::EXAMPLE`, `example-only`: màu cyan mức 2
    trong 25 giây khi có người ở đó, được gọi rõ là ví dụ về hình thức,
    "never answer with it") và được dặn rằng kỹ năng không
-   nói được và không tự giữ giờ được. Câu trả lời phải đúng hai khối có rào,
+   tự giữ giờ được, và cách nó nói (dưới đây, #6055). Câu trả lời phải đúng hai khối có rào,
    `skill.toml` và `SKILL.md`, mỗi khối tối đa 8 KiB.
 4. **Giới hạn những gì kỹ năng tạo ra được dùng** (giới hạn của điều phối
    viên, 19/10):
    - `kind` là installable, có phiên bản;
-   - `[permissions]` chỉ có `light`, `body`, và `topics` trong số
+   - `[permissions]` chỉ có `light`, `body`, `speak`, và `topics` trong số
      `voice/state` và `room/presence`;
    - không có hàm cho mô hình (`tool`);
    - `[ask] policy` chỉ là `nudge`, không bao giờ là lời chào, tin tức hay lời nhắc;
-   - nói, tin nhắn, cái nhìn và mọi chủ đề khác đều bị từ chối.
+   - tin nhắn, cái nhìn, khuôn mặt quen, hành động và mọi chủ đề khác đều
+     bị từ chối.
+   - **Kỹ năng được nói** (#6055, chủ ứng dụng, 10/11: "Say hello when I
+     sit down at my desk", ví dụ của chính ứng dụng, bị từ chối hoặc bị sửa
+     thành một lệnh đèn). `speak = true` cùng một bước `[[do]]`
+     `say = "greet them warmly"` (một `say` mỗi kỹ năng, như `lamp-skills`
+     nhận), một mình hoặc cạnh bước đèn và cử chỉ: một ghi chú mà giọng nói nói bằng lời của chính nó, bằng
+     ngôn ngữ của cuộc trò chuyện, như ghi chú của mọi kỹ năng (`do.say`,
+     qua dịch vụ say, lần chạy được hỏi Policy như một nudge). Ghi chú là
+     một chuỗi một mệnh đề, tối đa 60 ký tự
+     (`made_skill::MOST_SAY_NOTE_CHARS`), không có dấu ngoặc kép (dấu nháy
+     trong một từ thì giữ), không có `.`, `!`, `?`, `;` hay `:` trừ một dấu
+     ở cuối, không có ngoặc nhọn và ký tự điều khiển
+     (`made_skill::say_note`); không bao giờ là `{ text }`, danh sách câu
+     hay `{ from = ... }`. Một `say` không phải ghi chú như vậy bị từ chối
+     ("what it would say isn't one short note; try saying it in a few
+     words, like 'greet me warmly'"), hai bước `say` ("it would say more
+     than one line"), bước `say` không có `speak = true`
+     ("it would say something without asking for its voice") và
+     `speak = true` không có bước `say` nào và không đọc dịch vụ ("it asks
+     for its voice but never says anything"), mỗi cái được sửa như lỗi của
+     giới hạn. Trình quản lý giữ lại giới hạn này lần nữa (`put_on_cap`),
+     nên một gói đã giữ mà nói điều gì khác không bao giờ được bật. Kỹ năng
+     đọc một dịch vụ liên kết giữ quy tắc riêng của nó dưới đây: một bước
+     đọc và không gì khác.
    Mở rộng giới hạn này là quyết định của trưởng nhóm. Lần mở rộng duy nhất
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
    `lamp-skills-manage@`, bật trong các unit sản phẩm): `services` nêu một dịch vụ
@@ -122,8 +146,12 @@ sau:
      kèm các dòng của bước kiểm tra (thư mục được thay bằng `<folder>`, tối
      đa 560 byte) trước lời yêu cầu của người dùng
      (`made_skill::repair_brief`). Tối đa `make_skill_local::MOST_REPAIRS`
-     (3) lần, mỗi lần chỉ bắt đầu khi thêm một câu trả lời (30 s) vẫn kết
-     thúc trong `MAKE_WITHIN` (120 s); journal ghi `a made skill's repair N
+     (3) lần, mỗi lần chỉ bắt đầu khi thêm một lượt vẫn kết
+     thúc trong `MAKE_WITHIN` (120 s): một lượt tối đa là hai câu trả lời
+     30 s (`ROUND_WITHIN`), vì câu trả lời bị cắt hay lỗi được hỏi lại một
+     lần, nên không lần sửa nào bắt đầu sau 60 s và việc tạo kết thúc trong
+     120 s (P2 của người đọc trên #6054: chỉ tính một câu trả lời thì lần
+     sửa bắt đầu ở 89 s có thể kết thúc gần 149 s khi giọng nói giữ lượt); journal ghi `a made skill's repair N
      of 3: <why>` mỗi lượt. Lỗi của bước kiểm tra, của phần nói rõ bên
      dưới, của giới hạn quyền (lý do của đèn và những gì kỹ năng tự tạo
      được có, `CAPPED_ONLY`), TOML không đọc được, hoặc khi trả lại chính ví
@@ -161,8 +189,14 @@ sau:
      vì `lamp-skills` chỉ tính nó khi đó: "When someone comes back to the
      desk after it was empty for 5 minutes"), trigger khác "đèn nghỉ" hoặc
      "có/không có người", hay bước khác một lệnh đèn (`colour`, `level`,
-     `for`, hoặc chỉ `dim`) hoặc một cử chỉ (`nod`, `curious`) đều bị từ
-     chối. Người dùng được nói `made_skill::UNSAID` (lời dễ hiểu, gợi ý nói
+     `for`, hoặc chỉ `dim`), một cử chỉ (`nod`, `curious`) hoặc một ghi
+     chú `say` như trên đều bị từ chối. Bước `say` được nói kèm ghi chú
+     trong mệnh đề riêng, không có ngoặc kép bên trong: "When someone has
+     been at the desk for 5 seconds, it says a short line in its own words:
+     greet them warmly, at most once an hour." Bước `say` không nói được
+     thì lần sửa nêu nó cùng thế nào là một `say` ("[[do]] step 1, say: one
+     short note, a few words, one clause, no quotes"), và `PLAIN_ONLY` nói
+     một bước có thể là một `say` với `speak = true`. Người dùng được nói `made_skill::UNSAID` (lời dễ hiểu, gợi ý nói
      khi nào chạy, như 'when I come to my desk', và làm gì, như 'glow
      green'). Lần sửa nêu phần không nói được, chỉ bằng các khóa và topic
      của trigger, không bao giờ giá trị ("Can't be said plainly: trigger
