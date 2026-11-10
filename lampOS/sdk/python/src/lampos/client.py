@@ -940,6 +940,17 @@ class Lamp:
         `(r, g, b)`, for `for_ms`, at `brightness` 0-100."""
         return await self._act("light", False, rgb=_hex(rgb), brightness=brightness, fade_ms=fade_ms, for_ms=for_ms)
 
+    async def light_off(self, *, for_ms: int = 30_000) -> dict:
+        """Put the lamp's light out for `for_ms` (30 s at most), as a black
+        ring: there is no level 0 for `light`, and a ring of black pixels is
+        how a program turns the light off. The lamp's own light comes back
+        when it lapses or at `stop()`; ask again before it lapses to keep it
+        out. Needs a lamp with a pixel ring (`ring_pixels`)."""
+        count = self.ring_pixels
+        if count is None:
+            raise LampError("light_off needs a lamp with a pixel ring: this one has none", code="bad_request")
+        return await self.ring(["#000000"] * count, for_ms=for_ms)
+
     async def say(self, text: str, *, rephrase: bool = False, wait: bool = False) -> dict:
         """Say `text` in the lamp's voice, exactly as written, once the person
         isn't talking. `rephrase=True` lets the lamp's model say it in its own

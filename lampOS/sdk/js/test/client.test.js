@@ -34,6 +34,19 @@ test('the packaged schema is the repository\'s', (t) => {
   assert.deepEqual(JSON.parse(readFileSync(repoSchema, 'utf8')), schema.schema);
 });
 
+test('light_off is a black ring for a while', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    const count = lamp.ringPixels;
+    assert.ok(count);
+    await lamp.lightOff({ forMs: 5000 });
+    const asked = fake.received.filter((f) => f.op === 'light').at(-1);
+    assert.deepEqual(asked.pixels, Array(count).fill('#000000'));
+    assert.equal(asked.for_ms, 5000);
+    await lamp.lightOff();
+    assert.equal(fake.received.filter((f) => f.op === 'light').at(-1).for_ms, 30000);
+  });
+});
+
 test('proofs name what they are for', async () => {
   const { HELLO, PAIR, proof } = await import('../src/keys.js');
   const { createHmac } = await import('node:crypto');

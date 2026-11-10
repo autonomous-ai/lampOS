@@ -773,6 +773,26 @@ def test_the_fakes_light_state_shows_what_the_ring_draws(tmp_path):
     run(go())
 
 
+def test_light_off_is_a_black_ring_for_a_while(tmp_path):
+    """No level 0 for `light`: the way to put the light out is a ring of
+    black pixels (blue's bedtime app)."""
+
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                count = lamp.ring_pixels
+                assert count
+                await lamp.light_off(for_ms=5_000)
+                asked = fake.asked("light")[-1]
+                assert asked["pixels"] == ["#000000"] * count and asked["for_ms"] == 5_000
+                # By default 30 s, the longest a light asks.
+                await lamp.light_off()
+                assert fake.asked("light")[-1]["for_ms"] == 30_000
+
+    run(go())
+
+
 def test_get_replies_with_light_and_shows_are_the_schemas():
     jsonschema = pytest.importorskip("jsonschema")
     validator = jsonschema.Draft202012Validator({**schema.schema(), "$ref": "#/$defs/reply"})

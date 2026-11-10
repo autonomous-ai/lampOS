@@ -688,6 +688,15 @@ export class Lamp {
     try { colour = hex(rgb); } catch (error) { return Promise.reject(error); }
     return this.act('light', { rgb: colour, brightness, fade_ms: fadeMs, for_ms: forMs });
   }
+  // Put the lamp's light out for `forMs` (30 s at most), as a black ring: there is no level 0 for `light`, and a ring
+  // of black pixels is how a program turns the light off. The lamp's own light comes back when it lapses or at
+  // `stop()`; ask again before it lapses to keep it out. Needs a lamp with a pixel ring (`ringPixels`).
+  lightOff({ forMs = 30_000 } = {}) {
+    if (this.ringPixels === undefined) {
+      return Promise.reject(new LampError('light_off needs a lamp with a pixel ring: this one has none', { code: 'bad_request' }));
+    }
+    return this.ring(Array(this.ringPixels).fill('#000000'), { forMs });
+  }
   // Say `text` in the lamp's voice, exactly as written, once the person isn't talking; `{ rephrase: true }` lets the
   // lamp's model say it in its own words instead, as before.
   say(text, { rephrase, wait = false } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }, wait); }
