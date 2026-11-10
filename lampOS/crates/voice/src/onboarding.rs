@@ -869,6 +869,12 @@ struct Answers {
     /// ([`face_save_let_go`]): the step closes by [`LET_GO_CLOSE_US`] after
     /// it unless the person answers again meanwhile.
     let_go_us: Option<u64>,
+    /// The face question was said ([`Onboarding::lamp_words`]), by the
+    /// model or by the walk ([`skill::FACE_ASK`]): the walk asks it at most once.
+    face_asked: bool,
+    /// The latest answer after the name was a yes, not a no: only then does
+    /// the walk ask for the face ([`skill::FACE_ASK`]).
+    name_yes: bool,
     /// The model reported "who you are" done while a face save was held:
     /// the step ends done, the name only, once the hold is over unless the
     /// face is saved first.
@@ -2687,6 +2693,7 @@ impl Onboarding {
                     // Reviewer-lead's P2 on #3992).
                     if face_kept {
                         led.heard.face_answered_us = Some(now_us);
+                        led.heard.name_yes = true;
                     }
                     !face_kept
                 } else if read.names_someone {
@@ -2719,6 +2726,7 @@ impl Onboarding {
                         "lamp-voice: onboarding: who_you_are heard a no after the name: the face wait restarts"
                     );
                     led.heard.face_answered_us = Some(now_us);
+                    led.heard.name_yes = false;
                     false
                 } else {
                     // "No" to the name the lamp checked: not known.
@@ -2974,6 +2982,20 @@ impl Onboarding {
         if let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) {
             led.spoke = true;
             led.lamp_said_us = Some(now_us);
+        }
+    }
+
+    /// The lamp's own words, as they come: whether "who you are"'s face
+    /// question was said, by the worker's own rule
+    /// (`known_faces::asks_for_the_face`), so the walk never asks it again.
+    pub fn lamp_words(&mut self, text: &str) {
+        if let Some(led) = self
+            .led
+            .as_mut()
+            .filter(|led| led.step == Step::WhoYouAre && led.asked_us.is_some())
+            && crate::known_faces::asks_for_the_face(text)
+        {
+            led.heard.face_asked = true;
         }
     }
 
@@ -3345,6 +3367,30 @@ impl Onboarding {
             .heard
             .save_held_us
             .is_some_and(|at| now_us.saturating_sub(at) < FACE_SAVE_HELD_US);
+        // A name and a yes with no face question said (#5931, lamp-52e6 10
+        // Nov: "Yes. That's my name." got "your name settled" and nothing
+        // more): the walk asks it itself, once, after the short quiet a step
+        // starts on. Its yes runs the save in the worker; the face wait runs
+        // from the question, as from any of the lamp's words.
+        if step == Step::WhoYouAre
+            && self.face_kept
+            && !led.face_only
+            && !led.heard.face_asked
+            && led.heard.name
+            && led.heard.name_yes
+            && can_speak
+            && quiet_us >= START_QUIET_US
+            && !save_held
+        {
+            led.heard.face_asked = true;
+            led.heard.face_answered_us = Some(now_us);
+            eprintln!(
+                "lamp-voice: onboarding: who_you_are: a name and a yes, no face question said: the walk asks it"
+            );
+            self.records
+                .push(json!({"kind":"onboarding_face_asked","at_us":now_us}));
+            return Some(skill::FACE_ASK.to_owned());
+        }
         if step == Step::WhoYouAre
             && quiet_us >= START_QUIET_US
             && !save_held
@@ -7168,6 +7214,107 @@ mod tests {
             room.wait(S, Some(NEAR_MIDDLE));
             assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done), "{yes}");
         }
+    }
+
+    /// #5931, lamp-52e6 10 Nov 12:15: "Yes. That's my name." after the
+    /// read-back, and the model said "your name settled" and never asked
+    /// for the face. The walk asks it itself, once, as a fixed note the
+    /// model says (so it is in the chat history); silence after it still
+    /// ends the step with the name only.
+    #[test]
+    fn a_name_and_a_yes_with_no_face_question_get_the_walks_face_question() {
+        let mut room = Room::new("face-asked-by-walk");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("My name is Walter.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Walter, did I get that right?");
+        room.walk.heard("Yes. That's my name.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Yes, that's your name settled, then.");
+        // The room's clock counts quiet from the walk's last note, so the
+        // question comes on the next tick.
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::FACE_ASK]);
+        assert!(
+            room.walk
+                .take_records()
+                .iter()
+                .any(|line| line["kind"] == "onboarding_face_asked")
+        );
+        // Once: the wait runs from the question, and nothing is asked again.
+        assert_eq!(
+            room.wait(FACE_SAVE_WAIT_US - 2 * S, Some(NEAR_MIDDLE)),
+            NONE
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        let notes = room.wait(2 * S, Some(NEAR_MIDDLE));
+        assert_eq!(notes.first().map(String::as_str), Some(skill::NAME_ONLY));
+        assert!(
+            !notes.iter().any(|note| note == skill::FACE_ASK),
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// The walk's face question and its yes end the step once the face is
+    /// saved, as the model's question did; and the model's own question,
+    /// said first, is never asked again by the walk.
+    #[test]
+    fn the_face_question_is_asked_once_by_whoever_asks_first() {
+        let mut room = Room::new("face-asked-then-saved");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("My name is Walter.", room.at);
+        room.walk.heard("Yes.", room.at);
+        assert_eq!(
+            room.wait(START_QUIET_US + S, Some(NEAR_MIDDLE)),
+            [skill::FACE_ASK]
+        );
+        room.walk.heard("Yes.", room.at);
+        face_saved(&room.walk.file, Some("Walter"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+
+        // The model asked it, in pieces as the words come: never again.
+        let mut room = Room::new("face-asked-by-model");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("My name is Walter.", room.at);
+        room.walk.heard("Yes.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("May I remember your face,");
+        room.walk
+            .lamp_words("May I remember your face, so I know you next time?");
+        let notes = room.wait(
+            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+            Some(NEAR_MIDDLE),
+        );
+        assert!(
+            !notes.iter().any(|note| note == skill::FACE_ASK),
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// The walk's face question, in every language it speaks, is one the
+    /// worker's setup save reads as the face question
+    /// (`known_faces::asks_for_the_face`), so its yes runs the save with no
+    /// model call (#5684).
+    #[test]
+    fn the_walks_face_question_is_the_one_the_worker_takes_a_yes_to() {
+        let english = fixed_words(skill::FACE_ASK).expect("a fixed line");
+        assert!(crate::known_faces::asks_for_the_face(english));
+        let vietnamese = in_language::said(
+            skill::FACE_ASK.to_owned(),
+            Some(crate::language::Language::Vietnamese),
+        );
+        assert_ne!(vietnamese, skill::FACE_ASK);
+        assert!(crate::known_faces::asks_for_the_face(
+            fixed_words(&vietnamese).expect("a fixed line")
+        ));
     }
 
     /// The Reviewer-lead's P2s on #3992: with a face to keep, a face no of
