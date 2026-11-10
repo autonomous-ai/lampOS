@@ -5,6 +5,7 @@
 //!                    [--mood-socket PATH] [--say-socket PATH] [--actions-socket PATH]
 //!                    [--bus-root DIR] [--boot-id ID]
 //!                    [--sight-file PATH|off] [--frames-socket PATH|off] [--remote on|off]
+//!                    [--camera-opens-on-demand]
 //!                    [--microphone on|off]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
@@ -347,10 +348,14 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         if let Some(actions) = actions {
             lamp = lamp.volume_through(actions);
         }
+        let on_demand = arguments.iter().any(|a| a == "--camera-opens-on-demand");
         let lamp = match sight {
             Some((sight, mark)) => match frames {
-                Some(frames) => lamp.seeing(sight, mark).fast_frames(frames, sink_for_lamp),
-                None => lamp.seeing(sight, mark),
+                Some(frames) => lamp
+                    .seeing(sight, mark)
+                    .camera_on_demand(on_demand)
+                    .fast_frames(frames, sink_for_lamp),
+                None => lamp.seeing(sight, mark).camera_on_demand(on_demand),
             },
             None => lamp,
         };
