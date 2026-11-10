@@ -1,3 +1,31 @@
+## 2026-11-10 — requested-music carry published; reminder ARM green
+
+- Draft #5975 published at 4ebf8927dea2e01493043994cfda95f2b5976fad,
+  carrying #5802. Sixth's four authored patches remain intact, followed by
+  the request-object/retraction and cue-provenance repair plus evidence.
+  Rebase onto b3e2d0903 preserves all five source patches (`=`).
+- Final local gate: fmt and strict Voice all-target Clippy passed; 66
+  requested-audio tests / one ignored manual diagnostic, all four
+  music-policy tests and exact serde/Live/wait-cue tests passed. Docs:
+  nine tests, 192 documents, 1900 links, none broken. Full local Voice
+  suite was not claimed. Clean cue fail-first and the accidental broad
+  manual endpoint-filter failure are retained in verification evidence.
+- Final first/repeated host retirement-to-write: 579/580 us against 250 ms.
+  Narrow packet append diagnostic: spoken first 1.719 us, p95 1.248 us,
+  max 1.725 us across 256 fresh replies. No acoustic/device claim.
+- READ ASK 6759167802 names Second and Reviewer-lead; original PR linked
+  in 6759168666, Queue 6759172728. ARM 42757338768 and Linux 42757338465
+  active; docs 42757338515 passed. Requested audio stays off; no device,
+  activation or live account action. Original played/Store/default gates
+  remain. PM can coordinate closing #5802; I left it open.
+- #5969 rebased to 86f99734824f61fa81bf571f74bec7e80ca0d77b. Its tree
+  3d8e46bc7ecb16795faa77294f2db3c634c57aea equals green ARM checkout
+  c9b37f53d5e161e4adfd4f2efb9233d9017a4aae (b3e2d0903 + a15b2c199).
+  ARM 42753668072: 14,983 passed / 113 skipped, 302.456 s, plus 13
+  process cases and remaining release/docs/export gates. Reviewer-lead
+  READ-OK 6759092304; Twelve holds the other read. Fresh Linux/docs pass;
+  ARM rerun 42756329612 remains active. Rebase note 6759028294.
+
 ## 2026-11-10 — reminder repair published; requested-music carry
 
 - Published draft #5969 at a15b2c19932999a859be4531287aa24e3402981c.
