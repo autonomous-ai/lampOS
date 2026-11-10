@@ -249,6 +249,11 @@ pub const DEADLINE: Duration = Duration::from_millis(3_500);
 const READ_AGAIN: Duration = Duration::from_secs(30);
 /// Who gets the work when the switch is off: as it always was.
 const CLAUDE_CODE: &str = "Claude Code";
+/// Who does the work on the lamp itself ([`LAMP_TARGET`], #5978).
+const HERMES: &str = "Hermes";
+/// What the model is told when the work was asked for on the lamp itself
+/// and the lamp has no target of its own (#5978): nothing goes elsewhere.
+const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that isn't set up on this lamp, so nothing was handed over. Say so plainly in a few words.";
 
 /// The task prepared and not yet started.
 #[derive(Clone, Debug)]
@@ -370,6 +375,25 @@ const KINDS: [Kind; 6] = [
     },
 ];
 
+/// The lamp's own target, Hermes on the lamp itself (`lamp-tasks` with
+/// `LAMP_HERMES_ON_LAMP`, #5978): never one of the staff, so the person's
+/// computers come first; the work goes there only when the person asks for
+/// it to be done on the lamp ([`START`]'s `where`), or when the tasks part
+/// finds no computer there and says it prepared it there instead.
+pub(crate) const LAMP_TARGET: &str = "lamp";
+/// Whether the tasks part last said it has the lamp's own target.
+static LAMP_THERE: AtomicBool = AtomicBool::new(false);
+
+/// Whether the targets answer has the lamp's own target, Hermes.
+fn lamp_in(answer: &Value) -> bool {
+    answer.get("ok") == Some(&json!(true))
+        && answer["targets"].as_array().is_some_and(|targets| {
+            targets
+                .iter()
+                .any(|target| target["alias"] == LAMP_TARGET && target["engine"] == "hermes")
+        })
+}
+
 /// One of the staff: a target of the tasks part, and its kind.
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Member {
@@ -384,7 +408,7 @@ static READING: OnceLock<()> = OnceLock::new();
 /// The functions a session is told of: with [`WHO_FLAG`], for the staff as
 /// last read.
 pub fn tools(place: &Place) -> Vec<Tool> {
-    declared(place, &staff_now(place))
+    declared_on(place, &staff_now(place), LAMP_THERE.load(Ordering::Relaxed))
 }
 
 fn staff_now(place: &Place) -> Vec<Member> {
@@ -648,6 +672,12 @@ const TASK_SHORT: &str =
     "The work, in the person's own words. A short ask is enough: the agent works out the details.";
 
 fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
+    declared_on(place, staff, false)
+}
+
+/// [`declared`], with `start_agent_task`'s `where` when the tasks part has
+/// the lamp's own target (`lamp`, #5978).
+fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
     let choosing = choosing(place, staff);
     // Who does it when nobody is named; without the switch, as always.
     let default = if place.who {
@@ -767,6 +797,13 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
             "session".into(),
             json!({"type": "string", "description": SESSION}),
         );
+    }
+    if lamp {
+        start_parameters["properties"]["where"] = json!({
+            "type": "string",
+            "enum": [LAMP_TARGET],
+            "description": "\"lamp\" only if the person asks for the work to be done here on the lamp itself (\"on the lamp\", \"do it yourself\"). Leave it out otherwise: their computer does it."
+        });
     }
     let mut tools = vec![
         Tool {
@@ -1267,6 +1304,10 @@ fn staff_from(answer: &Value) -> Option<Vec<Member>> {
         if target.get("installed") == Some(&json!(false)) {
             continue;
         }
+        // The lamp's own: asked for by `where`, never one of the staff.
+        if name == LAMP_TARGET && engine == "hermes" {
+            continue;
+        }
         // One member a name: Devin and Devin Cloud are both "Devin", so
         // with both targets the first is kept and the other left out, and
         // "Devin" names it (the reviewer's P3 3 on #2240).
@@ -1449,6 +1490,9 @@ pub(crate) fn machine_name(alias: &str) -> Option<String> {
 /// computer known by name ([`NAMES_FLAG`]), else "the office computer" (or
 /// "the computer"), as without it.
 fn where_done(place: &Place, alias: &str) -> String {
+    if alias == LAMP_TARGET {
+        return "the lamp".to_owned();
+    }
     match place.machine_names.then(|| machine_name(alias)).flatten() {
         Some(name) => format!("your {name}"),
         None => format!("the {}", computer(place)),
@@ -1538,6 +1582,7 @@ fn read_staff(socket: &Path, target: &str, deadline: Duration, who: bool) {
     let Some(read) = staff_from(&answer) else {
         return;
     };
+    LAMP_THERE.store(lamp_in(&answer), Ordering::Relaxed);
     if let Some(names) = names_from(&answer) {
         keep_names(names);
     }
@@ -2454,9 +2499,14 @@ fn run_for(
                 Ok(member) => member,
                 Err(told) => return (told, true),
             };
-            let (target, who) = member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
-                (member.alias.as_str(), member.kind.name)
-            });
+            let (mut target, mut who) = member
+                .map_or((place.target.as_str(), CLAUDE_CODE), |member| {
+                    (member.alias.as_str(), member.kind.name)
+                });
+            // Asked for on the lamp itself (#5978): Hermes there.
+            if call.args.get("where").and_then(Value::as_str) == Some(LAMP_TARGET) {
+                (target, who) = (LAMP_TARGET, HERMES);
+            }
             // Devin's cloud has no sessions of the person's to name (the
             // Reviewer-lead's P3 on #5784): refused, never sent.
             if session.is_some() && member.is_some_and(|member| member.kind.engine == "devin-cloud")
@@ -2506,6 +2556,11 @@ fn run_for(
                 .as_ref()
                 .is_some_and(|answer| answer.get("error") == Some(&json!("target")))
             {
+                // Asked for on the lamp, which has no target of its own:
+                // never handed to a computer instead (#5978).
+                if target == LAMP_TARGET {
+                    return (json!({"error": LAMP_NOT_SET_UP}), true);
+                }
                 let engine = member.map_or("claude", |member| member.kind.engine);
                 match missing_target(place, request, target, engine, left()) {
                     Missing::Use(other) => {
@@ -2524,6 +2579,15 @@ fn run_for(
                     Missing::NotSetUp => return (not_set_up(who), true),
                     Missing::Unread => {}
                 }
+            }
+            // No computer there: the tasks part prepared it on the lamp
+            // itself, and says so (#5978).
+            if prepared
+                .as_ref()
+                .is_some_and(|answer| answer.get("target") == Some(&json!(LAMP_TARGET)))
+            {
+                sent_to = LAMP_TARGET.to_owned();
+                who = HERMES;
             }
             match prepared {
                 Some(answer) if answer.get("ok") == Some(&json!(true)) => {
@@ -8403,6 +8467,109 @@ pub(crate) mod tests {
             .collect();
         assert_eq!(ops, ["status", "prepare", "status", "prepare"]);
         assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 8);
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #5978: the lamp's own target (`lamp`, Hermes) is never one of the
+    /// staff, and `start_agent_task` offers `where` only while the tasks
+    /// part has it. Asked for on the lamp, the work is prepared there; with
+    /// no computer there, the tasks part prepares it on the lamp and the
+    /// model is told so; asked for on a lamp with no target of its own,
+    /// nothing goes to a computer instead.
+    #[test]
+    fn work_goes_to_the_lamp_itself_only_when_asked_or_told_so() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let answer = json!({"ok":true,"targets":[
+            {"alias":"lamp","engine":"hermes"},{"alias":"office","engine":"claude"}]});
+        assert_eq!(
+            staff_from(&answer).unwrap(),
+            vec![member("office", "claude")]
+        );
+        assert!(lamp_in(&answer));
+        assert!(!lamp_in(
+            &json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]})
+        ));
+        let off = place(Path::new("/run/t"), false);
+        let start = |lamp: bool| {
+            declared_on(&off, &[], lamp)
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .unwrap()
+                .parameters
+                .unwrap()
+        };
+        assert_eq!(start(false)["properties"].get("where"), None);
+        assert_eq!(start(true)["properties"]["where"]["enum"], json!(["lamp"]));
+        assert_eq!(
+            declared(&off, &[]),
+            declared_on(&off, &[], false),
+            "off: as before"
+        );
+
+        let directory = std::env::temp_dir().join(format!("agent-lamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ),
+                ("request.sock", status.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":8,"prepared_digest":"abd","revision":1,"target":"lamp"}),
+                ),
+                ("request.sock", status),
+                ("request.sock", json!({"ok":false,"error":"target"})),
+            ],
+        );
+        let at = place(&directory, false);
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args,
+        };
+        let asked = run(
+            &at,
+            &call(json!({"task":"Write a poem","where":"lamp"})),
+            3,
+            true,
+            PEER_WAIT,
+        )
+        .0;
+        assert_eq!(asked["where"], "Hermes on the lamp", "{asked}");
+        let instead = run(
+            &at,
+            &call(json!({"task":"Write a poem"})),
+            4,
+            true,
+            PEER_WAIT,
+        )
+        .0;
+        assert_eq!(instead["where"], "Hermes on the lamp", "{instead}");
+        let none = run(
+            &at,
+            &call(json!({"task":"Write a poem","where":"lamp"})),
+            5,
+            true,
+            PEER_WAIT,
+        )
+        .0;
+        assert_eq!(none, json!({"error": LAMP_NOT_SET_UP}));
+        let targets: Vec<Value> = (0..6)
+            .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
+            .filter(|line| line["op"] == "prepare")
+            .map(|line| line["target"].clone())
+            .collect();
+        assert_eq!(targets, [json!("lamp"), json!("office"), json!("lamp")]);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }

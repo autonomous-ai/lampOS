@@ -152,6 +152,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .into(),
         );
     }
+    // The lamp's own machine as a target, with Hermes (#5978): read only
+    // here, and only with the machines' engines looked at.
+    let hermes_on_lamp = std::env::var("LAMP_HERMES_ON_LAMP").is_ok_and(|value| value == "on");
+    if hermes_on_lamp && !engines_from_machines {
+        eprintln!(
+            "tasks: LAMP_HERMES_ON_LAMP is on, but without --engines-from-machines the lamp's own Hermes is never looked for; the lamp is no target"
+        );
+    }
     if push_wait && !watch {
         return Err("--push-wait reads with the watch; it cannot go with --no-watch".into());
     }
@@ -204,6 +212,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             every: SET_UP_LOOK_EVERY,
             from_machines,
             engines: engines_from_machines,
+            lamp: hermes_on_lamp
+                .then(|| std::env::var_os("HOME").map(PathBuf::from))
+                .flatten(),
         }),
         sign_in_by_code,
         app_socket,

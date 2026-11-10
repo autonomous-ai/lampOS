@@ -1753,6 +1753,7 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
         every: Duration::from_millis(50),
         from_machines: None,
         engines: false,
+        lamp: None,
     });
     s.start();
     let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_some());
@@ -1826,6 +1827,7 @@ fn a_sign_in_read_failing_three_times_in_a_row_is_let_go_by_the_part() {
         every: Duration::from_millis(300),
         from_machines: None,
         engines: false,
+        lamp: None,
     });
     s.start();
     let signed_in = |s: &Running| s.status()["signed_in"].clone();
@@ -1870,6 +1872,7 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         every: Duration::from_millis(20),
         from_machines: Some(EngineKind::Claude),
         engines: false,
+        lamp: None,
     });
     let machine = |id: char, label: &str, current: bool| AccountMachine {
         machine_id: id.to_string().repeat(32),
@@ -1987,6 +1990,7 @@ fn engines_running(engines: bool) -> (Running, std::path::PathBuf) {
         every: Duration::from_millis(20),
         from_machines: Some(EngineKind::Claude),
         engines,
+        lamp: None,
     });
     let machine = |id: char, label: &str, current: bool| AccountMachine {
         machine_id: id.to_string().repeat(32),
@@ -2100,6 +2104,101 @@ fn engines_from_machines_choose_an_engine_there_and_refuse_early() {
         s.ask(json!({"op":"targets"}))["targets"][0].get("installed"),
         None
     );
+}
+
+/// Asks `targets` until they are `want`, within 5 s.
+fn targets_until(s: &Running, want: Value) {
+    let start = Instant::now();
+    loop {
+        let told = s.ask(json!({"op":"targets"}))["targets"].clone();
+        if told == want {
+            return;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "{told}");
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// Prepares to `target` until `done` holds for the answer, within 5 s.
+fn prepared_for(s: &Running, target: &str, done: impl Fn(&Value) -> bool) -> Value {
+    let start = Instant::now();
+    loop {
+        let answer = s.ask(
+            json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":target}),
+        );
+        if done(&answer) {
+            return answer;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "{answer}");
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// #5978: with `LAMP_HERMES_ON_LAMP` (`lamp`), the lamp's own machine is a
+/// target, `lamp` with Hermes, only while its look says Hermes is
+/// installed; off, or Hermes missing there, it is left out as before. A
+/// `prepare` for the office computer goes there while it is not known
+/// offline, and to the lamp, saying so, once it is; one asking for the
+/// lamp goes there whatever the computers.
+#[test]
+fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
+    let lamp_engines = |s: &Running, rows: Vec<EngineRow>| {
+        s.counts
+            .engines
+            .lock()
+            .unwrap()
+            .insert("a".repeat(32), Ok(rows));
+    };
+    let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    let both = json!([{"alias":"lamp","engine":"hermes"},{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    // Off: Hermes installed on the lamp changes nothing.
+    let (mut off, _) = engines_running(true);
+    office_engines(&off, Ok(vec![row("claude", Some(true), Some(true))]));
+    lamp_engines(&off, vec![row("hermes", Some(true), None)]);
+    off.start();
+    targets_until(&off, office.clone());
+    let looks = off.counts.engine_looks.load(Ordering::SeqCst);
+    let start = Instant::now();
+    while off.counts.engine_looks.load(Ordering::SeqCst) < looks + 3 {
+        assert!(start.elapsed() < Duration::from_secs(5), "not looked again");
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(off.ask(json!({"op":"targets"}))["targets"], office);
+    drop(off);
+
+    let home = tempfile::tempdir().unwrap();
+    let (mut s, _) = engines_running(true);
+    s.config.set_up_later.as_mut().unwrap().lamp = Some(home.path().to_owned());
+    office_engines(&s, Ok(vec![row("claude", Some(true), Some(true))]));
+    // On, Hermes not found on the lamp: left out.
+    lamp_engines(
+        &s,
+        vec![EngineRow {
+            installable: Some(true),
+            ..row("hermes", None, None)
+        }],
+    );
+    s.start();
+    targets_until(&s, office.clone());
+    // Installed there: the lamp is a target, its folder made.
+    lamp_engines(&s, vec![row("hermes", Some(true), None)]);
+    targets_until(&s, both);
+    assert!(home.path().join("harnesses/lamp-tasks/lamp").is_dir());
+    // The office computer online: it does the work, as before.
+    let prepared = prepared_until(&s, None);
+    assert_eq!(prepared.get("target"), None, "{prepared}");
+    // Asked for the lamp: the lamp, though a computer is online.
+    let asked = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    assert_eq!(asked.get("target"), None, "{asked}");
+    // No computer online: the lamp, and the answer says so.
+    s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
+    let instead = prepared_for(&s, "office", |answer| answer["target"] == "lamp");
+    assert_eq!(instead["ok"], true, "{instead}");
+    let id = instead["id"].as_u64().unwrap();
+    let task = s.ask(json!({"op":"get_task","id":id}));
+    assert_eq!(task["target"]["engine"], "hermes", "{task}");
+    assert_eq!(task["target"]["project"], "~/harnesses/lamp-tasks/lamp");
+    assert_eq!(task["task"]["target_alias"], "lamp");
 }
 
 /// #5199: an engine not found on that computer (`installed` null with
@@ -2414,6 +2513,7 @@ fn a_part_started_signed_in_starts_harnesss_daemon_once() {
             every: Duration::from_millis(20),
             from_machines: None,
             engines: false,
+            lamp: None,
         });
         s.counts.signed_out.store(signed_out, Ordering::SeqCst);
         s.start();
@@ -3133,6 +3233,7 @@ fn the_apps_state_says_harness_signed_in_across_a_restart() {
         every: Duration::from_millis(20),
         from_machines: None,
         engines: false,
+        lamp: None,
     });
     let said_until = |s: &Running, want: &str| {
         let start = Instant::now();

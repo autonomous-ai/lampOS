@@ -1723,6 +1723,9 @@ pub(crate) fn their_computer(task: &Value) -> String {
     if task["target"]["engine"] == "devin-cloud" {
         return "the Devin session in Harness".to_owned();
     }
+    if on_the_lamp(task) {
+        return "the lamp".to_owned();
+    }
     task["target_alias"]
         .as_str()
         .and_then(crate::agent_tasks::machine_name)
@@ -1731,6 +1734,16 @@ pub(crate) fn their_computer(task: &Value) -> String {
             |name| format!("their {name}"),
         )
 }
+
+/// Whether the work was done on the lamp itself, by Hermes there
+/// (`lamp-tasks` with `LAMP_HERMES_ON_LAMP`, #5978).
+pub(crate) fn on_the_lamp(task: &Value) -> bool {
+    task["target_alias"] == crate::agent_tasks::LAMP_TARGET && task["target"]["engine"] == "hermes"
+}
+
+/// What a note of work done on the lamp itself adds (#5978): the person
+/// hears that the lamp did it, here.
+const ON_THE_LAMP: &str = " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\").";
 
 /// At most `most` characters of `text` on one line, with no double quotes
 /// to end the note's quotation early.
@@ -1751,6 +1764,7 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
     // A question task (`agent_tasks::QUESTION`) is told as its answer.
     let question = crate::agent_tasks::question_of(task["text"].as_str()?).is_some();
     let computer = their_computer(task);
+    let lamp = on_the_lamp(task) && data["state"] == "idle";
     let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
     let (answer, cut) = quoted(
         data["answer"].as_str().unwrap_or_default(),
@@ -1811,7 +1825,7 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
             ),
             _ => (&words.stopped, "", String::new()),
         };
-        unprompted(&fill(
+        let filled = fill(
             line,
             &[
                 ("who", who),
@@ -1822,7 +1836,12 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
                 ("no_question", no_question),
                 ("waiting", &waiting),
             ],
-        ))
+        );
+        if lamp {
+            unprompted(&format!("{filled}{ON_THE_LAMP}"))
+        } else {
+            unprompted(&filled)
+        }
     };
     fitted(&asked, &answer, cut, say)
 }
@@ -4757,5 +4776,23 @@ mod tests {
         cut_short(&["s:1:1".into(), "s:2:1".into()]);
         assert_eq!(take_cut_short(), ["s:1:1", "s:2:1"]);
         assert!(take_cut_short().is_empty());
+    }
+
+    /// #5978: work done on the lamp itself is told as done here on the
+    /// lamp, and the rest as on the lamp; work on a computer as before.
+    #[test]
+    fn work_done_on_the_lamp_is_told_as_done_here() {
+        let done =
+            json!({"state":"idle","answer":"A short poem about the rain.","truncated":false});
+        let on = |alias: &str, engine: &str| json!({"text":"Write a poem","target":{"engine":engine},"target_alias":alias});
+        let lamp = note(&own(), &on("lamp", "hermes"), &done, 0).unwrap();
+        assert!(lamp.contains("Hermes"), "{lamp}");
+        assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
+        assert_eq!(their_computer(&on("lamp", "hermes")), "the lamp");
+        let office = note(&own(), &on("office", "claude"), &done, 0).unwrap();
+        assert!(!office.contains("on the lamp"), "{office}");
+        assert_eq!(their_computer(&on("office", "claude")), "their computer");
+        // A computer someone named `lamp` by hand is no lamp.
+        assert_eq!(their_computer(&on("lamp", "claude")), "their computer");
     }
 }

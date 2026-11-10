@@ -1337,6 +1337,42 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   - **Not yet shown on a lamp:** a played before/after count on lamp-c0a4,
     hand-overs to a missing, a signed-out and an offline agent each refused
     at once with a plain line, and a good one unchanged.
+- **The lamp itself, with Hermes** (`LAMP_HERMES_ON_LAMP=on`, only with
+  `--engines-from-machines`; off unless set, #5978 part 3). Off, the
+  machine Harness marks `current` (the lamp) is left out, as above.
+  - **Kept as a target** only while its own engines look says `hermes` is
+    `installed: true` (fresh, as above): with the switch the lamp's machine
+    is looked at too. The target is `lamp`, engine Hermes only, folder
+    `~/harnesses/lamp-tasks/lamp` under `lampos`'s home (the part makes it,
+    0700, since Harness makes only a `~/harnesses/<name>` folder), with no
+    name. With it, at most 7 computers are kept, so the file keeps its 8; a
+    computer whose name makes `lamp` is `lamp-2`. With no computer, the
+    file holds the lamp alone instead of being removed. Hermes missing, not
+    looked at, or the switch off: left out, as before. Without
+    `--engines-from-machines` the part says once that the lamp is no target.
+  - **Computers first.** A `prepare` for a computer goes there as before
+    while any computer target is not known `offline`. Only when every
+    computer target is known offline, or there is none, does it go to
+    `lamp`, and the answer says `"target":"lamp"`. A `prepare` naming
+    `lamp` goes there.
+  - **The voice:** the `lamp` target is never one of the staff.
+    `start_agent_task` gets `where` (`"lamp"` only) while the tasks part
+    has it, for "on the lamp" or "do it yourself". The read-back says
+    "Hermes on the lamp", whether asked or told by the answer. Asked for
+    with no `lamp` target, it says that isn't set up and nothing goes to a
+    computer instead. A finished task's news adds that it was done here on
+    the lamp ("I did it here on the lamp"), and the rest is said to be on
+    the lamp.
+  - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
+    `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
+    `tests/runtime.rs`: `the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there`
+    (off, Hermes missing, installed; a computer online, asked for the lamp,
+    no computer online), the voice's
+    `agent_tasks::tests::work_goes_to_the_lamp_itself_only_when_asked_or_told_so`
+    and `task_news::tests::work_done_on_the_lamp_is_told_as_done_here`.
+  - **Not yet shown on a lamp:** Hermes found by the lamp's Harness, a task
+    run there with no computer online, its done line, and the voice staying
+    responsive while it runs (#5978 part 4).
 
 Signing in a lamp with no screen is by a spoken code since Harness 0.4.23
 (openharness#1410; ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
