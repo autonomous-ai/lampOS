@@ -671,7 +671,11 @@ a read is said in full only for a line in the conversation's voice
 (`VoiceAsk::Conversation`, at `SERVICES_SAME_FROM`, 0.55, or over). A
 write's send is held to no voice since the owner's call of 10 Nov (natural
 confirmations, no read-back or asker condition: whoever agrees sends it),
-so `VoiceAsk::Alike` is gone. It needs the model, and
+but in a line begun in the lamp's 1.5 s echo tail with any of its words
+(#6009, `services::Turn::in_echo_tail`): that one must be in the asker's
+voice (`VoiceAsk::Alike` against the line that prepared the write, or
+`VoiceAsk::Owner` with the owner's enrolled print, at 0.55 or over), so the
+lamp's own short "Yes." or "Send it." heard back never sends. It needs the model, and
 until now the model came with every conversation rule that reads a print.
 `LAMP_SAME_VOICE_FOR=services`, beside `LAMP_SAME_VOICE_MODEL`, makes the
 prints for the services alone:
@@ -751,10 +755,11 @@ second route calls `owner_voice::enable` where it starts the services'
 prints).
 
 **Since the owner's call of 10 Nov** (natural confirmations, no read-back or
-asker condition) a send is held to no voice, and `services::run` no longer
-asks after a send (`owner_voice::ask_after_send` is no longer called): a
-print already kept is still used for a read in full, and the rules below
-are otherwise as they were.
+asker condition) a send is held to no voice, but in a line begun in the
+lamp's echo tail with any of its words (#6009), and `services::run` no
+longer asks after a send (`owner_voice::ask_after_send` is no longer
+called): a print already kept is still used for a read in full and for such
+a send, and the rules below are otherwise as they were.
 
 - **Asked once, of the setup owner alone.** After a `service_write` send by
   the owner (`person::owner_ids`, as the send gate's owner), sent or
@@ -822,9 +827,11 @@ are otherwise as they were.
 - **Used:** a read in full is held to it (`VoiceAsk::Owner`, at
   `SERVICES_SAME_FROM`, 0.55) in place of the conversation's voice
   ([services.md](services.md)); with none, as before. A send was held to it
-  too until the owner's call of 10 Nov.
+  too until the owner's call of 10 Nov; since then only a send in a line
+  begun in the lamp's echo tail with any of its words (#6009).
 - **The services' bar, 0.55** (`same_voice::SERVICES_SAME_FROM`): the
-  read in full passes (and the send gate did, until the owner's call of 10 Nov) at 0.55 or over, looser than the
+  read in full passes (and so does a send in the lamp's echo tail; every
+  send did until the owner's call of 10 Nov) at 0.55 or over, looser than the
   conversation's `SAME_FROM`, 0.70, which every conversation rule keeps.
   Most owners are alone with the lamp, so a lower bar keeps the owner from
   being refused while still turning away a clearly different voice: CAM++
