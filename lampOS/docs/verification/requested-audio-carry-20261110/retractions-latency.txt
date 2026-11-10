@@ -1,0 +1,6 @@
+
+running 1 test
+recording admission, 256 calls: first 253.262µs, p95 46.061µs, max 253.262µs; input allocation excluded, folding and phrase checks included
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5531 filtered out; finished in 0.01s
+
