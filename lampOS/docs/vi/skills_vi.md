@@ -232,6 +232,27 @@ sau:
    khởi động lại. Journal chỉ giữ kết quả, không bao giờ có người nhận hay
    nội dung ([services_vi.md](services_vi.md), "Một kỹ năng tự tạo ghi vào
    dịch vụ").
+
+   Bước `remind` (`lamp-skills`, `remind`, #6066; bảng bước trong
+   [skills.md](../skills.md), `do.remind`): `{ at = "HH:MM", words = "..." }`
+   đặt một lời nhắc qua `set_reminder` của phần actions (lần `HH:MM` địa
+   phương kế tiếp), hoặc `{ in = D, words = "..." }` đặt một hẹn giờ qua
+   `set_timer` (D tính từ lần chạy, từ `1m` đến `24h`), cùng lời gọi giọng nói
+   dùng khi có người hỏi, với `LAMP_SCHEDULE_TOOLS=on` trong `lamp-actions`.
+   Cần tên hàm đó trong `[permissions] actions`, kiểm tra lúc nạp và lại lúc
+   gọi. `words` là chữ cố định của kỹ năng, không bao giờ do mô hình viết lúc
+   chạy, cùng giới hạn của câu nói trong kỹ năng tự tạo: tối đa 120 ký tự, một
+   hoặc hai câu, không địa chỉ web, không dấu ngoặc kép, ngoặc nhọn hay dấu
+   backtick, không ký tự điều khiển hay định dạng; sai thì kỹ năng bị từ chối
+   lúc nạp. Chỉ trong kỹ năng do trigger khởi động, không có `tool`. Phép lịch
+   sự: một kỹ năng đặt tối đa 3 cái trong 24 giờ bất kỳ (`remind::MOST_A_DAY`),
+   và không bao giờ chồng: trước khi đặt nó đọc `list_reminders`, và cùng lời
+   đã đặt mà chưa nói thì không đặt mới; danh sách không đọc trọn được thì không
+   đặt gì. Đọc lại là của lịch: journal ghi `set, due HH:MM` chỉ khi câu trả
+   lời là `committed`, không bao giờ ghi lời nhắc. Lời gọi không nêu người gọi,
+   nên lời nhắc là của phòng: nói với ai đang ở bên đèn khi đến giờ. Nó không
+   đọc bộ nhớ và không ghi gì ngoài mục trong lịch. Kỹ năng tự tạo chưa tạo
+   được bước này; phần nói lại của nó đến sau.
 5. **Kiểm tra.** Thẻ được đánh dấu `made: here` (nhóm "Tạo trên đèn này"
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi
