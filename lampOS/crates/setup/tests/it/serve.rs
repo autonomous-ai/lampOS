@@ -304,6 +304,9 @@ impl Save for Saved {
         ));
         Some(lamp_setup::first_update::Ended::TooLong)
     }
+    fn update_first_over(&mut self) {
+        self.calls.push("update_first_over".into());
+    }
 }
 impl Saved {
     fn record(&mut self, what: &'static str, value: &str) -> io::Result<()> {
@@ -377,7 +380,8 @@ fn the_first_update_comes_between_the_saves_and_the_marker_only_when_asked() {
             "timezone=Asia/Ho_Chi_Minh",
             "credential=AIza-key_1",
             "update_first updating=true phase=fetching lan_ip=192.168.1.23 set_up=false",
-            "marker="
+            "marker=",
+            "update_first_over"
         ]
     );
     let status = status.lock().unwrap().clone();
@@ -412,6 +416,157 @@ fn the_first_update_comes_between_the_saves_and_the_marker_only_when_asked() {
         );
         assert_eq!(saved.calls.last().unwrap(), "marker=");
     }
+}
+
+/// Setup's own files, its first update ended by its ten minutes (#5965,
+/// reviewer-two's HOLD): what an update round reads between the wait's
+/// end and the marker, and once the marker is there.
+struct Waits<'a> {
+    files: Files<'a>,
+    seen: Vec<String>,
+}
+impl Waits<'_> {
+    /// What a round's restart selection reads now: setup is left alone
+    /// while it is done (the marker) or waiting (the first-update file).
+    fn look(&mut self, when: &str) {
+        let config = self.files.0;
+        let waiting = config
+            .marker
+            .with_file_name(lamp_setup::first_update::WAITING)
+            .is_file();
+        let done = config.marker.is_file();
+        self.seen
+            .push(format!("{when}: waiting={waiting} done={done}"));
+    }
+}
+impl Save for Waits<'_> {
+    fn credential(&mut self, key: &str) -> io::Result<()> {
+        self.files.credential(key)
+    }
+    fn name(&mut self, name: &str) -> io::Result<()> {
+        self.files.name(name)
+    }
+    fn timezone(&mut self, zone: &str) -> io::Result<()> {
+        self.files.timezone(zone)
+    }
+    fn language(&mut self, code: &str) -> io::Result<()> {
+        self.files.language(code)
+    }
+    fn backend(&mut self, link: &Backend) -> io::Result<()> {
+        self.files.backend(link)
+    }
+    fn marker(&mut self) -> io::Result<()> {
+        let marked = self.files.marker();
+        self.look("marker");
+        marked
+    }
+    fn first_volume(&mut self) {
+        // Between the wait's end and the marker: a pending update's round
+        // may reach its restart selection here.
+        self.look("before the marker");
+    }
+    fn update_first(
+        &mut self,
+        _phase: &mut dyn FnMut(&str),
+    ) -> Option<lamp_setup::first_update::Ended> {
+        Some(
+            self.files
+                .wait_first_update(|| lamp_setup::first_update::Ended::TooLong),
+        )
+    }
+    fn update_first_over(&mut self) {
+        self.files.update_first_over();
+        self.look("over");
+    }
+}
+
+#[test]
+fn the_first_update_file_stays_from_the_waits_end_until_the_marker_is_written() {
+    let root = Root::new();
+    let config = root.config(false);
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut asked = good();
+    asked["update_first"] = json!(true);
+    let accepted = check(&request(asked), &config).unwrap();
+    let mut waits = Waits {
+        files: Files(&config),
+        seen: vec![],
+    };
+    run(
+        &status,
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut waits,
+        || None,
+    );
+    assert_eq!(
+        waits.seen,
+        [
+            "before the marker: waiting=true done=false",
+            "marker: waiting=true done=true",
+            "over: waiting=false done=true",
+        ]
+    );
+    assert!(status.lock().unwrap().set_up_completed);
+}
+
+#[test]
+fn a_marker_that_fails_after_the_first_update_takes_its_file_away() {
+    let root = Root::new();
+    let config = root.config(false);
+    // A folder where the marker goes: it cannot be written.
+    fs::create_dir_all(&config.marker).unwrap();
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut asked = good();
+    asked["update_first"] = json!(true);
+    let accepted = check(&request(asked), &config).unwrap();
+    let mut waits = Waits {
+        files: Files(&config),
+        seen: vec![],
+    };
+    run(
+        &status,
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut waits,
+        || None,
+    );
+    assert_eq!(
+        waits.seen,
+        [
+            "before the marker: waiting=true done=false",
+            "marker: waiting=true done=false",
+            "over: waiting=false done=false",
+        ]
+    );
+    let status = status.lock().unwrap().clone();
+    assert_eq!(status.phase, Phase::Failed);
+    assert!(!status.set_up_completed);
+}
+
+#[test]
+fn a_failed_marker_after_the_first_update_still_ends_its_wait() {
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut saved = Saved {
+        watched: Some(Arc::clone(&status)),
+        fail_on: Some("marker"),
+        ..Saved::default()
+    };
+    let mut asked = good();
+    asked["update_first"] = json!(true);
+    let accepted = check(&request(asked), &Root::new().config(false)).unwrap();
+    run(
+        &status,
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut saved,
+        || None,
+    );
+    assert_eq!(saved.calls.last().unwrap(), "update_first_over");
+    assert_eq!(status.lock().unwrap().phase, Phase::Failed);
 }
 
 /// #4473: setup's optional `language`, checked as `language.set` checks

@@ -738,6 +738,11 @@ pub trait Save {
     fn update_first(&mut self, _phase: &mut dyn FnMut(&str)) -> Option<crate::first_update::Ended> {
         None
     }
+    /// The first update's wait is over for good (#5965, reviewer-two's
+    /// HOLD): called after the marker is written, or after setup failed,
+    /// whenever the app asked for the update. Nothing by default: only
+    /// [`Files`] keeps the file the updater reads while setup waits.
+    fn update_first_over(&mut self) {}
 }
 
 /// What recovery saves of a setup request (#3020, El's P1 on #3024): the
@@ -928,6 +933,23 @@ impl Files<'_> {
         let temporary = stage(&self.0.control_dropin, bytes, 0o644)?;
         put_in_place(&temporary, &self.0.control_dropin)
     }
+
+    /// The first update's wait (#5458), with the file the updater reads
+    /// as setup waiting (`first_update::WAITING`, next to the marker) put
+    /// there first, so a round leaves this unit alone meanwhile.
+    pub fn wait_first_update(
+        &mut self,
+        wait: impl FnOnce() -> crate::first_update::Ended,
+    ) -> crate::first_update::Ended {
+        use crate::first_update::{self as first, Ended};
+        let waiting = self.0.marker.with_file_name(first::WAITING);
+        if let Err(error) = write_private(&waiting, b"") {
+            return Ended::NotAsked(format!("{}: {error}", waiting.display()));
+        }
+        let ended = wait();
+        let _ = fs::remove_file(&waiting);
+        ended
+    }
 }
 
 impl Save for Files<'_> {
@@ -1027,19 +1049,12 @@ impl Save for Files<'_> {
         if !first::on(std::env::var(first::SWITCH).ok().as_deref()) {
             return None;
         }
-        // There while setup waits, so the updater leaves this unit alone.
-        let waiting = self.0.marker.with_file_name(first::WAITING);
-        if let Err(error) = write_private(&waiting, b"") {
-            return Some(Ended::NotAsked(format!("{}: {error}", waiting.display())));
-        }
-        let ended = match first::OnTheBus::new() {
+        Some(self.wait_first_update(|| match first::OnTheBus::new() {
             Ok(mut updates) => {
                 first::wait(&mut updates, first::MOST, std::time::Instant::now, phase)
             }
             Err(error) => Ended::NotAsked(error.to_string()),
-        };
-        let _ = fs::remove_file(&waiting);
-        Some(ended)
+        }))
     }
     fn own_key(&mut self, given: &crate::keys::Given) -> crate::keys::Verdict {
         use crate::keys;
