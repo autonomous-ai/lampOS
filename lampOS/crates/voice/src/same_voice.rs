@@ -762,7 +762,14 @@ pub fn confirms_from(var: impl Fn(&str) -> Option<String>) -> Option<f32> {
 pub struct OwnerVoice {
     bar: f32,
     /// Whose, and each print with its line's request.
-    kept: std::sync::Mutex<Option<OwnPrints>>,
+    kept: std::sync::Mutex<OwnState>,
+}
+
+/// One bounded fence for pending observations, with no retained person IDs.
+#[derive(Default)]
+struct OwnState {
+    generation: u64,
+    prints: Option<OwnPrints>,
 }
 
 /// Whose prints [`OwnerVoice`] keeps, and each with its line's request.
@@ -808,7 +815,7 @@ impl OwnerVoice {
     pub fn new(bar: f32) -> Self {
         Self {
             bar,
-            kept: std::sync::Mutex::new(None),
+            kept: std::sync::Mutex::new(OwnState::default()),
         }
     }
 
@@ -821,17 +828,53 @@ impl OwnerVoice {
     /// are, once a line. Another person's replaces what was kept. Whether
     /// it was kept.
     pub fn learn(&self, person: &str, request: u64, print: Vec<f32>) -> bool {
+        self.learn_at(self.generation(), person, request, print)
+    }
+
+    /// Snapshot before waiting for a face or print, never after it arrives.
+    pub fn generation(&self) -> u64 {
+        self.kept
+            .lock()
+            .map(|state| state.generation)
+            .unwrap_or(u64::MAX)
+    }
+
+    /// Forget only this person's cache. Fence all pending observations even
+    /// when the cache is empty or belongs to someone else: a late observation
+    /// of this person must not recreate it. Other stored prints stay intact.
+    pub fn forget_person(&self, person: &str) {
+        if let Ok(mut state) = self.kept.lock() {
+            state.generation = state.generation.wrapping_add(1);
+            if state.prints.as_ref().is_some_and(|(of, _)| of == person) {
+                state.prints = None;
+            }
+        }
+    }
+
+    /// Everyone's memory was forgotten. Invalidate pending observations even
+    /// when no prints are currently stored.
+    pub fn forget_all(&self) {
+        if let Ok(mut state) = self.kept.lock() {
+            state.generation = state.generation.wrapping_add(1);
+            state.prints = None;
+        }
+    }
+
+    pub fn learn_at(&self, generation: u64, person: &str, request: u64, print: Vec<f32>) -> bool {
         let Ok(mut kept) = self.kept.lock() else {
             return false;
         };
-        match kept.as_mut() {
+        if kept.generation != generation {
+            return false;
+        }
+        match kept.prints.as_mut() {
             Some((of, prints)) if of == person => {
                 if prints.len() >= OWNER_PRINTS || prints.iter().any(|(line, _)| *line == request) {
                     return false;
                 }
                 prints.push((request, print));
             }
-            _ => *kept = Some((person.to_owned(), vec![(request, print)])),
+            _ => kept.prints = Some((person.to_owned(), vec![(request, print)])),
         }
         true
     }
@@ -842,7 +885,8 @@ impl OwnerVoice {
             .lock()
             .ok()
             .and_then(|kept| {
-                kept.as_ref()
+                kept.prints
+                    .as_ref()
                     .filter(|(of, _)| of == person)
                     .map(|(_, prints)| prints.len())
             })
@@ -856,10 +900,18 @@ impl OwnerVoice {
     /// of the owner's long lines at 0.70 against the mean's 89%, with no
     /// other voice passing either.
     pub fn judge(&self, person: &str, print: &[f32]) -> Confirmed {
+        self.judge_at(self.generation(), person, print)
+    }
+
+    pub fn judge_at(&self, generation: u64, person: &str, print: &[f32]) -> Confirmed {
         let Ok(kept) = self.kept.lock() else {
             return Confirmed::Unknown;
         };
+        if kept.generation != generation {
+            return Confirmed::Unknown;
+        }
         let best = kept
+            .prints
             .as_ref()
             .filter(|(of, prints)| of == person && prints.len() >= OWNER_LEAST_PRINTS)
             .and_then(|(_, prints)| mean_of_units(prints.iter().map(|(_, own)| own.as_slice())))

@@ -35,6 +35,9 @@ const WROTE: &str = "(the lamp wrote) ";
 
 /// What the engine ran and what the model was told over `turns`.
 struct Ran {
+    second_audio_calls: usize,
+    second_voice_prints: usize,
+    second_voice_judgment: crate::same_voice::Confirmed,
     /// Each forget run, by name and arguments.
     forgets: Vec<(String, Value)>,
     /// What each chat round was asked.
@@ -111,8 +114,20 @@ async fn run_full(
     turns: &[Turn],
     sight: Option<&[Sight]>,
     first: u64,
+    switches: (bool, bool),
+    result: Value,
+) -> Ran {
+    run_full_with_audio(turns, sight, first, switches, result, false).await
+}
+
+/// The same actual Engine fixture through the optional spoken-audio runner.
+async fn run_full_with_audio(
+    turns: &[Turn],
+    sight: Option<&[Sight]>,
+    first: u64,
     (spelling, doubt_undoes): (bool, bool),
     result: Value,
+    requested_audio: bool,
 ) -> Ran {
     use crate::speaking_faces::{SpeakingFaces, known_face_of};
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -178,12 +193,23 @@ async fn run_full(
     ));
     let cache = Arc::new(FaceCache::default());
     let (engine, _, now) = scripted(script.clone());
+    let second_owner = Arc::new(crate::same_voice::OwnerVoice::new(0.45));
+    // The cache keys are memory person IDs, not the display names used by
+    // the scripted eyes. Match the admitted ScopeSnapshot's identity.
+    let second_person = crate::remember::person_id("A");
+    for request in 100..104 {
+        assert!(second_owner.learn(&second_person, request, vec![1.0, 0.0, 0.0]));
+    }
+    let engine = engine.confirming_by_voice(super::super::VoiceConfirms {
+        owner: second_owner.clone(),
+        print_of: Arc::new(|_| None),
+    });
     let eyes = Arc::new(SpeakingFaces::default());
     let mut engine = engine
         .with_memory_scope(
             lamp_turn_owner::BootId::new([12; 16]).unwrap(),
             cache.clone(),
-            runner,
+            runner.clone(),
             Some(Arc::new(|_: &crate::memory_scope::ScopeLease| Told {
                 text: "SYSTEM with old private context".into(),
                 after: Some("old private context".into()),
@@ -193,6 +219,18 @@ async fn run_full(
         .announcing(false)
         .holding_forgets_through_spelling(spelling)
         .undoing_doubted_keeps(doubt_undoes);
+    let audio_calls = Arc::new(AtomicUsize::new(0));
+    if requested_audio {
+        let seen = audio_calls.clone();
+        engine = engine.requesting_audio(
+            lamp_turn_owner::BootId::new([12; 16]).unwrap(),
+            Arc::new(move |context, call, scope| {
+                seen.fetch_add(1, Ordering::SeqCst);
+                let running = runner(context.request, true, call.name, call.args, scope);
+                Box::pin(async move { crate::tools::ToolAnswer::plain(running.await) })
+            }),
+        );
+    }
     if sight.is_some() {
         engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
     }
@@ -297,6 +335,9 @@ async fn run_full(
     let lines = lines.lock().unwrap().clone();
     let marked = marked.lock().unwrap().clone();
     Ran {
+        second_audio_calls: audio_calls.load(Ordering::SeqCst),
+        second_voice_prints: second_owner.known(&second_person),
+        second_voice_judgment: second_owner.judge(&second_person, &[1.0, 0.0, 0.0]),
         forgets,
         asked,
         lines,
@@ -1356,6 +1397,7 @@ async fn a_lines_end_records_who_was_seen_saying_it() {
                 speakers: vec![format!("eyes/{speaker}")],
                 known: Some(("A".to_owned(), "eyes/f1".to_owned())),
                 enrollment: None,
+                by_voice: false,
             }),
         )
     };
@@ -1924,4 +1966,189 @@ async fn cut_during_held_face_forget_drops_prior_recall_from_resumed_request() {
 #[tokio::test]
 async fn cut_during_plain_forget_drops_prior_recall_from_resumed_request() {
     cut_during_forget_discards_recalled_round(crate::remember::FORGET, false).await;
+}
+
+#[tokio::test]
+async fn second_admitted_forget_everything_drops_learned_confirmation_prints() {
+    let ran = run_seen_from_result(
+        &[
+            (
+                "A",
+                "Forget everything about me.",
+                Lamp::Calls(
+                    EVERYTHING,
+                    "Shall I forget everything I know about you, including your name?",
+                ),
+                0,
+            ),
+            ("A", "Yes.", Lamp::Says("Done, it's all gone."), 5),
+        ],
+        None,
+        45001,
+        json!({"forgotten": true, "everything": true, "face": "forgotten too"}),
+    )
+    .await;
+    assert_eq!(ran.forgets.len(), 1, "forget must actually run");
+    assert_eq!(ran.marked, vec![(EVERYTHING.to_owned(), true)]);
+    assert_eq!(
+        ran.second_voice_prints, 0,
+        "after admitted forget: {:?}",
+        ran.second_voice_judgment
+    );
+    assert_eq!(
+        ran.second_voice_judgment,
+        crate::same_voice::Confirmed::Unknown
+    );
+}
+
+#[tokio::test]
+async fn second_declined_forget_keeps_learned_confirmation_prints() {
+    let ran = run(&[
+        (
+            "A",
+            "Forget everything about me.",
+            Lamp::Calls(
+                EVERYTHING,
+                "Shall I forget everything I know about you, including your name?",
+            ),
+            0,
+        ),
+        ("A", "No.", Lamp::Says("Okay, I won't forget it."), 5),
+    ])
+    .await;
+    assert!(ran.forgets.is_empty());
+    assert_eq!(ran.second_voice_prints, 4);
+    assert!(matches!(
+        ran.second_voice_judgment,
+        crate::same_voice::Confirmed::Theirs(_)
+    ));
+}
+
+#[tokio::test]
+async fn confirmation_prints_survive_failed_or_other_persons_forget() {
+    for (person, receipt) in [
+        ("A", json!({"forgotten":false, "error":"unavailable"})),
+        ("B", json!({"forgotten":true, "everything":true})),
+    ] {
+        let ran = run_seen_from_result(
+            &[
+                (
+                    person,
+                    "Forget everything about me.",
+                    Lamp::Calls(
+                        EVERYTHING,
+                        "Shall I forget everything I know about you, including your name?",
+                    ),
+                    0,
+                ),
+                (person, "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            None,
+            45002,
+            receipt,
+        )
+        .await;
+        assert_eq!(ran.forgets.len(), 1);
+        assert_eq!(ran.second_voice_prints, 4);
+        assert!(matches!(
+            ran.second_voice_judgment,
+            crate::same_voice::Confirmed::Theirs(_)
+        ));
+    }
+}
+
+/// Exercise the Engine's actual run_tool target capture, not just its
+/// cleanup helper. Receipts are synthetic; real eyes deletion is separate.
+#[tokio::test]
+async fn face_forget_receipts_clear_only_the_successfully_deleted_persons_voice() {
+    for (at, (person, receipt, kept)) in [
+        ("A", json!({"ok": true}), 0),
+        ("A", json!({"error": "face deletion failed"}), 4),
+        ("B", json!({"ok": true}), 4),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let ran = run_seen_from_result(
+            &[(person, "Forget my face.", Lamp::Calls(FACE, "Okay."), 0)],
+            None,
+            45_100 + at as u64 * 10,
+            receipt,
+        )
+        .await;
+        assert_eq!(ran.forgets, [(FACE.to_owned(), json!({"name": person}))]);
+        assert_eq!(ran.second_voice_prints, kept);
+        if kept == 0 {
+            assert_eq!(
+                ran.second_voice_judgment,
+                crate::same_voice::Confirmed::Unknown
+            );
+        } else {
+            assert!(matches!(
+                ran.second_voice_judgment,
+                crate::same_voice::Confirmed::Theirs(_)
+            ));
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_held_face_forget_clears_confirmation_voice_only_after_yes() {
+    for (answer, runs, kept) in [("Yes.", 1, 0), ("No.", 0, 4)] {
+        let ran = run_seen_from_result(
+            &[
+                ("A", "What's my name?", ASKS, 0),
+                ("A", answer, Lamp::Says("Okay."), 5),
+            ],
+            None,
+            45_200,
+            json!({"ok": true}),
+        )
+        .await;
+        assert_eq!(ran.forgets.len(), runs);
+        assert_eq!(ran.second_voice_prints, kept);
+    }
+}
+
+#[tokio::test]
+async fn a_successful_face_forget_clears_confirmation_prints_through_the_audio_runner() {
+    for requested_audio in [false, true] {
+        let ran = run_full_with_audio(
+            &[("A", "Forget my face.", Lamp::Calls(FACE, "Done."), 0)],
+            None,
+            46_100 + u64::from(requested_audio),
+            (false, false),
+            json!({"ok": true}),
+            requested_audio,
+        )
+        .await;
+        assert_eq!(ran.forgets.len(), 1);
+        assert_eq!(ran.second_audio_calls, usize::from(requested_audio));
+        assert_eq!(
+            ran.second_voice_prints, 0,
+            "requested audio: {requested_audio}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_audio_runner_preserves_confirmation_prints_after_failed_or_other_person_deletion() {
+    for (index, who, result) in [
+        (0, "A", json!({"ok": false, "error": "storage"})),
+        (1, "A", json!({"ok": false})),
+        (2, "B", json!({"ok": true})),
+    ] {
+        let ran = run_full_with_audio(
+            &[(who, "Forget my face.", Lamp::Calls(FACE, "Okay."), 0)],
+            None,
+            46_120 + index,
+            (false, false),
+            result,
+            true,
+        )
+        .await;
+        assert_eq!(ran.forgets.len(), 1);
+        assert_eq!(ran.second_audio_calls, 1);
+        assert_eq!(ran.second_voice_prints, 4, "case {index}");
+    }
 }

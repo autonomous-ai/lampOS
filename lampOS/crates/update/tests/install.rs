@@ -1669,6 +1669,54 @@ fn the_product_keeps_what_was_heard() {
     );
 }
 
+/// CAM++ one way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
+/// decision of 4 Nov, switched on 10 Nov): the product's voice sets it once,
+/// beside the one model and the services-only prints it reads, and no other
+/// unit, nor the generic voice, sets it.
+#[test]
+fn the_product_voice_only_confirms_the_known_person_by_their_voice() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let voice = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_SAME_VOICE_CONFIRMS=on",
+        "Environment=LAMP_SAME_VOICE_FOR=services",
+        "Environment=LAMP_VOICE_ROUTE=second",
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+    ] {
+        assert_eq!(
+            voice.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+    assert_eq!(
+        voice
+            .iter()
+            .filter(|set| set.starts_with("Environment=LAMP_SAME_VOICE_CONFIRM"))
+            .count(),
+        1,
+        "the bar is the code's own 0.45"
+    );
+    for other in [
+        "lamp-cloud.service",
+        "lamp-update.service",
+        "lamp-services.service",
+    ] {
+        assert!(!unit(other).contains("LAMP_SAME_VOICE_CONFIRMS"), "{other}");
+    }
+    let generic = include_str!("../../../deploy/units/lamp-voice.service");
+    assert!(
+        !generic.contains("LAMP_SAME_VOICE_CONFIRMS"),
+        "the generic voice"
+    );
+}
+
 /// A don't-know about the person's own kept thing recalls first
 /// (`LAMP_MEMORY_DONT_KNOW_RECALLS`, task C57): the memory owner's call on
 /// 5 Nov, after lamp-06c1 said "I don't remember any holiday plans" without

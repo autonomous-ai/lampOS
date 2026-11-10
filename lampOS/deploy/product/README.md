@@ -22,7 +22,11 @@ folder: `lamp-turn-end`, always, and `lamp-same-voice` when the build
 carries it ([same-voice.md](../../docs/same-voice.md)). The latter runs
 only when `LAMP_SAME_VOICE_MODEL` is set, which `lamp-voice.service` sets
 since 4 November with `LAMP_SAME_VOICE_FOR=services`: the prints are for
-the linked services alone, and no conversation rule reads them.
+the linked services alone, and no conversation rule reads them. Since
+10 November `LAMP_SAME_VOICE_CONFIRMS=on` reads the same prints for one
+thing more: the known person's own voice confirms a line as theirs while
+their face is the one face in view, and never ends, holds or carries a
+conversation (same-voice.md, "One way only").
 
 | File | What |
 |---|---|

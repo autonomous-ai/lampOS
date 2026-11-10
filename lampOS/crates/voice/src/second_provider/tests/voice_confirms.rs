@@ -161,3 +161,268 @@ fn their_voice_is_learnt_only_from_lines_seen_spoken_by_them_alone() {
     assert_eq!(confirm(Some(&fresh), 51, &[], true), vec![FACE.to_owned()]);
     assert_eq!(fresh.owner.known(PERSON), OWNER_LEAST_PRINTS);
 }
+
+/// A pending print cannot teach the old identity or confirm against a new
+/// enrollment after forget. The print callback models the exact blocking
+/// boundary without sleeps or real biometric data.
+#[test]
+fn forgetting_during_a_print_fences_learning_and_confirmation() {
+    for seen in [true, false] {
+        let owner = Arc::new(OwnerVoice::new(CONFIRM_BAR));
+        for request in 1..=4 {
+            assert!(owner.learn(PERSON, request, OWN.to_vec()));
+        }
+        let before = owner.generation();
+        let during = owner.clone();
+        let confirms = VoiceConfirms {
+            owner: owner.clone(),
+            print_of: Arc::new(move |_| {
+                during.forget_person(PERSON);
+                // Fresh observations may teach the same identity again, but
+                // the old confirmation must not use their new prints.
+                for request in 11..=14 {
+                    assert!(during.learn(PERSON, request, OWN.to_vec()));
+                }
+                Some(OWN.to_vec())
+            }),
+        };
+        let speakers = if seen { vec![FACE.to_owned()] } else { vec![] };
+        let actual = confirmed_by_voice_at(
+            Some(&confirms),
+            Some(before),
+            20,
+            PERSON,
+            speakers.clone(),
+            Some(FACE),
+            |_| true,
+        );
+        assert_eq!(actual, speakers);
+        assert!(!owner.learn_at(before, PERSON, 21, OWN.to_vec()));
+        assert_eq!(
+            owner.judge_at(before, PERSON, &OWN),
+            crate::same_voice::Confirmed::Unknown
+        );
+        assert_eq!(owner.known(PERSON), 4);
+    }
+}
+
+#[test]
+fn a_late_face_observation_keeps_its_pre_forget_fence() {
+    let confirms = confirms(CONFIRM_BAR, Some(OWN));
+    let pending_face = confirms.owner.generation();
+    confirms.owner.forget_person(PERSON);
+    let speakers = vec![FACE.to_owned()];
+    assert_eq!(
+        confirmed_by_voice_at(
+            Some(&confirms),
+            Some(pending_face),
+            1,
+            PERSON,
+            speakers.clone(),
+            Some(FACE),
+            |_| true
+        ),
+        speakers
+    );
+    assert_eq!(confirms.owner.known(PERSON), 0);
+    // A genuinely new observed line is still learnable.
+    confirm(Some(&confirms), 2, &[FACE], true);
+    assert_eq!(confirms.owner.known(PERSON), 1);
+}
+
+#[test]
+fn successful_face_forget_clears_only_its_person_and_fences_pending_prints() {
+    let owner = OwnerVoice::new(CONFIRM_BAR);
+    for request in 1..=4 {
+        assert!(owner.learn(PERSON, request, OWN.to_vec()));
+    }
+    let pending = owner.generation();
+    let forget = |target: &str, heard, told: Value| {
+        crate::tools::forget_confirmation_voice(
+            &owner,
+            crate::known_faces::FORGET,
+            Some(target),
+            heard,
+            None,
+            &told,
+        )
+    };
+    forget(PERSON, true, json!({"error":"refused"}));
+    forget(PERSON, false, json!({"ok":true}));
+    assert_eq!(owner.generation(), pending);
+    assert_eq!(owner.known(PERSON), 4);
+    forget("person_else", true, json!({"ok":true}));
+    assert_eq!(owner.known(PERSON), 4);
+    forget(PERSON, true, json!({"ok":true}));
+    assert_eq!(owner.known(PERSON), 0);
+    assert!(!owner.learn_at(pending, PERSON, 5, OWN.to_vec()));
+    assert!(owner.learn(PERSON, 6, OWN.to_vec()));
+}
+
+#[test]
+fn an_unadmitted_whole_forget_receipt_does_not_clear_confirmation_prints() {
+    let owner = OwnerVoice::new(CONFIRM_BAR);
+    assert!(owner.learn(PERSON, 1, OWN.to_vec()));
+    let before = owner.generation();
+    crate::tools::forget_confirmation_voice(
+        &owner,
+        crate::remember::FORGET_EVERYTHING,
+        Some(PERSON),
+        true,
+        None,
+        &json!({"forgotten":true}),
+    );
+    assert_eq!(owner.known(PERSON), 1);
+    assert_eq!(owner.generation(), before);
+}
+
+/// The real Start arm calls its clock before begin when wordless resumes
+/// is enabled. Forget/relearn there deterministically models Start pausing
+/// across deletion, without a production-only testing hook.
+#[tokio::test]
+async fn start_processing_keeps_its_fence_across_an_early_callback() {
+    use crate::memory_scope::FaceCache;
+    use crate::speaking_faces::{SpeakingFaces, known_face_of};
+    let person = crate::remember::person_id("Linh");
+    let owner = Arc::new(OwnerVoice::new(CONFIRM_BAR));
+    let script = Arc::new(Script {
+        heard: Mutex::new(VecDeque::from([
+            Ok("Tell me a story.".into()),
+            Ok("Tell me another story.".into()),
+        ])),
+        chats: Mutex::new(VecDeque::from([
+            vec![text("Here is a story."), Ok(ChatEvent::Done)],
+            vec![text("Here is another story."), Ok(ChatEvent::Done)],
+        ])),
+        ..Script::default()
+    });
+    let eyes = Arc::new(SpeakingFaces::default());
+    eyes.look(
+        Instant::now(),
+        Some((("start-fence", 0), &lamp_msgs::Faces { faces: vec![] })),
+    );
+    std::thread::sleep(Duration::from_millis(20));
+    let path = std::env::temp_dir().join(format!(
+        "confirmation-start-fence-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::write(&path, "Linh").unwrap();
+    std::fs::write(known_face_of(&path), "f1\n").unwrap();
+    let cache = Arc::new(FaceCache::default());
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    let named = Arc::new(Mutex::new(Vec::new()));
+    let told = named.clone();
+    let (engine, _, _) = scripted(script);
+    let printed = Arc::new(AtomicUsize::new(0));
+    let read_print = printed.clone();
+    let mut engine = engine
+        .confirming_by_voice(VoiceConfirms {
+            owner: owner.clone(),
+            print_of: Arc::new(move |_| {
+                read_print.fetch_add(1, Ordering::SeqCst);
+                Some(OWN.to_vec())
+            }),
+        })
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([29; 16]).unwrap(),
+            cache.clone(),
+            Arc::new(|_, _, _, _, _| Box::pin(async { json!({"ok":true}) })),
+            Some(Arc::new(move |lease| {
+                told.lock().unwrap().push(
+                    lease
+                        .scope()
+                        .and_then(|scope| scope.person())
+                        .map(str::to_owned),
+                );
+                "SYSTEM".to_owned().into()
+            })),
+        )
+        .seeing_who_speaks(eyes.clone(), path.clone())
+        .scoping_by_sight(true)
+        .resuming_after_wordless_cut_ins(true)
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    let armed = Arc::new(AtomicBool::new(true));
+    let fired = armed.clone();
+    let forgotten = owner.clone();
+    let forgotten_person = person.clone();
+    Arc::get_mut(&mut engine.shared).unwrap().clock = Arc::new(move || {
+        if fired.swap(false, Ordering::SeqCst) {
+            forgotten.forget_person(&forgotten_person);
+            for request in 100..104 {
+                assert!(forgotten.learn(&forgotten_person, request, OWN.to_vec()));
+            }
+        }
+        Instant::now()
+    });
+    let done = Arc::new(AtomicBool::new(false));
+    let feed_done = done.clone();
+    let feeder = std::thread::spawn(move || {
+        // Also stop if a test assertion unwinds before normal cleanup.
+        let until = Instant::now() + Duration::from_secs(30);
+        let mut frame = 1;
+        while !feed_done.load(Ordering::SeqCst) && Instant::now() < until {
+            eyes.look(
+                Instant::now(),
+                Some((
+                    ("start-fence", frame),
+                    &lamp_msgs::Faces {
+                        faces: vec![lamp_msgs::Face {
+                            id: "f1".into(),
+                            xmin: 0.1,
+                            ymin: 0.1,
+                            xmax: 0.3,
+                            ymax: 0.4,
+                            confidence: 1.0,
+                            yaw: None,
+                            facing: None,
+                            follows: None,
+                            speaking: Some(lamp_msgs::Speaking {
+                                state: lamp_msgs::SpeakingState::No,
+                                score: 0.9,
+                                from: None,
+                            }),
+                        }],
+                    },
+                )),
+            );
+            frame += 1;
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    });
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    for request in [45_300, 45_301] {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        engine.submit(end(request));
+        turn(&mut engine).await;
+        engine.retire_through(request);
+    }
+    done.store(true, Ordering::SeqCst);
+    feeder.join().unwrap();
+    let _ = std::fs::remove_file(known_face_of(&path));
+    let _ = std::fs::remove_file(path);
+    assert!(
+        !armed.load(Ordering::SeqCst),
+        "Start callback must have run"
+    );
+    assert_eq!(
+        printed.load(Ordering::SeqCst),
+        2,
+        "both turns must reach actual confirmation"
+    );
+    assert_eq!(
+        *named.lock().unwrap(),
+        vec![None, Some(person)],
+        "the old Start cannot confirm against fresh prints; the fresh Start can"
+    );
+}
