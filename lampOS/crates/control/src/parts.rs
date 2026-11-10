@@ -1531,7 +1531,8 @@ impl Parts for Lamp {
             }
             Op::Express { feeling, strength } => self.express(client, re, feeling, *strength),
             Op::Sound { name } => self.sound(client, re, name),
-            Op::Play { .. } => Err(waits_for("client packages")),
+            // The door sends a recorded move as a `move` (session.rs).
+            Op::Play { .. } => Err(waits_for("the door's recorded moves")),
             Op::TurnStart { prompt } => self.turn_start(client, re, prompt.as_deref()),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
@@ -2603,7 +2604,7 @@ mod tests {
                 "lease socket is not on",
             ),
             (r#"{"id":1,"op":"look","at":"name"}"#, NOT_IN_THIS_RELEASE),
-            (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
+            (r#"{"id":1,"op":"play","name":"wave"}"#, "recorded moves"),
         ] {
             let error = lamp.act("c_1", 1, &op(frame), 0).unwrap_err();
             assert!(error.why.contains(waits), "{frame}: {}", error.why);

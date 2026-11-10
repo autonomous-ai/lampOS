@@ -40,7 +40,7 @@ export const RECONNECT_PAUSES = Object.freeze([1, 2, 5, 10]);
 // Ended at their answer by a lamp-control that doesn't say `motion_done` in
 // hello's limits (from before #4209): it hands them to the body and says
 // nothing back.
-export const ENDS_AT_REPLY = new Set(['gesture', 'move', 'express']);
+export const ENDS_AT_REPLY = new Set(['gesture', 'move', 'express', 'play']);
 // A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 // The SDK's check is a pre-check: it may let through what the lamp refuses,
 // never the other way.
@@ -551,8 +551,8 @@ export class Lamp {
     // and every id is this call's own.
     try { check(op, clean); } catch (error) { return Promise.reject(error); }
     const id = this.nextId++;
-    // A lamp that says `motion_done` ends `gesture`, `move` and an express's
-    // move with a `done` once the body says what became of them; on one that
+    // A lamp that says `motion_done` ends `gesture`, `move`, `play` (a move, by another
+    // name) and an express's move with a `done` once the body says what became of them; on one that
     // doesn't, their wait ends at the answer, so none is kept for them.
     const atReply = ENDS_AT_REPLY.has(op) && !this.limits?.motion_done;
     const done = wait && !atReply
@@ -717,7 +717,10 @@ export class Lamp {
     try { frames = posesToFrames(poses, { stepMs: POSES_STEP_MS, holdMs }); } catch (error) { return Promise.reject(error); }
     return this.move(frames, POSES_STEP_MS, { wait });
   }
-  play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
+  // Play a move recorded in a skill this computer pushed (its `moves/NAME.json`, kept when `pushSkill` installed it), as
+  // a `move` of the same frames is played: the same body lease, caps and answer. `skill` says which when two of your
+  // skills have the name; the lamp refuses an ambiguous name, naming them.
+  play(name, { skill, wait = false } = {}) { return this.act('play', { name, ...(skill !== undefined ? { skill } : {}) }, wait); }
   // Aim the joints named, in degrees, under `lease`. Its answer when the door
   // takes it; with `wait`, the body's `done`, as look's.
   // lamp-control sends yaw and pitch as the holder's look, so taking it ends a
@@ -914,7 +917,8 @@ export class Lamp {
         name: pkg.name, sha256: pkg.sha256, size: pkg.data.length, part, parts: pkg.parts.length, data,
       });
     }
-    return reply.skill ?? {};
+    // What the lamp kept of the package's `moves/` for `play`, when it has it: { kept: [...], left_out: [{ name, why }] }.
+    return reply.moves ? { ...(reply.skill ?? {}), moves: reply.moves } : reply.skill ?? {};
   }
 
   async skills() { return (await this.request('skill.list')).skills ?? []; }

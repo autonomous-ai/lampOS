@@ -1397,12 +1397,13 @@ def test_off_takes_a_handler_off_and_unsubscribes_the_last(tmp_path):
 
 def test_the_fake_says_done_and_lease_changes_to_whoever_they_are_for(tmp_path):
     async def go():
-        async with FakeLamp(auto_done=False) as fake:
+        async with FakeLamp(auto_done=False, grants=("body", "light", "speak", "hear")) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000) as lease:
-                    waiting = asyncio.ensure_future(lamp.play("wave", wait=True))
-                    while not fake.asked("play"):
+                    # A turn, whose `done` the test says.
+                    waiting = asyncio.ensure_future(lamp.start_turn(wait=True))
+                    while not fake.asked("turn.start"):
                         await asyncio.sleep(0.01)
                     await fake.lease_event(lease.id, "suspended", "conversation")
                     while lease.state != "suspended":
@@ -2344,6 +2345,127 @@ def test_a_skill_is_pushed_in_parts_listed_and_removed(tmp_path, monkeypatch):
                 assert int(at.timestamp() * 1000) == listed["pushed_at_unix_ms"]
                 await lamp.remove_skill("desk-wave")
                 assert await lamp.skills() == []
+
+    run(go())
+
+
+def _move_file(path: Path, name: str, yaw: int = 100) -> None:
+    """A recorded move: an 8 s lean of `yaw` counts and back, no step over half of it."""
+    path.parent.mkdir(exist_ok=True)
+    frames = [[0, 0, count, 0, 0] for count in (0, yaw // 2, yaw, yaw // 2, 0, yaw // 2, yaw, yaw // 2, 0)]
+    path.write_text(json.dumps({"name": name, "step_ms": 1000, "frames": frames}))
+
+
+def test_a_package_whose_moves_fail_the_check_still_installs_and_the_answer_names_them(tmp_path):
+    """`lamp skill check` and `push_skill` warn of a recorded move the body
+    would refuse (never stricter than the lamp) and send the skill; the lamp
+    installs it and says which moves it left out and why. A lamp that says
+    nothing of moves gets the check's own list, with `kept` None."""
+
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                folder = _skill(tmp_path, "desk-bad")
+                _move_file(folder / "moves" / "ok.json", "ok")
+                _move_file(folder / "moves" / "far.json", "far", 1400)
+                with pytest.warns(UserWarning, match="moves/far.json.*farther than.*leaves it out"):
+                    skill = await lamp.push_skill(folder)
+                assert skill["name"] == "desk-bad"
+                assert skill["moves"]["kept"] == ["ok"]
+                assert [(left["name"], "farther than" in left["why"]) for left in skill["moves"]["left_out"]] == [("far", True)]
+                assert [listed["name"] for listed in await lamp.skills()] == ["desk-bad"]
+                # A lamp that doesn't tell of moves: the check's own list.
+                request = lamp.request
+
+                async def old_lamp(op, **fields):
+                    reply = await request(op, **fields)
+                    reply.pop("moves", None)
+                    return reply
+
+                lamp.request = old_lamp
+                other = _skill(tmp_path, "desk-old")
+                _move_file(other / "moves" / "far.json", "far", 1400)
+                with pytest.warns(UserWarning):
+                    told = await lamp.push_skill(other)
+                assert told["moves"]["kept"] is None
+                assert [left["name"] for left in told["moves"]["left_out"]] == ["far"]
+
+    run(go())
+
+
+def test_a_waiting_play_ends_at_the_answer_or_the_done_as_a_move_does(tmp_path):
+    """`play` is sent as a `move`: its wait ends at the answer on a lamp
+    that does not say `motion_done`, and at the body's `done` (told by the
+    test here) on one that does (Second's composition check on #6039)."""
+    from lampos.errors import LampError
+
+    async def go():
+        for motion_done in (False, True):
+            async with FakeLamp(grants=("body", "light", "skills"), motion_done=motion_done, auto_done=False) as fake:
+                ring = await paired(fake, tmp_path / f"keys-{motion_done}")
+                async with await Lamp.connect(keyring=ring) as lamp:
+                    one = _skill(tmp_path, "desk-wave-on" if motion_done else "desk-wave-off")
+                    _move_file(one / "moves" / "wave.json", "wave")
+                    await lamp.push_skill(one)
+                    async with lamp.lease("body", for_ms=5000):
+                        waiting = asyncio.ensure_future(lamp.play("wave", wait=True))
+                        if not motion_done:
+                            assert (await asyncio.wait_for(waiting, 2))["to"] == "body"
+                        else:
+                            await until(lambda: fake.asked("play"))
+                            await asyncio.sleep(0.05)
+                            assert not waiting.done()
+                            await fake.done(fake.requests[-1]["id"], "finished")
+                            assert (await asyncio.wait_for(waiting, 2))["how"] == "finished"
+
+    run(go())
+
+
+def test_a_recorded_move_of_a_pushed_skill_is_played_by_name(tmp_path):
+    """lamp-control keeps a pushed package's `moves/` when the skill installs
+    (the answer names the kept and the left out) and `play` sends one as a
+    `move`; a name in two skills is refused naming them unless `skill` says
+    which; a removed skill's moves are gone."""
+    from lampos.errors import LampError, NoLeaseError
+
+    async def go():
+        async with FakeLamp(grants=("body", "light", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                one = _skill(tmp_path, "desk-wave")
+                _move_file(one / "moves" / "wave.json", "wave")
+                _move_file(one / "moves" / "wiggle.json", "wiggle", 120)
+                skill = await lamp.push_skill(one)
+                assert skill["name"] == "desk-wave"
+                assert skill["moves"] == {"kept": ["wave", "wiggle"], "left_out": []}
+                # The listing is the helper's shape: the moves are the door's, not the skill's.
+                assert "moves" not in (await lamp.skills())[0]
+                # Taken only under a body lease, as a move is.
+                with pytest.raises(NoLeaseError):
+                    await lamp.play("wave")
+                async with lamp.lease("body", for_ms=5000):
+                    assert (await lamp.play("wave"))["to"] == "body"
+                    assert fake.asked("play") == [{"name": "wave"}]
+                    # A wait ends at the body's `done`, as `move`'s does where the lamp says `motion_done`.
+                    assert (await asyncio.wait_for(lamp.play("wave", wait=True), 2))["how"] == "finished"
+                    with pytest.raises(LampError, match="no move nothing in your pushed skills: skill.push one with moves/nothing.json"):
+                        await lamp.play("nothing")
+                    # The same name in a second skill: refused, naming both.
+                    two = _skill(tmp_path, "desk-greet")
+                    _move_file(two / "moves" / "wave.json", "wave", 90)
+                    await lamp.push_skill(two)
+                    with pytest.raises(LampError, match=r"more than one of your skills \(desk-greet, desk-wave\): say which with skill"):
+                        await lamp.play("wave")
+                    assert (await lamp.play("wave", skill="desk-greet"))["to"] == "body"
+                    assert fake.asked("play")[-1] == {"name": "wave", "skill": "desk-greet"}
+                    with pytest.raises(LampError, match="no skill gamma of yours has recorded moves"):
+                        await lamp.play("wave", skill="gamma")
+                    with pytest.raises(LampError, match="no move wiggle in your skill desk-greet"):
+                        await lamp.play("wiggle", skill="desk-greet")
+                    await lamp.remove_skill("desk-wave")
+                    with pytest.raises(LampError, match="no move wiggle in your pushed skills"):
+                        await lamp.play("wiggle")
 
     run(go())
 

@@ -345,7 +345,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not ended.done():
                     ended.set_result(("done", "refused", None))
                 raise refused(error) from error
-            motion_done = op == "move" and bool(lamp.limits.get("motion_done"))
+            motion_done = op in ("move", "play") and bool(lamp.limits.get("motion_done"))
             if sent.get("to") and op not in DONE_FOLLOWS and not motion_done:
                 # Handed to a part (`{"to": "body"}`): no `done` follows, so
                 # the tool ends now and the lease lapses by itself (blue's
@@ -538,10 +538,12 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             return await with_body_lease("move", step_ms=POSES_STEP_MS, frames=frames)
 
         @server.tool()
-        async def lamp_play(name: str) -> str:
-            """Play a recorded move by its name (lowercase letters, digits, - and _). The body checks
-            it as any move. A lamp that doesn't route `play` yet says so, as the tool's error."""
-            return await with_body_lease("play", name=name)
+        async def lamp_play(name: str, skill: str | None = None) -> str:
+            """Play a move recorded in one of your pushed skills (its `moves/NAME.json`) by its name
+            (lowercase letters, digits, - and _), sent as a `move` of the same frames is: the body checks
+            it as any move. `skill` says which skill when two have the name (the lamp refuses an ambiguous
+            name, naming them). A lamp that doesn't route `play` yet says so, as the tool's error."""
+            return await with_body_lease("play", name=name, **({"skill": skill} if skill else {}))
 
         @server.tool()
         async def lamp_joints(

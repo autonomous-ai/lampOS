@@ -16,7 +16,8 @@ events, and a new motion that replaces the one playing.
    at the body's `done` (hello's `limits.motion_done`). `look` and `joints`
    with `wait=True` already return the body's `done`.
 2. **Play and a look at a face.** `play` is refused, "not routed yet: waits
-   for client packages". `look` at `face` and `name` are refused, "not in
+   for client packages" (from the next build it plays a move recorded in a
+   pushed skill's `moves/`). `look` at `face` and `name` are refused, "not in
    this release". Send a recorded move as `move`; look at `ahead` or an
    angle. With the body silent for 15 s, name both yaw and pitch in
    `joints`. `sound` works.
