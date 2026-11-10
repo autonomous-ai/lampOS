@@ -134,13 +134,22 @@ fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
         "light = { dim = 1 }\nbody = { gesture = \"curious\" }",
     );
     let refused = keep(&answer(&gesture, "evening-dim"), false, "s1:8:1", &keeping).unwrap_err();
-    assert_eq!(refused.0, "it doesn't pass the lamp's check");
+    assert_eq!(refused.0, lamp_voice::made_skill::NOT_PASSED);
     // The check's own lines come back for a repair (#2813 piece 2).
     assert!(refused.1.is_some_and(|lines| !lines.is_empty()));
     let speaking = TOML.replace("light = true\n", "light = true\nspeak = true\n");
     let capped = keep(&answer(&speaking, "evening-dim"), false, "s1:9:1", &keeping);
-    assert!(capped.unwrap_err().0.contains("more than the light"));
+    assert!(capped.unwrap_err().0.contains("never says anything"));
     assert!(tars(&keeping.directory).is_empty());
+    // A say step, its voice asked for (#6055): the checker takes it, and it
+    // is kept, said plainly.
+    let saying = speaking.replace(
+        "light = { dim = 1 }",
+        "light = { dim = 1 }\n\n[[do]]\nsay = \"wish them a good night\"",
+    );
+    let made = keep(&answer(&saying, "night-word"), false, "s1:10:1", &keeping).unwrap();
+    assert!(made.uses.speak && made.uses.light);
+    assert_eq!(tars(&keeping.directory).len(), 1);
 }
 
 /// At most five made skills are kept: the sixth lets the oldest go, its
@@ -267,7 +276,14 @@ fn a_made_skill_past_the_cap_or_not_made_here_does_not_go_on() {
             "loud-dim",
             TOML.replace("light = true\n", "light = true\nspeak = true\n"),
             card("loud-dim").replace("---\n\n", "made: here\n---\n\n"),
-            "more than the light",
+            "never says anything",
+        ),
+        (
+            "tasks-dim",
+            TOML.replace("light = true\n", "light = true\nspeak = true\n")
+                .replace("light = { dim = 1 }", "say = { text = \"Hi. Hello.\" }"),
+            card("tasks-dim").replace("---\n\n", "made: here\n---\n\n"),
+            "isn't one short note",
         ),
         (
             "plain-dim",

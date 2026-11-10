@@ -30,10 +30,21 @@ pub const WRITE_WITHIN: Duration = Duration::from_secs(30);
 /// refused (the owner, 10 Nov: "re-run it yourself until it works"; one,
 /// before: lamp-74ff's "come back to my desk" failed its one repair).
 pub const MOST_REPAIRS: usize = 3;
-/// The longest a make goes on: no repair is begun once one more answer
-/// ([`WRITE_WITHIN`]) would end past it. 120 s, the longest a make with
+/// The longest a make goes on: no repair is begun once one more round
+/// ([`ROUND_WITHIN`]) would end past it. 120 s, the longest a make with
 /// one repair could take before (two answers, each asked once more).
 pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
+/// The longest one round of asking takes: [`written`] asks a cut or failed
+/// answer once more, so two answers (the readers' P2 on #6054: a repair
+/// begun at 89 s, guarded by one answer alone, could end near 149 s while
+/// the voice's `make_skill` held the turn).
+pub const ROUND_WITHIN: Duration = WRITE_WITHIN.saturating_mul(2);
+
+/// Whether a repair begun `elapsed` into a make still ends within
+/// [`MAKE_WITHIN`], its answer asked twice at worst.
+fn round_fits(elapsed: Duration) -> bool {
+    elapsed + ROUND_WITHIN <= MAKE_WITHIN
+}
 /// The most of an answer read: two files of at most 8 KiB, and the fences.
 const MOST_ANSWER_BYTES: usize = 20 * 1024;
 /// What a made skill's answer is kept from: this, and when it was made.
@@ -118,10 +129,12 @@ fn system_with(reads: bool) -> String {
         "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
          blocks and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
-         the form only: never answer with it. A skill can't speak \
-         (but to read a linked service aloud, as below) or keep time by itself: a reminder at a time or every so often is the lamp's own \
-         timer, not a skill. Make what the request asks with the light or the head, or a \
-         read as below, on the lamp's resting or someone being there. When it runs is one \
+         the form only: never answer with it. A skill can't keep time by itself: a reminder at \
+         a time or every so often is the lamp's own timer, not a skill. Make what the request \
+         asks with the light, the head or a short line it says, or a read as below, on the \
+         lamp's resting or someone being there. To speak, a skill has speak = true in \
+         [permissions] and a [[do]] step say = \"greet them warmly\": a few words of what to \
+         say, one clause, no quotes, which the lamp says in its own words. When it runs is one \
          [trigger] table (never [[trigger]], never the faces' topic): {triggers} A skill can't hear what is said: a request \
          that needs words or a sound heard, or anything else a skill here can't sense or do, \
          is answered with one line and no blocks: {cannot} then one short sentence said to \
@@ -180,7 +193,7 @@ pub fn tool() -> lamp_gemini::Tool {
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description: "Make a new skill for the lamp: something the lamp then does by itself with \
-             its light or its head, at a time of day, when someone comes or goes, or when it is \
+             its light, its head or a short line it says, at a time of day, when someone comes or goes, or when it is \
              resting (\"make me a skill that dims the light at 10 pm\"). Call it only when the \
              person asks for a skill to be made. In the same breath, before you call it, say in a \
              few words that you'll make it now. The skill is made, checked, kept and put on the \
@@ -411,12 +424,12 @@ fn made_and_journaled(
     // read, or the example given back: its lines go back to the model, up
     // to [`MOST_REPAIRS`] times (`made_skill::repair_brief`; the owner,
     // 10 Nov: "re-run it yourself until it works"), each begun only while
-    // one more answer still fits [`MAKE_WITHIN`].
+    // one more round, two answers at worst, still fits [`MAKE_WITHIN`].
     for round in 1..=MOST_REPAIRS {
         let Err(Refused(why, Some(lines))) = &made else {
             break;
         };
-        if began.elapsed() + WRITE_WITHIN > MAKE_WITHIN {
+        if !round_fits(began.elapsed()) {
             eprintln!(
                 "lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}: no time left, \
                  not asked"
@@ -1338,6 +1351,19 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The readers' P2 on #6054: a repair is begun only while a whole
+    /// round, its answer asked once more at worst, still ends within
+    /// [`MAKE_WITHIN`]; at 89 s, as at 61 s, none is.
+    #[test]
+    fn a_repair_is_begun_only_while_two_answers_still_fit() {
+        assert_eq!(ROUND_WITHIN, 2 * WRITE_WITHIN);
+        assert!(round_fits(Duration::ZERO));
+        assert!(round_fits(MAKE_WITHIN - ROUND_WITHIN));
+        for late in [61, 89, 91, 119] {
+            assert!(!round_fits(Duration::from_secs(late)), "{late}");
+        }
     }
 
     /// The making model is told, before it writes, what each trigger means:
