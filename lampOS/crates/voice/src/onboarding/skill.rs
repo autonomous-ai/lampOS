@@ -44,6 +44,13 @@ pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or aft
 /// file: an older build refuses a new key.
 pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: \"Got your name. I'll remember things for you once I've seen your face.\")";
 
+/// The face question, said by the walk when the model has not asked it
+/// once the name's yes is in (#5931: on lamp-52e6 on 10 Nov two walks
+/// ended with the name only and the question never asked). A fixed note
+/// the model says, never an own line, so it is in the chat history and the
+/// worker's yes to it runs the save with no call (`yes_save`, #5684).
+pub(crate) const FACE_ASK: &str = "(Say only this, nothing before or after it: \"May I remember your face, so I know you next time?\")";
+
 /// The face asked for once more, after the walk, when "who you are" ended
 /// with the name only (#5139). The name is known by then; a yes and the
 /// save end it, a no or silence leaves it, and it is never asked again.

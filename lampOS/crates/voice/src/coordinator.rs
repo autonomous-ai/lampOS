@@ -6536,6 +6536,9 @@ fn conversation_with_gate_inner(
     // What the person is saying, until its last piece, for the onboarding
     // steps that end on a heard answer (#1722 row 10). Memory only.
     let mut onboarding_heard = String::new();
+    // The lamp's words of its current line, for the walk's face question
+    // (`Onboarding::lamp_words`): they come in pieces too.
+    let mut onboarding_said = String::new();
     // The answer whose words are arriving, and whether any of them has been
     // a word yet.
     let mut answer_words: Option<(u64, bool)> = None;
@@ -9023,6 +9026,14 @@ fn conversation_with_gate_inner(
                         && let Some(walk) = onboarding.as_mut()
                     {
                         walk.lamp_said(monotonic_us());
+                        // ponytail: past 4 KiB a line is not read, as heard.
+                        if onboarding_said.len() + text.len() <= 4_096 {
+                            onboarding_said.push_str(&text);
+                        }
+                        walk.lamp_words(&onboarding_said);
+                        if finished {
+                            onboarding_said.clear();
+                        }
                     }
                     // What the lamp says is its own, not a stop said over it
                     // (#828, `heard-always`), stamped with when it will be
