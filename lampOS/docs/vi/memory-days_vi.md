@@ -1204,3 +1204,27 @@ quên (bộ nhớ, khuôn mặt hay quy tắc) trong cùng một vòng thì khô
 nhưng cũng không đặt lời nhắc nào: vòng sau nói theo đúng kết quả của lệnh
 quên. Chi tiết ở
 [memory.md](../memory.md).
+
+## Không nói «đã giữ» khi lệnh giữ sau một lời «có» không giữ gì
+
+Khi chạy lại trên lamp-06c1 (10/11, bản 11211), câu «Yes. Please keep that.»
+được thấy nói nhưng không có lời đề nghị giữ nào đang chờ. Mô hình gọi
+`remember`, lệnh này không giữ gì và báo cho mô hình biết
+(`heard::YES_ALONE`, «Never say it was kept.»), nhưng vòng 2 vẫn nói
+«Kept—the office plant gets watered on Mondays.» (S4, yêu cầu 54: một điều
+của phòng từ mười phút trước) và «Fifty-three, kept as your lucky number.»
+(S14, yêu cầu 103). Bộ kiểm tra lời tự nhận đã giữ không nhận ra hai dạng
+này. Giờ «Kept» (hoặc «I've kept») trước dấu gạch ngang là một lời tự nhận
+chắc chắn trên mọi câu; trên câu chỉ là một lời «có», «kept», «saved» hoặc
+«remembered» ở đúng dạng một lời tự nhận cũng vậy: sau «I», «I've» hoặc
+«I have», sau một dấu câu và trước «as your», hoặc trước «that»/«it» «for you»
+(`remember::kept_in_a_claims_shape`). «kept» chỉ là một từ thường giữa câu
+thì không tính, dù trước nó là dấu gì (HOLD của Third trên #5994: «Your
+plant, kept outdoors, needs watering.», «kept under the mat», «kept
+refrigerated» được nói nguyên văn), cũng như một trạng thái được giữ
+(«I've kept it dim.»); nhưng một từ trạng thái nằm trong mệnh đề về một
+người là của điều được giữ, nên «I've kept that you like bright light.» vẫn
+là lời tự nhận (P3 của Fourth trên #5994). Lời tự nhận đó không được nói:
+mô hình được hỏi lại một lần, lần thứ hai thì lamp nói «I didn't keep that.
+Tell me again and I'll remember it.». Chi tiết ở
+[second-voice.md](../second-voice.md).

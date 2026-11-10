@@ -10263,6 +10263,135 @@ async fn a_keep_said_back_to_a_yes_with_no_remember_is_a_claim() {
     }
 }
 
+/// lamp-06c1, build 11211, 10 Nov rerun: "Yes. Please keep that.", seen
+/// spoken with no offer waiting, called `remember`, which kept nothing and
+/// told the model so (`heard::YES_ALONE`, "Never say it was kept."). Round 2
+/// still said "Kept\u{2014}the office plant gets watered on Mondays." (S4,
+/// request 54: a room fact from ten minutes before) and "Fifty-three, kept
+/// as your lucky number." (S14, request 103). Neither opening was read as
+/// a keep claim, so both were said. Each is held, asked again once, then
+/// the plain line; beside a `remember` that kept, the same words are said.
+#[tokio::test]
+async fn a_kept_said_after_a_yes_whose_remember_kept_nothing_is_never_said() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let remember = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                crate::remember::REMEMBER,
+                json!({"text": "Yes. Please keep that."}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let saying = |words: &str| vec![text(words), Ok(ChatEvent::Done)];
+    let plant = "Kept\u{2014}the office plant gets watered on Mondays. Do you want me to nudge you on Monday mornings about it?";
+    let lucky = "Fifty-three, kept as your lucky number.";
+    for claim in [
+        plant,
+        lucky,
+        "Kept \u{2014} the office plant gets watered on Mondays.",
+    ] {
+        for kept in [false, true] {
+            let chats: Chats = vec![remember(), saying(claim), saying(claim)];
+            let script = Arc::new(Script {
+                heard: Mutex::new([Ok("Yes. Please keep that.".into())].into()),
+                chats: Mutex::new(chats.into()),
+                ..Script::default()
+            });
+            let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+                Box::pin(async move {
+                    if kept {
+                        json!({"remembered": true})
+                    } else {
+                        json!({"remembered": false, "note": crate::remember::heard::YES_ALONE})
+                    }
+                })
+            });
+            let mut engine = Engine::with_clock(
+                script.clone(),
+                Arc::new(|| "SYSTEM".to_owned().into()),
+                runner,
+                Arc::new(Instant::now),
+            )
+            .announcing(false);
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            let labels = turn(&mut engine).await;
+            let said: Vec<&str> = labels
+                .iter()
+                .filter_map(|label| label.strip_prefix("said:"))
+                .map(str::trim)
+                .filter(|said| !said.is_empty())
+                .collect();
+            let asked = script.asked.lock().unwrap().len();
+            if kept {
+                // A keep that ran backs its words: said as they came.
+                assert!(
+                    said.first().is_some_and(|said| claim.starts_with(said)),
+                    "{claim}: {labels:?}"
+                );
+                assert_eq!(asked, 2, "{claim}: {labels:?}");
+            } else {
+                assert_eq!(
+                    said,
+                    [crate::remember::NOT_KEPT_LINE],
+                    "{claim}: {labels:?}"
+                );
+                assert_eq!(asked, 3, "{claim}: {labels:?}");
+            }
+        }
+    }
+}
+
+/// Third's HOLD on #5994: heard "Yes.", no tool call, and an answer that
+/// uses "kept" as a plain word ("Your plant, kept outdoors, needs
+/// watering.") was held, asked again, then said as `NOT_KEPT_LINE`. Only a
+/// claim's own shape is a claim: each of these is said as it came, in one
+/// round.
+#[tokio::test]
+async fn a_kept_as_a_plain_word_after_a_yes_is_said() {
+    let saying = |words: &str| vec![text(words), Ok(ChatEvent::Done)];
+    for answer in [
+        "Your plant, kept outdoors, needs watering.",
+        "Your key, kept under the mat, opens the side door.",
+        "The milk, kept refrigerated, lasts a week.",
+        "The light, kept on since noon, is warm.",
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Yes.".into())].into()),
+            chats: Mutex::new(vec![saying(answer), saying(answer)].into()),
+            ..Script::default()
+        });
+        let runner: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: String = labels
+            .iter()
+            .filter_map(|label| label.strip_prefix("said:"))
+            .map(str::trim)
+            .filter(|said| !said.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert_eq!(said, answer, "{labels:?}");
+        assert_eq!(
+            script.asked.lock().unwrap().len(),
+            1,
+            "{answer}: {labels:?}"
+        );
+    }
+}
+
 /// Finding K2 on #3504 (lamp-06c1, 28 Oct, "Want me to keep that as the
 /// change? Kept — library now, not the bakery."): an offer to keep, beside
 /// the `remember` call that keeps it or after one, is not said; with no
