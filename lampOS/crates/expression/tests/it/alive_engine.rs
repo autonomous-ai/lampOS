@@ -565,6 +565,7 @@ fn where_the_ring_jumps_on_the_hour_the_head_does_not() {
 }
 
 #[test]
+#[ignore = "PARKED (#5955): the work gate is off on every lamp (alive.rs WORK_GATE)"]
 fn someone_working_close_and_still_under_it_has_a_still_lamp() {
     let mut lamp = Lamp::new(catalogue());
     lamp.run(2 * SECOND, |_, _| {});
@@ -617,6 +618,22 @@ fn the_product_catalogue_has_no_work_light() {
     ))
     .unwrap();
     assert!(product.alive.as_ref().unwrap().work.is_none());
+}
+
+/// #5955 on an updated lamp: its installed catalogue still has the work
+/// light, and a close, still face keeps it breathing all the same.
+#[test]
+fn with_a_work_light_installed_someone_close_and_still_keeps_it_breathing() {
+    assert!(catalogue().alive.as_ref().unwrap().work.is_some());
+    let mut lamp = Lamp::new(catalogue());
+    lamp.run(2 * SECOND, |_, _| {});
+    lamp.faces = Some(vec![face(0.35, 0.3, 0.3)]);
+    lamp.run(40 * SECOND, |output, _| {
+        assert!(!named(output, "still for work"));
+    });
+    let output = lamp.last(TICK);
+    assert!(named(&output, "breathing"));
+    assert_ne!(asked(&output), BodyOffsets::ZERO);
 }
 
 #[test]
