@@ -925,12 +925,20 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
             )
         {
-            lamp_update::harness_install::after_round(
+            // A move to a newer pin waits while Harness is in use (#5957):
+            // tasks/status on the bus, and Harness's own processes.
+            lamp_update::harness_install::after_round_when(
                 &config.root,
                 &records,
                 pin,
                 &mut systemd,
                 lamp_update::records::unix_ms(),
+                &mut || {
+                    lamp_update::harness_install::busy::in_use(
+                        &config.root,
+                        Some(bus_root.as_path()),
+                    )
+                },
                 &mut say,
             );
         }

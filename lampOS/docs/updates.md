@@ -3258,6 +3258,9 @@ may not exist yet under `/var/lib`; network on; 1500 s. It runs
 `lamp-update harness-install`. `check-units` compares it with its own text
 as "the updater's", and a round never takes it for a part's unit. Its
 record, `harness-install.json`, is said on `update/status` as `harness`.
+The same unit moves a Harness older than the build's pin to it, when
+Harness is not in use, and puts the older one back if the move fails
+(#5957; `docs/install.md`, "A newer pin moves an older Harness").
 
 ### A fixed copy, checked (#3689)
 
