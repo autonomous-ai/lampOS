@@ -1386,8 +1386,9 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     computer that can't be read is left out rather than said not found.
     A hand-over naming a machine looks there only.
   - **New work goes to the lamp.** A new task naming nothing goes to the
-    lamp's Hermes; one naming their computer (`where` `"computer"`) or an
-    agent there goes to the computer, and a computer known `offline` is
+    lamp's Hermes, and so does one naming Hermes or the lamp as `who`;
+    one naming their computer (`where` `"computer"`) or an agent there
+    goes to the computer, and a computer known `offline` is
     refused `computer_offline`, never moved to the lamp quietly. The task
     is followed on the lamp's machine id exactly like a computer task:
     show, wait, watch, task news and the status and progress tool. Its
