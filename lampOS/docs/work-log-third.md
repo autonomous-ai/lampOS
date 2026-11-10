@@ -1,3 +1,23 @@
+## 2026-11-10 — volume restore reread clears both demonstrated faults
+
+- READ-OK #6008 663ec9965, comment 6761178210, lifts Third's HOLD
+  6760862581. Identical two public Mixer/Volume regression probes now
+  pass (0.00 s), where old head returned Ok(0) and Ok(41).
+- Same local 300 ms failing amixer process probe: old head 12.672 s;
+  repaired head 4.346 s first / 3.501 s repeat, launch through observed
+  restore-failure log before serving, against five seconds. Host startup
+  and scheduling included; no hard real-time or device claim.
+- Independent repaired fmt, strict Actions all-target lint, full package
+  145 pass / 2 ignored, binary build and docs 192/1899/0. Temporary probes
+  removed, checkout clean. Built binary 58fec269bc5caee002ccf920add1a0ce55a6f2990a634e83bb611214da9c2d92;
+  logs retained under /private/tmp/third-6008-fixed-* and startup-fixed-*.
+- P3: final attempt may start after sleeping to start_by; the intended
+  elapsed budget plus one reserved attempt is what is enforced, not the
+  literal comment that each attempt begins before start_by. Author's
+  prior lamp row stays on its old head; other read/default/lamp gates stand.
+- Reviewer-two picked up #5975's replacement read in 6761122505. No
+  result yet; current music head unchanged, draft/OFF. No device work.
+
 ## 2026-11-10 — interrupted-question read complete; concrete lamp handoffs
 
 - READ-OK #6006 bb5b1a1df, comment 6761054151: fmt and strict Voice
