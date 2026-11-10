@@ -1644,11 +1644,22 @@ fn note_joined(words: &NewsWords, task: &Value, session: &Value) -> Option<Strin
         (None, Some(ask)) => (&words.joined_asked, "earlier", ask),
         (None, None) => return None,
     };
+    // Closed, and reopened for it (lamp-tasks' `LAMP_TASKS_RESUME_CLOSED`):
+    // said so, and whether its earlier conversation came back.
+    let reopened = match session["resumed"].as_bool() {
+        Some(true) => Some(&words.joined_reopened),
+        Some(false) => Some(&words.joined_fresh),
+        None => None,
+    };
     fitted(&asked, "", false, |asked, _, _| {
-        unprompted(&fill(
+        let said = fill(
             line,
             &[("asked", asked), ("who", who), (slot, value.as_str())],
-        ))
+        );
+        unprompted(&match reopened {
+            Some(reopened) => format!("{said} {reopened}"),
+            None => said,
+        })
     })
 }
 
@@ -1684,6 +1695,9 @@ fn note_failed(
         // builder's ruling on #5784's follow-up): how to open it again, or
         // a new one in the same project; nothing is started on its own.
         Some("session_closed" | "session_stopped") => Some(&words.failed_closed),
+        // Reopening it could not be confirmed yet (`LAMP_TASKS_RESUME_CLOSED`):
+        // the same, and that they may try again in a moment.
+        Some("session_resume_unconfirmed") => Some(&words.failed_closed_soon),
         _ => None,
     };
     if let Some(line) = refused
@@ -3356,6 +3370,31 @@ mod tests {
                 "{code}"
             );
         }
+    }
+
+    /// `LAMP_TASKS_RESUME_CLOSED` (openharness#3606): a named session that was
+    /// closed and reopened for the work is said reopened, and whether it
+    /// starts fresh; one whose reopening wasn't confirmed is told closed,
+    /// and to try again in a moment.
+    #[test]
+    fn a_reopened_named_session_is_said_reopened_and_an_unconfirmed_one_closed() {
+        let task = task("claude", json!([]));
+        let open = note_joined(&own(), &task, &json!({"name":"docs"})).unwrap();
+        assert!(!open.contains("reopened"), "{open}");
+        let back = note_joined(&own(), &task, &json!({"name":"docs","resumed":true})).unwrap();
+        assert!(back.contains("\"I reopened that session\""), "{back}");
+        assert!(
+            back.contains("\"docs\"") && !back.contains("fresh"),
+            "{back}"
+        );
+        let fresh = note_joined(&own(), &task, &json!({"ask":"Fix it","resumed":false})).unwrap();
+        assert!(fresh.contains("\"I reopened that session\""), "{fresh}");
+        assert!(
+            fresh.contains("starts fresh, without the earlier conversation"),
+            "{fresh}"
+        );
+        let soon = note_failed(&own(), &task, false, Some("session_resume_unconfirmed")).unwrap();
+        assert!(soon.contains("That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project. Or try again in a moment."), "{soon}");
     }
 
     /// `serve --reply-named` (#5535), the Reviewer-lead's P2 on #5784 at

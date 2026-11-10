@@ -3521,6 +3521,7 @@ mod tests {
         let session = JoinedSession {
             name: Some("Docs-Update".into()),
             ask: Some("Update the setup page".into()),
+            resumed: None,
         };
         engine
             .finish_launch(
