@@ -142,8 +142,9 @@ to" or "let's", with an ask: play, put on, put some or put something, turn
 on, start, hear, listen to, or Vietnamese "mở/bật/phát nhạc", "mở/bật/phát
 bài" or "cho tôi/mình/em nghe". The immediate requested object must name
 music, a song, recording, sound, track, tune, playlist, melody, lullaby,
-"nhạc" or "bài". An optional recipient (me/us), determiner, and up to three
-calm-mood adjectives may precede that noun. A recording mentioned later in
+"nhạc" or "bài". An optional recipient (me/us), determiner, one recording selector
+(first/second/next/previous/last/another/different), and up to three calm-mood
+adjectives may precede that noun. A recording mentioned later in
 an unrelated clause does not count: "turn on the light so I can read sheet
 music" and "play chess while I listen to music" are refused.
 "Something" instead accepts a calm-mood adjective, "to relax/unwind/sleep",
