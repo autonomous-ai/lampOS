@@ -218,8 +218,14 @@ impl Rig {
         }
         thread::sleep(ms(60));
         rig.voice(Voice::Resting);
-        room.publish_json(0, &RoomState { state: Room::Quiet })
-            .unwrap();
+        room.publish_json(
+            0,
+            &RoomState {
+                state: Room::Quiet,
+                another_voice: None,
+            },
+        )
+        .unwrap();
         // The eyes publish their list over and over, as they do.
         let stop = Arc::clone(&rig.stop);
         thread::spawn(move || {

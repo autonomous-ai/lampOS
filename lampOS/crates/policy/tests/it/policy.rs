@@ -1439,6 +1439,7 @@ fn how_the_room_is_and_who_the_eyes_see_are_taken_from_the_bus() {
         0,
         &RoomState {
             state: lamp_msgs::Room::Quiet,
+            another_voice: None,
         },
     )
     .unwrap();

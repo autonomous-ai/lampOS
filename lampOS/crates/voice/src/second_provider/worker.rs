@@ -2641,6 +2641,8 @@ pub fn serve(
     }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
+    // Whether anything tracks it: set where the one-face rule takes the flag.
+    let another_voice_tracked = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let no_owner = NoOwnerTold::default();
     let told_for = memory_context_carried(
         sessions,
@@ -3902,6 +3904,7 @@ pub fn serve(
                 .is_ok_and(|value| value == "on"),
             files.room_file.as_deref(),
             files.bus_root.as_deref(),
+            Some((another_voice_tracked.clone(), another_voice.clone())),
         ));
     }
     // The rule's own, for `voice/remarked` below (#4175).
@@ -4482,6 +4485,7 @@ pub fn serve(
                     eprintln!(
                         "lamp-voice second: a known person's keep on a line no face was seen speaking is theirs, its reads the room's, when their known face was the one face in view and no other voice was heard in the conversation (LAMP_PERSON_SCOPE_ONE_FACE)"
                     );
+                    another_voice_tracked.store(true, std::sync::atomic::Ordering::Release);
                     engine = engine.scoping_by_one_face(another_voice.clone());
                     // Read as theirs too, forgets refused (#5522).
                     if std::env::var(
@@ -5494,6 +5498,10 @@ pub(crate) fn keeping_room(
     ends_sooner: bool,
     room_file: Option<&Path>,
     bus_root: Option<&Path>,
+    another_voice: Option<(
+        Arc<std::sync::atomic::AtomicBool>,
+        Arc<std::sync::atomic::AtomicBool>,
+    )>,
 ) -> Box<dyn FnMut(u64) + Send> {
     let mut kept_boot = None;
     if let Ok(mut room) = crate::room_told::room().lock() {
@@ -5530,7 +5538,14 @@ pub(crate) fn keeping_room(
         };
         let now = room.at(now_us);
         if let Some(out) = out.as_mut() {
-            out.tell(now, now_us);
+            // The one-face rule's record, said only where something tracks it
+            // (`tracked`); without, nothing proves there is no other voice.
+            let another = another_voice.as_ref().and_then(|(tracked, flag)| {
+                tracked
+                    .load(std::sync::atomic::Ordering::Acquire)
+                    .then(|| flag.load(std::sync::atomic::Ordering::Acquire))
+            });
+            out.tell_with(now, another, now_us);
         }
         if let Some((path, boot)) = &kept_boot
             && now_us.saturating_sub(saved_at_us) >= 1_000_000
@@ -22286,7 +22301,7 @@ mod tests {
         let path = dir.join("room.json");
         let first = path.clone();
         std::thread::spawn(move || {
-            let mut tick = super::keeping_room(false, false, false, Some(&first), None);
+            let mut tick = super::keeping_room(false, false, false, Some(&first), None, None);
             let now = monotonic_us();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
@@ -22304,7 +22319,7 @@ mod tests {
         assert!(path.exists(), "the room went to its file");
         let second = path.clone();
         let taken = std::thread::spawn(move || {
-            let _tick = super::keeping_room(false, false, false, Some(&second), None);
+            let _tick = super::keeping_room(false, false, false, Some(&second), None, None);
             let mut room = crate::room_told::room().lock().unwrap();
             room.at(monotonic_us())
         })
@@ -26528,7 +26543,13 @@ mod tests {
                 )
                 .unwrap();
                 rooms
-                    .publish_json(monotonic_us(), &RoomState { state: room })
+                    .publish_json(
+                        monotonic_us(),
+                        &RoomState {
+                            state: room,
+                            another_voice: None,
+                        },
+                    )
                     .unwrap();
                 let now = monotonic_us();
                 heeding.keep_unjudged(request, (now.saturating_sub(1_000_000), now));
@@ -27301,7 +27322,7 @@ mod tests {
         let _one = crate::provider_worker::tests::one_thread();
         let busy_after_three = |cut_ins_not_talk: bool| {
             std::thread::spawn(move || {
-                let _tick = super::keeping_room(false, cut_ins_not_talk, false, None, None);
+                let _tick = super::keeping_room(false, cut_ins_not_talk, false, None, None, None);
                 let mut room = crate::room_told::room().lock().unwrap();
                 let now = monotonic_us();
                 for request in 1..=3 {
@@ -27336,7 +27357,7 @@ mod tests {
         // after it or not at all.
         let room_at = |ends_sooner: bool, answered: Option<u64>, end: u64| {
             std::thread::spawn(move || {
-                let _tick = super::keeping_room(true, false, ends_sooner, None, None);
+                let _tick = super::keeping_room(true, false, ends_sooner, None, None, None);
                 let mut room = crate::room_told::room().lock().unwrap();
                 let start = 1_000 * S;
                 for request in 1..=3 {
@@ -28950,7 +28971,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("lamp-second-room-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
-        let mut tick = super::keeping_room(false, false, false, None, Some(&root));
+        let mut tick = super::keeping_room(false, false, false, None, Some(&root), None);
         tick(monotonic_us());
         let told = lamp_bus::Bus::new(&root)
             .unwrap()
