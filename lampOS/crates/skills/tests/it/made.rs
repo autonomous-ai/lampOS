@@ -89,7 +89,8 @@ fn a_skill_made_by_voice_is_checked_packed_and_kept() {
     assert_eq!(
         made.description,
         "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most \
-         once every 12 hours."
+         once every 12 hours. It starts on its own, at most 3 times a day, one an hour with the \
+         lamp's other nudges, never from 22:00 to 08:00, and rests till morning if ignored twice."
     );
     assert_eq!(made.uses.spoken(), "its light and whether it is talking");
     let bytes = fs::read(&made.package).unwrap();
@@ -186,15 +187,16 @@ fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
         made.description
     );
     assert_eq!(tars(&keeping.directory).len(), 2);
-    // Past the old cap (#6066): the camera granted and a hello, which the
-    // checker takes, kept and said back with the camera named.
+    // Past the old cap (#6066): a hello, which the checker takes, kept; the
+    // camera granted with no step that looks is dropped, not refused, and
+    // never said (App Only's P2 on #6103).
     let camera = TOML
         .replace("light = true\n", "light = true\ncamera = true\n")
         .replace("policy = \"nudge\"", "policy = \"hello\"");
-    let made = keep(&answer(&camera, "night-look"), false, "s1:12:1", &keeping).unwrap();
-    assert!(made.uses.camera);
+    let made = keep(&answer(&camera, "night-look"), false, "s1:14:1", &keeping).unwrap();
+    assert!(!made.uses.camera);
     assert!(
-        made.description.contains(", as a hello, using the camera."),
+        made.description.contains(", as a hello.") && !made.description.contains("camera"),
         "{}",
         made.description
     );
@@ -758,7 +760,16 @@ fn a_face_a_getting_up_and_a_clock_made_skill_are_packed_and_kept() {
         )
         .unwrap_or_else(|refused| panic!("{name}: {refused:?}"));
         assert_eq!(made.name, name);
-        assert_eq!(made.description, said, "{name}");
+        // Each starts on its own, with the nudges' manners (#6066 (a)).
+        assert_eq!(
+            made.description,
+            format!(
+                "{said} It starts on its own, at most 3 times a day, one an hour with the \
+                 lamp's other nudges, never from 22:00 to 08:00, and rests till morning if \
+                 ignored twice."
+            ),
+            "{name}"
+        );
         assert!(made.uses.body, "{name}");
     }
     assert_eq!(tars(&keeping.directory).len(), 3);
@@ -823,12 +834,29 @@ fn a_made_face_skill_greets_once_through_a_glance_away() {
     )
     .unwrap();
     let on = skills.join("face-hello");
+    let installed = fs::read_to_string(on.join("skill.toml")).unwrap();
+    assert!(installed.contains("absent_for = \"1m\""));
+    // With the nudges' manners too (#6066 (a)): the glance back never
+    // greets, and its budget lets at most one greeting through here.
+    assert!(installed.contains("[budget]") && installed.contains("[rest]"));
+    let mannered = greetings(lamp_skills::load(&on).unwrap());
     assert!(
-        fs::read_to_string(on.join("skill.toml"))
-            .unwrap()
-            .contains("absent_for = \"1m\"")
+        !mannered.contains(&101) && mannered.len() <= 1,
+        "{mannered:?}"
     );
-    assert_eq!(greetings(lamp_skills::load(&on).unwrap()), [70, 200]);
+    // The floor alone, its manners taken off: one greeting each arrival.
+    let floor = dir.path().join("floor").join("face-hello");
+    fs::create_dir_all(&floor).unwrap();
+    let floor_only =
+        installed
+            .split("\n[quiet]")
+            .next()
+            .unwrap()
+            .replacen("most_a_day = 3\n", "", 1);
+    assert!(!floor_only.contains("[budget]") && floor_only.contains("absent_for = \"1m\""));
+    fs::write(floor.join("skill.toml"), &floor_only).unwrap();
+    fs::write(floor.join("SKILL.md"), card("face-hello")).unwrap();
+    assert_eq!(greetings(lamp_skills::load(&floor).unwrap()), [70, 200]);
     // Unpaced, the same skill greets the glance back at 101 s too.
     let unpaced = dir.path().join("unpaced").join("face-hello");
     fs::create_dir_all(&unpaced).unwrap();
