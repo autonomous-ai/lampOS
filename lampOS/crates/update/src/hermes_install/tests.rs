@@ -63,7 +63,21 @@ impl Lamp {
         ] {
             fs::create_dir_all(root.path().join(folder)).unwrap();
         }
-        Self { root }
+        let lamp = Self { root };
+        lamp.memory(4 * NEEDS_AVAILABLE_KB);
+        lamp
+    }
+    /// [`MEMINFO`] saying `available_kb` available, as the kernel writes it.
+    fn memory(&self, available_kb: u64) {
+        self.meminfo(&format!(
+            "MemTotal:        8045532 kB\nMemFree:          301234 kB\n\
+             MemAvailable:   {available_kb:>8} kB\nBuffers:           12345 kB\n"
+        ));
+    }
+    fn meminfo(&self, text: &str) {
+        let meminfo = self.at(MEMINFO);
+        fs::create_dir_all(meminfo.parent().unwrap()).unwrap();
+        fs::write(meminfo, text).unwrap();
     }
     fn root(&self) -> &Path {
         self.root.path()
@@ -251,14 +265,21 @@ fn mode(path: &Path) -> u32 {
 const AS_LAMPOS: &str = "runuser -u lampos -- env HOME=/var/lib/lampos-hermes \
      HERMES_HOME=/var/lib/lampos-hermes/.hermes PATH=/usr/bin:/bin SHELL=/bin/sh ";
 
-/// On by default on a product lamp, as Harness's: unset there is the
-/// build's default, on; unset on any other lamp is off; set, only `on` is
-/// on, so `off` turns a product lamp off. `serve` with it off takes an
-/// earlier record and ask away.
+/// Off by default on every lamp until the lamp-c0a4 numbers are judged
+/// (the first builder, 10 Nov): unset on a product lamp is the build's
+/// default, off; unset on any other lamp is off; set, only `on` is on, so
+/// `off` keeps a product lamp off. A product default of on would still
+/// install on a product lamp alone. `serve` with it off takes an earlier
+/// record and ask away.
 #[test]
-fn the_switch_is_on_by_default_on_a_product_lamp_alone() {
-    const { assert!(PRODUCT_DEFAULT) };
-    assert!(wanted(None, true, PRODUCT_DEFAULT), "a product lamp, unset");
+fn the_switch_is_off_by_default_on_every_lamp() {
+    const { assert!(!PRODUCT_DEFAULT) };
+    assert!(
+        !wanted(None, true, PRODUCT_DEFAULT),
+        "a product lamp, unset"
+    );
+    assert!(wanted(None, true, true), "a default of on: a product lamp");
+    assert!(!wanted(None, false, true), "a default of on: another lamp");
     assert!(!wanted(None, false, PRODUCT_DEFAULT), "another lamp, unset");
     assert!(!wanted(Some("off"), true, PRODUCT_DEFAULT), "off wins");
     for value in ["off", "", "ON", "1"] {
@@ -413,7 +434,8 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
         "export {TOKEN_ENV}=\"$T\" HERMES_HOME={HERMES_HOME} "
     )));
     assert!(WRAPPER_TEXT.ends_with(&format!(
-        "exec /usr/bin/unshare --map-root-user --mount --propagation private {NS} \"$@\"\n"
+        "exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc \
+         --propagation private {NS} \"$@\"\n"
     )));
     assert_eq!(
         WRAPPER_TEXT.matches("exec ").count(),
@@ -460,8 +482,31 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
         "token=tok_0123456789abcdef0123456789abcdef home={HERMES_HOME} ids={uid}:{gid}\n"
     )));
     assert!(out.contains(&format!(
-        "args: --map-root-user --mount --propagation private {NS} chat -q a b\n"
+        "args: --map-root-user --mount --pid --kill-child --mount-proc --propagation private \
+         {NS} chat -q a b\n"
     )));
+}
+
+/// Hermes shares `lampos`'s uid with lamp-cloud, so with the lamp's
+/// `/proc` it could open lamp-cloud's `/proc/<pid>/root` (its credentials
+/// there), `environ` and `fd` (Thirteen's P1 on #6093). The wrapper gives
+/// it a PID namespace of its own (`--pid`), forks into it with the wrapper
+/// its parent (`--kill-child`: killing the wrapper kills Hermes) and
+/// mounts that namespace's own `/proc` (`--mount-proc`), so no lamp
+/// process is visible. On lamp-c0a4 on 10 Nov the lamp-cloud pid did not
+/// exist there and three processes were visible.
+#[test]
+fn the_wrapper_gives_hermes_its_own_pid_namespace_and_proc() {
+    let exec = WRAPPER_TEXT
+        .lines()
+        .find(|line| line.starts_with("exec "))
+        .unwrap();
+    let words: Vec<&str> = exec.split_whitespace().collect();
+    let ns = words.iter().position(|word| *word == NS).unwrap();
+    for flag in ["--pid", "--kill-child", "--mount-proc", "--mount"] {
+        let at = words.iter().position(|word| *word == flag);
+        assert!(at.is_some_and(|at| at < ns), "{flag} before {NS}");
+    }
 }
 
 /// The namespace script hides both of [`HIDDEN`] before Hermes runs, drops
@@ -1120,30 +1165,61 @@ fn too_little_free_space_is_no_space_and_nothing_is_made() {
     assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
 }
 
-/// The product units carry what the lamp's Hermes needs: lamp-tasks the
-/// switch with `--engines-from-machines` (without it the lamp is never a
-/// target) and `--reply-named`; lamp-cloud the switch for its forwarder.
-/// The voice's `LAMP_TASKS_REPLY_NAMED` and lamp-tasks'
-/// `LAMP_TASKS_RESUME_CLOSED` come with the routing that reads them (#6094).
+/// The product units do not turn the lamp's Hermes on: lamp-update's own
+/// unit alone decides (`PRODUCT_DEFAULT` off until the lamp-c0a4 numbers
+/// are judged), and neither lamp-cloud nor lamp-tasks sets the switch on.
+/// lamp-tasks' `--engines-from-machines` and `--reply-named` come with the
+/// routing that uses them (#6094), not here.
 #[test]
-fn the_product_units_carry_the_lamps_hermes() {
+fn the_product_units_do_not_turn_the_lamps_hermes_on() {
     let tasks = include_str!("../../../../deploy/product/lamp-tasks.service");
     let cloud = include_str!("../../../../deploy/product/lamp-cloud.service");
     let switch = format!("Environment={SWITCH}=on");
-    assert!(tasks.lines().any(|line| line == switch));
-    assert!(cloud.lines().any(|line| line == switch));
-    let exec = tasks
-        .lines()
-        .find(|line| line.starts_with("ExecStart="))
-        .unwrap();
-    for flag in [
-        "--targets-from-machines claude",
-        "--engines-from-machines",
-        "--reply-named",
-    ] {
-        assert!(exec.contains(&format!(" {flag} ")), "{flag}");
+    for (unit, text) in [("lamp-tasks", tasks), ("lamp-cloud", cloud)] {
+        assert!(!text.lines().any(|line| line == switch), "{unit}");
     }
-    // lamp-cloud needs nothing more of the file system: the token is in its
-    // own state folder.
     assert!(!cloud.contains("lampos-hermes"));
+}
+
+/// Under 1 GiB of memory available (`MemAvailable`; lamp-c0a4 had about
+/// 2.1 GB at rest with the voice running), or it not read: `no_memory`
+/// before the disk is looked at, and nothing written under Hermes's place,
+/// no stage run. Exactly enough is enough.
+#[test]
+fn too_little_memory_is_no_memory_and_nothing_is_made() {
+    let short = format!("MemAvailable: {} kB\n", NEEDS_AVAILABLE_KB - 1);
+    // Each case's /proc/meminfo; none is no file at all.
+    let cases = [
+        ("under the floor", Some(short.as_str())),
+        ("not a number", Some("MemAvailable: lots\n")),
+        ("no unit", Some("MemAvailable: 9999999\n")),
+        (
+            "no MemAvailable",
+            Some("MemTotal: 8045532 kB\nMemFree: 9999999 kB\n"),
+        ),
+        ("no file", None),
+    ];
+    for (case, meminfo) in cases {
+        let lamp = Lamp::new();
+        lamp.ask();
+        match meminfo {
+            Some(text) => lamp.meminfo(text),
+            None => fs::remove_file(lamp.at(MEMINFO)).unwrap(),
+        }
+        let runs = Runs::new(&lamp);
+        let said = install(&lamp, &runs, 5).unwrap();
+        assert_eq!(said.install, "failed", "{case}");
+        assert_eq!(said.error.as_deref(), Some("no_memory"), "{case}");
+        assert!(lamp.said().unwrap().check(), "{case}");
+        assert!(!runs.ran("df") && !runs.ran("install -d"), "{case}");
+        assert!(runs.stages().is_empty(), "{case}");
+        assert!(!lamp.at(PLACE).exists(), "{case}");
+        assert!(lamp.entry_points().is_empty(), "{case}");
+    }
+    let lamp = Lamp::new();
+    lamp.ask();
+    lamp.memory(NEEDS_AVAILABLE_KB);
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
+    assert!(runs.ran("df -Pk /var/lib"));
 }

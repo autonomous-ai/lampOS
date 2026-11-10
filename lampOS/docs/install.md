@@ -1423,9 +1423,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    **Hermes on the lamp** (#5978;
    `crates/update/src/hermes_install.rs`; `LAMP_HERMES_ON_LAMP` in
    `lamp-update.service`'s environment: set, on only when `on` exactly, so
-   `off` turns it off on a product lamp too; unset, on on a lamp installed
-   as the product, the build's default `PRODUCT_DEFAULT` (on, the owner's
-   call, as Harness's), and off on any other lamp). Hermes (NousResearch
+   any other value is off; unset, off on every lamp: the build's default
+   `PRODUCT_DEFAULT` is off, and the product turns it on only once its
+   lamp-c0a4 numbers are judged (the first builder, 10 Nov); no product
+   unit sets it). Hermes (NousResearch
    hermes-agent) is a coding agent Harness already knows as an engine.
    Harness finds an engine only by `command -v` in its user's login shell,
    so a `hermes` on `lampos`'s login `PATH` is all it needs: the wrapper
@@ -1482,8 +1483,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        or empty, it says so and ends with 1, running nothing. Else it
        exports `LAMP_HERMES_TOKEN` (the variable Hermes's `providers.lamp`
        reads its key from, as lamp-tasks writes it) and `HERMES_HOME`, and
-       runs `unshare --map-root-user --mount --propagation private
-       /usr/local/lib/lampos/hermes-ns`;
+       runs `unshare --map-root-user --mount --pid --kill-child
+       --mount-proc --propagation private /usr/local/lib/lampos/hermes-ns`:
+       a PID namespace of its own with its own `/proc`, the wrapper its
+       parent (`--kill-child` forks, and killing the wrapper kills Hermes).
+       Hermes shares `lampos`'s uid with lamp-cloud, so with the lamp's
+       `/proc` it could open lamp-cloud's `/proc/<pid>/root` (lamp-cloud's
+       own mount view, the credentials there), `environ` and `fd`; in its
+       own PID namespace Hermes sees only its own processes, and no lamp
+       process is there to open;
      - the namespace script `/usr/local/lib/lampos/hermes-ns` refuses to
        run in the lamp's own user namespace (its `uid_map` the whole
        range), mounts an empty read-only tmpfs (`size=4k,mode=0555`) over
@@ -1493,8 +1501,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        In that nested user namespace the mounts are locked: Hermes cannot
        take them off. Any step failing ends it before Hermes runs.
      Shown on lamp-c0a4 by hand (10 Nov, the same scripts): the key hidden;
-     lamp-cloud's `/proc/<pid>/root`, `environ` and `mem` refused; none of
-     its file descriptors openable; `umount` refused, nested too. The relay
+     `umount` refused, nested too. As plain `lampos`, `ls /proc/<lamp-cloud
+     pid>/root/run/credentials/lamp-cloud.service/` lists `account build
+     key`; inside the wrapper's namespaces without the PID namespace it is
+     `Permission denied`, but `/proc/<pid>/fd` is still listable; with
+     `--pid --fork --mount-proc` the lamp-cloud pid does not exist there and
+     only 3 processes are visible. The relay
      key never goes into Hermes's environment or its folder; only the
      forwarder's token does (Hermes keeps snapshots of its shell's
      environment under its home).
@@ -1580,10 +1592,29 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      only a marker. Each stage has the installer's 15-min bound
      (`INSTALLER_WITHIN`); the unit's is an hour for Harness and Hermes
      together.
-   - **Free space first:** before anything is moved or made, `df -Pk
+   - **Memory first:** before anything is moved or made, and before the
+     disk is looked at, `MemAvailable` in `/proc/meminfo` must be at least
+     1 GiB (`NEEDS_AVAILABLE_KB`, 1,048,576 kB); less, or it not read (no
+     file, no such line, not a number in kB), is `no_memory` and nothing
+     is changed. The floor is from lamp-c0a4 on 10 Nov, which had about
+     2.1 GB available at rest with the voice running; the install's own
+     peak is still to be measured. pip's `python-deps` stage is the heavy
+     one.
+   - **Free space next:** before anything is moved or made, `df -Pk
      /var/lib` must show at least 4 GiB available (`NEEDS_FREE_KB`); less,
      or `df` not read, is `no_space` and nothing is changed. Hermes v0.22.2
-     took 3.0 GB on lamp-c0a4.
+     took 3.0 GB on lamp-c0a4. The check reads the file system's free
+     space alone: a partial `/var/lib/lampos-hermes` or a
+     `/var/lib/lampos-hermes.old` left by a failed try is not counted as
+     room the install gets back, so their space is taken off the 4 GiB
+     like any other file's. Neither check runs when Hermes is already
+     there at the pin in a `lampos` folder (the try only repairs the
+     entry points and config then).
+   - **Disk on a 16 GB card:** the lampOS image plus Harness and Hermes
+     use about 7.0 GB (Hermes's folder about 2.4 GB of it), leaving
+     roughly 7–8 GB free. Measured on lamp-c0a4 (10 Nov): 13.1 GB used on
+     its 58 GB card, of which 6.1 GB were test copies, so about 7.0 GB
+     for the product.
    - **What the lamp must have:** `git`, `curl` and `bash`, looked for as
      `lampos` with the install's `PATH`, and `/usr/bin/unshare`, before the
      installer runs (`no_tools` otherwise). Nothing is added to the system
@@ -1592,7 +1623,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      Harness's, `{"install", "revision", "at_unix_ms", "version"?,
      "commit"?, "error"?}`, lamp-update's own (not on `update/status`
      yet). `install` is `absent`, `installing`, `installed` or `failed`;
-     `error` one of `pin_mismatch`, `no_user`, `no_space`, `no_tools`,
+     `error` one of `pin_mismatch`, `no_user`, `no_space`, `no_memory`,
+     `no_tools`,
      `no_userns`, `serve` (one of lamp-update's own steps: the installer's
      file, moving the old Hermes aside, making the folder), `timeout`,
      `installer`, `version`, `config`, `entry`, `not_started`; `version`
@@ -1600,18 +1632,23 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      and the ask at its start; the entry points go as above.
    - **Tried again** by the first reached round 24 h after a failure
      (`RETRY_AFTER`), or after `installing` for over 70 min; `serve` and
-     `not_started` at the next round.
-   - **The parts' units** (`deploy/product`): `lamp-tasks.service` has
-     `LAMP_HERMES_ON_LAMP=on` with `--engines-from-machines` (without it
-     the lamp's own Hermes is never looked for, and the lamp is no target)
-     and `--reply-named`; lamp-tasks keeps the lamp a target only while
-     Harness's look at the lamp says Hermes is installed, so a lamp with
-     the switch off in lamp-update hands over as before.
-     `lamp-cloud.service` has `LAMP_HERMES_ON_LAMP=on` for its forwarder;
-     it writes only its own state folder, so it needs no other path and no
-     group. `LAMP_TASKS_REPLY_NAMED` (lamp-voice) and
-     `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) are turned on with the routing
-     that reads them (#6094).
+     `not_started` at the next round. A failed install takes out the
+     wrapper and the namespace script, but keeps its partial
+     `/var/lib/lampos-hermes` (up to about 2.4 GB) until that retry 24 h
+     later, which continues it when its checkout is at the pin or not made
+     yet, and moves it aside (or removes it) otherwise; a `/var/lib/lampos-hermes.old` set aside
+     before the failure stays until a later install's new Hermes runs.
+   - **The parts' units** (`deploy/product`): unchanged; none sets
+     `LAMP_HERMES_ON_LAMP`, so the product's Hermes stays off until the
+     lamp-c0a4 numbers are judged (the first builder, 10 Nov). Turning it
+     on later means `LAMP_HERMES_ON_LAMP=on` in lamp-update's unit (the
+     install), in `lamp-cloud.service` (its forwarder, which writes only
+     its own state folder, so it needs no other path and no group) and in
+     `lamp-tasks.service`. lamp-tasks' `--engines-from-machines` (without
+     it the lamp's own Hermes is never looked for, and the lamp is no
+     target) and `--reply-named`, `LAMP_TASKS_REPLY_NAMED` (lamp-voice) and
+     `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) come with the routing that
+     reads them (#6094).
    - **Shown only in tests** (`hermes_install::tests`, the wrapper and the
      namespace script run by `sh` there too). Not run on a lamp yet: the
      whole install by lamp-update. Measured by hand on lamp-c0a4 (10 Nov,
