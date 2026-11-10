@@ -243,6 +243,46 @@ test('the fake refuses a move the body would drop, with its words, before the le
   });
 });
 
+const LIGHT_REFUSALS = [
+  [{ rgb: '#ff8000', for_ms: 1000, fade_ms: 500 }, 'fade_ms: from 1000 to 60000'],
+  [{ rgb: '#ff8000', for_ms: 1000, fade_ms: 60001 }, 'fade_ms: from 1000 to 60000'],
+  [{ rgb: '#ff8000', for_ms: 30001 }, 'for_ms: from 1 to 30000'],
+  [{ rgb: '#ff8000', for_ms: 0 }, 'for_ms: from 1 to 30000'],
+  [{ rgb: '#ff8000', for_ms: 1000, brightness: 101 }, 'brightness: from 0 to 100'],
+  [{ rgb: 'ff8000', for_ms: 1000 }, 'rgb: #rrggbb'],
+  [{ pixels: Array(33).fill('#000000'), for_ms: 1000 }, 'pixels: 32 of them, one per pixel of the ring'],
+  [{ pixels: [...Array(31).fill('#000000'), 'red'], for_ms: 1000 }, 'pixels: each #rrggbb'],
+  [{ rgb: '#ff8000', colour: 'red', level: 3, for_ms: 1000 }, 'one of colour, rgb or pixels'],
+  [{ for_ms: 1000 }, 'one of colour, rgb or pixels'],
+  [{ colour: 'mauve', level: 3, for_ms: 1000 }, 'colour: one of yellow, red, green, blue, cyan, purple, orange, pink, white, warm'],
+  [{ colour: 'red', level: 6, for_ms: 1000 }, 'level: from 1 to 5, with colour'],
+  [{ colour: 'red', for_ms: 1000 }, 'level: from 1 to 5, with colour'],
+  [{ colour: 'red', level: 3, brightness: 50, for_ms: 1000 }, 'brightness goes with rgb or pixels; colour has level'],
+  [{ rgb: '#ff8000', level: 3, for_ms: 1000 }, 'level and pattern go with colour'],
+];
+const LIGHT_TAKEN = [
+  { rgb: '#FF8000', for_ms: 1, fade_ms: 1000 },
+  { rgb: '#ff8000', for_ms: 30000, fade_ms: 60000, brightness: 0 },
+  { pixels: Array(32).fill('#000000'), for_ms: 1000, brightness: 100 },
+  { colour: 'warm', level: 3, for_ms: 1000 },
+];
+
+test('the fake refuses a light the lamp would refuse, with lamp-control\'s words, and keeps the connection', async () => {
+  const { lightRefusal } = await import('../src/testing.js');
+  for (const [fields, refusal] of LIGHT_REFUSALS) assert.equal(lightRefusal({ op: 'light', ...fields }), refusal, JSON.stringify(fields).slice(0, 80));
+  for (const fields of LIGHT_TAKEN) assert.equal(lightRefusal({ op: 'light', ...fields }), null, JSON.stringify(fields).slice(0, 80));
+  await withLamp({}, async (lamp, fake) => {
+    // Sent past the client's own check, as another computer's code might.
+    for (const [fields, refusal] of LIGHT_REFUSALS) {
+      // A colour the client itself knows is wrong is refused by its own check, in its words.
+      const own = fields.colour === 'mauve';
+      await assert.rejects(lamp.request('light', fields), (error) => (own ? error.code === 'bad_request' : error instanceof byCode.bad_request && error.why === refusal), JSON.stringify(fields).slice(0, 80));
+    }
+    for (const fields of LIGHT_TAKEN) await lamp.request('light', fields);
+    assert.equal(fake.asked('light').length, LIGHT_TAKEN.length);
+  });
+});
+
 test('the fake refuses a move whose frames lamp-control cannot parse, and keeps the connection', async () => {
   await withLamp({}, async (lamp, fake) => {
     await lamp.withLease(['body'], async () => {
