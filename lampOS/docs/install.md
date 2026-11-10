@@ -1501,10 +1501,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      record says `installing` and systemd says the one-shot is
      `activating`):
      - the voice not quiet (someone heard or answered, the voice not
-       resting, or not seen): `systemctl freeze lamp-update-harness.service`
-       (systemd 246 or later; the lamp has 252), journaled `Hermes's
+       resting, or not seen): the unit's own `cgroup.freeze` (systemd 252 refuses `systemctl freeze` for a oneshot still activating, "Unit has a pending job")
+       journaled `Hermes's
        install is frozen while the voice is not quiet: <why>`; thawed with
-       `systemctl thaw` once the quiet stretch (10 min) is back. Frozen
+       `cgroup.freeze` back to 0 once the quiet stretch (10 min) is back. Frozen
        30 min in all (`MOST_FROZEN`), over one freeze or several, it is
        stopped as `interrupted`, so with the install's own 7 to 12 min it
        ends inside the unit's hour (`TimeoutStartSec` counts on while

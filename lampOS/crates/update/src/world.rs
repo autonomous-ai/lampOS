@@ -6,8 +6,8 @@ use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{Health, MicrophonePrivacy, Speech, VoiceMute, VoiceState};
 use std::{
     collections::BTreeMap,
-    io,
-    path::Path,
+    fs, io,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -65,14 +65,15 @@ pub trait Systemd {
     fn start_harness_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot start the Harness unit".to_owned())
     }
-    /// `systemctl freeze` of [`crate::harness_install::UNIT`], and only it
-    /// (#5978): its cgroup frozen while the voice is not quiet during
-    /// Hermes's install (systemd 246 and later). A systemd that cannot
-    /// refuses.
+    /// [`crate::harness_install::UNIT`]'s cgroup frozen, and only its
+    /// (#5978), while the voice is not quiet during Hermes's install: by
+    /// its `cgroup.freeze`, as systemd refuses `systemctl freeze` for a
+    /// oneshot still activating. A systemd that cannot refuses.
     fn freeze_harness_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot freeze the Harness unit".to_owned())
     }
-    /// `systemctl thaw` of [`crate::harness_install::UNIT`], and only it.
+    /// [`crate::harness_install::UNIT`]'s cgroup thawed, and only its; no
+    /// cgroup (the unit not running) is nothing to thaw.
     fn thaw_harness_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot thaw the Harness unit".to_owned())
     }
@@ -233,11 +234,11 @@ impl Systemd for Systemctl {
     }
 
     fn freeze_harness_unit(&mut self) -> Result<(), String> {
-        run(&["freeze", crate::harness_install::UNIT], JOURNAL_WITHIN)
+        harness_cgroup_freeze(true)
     }
 
     fn thaw_harness_unit(&mut self) -> Result<(), String> {
-        run(&["thaw", crate::harness_install::UNIT], JOURNAL_WITHIN)
+        harness_cgroup_freeze(false)
     }
 
     fn start_writer_unit(&mut self) -> Result<(), String> {
@@ -496,6 +497,41 @@ fn not_loaded(why: &str) -> bool {
 /// How long a start of the writer's one-shot is waited for: past its own
 /// `TimeoutStartSec=120`.
 const WRITER_WITHIN: Duration = Duration::from_secs(150);
+
+/// The cgroup v2 root, where a unit's `ControlGroup` path begins.
+const CGROUP_ROOT: &str = "/sys/fs/cgroup";
+
+/// Freezes (or thaws) the Harness one-shot's cgroup by its own
+/// `cgroup.freeze` (#5978). `systemctl freeze` would be the plain way, but
+/// systemd (252 on the lamp) refuses it for a oneshot still activating, as
+/// the install is all its life: "Unit has a pending job" (c0a4, 11 Nov). The
+/// kernel's freezer has no such rule, and systemd keeps the unit as it is.
+/// No cgroup (the unit not running): nothing to thaw, and a freeze refused.
+fn harness_cgroup_freeze(frozen: bool) -> Result<(), String> {
+    let unit = crate::harness_install::UNIT;
+    let group = show_within(
+        Command::new("systemctl").args(["show", "--property=ControlGroup", "--value", "--", unit]),
+        JOURNAL_WITHIN,
+    )?;
+    let group = group.trim();
+    match cgroup_freeze_file(group) {
+        Some(file) => fs::write(&file, if frozen { "1" } else { "0" })
+            .map_err(|error| format!("{}: {error}", file.display())),
+        None if frozen => Err(format!("{unit} has no cgroup to freeze ({group:?})")),
+        None => Ok(()),
+    }
+}
+
+/// `cgroup.freeze` of a unit's `ControlGroup`, for a path systemd gives:
+/// absolute, below the root, with no `.` or `..` part.
+fn cgroup_freeze_file(group: &str) -> Option<PathBuf> {
+    let below = group.strip_prefix('/')?;
+    let parts_fit = !below.is_empty()
+        && below
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..");
+    parts_fit.then(|| Path::new(CGROUP_ROOT).join(below).join("cgroup.freeze"))
+}
 
 fn run(words: &[&str], within: Duration) -> Result<(), String> {
     let mut child = Command::new("systemctl")
@@ -784,6 +820,30 @@ impl Clock for Monotonic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// c0a4, 11 Nov: systemd 252 refused `systemctl freeze` for the
+    /// activating one-shot ("Unit has a pending job"), so the install was
+    /// stopped at the first ask instead of held. The freeze goes to the
+    /// unit's own `cgroup.freeze`, and only for a path systemd could give.
+    #[test]
+    fn the_harness_unit_is_frozen_by_its_own_cgroup_freeze_file() {
+        assert_eq!(
+            cgroup_freeze_file("/system.slice/lamp-update-harness.service"),
+            Some(PathBuf::from(
+                "/sys/fs/cgroup/system.slice/lamp-update-harness.service/cgroup.freeze"
+            ))
+        );
+        for refused in [
+            "",
+            "/",
+            "system.slice/lamp-update-harness.service",
+            "/system.slice/../x",
+            "/system.slice/./x",
+            "/system.slice//x",
+        ] {
+            assert_eq!(cgroup_freeze_file(refused), None, "{refused:?}");
+        }
+    }
 
     #[test]
     fn a_stop_of_a_unit_systemd_never_loaded_is_known_by_its_status_or_its_words() {
