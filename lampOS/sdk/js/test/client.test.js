@@ -211,7 +211,7 @@ test('LAMPOS_LOG=debug logs each frame with its secrets redacted', async () => {
 // the Python SDK's test has the same list).
 const UNPLAYABLE = [
   [[[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 200, 'frames: a move this body cannot play: it lasts 600 ms, not 1500 to 10000'],
-  [[[0, 0, 0, 0, 0], [0, 0, 151, 0, 0], [0, 0, 0, 0, 0]], 1000, 'frames: a move this body cannot play: frame 1 takes joint 2 151 counts, farther than 150'],
+  [[[0, 0, 0, 0, 0], [0, 0, 251, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 251 counts, farther than 250, this lamp's yaw reach (--reach)"],
   [[[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 1000, null], // 2 s: one the body plays
   [[...Array(7).fill([0, 0, 0, 0, 0]), ...Array(8).fill([0, 0, 0, 0, 300]), [0, 0, 0, 0, 0]], 100, 'frames: a move this body cannot play: frame 7 asks joint 4 for 3000 counts a second, faster than 800'],
   [[[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 500, 'frames: start and end at home, all five 0'],
@@ -1807,7 +1807,7 @@ test('poses a move cannot make are refused with the joint, before sending', asyn
     [[{ pitch: true }], 'pitch must be a number of degrees'],
     [[{ pitch: NaN }], 'pitch must be a number of degrees'],
     [[{ pitch: 40 }], 'pitch 40° is farther than a move may take it, 17.6° either way'],
-    [[{ yaw: -14 }], 'yaw -14° is farther than a move may take it, 13.2° either way'],
+    [[{ yaw: -23 }], 'yaw -23° is farther than a move may take it, 22.0° either way'],
     [Array(12).fill({ shoulder: 30, elbow: -30 }), "longer than a move's 10000"],
   ]) {
     assert.throws(() => posesToFrames(poses), (error) => error instanceof LampError && error.code === 'bad_request' && error.message.includes(words), words);

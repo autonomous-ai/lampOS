@@ -681,7 +681,10 @@ folded, may wait up to that long for its first motion to begin.
 | `skill.remove` | `name` | `skills` | — |
 
 `move`'s shape is checked here, and the body's move check
-(`crates/body/src/moves.rs`) judges the rest.
+(`crates/body/src/moves.rs`) judges the rest. The door doesn't know the lamp's
+reach, so its pre-check lets a base yaw through up to 250 counts, the most any
+lamp may be given; the body holds the move to its own reach and refuses one
+past it with the reach in its words.
 
 ## Who wins
 
@@ -825,8 +828,9 @@ listening. The person wins over each, as "Who wins" says.
 
 Every motion goes through `lamp-body`'s limits, which no sender can raise:
 its speed and acceleration caps and pitch floor (`body.rs`), each joint's
-farthest and fastest in a move (`moves.rs`: farthest 200, 200, 150, 350, 350
-counts and fastest 900, 1,300, 1,000, 800, 800 counts a second for head
+farthest and fastest in a move (`moves.rs`: farthest 200, 200, the lamp's own
+yaw reach (`--reach`'s last figure: 250 counts, 22 degrees, on lamp-75c9 and
+lamp-a63e), 350, 350 counts and fastest 900, 1,300, 1,000, 800, 800 counts a second for head
 pitch, head roll, base yaw, shoulder and elbow; 1.5 to 10 s, from the pose
 and back), the 22 mm centre-of-gravity rule (`cog.rs`), its force limit,
 strain rests and heat stop. `joints` goals get the same caps at each step.
