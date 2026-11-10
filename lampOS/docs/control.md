@@ -77,7 +77,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 
 | event | fields | from | grant |
 |---|---|---|---|
-| `person.arrived`, `person.left` | `count`, `near` (share of the picture's height) | `humans/faces/tracked`, as skills' `appears` and `absent_for` | `look` |
+| `person.arrived`, `person.left` | `count`, `near` (share of the picture's height); `left` comes after 5 s with no face, and only then is the next face an `arrived` (under 5 s away is neither) | `humans/faces/tracked`, as skills' `appears` and `absent_for` | `look` |
 | `person.stood_up` | `side` | `room/stood_up` | `look` |
 | `person.facing` | `facing` | `humans/faces/tracked` | `look` |
 | `hand` | `seen`; when seen, `x`, `y` (the palm's centre, a share of the picture from its left and top), `size` (the palm's width, a share of the picture's), `open`, `confidence` | `humans/hands/tracked`: one message per look that sees a hand, none without. Told when first seen, moved or grown by 0.05, opened or closed, at most every 250 ms with the newest held back until then; `seen: false` once, 1 s after the last message. A message under 0.5 confidence, or a share outside 0 to 1, is no hand. Never the picture, keypoints or the tracker's clock | `look` |
