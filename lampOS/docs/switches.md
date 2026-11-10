@@ -912,7 +912,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_CALENDAR_EDITS` | The lamp can move or cancel a calendar event for you, after reading the change back and hearing your yes. |
 | `LAMP_SKILL_READS` | A skill you make can read you a linked service, like your calendar, only when you are alone with the lamp. |
 | `LAMP_SKILL_LINK_NOTE` | A skill you made that reads a service you haven't linked tells you once where to link it in the app. |
-| `LAMP_SKILL_WRITES` | A skill you made can send a fixed mail or event on its own, once you said yes to it, at most three a day. |
+| `LAMP_SKILL_WRITES` | A skill you made can send or post one fixed thing on its own, once you said yes to it, at most three a day. |
 | `lamp-tasks --push-watch` | Nothing you'd notice: the lamp hears that a task on your computer is done as it ends, not at its next check. |
 | `LAMP_LEDGER_REFENCE` | A lamp whose timers stopped ringing after a restore rings them again, or says it couldn't set one. |
 
