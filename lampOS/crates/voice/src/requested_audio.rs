@@ -99,9 +99,8 @@ const NOT: &[&str] = &[
     "dung",
     "thoi",
 ];
-/// What is asked for must be a recording: one of these at or after the ask
-/// ("play some music", "mở nhạc"), so "turn on the light" or "play chess"
-/// does not ask.
+/// The recording noun must be the requested object, not a word in a later
+/// clause ("turn on the light so I can read sheet music" is not an ask).
 const AUDIO: &[&str] = &[
     "music",
     "song",
@@ -120,22 +119,84 @@ const AUDIO: &[&str] = &[
     "nhac",
     "bai",
 ];
-/// "Something" names a recording only with one of these within
-/// [`MOOD_WITHIN`] words after it ("play something calm", "play me something
-/// to relax", "play something to help me sleep"); "play something with me"
-/// does not.
+/// Adjectives allowed directly before a recording noun or after "something".
 const MOODS: &[&str] = &[
     "relaxing", "calm", "calming", "quiet", "soft", "soothing", "gentle", "peaceful", "chill",
-    "relax", "unwind", "sleep",
 ];
-/// How many words after "something" a [`MOODS`] word may come.
-const MOOD_WITHIN: usize = 4;
+
+fn starts_with_words(words: &[String], prefix: &[&str]) -> bool {
+    words.len() >= prefix.len()
+        && words
+            .iter()
+            .zip(prefix)
+            .all(|(word, expected)| word == expected)
+}
+
+/// A conservative object grammar: an optional recipient and determiner,
+/// then a recording noun (with at most three mood adjectives), or one of
+/// the explicit "something ..." constructions heard on the lamp. Never
+/// skip an unrelated object, "with me", or "like chess" to find a mood.
+fn audio_object(mut words: &[String]) -> bool {
+    if words
+        .first()
+        .is_some_and(|word| matches!(word.as_str(), "me" | "us"))
+    {
+        words = &words[1..];
+    }
+    if words
+        .first()
+        .is_some_and(|word| matches!(word.as_str(), "a" | "an" | "some" | "the"))
+    {
+        words = &words[1..];
+    }
+    if words.first().is_some_and(|word| word == "something") {
+        let rest = &words[1..];
+        let used = if rest
+            .first()
+            .is_some_and(|word| MOODS.contains(&word.as_str()))
+        {
+            1
+        } else if starts_with_words(rest, &["to", "help", "me"])
+            && rest
+                .get(3)
+                .is_some_and(|word| matches!(word.as_str(), "relax" | "unwind" | "sleep"))
+        {
+            4
+        } else if rest.first().is_some_and(|word| word == "to")
+            && rest
+                .get(1)
+                .is_some_and(|word| matches!(word.as_str(), "relax" | "unwind" | "sleep"))
+        {
+            2
+        } else {
+            return false;
+        };
+        // Do not turn "something calm like chess" into a recording ask.
+        return rest[used..]
+            .iter()
+            .all(|word| matches!(word.as_str(), "please" | "now" | "on"));
+    }
+    for _ in 0..3 {
+        if words
+            .first()
+            .is_some_and(|word| MOODS.contains(&word.as_str()))
+        {
+            words = &words[1..];
+        } else {
+            break;
+        }
+    }
+    words
+        .first()
+        .is_some_and(|word| AUDIO.contains(&word.as_str()))
+}
 
 /// Whether `said`, the line that led to a requested-audio call, plainly asks
 /// to play something (#5764). Some sentence of it must start, past greetings
 /// ([`BEFORE`]) and at most one lead-in ([`LEAD_INS`]), with an ask
-/// ([`ASKS`]) for a recording ([`AUDIO`], or "something" with a
-/// [`MOODS`] word soon after), and no word of the whole line may be one of [`NOT`]. On lamp-52e6 on 9 Nov, "Lamp, I
+/// ([`ASKS`]) with a recording object ([`audio_object`]). No word of the
+/// whole line may be one of [`NOT`], and "forget it" retracts the ask.
+/// On lamp-52e6 on 9 Nov, "Lamp, I
 /// listened to some relaxing music on the train this morning, it was really
 /// nice." got a `use_skill` call to the relaxing-music skill: talk about
 /// music, not an ask, so it is refused here, not left to the skill's text.
@@ -145,9 +206,11 @@ const MOOD_WITHIN: usize = 4;
 // another language or phrasing is refused (the model is told so, and the
 // person can say it plainly). Widen ASKS when a lamp run shows one.
 pub fn asks_to_play(said: &str) -> bool {
-    if crate::known_faces::folded_words(said)
-        .iter()
-        .any(|word| NOT.contains(&word.as_str()))
+    let whole = crate::known_faces::folded_words(said);
+    if whole.iter().any(|word| NOT.contains(&word.as_str()))
+        || whole
+            .windows(2)
+            .any(|words| starts_with_words(words, &["forget", "it"]))
     {
         return false;
     }
@@ -173,17 +236,18 @@ pub fn asks_to_play(said: &str) -> bool {
                 at += 1;
             }
         }
-        let asked = &words[at.min(words.len())..];
-        ASKS.iter().any(|ask| starts(at, ask))
-            && asked.iter().enumerate().any(|(i, word)| {
-                AUDIO.contains(&word.as_str())
-                    || (word == "something"
-                        && asked
-                            .iter()
-                            .skip(i + 1)
-                            .take(MOOD_WITHIN)
-                            .any(|next| MOODS.contains(&next.as_str())))
-            })
+        ASKS.iter().any(|ask| {
+            if !starts(at, ask) {
+                return false;
+            }
+            // These prefixes already include the object's first word:
+            // "put some/ something" and Vietnamese "mở nhạc / bật bài".
+            let includes_object = ask
+                .last()
+                .is_some_and(|word| matches!(*word, "some" | "something") || AUDIO.contains(word));
+            let object_at = at + ask.len() - usize::from(includes_object);
+            audio_object(&words[object_at..])
+        })
     })
 }
 
@@ -309,6 +373,11 @@ mod tests {
             "Lamp, turn on the light.",
             "Lamp, play chess with me.",
             "Play something with me.",
+            "Lamp, turn on the light so I can read my sheet music.",
+            "Can you play chess while I listen to music?",
+            "Play something like chess to relax.",
+            "Play something with me to relax.",
+            "Lamp, play some music. Forget it.",
             "",
         ] {
             assert!(!asks_to_play(talk), "{talk}");

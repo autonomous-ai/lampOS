@@ -382,6 +382,18 @@ async fn talk_about_music_gets_no_recording_and_the_model_is_told_so() {
         ("Lamp, what kind of music helps people relax?", false),
         ("Lamp, play some relaxing music. Actually, don't.", false),
         ("Lamp, can you play some relaxing music?", true),
+        (
+            "Lamp, turn on the light so I can read my sheet music.",
+            false,
+        ),
+        ("Can you play chess while I listen to music?", false),
+        ("Play something like chess to relax.", false),
+        ("Play something with me to relax.", false),
+        ("Lamp, play some music. Forget it.", false),
+        ("Lamp, play me something to relax.", true),
+        ("Play something to help me sleep.", true),
+        ("Lamp, mở nhạc thư giãn đi.", true),
+        ("Bật nhạc cho mình nhé.", true),
     ] {
         for wrapped in [false, true] {
             let script = Arc::new(Script {
@@ -408,7 +420,13 @@ async fn talk_about_music_gets_no_recording_and_the_model_is_told_so() {
                 .iter()
                 .filter(|event| matches!(event, ProviderOutput::RequestedAudio { .. }))
                 .count();
-            assert_eq!(offers, usize::from(asks), "{words}");
+            assert_eq!(offers, usize::from(asks), "{words}; wrapped={wrapped}");
+            assert!(
+                outputs.iter().any(|event| matches!(event,
+                    ProviderOutput::Audio { spoken: true, samples, .. } if !samples.is_empty()
+                )),
+                "the genuine Ready reply has spoken PCM; {words}; wrapped={wrapped}"
+            );
             assert_eq!(calls.audio.lock().unwrap().len(), 1, "{words}");
             let told = if asks {
                 json!({"ok": true})

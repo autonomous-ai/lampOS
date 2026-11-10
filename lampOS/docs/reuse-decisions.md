@@ -1,5 +1,18 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Keep retirement before requested music; distinguish cues (2026-11-10)
+
+V1 `hal/drivers/voice/music_service.py` waits while TTS is speaking before
+music, polling up to 100 times at 100 ms and then waiting another 500 ms.
+It checks stop before taking the speaker. Keep speech-before-music and stop
+handling; reuse lampOS's existing owner, lease, cancellation and actual
+speaker-retirement gate instead of adding that polling delay. This repair
+only distinguishes answer PCM from local wait cues/announcements and binds
+the music noun to the requested object. A transcript may exist without TTS
+PCM, so it cannot supply confirmation evidence. Live model answer audio
+retains its existing eligibility. No device timing or acoustic parity is
+claimed by the host fixtures; see [requested audio](requested-audio.md).
+
 ## A Gmail PDF attachment's text through pdf-extract, in a child (#5826, 2026-11-09)
 
 Reuse `pdf-extract` 0.12.1 on `lopdf` 0.42 (MIT, pure Rust, from crates.io and
