@@ -131,9 +131,13 @@ một câu mà chính người đó đã giữ, còn hiệu lực và cùng ch�
 hoa thường, khoảng trắng và dấu câu cuối; trong phạm vi riêng của một người,
 cả chữ «my» hay «the» ở đầu: C81, bản 10538 trên lamp-06c1, 6/11, «The gym
 locker code is 441.» đã giữ và «My gym locker code is 441.» bị giữ lần nữa;
-không bao giờ trong phạm vi căn phòng, nơi «my» là của bất kỳ ai nói,
+và trước đó cả «They said: » mà một câu giữ theo lời nghe được mở đầu: C81,
+bản 11091, 10/11, «They said: my gym locker code is 441.» là «Gym locker code
+is 441.»; không bao giờ trong phạm vi căn phòng, nơi «my» là của bất kỳ ai nói,
 `days::own_text`), là chính điều đã giữ đó, không ghi
-thêm dòng nào. Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
+thêm dòng nào. Một lời sửa có `once` mà nêu đúng điều đã giữ bằng cùng chữ như
+vậy (`Days::restates`) cũng là điều đó được nói lại: không có bản mới, và nó
+mang thời điểm được nói lại («last said»). Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
 điều đã quên hay đã bị thay, không tính là cùng một điều. Unit sản phẩm bật công
 tắc này từ 28/10: trên lamp-06c1, khi không có nó, một câu nói lại đã được giữ
 lần thứ hai (lượt chạy của Friday, #3504). Vẫn còn nợ một lần kiểm tra trên

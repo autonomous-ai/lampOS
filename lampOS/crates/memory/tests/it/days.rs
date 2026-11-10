@@ -3919,6 +3919,80 @@ fn a_correction_in_the_very_words_it_replaces_is_said_again() {
     );
 }
 
+/// C81 on lamp-06c1, stock 11091, 10 Nov: the gym code kept as heard
+/// ("They said: my gym locker code is 441.") and said again, the model's
+/// correction "Gym locker code is 441." naming it, was kept as a new id with
+/// the old one retired and no time it was said again. In a person's own
+/// scope the heard line's "They said: " and a leading "my" or "the" are
+/// folded as `once` folds them: it is that kept thing said again, in either
+/// way of asking. In the room's, "my" is whoever said it: a new version.
+#[test]
+fn a_heard_keep_said_again_in_the_models_words_is_said_again() {
+    const HEARD: &str = "They said: my gym locker code is 441.";
+    const MODEL: &str = "Gym locker code is 441.";
+    for (scope, replaces) in [
+        ("p-minh", true),
+        ("p-minh", false),
+        ("everyone", true),
+        ("everyone", false),
+    ] {
+        let scratch = Scratch::new("last-said-heard");
+        let mut store = scratch.open(30, NOW);
+        let who = person(scope);
+        let (id, _) = said_in_a_turn(
+            &mut store,
+            &who,
+            NOW,
+            HEARD,
+            &[],
+            "Lamp, please remember that my gym locker code is 441.",
+            &[],
+        );
+        let again = NOW + DAY;
+        store.maintain(again).unwrap();
+        let mut ask = json!({"op":"remember","person":scope,"at_unix_ms":again,
+            "text":MODEL,"once":true});
+        if replaces {
+            ask["replaces"] = json!(id);
+            ask["shown"] = json!([id]);
+        }
+        let (answer, _) = request(&mut store, ask, again);
+        if scope == "everyone" {
+            assert_ne!(answer["id"], json!(id), "{scope} {replaces}: {answer}");
+            continue;
+        }
+        assert_eq!(
+            answer,
+            json!({"ok":true,"id":id,"existing":true}),
+            "{replaces}"
+        );
+        store
+            .append(
+                &who,
+                again,
+                "Now remember that my gym locker code is 441.",
+                "Kept.",
+                &[id],
+            )
+            .unwrap();
+        assert_eq!(said_again_rows(&scratch, scope, id), 1, "{replaces}");
+        let (kept, _) = request(&mut store, json!({"op":"kept","person":scope}), again);
+        let gym = kept["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["text"].as_str().is_some_and(|t| t.contains("gym")))
+            .collect::<Vec<_>>();
+        assert_eq!(gym.len(), 1, "{replaces}: {kept}");
+        assert_eq!(gym[0]["id"], json!(id), "{replaces}: {kept}");
+        assert_eq!(
+            gym[0]["last_said_unix_ms"],
+            json!(again),
+            "{replaces}: {kept}"
+        );
+    }
+}
+
 /// #4753, the forget guards, in the voice's order (Reviewer-lead's P2): a
 /// forget of the line a kept thing was said again in (by id, "forget what I
 /// just said" as `forget_last`, a forget-all) leaves no time of it; a
