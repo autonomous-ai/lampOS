@@ -2403,7 +2403,16 @@ fn a_kept_copy_already_there_stops_nothing() {
 #[test]
 fn the_one_shot_runs_below_the_lamps_services() {
     let lines: Vec<&str> = TEXT.lines().collect();
-    for wanted in ["Nice=10", "IOSchedulingClass=idle", "CPUWeight=20"] {
+    for wanted in [
+        "Nice=10",
+        "IOSchedulingClass=idle",
+        "CPUWeight=20",
+        "CPUQuota=150%",
+        "IOWriteBandwidthMax=/var/lib 8M",
+        "IOReadBandwidthMax=/var/lib 16M",
+        "IOWriteIOPSMax=/var/lib 200",
+        "IOReadIOPSMax=/var/lib 400",
+    ] {
         assert!(
             lines.contains(&wanted),
             "{wanted} missing from the one-shot"
