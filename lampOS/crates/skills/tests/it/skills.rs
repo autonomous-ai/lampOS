@@ -14244,6 +14244,7 @@ fn unplug_with_turn_off(
             lamp_ipc::monotonic_us(),
             &lamp_msgs::RoomState {
                 state: lamp_msgs::Room::Busy,
+                another_voice: None,
             },
         )
         .unwrap();

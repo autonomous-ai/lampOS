@@ -661,6 +661,7 @@ mod tests {
         watcher.room(
             &RoomState {
                 state: Room::Unknown,
+                another_voice: None,
             },
             1,
         );
@@ -674,7 +675,13 @@ mod tests {
         let s = watcher.situation(1);
         assert!(!s.room_quiet.unwrap().value);
         assert!(!s.voice_resting.unwrap().value);
-        watcher.room(&RoomState { state: Room::Quiet }, 2);
+        watcher.room(
+            &RoomState {
+                state: Room::Quiet,
+                another_voice: None,
+            },
+            2,
+        );
         watcher.voice(
             &VoiceState {
                 state: Voice::Resting,

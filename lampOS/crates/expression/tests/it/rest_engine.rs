@@ -120,7 +120,10 @@ impl Harness {
         let stamp = self.stamp(at);
         self.send(Input::Room {
             stamp,
-            value: RoomState { state: self.room },
+            value: RoomState {
+                state: self.room,
+                another_voice: None,
+            },
         });
     }
 

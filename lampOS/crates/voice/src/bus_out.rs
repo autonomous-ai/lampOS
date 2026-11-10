@@ -87,7 +87,7 @@ pub fn take_root(flags: &[String]) -> io::Result<(Option<PathBuf>, &[String])> {
 /// How the room is, from the process that judges it.
 pub struct RoomOut {
     room: Publisher,
-    last: Option<(crate::room_told::Room, u64)>,
+    last: Option<(crate::room_told::Room, Option<bool>, u64)>,
 }
 
 impl RoomOut {
@@ -105,19 +105,35 @@ impl RoomOut {
     /// a few seconds old as no judgement, and the room is judged all the
     /// time whether or not it changes.
     pub fn tell(&mut self, room: crate::room_told::Room, now_us: u64) {
-        if self
-            .last
-            .is_some_and(|(told, at)| told == room && now_us.saturating_sub(at) < REPEAT_US)
-        {
+        self.tell_with(room, None, now_us);
+    }
+
+    /// [`Self::tell`] with the one-face rule's record of another voice in the
+    /// conversation, when something tracks it (`None`: nothing does).
+    pub fn tell_with(
+        &mut self,
+        room: crate::room_told::Room,
+        another_voice: Option<bool>,
+        now_us: u64,
+    ) {
+        if self.last.is_some_and(|(told, voice, at)| {
+            told == room && voice == another_voice && now_us.saturating_sub(at) < REPEAT_US
+        }) {
             return;
         }
-        self.last = Some((room, now_us));
+        self.last = Some((room, another_voice, now_us));
         let state = match room {
             crate::room_told::Room::Unknown => Room::Unknown,
             crate::room_told::Room::Quiet => Room::Quiet,
             crate::room_told::Room::Busy => Room::Busy,
         };
-        let _ = self.room.publish_json(now_us, &RoomState { state });
+        let _ = self.room.publish_json(
+            now_us,
+            &RoomState {
+                state,
+                another_voice,
+            },
+        );
     }
 }
 
@@ -488,6 +504,13 @@ impl TapsIn {
 /// stopped (when the second route stands in for Gemini's) leaves its last
 /// room kept however old.
 pub fn room_now(bus: &Bus) -> crate::room_told::Room {
+    room_and_voice_now(bus).0
+}
+
+/// [`room_now`] with the tracker's word on another voice in the conversation
+/// (`RoomState::another_voice`), aged the same way: `None` when it is old,
+/// absent, or the room is unknown.
+pub fn room_and_voice_now(bus: &Bus) -> (crate::room_told::Room, Option<bool>) {
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis().try_into().unwrap_or(u64::MAX));
@@ -496,10 +519,14 @@ pub fn room_now(bus: &Bus) -> crate::room_told::Room {
         .flatten()
         .filter(|message| !message.expired)
         .and_then(|message| {
-            let state = message.parse::<RoomState>().ok()?.state;
-            Some(room_at(state, message.header.at_unix_ms, now_ms))
+            let told = message.parse::<RoomState>().ok()?;
+            let room = room_at(told.state, message.header.at_unix_ms, now_ms);
+            let voice = told
+                .another_voice
+                .filter(|_| room != crate::room_told::Room::Unknown);
+            Some((room, voice))
         })
-        .unwrap_or(crate::room_told::Room::Unknown)
+        .unwrap_or((crate::room_told::Room::Unknown, None))
 }
 
 /// [`RoomOut`] says the room again every second; a value this old says
@@ -1088,6 +1115,14 @@ pub struct BusOut {
     /// The reply whose pieces are being gathered into its line, and the
     /// words so far.
     replying: Option<(u64, String, u64)>,
+    /// Whether the owner was alone in view for every piece of `replying`
+    /// ([`crate::said_scope`]).
+    reply_alone: bool,
+    /// When the latest input began, for the owner scope: the owner's face
+    /// must have been seen speaking since ([`crate::said_scope`]).
+    input_at: Option<(u64, std::time::Instant)>,
+    /// How that is told; replaced in tests.
+    owner_alone: fn(Option<std::time::Instant>) -> bool,
     health: Publisher,
     /// `voice/link`, with [`LINK_ENVIRONMENT`].
     link: Option<Publisher>,
@@ -1124,6 +1159,8 @@ impl BusOut {
         }
         let link = std::env::var(LINK_ENVIRONMENT).ok().as_deref() == Some("on");
         match Bus::from_environment().and_then(|bus| {
+            // What the owner scope of a reply reads, kept in this process.
+            crate::said_scope::keep(bus.clone());
             Self::on(&bus)?.with_link(&bus, link)?.with_onboarding(
                 &bus,
                 std::env::var(crate::onboarding::ENVIRONMENT)
@@ -1150,6 +1187,9 @@ impl BusOut {
             said: bus.publisher_declared(said, &Speech::declaration(), SOURCE)?,
             line: bus.publisher_declared(SaidLine::TOPIC, &SaidLine::declaration(), SOURCE)?,
             replying: None,
+            reply_alone: false,
+            input_at: None,
+            owner_alone: crate::said_scope::owner_alone_now,
             health: bus.publisher_declared(
                 lamp_msgs::Diagnostic::TOPIC,
                 &lamp_msgs::Diagnostic::declaration(),
@@ -1206,6 +1246,7 @@ impl BusOut {
     /// The service began to take in the person's words for turn `request`.
     pub fn input_started(&mut self, request: u64) {
         self.heard_in = Some(request);
+        self.input_at = Some((request, std::time::Instant::now()));
     }
 
     /// Publishes `voice/link` as well, when `on`.
@@ -1333,6 +1374,21 @@ impl BusOut {
 
     /// How many runs in a row failed before they heard anything, as the
     /// hand controls keep it (#1567): said with each report while above 0.
+    /// When the input of `request` began, if it is the latest input and its
+    /// reply has not been told yet.
+    fn input_for(&self, request: u64) -> Option<std::time::Instant> {
+        self.input_at
+            .filter(|(held, _)| *held == request)
+            .map(|(_, at)| at)
+    }
+
+    /// Tests: how the owner alone in view is told.
+    #[cfg(test)]
+    fn with_owner_alone(mut self, told: fn(Option<std::time::Instant>) -> bool) -> Self {
+        self.owner_alone = told;
+        self
+    }
+
     pub fn set_could_not_start(&mut self, runs: u32) {
         self.could_not_start = runs;
     }
@@ -1381,6 +1437,11 @@ impl BusOut {
         {
             self.flush_reply(true, now_us);
         }
+        // Asked at every piece: a person walking in mid-reply takes the
+        // scope from the whole line.
+        let alone = (self.owner_alone)(self.input_for(request));
+        let opening_line = self.replying.is_none();
+        self.reply_alone = alone && (opening_line || self.reply_alone);
         let held = self
             .replying
             .get_or_insert_with(|| (request, String::new(), now_us));
@@ -1424,6 +1485,16 @@ impl BusOut {
         if words.is_empty() {
             return;
         }
+        // Asked once more as the line goes out, on every way it does (its
+        // end, the next reply, stale, a played line): someone who walked in
+        // during the audio's tail takes the scope from it.
+        self.reply_alone = self.reply_alone && (self.owner_alone)(self.input_for(request));
+        // That input is spent with its reply: a later reply to the same
+        // request (a model turn after a tool's answer, no new input) has none
+        // of its own, so none of the scope.
+        if self.input_at.is_some_and(|(held, _)| held == request) {
+            self.input_at = None;
+        }
         let line = SaidLine {
             text: words.to_owned(),
             by: LineBy::Lamp,
@@ -1431,6 +1502,7 @@ impl BusOut {
             app: None,
             request: Some(request),
             cut,
+            scope: self.reply_alone.then_some(lamp_msgs::LineScope::Owner),
         };
         let _ = self.line.publish_json(now_us, &line);
     }
@@ -1458,6 +1530,7 @@ impl BusOut {
             app: app.map(str::to_owned),
             request: None,
             cut: false,
+            scope: None,
         };
         let _ = self.line.publish_json(now_us, &line);
     }
@@ -2706,5 +2779,69 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
         out.state(Some(RingPhase::Speaking), 2);
         out.said(1, "still talking", true, 3);
+    }
+
+    /// A reply is the owner's only if the owner was alone in view at every
+    /// piece (#6081): a person walking in mid-reply takes it from the line.
+    #[test]
+    fn a_reply_is_the_owners_only_if_the_owner_was_alone_at_every_piece() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static ALONE: AtomicBool = AtomicBool::new(true);
+        let (bus, root) = bus("line-scope");
+        // The gate here has the input of the reply's own request or none:
+        // none is no scope, as with the real one.
+        let mut out = BusOut::on(&bus)
+            .unwrap()
+            .with_owner_alone(|input| input.is_some() && ALONE.load(Ordering::SeqCst));
+        let mut lines = bus
+            .subscribe_typed("voice/line", "l", lamp_msgs::SaidLine::TYPE)
+            .unwrap();
+        out.input_started(1);
+        out.said(1, "Your mail", false, 1);
+        out.said(1, " is here.", true, 2);
+        out.reply_ended(1, false, 2);
+        out.input_started(2);
+        out.said(2, "Your mail", false, 3);
+        ALONE.store(false, Ordering::SeqCst);
+        out.said(2, " is here.", true, 4);
+        ALONE.store(true, Ordering::SeqCst);
+        out.reply_ended(2, false, 4);
+        out.input_started(3);
+        out.said(3, "Hello.", true, 5);
+        out.reply_ended(3, false, 5);
+        // Alone through every piece, but someone walks in during the tail.
+        out.input_started(4);
+        out.said(4, "Done.", true, 6);
+        ALONE.store(false, Ordering::SeqCst);
+        out.reply_ended(4, false, 6);
+        ALONE.store(true, Ordering::SeqCst);
+        // A reply whose request had no input noted: no scope.
+        out.said(5, "From nowhere.", true, 7);
+        out.reply_ended(5, false, 7);
+        // A second reply to the same request (a model turn after a tool's
+        // answer) has no input of its own: the first had the scope, not it.
+        out.input_started(6);
+        out.said(6, "One.", true, 8);
+        out.reply_ended(6, false, 8);
+        out.said(6, " Two.", true, 9);
+        out.reply_ended(6, false, 9);
+        let mut got = Vec::new();
+        while let Some(message) = lines.recv(Duration::from_millis(100)).unwrap() {
+            let line: lamp_msgs::SaidLine = message.parse().unwrap();
+            got.push((line.request, line.scope));
+        }
+        assert_eq!(
+            got,
+            vec![
+                (Some(1), Some(lamp_msgs::LineScope::Owner)),
+                (Some(2), None),
+                (Some(3), Some(lamp_msgs::LineScope::Owner)),
+                (Some(4), None),
+                (Some(5), None),
+                (Some(6), Some(lamp_msgs::LineScope::Owner)),
+                (Some(6), None),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 }

@@ -76,7 +76,10 @@ fn configured(catalogue: Catalogue, enabled: bool) -> Engine {
         joints(0, 1),
         Input::Room {
             stamp: stamp(0, 1),
-            value: RoomState { state: Room::Quiet },
+            value: RoomState {
+                state: Room::Quiet,
+                another_voice: None,
+            },
         },
         Input::Light {
             stamp: stamp(0, 1),
@@ -686,7 +689,10 @@ fn busy_room_restrains_unsolicited_motion_but_never_infers_concentration() {
         &mut engine,
         Input::Room {
             stamp: stamp(10_000, 2),
-            value: RoomState { state: Room::Busy },
+            value: RoomState {
+                state: Room::Busy,
+                another_voice: None,
+            },
         },
     );
     send(&mut engine, activity(20_000, 1, true));
