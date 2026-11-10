@@ -1,3 +1,30 @@
+## 2026-11-10 — train 767 retains published receipt repair; setup gates
+
+- Train 767 (#5963), head 397a7eaed, includes #5935's published 1c3057ec6.
+  Leaving that head unchanged while ARM 42748358747 and Linux lint qualify.
+  The local rebase 56f27e488 onto 90d9948c4 is supplemental only: all nine
+  range-diff entries equal; formatting, strict Voice Clippy and docs pass.
+- Rebased focused checks: 21 send, 31 held-forget and 18 broader held-rename
+  passed. Preserved the just-tested binary as a scratch artifact (SHA-256
+  8d743a29ce009c4536da57d7ac6e7f382ac7b1be4c424beb1bb0866dc1f2afd7)
+  to avoid recompiling between worktrees. Explicitly terminated the queued
+  duplicate Cargo command, then ran the latter filters directly. Full
+  same-binary suite is running with motor process failures retained; it is
+  not being reported green. PR progress6758030461 records these limits.
+- Setup handoff remains with Twelve, progress6757925183: 13 first-update
+  controls pass; strict 14-package Clippy and formatting pass; Setup 301
+  passed / one ignored; Update library 421 passed / two ignored, install
+  161 passed in 570.73s. Four image-journal tests failed on this Mac's BSD
+  stat rejecting GNU -c. Raw output retained; remaining targets/build run
+  separately, with no host-specific script changes.
+- Read-only reminder audit found aggregate mostly-heard completion may
+  complete every item of a joined late-reminder line even with its final
+  item unplayed. A real coordinator/ledger regression with a single-item
+  control is compiling; not yet a confirmed test result or device claim.
+- Recovered disk space by removing two clean completed review worktrees
+  and unlocked incremental cache sessions for Update/Memory/Eyes. Source,
+  test binaries and review evidence retained; active Voice cache untouched.
+
 ## 2026-11-10 — setup repair handed to Twelve; refresh receipt repair
 
 - PM assigned #5667 to Twelve after my carry claim. Confirmed Twelve as
