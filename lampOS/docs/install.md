@@ -1424,10 +1424,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    **Hermes on the lamp** (#5978;
    `crates/update/src/hermes_install.rs`; `LAMP_HERMES_ON_LAMP` in
    `lamp-update.service`'s environment: set, on only when `on` exactly, so
-   any other value is off; unset, off on every lamp: the build's default
-   `PRODUCT_DEFAULT` is off, and the product turns it on only once its
-   lamp-c0a4 numbers are judged (the first builder, 10 Nov); no product
-   unit sets it). Hermes (NousResearch
+   any other value is off and `off` turns a product lamp off; unset, on on
+   a lamp installed as the product, the build's default `PRODUCT_DEFAULT`
+   being on (the product owner's decision, 10 Nov), and off on any other
+   lamp; no product unit sets it). Hermes (NousResearch
    hermes-agent) is a coding agent Harness already knows as an engine.
    Harness finds an engine only by `command -v` in its user's login shell,
    so a `hermes` on `lampos`'s login `PATH` is all it needs: the wrapper
@@ -1473,7 +1473,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `/var/lib/lampos-hermes/.local/bin/hermes`, on no `PATH`. No unit, no
      service, no gateway, nothing at boot: Harness starts `hermes` in a
      pane only when a task is sent to it.
-   - **In a namespace that shows Hermes only its own folders.** Hermes
+   - **In a namespace that shows Hermes only its own folders, and the lamp
+     only through the skills.** Hermes
      runs shell commands the model chooses. As plain `lampos` they could
      reach every lamp service run as `lampos`: lamp-cloud's relay key (its
      systemd credential under `/run/credentials`, and lamp-cloud's state
@@ -1514,7 +1515,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
           there), and the file `/etc/resolv.conf` resolves to when it is
           under `/run` (such as `/run/systemd/resolve/stub-resolv.conf`),
           so names still resolve for the web and the forwarder stays on
-          TCP `127.0.0.1:7741`. The work folder is Harness's project
+          TCP `127.0.0.1:7741`; and lamp-skills' tools folder
+          `/run/lampos-skills` (`tools.json` and `call.sock`, the voice's
+          `LAMP_SKILLS_DIR`) when it is there, skipped on a lamp without
+          lamp-skills. The work folder is Harness's project
           `~/harnesses/lamp-tasks` in its home, not only its `lamp`
           subfolder (where lamp-tasks puts `AGENTS.md` and Harness starts
           Hermes), as Harness names the project and may start a task in
@@ -1522,8 +1526,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
           (its `store`, Harness's own files) is shown;
        3. an empty tmpfs over `/run`, `/var/lib` and `/etc/lampOS` (when
           there), the mount points made in it and the staged mounts moved
-          back; the skills and `resolv.conf` remounted read-only (with the
-          flags they had, as a user namespace may only add flags); then
+          back; the skills, `/run/lampos-skills` and `resolv.conf`
+          remounted read-only with `remount,bind,ro` (with the flags they
+          had, as a user namespace may only add flags, and refuses a plain
+          `remount,ro`); a unix socket still connects on a read-only
+          mount; then
           the three overlays remounted read-only;
        4. `/dev/null` bound over every character device matching
           `/dev/video*`, `/dev/media*`, `/dev/v4l-subdev*`, `/dev/snd/*`,
@@ -1541,15 +1548,22 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        In that nested user namespace the mounts are locked: Hermes cannot
        take them off. Any step failing ends it before Hermes runs.
      So Hermes sees its own folder, its work folder and the skills
-     (read-only), `resolv.conf`, its own `/tmp` and `/proc`, and the
-     lamp's programs (`/usr`, `/opt/lampOS`); no lamp service's `/run` or
-     `/var/lib` folder (no socket, no state, no credential), no
+     (read-only), lamp-skills' `/run/lampos-skills` (read-only),
+     `resolv.conf`, its own `/tmp` and `/proc`, and the lamp's programs
+     (`/usr`, `/opt/lampOS`); no other lamp service's `/run` or `/var/lib`
+     folder (no other socket, no state, no credential), no
      `/etc/lampOS`, no camera, mic, serial, I2C, SPI or GPIO device and no
      lamp process. A test (`no_lampos_service_folder_is_visible_to_hermes`)
      reads every `RuntimeDirectory=`, `StateDirectory=` and
      `ReadWritePaths=` under `/run` or `/var/lib` of the product units run
      as `lampos`, and the tmpfiles folders made `lampos`'s, and fails if
-     any of them is not hidden, so a new service is hidden with no change.
+     any of them but `/run/lampos-skills` is not hidden, so a new service
+     is hidden with no change. Its reach into the lamp is the voice's
+     model's (the product owner, 10 Nov): only through lamp-skills'
+     socket, with `lamp-tasks skill call NAME`
+     (`/opt/lampOS/tasks/current/lamp-tasks`), where lamp-skills applies
+     its cooldowns, pause and policy as for the voice; never a device or a
+     service's files.
      Shown on lamp-c0a4 by hand (10 Nov, the earlier deny-list scripts):
      the key hidden; `umount` refused, nested too. As plain `lampos`, `ls
      /proc/<lamp-cloud pid>/root/run/credentials/lamp-cloud.service/`
@@ -1693,12 +1707,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      yet, and moves it aside (or removes it) otherwise; a `/var/lib/lampos-hermes.old` set aside
      before the failure stays until a later install's new Hermes runs.
    - **The parts' units** (`deploy/product`): unchanged; none sets
-     `LAMP_HERMES_ON_LAMP`, so the product's Hermes stays off until the
-     lamp-c0a4 numbers are judged (the first builder, 10 Nov). Turning it
-     on later means `LAMP_HERMES_ON_LAMP=on` in lamp-update's unit (the
-     install), in `lamp-cloud.service` (its forwarder, which writes only
-     its own state folder, so it needs no other path and no group) and in
-     `lamp-tasks.service`. lamp-tasks' `--engines-from-machines` (without
+     `LAMP_HERMES_ON_LAMP` in this change: lamp-update installs the
+     product's Hermes by its own default (on since the product owner's
+     decision, 10 Nov), and `LAMP_HERMES_ON_LAMP=off` in its unit turns
+     that off. lamp-cloud's forwarder (`LAMP_HERMES_ON_LAMP=on` in
+     `lamp-cloud.service`, which writes only its own state folder, so it
+     needs no other path and no group) and lamp-tasks' side
+     (`lamp-tasks.service`) are turned on by the units' own change. lamp-tasks' `--engines-from-machines` (without
      it the lamp's own Hermes is never looked for, and the lamp is no
      target) and `--reply-named`, `LAMP_TASKS_REPLY_NAMED` (lamp-voice) and
      `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) come with the routing that
