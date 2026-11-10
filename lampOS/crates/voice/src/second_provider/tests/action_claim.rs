@@ -78,6 +78,25 @@ fn turn_with(
         // A set refused by a ledger that can't ring it (#5560).
         let answer = if args["cannot_ring"] == true {
             json!({"error": crate::reminders::CANNOT_RING})
+        } else if name == crate::remember::FORGET {
+            // A forget the memory refused (a one-face line's), or one that
+            // removed something.
+            if args["refused"] == true {
+                json!({"forgotten": false, "note": "Nothing was forgotten."})
+            } else {
+                json!({"forgotten": true})
+            }
+        } else if name == crate::known_faces::FORGET && args["refused"] == true {
+            // A face forget refused for someone not in view.
+            json!({"error": crate::known_faces::NOT_THEIRS})
+        } else if name == crate::rules::FORGET_RULE {
+            // A rule forget that removed nothing asks which one; one that
+            // removed something says so.
+            if args["refused"] == true {
+                json!({"rules": [], "note": "They have not asked you for anything like that."})
+            } else {
+                json!({"forgotten": true, "note": "Stop following it from now on."})
+            }
         } else {
             told(&name)
         };
@@ -1070,4 +1089,179 @@ fn a_declined_not_for_me_alone_still_holds_the_claim() {
     assert!(went.ran.is_empty());
     assert!(!went.said.iter().any(|line| line == "said:Timer set."));
     assert!(told_claim(&went));
+}
+
+/// C88, B-G23: lamp-06c1 (10 Nov, build 11091, request 30), "Lamp, forget
+/// that." with the face still was answered "I've forgotten the thing about
+/// your umbrella." with `calls=none`, and the umbrella stayed kept. With the
+/// switch the forget said done is held, the model is told so and asked
+/// again; said again with no forget, it is the line that it wasn't done.
+/// Without the switch it is said as it came, as on the lamp.
+#[test]
+fn a_forget_said_done_with_no_forget_is_never_said() {
+    let heard = "Lamp, forget that.";
+    let claim = "I've forgotten the thing about your umbrella.";
+    let went = claimed(true, heard, saying(claim), vec![saying(claim)]);
+    assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
+    assert_eq!((went.asked, went.ran.len()), (2, 0), "{went:?}");
+    assert!(
+        went.notes
+            .iter()
+            .any(|note| note == crate::action_claim::FORGET_NOTE),
+        "{:?}",
+        went.notes
+    );
+    // Off: said as it came, nothing forgotten.
+    let went = claimed(false, heard, saying(claim), vec![saying(claim)]);
+    assert_eq!(went.said, said(&[claim]));
+    assert_eq!((went.asked, went.ran.len()), (1, 0));
+}
+
+/// Asked again, the model calls `forget`. One the memory refused (a
+/// one-face line's) removed nothing: a forget said done after it is still
+/// held, and what its answer told them to say goes on. One that removed
+/// something lets its line stand, as without the switch.
+#[test]
+fn a_forget_said_done_stands_only_beside_a_forget_that_removed_something() {
+    let heard = "Lamp, forget that.";
+    let forget = |refused: bool| {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                crate::remember::FORGET,
+                json!({"refused": refused}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let honest = "I'll forget that when I can see you say it.";
+    let went = claimed(
+        true,
+        heard,
+        saying("I've forgotten it."),
+        vec![forget(true), saying(honest)],
+    );
+    assert_eq!(went.said, said(&[honest]), "{went:?}");
+    assert_eq!(went.ran, [crate::remember::FORGET]);
+    // Refused, then said done anyway: never said.
+    let went = claimed(
+        true,
+        heard,
+        forget(true),
+        vec![saying("Okay, forgotten."), saying("I forgot it.")],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    // Removed: the line stands, byte for byte as without the switch.
+    let ran = |on| claimed(on, heard, forget(false), vec![saying("I've forgotten it.")]);
+    assert_eq!(ran(true), ran(false));
+    assert_eq!(ran(true).said, said(&["I've forgotten it."]));
+}
+
+/// Only a line that asks to forget judges a forget said done: "I forgot,
+/// sorry." answering a question goes on as without the switch.
+#[test]
+fn a_forget_said_on_a_line_not_asking_to_forget_is_untouched() {
+    let went = |on| {
+        claimed(
+            on,
+            "What did I tell you yesterday?",
+            saying("I forgot, sorry."),
+            vec![],
+        )
+    };
+    assert_eq!(went(true), went(false));
+    assert_eq!(went(true).said, said(&["I forgot, sorry."]));
+}
+
+/// Thirteen's P2-1 on #5942: a face's or a rule's forget backs a forget said
+/// done only when it removed something. One refused (`NOT_THEIRS`), or a
+/// rule forget that removed nothing, leaves "I've forgotten it." held and,
+/// said again, the line that it wasn't done; one that removed something
+/// lets the line stand, byte for byte as without the switch.
+#[test]
+fn a_face_or_rule_forget_backs_a_forget_said_done_only_by_its_outcome() {
+    let forget = |name: &str, refused: bool| {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                name,
+                json!({"refused": refused}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for (heard, name) in [
+        ("Lamp, forget my face.", crate::known_faces::FORGET),
+        (
+            "Lamp, forget the rule about the light.",
+            crate::rules::FORGET_RULE,
+        ),
+    ] {
+        let went = claimed(
+            true,
+            heard,
+            forget(name, true),
+            vec![saying("I've forgotten it."), saying("Okay, forgotten.")],
+        );
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{name}: {went:?}"
+        );
+        assert_eq!(went.ran, [name]);
+        assert!(
+            went.notes
+                .iter()
+                .any(|note| note == crate::action_claim::FORGET_NOTE),
+            "{name}: {:?}",
+            went.notes
+        );
+        let ran = |on| {
+            claimed(
+                on,
+                heard,
+                forget(name, false),
+                vec![saying("I've forgotten it.")],
+            )
+        };
+        assert_eq!(ran(true), ran(false), "{name}");
+        assert_eq!(ran(true).said, said(&["I've forgotten it."]), "{name}");
+    }
+}
+
+/// Thirteen's P2-2 on #5942: words that say a forget done, and a forget
+/// called, in one round. The words are not said, as they ran ahead of the
+/// call, but the next round is told no `FORGET_NOTE`: it speaks from the
+/// forget's own answer, and its line is said.
+#[test]
+fn words_and_a_forget_in_one_round_bring_no_false_note() {
+    let heard = "Lamp, forget that.";
+    let both = |name: &str| {
+        vec![
+            text("Okay, I've forgotten that."),
+            Ok(ChatEvent::ToolCalls(vec![call("c0", name, json!({}))])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for name in [
+        crate::remember::FORGET,
+        crate::known_faces::FORGET,
+        crate::rules::FORGET_RULE,
+    ] {
+        let went = claimed(true, heard, both(name), vec![saying("I've forgotten it.")]);
+        assert!(
+            !went
+                .notes
+                .iter()
+                .any(|note| note == crate::action_claim::FORGET_NOTE),
+            "{name}: {:?}",
+            went.notes
+        );
+        assert_eq!(went.ran, [name], "{name}");
+        assert_eq!(went.said, said(&["I've forgotten it."]), "{name}: {went:?}");
+    }
 }

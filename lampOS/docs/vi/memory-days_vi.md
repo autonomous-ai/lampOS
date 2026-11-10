@@ -1147,3 +1147,26 @@ trọn vẹn cho cuộc nói chuyện của người đó, sẽ trả lời tron
 người đó, không bị giữ (`ScopeLease::answer_words_seen`): đọc bộ nhớ, giữ
 ngay, sửa hoặc quên đều chạy, như ở câu gốc. Chi tiết ở
 [memory.md](../memory.md).
+
+## Không bao giờ nói đã quên khi chưa quên (C88, B-G23)
+
+Trên lamp-06c1 (10/11, bản 11091, yêu cầu 30), câu «Lamp, forget that.» khi
+khuôn mặt đứng yên được trả lời «I've forgotten the thing about your
+umbrella.» nhưng không có lệnh gọi nào (`calls=none`): `forget` vẫn được đưa
+cho mô hình, mô hình không gọi, và chiếc ô vẫn còn trong bộ nhớ. Với
+`LAMP_ACTION_CLAIM_CHECKED` (bật trong sản phẩm), trên một câu nói yêu cầu
+quên, câu trả lời mà câu đầu tiên nói đã quên điều gì đó
+(`action_claim::forget_claim`) chỉ được nói khi trong lượt đó có một lệnh
+quên thật sự xóa được (`forgotten`, `everything` hoặc khuôn mặt đã quên là
+true, `action_claim::forgot_in`), hoặc bên cạnh lệnh quên khuôn mặt hay quy
+tắc đã xóa được (`forget_my_face` trả `ok` và không có `error`, `forget_rule`
+trả `forgotten: true`). Lệnh quên bị từ chối (kể cả trên câu chỉ có một khuôn
+mặt), lệnh quên khuôn mặt trả `NOT_SEEN` hay `NOT_THEIRS`, hoặc lệnh quên quy
+tắc không xóa được gì, đều không xóa gì.
+Nếu không, mô hình được báo `action_claim::FORGET_NOTE` và hỏi lại một lần;
+lần thứ hai vẫn nói đã quên thì lamp nói «Sorry, I didn't do that. Could you
+ask me again?» (bằng ngôn ngữ của chủ). Lời nói đã quên đi cùng lệnh gọi
+quên (bộ nhớ, khuôn mặt hay quy tắc) trong cùng một vòng thì không được nói,
+nhưng cũng không đặt lời nhắc nào: vòng sau nói theo đúng kết quả của lệnh
+quên. Chi tiết ở
+[memory.md](../memory.md).

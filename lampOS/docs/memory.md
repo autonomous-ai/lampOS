@@ -664,7 +664,33 @@ is yellow" was kept as Olivia's, her next line "forget that" ran as the
 room's `forget_last`, and the room's Wi-Fi name went (#5608, Jarvis's P2s).
 A guest off camera or a TV saying "forget that" beside her silent face
 forgets nothing. Said with their mouth read speaking, the line is theirs and
-the forget runs in their scope as any of theirs. Ids are counted per person, so their 3 and the room's 3 are two
+the forget runs in their scope as any of theirs.
+**A forget is never said done unless one ran and removed something**
+(C88, B-G23; `LAMP_ACTION_CLAIM_CHECKED`, on in the product). On lamp-06c1
+(10 Nov, build 11091, request 30) "Lamp, forget that." with her face still
+and alone in view was answered "I've forgotten the thing about your
+umbrella." with `calls=none`: `forget` was offered (only a line held by a
+face's gap leaves it out, `second_provider::withheld`), the model did not
+call it, and the umbrella stayed kept. On a spoken line that asks to forget
+(`remember::asks_to_forget`), a reply whose first sentence says something
+was forgotten (`action_claim::forget_claim`: "I've forgotten …", "Okay,
+forgotten.", "Mình đã quên …"; not "I'll forget that when I can see you say
+it." nor "I forgot nothing.") is held like any claimed action: it stands
+only when a memory forget in the turn answered `forgotten`, `everything` or
+its face forgotten true (`action_claim::forgot_in`), or beside a face's or
+a rule's forget that removed something (`forget_my_face` answering `ok`
+with no `error`, `forget_rule` answering `forgotten: true`). A refused
+forget, a one-face line's included, a face forget answered `NOT_SEEN` or
+`NOT_THEIRS`, or a rule forget that removed nothing, removed nothing.
+Otherwise the model is told `action_claim::FORGET_NOTE` and asked
+once more: it calls `forget`, whose answer says what to tell them, and a
+second claim is said as "Sorry, I didn't do that. Could you ask me again?"
+Words that say a forget done in the same round as a memory, face or rule
+forget call ran ahead of it: they are not said, but no note is set, and the
+next round speaks from the forget's own answer.
+Tests: `second_provider::tests::action_claim`'s five forget tests,
+`action_claim`'s three and `after_forget`'s
+`a_rule_or_face_forget_keeps_its_name_and_outcome`. Ids are counted per person, so their 3 and the room's 3 are two
 kept things: a forget by id goes only to the scope whose listing showed
 that id this session, and an id shown of both forgets nothing and the
 model asks which one (`remember::by_where_shown`; Thirteen's second P2 on

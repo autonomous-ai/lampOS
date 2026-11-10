@@ -13772,6 +13772,11 @@ async fn answer(
     // Whether the line asks to read something back: then a `list_reminders`
     // may back a time a worded claim says (the Reviewer-lead's P2 on #5737).
     let read_asked = crate::action_claim::worded_as_a_question(&said);
+    // Whether a forget said done is a claim on this turn: a spoken line
+    // that asks to forget (`LAMP_ACTION_CLAIM_CHECKED`, C88: lamp-06c1, 10
+    // Nov, request 30, "I've forgotten the thing about your umbrella." with
+    // `calls=none`).
+    let forget_turn = heard && crate::remember::asks_to_forget(&said);
     let words = Message::user(said.clone());
     let event_words = said.clone();
     // The line's words, for a carried keep held on it ([`hold_carried_keep`]).
@@ -14728,16 +14733,22 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::action_claim::claim_as(held, false, worded_turn) {
+                                match crate::action_claim::claim_on(
+                                    held,
+                                    false,
+                                    worded_turn,
+                                    forget_turn,
+                                ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
-                                        if crate::action_claim::stands(
+                                        if crate::action_claim::stands_on(
                                             kind,
                                             held,
                                             read_asked,
                                             turn_called
                                                 .iter()
                                                 .map(|(name, args)| (name.as_str(), args)),
+                                            crate::action_claim::forgot_in(&call_statuses),
                                         ) =>
                                     {
                                         action_held.take().unwrap_or_default()
@@ -15167,23 +15178,37 @@ async fn answer(
                         .map(|(name, args)| (name.as_str(), args))
                         .chain(calls.iter().map(|call| (call.name.as_str(), &call.args)))
                 };
-                let unmade = crate::action_claim::claim_as(&held, true, worded_turn)
+                let forgot = crate::action_claim::forgot_in(&call_statuses);
+                let unmade = crate::action_claim::claim_on(&held, true, worded_turn, forget_turn)
                     .flatten()
                     .filter(|kind| {
-                        !crate::action_claim::stands(*kind, &held, read_asked, called())
+                        !crate::action_claim::stands_on(*kind, &held, read_asked, called(), forgot)
                     });
+                // A forget said done is told its own note (C88).
+                let forget_said = unmade == Some(crate::action_claim::Claim::Forgot);
+                // Said in the round that calls a forget, the words ran ahead
+                // of it: not said, and no note, so the next round speaks from
+                // its answer (Thirteen's P2-2 on #5942).
+                let forget_calling = forget_said
+                    && calls
+                        .iter()
+                        .any(|call| crate::action_claim::is_forget(&call.name));
                 // A worded claim beside calls is held only for a limit it
                 // said that none of them carried, a kept light's always (the
                 // first builder's ruling on #5215): its note says so, never
                 // that nothing ran.
-                let limited = unmade.is_some_and(|kind| {
-                    kind == crate::action_claim::Claim::LightKept
-                        || crate::action_claim::worded_limit(&held).is_some()
-                }) && called().next().is_some();
+                let limited = !forget_said
+                    && unmade.is_some_and(|kind| {
+                        kind == crate::action_claim::Claim::LightKept
+                            || crate::action_claim::worded_limit(&held).is_some()
+                    })
+                    && called().next().is_some();
                 // Whether only the worded claims found it: the journal says so.
                 let worded = if limited {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"
-                } else if worded_turn && crate::action_claim::claim(&held, true).flatten().is_none()
+                } else if worded_turn
+                    && !forget_said
+                    && crate::action_claim::claim(&held, true).flatten().is_none()
                 {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED"
                 } else {
@@ -15197,6 +15222,13 @@ async fn answer(
                             }
                         }
                     }
+                    Some(_) if forget_calling => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says a forget done before its forget ran: not said, its {} call(s) run, no note (LAMP_ACTION_CLAIM_CHECKED)",
+                            calls.len()
+                        );
+                        text.clear();
+                    }
                     Some(kind) if !calls.is_empty() => {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply claims a {} action with no such call: not said, its {} other call(s) run (LAMP_ACTION_CLAIM_CHECKED{worded})",
@@ -15204,7 +15236,9 @@ async fn answer(
                             calls.len()
                         );
                         action_claim_asked = true;
-                        action_claim_note = Some(if limited {
+                        action_claim_note = Some(if forget_said {
+                            crate::action_claim::FORGET_NOTE.to_owned()
+                        } else if limited {
                             crate::action_claim::LIMIT_NOTE.to_owned()
                         } else {
                             crate::action_claim::beside_calls_note(kind)
@@ -15220,7 +15254,9 @@ async fn answer(
                             kind.label(),
                             turn_called.len()
                         );
-                        messages.push(Message::system(if limited {
+                        messages.push(Message::system(if forget_said {
+                            crate::action_claim::FORGET_NOTE
+                        } else if limited {
                             crate::action_claim::LIMIT_NOTE
                         } else {
                             crate::action_claim::NOTE
