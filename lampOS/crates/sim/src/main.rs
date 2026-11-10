@@ -1,12 +1,19 @@
 //! `lamp-sim`: the virtual desktop lamp's hardware edge (docs/simulator-lamp.md).
 //!
-//! lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always] [--microphone]
+//! lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone]
 //!     Starts everything in DIR (short, private, outside a world-writable
 //!     folder): the simulated servo bus, the real lamp-body on it, the ring,
 //!     the voice and the volume, and the real lamp-control; prints a pairing
 //!     code on demand with `lamp-sim code DIR`.
 use lamp_sim::{
-    camera::Camera, mic, people::People, pty::Port, ring::Ring, servo::Bus, stimuli::Stimuli, voice,
+    camera::{Camera, Warp},
+    mic,
+    people::People,
+    pty::Port,
+    ring::Ring,
+    servo::Bus,
+    stimuli::Stimuli,
+    voice,
 };
 use std::{
     os::unix::{fs::symlink, process::CommandExt},
@@ -16,7 +23,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always] [--microphone] | lamp-sim code DIR | lamp-sim servo DIR";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] | lamp-sim code DIR | lamp-sim servo DIR";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -121,8 +128,10 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     let link = dir.join("servo");
     let _ = std::fs::remove_file(&link);
     symlink(&port.slave, &link)?;
+    let mut servo_bus = found_bus();
+    let servo_pose = servo_bus.pose();
     let mut threads = vec![spawn_named("servo bus", move || {
-        let _ = port.serve(&mut found_bus(), &link, || false);
+        let _ = port.serve(&mut servo_bus, &link, || false);
     })];
     // The voice and the volume.
     let (say, act) = (dir.join("say.sock"), dir.join("act.sock"));
@@ -158,7 +167,16 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     let mut stimuli = Stimuli::on(&bus, dir)?;
     let view = dir.join("ring.json");
     let sight = dir.join("sight.jpg");
-    let mut camera = Camera::new(&sight);
+    // The picture turns with the head (`--camera-warp=off` leaves it as it is);
+    // `--camera-gain=N` makes the head's small turns N times bigger for the camera.
+    let gain: f64 = option(args, "--camera-gain")
+        .and_then(|g| g.parse().ok())
+        .unwrap_or(1.0);
+    let warp = (!args.iter().any(|a| a == "--camera-warp=off")).then(|| Warp {
+        pose: servo_pose.clone(),
+        gain,
+    });
+    let mut camera = Camera::new(&sight, warp);
     // The host's camera is off unless asked for. `--camera=always`: open for the
     // lamp's whole life, as the eyes' is (the host's camera light stays on).
     // `--camera`: open while a computer's camera mark is on the ring (the ring

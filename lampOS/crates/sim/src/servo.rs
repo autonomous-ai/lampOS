@@ -3,6 +3,9 @@
 //! for each servo, and a position that follows its goal at the servo's own
 //! speed. Pure: bytes in, bytes out, and time given by the caller.
 
+/// Where the five servos are now, in counts, for whoever looks (the camera).
+pub type Pose = std::sync::Arc<[std::sync::atomic::AtomicU16; 5]>;
+
 /// The servos on the bus, ids 1 to 5: base yaw, shoulder, elbow, head roll,
 /// head pitch (the order of `lamp-body`'s servo ids).
 pub const IDS: [u8; 5] = [1, 2, 3, 4, 5];
@@ -146,6 +149,7 @@ impl Servo {
 pub struct Bus {
     servos: Vec<Servo>,
     buffer: Vec<u8>,
+    pose: Pose,
 }
 
 impl Bus {
@@ -158,7 +162,13 @@ impl Bus {
                 .map(|(k, id)| Servo::new(*id, found[k], limits[k].0, limits[k].1))
                 .collect(),
             buffer: Vec::new(),
+            pose: Pose::default(),
         }
+    }
+
+    /// Where the servos are, kept up to date by [`Bus::step`].
+    pub fn pose(&self) -> Pose {
+        std::sync::Arc::clone(&self.pose)
     }
 
     pub fn servos(&self) -> &[Servo] {
@@ -167,8 +177,9 @@ impl Bus {
 
     /// `dt` seconds pass.
     pub fn step(&mut self, dt: f64) {
-        for servo in &mut self.servos {
+        for (servo, slot) in self.servos.iter_mut().zip(self.pose.iter()) {
             servo.step(dt);
+            slot.store(servo.position(), std::sync::atomic::Ordering::Relaxed);
         }
     }
 
