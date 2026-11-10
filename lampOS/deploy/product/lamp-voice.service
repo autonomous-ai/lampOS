@@ -437,6 +437,12 @@ Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
 # 0, and their own reminder left out of the list). Memory's reads stay the room's. Known risk, accepted by the
 # memory owner on 4 Nov: a voice not seen saying it, with the person's face alone in view, hears their reminders.
 Environment=LAMP_ONE_FACE_REMINDERS=on
+# And such a line is told and read as theirs too, recall, hits and their note, and journalled in their record, while
+# no forget, correction, yes or rule change runs on it (the memory owner's call on 9 Nov, after #5522: a lone known face
+# counts for saving and recall, never forgetting; lamp-220c and 29e7: the face alone in 17 looks, read speaking in 0,
+# so their recall went to the room). Known risk, accepted: a guest off camera, the person's face silent and alone in
+# view and no other voice heard, is told the person's recall and their exchange is filed in the person's record.
+Environment=LAMP_PERSON_SCOPE_ONE_FACE_READS=on
 # And such a line's reply is told the person's name, only their name, when no face was seen speaking it, their own
 # known face was the one face in view through it (the mouth not read), it was not carried and no other voice was heard
 # (lamp-06c1 on 5 Nov, request 6: the test face alone in 11 of 11 looks, read still in 6, and "what's my name?" got

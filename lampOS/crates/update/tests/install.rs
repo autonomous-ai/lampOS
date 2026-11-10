@@ -2205,6 +2205,28 @@ fn the_product_lets_a_one_face_line_hear_its_persons_reminders() {
     }
 }
 
+/// A one-face line is told and read as its person's, and journalled in
+/// their record, while no forget or change runs on it
+/// (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, #5522): on lamp-220c and 29e7 the
+/// face was alone in 17 looks, read speaking in 0, and their recall went to
+/// the room. The memory owner's call, 9 Nov: a lone known face counts for
+/// saving and recall, never forgetting. Beside the one-face keep it acts with.
+#[test]
+fn the_product_reads_a_one_face_line_as_its_persons() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE_READS=on",
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A line narrowed to the room for want of a face seen speaking it is still
 /// told the person's name, only that, when their own known face was the one
 /// face in view and no other voice was heard (`LAMP_SECOND_NAME_ONE_FACE`):
