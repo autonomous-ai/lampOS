@@ -2367,6 +2367,40 @@ mod tests {
         );
     }
 
+    /// The offered `service_read` says a left-out security mail only as
+    /// left out, and the owner's own one as given, its links and codes
+    /// masked (#5893): the old words had the model say every security mail
+    /// as left out, the owner's masked one too (Second's P3 on #5893).
+    #[test]
+    fn a_security_mail_is_said_left_out_only_when_it_was_left_out() {
+        let dir =
+            std::env::temp_dir().join(format!("lamp-services-secmail-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        lamp_services::tools::write(&dir).unwrap();
+        let offered = tools(&dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let read = offered.iter().find(|tool| tool.name == READ).unwrap();
+        assert!(
+            read.description.len() <= MOST_DESCRIPTION_BYTES,
+            "{} bytes: {}",
+            read.description.len(),
+            read.description
+        );
+        assert!(
+            read.description.contains(
+                "Say a security mail or message as it comes: left out, or the owner's own with its links and codes masked."
+            ),
+            "{}",
+            read.description
+        );
+        assert!(
+            !read
+                .description
+                .contains("Say a security mail or message only as")
+        );
+    }
+
     /// The few words the model is told to say before a service call never
     /// ask for the lamp's eyes (lamp-9adf, 4 Nov 21:45).
     #[test]
