@@ -364,6 +364,26 @@ sau:
    đa 30 giây một lần hỏi, với một lần thử lại sau lỗi; các lần sửa sau khi
    bị từ chối chỉ bắt đầu khi thêm một lần hỏi vẫn kết thúc trong
    `make_skill_local::MAKE_WITHIN`, 120 giây.
+10. **Bị cắt khi đang tạo** (lamp-9adf, staging 11625, 02:16 và 02:19 ngày
+    11/11: tiếng vọng của chính đèn cắt "I'll make it", kỹ năng đã được tạo
+    và bật, mà người dùng chỉ nghe "Um, excuse me, did anyone say
+    something?"). Một câu mới cắt lượt thì kết thúc vòng của mô hình lẽ ra
+    nói câu đó, nhưng không dừng việc tạo: nó chạy tiếp trong worker của
+    tuyến thứ hai đến hết (`worker::made_running`). Câu của nó, đúng những
+    chữ mô hình được đưa ("I made evening dim, and it's on.", "I made it but
+    couldn't put it on: <lý do>." hoặc "I couldn't make that: <lý do>.";
+    `make_skill_local::take_said_line`), khi đó được nói một lần qua dịch
+    vụ nói, như việc tạo từ ứng dụng (`app_make::say_line_at`: cùng note
+    theo ngôn ngữ của cuộc trò chuyện, tên skill `voice-make`, vào lúc thích
+    hợp trong vòng một giờ, hỏi lại một lần nếu bị bỏ). Lượt còn đang chờ
+    thì nhận câu trả lời như trước, và không có gì đi qua dịch vụ nói. Khi
+    dịch vụ nói tắt, câu không được nói. Trong lúc đang tạo, hoặc câu của
+    nó chưa được nói (`make_skill_local::Pending`), và tối đa 2 phút sau
+    lời gọi (`make_skill_local::MAKE_WITHIN`, thời gian dài nhất một lần
+    tạo chạy; câu có thể chờ tới một giờ để được nói, nhưng câu hỏi không bị
+    giữ lâu như vậy: first builder trên #6174), một lần cắt không lời
+    của câu sau không bao giờ được đáp "Um, excuse me, did anyone say
+    something?" (`Shared::quiet_for_a_make`).
 
 Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến sau.
 
@@ -381,7 +401,15 @@ phần tasks, kỹ năng được tạo và được bật ngay mà không cần
 các bước được liệt kê, ngoài ra là `cannot:`; khi tắt, không dịch vụ nào),
 `made_skill::tests` (kể cả `every_request_is_briefed_and_the_model_judges_it`:
 dịch vụ, việc ghi hay hai dịch vụ đều được soạn brief, không bị danh sách từ
-từ chối; và `the_read_steps_are_the_catalogues_readable_services`), và
+từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
+`second_provider::worker::made_line`
+(`a_make_whose_turn_was_cut_still_says_its_line_once`,
+`a_make_whose_turn_waits_never_uses_the_say_service`),
+`second_provider::tests::made_line`
+(`a_wordless_cut_while_a_skill_is_made_never_asks_if_someone_spoke`,
+`past_the_makes_bound_a_wordless_cut_asks_again`, đối chứng
+`a_wordless_cut_while_another_call_runs_still_asks`),
+`app_make::tests::a_voice_make_line_is_asked_on_the_say_socket`, và
 `crates/skills/tests/it/made.rs` với `lamp-skills` thật.
 
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)

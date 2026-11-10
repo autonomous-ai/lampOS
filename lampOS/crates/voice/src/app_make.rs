@@ -576,7 +576,7 @@ pub fn write_here(
 /// once more, said at the next good moment within what is left of
 /// [`LINE_WAITS_MS`].
 pub fn say_line(asks: &crate::say::OwnAsks, line: &str) {
-    said(line, |words, note, within_ms| {
+    said("an app's skill", line, |words, note, within_ms| {
         let priority = crate::say::NORMAL_PRIORITY;
         if note {
             asks.note("app-make", words, priority, within_ms)
@@ -586,10 +586,82 @@ pub fn say_line(asks: &crate::say::OwnAsks, line: &str) {
     });
 }
 
+/// The skill name a voice make's line is asked under on the say socket
+/// ([`say_line_at`]).
+pub const VOICE_MAKE_SKILL: &str = "voice-make";
+
+/// [`say_line`] from a process that holds no [`crate::say::OwnAsks`]: the
+/// second route's worker, whose turn was cut while it made a skill by
+/// voice. Asked as a client of the say socket at `socket`, under
+/// [`VOICE_MAKE_SKILL`], with the same note, the same wait and the same one
+/// more ask after a drop. Blocking, until the outcome; none when the say
+/// service isn't there.
+pub fn say_line_at(socket: &Path, line: &str) -> Option<crate::say::Outcome> {
+    said("a skill made by voice", line, |words, note, within_ms| {
+        socket_ask(socket, words, note, within_ms)
+    })
+}
+
+/// One ask of `words` on the say socket at `socket`, as a note or as
+/// written, not begun after `within_ms`: its answers, read until the
+/// outcome. The receiver's sender is dropped, with no outcome, when the
+/// socket isn't there or goes quiet past the ask's wait.
+fn socket_ask(
+    socket: &Path,
+    words: &str,
+    note: bool,
+    within_ms: u64,
+) -> std::sync::mpsc::Receiver<crate::say::Answer> {
+    use crate::say::{Answer, Outcome};
+    let (answer, answered) = std::sync::mpsc::channel();
+    let key = if note { "note" } else { "text" };
+    let ask = json!({
+        "skill": VOICE_MAKE_SKILL,
+        key: words,
+        "priority": crate::say::NORMAL_PRIORITY,
+        "expires_in_ms": within_ms,
+    });
+    let Ok(mut stream) = std::os::unix::net::UnixStream::connect(socket) else {
+        eprintln!(
+            "lamp-voice: a skill made by voice: the say service is not there; its line wasn't said"
+        );
+        return answered;
+    };
+    let waits = Duration::from_millis(within_ms).saturating_add(LINE_SAID_WITHIN);
+    if writeln!(stream, "{ask}").is_err() || stream.set_read_timeout(Some(waits)).is_err() {
+        return answered;
+    }
+    for read in BufReader::new(stream).lines() {
+        let Ok(read) = read else {
+            break;
+        };
+        let told: Value = serde_json::from_str(&read).unwrap_or(Value::Null);
+        let why = || told["why"].as_str().unwrap_or_default().to_owned();
+        let outcome = match told["outcome"].as_str() {
+            Some("spoken") => Outcome::Spoken,
+            Some("dropped") => Outcome::Dropped(why()),
+            Some("expired") => Outcome::Expired,
+            Some(other) => Outcome::Refused(format!("{other} {}", why()).trim().to_owned()),
+            None => {
+                let _ = answer.send(Answer::Begun(told["at_us"].as_u64().unwrap_or_default()));
+                continue;
+            }
+        };
+        let _ = answer.send(Answer::Done(outcome));
+        break;
+    }
+    answered
+}
+
+/// How long past an ask's wait its outcome may still come over the say
+/// socket: the line begun at the end of its wait, said whole.
+const LINE_SAID_WITHIN: Duration = Duration::from_secs(120);
+
 /// [`say_line`]'s asks, through `ask` (the words, whether they are a note,
 /// and how long the ask may wait): the last outcome, none when the voice
 /// went away.
 fn said(
+    who: &str,
     line: &str,
     mut ask: impl FnMut(&str, bool, u64) -> std::sync::mpsc::Receiver<crate::say::Answer>,
 ) -> Option<crate::say::Outcome> {
@@ -613,16 +685,16 @@ fn said(
                 Err(_) => break None,
             }
         };
-        eprintln!("lamp-voice: an app's skill: its line: {outcome:?}");
+        eprintln!("lamp-voice: {who}: its line: {outcome:?}");
         match &outcome {
             Some(crate::say::Outcome::Dropped(_)) if asked == 1 => {
-                eprintln!("lamp-voice: an app's skill: its line dropped; asked once more");
+                eprintln!("lamp-voice: {who}: its line dropped; asked once more");
             }
             Some(crate::say::Outcome::Spoken) => return outcome,
             _ => break,
         }
     }
-    eprintln!("lamp-voice: an app's skill: its line wasn't said");
+    eprintln!("lamp-voice: {who}: its line wasn't said");
     outcome
 }
 
@@ -1145,13 +1217,17 @@ mod tests {
         let answering = |outcomes: Vec<Outcome>| {
             let mut outcomes = outcomes.into_iter();
             let mut asked = Vec::new();
-            let last = said("I made x, and it's on.", |words, note, within_ms| {
-                asked.push((words.to_owned(), note, within_ms));
-                let (answer, answered) = std::sync::mpsc::channel();
-                let _ = answer.send(Answer::Begun(1));
-                let _ = answer.send(Answer::Done(outcomes.next().unwrap()));
-                answered
-            });
+            let last = said(
+                "an app's skill",
+                "I made x, and it's on.",
+                |words, note, within_ms| {
+                    asked.push((words.to_owned(), note, within_ms));
+                    let (answer, answered) = std::sync::mpsc::channel();
+                    let _ = answer.send(Answer::Begun(1));
+                    let _ = answer.send(Answer::Done(outcomes.next().unwrap()));
+                    answered
+                },
+            );
             (last, asked)
         };
         let (last, asked) = answering(vec![
@@ -1176,6 +1252,47 @@ mod tests {
         let note = say_note(&line).unwrap();
         assert_eq!(note, made_skill::not_made_in_their_language(&line));
         assert!(note.contains("call no tool"), "{note}");
+    }
+
+    /// A voice make's line from the second route's worker (lamp-9adf, 11
+    /// Nov): asked on the say socket under its own skill name, as the same
+    /// note an app's is, its outcome read back; dropped once, asked once
+    /// more. No socket: nothing is said, and nothing waits.
+    #[test]
+    fn a_voice_make_line_is_asked_on_the_say_socket() {
+        let dir = folder("say-socket");
+        let socket = dir.join("say.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let mut asked = Vec::new();
+            for answer in [
+                r#"{"outcome":"dropped","why":"user_interrupted"}"#,
+                r#"{"outcome":"spoken"}"#,
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                writeln!(&stream, r#"{{"event":"begun","at_us":7}}"#).unwrap();
+                writeln!(&stream, "{answer}").unwrap();
+            }
+            asked
+        });
+        let line = "I made x, and it's on.";
+        assert_eq!(
+            say_line_at(&socket, line),
+            Some(crate::say::Outcome::Spoken)
+        );
+        let asked = served.join().unwrap();
+        assert_eq!(asked.len(), 2);
+        for asked in &asked {
+            assert_eq!(asked["skill"], VOICE_MAKE_SKILL);
+            assert_eq!(asked["note"], made_skill::in_their_language(line));
+            assert_eq!(asked["priority"], crate::say::NORMAL_PRIORITY);
+            assert!(asked["expires_in_ms"].as_u64().unwrap() <= LINE_WAITS_MS);
+        }
+        assert_eq!(say_line_at(&dir.join("none.sock"), line), None);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// One at a time, a request id each, the words within the voice's own
