@@ -195,7 +195,13 @@ fn calm(bus: &Bus, persons_light: bool, product: bool) -> Privacy {
         .unwrap();
     bus.publisher_declared(RoomState::TOPIC, &RoomState::declaration(), "voice")
         .unwrap()
-        .publish_json(now, &RoomState { state: Room::Quiet })
+        .publish_json(
+            now,
+            &RoomState {
+                state: Room::Quiet,
+                another_voice: None,
+            },
+        )
         .unwrap();
     if persons_light {
         let blue = Light::new(true, "blue", 3).unwrap();

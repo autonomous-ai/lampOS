@@ -269,8 +269,14 @@ impl Rig {
         }
         thread::sleep(ms(60));
         rig.state(Voice::Resting);
-        room.publish_json(0, &RoomState { state: Room::Quiet })
-            .unwrap();
+        room.publish_json(
+            0,
+            &RoomState {
+                state: Room::Quiet,
+                another_voice: None,
+            },
+        )
+        .unwrap();
         let stop = Arc::clone(&rig.stop);
         thread::spawn(move || {
             while !stop.load(Ordering::Relaxed) {

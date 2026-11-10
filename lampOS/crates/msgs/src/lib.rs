@@ -695,6 +695,15 @@ pub enum Room {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoomState {
     pub state: Room,
+    /// Whether the conversation has shown another person than the one it
+    /// began with (a voice printed as another's, or two faces seen speaking
+    /// a line): `Some(false)` is a tracker saying there was none, `Some(true)`
+    /// that there was. Absent when nothing tracks it (the rule is off, or the
+    /// publisher is the Live worker): no proof either way. Read by
+    /// lamp-voice's reply scope (`scope: owner`), which needs it present and
+    /// false, aged as `state` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub another_voice: Option<bool>,
 }
 
 impl RoomState {
@@ -809,6 +818,18 @@ pub struct SaidLine {
     /// have said in full. Absent when the line played to its end.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub cut: bool,
+    /// `owner` on a reply said while the owner was alone in view, every
+    /// moment of it (`voice/src/said_scope.rs`): the only reply a computer
+    /// may be told (lamp-control's `lamp.said`). Absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<LineScope>,
+}
+
+/// Whose a line is ([`SaidLine::scope`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineScope {
+    Owner,
 }
 
 impl SaidLine {
@@ -2692,9 +2713,23 @@ mod tests {
             (Room::Quiet, "quiet"),
             (Room::Busy, "busy"),
         ] {
-            round_trip(&RoomState { state }, &format!("{{\"state\":\"{word}\"}}"));
+            round_trip(
+                &RoomState {
+                    state,
+                    another_voice: None,
+                },
+                &format!("{{\"state\":\"{word}\"}}"),
+            );
         }
         assert!(serde_json::from_str::<RoomState>("{\"state\":\"loud\"}").is_err());
+        // The tracker's word is optional and only said when there is one.
+        round_trip(
+            &RoomState {
+                state: Room::Quiet,
+                another_voice: Some(false),
+            },
+            "{\"state\":\"quiet\",\"another_voice\":false}",
+        );
     }
 
     /// #4175: a remark held, as Expression's glance reads it.
@@ -2753,6 +2788,7 @@ mod tests {
                 app: None,
                 request: Some(7),
                 cut: false,
+                scope: None,
             },
             "{\"text\":\"Good morning.\",\"by\":\"lamp\",\"source\":\"reply\",\"request\":7}",
         );
@@ -2764,6 +2800,7 @@ mod tests {
                 app: None,
                 request: Some(8),
                 cut: true,
+                scope: None,
             },
             "{\"text\":\"It is a long\",\"by\":\"lamp\",\"source\":\"reply\",\"request\":8,\"cut\":true}",
         );
@@ -2775,6 +2812,7 @@ mod tests {
                 app: Some("desk-wave".into()),
                 request: None,
                 cut: false,
+                scope: None,
             },
             "{\"text\":\"Build passed.\",\"by\":\"computer\",\"source\":\"exact\",\"app\":\"desk-wave\"}",
         );
@@ -2792,6 +2830,7 @@ mod tests {
                     app: Some("reminder".into()),
                     request: None,
                     cut: false,
+                    scope: None,
                 },
                 &format!(
                     "{{\"text\":\"x\",\"by\":\"skill\",\"source\":\"{word}\",\"app\":\"reminder\"}}"
