@@ -14,7 +14,7 @@ given.
 |---|---|
 | Board | OrangePi 4 Pro (Allwinner A733), 4 or 6 GB |
 | Joints | 5 × Feetech STS3215, 4,096 counts a turn, read and written every 20 ms: `yaw`, `shoulder`, `elbow`, `pitch`, `roll` |
-| Camera | USB UVC, 78° field of view; MJPG 1080p30 (wiring.md), 1280 × 960 as lampOS uses it. Through lamp-control only with the `camera` grant, on the lamp's own network, never while private (control.md, "The camera") |
+| Camera | USB UVC, 78° field of view on the datasheet and about 128° across as the gaze was measured on lamp-4ace (body.md); MJPG 1080p30 (wiring.md), 1280 × 960 as lampOS uses it. Through lamp-control only with the `camera` grant, on the lamp's own network, never while private (control.md, "The camera") |
 | Microphones | a Jieli dual-mic ENC module (voice, 48 kHz mono) and a C-Media adapter (sensing); lampOS captures at 16 kHz. The `microphone` grant exists but is not routed yet: no audio leaves through lamp-control today |
 | Speaker | 2 × 3 W on a PAM8610 amplifier |
 | Light | a WS2812B ring of 32, ten named colours, levels 1 to 5, brightness capped in software |
