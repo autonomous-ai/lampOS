@@ -2441,13 +2441,20 @@ adds the key itself (`lamp_cloud::hermes_llm`).
   back as it comes (chunked, so a streamed Server-Sent Events answer reaches
   Hermes piece by piece), with the relay's status and `Content-Type`. Any
   other path is 404, another method on those two 405, a chunked request
-  body 411.
+  body 411, and a chat whose JSON `model` isn't `deepseek-flash` (the
+  voice's model) 400, so nothing dearer is asked on the voice's key.
+- **Billing:** Hermes' requests go on the voice's key, so the relay bills
+  and attributes them to the lamp exactly as it does the voice's own
+  DeepSeek turns; it can't tell the two apart.
 - **The relay:** `<relay>` is the voice's DeepSeek: `second.json`'s
   `deepseek_base_url`, else the company relay's DeepSeek under its
   `llm_base_url` (`…/api/v1/ai/v1/deepseek`, as `second_config.rs`'s
   `relay_deepseek`), read from a `second` credential when the unit hands
   one in. The product unit hands in none yet, so it is the product
   `second.json`'s, `https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`.
+  It is only ever on the company relay's host (`campaign-api.autonomous.ai`,
+  HTTPS): a `second.json` naming any other host gets that default, so the
+  key never goes anywhere else.
 - **The local token:** every request must carry
   `Authorization: Bearer <token>`, or it is 401 and the relay is never
   asked. The token is 32 random bytes in hex, made once into
@@ -2457,12 +2464,15 @@ adds the key itself (`lamp_cloud::hermes_llm`).
   (docs/tasks.md, "Hermes' settings on the lamp"), so other local users
   can't use the forwarder, and nothing Hermes can read holds the relay's
   key. The token is compared in constant time and never leaves the lamp.
-- **Bounds:** a request body at most 2 MiB (413 before it is read), its
-  head at most 16 KiB, read within 10 s and its body within 30 s; at most 4
-  requests at once and 60 started in any minute (429 past either); the relay
+- **Bounds:** at most 16 connections being read at once (one more is
+  closed); a request head at most 16 KiB, read within 10 s; at most 4
+  requests at once and 60 started in any minute (429 past either), both
+  taken after the token and path are checked and before a body is read,
+  and a minute's start used only once one of the 4 places is held; a body
+  at most 2 MiB (413 before it is read), read within 30 s; the relay
   connected within 10 s, each read of its answer within 120 s and the whole
-  answer within 10 min. An unreachable relay is 502. One request per
-  connection.
+  answer within 10 min; each write to Hermes taken within 30 s. An
+  unreachable relay is 502. One request per connection.
 - **Logs:** one line when it starts listening, or why it couldn't (no state
   folder, the port taken); never a body, the token or the key.
 

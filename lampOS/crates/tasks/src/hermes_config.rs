@@ -20,8 +20,13 @@
 //! and Harness write; a file it can't merge safely (tabs, several
 //! documents, a flow-style or sequence value where a mapping is set) is
 //! refused and left as it is, never rewritten.
+//!
+//! [`write`] must run as Hermes' own user (`lampos`), so the files it
+//! writes are Hermes' and no one else's. The token it is given is lamp-cloud's
+//! [`TOKEN_PATH`], which lamp-tasks (also `lampos`) reads. Neither file is
+//! followed through a link, and one that isn't a regular file is refused.
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
@@ -32,6 +37,19 @@ pub const PROVIDER: &str = "lamp";
 pub const MODEL: &str = "deepseek-flash";
 /// Where Hermes' key for `lamp` is read: `.env`'s line, the local token.
 pub const TOKEN_ENV: &str = "LAMP_HERMES_TOKEN";
+/// lamp-cloud's local token for its forwarder
+/// (`lamp_cloud::hermes_llm::TOKEN_FILE` in its state folder), read by
+/// lamp-tasks and handed to [`write`].
+pub const TOKEN_PATH: &str = "/var/lib/lampos-cloud/hermes-token";
+/// Provider keys taken out of `.env`: Hermes asks only the forwarder, and
+/// no provider's own key is kept where Hermes, or what it runs, reads it.
+pub const DROPPED_KEYS: [&str; 5] = [
+    "DEEPSEEK_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "AUTONOMOUS_API_KEY",
+    "OPENROUTER_API_KEY",
+];
 /// Hermes' approval mode that asks before a dangerous command.
 pub const APPROVALS: &str = "manual";
 
@@ -320,18 +338,23 @@ pub fn merge_config(text: &str, port: u16) -> Result<String, Refused> {
     Ok(out)
 }
 
-/// `.env`'s text with [`TOKEN_ENV`] set to `token` and every other line
-/// kept. `None` for a token that isn't [`token_is_plain`].
+/// `.env`'s text with [`TOKEN_ENV`] set to `token`, the [`DROPPED_KEYS`]
+/// taken out and every other line kept. `None` for a token that isn't
+/// [`token_is_plain`].
 pub fn merge_env(text: &str, token: &str) -> Option<String> {
     if !token_is_plain(token) {
         return None;
     }
     let mut out = String::new();
     let prefix = format!("{TOKEN_ENV}=");
-    let exported = format!("export {TOKEN_ENV}=");
     for line in text.lines() {
         let trimmed = line.trim_start();
-        if trimmed.starts_with(&prefix) || trimmed.starts_with(&exported) {
+        let trimmed = trimmed
+            .strip_prefix("export ")
+            .unwrap_or(trimmed)
+            .trim_start();
+        let name = trimmed.split('=').next().unwrap_or_default().trim();
+        if trimmed.contains('=') && (name == TOKEN_ENV || DROPPED_KEYS.contains(&name)) {
             continue;
         }
         out.push_str(line);
@@ -350,12 +373,27 @@ pub struct Written {
     pub env_changed: bool,
 }
 
+/// `path`'s text, never through a link (`O_NOFOLLOW`), and only of a
+/// regular file; empty when there is none.
 fn read_or_empty(path: &Path) -> io::Result<String> {
-    match fs::read_to_string(path) {
-        Ok(text) => Ok(text),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(String::new()),
-        Err(error) => Err(error),
+    let opened = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
+        .open(path);
+    let mut file = match opened {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(error) => return Err(error),
+    };
+    if !file.metadata()?.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "not a regular file",
+        ));
     }
+    let mut text = String::new();
+    file.read_to_string(&mut text)?;
+    Ok(text)
 }
 
 /// `text` in place of `path`, 0600, through a new file beside it renamed
@@ -576,6 +614,63 @@ custom_providers:
                 .mode();
             assert_eq!(mode & 0o777, 0o600, "{name}");
         }
+    }
+
+    #[test]
+    fn the_env_gains_only_the_token_and_loses_only_provider_keys() {
+        let before = "\
+# Hermes' own
+TELEGRAM_BOT_TOKEN=x
+DEEPSEEK_API_KEY=a
+export OPENAI_API_KEY=b
+ANTHROPIC_API_KEY=c
+AUTONOMOUS_API_KEY=d
+OPENROUTER_API_KEY=e
+API_SERVER_KEY=kept
+
+LAMP_HERMES_TOKEN=old
+";
+        let merged = merge_env(before, TOKEN).unwrap();
+        let kept: Vec<&str> = before
+            .lines()
+            .filter(|line| {
+                let name = line
+                    .trim_start_matches("export ")
+                    .split('=')
+                    .next()
+                    .unwrap();
+                !(line.contains('=') && (name == TOKEN_ENV || DROPPED_KEYS.contains(&name)))
+            })
+            .collect();
+        let token_line = format!("{TOKEN_ENV}={TOKEN}");
+        let mut want = kept.clone();
+        want.push(&token_line);
+        assert_eq!(merged.lines().collect::<Vec<_>>(), want);
+        for line in merged.lines() {
+            assert!(
+                line == token_line || before.lines().any(|old| old == line),
+                "a line that was not there: {line}"
+            );
+        }
+        for name in DROPPED_KEYS {
+            assert!(!merged.contains(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn links_and_other_kinds_of_file_are_refused() {
+        let home = tempfile::tempdir().unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        let target = elsewhere.path().join("config.yaml");
+        fs::write(&target, "model: {}\n").unwrap();
+        std::os::unix::fs::symlink(&target, home.path().join("config.yaml")).unwrap();
+        assert!(write(home.path(), 7741, TOKEN).is_err());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "model: {}\n");
+        assert!(!home.path().join(".env").exists());
+        let other = tempfile::tempdir().unwrap();
+        fs::create_dir(other.path().join(".env")).unwrap();
+        assert!(write(other.path(), 7741, TOKEN).is_err());
+        assert!(!other.path().join("config.yaml").exists());
     }
 
     #[test]
