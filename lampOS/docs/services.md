@@ -20,8 +20,10 @@ at 14:11 on 3 Nov 2026):
   opened read-only.
 - **Writes only live**, behind their own switch: asked by the owner at the
   lamp, read back in full (where it lands, every recipient, who can see it,
-  the whole text) and sent only on a spoken "send" as their very next line;
-  anything else cancels it.
+  the whole text), then the lamp says "Say 'yes, send it' to send it."; the
+  model decides whether the answer confirms or cancels, in any words (the
+  owner, 10 Nov), and sends with the write's `send_id` within two minutes,
+  whoever says it; no word list in the lamp decides it.
 - **The guards**: only the owner's own heard line reaches a service
   ("Who can use them", below); a token goes only to its own service's hosts,
   over HTTPS, no redirect followed; scheduled runs reach no service, and
@@ -36,7 +38,7 @@ at 14:11 on 3 Nov 2026):
 
 ## Who can use them
 
-**In the product today, anyone who speaks to the lamp** (`LAMP_PRIVATE_ROOM=on`, the owner's call on 6 Nov). The lamp is a private room between it and its owner, so whoever speaks is the owner, and no ownership check runs: telling who is speaking wasn't reliable enough, and the lamp refused its own owner. A line must still be spoken (`NOT_HEARD`), and a write still needs its read-back and a plain "send" right after it, which catch a mishearing. Writes stay on the second route only.
+**In the product today, anyone who speaks to the lamp** (`LAMP_PRIVATE_ROOM=on`, the owner's call on 6 Nov). The lamp is a private room between it and its owner, so whoever speaks is the owner, and no ownership check runs: telling who is speaking wasn't reliable enough, and the lamp refused its own owner. A line must still be spoken (`NOT_HEARD`), and a write is still read back, and sent only by the model's call with its `send_id` after a spoken answer (the owner, 10 Nov: the model decides confirm or cancel; the lamp checks only the send_id, a later request, two minutes and an uncut read-back). Writes stay on the second route only.
 
 **The accepted cost (the owner, 6 Nov):** no face is asked for at all, with nobody in view too. So a TV, a video call or a recording that says "read my mail" can get it read aloud in full. The owner chose this over any face-in-view rule, so the lamp doesn't refuse.
 
@@ -397,7 +399,7 @@ heard line only, nothing kept.
   `{"sent": false, "saved": true, "service": "Gmail"}`; a refused `APPEND`
   is "not saved: Gmail couldn't be reached". The prepare's `next` says
   "Nothing is saved yet. Read read_back to the person in full; save the
-  draft only if their next words say save or send."
+  draft only if they agree, in any words."
 - The password is only in the `LOGIN` and `AUTH` lines. A failure is said as
   one of the two phrases above, never with what the server said.
 
@@ -938,7 +940,7 @@ A made skill's read (`lamp-skills`, "A made skill's read", below) keeps the
 rule above: a security mail stays "a security mail, left out". So does
 every other service.
 
-## Writes: read back, then a spoken "send"
+## Writes: read back, then a spoken yes
 
 Off unless `LAMP_SERVICES_WRITE=on`. Two phases (`writes.rs`):
 
@@ -1120,8 +1122,10 @@ them within the 1,024 bytes its link takes.
   (primary). … The lamp can't bring it back." The event's own text is the
   service's data, kept to one line of at most 200 characters.
 - **Then sent as any write**: held 120 s, sent once on `"said":"send"`, with
-  the voice's same gate (the owner seen saying it, the read-back said in
-  full, "send" the very next line). The send is one
+  the voice's same gate ("Writes", above): prepared only for the owner seen
+  saying it, and sent on the person's yes in any words, in a later request
+  than its read-back, that read-back not cut or talked over; a negation, a
+  cancel or a question sends nothing. The send is one
   `PATCH …/events/<id>?sendUpdates=all` carrying only what changes
   (`summary`, `start` and `end` together, `description`), or one
   `DELETE …/events/<id>?sendUpdates=all` with no body; both are on
@@ -1142,22 +1146,23 @@ The model is told of `service_write`, first in its description
 "Only when the person asks you, now, to send or post something; an ask to
 draft, write or reply to a mail or message is one, never a remember. A mail
 draft: gmail's action save_draft; if refused, say what the call said. Call it
-first without send_id: it sends nothing and gives a read_back. Say that
-read_back in full, word for word, then ask for "send it" (a draft: "save
-it"). Call it again with its send_id only if their very next words are that;
-anything else cancels it. Never say a read-back yourself: only one this call
-gave in this turn; a new write, or the same one again, needs a new call.
-Never say you can't use their services: refuse only for a reason a call
-gave."
+first without send_id: it sends nothing and gives a read_back. Say it in full,
+word for word, then "Say 'yes, send it' to send it." (Vietnamese "Nói 'gửi đi'
+để gửi nhé."; a draft: "save it"). If they agree, in any words, call it again
+with its send_id; if they cancel or wait, don't send and say it's cancelled.
+Never say a read-back no call gave in this turn. Never say you can't use their
+services: refuse only for a reason a call gave."
 
 An ask to draft a mail is a write: since the owner's ask of 10 Nov, with
 Gmail linked by an app password it is `save_draft`, prepared and read back
-as any write and saved in Gmail's Drafts on a plain "save it" or "send it"
-(above, "Drafts"), never sent. A Google sign-in's Gmail link (`gmail-app`, or
-`gmail` made with one) holds no `gmail.compose` and saves none: its
-`save_draft` is refused with the call's own reason, which carries the line
-to say, "I can't save a draft yet. I can read it back and send it when you
-say 'send it'." It is never a `remember`: on lamp-3e83 on 10 Nov the
+as any write and saved in Gmail's Drafts when the person agrees, in any
+words (above, "Drafts"), never sent. A Google sign-in's Gmail link
+(`gmail-app`, or `gmail` made with one) holds no `gmail.compose` and saves
+none: its `save_draft` is refused with the call's own reason, which carries
+the line to say, "I can't save a draft yet. I can read it back and send it
+when you say 'send it'." After any read-back the lamp asks short (the owner,
+10 Nov), "Say 'yes, send it' to send it." (a draft: "save it"), and the model
+judges any answer. It is never a `remember`: on lamp-3e83 on 10 Nov the
 model called `remember` three times for a draft before it wrote, and the
 draft ended in "shall I send it?". On lamp-29e7 on 9 Nov "Draft a new email
 for me" was refused with no call ("I cannot touch your mail") and, asked why,
@@ -1170,17 +1175,28 @@ told on the `action` parameter.
 ### The voice's send gate
 
 `crates/voice/src/services.rs` holds its own rules, whatever `lamp-services`
-or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
+or the model says (`gate`, `answered`). **The owner, 10 Nov: whether the
+person confirmed or cancelled is the model's to judge ("quăng cho deepseek
+hết đi, đừng if else"), for every connector.** No word list, agreement test
+or plain-cancel match in the lamp decides it any more (`agrees_to_send`,
+`says_send`, `AGREE_WORDS`, `SEND_WORDS`, `PLAIN_WORDS`, `NOT_WORDS`,
+`says_cancel`, `CANCEL_WORDS`, `cancel_waiting` and the lamp's own "Okay,
+cancelled." are gone). The lamp checks only structure: the write's own
+`send_id`, a later request than the read-back's, at most two minutes, and a
+read-back not cut or talked over.
 
-- **Only the owner's heard line** reaches a service at all, read or write
-  ("Who can use them", above); anything else is `OWNER_ONLY` or
-  `NOT_HEARD`, and any waiting write is forgotten.
-- **Writes only on the second route.** The Live route has no voice prints,
-  so it can't tell whose voice says "send": there a `service_write`, with or
-  without `send_id`, is told `NO_SEND_HERE`, "Not done: on this voice I
-  don't send or post to linked services. Say so in a few words; they can ask
-  again on the lamp's other voice.", and nothing is prepared or sent. A
-  route is the second when its worker gave the services its same-voice check
+- **Only a heard line** reaches a service at all, read or write; anything
+  else is `NOT_HEARD`, and any waiting write is forgotten. **Only the owner's
+  line** reads or prepares a write ("Who can use them", above): any other is
+  `OWNER_ONLY`, and any waiting write is forgotten. The one exception is the
+  send of a write already waiting: the model's call with its `send_id` sends
+  it whoever answered (a known other too, or a line no known face holds).
+- **Writes only on the second route.** There a `service_write`, with or
+  without `send_id`, is passed to the rules below; on the Live route it is
+  told `NO_SEND_HERE`, "Not done: on this voice I don't send or post to
+  linked services. Say so in a few words; they can ask again on the lamp's
+  other voice.", and nothing is prepared or sent. A route is the second when
+  its worker gave the services its same-voice check
   (`services::judging_voices`); the Live process never does.
 - **Prepared only for the owner seen saying it.** A `service_write` without
   `send_id` whose line the owner's face was not seen saying ("Who can use
@@ -1191,200 +1207,150 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   and not offered in the function's parameters.
 - **Prepare:** a `service_write` without `send_id` is passed on, any waiting
   write forgotten first. When the answer has a `read_back` and a `send_id`,
-  that id is kept with the request it came in, the read-back, and the
-  owner who asked, and the model is told "Nothing is sent yet. Say read_back
-  in full, word for word, leaving nothing out, then ask them to say "send
-  it" (in Vietnamese "ừ, gửi đi giúp tôi") to send it. Send
-  only if their next words are that."; an id with no read-back is dropped
-  and never sent. A write prepared with `action` `save_draft` is kept as a
-  draft (`Pending::draft`), and the model is told instead
-  `SAVE_READ_BACK_NEXT`, "Nothing is saved yet, and nothing is ever sent.
-  Say read_back in full, word for word, leaving nothing out, then ask them
-  to say "save it" (in Vietnamese "lưu đi") to save it as a draft. Save only
-  if their next words are that."
+  that id is kept with the request it came in, the service, the read-back,
+  and the owner who asked, and the model is told "Nothing is sent yet. Say
+  read_back in full, word for word, leaving nothing out, then say "Say 'yes,
+  send it' to send it." (in Vietnamese "Nói 'gửi đi' để gửi nhé."). If they
+  agree, in any words, call service_write again with its send_id. If they
+  cancel, decline, wait or change it, don't send: say it's cancelled, or
+  prepare the changed one anew.";
+  an id with no read-back is dropped and never sent. A write prepared with
+  `action` `save_draft` is kept as a draft (`Pending::draft`), and the model
+  is told instead `SAVE_READ_BACK_NEXT`, "Nothing is saved yet, and nothing
+  is ever sent. Say read_back in full, word for word, leaving nothing out,
+  then say "Say 'yes, save it' to save it as a draft." (in Vietnamese "Nói
+  'lưu đi' để lưu nháp nhé."). If they agree, in any words, call
+  service_write again with its send_id. If they cancel, decline, wait or
+  change it, don't save: say it's cancelled, or prepare the changed one
+  anew."
 - **What the lamp said of it:** every word the lamp says in that request
   after the write is prepared is kept with it, as said, on both routes
-  (`thread::Thread::lamp_for` → `services::lamp_said`).
-- **A plain "send" is the waiting write's.** A later turn's history keeps
-  a call's name, never its answer, so the model can't know the `send_id`.
-  A `service_write` in a later request whose line is a plain send
-  (`says_send`) is taken as the waiting write's, whatever id it gives, or
-  none: its arguments become only `{"service": <the service the write was
-  prepared for>, "send_id": <its id>}`, so exactly what was read back goes,
-  to that service, held to every rule below. Its voice is judged as any
-  send's (`is_send`, the same test the gate makes): on lamp-9adf on 4 Nov a
-  send with no id was taken but never judged, and refused as a voice not
-  heard. Any other line's `service_write` is a new write, as before.
-- **Send:** a `service_write` with a `send_id` is passed on, with
-  `"said":"send"` added, only when all hold: it is the id kept; it comes in a
-  later request than the one that read it back; the lamp's turn just before
-  this one is that read-back's, and the lamp spoke in no other request
-  since; the person's line is the very first of theirs begun since the write
-  was prepared (the lamp's own echo is not theirs, below); it is the same owner who asked; at most 2 minutes since it was
-  prepared and 30 s (`SEND_WITHIN`, `send_by`) since the lamp last said a
-  word of it, or since the read-back could have finished playing at 600 ms a
-  word, if later (after the lamp asks once more, since that asking alone);
-  and the person's words in this turn are a plain send, or for a draft a
-  plain send or a plain save (`confirms`). Otherwise the model
-  is told `CANCELLED`, "Not sent, and cancelled: I send only on a plain
-  "send" said to me right after I read the message back. Say it was not
-  sent." The journal names each check that failed ("a send cancelled: …"), and
-  every refusal the words it gave.
+  (`thread::Thread::lamp_for` → `services::lamp_said`), to time a line begun
+  over it (below).
+- **The send is the model's call with the `send_id`.** Each later turn's
+  waiting note gives the model the write's `send_id` (below), since history
+  keeps a call's name, never its answer. A `service_write` with no
+  `send_id` is a new write, as before.
+- **Send:** a `service_write` with a `send_id` is passed on as
+  `{"service": <the service the write was prepared for>, "send_id": <its
+  id>, "said": "send"}`, so exactly what was read back goes, to that
+  service, only when all hold: it is the id kept; it comes in a later
+  request than the one that read it back; the write has its service; and at
+  most 2 minutes (`PENDING_FOR`) since it was prepared. The words of the
+  line are not checked: "Yes.", "ok send", "sure", "gửi đi" or "send it to
+  Bob" are the model's to judge. It doesn't matter whether it is the very
+  next line (a line the lamp never answered may come between), whether the lamp's
+  words held the read-back word for word (`read_back_said` is now only the
+  owner-voice ask's check), or who says it. Otherwise the model is told
+  `CANCELLED`, "Not sent, and cancelled: a send needs the waiting write's
+  own send_id, in a later turn than its read-back, within two minutes. Say
+  it was not sent." The journal names each check that failed ("a send
+  cancelled: …": another send_id, not a later request than the read-back's,
+  no service, prepared too long ago), and every refusal the words it gave.
+- **A cut read-back still sends nothing.** The read-back must not have been
+  cut by a line or a Stop (`Thread::heard_only` → `services::lamp_cut`), and
+  the person's line must not have begun before the read-back could have been
+  said whole (400 ms a word, the lamp's own pace, from its first word) or
+  before any of it was said, nor over the lamp's own voice. On the second
+  route the line is timed from when it began (`Heeding::hear`'s `Began`,
+  before its words come → `services::voice_began`), with the rule
+  (`--attention`); without it, from when its first words came. Otherwise the
+  model is told `NOT_READ_BACK`, "Not sent, and cancelled: the read-back was
+  cut off before they agreed. Say it was not sent, and that they can ask
+  again." A refused send forgets the id either way.
 - **A send with nothing waiting** (none prepared, or already sent or
   cancelled) sends nothing, and the model is told `NOTHING_WAITING`, "Not
   sent: no write waits for a send. None was prepared, or it was already sent
   or cancelled. If they still want it, call service_write now without
   send_id, say its read_back in full, and ask them again.", so the person
-  hears a real read-back and says "send" again. The journal says "a send with
-  no write waiting". On lamp-9adf on 4 Nov the model twice said a read-back of
+  hears a real read-back and agrees again. The journal says "a send with no
+  write waiting". On lamp-9adf on 4 Nov the model twice said a read-back of
   its own, with no call, and the "send" after it found nothing; the
   function's own rule now says never to say a read-back that no call gave in
   the same turn.
-- **A plain cancel is the lamp's, with no model choice** (#5958). Only as
-  the reply the read-back asked for (`answers_the_read_back`, Thirteen's P2
-  and Reviewer-two's HOLD on #5967): the very next line after it, the
-  read-back uncut, nothing the lamp answered between, and by the one who
-  asked when the line's person is known (`speaker_of`: outside a private
-  room the line's known face, the owner's or another's, so a known other's
-  "Cancel." or "go ahead" is the model's; in a private room the owner);
-  any other "Cancel that." is the model's. A forget (the thread's, by voice;
-  memory's `memory/forgot` for anyone, with the running summary on or off:
-  off, the worker's own reader, `memory_forgot_waiting`) or a privacy
-  change of the camera or the microphone drops the waiting write
-  (`forget_waiting`). A waiting-write note taken before it is let go at
-  every chat the engine asks, any round or try (`LettingGo`,
+- **Any answer is heard as an answer** (`answer_awaited`). While a write
+  waits (prepared under 2 minutes ago, its read-back not cut, the very next
+  line after it), a line with a word in it counts as answering the lamp,
+  whatever it says, however the read-back's last sentence reads. So a bare
+  "Yes.", "Send." or "Cancel." isn't held as a short sound or as the room's
+  lone words, even with nobody in view, and reaches the model. This applies
+  only to a line known to have begun clear of the lamp's words; one begun
+  over its voice, within 1.5 s (`own_echo::TAIL_US`) of its words' end, or
+  with no hearing hook to say when it began is judged as any other line.
+- **No nudge, no lamp-said cancel.** The lamp's own "Say 'send it' to send
+  it." nudge (`SAY_SEND_IT`, `nudge_waiting`; a draft's "Say 'save it' to
+  save the draft.", `SAY_SAVE_IT`) and its own "Okay, cancelled. Nothing was
+  sent." (`CANCELLED_SAID`, #5958) are gone: a "go ahead" or a "cancel
+  that" is the model's turn, told the waiting write (below). It sends with
+  the `send_id`, or says it's cancelled and doesn't send; the waiting write
+  then lapses at 2 minutes or is dropped by the next other call, and
+  `lamp-services` lets its own copy lapse at 2 minutes. A forget (the
+  thread's, by voice; memory's `memory/forgot` for anyone, with the running
+  summary on or off: off, the worker's own reader, `memory_forgot_waiting`)
+  or a privacy change of the camera or the microphone drops the waiting
+  write (`forget_waiting`). A waiting-write note taken before it is let go
+  at every chat the engine asks, any round or try (`LettingGo`,
   `waiting_note_stands`, which compares the note's text with the write
-  still waiting). On
-  lamp-9adf on 10 Nov, "Lamp, cancel that." after a read-back was answered
-  "Cancel what exactly? I have several things set", with no call: the model
-  weighed it against the lamp's reminders. Now, while another request's
-  write waits (at most 2 minutes since it was prepared), a line whose words
-  are a plain cancel (`CANCEL_WORDS`, fillers and "no", "wait", "actually"
-  aside: "cancel", "cancel that", "never mind", "don't send it", "stop,
-  don't send it", "hủy đi", "đừng gửi" and the like) forgets the write
-  (`services::cancel_waiting`), and the second route says the lamp's own
-  line, with no chat asked: "Okay, cancelled. Nothing was sent." (`CANCELLED_SAID`),
-  or "Vâng, đã hủy. Chưa gửi gì cả." (`CANCELLED_SAID_VI`) for a Vietnamese
-  cancel word. A later `send_id` finds `NOTHING_WAITING`, so nothing can send
-  it; `lamp-services` lets its own copy lapse at 2 minutes. The journal says
-  "a waiting write cancelled by a plain cancel". "Cancel my 9 o'clock
-  reminder", or a cancel with no write waiting, is the model's as before. A
-  bare "Cancel." while a write waits is the person's answer to the
-  read-back, never held as a short sound (`services::cancel_awaited`, as for
-  a plain send: only a line begun clear of the lamp's voice).
-- **A plain "go ahead" right after a read-back keeps the write** (#5962). On
-  lamp-3e83 on 10 Nov "ok, go ahead" after a read-back was neither a send nor
-  a cancel, the model answered "go ahead with what?", and the write was
-  lost. Now a line whose words are a plain agreement (`GO_AHEAD_WORDS`:
-  "go ahead", "do it", "sounds good", "that's right", "được rồi" and the
-  like, or fillers alone: "Yes.", "Okay."), the very next line after a
-  read-back said whole and uncut, its "send" still in time, keeps the write
-  waiting (`services::nudge_waiting`): the second route says the lamp's own
-  line, with no chat asked, "Say 'send it' to send it." (`SAY_SEND_IT`, or
-  "Nói 'gửi đi' để gửi nhé." for a Vietnamese one; for a draft "Say 'save
-  it' to save the draft." (`SAY_SAVE_IT`) or "Nói 'lưu đi' để lưu nháp
-  nhé."), and the "send" is timed
-  from it, as after the lamp asks once more. Once per write. It never sends:
-  "go ahead" alone is still no send. A bare one is the person's answer to the
-  read-back, as a bare cancel is (`services::cancel_awaited`). The journal
-  says "a go-ahead for the waiting write".
+  still waiting).
 - **Each later turn is told the waiting write** (#5962). History keeps a
   call's name, never its answer, and the lamp's side only its first 400
   bytes, so a long read-back's end was lost and the model asked again for
   what it had been told. While a write waits (at most 2 minutes), each later
-  turn's notes carry it, in memory only, with the write
-  (`services::waiting_note`): its service and its whole read-back (at most
-  1,500 bytes), that only a plain "send it" sends it (for a draft, "a Gmail
-  draft" that only a plain "save it" saves), and that a change is a
-  new `service_write` with the whole message changed, never an ask for
-  anything it holds. Read results stay private as before.
-- **The send's voice score is journaled**: "a send's voice beside request N's:
-  cosine 0.64" (or "no print"), a score only, never a print.
-- **The read-back must have been heard in full.** The lamp's words must hold
-  every word of the `read_back` in order (letters and digits, lower case, an
-  address's "at" and "dot" said or written alike; more words around it, such
-  as "Shall I send it?", are fine), so the recipients, the target and the
-  whole text were said. The read-back must not have been cut by a line or a
-  Stop (`Thread::heard_only` → `services::lamp_cut`), and the person's line
-  must not have begun before the read-back could have been said whole (400
-  ms a word, the lamp's own pace, from its first word) or before any of it
-  was said, nor over the lamp's own voice. On the second route the line is
-  timed from when it began (`Heeding::hear`'s `Began`, before its words come
-  → `services::voice_began`), with the rule (`--attention`); without it,
-  from when its first words came. Otherwise the model is told `NOT_READ_BACK`, "Not sent,
-  and cancelled: the message was not read back in full before the "send".
-  Say it was not sent, and that they can ask again." A refused send forgets
-  the id either way.
-- **The voice that said "send" is the one that asked.** The send line's
-  print and the prepare line's are compared (`same_voice::Voices::alike`).
-  A known other voice (both prints there, alike under
-  `same_voice::SERVICES_SAME_FROM`, 0.55) or another face seen saying the send line
-  (looser than the conversation's `SAME_FROM`, 0.70, which the
-  conversation's rules keep: most owners are alone with the lamp, so a
-  lower bar keeps the owner from being refused while still turning away a
-  clearly different voice; CAM++ scores one speaker usually above 0.6, two
-  at 0.2-0.4)
-  cancels it: the model is told `OTHER_VOICE`, "Not sent, and cancelled: I
-  send only when the voice saying "send" is the one that asked for it. Say
-  it was not sent." A print is made only of a line of 1.5 s of speech or
-  more begun with the lamp quiet (`same_voice::LEAST_SAMPLES`), so a bare
-  "send" often has none: then the write is kept (its 2 minutes still
-  running, its 30 s counted again from the lamp's asking once more, which
-  with the first "send" took past 30 s of the read-back on lamp-9adf) and the model is told `NO_PRINT_YET`, "Not sent yet: I
-  couldn't hear whose voice that was.", with the next step "Ask them, in the
-  conversation's language, to say "go ahead and send it" (in Vietnamese "ừ,
-  gửi đi giúp tôi"), and nothing else. …". The lamp's words in that request
-  are no other request's, and the person's next line may send, held to
-  every rule above with that request as the lamp's turn before it. A second
-  line with no print cancels it as `OTHER_VOICE`.
-- **The owner's enrolled print, when there is one** (only with
-  `LAMP_SAME_VOICE_FOR=services`, [same-voice.md](same-voice.md), "The
-  owner's voice print"): the send line's print is compared with the owner's
-  print, averaged from several of their lines, instead of the prepare
-  line's (`VoiceAsk::Owner`, `services::send_likeness`), at the same
-  `SERVICES_SAME_FROM`; the journal says only its cosine ("owner print: the send's
-  cosine 0.82"). Every other check above is unchanged. With no print, it is
-  as above. After a send by an owner with no print, sent or refused as
-  `OTHER_VOICE`, and their face seen saying it, the model is told once, as
-  `then`: "Then ask, in the conversation's language, exactly: "May I learn
-  your voice, so I only send mail when it's you?" (in Vietnamese "Cho tôi
-  học giọng của bạn nhé, để tôi chỉ gửi thư khi đúng là bạn?"). …". Not at
-  the prepare: the read-back and its "send" are the very next turns.
-- **Any later turn forgets it:** a second person's line (its send is
-  cancelled, "more than one line since"), the lamp speaking in a second other
-  request, or a services call with no `send_id` in another request drops the
-  waiting write. The journal says why: "a waiting write dropped: N lines since
-  its read-back", "… dropped: another call", "… dropped: the lamp answered
-  another request"; a plain send's `service_write` with no write waiting says
-  "a plain send with no write waiting: prepared anew".
+  turn of the one who asked (in a private room, whoever speaks) carries it in
+  its notes, in memory only, with the write (`services::waiting_note`): its
+  service, its `send_id` and its whole read-back (at most 1,500 bytes), for
+  a draft that it is "a Gmail draft, saved, never sent", that if they agree, in any words, the model calls `service_write` with that
+  `send_id`, that if they cancel, decline or wait it doesn't send and says
+  it's cancelled, and that a change is a new `service_write` with the whole
+  message changed, never an ask for anything it holds. Read results stay private as before.
+- **Any other call forgets it:** a services call with no `send_id` in
+  another request, or the lamp speaking in a second other request, drops the
+  waiting write. The journal says why: "a waiting write dropped: another
+  call (prepared in request N)", "… dropped: the lamp answered another
+  request".
+- **The read-back's answer is its one chance** (Thirteen's P2 on #6009).
+  Once the lamp answered the request after the read-back (`Pending.other`)
+  with no send in it, any later request drops the write before its call or
+  its note (`answered_without_send`, journal "a waiting write dropped: the
+  lamp answered request N after its read-back with no send"): the model
+  took the answer as a cancel ("Cancel that." → "Okay, cancelled."), a wait,
+  or something else ("What time is it?" → "It's three."). A "Yes, send it."
+  after that finds `NOTHING_WAITING`, no later turn is told of the write,
+  and the model prepares it anew. That request's own send, after words such
+  as "Sure, sending it now.", still goes.
 - **The lamp's own echo is no line of the person's** (#5846). A line the
   second route holds as the lamp's own words heard back (`own_echo`,
   `Echo::Held`) is told through the thread (`Thread::own_echo_held` →
   `services::own_echo_held`, journal "the lamp's echo, not counted toward the
-  waiting write"): `Pending.echoes` counts it, and the send checks the
-  person's lines, so it doesn't matter whether the thread hears of the line's
-  start or of its echo first. Each line is counted twice over: by the thread,
-  with no request (`Thread::person` → `line_began(None)`, `lines`), and on the
-  second route with its request as its words are told (`Thread::line_heard`
-  → `line_began(Some(request))`, `heard`, the newest 8 ids kept). The
-  person's lines are the larger count less the echoes, and an echo is taken
-  off only for a request counted with its id, and once: the mark goes with
-  its id among the newest 8, so a repeat of it is never taken off again:
-  a line the thread never counted (a piece joined to a line going on, or with
-  no letter or digit) takes no person's line off, so a person's line and the
-  send after an uncounted echo are still two, and cancelled. On lamp-29e7 on 9
-  Nov the read-back's own "go ahead and send it", heard back, was counted as
-  the first line, so the owner's "send" was the second: the write was
-  dropped, prepared again, read back and echoed again, and the owner said
-  "send" five times. The owner's own "Go ahead and send it." is the
-  read-back's tail word for word, so if `own_echo` ever holds a real reply as
-  the lamp's echo, that line goes unanswered and the owner says it again: that
-  was so before this rule too. A cut the echo's start alone made (begun over the lamp's
-  voice, `voice_began` for that request, `Pending.cut_by`) is undone with
-  it; a cut by the lamp's answer stopped, by another line, or by the thread's
-  own timing (`began_in`) stays. Only a line after the one that prepared the
-  write (or asked once more) counts, each once. A person's line is always
-  counted: every other check above is unchanged.
+  waiting write"): `Pending.echoes` counts it, and an awaited answer checks
+  the person's lines, so it doesn't matter whether the thread hears of the
+  line's start or of its echo first. Each line is counted twice over: by the
+  thread, with no request (`Thread::person` → `line_began(None)`, `lines`),
+  and on the second route with its request as its words are told
+  (`Thread::line_heard` → `line_began(Some(request))`, `heard`, the newest 8
+  ids kept). The person's lines are the larger count less the echoes, and an
+  echo is taken off only for a request counted with its id, and once: the
+  mark goes with its id among the newest 8, so a repeat of it is never taken
+  off again, and a line the thread never counted (a piece joined to a line
+  going on, or with no letter or digit) takes no person's line off. A cut
+  the echo's start alone made (begun over the lamp's voice, `voice_began`
+  for that request, `Pending.cut_by`) is undone with it; a cut by the lamp's
+  answer stopped, by another line, or by the thread's own timing
+  (`began_in`) stays, and refuses the send as `NOT_READ_BACK`. On lamp-29e7
+  on 9 Nov the read-back's own "go ahead and send it", heard back, was
+  counted as the first line, and the owner said "send" five times.
+- **An answer to a waiting read-back is never held as the echo** (lamp-3e83,
+  10 Nov). After the lamp's "Say 'go ahead and send it'", the owner's "go
+  ahead and send it", begun just after the lamp's words, held only the
+  lamp's own words and was held as its echo ("its answer is held back: the
+  lamp's own echo"), so the write never went. While a write waits for its
+  answer (`services::write_waits`: the very next line after an uncut
+  read-back, under 2 minutes), `own_echo` takes a line begun after the
+  lamp's words as the person's ("it began after a read-back that waits for
+  its answer"), so "Yes, send it." after "Say 'yes, send it' to send it."
+  reaches the model and its send goes. A line heard over the lamp's voice
+  is still judged as before, so the read-back's own words heard back over
+  it (lamp-29e7) are still held.
 - **After a send** the model is told one fixed line: "Say only that it was
   sent, in the conversation's language." when the service answered
   `sent: true`; "Say only that the file was made in their Google Drive,
@@ -1401,7 +1367,10 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   it was not sent, in the conversation's language." A saved draft is a done
   write as a sent one is (`services::went`): its receipt is never undone
   nor let go first, and a cut turn's note says the go-ahead "already sent
-  the write they asked for (or, for a draft, saved it)".
+  the write they asked for (or, for a draft, saved it)". The
+  owner is no longer asked, after a send, whether the lamp may learn their
+  voice (`owner_voice::ask_after_send` is no longer called): a send is held
+  to no voice.
 - **A send cut while awaited is never answered as nothing done** (#5853,
   lamp-9adf, 9 Nov). On the second route a send's call runs to its answer
   even when a newer line cuts the turn, and the line that answers those
@@ -1413,43 +1382,15 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   service's answer or the gate's refusal. Each try's receipt is its own, so
   a refused try never takes another's success, and an older request's slow
   send finishing later never overwrites a newer one's; 512 kept
-  (`RECEIPTS_KEPT`), refusals let go first), told the write was sent unless it was
-  refused, and runs no
-  `service_write` in its turn
+  (`RECEIPTS_KEPT`), refusals let go first), told the write was sent unless
+  it was refused, and runs no `service_write` in its turn
   ([second-voice.md](second-voice.md), `LAMP_JOIN_CUT_WORDS`'s carried
   rounds).
-- **A plain send** (`says_send`): the words in lower case, everything but
-  letters, digits and `'` as spaces, the fillers `yes`, `yeah`, `yep`, `ok`,
-  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
-  `oh`, `vâng`, `dạ`, `ừ`, `có` taken off both ends, and what is left exactly one of `send`, `send it`,
-  `send that`, `send the message`, `send the email`, `send it now`,
-  `go ahead and send it`, `go ahead and send`, `go ahead send it`,
-  `go ahead send`,
-  `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
-  `gửi đi giúp tôi`, `gui di giup toi`: each has "send", "gửi", "gởi" or
-  "gui" in it. So "Yes, send it.", "Vâng, gửi đi" and "Ừ, gửi đi giúp tôi"
-  send, and so does "Hey Lamp, yes, send it."; "do it", "go ahead", "don't
-  send it", "send it to Bo instead", "đừng gửi" and "no" don't. The forms
-  without "it" are speech-to-text's: on lamp-9adf on 9 Nov the owner's "Go
-  ahead and send it." came as "Go ahead and send", and the write was prepared
-  and read back again (#5846).
-- **A plain save** (`says_save`), for a draft alone: the same words taken
-  the same way, and what is left exactly one of `save`, `save it`, `save
-  that`, `save the draft`, `save it as a draft`, `save a draft`, `save
-  draft`, `lưu`, `lưu đi`, `lưu nháp`, `lưu lại`, `luu`, `luu di`, `luu
-  nhap` (`SAVE_WORDS`): each has "save", "lưu" or "luu" in it and none
-  "don't". It confirms a waiting draft as a plain send does, and never a
-  send: "save it" after a mail's read-back cancels it. "don't save it" and
-  "đừng lưu" save nothing.
-- **A plain send is heard as an answer** (`send_awaited`). While a write
-  waits, a plain send (for a draft, a plain save too) counts as answering the lamp, however the read-back's
-  last sentence reads. So it isn't held as a short sound or as the room's lone
-  words, even with nobody in view. This applies only to a line known to have
-  begun clear of the lamp's words. One begun over its voice, within 1.5 s
-  (`own_echo::TAIL_US`) of its words' end, or with no hearing hook to say when
-  it began may be the lamp's own "send it" heard back, which `own_echo` doesn't
-  hold in under 3 words. Such a line is judged as any other, and `gate` still
-  judges the send.
+
+Drafts: a Gmail draft (`save_draft`, above) is saved the same way: the
+model's call with its `send_id` carries the yes, in any words. No word list
+is checked for it (`says_save`, `SAVE_WORDS` are gone with `says_send`), and
+it is saved, never sent, whatever words agreed to it.
 
 ### After a read
 
@@ -2202,17 +2143,23 @@ items making a code left out, within a group and across three, never two
 separate mails or two calendar events; one answer's items with no group
 key read as one (the Reviewer-lead's P2 on #5070); "at 1430" kept as a time. `-p lamp-voice` (`services`, `tools`,
 `thread`, `made_skill`): the switch giving the flag and folder, the three
-declared and routed only with the switch and the folder, the rule first, a
-plain send and nothing else ("do it" never; "gởi", "gui di", "ừ, gửi đi
-giúp tôi" do), a send in a known other voice or seen from another face
-cancelled, a send with no print keeping the write and asking once more (the
-longer line sending, a second with no print cancelling), a write prepared
+declared and routed only with the switch and the folder, the rule first, only the waiting write's own `send_id` sending it,
+whatever the words (the model decides, the owner, 10 Nov), a made-up id
+cancelling and a call with none preparing anew, any line right after a
+read-back awaited as its answer, a known other's or a different speaker's
+send sending the waiting write, the lamp saying "Say 'yes, send it' to send
+it." and the waiting note giving the send_id, a "Yes, send it." after that
+read-back never held as the lamp's echo (lamp-3e83), a send after another line the lamp never answered or after a read-back not
+said whole still sending, the read-back's answer with no send ("Okay,
+cancelled.", "It's three.") ending the write so a later send finds
+nothing, while that answer's own send still goes, a write prepared
 only when the owner is seen saying it (an off-camera voice refused), the Live
 route never preparing or sending, a read in full only alone, seen saying it
 and in the conversation's voice (an off-camera voice brief), a line begun
 over the read-back marking it cut, a send refused and forgotten
-unless every rule holds, a send after a read-back not said in full or said
-over refused, any later line or turn forgetting the write, only the owner's
+unless every rule holds (the same turn, stale past two minutes, another
+send_id), a send said over the read-back refused, another call or the lamp
+answering twice forgetting the write, only the owner's
 heard line reaching a service (a guest, the room, a held or narrowed line,
 no scope and a scheduled run refused, read and write), nothing else run
 after a read in the same request, a read cut to who and what about with

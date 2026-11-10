@@ -1661,7 +1661,7 @@ async fn forget_invalidates_a_snapshotted_send_handle_after_ledger_eviction() {
     let engine = ledger_boundary_engine();
     let shared = &engine.shared;
     let call = ledger_boundary_call();
-    let (attempt, _) = send_attempt(shared, 100, &call);
+    let (attempt, _) = send_attempt(shared, &call);
     assert!(attempt.is_some());
     let (release, released) = tokio::sync::oneshot::channel::<Value>();
     let running = sending(
@@ -1694,7 +1694,7 @@ async fn forget_redacts_late_registration_of_a_captured_send_attempt() {
     let engine = ledger_boundary_engine();
     let shared = &engine.shared;
     let call = ledger_boundary_call();
-    let (attempt, _) = send_attempt(shared, 101, &call);
+    let (attempt, _) = send_attempt(shared, &call);
     assert!(attempt.is_some());
     forget_carried_context(shared);
     let running = sending(
@@ -1780,7 +1780,7 @@ async fn forgotten_send_outcomes_keep_only_fixed_notes_and_the_right_repeat_guar
         let origin = 110 + index * 2;
         let resumed = origin + 1;
         let call = ledger_boundary_call();
-        let (attempt, args) = send_attempt(shared, origin, &call);
+        let (attempt, args) = send_attempt(shared, &call);
         assert!(attempt.is_some());
         let (release, released) = tokio::sync::oneshot::channel::<Value>();
         let running = sending(
@@ -1990,7 +1990,7 @@ async fn forget_redacts_an_old_contexts_send_started_after_admission() {
     let epoch = shared.send_content_epoch.load(Ordering::Acquire);
     forget_carried_context(shared);
     let call = ledger_boundary_call();
-    let (attempt, _) = send_attempt_in_context(shared, 130, &call, epoch);
+    let (attempt, _) = send_attempt_in_context(shared, &call, epoch);
     sending(
         shared,
         (130, attempt),
@@ -2011,7 +2011,7 @@ async fn forget_admission_does_not_directly_wait_for_a_busy_receipt() {
     let engine = ledger_boundary_engine();
     let shared = &engine.shared;
     let call = ledger_boundary_call();
-    let (attempt, _) = send_attempt(shared, 150, &call);
+    let (attempt, _) = send_attempt(shared, &call);
     sending(
         shared,
         (150, attempt),
@@ -2062,7 +2062,7 @@ async fn forget_fences_a_completed_evicted_receipt_already_copied_by_recovery() 
     let engine = ledger_boundary_engine();
     let shared = &engine.shared;
     let first = ledger_boundary_call();
-    let (attempt, _) = send_attempt(shared, 160, &first);
+    let (attempt, _) = send_attempt(shared, &first);
     sending(
         shared,
         (160, attempt),
@@ -2078,7 +2078,7 @@ async fn forget_fences_a_completed_evicted_receipt_already_copied_by_recovery() 
     );
     let mut second = ledger_boundary_call();
     second.id = "later-pending-try".into();
-    let (attempt, _) = send_attempt(shared, 160, &second);
+    let (attempt, _) = send_attempt(shared, &second);
     let (release, released) = tokio::sync::oneshot::channel::<Value>();
     let pending = sending(
         shared,
