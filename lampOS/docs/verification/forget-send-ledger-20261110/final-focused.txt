@@ -1,0 +1,274 @@
+
+running 19 tests
+test second_provider::tests::sent_write::a_late_send_result_after_forget_updates_status_without_restoring_payload ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 1 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 1 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 2 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_ninth_send_try_never_takes_the_first_ones_receipt ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write, service_write, service_write, service_write, service_write, service_write, service_write, service_write, service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 9 send tries began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 10 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 2 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_prepare_cut_in_flight_is_answered_as_before ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 2 first event in 302 ms
+lamp-voice second: request 2 first piece to the voice 302 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 303 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_refused_second_send_in_one_batch_never_hides_the_first ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write, service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 2 send tries began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 3 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 1 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_send_cut_in_flight_is_answered_with_its_result_and_never_prepared_again ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 1 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_send_cut_twice_before_its_answer_is_still_answered_as_sent ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 3 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 3 first answer audio 1 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_send_fenced_after_the_cut_is_told_by_the_services_own_answer ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 2 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_send_reusing_a_carried_calls_id_still_brings_its_receipt ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called the_time
+lamp-voice second: request 1 chat round 2 first event in 0 ms
+lamp-voice second: request 1 chat round 2 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 4 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 1 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_send_then_cut_forget_then_cut_never_restores_payload_or_repeats_send ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 1 ms after the words were heard
+ok
+test second_provider::tests::sent_write::a_services_fallback_after_admitted_forget_keeps_status_without_private_payload ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 2 ms after the words were heard
+ok
+test second_provider::tests::sent_write::an_older_slow_send_finishing_late_never_hides_a_newer_one ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 7 words, the last 0 ms after the line ended
+lamp-voice second: request 2: of its 7 words, 0 in request 1's words it cut short
+lamp-voice second: request 1's words, cut short, are let go: request 2 is answered
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 1 ms after the words were heard
+lamp-voice second: request 3: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 3 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 3: of its 5 words, 5 in the lamp's answer to request 2 so far
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 4: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 4 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 4 is held, so request 3's words, cut short by it, are answered in its place
+lamp-voice second: request 4: request 3's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 4 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 4 chat round 1 first event in 0 ms
+lamp-voice second: request 4 chat round 1 called service_write
+lamp-voice second: request 4 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 4 chat round 2 first event in 0 ms
+lamp-voice second: request 4 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 4 first answer audio 1 ms after the words were heard
+ok
+test second_provider::tests::sent_write::an_unadmitted_face_forget_keeps_send_payload_and_repeat_protection ... lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 1 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 1 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2 chat round 1: forget_my_face not run: nothing they said asks to forget (LAMP_FORGET_ASKED)
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 3 goes on from 4 messages of the cut answer's finished rounds
+lamp-voice second: request 3 chat round 1 first event in 1 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 3 ms
+lamp-voice second: request 3 first piece to the voice 3 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 4 ms after the words were heard
+ok
+test second_provider::tests::sent_write::forget_clears_installed_and_later_restored_carried_rounds_but_keeps_words ... ok
+test second_provider::tests::sent_write::forget_invalidates_a_snapshotted_send_handle_after_ledger_eviction ... ok
+test second_provider::tests::sent_write::forget_ledger_host_admission_latency_diagnostic ... forget admission host first call after engine setup, empty: n=1 median=2.455 us p95=2.455 us max=2.455 us; target <1000 us (diagnostic only)
+forget admission host repeated empty: n=256 median=0.142 us p95=0.159 us max=0.556 us; target <1000 us (diagnostic only)
+forget admission host inputs: 8 requests x 64 calls = 512 receipt entries; each has 1024 ASCII argument bytes and 4096 ASCII result bytes plus JSON/IDs; 2621440 variable-content bytes total; no carried rounds, no lock contention; representative bounded payload, not maximum wire-response size
+forget admission host saturated ledger: n=64 median=1729.583 us p95=1881.262 us max=1971.568 us; target <1000 us (diagnostic only)
+ok
+test second_provider::tests::sent_write::forget_redacts_an_old_contexts_send_started_after_admission ... ok
+test second_provider::tests::sent_write::forget_redacts_late_registration_of_a_captured_send_attempt ... ok
+test second_provider::tests::sent_write::forget_rejects_an_older_batches_late_carried_round ... ok
+test second_provider::tests::sent_write::forgotten_send_outcomes_keep_only_fixed_notes_and_the_right_repeat_guard ... lamp-voice second: request 111: request 110's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 113: request 112's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 115: request 114's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 117: request 116's 1 send try began before a newer line cut its answer; only the earlier refusal go with its words
+ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 5479 filtered out; finished in 3.11s
+

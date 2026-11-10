@@ -3439,12 +3439,24 @@ then use that person's scope:
   pending rename notes, pictures and raw tool payloads are discarded.
   Later calls from the old batch are replanned, never executed with the old
   arguments. A confirmed held face-forget uses the same boundary before
-  round one. Earlier tool rounds retained for a later turn are cleared as
-  soon as the forget is admitted, before awaiting its call, alongside the
-  pending rename. They stay cleared if the turn is cut or dropped during
-  that await. The returned receipt still triggers the current turn's local
+  round one. Admission advances a shared context epoch and clears all
+  retained earlier tool rounds, before awaiting the call, alongside the
+  pending rename. Copied rounds from an older epoch cannot be restored by
+  a later turn, even if the forget's turn is cut or dropped during that
+  await. Earlier send records lose their display calls and results while
+  retaining request, attempt, timing and outcome accounting. A cloned
+  handle, late registration or completion, or service-receipt fallback
+  cannot restore raw call IDs, arguments or results. Final publication is
+  synchronized with admission. Ordinary batches retain the epoch of the
+  context that produced them, both when publishing finished rounds and
+  when registering a send receipt. Starting or finishing after admission
+  cannot make an old batch's display content fresh again. A late confirmed send can still update the
+  fixed sent status; pending or unknown sends remain uncertain, and a
+  confirmed refusal is not reported as success. Duplicate-send guards
+  remain in place. The returned receipt still triggers the current turn's local
   context reset. Calls refused or held before admission do not clear
-  context. This does not retract already generated or queued speech; see
+  context. This adds no deletion call or switch, does not cancel provider
+  work or queued audio, and is not evidence of device behavior; see
   [the Second-route boundary](second-voice.md).
   The face asked for is the known person's at the lamp, under the name
   the eyes keep (their known file), whatever name the model wrote: on the
