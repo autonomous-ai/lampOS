@@ -82,21 +82,21 @@ from lampos.errors import LampError
 
 async def main():
     async with await Lamp.connect() as lamp:
-        print("connected to", lamp.info.get("id"), "with", lamp.grants)
+        print("connected to", lamp.info.get("id"), "with", lamp.grants, flush=True)
 
         async def arrived(event):
             try:
                 await lamp.light("warm", 3, 10_000, pattern="breathe")
                 await lamp.say("Hello there.")
             except LampError as refused:  # private, paused, asleep, quiet_hours, rate...
-                print("not now:", refused)
+                print("not now:", refused, flush=True)
 
         async def heard(event):
-            print("heard:", event["phrase"])
+            print("heard:", event["phrase"], flush=True)
             # Hold the body while it nods, so the lamp's own idle life stands back.
             async with lamp.lease("body", why="quick-start") as lease:
                 await lamp.gesture("nod")
-                print("lease:", lease.state)  # held; "suspended" or "lost" if someone takes it back
+                print("lease:", lease.state, flush=True)  # held; "suspended" or "lost" if someone takes it back
 
         await lamp.on("person.arrived", arrived)
         await lamp.on("phrase.heard", heard, phrases=["good night lamp"])
@@ -115,6 +115,7 @@ Terminal 1 shows each request: `subscribe` (twice), `light`, `say`,
 `lease.take`, `gesture` and `lease.release`. Terminal 2 shows
 `connected to lamp-fake with ['body', 'light', 'speak', 'look', 'hear', 'sound', 'skills']`,
 then `heard: good night lamp` and `lease: held`.
+(`flush=True` shows each line at once when the output is piped or logged: Python holds it back otherwise.)
 
 - **`hello`** is `Lamp.connect()`. It signs the lamp's nonce with this
   computer's key, and `lamp.grants` says what the owner granted.
