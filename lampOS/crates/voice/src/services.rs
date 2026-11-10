@@ -2161,17 +2161,21 @@ pub const APPROVE_DEADLINE: Duration = Duration::from_secs(5);
 
 /// The person's yes to a made skill's writes (#6066), the voice's own call
 /// on `lamp-services`' tools socket, never offered to its model:
-/// `skill_write_approve` with the skill's name and each write's exact
-/// content, after the skill is on (the yes binds its installed package).
+/// `skill_write_approve` with the skill's name, each write's exact content
+/// and the SHA-256 of the package said back, after the skill is on (the
+/// yes binds its installed package, refused if another is installed).
 /// Its result (`{"approved": N, "public": [repo, ...]}`), or why not, in
 /// `lamp-services`' words, which name no recipient or text. Blocking. The
 /// one place the voice makes this call, so a change of its shape is made
 /// here.
-pub fn skill_write_approve(folder: &Path, skill: &str, writes: &[Value]) -> Result<Value, String> {
+pub fn skill_write_approve(
+    folder: &Path,
+    asks: &crate::skill_write_yes::Asks,
+) -> Result<Value, String> {
     let told = crate::tools::exchange(
         &folder.join(crate::tools::CALL_SOCKET),
         &json!({"op": "call", "name": lamp_services::skill_writes::APPROVE,
-                "args": {"skill": skill, "writes": writes}}),
+                "args": {"skill": asks.skill, "writes": asks.writes, "sha256": asks.sha256}}),
         APPROVE_DEADLINE,
     )
     .ok_or("the lamp's services didn't answer")?;

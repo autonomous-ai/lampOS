@@ -2407,7 +2407,10 @@ gone ([switches.md](switches.md)). What happens:
    - **Its words are the request's own** (`made_skill::write_from_request`,
      at `keep_asked`, which now takes the request, `made_skill::Asked`):
      every `subject`, `text` and `title` must be said in the person's
-     request, word for word in order, case, spacing, punctuation and
+     request (by voice the line heard for the make, `thread::heard_for`
+     as `forget` takes it, never the model's `request` argument, which
+     may carry a read's words; from the app its typed ask), word for word
+     in order, case, spacing, punctuation and
      quotes aside (a quoted span is just its words). Never from a read, the
      web or memory; the system prompt says so. Every place (`repo`,
      `team_id`, `project`, `workspace`, a Figma `id`, a `calendar` other
@@ -2447,9 +2450,17 @@ gone ([switches.md](switches.md)). What happens:
      model judges, as #6009 has a waiting mail's send judged), the model
      calls `make_skill` with only that id; the voice itself then calls
      `skill_write_approve` (`services::skill_write_approve`, the one place
-     it does). Taken once, only in a later heard request, on the second
-     route (`services::sends_here`), never on a line held as the lamp's
-     own echo. A decline, a wait or a change calls nothing, so nothing is
+     it does) with the SHA-256 of the package said back, and
+     `lamp-services` approves nothing if another package of the name is
+     installed by then. Taken once, only in a later heard request, on the
+     second route (`services::sends_here`), never on a line held as the
+     lamp's own echo, and only once the lamp's own words in one answer
+     from the make's on, as played and not cut (told by the thread as a
+     waiting write's read-back is), held every word of each write's
+     say-back (`made_skill::write_said`) in order; the model is told to
+     say the line word for word, and a yes before that is answered
+     `skill_write_yes::NOT_SAID_WHOLE`, the say-back to say again, the
+     wait going on. A decline, a wait or a change calls nothing, so nothing is
      approved; a change is a new make. `lamp-services`' answer names the
      public GitHub repositories, and the model then says "anyone can see"
      what it posts there. No identity check: whoever is at the lamp is
@@ -2788,9 +2799,13 @@ Tests:
   `the_system_prompt_carries_the_rules_of_a_read` (one service at most,
   read only, the listed steps, `cannot:` otherwise; off, none);
   `a_made_write_is_said_back_whole_and_waits_for_a_later_yes` and
-  `the_system_prompt_and_function_carry_a_write_only_with_its_switch`
-  (#6066). The made, not-on and not-made tests also take the line said for
-  a cut turn, the same words, once.
+  `the_system_prompt_and_function_carry_a_write_only_with_its_switch`,
+  `a_writes_words_only_in_the_models_request_are_refused` (#6066);
+  `skill_write_yes::tests::a_cut_or_summarised_say_back_does_not_approve`
+  and lamp-services'
+  `a_yes_naming_its_package_approves_only_that_package` (#6142). The made,
+  not-on and not-made tests also take the line said for a cut turn, the
+  same words, once.
 - `second_provider::worker::made_line`:
   `a_make_whose_turn_was_cut_still_says_its_line_once` and
   `a_make_whose_turn_waits_never_uses_the_say_service`;

@@ -336,7 +336,10 @@ sau:
    - **Lời của nó là lời của chính yêu cầu**
      (`made_skill::write_from_request`, tại `keep_asked`, nay nhận yêu
      cầu, `made_skill::Asked`): mọi `subject`, `text` và `title` phải có
-     trong yêu cầu của người dùng, đúng từng từ theo thứ tự, bỏ qua chữ
+     trong yêu cầu của người dùng (bằng giọng nói là dòng nghe được cho lần
+     tạo, `thread::heard_for` như `forget` dùng, không bao giờ là đối số
+     `request` của mô hình, vốn có thể mang lời của một lần đọc; từ ứng
+     dụng là yêu cầu được gõ), đúng từng từ theo thứ tự, bỏ qua chữ
      hoa, khoảng trắng, dấu câu và dấu ngoặc kép (một đoạn trong ngoặc kép
      chỉ là các từ của nó). Không bao giờ lấy từ một lần đọc, web hay bộ
      nhớ; system prompt nói vậy. Mọi nơi đến (`repo`, `team_id`,
@@ -377,9 +380,17 @@ sau:
      nào (mô hình phán đoán, như #6009 để mô hình phán đoán lệnh gửi một
      thư đang chờ), mô hình gọi `make_skill` chỉ với id đó; khi đó chính
      giọng nói gọi `skill_write_approve` (`services::skill_write_approve`,
-     nơi duy nhất nó gọi). Chỉ nhận một lần, chỉ trong một yêu cầu nghe
-     được sau đó, trên route thứ hai (`services::sends_here`), không bao
-     giờ trên một dòng bị giữ là tiếng vọng của chính đèn. Từ chối, chờ hay
+     nơi duy nhất nó gọi) với SHA-256 của package đã được nói lại, và
+     `lamp-services` không đồng ý gì nếu lúc đó một package khác cùng tên
+     đang được cài. Chỉ nhận một lần, chỉ trong một yêu cầu nghe được sau
+     đó, trên route thứ hai (`services::sends_here`), không bao giờ trên
+     một dòng bị giữ là tiếng vọng của chính đèn, và chỉ khi lời của chính
+     đèn trong một câu trả lời từ lần tạo trở đi, như đã phát và không bị
+     cắt (thread báo như với câu đọc lại của một lần ghi đang chờ), có mọi
+     từ của câu nói lại mỗi lần ghi (`made_skill::write_said`) theo thứ
+     tự; mô hình được dặn nói câu đó đúng từng từ, và một lời đồng ý trước
+     đó được trả lời `skill_write_yes::NOT_SAID_WHOLE`, kèm câu nói lại để
+     nói lại, và việc chờ vẫn tiếp tục. Từ chối, chờ hay
      thay đổi thì không gọi gì, nên không gì được đồng ý; thay đổi là một
      lần tạo mới. Câu trả lời của `lamp-services` nêu các repository GitHub
      công khai, và khi đó mô hình nói "anyone can see" những gì nó đăng ở
@@ -724,8 +735,11 @@ phần tasks, kỹ năng được tạo và được bật ngay mà không cần
 `the_system_prompt_carries_the_rules_of_a_read`: tối đa một dịch vụ, chỉ đọc,
 các bước được liệt kê, ngoài ra là `cannot:`; khi tắt, không dịch vụ nào;
 `a_made_write_is_said_back_whole_and_waits_for_a_later_yes` và
-`the_system_prompt_and_function_carry_a_write_only_with_its_switch`:
-#6066), các test ghi của #6066 (`made_skill::tests`:
+`the_system_prompt_and_function_carry_a_write_only_with_its_switch`,
+`a_writes_words_only_in_the_models_request_are_refused`: #6066;
+`skill_write_yes::tests::a_cut_or_summarised_say_back_does_not_approve` và
+`a_yes_naming_its_package_approves_only_that_package` của lamp-services:
+#6142), các test ghi của #6066 (`made_skill::tests`:
 `a_write_is_carried_only_with_its_switch`,
 `a_writes_say_back_is_whole_and_ends_on_its_wait`,
 `a_github_writes_say_back_says_who_can_see_it_before_the_yes`,
