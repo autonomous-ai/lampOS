@@ -334,6 +334,44 @@ mod tests {
         assert_eq!(asks, 2);
     }
 
+    /// Reviewer-two's P2 on #5667: a round already running when setup
+    /// first looks (`watching` with result A) ends before the next look
+    /// (`idle` with B). Its end is the round setup waits for, never a wait
+    /// for another round up to the bound; so for the first status heard
+    /// on `next` when the updater has no newest.
+    #[test]
+    fn a_round_running_at_the_first_look_is_followed_to_its_end() {
+        let (ended, asks, phases, waited) = run(
+            Some(status("watching", Some(("unreachable", 1)))),
+            vec![Some(status("idle", Some(("switched", 2))))],
+        );
+        assert_eq!(ended, Ended::Round("switched".into()));
+        assert_eq!(asks, 1);
+        assert_eq!(phases, ["watching", ""]);
+        assert!(waited < MOST, "{waited:?}");
+
+        let (ended, asks, phases, _) = run(
+            None,
+            vec![
+                Some(status("fetching", Some(("unreachable", 1)))),
+                Some(status("idle", Some(("switched", 2)))),
+            ],
+        );
+        assert_eq!(ended, Ended::Round("switched".into()));
+        assert_eq!(asks, 1);
+        assert_eq!(phases, ["fetching", ""]);
+
+        // A running round that ends with its result unchanged is no round:
+        // setup still waits for one that says a new result.
+        let mut said = vec![Some(status("idle", Some(("unreachable", 1))))];
+        said.extend([
+            Some(status("checking", Some(("unreachable", 1)))),
+            Some(status("idle", Some(("up-to-date", 2)))),
+        ]);
+        let (ended, _, _, _) = run(Some(status("watching", Some(("unreachable", 1)))), said);
+        assert_eq!(ended, Ended::Round("up-to-date".into()));
+    }
+
     #[test]
     fn an_updater_never_heard_ends_the_wait_at_once() {
         let (ended, asks, _, waited) = run(None, Vec::new());
