@@ -82,6 +82,11 @@ Environment=LAMP_TASKS_SIGN_IN_APP=on
 # The app told once that setup is done (#5812, onboarding.done; system.info's onboarding_done_supported),
 # its acked date kept in the state folder below: on, the lead's call (9 Nov).
 Environment=LAMP_APP_ONBOARDING_DONE=on
+# Hermes on the lamp (#5978): a forwarder on 127.0.0.1:7741 hands Hermes' chat requests to the
+# relay's DeepSeek with the voice's key, which never leaves lamp-cloud; Hermes gets only the local token lamp-cloud
+# keeps in its state folder (hermes-token, 0600), which Hermes' wrapper reads and then hides with this folder and
+# the credentials (lampOS/docs/install.md, "Hermes on the lamp"). Nothing more to write: no other path, no group.
+Environment=LAMP_HERMES_ON_LAMP=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

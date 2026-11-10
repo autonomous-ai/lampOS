@@ -63,7 +63,8 @@ harness-on puts Harness on a lamp lampOS is installed on: without Harness at
 harness-install run by lamp-update-harness.service, which a `serve` round starts with
         LAMP_HARNESS_AT_ONBOARDING=on while Harness is missing (#5197): harness-on's
         install alone, through the manifest the round pinned if it named one (its sha256
-        checked first), recorded for update/status; no Harness at boot, no daemon.
+        checked first), recorded for update/status; no Harness at boot, no daemon. With
+        LAMP_HERMES_ON_LAMP=on, Hermes after it, pinned, as lampos (#5978).
 back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
         lamp-update.service's failure and its timer): when lamp-update switched to its own
         new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
@@ -445,22 +446,19 @@ fn harness_on(options: &BTreeMap<String, String>) -> Result<(), String> {
     Ok(())
 }
 
-/// `lamp-update harness-install`: Harness's one-shot (#5197). Ends with 1
-/// when the install failed or another held its lock; the record says why.
+/// `lamp-update harness-install`: Harness's one-shot (#5197), and Hermes
+/// after it (#5978). Ends with 1 when Harness's install failed or another
+/// held its lock; the records say why. Hermes's failure is its own record's.
 fn harness_install(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
     let mut say = |line: &str| eprintln!("lamp-update: {line}");
-    let said = lamp_update::harness_install::install_now(
+    lamp_update::hermes_install::one_shot(
         Path::new("/"),
         Path::new(lamp_update::install::RECORDS),
         &mut install::output_of,
         &mut lamp_update::records::unix_ms,
         &mut say,
-    )?;
-    match said.error {
-        None => Ok(()),
-        Some(error) => Err(format!("Harness is not installed: {error}")),
-    }
+    )
 }
 
 /// `lamp-update back`: lamp-update-back, at its fixed path (#1680).
@@ -887,6 +885,28 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
         on.then_some(wanted.pin)
     };
+    // Hermes on the lamp (#5978): only with Harness's install on too, as it
+    // rides on Harness's one-shot.
+    let hermes = {
+        use lamp_update::{harness_install::product, hermes_install as hermes};
+        let acts = config.apply && command == "serve";
+        // On by this build's default on a product lamp, as Harness's.
+        let wanted = hermes::wanted(
+            std::env::var(hermes::SWITCH).ok().as_deref(),
+            acts && product::product_lamp(&config.root, &config.on(&config.units)),
+            hermes::PRODUCT_DEFAULT,
+        );
+        if acts && wanted && harness.is_none() {
+            say("Hermes on the lamp: off, as Harness before the sign-in is off");
+        }
+        let on = acts && wanted && harness.is_some();
+        if acts {
+            hermes::at_start(&config.root, &records, on, lamp_update::records::unix_ms());
+        }
+        // Off, a `serve` that acts still takes out what an earlier install
+        // left for lampos to run (its wrapper and namespace script).
+        acts.then_some(on)
+    };
     // `update/status` (#2194): where each round is, and how the last ended,
     // only for a round that acts; Harness's record looked at often only
     // with its switch on.
@@ -940,6 +960,28 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                         Some(bus_root.as_path()),
                     )
                 },
+                &mut say,
+            );
+            if hermes == Some(true) {
+                lamp_update::hermes_install::after_round(
+                    &config.root,
+                    &records,
+                    &mut systemd,
+                    lamp_update::records::unix_ms(),
+                    &mut say,
+                );
+            }
+        }
+        if hermes == Some(false)
+            && !matches!(
+                outcome,
+                Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
+            )
+        {
+            lamp_update::hermes_install::after_round_off(
+                &config.root,
+                &records,
+                &mut systemd,
                 &mut say,
             );
         }

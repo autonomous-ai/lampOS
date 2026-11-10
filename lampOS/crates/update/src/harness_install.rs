@@ -102,13 +102,19 @@ pub const UNIT: &str = "lamp-update-harness.service";
 /// The unit. Not `ProtectSystem=strict`: Harness's home
 /// (`/var/lib/lampos-tasks`) may not be there yet, and is made under
 /// `/var/lib`. `/etc` and `/usr` stay read-only but for `/usr/local/bin`,
-/// where [`install::HARNESS`] is linked. Its bound is past the installer's
-/// own ([`install::INSTALLER_WITHIN`]) and the steps around it.
+/// where [`install::HARNESS`] is linked and Hermes's wrapper is written,
+/// and `/usr/local/lib/lampos`, where Hermes's namespace script is
+/// (#5978, [`crate::hermes_install`]; `-`: a lamp without that folder
+/// still installs Harness). Its bound is past Harness's installer
+/// ([`install::INSTALLER_WITHIN`]) and the steps around it, with Hermes
+/// after it: an hour.
 pub const TEXT: &str = "\
 # lamp-update-harness: puts Harness on the lamp before its sign-in, with Harness's own installer, installed only
 # (lampOS/docs/install.md, \"Harness before the sign-in\", #5197). Written and started by a round of lamp-update
 # with LAMP_HARNESS_AT_ONBOARDING=on, whose own sandbox cannot write /usr/local/bin or Harness's home; never
-# enabled. Outside lampos.target, as lamp-update is.
+# enabled. Outside lampos.target, as lamp-update is. With LAMP_HERMES_ON_LAMP=on it puts the pinned Hermes there
+# after Harness, as lampos, with its wrapper in /usr/local/bin and its namespace script in /usr/local/lib/lampos
+# (lampOS/docs/install.md, \"Hermes on the lamp\", #5978).
 [Unit]
 Description=lampOS updates, Harness put on the lamp (lamp-update-harness)
 After=network-online.target
@@ -120,10 +126,10 @@ Group=root
 ExecStart=/opt/lampOS/update/current/lamp-update harness-install
 StandardInput=null
 SyslogIdentifier=lamp-update-harness
-TimeoutStartSec=1500
+TimeoutStartSec=3600
 NoNewPrivileges=yes
 ProtectSystem=full
-ReadWritePaths=/usr/local/bin
+ReadWritePaths=/usr/local/bin -/usr/local/lib/lampos
 ProtectHome=yes
 PrivateTmp=yes
 ";
@@ -255,7 +261,7 @@ fn failed(at_unix_ms: u64, pinned: Option<bool>, error: &str) -> HarnessInstall 
 /// Harness at [`HARNESS`], its link followed: a link whose target is gone
 /// is missing, so a round puts Harness there again (#5241's reader). An
 /// absolute target is read under `root`, as the lamp's own `/` is.
-fn present(root: &Path) -> bool {
+pub fn present(root: &Path) -> bool {
     let place = root.join(HARNESS.trim_start_matches('/'));
     match fs::read_link(&place) {
         Ok(target) if target.is_absolute() => {
@@ -508,7 +514,7 @@ fn ask_upgrade(
 /// [`TEXT`] written at [`UNIT`] unless it is there, systemd reloaded if
 /// it was, what systemd loaded checked to be it, and the unit started
 /// without waiting for its end.
-fn start(root: &Path, systemd: &mut dyn Systemd) -> Result<(), String> {
+pub(crate) fn start(root: &Path, systemd: &mut dyn Systemd) -> Result<(), String> {
     if crate::writer_unit::write_unit(root, UNIT, TEXT)? {
         systemd.reload()?;
     }

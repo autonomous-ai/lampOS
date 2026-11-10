@@ -1209,8 +1209,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      fixed one-shot `lamp-update-harness.service` in `/etc/systemd/system`,
      checks what systemd loaded is that file alone, and starts it with
      `--no-block`. Neither the round nor the onboarding waits for Harness's
-     download. The unit (`ProtectSystem=full`, `ReadWritePaths=/usr/local/bin`,
-     `TimeoutStartSec=1500`, never enabled) runs `lamp-update
+     download. The unit (`ProtectSystem=full`, `ReadWritePaths=/usr/local/bin
+     -/usr/local/lib/lampos` and `TimeoutStartSec=3600` since #5978, which
+     runs Hermes after Harness, never enabled) runs `lamp-update
      harness-install`: `harness-on`'s install steps above, then `harness
      version` and `systemctl restart lamp-tasks.service`. One install at a
      time (`harness.lock` in the records).
@@ -1420,6 +1421,202 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the real installer, and a first onboarding with the switch on.
      `lamp-update.service` is never switched by a round, so the switch
      reaches a lamp by a drop-in or a new image.
+
+   **Hermes on the lamp** (#5978;
+   `crates/update/src/hermes_install.rs`; `LAMP_HERMES_ON_LAMP` in
+   `lamp-update.service`'s environment: set, on only when `on` exactly, so
+   `off` turns it off on a product lamp too; unset, on on a lamp installed
+   as the product, the build's default `PRODUCT_DEFAULT` (on, the owner's
+   call, as Harness's), and off on any other lamp). Hermes (NousResearch
+   hermes-agent) is a coding agent Harness already knows as an engine.
+   Harness finds an engine only by `command -v` in its user's login shell,
+   so a `hermes` on `lampos`'s login `PATH` is all it needs: the wrapper
+   `/usr/local/bin/hermes`. Nothing is done by hand on the lamp: a fresh
+   install, an update from an older build and a try after a failure all
+   take the same steps.
+   - **Rides on Harness's install:** read only by a `serve` that acts with
+     Harness before the sign-in on too. With that off, Hermes is off as
+     well, journaled `Hermes on the lamp: off, as Harness before the
+     sign-in is off`.
+   - **When:** after each reached round, right after Harness's own step,
+     while Hermes is not there as this build puts it: `hermes` in its
+     folder, its checkout at the pinned commit (read from the checkout's
+     `.git/HEAD`), and the wrapper and the namespace script holding this
+     build's text. One of them missing or different is Hermes missing. The
+     round writes `hermes-ask.json` in the records. With Harness there, it
+     records `installing` and starts `lamp-update-harness.service` itself,
+     without waiting. With Harness missing it starts nothing: the one-shot
+     Harness's step started installs Hermes right after Harness, in the
+     same run, and the record stays `absent` until then.
+   - **The one-shot:** `lamp-update harness-install` runs Harness's install
+     when Harness is missing (started for Hermes alone, Harness's record is
+     left as it is), then Hermes's when the ask is there, whatever
+     Harness's install did. The unit's result is Harness's alone: a Hermes
+     failure is journaled and recorded, never the unit's, and never stops
+     Harness or the round. The ask is removed once answered. One Hermes
+     install at a time (`hermes.lock`).
+   - **As `lampos`, Harness's own user,** so Harness's hooks in Hermes's
+     `config.yaml` and its reading of Hermes's sessions work. No other
+     user, no group, no sudo. Hermes's folder is `/var/lib/lampos-hermes`,
+     made `lampos:lampos` 0700 by `install -d` before the installer runs;
+     Hermes's own home (`HERMES_HOME`) is `/var/lib/lampos-hermes/.hermes`,
+     the folder lamp-tasks and Harness's hold file name. Every step of the
+     installer runs as `runuser -u lampos -- env HOME=/var/lib/lampos-hermes
+     HERMES_HOME=/var/lib/lampos-hermes/.hermes PATH=/usr/bin:/bin
+     SHELL=/bin/sh`, so every file it writes, `config.yaml` among them, is
+     `lampos`'s. Its checkout (`.hermes/hermes-agent`), its `uv`, its
+     Python and its dependencies are all under the folder. The lamp has no
+     Python: the installer's `venv` stage fetches its own pinned `uv`
+     (checked by its SHA-256 in the checkout's `pm/lock.json`) and a
+     uv-managed Python, and its package manager installs the dependencies
+     from the checkout's hash-locked `uv.lock`. `hermes` is published at
+     `/var/lib/lampos-hermes/.local/bin/hermes`, on no `PATH`. No unit, no
+     service, no gateway, nothing at boot: Harness starts `hermes` in a
+     pane only when a task is sent to it.
+   - **In a namespace that hides the relay key.** As plain `lampos`, the
+     commands Hermes runs could read lamp-cloud's relay key (its systemd
+     credential under `/run/credentials`, and lamp-cloud's state folder).
+     So Hermes is never run but through two root-owned scripts, 0755, each
+     written whole beside and renamed in, never through a link:
+     - the wrapper `/usr/local/bin/hermes` reads lamp-cloud's local
+       forwarder token, `/var/lib/lampos-cloud/hermes-token` (lamp-cloud
+       makes it, 0600, with `LAMP_HERMES_ON_LAMP=on` in its unit). Missing
+       or empty, it says so and ends with 1, running nothing. Else it
+       exports `LAMP_HERMES_TOKEN` (the variable Hermes's `providers.lamp`
+       reads its key from, as lamp-tasks writes it) and `HERMES_HOME`, and
+       runs `unshare --map-root-user --mount --propagation private
+       /usr/local/lib/lampos/hermes-ns`;
+     - the namespace script `/usr/local/lib/lampos/hermes-ns` refuses to
+       run in the lamp's own user namespace (its `uid_map` the whole
+       range), mounts an empty read-only tmpfs (`size=4k,mode=0555`) over
+       `/run/credentials` (when there) and over `/var/lib/lampos-cloud`,
+       and runs `unshare --user --map-user=<caller's uid>
+       --map-group=<caller's gid> /var/lib/lampos-hermes/.local/bin/hermes`.
+       In that nested user namespace the mounts are locked: Hermes cannot
+       take them off. Any step failing ends it before Hermes runs.
+     Shown on lamp-c0a4 by hand (10 Nov, the same scripts): the key hidden;
+     lamp-cloud's `/proc/<pid>/root`, `environ` and `mem` refused; none of
+     its file descriptors openable; `umount` refused, nested too. The relay
+     key never goes into Hermes's environment or its folder; only the
+     forwarder's token does (Hermes keeps snapshots of its shell's
+     environment under its home).
+   - **User namespaces checked first:** before anything is made, `lampos`
+     must be able to make that namespace: `runuser -u lampos --
+     /usr/bin/unshare --map-root-user --mount --propagation private
+     /usr/bin/unshare --user --map-user=<uid> --map-group=<gid> true`. It
+     failing is `no_userns`, said with the reason, and nothing is
+     installed: Hermes never runs where it could read the key. lamp-c0a4
+     had kernel 5.15, `user.max_user_namespaces` 15294 and
+     `/usr/bin/unshare`.
+   - **Hermes's own update and lingering turned off:** after the install,
+     as `lampos`, `hermes config set` (Hermes's own writer, which changes
+     that key alone and keeps every other line, Harness's `hooks:` block
+     among them) sets `updates.check false` (no update check of its own,
+     so nothing offers a Hermes past the pin; Hermes applies no update
+     unless `hermes update` is run by hand), `plugins.auto_update_check_hours
+     0`, `lsp.enabled false` (no language servers, which Hermes otherwise
+     starts after an edit and keeps 600 s idle) and
+     `terminal.oneshot_completion_wait_seconds 0` (a `chat -q` run ends
+     with its turn, not up to 600 s later). Its messaging gateway is never
+     installed or started: the installer's `gateway` stage is not run, and
+     nothing runs `hermes gateway`. One not set is `config`. Then
+     `hermes --version` is run as `lampos`, and its first line journaled;
+     failing, `installer`.
+   - **Another Hermes moved aside:** a Hermes in `/var/lib/lampos-hermes`
+     that is not this build's (its checkout at another commit or on a
+     branch, a `hermes` with no checkout at a commit, or the folder
+     another user's) is moved whole to `/var/lib/lampos-hermes.old` before
+     the install, after the free-space check, and removed once the new
+     Hermes has run. A failed install keeps it there; a later try that
+     finds another one in the folder with one aside already removes that
+     one instead. A link at the folder is removed, never followed. A
+     checkout at the pinned commit left by a try that was cut off is kept:
+     the installer repairs it in place.
+   - **Then, in this order:** the namespace script, then the wrapper (so
+     `lampos` never finds a wrapper before what it runs); any not written,
+     or no `/usr/local/lib/lampos` folder, is `entry`. Then the old Hermes
+     removed, and, after an install that ran the installer,
+     `systemctl try-restart lamp-tasks.service`: lamp-tasks merges Hermes's
+     settings at its start (the forwarder as its provider, the lamp's
+     skills), and is started only if it was running. Hermes there at the
+     pin with an older build's wrapper gets its config and both scripts
+     again, with no installer and no restart.
+   - **The one-shot's sandbox:** `ReadWritePaths=/usr/local/bin
+     -/usr/local/lib/lampos` (since #5978; `-`, so a lamp without that
+     folder still installs Harness), `ProtectSystem=full` (so `/var` is
+     writable for Hermes's folder), `TimeoutStartSec=3600`, for Harness's
+     install as well. `/etc` is not writable.
+   - **Taken out:** a failed install takes the wrapper and the namespace
+     script out, the wrapper first, so `lampos` finds no `hermes`. With the
+     switch off, a reached round that finds either writes the ask with
+     `"remove": true` and starts the one-shot, which takes them out with
+     the record and runs nothing else. Hermes's folder stays.
+   - **Pinned:** the installer of hermes-agent's tag `v0.22.2`
+     (`scripts/install.sh` at the pinned commit) is compiled in, a
+     byte-for-byte copy at `deploy/hermes/install-v0.22.2-f4cdb0e2.sh`,
+     with its SHA-256 (`INSTALLER_SHA256`, `f4cdb0e2…`). It is checked
+     before anything runs, written as `hermes-install.sh` in a new folder
+     under the one-shot's private `/tmp` (root's, folder 0755, file 0644),
+     checked again, run with `bash`, and removed after; other bytes are
+     `pin_mismatch` and nothing runs. The commit is the tag `v0.22.2`,
+     `d923a5eb487a17c0a68801bba9ef0f56c81040a8` on `main` (`COMMIT`),
+     passed as the installer's own pin, `--branch main --commit <COMMIT>`:
+     the installer checks the commit is on `main`, checks it out detached,
+     and looks up no release. After it, the checkout's commit is read;
+     another is `failed` with `version`. Why 0.22.2: Harness takes no
+     session id of Hermes 0.22.3 or later until openharness main's fix is
+     in a Harness release. A new Hermes is a PR that copies the installer
+     again and updates `COMMIT`, `VERSION` and `INSTALLER_SHA256`; a test
+     holds them to the file. Harness's Hermes binding needs Harness 0.5.98
+     or later; this build's Harness pin is still 0.5.39
+     (`harness_install::product::VERSION`), so the pin must move in the
+     same release (#5957).
+   - **The stages:** `prerequisites repository venv python-deps config
+     products`, each run alone (`--stage`) with `--non-interactive
+     --skip-browser --skip-computer-use`, each stage's time journaled.
+     Version 1's list (`runtimes/hermes/install.sh` in the autonomous
+     repo) skipped `node-deps`, which hung on ARM; this installer has no
+     such stage: its `products` stage publishes the command, and Node's
+     tools come through its package manager only as a build asks for them.
+     `setup` and `gateway` need a person and are not run; `complete` writes
+     only a marker. Each stage has the installer's 15-min bound
+     (`INSTALLER_WITHIN`); the unit's is an hour for Harness and Hermes
+     together.
+   - **Free space first:** before anything is moved or made, `df -Pk
+     /var/lib` must show at least 4 GiB available (`NEEDS_FREE_KB`); less,
+     or `df` not read, is `no_space` and nothing is changed. Hermes v0.22.2
+     took 3.0 GB on lamp-c0a4.
+   - **What the lamp must have:** `git`, `curl` and `bash`, looked for as
+     `lampos` with the install's `PATH`, and `/usr/bin/unshare`, before the
+     installer runs (`no_tools` otherwise). Nothing is added to the system
+     for them.
+   - **The record:** `hermes-install.json` in the records, next to
+     Harness's, `{"install", "revision", "at_unix_ms", "version"?,
+     "commit"?, "error"?}`, lamp-update's own (not on `update/status`
+     yet). `install` is `absent`, `installing`, `installed` or `failed`;
+     `error` one of `pin_mismatch`, `no_user`, `no_space`, `no_tools`,
+     `no_userns`, `serve` (one of lamp-update's own steps: the installer's
+     file, moving the old Hermes aside, making the folder), `timeout`,
+     `installer`, `version`, `config`, `entry`, `not_started`; `version`
+     and `commit` with `installed`. Switch off, `serve` removes the record
+     and the ask at its start; the entry points go as above.
+   - **Tried again** by the first reached round 24 h after a failure
+     (`RETRY_AFTER`), or after `installing` for over 70 min; `serve` and
+     `not_started` at the next round.
+   - **The parts' units** (`deploy/product`): `lamp-tasks.service` has
+     `LAMP_HERMES_ON_LAMP=on` with `--engines-from-machines` (without it
+     the lamp's own Hermes is never looked for, and the lamp is no target)
+     and `--reply-named`; lamp-tasks keeps the lamp a target only while
+     Harness's look at the lamp says Hermes is installed, so a lamp with
+     the switch off in lamp-update hands over as before.
+     `lamp-cloud.service` has `LAMP_HERMES_ON_LAMP=on` for its forwarder;
+     it writes only its own state folder, so it needs no other path and no
+     group. `lamp-voice.service` has `LAMP_TASKS_REPLY_NAMED=on`.
+   - **Shown only in tests** (`hermes_install::tests`, the wrapper and the
+     namespace script run by `sh` there too). Not run on a lamp yet: the
+     whole install by lamp-update. Measured by hand on lamp-c0a4 (10 Nov,
+     the same installer as `lampos`, the same six stages): 557 s in all,
+     +3.0 GB, inside each stage's 15-min bound and the unit's hour.
 
    **Undone by `lamp-update harness-off`** (as root, #811; the first
    builder's yes on #705, 18 Oct): with that record, as `lampos` with the
