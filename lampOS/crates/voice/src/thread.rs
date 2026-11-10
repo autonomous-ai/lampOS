@@ -1190,6 +1190,9 @@ impl Thread {
     /// said about it is not to be told to the next session.
     pub fn forget(&mut self) {
         crate::conversation_summary::forget_all();
+        // The write waiting for its send goes with what was said of it
+        // (Thirteen's P2 on #5968).
+        crate::services::forget_waiting();
         self.exchanges.clear();
         self.lines.clear();
         self.calling.clear();

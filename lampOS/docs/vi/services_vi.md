@@ -713,25 +713,30 @@ this change"). Mọi 401 hoặc 403 khác giữ lời của nó.
 Mô hình được nói về `service_write`, trước tiên trong mô tả của nó
 (`WRITE_RULE`, rồi đến luật mà mọi hàm dịch vụ đều có, ở dưới):
 "Only when the person asks you, now, to send or post something; an ask to
-draft, write, compose or reply to a mail or message is one. No draft is
-saved; nothing goes before they say send: say so. Call it first without
-send_id: it sends nothing and gives a read_back. Say that read_back in full,
-word for word, then ask them to say "go ahead and send it" to send it. Call
-it again with its send_id only if their very next words are that; anything
-else cancels it. Never say a read-back yourself: only one this call gave in
-the same turn, and a new write, or the same one asked again, needs a new
-call. Never say you can't use their services: refuse only for a reason a
-call gave."
+draft, write or reply to a mail or message is one, never a remember. No
+draft yet: say "I can't save a draft yet. I can read it back and send it when
+you say 'send it'." Call it first without send_id: it sends nothing and gives
+a read_back. Say that read_back in full, word for word, then ask for "send
+it". Call it again with its send_id only if their very next words are that;
+anything else cancels it. Never say a read-back yourself: only one this call
+gave in this turn; a new write, or the same one again, needs a new call.
+Never say you can't use their services: refuse only for a reason a call
+gave."
 
-Một yêu cầu soạn nháp thư là một yêu cầu gửi nó: Gmail không có nháp (chỉ có
-`send_mail`), nên một yêu cầu như vậy được chuẩn bị và đọc lại như mọi lệnh
-ghi, và không gì được lưu thành nháp. Trên lamp-29e7 ngày 9 tháng 11, "Draft a
-new email for me" bị từ chối mà không có lệnh gọi nào ("I cannot touch your
-mail") và, khi được hỏi tại sao, "Because I'm a lamp."; luật không nói gì về
-nháp, cũng không nói lý do của một lời từ chối đến từ đâu. Toàn bộ luật cùng
-luật chung là 998 trong 1,024 byte của mô tả, chừa 25 byte cho lời riêng của
-`lamp-services` cho hàm ghi: chỉ những câu trọn vẹn, nên danh sách "action,
-by service: …" của nó được nói trên tham số `action`.
+Một yêu cầu soạn nháp thư là một yêu cầu gửi nó, và được nói thẳng là chưa
+có nháp: ở đây Gmail không có nháp (chỉ có `send_mail`; một nháp thật cần
+scope `gmail.compose`, một thay đổi backend làm riêng ngoài #5962), nên một
+yêu cầu như vậy được chuẩn bị và đọc lại như mọi lệnh ghi, không gì được lưu
+thành nháp, và người đó được nói "I can't save a draft yet. I can read it back
+and send it when you say 'send it'." Nó không bao giờ là một `remember`: trên
+lamp-3e83 ngày 10 tháng 11, mô hình gọi `remember` ba lần cho một bản nháp
+trước khi ghi, và bản nháp kết thúc bằng "shall I send it?". Trên lamp-29e7
+ngày 9 tháng 11, "Draft a new email for me" bị từ chối mà không có lệnh gọi nào
+("I cannot touch your mail") và, khi được hỏi tại sao, "Because I'm a lamp.";
+luật không nói gì về nháp, cũng không nói lý do của một lời từ chối đến từ
+đâu. Toàn bộ luật cùng luật chung là 1,000 trong 1,024 byte của mô tả, chừa 23
+byte cho lời riêng của `lamp-services` cho hàm ghi: chỉ những câu trọn vẹn,
+nên danh sách "action, by service: …" của nó được nói trên tham số `action`.
 
 ### Cổng gửi của giọng nói
 
@@ -760,7 +765,7 @@ by service: …" của nó được nói trên tham số `action`.
   lần ghi đang chờ bị quên trước. Khi câu trả lời có `read_back` và `send_id`,
   id đó được giữ cùng với yêu cầu mà nó đến, phần đọc lại, và chủ đèn đã yêu
   cầu, và mô hình được báo "Nothing is sent yet. Say read_back in full, word
-  for word, leaving nothing out, then ask them to say "go ahead and send it"
+  for word, leaving nothing out, then ask them to say "send it"
   (in Vietnamese "ừ, gửi đi giúp tôi") to send it. Send only if their next
   words are that."; một id không có phần đọc lại bị bỏ và không
   bao giờ được gửi.
@@ -809,7 +814,13 @@ by service: …" của nó được nói trên tham số `action`.
   người đã yêu cầu nói khi biết người nói là ai; mọi câu "Cancel that." khác
   là của mô hình. Khi biết người nói (`speaker_of`: ngoài phòng riêng là
   khuôn mặt đã biết của câu, của chủ hay của người khác, nên câu "Cancel."
-  của một người khác đã biết là của mô hình; trong phòng riêng là chủ). Trên
+  hay "go ahead" của một người khác đã biết là của mô hình; trong phòng
+  riêng là chủ). Một lần quên (của luồng, bằng giọng nói; `memory/forgot` của bộ nhớ cho
+  bất kỳ ai, dù bật hay tắt tóm tắt hội thoại: khi tắt là bộ đọc riêng của
+  worker, `memory_forgot_waiting`) hay một thay đổi riêng tư của camera hoặc
+  micro bỏ thư đang chờ (`forget_waiting`). Ghi chú về thư đang chờ lấy
+  trước đó bị bỏ ở mọi lần đèn hỏi mô hình, ở mọi vòng hay lần thử
+  (`LettingGo`, `waiting_note_stands`, so chữ của ghi chú với thư còn chờ). Trên
   lamp-9adf ngày 10/11, câu "Lamp, cancel that." sau phần đọc lại được trả
   lời "Cancel what exactly? I have several things set", không có lệnh gọi
   nào: mô hình cân nó với các nhắc việc của đèn. Giờ, khi một lệnh ghi của
@@ -828,6 +839,30 @@ by service: …" của nó được nói trên tham số `action`.
   trả lời của người đó cho phần đọc lại, không bao giờ bị giữ như một âm
   ngắn (`services::cancel_awaited`, như với một câu gửi trơn: chỉ câu bắt
   đầu không đè lên giọng của đèn).
+- **Một câu "go ahead" trơn ngay sau phần đọc lại giữ lệnh ghi** (#5962).
+  Trên lamp-3e83 ngày 10/11, "ok, go ahead" sau phần đọc lại không phải câu
+  gửi cũng không phải câu huỷ, mô hình trả lời "go ahead with what?", và lệnh
+  ghi bị mất. Giờ một câu mà lời là một lời đồng ý trơn (`GO_AHEAD_WORDS`:
+  "go ahead", "do it", "sounds good", "that's right", "được rồi" và tương
+  tự, hay chỉ từ đệm: "Yes.", "Okay."), là câu ngay sau một phần đọc lại
+  được nói trọn và không bị cắt, khi câu "send" vẫn còn kịp, sẽ giữ lệnh ghi
+  chờ (`services::nudge_waiting`): route thứ hai nói câu của chính đèn, không
+  hỏi chat, "Say 'send it' to send it." (`SAY_SEND_IT`, hay "Nói 'gửi đi'
+  để gửi nhé." với lời tiếng Việt), và câu "send" được tính giờ từ đó, như
+  sau khi đèn hỏi lại một lần. Mỗi lệnh ghi một lần. Nó không bao giờ gửi:
+  "go ahead" một mình vẫn không phải câu gửi. Một câu trơn như vậy là câu
+  trả lời của người đó cho phần đọc lại, như một câu huỷ trơn
+  (`services::cancel_awaited`). Journal ghi "a go-ahead for the waiting
+  write".
+- **Mỗi lượt sau được nói lệnh ghi đang chờ** (#5962). Lịch sử giữ tên một
+  lệnh gọi, không bao giờ giữ câu trả lời của nó, và phía đèn chỉ giữ 400 byte
+  đầu, nên đuôi của một phần đọc lại dài bị mất và mô hình hỏi lại những gì
+  nó đã được nói. Khi một lệnh ghi đang chờ (tối đa 2 phút), ghi chú của mỗi
+  lượt sau mang nó, chỉ trong bộ nhớ, cùng lệnh ghi (`services::waiting_note`):
+  dịch vụ của nó và toàn bộ phần đọc lại (tối đa 1,500 byte), rằng chỉ một
+  câu "send it" trơn mới gửi nó, và rằng một thay đổi là một `service_write`
+  mới với toàn bộ thư đã đổi, không bao giờ hỏi lại điều nó đã giữ. Kết quả
+  đọc vẫn riêng tư như trước.
 - **Điểm giọng của câu gửi được ghi vào journal**: "a send's voice beside
   request N's: cosine 0.64" (hoặc "no print"), chỉ là điểm, không bao giờ là
   dấu giọng.
