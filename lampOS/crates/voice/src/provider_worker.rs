@@ -898,6 +898,16 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// Whether the walk is under way (`onboarding::set_under_way`), told
+    /// the worker with each turn in hand while it is, and once as it ends:
+    /// the second route's replies drop the walk's step words in its own
+    /// process, which never reads the coordinator's (#5931). The Live
+    /// worker takes nothing from it.
+    WalkUnderWay {
+        request: u64,
+        privacy_generation: u64,
+        on: bool,
+    },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.
     Written {
@@ -956,6 +966,7 @@ impl ProviderInput {
             | Self::StepCall { request, .. }
             | Self::Onboarding { request, .. }
             | Self::TurnOpened { request, .. }
+            | Self::WalkUnderWay { request, .. }
             | Self::WokenByName { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
@@ -994,6 +1005,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::TurnOpened {
+                privacy_generation, ..
+            }
+            | Self::WalkUnderWay {
                 privacy_generation, ..
             }
             | Self::WokenByName {
@@ -6560,6 +6574,8 @@ impl InputHandoff {
             ProviderInput::PauseJoin { .. } => {}
             // The second route's (`LAMP_STOP_WORDS_COMMIT_WAITS`).
             ProviderInput::StopWords { .. } => {}
+            // The second route's (#5931).
+            ProviderInput::WalkUnderWay { .. } => {}
             // Onboarding's sentence (#1803): from now its words and the
             // answer to it are kept out of the thread.
             ProviderInput::CountOnly { .. } => {

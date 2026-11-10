@@ -191,6 +191,7 @@ impl CloudRequest {
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
             | ProviderInput::TurnOpened { .. }
+            | ProviderInput::WalkUnderWay { .. }
             | ProviderInput::WokenByName { .. }
             | ProviderInput::End { .. }
                 if self.start_submitted && !self.input_end_submitted =>
@@ -224,6 +225,7 @@ impl CloudRequest {
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
             | ProviderInput::TurnOpened { .. }
+            | ProviderInput::WalkUnderWay { .. }
             | ProviderInput::WokenByName { .. } => {}
             ProviderInput::Written { .. } | ProviderInput::Reminder { .. } => {
                 self.start_submitted = true;
