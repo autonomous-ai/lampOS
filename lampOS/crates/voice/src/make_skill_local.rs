@@ -379,7 +379,65 @@ pub fn make_with(
         .as_ref()
         .map(|made| made_skill::put_on(keeping, made))
         .unwrap_or(Ok(()));
+    MADE_LINE.with(|kept| kept.replace(Some(said_line(&made, &on))));
     told(made, on, needs.as_deref())
+}
+
+std::thread_local! {
+    /// The line of the make [`make_with`] last finished on this thread
+    /// ([`said_line`]), until [`take_said_line`] takes it.
+    static MADE_LINE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The line the lamp says of the make just finished on this thread, for
+/// a caller that gave it no turn to say it in (lamp-9adf, 11 Nov 02:16
+/// and 02:19: a wordless cut ended the turn waiting on `make_skill`, the
+/// skill was made and put on, and its line was never said): made and on
+/// ([`made_skill::on_line`]), made and not on ([`made_skill::not_on_line`]),
+/// or not made ([`made_skill::not_made_line`]). None when no make finished
+/// here since the last take (not asked aloud, the brief refused).
+pub fn take_said_line() -> Option<String> {
+    MADE_LINE.with(|kept| kept.take())
+}
+
+/// The one short line of a make that kept `made`, `on` or not; or not
+/// made and why: the line [`told`] gives the model, as written.
+fn said_line(made: &Result<Made, Refused>, on: &Result<(), String>) -> String {
+    match (made, on) {
+        (Ok(made), Ok(())) => made_skill::on_line(made),
+        (Ok(_), Err(why)) => made_skill::not_on_line(why),
+        (Err(Refused(why, _)), _) => made_skill::not_made_line(why),
+    }
+}
+
+/// How many voice makes are under way in this process, or have a line
+/// still being said for a turn that was cut ([`Pending`]).
+static PENDING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// One voice make under way, from its call until its line was given to
+/// its turn or, its turn cut, said through the say service: dropped then.
+/// While any is held, and at most [`MAKE_WITHIN`] after the make's call
+/// (the second route's `Shared::quiet_for_a_make`), a wordless cut-in is
+/// not asked "did anyone say something?" ([`pending`]).
+pub struct Pending(());
+
+impl Pending {
+    pub fn begin() -> Self {
+        PENDING.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        Self(())
+    }
+}
+
+impl Drop for Pending {
+    fn drop(&mut self) {
+        PENDING.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
+}
+
+/// Whether a voice make is under way, or its line is still to be said
+/// ([`Pending`]).
+pub fn pending() -> bool {
+    PENDING.load(std::sync::atomic::Ordering::Acquire) > 0
 }
 
 /// The skill for `request` (its `brief` made already) written by the
@@ -521,16 +579,13 @@ fn ask(
 /// to tell them after the line in its own words and the conversation's
 /// language ([`made_skill::needs_link_ask`]), never a fixed sentence.
 fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Value]>) -> Value {
+    let line = said_line(&made, &on);
     match made {
         Ok(made) => {
             let link = needs
                 .and_then(made_skill::needs_link_ask)
                 .map(|ask| format!(" {ask}"))
                 .unwrap_or_default();
-            let line = match &on {
-                Ok(()) => made_skill::on_line(&made),
-                Err(why) => made_skill::not_on_line(why),
-            };
             let mut told = json!({
                 "made": made.name,
                 "on": on.is_ok(),
@@ -554,7 +609,7 @@ fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Val
         // instead, or the lamp's own plain reason.
         Err(Refused(why, _)) => json!({
             "error": format!("the skill couldn't be made: {why}"),
-            "next": made_skill::not_made_in_their_language(&made_skill::not_made_line(&why))
+            "next": made_skill::not_made_in_their_language(&line)
         }),
     }
 }
@@ -1052,6 +1107,15 @@ light = { dim = 1 }
             )
         );
         assert!(!told["next"].as_str().unwrap().contains("Say exactly"));
+        // The same line, as written, for a turn cut while it was made
+        // (lamp-9adf, 11 Nov): taken once.
+        assert_eq!(
+            take_said_line().as_deref(),
+            Some(
+                "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking."
+            )
+        );
+        assert_eq!(take_said_line(), None);
         assert!(!told.to_string().contains("Shall I"), "{told}");
         assert!(told["uses"].as_str().unwrap().contains("light"), "{told}");
         let entry = &made_skill::entries(&keeping.directory)[0];
@@ -1079,6 +1143,10 @@ light = { dim = 1 }
                     "I made it but couldn't put it on: the lamp's skills couldn't be reached."
                 )
             )
+        );
+        assert_eq!(
+            take_said_line().as_deref(),
+            Some("I made it but couldn't put it on: the lamp's skills couldn't be reached.")
         );
         assert!(!any_on(&keeping.directory));
         assert_eq!(served.join().unwrap(), 1);
@@ -1150,6 +1218,10 @@ light = { dim = 1 }
             made_skill::not_made_in_their_language(
                 "I couldn't make that: a skill can't hear what is said."
             )
+        );
+        assert_eq!(
+            take_said_line().as_deref(),
+            Some("I couldn't make that: a skill can't hear what is said.")
         );
         assert_eq!(served.join().unwrap(), 1);
         assert!(made_skill::entries(&keeping.directory).is_empty());

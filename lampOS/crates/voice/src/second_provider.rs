@@ -1559,6 +1559,13 @@ struct Shared {
     wordless_resumes: bool,
     /// The run of wordless cuts, by the engine's clock (`LAMP_CUT_IN_WORDLESS_RESUMES`).
     wordless_cuts: Mutex<crate::cut_in_wordless::Cuts>,
+    /// The newest request whose turn called [`crate::made_skill::MAKE`],
+    /// and when, by the engine's clock: while that make is under way, or its
+    /// line is still to be said ([`crate::make_skill_local::pending`]), and
+    /// at most [`crate::make_skill_local::MAKE_WITHIN`] after the call, a
+    /// wordless cut of a later line is never asked
+    /// [`crate::cut_in_wordless::LINE`] ([`Shared::quiet_for_a_make`]).
+    made_by: Mutex<Option<(u64, Instant)>>,
     /// The newest line's request and how much of the answer it cut was
     /// played (`Start`'s `heard_of_cut`, `LAMP_SAID_AS_HEARD`).
     /// With when that line began, by the engine's clock: a tail of the
@@ -3542,6 +3549,31 @@ struct WordlessSaid {
 }
 
 impl Shared {
+    /// Whether wordless line `request` is left without
+    /// [`crate::cut_in_wordless::LINE`] because a skill an earlier line
+    /// asked for by voice is still being made, or its line is still to be
+    /// said ([`crate::make_skill_local::pending`]): lamp-9adf, 11 Nov 02:16
+    /// and 02:19, the lamp's own echo cut "I'll make it", and "Um, excuse
+    /// me, did anyone say something?" came in place of the made line.
+    /// Held at most [`crate::make_skill_local::MAKE_WITHIN`] (120 s, the
+    /// longest a make goes on) after its call, by the engine's clock: the
+    /// line's say may wait up to an hour for a good moment, and the question
+    /// is not held that long (the first builder on #6174).
+    fn quiet_for_a_make(&self, request: u64) -> bool {
+        let Some((by, at)) = self.made_by.lock().ok().and_then(|by| *by) else {
+            return false;
+        };
+        let within =
+            (self.clock)().saturating_duration_since(at) < crate::make_skill_local::MAKE_WITHIN;
+        let quiet = by < request && within && crate::make_skill_local::pending();
+        if quiet {
+            eprintln!(
+                "lamp-voice second: request {request}: a cut-in with no words while request {by}'s skill is made, or its line is still to be said: not asked if someone spoke"
+            );
+        }
+        quiet
+    }
+
     /// The fixed line `request`, a wordless line, cut as the same sound's
     /// tail, begun within [`crate::cut_in_wordless::TAIL_WITHIN`] of that
     /// line's start ([`WordlessSaid`]), and how long after.
@@ -3669,6 +3701,7 @@ async fn wordless_cut(
     };
     let line = match chosen.line() {
         Some((crate::cut_in_wordless::LINE, _)) if !shared.wordless_asks => None,
+        Some((crate::cut_in_wordless::LINE, _)) if shared.quiet_for_a_make(request) => None,
         line => line,
     };
     eprintln!(
@@ -4254,6 +4287,7 @@ impl Engine {
                 wordless_asked_at: Mutex::new(None),
                 wordless_resumes: false,
                 wordless_cuts: Mutex::default(),
+                made_by: Mutex::new(None),
                 heard_of_cut: Mutex::new(None),
                 wordless_said: Mutex::new(None),
                 said_whole: Mutex::new(None),
@@ -9395,6 +9429,7 @@ async fn spoken(
             && !echoed
             && heeded.is_none()
             && !shared.busy(request)
+            && !shared.quiet_for_a_make(request)
             && shared.wordless_asked_at.lock().is_ok_and(|mut at| {
                 let now = (shared.clock)();
                 let due = at.is_none_or(|at| {
@@ -15887,6 +15922,13 @@ async fn answer(
                     scope.mark_everything_asked(&EverythingShown(()));
                 }
                 ran_tool.store(true, Ordering::Relaxed);
+                // A skill made by voice: a wordless cut while it is made
+                // is not asked if someone spoke ([`Shared::quiet_for_a_make`]).
+                if call.name == crate::made_skill::MAKE
+                    && let Ok(mut made_by) = shared.made_by.lock()
+                {
+                    *made_by = Some((request, (shared.clock)()));
+                }
                 // An admitted forget (`forget`, `forget_everything`,
                 // `forget_my_face`) ends a rename asked before it now,
                 // before either runner is awaited: neither a scope
