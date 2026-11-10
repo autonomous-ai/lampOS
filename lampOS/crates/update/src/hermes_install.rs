@@ -13,18 +13,24 @@
 //!
 //! **As `lampos`, in a namespace.** Hermes runs as `lampos`, Harness's own
 //! user, so Harness's hooks and its reading of Hermes's sessions work.
-//! Hermes runs shell commands, and as plain `lampos` they could read
-//! lamp-cloud's relay key (its systemd credential, and lamp-cloud's state
-//! folder). So [`WRAPPER`] never starts Hermes but through
+//! Hermes runs shell commands the model chooses, and as plain `lampos` they
+//! could reach every lamp service that runs as `lampos`: lamp-cloud's relay
+//! key, the eyes' sockets (the camera on) and face prints, the body's
+//! motors, the person's tasks, and the camera, mic and serial ports through
+//! `lampos`'s groups. So [`WRAPPER`] never starts Hermes but through
 //! `unshare --map-root-user --mount --pid --kill-child --mount-proc` (its
 //! own PID namespace and `/proc`, so no lamp process, lamp-cloud's
-//! `/proc/<pid>/root` among them, is visible) and [`NS`], which lays an empty
-//! read-only tmpfs over each of [`HIDDEN`] and then drops back to the
-//! caller's own ids in a nested user namespace, where those mounts are
-//! locked. Hermes is given only lamp-cloud's local forwarder token
-//! ([`TOKEN`], as [`TOKEN_ENV`]), never the relay key. Before anything is
-//! installed, the namespace is tried as `lampos` ([`userns_argv`]); a lamp
-//! where it does not work gets nothing, `no_userns`. No unit, no daemon,
+//! `/proc/<pid>/root` among them, is visible) and [`NS`], which shows
+//! Hermes, by an allow-list, only [`ALLOWED`] (its own folder, its work
+//! folder and the skills) over empty read-only tmpfs on each of
+//! [`OVERLAID`] (`/run`, `/var/lib`, `/etc/lampOS`), gives it its own
+//! [`PRIVATE`] (`/tmp`), binds `/dev/null` over the devices of [`DEVICES`],
+//! and then drops back to the caller's own ids in a nested user namespace,
+//! where those mounts are locked. Hermes is given only lamp-cloud's local
+//! forwarder token ([`TOKEN`], as [`TOKEN_ENV`]), never the relay key.
+//! Before anything is installed, the namespace is tried as `lampos`
+//! ([`userns_argv`]); a lamp where it does not work gets nothing,
+//! `no_userns`. No unit, no daemon,
 //! nothing at boot: Harness starts `hermes` in a pane only when a task is
 //! sent to it.
 //!
@@ -130,11 +136,53 @@ pub const TOKEN: &str = "/var/lib/lampos-cloud/hermes-token";
 /// `providers.lamp.key_env`, as lamp-tasks' `hermes_config::TOKEN_ENV`
 /// writes it.
 pub const TOKEN_ENV: &str = "LAMP_HERMES_TOKEN";
-/// What [`NS`] hides from Hermes with an empty read-only tmpfs: systemd's
-/// credentials (lamp-cloud's relay key, `LoadCredential=key`) and
-/// lamp-cloud's state folder (the token's own file, and what else
-/// lamp-cloud keeps).
-pub const HIDDEN: [&str; 2] = ["/run/credentials", "/var/lib/lampos-cloud"];
+/// The folder Harness starts Hermes in, and every folder Harness may make
+/// beside it: Harness's project `~/harnesses/lamp-tasks` in its home
+/// (`lamp_tasks::runtime::MACHINES_PROJECT` under
+/// [`crate::install::HARNESS_HOME`]). lamp-tasks makes its `lamp`
+/// subfolder (with `AGENTS.md`) and Harness starts Hermes there; the
+/// project, not only `lamp`, is shown because Harness names the project
+/// and may start a task in another folder of it. Nothing else of
+/// lamp-tasks' state folder (its `store`, Harness's own files) is.
+pub const WORK: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks";
+/// The lamp's skills, which Hermes reads in place: shown read-only.
+pub const SKILLS: &str = "/var/lib/lampOS/skills";
+/// All [`NS`] shows Hermes of what it lays [`OVERLAID`] over: its own
+/// folder, the work folder and the skills (read-only), plus the file
+/// `/etc/resolv.conf` resolves to when that is under `/run` (read-only,
+/// so names still resolve). An allow-list: a lamp service's runtime or
+/// state folder is hidden unless named here, so a new service is hidden
+/// with no change (`no_lampos_service_folder_is_visible_to_hermes`).
+pub const ALLOWED: [&str; 3] = [PLACE, WORK, SKILLS];
+/// What [`NS`] lays an empty read-only tmpfs over, with only [`ALLOWED`]
+/// put back: every lamp service's sockets and runtime files, systemd's
+/// credentials (lamp-cloud's relay key), every state folder (lamp-cloud's,
+/// with [`TOKEN`], among them) and the lamp's own settings.
+pub const OVERLAID: [&str; 3] = ["/run", "/var/lib", "/etc/lampOS"];
+/// Shared on the lamp, so [`NS`] gives Hermes an empty writable tmpfs of
+/// its own on each.
+pub const PRIVATE: [&str; 3] = ["/tmp", "/var/tmp", "/dev/shm"];
+/// Devices `lampos`'s groups open (`video`, `audio`, `dialout`, `i2c`):
+/// under `--map-root-user` the groups cannot be dropped, so [`NS`] binds
+/// `/dev/null` over each character device these match: cameras, the
+/// microphone and speaker, the servo and other serial ports, I2C, SPI,
+/// GPIO, HID and the display.
+pub const DEVICES: [&str; 14] = [
+    "/dev/video*",
+    "/dev/media*",
+    "/dev/v4l-subdev*",
+    "/dev/snd/*",
+    "/dev/ttyACM*",
+    "/dev/ttyUSB*",
+    "/dev/ttyS*",
+    "/dev/ttyAMA*",
+    "/dev/i2c-*",
+    "/dev/spidev*",
+    "/dev/gpiochip*",
+    "/dev/hidraw*",
+    "/dev/fb*",
+    "/dev/dri/*",
+];
 /// Free space `/var/lib` must hold before an install: Hermes v0.22.2 took
 /// 3.0 GB there on lamp-c0a4, with room to spare.
 pub const NEEDS_FREE_KB: u64 = 4 * 1024 * 1024;
@@ -158,9 +206,9 @@ pub const INSTALL_PATH: &str = "/usr/bin:/bin";
 /// lamp process is there. Nothing else of the caller's changes.
 pub const WRAPPER_TEXT: &str = r#"#!/bin/sh
 # lampOS: Hermes on the lamp (#5978; lampOS/docs/install.md, "Hermes on the lamp"). Written by lamp-update.
-# Hermes runs as its caller (lampos, Harness's user), in a user, mount and PID namespace with its own /proc, where
-# lamp-cloud's credentials and state are hidden and no lamp process is visible; it is given only lamp-cloud's local
-# forwarder token. It is never run any other way.
+# Hermes runs as its caller (lampos, Harness's user), in a user, mount and PID namespace with its own /proc, where it
+# sees only its own folder, its work folder and the skills, no lamp service's files or sockets, no camera, mic or
+# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.
 T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   echo "hermes: no forwarder token at /var/lib/lampos-cloud/hermes-token; lamp-cloud makes it with LAMP_HERMES_ON_LAMP=on" >&2
   exit 1
@@ -172,24 +220,65 @@ exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --
 "#;
 
 /// [`NS`]: only inside a user namespace (refused in the lamp's own, where
-/// it would hide lamp-cloud's files from the whole lamp), it mounts an
-/// empty read-only tmpfs over each of [`HIDDEN`] (the credentials only
-/// when the folder is there), then runs [`HERMES`] as the caller's own ids
-/// in a nested user namespace, where those mounts cannot be undone. Any
-/// step failing ends it before Hermes runs.
+/// it would hide the lamp's files from the whole lamp). An allow-list:
+/// 1. a private tmpfs on each of [`PRIVATE`]; on the new `/tmp`, what
+///    stays visible is staged: [`ALLOWED`] bound there (the work folder
+///    and the skills only when there) and the file `/etc/resolv.conf`
+///    resolves to when it is under `/run`;
+/// 2. an empty tmpfs over each of [`OVERLAID`] (`/etc/lampOS` when there),
+///    the mount points made in it and the staged mounts moved back; the
+///    skills and `resolv.conf` remounted read-only (with the flags they
+///    had, as a user namespace may only add flags), then each overlay;
+/// 3. `/dev/null` bound over each character device of [`DEVICES`];
+/// 4. back into the folder it was started in, now through the new mounts
+///    (the old one would reach the hidden folders by `..`): one not
+///    visible ends it;
+/// 5. [`HERMES`] run with `HOME` its own folder, as the caller's own ids,
+///    in a nested user namespace, where none of these mounts can be undone.
+///
+/// Any step failing ends it before Hermes runs.
 pub const NS_TEXT: &str = r#"#!/bin/sh
 # lampOS: Hermes on the lamp, inside the namespace /usr/local/bin/hermes makes (#5978; lampOS/docs/install.md,
-# "Hermes on the lamp"). Written by lamp-update. Root here only: it hides lamp-cloud's credentials and state, then
-# drops back to the caller's own ids in a nested user namespace, where these mounts are locked.
+# "Hermes on the lamp"). Written by lamp-update. Root here only: it shows Hermes only its own folder, its work folder,
+# the skills (read-only) and resolv.conf over empty read-only /run, /var/lib and /etc/lampOS, gives it its own /tmp,
+# hides the camera, mic and serial devices, then drops back to the caller's own ids in a nested user namespace,
+# where these mounts are locked. Any step failing ends it before Hermes runs.
 read -r _ _ count < /proc/self/uid_map || exit 1
 [ "$count" != 4294967295 ] || { echo "hermes-ns: only inside the namespace /usr/local/bin/hermes makes" >&2; exit 1; }
 [ -n "${LAMP_NS_UID-}" ] && [ -n "${LAMP_NS_GID-}" ] || exit 1
-if [ -e /run/credentials ]; then
-  mount -t tmpfs -o size=4k,mode=0555 none /run/credentials || exit 1
-fi
-mount -t tmpfs -o size=4k,mode=0555 none /var/lib/lampos-cloud || exit 1
-U=$LAMP_NS_UID G=$LAMP_NS_GID
+H=/var/lib/lampos-hermes W=/var/lib/lampos-tasks/harnesses/lamp-tasks K=/var/lib/lampOS/skills S=/tmp/.lampos-ns
+D=$(pwd -P) || exit 1
+R=$(readlink -f /etc/resolv.conf) || R=
+case $R in /run/?*) [ -f "$R" ] || R= ;; *) R= ;; esac
+fail() { echo "hermes-ns: $1" >&2; exit 1; }
+ro() { O=$(findmnt -no VFS-OPTIONS -M "$1") || fail "no mount at $1"; O=${O#r[ow]}; mount -o "remount,bind,ro$O" "$1" || fail "$1 not read-only"; }
+mount -t tmpfs -o size=256m,mode=1777,nosuid,nodev none /tmp || fail "no /tmp"
+mount -t tmpfs -o size=64m,mode=1777,nosuid,nodev none /var/tmp || fail "no /var/tmp"
+if [ -d /dev/shm ]; then mount -t tmpfs -o size=64m,mode=1777,nosuid,nodev none /dev/shm || fail "no /dev/shm"; fi
+mkdir -m 0700 "$S" "$S/h" "$S/w" "$S/k" || fail "no staging"
+mount --bind "$H" "$S/h" || fail "no $H"
+if [ -d "$W" ]; then mount --bind "$W" "$S/w" || fail "no $W"; else W=; fi
+if [ -d "$K" ]; then mount --bind "$K" "$S/k" || fail "no $K"; else K=; fi
+if [ -n "$R" ]; then touch "$S/r" && mount --bind "$R" "$S/r" || fail "no $R"; fi
+mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none /run || fail "/run not hidden"
+mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none /var/lib || fail "/var/lib not hidden"
+if [ -d /etc/lampOS ]; then mount -t tmpfs -o size=4k,mode=0555,nosuid,nodev,noexec none /etc/lampOS || fail "/etc/lampOS not hidden"; fi
+mkdir -p "$H" && mount --move "$S/h" "$H" || fail "$H not shown"
+if [ -n "$W" ]; then mkdir -p "$W" && mount --move "$S/w" "$W" || fail "$W not shown"; fi
+if [ -n "$K" ]; then mkdir -p "$K" && mount --move "$S/k" "$K" && ro "$K" || fail "$K not shown"; fi
+if [ -n "$R" ]; then mkdir -p "${R%/*}" && touch "$R" && mount --move "$S/r" "$R" && ro "$R" || fail "$R not shown"; fi
+rm -f "$S/r" && rmdir "$S/h" "$S/w" "$S/k" "$S" || fail "staging left"
+mount -o remount,ro,nosuid,nodev,noexec /run || fail "/run not read-only"
+mount -o remount,ro,nosuid,nodev,noexec /var/lib || fail "/var/lib not read-only"
+if [ -d /etc/lampOS ]; then mount -o remount,ro,nosuid,nodev,noexec /etc/lampOS || fail "/etc/lampOS not read-only"; fi
+for d in /dev/video* /dev/media* /dev/v4l-subdev* /dev/snd/* /dev/ttyACM* /dev/ttyUSB* /dev/ttyS* /dev/ttyAMA* /dev/i2c-* /dev/spidev* /dev/gpiochip* /dev/hidraw* /dev/fb* /dev/dri/*; do
+  [ -c "$d" ] || continue
+  mount --bind /dev/null "$d" || fail "$d not hidden"
+done
+cd "$D" || fail "$D is not visible to Hermes"
+U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H
 unset LAMP_NS_UID LAMP_NS_GID
+export HOME
 exec /usr/bin/unshare --user --map-user="$U" --map-group="$G" /var/lib/lampos-hermes/.local/bin/hermes "$@"
 "#;
 
@@ -713,7 +802,7 @@ fn steps(
     if let Err(why) = run(&userns_argv(&uid, &gid)) {
         let why = format!(
             "no user namespaces for {USER} (unshare --map-root-user --mount, then --user back to {uid}:{gid}): {why}; \
-             Hermes would see lamp-cloud's relay key, so nothing is installed"
+             Hermes would see the lamp's services' files, so nothing is installed"
         );
         return fail("no_userns", why, say);
     }
@@ -843,7 +932,7 @@ fn steps(
         }
     }
     say(&format!(
-        "Hermes {VERSION} ({}) installed for {USER} at {HERMES}; Harness runs it through {WRAPPER}, in a namespace that hides lamp-cloud's credentials; no service, nothing at boot",
+        "Hermes {VERSION} ({}) installed for {USER} at {HERMES}; Harness runs it through {WRAPPER}, in a namespace that shows it only its own folder, its work folder and the skills; no service, nothing at boot",
         kit.commit
     ));
     write(records, HermesInstall::installed(now_unix_ms()))
