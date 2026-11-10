@@ -139,8 +139,8 @@ pub const NO_MESSAGE: &str = "the backend didn't give the file to add";
 pub const BUSY: &str = "a skill from a file is still being added";
 pub const UNCHECKED: &str = "a signed package can't be checked on this lamp now";
 pub const VOICE_UNREACHED: &str = "adding a skill can't be reached on the lamp now";
-pub const LEFT_OFF: &str = "it wasn't put on: there was no spoken yes at the lamp";
-pub const NEVER_ASKED: &str = "it was never asked about aloud, so it isn't on";
+pub const LEFT_OFF: &str = "it was kept but isn't on";
+pub const NEVER_ASKED: &str = "it was kept but never put on";
 pub const LET_GO: &str = "it is no longer kept on the lamp";
 /// What the journal says of any other reason: one that may name the skill
 /// (a name the lamp holds, lamp-voice's own refusal), told whole to the app

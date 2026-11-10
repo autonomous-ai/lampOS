@@ -1288,9 +1288,9 @@ is Backend3's.
 6. **Settled** (`Uploads::settle`): `lamp-cloud` asks `{"added": {"sha256"}}`
    every 5 s, for at most 2 h: `on` is `success`; `left_off` (since #5977,
    kept and not put on by the manage helper) is `failure`, said with
-   `lamp-cloud`'s own words, "it wasn't put on: there was no spoken yes at
-   the lamp", which still name the yes (`upload::LEFT_OFF`, not changed
-   here); let go, or not on within the wait, is `failure` too. The next upload need not wait
+   `lamp-cloud`'s own words, "it was kept but isn't on"
+   (`upload::LEFT_OFF`; never asked about: "it was kept but never put on",
+   `upload::NEVER_ASKED`); let go, or not on within the wait, is `failure` too. The next upload need not wait
    for it.
 7. **The result** goes to the app as the kind's second reply, on the
    broker's own loop while online, and is said again if the connection
