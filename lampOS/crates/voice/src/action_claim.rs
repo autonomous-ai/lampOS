@@ -64,7 +64,10 @@
 //! lookahead or model completion because it may still begin a decimal;
 //! other word runs keep their existing streaming decisions. A colour said
 //! ("My light is blue now.") is still no claim, nor is any sentence the run
-//! opens that ends in a '?'. Beside any call a worded claim stands, so work
+//! opens that ends in a '?'. A clock's ':' or '.' is inside its time ("until
+//! 10:30"), and a comma after a run leaves it to the sentence's own end
+//! ("Keeping it on until ten, would that help?" is none; Fourth's HOLD on
+//! #5910). Beside any call a worded claim stands, so work
 //! another tool did stands ("I've added a reminder to your calendar."
 //! beside `service_write`), unless it says a limit: a clock after "until",
 //! "till" or "at", or a length after "for" or "in" ([`worded_limit`]). A
@@ -410,7 +413,7 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
     if let Some(kind) = judge(found, Claim::ReminderTime) {
         return Some(Some(kind));
     }
-    match runs_claim(&SNOOZED, &text, ended, true) {
+    match runs_claim(&SNOOZED, &text, ended, true, false) {
         Some(Some(kind)) => return Some(Some(kind)),
         None => undecided = true,
         Some(None) => {}
@@ -701,7 +704,7 @@ pub fn worded_limit(reply: &str) -> Option<Limit> {
         return None;
     }
     let text = normalised(reply);
-    let tokens = tokens(&text, true);
+    let tokens = tokens(&text, true, false);
     (0..tokens.len()).find_map(|at| match tokens[at] {
         Token::Word("until" | "till" | "at") => said_clock(&tokens[at + 1..]),
         Token::Word("for") => {
@@ -1337,14 +1340,33 @@ enum Token<'a> {
     Mark(char, bool),
 }
 
-/// `text` (already [`normalised`]) as words and marks.
-fn tokens(text: &str, ended: bool) -> Vec<Token<'_>> {
+/// `text` (already [`normalised`]) as words and marks; with `clocks`, a
+/// clock or a number with a ':' or '.' inside is one word (the worded
+/// runs), else its parts ([`worded_limit`] reads them).
+fn tokens(text: &str, ended: bool, clocks: bool) -> Vec<Token<'_>> {
     let mut out = Vec::new();
     let mut start: Option<usize> = None;
-    for (at, c) in text.char_indices() {
+    let mut chars = text.char_indices().peekable();
+    while let Some((at, c)) = chars.next() {
         if c.is_alphanumeric() || c == '\'' || (c == '-' && start.is_some()) {
             start.get_or_insert(at);
             continue;
+        }
+        // A clock's or a number's ':' or '.' between digits is inside its
+        // word ("10:30", "1.5"), never a sentence's end (Fourth's HOLD on
+        // #5910); at the end of text still streaming it may yet be one.
+        if clocks
+            && matches!(c, ':' | '.')
+            && start.is_some_and(|from| text[from..at].bytes().all(|b| b.is_ascii_digit()))
+        {
+            match chars.peek() {
+                Some((_, next)) if next.is_ascii_digit() => continue,
+                None if !ended => {
+                    out.push(Token::Part(&text[start.take().unwrap_or(at)..]));
+                    return out;
+                }
+                _ => {}
+            }
         }
         if let Some(from) = start.take() {
             out.push(Token::Word(&text[from..at]));
@@ -1377,7 +1399,8 @@ enum Slot<'a> {
     Words(&'a str),
     /// Up to [`ANY_WORDS`] words.
     Any,
-    /// The end, or a mark that is not a '?'.
+    /// The end, a '.' or '!', or another mark (a comma) whose sentence
+    /// then ends with no '?'.
     End,
     /// A bare kept time's sentence end, never its comma or clock colon.
     TimeEnd,
@@ -1467,7 +1490,11 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
             None if more => None,
             None => Some(true),
             Some(Token::Mark('?', _) | Token::Word(_) | Token::Part(_)) => Some(false),
-            Some(Token::Mark(_, _)) => Some(true),
+            Some(Token::Mark('.' | '!', _)) => Some(true),
+            // Any other mark ("ten, would that help?") leaves it to the
+            // sentence's own end, as after a whole run (Fourth's HOLD on
+            // #5910).
+            Some(Token::Mark(_, _)) => fits(&[], tokens, at + 1, more),
         },
         Slot::TimeEnd => match tokens.get(at) {
             None if more => None,
@@ -1551,20 +1578,22 @@ fn fits_numeric_time(
 /// Whether `text` (already [`normalised`]) claims an action in other words
 /// ([`WORDED`]), as [`claim`] says it.
 fn worded_claim(text: &str, ended: bool) -> Option<Option<Claim>> {
-    runs_claim(&WORDED, text, ended, false)
+    runs_claim(&WORDED, text, ended, false, true)
 }
 
 /// Whether `text` (already [`normalised`]) opens with one of `runs`, bare
 /// or after one of [`LEAD_INS`], as [`claim`] says it. With `whole_lead`,
 /// a lead-in is read only once the first word is whole, so a reply still
 /// streaming "The" is decided no claim, as the strict lines decide it.
+/// With `clocks`, a clock's mark stays inside its time ([`tokens`]).
 fn runs_claim(
     runs: &[(&str, Claim)],
     text: &str,
     ended: bool,
     whole_lead: bool,
+    clocks: bool,
 ) -> Option<Option<Claim>> {
-    let tokens = tokens(text, ended);
+    let tokens = tokens(text, ended, clocks);
     let more = !ended;
     let leads: &[&str] = if whole_lead && matches!(tokens.first(), Some(Token::Part(_))) {
         &[]
