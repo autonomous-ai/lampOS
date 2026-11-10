@@ -580,6 +580,14 @@ pub fn items(body: &str) -> Vec<Value> {
     }
 }
 
+/// Who asks a read: the owner, through the voice, or a made skill
+/// (`lamp-skills`, #5288).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Asker {
+    Owner,
+    Skill,
+}
+
 /// A mail as it is quoted; a security mail only as "a security mail, left
 /// out", nothing of it kept.
 ///
@@ -639,6 +647,37 @@ fn size_words(bytes: usize) -> String {
         1_024..1_048_576 => format!("{} KB", bytes.div_ceil(1_024)),
         _ => format!("{:.1} MB", bytes as f64 / 1_048_576.0),
     }
+}
+
+/// Gmail's mails as the owner's own read quotes them: a security mail
+/// ([`mail::is_security_item`], or one [`quoted`] would leave out) listed
+/// and read like any other, its date as it is, its subject and From's
+/// name with every link and code shape masked ([`mail::masked_subject`],
+/// [`mail::masked_from`]), its text with every link said as "a link" and
+/// its codes as "a code" ([`mail::masked`]), its attachments not named.
+/// A list's preview is never a whole text, nor one cut
+/// at the cap, so each code shape in it goes. Separate mails are never read
+/// joined ([`kept_apart`]), so nothing more is left out.
+pub fn owner_mails_quoted(name: &str, items: &[MailItem], whole: bool) -> Value {
+    let items = items
+        .iter()
+        .map(|item| {
+            let value = mail_item(item);
+            let mut said = String::new();
+            texts_of(&value, &mut said);
+            if value.is_object() && !mail::is_security_mail("", "", &said) {
+                return value;
+            }
+            json!({
+                "id": item.id,
+                "from": mail::masked_from(&item.from),
+                "subject": mail::masked_subject(&item.subject),
+                "date": item.date,
+                "text": mail::masked(&item.from, &item.subject, &item.text, whole),
+            })
+        })
+        .collect();
+    fitted(name, items)
 }
 
 /// The words every quoted result carries.
@@ -939,10 +978,17 @@ pub fn quoted_in(name: &str, items: Vec<(Option<String>, Value)>) -> Value {
     } else {
         mail::SECURITY_MESSAGE_LEFT_OUT
     };
+    fitted(name, without_security(items, left_out))
+}
+
+/// Items, their security check made, wrapped as quoted data from `name`,
+/// as many as fit in [`RESULT_MOST`] (each made smaller first if need be),
+/// and how many were left out.
+fn fitted(name: &str, items: Vec<Value>) -> Value {
     let mut result = json!({"source": name, "about": about(name), "quoted": []});
     let total = items.len();
     let mut kept = 0;
-    for item in without_security(items, left_out) {
+    for item in items {
         for most in [600, 200, 60] {
             let small = compact(&item, most, 0);
             result["quoted"]
