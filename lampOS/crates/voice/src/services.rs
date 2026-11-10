@@ -34,6 +34,7 @@
 //!
 //! A call may wait [`DEADLINE`], longer than the executive's: a mail box or a
 //! web service takes seconds to answer.
+use crate::service_records::Status;
 use lamp_gemini::{Tool, ToolCall};
 use serde_json::{Value, json};
 use std::{
@@ -401,23 +402,15 @@ impl Pending {
 #[cfg(not(test))]
 mod kept {
     use super::Pending;
-    use serde_json::Value;
     use std::{collections::VecDeque, sync::Mutex};
     /// The one write waiting for its "send", for both voice routes.
     static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
     /// The newest requests a read answered in.
     static READ_IN: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
-    /// The newest send tries past the gate or refused, by the voice's
-    /// attempt id, each with what it was told once it was
-    /// ([`super::send_state`]).
-    static SENT: Mutex<VecDeque<(u64, Option<Value>)>> = Mutex::new(VecDeque::new());
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         f(&mut PENDING
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()))
-    }
-    pub fn sent<R>(f: impl FnOnce(&mut VecDeque<(u64, Option<Value>)>) -> R) -> R {
-        f(&mut SENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
     }
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
         f(&mut READ_IN
@@ -431,18 +424,13 @@ mod kept {
 #[cfg(test)]
 mod kept {
     use super::Pending;
-    use serde_json::Value;
     use std::{cell::RefCell, collections::VecDeque};
     thread_local! {
         static PENDING: RefCell<Option<Pending>> = const { RefCell::new(None) };
         static READ_IN: RefCell<VecDeque<u64>> = const { RefCell::new(VecDeque::new()) };
-        static SENT: RefCell<VecDeque<(u64, Option<Value>)>> = const { RefCell::new(VecDeque::new()) };
     }
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         PENDING.with(|cell| f(&mut cell.borrow_mut()))
-    }
-    pub fn sent<R>(f: impl FnOnce(&mut VecDeque<(u64, Option<Value>)>) -> R) -> R {
-        SENT.with(|cell| f(&mut cell.borrow_mut()))
     }
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
         READ_IN.with(|cell| f(&mut cell.borrow_mut()))
@@ -498,7 +486,11 @@ pub fn said_in(pending: &mut Option<Pending>, request: u64, words: &str, now: In
         eprintln!(
             "lamp-voice: request {request}: a waiting write dropped: the lamp answered another request"
         );
-        *pending = None;
+        drop_waiting(
+            pending,
+            Status::Cancelled,
+            "the lamp answered another request before a send",
+        );
     }
 }
 
@@ -518,7 +510,11 @@ fn answered_without_send(pending: &mut Option<Pending>, request: u64) {
             "lamp-voice: request {request}: a waiting write dropped: the lamp answered request {} after its read-back with no send",
             kept.other.unwrap_or_default()
         );
-        *pending = None;
+        drop_waiting(
+            pending,
+            Status::Cancelled,
+            "the lamp answered after the read-back with no send",
+        );
     }
 }
 
@@ -876,11 +872,8 @@ pub const RECEIPTS_KEPT: usize = 8 * 64;
 
 /// [`SendState`] of the send try `attempt`.
 pub fn send_state(attempt: u64) -> Option<SendState> {
-    kept::sent(|sent| {
-        sent.iter()
-            .find(|(of, _)| *of == attempt)
-            .map(|(_, told)| told.clone().map_or(SendState::Asked, SendState::Told))
-    })
+    crate::service_records::receipt(attempt)
+        .map(|told| told.map_or(SendState::Asked, SendState::Told))
 }
 
 /// `call` without its [`ATTEMPT`], and that attempt id, if it had one.
@@ -911,30 +904,27 @@ pub fn went(told: &Value) -> bool {
     told["sent"] == true || told["saved"] == true
 }
 
-/// The send try `attempt` kept for [`send_state`]; a try with no attempt
-/// id (the Live route's) keeps nothing. A sent (or saved) receipt is never
-/// undone. When full, the oldest refusal goes, else the oldest try.
+/// The send try `attempt` kept for [`send_state`], with the record of the
+/// waiting write it sends (`LAMP_SERVICE_RECORDS`): the receipts live in
+/// the records' ledger, so a send's answer sets both at once
+/// ([`crate::service_records::keep_send`]). A try with no attempt id (the
+/// Live route's) keeps no receipt. A sent receipt is never undone. When
+/// full, the oldest refusal goes, else the oldest try.
 fn keep_send(attempt: Option<u64>, got: Got<'_>) {
-    let Some(attempt) = attempt else { return };
-    kept::sent(|sent| {
-        let told = match got {
-            Got::Refused(told) | Got::Answered(told) => Some(told.clone()),
-            Got::Asked => None,
-        };
-        if let Some(kept) = sent.iter_mut().find(|(of, _)| *of == attempt) {
-            if kept.1.as_ref().is_none_or(|told| !went(told)) {
-                kept.1 = told;
-            }
-            return;
-        }
-        if sent.len() >= RECEIPTS_KEPT {
-            let refused = sent
-                .iter()
-                .position(|(_, told)| told.as_ref().is_some_and(|told| !went(told)));
-            sent.remove(refused.unwrap_or(0));
-        }
-        sent.push_back((attempt, told));
-    });
+    keep_send_of(attempt, None, got);
+}
+
+fn keep_send_of(attempt: Option<u64>, send_id: Option<&str>, got: Got<'_>) {
+    use crate::service_records::Got as Kept;
+    crate::service_records::keep_send(
+        attempt,
+        send_id,
+        match got {
+            Got::Refused(told) => Kept::Refused(told),
+            Got::Asked => Kept::Asked,
+            Got::Answered(told) => Kept::Answered(told),
+        },
+    );
 }
 
 /// [`keep_send`] for a test standing in for [`run`]: the try marked in
@@ -955,6 +945,25 @@ pub fn without_attempt(mut args: Value) -> Value {
         args.remove(ATTEMPT);
     }
     args
+}
+
+/// The waiting write let go: `pending` emptied, and its record
+/// (`LAMP_SERVICE_RECORDS`) given `status` and `why`.
+fn drop_waiting(pending: &mut Option<Pending>, status: Status, why: &str) {
+    if let Some(kept) = pending.take() {
+        crate::service_records::settle(&kept.send_id, status, why);
+    }
+}
+
+/// What the gate refused a send for, as its record says it
+/// (`LAMP_SERVICE_RECORDS`): never the model's words.
+fn refused_send(pending: &mut Option<Pending>, send_id: Option<&str>, why: &str) {
+    let status = if send_id.is_some() {
+        Status::Refused
+    } else {
+        Status::Cancelled
+    };
+    drop_waiting(pending, status, why);
 }
 
 /// The call to send on, or what the model is told instead. Only a heard
@@ -993,27 +1002,31 @@ pub fn gate(
             "lamp-voice: request {request}: a waiting write dropped: another call (prepared in request {})",
             kept.request
         );
-        *pending = None;
+        drop_waiting(
+            pending,
+            Status::Cancelled,
+            "another request came before a send",
+        );
     }
     if !is_tool(&call.name) {
         return Err(crate::tools::unavailable());
     }
     if !turn.heard {
-        *pending = None;
+        refused_send(pending, send_id, "not heard live at the lamp");
         return Err(json!({ "error": NOT_HEARD }));
     }
     // The send of a waiting write is anyone's yes; everything else is the
     // owner's alone.
     let answers_waiting = send_id.is_some() && pending.is_some();
     if turn.owner.is_none() && !answers_waiting {
-        *pending = None;
+        refused_send(pending, send_id, "not asked by the lamp's owner");
         return Err(json!({ "error": OWNER_ONLY }));
     }
     if reads_only(&call.name) {
         return Ok(call.clone());
     }
     if !turn.sends {
-        *pending = None;
+        refused_send(pending, send_id, "this voice does not send");
         return Err(json!({ "error": NO_SEND_HERE }));
     }
     let mut call = call.clone();
@@ -1023,7 +1036,7 @@ pub fn gate(
     }
     let Some(send_id) = send_id else {
         // A new write replaces any other waiting: one at a time.
-        *pending = None;
+        drop_waiting(pending, Status::Cancelled, "a new write replaced it");
         // The face says who is at the lamp, a voice only that it is the
         // same one: a write is prepared only for a line the owner's face
         // was seen saying.
@@ -1056,10 +1069,22 @@ pub fn gate(
             "lamp-voice: request {request}: a send cancelled: {}",
             why.join("; ")
         );
+        // Past the two minutes it waits, it timed out; else the reasons.
+        let status = if late {
+            Status::TimedOut
+        } else {
+            Status::Cancelled
+        };
+        crate::service_records::settle(&kept.send_id, status, &why.join("; "));
         return Err(json!({ "error": CANCELLED }));
     }
     if kept.cut {
         eprintln!("lamp-voice: request {request}: a send cancelled: its read-back was cut");
+        crate::service_records::settle(
+            &kept.send_id,
+            Status::Refused,
+            "the message was not read back in full",
+        );
         return Err(json!({ "error": NOT_READ_BACK }));
     }
     // In the echo tail of the lamp's words, with any of them, the line may be
@@ -1067,10 +1092,15 @@ pub fn gate(
     // other voice or another face seen saying it cancels it, and no print yet
     // keeps it for one more try. Past the tail, whoever says it agrees.
     if turn.in_echo_tail {
+        let kept_id = kept.send_id.clone();
+        let other = |why: &str| {
+            crate::service_records::settle(&kept_id, Status::Refused, why);
+            Err(json!({ "error": OTHER_VOICE }))
+        };
         match turn.alike {
-            _ if turn.other_seen => return Err(json!({ "error": OTHER_VOICE })),
+            _ if turn.other_seen => return other("another face was seen saying send"),
             Some(alike) if alike >= crate::same_voice::SERVICES_SAME_FROM => {}
-            Some(_) => return Err(json!({ "error": OTHER_VOICE })),
+            Some(_) => return other("another voice said send"),
             None if !kept.print_asked => {
                 *pending = Some(Pending {
                     asked_again: Some(request),
@@ -1084,7 +1114,7 @@ pub fn gate(
                 });
                 return Err(json!({ "error": NO_PRINT_YET, "next": SAY_IT_LONGER }));
             }
-            None => return Err(json!({ "error": OTHER_VOICE })),
+            None => return other("no voice print was heard twice"),
         }
     }
     // Sent exactly as prepared, to its own service.
@@ -1152,6 +1182,7 @@ pub fn answered(
                 .unwrap_or_default()
                 .clone_into(&mut kept.service);
             kept.draft = call.args.get("action").and_then(Value::as_str) == Some("save_draft");
+            crate::service_records::prepared(owner, &kept.service, &call.args, send_id, now);
             told["next"] = json!(if kept.draft {
                 SAVE_READ_BACK_NEXT
             } else {
@@ -1165,8 +1196,25 @@ pub fn answered(
             if let Some(told) = told.as_object_mut() {
                 told.remove("send_id");
             }
+            crate::service_records::ended(
+                Some(owner),
+                WRITE,
+                &call.args,
+                Status::Failed,
+                "the service gave nothing to read back",
+                true,
+            );
         }
-        (None, _) => {}
+        (None, _) => crate::service_records::ended(
+            Some(owner),
+            WRITE,
+            &call.args,
+            Status::Failed,
+            told.get("error")
+                .and_then(Value::as_str)
+                .unwrap_or("the service prepared nothing"),
+            true,
+        ),
     }
 }
 
@@ -1592,21 +1640,64 @@ pub fn run(
             // sent (#5853).
             if send_id {
                 keep_send(attempt, Got::Refused(&told));
+            } else if let Some(why) = refusal(&told) {
+                // A call refused before anything was prepared: its own
+                // record (`LAMP_SERVICE_RECORDS`), what it asked only when
+                // the owner asked it.
+                crate::service_records::ended(
+                    owner.as_deref(),
+                    &call.name,
+                    &call.args,
+                    Status::Refused,
+                    why,
+                    owner.is_some() && heard,
+                );
             }
             return (told, true);
         }
     };
+    // The waiting write this sends, whose record its answer settles.
+    let sends = call
+        .args
+        .get("send_id")
+        .and_then(Value::as_str)
+        .filter(|_| send_id)
+        .map(str::to_owned);
     if send_id {
-        keep_send(attempt, Got::Asked);
+        keep_send_of(attempt, sends.as_deref(), Got::Asked);
     }
     let (mut told, answered) = ask(folder, &call, DEADLINE);
+    if !answered {
+        // No answer in time: a send not known to have gone, any other
+        // call failed (`LAMP_SERVICE_RECORDS`).
+        match &sends {
+            Some(_) => crate::service_records::keep_send(
+                attempt,
+                sends.as_deref(),
+                crate::service_records::Got::Unanswered,
+            ),
+            None => crate::service_records::ended(
+                owner.as_deref(),
+                &call.name,
+                &call.args,
+                Status::Failed,
+                "the service did not answer in time",
+                true,
+            ),
+        }
+    }
     if answered {
         kept::pending(|pending| {
             let owner = owner.as_deref().unwrap_or_default();
             self::answered(pending, &call, request, &mut told, Instant::now(), owner);
         });
         if send_id {
-            keep_send(attempt, Got::Answered(&told));
+            keep_send_of(attempt, sends.as_deref(), Got::Answered(&told));
+        }
+        if call.name == READ {
+            // Its record from the whole answer, before any brief: the
+            // owner's, told only by the owner check (`LAMP_SERVICE_RECORDS`).
+            crate::service_records::read(owner, &call.args, &told);
         }
         if call.name == READ && told.get("error").is_none() {
             read_answered(request);
@@ -1626,6 +1717,21 @@ pub fn run(
         return (crate::tools::unavailable(), false);
     }
     (told, answered)
+}
+
+/// Why the gate refused a call that was no send, for its record
+/// (`LAMP_SERVICE_RECORDS`): `None` for an answer that is no refusal of
+/// the gate's (an unknown function).
+fn refusal(told: &Value) -> Option<&'static str> {
+    let error = told.get("error").and_then(Value::as_str)?;
+    [
+        (NOT_HEARD, "not heard live at the lamp"),
+        (OWNER_ONLY, "not asked by the lamp's owner"),
+        (NO_SEND_HERE, "this voice does not send"),
+        (NOT_SEEN_SAYING, "the owner was not seen saying it"),
+    ]
+    .into_iter()
+    .find_map(|(said, why)| (said == error).then_some(why))
 }
 
 /// [`crate::tools::ask`] with a services answer's bound.

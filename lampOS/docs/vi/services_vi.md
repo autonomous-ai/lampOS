@@ -2219,6 +2219,40 @@ căn phòng cho một lần đọc lịch (lamp-9adf, 4/11 21:45: "Let me look."
 `service_read`, rồi "I see a laptop screen…" không ai hỏi). Cái nhìn của một
 kỹ năng trong cùng lượt vẫn giữ.
 
+## Bản ghi dịch vụ (`LAMP_SERVICE_RECORDS`, tắt trừ khi bật)
+
+Với `LAMP_SERVICE_RECORDS=on` (chỉ tuyến thứ hai, cùng bộ nhớ Days; PR 1a
+của kế hoạch bản ghi connector), mỗi kết quả của `service_read` hoặc
+`service_write` được ghi vào bộ nhớ Days thành một bản ghi, giữ đến khi bị
+quên: `prepared` khi đọc lại; rồi `done` (kèm id của dịch vụ), `failed`,
+`cancelled` (kèm lý do), `refused` (lý do của cổng), `timed_out` (hai phút
+không có "send"); một lần đọc là `done` hoặc `no_result`.
+
+- Ghi của chủ được lưu đầy đủ. Lần đọc chỉ lưu truy vấn và, của mỗi mục,
+  tiêu đề, người gửi, ngày, liên kết, kèm đoạn trích tối đa 160 byte chỉ khi
+  qua kiểm tra bảo mật của dịch vụ. Mỗi trường cũng theo cùng quy tắc: tiêu
+  đề có dạng mã (`mail::has_code_shape`: một số mã hay mã chữ lẫn số như
+  "F7K2Q9"), người gửi có tên hiển thị dạng mã (`mail::from_has_code_shape`,
+  không bao giờ xét địa chỉ trần, nên "bob42@x.com" vẫn được lưu) và liên
+  kết đăng nhập, đặt lại hay có token
+  (`mail::is_secret_link`) không được lưu; liên kết trang hay tệp thường vẫn
+  được lưu.
+- Biên nhận gửi của #5853 nằm trong cùng sổ với bản ghi: câu trả lời của một
+  lần gửi đặt cả hai một lần.
+- Không làm chậm câu trả lời: hàng đợi tối đa 32, luồng riêng; bộ nhớ ngừng
+  thì chờ và thử lại, ghi một dòng nhật ký. Mỗi thay đổi một dòng nhật ký,
+  không có chữ nào của thư.
+- Quên tất cả và quên về một việc xóa bản ghi, dù `LAMP_SERVICE_RECORDS`
+  đang bật hay tắt, nên bản ghi giữ lúc còn bật không bị bỏ lại; không hoàn
+  tác gì ở dịch vụ.
+  Mỗi lần quên, các thay đổi còn chờ đều bị bỏ: của người đó (hoặc khớp với
+  việc đó) rời hàng đợi trước khi lệnh quên được gửi, nên luồng ghi đang chờ
+  thử lại không bao giờ ghi chúng sau lần quên, và bản sao trong voice bị xóa
+  mỗi khi memory trả lời ok, dù có xóa được gì hay không. Memory từ chối một
+  thay đổi được hỏi trước lần quên mà đến sau nó (`forgotten`, xem
+  `memory-days_vi.md`).
+- Tắt: không giữ, không ghi gì.
+
 ## Giọng nói được báo những gì đã liên kết (`LAMP_SERVICES_TOLD`, #5523, tắt trừ khi bật)
 
 Ngày 6/11 một người thử của nhóm marketing liên kết một dịch vụ trong mục
