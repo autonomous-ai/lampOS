@@ -107,6 +107,68 @@ pub(super) enum Echo {
     Stripped(String, String),
 }
 
+/// The echo hold while a made skill's writes wait for the person's yes
+/// (#6066, `crate::skill_write_yes`): a line made only of the lamp's own
+/// words, every heard word in a run the answer says in that order (one
+/// word alone counts), begun over its voice or within [`TAIL_US`] after its
+/// words, is held, whatever guard would let it through ([`judge`]'s name,
+/// question or offer) and however short. The say-back's own last words
+/// heard back ("before it sends anything") are no yes; the say-back has no
+/// "yes" in it, so a person's "Yes." is never one. Checked whether or
+/// not `LAMP_SECOND_OWN_ECHO` is on, and under the private room. The
+/// journal's line when held, counts only.
+pub(super) fn yes_echo(line: &Line<'_>, said: Option<&Said<'_>>) -> Option<String> {
+    let said = said.filter(|said| {
+        said.request != 0 && said.request < line.request && !said.words.trim().is_empty()
+    })?;
+    let words: Vec<&str> = line.heard.split_whitespace().collect();
+    let heard: Vec<String> = words
+        .iter()
+        .map(|word| super::word_key(word))
+        .filter(|key| !key.is_empty())
+        .collect();
+    if heard.is_empty() {
+        return None;
+    }
+    let within = line.over_the_lamps_voice
+        || line.began_us != 0
+            && said.until_us != 0
+            && line.began_us <= said.until_us.saturating_add(TAIL_US);
+    if !within {
+        return None;
+    }
+    let answer = keys(said.words);
+    // Every heard word inside a run of the answer, in order.
+    let mut at = 0;
+    while at < heard.len() {
+        let longest = (0..answer.len())
+            .map(|from| {
+                heard[at..]
+                    .iter()
+                    .zip(&answer[from..])
+                    .take_while(|(word, said)| word == said)
+                    .count()
+            })
+            .max()
+            .unwrap_or(0);
+        if longest == 0 {
+            return None;
+        }
+        at += longest;
+    }
+    Some(format!(
+        "lamp-voice second: request {}: its answer is held back: a made skill waits for a yes, and all {} of its words are the lamp's own answer to request {}, begun {} (#6066)",
+        line.request,
+        heard.len(),
+        said.request,
+        if line.over_the_lamps_voice {
+            "over the lamp's voice"
+        } else {
+            "within 1.5 s of the lamp's words"
+        }
+    ))
+}
+
 /// The answer's words as [`super::word_key`] keys, empty ones left out.
 fn keys(words: &str) -> Vec<String> {
     words
@@ -268,6 +330,90 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
                 "lamp-voice second: request {request}: {m} of its {n} words, the lamp's own answer to request {of} at its {at}, are taken out of what the model is sent (LAMP_SECOND_OWN_ECHO)"
             ),
         ),
+    }
+}
+
+#[cfg(test)]
+mod yes_tests {
+    use super::*;
+
+    /// A made skill's say-back (#6066), played until 10 s.
+    const SAY_BACK: &str = "I made leaving mail: when someone gets up from the desk, it mails mai@example.com from your Gmail, saying “I'm leaving now.” It starts on its own, once a day. It waits for you to agree before it sends anything.";
+    const UNTIL_US: u64 = 10_000_000;
+
+    fn line(heard: &str, began_us: u64, over: bool, called: bool) -> Line<'_> {
+        Line {
+            request: 5,
+            heard,
+            began_us,
+            over_the_lamps_voice: over,
+            called,
+        }
+    }
+
+    fn said() -> Said<'static> {
+        Said {
+            request: 3,
+            words: SAY_BACK,
+            until_us: UNTIL_US,
+        }
+    }
+
+    /// The say-back's own last words heard back within the tail, or over
+    /// its voice, are held while the yes is awaited, however short and even
+    /// with the lamp's name; a person's own words, or a line begun after the
+    /// tail, are not.
+    #[test]
+    fn the_say_backs_own_words_in_its_tail_are_held() {
+        for heard in [
+            "before it sends anything",
+            "sends anything",
+            "agree",
+            "it waits for you to agree",
+        ] {
+            assert!(
+                yes_echo(
+                    &line(heard, UNTIL_US + 1_000_000, false, false),
+                    Some(&said())
+                )
+                .is_some(),
+                "{heard}"
+            );
+            assert!(
+                yes_echo(&line(heard, 9_000_000, true, true), Some(&said())).is_some(),
+                "{heard}"
+            );
+        }
+        // The plain judge lets a two-word one through: too short to hold.
+        assert_eq!(
+            judge(
+                &line("sends anything", UNTIL_US + 1_000_000, false, false),
+                Some(&said())
+            ),
+            Echo::Answered(None)
+        );
+        for heard in ["yes", "yes send it", "okay go ahead", "sure", "no wait"] {
+            assert!(
+                yes_echo(
+                    &line(heard, UNTIL_US + 500_000, false, false),
+                    Some(&said())
+                )
+                .is_none(),
+                "{heard}"
+            );
+        }
+        assert!(
+            yes_echo(
+                &line(
+                    "before it sends anything",
+                    UNTIL_US + TAIL_US + 1,
+                    false,
+                    false
+                ),
+                Some(&said())
+            )
+            .is_none()
+        );
     }
 }
 

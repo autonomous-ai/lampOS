@@ -181,6 +181,8 @@ pub mod session_tools;
 pub mod short_turns;
 pub mod sight;
 pub mod skill_words;
+pub mod skill_write_yes;
+pub mod skill_writes_told;
 pub mod sleep_asked;
 pub mod sleep_capture;
 pub mod sleep_worker;

@@ -124,6 +124,45 @@ pub fn reads_on() -> bool {
     std::env::var(READS_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// The switch for a made skill that sends or writes on its own (#6066, the
+/// owner's lift of rule (b), 10 Nov): here, in `lamp-skills`, its manage
+/// helper and `lamp-services`. `on` only; off, the making model is told a
+/// skill can't send or write, and the cap says so ([`SENDS_ON_ITS_OWN`]).
+pub const WRITES_ENVIRONMENT: &str = lamp_services::skill_writes::ENVIRONMENT;
+
+#[cfg(test)]
+thread_local! {
+    /// [`WRITES_ENVIRONMENT`] as a test of this thread sets it.
+    static WRITES_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill may send or write in this process.
+pub fn writes_on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = WRITES_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(WRITES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`writes_on`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_writes_here(on: Option<bool>) {
+    WRITES_HERE.with(|here| here.set(on));
+}
+
+/// What the lamp can't do yet with [`WRITES_ENVIRONMENT`] off, said as
+/// [`cant_yet`]: "I can't do that yet: sending or writing on its own".
+pub const SENDS_ON_ITS_OWN: &str = "sending or writing on its own";
+
+/// How the say-back of a skill that sends or writes ends (#6066): that it
+/// waits for the person's agreement, never on a word for them to repeat,
+/// so its own last words heard back are no yes. It has no "yes" in it: a
+/// line made only of the say-back's words, begun in its echo tail, is held
+/// while the yes is awaited (`second_provider::own_echo::yes_echo`), and a
+/// person's quick "Yes." must not be one.
+pub const WAITS_FOR_YES: &str = " It waits for you to agree before it sends anything.";
+
 /// A calendar's step, given whole: its events of a day.
 pub const CALENDAR_READ: &str = "read = { service = \"google_calendar\", what = \"events\", \
      day = \"today\" }, or day = \"tomorrow\" when tomorrow is asked";
@@ -214,7 +253,14 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     if request.len() > MOST_REQUEST_BYTES {
         return Err("That is too long to ask for as one skill: say it more shortly.");
     }
-    let read = if reads { " Or one read, as above." } else { "" };
+    // A read or a write as the system prompt says them (`make_skill_local`),
+    // a write's words only the request's own (#6066).
+    let read = match (reads, writes_on()) {
+        (true, true) => " Or a read/write as above.",
+        (true, false) => " Or one read, as above.",
+        (false, true) => " Or one write, as above.",
+        (false, false) => "",
+    };
     Ok(format!(
         "{BRIEF_HEAD} for the request. Reply with two fenced blocks: \
          ```skill.toml, ```SKILL.md. skill.toml: \
@@ -467,6 +513,13 @@ pub struct Uses {
     pub actions: Vec<String>,
     /// It may set light and volume ceilings (`output_limits`).
     pub output_limits: bool,
+    /// The linked services it writes to, by code, with
+    /// [`WRITES_ENVIRONMENT`] on (#6066): each write waits for the
+    /// person's yes.
+    pub writes: Vec<String>,
+    /// Where its writes go, every recipient or place, for the say-back and
+    /// the app's list ("sends to …").
+    pub sends_to: Vec<String>,
 }
 
 /// The topics that are what the microphone hears: words, its name, the
@@ -499,6 +552,14 @@ impl Uses {
         }
         if self.messages {
             parts.push("messages to your phone".to_owned());
+        }
+        if !self.writes.is_empty() {
+            let names: Vec<&str> = self.writes.iter().map(|code| service_name(code)).collect();
+            parts.push(format!(
+                "your {}, sending to {}",
+                names.join(" and "),
+                self.sends_to.join(", ")
+            ));
         }
         if self.known_faces {
             parts.push("whether it knows a face".to_owned());
@@ -564,6 +625,11 @@ impl Uses {
         if !self.actions.is_empty() {
             uses["actions"] = json!(self.actions);
         }
+        // Where it sends, for the app's list ("sends to …", #6066).
+        if !self.writes.is_empty() {
+            uses["writes"] = json!(self.writes);
+            uses["sends_to"] = json!(self.sends_to);
+        }
         uses
     }
 
@@ -592,6 +658,8 @@ impl Uses {
             who: uses["who"] == true,
             actions: strings("actions"),
             output_limits: uses["output_limits"] == true,
+            writes: strings("writes"),
+            sends_to: strings("sends_to"),
         }
     }
 }
@@ -687,10 +755,14 @@ pub fn capped_with(text: &str, reads: bool) -> Result<(String, Uses), Refused> {
     // Its lines go back to the model as the check's do (the owner, 10 Nov:
     // "re-run it yourself until it works"): the lamp's own reason, and
     // what a made skill may have.
-    held.map_err(|Refused(why, _)| {
+    held.map_err(|Refused(why, lines)| {
         // What the lamp can't do yet is said, never repaired away.
         if why.starts_with(CANT_YET) {
             return Refused(why, None);
+        }
+        // A write's own repair lines (#6066), its check's words.
+        if let Some(lines) = lines {
+            return Refused(why, Some(lines));
         }
         let read = if reads { CAPPED_OR_READ } else { "" };
         let lines = format!("The lamp refused it: {why}. {CAPPED_ONLY}{read}");
@@ -1547,19 +1619,32 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
                 "known_faces" => uses.known_faces = on.ok_or_else(unclear)?,
                 "who" => uses.who = on.ok_or_else(unclear)?,
                 "output_limits" => uses.output_limits = on.ok_or_else(unclear)?,
-                // A linked service: what lamp-skills' check takes, a read
-                // (#5288); a write it refuses. Off, the lamp can't yet.
-                "services" if !added && !reads => {
-                    return Err(Refused::new(cant_yet("reading your linked services")));
-                }
+                // A linked service: a read (#5288), or with its switch a
+                // write (#6066), as lamp-skills' check takes them. Off, the
+                // lamp can't yet.
                 "services" => {
                     let services = value.as_table().ok_or_else(unclear)?;
-                    // A write: no step writes to a service yet (lamp-skills'
-                    // check takes only "read").
-                    if services.values().any(|how| how.as_str() != Some("read")) {
-                        return Err(Refused::new(cant_yet("writing to a linked service")));
+                    for (code, how) in services {
+                        match how.as_str() {
+                            Some("read") if reads => uses.reads.push(code.clone()),
+                            Some("read") => {
+                                return Err(Refused::new(cant_yet("reading your linked services")));
+                            }
+                            Some("write") if !writes_on() => {
+                                return Err(Refused::new(cant_yet(SENDS_ON_ITS_OWN)));
+                            }
+                            Some("write") if !lamp_services::skill_writes::writable(code) => {
+                                return Err(Refused::new(cant_yet(&format!(
+                                    "writing to your {} on its own",
+                                    service_name(code)
+                                ))));
+                            }
+                            Some("write") => uses.writes.push(code.clone()),
+                            _ => {
+                                return Err(Refused::new(cant_yet("writing to a linked service")));
+                            }
+                        }
                     }
-                    uses.reads = services.keys().cloned().collect();
                 }
                 // Any other key is lamp-skills' check's to take or refuse:
                 // a core grant, an add-on's, or a word it doesn't know.
@@ -1591,6 +1676,41 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
                 OTHER_SOUND => SOUND_NOT_SHIPPED.to_owned(),
                 what => cant_yet(what),
             }));
+        }
+        // A write (#6066): fixed whole in the file, one of the kinds
+        // lamp-services sends, its service granted as a write; where it
+        // goes kept for the say-back and the app's list. Refused for a
+        // repair with the check's own words, never said or journaled with
+        // a value.
+        for write in steps().filter_map(|step| step.get("write")) {
+            let content = write_content(write).ok_or_else(|| {
+                Refused(
+                    WRITE_NOT_FIXED.into(),
+                    Some(format!(
+                        "The lamp refused it: {WRITE_NOT_FIXED}. {WRITE_ONLY}"
+                    )),
+                )
+            })?;
+            if let Err(why) = lamp_services::skill_writes::check(&content) {
+                return Err(Refused(
+                    WRITE_NOT_FIXED.into(),
+                    Some(format!("The lamp refused it: {why}. {WRITE_ONLY}")),
+                ));
+            }
+            let code = content["service"].as_str().unwrap_or_default();
+            if !uses.writes.iter().any(|granted| granted == code) {
+                return Err(Refused(
+                    WRITE_NOT_FIXED.into(),
+                    Some(format!(
+                        "The lamp refused it: its write needs [permissions] services = {{ {code} = \"write\" }}. {WRITE_ONLY}"
+                    )),
+                ));
+            }
+            for to in write_reaches(&content) {
+                if !uses.sends_to.contains(&to) {
+                    uses.sends_to.push(to);
+                }
+            }
         }
         let cues: Vec<&toml::Value> = steps().filter_map(|step| step.get("cue")).collect();
         // One say or sound a run, as `lamp-skills` takes it.
@@ -1983,12 +2103,20 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
         return Err(Unsaid::of(extras));
     }
     let steps = steps_of(table)?;
+    // A write to a linked service (#6066): its skill's one step, said
+    // whole, every recipient and every word it sends.
+    let mut writes = false;
     // A read of a linked service (#5288): its skill's one step, said with
     // the gate it waits for.
     if let [step] = steps.as_slice()
         && let Some(read) = read_plainly(step).filter(|_| reads)
     {
         said.push_str(&format!(", when you're alone with the lamp, it {read}"));
+    } else if let [step] = steps.as_slice()
+        && let Some(write) = write_plainly(step).filter(|_| writes_on())
+    {
+        writes = true;
+        said.push_str(&format!(", it {write}"));
     } else {
         let steps = steps
             .iter()
@@ -2020,13 +2148,24 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
         false => said.push_str(&reach),
     }
     said.push('.');
-    // Said whole or not at all: never cut before a step or the cooldown.
-    if said.chars().count() > MOST_PLAIN_CHARS {
+    // Said whole or not at all: never cut before a step or the cooldown. A
+    // write's words are the request's own, so at most its length again.
+    let most = if writes {
+        MOST_WRITE_PLAIN_CHARS
+    } else {
+        MOST_PLAIN_CHARS
+    };
+    if said.chars().count() > most {
         return Err(too_long());
     }
     // That it starts on its own, and how often (#6066 (a)): a sentence of
     // its own, at most [`MOST_MANNERS_CHARS`], beside what it does.
     said.push_str(&manners_plainly(table)?);
+    // And that it sends nothing until the person's yes, ending on no word
+    // for them to repeat (#6066).
+    if writes {
+        said.push_str(WAITS_FOR_YES);
+    }
     Ok(said)
 }
 
@@ -2166,6 +2305,10 @@ fn topic_cant_yet(topic: &str) -> Option<&'static str> {
 /// or a sound it doesn't ship (a made skill carries no file but its two).
 fn step_cant_yet(step: &toml::Value) -> Option<&'static str> {
     let step = step.as_table()?;
+    // A fixed write to a linked service, only with its switch (#6066).
+    if step.contains_key("write") && step.len() == 1 {
+        return (!writes_on()).then_some(SENDS_ON_ITS_OWN);
+    }
     let sends = [
         "text", "message", "messages", "send", "mail", "email", "post", "write", "notify",
     ];
@@ -2586,6 +2729,12 @@ fn every_day_of(bits: u8) -> String {
 /// since #6066, room for an outbound or camera step named after the steps.
 const MOST_PLAIN_CHARS: usize = 240;
 
+/// The longest [`plainly`] says of a skill that writes (#6066): its write
+/// said whole, every recipient and every word, which are the request's own
+/// ([`MOST_REQUEST_BYTES`]) and may be said twice over (a subject and a
+/// text), with when it runs. Never cut: longer is unsaid.
+const MOST_WRITE_PLAIN_CHARS: usize = 1_400;
+
 /// The triggers [`plainly`] says, each with what it means: in
 /// [`SAYABLE_TRIGGERS`] and [`TRIGGER_MEANINGS`] alike.
 macro_rules! trigger_meanings {
@@ -2709,6 +2858,280 @@ fn read_plainly(step: &toml::Value) -> Option<String> {
         }
         _ => None,
     }
+}
+
+/// What the person is told of a write step the lamp can't send: not fixed
+/// whole, not one of the kinds a made skill writes, or its service not
+/// granted as a write. Never a value.
+pub const WRITE_NOT_FIXED: &str = "what it would send isn't something the lamp can send by \
+                                   itself; try saying exactly what to send, and to whom";
+
+/// What the person is told of a write whose words aren't their own, or
+/// whose recipient or place they didn't name (#6066).
+pub const WRITE_NOT_SAID: &str = "what it would send, or where, isn't in your own words; try \
+                                  saying the exact words to send and the address, like 'mail \
+                                  mai@example.com saying I'm leaving now'";
+
+/// What a repair is told of a write step.
+const WRITE_ONLY: &str = "A write is its skill's only [[do]] step, write = { service = \"CODE\", \
+                          action = \"ACTION\", ... } with only that kind's keys and every value \
+                          written out, with [permissions] services = { CODE = \"write\" }";
+
+/// What a repair is told of a write not from the request's own words.
+const WRITE_FROM_REQUEST: &str = "Every subject, text and title is the request's own words, \
+                                  copied exactly, never made up, read or remembered; every to, \
+                                  cc and attendee an address the request says, or the person's \
+                                  own";
+
+/// A `write = { … }` table as the content `lamp-services` checks and
+/// hashes: its keys, `service` and `action` among them, as JSON.
+fn write_content(write: &toml::Value) -> Option<Value> {
+    write.as_table()?;
+    serde_json::to_value(write).ok().filter(Value::is_object)
+}
+
+/// The addresses a write's `key` lists: a list, or a comma-separated text.
+fn addresses_of(content: &Value, key: &str) -> Vec<String> {
+    match content.get(key) {
+        Some(Value::Array(items)) => items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(|one| one.trim().to_owned())
+            .filter(|one| !one.is_empty())
+            .collect(),
+        Some(Value::String(text)) => text
+            .split(',')
+            .map(|one| one.trim().to_owned())
+            .filter(|one| !one.is_empty())
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Every recipient of a write, or the place it goes when it has none: a
+/// repository, a team, a project, a file, your calendar.
+fn write_reaches(content: &Value) -> Vec<String> {
+    let mut people = addresses_of(content, "to");
+    people.extend(addresses_of(content, "cc"));
+    people.extend(addresses_of(content, "attendees"));
+    if people.is_empty() {
+        let place = lamp_services::skill_writes::sent_to(content);
+        if !place.is_empty() {
+            people.push(place);
+        }
+    }
+    people
+}
+
+/// Items said as one: "a", "a and b", "a, b and c".
+fn and_list(items: &[String]) -> String {
+    match items {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// A write step (#6066) in plain words, whole: where it goes, every
+/// recipient, and every text quoted in full, as `lamp-skills` sends it
+/// (`lamp_skills::service_write`). None for a write the lamp can't send.
+fn write_plainly(step: &toml::Value) -> Option<String> {
+    let step = step.as_table().filter(|step| step.len() == 1)?;
+    let content = write_content(step.get("write")?)?;
+    lamp_services::skill_writes::check(&content).ok()?;
+    let text = |key: &str| content.get(key).and_then(Value::as_str);
+    let quoted = |key: &str| text(key).map(|text| format!("“{text}”"));
+    let saying = quoted("text")
+        .map(|text| format!(", saying {text}"))
+        .unwrap_or_default();
+    let service = text("service")?;
+    let name = service_name(service);
+    Some(match (service, text("action")?) {
+        (_, "send_mail") => {
+            let mut said = format!(
+                "mails {} from your {name}",
+                and_list(&addresses_of(&content, "to"))
+            );
+            let cc = addresses_of(&content, "cc");
+            if !cc.is_empty() {
+                said.push_str(&format!(", copying {}", and_list(&cc)));
+            }
+            if let Some(subject) = quoted("subject") {
+                said.push_str(&format!(", subject {subject}"));
+            }
+            said + &saying
+        }
+        ("google_calendar", _) => {
+            let mut said = format!(
+                "adds {} to your {name}",
+                quoted("title").unwrap_or_else(|| "an event".into())
+            );
+            if let (Some(start), Some(end)) = (text("start"), text("end")) {
+                said.push_str(&format!(" from {start} to {end}"));
+            }
+            let guests = addresses_of(&content, "attendees");
+            if !guests.is_empty() {
+                said.push_str(&format!(", inviting {}", and_list(&guests)));
+            }
+            said + &saying
+        }
+        ("github", "comment") => format!(
+            "comments on issue {} in {} on GitHub{saying}",
+            content.get("number")?,
+            text("repo")?
+        ),
+        ("github", _) => format!(
+            "opens an issue {} in {} on GitHub{saying}",
+            quoted("title")?,
+            text("repo")?
+        ),
+        ("linear", _) => format!(
+            "opens a Linear issue {} for team {}{saying}",
+            quoted("title")?,
+            text("team_id")?
+        ),
+        ("asana", _) => format!(
+            "adds an Asana task {} to {}{saying}",
+            quoted("title")?,
+            match (text("project"), text("workspace")) {
+                (Some(project), _) => format!("project {project}"),
+                (None, Some(workspace)) => format!("workspace {workspace}"),
+                (None, None) => return None,
+            }
+        ),
+        (_, "comment") => format!("comments on Figma file {}{saying}", text("id")?),
+        _ => return None,
+    })
+}
+
+/// Words as a write's check compares them: lower case, curly apostrophes
+/// made plain, split at anything but a letter, a digit or an apostrophe,
+/// apostrophes at a word's ends dropped (a quote's marks).
+fn words_of(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .replace(['’', '‘', '`'], "'")
+        .split(|letter: char| !(letter.is_alphanumeric() || letter == '\''))
+        .map(|word| word.trim_matches('\'').to_owned())
+        .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// Whether `part`'s words are said, one after another, in `whole`'s.
+fn said_in(part: &[String], whole: &[String]) -> bool {
+    !part.is_empty() && whole.windows(part.len()).any(|window| window == part)
+}
+
+/// Whether the address `address` is said in `request`: as written, or
+/// spoken ("mai at example dot com").
+fn address_said(address: &str, request: &str) -> bool {
+    let address = address.trim().to_lowercase();
+    if address.is_empty() {
+        return false;
+    }
+    if request
+        .to_lowercase()
+        .split(|letter: char| letter.is_whitespace() || "<>()[],;\"'“”".contains(letter))
+        .any(|word| word.trim_end_matches(['.', '!', '?', ':']) == address)
+    {
+        return true;
+    }
+    let spoken = address.replace('@', " at ").replace('.', " dot ");
+    said_in(&words_of(&spoken), &words_of(request))
+}
+
+/// Whether `code`'s linked account is `account`'s service: the same code,
+/// or either Gmail for the other.
+fn same_service(code: &str, linked: &str) -> bool {
+    code == linked
+        || matches!(
+            (code, linked),
+            ("gmail", "gmail-app") | ("gmail-app", "gmail")
+        )
+}
+
+/// A made skill's writes held to the request it was made from (#6066, the
+/// first builder's conditions of 21:44): every subject, text and title is
+/// the request's own words, copied (case, spacing and punctuation aside, a
+/// quoted span included), never from a read, the web or memory; every
+/// recipient (`to`, `cc`, `attendees`) is the linked account's own address
+/// (`own`: each linked service's code and account) or an address the
+/// request says; every place (a repository, a team, a project, a
+/// workspace, a file, an issue's number, a calendar other than the
+/// primary) is named in the request. Refused for a repair, its lines
+/// naming the rule and the person's own addresses, never a value of the
+/// request; the person hears [`WRITE_NOT_SAID`]. A skill with no write
+/// passes.
+pub fn write_from_request(
+    text: &str,
+    request: &str,
+    own: &[(String, String)],
+) -> Result<(), Refused> {
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return Ok(());
+    };
+    let heard = words_of(request);
+    let refused = |what: &str| {
+        eprintln!("lamp-voice: a made skill's write isn't the request's own: its {what}");
+        let mine: Vec<&str> = own
+            .iter()
+            .map(|(_, account)| account.as_str())
+            .filter(|account| account.contains('@'))
+            .collect();
+        let mine = match mine.as_slice() {
+            [] => String::new(),
+            mine => format!(" (the person's own: {})", mine.join(", ")),
+        };
+        Err(Refused(
+            WRITE_NOT_SAID.into(),
+            Some(format!(
+                "The lamp refused it: its {what} isn't from the request. {WRITE_FROM_REQUEST}{mine}."
+            )),
+        ))
+    };
+    let writes = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|step| step.get("write"))
+        .filter_map(write_content);
+    for content in writes {
+        let code = content["service"].as_str().unwrap_or_default();
+        for key in ["subject", "text", "title"] {
+            if let Some(field) = content.get(key).and_then(Value::as_str)
+                && !said_in(&words_of(field), &heard)
+            {
+                return refused(key);
+            }
+        }
+        for key in ["repo", "team_id", "project", "workspace", "id", "calendar"] {
+            let Some(place) = content.get(key).and_then(Value::as_str) else {
+                continue;
+            };
+            if key == "calendar" && place == "primary" {
+                continue;
+            }
+            if !said_in(&words_of(place), &heard) {
+                return refused(key);
+            }
+        }
+        if let Some(number) = content.get("number")
+            && !heard.contains(&number.to_string())
+        {
+            return refused("number");
+        }
+        for key in ["to", "cc", "attendees"] {
+            for address in addresses_of(&content, key) {
+                let mine = own.iter().any(|(linked, account)| {
+                    same_service(code, linked) && account.eq_ignore_ascii_case(address.trim())
+                });
+                if !mine && !address_said(&address, request) {
+                    return refused(key);
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// One `[[do]]` step in plain words: a light, a gesture, a say or the hum,
@@ -3413,19 +3836,30 @@ pub struct Made {
 /// answer made as `from` (`local:…`) is kept once: asked again,
 /// the kept one is given back.
 pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Made, Refused> {
-    keep_asked(answer, cut, from, keeping, &[])
+    keep_asked(answer, cut, from, keeping, &Asked::default())
 }
 
-/// [`keep`], with the times of day the person's request named
-/// ([`asked_windows`]): a `during` within one runs as said, at night too,
-/// with no quiet hours; any other keeps the night quiet.
+/// The person's request a skill is made from, as [`keep_asked`] holds it
+/// to: its words, and each linked service's code and account (a write's
+/// own address, #6066).
+#[derive(Clone, Debug, Default)]
+pub struct Asked<'a> {
+    pub request: &'a str,
+    pub own: Vec<(String, String)>,
+}
+
+/// [`keep`], with the person's request: the times of day it named
+/// ([`asked_windows`]), so a `during` within one runs as said, at night
+/// too, with no quiet hours and any other keeps the night quiet; and a
+/// write held to its words ([`write_from_request`], #6066).
 pub fn keep_asked(
     answer: &str,
     cut: bool,
     from: &str,
     keeping: &Keeping,
-    asked: &[(u32, u32)],
+    request: &Asked<'_>,
 ) -> Result<Made, Refused> {
+    let asked = &asked_windows(request.request)[..];
     let unkept = |why: io::Error| {
         eprintln!("lamp-voice: a made skill was not kept: {why}");
         Refused::new("the lamp couldn't keep it")
@@ -3443,6 +3877,10 @@ pub fn keep_asked(
     // packed is the paced one.
     files.toml = paced_asked(&files.toml, asked);
     let (version, uses) = capped(&files.toml)?;
+    // A write's words and recipients are the request's own (#6066).
+    if !uses.writes.is_empty() {
+        write_from_request(&files.toml, request.request, &request.own)?;
+    }
     // Said only once the check has passed: its lines, which name the
     // field, go to a repair before these do.
     let said = said_mannered(&files.toml, asked).map(|does| match &files.left_out {
@@ -3632,11 +4070,23 @@ fn packed_and_kept(
             name,
             version,
             sha256,
-            description: cut_chars(&description, MOST_DESCRIPTION_CHARS),
+            // A write's say-back is never cut (#6066): every recipient
+            // and word is said, bounded by [`MOST_WRITE_PLAIN_CHARS`].
+            description: if uses.writes.is_empty() {
+                cut_chars(&description, MOST_DESCRIPTION_CHARS)
+            } else {
+                description
+            },
             uses,
             package: kept_as,
         };
         remember(&keeping.directory, from, &made, added).map_err(unkept)?;
+        // A write's exact contents, kept beside it for the person's yes
+        // (#6066, [`writes_of`]): the voice's own folder, as the package.
+        let writes = writes_in(toml);
+        if !writes.is_empty() {
+            note_writes(&keeping.directory, &made.sha256, &writes).map_err(unkept)?;
+        }
         fs::rename(&new, &made.package).map_err(unkept)?;
         Ok(made)
     });
@@ -3918,6 +4368,43 @@ fn remember(directory: &Path, from: &str, made: &Made, added: bool) -> io::Resul
     write_index(directory, &entries)
 }
 
+/// The write steps' exact contents of a `skill.toml`, as `lamp-skills`
+/// sends them and `lamp-services` hashes them (#6066).
+pub fn writes_in(toml: &str) -> Vec<Value> {
+    let Ok(table) = toml::from_str::<toml::Table>(toml) else {
+        return Vec::new();
+    };
+    table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|step| step.get("write"))
+        .filter_map(write_content)
+        .collect()
+}
+
+/// Keep the writes of the kept skill `sha256` beside it in the index.
+fn note_writes(directory: &Path, sha256: &str, writes: &[Value]) -> io::Result<()> {
+    let mut entries = index(directory);
+    for entry in &mut entries {
+        if entry["sha256"] == sha256 {
+            entry["writes"] = json!(writes);
+        }
+    }
+    write_index(directory, &entries)
+}
+
+/// The writes kept with the made skill `sha256` ([`note_writes`]): what
+/// the person's yes approves. None for a skill that writes nothing.
+pub fn writes_of(directory: &Path, sha256: &str) -> Vec<Value> {
+    index(directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256)
+        .and_then(|entry| entry["writes"].as_array().cloned())
+        .unwrap_or_default()
+}
+
 /// The index written whole beside it and moved over it.
 fn write_index(directory: &Path, entries: &[Value]) -> io::Result<()> {
     let new = directory.join(format!(".{INDEX}.new"));
@@ -4005,6 +4492,16 @@ pub fn on_line(made: &Made) -> String {
         }
         _ => does.to_owned(),
     };
+    // One that sends or writes is said whole, its every recipient and word
+    // in its description, and ends as that does: it waits for the
+    // person's yes (#6066), never on a word for them to repeat.
+    if !made.uses.writes.is_empty() {
+        let mut said = format!("I made {name}: {does}");
+        if !said.ends_with(['.', '!', '?']) {
+            said.push('.');
+        }
+        return said;
+    }
     if does.is_empty() {
         return format!("I made {name}, and it's on.");
     }
@@ -4341,6 +4838,18 @@ light = { dim = 1 }
             let longest = brief_with(&request, reads).unwrap();
             assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
         }
+        // With a made skill's writes on (#6066), a write pointed to too,
+        // still within the bound.
+        set_writes_here(Some(true));
+        for (reads, said) in [
+            (true, " Or a read/write as above."),
+            (false, " Or one write, as above."),
+        ] {
+            let longest = brief_with(&request, reads).unwrap();
+            assert!(longest.contains(said), "{longest}");
+            assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
+        }
+        set_writes_here(None);
     }
 
     /// #5288: the making model is shown each readable service's one step,
@@ -4427,14 +4936,17 @@ light = { dim = 1 }
         );
         assert_eq!(uses.json()["reads"], "google_calendar");
         assert!(capped_with(READ_TOML, false).is_err());
-        // A write is what the lamp can't do yet (#6066); a second read, a
-        // service with nothing to read or none listed is lamp-skills'
-        // check's to refuse (`tests/it/made.rs`), no longer this cap's.
+        // A write, with LAMP_SKILL_WRITES off, is what the lamp can't do
+        // yet (#6066); a second read, a service with nothing to read or
+        // none listed is lamp-skills' check's to refuse
+        // (`tests/it/made.rs`), no longer this cap's.
+        set_writes_here(Some(false));
         let write = READ_TOML.replace("google_calendar = \"read\"", "google_calendar = \"write\"");
         assert_eq!(
             capped_with(&write, true).unwrap_err().0,
-            cant_yet("writing to a linked service")
+            cant_yet(SENDS_ON_ITS_OWN)
         );
+        set_writes_here(None);
         assert_eq!(
             capped_with(READ_TOML, false).unwrap_err().0,
             cant_yet("reading your linked services")
@@ -4626,16 +5138,18 @@ light = { dim = 1 }
             let (_, uses) = capped(&text).unwrap_or_else(|why| panic!("{wider}: {why:?}"));
             assert_eq!(uses.listens(), wider != "air/state", "{wider}");
         }
-        // A write to a service is what the lamp can't do yet, never
-        // repaired away.
+        // A write to a service, with LAMP_SKILL_WRITES off, is what the
+        // lamp can't do yet, never repaired away.
+        set_writes_here(Some(false));
         let write = TOML.replace(
             "light = true\n",
             "light = true\nservices = { gmail = \"write\" }\n",
         );
         assert_eq!(
             capped_with(&write, true).unwrap_err(),
-            Refused(cant_yet("writing to a linked service"), None)
+            Refused(cant_yet(SENDS_ON_ITS_OWN), None)
         );
+        set_writes_here(None);
         let tool = format!("tool = \"dim_now\"\n{TOML}");
         assert!(capped(&tool).unwrap_err().0.contains("runs by itself"));
         let core = TOML.replace("installable", "core");
@@ -7297,5 +7811,194 @@ light = { colour = "green", level = 3, for = "20s" }
             "{told}"
         );
         assert_eq!(needs_link_ask(&[]), None);
+    }
+
+    /// A made skill that mails, as the making model writes it (#6066).
+    pub(crate) const WRITE_TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+        [permissions]\ntopics = [\"room/stood_up\"]\nservices = { gmail = \"write\" }\n\
+        [trigger]\ntopic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n\
+        cooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[[do]]\n\
+        write = { service = \"gmail\", action = \"send_mail\", to = [\"mai@example.com\"], \
+        subject = \"Leaving\", text = \"I'm leaving now.\" }\n";
+
+    /// The request it is made from.
+    pub(crate) const WRITE_REQUEST: &str = "make a skill that mails mai@example.com with the \
+        subject Leaving, saying \"I'm leaving now.\" when I get up from my desk";
+
+    /// Item 1 (#6066): one write step, its service granted as a write, for
+    /// the kinds lamp-services sends, only with LAMP_SKILL_WRITES on; off,
+    /// "I can't do that yet: sending or writing on its own", never repaired.
+    #[test]
+    fn a_write_is_carried_only_with_its_switch() {
+        set_writes_here(Some(false));
+        assert_eq!(
+            capped_with(WRITE_TOML, false).unwrap_err(),
+            Refused(cant_yet(SENDS_ON_ITS_OWN), None)
+        );
+        assert_eq!(
+            not_made_line(&cant_yet(SENDS_ON_ITS_OWN)),
+            "I can't do that yet: sending or writing on its own."
+        );
+        // A write step with no permission, the switch off: said the same.
+        let bare = WRITE_TOML.replace("services = { gmail = \"write\" }\n", "");
+        assert_eq!(
+            capped_with(&bare, false).unwrap_err(),
+            Refused(cant_yet(SENDS_ON_ITS_OWN), None)
+        );
+        set_writes_here(Some(true));
+        let (_, uses) = capped_with(WRITE_TOML, false).unwrap();
+        assert_eq!(uses.writes, ["gmail"]);
+        assert_eq!(uses.sends_to, ["mai@example.com"]);
+        assert!(!uses.speak);
+        assert_eq!(uses.json()["sends_to"], json!(["mai@example.com"]));
+        assert_eq!(Uses::of_json(&uses.json()), uses);
+        assert!(
+            uses.spoken()
+                .contains("your Gmail, sending to mai@example.com"),
+            "{}",
+            uses.spoken()
+        );
+        assert_eq!(writes_in(WRITE_TOML)[0]["to"], json!(["mai@example.com"]));
+        // A service no skill writes to, a public post: can't yet.
+        let page = WRITE_TOML.replace("gmail = \"write\"", "facebook = \"write\"");
+        assert!(
+            capped_with(&page, false)
+                .unwrap_err()
+                .0
+                .starts_with(CANT_YET)
+        );
+        // Its write ungranted, or not one the lamp sends: repaired.
+        let ungranted = bare.clone();
+        let refused = capped_with(&ungranted, false).unwrap_err();
+        assert_eq!(refused.0, WRITE_NOT_FIXED);
+        assert!(
+            refused
+                .1
+                .unwrap()
+                .contains("services = { gmail = \"write\" }")
+        );
+        let unknown = WRITE_TOML.replace("subject = \"Leaving\"", "title = \"Leaving\"");
+        let refused = capped_with(&unknown, false).unwrap_err();
+        assert_eq!(refused.0, WRITE_NOT_FIXED);
+        assert!(refused.1.unwrap().contains(WRITE_ONLY));
+        set_writes_here(None);
+    }
+
+    /// Item 4: the say-back says where it goes, every recipient, the whole
+    /// text quoted, when and how often, and that it waits for a yes, ending
+    /// on no word to repeat; the lamp's line for it says the same, never
+    /// "it's on".
+    #[test]
+    fn a_writes_say_back_is_whole_and_ends_on_its_wait() {
+        set_writes_here(Some(true));
+        let said = plainly(&mannered(WRITE_TOML)).unwrap();
+        for part in [
+            "When someone sitting at the desk gets up",
+            "it mails mai@example.com from your Gmail, subject “Leaving”, saying “I'm leaving now.”",
+            "at most once an hour",
+            "It starts on its own",
+        ] {
+            assert!(said.contains(part), "{part}: {said}");
+        }
+        assert!(said.ends_with(WAITS_FOR_YES), "{said}");
+        assert!(!said.to_lowercase().contains("yes"), "{said}");
+        let made = Made {
+            name: "leaving-mail".into(),
+            version: "1.0.0".into(),
+            sha256: "0".repeat(64),
+            description: said.clone(),
+            uses: capped_with(WRITE_TOML, false).unwrap().1,
+            package: PathBuf::from("leaving-mail.tar"),
+        };
+        let line = on_line(&made);
+        assert!(
+            line.starts_with("I made leaving mail: when someone"),
+            "{line}"
+        );
+        assert!(!line.contains("it's on"), "{line}");
+        assert!(line.ends_with(WAITS_FOR_YES.trim()), "{line}");
+        // Off, the write is unsaid as what the lamp can't do yet.
+        set_writes_here(Some(false));
+        assert_eq!(
+            plainly(WRITE_TOML).unwrap_err().0,
+            cant_yet(SENDS_ON_ITS_OWN)
+        );
+        set_writes_here(None);
+    }
+
+    /// Items 2 and 3: every subject, text and title is in the request's own
+    /// words (case, spacing and quotes aside); every recipient the linked
+    /// account's own or an address the request says; every place named in
+    /// it. Anything else goes back for repair, never naming a value.
+    #[test]
+    fn a_writes_words_and_recipients_are_the_requests_own() {
+        let none: [(String, String); 0] = [];
+        assert_eq!(write_from_request(WRITE_TOML, WRITE_REQUEST, &none), Ok(()));
+        // Case, spacing, punctuation and a quoted span.
+        assert_eq!(
+            write_from_request(
+                WRITE_TOML,
+                "when I get up, MAIL mai@example.com:  subject 'leaving',  “i’m   LEAVING now”",
+                &none
+            ),
+            Ok(())
+        );
+        // A spoken address.
+        assert_eq!(
+            write_from_request(
+                WRITE_TOML,
+                "mail mai at example dot com, subject leaving: I'm leaving now",
+                &none
+            ),
+            Ok(())
+        );
+        let refused = |toml: &str, request: &str, own: &[(String, String)]| {
+            let Refused(why, lines) = write_from_request(toml, request, own).unwrap_err();
+            assert_eq!(why, WRITE_NOT_SAID);
+            let lines = lines.unwrap();
+            assert!(lines.contains(WRITE_FROM_REQUEST), "{lines}");
+            assert!(!lines.contains("mai@example.com"), "{lines}");
+            lines
+        };
+        // Words the model added, or took from elsewhere.
+        let added = WRITE_TOML.replace("I'm leaving now.", "I'm leaving now, see you tomorrow.");
+        assert!(refused(&added, WRITE_REQUEST, &none).contains("its text"));
+        let subject = WRITE_TOML.replace("subject = \"Leaving\"", "subject = \"Update\"");
+        assert!(refused(&subject, WRITE_REQUEST, &none).contains("its subject"));
+        // A recipient the request didn't say: refused; the person's own
+        // linked address: taken, and named to the repair.
+        let boss = WRITE_TOML.replace("mai@example.com", "boss@work.test");
+        let mine = [("gmail-app".to_owned(), "me@home.test".to_owned())];
+        assert!(refused(&boss, WRITE_REQUEST, &mine).contains("me@home.test"));
+        let me = WRITE_TOML.replace("mai@example.com", "me@home.test");
+        assert_eq!(
+            write_from_request(
+                &me,
+                "mail me saying I'm leaving now, subject leaving",
+                &mine
+            ),
+            Ok(())
+        );
+        // A contact named without an address is no address.
+        let named = "mail Mai saying I'm leaving now, subject leaving";
+        refused(WRITE_TOML, named, &none);
+        // A GitHub repository only as the request names it.
+        let issue = "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\n\
+            services = { github = \"write\" }\n[trigger]\ntopic = \"clock/local\"\n\
+            field = \"known\"\nequals = true\n[[do]]\nwrite = { service = \"github\", \
+            action = \"create_issue\", repo = \"acme/site\", title = \"Standup\", \
+            text = \"Standup notes\" }\n";
+        assert_eq!(
+            write_from_request(
+                issue,
+                "open an issue Standup in acme/site saying Standup notes",
+                &none
+            ),
+            Ok(())
+        );
+        assert!(
+            refused(issue, "open an issue Standup saying Standup notes", &none)
+                .contains("its repo")
+        );
     }
 }
