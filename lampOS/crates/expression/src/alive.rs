@@ -170,6 +170,16 @@ pub struct Alive {
     pub wake: Option<Wake>,
 }
 
+/// PARKED (#5955): the work light's gate, off on every lamp whatever its
+/// catalogue says. An updated lamp keeps the `alive.work` its install wrote
+/// in /etc/lampOS/expression/expression.json (install only writes the
+/// product settings), so taking it out of the product's file (#5959) did not
+/// reach it (lamp-52e6 on 11264, 10 Nov). With it off, someone close and
+/// still under the light keeps the breath and drift going. To turn the gate
+/// back on: set this to `true`; a catalogue's `alive.work` then works as
+/// before, and `alive_engine.rs`'s PARKED (#5955) test comes back.
+const WORK_GATE: bool = false;
+
 fn wrong(why: impl Into<String>) -> Error {
     Error(format!("alive: {}", why.into()))
 }
@@ -1352,10 +1362,11 @@ impl Life {
     }
 
     fn working(&self, now_us: u64) -> bool {
-        self.alive.work.is_some_and(|work| {
-            self.worked
-                .is_some_and(|at| now_us.saturating_sub(at) <= work.hold_us)
-        })
+        WORK_GATE
+            && self.alive.work.is_some_and(|work| {
+                self.worked
+                    .is_some_and(|at| now_us.saturating_sub(at) <= work.hold_us)
+            })
     }
 
     fn drift_now(&self, now_us: u64, pace: f64) -> BodyOffsets {
