@@ -11,15 +11,15 @@ use crate::reads::{self, ANSWER_MOST, Asker, Plan};
 use crate::refresh::Backend;
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
-use crate::{spoken, tools};
+use crate::{skill_writes, spoken, tools};
 use serde_json::{Value, json};
 use std::{
     fmt,
     io::{self, BufRead, BufReader, Read, Write},
     os::unix::net::{UnixListener, UnixStream},
     sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -47,6 +47,10 @@ pub const TOOLS_ASKER_CGROUP: &str = "/lampos.slice/lampos-voice.slice/lamp-voic
 pub const SKILLS_ASKER_CGROUP: &str = "/lampos.slice/lampos-parts.slice/lamp-skills.service";
 /// What a skill's call to anything but a read is told.
 pub const SKILL_READS_ONLY: &str = "a skill may only read a linked service";
+/// What a skill's call to anything but a read or its approved write is
+/// told, with `LAMP_SKILL_WRITES=on`.
+pub const SKILL_READS_AND_WRITES_ONLY: &str =
+    "a skill may only read a linked service or make its approved write";
 
 /// Whether `/proc/<pid>/cgroup`'s text puts the process in `asker` (or a
 /// cgroup under it): the unified hierarchy's line (`0::…`), or systemd's
@@ -69,17 +73,24 @@ pub fn from_asker(cgroup: &str, asker: &str) -> bool {
 /// Whether the peer on `stream` is in `asker`, by its credentials and its
 /// cgroup. Peer credentials are read on Linux only; elsewhere no peer is.
 pub fn peer_is(stream: &UnixStream, asker: &str) -> bool {
+    peer_cgroup(stream).is_some_and(|cgroup| from_asker(&cgroup, asker))
+}
+
+/// The text of the peer's `/proc/<pid>/cgroup`, by its credentials; on
+/// Linux only.
+fn peer_cgroup(stream: &UnixStream) -> Option<String> {
     #[cfg(target_os = "linux")]
     {
-        rustix::net::sockopt::socket_peercred(stream).is_ok_and(|peer| {
-            std::fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
-                .is_ok_and(|cgroup| from_asker(&cgroup, asker))
-        })
+        rustix::net::sockopt::socket_peercred(stream)
+            .ok()
+            .and_then(|peer| {
+                std::fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero())).ok()
+            })
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = (stream, asker);
-        false
+        let _ = stream;
+        None
     }
 }
 
@@ -94,6 +105,9 @@ pub enum Admin {
     Wipe,
     /// What is linked.
     List,
+    /// The owner's yes to a made skill's writes, from the app (#6066):
+    /// `{"skill", "writes": [...]}`, as [`Services::skill_write_approve`].
+    ApproveSkillWrites(Value),
 }
 
 impl fmt::Debug for Admin {
@@ -107,6 +121,10 @@ impl fmt::Debug for Admin {
             Self::Remove(code) => f.debug_tuple("Remove").field(code).finish(),
             Self::Wipe => f.write_str("Wipe"),
             Self::List => f.write_str("List"),
+            Self::ApproveSkillWrites(_) => f
+                .debug_tuple("ApproveSkillWrites")
+                .field(&"<hidden>")
+                .finish(),
         }
     }
 }
@@ -144,10 +162,20 @@ pub fn parse_admin(line: &str) -> Result<Admin, String> {
         Some("remove") if only(&["op", "code"]) => Ok(Admin::Remove(code()?)),
         Some("wipe") if only(&["op"]) => Ok(Admin::Wipe),
         Some("list") if only(&["op"]) => Ok(Admin::List),
-        Some("set" | "remove" | "wipe" | "list") => {
+        Some(skill_writes::APPROVE) if only(&["op", "skill", "writes"]) => {
+            let mut args = value.clone();
+            if let Some(args) = args.as_object_mut() {
+                args.remove("op");
+            }
+            Ok(Admin::ApproveSkillWrites(args))
+        }
+        Some("set" | "remove" | "wipe" | "list" | skill_writes::APPROVE) => {
             Err("the request has fields it doesn't take".into())
         }
-        _ => Err("op is set, remove, wipe or list".into()),
+        _ => Err(format!(
+            "op is set, remove, wipe, list or {}",
+            skill_writes::APPROVE
+        )),
     }
 }
 
@@ -163,7 +191,17 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
     let name = value
         .get("name")
         .and_then(Value::as_str)
-        .filter(|name| [tools::CONNECTED, tools::READ, tools::WRITE].contains(name))
+        .filter(|name| {
+            [
+                tools::CONNECTED,
+                tools::READ,
+                tools::WRITE,
+                skill_writes::FUNCTION,
+                skill_writes::APPROVE,
+                skill_writes::SENT,
+            ]
+            .contains(name)
+        })
         .ok_or("no such function")?;
     let args = match value.get("args") {
         None | Some(Value::Null) => json!({}),
@@ -185,6 +223,18 @@ pub struct Services<H, M> {
     /// `LAMP_SKILL_READS=on`: `lamp-skills` may call the tools' socket, for
     /// `service_read` alone ([`Services::skill_tool`]).
     pub skill_reads: bool,
+    /// `LAMP_SKILL_WRITES=on`: `lamp-skills` may make a made skill's
+    /// fixed write the owner said yes to ([`Services::skill_write`]).
+    pub skill_writes: bool,
+    /// A skill's writes refused for content not approved, since start: the
+    /// journal says this count, never the content.
+    pub not_approved: AtomicUsize,
+    /// A wipe came (a sign-out, an unpairing, a reset) and nothing was
+    /// linked since: no skill's write goes. A restart starts it clear: the
+    /// wipe left nothing linked.
+    pub signed_out: AtomicBool,
+    /// Held while a skill's write is counted against the bounds.
+    skill_send: Mutex<()>,
     pub desk: Desk,
 }
 
@@ -282,8 +332,27 @@ impl<H: Http, M: Mail> Services<H, M> {
             backend,
             write_on,
             skill_reads: false,
+            skill_writes: false,
+            not_approved: AtomicUsize::new(0),
+            signed_out: AtomicBool::new(false),
+            skill_send: Mutex::new(()),
             desk: Desk::default(),
         }
+    }
+
+    /// With `LAMP_SKILL_WRITES` as `on` gives it.
+    pub fn with_skill_writes(mut self, on: bool) -> Self {
+        self.skill_writes = on;
+        self
+    }
+
+    /// Whether a peer in `cgroup` is `lamp-skills` on the tools' door with
+    /// a skill's read or write switch on: then [`Self::skill_tool`] answers
+    /// it. Any other cgroup is refused at the door.
+    pub fn skill_caller(&self, door: Door, cgroup: &str) -> bool {
+        door == Door::Tools
+            && (self.skill_reads || self.skill_writes)
+            && from_asker(cgroup, SKILLS_ASKER_CGROUP)
     }
 
     /// With `LAMP_SKILL_READS` as `on` gives it.
@@ -305,8 +374,22 @@ impl<H: Http, M: Mail> Services<H, M> {
                 json!({"ok": true, "connected": self.store.list(crate::now_secs())}),
                 "listed".into(),
             ),
+            Admin::ApproveSkillWrites(args) => match self.skill_write_approve(&args).await {
+                Ok(result) => (
+                    json!({"ok": true, "result": result}),
+                    "a made skill's writes approved from the app".into(),
+                ),
+                Err(why) => (
+                    refused(&why),
+                    format!("a made skill's writes not approved: {why}"),
+                ),
+            },
             Admin::Wipe => {
                 self.desk.forget(None);
+                // A sign-out, an unpairing or a reset: no skill's write
+                // goes until a service is linked again, even if the wipe
+                // fails (`lamp-cloud` asks again while signed out).
+                self.signed_out.store(true, Ordering::SeqCst);
                 match self.store.wipe() {
                     Ok(()) => (json!({"ok": true}), "every service unlinked".into()),
                     Err(error) => (
@@ -355,10 +438,13 @@ impl<H: Http, M: Mail> Services<H, M> {
                     }
                 }
                 match self.store.keep(&entry) {
-                    Ok(()) => (
-                        json!({"ok": true, "connector": code, "scopes": entry.scopes}),
-                        format!("{code} linked"),
-                    ),
+                    Ok(()) => {
+                        self.signed_out.store(false, Ordering::SeqCst);
+                        (
+                            json!({"ok": true, "connector": code, "scopes": entry.scopes}),
+                            format!("{code} linked"),
+                        )
+                    }
                     Err(error) => (
                         refused("the link could not be kept"),
                         format!("{code} not kept: {}", error.kind()),
@@ -384,7 +470,17 @@ impl<H: Http, M: Mail> Services<H, M> {
             Ok((name, args)) => match name.as_str() {
                 tools::CONNECTED => Ok(self.connected()),
                 tools::READ => self.read(&args, asker).await,
-                _ => self.write(&args).await,
+                tools::WRITE => self.write(&args).await,
+                // The voice's own calls, never offered to its model: the
+                // owner's yes to a made skill's writes, and what they sent.
+                skill_writes::APPROVE if asker == Asker::Owner => {
+                    self.skill_write_approve(&args).await
+                }
+                skill_writes::SENT if asker == Asker::Owner => {
+                    Ok(skill_writes::SentLog::new(&self.store.0).list())
+                }
+                // A made skill's write is `lamp-skills`' alone.
+                _ => Err("no such function".into()),
             },
         };
         let answer = match answer {
@@ -407,16 +503,193 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// checked (Thirteen's P3 on #5303).
     pub async fn skill_tool(&self, line: &str) -> Value {
         match parse_tool(line.trim_end_matches(['\r', '\n'])) {
-            Ok((name, args)) if name == tools::READ => {
+            Ok((name, args)) if name == skill_writes::FUNCTION && self.skill_writes => {
+                match self.skill_write(&args).await {
+                    Ok(result) => json!({"ok": true, "result": result}),
+                    Err(why) => json!({"ok": false, "error": why}),
+                }
+            }
+            Ok((name, args)) if name == tools::READ && self.skill_reads => {
                 let text = |key: &str| args.get(key).and_then(Value::as_str).unwrap_or_default();
                 match spoken::skill_read_refused(text("service"), text("what")) {
                     Some(why) => json!({"ok": false, "error": why}),
                     None => self.tool_as(line, Asker::Skill).await,
                 }
             }
+            Ok(_) if self.skill_writes => {
+                json!({"ok": false, "error": SKILL_READS_AND_WRITES_ONLY})
+            }
             Ok(_) => json!({"ok": false, "error": SKILL_READS_ONLY}),
             Err(why) => json!({"ok": false, "error": why}),
         }
+    }
+
+    /// The owner's yes to a made skill's writes (#6066), from the voice's
+    /// yes path (the tools socket, its cgroup alone) or the app
+    /// (`lamp-cloud`, the admin socket), never `lamp-skills`; who said yes
+    /// is not checked. `{"skill", "writes": [content, ...]}`, each content
+    /// exactly as its skill file has it. Each is checked and its service
+    /// must be linked now; its hash is kept with the link it is approved
+    /// under ([`skill_writes::link_of`]), replacing what the skill had.
+    /// An empty list takes the skill's approvals away.
+    pub async fn skill_write_approve(&self, args: &Value) -> Result<Value, String> {
+        if !self.skill_writes {
+            return Err(format!(
+                "a skill's writes are off on this lamp ({} is not on)",
+                skill_writes::ENVIRONMENT
+            ));
+        }
+        let skill = args
+            .get("skill")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !skill_writes::skill_name_ok(skill) {
+            return Err("the approval names no skill".into());
+        }
+        let writes = args
+            .get("writes")
+            .and_then(Value::as_array)
+            .ok_or("writes is a list of the skill's writes")?;
+        let mut approved = Vec::new();
+        for write in writes {
+            skill_writes::check(write)
+                .map_err(|_| "a write is not one a skill makes: nothing was approved".to_owned())?;
+            let code = write["service"].as_str().unwrap_or_default();
+            let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
+            let entry = self
+                .store
+                .load(service.code)
+                .ok_or_else(|| format!("{} {NOT_LINKED}", service.name))?;
+            let link_of = skill_writes::link_of(&entry).ok_or_else(|| {
+                format!(
+                    "{} is linked without an account the lamp can tell: link it again in the app",
+                    service.name
+                )
+            })?;
+            approved.push((write.clone(), link_of));
+        }
+        skill_writes::Approvals::new(&self.store.0).approve(skill, &approved)?;
+        eprintln!(
+            "lamp-services: the owner approved {} write(s) of a made skill",
+            approved.len()
+        );
+        Ok(json!({"approved": approved.len()}))
+    }
+
+    /// A made skill's write (#6066, [`skill_writes`]): `{"skill", "write"}`,
+    /// the write's content exactly as its skill file has it. Sent only when
+    /// both switches are on, the lamp is not signed out, the content's hash is one the owner approved for that skill,
+    /// its service is still linked under the link approved, it is one of
+    /// [`skill_writes::KINDS`] on a service with a write list, the link's
+    /// scopes allow it and the day's bounds hold. The journal says counts
+    /// and outcomes only, never a recipient or a text, and no refusal
+    /// repeats a value.
+    pub async fn skill_write(&self, args: &Value) -> Result<Value, String> {
+        let refused = |why: String| {
+            eprintln!("lamp-services: a skill's write refused: {why}");
+            Err(why)
+        };
+        if !self.skill_writes {
+            return refused(format!(
+                "a skill's writes are off on this lamp ({} is not on)",
+                skill_writes::ENVIRONMENT
+            ));
+        }
+        if !self.write_on {
+            return refused("writing to services is off on this lamp".into());
+        }
+        if self.signed_out.load(Ordering::SeqCst) {
+            return refused("not sent: the lamp is signed out".into());
+        }
+        let skill = args
+            .get("skill")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !skill_writes::skill_name_ok(skill) {
+            return refused("not sent: the write names no skill".into());
+        }
+        let write = args.get("write").cloned().unwrap_or(Value::Null);
+        let approval = match skill_writes::Approvals::new(&self.store.0).find(skill, &write) {
+            skill_writes::Found::Approved(approval) => approval,
+            skill_writes::Found::Waiting => return refused(skill_writes::WAITING.into()),
+            skill_writes::Found::Other => {
+                let count = self.not_approved.fetch_add(1, Ordering::SeqCst) + 1;
+                eprintln!(
+                    "lamp-services: a skill's write refused: not the approved content ({count} since start)"
+                );
+                return Err(skill_writes::NOT_APPROVED.into());
+            }
+        };
+        if skill_writes::check(&write).is_err() {
+            return refused("not sent: the write is not one a skill makes".into());
+        }
+        let Some(service) = catalog::service(&approval.service) else {
+            return refused("not sent: the lamp doesn't know that service".into());
+        };
+        // Its write list, as the guard holds every write's call to it.
+        if service.mcp.is_some() || service.writes.is_empty() {
+            return refused(format!("not sent: the lamp only reads {}", service.name));
+        }
+        // The service named exactly, no other Gmail link standing in for
+        // it, and under the link the owner said yes to.
+        let Some(kept) = self.store.load(service.code) else {
+            return refused(format!(
+                "{}{} isn't linked any more; nothing was sent",
+                skill_writes::STOPPED,
+                service.name
+            ));
+        };
+        if skill_writes::link_of(&kept).as_deref() != Some(approval.link_of.as_str()) {
+            return refused(format!(
+                "{}the {} link changed since the owner's yes; nothing was sent",
+                skill_writes::STOPPED,
+                service.name
+            ));
+        }
+        let entry = match self.linked(&write).await {
+            Ok((_, entry)) => entry,
+            Err(why) => return refused(format!("not sent: {why}")),
+        };
+        if let Some(what) = writes::scope_missing(service.code, &write, &entry) {
+            return refused(format!("not sent: {}", no_permission(service, what)));
+        }
+        let Ok(pending) = writes::prepare(service.code, &write, &entry) else {
+            return refused("not sent: the write is not one the lamp makes".into());
+        };
+        // Counted before it is sent, one skill's write at a time, so two
+        // at once never pass a bound together; a send that then fails
+        // still counts.
+        let taken = {
+            let _one = self
+                .skill_send
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            skill_writes::Ledger::new(&self.store.0).take(skill, crate::now_secs())
+        };
+        let (mine, all) = match taken {
+            Ok(counts) => counts,
+            Err(why) => return refused(format!("not sent: {why}")),
+        };
+        let answer = match self.send(service, &entry, pending).await {
+            Ok(answer) => answer,
+            Err(why) => return refused(why),
+        };
+        let told = skill_writes::Told {
+            skill: skill.to_owned(),
+            service: service.code.to_owned(),
+            at: crate::now_secs(),
+            to: skill_writes::sent_to(&write),
+        };
+        if skill_writes::SentLog::new(&self.store.0).add(told).is_err() {
+            eprintln!("lamp-services: the owner's sent-log was not kept");
+        }
+        eprintln!(
+            "lamp-services: a skill's write to {} was sent ({mine} of {} for it today, {all} of {} for every skill)",
+            service.code,
+            skill_writes::PER_SKILL,
+            skill_writes::ALL_SKILLS
+        );
+        Ok(answer)
     }
 
     fn connected(&self) -> Value {
@@ -1035,6 +1308,25 @@ impl<H: Http, M: Mail> Services<H, M> {
         if writes::link_of(&entry) != pending.link {
             return Err(LINK_CHANGED.into());
         }
+        let answer = self.send(service, &entry, pending).await?;
+        if answer["sent"] == true {
+            eprintln!(
+                "lamp-services: a confirmed write to {} was sent",
+                service.code
+            );
+        }
+        Ok(answer)
+    }
+
+    /// A write checked and bound, sent once as its action says: the
+    /// answer, or why not, after "not sent: " (or "not saved: ").
+    async fn send(
+        &self,
+        service: &'static catalog::Service,
+        entry: &Entry,
+        pending: writes::Pending,
+    ) -> Result<Value, String> {
+        let entry = entry.clone();
         // What a write made, when its service says: a new Drive file's name
         // and link.
         let mut made = None;
@@ -1120,12 +1412,6 @@ impl<H: Http, M: Mail> Services<H, M> {
                     return Err(format!("{} answered that the call failed", service.name));
                 }
             }
-        }
-        if answer["sent"] == true {
-            eprintln!(
-                "lamp-services: a confirmed write to {} was sent",
-                service.code
-            );
         }
         if let Some(made) = made {
             answer["made"] = made;
@@ -1235,13 +1521,12 @@ fn answer_one<H: Http, M: Mail>(
 ) -> io::Result<()> {
     stream.set_read_timeout(Some(PEER_WITHIN))?;
     stream.set_write_timeout(Some(PEER_WITHIN))?;
-    // A made skill's read (#5288): `lamp-skills`, only with its switch on,
-    // and then only `service_read` ([`Services::skill_tool`]).
-    let asker = peer_is(stream, door.asker());
-    let skill = !asker
-        && door == Door::Tools
-        && services.skill_reads
-        && peer_is(stream, SKILLS_ASKER_CGROUP);
+    // A made skill's read (#5288) or its approved write (#6066):
+    // `lamp-skills`, only with a switch on, and then only `service_read` or
+    // `skill_write`, each with its own switch ([`Services::skill_tool`]).
+    let cgroup = peer_cgroup(stream).unwrap_or_default();
+    let asker = from_asker(&cgroup, door.asker());
+    let skill = !asker && services.skill_caller(door, &cgroup);
     if !asker && !skill {
         return writeln!(&*stream, "{}", door.refusal());
     }
@@ -2085,6 +2370,242 @@ mod tests {
             "writing to services is off on this lamp"
         );
         assert!(off.http.calls.lock().unwrap().is_empty());
+    }
+
+    fn skill_write_line(skill: &str, write: &Value) -> String {
+        json!({"op":"call","name":"skill_write","args":{"skill":skill,"write":write}}).to_string()
+    }
+
+    fn approve_line(skill: &str, writes: &[Value]) -> String {
+        json!({"op":"call","name":"skill_write_approve","args":{"skill":skill,"writes":writes}})
+            .to_string()
+    }
+
+    fn arrival_mail() -> Value {
+        json!({"service":"gmail","action":"send_mail","to":["boss@work.test"],"subject":"In","text":"I'm at my desk."})
+    }
+
+    fn app_password_gmail(account: &str) -> String {
+        set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":account}}),
+        )
+    }
+
+    /// Services with a made skill's writes on, Gmail linked as
+    /// me@home.test, and "arrive-mail"'s mail approved by the voice.
+    fn approved(dir: &std::path::Path) -> Services<FakeHttp, FakeMail> {
+        let on = services(dir, "{}", true).with_skill_writes(true);
+        run(on.admin(&app_password_gmail("me@home.test")));
+        let yes = run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])));
+        assert_eq!(yes["result"]["approved"], 1, "{yes}");
+        on
+    }
+
+    /// The app's yes (lamp-cloud's admin door) approves as the voice's
+    /// does; who said it is not checked.
+    #[test]
+    fn the_apps_yes_approves_a_skills_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = services(dir.path(), "{}", true).with_skill_writes(true);
+        run(on.admin(&app_password_gmail("me@home.test")));
+        let line = skill_write_line("arrive-mail", &arrival_mail());
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        let yes =
+            json!({"op":"skill_write_approve","skill":"arrive-mail","writes":[arrival_mail()]});
+        let (answer, said) = run(on.admin(&yes.to_string()));
+        assert_eq!(answer["result"]["approved"], 1, "{answer}");
+        assert!(!said.contains("boss@") && !said.contains("desk"), "{said}");
+        assert!(!format!("{:?}", parse_admin(&yes.to_string()).unwrap()).contains("boss@"));
+        assert_eq!(run(on.skill_tool(&line))["result"]["sent"], true);
+        // A field it doesn't take is refused whole.
+        let extra = json!({"op":"skill_write_approve","skill":"x","writes":[],"code":"gmail"});
+        assert_eq!(run(on.admin(&extra.to_string())).0["ok"], false);
+    }
+
+    /// #6066: a made skill's write goes only as the owner approved it,
+    /// within its bounds; refusals, the ledger and the sent-log hold no
+    /// text, and the journal counts.
+    #[test]
+    fn a_skills_approved_write_goes_and_any_other_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let line = skill_write_line("arrive-mail", &arrival_mail());
+        // Put on but no yes: waiting for the owner's.
+        let waiting = services(dir.path(), "{}", true).with_skill_writes(true);
+        run(waiting.admin(&app_password_gmail("me@home.test")));
+        assert_eq!(
+            run(waiting.skill_tool(&line))["error"],
+            skill_writes::WAITING
+        );
+        // Only the voice approves: never lamp-skills.
+        assert_eq!(
+            run(waiting.skill_tool(&approve_line("arrive-mail", &[arrival_mail()])))["error"],
+            SKILL_READS_AND_WRITES_ONLY
+        );
+        let on = approved(dir.path());
+        // The approved content goes.
+        let sent = run(on.skill_tool(&line));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
+        assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
+        assert_eq!(on.mail.sent.lock().unwrap()[0].to, vec!["boss@work.test"]);
+        // A changed text or recipient: refused, by count.
+        let mut changed = arrival_mail();
+        changed["text"] = json!("I'm at my desk!");
+        let mut redirected = arrival_mail();
+        redirected["to"] = json!(["someone@else.test"]);
+        for write in [&changed, &redirected] {
+            let refused = run(on.skill_tool(&skill_write_line("arrive-mail", write)));
+            assert_eq!(refused["error"], skill_writes::NOT_APPROVED, "{refused}");
+            assert!(!refused.to_string().contains("else.test"));
+        }
+        assert_eq!(on.not_approved.load(Ordering::SeqCst), 2);
+        // Another skill's name with the same content: no yes for it.
+        assert_eq!(
+            run(on.skill_tool(&skill_write_line("other-skill", &arrival_mail())))["error"],
+            skill_writes::WAITING
+        );
+        assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
+        // Over its bound: three a day, then refused.
+        for _ in 0..2 {
+            assert_eq!(run(on.skill_tool(&line))["result"]["sent"], true);
+        }
+        let over = run(on.skill_tool(&line));
+        assert!(
+            over["error"].as_str().unwrap().contains("at most 3"),
+            "{over}"
+        );
+        assert_eq!(on.mail.sent.lock().unwrap().len(), 3);
+        let store = dir.path().join("s");
+        for file in [skill_writes::LEDGER_FILE, skill_writes::APPROVED_FILE] {
+            let kept = std::fs::read_to_string(store.join(file)).unwrap();
+            assert!(!kept.contains("boss@") && !kept.contains("desk"), "{kept}");
+        }
+        // The owner's sent-log: who, never what.
+        let log = run(on.tool(r#"{"op":"call","name":"skill_writes_sent"}"#));
+        let sent = log["result"]["sent"].as_array().unwrap();
+        assert_eq!(sent.len(), 3, "{log}");
+        assert_eq!(sent[0]["skill"], "arrive-mail");
+        assert_eq!(sent[0]["to"], "boss@work.test");
+        assert!(!log.to_string().contains("desk"));
+        assert_eq!(
+            run(on.skill_tool(r#"{"op":"call","name":"skill_writes_sent"}"#))["error"],
+            SKILL_READS_AND_WRITES_ONLY
+        );
+        // The voice can't make a skill's write; nor can a skill do
+        // anything else.
+        assert_eq!(run(on.tool(&line))["error"], "no such function");
+        assert_eq!(
+            run(on.skill_tool(&mail_ask("gmail")))["error"],
+            SKILL_READS_AND_WRITES_ONLY
+        );
+    }
+
+    /// The link the owner said yes under: unlinked, or linked again as
+    /// another account, stops the skill's writes; the same account linked
+    /// again still goes.
+    #[test]
+    fn a_skills_write_is_bound_to_the_link_it_was_approved_under() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = approved(dir.path());
+        let line = skill_write_line("arrive-mail", &arrival_mail());
+        run(on.admin(r#"{"op":"remove","code":"gmail"}"#));
+        let gone = run(on.skill_tool(&line));
+        assert!(
+            gone["error"]
+                .as_str()
+                .unwrap()
+                .starts_with(skill_writes::STOPPED),
+            "{gone}"
+        );
+        run(on.admin(&app_password_gmail("someone@else.test")));
+        let other = run(on.skill_tool(&line));
+        assert!(
+            other["error"].as_str().unwrap().contains("link changed"),
+            "{other}"
+        );
+        assert!(on.mail.sent.lock().unwrap().is_empty());
+        run(on.admin(&app_password_gmail("me@home.test")));
+        assert_eq!(run(on.skill_tool(&line))["result"]["sent"], true);
+        // Nothing is approved for a service not linked.
+        let event = json!({"service":"google_calendar","action":"create_event","title":"Focus","start":"2026-11-11T09:00:00+07:00","end":"2026-11-11T10:00:00+07:00"});
+        let refused = run(on.tool(&approve_line("focus", &[event])));
+        assert!(
+            refused["error"].as_str().unwrap().contains("isn't linked"),
+            "{refused}"
+        );
+    }
+
+    #[test]
+    fn a_skills_write_is_refused_off_signed_out_or_elsewhere() {
+        let dir = tempfile::tempdir().unwrap();
+        let line = skill_write_line("arrive-mail", &arrival_mail());
+        let on = approved(dir.path());
+        // Its switch off: the door's own refusal, nothing approved or sent.
+        let off = services(dir.path(), "{}", true).with_skill_reads(true);
+        assert_eq!(run(off.skill_tool(&line))["error"], SKILL_READS_ONLY);
+        assert!(
+            run(off.tool(&approve_line("arrive-mail", &[arrival_mail()])))["error"]
+                .as_str()
+                .unwrap()
+                .contains("LAMP_SKILL_WRITES")
+        );
+        // Writes off on the lamp.
+        let writes_off = services(dir.path(), "{}", false).with_skill_writes(true);
+        assert_eq!(
+            run(writes_off.skill_tool(&line))["error"],
+            "writing to services is off on this lamp"
+        );
+        for service in [&off, &writes_off] {
+            assert!(service.mail.sent.lock().unwrap().is_empty());
+        }
+        // Signed out (a wipe): refused, and the approvals are gone with it.
+        run(on.admin(r#"{"op":"wipe"}"#));
+        let refused = run(on.skill_tool(&line));
+        assert!(
+            refused["error"].as_str().unwrap().contains("signed out"),
+            "{refused}"
+        );
+        run(on.admin(&app_password_gmail("me@home.test")));
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert!(on.mail.sent.lock().unwrap().is_empty());
+        // Only lamp-skills' own cgroup is a skill's caller, on the tools'
+        // door, and only with a skill's switch on.
+        let skills_cgroup = "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n";
+        assert!(on.skill_caller(Door::Tools, skills_cgroup));
+        assert!(!on.skill_caller(Door::Admin, skills_cgroup));
+        for other in [
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills-manage@1.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n",
+            "0::/user.slice/user-1000.slice/session-1.scope\n",
+        ] {
+            assert!(!on.skill_caller(Door::Tools, other), "{other}");
+        }
+        assert!(!services(dir.path(), "{}", true).skill_caller(Door::Tools, skills_cgroup));
+    }
+
+    /// A write no skill makes (a public post): never approved, never sent.
+    #[test]
+    fn a_skills_write_of_a_kind_no_skill_makes_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = services(dir.path(), "{}", true).with_skill_writes(true);
+        run(on.admin(&set_line(
+            "facebook",
+            json!({"auth_type":"oauth","access_token":"t","credentials":{"page_id":"42"}}),
+        )));
+        let post = json!({"service":"facebook","action":"page_post","text":"Hello"});
+        let refused = run(on.tool(&approve_line("post", std::slice::from_ref(&post))));
+        assert!(
+            refused["error"]
+                .as_str()
+                .unwrap()
+                .contains("not one a skill makes"),
+            "{refused}"
+        );
+        assert_eq!(
+            run(on.skill_tool(&skill_write_line("post", &post)))["error"],
+            skill_writes::WAITING
+        );
+        assert!(on.http.calls.lock().unwrap().is_empty());
     }
 
     #[test]

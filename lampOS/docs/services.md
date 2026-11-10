@@ -115,6 +115,7 @@ connected apps.
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
+| `LAMP_SKILL_WRITES=on` (#6066; off in every product unit) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, and `lamp-services` refuses `skill_write` and `skill_write_approve` ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -179,6 +180,7 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...]}`, the app's yes to a made skill's writes (with `LAMP_SKILL_WRITES=on`; "A made skill's write", below) | `{"ok":true,"result":{"approved":N}}` |
 
   A line with a field its op doesn't take, or a code the catalogue doesn't
   know, is refused without repeating it.
@@ -197,7 +199,10 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   With `LAMP_SKILL_READS=on`, a process at
   `/lampos.slice/lampos-parts.slice/lamp-skills.service` may call too, but
   only `service_read`: any other name gets "a skill may only read a linked
-  service" (`serve::Services::skill_tool`).
+  service" (`serve::Services::skill_tool`). With `LAMP_SKILL_WRITES=on`
+  it may call `skill_write` too, a made skill's write the owner said yes
+  to, and the voice alone `skill_write_approve` and `skill_writes_sent`
+  ("A made skill's write", below).
 
 Each door answers at most 8 connections at once ("busy" past it), and a peer
 has 5 s to send its line and take the answer. The unit is a plain service,
@@ -1699,6 +1704,149 @@ before, and:
 When `lamp-services` can't say (no socket, no answer in time, a
 refusal), `needs_link` is left out and nothing is said; the make never
 fails for it.
+
+## A made skill's write (#6066, `LAMP_SKILL_WRITES`, off)
+
+The owner lifted #6066's rule (b) on 10 Nov: a made skill that starts
+itself may send a mail, add a calendar event, or open an issue, a task or
+a comment on a linked service with nobody asking at that moment. This is
+the runtime half (`lamp_services::skill_writes`,
+`lamp_skills::service_write`). The voice's yes path and its say-back come
+later, and so does the product unit. All of it is off unless
+`LAMP_SKILL_WRITES=on` (exactly `on`) is in the environment of
+`lamp-services` and `lamp-skills`, and of `lamp-skills-manage@`, which
+loads a skill as it installs it. Every product unit leaves it off.
+
+**The step.** In `skill.toml` ([skills.md](skills.md)):
+
+```toml
+[permissions]
+services = { gmail = "write" }
+
+[[do]]
+write = { service = "gmail", action = "send_mail", to = ["boss@work.test"], subject = "In", text = "I'm at my desk." }
+```
+
+Every field is fixed in the file. Nothing is filled at run time, so a
+skill can't put what it read, heard or was told into a write. A step
+takes the action's own keys and no others (`skill_writes::KINDS`):
+
+| Service | Action | Keys |
+|---|---|---|
+| `gmail`, `gmail-app` | `send_mail` | `to`, `cc`, `subject`, `text` |
+| `google_calendar` | `create_event` | `title`, `start`, `end`, `calendar`, `attendees`, `text` |
+| `github` | `create_issue`, `comment` | `repo`, `title`, `text`; `repo`, `number`, `text` |
+| `linear` | `create_issue` | `team_id`, `title`, `text` |
+| `asana` | `create_task` | `project` or `workspace`, `title`, `text` |
+| `figma`, `figma-api` | `comment` | `id`, `text` |
+
+A skill makes no public post (Facebook's `page_post`), no draft and no MCP
+tool call, since an MCP call's shape is the caller's own. Each field is
+checked as it loads, with the same check the voice's write has
+(`writes::prepare` on a stand-in link): a plain address, one line of at
+most 200 characters for a subject or title, at most 3,000 characters for a
+text, a calendar time with its offset. `send_id` and `said` are no keys of
+a step. The write is its skill's only step, alone in it, in a skill a
+trigger starts, with no `each` and no tool. It needs
+`[permissions] services = { <code> = "write" }`, and a `"write"`
+permission is accepted only with the switch on and for a service in the
+table. With the switch off in `lamp-skills`, such a skill does not load.
+
+**Installing approves nothing.** Putting a made skill on, by
+`install_made` or any other way, records no approval. Until the owner says
+yes, each run is refused with "not sent: waiting for the owner's yes".
+
+**The owner's yes** (`skill_write_approve`). It comes from the voice's
+yes path or from the app, never from `lamp-skills`. On the tools socket
+only `lamp-voice.service`'s cgroup reaches it. It is not in `tools.json`
+and not among the three functions the voice offers its model
+(`services::NAMES`), so the model can never call it. On the admin socket it
+is `lamp-cloud`'s op `{"op": "skill_write_approve", "skill", "writes"}`,
+for the app. Who said yes is not checked (the owner, 10 Nov: no face,
+voice-print or owner check; under the private room whoever is at the lamp
+is its owner). The voice's line is
+`{"skill": "<name>", "writes": [<content>, ...]}`, each content the step's
+exact fields with `service` and `action`. Each is checked as at load, and
+its service must be linked now. `lamp-services` keeps, in its own store
+folder (`/var/lib/lampos-services/skill-writes-approved.json`, root's,
+0600 in the 0700 folder, which `lamp-skills` can't reach), the SHA-256 of
+each content as one line of JSON with its keys sorted
+(`skill_writes::canonical`, the same bytes on both sides), the skill's
+name, the service, and the link it was approved under
+(`skill_writes::link_of`). That link is the account the link names, or,
+where it names none, the link's own id, a random 16 bytes given when the
+app links it and kept through a renewal (`Entry::link_id`). It is never a
+token. A new yes replaces the skill's approvals, and an empty list takes
+them away. A skill holds at most 4, and the lamp at most 50. The journal
+says only how many were approved.
+
+**Who sends.** `lamp-skills` itself, as with a read: `lamp-services` takes
+`lamp-skills.service`'s cgroup on the tools socket when either
+`LAMP_SKILL_READS` or `LAMP_SKILL_WRITES` is on, and then only
+`service_read` (with reads on) or `skill_write` (with writes on). Any other
+name gets "a skill may only read a linked service or make its approved
+write". Any other cgroup (`lamp-skills-manage@`, `lamp-cloud`, a login
+shell) is refused at the door (`Services::skill_caller`). The run's line is
+`{"op":"call","name":"skill_write","args":{"skill","write"}}`.
+
+**What `lamp-services` checks,** in order. A refusal names no recipient
+and no text:
+
+1. `LAMP_SKILL_WRITES=on` and `LAMP_SERVICES_WRITE=on`.
+2. Not signed out: after a wipe (a sign-out, an unpairing or a reset), no
+   skill's write goes until a service is linked again, even if the wipe
+   failed. This is held in memory. A restart clears it, because the wipe
+   left nothing linked. The wipe also deletes the approvals, the bounds'
+   ledger and the sent-log, so the owner says yes again.
+3. The content's hash approved for that skill. With no approval for the
+   skill the answer is `WAITING`. A content that is none of its approved
+   ones (a text changed by one character, another recipient) is refused,
+   "not sent: this write is not the one the owner said yes to", and the
+   journal says only how many have been refused since the start.
+4. The content is one of the kinds above, on a service with a write list
+   in `catalog.rs`, never an MCP service.
+5. The service, by its exact code (no other Gmail link stands in), still
+   linked under the link approved. Unlinked, or linked again as another
+   account, is refused as `STOPPED` ("stopped: the Gmail link changed since
+   the owner's yes; nothing was sent"), and `lamp-skills` stops that
+   skill's writes until it restarts. The same account linked again still
+   goes. An expired link, or one whose scopes don't allow the write
+   (`writes::scope_missing`), is refused as for the voice.
+6. **The bounds** (`skill_writes::Ledger`, `skill-writes.json` in the store
+   folder): at most 3 sends a skill and 10 across every skill in any 24
+   hours. Each send is counted before it goes, one at a time, so two at
+   once never pass a bound together. A send that then fails still counts.
+   The ledger keeps a skill's name and a time, nothing else, so a restart
+   doesn't forget the day's sends.
+
+The write is then sent as the voice's confirmed write is, through the same
+guard and write list, once.
+
+**The journal** keeps counts and outcomes only. "a skill's write to gmail
+was sent (2 of 3 for it today, 5 of 10 for every skill)", "a skill's write
+refused: not the approved content (3 since start)", or the refusal's
+words. Never a recipient, a subject or a text. `lamp-skills` writes the
+outcome on its run: "sent to gmail", or the refusal.
+
+**The owner's sent-log** (`skill-writes-sent.json` in the store folder).
+It keeps the last 20 sends, each the skill's name, the service, the time
+and who it went to (`skill_writes::sent_to`): a mail's first address and
+how many more, an event's guests, an issue's repository or team. It holds
+no text, subject or title. The voice reads it with `skill_writes_sent`,
+its own call like the yes, as `{"sent": [{"skill", "service", "at",
+"to"}]}`, to tell the owner "I sent your arrival mail to boss@work.test
+at 18:02" the next time they are seen. That telling is not built yet.
+
+**Not done yet:**
+
+- The voice's yes path and the app's: saying a made skill's write back
+  and calling `skill_write_approve` on a yes (`lamp-cloud` has no kind
+  for it yet). The made skill's say-back of a
+  write is in `crates/voice/src/made_skill.rs`, which this change leaves
+  alone. Until then `put_on_cap` refuses a made skill with a `"write"`
+  permission.
+- Telling the owner of the sent-log.
+- A product unit that sets `LAMP_SKILL_WRITES=on`.
 
 ## Refresh
 

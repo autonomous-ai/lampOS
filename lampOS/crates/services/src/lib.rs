@@ -12,6 +12,8 @@
 //! Reads go through an allow-list per service; writes are behind their own
 //! switch (`LAMP_SERVICES_WRITE=on`) and two phases: a full read-back first,
 //! then the one send it names. Off unless `LAMP_SERVICES=on` (or `--enable`).
+//! With `LAMP_SKILL_WRITES=on` too, `lamp-skills.service` may make a made
+//! skill's one fixed write, approved at install ([`skill_writes`]).
 pub mod catalog;
 pub mod mail;
 pub mod mcp;
@@ -19,6 +21,7 @@ pub mod net;
 pub mod reads;
 pub mod refresh;
 pub mod serve;
+pub mod skill_writes;
 pub mod spoken;
 pub mod store;
 pub mod tools;

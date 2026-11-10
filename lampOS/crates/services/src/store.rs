@@ -51,6 +51,10 @@ pub struct Entry {
     /// Refresh allowed (V1's flag; a refresh token is needed too).
     pub refresh: bool,
     pub obtained_at: i64,
+    /// A random id given when the app links it, kept through a renewal:
+    /// which link a made skill's write was approved under, where the link
+    /// names no account (`skill_writes`). Never a token's.
+    pub link_id: String,
 }
 
 impl fmt::Debug for Entry {
@@ -175,6 +179,7 @@ impl Entry {
             credentials: data.credentials,
             refresh: data.refresh,
             obtained_at: now,
+            link_id: crate::writes::random_id(),
         };
         // An app password needs its account; a Google sign-in's account is
         // read from Gmail itself at `set` when the data has none.

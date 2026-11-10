@@ -118,6 +118,7 @@ dịch vụ.
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
+| `LAMP_SKILL_WRITES=on` (#6066; tắt trong mọi unit sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, và `lamp-services` từ chối `skill_write` và `skill_write_approve` ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -183,6 +184,7 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...]}`, lời đồng ý của ứng dụng cho các lần ghi của kỹ năng tự tạo (với `LAMP_SKILL_WRITES=on`; "Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) | `{"ok":true,"result":{"approved":N}}` |
 
   Một dòng có trường mà op của nó không nhận, hoặc một code mà danh mục không
   biết, bị từ chối mà không lặp lại nó.
@@ -202,7 +204,10 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   `LAMP_SKILL_READS=on`, một tiến trình tại
   `/lampos.slice/lampos-parts.slice/lamp-skills.service` cũng được gọi, nhưng
   chỉ `service_read`: mọi tên khác nhận "a skill may only read a linked
-  service" (`serve::Services::skill_tool`).
+  service" (`serve::Services::skill_tool`). Với `LAMP_SKILL_WRITES=on` nó
+  còn được gọi `skill_write`, lần ghi của kỹ năng tự tạo mà chủ đèn đã đồng
+  ý, và chỉ giọng nói được gọi `skill_write_approve` và `skill_writes_sent`
+  ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới).
 
 Mỗi cửa trả lời tối đa 8 kết nối cùng lúc ("busy" khi vượt quá), và một peer
 có 5 s để gửi dòng của nó và nhận câu trả lời. Unit là một service thường,
@@ -1745,6 +1750,154 @@ hỏi như trước, và:
 Khi `lamp-services` không trả lời được (không có socket, không trả lời kịp,
 bị từ chối), `needs_link` bị bỏ ra và không nói gì; việc tạo không bao giờ
 hỏng vì nó.
+
+## Một kỹ năng tự tạo ghi vào dịch vụ (#6066, `LAMP_SKILL_WRITES`, tắt)
+
+Chủ đèn đã bỏ quy tắc (b) của #6066 vào ngày 10/11: một kỹ năng tự tạo tự
+khởi động có thể gửi một thư, thêm một sự kiện lịch, hoặc mở một issue, một
+task hay một bình luận trên một dịch vụ đã liên kết, dù lúc đó không ai yêu
+cầu. Đây là nửa runtime (`lamp_services::skill_writes`,
+`lamp_skills::service_write`). Đường "đồng ý" của giọng nói và câu nói lại
+của nó làm sau, unit sản phẩm cũng vậy. Mọi thứ đều tắt trừ khi
+`LAMP_SKILL_WRITES=on` (đúng `on`) có trong môi trường của `lamp-services`
+và `lamp-skills`, và của `lamp-skills-manage@`, nơi nạp kỹ năng khi cài nó.
+Mọi unit sản phẩm để nó tắt.
+
+**Bước.** Trong `skill.toml` ([skills.md](../skills.md)):
+
+```toml
+[permissions]
+services = { gmail = "write" }
+
+[[do]]
+write = { service = "gmail", action = "send_mail", to = ["boss@work.test"], subject = "In", text = "I'm at my desk." }
+```
+
+Mọi trường đều cố định trong tệp. Không gì được điền lúc chạy, nên kỹ năng
+không thể đưa những gì nó đọc, nghe hay được bảo vào một lần ghi. Một bước
+chỉ nhận đúng các khoá của hành động đó (`skill_writes::KINDS`):
+
+| Dịch vụ | Hành động | Khoá |
+|---|---|---|
+| `gmail`, `gmail-app` | `send_mail` | `to`, `cc`, `subject`, `text` |
+| `google_calendar` | `create_event` | `title`, `start`, `end`, `calendar`, `attendees`, `text` |
+| `github` | `create_issue`, `comment` | `repo`, `title`, `text`; `repo`, `number`, `text` |
+| `linear` | `create_issue` | `team_id`, `title`, `text` |
+| `asana` | `create_task` | `project` hoặc `workspace`, `title`, `text` |
+| `figma`, `figma-api` | `comment` | `id`, `text` |
+
+Kỹ năng không đăng bài công khai (`page_post` của Facebook), không lưu bản
+nháp và không gọi tool MCP, vì hình dạng của lệnh gọi MCP là do bên gọi tự
+đặt. Mỗi trường được kiểm tra khi nạp, bằng đúng phép kiểm tra mà lần ghi
+của giọng nói có (`writes::prepare` trên một liên kết thay thế): một địa
+chỉ thường, tiêu đề hay chủ đề một dòng tối đa 200 ký tự, nội dung tối đa
+3.000 ký tự, giờ lịch có độ lệch múi giờ. `send_id` và `said` không phải
+khoá của bước. Lần ghi là bước duy nhất của kỹ năng, đứng một mình, trong
+kỹ năng do trigger khởi động, không có `each` và không có tool. Nó cần
+`[permissions] services = { <code> = "write" }`, và quyền `"write"` chỉ
+được nhận khi công tắc bật và với dịch vụ có trong bảng. Khi công tắc tắt
+trong `lamp-skills`, kỹ năng như vậy không được nạp.
+
+**Cài đặt không duyệt gì cả.** Việc bật một kỹ năng tự tạo, bằng
+`install_made` hay cách nào khác, không ghi lại sự đồng ý nào. Cho đến khi
+chủ đèn đồng ý, mỗi lần chạy bị từ chối với "not sent: waiting for the
+owner's yes".
+
+**Sự đồng ý của chủ đèn** (`skill_write_approve`). Nó đến từ đường đồng ý
+của giọng nói hoặc từ ứng dụng, không bao giờ từ `lamp-skills`. Trên socket
+tools chỉ cgroup của `lamp-voice.service` tới được nó. Nó không có trong
+`tools.json` và không nằm trong ba hàm giọng nói đưa cho mô hình
+(`services::NAMES`), nên mô hình không bao giờ gọi được nó. Trên socket
+admin, nó là op `{"op": "skill_write_approve", "skill", "writes"}` của
+`lamp-cloud`, cho ứng dụng. Không kiểm tra ai đã đồng ý (chủ đèn, 10/11:
+không kiểm tra khuôn mặt, dấu giọng hay chủ đèn; ở phòng riêng, ai đang ở
+bên đèn là chủ của nó). Dòng của giọng nói là
+`{"skill": "<name>", "writes": [<content>, ...]}`, mỗi nội dung là đúng
+các trường của bước cùng `service` và `action`. Mỗi nội dung được kiểm tra
+như lúc nạp, và dịch vụ của nó phải đang được liên kết. `lamp-services` giữ
+trong thư mục kho của chính nó
+(`/var/lib/lampos-services/skill-writes-approved.json`, của root, 0600
+trong thư mục 0700, nơi `lamp-skills` không tới được) SHA-256 của mỗi nội
+dung, tính trên một dòng JSON có khoá được sắp xếp
+(`skill_writes::canonical`, cùng các byte ở cả hai phía), tên kỹ năng, dịch
+vụ, và liên kết mà nó được duyệt dưới đó (`skill_writes::link_of`). Liên
+kết đó là tài khoản mà liên kết ghi, hoặc, khi nó không ghi tài khoản nào,
+id riêng của liên kết, 16 byte ngẫu nhiên được cấp khi ứng dụng liên kết và
+được giữ qua lần làm mới (`Entry::link_id`). Nó không bao giờ là token. Một
+lần đồng ý mới thay các phê duyệt của kỹ năng, và danh sách rỗng xoá chúng.
+Một kỹ năng giữ tối đa 4, cả đèn tối đa 50. Journal chỉ nói có bao nhiêu
+lần ghi được duyệt.
+
+**Ai gửi.** Chính `lamp-skills`, như với việc đọc: `lamp-services` nhận
+cgroup của `lamp-skills.service` trên socket tools khi `LAMP_SKILL_READS`
+hoặc `LAMP_SKILL_WRITES` bật, và khi đó chỉ nhận `service_read` (khi đọc
+bật) hoặc `skill_write` (khi ghi bật). Tên khác nhận "a skill may only read
+a linked service or make its approved write". Mọi cgroup khác
+(`lamp-skills-manage@`, `lamp-cloud`, một shell đăng nhập) bị từ chối ở cửa
+(`Services::skill_caller`). Dòng của lần chạy là
+`{"op":"call","name":"skill_write","args":{"skill","write"}}`.
+
+**Những gì `lamp-services` kiểm tra,** theo thứ tự. Lời từ chối không nêu
+người nhận hay nội dung:
+
+1. `LAMP_SKILL_WRITES=on` và `LAMP_SERVICES_WRITE=on`.
+2. Không bị đăng xuất: sau một lần xoá (đăng xuất, huỷ ghép đôi hay đặt
+   lại), không lần ghi nào của kỹ năng được gửi cho đến khi một dịch vụ được
+   liên kết lại, kể cả khi việc xoá thất bại. Điều này được giữ trong bộ
+   nhớ. Khởi động lại sẽ xoá nó, vì lần xoá đã không để lại liên kết nào.
+   Lần xoá cũng xoá các phê duyệt, sổ giới hạn và nhật ký đã gửi, nên chủ
+   đèn phải đồng ý lại.
+3. Hash của nội dung đã được duyệt cho kỹ năng đó. Nếu kỹ năng chưa có phê
+   duyệt nào, câu trả lời là `WAITING`. Một nội dung không thuộc các nội
+   dung đã duyệt (nội dung đổi một ký tự, người nhận khác) bị từ chối, "not
+   sent: this write is not the one the owner said yes to", và journal chỉ
+   nói đã có bao nhiêu lần bị từ chối kể từ khi khởi động.
+4. Nội dung thuộc một trong các loại ở trên, trên dịch vụ có danh sách ghi
+   trong `catalog.rs`, không bao giờ là dịch vụ MCP.
+5. Dịch vụ, theo đúng mã của nó (không liên kết Gmail nào khác thay thế),
+   vẫn được liên kết dưới liên kết đã duyệt. Nếu bị huỷ liên kết, hoặc liên
+   kết lại bằng tài khoản khác, lần ghi bị từ chối dạng `STOPPED` ("stopped:
+   the Gmail link changed since the owner's yes; nothing was sent"), và
+   `lamp-skills` dừng các lần ghi của kỹ năng đó cho đến khi nó khởi động
+   lại. Cùng tài khoản liên kết lại thì vẫn gửi. Liên kết hết hạn, hoặc có
+   phạm vi không cho phép lần ghi (`writes::scope_missing`), bị từ chối như
+   với giọng nói.
+6. **Giới hạn** (`skill_writes::Ledger`, `skill-writes.json` trong thư mục
+   kho): tối đa 3 lần gửi mỗi kỹ năng và 10 lần cho mọi kỹ năng trong bất
+   kỳ 24 giờ nào. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
+   lần cùng lúc không bao giờ cùng vượt giới hạn. Lần gửi thất bại sau đó
+   vẫn được đếm. Sổ chỉ giữ tên kỹ năng và thời điểm, nên khởi động lại
+   không quên các lần gửi trong ngày.
+
+Sau đó lần ghi được gửi một lần, như lần ghi đã xác nhận của giọng nói,
+qua cùng bộ chặn và danh sách ghi.
+
+**Journal** chỉ giữ số đếm và kết quả. "a skill's write to gmail was sent
+(2 of 3 for it today, 5 of 10 for every skill)", "a skill's write refused:
+not the approved content (3 since start)", hoặc lời từ chối. Không bao giờ
+có người nhận, chủ đề hay nội dung. `lamp-skills` ghi kết quả của lần chạy:
+"sent to gmail", hoặc lời từ chối.
+
+**Nhật ký đã gửi cho chủ đèn** (`skill-writes-sent.json` trong thư mục
+kho). Nó giữ 20 lần gửi gần nhất, mỗi lần gồm tên kỹ năng, dịch vụ, thời
+điểm và gửi cho ai (`skill_writes::sent_to`): địa chỉ đầu tiên của thư và
+còn bao nhiêu người nữa, khách mời của sự kiện, repository hay team của
+issue. Nó không giữ nội dung, chủ đề hay tiêu đề. Giọng nói đọc nó bằng
+`skill_writes_sent`, lệnh gọi riêng của nó như lần đồng ý, dưới dạng
+`{"sent": [{"skill", "service", "at", "to"}]}`, để nói với chủ đèn "I sent
+your arrival mail to boss@work.test at 18:02" vào lần tới thấy họ. Phần nói
+đó chưa làm.
+
+**Chưa làm:**
+
+- Đường đồng ý của giọng nói và của ứng dụng: nói lại lần ghi của kỹ năng
+  tự tạo và gọi `skill_write_approve` khi có lời đồng ý (`lamp-cloud` chưa
+  có kind cho việc này). Câu nói lại một lần ghi của kỹ
+  năng tự tạo nằm trong `crates/voice/src/made_skill.rs`, mà thay đổi này
+  không đụng tới. Cho đến lúc đó `put_on_cap` từ chối kỹ năng tự tạo có quyền
+  `"write"`.
+- Nói với chủ đèn về nhật ký đã gửi.
+- Một unit sản phẩm đặt `LAMP_SKILL_WRITES=on`.
 
 ## Làm mới
 
