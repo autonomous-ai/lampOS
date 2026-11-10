@@ -1113,7 +1113,15 @@ fn owner<C: Clock>(
                 }
             }
             if let (Some(wanted), Some(listed)) = (later.from_machines, last_listed.as_ref()) {
-                let chosen = known.choices(listed, wanted, unix_ms());
+                let mut chosen = known.choices(listed, wanted, unix_ms());
+                // The lamp itself, with Hermes (#5978), as at the machines'
+                // look: without it, each look that comes back wrote the
+                // targets again without the lamp.
+                if later.lamp.is_some()
+                    && let Some(lamp) = known.lamp_with_hermes(listed, unix_ms())
+                {
+                    chosen.insert(lamp, EngineKind::Hermes);
+                }
                 let said =
                     machines_written(&later.targets, listed, wanted, &chosen, &mut targets_due);
                 if said != machines_said {

@@ -93,6 +93,9 @@ const ENVIRONMENT: &[&str] = &[
     // Where Harness finds the lamp's own Hermes' sessions
     // (`LAMP_HERMES_ON_LAMP`, crate::hold::HERMES_HOME, #5978).
     crate::hold::HERMES_HOME,
+    // How Harness reads the engine's launch environment: `lampos` has a
+    // nologin shell, so the hold gives it `/bin/sh` (crate::hold::SHELL).
+    crate::hold::SHELL,
 ];
 
 /// The agents a target may name. `opencode` since Harness 0.4.2 names it
