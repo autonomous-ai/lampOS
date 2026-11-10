@@ -16,7 +16,7 @@ MOVE_FRAMES_MIN = 2
 MOVE_LASTS_MS = (1_500, 10_000)
 # Head pitch, head roll, base yaw, shoulder, elbow: counts from rest, and
 # counts a second.
-MOVE_FARTHEST = (200, 200, 150, 350, 350)
+MOVE_FARTHEST = (200, 200, 250, 350, 350)
 MOVE_FASTEST = (900.0, 1_300.0, 1_000.0, 800.0, 800.0)
 
 
@@ -35,7 +35,8 @@ def move_why(step_ms: int, frames: list[list[int]]) -> str | None:
     for at, (before, after) in enumerate(zip(frames, frames[1:]), start=1):
         for joint in range(5):
             if abs(after[joint]) > MOVE_FARTHEST[joint]:
-                return f"frame {at} takes joint {joint} {after[joint]} counts, farther than {MOVE_FARTHEST[joint]}"
+                reach = ", this lamp's yaw reach (--reach)" if joint == 2 else ""
+                return f"frame {at} takes joint {joint} {after[joint]} counts, farther than {MOVE_FARTHEST[joint]}{reach}"
             speed = abs(after[joint] - before[joint]) / step
             if speed > MOVE_FASTEST[joint] + 2 / step:
                 return f"frame {at} asks joint {joint} for {speed:.0f} counts a second, faster than {MOVE_FASTEST[joint]:.0f}"

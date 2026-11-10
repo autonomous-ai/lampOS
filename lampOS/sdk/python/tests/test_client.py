@@ -978,7 +978,7 @@ def test_the_readme_reference_names_every_public_call_command_and_option():
 # the JS SDK's test has the same list).
 UNPLAYABLE = [
     ([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 200, "frames: a move this body cannot play: it lasts 600 ms, not 1500 to 10000"),
-    ([[0, 0, 0, 0, 0], [0, 0, 151, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 151 counts, farther than 150"),
+    ([[0, 0, 0, 0, 0], [0, 0, 251, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 251 counts, farther than 250, this lamp's yaw reach (--reach)"),
     ([[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 1000, None),  # 2 s: one the body plays
     ([[0, 0, 0, 0, 0]] * 7 + [[0, 0, 0, 0, 300]] * 8 + [[0, 0, 0, 0, 0]], 100, "frames: a move this body cannot play: frame 7 asks joint 4 for 3000 counts a second, faster than 800"),
     ([[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 500, "frames: start and end at home, all five 0"),
@@ -1178,7 +1178,7 @@ def test_poses_a_move_cannot_make_are_refused_with_the_joint_before_sending(tmp_
         ([{"pitch": True}], "pitch must be a number of degrees"),
         ([{"pitch": float("nan")}], "pitch must be a number of degrees"),
         ([{"pitch": 40}], "pitch 40° is farther than a move may take it, 17.6° either way"),
-        ([{"yaw": -14}], "yaw -14° is farther than a move may take it, 13.2° either way"),
+        ([{"yaw": -23}], "yaw -23° is farther than a move may take it, 22.0° either way"),
         ([{"shoulder": 30, "elbow": -30}] * 12, "longer than a move's 10000"),
     ):
         with pytest.raises(errors.BY_CODE["bad_request"], match=re.escape(words)):

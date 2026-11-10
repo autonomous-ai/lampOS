@@ -3059,10 +3059,37 @@ fn gesture_run(
     seconds: u64,
     prepare: impl FnOnce(&mut Lamp),
 ) -> (BodyReport, Lamp, Vec<Step>) {
-    gesture_run_glancing(clip, ask_at, seconds, prepare, false)
+    gesture_run_over(clip, ask_at, seconds, prepare, None)
 }
 
-/// [`gesture_run`], and when `glancing`, on a lamp at rest (mood Resting) with `--rest-glance` whose
+/// [`gesture_run`], with a holder's look (`Asked::aim`, as `{"look":…}` on
+/// the lamp's lease socket) at `yaw` counts from the pose's own direction from the
+/// given moment on: the lamp is turned that far, as a look at a person turns
+/// it, when the gesture is asked.
+fn gesture_run_over(
+    clip: &'static Clip,
+    ask_at: Duration,
+    seconds: u64,
+    prepare: impl FnOnce(&mut Lamp),
+    looking: Option<(Duration, f32)>,
+) -> (BodyReport, Lamp, Vec<Step>) {
+    gesture_run_yaw(clip, ask_at, seconds, prepare, looking, None)
+}
+
+/// [`gesture_run_over`], the base's yaw reach set to `yaw` counts when given: 40, what a lamp
+/// started without `--reach` has (`Limits::FOLDED.yaw`).
+fn gesture_run_yaw(
+    clip: &'static Clip,
+    ask_at: Duration,
+    seconds: u64,
+    prepare: impl FnOnce(&mut Lamp),
+    looking: Option<(Duration, f32)>,
+    yaw: Option<f32>,
+) -> (BodyReport, Lamp, Vec<Step>) {
+    gesture_run_glancing(clip, ask_at, seconds, prepare, looking, yaw, false)
+}
+
+/// [`gesture_run_yaw`], and when `glancing`, on a lamp at rest (mood Resting) with `--rest-glance` whose
 /// Expression asks a small head glance without a break from 6 s on (the lamp has stood by then): the
 /// glance that begins takes the head out of rest (`glance_from`) and keeps it out, as on lamp-75c9.
 fn gesture_run_glancing(
@@ -3070,6 +3097,8 @@ fn gesture_run_glancing(
     ask_at: Duration,
     seconds: u64,
     prepare: impl FnOnce(&mut Lamp),
+    looking: Option<(Duration, f32)>,
+    yaw: Option<f32>,
     glancing: bool,
 ) -> (BodyReport, Lamp, Vec<Step>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
@@ -3083,6 +3112,9 @@ fn gesture_run_glancing(
         servo_acceleration: 60,
     })
     .map(|limits| Limits {
+        yaw: yaw.unwrap_or(limits.yaw),
+        // 40 is `Limits::FOLDED`'s: the lamp started without `--reach`.
+        yaw_unset: yaw == Some(Limits::FOLDED.yaw),
         rest_glance: glancing,
         ..limits
     })
@@ -3125,8 +3157,8 @@ fn gesture_run_glancing(
                 pose: None,
                 unplug: false,
                 held_by_test: false,
-                held: false,
-                aim: None,
+                held: looking.is_some_and(|(from, _)| time.get() >= from),
+                aim: looking.map(|(_, yaw)| [yaw, 0.0]),
                 limp: false,
                 unseat: false,
                 night: false,
@@ -3170,8 +3202,15 @@ fn a_move_turns_the_base_while_a_rest_glance_is_under_way() {
         ],
     };
     // Asked in the middle of an odd second, a glance under way.
-    let (report, _, seen) =
-        gesture_run_glancing(&SWAY, Duration::from_millis(9_300), 16, |_| {}, true);
+    let (report, _, seen) = gesture_run_glancing(
+        &SWAY,
+        Duration::from_millis(9_300),
+        16,
+        |_| {},
+        None,
+        None,
+        true,
+    );
     assert_eq!(report.gestures_dropped, 0, "{report:?}");
     let rested = seen
         .iter()
@@ -4379,6 +4418,226 @@ fn a_head_dipped_before_its_rest_has_lasted_is_led_back_up() {
         after.abs_diff(before) <= 12,
         "back at {after}, rested at {before}"
     );
+}
+
+/// A move that sways the base 250 counts either way (the lamp's own yaw
+/// reach, 22 degrees) and back in 2 s, 500 counts a second at most.
+static SWAY_250: Clip = Clip {
+    name: "sway",
+    step_ms: 250,
+    frames: &[
+        [0, 0, 0, 0, 0],
+        [0, 0, 125, 0, 0],
+        [0, 0, 250, 0, 0],
+        [0, 0, 125, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, -125, 0, 0],
+        [0, 0, -250, 0, 0],
+        [0, 0, -125, 0, 0],
+        [0, 0, 0, 0, 0],
+    ],
+};
+
+/// The person, 12:36 on 10 Nov: the move check takes a base yaw up to the
+/// lamp's own reach (250 counts), so the engine must play one that far, not
+/// cut it to the 170 `GESTURE_REACH` held before (banana's P2 on
+/// ten/move-reach): a standing lamp's base goes 250 either way of where it
+/// was, and is back to it.
+#[test]
+fn a_sway_of_the_lamps_whole_yaw_reach_is_played_and_not_cut_short() {
+    let (report, _, seen) = gesture_run(&SWAY_250, Duration::from_secs(8), 16, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(
+        (report.gestures, report.gestures_dropped),
+        (1, 0),
+        "{report:?}"
+    );
+    let before = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[2];
+    let during: Vec<u16> = seen
+        .iter()
+        .filter(|step| step.1 == Some("sway"))
+        .map(|step| step.2[2])
+        .collect();
+    let (high, low) = (*during.iter().max().unwrap(), *during.iter().min().unwrap());
+    assert!(
+        high >= before + 248 && low + 248 <= before,
+        "swayed {low} to {high} from {before}, not 250 either way"
+    );
+    // And no farther: the move asked 250, the body adds no more.
+    assert!(
+        high <= before + 252 && low + 252 >= before,
+        "{low} {high} {before}"
+    );
+    let after = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(13))
+        .unwrap()
+        .2[2];
+    assert!(
+        after.abs_diff(before) <= 4,
+        "back at {after}, rested at {before}"
+    );
+}
+
+/// The base is never asked past its reach whatever is laid over what (the
+/// Reviewer-lead's P2 on ten/move-reach): a look that has the lamp turned,
+/// 170 counts (15 degrees) or the whole 250, and a sway of 250 laid over it
+/// sum to more than the reach, and the goal stops at the reach: 250 counts
+/// (22 degrees) from where the lamp rests, held there until the sway is
+/// back inside it, and the journal says it was cut. The way back toward
+/// home is never cut.
+#[test]
+fn a_sway_over_a_turned_look_goes_only_to_the_yaw_reach() {
+    for look in [170.0f32, 250.0] {
+        let (report, _, seen) = gesture_run_over(
+            &SWAY_250,
+            Duration::from_secs(10),
+            18,
+            |_| {},
+            Some((Duration::from_secs(6), look)),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert_eq!(
+            (report.gestures, report.gestures_dropped),
+            (1, 0),
+            "{report:?}"
+        );
+        let rest = seen
+            .iter()
+            .rfind(|step| step.0 < Duration::from_secs(6))
+            .unwrap()
+            .2[2];
+        let turned = seen
+            .iter()
+            .rfind(|step| step.0 < Duration::from_secs(10))
+            .unwrap()
+            .2[2];
+        assert!(
+            turned >= rest + (look as u16) - 10,
+            "look {look}: rest {rest} turned {turned}"
+        );
+        let during: Vec<u16> = seen
+            .iter()
+            .filter(|step| step.1 == Some("sway"))
+            .map(|step| step.2[2])
+            .collect();
+        let (high, low) = (*during.iter().max().unwrap(), *during.iter().min().unwrap());
+        assert!(
+            high <= rest + 252,
+            "look {look}: rest {rest}, the sway went to {high}, past the reach"
+        );
+        assert!(
+            high >= rest + 245,
+            "look {look}: held at the reach, not short: {high}"
+        );
+        // Toward home it goes the whole way: the look less the sway.
+        assert!(
+            low + 245 <= turned,
+            "look {look}: turned {turned}, sway low {low}: cut on the way back"
+        );
+    }
+}
+
+/// Third's P2 on #6002 (14:09): a lamp started without `--reach` has a yaw reach of 40 (`Limits::FOLDED`)
+/// and its moves are admitted to 150 counts (`YAW_REACH_DEFAULT`); the sum clamp must not cut such a move to
+/// the 40: an accepted move of 150 is played whole, as it was before the clamp.
+#[test]
+fn a_lamp_without_a_reach_plays_an_accepted_150_count_sway_whole() {
+    static SWAY_150: Clip = Clip {
+        name: "sway",
+        step_ms: 1_000,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 0, -75, 0, 0],
+            [0, 0, -150, 0, 0],
+            [0, 0, -75, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 75, 0, 0],
+            [0, 0, 150, 0, 0],
+            [0, 0, 75, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    let (report, _, seen) = gesture_run_yaw(
+        &SWAY_150,
+        Duration::from_secs(8),
+        18,
+        |_| {},
+        None,
+        Some(40.0),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(
+        (report.gestures, report.gestures_dropped),
+        (1, 0),
+        "{report:?}"
+    );
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[2];
+    let during: Vec<u16> = seen
+        .iter()
+        .filter(|step| step.1 == Some("sway"))
+        .map(|step| step.2[2])
+        .collect();
+    let (high, low) = (*during.iter().max().unwrap(), *during.iter().min().unwrap());
+    assert!(
+        high >= rested + 148 && low + 148 <= rested,
+        "swayed {low} to {high} from {rested}, cut short of 150 either way"
+    );
+}
+
+/// Second's P2 on #6002 (14:41): a lamp configured with a yaw reach under 150 keeps it. With a look
+/// 100 counts out and an accepted sway of 100 more, the base is asked no farther than 100 from home,
+/// not the 150 a lamp started without `--reach` is given (the no-argument and 250 controls are above).
+#[test]
+fn a_configured_yaw_reach_of_100_is_kept_under_a_look_and_a_sway() {
+    static SWAY_100: Clip = Clip {
+        name: "sway",
+        step_ms: 1_000,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 0, -50, 0, 0],
+            [0, 0, -100, 0, 0],
+            [0, 0, -50, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 50, 0, 0],
+            [0, 0, 100, 0, 0],
+            [0, 0, 50, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    let (report, _, seen) = gesture_run_yaw(
+        &SWAY_100,
+        Duration::from_secs(10),
+        18,
+        |_| {},
+        Some((Duration::from_secs(6), 100.0)),
+        Some(100.0),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let rest = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(6))
+        .unwrap()
+        .2[2];
+    let high = seen
+        .iter()
+        .filter(|step| step.1 == Some("sway"))
+        .map(|step| step.2[2])
+        .max()
+        .unwrap();
+    assert!(
+        high <= rest + 102,
+        "rest {rest}: the base went to {high}, past the configured 100"
+    );
+    assert!(high >= rest + 95, "held at the reach, not short: {high}");
 }
 
 #[test]
