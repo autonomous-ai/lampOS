@@ -1573,13 +1573,27 @@ impl Thread {
     /// `exchanges` before it, oldest first, each with what the lamp said
     /// back. A note the lamp was given in writing is not anyone's words.
     pub fn names_window(&self, exchanges: usize) -> crate::known_faces::Said {
-        let spoken: Vec<&Exchange> = self
-            .exchanges
-            .iter()
-            .filter(|exchange| exchange.written.is_none())
-            .collect();
+        // The face question the walk hands out in writing
+        // (`onboarding::skill::FACE_ASK`, #5931) is the lamp's own words
+        // after the line before it: kept as that exchange's, so its yes runs
+        // the setup save (`yes_save`) and the read-back stays in the window
+        // (the Reviewer-lead's HOLD on #6013). Any other written note is
+        // not anyone's words, and is left out.
+        let mut spoken: Vec<(String, String)> = Vec::new();
+        for exchange in &self.exchanges {
+            if exchange.written.is_none() {
+                spoken.push((exchange.person.clone(), exchange.lamp.clone()));
+            } else if crate::known_faces::asks_for_the_face(&exchange.lamp)
+                && let Some((_, lamp)) = spoken.last_mut()
+            {
+                if !lamp.trim().is_empty() {
+                    lamp.push(' ');
+                }
+                lamp.push_str(exchange.lamp.trim());
+            }
+        }
         let (this, earlier) = match spoken.split_last() {
-            Some((last, rest)) if self.heard.trim().is_empty() => (last.person.clone(), rest),
+            Some((last, rest)) if self.heard.trim().is_empty() => (last.0.clone(), rest),
             _ => (self.heard.clone(), &spoken[..]),
         };
         // An exchange where neither they nor the lamp said a word is
@@ -1589,18 +1603,16 @@ impl Thread {
         // builder's P3) or the wordless cut-in's own question, "did anyone
         // say something?", whose yes answers it and never the read-back
         // before it (the Reviewer-lead's P2).
-        let earlier: Vec<&&Exchange> = earlier
+        let earlier: Vec<&(String, String)> = earlier
             .iter()
-            .filter(|exchange| {
-                !(exchange.person.trim().is_empty() && exchange.lamp.trim().is_empty())
-            })
+            .filter(|(person, lamp)| !(person.trim().is_empty() && lamp.trim().is_empty()))
             .collect();
         let from = earlier.len().saturating_sub(exchanges);
         crate::known_faces::Said {
             this,
             before: earlier[from..]
                 .iter()
-                .map(|exchange| (exchange.person.clone(), exchange.lamp.clone()))
+                .map(|&exchange| exchange.clone())
                 .collect(),
         }
     }
@@ -3766,6 +3778,53 @@ mod tests {
         let said = thread.names_window(crate::known_faces::SAID_EXCHANGES);
         assert_eq!(said.before.len(), 2, "{:?}", said.before);
         assert_eq!(said.before[1].1, "Walter, did I get that right?");
+    }
+
+    /// The Reviewer-lead's HOLD on #6013: the walk's face question goes out
+    /// as a written note, and a window that dropped it never let its yes run
+    /// the setup save. It stays the lamp's words after the line before it,
+    /// with the read-back still in the window; a no to it saves nothing.
+    #[test]
+    fn the_walks_written_face_question_is_in_the_names_window() {
+        let now = Instant::now();
+        let asked = |answer: &str| {
+            let mut thread = Thread::new();
+            thread.person("My name is Walter.", true, now);
+            thread.lamp(1, "Walter, did I get that right?", now);
+            thread.person("Yes. That's my name.", true, now);
+            thread.lamp(2, "Yes, that's your name settled, then.", now);
+            thread.written(3, crate::onboarding::skill::FACE_ASK);
+            thread.lamp(3, "May I remember your face, so I know you next time?", now);
+            thread.person(answer, true, now);
+            thread.names_window(crate::known_faces::SAID_EXCHANGES)
+        };
+        let said = asked("Yes.");
+        assert_eq!(said.before.len(), 2, "{:?}", said.before);
+        assert_eq!(said.before[0].1, "Walter, did I get that right?");
+        assert_eq!(
+            crate::known_faces::face_agreed_name(&said).as_deref(),
+            Some("Walter"),
+            "{said:?}"
+        );
+        assert_eq!(crate::known_faces::face_agreed_name(&asked("No.")), None);
+        // Any other written note is still no one's words.
+        let mut thread = Thread::new();
+        thread.person("My name is Walter.", true, now);
+        thread.lamp(1, "Walter, did I get that right?", now);
+        thread.written(
+            2,
+            "(Say only this, nothing before or after it: \"Step three: pet the top of my head.\")",
+        );
+        thread.lamp(2, "Step three: pet the top of my head.", now);
+        thread.person("Yes.", true, now);
+        let said = thread.names_window(crate::known_faces::SAID_EXCHANGES);
+        assert_eq!(
+            said.before,
+            [(
+                "My name is Walter.".to_owned(),
+                "Walter, did I get that right?".to_owned()
+            )]
+        );
     }
 
     /// `LAMP_LIVE_SCOPED_SESSION`: a line admitted for someone known makes
