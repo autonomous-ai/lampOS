@@ -1122,21 +1122,16 @@ fn too_little_free_space_is_no_space_and_nothing_is_made() {
 
 /// The product units carry what the lamp's Hermes needs: lamp-tasks the
 /// switch with `--engines-from-machines` (without it the lamp is never a
-/// target) and `--reply-named`; lamp-cloud the switch for its forwarder;
-/// lamp-voice `LAMP_TASKS_REPLY_NAMED`.
+/// target) and `--reply-named`; lamp-cloud the switch for its forwarder.
+/// The voice's `LAMP_TASKS_REPLY_NAMED` and lamp-tasks'
+/// `LAMP_TASKS_RESUME_CLOSED` come with the routing that reads them (#6094).
 #[test]
 fn the_product_units_carry_the_lamps_hermes() {
     let tasks = include_str!("../../../../deploy/product/lamp-tasks.service");
     let cloud = include_str!("../../../../deploy/product/lamp-cloud.service");
-    let voice = include_str!("../../../../deploy/product/lamp-voice.service");
     let switch = format!("Environment={SWITCH}=on");
     assert!(tasks.lines().any(|line| line == switch));
     assert!(cloud.lines().any(|line| line == switch));
-    assert!(
-        voice
-            .lines()
-            .any(|line| line == "Environment=LAMP_TASKS_REPLY_NAMED=on")
-    );
     let exec = tasks
         .lines()
         .find(|line| line.starts_with("ExecStart="))
