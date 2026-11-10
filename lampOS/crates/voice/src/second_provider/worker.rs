@@ -20809,15 +20809,18 @@ mod tests {
         }
     }
 
-    /// #5530, the first builder's P3: the journal says which version the
-    /// spoken turns are told, so a failed row tells a wrong version from a
-    /// model that ignored it.
+    /// The journal reports installed permission, not selection of a camera
+    /// character: a route without a look remains blind even when allowed.
     #[test]
-    fn the_journal_says_which_version_the_eye_tells() {
-        let open = crate::second_provider::eye_line(true);
-        let closed = crate::second_provider::eye_line(false);
-        assert!(open.starts_with("the eye is open") && open.contains("camera's character"));
-        assert!(closed.starts_with("the eye is closed") && closed.contains("without the camera"));
+    fn the_journal_reports_camera_permission_without_claiming_a_character() {
+        assert_eq!(
+            crate::second_provider::eye_line(true),
+            "camera permission is allowed (#5530)"
+        );
+        assert_eq!(
+            crate::second_provider::eye_line(false),
+            "camera permission is denied (#5530)"
+        );
     }
 
     #[tokio::test]

@@ -4095,14 +4095,14 @@ pub struct Engine {
     eye: Option<Arc<AtomicBool>>,
 }
 
-/// The journal line when the eye a spoken turn is told by changes, and at
-/// the first authority installed ([`Engine::privacy`], #5530): which
-/// version of the character the next spoken turns are told.
+/// The camera permission in the installed authority ([`Engine::privacy`],
+/// #5530), logged initially and when it changes. Selecting the camera-aware
+/// character also requires a usable look route.
 pub(crate) fn eye_line(open: bool) -> &'static str {
     if open {
-        "the eye is open: spoken turns are told the camera's character (#5530)"
+        "camera permission is allowed (#5530)"
     } else {
-        "the eye is closed: spoken turns are told the character without the camera (#5530)"
+        "camera permission is denied (#5530)"
     }
 }
 

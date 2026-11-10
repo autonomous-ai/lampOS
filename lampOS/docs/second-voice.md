@@ -2610,11 +2610,12 @@ When the coordinator switches (below):
   pretend to see (`worker::character_now`, `Engine::telling_the_eye`;
   #5530: this route always took the version without a camera). Chosen for
   each turn as its request is built, so a slide closed between two turns
-  tells the next one it can't see now. The journal says which version the
-  spoken turns are told when the eye opens or closes, and at the first
-  authority: `lamp-voice second: the eye is open: spoken turns are told the
-  camera's character (#5530)` or `… the eye is closed: spoken turns are
-  told the character without the camera (#5530)` (`second_provider::eye_line`).
+  tells the next one it can't see now. At the first authority and when its
+  camera permission changes, the journal says `lamp-voice second: camera
+  permission is allowed (#5530)` or `… camera permission is denied (#5530)`
+  (`second_provider::eye_line`). This reports permission, not the selected
+  character: without a usable look route, the no-picture version still applies.
+  A [Vietnamese note](vi/second-voice_vi.md) describes this distinction.
   Texts and the instruction after a forget keep the version without a camera. Then the
   time and place (the time as the request is built, "Second only" below),
   then the memory note (the
@@ -5676,8 +5677,9 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
   are not) and told "When you would look, call take_a_look"
   (`worker::LOOK_CALL_NOTE`), in the camera's version of the character
-  only (`worker::spoken_version`): the version without one says the eye
-  is closed, so a closed-eye turn is not also told to look (#5530). The
+  only (`worker::spoken_version`): the version without one says no picture
+  reaches it, without claiming the physical eye is closed. A turn without
+  camera permission is not also told to look (#5530). The
   function stays offered; called with the eye closed, the lamp says "Let
   me look." and the look turn, with no still within 2.6 s, says the eye
   was shut (`speak_up::NO_LOOK_NOTE`). It is one of the core within the route's bound of 48:
