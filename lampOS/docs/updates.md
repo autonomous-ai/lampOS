@@ -106,7 +106,7 @@ by default**: the helper requires repository variable
 **`LAMPOS_UPDATE_PUBLISH` to be exactly lowercase `on`**. Only a push to
 `autonomous-ai/lampOS`'s `lamp-voice` can publish; pull requests and manual
 runs cannot. [Actions string comparisons ignore case](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#operators),
-so `ON` can enter the cold-build and protected publication job paths, but
+so `ON` can enter the protected publication job path, but
 the helper rejects it before executing an artifact binary.
 
 **Where the artifact is built.** With repository variable `LAMPOS_STUDIO` set
@@ -116,7 +116,7 @@ job and deleted after it, with no cache mounted, that takes only `lamp-voice`.
 `.github/scripts/lampos-route.py` chooses, and falls back to GitHub-hosted on
 any doubt and on every re-run: any attempt after the first runs the `arm64`
 job on GitHub-hosted, whether it is "Re-run all jobs" or "Re-run failed
-jobs" (which reuses `route`'s first answer). The build is cold either way. `publish` and
+jobs" (which reuses `route`'s first answer). The Studio builds cold; GitHub-hosted uses the cache (below). `publish` and
 `promote-stable` always run on GitHub-hosted, so the signing key never
 reaches the Studio. The key staying away does not keep the Studio out of the
 release's trust: `publish` signs the bytes the Studio built, and its SHA-256
@@ -270,18 +270,24 @@ These tests do not establish a real stable promotion or lamp acceptance.
   `lampos-arm64-<github.sha>` from the same run. No artifact from another
   run, branch, pull request or manual input is accepted. The manifest's
   commit is that SHA and its sequence is `github.run_number`.
-- A run eligible to publish under that exact event/ref/repository/variable
-  gate builds cold: it skips cache restore and the step that restores
-  cached source times. A separate step first refuses an existing
-  `lampOS/target`, including a dangling symlink, then runs the unchanged
-  source-times helper against the absent target. This only records fresh
-  checkout times for the cache saved afterward; it cannot reuse a cached
-  binary or timestamp record. The save keeps the upstream commit-keyed
-  policy, with the same explicit key when restore produced no output.
-  Pull requests, manual runs and publication-disabled pushes keep their
-  existing cached behavior. This cold build is the reviewable default for
-  signing candidates, not an activation or an owner configuration change;
-  its extra compilation time belongs in the publication cadence decision.
+- A run eligible to publish builds on GitHub-hosted from the cache, like a
+  pull request: it restores lamp-voice's newest build and gives unchanged
+  source files their cached times back, so cargo rebuilds only the crates
+  that changed (the owner's yes on
+  [#6021](https://github.com/autonomous-ai/lampOS/issues/6021), 10 Nov 2026;
+  a cold build held every promote about 35 minutes, against about 13
+  cached). Only lamp-voice's own runs save that cache; pull requests restore
+  it and never save it.
+- The nightly full run is the check on that cache: it builds cold. It skips
+  cache restore and the step that restores cached source times. A separate
+  step first refuses an existing `lampOS/target`, including a dangling
+  symlink, then runs the unchanged source-times helper against the absent
+  target. This only records fresh checkout times for the cache saved
+  afterward; it cannot reuse a cached binary or timestamp record. The save
+  keeps the commit-keyed policy, with the same explicit key when restore
+  produced no output. If the cold full run fails where lamp-voice's cached
+  build of the same commit passed, publication goes back to cold until the
+  difference is explained; the full run's failure issue says so.
 - Artifact packaging uses the current workspace's `cargo metadata` and
   successful build's JSON `compiler-artifact` records, never a glob over
   the restored target cache. Every current `lamp-*` binary target and both
