@@ -271,10 +271,16 @@ sau:
      `when = "appears"` hoặc `rearm = "ends"`: "When the lamp sees a face,
      after seeing none", với `for` "When the lamp has seen a face for 3
      seconds, …", với `absent_for` "… after seeing none for 10 minutes";
+     `paced` đặt mọi trigger khuôn mặt, có nói hay không, thành
+     `when = "appears"` với `absent_for` ít nhất `"1m"`, giữ giá trị dài hơn
+     (#6070), nên khuôn mặt mất một khung hình rồi thấy lại không chạy lại:
+     "When the lamp sees a face, after seeing none for a minute";
      **có người đứng dậy** (`room/stood_up`, mắt nói một lần cho mỗi lần
      người ngồi ở bàn rời đi, khi bật `LAMP_ACTIVITY=on`), chỉ như Watch you
      leave kiểm tra, `field = "sitting_s"`, `above = 0`, không có `for` hay
-     `absent_for`: "When someone sitting at the desk gets up"; **một giờ
+     `absent_for`: "When someone sitting at the desk gets up" (mắt nói lại
+     mỗi lần khuôn mặt người ngồi quay lại rồi mất khi nhô lên, nên `paced`
+     đặt `cooldown` ít nhất `"1m"`, #6070: "…, at most once a minute"); **một giờ
      mỗi ngày** (`clock/local`, như các trigger hằng ngày của lamp-skills):
      `field = "known"`, `equals = true`, `rearm = "ends"` và `during` đúng
      một phút, `{ from = "22:00", to = "22:01" }` (`HH:MM`; cả 23:59 tới
