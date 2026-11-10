@@ -762,7 +762,12 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   its own, with no call, and the "send" after it found nothing; the
   function's own rule now says never to say a read-back that no call gave in
   the same turn.
-- **A plain cancel is the lamp's, with no model choice** (#5958). On
+- **A plain cancel is the lamp's, with no model choice** (#5958). Only as
+  the reply the read-back asked for (`answers_the_read_back`, Thirteen's P2
+  and Reviewer-two's HOLD on #5967): the very next line after it, the
+  read-back uncut, nothing the lamp answered between, and by the one who
+  asked when the line's person is known; any other "Cancel that." is the
+  model's. On
   lamp-9adf on 10 Nov, "Lamp, cancel that." after a read-back was answered
   "Cancel what exactly? I have several things set", with no call: the model
   weighed it against the lamp's reminders. Now, while another request's
