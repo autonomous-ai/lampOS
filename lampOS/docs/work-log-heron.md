@@ -630,3 +630,27 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   #5505 is Heron's if El hasn't read it by 17:00. #5118 waits on its new
   head. Faye's 15:44 ruling (D, A, part of B) brings PRs that need two
   security reads.
+
+## 2026-11-10 — back to the first builder, from 12:0x
+
+Ready for lamp-voice: no (a read and a lamp result; no code)
+
+- 12:0x: Faye is on maintenance; the person moved heron back to the first
+  builder. The Queue is #5385 now (#4710 is full). Ready post: #5385
+  issuecomment-6759467228.
+- 12:14: the first builder's order: #4450 first (rerun on fc4b), #5835's one
+  read meanwhile, #5524 after.
+- 12:5x: #5835 READ-OK 6bbd21cbab. Its patch is the two-read `fff419e6d`'s
+  except `sdk/GUIDE.md`. lamp-control fmt and clippy clean; tests lib 164/0,
+  door 29/0, run with a short TMPDIR (a long one fails the socket tests on
+  SUN_LEN). Mutation `parts.asking(None)` fails the per-connection test. P3:
+  GUIDE's gesture, express and move rows have 10 cells in a 9-column table.
+  At 14:0x I checked it carries to nine's `7dd6f442f` (same added and removed
+  lines).
+- 14:11–14:15: #4450 on lamp-fc4b at installed 11308, as found, with the
+  person's yes; PLAYING and QUIET on #3336. desk1 and desk3 held 8/8
+  (d02 req 56 and d10 req 63 held). after2: d08 (req 73) still answered,
+  joined with the cut-short d07, "I don't know which shop you mean", 3638 ms;
+  `LAMP_UNTIED_GOING_ON` is not set on 11308. Stays heron's (#4450
+  issuecomment-6761445939). Kit P3: `night.py`'s bus taps want
+  `/usr/local/bin/lamp-bus`, which this product lamp doesn't have.
