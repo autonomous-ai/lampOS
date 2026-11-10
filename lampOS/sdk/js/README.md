@@ -266,6 +266,11 @@ await lamp.closed();
   await fake.stop();
   ```
 
+  The fake pairs with `body`, `light` and `speak` only, as a real pairing the
+  owner chose might; an app that listens (`hear`) or reads the air needs more:
+  `FakeLamp.start({ grants: 'all' })` is every grant the protocol names, or
+  name your own.
+
   `FakeLamp` from `lampos/testing` is the same fake lamp:
   `emit`, `refuseNext`, `done`, `leaseEvent`, `requests`, `received`. Its
   `light` keeps lamp-control's pattern levels (a `breathe` at level 1 is refused)

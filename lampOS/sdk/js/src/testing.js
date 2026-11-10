@@ -361,7 +361,11 @@ export class FakeLamp {
   constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null } = {}) {
     // `followsHand: false` answers a look at `hand` as a lamp-control from
     // before #4183 does: taken, with no `follow`, and nothing follows it.
-    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone, faceLook, face });
+    // 'all': every grant the protocol names, as `lamp fake` pairs with. The default
+    // stays narrow, as a real pairing the owner chose is.
+    // A bare string would be split into letters: grants: 'hear' is a slip.
+    if (typeof grants === 'string' && grants !== 'all') throw new TypeError(`grants is 'all' or an array of grant names, not '${grants}'`);
+    Object.assign(this, { code, grants: grants === 'all' ? [...schema.grants] : [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone, faceLook, face });
     this.asker = new Map();
     this.lamp = { id: lampId, name, v: schema.VERSION };
     this.clients = new Map();
@@ -440,7 +444,8 @@ export class FakeLamp {
   //   const lamp = await fake.connect();
   //   await lamp.say('hello');
   //   assert.deepEqual(fake.asked('say'), [{ text: 'hello' }]);
-  async connect({ name = 'test app' } = {}) {
+  async connect({ name } = {}) {
+    name ??= `test app ${(this.connected?.length ?? 0) + 1}`; // each computer has its own name
     const { Lamp } = await import('./client.js');
     const { Keyring } = await import('./keys.js');
     const folder = mkdtempSync(join(tmpdir(), 'lampos-fake-'));
@@ -455,15 +460,19 @@ export class FakeLamp {
   async stop() {
     // A test may have dropped or closed it already (a lease held on a dead
     // socket): that must not mask the test's own result.
-    for (const lamp of this.connected ?? []) await lamp.close().catch(() => {});
-    this.connected = [];
-    for (const ws of [...this.listening.keys()]) this.stopListening(ws);
-    for (const ws of this.wss.clients) ws.terminate();
-    await new Promise((resolve) => this.wss.close(resolve));
-    this.https.closeAllConnections();
-    await new Promise((resolve) => this.https.close(resolve));
-    for (const folder of this.folders ?? []) rmSync(folder, { recursive: true, force: true });
-    this.folders = [];
+    try {
+      for (const lamp of this.connected ?? []) await lamp.close().catch(() => {});
+      this.connected = [];
+      for (const ws of [...this.listening.keys()]) this.stopListening(ws);
+      for (const ws of this.wss.clients) ws.terminate();
+      await new Promise((resolve) => this.wss.close(resolve));
+      this.https.closeAllConnections();
+      await new Promise((resolve) => this.https.close(resolve));
+    } finally {
+      // The folders go even if closing the server threw.
+      for (const folder of this.folders ?? []) rmSync(folder, { recursive: true, force: true });
+      this.folders = [];
+    }
   }
 
   // The fields of every `op` request taken, oldest first.

@@ -196,6 +196,10 @@ asyncio.run(main())
       assert fake.asked("say") == [{"text": "hello"}]
   ```
 
+  The fake pairs with `body`, `light` and `speak` only, as a real pairing the
+  owner chose might; an app that listens (`hear`) or reads the air needs more:
+  `FakeLamp(grants="all")` is every grant the protocol names, or name your own.
+
   `lampos.testing.FakeLamp(grants=...)` is the same fake
   lamp: `emit(event, **fields)`, `refuse_next(op, code, why)`,
   `done(re)`, `lease_event(lease, state, why)`, and `requests` /
