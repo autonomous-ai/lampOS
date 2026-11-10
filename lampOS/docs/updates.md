@@ -3291,7 +3291,7 @@ freezes the unit (its own `cgroup.freeze`; `systemctl freeze` is refused for a o
 thaws it after 10 quiet min, stops it after 30 min frozen in all
 (`interrupted`) and stops it at once when the voice's privacy lease is
 lost (`privacy_lost`); both are tried in the next open window. The unit
-has `MemoryHigh=1200M` too, so a 4 GB lamp keeps about 1.2 GB available. `check-units` compares it with its own text
+has `MemoryHigh=600M` and `CPUQuota=100%` too, so the voice keeps its privacy reading through the `products` stage (lamp-c0a4, 11 Nov: above 1.4 GB available all through). `check-units` compares it with its own text
 as "the updater's", and a round never takes it for a part's unit. Its
 record, `harness-install.json`, is said on `update/status` as `harness`.
 The same unit moves a Harness older than the build's pin to it, when

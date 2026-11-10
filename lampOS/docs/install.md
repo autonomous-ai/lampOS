@@ -1690,12 +1690,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      writable for Hermes's folder), `TimeoutStartSec=3600`, for Harness's
      install as well. `/etc` is not writable. It runs at `Nice=10`,
      `IOSchedulingClass=idle` and `CPUWeight=20`, as lamp-update does, and
-     is capped: `CPUQuota=150%`, writes 8 MB/s and 200 IOPS, reads 16 MB/s
-     and 400 IOPS on `/var/lib`'s card, and `MemoryHigh=1200M`: past it
+     is capped: `CPUQuota=100%`, writes 8 MB/s and 200 IOPS, reads 16 MB/s
+     and 400 IOPS on `/var/lib`'s card, and `MemoryHigh=600M`: past it
      the kernel reclaims the one-shot's own memory and throttles it, never
-     kills it (no `MemoryMax`), so a 4 GB lamp keeps about 1.2 GB
-     available; with the other caps the `products` stage took
-     `MemAvailable` down to about 868 MB on lamp-c0a4. On lamp-c0a4 on 10 Nov a Hermes
+     kills it (no `MemoryMax`). At `CPUQuota=150%` and `MemoryHigh=1200M`
+     the `products` stage took `MemAvailable` down to about 786 MB on
+     lamp-c0a4 and the voice lost its privacy reading (2 of 2 runs); at
+     100% and 600M it stayed above 1.4 GB, the privacy reading held, and
+     the whole install took 20 min (`products` 531 s) on 11 Nov. On lamp-c0a4 on 10 Nov a Hermes
      install at the default priority stalled lamp-controls' loop 93 ms past
      the privacy reading's 50 ms, and the voice kept the microphones closed
      until it was restarted. The lower priority alone did not stop it: the
