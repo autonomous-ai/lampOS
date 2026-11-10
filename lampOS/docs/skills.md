@@ -1382,7 +1382,9 @@ core skill that is off by default (Comfort break, and those of
 `install::PRODUCT_SKILLS_OFF`) is turned on by editing its installed
 `skill.toml` (`enabled = true`, or install's off line taken out), or from
 the app (`skills.on`, #2815), which makes that edit through the manage
-helper and writes the name in `on` at once. The next
+helper and writes the name in `on` at once; the app's turn-on of a core
+skill the build ships on writes its name in `on` too, so an off then on
+in the app outlives a later build that ships it off. The next
 install or round sees that, keeps the name in `--state-dir`'s `on` (one
 name a line, beside `off`, written whole, 0644), and writes the build's
 file turned on. A skill named in `on` is written turned on even when its

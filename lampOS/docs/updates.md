@@ -1080,7 +1080,9 @@ lamp-skills, for good. `crates/update/src/product_skills.rs`:
   the lamp turned off again takes it out. A file a build wrote on (a build
   before shipped the skill on, then this one ships it off, as
   `PRODUCT_SKILLS_OFF` does) is the build's, not a choice: it goes off
-  unless `on` names it (the app's or a voice's turn-on, lamp-skills' set).
+  unless `on` names it (the app's turn-on, `skills.on`, which writes the
+  name in `on` even when the file is already on, so an app off then on is
+  kept).
   Every skill `on` names is then
   written turned on: install's off line taken out and a top-level
   `enabled = false` made `true`. A lamp with no `on` has none, as before;

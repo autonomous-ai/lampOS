@@ -2468,10 +2468,10 @@ pub fn cannot_turn_off(name: &str, permissions: &super::Permissions) -> Option<S
 /// a `[stop]`'s off and on keep it: in `state`'s [`super::OFF_FILE`],
 /// written whole by the same writer ([`super::keep_names`]), which the
 /// running program reads again within 2 s and at a start, and which a
-/// round never touches. A core skill shipped off is turned on in its own
-/// `skill.toml`, as by hand, and kept in [`super::ON_FILE`] so a round
-/// keeps it on (#2585); turned off again, its name leaves `on`, its file
-/// is off again, and it is in `off`. A skill that is part of the lamp
+/// round never touches. A core skill turned on is kept in
+/// [`super::ON_FILE`] so a round keeps it on (#2585, #5744), and one shipped
+/// off is turned on in its own `skill.toml`, as by hand; turned off
+/// again, its name leaves `on`, its file is off again, and it is in `off`. A skill that is part of the lamp
 /// itself is refused ([`cannot_turn_off`]), and so is one that does not
 /// load. The folder's lock is waited for at most `wait`.
 pub fn turn(
@@ -2522,10 +2522,13 @@ pub fn turn(
     if offs.remove(name) {
         super::keep_names(&off_file, &offs).map_err(|error| failed(&off_file, error))?;
     }
+    // Every turn-on of a core skill is the person's, kept in `on` even when
+    // its file is already on (the build shipped it on): a later build that
+    // ships it off must not take it back (#5744).
+    if skill.kind == SkillKind::Core && ons.insert(name.to_owned()) {
+        super::keep_names(&on_file, &ons).map_err(|error| failed(&on_file, error))?;
+    }
     if !skill.enabled {
-        if skill.kind == SkillKind::Core && ons.insert(name.to_owned()) {
-            super::keep_names(&on_file, &ons).map_err(|error| failed(&on_file, error))?;
-        }
         let text = fs::read_to_string(&toml).map_err(|error| failed(&toml, error))?;
         rewrite(lamp_update::product_skills::turned_on(&text))?;
     }
