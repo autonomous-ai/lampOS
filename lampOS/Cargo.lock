@@ -2460,12 +2460,14 @@ dependencies = [
 name = "lamp-sim"
 version = "0.1.0"
 dependencies = [
+ "jpeg-encoder",
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
  "rustix",
  "serde",
  "serde_json",
+ "zune-jpeg",
 ]
 
 [[package]]
