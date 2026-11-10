@@ -1840,11 +1840,14 @@ test('fake.connect() gives a connected lamp with its own keyring and stop() clea
   const fake = await FakeLamp.start();
   try {
     const lamp = await fake.connect();
+    const third = await fake.connect();
     const other = await fake.connect({ name: 'second computer' });
+    assert.deepEqual([...fake.clients.values()].map((c) => c.name), ['test app 1', 'test app 2', 'second computer']);
+    await third.close();
     const reply = await lamp.say('hello');
     assert.deepEqual(fake.asked('say'), [{ text: 'hello' }]);
     assert.ok(reply.ok !== false && other !== lamp);
-    assert.equal(fake.folders.length, 2);
+    assert.equal(fake.folders.length, 3);
     assert.ok(fake.folders.every((f) => existsSync(f)));
     await other.close(); // the test closed one itself: stop() must not trip on it
     const folders = [...fake.folders];
@@ -1855,4 +1858,19 @@ test('fake.connect() gives a connected lamp with its own keyring and stop() clea
   } finally {
     if (before === undefined) delete process.env.LAMPOS_HOME; else process.env.LAMPOS_HOME = before;
   }
+});
+
+test("FakeLamp({ grants: 'all' }) takes every grant the protocol names; the default stays narrow", async () => {
+  const narrow = await FakeLamp.start();
+  try {
+    const lamp = await narrow.connect();
+    await assert.rejects(lamp.on('phrase.heard', () => {}, { phrases: ['good night lamp'] }), { code: 'no_grant' });
+  } finally { await narrow.stop(); }
+  const wide = await FakeLamp.start({ grants: 'all' });
+  try {
+    const lamp = await wide.connect();
+    await lamp.on('phrase.heard', () => {}, { phrases: ['good night lamp'] });
+    assert.deepEqual(wide.grants, [...schema.grants]);
+  } finally { await wide.stop(); }
+  for (const slip of ['hear', 'All', '']) assert.throws(() => new FakeLamp({ grants: slip }), TypeError);
 });

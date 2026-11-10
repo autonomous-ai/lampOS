@@ -447,7 +447,7 @@ class FakeLamp:
         self,
         *,
         code: str = "12345678",
-        grants: tuple[str, ...] = ("body", "light", "speak"),
+        grants: tuple[str, ...] | str = ("body", "light", "speak"),
         lamp_id: str = "lamp-fake",
         name: str = "Fake lamp",
         auto_done: bool = True,
@@ -479,7 +479,12 @@ class FakeLamp:
         # False leaves it to the test (`done`).
         self.auto_done = auto_done
         self._asker: dict[int, ServerConnection] = {}
-        self.grants = list(grants)
+        # "all": every grant the protocol names, as `lamp fake` pairs with. The
+        # default stays narrow, as a real pairing the owner chose is.
+        if isinstance(grants, str) and grants != "all":
+            # A bare string would be split into letters: grants="hear" is a slip.
+            raise ValueError(f'grants is "all" or a list of grant names, not {grants!r}')
+        self.grants = list(schema.grants()) if grants == "all" else list(grants)
         self.lamp = {"id": lamp_id, "name": name, "v": schema.VERSION}
         self.host = "127.0.0.1"
         self.port = 0
@@ -586,7 +591,7 @@ class FakeLamp:
             shutil.rmtree(folder, ignore_errors=True)
         self._folders.clear()
 
-    async def connect(self, *, name: str = "test app") -> Any:
+    async def connect(self, *, name: str | None = None) -> Any:
         """A `Lamp` paired with this fake and connected, for a test of your own
         program: no code, pin or keyring to set up. Its keyring is a folder of its
         own (removed on exit, your `LAMPOS_HOME` untouched), and it is closed when
@@ -600,6 +605,7 @@ class FakeLamp:
         from .client import Lamp
         from .keys import Keyring
 
+        name = name or f"test app {len(self._connected) + 1}"  # each computer has its own name
         folder = tempfile.mkdtemp(prefix="lampos-fake-")
         self._folders.append(folder)
         ring = Keyring(folder)
