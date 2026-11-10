@@ -939,8 +939,9 @@ notes (`ScopeLease::reads_carried`). It needs the one-face rule's tracker
 conversation, nor, with `LAMP_CONVERSATION_CARRIES_PAST_SILENT`, its sign
 of another person (`second_provider::no_other_voice_shown`, failing closed):
 with no tracker, a carried line stays held and the room's, as with the
-switch off (Thirteen's P2 on #5842). It also needs the same-voice check
-running for the route (`Engine::reading_carried_where_heard`), the rule to
+switch off (Thirteen's P2 on #5842). Since 10 Nov it acts without a voice
+print for the rules (the memory owner's call; `Engine::reading_carried_where_heard`).
+It also needs the rule to
 have judged the line's own voice (a line it skipped is narrowed to the
 room's), and P's own face the one face in view through the line by the
 one-face count (`SpeakingFaces::one_face_in_view`): P seen only in the 5 s
@@ -951,6 +952,33 @@ the room's, keeps and all; a carried line for P never reads anyone else's
 memory. Risk, accepted with the switch: a guest off camera while P's face
 sits silent and alone in view, no other face or voice shown, is told P's
 recall and may add a keep to P's memory.
+
+**Cut words keep the scope their own line settled.** On lamp-0c4e (10 Nov)
+a carried ask (request 238, "Yesterday, I told you to remember that I like
+Jasmine tea. Remember?") was read as P's, its memory told with 3 hits, then
+cut before its answer played by a 0-word line (239), which answered its
+words in its place (`LAMP_JOIN_CUT_WORDS`). The rule never judges a line
+with no words, so the "rule never heard its voice" narrow above made 239,
+and so the answer to 238's words, the room's: "nothing in my memory says
+that". Now a line whose words are settled as a known person's, every check
+on its own voice done, is marked with whose and how
+(`memory_scope::mark_said_line`: `SaidAs::Seen`, their own face seen saying
+it, `LAMP_HELD_WORDS_SEEN`'s mark; `SaidAs::ReadCarried`, read as carried
+here); any narrow takes the mark off. A carried line with no words of its
+own whose only reason to narrow is that the rule never heard it (this
+switch's, or `LAMP_CONVERSATION_CARRIES_PAST_SILENT`'s) waits for the words
+it may answer in its place: when every part of them was settled as the
+person it is itself carried for (`second_provider::said_saying`), it keeps
+its own scope, theirs, and answers them so; any other words, or none, and it
+is the room's as before. It adds nothing to whose the words are, and never
+more than its own carry gives it. A line with words that no rule judged
+(held as a short sound, its own echo) is still the room's, and another
+voice shown, or any later narrow, still makes it the room's. Tests:
+`second_provider/tests/person_scope_seen.rs`
+`with_carried_memory_cut_words_answered_by_a_0_word_line_stay_theirs`,
+`past_silent_cut_words_answered_by_a_0_word_line_stay_theirs`,
+`past_silent_alone_seen_words_answered_by_a_0_word_line_stay_in_their_conversation`,
+`with_carried_memory_cut_words_answered_by_a_held_line_with_words_are_the_rooms`.
 
 **Words seen said, answered in a 0-word line's place, stay theirs**
 (`LAMP_HELD_WORDS_SEEN=on`, off by default until its lamp check). On
