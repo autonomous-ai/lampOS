@@ -84,6 +84,10 @@ RestrictSUIDSGID=yes
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources
+# Back from @resources for the PDF reader's child alone (lamp-services --pdf-text, services.md): it
+# caps its own memory (RLIMIT_AS, RLIMIT_DATA, 128 MiB) before it parses. With no capability a limit
+# is only ever lowered, or a soft one raised to its hard one.
+SystemCallFilter=setrlimit prlimit64
 # The services and the backend (AF_INET, AF_INET6); its own sockets (AF_UNIX).
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 

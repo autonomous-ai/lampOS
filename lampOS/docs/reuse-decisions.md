@@ -1,5 +1,21 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## A Gmail PDF attachment's text through pdf-extract, in a child (#5826, 2026-11-09)
+
+Reuse `pdf-extract` 0.12.1 on `lopdf` 0.42 (MIT, pure Rust, from crates.io and
+pinned in `Cargo.lock`, as the workspace's other unpatched dependencies; no
+`vendor/` snapshot, which holds patched crates only) rather than writing a PDF
+text extractor. lopdf alone was measured too: it is most of the size (its
+decryption is not optional), and pdf-extract adds about 60 KB to it for words
+spaced as laid out, so lopdf alone saves nothing worth its plainer text. Both
+panic and recurse on hostile input and lopdf inflates streams without a bound,
+so the parse runs only in a child of the service's own binary, killed at 2 s,
+its memory capped at 128 MiB (`RLIMIT_AS` and `RLIMIT_DATA`, set before it
+runs), its environment cleared, after a bounded inflate count and a 2 MB input
+limit; nothing of it runs in the service. The release binary grows by about 1.5 MB on an aarch64-darwin host,
+over the ~1 MB asked; the lamp's own size and time are not measured yet. See
+[services](services.md) ("A PDF").
+
 ## Bind signed source to saved ordinary decisions without another executor (2026-10-28)
 
 Reuse the full existing Ed25519 manifest verifier at its compiled capability,
