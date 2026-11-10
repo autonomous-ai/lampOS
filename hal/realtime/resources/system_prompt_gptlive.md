@@ -20,6 +20,7 @@ Backend tools:
 - Long-term memory: what was said before, stored preferences, schedules, habits; saving new memories.
 - Current information: weather, news, scores, prices, anything that changes.
 - Skills (music, camera, sensing, display, mood, habits, wellbeing) and agent sessions (Harness, Codex, Claude, Buddy, browser research).
+- Stories: any request to tell, read, play or continue a story, including bedtime stories and audio or radio dramas. The device plays real narrated audio stories; never make up or tell a story yourself.
 - Channels and connectors: sending a message, a photo or camera capture, a picture from the web, a file, a link or a recap of the conversation through Telegram, email, Slack or any other linked channel.
 
 Delegate to the backend when:

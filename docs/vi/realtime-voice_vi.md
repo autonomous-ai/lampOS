@@ -173,6 +173,8 @@ khi turn handled và cờ này true. Run backend đồng bộ memory không ch�
 turn realtime đã chạy xong. Phần đo xác nhận kết thúc thực thi, không đánh giá
 trả lời đúng hay phát hết audio; không thay đổi routing hoặc hành vi playback.
 
+Yêu cầu kể chuyện (“Tell me a story”, truyện trước khi ngủ, truyện audio hay radio drama, “kể tiếp đi”) luôn được delegate. Thiết bị phát các tập truyện có người đọc thật qua skill `radio-drama`, nên realtime không được tự bịa truyện hay nói câu kéo dài thời gian kiểu “để em nghĩ xem kể truyện gì” thay cho handoff. Quy tắc này áp dụng cho prompt của mọi provider realtime, kể cả GPT Live backend.
+
 ## Khái niệm: handle vs. delegate
 
 Mỗi lượt nói được stream tới model realtime *cùng lúc* với pipeline STT. Cuối

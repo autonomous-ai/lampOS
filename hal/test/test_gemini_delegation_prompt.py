@@ -130,3 +130,9 @@ def test_earlier_sessions_stay_delegated_and_remind_me_what_is_recall():
     assert "delegate specific recall of anything older that it does not contain" not in PROMPT
     assert '"remind me what' in PROMPT
     assert '"remind me what' in ROUTING
+
+
+def test_story_requests_delegate_to_the_radio_drama_skill():
+    assert "Story requests are delegated" in PROMPT
+    assert "never make up or tell a story yourself" in PROMPT
+    assert "tell a story." not in PROMPT
