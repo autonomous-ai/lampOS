@@ -15,7 +15,11 @@ use std::{
     os::unix::process::CommandExt,
     path::{Path, PathBuf},
     process::{Child, ChildStdout, Command, Stdio},
-    sync::atomic::Ordering,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread::JoinHandle,
     time::{Duration, Instant},
 };
 
@@ -44,6 +48,10 @@ pub struct Camera {
     /// [`RETRY_AFTER`], not every tick.
     retry_at: Option<Instant>,
     warp: Option<Warp>,
+    /// The thread that turns ffmpeg's pictures into the sight file, and the flag
+    /// that tells it to write no more: `close` sets it and waits for the thread
+    /// before it removes the file, so no picture comes back after the camera closed.
+    pump: Option<(Arc<AtomicBool>, JoinHandle<()>)>,
 }
 
 impl Camera {
@@ -54,6 +62,7 @@ impl Camera {
             asked: None,
             retry_at: None,
             warp,
+            pump: None,
         }
     }
 
@@ -82,7 +91,7 @@ impl Camera {
         }
     }
 
-    fn open(&self) -> Option<Child> {
+    fn open(&mut self) -> Option<Child> {
         // The device and the format reach the shell as environment values, never
         // as text of the script, so a value can't break out of it.
         let (format, default) = if cfg!(target_os = "macos") {
@@ -118,17 +127,41 @@ impl Camera {
         };
         let out = child.stdout.take()?;
         let (sight, warp) = (self.sight.clone(), self.warp.clone());
-        std::thread::spawn(move || pump(out, &sight, warp.as_ref()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&stop);
+        let thread = std::thread::spawn(move || pump(out, &sight, warp.as_ref(), &flag));
+        self.pump = Some((stop, thread));
         Some(child)
     }
 
     fn close(&mut self) {
+        // No more pictures from now on, whatever the pump still holds.
+        if let Some((stop, _)) = &self.pump {
+            stop.store(true, Ordering::SeqCst);
+        }
         if let Some(mut child) = self.child.take() {
-            if let Some(group) = rustix::process::Pid::from_raw(child.id() as i32) {
+            let group = rustix::process::Pid::from_raw(child.id() as i32);
+            if let Some(group) = group {
                 let _ = rustix::process::kill_process_group(group, rustix::process::Signal::TERM);
+            }
+            // TERM first, a short wait for the shell, then KILL to the whole group
+            // whatever the shell did: an ffmpeg that ignored TERM would otherwise
+            // outlive its shell and hold the pipe (no process left is ESRCH, fine).
+            let until = Instant::now() + Duration::from_secs(2);
+            while Instant::now() < until && matches!(child.try_wait(), Ok(None)) {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            if let Some(group) = group {
+                let _ = rustix::process::kill_process_group(group, rustix::process::Signal::KILL);
             }
             let _ = child.wait();
         }
+        // ffmpeg is gone, so the pump ends at once; wait for it, then remove the file.
+        if let Some((_, thread)) = self.pump.take() {
+            let _ = thread.join();
+        }
+        // A picture the pump had written but not yet renamed goes too.
+        let _ = std::fs::remove_file(self.sight.with_extension("jpg.tmp"));
         let _ = std::fs::remove_file(&self.sight);
     }
 }
@@ -141,7 +174,7 @@ impl Drop for Camera {
 
 /// Reads the camera's JPEGs from `out` until it ends, and writes each, warped
 /// by the head's pose, as the sight file (whole or not at all).
-fn pump(mut out: ChildStdout, sight: &Path, warp: Option<&Warp>) {
+fn pump(mut out: ChildStdout, sight: &Path, warp: Option<&Warp>, stop: &AtomicBool) {
     let model = Model::shipped();
     let mut buffer: Vec<u8> = Vec::new();
     let mut chunk = [0u8; 65_536];
@@ -149,6 +182,7 @@ fn pump(mut out: ChildStdout, sight: &Path, warp: Option<&Warp>) {
     loop {
         match out.read(&mut chunk) {
             Ok(0) | Err(_) => return,
+            Ok(_) if stop.load(Ordering::SeqCst) => return,
             Ok(n) => buffer.extend_from_slice(&chunk[..n]),
         }
         while let Some((start, end)) = frame(&buffer) {
@@ -158,7 +192,9 @@ fn pump(mut out: ChildStdout, sight: &Path, warp: Option<&Warp>) {
                 None => Some(jpeg.to_vec()),
             };
             if let Some(bytes) = written
+                && !stop.load(Ordering::SeqCst)
                 && std::fs::write(&temp, bytes).is_ok()
+                && !stop.load(Ordering::SeqCst)
             {
                 let _ = std::fs::rename(&temp, sight);
             }
@@ -173,7 +209,9 @@ fn pump(mut out: ChildStdout, sight: &Path, warp: Option<&Warp>) {
 
 /// The first whole JPEG in `bytes`, as its start and end (past its last byte):
 /// from the first start-of-image to the first end-of-image after it (the entropy
-/// coded data stuffs every 0xFF, so an 0xFFD9 is the end).
+/// coded data stuffs every 0xFF, so an 0xFFD9 is the end). This is right for
+/// ffmpeg's plain MJPEG, which carries no embedded thumbnail (a JPEG inside the
+/// JPEG would end the picture at the thumbnail's end).
 pub fn frame(bytes: &[u8]) -> Option<(usize, usize)> {
     let start = bytes.windows(2).position(|w| w == [0xff, 0xd8])?;
     let end = bytes[start + 2..]
