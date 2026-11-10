@@ -9,7 +9,8 @@
 //!
 //! Each is answered with one [`Said`], and a change while held is said the
 //! same way, unasked:
-//! - `{"lease":"held"}`;
+//! - `{"lease":"held","tags":true}` (`tags`: a look or pose line may carry
+//!   `"tag":N`, said back in every answer to it);
 //! - `{"lease":"suspended","why":"conversation"}`, while someone talks to
 //!   the lamp, and `held` again after;
 //! - `{"lease":"lost","why":"hand|slumped|private|paused|asleep|lapsed"}`: a hand on
@@ -53,6 +54,11 @@
 
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
+
+/// How far, in counts, a joint at rest may stop short of its goal and still
+/// count as resting on it. Here, not in `body`, so the crate builds off
+/// Linux, where `body` is not compiled.
+pub const REST_SLACK: u16 = 24;
 
 /// The longest one hold lasts: the holder renews what it keeps.
 pub const MOST_MS: u64 = 30_000;
@@ -112,20 +118,29 @@ pub struct Said {
     pub lease: State,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub why: Option<&'static str>,
+    /// `true` with each hold: this body takes a `tag` on a holder's look
+    /// and pose lines and says it back in every answer to that line
+    /// ([`with_tag`]), so lamp-control tags its lines only for a body that
+    /// says so (an older body answers in order, one line at a time).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<bool>,
 }
 
 impl Said {
     const HELD: Said = Said {
         lease: State::Held,
         why: None,
+        tags: Some(true),
     };
     const SUSPENDED: Said = Said {
         lease: State::Suspended,
         why: Some("conversation"),
+        tags: Some(true),
     };
     const FREE: Said = Said {
         lease: State::Free,
         why: None,
+        tags: None,
     };
 
     pub fn lost(why: &'static str) -> Said {
@@ -135,6 +150,7 @@ impl Said {
         Said {
             lease: State::Lost,
             why: Some(why),
+            tags: None,
         }
     }
 
@@ -142,6 +158,7 @@ impl Said {
         Said {
             lease: State::Refused,
             why: Some(why),
+            tags: None,
         }
     }
 
@@ -250,6 +267,10 @@ pub const THERE_WITHIN: f32 = 6.0;
 pub const THERE_STEPS: u32 = 10;
 /// A look not there by then is cut short: something holds the head.
 pub const LONGEST_LOOK: Duration = Duration::from_secs(5);
+/// A look stopped short of its goal, though inside the slack a rest is let
+/// stop in ([`REST_SLACK`]), is there once still this many steps: a second,
+/// as long as the body waits before it counts a rest (`REST_STEPS`).
+pub const REST_STOPPED_STEPS: u32 = 50;
 
 /// How far a look may take the head from the pose's own direction, in
 /// counts: the base either way, and the head up and down. The body's own
@@ -265,6 +286,10 @@ pub struct Reach {
 #[serde(deny_unknown_fields)]
 struct LookLine {
     look: LookValue,
+    /// lamp-control's request, echoed in every answer to this line.
+    #[serde(default)]
+    #[allow(dead_code)]
+    tag: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -295,9 +320,16 @@ struct Owed {
     clamped: bool,
     settled: u32,
     goals: Option<[u16; 3]>,
+    /// The joints' positions at the last step, to tell when they stopped.
+    positions: Option<[u16; 3]>,
+    /// How far the head's pitch and the base's yaw were from where the look
+    /// drove them at the last step, in counts: said when it is cut short.
+    short: [f32; 2],
     /// The look as the body last applied it, after the joints' own bounds
     /// (counts, yaw and pitch): what `there` says, when the body said it.
     applied: Option<[f32; 2]>,
+    /// The line's `tag`, echoed in its answer.
+    tag: Option<u64>,
 }
 
 /// The holder's look: where the head is asked to look, and the answer
@@ -321,9 +353,11 @@ impl Looking {
     /// A look from the holder ([`Looking::is_look`]): its answer now, if one
     /// is due now (a refusal, or the look it replaces cut short).
     pub fn ask(&mut self, line: &[u8], held: bool, reach: Reach, now: Instant) -> Option<String> {
+        let tag = tag_of(line);
         let (at, from_home) = match serde_json::from_slice::<LookLine>(line) {
             Ok(LookLine {
                 look: LookValue::Angles(Angles { yaw, pitch, from }),
+                ..
             }) if yaw.is_finite()
                 && pitch.is_finite()
                 && from.as_deref().is_none_or(|from| from == "home") =>
@@ -332,17 +366,22 @@ impl Looking {
             }
             Ok(LookLine {
                 look: LookValue::Word(word),
+                ..
             }) if word == "ahead" => ([0.0, 0.0], false),
             _ => {
-                return Some(refused(
-                    "a look is {\"yaw\":Y,\"pitch\":P} in degrees, or \"ahead\"",
+                return Some(with_tag(
+                    refused("a look is {\"yaw\":Y,\"pitch\":P} in degrees, or \"ahead\""),
+                    tag,
                 ));
             }
         };
         if !held {
-            return Some(refused("the body is not held"));
+            return Some(with_tag(refused("the body is not held"), tag));
         }
-        let before = self.asked.take().map(|_| cut_short("another look"));
+        let before = self
+            .asked
+            .take()
+            .map(|owed| with_tag(cut_short("another look"), owed.tag));
         // Degrees to counts: the base turns right with more counts (every
         // measured `--gaze` yaw is positive: more counts bring a face from the
         // picture's right edge to its middle; on lamp-75c9 on 28 Oct fewer
@@ -374,7 +413,10 @@ impl Looking {
             clamped,
             settled: 0,
             goals: None,
+            positions: None,
+            short: [0.0; 2],
             applied: None,
+            tag,
         });
         before
     }
@@ -417,43 +459,102 @@ impl Looking {
             if why != "conversation" {
                 self.aim = None;
             }
-            return self.asked.take().map(|_| cut_short(why));
+            return self
+                .asked
+                .take()
+                .map(|owed| with_tag(cut_short(why), owed.tag));
         }
         let asked = self.asked.as_mut()?;
         if let Some((goals, positions)) = seen {
-            let near = [0, 2].into_iter().all(|joint| {
-                (f32::from(goals[joint]) - f32::from(positions[joint])).abs() <= THERE_WITHIN
-            });
-            let still = asked.goals.is_some_and(|before| {
-                [0, 2]
-                    .into_iter()
-                    .all(|joint| before[joint].abs_diff(goals[joint]) <= 1)
-            });
+            let still = |before: Option<[u16; 3]>, now: [u16; 3]| {
+                before.is_some_and(|before| {
+                    [0, 2]
+                        .into_iter()
+                        .all(|joint| before[joint].abs_diff(now[joint]) <= 1)
+                })
+            };
+            let goals_still = still(asked.goals, goals);
+            let stopped = still(asked.positions, positions);
             asked.goals = Some(goals);
-            asked.settled = if near && still { asked.settled + 1 } else { 0 };
-            if asked.settled >= THERE_STEPS {
+            asked.positions = Some(positions);
+            // How far each of the head's pitch and the base's yaw stopped
+            // from where the look drove it, in counts.
+            let short = [0, 2].map(|joint| f32::from(positions[joint]) - f32::from(goals[joint]));
+            let near = short.iter().all(|short| short.abs() <= THERE_WITHIN);
+            // There, or stopped where a rest is let stop (`REST_SLACK`): a
+            // resting head stops short against its own friction or weight
+            // (lamp-75c9's pitch, 17 counts at load 80), and is not pushed on.
+            let rested = short
+                .iter()
+                .all(|short| short.abs() <= f32::from(REST_SLACK));
+            asked.settled = if goals_still && stopped {
+                asked.settled + 1
+            } else {
+                0
+            };
+            asked.short = short;
+            // Near, the look is there once still for `THERE_STEPS`; stopped
+            // short inside the slack, once still for as long as a rest takes
+            // to count (`REST_STOPPED_STEPS`), not before its servo starts.
+            let due = if near {
+                THERE_STEPS
+            } else {
+                REST_STOPPED_STEPS
+            };
+            if rested && asked.settled >= due {
                 let asked = self.asked.take()?;
+                // Where the joints stopped, in the look's own frame: the
+                // look as applied, and how short each joint stopped of it.
                 let aim = self.aim.unwrap_or_default();
-                return Some(match asked.applied {
+                let (applied, cut) = match asked.applied {
                     // As the body applied it: its own bounds may cut more
                     // than the reach did (lamp-a0ae on 29 Oct: a pitch of 5
                     // up kept 4, at its pitch window, said 5 and unclamped).
-                    Some(applied) => there(
-                        [
-                            applied[0] / COUNTS_PER_DEGREE,
-                            -applied[1] / COUNTS_PER_DEGREE,
-                        ],
-                        asked.clamped
-                            || (applied[0] - aim[0]).abs() > 0.5
-                            || (applied[1] - aim[1]).abs() > 0.5,
+                    Some(applied) => (
+                        applied,
+                        (applied[0] - aim[0]).abs() > 0.5 || (applied[1] - aim[1]).abs() > 0.5,
                     ),
-                    None => there(asked.degrees, asked.clamped),
-                });
+                    None => (
+                        [
+                            asked.degrees[0] * COUNTS_PER_DEGREE,
+                            -asked.degrees[1] * COUNTS_PER_DEGREE,
+                        ],
+                        false,
+                    ),
+                };
+                // Near, as applied (the look's own angles, to a servo's
+                // few counts); stopped further, where the joints are.
+                let off = if near { [0.0; 2] } else { short };
+                let reached = [
+                    (applied[0] + off[1]) / COUNTS_PER_DEGREE,
+                    -(applied[1] + off[0]) / COUNTS_PER_DEGREE,
+                ];
+                let stopped_off = off
+                    .iter()
+                    .any(|short| short.abs() > 0.5 * COUNTS_PER_DEGREE);
+                return Some(with_tag(
+                    there(reached, asked.clamped || cut || stopped_off),
+                    asked.tag,
+                ));
             }
         }
         if now.duration_since(asked.since) >= LONGEST_LOOK {
+            let short = asked.short;
+            let tag = asked.tag;
             self.asked = None;
-            return Some(cut_short("not there in time: something holds the head"));
+            let worst = short
+                .iter()
+                .fold(0.0_f32, |worst, short| worst.max(short.abs()));
+            return Some(with_tag(
+                cut_short(&if worst > f32::from(REST_SLACK) {
+                    format!(
+                        "not there in time: stopped {worst:.0} counts short of the look; something holds the head or base"
+                    )
+                } else {
+                    "not there in time: still moving".to_owned()
+                }),
+                tag,
+            ));
         }
         None
     }
@@ -462,7 +563,9 @@ impl Looking {
     /// back to the pose's own direction, and a look owed is cut short.
     pub fn end(&mut self, why: &'static str) -> Option<String> {
         self.aim = None;
-        self.asked.take().map(|_| cut_short(why))
+        self.asked
+            .take()
+            .map(|owed| with_tag(cut_short(why), owed.tag))
     }
 }
 
@@ -481,6 +584,10 @@ const POSE_KEPT_WITHIN: f32 = 0.5;
 #[serde(deny_unknown_fields)]
 struct PoseLine {
     pose: PoseJoints,
+    /// lamp-control's request, echoed in every answer to this line.
+    #[serde(default)]
+    #[allow(dead_code)]
+    tag: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
@@ -499,6 +606,8 @@ struct PoseOwed {
     arm_goals: Option<[u16; 2]>,
     /// The roll's and the arm's positions the step before.
     positions: Option<[u16; 3]>,
+    /// The line's `tag`, echoed in its answer.
+    tag: Option<u64>,
 }
 
 /// The holder's pose of the head's roll and the arm ([`Posing::ask`]), in
@@ -540,26 +649,33 @@ impl Posing {
         now_posed: Result<[f32; 3], &'static str>,
         now: Instant,
     ) -> Option<String> {
+        let tag = tag_of(line);
         let joints = match serde_json::from_slice::<PoseLine>(line) {
-            Ok(PoseLine { pose }) if pose != PoseJoints::default() => pose,
+            Ok(PoseLine { pose, .. }) if pose != PoseJoints::default() => pose,
             _ => {
-                return Some(pose_refused(
-                    "a pose is {\"roll\":R,\"shoulder\":S,\"elbow\":E} in degrees, one at least",
+                return Some(with_tag(
+                    pose_refused(
+                        "a pose is {\"roll\":R,\"shoulder\":S,\"elbow\":E} in degrees, one at least",
+                    ),
+                    tag,
                 ));
             }
         };
         let named = [joints.roll, joints.shoulder, joints.elbow];
         if named.iter().flatten().any(|degrees| !degrees.is_finite()) {
-            return Some(pose_refused("a pose's degrees are numbers"));
+            return Some(with_tag(pose_refused("a pose's degrees are numbers"), tag));
         }
         if !held {
-            return Some(pose_refused("the body is not held"));
+            return Some(with_tag(pose_refused("the body is not held"), tag));
         }
         let posed = match now_posed {
             Ok(posed) => posed,
-            Err(why) => return Some(pose_refused(why)),
+            Err(why) => return Some(with_tag(pose_refused(why), tag)),
         };
-        let before = self.asked.take().map(|_| pose_cut_short("another pose"));
+        let before = self
+            .asked
+            .take()
+            .map(|owed| with_tag(pose_cut_short("another pose"), owed.tag));
         let kept = self.pose.unwrap_or(posed);
         self.pose = Some(std::array::from_fn(|index| {
             named[index].unwrap_or(kept[index])
@@ -569,6 +685,7 @@ impl Posing {
             settled: 0,
             arm_goals: None,
             positions: None,
+            tag,
         });
         before
     }
@@ -591,15 +708,19 @@ impl Posing {
             if why != "conversation" {
                 self.pose = None;
             }
-            return self.asked.take().map(|_| pose_cut_short(why));
+            return self
+                .asked
+                .take()
+                .map(|owed| with_tag(pose_cut_short(why), owed.tag));
         }
         let asked = self.asked.as_mut()?;
+        let tag = asked.tag;
         if let Some(seen) = seen {
             let posed = match seen.posed {
                 Ok(posed) => posed,
                 Err(why) => {
                     self.asked = None;
-                    return Some(pose_cut_short(why));
+                    return Some(with_tag(pose_cut_short(why), tag));
                 }
             };
             // Each joint has arrived near its goal, or stopped where its
@@ -630,12 +751,15 @@ impl Posing {
                 let clamped =
                     (0..3).any(|index| (posed[index] - wanted[index]).abs() > POSE_KEPT_WITHIN);
                 // Said as reached: a developer sees the sag.
-                return Some(pose_there(seen.reached, clamped));
+                return Some(with_tag(pose_there(seen.reached, clamped), tag));
             }
         }
         if now.duration_since(asked.since) >= LONGEST_POSE {
             self.asked = None;
-            return Some(pose_cut_short("not there in time: something holds the arm"));
+            return Some(with_tag(
+                pose_cut_short("not there in time: something holds the arm"),
+                tag,
+            ));
         }
         None
     }
@@ -644,7 +768,9 @@ impl Posing {
     /// pose owed is cut short.
     pub fn end(&mut self, why: &'static str) -> Option<String> {
         self.pose = None;
-        self.asked.take().map(|_| pose_cut_short(why))
+        self.asked
+            .take()
+            .map(|owed| with_tag(pose_cut_short(why), owed.tag))
     }
 }
 
@@ -712,8 +838,8 @@ impl Limping {
 
     /// A look asked while the base is limp: refused, never a no-op on the
     /// base and then a jerk when its torque comes back.
-    pub fn look_refused() -> String {
-        refused(LIMP_REFUSES)
+    pub fn look_refused(line: &[u8]) -> String {
+        with_tag(refused(LIMP_REFUSES), tag_of(line))
     }
 
     /// Whether base yaw is let go now, as the body's `Asked::limp` takes it.
@@ -745,6 +871,32 @@ fn line(value: serde_json::Value) -> String {
     let mut line = value.to_string();
     line.push('\n');
     line
+}
+
+/// The `tag` a holder's look or pose line carries, if any: lamp-control's
+/// request, echoed in every answer to that line, so it never pins one line's
+/// answer on another. A line refused at once can overtake one still owed
+/// (Second's P2 on #5855).
+fn tag_of(line: &[u8]) -> Option<u64> {
+    serde_json::from_slice::<serde_json::Value>(line)
+        .ok()?
+        .get("tag")?
+        .as_u64()
+}
+
+/// `answer` with the `tag` of the line it answers, when it had one; as it is
+/// otherwise, so a line without `tag` is answered as before.
+fn with_tag(answer: String, tag: Option<u64>) -> String {
+    let Some(tag) = tag else {
+        return answer;
+    };
+    match serde_json::from_str::<serde_json::Value>(&answer) {
+        Ok(mut value) => {
+            value["tag"] = serde_json::json!(tag);
+            line(value)
+        }
+        Err(_) => answer,
+    }
 }
 
 fn there(degrees: [f32; 2], clamped: bool) -> String {
@@ -906,6 +1058,60 @@ mod tests {
 
     /// `there` says the look as the body applied it, and `clamped` when a
     /// joint's own bound cut more than the reach did.
+    /// Lamp-75c9 on 7 Nov: a resting head stopped 17 counts short of a look
+    /// and the look was cut short after 5 s, "something holds the head".
+    /// Stopped inside the rest's slack, it is there once still a second (not
+    /// before: a servo may not have started), from where it stopped, and
+    /// `clamped`; still farther short at 5 s, it is cut short with how far.
+    #[test]
+    fn a_look_stopped_short_is_there_inside_the_slack_and_cut_short_beyond_it() {
+        let now = Instant::now();
+        let tick = Duration::from_millis(20);
+        let mut looking = Looking::default();
+        looking.ask(
+            br#"{"look":{"yaw":5,"pitch":5,"from":"home"}}"#,
+            true,
+            REACH,
+            now,
+        );
+        // Pitch 1943 wanted (57 up from 2000), stopped at 1960; base there.
+        let seen = Some(([1943, 2060, 2072], [1960, 2060, 2072]));
+        let mut at = now;
+        for step in 0..REST_STOPPED_STEPS {
+            at += tick;
+            assert_eq!(looking.step(Ok(()), seen, at), None, "step {step}");
+        }
+        at += tick;
+        let said = value(&looking.step(Ok(()), seen, at).expect("there"));
+        assert_eq!(said["look"], "there");
+        assert_eq!(said["clamped"], true);
+        assert_eq!(said["pitch"], 3.5);
+        assert_eq!(said["yaw"], 5.0);
+        // 40 counts short, past the slack: owed until 5 s, then cut short.
+        looking.ask(
+            br#"{"look":{"yaw":5,"pitch":5,"from":"home"}}"#,
+            true,
+            REACH,
+            now,
+        );
+        let seen = Some(([1943, 2060, 2072], [1983, 2060, 2072]));
+        let mut at = now;
+        while at < now + LONGEST_LOOK - tick {
+            at += tick;
+            assert_eq!(looking.step(Ok(()), seen, at), None);
+        }
+        let said = value(
+            &looking
+                .step(Ok(()), seen, now + LONGEST_LOOK)
+                .expect("cut short"),
+        );
+        assert_eq!(said["look"], "cut_short");
+        assert_eq!(
+            said["why"],
+            "not there in time: stopped 40 counts short of the look; something holds the head or base"
+        );
+    }
+
     #[test]
     fn there_says_the_look_as_the_body_applied_it() {
         let mut looking = Looking::default();
@@ -1022,7 +1228,7 @@ mod tests {
         let now = Instant::now();
         assert!(!lease.holds(now));
         let held = lease.ask(br#"{"hold":{"for_ms":5000}}"#, QUIET, now);
-        assert_eq!(held.line(), said(r#"{"lease":"held"}"#));
+        assert_eq!(held.line(), said(r#"{"lease":"held","tags":true}"#));
         assert!(lease.holds(now + Duration::from_millis(4999)));
         // Renewed before it lapses, it holds on.
         let later = now + Duration::from_millis(4000);
@@ -1058,7 +1264,7 @@ mod tests {
         let suspended = lease.step(talking, now).unwrap();
         assert_eq!(
             suspended.line(),
-            said(r#"{"lease":"suspended","why":"conversation"}"#)
+            said(r#"{"lease":"suspended","why":"conversation","tags":true}"#)
         );
         assert!(!lease.holds(now), "the conversation has the body");
         assert_eq!(lease.step(talking, now), None, "said once");
@@ -1459,5 +1665,136 @@ mod tests {
 
     fn said_line(text: &str) -> String {
         text.to_owned() + "\n"
+    }
+
+    /// Second's P2 on #5855: a line refused at once overtakes one still
+    /// owed, so each answer says which line it answers by the `tag` it came
+    /// with. A accepted, B refused while A is owed, then A cut: each answer
+    /// carries its own line's `tag`, and a line without `tag` is answered as
+    /// before.
+    #[test]
+    fn each_look_and_pose_answer_carries_its_own_lines_tag() {
+        let now = Instant::now();
+        let mut looking = Looking::default();
+        assert_eq!(
+            looking.ask(br#"{"look":{"yaw":5,"pitch":2},"tag":1}"#, true, REACH, now),
+            None
+        );
+        // B refused at once, while A is owed: B's tag, not A's.
+        let b = value(
+            &looking
+                .ask(br#"{"look":"sideways","tag":2}"#, true, REACH, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (b["look"].as_str(), b["tag"].as_u64()),
+            (Some("refused"), Some(2))
+        );
+        let b = value(
+            &looking
+                .ask(br#"{"look":"ahead","tag":3}"#, false, REACH, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (b["look"].as_str(), b["tag"].as_u64()),
+            (Some("refused"), Some(3))
+        );
+        // A still owed, then cut: A's tag.
+        let a = value(&looking.end("let go").unwrap());
+        assert_eq!(
+            (a["look"].as_str(), a["tag"].as_u64()),
+            (Some("cut_short"), Some(1))
+        );
+        // A replaced by C: A's cut_short with A's tag, at C's ask.
+        looking.ask(br#"{"look":"ahead","tag":4}"#, true, REACH, now);
+        let a = value(
+            &looking
+                .ask(br#"{"look":{"yaw":1,"pitch":1},"tag":5}"#, true, REACH, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (a["look"].as_str(), a["tag"].as_u64()),
+            (Some("cut_short"), Some(4))
+        );
+        let c = value(&looking.step(Err("hand"), None, now).unwrap());
+        assert_eq!(c["tag"].as_u64(), Some(5));
+        // A line without tag: answered as before, with no tag.
+        looking.ask(br#"{"look":"ahead"}"#, true, REACH, now);
+        let old = looking.end("let go").unwrap();
+        assert_eq!(old, said(r#"{"look":"cut_short","why":"let go"}"#));
+
+        let mut posing = Posing::default();
+        let has = Ok([0.0, 52.7, 48.5]);
+        assert_eq!(
+            posing.ask(br#"{"pose":{"shoulder":30},"tag":7}"#, true, has, now),
+            None
+        );
+        let b = value(
+            &posing
+                .ask(br#"{"pose":{"elbow":10},"tag":8}"#, false, has, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (b["pose"].as_str(), b["tag"].as_u64()),
+            (Some("refused"), Some(8))
+        );
+        let b = value(
+            &posing
+                .ask(
+                    br#"{"pose":{"elbow":10},"tag":9}"#,
+                    true,
+                    Err("the lamp is not standing still at its full height"),
+                    now,
+                )
+                .unwrap(),
+        );
+        assert_eq!(
+            (b["pose"].as_str(), b["tag"].as_u64()),
+            (Some("refused"), Some(9))
+        );
+        let a = value(
+            &posing
+                .ask(br#"{"pose":{"elbow":5},"tag":10}"#, true, has, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (a["pose"].as_str(), a["tag"].as_u64()),
+            (Some("cut_short"), Some(7))
+        );
+        let a = value(&posing.end("let go").unwrap());
+        assert_eq!(
+            (a["pose"].as_str(), a["tag"].as_u64()),
+            (Some("cut_short"), Some(10))
+        );
+        posing.ask(br#"{"pose":{"elbow":5}}"#, true, has, now);
+        assert!(value(&posing.end("let go").unwrap()).get("tag").is_none());
+        // A tag that isn't an unsigned 64-bit integer refuses the line,
+        // and that refusal carries no tag (Second's P3 on #5880).
+        for bad in [
+            &br#"{"look":"ahead","tag":"7"}"#[..],
+            br#"{"look":"ahead","tag":-1}"#,
+            br#"{"look":"ahead","tag":1.5}"#,
+        ] {
+            let answer = value(&Looking::default().ask(bad, true, REACH, now).unwrap());
+            assert_eq!(answer["look"], "refused");
+            assert!(answer.get("tag").is_none());
+        }
+        let answer = value(
+            &Posing::default()
+                .ask(br#"{"pose":{"elbow":5},"tag":"7"}"#, true, has, now)
+                .unwrap(),
+        );
+        assert_eq!(answer["pose"], "refused");
+        assert!(answer.get("tag").is_none());
+        // While limp, a look refused with its own tag.
+        assert_eq!(
+            value(&Limping::look_refused(br#"{"look":"ahead","tag":11}"#))["tag"],
+            11
+        );
+        assert!(
+            value(&Limping::look_refused(br#"{"look":"ahead"}"#))
+                .get("tag")
+                .is_none()
+        );
     }
 }

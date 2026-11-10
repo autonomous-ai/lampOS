@@ -60,6 +60,23 @@ fn words<'a>(args: &'a Value, key: &str, what: &str) -> Result<&'a str, String> 
     Ok(words)
 }
 
+/// Drive's `q` for search words: each word in the file's name or its text,
+/// none in the trash. A name's file extension or its `_` and `-` don't stop
+/// a spoken name ("budget plan" finds `Budget_plan_2026.xlsx`).
+fn drive_search(words: &str) -> String {
+    let mut q: Vec<String> = words
+        .split(|c: char| c.is_whitespace() || matches!(c, '_' | '-' | '.' | ','))
+        .filter(|word| !word.is_empty())
+        .take(8)
+        .map(|word| {
+            let word = word.replace('\\', "\\\\").replace('\'', "\\'");
+            format!("(name contains '{word}' or fullText contains '{word}')")
+        })
+        .collect();
+    q.push("trashed = false".into());
+    q.join(" and ")
+}
+
 /// An id or a name that goes in a path: one segment, bounded.
 fn segment<'a>(args: &'a Value, key: &str, what: &str) -> Result<&'a str, String> {
     let id = needed(args, key, what)?;
@@ -262,13 +279,14 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
         return Ok(Plan::Mail(match what {
             "recent" => MailAsk::Recent(count(args)),
             "search" => MailAsk::Search(words(args, "query", what)?.to_owned(), count(args)),
-            // A UID over IMAP; Gmail's own id with a Google sign-in.
+            // Over IMAP a UID, the inbox's or All Mail's (`all41`, from a
+            // search); Gmail's own id with a Google sign-in.
             "message" => {
                 let id = needed(args, "id", what)?;
                 let fits = if entry.oauth() {
                     mail::api_id_ok(id)
                 } else {
-                    id.parse::<u32>().is_ok()
+                    mail::imap_id_ok(id)
                 };
                 if !fits {
                     return Err("a mail's id is the one a list gave".into());
@@ -318,27 +336,35 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
             get(&["calendar", "v3", "calendars", calendar, "events"], &query)
         }
         ("google_drive", "files") => {
-            let q = match text(args, "query") {
-                Some(_) => format!(
-                    "fullText contains '{}' and trashed = false",
-                    words(args, "query", what)?
-                        .replace('\\', "\\\\")
-                        .replace('\'', "\\'")
+            let fields = (
+                "fields",
+                "files(id,name,mimeType,modifiedTime,owners(displayName))".to_owned(),
+            );
+            match text(args, "query") {
+                // Drive refuses an order with `fullText` (HTTP 400, "Sorting
+                // is not supported for queries with fullText terms"), so a
+                // search comes back by relevance. Each word is looked for in
+                // the name as well as the text, so a file asked for by its
+                // name is found (lamp-3e83, 9 Nov: a file named to the lamp
+                // was never found).
+                Some(_) => get(
+                    &["drive", "v3", "files"],
+                    &[
+                        ("q", drive_search(words(args, "query", what)?)),
+                        ("pageSize", n),
+                        fields,
+                    ],
                 ),
-                None => "trashed = false".into(),
-            };
-            get(
-                &["drive", "v3", "files"],
-                &[
-                    ("q", q),
-                    ("pageSize", n),
-                    ("orderBy", "modifiedTime desc".into()),
-                    (
-                        "fields",
-                        "files(id,name,mimeType,modifiedTime,owners(displayName))".into(),
-                    ),
-                ],
-            )
+                None => get(
+                    &["drive", "v3", "files"],
+                    &[
+                        ("q", "trashed = false".into()),
+                        ("pageSize", n),
+                        ("orderBy", "modifiedTime desc".into()),
+                        fields,
+                    ],
+                ),
+            }
         }
         ("google_drive", "file") => get(
             &["drive", "v3", "files", segment(args, "id", what)?],
@@ -958,6 +984,51 @@ mod tests {
     }
 
     #[test]
+    fn a_drive_search_looks_in_names_and_never_orders_a_full_text_search() {
+        let pairs = |args: Value| -> Vec<(String, String)> {
+            let (_, url, _) = http(plan("google_drive", &args, &entry(), 0).unwrap());
+            reqwest::Url::parse(&url)
+                .unwrap()
+                .query_pairs()
+                .map(|(key, value)| (key.into_owned(), value.into_owned()))
+                .collect()
+        };
+        let value = |pairs: &[(String, String)], key: &str| {
+            pairs
+                .iter()
+                .find(|(k, _)| k == key)
+                .map(|(_, value)| value.clone())
+        };
+        // Drive answers HTTP 400 to `orderBy` beside `fullText`.
+        let searched = pairs(json!({"what":"files","query":"Budget_plan 2026.xlsx"}));
+        assert_eq!(value(&searched, "orderBy"), None, "{searched:?}");
+        assert_eq!(
+            value(&searched, "q").as_deref(),
+            Some(
+                "(name contains 'Budget' or fullText contains 'Budget') and \
+                 (name contains 'plan' or fullText contains 'plan') and \
+                 (name contains '2026' or fullText contains '2026') and \
+                 (name contains 'xlsx' or fullText contains 'xlsx') and trashed = false"
+            )
+        );
+        let quoted = pairs(json!({"what":"files","query":"tax 'x'"}));
+        assert_eq!(
+            value(&quoted, "q").as_deref(),
+            Some(
+                "(name contains 'tax' or fullText contains 'tax') and \
+                 (name contains '\\'x\\'' or fullText contains '\\'x\\'') and trashed = false"
+            )
+        );
+        // With no words, the newest come first.
+        let latest = pairs(json!({"what":"files"}));
+        assert_eq!(
+            value(&latest, "orderBy").as_deref(),
+            Some("modifiedTime desc")
+        );
+        assert_eq!(value(&latest, "q").as_deref(), Some("trashed = false"));
+    }
+
+    #[test]
     fn each_named_read_is_on_its_services_allow_list() {
         let cases = [
             (
@@ -1079,6 +1150,18 @@ mod tests {
             Plan::Mail(MailAsk::Search("from:mom".into(), COUNT_MOST))
         );
         assert!(plan("gmail", &json!({"what":"message","id":"x"}), &entry(), 0).is_err());
+        // Over IMAP an inbox UID or an All Mail one a search gave.
+        for (id, fits) in [
+            ("41", true),
+            ("all41", true),
+            ("all", false),
+            ("allx", false),
+            ("+41", false),
+            ("all+41", false),
+        ] {
+            let planned = plan("gmail", &json!({"what":"message","id":id}), &entry(), 0);
+            assert_eq!(planned.is_ok(), fits, "{id}");
+        }
     }
 
     #[test]

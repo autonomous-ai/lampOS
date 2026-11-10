@@ -20,6 +20,7 @@ import os
 import re
 import socket
 import ssl
+import sys
 import unicodedata
 import warnings
 from collections import defaultdict
@@ -27,11 +28,12 @@ from pathlib import Path
 from typing import Any, Callable
 
 from websockets.asyncio.client import ClientConnection, connect as ws_connect
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from . import debug, errors, schema
 from .errors import BY_CODE, LampError, NotPaired, WrongLamp, from_reply
 from .keys import Keyring, Pairing, b64, is_pin, pin_of, proof, unb64
+from .moves import POSES_STEP_MS, poses_to_frames
 
 Handler = Callable[[dict], Any]
 
@@ -162,6 +164,11 @@ def binary_frame(message: bytes) -> dict:
 
 # Events that come with a request, never subscribed to: a camera stream's.
 CAMERA_EVENTS = ("camera.frame", "camera.ended")
+
+# `keep_connected`'s pauses before connecting again, in seconds: the first
+# after a closed connection, then longer while the lamp can't be reached (a
+# restart takes a few seconds; an update about a minute).
+RECONNECT_PAUSES = (1.0, 2.0, 5.0, 10.0)
 
 class Subscription:
     """What `Lamp.on` returns: an awaitable, not a future. Awaited, it raises
@@ -449,6 +456,62 @@ class Lamp:
             raise from_reply(reply.get("error", {}))
         return cls(ws, welcome, reply)
 
+    @classmethod
+    async def keep_connected(
+        cls,
+        setup: Callable[["Lamp"], Any],
+        lamp: str | None = None,
+        *,
+        host: str | None = None,
+        keyring: Keyring | None = None,
+        pauses: tuple[float, ...] = RECONNECT_PAUSES,
+    ) -> None:
+        """Run a long-running program across the lamp's restarts (every update
+        restarts it, and the connection closes). Connects, runs
+        `await setup(lamp)` (subscribe, ask for leases, as after `connect`),
+        and waits until the connection ends; then connects again and runs
+        `setup` again on the new connection, after a pause that grows along
+        `pauses` while the lamp can't be reached and starts over once it can.
+
+        Never returns by itself: cancel it to stop. Raises at once what
+        connecting again can't mend: no pairing (`NotPaired`), another lamp
+        at the address (`WrongLamp`), a refusal of the hello (`unpaired`,
+        revoked), and anything `setup` raises or a subscription's refusal
+        (`no_grant`) that nobody awaited."""
+        failures = 0
+        while True:
+            unreachable: BaseException | None = None
+            try:
+                connection = await cls.connect(lamp, host=host, keyring=keyring)
+            except LampError as error:
+                # `closed`: the lamp went while saying hello, as a restart does.
+                if error.code != "closed":
+                    raise
+                unreachable = error
+            except (OSError, asyncio.TimeoutError, WebSocketException, EOFError) as error:
+                unreachable = error
+            if unreachable is not None:
+                wait = pauses[min(failures, len(pauses) - 1)]
+                if debug.on():
+                    print(f"lampos .. not reached ({type(unreachable).__name__}), again in {wait:g} s", file=sys.stderr, flush=True)
+                failures += 1
+                await asyncio.sleep(wait)
+                continue
+            failures = 0
+            try:
+                result = setup(connection)
+                if inspect.isawaitable(result):
+                    await result
+                await connection.wait_closed()
+            except LampError as error:
+                # The lamp went in the middle of setup: connect again.
+                if error.code != "closed":
+                    raise
+            finally:
+                # Quiet when the lamp has gone already: its leases went with it.
+                await connection.close()
+            await asyncio.sleep(pauses[0])
+
     async def __aenter__(self) -> "Lamp":
         return self
 
@@ -516,9 +579,12 @@ class Lamp:
             raise from_reply(reply.get("error", {}))
         return reply
 
-    async def _act(self, op: str, wait: bool, **fields: Any) -> dict:
+    async def _act(self, op: str, wait: bool, *, taken: Callable[[], None] | None = None, **fields: Any) -> dict:
         """An action: its reply when taken, or with `wait` its `done` event;
         for the actions no `done` follows yet (`ENDS_AT_REPLY`), the reply.
+        `taken` runs once the lamp has taken it, before any wait for its
+        `done`, and never for a refusal: what the lamp ends on taking it ends
+        here then, even if the wait is cancelled (Reviewer-two's P2 on #5837).
         `request` takes the next id before it first yields, so this is it."""
         id_ = self._next_id
         # Handed to the body, which says nothing back, `gesture` and `move`
@@ -533,6 +599,8 @@ class Lamp:
             if done is not None:
                 self._done.pop(id_, None)
             raise
+        if taken is not None:
+            taken()
         return reply if done is None else await done
 
     # The reader.
@@ -700,13 +768,24 @@ class Lamp:
     async def gesture(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("gesture", wait, name=name)
 
-    async def look(self, at: str | None = None, *, yaw: float | None = None, pitch: float | None = None) -> dict:
+    async def look(
+        self, at: str | None = None, *, yaw: float | None = None, pitch: float | None = None, wait: bool = False
+    ) -> dict:
+        """Turn the head (`at`, or `yaw`/`pitch` in degrees). Its answer when
+        the door takes it; with `wait`, the body's `done` instead: `finished`
+        with where the head got to, or `dropped` with why (`the body is not
+        held` while a conversation suspends your lease). A look at `hand` has
+        no `done` (`follow_hand`)."""
+        if wait and at == "hand":
+            raise BY_CODE["bad_request"]("a look at hand is followed until it ends, with no done: use follow_hand")
         target: Any = at if at is not None else {"yaw": yaw or 0.0, "pitch": pitch or 0.0}
-        reply = await self._act("look", False, at=target)
-        # Taken, another look ends a following (lamp-control's own rule).
+        # Taken, another look ends a following (lamp-control's own rule), at
+        # once, not after its `done`.
+        return await self._act("look", wait, taken=self._another_look, at=target)
+
+    def _another_look(self) -> None:
         if self._following is not None:
             self._following.end("cut_short", "another look")
-        return reply
 
     def follow_hand(self, *, for_ms: int = 10_000, why: str | None = None) -> Following:
         """`async with lamp.follow_hand() as following:` turns the head after
@@ -720,11 +799,23 @@ class Lamp:
     async def move(self, frames: list[list[int]], step_ms: int, *, wait: bool = False) -> dict:
         return await self._act("move", wait, step_ms=step_ms, frames=frames)
 
+    async def move_poses(self, poses: list[dict], *, hold_ms: int = 400, wait: bool = False) -> dict:
+        """A move through `poses`, each the degrees of the joints it turns
+        from the standing pose (`{"pitch": 10, "yaw": -8}`), eased there and
+        back (`moves.poses_to_frames`). LampError `bad_request`, before sending, for poses
+        a move can't make."""
+        frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)
+        return await self.move(frames, POSES_STEP_MS, wait=wait)
+
     async def play(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("play", wait, name=name)
 
-    async def joints(self, lease: Lease, within_ms: int, **targets: float) -> dict:
-        return await self._act("joints", False, lease=lease.id, targets=targets, within_ms=within_ms)
+    async def joints(self, lease: Lease, within_ms: int, *, wait: bool = False, **targets: float) -> dict:
+        """Aim the joints named, in degrees, under `lease`. Its answer when the
+        door takes it; with `wait`, the body's `done`, as `look`'s."""
+        # lamp-control sends yaw and pitch as the holder's look, so taking it
+        # ends a following too (parts.rs `joints`).
+        return await self._act("joints", wait, taken=self._another_look, lease=lease.id, targets=targets, within_ms=within_ms)
 
     async def light(self, colour: str, level: int, for_ms: int, pattern: str | None = None) -> dict:
         return await self._act("light", False, colour=colour, level=level, pattern=pattern, for_ms=for_ms)

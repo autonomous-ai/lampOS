@@ -356,11 +356,6 @@ Environment=LAMP_SKILLS_DIR=/run/lampos-skills
 # installed skills no longer push the lamp's own past the chat route's 48 (lamp-9adf, 6 Nov, on 10441: the_time,
 # reports_state and fetch_page left out). Who was here and Guard mode answered through it there by drop-in (#1685).
 Environment=LAMP_USE_SKILL=on
-# Music to relax (#1685, #5749): a spoken request for a skill's checked local recording plays it after the
-# confirmation; Stop, an interruption, the privacy slide or mute ends it, and nothing resumes (requested-audio.md).
-# The same line in lamp-voice, lamp-skills and lamp-actions; played on lamp-4ace on 6963 (#2793). Installing
-# the skill (relaxing-music, a Store skill) is separate: with none installed nothing plays.
-Environment=LAMP_REQUESTED_AUDIO=on
 # "Stop sending reports" and asking whether they're sent (#2862, reports_stop.rs): the voice can only
 # turn them off, never on.
 Environment=LAMP_REPORTS=on
@@ -419,6 +414,12 @@ Environment=LAMP_MEMORY_KEEP_ASKED=on
 # And a line that plainly asks for a timer or a reminder calls the function that sets it (lamp-4ace, 25 Oct:
 # "remind me in three minutes to call my sister" got "Three minutes, call your sister." and no call).
 Environment=LAMP_SCHEDULE_ASKED=on
+# And a line that is only a plain question about the person's reminders calls list_reminders (lamp-52e6, 9 Nov:
+# "what reminders do I have?" was answered in words with no call in 2 of 8 asks).
+Environment=LAMP_REMINDERS_ASKED=on
+# And a line that is only a plain ask for a light scene or a light show calls its skill (lamp-52e6, 9 Nov: "movie
+# light" and "show me a light show" were answered in words and no call, and the light never changed).
+Environment=LAMP_SKILL_ASKED=on
 # A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.

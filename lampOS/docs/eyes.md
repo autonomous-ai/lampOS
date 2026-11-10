@@ -1165,9 +1165,47 @@ hold, which needs the match's id, let them go. With both on:
 
 With either switch off nothing is followed and no `follows` is said.
 
+
 Off, nothing changes: each miss lets go, as before. The lamp check: on
 lamp-52e6, the lead's face from a seat with the switch on and off, the
 score in the journal, the known file held and `who` naming them.
+
+**Unsure until a print** (#5738), only with `LAMP_FACE_KNOWN_UNSURE=on` and
+the hold on (off unless set; `who::known_unsure_on`). A check with no
+print, within the 4 s bound, no longer lets the one known go for a near face
+that isn't their unbroken id, and no longer holds them sure with nobody
+near: both hold them **unsure** (`who::Held::unprinted`). Sure stays only
+for their own id in every look since, with nothing unsure since the last
+print.
+
+- **The known file moved aside.** An unsure check moves the known file to
+  `known-unsure` and its face to `known-unsure-face` (`who::hold_unsure`,
+  the name first), renewed there while it lasts. Every reader of the known
+  file (the first voice's name note, memory's person, the cloud's
+  tellable names, the skills, the second voice's face cache) sees nobody
+  known, as when the hold let go; only the second voice reads the hold.
+- **A print decides.** A match writes the known file as ever; a held print
+  writes it back with the name and the face held (or the carried id); a
+  let-go removes it. Only after that write or remove do the hold's files go
+  (`who::keep_known`, `who::clear_unsure`), so the voice, seeing them go,
+  reads the decision. A held print counts at the hold's own bar
+  (`HOLD_LIKENESS`, 0.30, `who::Held::printed_theirs`); after a gap such a
+  print keeps them only once `who::Held::printed` read the same face at
+  `SAME_PERSON` (0.363), on their id or a followed one.
+- **Checked every half second.** While unsure with a near face, a check is
+  due every 0.5 s (`who::recognise_due_unsure`), not every 2 s, so a print
+  comes within the voice's wait.
+- **The second voice waits for it.** A line ending while `known-unsure` is
+  fresh (3 s, as the known file) is tied to no one until it goes, at most
+  1 s past the line's end (`speaking_faces::known_once_printed`): then the
+  known file as it stands, theirs only if a print wrote it back; still
+  unsure at the bound, the room's ([second-voice.md](second-voice.md)). A
+  line begun while unsure was admitted as nobody's and stays the room's
+  unless the late keeper finds their face.
+
+With `LAMP_FACE_KNOWN_UNSURE` off, nothing changes. The lamp check: on lamp-52e6, row-5738a (from
+row-5546i): A's lines after a gap to A with miss-cold 0, the swap and C's
+lines to the room.
 
 ### Atomic face repair store (inactive)
 
@@ -1467,23 +1505,54 @@ With the switch:
     nothing is sent and the model is told to say the name back and ask if
     it is right (`SAY_IT_BACK`). The voice keeps that refused save
     (`second_provider::HeldSave`, as a held forget is kept) and runs it
-    itself on the person's next turn when that turn is a plain yes to the
-    read-back (`known_faces::held_save_verdict`, which judges a name held
+    itself once the person agrees to their face being kept
+    (`known_faces::face_agreed`): a plain yes to the face question after
+    the name's yes, or a yes to the read-back whose own words ask for the
+    face ("Yes. That's right. Please remember my face."). A plain yes to
+    the read-back alone keeps it held and the model is told to ask "May I
+    remember your face, so I know you next time?" first; anything but a
+    plain yes to that drops it (the first builder's HOLD on #5700: the
+    walk keeps a face only after a clear yes to that question). The name
+    is judged as `known_faces::held_save_verdict` judges it (a name held
     as letters, "J-A-N-E", as the word they make, "Jane", as the run
-    does: Fifth's P2 on #5580), through the same runner
+    does: Fifth's P2 on #5580). It runs through the same runner
     and check as a model call, so it counts as the walk's face save; the
     model is told the face is kept, or, when the eyes keep nothing, that it
     was not kept and why, and a model call after it gets
     `ALREADY_KEPT`, never a second save. A correction, a spelling, another
-    name, a no, a new save call, a second face seen speaking the yes (or,
-    where the eyes read speaking, the speaker not seen saying it), a line
-    held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`) drops
-    it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
-    right?" "Yes, that's my name." made no call and kept no face). A
-    plain yes dropped for the second face or the speaker not seen saying
-    it is told to the model as a face not kept, and why, so it makes up no
-    reason of its own (lamp-52e6, 5 Nov, Fifth's run B on #5415: "I need
-    to know who you are first"). While
+    name, a no, a new save call, a second face seen speaking the yes, a
+    line held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`)
+    drops it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
+    right?" "Yes, that's my name." made no call and kept no face). A yes
+    no face was seen saying, even with no face in view, still runs it
+    (the lead, 9 Nov: the owner may not face the lamp; when the eyes then
+    find no face, the model is told it was not kept, and why). A plain
+    yes dropped for the second face is told to the model as a face not
+    kept, and why, so it makes up no reason of its own (lamp-52e6, 5 Nov,
+    Fifth's run B on #5415: "I need to know who you are first"). With nothing held, while "who you are"
+    is still open and no face was kept in the last 45 s, a plain yes to
+    the name the lamp's last answer said back, the name the person's line
+    before gave (`known_faces::read_back_name`), has the model told to ask
+    the face question, and a plain yes to that question (or a yes to the
+    read-back that asks for the face itself) runs the same save with no
+    model call at all, through the same gates (`second_provider::yes_save`,
+    `known_faces::face_agreed_name`); a model save of that name within
+    45 s after it gets `ALREADY_KEPT` (#5684: "Name is Walter.", "Walter,
+    did I get that right?", "Yes. That's my name." with no call ended the
+    step with the name only). The face question is known in English and
+    Vietnamese; in another language its yes still waits on the model's
+    call. It is a line that asks leave to remember their face ("May I",
+    "Can I", "Shall I", "Do you want me to" … then "remember your face"
+    or "remember the face"), with nothing in it that turns it round or
+    makes it a choice ("not", a "n't" word, "never", "forget", "rather",
+    "unless", "instead", "or", "without", "skip", "no"; in Vietnamese
+    "nhớ khuôn mặt" with "đừng", "quên", "chẳng", "hay" or "hoặc"
+    anywhere, or "không"/"chưa" before that "nhớ"), so a yes to "Would
+    you rather I didn't remember your face?" or "May I remember just
+    your name, without your face?" keeps nothing (Fourteen's HOLDs on
+    #5720). A read-back and the face question in one line
+    ("Walter, did I get that right? May I remember your face?" "Yes.")
+    is neither, so its face waits on the model's call. While
     it is held, the onboarding walk keeps "who you are" open for it, up to
     45 s (`onboarding::face_save_held`, `FACE_SAVE_HELD_US`), instead of
     ending it done with the name only 15 s after the lamp's read-back

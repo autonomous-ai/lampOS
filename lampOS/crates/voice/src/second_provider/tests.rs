@@ -25,6 +25,7 @@ mod opens_further;
 mod pause_join;
 mod person_scope_seen;
 mod remember_speaker;
+mod sent_write;
 mod short_done;
 mod unplayed_join;
 mod voice_confirms;
@@ -9982,6 +9983,75 @@ async fn an_offer_to_keep_is_not_cut_early_into_first_words() {
     }
 }
 
+/// Reviewer-lead's P2 on #5890: with the first words cut early
+/// (`cutting_first_words(4)`), a reply opening with a step word in the
+/// walk is held to its clause's end, so tonight's made-up ask (lamp-52e6,
+/// 9 Nov 21:46:42) is dropped whole, not cut into "Step three: tell me"
+/// and a lone "one thing you'd like me to keep in mind for you.". The
+/// walk's own ask keeps its step word; outside the walk nothing changes.
+#[tokio::test]
+async fn a_step_word_opening_a_reply_in_the_walk_is_held_to_its_clause() {
+    let made_up = || {
+        vec![vec![
+            text("Step three: tell "),
+            text("me one thing you'd "),
+            text("like me to keep in mind for you. "),
+            text("Okay."),
+            Ok(ChatEvent::Done),
+        ]]
+    };
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let cases: Vec<(bool, Chats, Vec<&str>)> = vec![
+        (true, made_up(), vec!["said:Okay."]),
+        (
+            true,
+            vec![vec![
+                text("Step three: pet "),
+                text("the top of my head."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec!["said:Step three: pet the top of my head."],
+        ),
+        (
+            false,
+            made_up(),
+            vec![
+                "said:Step three: tell me",
+                "said:one thing you'd like me to keep in mind for you.",
+                "said:Okay.",
+            ],
+        ),
+    ];
+    for (walk, chats, want) in cases {
+        crate::onboarding::set_under_way(walk);
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [Ok(
+                    "Yes, please. (Say only this, nothing before or after it: \"Step three: Pet the top of my head.\")"
+                        .into(),
+                )]
+                .into(),
+            ),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.cutting_first_words(4);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        crate::onboarding::set_under_way(false);
+        let said: Vec<String> = labels
+            .iter()
+            .filter_map(|label| label.strip_prefix("said:"))
+            .map(|said| format!("said:{}", said.trim()))
+            .filter(|said| said != "said:")
+            .collect();
+        assert_eq!(said, want, "walk {walk}: {labels:?}");
+    }
+}
+
 /// Reviewer-two's P3 on #4076: a held sentence is never lost when the turn
 /// ends on the plain line that nothing was kept. Here the offer is held by
 /// a round asked once more (a decline of a line named to a face), then two
@@ -13136,6 +13206,45 @@ async fn only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words() {
             .await
             .is_empty()
     );
+}
+
+/// `LAMP_NAME_WORDLESS_BAR=on` (#5385, the first builder's rule): a line
+/// marked as only the lamp's name whose words came back empty, heard under
+/// 0.99 (lamp-75c9's 0.941 in its own move's sound, or none said in full),
+/// is not asked: no turn, no answer. At 0.99 or more it is asked as the
+/// name, as before; a line with words is asked as it is whatever the score;
+/// and without the switch the wordless line is asked as the name.
+#[tokio::test]
+async fn a_wordless_call_under_the_bar_is_not_answered_with_the_switch() {
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    let barred = |best: Option<f32>| {
+        move |engine: Engine| engine.holding_a_wordless_call(Arc::new(move |_: (u64, u64)| best))
+    };
+    // (1) Under the bar, no words: nothing asked.
+    for best in [Some(0.941), Some(0.989), None] {
+        assert!(
+            asked_with("", barred(best), start(1), true, false)
+                .await
+                .is_empty(),
+            "{best:?}"
+        );
+    }
+    // (2) Off: asked as the name, as before.
+    let off = asked_with("", |engine| engine, start(1), true, false).await;
+    assert_eq!(off[0][off[0].len() - 2], called, "{:?}", off[0]);
+    assert_eq!(off[0].last(), Some(&Message::user(super::CALLED_WORDS)));
+    // (3) Under the bar, with words: asked as said, told it was a call.
+    let worded = asked_with("Lamp", barred(Some(0.941)), start(1), true, false).await;
+    assert_eq!(worded[0][worded[0].len() - 2], called, "{:?}", worded[0]);
+    assert_eq!(worded[0].last(), Some(&Message::user("Lamp")));
+    let asked = "Lamp, what time is it?";
+    let whole = asked_with(asked, barred(Some(0.941)), start(1), true, false).await;
+    assert_eq!(whole[0].last(), Some(&Message::user(asked)));
+    // (4) At the bar or over, no words: asked as the name, as before.
+    for best in [0.99, 1.0] {
+        let sure = asked_with("", barred(Some(best)), start(1), true, false).await;
+        assert_eq!(sure, off, "{best}");
+    }
 }
 
 /// A line marked as only the lamp's name (`Called`) whose words came back

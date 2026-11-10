@@ -231,6 +231,33 @@ fn a_timer_claimed_after_a_set_the_ledger_refused_is_never_said() {
     assert_eq!(ran(true).said, said(&["Timer set."]));
 }
 
+/// Reviewer-three's after-merge P2 on #5326: a forget discards the later
+/// calls of its batch, so a `set_timer` planned beside it never ran and is
+/// no call of its kind. "Timer set." in the clean round after it is held as
+/// a claim with no call, never said as it came.
+#[test]
+fn a_timer_the_forget_discarded_never_backs_a_claim() {
+    let went = claimed(
+        true,
+        "Forget that, then set a timer for one minute.",
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("erase", crate::remember::FORGET, json!({})),
+                call("stale", "set_timer", json!({"seconds": 60})),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![saying("Timer set."), saying("Timer set.")],
+    );
+    assert_eq!(went.ran, [crate::remember::FORGET], "{went:?}");
+    assert!(
+        went.said.iter().all(|said| !said.contains("Timer set")),
+        "{went:?}"
+    );
+    assert!(told_claim(&went), "{went:?}");
+    assert_eq!(went.asked, 3, "{went:?}");
+}
+
 /// lamp-52e6, the earlier run: "Louder." and "Brighter." with no call. The
 /// first is held (without the switch too) and asked again; a second with no
 /// call is the plain line that it wasn't done, never silence.
@@ -923,4 +950,124 @@ fn a_kept_lights_claim_is_held_beside_any_call() {
         }
     }
     assert!(said_anyway.is_empty(), "said: {said_anyway:?}");
+}
+
+/// One spoken turn begun with the lamp's name to a face turned to the
+/// lamp (`answering_named_to_a_face`), so a `not_for_me` is not taken and
+/// the model is asked once more, every call of that round answered and
+/// none run. Reviewer-three's harness on #5215 (merged 66bc7d93b7).
+fn named_turn(
+    on: bool,
+    worded_on: bool,
+    product: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new(std::iter::once(first).chain(later).collect()),
+        ..Script::default()
+    });
+    let ran: Calls = Arc::default();
+    let seen = ran.clone();
+    let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
+        let answer = told(&name);
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async move { answer })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .answering_short(product)
+    .saying_at_once(product)
+    .checking_action_claims(on)
+    .checking_worded_claims(worded_on)
+    .answering_named_to_a_face(Arc::new(|_| true));
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn(&mut engine).await
+        });
+    let asked = script.asked.lock().unwrap();
+    let notes = asked
+        .iter()
+        .flatten()
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .filter(|content| content.starts_with("(For you to know"))
+        .map(str::to_owned)
+        .collect();
+    Went {
+        said: labels
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect(),
+        asked: asked.len(),
+        ran: ran
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(name, ..)| name.clone())
+            .collect(),
+        notes,
+    }
+}
+
+/// A round of `not_for_me` and `set_timer`, not taken because the lamp was
+/// named to a face: neither runs, so the timer is no evidence for "Timer
+/// set." in the next round, which is held as with no call (Reviewer-three's
+/// after-merge P2 on #5215).
+#[test]
+fn a_declined_rounds_calls_are_no_evidence_for_a_claim() {
+    let first = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("decline", NOT_FOR_ME, json!({})),
+                call("timer", "set_timer", json!({"seconds": 60})),
+            ])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for worded in [false, true] {
+        let went = named_turn(
+            true,
+            worded,
+            true,
+            "Lamp, set a timer to one minute.",
+            first(),
+            vec![saying("Timer set."), saying("I did not set it.")],
+        );
+        assert!(went.ran.is_empty(), "the declined round ran: {went:?}");
+        assert!(
+            !went.said.iter().any(|line| line == "said:Timer set."),
+            "a call not run stood behind the claim (worded {worded}): {went:?}"
+        );
+        assert!(told_claim(&went), "{went:?}");
+    }
+}
+
+/// The control: a declined round of `not_for_me` alone, then "Timer set.",
+/// is held and asked again.
+#[test]
+fn a_declined_not_for_me_alone_still_holds_the_claim() {
+    let went = named_turn(
+        true,
+        false,
+        true,
+        "Lamp, set a timer to one minute.",
+        calling(NOT_FOR_ME),
+        vec![saying("Timer set."), saying("I did not set it.")],
+    );
+    assert!(went.ran.is_empty());
+    assert!(!went.said.iter().any(|line| line == "said:Timer set."));
+    assert!(told_claim(&went));
 }

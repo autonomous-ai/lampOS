@@ -1050,6 +1050,140 @@ pub(super) const LINES: &[Line] = &[
         "刚才我们还没问到你的名字。现在试试吧。",
         "아까는 이름을 여쭤보지 못했어요. 지금 여쭤볼게요.",
     ]),
+    // The lead's lines for the walk (#4080, 9 Nov).
+    ("Sit where you usually sit, and look at me.", [
+        "Bạn ngồi ở chỗ quen thuộc và nhìn mình nhé.",
+        "いつもの席に座って、私を見てください。",
+        "坐在你平时坐的地方，看着我。",
+        "평소 앉는 자리에 앉아서 저를 봐 주세요.",
+    ]),
+    ("One more thing: sit where you usually sit, and look at me.", [
+        "Còn một việc nữa: bạn ngồi ở chỗ quen thuộc và nhìn mình nhé.",
+        "もう一つだけ。いつもの席に座って、私を見てください。",
+        "还有一件事：坐在你平时坐的地方，看着我。",
+        "아, 하나 더 있어요. 평소 앉는 자리에 앉아서 저를 봐 주세요.",
+    ]),
+    ("I can't see you yet. Look at me for a moment.", [
+        "Mình chưa thấy bạn. Bạn nhìn mình một chút nhé.",
+        "まだ見えません。少しの間、私を見てください。",
+        "我还看不到你。看着我一会儿。",
+        "아직 안 보여요. 잠깐 저를 봐 주세요.",
+    ]),
+    ("There you are. I can see you.", [
+        "Thấy bạn rồi. Mình nhìn thấy bạn rồi.",
+        "いました。見えますよ。",
+        "找到你了。我看到你了。",
+        "거기 계셨네요. 잘 보여요.",
+    ]),
+    ("No problem. You can turn me toward you any time.", [
+        "Không sao. Lúc nào bạn cũng có thể xoay mình về phía bạn.",
+        "大丈夫です。いつでも私をあなたの方に向けてください。",
+        "没关系。你随时可以把我转向你。",
+        "괜찮아요. 언제든 저를 당신 쪽으로 돌려 주세요.",
+    ]),
+    ("Pet the top of my head.", [
+        "Bạn vuốt nhẹ đỉnh đầu mình nhé.",
+        "私の頭のてっぺんをなでてください。",
+        "摸摸我的头顶吧。",
+        "제 머리 맨 위를 쓰다듬어 주세요.",
+    ]),
+    ("Gently, on top of my head.", [
+        "Nhẹ nhàng thôi, trên đỉnh đầu mình.",
+        "やさしく、頭のてっぺんを。",
+        "轻轻地，在我头顶上。",
+        "부드럽게, 제 머리 맨 위를요.",
+    ]),
+    ("Mmm, that feels nice.", [
+        "Ưm, dễ chịu quá.",
+        "んー、気持ちいいです。",
+        "嗯，好舒服。",
+        "음, 기분 좋아요.",
+    ]),
+    ("That's okay. You can pet my head any time.", [
+        "Không sao đâu. Lúc nào bạn cũng có thể vuốt đầu mình.",
+        "大丈夫です。いつでも頭をなでてくださいね。",
+        "没关系。你随时可以摸摸我的头。",
+        "괜찮아요. 언제든 제 머리를 쓰다듬어 주세요.",
+    ]),
+    ("When you want me, start with 'Hey Lamp'. When I stop talking, give it a try.", [
+        "Khi cần mình, bạn hãy bắt đầu bằng 'Hey Lamp'. Khi mình nói xong, bạn thử nhé.",
+        "私を呼ぶときは、「Hey Lamp」から始めてください。私が話し終えたら、試してみてください。",
+        "想找我的时候，先说“Hey Lamp”。等我说完，试一下吧。",
+        "저를 부를 땐 'Hey Lamp'로 시작해 주세요. 제 말이 끝나면 한번 해 보세요.",
+    ]),
+    ("That's me! Say 'Hey Lamp' whenever you need me.", [
+        "Là mình đây! Khi nào cần mình, cứ nói 'Hey Lamp' nhé.",
+        "はい、私です！用があるときは、いつでも「Hey Lamp」と言ってください。",
+        "是我！需要我的时候，就说“Hey Lamp”。",
+        "저예요! 제가 필요할 땐 언제든 'Hey Lamp'라고 말해 주세요.",
+    ]),
+    ("I didn't catch that. Try once more when I stop talking.", [
+        "Mình chưa nghe rõ. Khi mình nói xong, bạn thử lại lần nữa nhé.",
+        "聞き取れませんでした。私が話し終わったら、もう一度試してください。",
+        "我没听清。等我说完，再试一次。",
+        "잘 못 들었어요. 제가 말을 마치면 한 번 더 해 보세요.",
+    ]),
+    ("No worries. Just say 'Hey Lamp' whenever you need me.", [
+        "Không sao. Khi nào cần mình, cứ nói 'Hey Lamp' nhé.",
+        "大丈夫です。用があるときは、いつでも「Hey Lamp」と言ってください。",
+        "没关系。需要我的时候，就说“Hey Lamp”。",
+        "괜찮아요. 제가 필요할 땐 언제든 'Hey Lamp'라고 말해 주세요.",
+    ]),
+    // #4080: petting and "Hey Lamp" taught (the lead, 9 Nov).
+    ("When you want me, say 'Hey Lamp' first. Try it now.", [
+        "Khi cần mình, bạn hãy nói 'Hey Lamp' trước nhé. Thử ngay bây giờ đi.",
+        "私を呼びたいときは、最初に「Hey Lamp」と言ってください。今、試してみてください。",
+        "想找我的时候，先说“Hey Lamp”。现在试试吧。",
+        "저를 부르고 싶을 땐 먼저 'Hey Lamp'라고 말해 주세요. 지금 해 보세요.",
+    ]),
+    ("Earlier we skipped saying 'Hey Lamp'. Let's try it now.", [
+        "Lúc nãy mình bỏ qua phần nói 'Hey Lamp'. Giờ mình thử nhé.",
+        "さっきは「Hey Lamp」を飛ばしました。今やってみましょう。",
+        "刚才我们跳过了说“Hey Lamp”。现在试试吧。",
+        "아까 'Hey Lamp'라고 말하는 단계를 건너뛰었어요. 지금 해 볼게요.",
+    ]),
+    ("I didn't catch that. Say 'Hey Lamp' once more.", [
+        "Mình chưa nghe rõ. Bạn nói 'Hey Lamp' thêm lần nữa nhé.",
+        "聞き取れませんでした。もう一度「Hey Lamp」と言ってください。",
+        "我没听清。再说一次“Hey Lamp”。",
+        "잘 못 들었어요. 'Hey Lamp'라고 한 번 더 말해 주세요.",
+    ]),
+    ("Got it. Just say 'Hey Lamp' whenever you want me.", [
+        "Rồi. Khi nào cần mình, bạn chỉ cần nói 'Hey Lamp'.",
+        "はい。用があるときは、いつでも「Hey Lamp」と言ってください。",
+        "好的。想找我的时候，说“Hey Lamp”就行。",
+        "좋아요. 저를 부르고 싶을 땐 언제든 'Hey Lamp'라고 말해 주세요.",
+    ]),
+    ("Try petting the top of my head.", [
+        "Bạn thử vuốt nhẹ đỉnh đầu mình xem.",
+        "私の頭のてっぺんをなでてみてください。",
+        "试着摸摸我的头顶吧。",
+        "제 머리 맨 위를 쓰다듬어 보세요.",
+    ]),
+    ("One more thing: try petting the top of my head.", [
+        "Còn một việc nữa: bạn thử vuốt nhẹ đỉnh đầu mình xem.",
+        "もう一つだけ。私の頭のてっぺんをなでてみてください。",
+        "还有一件事：试着摸摸我的头顶吧。",
+        "아, 아직 안 한 게 하나 있어요. 제 머리 맨 위를 쓰다듬어 보세요.",
+    ]),
+    ("Earlier we skipped petting my head. Let's try it now.", [
+        "Lúc nãy mình bỏ qua phần vuốt đầu. Giờ mình thử nhé.",
+        "さっきは頭をなでるところを飛ばしました。今やってみましょう。",
+        "刚才我们跳过了摸头。现在试试吧。",
+        "아까 제 머리를 쓰다듬는 단계를 건너뛰었어요. 지금 해 볼게요.",
+    ]),
+    ("I didn't feel that. Try petting the top of my head.", [
+        "Mình chưa cảm thấy. Bạn thử vuốt nhẹ đỉnh đầu mình xem.",
+        "感じませんでした。私の頭のてっぺんをなでてみてください。",
+        "我没感觉到。试着摸摸我的头顶吧。",
+        "방금은 느껴지지 않았어요. 제 머리 맨 위를 쓰다듬어 보세요.",
+    ]),
+    ("That feels nice.", [
+        "Dễ chịu quá.",
+        "気持ちいいです。",
+        "好舒服。",
+        "기분 좋아요.",
+    ]),
     ("Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat, the way you'd get my attention. I'll ask until I've heard you three times.", [
         "Giờ mình sẽ học cách bạn gọi mình. Khi mình nói xong, bạn ngồi tại chỗ và nói 'Hey Lamp', như khi muốn gọi mình. Mình sẽ nhờ bạn cho đến khi nghe được ba lần.",
         "次は、呼びかけ方を覚えます。私が話し終えたら、座ったまま、呼びかけるように「Hey Lamp」と言ってください。三回聞こえるまでお願いします。",
@@ -1356,17 +1490,17 @@ pub(super) const LINES: &[Line] = &[
         "你坐下的时候，我可以跟你打个招呼吗？",
         "자리에 앉으시면 인사해도 될까요?",
     ]),
-    ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures.", [
-        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé.",
-        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。",
-        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。",
-        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요.",
+    ("You can add more skills in the Autonomous app. Now, ask me anything.", [
+        "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé.",
+        "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。",
+        "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。",
+        "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요.",
     ]),
-    ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.", [
-        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng.",
-        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。",
-        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。",
-        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요.",
+    ("You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.", [
+        "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng.",
+        "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。",
+        "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。",
+        "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요.",
     ]),
     // The sentence about Harness (#5488, `harness_line::SENTENCE`), alone
     // and ending each closing it goes into.
@@ -1376,17 +1510,17 @@ pub(super) const LINES: &[Line] = &[
         "如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
         "컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
     ]),
-    ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
-        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
-        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
-        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
-        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
+    ("You can add more skills in the Autonomous app. Now, ask me anything. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
+        "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
+        "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
+        "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
+        "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
     ]),
-    ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
-        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
-        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
-        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
-        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
+    ("You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
+        "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
+        "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
+        "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
+        "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
     ]),
     ("That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
@@ -1423,7 +1557,9 @@ fn line_in(quoted: &str, language: Language) -> Option<String> {
 }
 
 /// A note of the walk as said in `language`: its instruction as it is,
-/// each quoted line in the language. English is the note itself.
+/// each quoted line in the language. English is the note itself. A step
+/// counter in a quoted line ([`with_counter`]) is said in the language too,
+/// where it stood, around the line's own words.
 pub(super) fn said(note: String, language: Option<Language>) -> String {
     let Some(language) = language else {
         return note;
@@ -1431,16 +1567,341 @@ pub(super) fn said(note: String, language: Option<Language>) -> String {
     note.split('"')
         .enumerate()
         .map(|(at, part)| {
-            if at % 2 == 1
-                && let Some(line) = line_in(part, language)
-            {
-                line
-            } else {
-                part.to_owned()
+            if at % 2 == 0 {
+                return part.to_owned();
             }
+            if let Some((counter, line)) = Counter::find(part) {
+                return line_in(&line, language).map_or_else(
+                    || part.to_owned(),
+                    |said| {
+                        let said = match language {
+                            Language::Vietnamese => first_letter(&said, false),
+                            _ => said,
+                        };
+                        format!("{}{said}", counter.said(Some(language)))
+                    },
+                );
+            }
+            if let Some((name, rest)) = find_all_done(part) {
+                return line_in(rest, language).map_or_else(
+                    || part.to_owned(),
+                    |said| format!("{}{said}", all_done(language, name)),
+                );
+            }
+            line_in(part, language).unwrap_or_else(|| part.to_owned())
         })
         .collect::<Vec<_>>()
         .join("\"")
+}
+
+/// The walk's step words (#4080, the lead, 9 Nov): "Step one: " ...
+/// "Last step: " before a step's first line, and with `intro` the walk's
+/// opening before it ("... Four quick steps, just a few minutes. ").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Counter {
+    Step { at: usize, of: usize, intro: bool },
+}
+
+const EN_INTRO: &str = "Hi! I'm your lamp. Let's get to know each other. ";
+const EN_NUMBERS: [&str; 9] = [
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+];
+const VI_NUMBERS: [&str; 9] = [
+    "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín",
+];
+const ZH_NUMBERS: [&str; 9] = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
+
+fn number(words: &[&str; 9], count: usize) -> String {
+    words
+        .get(count.wrapping_sub(1))
+        .map_or_else(|| count.to_string(), |word| (*word).to_owned())
+}
+
+/// The first letter in upper case (`upper`) or lower case.
+fn first_letter(line: &str, upper: bool) -> String {
+    let mut chars = line.chars();
+    match chars.next() {
+        Some(first) if upper => first.to_uppercase().chain(chars).collect(),
+        Some(first) => first.to_lowercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
+
+impl Counter {
+    /// Its words in `language`, English with none, ending where the
+    /// step's own line begins.
+    fn said(self, language: Option<Language>) -> String {
+        let Self::Step { at, of, intro } = self;
+        let last = at == of;
+        let (opening, step) = match language {
+            None => {
+                let count = first_letter(&number(&EN_NUMBERS, of), true);
+                let steps = if of == 1 { "step" } else { "steps" };
+                (
+                    format!("{EN_INTRO}{count} quick {steps}, just a few minutes. "),
+                    if last {
+                        "Last step: ".to_owned()
+                    } else {
+                        format!("Step {}: ", number(&EN_NUMBERS, at))
+                    },
+                )
+            }
+            Some(Language::Vietnamese) => (
+                format!(
+                    "Chào bạn! Mình là chiếc đèn của bạn. Mình làm quen nhau nhé. Có {} bước nhanh, chỉ vài phút thôi. ",
+                    number(&VI_NUMBERS, of)
+                ),
+                if last {
+                    "Bước cuối: ".to_owned()
+                } else {
+                    format!("Bước {}: ", number(&VI_NUMBERS, at))
+                },
+            ),
+            Some(Language::Japanese) => (
+                format!(
+                    "こんにちは！あなたのランプです。仲良くなりましょう。かんたんな{of}ステップで、ほんの数分です。"
+                ),
+                if last {
+                    "最後のステップ：".to_owned()
+                } else {
+                    format!("ステップ{at}：")
+                },
+            ),
+            Some(Language::Chinese) => (
+                format!(
+                    "你好！我是你的台灯。我们来认识一下吧。一共{}个简单步骤，只要几分钟。",
+                    number(&ZH_NUMBERS, of)
+                ),
+                if last {
+                    "最后一步：".to_owned()
+                } else {
+                    format!("第{}步：", number(&ZH_NUMBERS, at))
+                },
+            ),
+            Some(Language::Korean) => (
+                format!(
+                    "안녕하세요! 저는 당신의 램프예요. 서로 알아가 봐요. 간단한 {of}단계, 몇 분이면 돼요. "
+                ),
+                if last {
+                    "마지막 단계: ".to_owned()
+                } else {
+                    format!("{at}단계: ")
+                },
+            ),
+        };
+        if intro { opening + &step } else { step }
+    }
+
+    /// The English step words at the start of a quoted line, and the
+    /// line's own words after them, as the skill keeps them (first letter
+    /// in upper case). `at` and `of` are read back only as far as the
+    /// words say them: the last step is `at == of`.
+    fn find(quoted: &str) -> Option<(Self, String)> {
+        let (intro, of, rest) = match quoted.strip_prefix(EN_INTRO) {
+            Some(rest) => {
+                let (count, rest) = rest.split_once(" quick step")?;
+                let of = 1 + EN_NUMBERS
+                    .iter()
+                    .position(|word| first_letter(word, true) == count)?;
+                let rest = rest
+                    .strip_prefix("s, just a few minutes. ")
+                    .or_else(|| rest.strip_prefix(", just a few minutes. "))?;
+                (true, Some(of), rest)
+            }
+            None => (false, None, quoted),
+        };
+        let (at, line) = if let Some(line) = rest.strip_prefix("Last step: ") {
+            (None, line)
+        } else {
+            let rest = rest.strip_prefix("Step ")?;
+            let (word, line) = rest.split_once(": ")?;
+            (
+                Some(1 + EN_NUMBERS.iter().position(|number| *number == word)?),
+                line,
+            )
+        };
+        // Not the last: any count past it; the last: its own place.
+        let (at, of) = match (at, of) {
+            (Some(at), Some(of)) => (at, of),
+            (Some(at), None) => (at, at + 1),
+            (None, Some(of)) => (of, of),
+            (None, None) => (1, 1),
+        };
+        Some((Self::Step { at, of, intro }, first_letter(line, true)))
+    }
+}
+
+/// `text` without the step words ([`Counter`], every language) that `line`
+/// does not say: anywhere in it, or cut off at its end ("Step three:").
+pub(super) fn without_step_words(text: &str, line: &str) -> String {
+    let mut text = text.to_owned();
+    for words in step_words() {
+        if let Some(at) = line.find(&words) {
+            // The line's own step: kept only with its own ask after it;
+            // a step word opening some other ask goes with that ask
+            // (tonight's B: "Step three: tell me one thing..." 12 s
+            // before the walk's "Step three: pet the top of my head.").
+            text = without_other_asks(&text, &words, clause(&line[at + words.len()..]));
+            continue;
+        }
+        if line.contains(words.trim_end()) {
+            continue;
+        }
+        text = text.replace(&words, "");
+        if let Some(kept) = text.strip_suffix(words.trim_end()) {
+            text = kept.trim_end().to_owned();
+        }
+    }
+    text
+}
+
+/// Every step word, every language: "Step one: " .. "Step nine: ", then
+/// "Last step: ".
+fn step_words() -> Vec<String> {
+    let languages = [
+        None,
+        Some(Language::Vietnamese),
+        Some(Language::Japanese),
+        Some(Language::Chinese),
+        Some(Language::Korean),
+    ];
+    languages
+        .into_iter()
+        .flat_map(|language| {
+            (1..=9)
+                .map(|at| Counter::Step {
+                    at,
+                    of: 10,
+                    intro: false,
+                })
+                .chain([Counter::Step {
+                    at: 1,
+                    of: 1,
+                    intro: false,
+                }])
+                .map(move |counter| counter.said(language))
+        })
+        .collect()
+}
+
+/// Whether `pending`, a reply's opening not yet said, opens with a step
+/// word or may still become one ("Step th"): its clause is then held to its
+/// end, so [`without_step_words`] reads the whole ask (Reviewer-lead's P2 on
+/// #5890: the first piece cut at 4 words, "Step three: tell me").
+pub(super) fn may_open_a_step(pending: &str) -> bool {
+    let pending = pending.trim_start();
+    !pending.is_empty()
+        && step_words()
+            .iter()
+            .any(|words| pending.starts_with(words.trim_end()) || words.starts_with(pending))
+}
+
+/// The clause `text` opens with: up to its first sentence end, kept.
+fn clause(text: &str) -> &str {
+    let end = text
+        .char_indices()
+        .find(|(_, c)| matches!(c, '.' | '!' | '?' | '。' | '！' | '？'))
+        .map_or(text.len(), |(at, c)| at + c.len_utf8());
+    &text[..end]
+}
+
+/// Its words, lowercased; a clause written without spaces (Japanese,
+/// Chinese) by its letters.
+fn words_of(clause: &str) -> Vec<String> {
+    let clause = clause.to_lowercase();
+    let words: Vec<String> = clause
+        .split_whitespace()
+        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()).to_owned())
+        .filter(|word| !word.is_empty())
+        .collect();
+    if words.len() > 1 {
+        return words;
+    }
+    clause
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .map(String::from)
+        .collect()
+}
+
+/// `text` with each `step` word whose clause is not `ask` dropped with that
+/// clause. A clause is `ask` when at least half its words are `ask`'s, so the
+/// model's own wording of the walk's ask keeps it.
+// ponytail: a word-overlap test, not meaning; an ask reworded past half its
+// words is dropped, the walk's next poll asks it again.
+fn without_other_asks(text: &str, step: &str, ask: &str) -> String {
+    let asked = words_of(ask);
+    let mut kept = String::new();
+    let mut rest = text;
+    while let Some(at) = rest.find(step) {
+        kept.push_str(&rest[..at]);
+        let after = &rest[at + step.len()..];
+        let own = clause(after);
+        let words = words_of(own);
+        let same = words.iter().filter(|word| asked.contains(word)).count();
+        if words.is_empty() || same * 2 >= words.len() {
+            kept.push_str(&rest[at..at + step.len() + own.len()]);
+        } else if kept.ends_with(' ') && after[own.len()..].is_empty() {
+            kept.truncate(kept.trim_end().len());
+        }
+        rest = &after[own.len()..];
+        if kept.is_empty() || kept.ends_with(' ') {
+            rest = rest.trim_start();
+        }
+    }
+    kept.push_str(rest);
+    kept
+}
+
+/// "All done!" opening the walk's done line, with the owner's name when
+/// the walk knows it: "All done, Mia!" (#4080).
+pub(super) fn with_name(note: &str, name: Option<&str>) -> String {
+    match name.filter(|name| !name.trim().is_empty()) {
+        Some(name) => note.replacen("\"All done! ", &format!("\"All done, {}! ", name.trim()), 1),
+        None => note.to_owned(),
+    }
+}
+
+/// The done line's opening in `language`, with or without the name.
+fn all_done(language: Language, name: Option<&str>) -> String {
+    match (language, name) {
+        (Language::Vietnamese, None) => "Xong hết rồi! ".into(),
+        (Language::Vietnamese, Some(name)) => format!("Xong hết rồi, {name}! "),
+        (Language::Japanese, None) => "全部終わりました！".into(),
+        (Language::Japanese, Some(name)) => format!("{name}さん、全部終わりました！"),
+        (Language::Chinese, None) => "全部完成！".into(),
+        (Language::Chinese, Some(name)) => format!("{name}，全部完成！"),
+        (Language::Korean, None) => "모두 끝났어요! ".into(),
+        (Language::Korean, Some(name)) => format!("{name}님, 모두 끝났어요! "),
+    }
+}
+
+/// "All done!" or "All done, X!" at a quoted line's start: the name, and
+/// the rest of the line.
+fn find_all_done(quoted: &str) -> Option<(Option<&str>, &str)> {
+    if let Some(rest) = quoted.strip_prefix("All done! ") {
+        return Some((None, rest));
+    }
+    let rest = quoted.strip_prefix("All done, ")?;
+    let (name, rest) = rest.split_once("! ")?;
+    Some((Some(name), rest))
+}
+
+/// A note with the step words in its first quoted line (#4080), the
+/// line's first letter in lower case after them. Kept in English here;
+/// [`said`] says it in the owner's language.
+pub(super) fn with_counter(note: &str, counter: Counter) -> String {
+    let Some((head, rest)) = note.split_once('"') else {
+        return note.to_owned();
+    };
+    let Some((quoted, tail)) = rest.split_once('"') else {
+        return note.to_owned();
+    };
+    format!(
+        "{head}\"{}{}\"{tail}",
+        counter.said(None),
+        first_letter(quoted, false)
+    )
 }
 
 #[cfg(test)]
@@ -1522,31 +1983,32 @@ mod tests {
         }
     }
 
-    /// The walk's last words say where the app's buttons and gestures guide
-    /// is, in each of the five languages (#1711 item 1).
+    /// The walk's last words (#4080, the lead, 9 Nov; before, where the
+    /// app's buttons guide is, #1711 item 1), in each of the five
+    /// languages, opening "All done!".
     #[test]
     fn the_walks_done_line_ends_with_where_the_buttons_guide_is() {
         let done = super::super::skill::PREFERENCES_DONE;
         let closing = [
             (
                 None,
-                "For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures.",
+                "All done! You can add more skills in the Autonomous app. Now, ask me anything.",
             ),
             (
                 Some(Language::Vietnamese),
-                "Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé.",
+                "Xong hết rồi! Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé.",
             ),
             (
                 Some(Language::Japanese),
-                "ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。",
+                "全部終わりました！Autonomous アプリでスキルを追加できます。では、何でも聞いてください。",
             ),
             (
                 Some(Language::Chinese),
-                "想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。",
+                "全部完成！你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。",
             ),
             (
                 Some(Language::Korean),
-                "제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요.",
+                "모두 끝났어요! Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요.",
             ),
         ];
         for (language, line) in closing {

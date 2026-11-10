@@ -28,6 +28,22 @@
 //!   were cut to its reach, or `cut_short` or `dropped` with why. Looks still
 //!   owed when the connection goes are `cut_short`, why `reconnected`, or
 //!   `released` when the door let go.
+//! - **A computer's `joints`** for the head's roll and the arm go the same
+//!   way as the body's holder pose (lamp-body's `Posing`, d83b9dda68):
+//!   `{"pose":{"roll":R,"shoulder":S,"elbow":E}}`, answered once
+//!   `there`, `cut_short` or `refused`. Looks and poses are owed apart, each
+//!   in the order sent, since a pose may be answered before a later look. A
+//!   `joints` naming the head's yaw or pitch and an arm joint sends both
+//!   lines under one request ([`Join`]): its `done` comes once both are
+//!   answered, `finished` only when both are.
+//! - **Each answer to its own line.** A body refuses a new line at once while
+//!   an older one is still owed, so its answers don't always come in the
+//!   order the lines went (Second's P2 on #5855). A body that says so on its
+//!   lease answer (`"tags":true`) gets each line with the door's own tag,
+//!   `"tag":N`, and says it back on every answer to that line; the door
+//!   matches by it. A body that doesn't gets one pose at a time: a second
+//!   while one is owed is `dropped` ([`ONE_POSE_AT_A_TIME`]), never sent, so
+//!   no refusal can overtake.
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -66,24 +82,161 @@ pub fn follows(follower: &mut Option<String>, holder: Option<&str>) -> bool {
     follower.is_some()
 }
 
-/// A computer's `look`, for the body: who asked, its request, and the line.
+/// A computer's `look` or pose, for the body: who asked, its request, the
+/// line, and, when one `joints` sent two lines, the [`Join`] they share.
 #[derive(Debug)]
 pub struct Look {
     pub client: String,
     pub re: u64,
     pub line: String,
+    pub join: Option<Join>,
+}
+
+/// The two answers one `joints` waits for (a look and a pose): the first
+/// is kept here, and the second makes the one `done`.
+pub type Join = Arc<Mutex<Option<Value>>>;
+
+/// Whether a line for the body is a pose (else a look).
+fn is_pose(line: &str) -> bool {
+    serde_json::from_str::<Value>(line).is_ok_and(|said| said.get("pose").is_some())
+}
+
+/// Two answers to one `joints` as its one `done`: `finished` only when both
+/// are, with both parts' angles and `clamped` if either was; else the first
+/// not finished, with its why.
+fn joined(first: Value, second: Value) -> Value {
+    let finished = |done: &Value| done["how"] == "finished";
+    match (finished(&first), finished(&second)) {
+        (true, true) => {
+            let mut done = first.clone();
+            for (field, value) in second.as_object().into_iter().flatten() {
+                if field != "clamped" {
+                    done[field.as_str()] = value.clone();
+                }
+            }
+            done["clamped"] = Value::Bool(first["clamped"] == true || second["clamped"] == true);
+            done
+        }
+        (false, _) => first,
+        (true, false) => second,
+    }
+}
+
+/// Tells a `done` to its asker, or keeps it until the other half of its
+/// `joints` is answered.
+fn tell(events: &Events, client: &str, join: Option<&Join>, done: Value) {
+    let done = match join {
+        None => done,
+        Some(join) => {
+            let mut kept = join.lock().expect("join");
+            match kept.take() {
+                None => {
+                    *kept = Some(done);
+                    return;
+                }
+                Some(first) => joined(first, done),
+            }
+        }
+    };
+    events(client, done);
 }
 
 /// Where `parts.rs` sends a `look`.
 pub type Looks = tokio::sync::mpsc::UnboundedSender<Look>;
 
-/// The looks sent and not yet answered, oldest first.
-type Owed = Arc<Mutex<VecDeque<(String, u64)>>>;
+/// One look or pose sent and not yet answered: who asked, the request, and
+/// its [`Join`].
+/// Who asked, the request, its [`Join`], and the door's own tag for the
+/// line, which a body that echoes it says back with its answer.
+type Asker = (String, u64, Option<Join>, u64);
 
-/// The body's answer to a look, as the computer's `done`.
+/// The looks and the poses sent and not yet answered, each oldest first.
+#[derive(Default)]
+struct Waiting {
+    looks: VecDeque<Asker>,
+    poses: VecDeque<Asker>,
+    /// Whether the body says back each line's tag (it said so on its lease
+    /// answer, `"tags":true`); until then its answers carry none.
+    tagged: bool,
+}
+
+/// Why a pose isn't sent to a body that doesn't say tags back while another
+/// is still owed: its refusal could overtake the owed one's answer, and the
+/// door couldn't tell them apart (Second, #5855).
+pub const ONE_POSE_AT_A_TIME: &str = "another pose is still owed, and this body can't tell its answers apart; ask again once it is answered";
+
+impl Waiting {
+    fn push(&mut self, look: &Look, tag: u64) {
+        let asker = (look.client.clone(), look.re, look.join.clone(), tag);
+        if is_pose(&look.line) {
+            self.poses.push_back(asker);
+        } else {
+            self.looks.push_back(asker);
+        }
+    }
+
+    /// The line to send for `look`, owed as `tag`: with its tag when the body
+    /// says tags back; else the line as it is, but never a second pose while
+    /// one is owed. `Err` with why when it can't go.
+    fn admit(&mut self, look: &Look, tag: u64) -> Result<String, &'static str> {
+        let pose = is_pose(&look.line);
+        let line = if self.tagged {
+            let mut line: Value =
+                serde_json::from_str(&look.line).map_err(|_| "a line the door can't read")?;
+            line["tag"] = Value::from(tag);
+            line.to_string()
+        } else if pose && !self.poses.is_empty() {
+            return Err(ONE_POSE_AT_A_TIME);
+        } else {
+            look.line.clone()
+        };
+        self.push(look, tag);
+        Ok(line)
+    }
+
+    /// The asker an answer is for: the one whose line carried `tag` when the
+    /// body says it back, else the oldest of its kind. A body refuses a new
+    /// line at once while an older one is still owed, so its answers don't
+    /// always come in the order the lines went (Second's P2 on #5855); only
+    /// the tag tells them apart. A tag nobody is owed takes nothing.
+    fn take(&mut self, pose: bool, tag: Option<u64>) -> Option<Asker> {
+        let queue = if pose {
+            &mut self.poses
+        } else {
+            &mut self.looks
+        };
+        match tag {
+            Some(tag) => {
+                let at = queue.iter().position(|asker| asker.3 == tag)?;
+                queue.remove(at)
+            }
+            None => queue.pop_front(),
+        }
+    }
+}
+
+/// Whether a lease answer says the body says each line's tag back.
+fn says_tags(line: &str) -> bool {
+    serde_json::from_str::<Value>(line)
+        .is_ok_and(|said| said.get("lease").is_some() && said["tags"] == true)
+}
+
+/// The door's tag a body said back with its answer, if it did.
+fn tag_of(line: &str) -> Option<u64> {
+    serde_json::from_str::<Value>(line).ok()?["tag"].as_u64()
+}
+
+type Owed = Arc<Mutex<Waiting>>;
+
+/// The body's answer to a look or a pose, as the computer's `done`.
 pub fn done_of(line: &str, re: u64) -> Option<Value> {
     let said: Value = serde_json::from_str(line).ok()?;
-    let how = match said["look"].as_str()? {
+    let (answer, fields): (&str, &[&str]) = match (said["look"].as_str(), said["pose"].as_str()) {
+        (Some(answer), None) => (answer, &["yaw", "pitch", "clamped"]),
+        (None, Some(answer)) => (answer, &["roll", "shoulder", "elbow", "clamped"]),
+        _ => return None,
+    };
+    let how = match answer {
         "there" => "finished",
         "cut_short" => "cut_short",
         "refused" => "dropped",
@@ -91,8 +244,8 @@ pub fn done_of(line: &str, re: u64) -> Option<Value> {
     };
     let mut done = serde_json::json!({"ev": "done", "re": re, "how": how});
     if how == "finished" {
-        for field in ["yaw", "pitch", "clamped"] {
-            done[field] = said[field].clone();
+        for field in fields {
+            done[*field] = said[*field].clone();
         }
     } else {
         done["why"] = said["why"].clone();
@@ -100,20 +253,28 @@ pub fn done_of(line: &str, re: u64) -> Option<Value> {
     Some(done)
 }
 
-/// A look that never reached the body.
+/// A look or pose that never reached the body.
 fn dropped(events: &Events, look: &Look, why: &str) {
-    events(
+    tell(
+        events,
         &look.client,
+        look.join.as_ref(),
         serde_json::json!({"ev": "done", "re": look.re, "how": "dropped", "why": why}),
     );
 }
 
-/// Every look still owed ends: the connection it went on is gone.
+/// Every look and pose still owed ends: the connection it went on is gone.
 fn end_owed(owed: &Owed, events: &Events, why: &str) {
-    let ended: Vec<_> = owed.lock().expect("owed").drain(..).collect();
-    for (client, re) in ended {
-        events(
+    let ended: Vec<Asker> = {
+        let mut waiting = owed.lock().expect("owed");
+        let looks: Vec<_> = waiting.looks.drain(..).collect();
+        looks.into_iter().chain(waiting.poses.drain(..)).collect()
+    };
+    for (client, re, join, _) in ended {
+        tell(
+            events,
             &client,
+            join.as_ref(),
             serde_json::json!({"ev": "done", "re": re, "how": "cut_short", "why": why}),
         );
     }
@@ -229,6 +390,9 @@ pub async fn hold(
     mut looks: tokio::sync::mpsc::UnboundedReceiver<Look>,
 ) {
     let owed: Owed = Arc::default();
+    // The door's own tag for each line it sends, so a body that says it back
+    // ties each answer to its line.
+    let mut tags: u64 = 0;
     // Looks asked before the body's hold was taken, sent once it is.
     let mut waiting: Vec<(String, Look)> = Vec::new();
     let mut holding = Holding::default();
@@ -244,8 +408,15 @@ pub async fn hold(
             Some(look) = looks.recv() => {
                 let sent = match writer.as_mut() {
                     Some(write) => {
-                        owed.lock().expect("owed").push_back((look.client.clone(), look.re));
-                        write.write_all(format!("{}\n", look.line).as_bytes()).await.is_ok()
+                        tags += 1;
+                        let admitted = owed.lock().expect("owed").admit(&look, tags);
+                        match admitted {
+                            Ok(line) => write.write_all(format!("{line}\n").as_bytes()).await.is_ok(),
+                            Err(why) => {
+                                dropped(&events, &look, why);
+                                true
+                            }
+                        }
                     }
                     // The computer holds `body`, and the door takes the body's
                     // hold at its next check: the look waits for it, at most
@@ -295,6 +466,9 @@ pub async fn hold(
                     told_unreachable = false;
                     let (read, write) = stream.into_split();
                     writer = Some(write);
+                    // A new connection may be another build of the body: untagged
+                    // until it says otherwise.
+                    owed.lock().expect("owed").tagged = false;
                     let generation = current.fetch_add(1, Ordering::AcqRel) + 1;
                     ended = Arc::new(AtomicBool::new(false));
                     let (shared, current, ended) = (shared.clone(), current.clone(), ended.clone());
@@ -308,15 +482,19 @@ pub async fn hold(
                             if line.contains("\"lease\":\"refused\"") {
                                 eprintln!("lamp-control: the body refused its lease: {line}");
                             }
+                            if says_tags(&line) {
+                                owed.lock().expect("owed").tagged = true;
+                            }
                             if let Some(out) = heard(&line) {
                                 shared.deliver(vec![out]);
                             }
-                            if line.contains("\"look\"") {
-                                let asker = owed.lock().expect("owed").pop_front();
-                                if let Some((client, re)) = asker
+                            let pose = line.contains("\"pose\"");
+                            if pose || line.contains("\"look\"") {
+                                let asker = owed.lock().expect("owed").take(pose, tag_of(&line));
+                                if let Some((client, re, join, _)) = asker
                                     && let Some(done) = done_of(&line, re)
                                 {
-                                    events(&client, done);
+                                    tell(&events, &client, join.as_ref(), done);
                                 }
                             }
                         }
@@ -355,10 +533,15 @@ pub async fn hold(
             }
             let mut looks = ours.into_iter().map(|(_, look)| look);
             for look in looks.by_ref() {
-                owed.lock()
-                    .expect("owed")
-                    .push_back((look.client.clone(), look.re));
-                sent = write.write_all(format!("{}\n", look.line).as_bytes()).await;
+                tags += 1;
+                let admitted = owed.lock().expect("owed").admit(&look, tags);
+                sent = match admitted {
+                    Ok(line) => write.write_all(format!("{line}\n").as_bytes()).await,
+                    Err(why) => {
+                        dropped(&events, &look, why);
+                        Ok(())
+                    }
+                };
                 if sent.is_err() {
                     break;
                 }
@@ -478,19 +661,255 @@ mod tests {
         );
         assert_eq!(done_of(r#"{"lease":"held"}"#, 1), None);
         let owed: Owed = Arc::default();
-        owed.lock()
-            .unwrap()
-            .extend([("c_1".to_owned(), 3), ("c_2".to_owned(), 4)]);
-        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
-        let sink = told.clone();
-        let events: Events =
-            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        owed.lock().unwrap().looks.extend([
+            ("c_1".to_owned(), 3, None, 1),
+            ("c_2".to_owned(), 4, None, 2),
+        ]);
+        let (told, events) = recorder();
         end_owed(&owed, &events, "reconnected");
         let told = told.lock().unwrap();
         assert_eq!(told.len(), 2);
         assert_eq!(told[1].0, "c_2");
         assert_eq!(told[1].1["why"], "reconnected");
-        assert!(owed.lock().unwrap().is_empty());
+        let waiting = owed.lock().unwrap();
+        assert!(waiting.looks.is_empty() && waiting.poses.is_empty());
+    }
+
+    type Told = Arc<Mutex<Vec<(String, Value)>>>;
+
+    fn recorder() -> (Told, Events) {
+        let told: Told = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        (told, events)
+    }
+
+    /// lamp-body's answers to a holder's pose (`Posing`) are the
+    /// computer's `done` as a look's are, with the arm's angles.
+    #[test]
+    fn the_bodys_answer_to_a_pose_is_the_computers_done() {
+        assert_eq!(
+            done_of(
+                r#"{"pose":"there","roll":3.0,"shoulder":10.1,"elbow":0.0,"clamped":false}"#,
+                5
+            ),
+            Some(
+                serde_json::json!({"ev": "done", "re": 5, "how": "finished", "roll": 3.0, "shoulder": 10.1, "elbow": 0.0, "clamped": false})
+            )
+        );
+        assert_eq!(
+            done_of(
+                r#"{"pose":"refused","why":"the lamp is not standing still at its full height"}"#,
+                6
+            ),
+            Some(
+                serde_json::json!({"ev": "done", "re": 6, "how": "dropped", "why": "the lamp is not standing still at its full height"})
+            )
+        );
+        assert_eq!(
+            done_of(r#"{"pose":"cut_short","why":"another pose"}"#, 7).unwrap()["how"],
+            "cut_short"
+        );
+        assert!(is_pose(r#"{"pose":{"roll":3}}"#) && !is_pose(r#"{"look":"ahead"}"#));
+    }
+
+    /// One `joints` with a look and a pose is one `done`: held until both
+    /// are answered, finished only when both are, else the first that
+    /// wasn't, whichever answer came first.
+    #[test]
+    fn a_look_and_a_pose_under_one_joints_are_one_done() {
+        let (told, events) = recorder();
+        let look = r#"{"look":"there","yaw":2.0,"pitch":1.0,"clamped":false}"#;
+        let pose = r#"{"pose":"there","roll":0.0,"shoulder":0.0,"elbow":-4.2,"clamped":true}"#;
+        let join = Join::default();
+        tell(&events, "c_1", Some(&join), done_of(pose, 9).unwrap());
+        assert!(told.lock().unwrap().is_empty(), "held for the look");
+        tell(&events, "c_1", Some(&join), done_of(look, 9).unwrap());
+        assert_eq!(
+            told.lock().unwrap().pop().unwrap().1,
+            serde_json::json!({"ev": "done", "re": 9, "how": "finished", "yaw": 2.0, "pitch": 1.0, "roll": 0.0, "shoulder": 0.0, "elbow": -4.2, "clamped": true})
+        );
+        // A pose refused (not standing) and the look there: dropped, with why.
+        let join = Join::default();
+        tell(&events, "c_1", Some(&join), done_of(look, 10).unwrap());
+        tell(
+            &events,
+            "c_1",
+            Some(&join),
+            done_of(
+                r#"{"pose":"refused","why":"the lamp is not standing still at its full height"}"#,
+                10,
+            )
+            .unwrap(),
+        );
+        let done = told.lock().unwrap().pop().unwrap().1;
+        assert_eq!(
+            (done["how"].as_str(), done["why"].as_str()),
+            (
+                Some("dropped"),
+                Some("the lamp is not standing still at its full height")
+            )
+        );
+        // The connection gone with both owed: one cut_short, not two.
+        let owed: Owed = Arc::default();
+        let join = Join::default();
+        {
+            let mut waiting = owed.lock().unwrap();
+            waiting
+                .looks
+                .push_back(("c_2".to_owned(), 11, Some(join.clone()), 1));
+            waiting
+                .poses
+                .push_back(("c_2".to_owned(), 11, Some(join), 2));
+        }
+        end_owed(&owed, &events, "released");
+        let told = told.lock().unwrap();
+        assert_eq!(told.len(), 1);
+        assert_eq!(
+            (told[0].1["re"].as_u64(), told[0].1["how"].as_str()),
+            (Some(11), Some("cut_short"))
+        );
+    }
+
+    /// Second's P2 on #5855: a body refuses a new pose at once while an
+    /// older one is still owed, and cuts the older one short after, so the
+    /// answers come out of the order the lines went. With the tag said back,
+    /// each answer goes to its own line; a joint join gets its own part's.
+    #[test]
+    fn a_refusal_that_overtakes_an_owed_pose_goes_to_its_own_line() {
+        let mut waiting = Waiting::default();
+        let line = |line: &str, re| Look {
+            client: "c_1".into(),
+            re,
+            line: line.into(),
+            join: None,
+        };
+        waiting.push(&line(r#"{"pose":{"roll":2}}"#, 41), 1);
+        waiting.push(&line(r#"{"pose":{"roll":3}}"#, 42), 2);
+        let refused = r#"{"pose":"refused","why":"a gesture plays","tag":2}"#;
+        let cut = r#"{"pose":"cut_short","why":"a gesture plays","tag":1}"#;
+        let first = waiting.take(true, tag_of(refused)).unwrap();
+        assert_eq!(
+            (first.1, done_of(refused, first.1).unwrap()["how"].clone()),
+            (42, serde_json::json!("dropped"))
+        );
+        let second = waiting.take(true, tag_of(cut)).unwrap();
+        assert_eq!(
+            (second.1, done_of(cut, second.1).unwrap()["how"].clone()),
+            (41, serde_json::json!("cut_short"))
+        );
+        assert!(waiting.poses.is_empty());
+        // An older body that says no tag: the oldest, as before.
+        waiting.push(&line(r#"{"pose":{"roll":1}}"#, 50), 3);
+        assert_eq!(waiting.take(true, None).map(|asker| asker.1), Some(50));
+        // A tag nobody is owed takes nothing.
+        assert!(waiting.take(true, Some(99)).is_none());
+        // A joint join under it: the look and the pose each get their own answer.
+        let (told, events) = recorder();
+        let join = Join::default();
+        let joint = |kind: &str| Look {
+            client: "c_1".into(),
+            re: 60,
+            line: kind.into(),
+            join: Some(join.clone()),
+        };
+        waiting.push(&joint(r#"{"look":{"yaw":1,"pitch":0}}"#), 4);
+        waiting.push(&joint(r#"{"pose":{"elbow":3}}"#), 5);
+        waiting.push(&line(r#"{"pose":{"elbow":4}}"#, 61), 6);
+        let refused = r#"{"pose":"refused","why":"a gesture plays","tag":6}"#;
+        let asker = waiting.take(true, tag_of(refused)).unwrap();
+        assert_eq!(asker.1, 61, "the refusal is the new pose's, not the join's");
+        tell(
+            &events,
+            &asker.0,
+            asker.2.as_ref(),
+            done_of(refused, asker.1).unwrap(),
+        );
+        let there =
+            r#"{"pose":"there","roll":0.0,"shoulder":0.0,"elbow":3.0,"clamped":false,"tag":5}"#;
+        let asker = waiting.take(true, tag_of(there)).unwrap();
+        tell(
+            &events,
+            &asker.0,
+            asker.2.as_ref(),
+            done_of(there, asker.1).unwrap(),
+        );
+        let look = r#"{"look":"there","yaw":1.0,"pitch":0.0,"clamped":false,"tag":4}"#;
+        let asker = waiting.take(false, tag_of(look)).unwrap();
+        tell(
+            &events,
+            &asker.0,
+            asker.2.as_ref(),
+            done_of(look, asker.1).unwrap(),
+        );
+        let told = told.lock().unwrap();
+        assert_eq!(told.len(), 2, "{told:?}");
+        assert_eq!(
+            (told[0].1["re"].as_u64(), told[0].1["how"].as_str()),
+            (Some(61), Some("dropped"))
+        );
+        assert_eq!(
+            (told[1].1["re"].as_u64(), told[1].1["how"].as_str()),
+            (Some(60), Some("finished"))
+        );
+    }
+
+    /// Second on #5855: a body that doesn't say tags back gets one pose at a
+    /// time, so no refusal can overtake an owed pose's answer; one that does
+    /// gets each line with its tag. A look is never held back.
+    #[test]
+    fn an_untagged_body_gets_one_pose_at_a_time_and_a_tagged_one_its_tags() {
+        let line = |line: &str, re| Look {
+            client: "c_1".into(),
+            re,
+            line: line.into(),
+            join: None,
+        };
+        let mut waiting = Waiting::default();
+        assert_eq!(
+            waiting.admit(&line(r#"{"pose":{"roll":2}}"#, 1), 1),
+            Ok(r#"{"pose":{"roll":2}}"#.to_owned())
+        );
+        assert_eq!(
+            waiting.admit(&line(r#"{"pose":{"roll":3}}"#, 2), 2),
+            Err(ONE_POSE_AT_A_TIME)
+        );
+        assert!(waiting.admit(&line(r#"{"look":"ahead"}"#, 3), 3).is_ok());
+        assert_eq!(waiting.poses.len(), 1);
+        waiting.take(true, None);
+        assert!(waiting.admit(&line(r#"{"pose":{"roll":3}}"#, 4), 4).is_ok());
+        // A body that says tags back: every line carries its tag, any number of poses.
+        assert!(says_tags(r#"{"lease":"held","tags":true}"#) && !says_tags(r#"{"lease":"held"}"#));
+        let mut tagged = Waiting {
+            tagged: true,
+            ..Waiting::default()
+        };
+        let sent = tagged
+            .admit(&line(r#"{"pose":{"elbow":3}}"#, 5), 7)
+            .unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&sent).unwrap()["tag"], 7);
+        assert!(tagged.admit(&line(r#"{"pose":{"elbow":4}}"#, 6), 8).is_ok());
+        assert_eq!(tagged.poses.len(), 2);
+    }
+
+    /// Looks and poses are owed apart: a pose answered before an earlier
+    /// look still goes to the pose's asker.
+    #[test]
+    fn looks_and_poses_are_owed_apart() {
+        let mut waiting = Waiting::default();
+        let line = |line: &str, re| Look {
+            client: "c_1".into(),
+            re,
+            line: line.into(),
+            join: None,
+        };
+        waiting.push(&line(r#"{"look":"ahead"}"#, 1), 1);
+        waiting.push(&line(r#"{"pose":{"shoulder":5}}"#, 2), 2);
+        waiting.push(&line(r#"{"look":{"yaw":3,"pitch":0}}"#, 3), 3);
+        assert_eq!(waiting.poses.pop_front().map(|asker| asker.1), Some(2));
+        assert_eq!(waiting.looks.pop_front().map(|asker| asker.1), Some(1));
+        assert_eq!(waiting.looks.pop_front().map(|asker| asker.1), Some(3));
     }
 
     #[test]

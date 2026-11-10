@@ -740,6 +740,24 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     /// the hold carried to a followed passing id by its print (`who::Held::carry`,
     /// #4885), the known face beside it is rewritten to that id.
     fn keep_held(path: &std::path::Path, who: &Who, carried: bool, near_id: Option<&str>) {
+        // Held unsure, the known file moved aside (`who::hold_unsure`): this
+        // print keeps them, so it is written again, on the carried id or the
+        // one held (#5738).
+        let unsure = lamp_eyes::who::known_unsure_of(path).exists();
+        if unsure && let Some((name, ..)) = who.known.as_ref() {
+            let face = if carried {
+                near_id.map(str::to_owned)
+            } else {
+                lamp_eyes::who::unsure_face(path)
+            };
+            lamp_eyes::who::keep_known(
+                path,
+                Some(name),
+                who.people.id_of(name).as_deref(),
+                face.as_deref(),
+            );
+            return;
+        }
         match who.known.as_ref().filter(|_| carried) {
             Some((name, ..)) => lamp_eyes::who::keep_known(
                 path,
@@ -1123,7 +1141,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     lamp_eyes::who::full_crop_on(),
                     lamp_eyes::who::known_hold_on(),
                 ))
-                .following(lamp_eyes::bus_out::follows_from_environment()),
+                .following(lamp_eyes::bus_out::follows_from_environment())
+                .unsure_holds(lamp_eyes::who::known_unsure_on()),
             })
         }
         None => None,
@@ -2663,14 +2682,19 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             bus_out.as_ref().and_then(|bus| bus.speaking_id(index))
                         });
                         if let Some(who) = who.as_mut()
-                            && lamp_eyes::who::recognise_due_near(
+                            && (lamp_eyes::who::recognise_due_near(
                                 who.looked_for,
                                 who.taking.is_some(),
                                 Instant::now(),
                                 who.refound,
                                 near_id.as_deref(),
                                 &who.printed_ids,
-                            )
+                            ) || lamp_eyes::who::recognise_due_unsure(
+                                who.looked_for,
+                                who.held.unsure(),
+                                near.is_some(),
+                                Instant::now(),
+                            ))
                         {
                             // The look's own time: a match is stamped with
                             // it, not after the print's ~152 ms, so the hold's
@@ -2794,6 +2818,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     if let Some(known) = who.known.as_mut() {
                                         known.2 = now;
                                     }
+                                    who.held.printed_theirs();
                                     // A followed id carried by this print
                                     // (`who::Held::carry`, #4885).
                                     let carried = who.held.carry(near_id.as_deref());
@@ -2843,24 +2868,38 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         near_id.as_deref(),
                                     );
                                 }
-                            } else if who.known.is_some()
-                                && who.held.keeps_unprinted(
-                                    checked,
-                                    near.is_some(),
-                                    near_id.as_deref(),
-                                )
+                            } else if let Some(unprinted) = who
+                                .known
+                                .is_some()
+                                .then(|| {
+                                    who.held.unprinted(checked, near.is_some(), near_id.as_deref())
+                                })
+                                .filter(|unprinted| *unprinted != lamp_eyes::who::Unprinted::LetGo)
                             {
                                 // No print, within the hold
                                 // (`LAMP_FACE_FULL_CROP` or
                                 // `LAMP_FACE_KNOWN_HOLD` on): the one known
                                 // stays, as they were, only if nobody is near
                                 // or the near face has their passing id
-                                // (`who::Held::keeps_unprinted`, #3285).
+                                // (`who::Held::keeps_unprinted`, #3285). With
+                                // `LAMP_FACE_KNOWN_UNSURE` on, any near face
+                                // holds too, and nobody near, but unsure: the
+                                // voice waits for a print before a line is
+                                // theirs (`who::Held::unprinted`, #5738).
                                 if let Some(known) = who.known.as_mut() {
                                     known.2 = checked;
                                 }
                                 if let Some(path) = &arguments.known_file {
-                                    lamp_eyes::who::renew_known(path);
+                                    // Unsure: the known file moved aside, so
+                                    // no reader of it sees the name held
+                                    // (`who::hold_unsure`, the Reviewer-lead's
+                                    // P2 on #5743).
+                                    match unprinted {
+                                        lamp_eyes::who::Unprinted::Unsure => {
+                                            lamp_eyes::who::hold_unsure(path)
+                                        }
+                                        _ => lamp_eyes::who::renew_known(path),
+                                    }
                                 }
                             } else {
                                 // Nobody near: nobody known at the lamp.

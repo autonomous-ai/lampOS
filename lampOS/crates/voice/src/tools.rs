@@ -47,6 +47,12 @@ mod schedule_integration_tests;
 #[path = "tools/schedule_asked.rs"]
 pub mod schedule_asked;
 
+#[path = "tools/reminders_asked.rs"]
+pub mod reminders_asked;
+
+#[path = "tools/skill_asked.rs"]
+pub mod skill_asked;
+
 #[path = "tools/schedule_whose.rs"]
 pub mod schedule_whose;
 

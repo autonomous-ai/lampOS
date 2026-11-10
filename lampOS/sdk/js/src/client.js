@@ -13,6 +13,7 @@ import * as debug from './debug.js';
 import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
+import { POSES_STEP_MS, posesToFrames } from './moves.js';
 
 /** A fast stream's binary `camera.frame`: its header, with the JPEG as `data`. */
 export function binaryFrame(message) {
@@ -24,6 +25,11 @@ export function binaryFrame(message) {
 
 // Events that come with a request, never subscribed to: a camera stream's.
 const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
+
+// `keepConnected`'s pauses before connecting again, in seconds: the first after
+// a closed connection, then longer while the lamp can't be reached (a restart
+// takes a few seconds; an update about a minute).
+export const RECONNECT_PAUSES = Object.freeze([1, 2, 5, 10]);
 
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
 // (docs/control.md): a wait for them ends at that answer. `say` and
@@ -362,6 +368,65 @@ export class Lamp {
     return new Lamp(ws, welcome, reply, frames);
   }
 
+  /**
+   * Run a long-running program across the lamp's restarts (every update
+   * restarts it, and the connection closes). Connects, runs
+   * `await setup(lamp)` (subscribe, ask for leases, as after `connect`), and
+   * waits until the connection ends; then connects again and runs `setup`
+   * again on the new connection, after a pause that grows along `pauses`
+   * (seconds) while the lamp can't be reached and starts over once it can.
+   *
+   * Never resolves by itself: pass `signal` (an AbortSignal) to stop it.
+   * Rejects at once with what connecting again can't mend: no pairing
+   * (`NotPaired`), another lamp at the address (`WrongLamp`), a refusal of
+   * the hello (`unpaired`, revoked), and anything `setup` throws, a refused
+   * subscription it awaited (`no_grant`) included.
+   */
+  static async keepConnected(setup, { lamp, host, keyring, pauses = RECONNECT_PAUSES, signal } = {}) {
+    // An abort already fired doesn't fire again for a listener added later,
+    // so each step checks `signal.aborted` first (Second's P2 on #5833).
+    const pause = (seconds) => new Promise((resolve) => {
+      if (signal?.aborted) { resolve(); return; }
+      const timer = setTimeout(done, seconds * 1000);
+      function done() { clearTimeout(timer); signal?.removeEventListener('abort', done); resolve(); }
+      signal?.addEventListener('abort', done, { once: true });
+    });
+    let failures = 0;
+    while (!signal?.aborted) {
+      let connection;
+      try {
+        connection = await Lamp.connect(lamp, { host, keyring });
+      } catch (error) {
+        // `closed`: the lamp went while saying hello, as a restart does.
+        if (error instanceof LampError && error.code !== 'closed') throw error;
+        const wait = pauses[Math.min(failures, pauses.length - 1)];
+        if (debug.on()) process.stderr.write(`lampos .. not reached (${error.code ?? error.name}), again in ${wait} s\n`);
+        failures += 1;
+        await pause(wait);
+        continue;
+      }
+      failures = 0;
+      if (signal?.aborted) {
+        // Aborted while it connected: closed again, setup never run.
+        await connection.close().catch(() => {});
+        break;
+      }
+      const stop = () => connection.close();
+      signal?.addEventListener('abort', stop, { once: true });
+      try {
+        await setup(connection);
+        await connection.closed();
+      } catch (error) {
+        // The lamp went in the middle of setup: connect again.
+        if (!(error instanceof LampError) || error.code !== 'closed') throw error;
+      } finally {
+        signal?.removeEventListener('abort', stop);
+        await connection.close().catch(() => {});
+      }
+      if (!signal?.aborted) await pause(pauses[0]);
+    }
+  }
+
   async close() {
     for (const lease of [...this.leases.values()]) await lease.release();
     this.ws.close();
@@ -400,7 +465,10 @@ export class Lamp {
 
   // An action: its reply when taken, or with `wait` its `done` event; for the
   // actions no `done` follows yet (`ENDS_AT_REPLY`), the reply.
-  act(op, fields, wait = false) {
+  // `onTaken` runs once the lamp has taken the action, before any wait for its
+  // `done`, and never for a refusal: what the lamp ends on taking it ends here
+  // then, even if the wait is abandoned (Reviewer-two's P2 on #5837).
+  act(op, fields, wait = false, onTaken = undefined) {
     const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
     // Checked before an id is taken, so an action refused here has no id,
     // and every id is this call's own.
@@ -416,7 +484,8 @@ export class Lamp {
     // carries the rejection to the caller and this one has no listener, which
     // Node would end the program for.
     done?.catch(() => {});
-    const taken = this.send(id, op, clean);
+    const sent = this.send(id, op, clean);
+    const taken = onTaken ? sent.then((reply) => { onTaken(); return reply; }) : sent;
     if (!done) return taken;
     // A refused action takes its `done` back, so nothing is left to reject,
     // unheard, when the connection closes.
@@ -518,12 +587,18 @@ export class Lamp {
 
   express(feeling, strength) { return this.act('express', { feeling, strength }); }
   gesture(name, { wait = false } = {}) { return this.act('gesture', { name }, wait); }
-  // Taken, another look ends a following (lamp-control's own rule).
-  async look(at) {
-    const reply = await this.act('look', { at });
-    this.following?.end('cut_short', 'another look');
-    return reply;
+  // Turn the head (`at`, or `{ yaw, pitch }` in degrees). Its answer when the
+  // door takes it; with `wait`, the body's `done` instead: `finished` with
+  // where the head got to, or `dropped` with why ('the body is not held' while
+  // a conversation suspends your lease). A look at 'hand' has no `done`
+  // (followHand). Taken, another look ends a following (lamp-control's rule).
+  async look(at, { wait = false } = {}) {
+    if (wait && at === 'hand') throw new LampError('a look at hand is followed until it ends, with no done: use followHand', { code: 'bad_request' });
+    // Taken, another look ends a following (lamp-control's own rule), at
+    // once, not after its `done`.
+    return this.act('look', { at }, wait, () => this.#anotherLook());
   }
+  #anotherLook() { this.following?.end('cut_short', 'another look'); }
   // `const following = await lamp.followHand().start()` ... `await
   // following.stop()`, or `await lamp.withHand(async (following) => ...)`:
   // the head turns after the hand the lamp sees. Listen with
@@ -534,8 +609,20 @@ export class Lamp {
     try { return await body(following); } finally { await following.stop(); }
   }
   move(frames, stepMs, { wait = false } = {}) { return this.act('move', { step_ms: stepMs, frames }, wait); }
+  // A move through `poses`, each the degrees of the joints it turns from the
+  // standing pose ({ pitch: 10, yaw: -8 }), eased there and back
+  // (`posesToFrames`). A LampError (code 'bad_request'), before sending, for poses a move can't make.
+  movePoses(poses, { holdMs = 400, wait = false } = {}) {
+    let frames;
+    try { frames = posesToFrames(poses, { stepMs: POSES_STEP_MS, holdMs }); } catch (error) { return Promise.reject(error); }
+    return this.move(frames, POSES_STEP_MS, { wait });
+  }
   play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
-  joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
+  // Aim the joints named, in degrees, under `lease`. Its answer when the door
+  // takes it; with `wait`, the body's `done`, as look's.
+  // lamp-control sends yaw and pitch as the holder's look, so taking it ends a
+  // following too (parts.rs `joints`).
+  joints(lease, withinMs, targets, { wait = false } = {}) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }, wait, () => this.#anotherLook()); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
   // How many pixels the ring has, from hello's limits (undefined from a lamp before pixel lights).
   get ringPixels() { return this.limits.ring?.pixels; }

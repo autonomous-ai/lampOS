@@ -9,11 +9,9 @@ A person speaking to the lamp can ask a skill to play one fixed local
 recording. Voice says a short confirmation, waits for its confirmed speaker
 retirement, then plays the recording under the same live spoken owner.
 `LAMP_REQUESTED_AUDIO=on` is required in **Voice, Skills and Actions**.
-Only the exact value `on` enables it; it is off unless set. The product's
-`lamp-voice`, `lamp-skills` and `lamp-actions` units set it since #5749
-(9 Nov); the repository's per-lamp units do not. Installing a skill does not
-enable playback, and with the switch on nothing plays until a requested-audio
-skill such as relaxing-music is installed (from the Skills Store).
+Only the exact value `on` enables it; it is off by default and is not enabled
+in the repository's product or lamp units. Installing a skill does not
+enable playback.
 
 Voice also requires an explicit absolute `LAMP_SKILLS_DIR` for the existing
 Skills socket. Missing or invalid optional playback configuration disables
@@ -249,8 +247,19 @@ own checks: the service stopped, it wasn't ready, the speaker's state was
 being read past the clash spin, the speaker was muted, silent or its state
 unknown, its state changed, was stale, or was read after the check's own
 time, its Skills lease lapsed, it was past its time, Skills refused its start or a renewal, or its recording
-couldn't be read or wasn't the one offered. `request N: requested audio
+couldn't be read or wasn't the one offered. It also comes when the turn's
+output settles and its confirmation failed, was empty, had a gap or never
+retired. Before #5764 this end said nothing: on lamp-52e6 on 9 Nov (10883)
+three triggered requests played nothing and the journal said nothing. `request N: requested audio
 revoked: <why>` comes from the coordinator, when the turn is revoked.
+
+The second route says the confirmation with the call and, with
+`LAMP_SECOND_SAID_ONCE`, nothing after its result, so a short confirmation
+can retire before the offer reaches the coordinator. That retirement still
+counts: accepting the offer keeps it. Any provider audio after it clears it,
+so newer words must retire before the recording starts. Before #5764 the
+offer cleared it, the confirmation never retired again, and the recording
+was dropped at settle.
 
 The same socket accepts two private operations:
 

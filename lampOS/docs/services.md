@@ -337,14 +337,25 @@ heard line only, nothing kept.
 - **At `set`:** an IMAP `LOGIN` is tried first. Refused: `failure` with "Gmail
   refused the app password"; unreachable: "Gmail couldn't be reached"; either
   way nothing is kept.
-- **Reads:** IMAP over TLS to `imap.gmail.com:993`: `LOGIN`, `EXAMINE INBOX`
-  (the mailbox opened read-only), `UID SEARCH` (`search`'s words are Gmail's
+- **Reads:** IMAP over TLS to `imap.gmail.com:993`: `LOGIN`, `EXAMINE` of
+  one mailbox (opened read-only), `UID SEARCH` (`search`'s words are Gmail's
   own, `X-GM-RAW`), `UID FETCH` of From, Subject, Date and the start of the
-  text with `BODY.PEEK` (nothing is marked read), `LOGOUT`. A list is at most
-  10 mails, 300 characters of each; `message {id}` (the UID a list gave) up
-  to 3,000. Text comes from a plain part first, else HTML with its tags
-  taken out; quoted-printable, base64 and RFC 2047 words are decoded. 5 s to
-  connect, 20 s for the whole exchange.
+  text with `BODY.PEEK` (nothing is marked read), `LOGOUT`. `recent` reads
+  the inbox (`EXAMINE INBOX`). `search` reads All Mail, as Gmail's own
+  search does, so an archived or labelled mail out of the inbox is found
+  too (Spam and Trash are not in All Mail): a `LIST "" "*"` first finds the
+  mailbox flagged `\All` (RFC 6154), whatever its name in the account's
+  language (`[Gmail]/All Mail`, `[Gmail]/Tất cả thư`), sent back as the
+  server spelled it (modified UTF-7); with none flagged (All Mail hidden
+  from IMAP in Gmail's settings) the search reads the inbox. A UID names a
+  mail only within its mailbox, so an id from All Mail carries it: `all41`
+  is UID 41 in All Mail, a bare `41` UID 41 in the inbox. `message {id}`
+  opens the mailbox its id names again (for `all…`, the `LIST` again; with
+  All Mail gone since, nothing is read). A list is at most 10 mails, 300
+  characters of each; `message {id}` (an id a list gave) up to 3,000. Text
+  comes from a plain part first, else HTML with its tags taken out;
+  quoted-printable, base64 and RFC 2047 words are decoded. 5 s to connect,
+  20 s for the whole exchange.
 - **Writes:** SMTP over TLS to `smtp.gmail.com:465`: `EHLO`, `AUTH PLAIN`
   (else `LOGIN`), `MAIL`, `RCPT` for each recipient, `DATA`, `QUIT`. One plain
   text message in UTF-8, its body in base64, from the account itself.
@@ -364,9 +375,13 @@ heard line only, nothing kept.
   "Gmail couldn't be reached"; either way nothing is kept. On success the
   answer's `scopes` are the link's, as the backend gave them.
 - **Reads** (`users.messages.list` and `users.messages.get`, each on the
-  read list): `recent` and `search` list the inbox
-  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`, `search`
-  adding `q=<words>`, Gmail's own search), then get each mail with
+  read list): `recent` lists the inbox
+  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`), and
+  `search` all mail, as Gmail's own search does
+  (`/gmail/v1/users/me/messages?maxResults=<count>&q=<words>`, no label,
+  so an archived or labelled mail out of the inbox is found too; Spam and
+  Trash stay out, `includeSpamTrash` left at its default, false), then get
+  each mail with
   `format=metadata` (From, Subject, Date) and Gmail's short preview (its
   HTML entities read), 300 characters of it. `message {id}` (Gmail's own id
   a list gave: letters and digits, at most 64) gets it with `format=full`:
@@ -388,8 +403,11 @@ heard line only, nothing kept.
 - **Scopes** it needs from Google: `gmail.readonly` for the profile, the
   list (with `q`) and each get, and `gmail.send` for a send (`gmail.modify`
   or `https://mail.google.com/` cover both). IMAP is not used because it takes
-  only `https://mail.google.com/`. A token without a scope a call needs gets
-  403: "Gmail refused the lamp's link: it may need linking again in the app".
+  only `https://mail.google.com/`. A send the link's listed scopes don't
+  allow is refused before it is read back, and a send Google refuses for its
+  scopes is told the same ("Scopes a write needs", under Writes). A read
+  without a scope it needs gets 403: "Gmail refused the lamp's link: it may
+  need linking again in the app".
 - **Refresh:** through the backend, as every OAuth link ([Refresh](#refresh)).
 
 **A send-only Google sign-in (`gmail-app`):** a Lamp 2's Google sign-in
@@ -512,7 +530,8 @@ before the read-back, `reads::calendar_time`). A request is HTTPS
 only, to the service's own hosts, no redirect followed, 5 s to connect, 15 s
 in all, and at most 1 MiB of the answer read. An error status is said
 plainly: 401 or 403 "<Service> refused the lamp's link: it may need linking
-again in the app", 404 "has no such item", 429 "is busy: try again in a
+again in the app" (a write's 401 or 403 that says its scopes are too few is
+told what to do instead: "Scopes a write needs", under Writes), 404 "has no such item", 429 "is busy: try again in a
 while", else "answered with an error". The token and the refresh token are
 scrubbed from any answer (each spelling, plain or URL-encoded).
 
@@ -621,6 +640,61 @@ at most 200, at most 20 recipients or attendees, each a plain
 `local@domain.tld`. Google Drive and Ahrefs have no write ("the lamp only
 reads …").
 
+**Scopes a write needs** (`writes::SCOPES`). The check applies only to an
+OAuth link that records its scopes: a sign-in (an access token, `auth_type`
+not `pat`) whose `scopes` hold at least one non-blank item. Such a
+`service_write` without `send_id` is checked against them before anything is
+prepared or held, and before anything is asked of the service. One of these
+full scope URLs allows the write (the services' own docs:
+`users.messages.send`, `events.insert`), `https://www.googleapis.com/auth/`
+written `…/` here:
+
+| Service | Action | Any of |
+|---|---|---|
+| `gmail`, `gmail-app` | `send_mail` | `…/gmail.send`, `…/gmail.compose`, `…/gmail.modify`, `https://mail.google.com/` |
+| `google_calendar` | `create_event` | `…/calendar`, `…/calendar.events`, `…/calendar.events.owned` |
+
+`writes::scope_allows` splits each `scopes` item on whitespace (a list kept
+as one spaced string reads alike) and matches each scope as a full URL,
+exactly: a bare name such as `gmail.send` allows nothing, as Google Drive's
+create (#5825) refuses a bare `drive.file`; that check is to call the same
+helper once #5825 lands. Only Google's links record their scopes in this
+form, so no other service is in the table. With
+none of them, the call fails with "<Service> is linked without permission to
+<what>: link it again in the app (Skills, then Connectors) and allow it."
+(`serve::NO_PERMISSION`, after the colon), `<what>` being "send mail" or "add
+calendar events": nothing is held, nothing is called. An app password, a
+personal key (`pat`) or a link recording no scopes is not checked, as
+before.
+
+On the "send", a 401 or 403 whose body says the token's scopes are too few,
+in Google's words (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` or
+`insufficientPermissions`, `writes::scope_refused`), is told the same words
+after "not sent: " (for a service not in the table, `<what>` is "make this
+change"). Any other 401 or 403 keeps its words.
+
+The model is told of `service_write`, first in its description
+(`WRITE_RULE`, then the rule every services function has, below):
+"Only when the person asks you, now, to send or post something; an ask to
+draft, write, compose or reply to a mail or message is one. No draft is
+saved; nothing goes before they say send: say so. Call it first without
+send_id: it sends nothing and gives a read_back. Say that read_back in full,
+word for word, then ask them to say "go ahead and send it" to send it. Call
+it again with its send_id only if their very next words are that; anything
+else cancels it. Never say a read-back yourself: only one this call gave in
+the same turn, and a new write, or the same one asked again, needs a new
+call. Never say you can't use their services: refuse only for a reason a
+call gave."
+
+An ask to draft a mail is an ask to send it: Gmail has no draft (`send_mail`
+only), so such an ask is prepared and read back as any write, and nothing is
+saved as a draft. On lamp-29e7 on 9 Nov "Draft a new email for me" was refused
+with no call ("I cannot touch your mail") and, asked why, "Because I'm a
+lamp."; the rule said nothing of drafts, nor where a refusal's reason comes
+from. The whole rule with the shared one is 998 of the description's 1,024 bytes,
+which leaves 25 for `lamp-services`' own words for the write: whole sentences
+only, so its "action, by service: …" list is told on the `action` parameter.
+
 ### The voice's send gate
 
 `crates/voice/src/services.rs` holds its own rules, whatever `lamp-services`
@@ -668,8 +742,8 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   `"said":"send"` added, only when all hold: it is the id kept; it comes in a
   later request than the one that read it back; the lamp's turn just before
   this one is that read-back's, and the lamp spoke in no other request
-  since; the person's line is the very first begun since the write was
-  prepared; it is the same owner who asked; at most 2 minutes since it was
+  since; the person's line is the very first of theirs begun since the write
+  was prepared (the lamp's own echo is not theirs, below); it is the same owner who asked; at most 2 minutes since it was
   prepared and 30 s (`SEND_WITHIN`, `send_by`) since the lamp last said a
   word of it, or since the read-back could have finished playing at 600 ms a
   word, if later (after the lamp asks once more, since that asking alone);
@@ -740,23 +814,76 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   your voice, so I only send mail when it's you?" (in Vietnamese "Cho tôi
   học giọng của bạn nhé, để tôi chỉ gửi thư khi đúng là bạn?"). …". Not at
   the prepare: the read-back and its "send" are the very next turns.
-- **Any later turn forgets it:** a second line begun by anyone, the lamp
-  speaking in a second other request, or a services call with no `send_id`
-  in another request drops the waiting write.
+- **Any later turn forgets it:** a second person's line (its send is
+  cancelled, "more than one line since"), the lamp speaking in a second other
+  request, or a services call with no `send_id` in another request drops the
+  waiting write. The journal says why: "a waiting write dropped: N lines since
+  its read-back", "… dropped: another call", "… dropped: the lamp answered
+  another request"; a plain send's `service_write` with no write waiting says
+  "a plain send with no write waiting: prepared anew".
+- **The lamp's own echo is no line of the person's** (#5846). A line the
+  second route holds as the lamp's own words heard back (`own_echo`,
+  `Echo::Held`) is told through the thread (`Thread::own_echo_held` →
+  `services::own_echo_held`, journal "the lamp's echo, not counted toward the
+  waiting write"): `Pending.echoes` counts it, and the send checks the
+  person's lines, so it doesn't matter whether the thread hears of the line's
+  start or of its echo first. Each line is counted twice over: by the thread,
+  with no request (`Thread::person` → `line_began(None)`, `lines`), and on the
+  second route with its request as its words are told (`Thread::line_heard`
+  → `line_began(Some(request))`, `heard`, the newest 8 ids kept). The
+  person's lines are the larger count less the echoes, and an echo is taken
+  off only for a request counted with its id, and once: the mark goes with
+  its id among the newest 8, so a repeat of it is never taken off again:
+  a line the thread never counted (a piece joined to a line going on, or with
+  no letter or digit) takes no person's line off, so a person's line and the
+  send after an uncounted echo are still two, and cancelled. On lamp-29e7 on 9
+  Nov the read-back's own "go ahead and send it", heard back, was counted as
+  the first line, so the owner's "send" was the second: the write was
+  dropped, prepared again, read back and echoed again, and the owner said
+  "send" five times. The owner's own "Go ahead and send it." is the
+  read-back's tail word for word, so if `own_echo` ever holds a real reply as
+  the lamp's echo, that line goes unanswered and the owner says it again: that
+  was so before this rule too. A cut the echo's start alone made (begun over the lamp's
+  voice, `voice_began` for that request, `Pending.cut_by`) is undone with
+  it; a cut by the lamp's answer stopped, by another line, or by the thread's
+  own timing (`began_in`) stays. Only a line after the one that prepared the
+  write (or asked once more) counts, each once. A person's line is always
+  counted: every other check above is unchanged.
 - **After a send** the model is told one fixed line: "Say only that it was
   sent, in the conversation's language." when the service answered
   `sent: true`, else "Say only that it was not sent, in the conversation's
   language."
+- **A send cut while awaited is never answered as nothing done** (#5853,
+  lamp-9adf, 9 Nov). On the second route a send's call runs to its answer
+  even when a newer line cuts the turn, and the line that answers those
+  words again is given the send's call and where the services got to with
+  it (`send_state`, kept in `run` before any route's fence by the second
+  route's own attempt id, which it adds to each send's arguments as
+  `lamp_send_attempt` and `run` takes out before the gate or
+  `lamp-services` sees them: asked once past the gate, then told the
+  service's answer or the gate's refusal. Each try's receipt is its own, so
+  a refused try never takes another's success, and an older request's slow
+  send finishing later never overwrites a newer one's; 512 kept
+  (`RECEIPTS_KEPT`), refusals let go first), told the write was sent unless it was
+  refused, and runs no
+  `service_write` in its turn
+  ([second-voice.md](second-voice.md), `LAMP_JOIN_CUT_WORDS`'s carried
+  rounds).
 - **A plain send** (`says_send`): the words in lower case, everything but
   letters, digits and `'` as spaces, the fillers `yes`, `yeah`, `yep`, `ok`,
   `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
   `oh`, `vâng`, `dạ`, `ừ`, `có` taken off both ends, and what is left exactly one of `send`, `send it`,
-  `send that`, `send the message`, `send the email`, `go ahead and send it`,
+  `send that`, `send the message`, `send the email`, `send it now`,
+  `go ahead and send it`, `go ahead and send`, `go ahead send it`,
+  `go ahead send`,
   `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
   `gửi đi giúp tôi`, `gui di giup toi`: each has "send", "gửi", "gởi" or
   "gui" in it. So "Yes, send it.", "Vâng, gửi đi" and "Ừ, gửi đi giúp tôi"
-  send, and so does "Hey Lamp, yes, send it."; "do it", "don't send it",
-  "send it to Bo instead", "đừng gửi" and "no" don't.
+  send, and so does "Hey Lamp, yes, send it."; "do it", "go ahead", "don't
+  send it", "send it to Bo instead", "đừng gửi" and "no" don't. The forms
+  without "it" are speech-to-text's: on lamp-9adf on 9 Nov the owner's "Go
+  ahead and send it." came as "Go ahead and send", and the write was prepared
+  and read back again (#5846).
 - **A plain send is heard as an answer** (`send_awaited`). While a write
   waits, a plain send counts as answering the lamp, however the read-back's
   last sentence reads. So it isn't held as a short sound or as the room's lone
@@ -811,6 +938,21 @@ A call to a service that isn't linked fails with "<Service> isn't linked to
 this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), so the lamp says where to link it, not only that it
 isn't.
+
+A call's `service` reaches a service by its code exactly (either Gmail
+code reaching whichever Gmail link the lamp has, as before), else by a
+catalogue code or name as the model may say it: case aside, spaces and `-`
+read as `_` ("Google Drive", "GMAIL", "google calendar", "GitHub"); of two
+services with one name (Figma's), the linked one (`serve::named`). Such a
+call then gets that service's answer, or its `NOT_LINKED` words.
+
+A call naming a service the lamp has no connector for (no code or name in
+the catalogue matches) fails with "The lamp can't link <name> yet. The services it can
+link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, after the
+first sentence). `<name>` is the name the call gave, said only when it is at
+most 40 characters, all letters, digits, spaces, `-` or `_`; any other name,
+or none, is said as "that service". `services_connected`'s description names
+the services the lamp can link ("The voice's three functions").
 
 ## A made skill's read (proposal #5288, `LAMP_SKILL_READS`, on in the product)
 
@@ -879,8 +1021,12 @@ other keys are `service_read`'s own for a fixed read: `count` (1 to 10),
 `query` (search words), `id`, `repo`, `calendar`, `project` and
 `workspace` (each 1 to 1,000 bytes); never `from` or `to`, nor a free-form
 read's `graphql`, `variables`, `path`, `params`, `tool` or `arguments`.
-`query` is searched for (Drive's `fullText contains`), never an order:
-Drive lists files newest first (`orderBy = modifiedTime desc`) and mail
+`query` is searched for, each word in a file's name or its text (Drive's
+`name contains` or `fullText contains`, a name's `_`, `-` and `.` splitting
+words), and comes back by relevance, as Drive refuses an order beside
+`fullText` (HTTP 400; lamp-3e83, 9 Nov: a file asked for by its name was
+never found). It is never an order: with no `query` Drive lists files newest
+first (`orderBy = modifiedTime desc`) and mail
 comes newest first, so a read of the latest leaves it out; an order or the
 latest alone ("order by modifiedTime desc", "newest") is refused
 (`service_read::ordering`, after a lamp's made skill read 0 files with
@@ -1113,7 +1259,13 @@ up as the skills' folders are), routed to its `call.sock` and nowhere else,
 and never taken from the executive's or a skill's folder.
 
 - **`services_connected {}`**: `{"connected": [{"service", "name",
-  "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`.
+  "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`. Its
+  description names each service the lamp can link, by its catalogue name
+  once ("The lamp can link only: Gmail, Gmail with Google sign-in, Google
+  Calendar, …, Notion."), and tells the model: "If the person names a service
+  not among them, say the lamp can't link it yet, and never give another
+  reason." It is at most 600 bytes, so the voice's own rule fits before it
+  within the 1,024 its provider link takes.
 - **`service_read {service, what, …}`**: `what` and its arguments as in the
   table above; the answer quoted, cut to who and what about when the owner
   may not be alone. A read in full also needs the line in the
@@ -1247,10 +1399,13 @@ whole, a code never a path, remove and wipe; no secret in a `Debug` or a
 refusal; a token only over https to its own hosts (no port, user, fragment or
 lookalike host), reads only on the allow-list, writes only on the write list;
 every GraphQL mutation refused; Gmail's IMAP read-only (`EXAMINE`,
-`BODY.PEEK`) and SMTP's one message after `AUTH`; `set` keeping nothing on a
-refused Gmail login; a Gmail Google sign-in checked at `set` with its profile
-(refused, unreached, its account taken from it), read through the REST API
-(the inbox list, each mail's metadata, one mail whole from its plain part,
+`BODY.PEEK`), its search in All Mail (found by its `\All` flag under a
+localized name, else the inbox), `recent` in the inbox and `message` in
+the mailbox its id names, and SMTP's one message after `AUTH`; `set`
+keeping nothing on a refused Gmail login; a Gmail Google sign-in checked at
+`set` with its profile (refused, unreached, its account taken from it),
+read through the REST API (the inbox list, a search in all mail and its
+archived mail read by id, each mail's metadata, one mail whole from its plain part,
 its token scrubbed, security mails left out, an id not Gmail's never sent),
 renewed through the backend, sent through the API only on a spoken "send",
 and an app password never sent to the API; a `gmail-app` link kept on its
@@ -1259,7 +1414,14 @@ answered as send-only (linked or not, no call made), its send through the
 API only, a refused token said as "Google refused the Gmail sign-in", and
 its renewal under its own code; security mails found and left out whole; answers quoted
 and under the voice's cap; a write refused when off, read back in full and
-sent once within two minutes; the MCP read/write rule, its pinned host, a
+sent once within two minutes; a send or an event the link's listed scopes
+don't allow refused in plain words with nothing held or called, one they
+allow read back, a send Google refuses for its scopes told the same and any
+other 403 its own words, a link with no scopes listed (an app password, a
+personal key) unchecked, a scope allowing only as its full URL (one
+spaced string read as a list, a bare `gmail.send` refused), a service said
+by its name ("Google Drive", "GMAIL") reaching it, and a service the lamp
+can't link told so, a hostile name said as "that service"; the MCP read/write rule, its pinned host, a
 link on another host never called, a write tool read back whole and called
 once on send; the refresh request as V1's; the askers told by their cgroup.
 `-p lamp-cloud` (`services`, `online`, `answer`): both switch words needed,

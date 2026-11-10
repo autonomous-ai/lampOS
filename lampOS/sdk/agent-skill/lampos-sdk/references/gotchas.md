@@ -2,6 +2,49 @@
 
 Each of these cost someone a run on a real lamp.
 
+## On a customer lamp today (stable 10824)
+
+Customer lamps run stable build 10824. lamp-control is on every lamp and
+answers once the owner turns on developer access in the app. Five gaps:
+
+1. **Skill push is not yet on customer lamps.** `push_skill`, `skills`,
+   `remove_skill` (`lamp skill push/list/remove`, `lamp_skill_push`, …) are
+   refused, `refused`, "skill push is not on this lamp". Try a push on
+   `lamp fake`, or write the behaviour as a program that runs on the
+   computer while connected. `lamp skill check` works anywhere.
+2. **Joints and play.** `joints` takes `yaw` and `pitch` only; `roll`,
+   `shoulder` and `elbow` are refused, "not routed yet: …". With the body
+   silent for 15 s, name both yaw and pitch. `play` is refused, "not routed
+   yet: waits for client packages". Use `look`, `gesture` or `move`.
+   `sound` works.
+3. **Limp and pose** (letting the arm go limp, holding a pose) can't be
+   reached from a computer.
+4. **No mDNS.** No lamp announces itself: `lamp find` finds nothing, and
+   `lamp pair` without `--host` finds nothing. Pair with
+   `--host lamp-xxxx.local` (the lamp's host name) or its IP address. The
+   pairing keeps the address, so later connects need nothing.
+5. **Event times are UTC.** `at` ends in `Z` (`2026-10-27T08:40:01Z`).
+   Convert to local time yourself.
+
+And three more:
+- **A motion asked while another plays is refused `busy`**, "busy: a motion
+  plays for N ms more", with `retry_ms`, while the last gesture, move or
+  feeling's move lamp-control sent (from any computer) still plays; the
+  lamp's own motions don't count. Wait `retry_ms` and ask again. Builds after 10824 replace
+  the playing motion instead (below).
+- **`look` on a resting lamp may end `cut_short`**, "not there in time:
+  something holds the head", with no hand on it. Treat a `cut_short` close
+  to the target as arrived, ask again, or lift the head with a gesture
+  first. `look` at `face` and `name` are refused, "not in this release";
+  `ahead`, a yaw and pitch, and `hand` work.
+- **The camera** sends the eyes' newest frame, about 1 to 2 a second; the
+  fast path (`fast: true`) is not on customer lamps.
+
+`lamp fake` refuses every `look` (but with `--hands`) and every `joints` by
+default, which a customer lamp takes in part; and it takes a skill push and
+an overlapping motion, which a customer lamp refuses. Test those paths
+against the gaps above, not only the fake.
+
 ## Light
 
 - **`breathe` needs level 2 or more; `candle` 3; `pulse` 2.** Below that the
@@ -23,12 +66,13 @@ Each of these cost someone a run on a real lamp.
 
 ## Body
 
-- **A new motion cuts the one playing short.** A gesture, move or
-  feeling's move asked while another plays (whoever asked it) replaces it,
-  eased out from where the body is under its own caps. While the person is
-  using the lamp (a conversation, a hand on it), the body drops the new one
-  ("the person is using the lamp"); the door has already answered
-  `{"to":"body"}`.
+- **A new motion cuts the one playing short** (after stable 10824). A
+  gesture, move or feeling's move asked while another plays (whoever asked
+  it) replaces it, eased out from where the body is under its own caps.
+  While the person is using the lamp (a conversation, a hand on it), the
+  body drops the new one ("the person is using the lamp"); the door has
+  already answered `{"to":"body"}`. **Stable 10824 and older** refuse it
+  `busy` with `retry_ms` instead: wait `retry_ms` and ask again.
 - **`look`, `move`, `play` and `joints` need a `body` lease;** `gesture` and
   `express` don't. Hold the lease around a sequence of moves, not per move.
 - **The lamp takes the body back** when someone talks to it, touches its
@@ -37,8 +81,9 @@ Each of these cost someone a run on a real lamp.
   `play` (and a build from before the hum, `sound`) with `refused`, "not
   routed yet: waits for …". Handle it; don't retry. `joints` takes `yaw` and
   `pitch` (degrees from home, as `body_info()` gives them, both named until
-  the body has said where it is); `roll`, `shoulder` and `elbow` are refused
-  until the body's goal stream.
+  the body has said where it is); `roll`, `shoulder` and `elbow` go as the
+  body's pose, only while the lamp stands (else `done` `dropped`, with why);
+  a build from before that refuses them, "not routed yet".
 - **A move must start and end at home** (all five joints 0) and last 1.5 to
   10 s, within each joint's reach and speed. The body's words say which
   frame was wrong.

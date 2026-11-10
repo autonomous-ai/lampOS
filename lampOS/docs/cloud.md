@@ -117,6 +117,8 @@ lamp says so.
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
 | `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
+| `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
+| `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
@@ -2160,6 +2162,46 @@ passes the key through to the lamp and never stores or logs it** (the
 backend's side, to be confirmed by them). The rest is in
 [own-keys.md](own-keys.md).
 
+## Setup done, told to the app (#5812, `onboarding.done`)
+
+Once per lamp setup, the app is told the walk ended, so it opens Skills. Off
+unless `LAMP_APP_ONBOARDING_DONE=on` exactly, with `LAMP_CLOUD=on` and a
+state folder (`STATE_DIRECTORY`); on in the product unit, the lead's call on
+9 Nov (the design on #1711).
+
+- **What.** One unasked `data` reply on `fd_channel`, in V1's envelope, as
+  `harness.sign_in.state` is pushed:
+  `{"type":"data","kind":"onboarding.done","status":"success","data":{"at":<unix ms>},"device":"lamp",...}`.
+  `data` holds `at` only, the app's dedupe key.
+- **When.** `at` is the voice's own date for the walk's done line,
+  `onboarding/pending`'s `done_at_unix_ms` ([onboarding.md](onboarding.md)):
+  kept through `redo_setup`, so a redo never sends it again, and wiped by a
+  factory reset, so a new owner gets it. A lamp set up before it was dated
+  has none and never sends it. lamp-cloud reads the heartbeat's latest value
+  at most once a second on its tick (`crate::onboarding_done`).
+- **Offline.** Sent only while connected and kept until the broker's ack,
+  as a change's result is: lost with the connection, it is sent again on
+  the next. Once acked, `at` is written to `$STATE_DIRECTORY/onboarding-done`,
+  so a restart doesn't send it again; a new `at` (a new setup) is sent.
+  The journal says `onboarding.done: handed to the client, at <at>` and
+  `onboarding.done: acked by the broker, at <at> kept`.
+- **Missed.** An app that wasn't listening reads `system.info`'s
+  `onboarding_done_at` when its page opens. It is said whenever the voice's
+  heartbeat carries the date, with the switch or without it.
+- **Will it come.** `system.info`'s `onboarding_done_supported: true` says
+  the switch is on, so the app waits for the event only on such a lamp; an
+  older lamp, or one with the switch off, says no field.
+
+The app opens Skills once per `(device id, at)` on `kind == "onboarding.done"`,
+and on its page's open if `system.info.onboarding_done_at` is an `at` it
+hasn't seen; it ignores the event when there's no `at`.
+
+Tests: `online::tests::the_walks_end_is_told_once_and_kept_after_the_ack`,
+`the_walks_end_lost_before_its_ack_is_told_again_on_the_next_connection`,
+`without_a_date_or_the_switch_the_walks_end_is_not_told`,
+`onboarding_done::tests`, `answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`,
+and `app_contract.rs`'s `system.info` row.
+
 ## The two yeses from the app (#5500, `consent.get`, `consent.set`)
 
 The owner's face expressions yes (lamp-eyes reads how a near face seems)
@@ -2193,8 +2235,14 @@ until its lamp check. Both yeses stay off by default.
   (`try-restart lamp-ears.service`) once no update holds lamp-update's
   lock; an off is followed within 2 s without one.
 - **What takes it back besides the app:** a redo of setup or of the step
-  and a later "no" at the lamp (the voice's next write), a forget of
-  everything and the factory reset, whoever gave it.
+  and a later "no" at the lamp (when the voice first writes it, whatever
+  the clocks say), a forget of everything and the factory reset, whoever
+  gave it.
+- **Owed before `LAMP_APP_CONSENT` goes on:** the `consent.set` command
+  (`crates/cloud/src/wire.rs`) carries no id or send time, and the helper
+  stamps the yes when it arrives (`crates/setup/src/change.rs`), so an
+  MQTT QoS 1 resend or a late-delivered app yes counts as a new yes, even
+  after a later "no" at the lamp.
 
 ## A person's linked services (Queue #4710, `connector.*`, `services.list`)
 
@@ -2240,9 +2288,9 @@ isn't there, so the five kinds are neither listed nor answered.
 Off unless `lamp-cloud` is started with `--control-admin-socket PATH`
 (lamp-control's admin socket, `/run/lampos-control/admin.sock`; docs/control.md,
 "Running the door"). The product `lamp-cloud.service` passes it, with
-`-/run/lampos-control` in its `ReadWritePaths=`; lamp-control itself becomes a
-product unit with #4526, and until that lands a lamp has the socket only with
-lamp-control's own runtime unit. Each
+`-/run/lampos-control` in its `ReadWritePaths=`, and lamp-control's own
+product unit is installed on every lamp (on stable 10824 too), so the socket
+is there once the owner turns developer access on (`control.set`). Each
 kind is one JSON line asked of that socket, as `lamp-control code`, `clients`
 and `revoke` ask it at the lamp, waited on 3 s. `can` lists the five only
 while the socket is there (lamp-control running with `LAMP_CONTROL=on`); an

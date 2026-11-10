@@ -1113,6 +1113,14 @@ fn worker_command(
             role,
             var(crate::tools::schedule_asked::ENVIRONMENT).as_deref(),
         ))
+        .envs(reminders_asked_worker_environment(
+            role,
+            var(crate::tools::reminders_asked::ENVIRONMENT).as_deref(),
+        ))
+        .envs(skill_asked_worker_environment(
+            role,
+            var(crate::tools::skill_asked::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1687,6 +1695,28 @@ fn schedule_asked_worker_environment(
         .then_some((crate::tools::schedule_asked::ENVIRONMENT, "on"))
 }
 
+// A plain question about the person's reminders calls list_reminders
+// (`tools::reminders_asked`), passed the same narrow way: the exact `on`, to
+// the second route, whose chat can be made to call a function.
+fn reminders_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::tools::reminders_asked::ENVIRONMENT, "on"))
+}
+
+// A plain ask for a light scene or a light show calls its skill
+// (`tools::skill_asked`), passed the same narrow way: the exact `on`, to the
+// second route, whose chat can be made to call a function.
+fn skill_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::tools::skill_asked::ENVIRONMENT, "on"))
+}
+
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
 // the two workers that tell the time and judge the night. Cleared, it never
 // reached them, so a lamp whose clock was not set took its saved 22:00 as
@@ -1883,6 +1913,8 @@ fn second_route_worker_environment(
         lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
         // The name said as a sentence of its own, with the near hearing (#5277).
         crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
+        // A wordless call only on a sure hearing (#5385).
+        crate::second_provider::wordless_call::ENVIRONMENT,
         crate::second_provider::OWN_ECHO_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
@@ -1958,6 +1990,8 @@ fn second_route_worker_environment(
         crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
+        // A carried line read and kept as its person's (9 Nov, #5842).
+        crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
         crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
         crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
@@ -2193,6 +2227,7 @@ mod tests {
             crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
             lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
             crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
+            crate::second_provider::wordless_call::ENVIRONMENT,
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
@@ -2202,6 +2237,7 @@ mod tests {
             crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
             crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
             crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
@@ -2656,6 +2692,20 @@ mod tests {
                         "LAMP_SCHEDULE_ASKED",
                         ["second"].as_slice(),
                     ),
+                    // A plain question about the person's reminders calls
+                    // list_reminders: the second route alone.
+                    (
+                        reminders_asked_worker_environment,
+                        "LAMP_REMINDERS_ASKED",
+                        ["second"].as_slice(),
+                    ),
+                    // A plain ask for a light scene or a light show calls
+                    // its skill: the second route alone.
+                    (
+                        skill_asked_worker_environment,
+                        "LAMP_SKILL_ASKED",
+                        ["second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -2901,6 +2951,8 @@ mod tests {
                     crate::remember::ROOM_SPEAKER_ENVIRONMENT,
                     crate::remember::asked::ENVIRONMENT,
                     crate::tools::schedule_asked::ENVIRONMENT,
+                    crate::tools::reminders_asked::ENVIRONMENT,
+                    crate::tools::skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -3027,6 +3079,7 @@ mod tests {
                     || name == crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT
                     || name == lamp_msgs::NameHeard::NEAR_ENVIRONMENT
                     || name == crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT
+                    || name == crate::second_provider::wordless_call::ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
@@ -3036,6 +3089,7 @@ mod tests {
                     || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
                     || name == crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT
@@ -3147,6 +3201,7 @@ mod tests {
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
                     "LAMP_CHOSEN_VOICE=on",
+                    "LAMP_CONVERSATION_CARRIED_MEMORY=on",
                     "LAMP_CONVERSATION_CARRIED_SAVES=on",
                     "LAMP_CONVERSATION_CARRIES=on",
                     "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
@@ -3210,6 +3265,7 @@ mod tests {
                     "LAMP_NAME_SECOND_SIGN=on",
                     "LAMP_NAME_START_USUAL=on",
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
+                    "LAMP_NAME_WORDLESS_BAR=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_ONE_AS_LAMP=on",
@@ -3227,6 +3283,7 @@ mod tests {
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
+                    "LAMP_REMINDERS_ASKED=on",
                     "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
@@ -3274,6 +3331,7 @@ mod tests {
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SERVICES_TOLD=on",
                     "LAMP_SHORT_DONE=on",
+                    "LAMP_SKILL_ASKED=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",

@@ -179,7 +179,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         ("humans/faces/tracked", json!({"faces": []}), 17 * S),
         ("room/stood_up", json!({"side": "left"}), 18 * S),
         ("room/stood_up", json!({}), 18 * S),
-        ("name/heard", json!({}), 19 * S),
+        ("name/heard", json!({"score": 0.94, "ago_ms": 75}), 19 * S),
         (
             "ears/classes",
             json!({"scores": {"music": 0.9, "door": 0.7}}),
@@ -219,6 +219,27 @@ fn every_event_from_the_bus_validates_against_the_schema() {
             "speaker/volume",
             json!({"volume": 0, "muted": true}),
             29 * S,
+        ),
+        (
+            "light/drawn",
+            json!({"on": true, "colour": "warm", "level": 3}),
+            28 * S,
+        ),
+        (
+            "diagnostics",
+            json!({"level": 0, "name": "body", "message": "", "values": [{"key": "temperature_head_pitch", "value": "44"}]}),
+            28 * S,
+        ),
+        (
+            "body/joint_states",
+            json!({
+                "name": ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"],
+                "position": [-0.5, 0.7, -1.1, 0.02, 0.3],
+                "velocity": [0.4, 0.0, 0.0, 0.0, 0.0],
+                "effort": [0.1, 0.35, 0.2, 0.0, 0.06],
+                "commanded": [-0.4, 0.7, -1.1, 0.0, 0.3],
+            }),
+            28 * S,
         ),
     ];
     let mut kinds = std::collections::BTreeSet::new();
@@ -265,6 +286,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         "hand",
         "air.changed",
         "volume.changed",
+        "body.state",
     ] {
         assert!(kinds.contains(kind), "{kind} not seen: {kinds:?}");
     }

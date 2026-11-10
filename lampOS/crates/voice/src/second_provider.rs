@@ -71,6 +71,7 @@ pub mod probe;
 mod second_try;
 mod services;
 pub mod speech_tags;
+pub mod wordless_call;
 pub mod worker;
 
 pub use second_try::{CHAT_SECOND_TRY_ENVIRONMENT, ChatTold, SECOND_TRY_AFTER, second_try_on};
@@ -767,6 +768,20 @@ pub const CONVERSATION_CARRIES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES";
 /// `ScopeLease::save_carried`). Reads, forgets and a yes stay refused. `on`,
 /// and nothing else; off, a carried line keeps nothing, as before.
 pub const CONVERSATION_CARRIED_SAVES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIED_SAVES";
+
+/// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a line carried in full as a
+/// known person's conversation is read and kept as theirs, as a lone known
+/// face's line is with [`PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT`]: recall,
+/// hits, the memory note, and its `remember` written in their scope at
+/// once, not held for a yes ([`Engine::reading_carried`],
+/// `ScopeLease::read_carried`). No forget of any kind, no correction, rule
+/// or yes runs on it (`ScopeLease::forgets_need_mouth`), and it is still
+/// never journalled or summarised. A line carried for a keep only stays as
+/// before. The memory owner's decision of 9 Nov, after lamp-06c1's S14 run
+/// (build 10824): every carried line refused its recall, so 11 of 14 asks
+/// failed though the facts were stored. `on`, and nothing else; off, a
+/// carried line is as before, byte for byte.
+pub const CONVERSATION_CARRIED_MEMORY_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIED_MEMORY";
 /// A known person's keep on a line no face was seen speaking is theirs when
 /// their known face was the one face in every look of it and no other voice
 /// was heard since the conversation began (the launch testers' item 1 on
@@ -1687,6 +1702,10 @@ struct Shared {
     /// lamp-name's near hearings, for a line's first word
     /// ([`Engine::hearing_the_name_near`]).
     name_near: Option<NameNear>,
+    /// `LAMP_NAME_WORDLESS_BAR=on`: lamp-name's best hearing in a line, for
+    /// one marked as only the name whose words came back empty
+    /// ([`Engine::holding_a_wordless_call`]).
+    wordless_bar: Option<wordless_call::BestHeard>,
     /// With `name_near`, a first word said as a sentence of its own is the
     /// name by its near hearing alone ([`Engine::taking_the_name_as_a_sentence`]).
     name_as_a_sentence: bool,
@@ -1696,6 +1715,20 @@ struct Shared {
     own_echo: bool,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
+    /// The last send try's attempt id ([`send_attempt`], #5853).
+    send_attempts: AtomicU64,
+    /// The send tries [`sent_with_words`] put in carried rounds, by attempt
+    /// id, the newest [`crate::services::RECEIPTS_KEPT`]: a call id alone
+    /// may be a finished round's other call's (the P3 on #5863).
+    carried_attempts: Mutex<std::collections::VecDeque<u64>>,
+    /// The write's send under way, or answered, for a turn a newer line may
+    /// cut before its round is carried ([`SentWrite`], #5853).
+    sent_write: Mutex<Vec<SentWrite>>,
+    /// The request answering words whose own write was sent
+    /// ([`sent_with_words`]), with the send's own request and what a
+    /// `service_write` in its turn is told instead of running, if anything
+    /// (#5853). Cleared as that turn ends.
+    write_sent_in: Mutex<Option<(u64, u64, Option<&'static str>)>>,
     /// The privacy generation one was opened under before any line
     /// ([`Engine::listening`]); `None` again when listening stops.
     warmed: Mutex<Option<u64>>,
@@ -1750,7 +1783,11 @@ struct Shared {
     held_save: Mutex<Option<HeldSave>>,
     /// The save a held one ran: its request, name and answer, so a model
     /// call after the yes never saves twice.
-    saved_by_hold: Mutex<Option<(u64, String, Value)>>,
+    saved_by_hold: Mutex<Option<(u64, String, Value, Instant)>>,
+    /// When a face save last kept a face, the model's or a held one's, so
+    /// a yes to the read-back with no save called never saves twice
+    /// ([`yes_save`]).
+    face_kept_at: Mutex<Option<Instant>>,
     /// A face rename's yes judged by its guards and a rename held for it
     /// (`LAMP_NAMES_RENAME_YES`, #5485, [`Engine::holding_renames_for_yes`]).
     rename_yes: bool,
@@ -1760,6 +1797,10 @@ struct Shared {
     /// Where a held save reads what was said; the thread's window when
     /// unset ([`said_window`]).
     said_window: Option<SaidWindow>,
+    /// Whether onboarding's "who you are" is open, for a yes to the
+    /// read-back with no save called ([`yes_save`]); the walk's file when
+    /// unset.
+    setup_open: Option<SetupOpen>,
     /// Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`): the eyes'
     /// looks and their known file, and a held forget's yes counts only
     /// from the held person's face seen saying it (#2377).
@@ -1793,6 +1834,9 @@ struct Shared {
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
+    /// A carried line is read and kept as its person's, forgets refused
+    /// (`LAMP_CONVERSATION_CARRIED_MEMORY`, [`Engine::reading_carried`]).
+    carried_memory: bool,
     /// Who was seen saying a known person's line is kept for its services
     /// write (`LAMP_SERVICES`, [`Engine::keeping_sight_for_services`]).
     services_sight: bool,
@@ -2016,7 +2060,8 @@ fn carried_as(shared: &Shared) -> &'static str {
 /// reused id is someone else, and a known face with no boot is nobody's.
 /// Without it, the bare ids, as before. A follow of the known face the
 /// eyes' last look still says at the line's end waits for their print to
-/// decide (`speaking_faces::known_once_decided`, #4966).
+/// decide (`speaking_faces::known_once_decided`, #4966), and an unsure hold
+/// for a print (`speaking_faces::known_once_printed`, #5738).
 ///
 /// [`SpeakingFaces::known_with_boot`]: crate::speaking_faces::SpeakingFaces::known_with_boot
 async fn line_sight(
@@ -2054,6 +2099,20 @@ async fn line_sight(
             crate::speaking_faces::FOLLOW_DECIDED_WITHIN,
         )
         .await;
+        // An unsure hold (nobody near, or their face not printed since a
+        // gap) ties the line to no one until a print decides (#5738).
+        let read = {
+            let (eyes, file) = (eyes.clone(), known_file.clone());
+            move || eyes.known_with_boot(&file)
+        };
+        let pair = crate::speaking_faces::known_once_printed(
+            &known_file,
+            pair,
+            finishing,
+            crate::speaking_faces::FOLLOW_DECIDED_WITHIN,
+            read,
+        )
+        .await;
         // The known face the only one in view through the line (lamp-3e83).
         let alone = pair
             .as_ref()
@@ -2066,6 +2125,18 @@ async fn line_sight(
                 .await
                 .ok()
                 .flatten();
+        let read = {
+            let file = known_file.clone();
+            move || crate::speaking_faces::known_with_face(&file)
+        };
+        let pair = crate::speaking_faces::known_once_printed(
+            &known_file,
+            pair,
+            finishing,
+            crate::speaking_faces::FOLLOW_DECIDED_WITHIN,
+            read,
+        )
+        .await;
         (speakers, pair, false)
     }
 }
@@ -4163,10 +4234,15 @@ impl Engine {
                 name_refused: Mutex::new(None),
                 one_speaker: None,
                 name_near: None,
+                wordless_bar: None,
                 name_as_a_sentence: false,
                 own_echo: false,
                 spare: Mutex::new(None),
+                sent_write: Mutex::new(Vec::new()),
+                write_sent_in: Mutex::new(None),
                 spares: AtomicU64::new(0),
+                send_attempts: AtomicU64::new(0),
+                carried_attempts: Mutex::new(std::collections::VecDeque::new()),
                 warmed: Mutex::new(None),
                 begun: Mutex::new(None),
                 wait_sound_only: Mutex::new(None),
@@ -4183,9 +4259,11 @@ impl Engine {
                 held_forget: Mutex::new(HeldForgets::default()),
                 held_save: Mutex::new(None),
                 saved_by_hold: Mutex::new(None),
+                face_kept_at: Mutex::new(None),
                 rename_yes: false,
                 held_rename: Mutex::new(held_rename::HeldRenames::default()),
                 said_window: None,
+                setup_open: None,
                 forget_sight: None,
                 forget_through_spelling: false,
                 face_claims: false,
@@ -4195,6 +4273,7 @@ impl Engine {
                 scope_seen: false,
                 carries: None,
                 carried_saves: false,
+                carried_memory: false,
                 services_sight: false,
                 past_silent: None,
                 one_face: None,
@@ -4491,6 +4570,41 @@ impl Engine {
         self
     }
 
+    /// With [`Self::carrying_conversations`], a line carried in full is read
+    /// and kept as the carried person's, as a lone known face's line is
+    /// (`LAMP_CONVERSATION_CARRIED_MEMORY=on`, `ScopeLease::read_carried`):
+    /// its recall, hits and note read their memory, and its `remember` is
+    /// written in their scope at once, not held for a yes. No forget,
+    /// correction, rule or yes runs on it, and it is never journalled. A
+    /// line carried for a keep only stays as before. Only with
+    /// [`Self::scoping_by_one_face`]'s tracker showing no other voice, their
+    /// own face the one face in view through the line, and the rule having
+    /// judged its voice: otherwise a carried line stays as before. Off, as
+    /// before.
+    pub fn reading_carried(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.carried_memory = on;
+        self
+    }
+
+    /// [`Self::reading_carried`] only where another voice can be heard:
+    /// `hears`, the same-voice check runs for this route (its printer
+    /// started for every rule). Without it the tracker would never record a
+    /// voice, so "no other voice" would always hold (Jarvis's P2 on #5842,
+    /// as the Reviewer-lead's P2 on #4610 for
+    /// [`Self::carrying_past_silent_where_heard`]): a carried line stays as
+    /// before, said once at start with why.
+    pub(crate) fn reading_carried_where_heard(mut self, hears: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        if shared.carried_memory && !hears {
+            eprintln!(
+                "lamp-voice second: LAMP_CONVERSATION_CARRIED_MEMORY is inactive: the same-voice check is not running here; a carried line stays held and the room's"
+            );
+            shared.carried_memory = false;
+        }
+        self
+    }
+
     /// With `LAMP_SERVICES=on`: who the eyes saw saying a known person's
     /// line is kept as it is admitted, before the chat begins, for the
     /// line's own services write (`services::seen_saying_owner`), whatever
@@ -4643,6 +4757,16 @@ impl Engine {
     pub(crate) fn reading_said_from(mut self, window: SaidWindow) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.said_window = Some(window);
+        self
+    }
+
+    /// Where a yes to the read-back with no save called reads whether
+    /// onboarding's "who you are" is open ([`yes_save`]), in place of the
+    /// walk's file.
+    #[cfg(test)]
+    pub(crate) fn reading_setup_from(mut self, open: SetupOpen) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.setup_open = Some(open);
         self
     }
 
@@ -4939,6 +5063,18 @@ impl Engine {
         self
     }
 
+    /// `LAMP_NAME_WORDLESS_BAR=on` (#5385): a line marked as only the
+    /// lamp's name whose words came back empty is asked as the name only
+    /// when `best` says lamp-name heard it there at
+    /// [`wordless_call::BAR`] or more; under it, it is left as a sound.
+    /// Without it, as before. Before any turn only.
+    pub fn holding_a_wordless_call(mut self, best: wordless_call::BestHeard) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.wordless_bar = Some(best);
+        }
+        self
+    }
+
     /// `LAMP_NAME_AS_A_SENTENCE=on`, with [`Self::hearing_the_name_near`]:
     /// a line's first word said as a sentence of its own, more said after
     /// it, is the name when lamp-name heard it near at the line's start,
@@ -5158,7 +5294,9 @@ impl Engine {
     /// [`crate::keep_at_once::KEPT`] once every call came back kept plainly,
     /// and the turn ends with no second round. A keep failed, refused, held,
     /// doubted or told with a note, other calls, the model's own words, or
-    /// more asked go on as without the switch. Before any turn only.
+    /// more asked go on as without the switch. In an owner's language the
+    /// line is said in it only from its clip rendered ahead ([`FixedClips`]);
+    /// until then such turns ask round 2. Before any turn only.
     pub fn keeping_at_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.keep_at_once = on;
@@ -5925,6 +6063,13 @@ impl Engine {
             (shared.wordless_resumes, crate::cut_in_wordless::BRIDGE),
             (shared.wordless_resumes, crate::cut_in_wordless::AGAIN),
             (shared.wordless_resumes, crate::cut_in_wordless::PAUSE),
+            // In English the keep's line is said by the voice as the turn's
+            // piece, as it always was; in the owner's language only from
+            // its clip (C59).
+            (
+                shared.keep_at_once && shared.language.is_some(),
+                crate::keep_at_once::KEPT,
+            ),
         ]
         .into_iter()
         .filter_map(|(on, line)| on.then_some(line))
@@ -7765,6 +7910,9 @@ async fn spoken(
     // (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): judged again by the voice
     // once the rule has heard it.
     let mut carried_past_silent = false;
+    // The carried person's own face, when a line is carried in full by
+    // either rule below (`LAMP_CONVERSATION_CARRIED_MEMORY`'s look).
+    let mut carried_face: Option<String> = None;
     let mut one_face = false;
     // No face seen speaking it at all and the admitted person's own known
     // face the only face in view through it: memory's hits may fall back to their scope
@@ -7858,6 +8006,7 @@ async fn spoken(
                         });
                 if carried {
                     carried_past_silent = shared.past_silent.is_some();
+                    carried_face = own_face.map(str::to_owned);
                     eprintln!(
                         "lamp-voice second: request {request}: no face was seen speaking it, in their conversation going on, {}: {} (LAMP_CONVERSATION_CARRIES)",
                         carried_as(&shared),
@@ -8054,6 +8203,7 @@ async fn spoken(
             && carry_into(&shared, lease, &person, keep_only)
         {
             carried_past_silent = shared.past_silent.is_some();
+            carried_face = face.map(str::to_owned);
             eprintln!(
                 "lamp-voice second: request {request}: admitted as the room's, no face seen speaking it, in a known person's conversation going on, {}: {} (LAMP_CONVERSATION_CARRIES)",
                 carried_as(&shared),
@@ -8066,10 +8216,41 @@ async fn spoken(
             }
         }
     }
+    // Carried in full, by either rule above, with
+    // `LAMP_CONVERSATION_CARRIED_MEMORY` (the memory owner's decision of 9
+    // Nov, after lamp-06c1's S14 run): read and kept as the carried person's,
+    // as a lone known face's line is, no forget, correction, rule or yes run
+    // on it, never journalled. Only with the one-face rule's tracker there
+    // and no other voice it recorded in the conversation, nor
+    // `past_silent`'s sign of another person: fails closed, so with no
+    // tracker an off-camera guest's line just after their face stays held
+    // and the room's (Thirteen's P2 on #5842). And only with their own face
+    // the one face in view through the line, by the one-face count
+    // (`SpeakingFaces::one_face_in_view`), as a lone known face's line is
+    // read: a face seen only in the seconds before, gone or out of view as
+    // it is said, is not enough (Jarvis's P2 on #5842: an off-camera guest
+    // just after they walked out). The rule must also judge the line's own
+    // voice, checked once it has (below). A keep-only carry stays as
+    // before.
+    let mut carried_memory = false;
+    if shared.carried_memory
+        && no_other_voice_shown(&shared)
+        && let (Some(lease), Some((eyes, _))) = (scope.as_ref(), &shared.speaking)
+        && carried_face
+            .as_deref()
+            .is_some_and(|face| eyes.one_face_in_view(face, begun, finishing))
+        && lease.read_carried()
+    {
+        carried_memory = true;
+        eprintln!(
+            "lamp-voice second: request {request}: carried: read and kept as theirs, a keep written at once; no forget, correction, rule or yes runs on it, never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
+        );
+    }
     // Carried, by either rule above, with `LAMP_CONVERSATION_CARRIED_SAVES`:
     // its keep is held for the carried person's yes, their face seen saying
     // it, never written at once (the first builder's call on #4508).
-    if shared.carried_saves
+    if !carried_memory
+        && shared.carried_saves
         && let Some(lease) = scope.as_ref()
         && lease.save_carried()
     {
@@ -8286,6 +8467,14 @@ async fn spoken(
     if let Ok(mut last) = shared.heard_last.lock() {
         *last = Some((request, text.clone()));
     }
+    // A write waiting for its "send" counts this line with its request,
+    // before it is judged as the lamp's echo below (`Echo::Held`): only a
+    // line so counted is taken off as one (`crate::services`, #5846).
+    if text.chars().any(char::is_alphanumeric)
+        && let Ok(mut thread) = crate::thread::THREAD.lock()
+    {
+        thread.line_heard(request, std::time::Instant::now());
+    }
     if !shared
         .emit(ProviderOutput::Transcript {
             request: None,
@@ -8318,6 +8507,24 @@ async fn spoken(
     // often does: asked as the name the coordinator heard, or it would go
     // unanswered as a sound (#1712).
     let called = marks.called.load(Ordering::Acquire);
+    // With `LAMP_NAME_WORDLESS_BAR=on` (#5385), only on a sure hearing: a
+    // call heard under the bar with no words is no call, and is left as a
+    // sound, as a line with no words and no call is.
+    let called = match &shared.wordless_bar {
+        Some(best) if called && text.trim().is_empty() => {
+            let best = best(said.lock().map_or((0, 0), |said| *said));
+            let answered = wordless_call::answered(best);
+            if !answered {
+                eprintln!(
+                    "lamp-voice second: request {request}: only the lamp's name, and no words of it came back: {}, under {}: not answered as a call (LAMP_NAME_WORDLESS_BAR)",
+                    wordless_call::scored(best),
+                    wordless_call::BAR
+                );
+            }
+            answered
+        }
+        _ => called,
+    };
     let text = if called && text.trim().is_empty() {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and no words of it came back: asked as the name"
@@ -8526,6 +8733,12 @@ async fn spoken(
         }
         own_echo::Echo::Held(line) => {
             eprintln!("{line}");
+            // Not the person's line: a write waiting for its "send" does not
+            // count it (lamp-29e7, 9 Nov: the read-back's "go ahead and send
+            // it" heard back dropped the write before the owner's "send").
+            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                thread.own_echo_held(request);
+            }
             (true, None)
         }
         own_echo::Echo::Stripped(kept, line) => {
@@ -8615,7 +8828,28 @@ async fn spoken(
             "lamp-voice second: request {request}: another voice in the conversation, heard as it was judged: it opens no conversation of the named person's"
         );
     }
-    if (one_face || hits_face || named_by_one_face)
+    // A carried line read as its person's (`LAMP_CONVERSATION_CARRIED_MEMORY`)
+    // the rule never judged (held, empty, its own echo, or no rule): whether
+    // another voice said it is unknown, so it is the room's after all, keeps
+    // and all (Jarvis's P2 on #5842: fail closed unless a voice check ran on
+    // this very line).
+    if carried_memory
+        && !heed_ran
+        && let Some(scope) = scope.as_ref()
+    {
+        scope.narrow_to_room();
+        eprintln!(
+            "lamp-voice second: request {request}: carried, then the rule never heard its voice: told and kept as the room's (LAMP_CONVERSATION_CARRIED_MEMORY)"
+        );
+        if prepared.take().is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+            );
+        }
+    }
+    // So too a carried line read as its person's
+    // (`LAMP_CONVERSATION_CARRIED_MEMORY`) another voice shows in.
+    if (one_face || hits_face || named_by_one_face || carried_memory)
         && another_voice_heard(shared.one_face.as_deref())
         && let Some(scope) = scope.as_ref()
         && (scope.by_one_face()
@@ -8915,6 +9149,16 @@ async fn spoken(
                     earlier: carried.earlier.clone(),
                 },
             );
+            // Their go-ahead's write, sent while a cut turn still awaited it
+            // (#5853): its result goes with the words, never prepared again.
+            // Waited for with the words in flight, so a newer line that cuts
+            // this one meanwhile carries them, and the send's record with
+            // them.
+            let sent_note = match sent_with_words(&shared, &origins(&carried), request).await {
+                SentWith::Cut => return,
+                SentWith::Nothing => None,
+                SentWith::Told(note) => note,
+            };
             let lease = scope.clone();
             // Another person's words the carried ones kept, cut short in
             // their pause's grace (`LAMP_ENDPOINT_PAUSE_JOIN`): told first,
@@ -8925,7 +9169,11 @@ async fn spoken(
             } else {
                 Vec::new()
             };
-            let notes = earlier.into_iter().chain(notes).collect();
+            let notes = earlier
+                .into_iter()
+                .chain(notes)
+                .chain(sent_note.map(str::to_owned))
+                .collect();
             tokio::join!(
                 though_held,
                 answer(
@@ -9063,6 +9311,7 @@ async fn spoken(
         .as_ref()
         .map(|carried| carried.earlier.clone())
         .unwrap_or_default();
+    let cut_from = carried.as_ref().map(origins).unwrap_or_default();
     let (text, carried, parts) = match carried {
         Some(carried) if name_refused(&shared, request, &carried) => {
             (text, Some(carried), vec![own])
@@ -9087,6 +9336,11 @@ async fn spoken(
         }
         None => (text, None, vec![own]),
     };
+    // Words let go, or none carried: a send kept for them goes too (#5853).
+    let joined_sent = !cut_from.is_empty() && carried.is_none();
+    if !joined_sent {
+        drop_sent_write(&shared, None);
+    }
     // Words cut short in their pause's grace and not joined to this line,
     // another person's: still answered, first, in this answer
     // (`LAMP_ENDPOINT_PAUSE_JOIN`, Sixth's P2 on #4916), as the asker comes
@@ -9306,7 +9560,8 @@ async fn spoken(
         })
         .flatten()
         .map(str::to_owned);
-    let notes = stopped
+    let cut_in_told = cut_in.len();
+    let mut notes: Vec<String> = stopped
         .into_iter()
         .chain(earlier)
         .chain(pushed)
@@ -9361,6 +9616,18 @@ async fn spoken(
             },
         },
     );
+    // Joined with words whose write their go-ahead sent while a cut turn
+    // still awaited it (#5853): its result goes with them, its note before
+    // the cut-in's, which come last.
+    if joined_sent {
+        match sent_with_words(&shared, &cut_from, request).await {
+            SentWith::Cut => return,
+            SentWith::Nothing | SentWith::Told(None) => {}
+            SentWith::Told(Some(note)) => {
+                notes.insert(notes.len() - cut_in_told, note.to_owned());
+            }
+        }
+    }
     if let Some(heard) = &shared.words_heard {
         heard(request, &text);
     }
@@ -9543,6 +9810,360 @@ fn carry_round(shared: &Shared, request: u64, round: &[Message]) {
     {
         carried.rounds.extend_from_slice(round);
     }
+}
+
+/// A write's send under way in `request`'s turn (#5853): its call, when it
+/// began, its attempt id ([`send_attempt`]) and the route's answer once it
+/// came. Every try of a request is kept, up to a batch's
+/// [`net::MOST_CALLS`], refusals let go first, so a later try (the gate's
+/// refusal of a write already sent) never hides the one that went (Third's
+/// and Second's HOLDs on #5863); the newest [`SENDS_KEPT`] requests'. Kept
+/// by [`sending`] until
+/// the turn carries the round ([`carry_round`]), a turn given it ends
+/// ([`sent_given_over`]) or its words are let go, so every newer line that
+/// cuts the words while the send is still awaited finds what it did: the
+/// cut turn never finished the round that would have carried it.
+struct SentWrite {
+    request: u64,
+    attempt: u64,
+    call: net::ToolCall,
+    began: tokio::time::Instant,
+    told: tokio::sync::watch::Receiver<Option<Value>>,
+}
+
+/// Told the model answering words again whose own write their go-ahead
+/// sent (#5853), beside the send's call and result.
+const SENT_WRITE_NOTE: &str = "(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)";
+/// The same, when the send's answer did not come within
+/// [`crate::services::DEADLINE`]: sent, its result not known, never "nothing
+/// was sent".
+const SENT_UNKNOWN_NOTE: &str = "(For you to know: their go-ahead already sent the write they asked for, but its result is not known yet. Say it was sent and that you could not confirm it yet; do not call service_write again for it.)";
+/// The same, when no answer came within the bound and the services hold
+/// nothing of the send: not known to have gone, never "already sent".
+const SEND_NOT_KNOWN_NOTE: &str = "(For you to know: their go-ahead asked for the write to be sent, but whether it went is not known. Say you could not confirm it; do not call service_write again for it.)";
+/// What a `service_write` is told in that turn: nothing runs, nor "sent".
+const SEND_NOT_KNOWN: &str = "Not run: whether the write their go-ahead asked for went is not known. Do not prepare it again; say you could not confirm it.";
+/// How many requests' send tries are kept ([`SentWrite`]).
+const SENDS_KEPT: usize = 8;
+/// What a `service_write` is told in a turn answering words whose write was
+/// sent ([`sent_already`]): nothing runs, so no new read-back follows.
+const ALREADY_SENT: &str = "Not run: the write their go-ahead asked for was already sent. Do not prepare it again; say what was done.";
+
+/// A new attempt id for `call` of `request` when it is a write's send
+/// ([`crate::services::may_send`]), and its arguments marked with it
+/// ([`crate::services::ATTEMPT`]), so the services keep its receipt as its
+/// own (#5853). Any other call: none, and its arguments as they are.
+fn send_attempt(shared: &Shared, request: u64, call: &net::ToolCall) -> (Option<u64>, Value) {
+    if !crate::services::may_send(&call.name, &call.args, request) {
+        return (None, call.args.clone());
+    }
+    let attempt = shared.send_attempts.fetch_add(1, Ordering::Relaxed) + 1;
+    let mut args = call.args.clone();
+    if let Some(marked) = args.as_object_mut() {
+        marked.insert(crate::services::ATTEMPT.into(), attempt.into());
+    }
+    (Some(attempt), args)
+}
+
+/// Whether a kept try was answered and did not go: the first let go.
+fn refused(sent: &SentWrite) -> bool {
+    sent.told
+        .borrow()
+        .as_ref()
+        .is_some_and(|told| told["sent"] != true && *told != crate::tools::unavailable())
+}
+
+/// `running`, `call` of `request`'s turn: a write's send (`attempt` from
+/// [`send_attempt`]) is run on a task of its own, so it goes on to its
+/// answer if a newer line cuts the turn, and kept in [`Shared::sent_write`]
+/// with that answer (`told_of`) once it comes (#5853). Any other call:
+/// `running` as it is.
+fn sending<T: Send + 'static>(
+    shared: &Shared,
+    (request, attempt): (u64, Option<u64>),
+    call: &net::ToolCall,
+    running: BoxFuture<'static, T>,
+    told_of: fn(&T) -> Value,
+) -> BoxFuture<'static, T> {
+    let Some(attempt) = attempt else {
+        return running;
+    };
+    let (answered, told) = tokio::sync::watch::channel(None);
+    if let Ok(mut sent) = shared.sent_write.lock() {
+        // The newest requests': an older request's tries go first, never a
+        // newer one's for an older one's (Second's trace on #5863).
+        let mut requests: Vec<u64> = sent.iter().map(|sent| sent.request).collect();
+        requests.sort_unstable();
+        requests.dedup();
+        let fits = if requests.contains(&request) || requests.len() < SENDS_KEPT {
+            true
+        } else if requests[0] < request {
+            let oldest = requests[0];
+            sent.retain(|sent| sent.request != oldest);
+            true
+        } else {
+            false
+        };
+        // A batch at its bound: a refused try goes, never one that went or
+        // may have gone.
+        let mine = sent.iter().filter(|sent| sent.request == request).count();
+        let fits = fits
+            && (mine < net::MOST_CALLS
+                || sent
+                    .iter()
+                    .position(|sent| sent.request == request && refused(sent))
+                    .map(|at| sent.remove(at))
+                    .is_some());
+        if fits {
+            sent.push(SentWrite {
+                request,
+                attempt,
+                call: call.clone(),
+                began: tokio::time::Instant::now(),
+                told,
+            });
+        }
+    }
+    let task = tokio::spawn(async move {
+        let out = running.await;
+        let _ = answered.send(Some(told_of(&out)));
+        out
+    });
+    Box::pin(async move {
+        match task.await {
+            Ok(out) => out,
+            Err(error) => std::panic::resume_unwind(error.into_panic()),
+        }
+    })
+}
+
+/// The sends kept in [`Shared::sent_write`] dropped: `request`'s only, or
+/// any with `None`.
+fn drop_sent_write(shared: &Shared, request: Option<u64>) {
+    if let Ok(mut sent) = shared.sent_write.lock() {
+        sent.retain(|sent| request.is_some_and(|request| sent.request != request));
+    }
+}
+
+/// The requests whose words `carried` holds: its own and each part's. A
+/// send is kept by its own request, whichever line carries its words on
+/// (#5853, the HOLD on #5863: a second cut carried them as the first held
+/// line's).
+fn origins(carried: &Carried) -> Vec<u64> {
+    std::iter::once(carried.request)
+        .chain(carried.parts.iter().map(|part| part.request))
+        .collect()
+}
+
+/// What [`sent_with_words`] found.
+enum SentWith {
+    /// No send kept for the words.
+    Nothing,
+    /// A newer line cut `request` while it waited for the send's answer:
+    /// the words, and the send's record, are that line's now.
+    Cut,
+    /// The send's call and result went with the words; the note to tell,
+    /// if any.
+    Told(Option<&'static str>),
+}
+
+/// The send a cut turn made for words `request` now answers again, held
+/// or joined, their requests `origins` (#5853, lamp-9adf: the write was
+/// sent, the held line's model was given no trace of it, and prepared a new
+/// one). Called with the words in flight as `request`'s, so a newer line
+/// that cuts it while it waits carries them on. Its answer is waited for,
+/// bounded by [`crate::services::DEADLINE`] from when the send began; the
+/// record is only read, and stays until a turn given it ends
+/// ([`sent_given_over`]) or the words are let go. Its call and result go
+/// into the words' carried rounds, as [`carry_round`] would have carried
+/// them, once only. Sent, or passed the gate with no answer: the note, and
+/// `request`'s turn runs no `service_write` ([`sent_already`]). Refused, or
+/// never reaching the services: its result only, never told as sent.
+async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> SentWith {
+    // The newest of the words' requests that made a send: its tries.
+    let kept: Vec<_> = shared
+        .sent_write
+        .lock()
+        .map(|sent| {
+            let origin = sent
+                .iter()
+                .map(|sent| sent.request)
+                .filter(|request| origins.contains(request))
+                .max();
+            sent.iter()
+                .filter(|sent| Some(sent.request) == origin)
+                .map(|sent| {
+                    (
+                        sent.request,
+                        sent.attempt,
+                        sent.call.clone(),
+                        sent.began,
+                        sent.told.clone(),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let Some(origin) = kept.first().map(|kept| kept.0) else {
+        return SentWith::Nothing;
+    };
+    // Each try's answer, waited for within its own bound.
+    let mut answers = Vec::new();
+    for (_, attempt, call, began, mut told) in kept {
+        let came = tokio::time::timeout_at(
+            began + crate::services::DEADLINE,
+            told.wait_for(Option::is_some),
+        )
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .map(|told| told.clone().unwrap_or_default());
+        answers.push((attempt, call, came));
+    }
+    if !still_holding(shared, request) {
+        return SentWith::Cut;
+    }
+    // Each try with its own result (Second's HOLD on #5863: never another
+    // try's): the route's answer, or, fenced to "not running" as a cut
+    // turn's lease is no longer current, where the services got to with
+    // that very try (`services::send_state`, by its attempt id).
+    use crate::services::SendState;
+    let unavailable = crate::tools::unavailable();
+    let tries: Vec<Try> = answers
+        .into_iter()
+        .map(|(attempt, call, came)| {
+            let own = came.clone().filter(|told| *told != unavailable);
+            let (told, got) = match (own, crate::services::send_state(attempt), came) {
+                (Some(told), _, _) => (told, Got::Told),
+                (None, Some(SendState::Told(told)), _) => (told, Got::Told),
+                (None, Some(SendState::Asked), _) => (unavailable.clone(), Got::Asked),
+                (None, None, None) => (unavailable.clone(), Got::Unknown),
+                // Answered "not running" before the services had it.
+                (None, None, Some(told)) => (told, Got::Told),
+            };
+            Try {
+                attempt,
+                call,
+                told,
+                got,
+            }
+        })
+        .collect();
+    let note = if tries
+        .iter()
+        .any(|tried| tried.got == Got::Told && tried.told["sent"] == true)
+    {
+        Some(SENT_WRITE_NOTE)
+    } else if tries.iter().any(|tried| tried.got == Got::Asked) {
+        Some(SENT_UNKNOWN_NOTE)
+    } else if tries.iter().any(|tried| tried.got == Got::Unknown) {
+        Some(SEND_NOT_KNOWN_NOTE)
+    } else {
+        None
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: request {origin}'s {} send tr{} began before a newer line cut its answer; {} go with its words",
+        tries.len(),
+        if tries.len() == 1 { "y" } else { "ies" },
+        match note {
+            Some(SENT_WRITE_NOTE) => "the sent one and each try's own result",
+            Some(SENT_UNKNOWN_NOTE) => "a send whose result is not known",
+            Some(_) => "a send not known to have gone",
+            None => "their results, none sent,",
+        }
+    );
+    let instead = match note {
+        Some(SEND_NOT_KNOWN_NOTE) => Some(SEND_NOT_KNOWN),
+        Some(_) => Some(ALREADY_SENT),
+        None => None,
+    };
+    if let Ok(mut sent_in) = shared.write_sent_in.lock() {
+        *sent_in = Some((request, origin, instead));
+    }
+    // Every try with its own result, so each call id meets its answer
+    // (Second's repro on #5863); once only: already carried when every try's
+    // attempt was, and its call id is still in the rounds. The call id
+    // alone may be a finished round's other call's, a clock's `call_0`
+    // before a send's `call_0` (the P3 on #5863).
+    let rounds = carried_rounds(shared, request);
+    let carried = shared.carried_attempts.lock().is_ok_and(|attempts| {
+        tries.iter().all(|tried| {
+            attempts.contains(&tried.attempt)
+                && rounds
+                    .iter()
+                    .any(|message| message.tool_call_id.as_deref() == Some(tried.call.id.as_str()))
+        })
+    });
+    if !carried {
+        if let Ok(mut attempts) = shared.carried_attempts.lock() {
+            for tried in &tries {
+                if !attempts.contains(&tried.attempt) {
+                    if attempts.len() >= crate::services::RECEIPTS_KEPT {
+                        attempts.pop_front();
+                    }
+                    attempts.push_back(tried.attempt);
+                }
+            }
+        }
+        let calls: Vec<net::ToolCall> = tries.iter().map(|tried| tried.call.clone()).collect();
+        let round: Vec<Message> = std::iter::once(Message::assistant_calls(None, &calls))
+            .chain(
+                tries
+                    .iter()
+                    .map(|tried| Message::tool(tried.call.id.clone(), tried.told.to_string())),
+            )
+            .collect();
+        carry_round(shared, request, &round);
+    }
+    SentWith::Told(note)
+}
+
+/// One send try as [`sent_with_words`] carries it: its call, its own
+/// result, and how far it is known to have got.
+struct Try {
+    attempt: u64,
+    call: net::ToolCall,
+    told: Value,
+    got: Got,
+}
+
+/// How far a send try is known to have got.
+#[derive(PartialEq)]
+enum Got {
+    /// Its result is known: the service's answer, or its refusal.
+    Told,
+    /// Past the gate with no answer: it may have gone.
+    Asked,
+    /// No answer within the bound, and the services hold nothing of it.
+    Unknown,
+}
+
+/// `request`'s turn over: a send given to it ([`sent_with_words`]) is done
+/// with, its record dropped, and a later turn may write again (#5853).
+fn sent_given_over(shared: &Shared, request: u64) {
+    let given = shared
+        .write_sent_in
+        .lock()
+        .ok()
+        .and_then(|mut sent_in| sent_in.take_if(|(of, _, _)| *of == request));
+    if let Some((_, origin, _)) = given {
+        drop_sent_write(shared, Some(origin));
+    }
+}
+
+/// What `request`'s `name` call is told instead of running, when it is a
+/// `service_write` in a turn answering words whose write was sent
+/// ([`sent_with_words`]).
+fn sent_already(shared: &Shared, request: u64, name: &str) -> Option<Value> {
+    if name != crate::services::WRITE {
+        return None;
+    }
+    let instead = shared.write_sent_in.lock().ok().and_then(|sent_in| {
+        sent_in
+            .filter(|(of, _, _)| *of == request)
+            .and_then(|(_, _, instead)| instead)
+    })?;
+    Some(serde_json::json!({ "error": instead }))
 }
 
 /// `request`'s carried rounds dropped, after a memory forget (#4848).
@@ -11555,6 +12176,10 @@ fn take_held_forget(
 /// What a held setup save reads of what was said.
 pub(crate) type SaidWindow = Arc<dyn Fn() -> crate::known_faces::Said + Send + Sync>;
 
+/// Whether onboarding's "who you are" is open, as a yes to the read-back
+/// with no save called reads it ([`yes_save`]).
+pub(crate) type SetupOpen = Arc<dyn Fn() -> bool + Send + Sync>;
+
 /// How long a held setup save waits for the yes.
 // One bound with the walk's: "who you are" stays open as long as a save is
 // held (the Reviewer-lead's P3 on #5415).
@@ -11637,24 +12262,47 @@ fn let_the_walk_go() {
 /// spoken turn of the same session, within [`HELD_SAVE_FOR`], when that
 /// turn is a plain yes to the lamp's read-back. A turn the lamp wrote
 /// leaves it as it is; any other turn drops it. A plain yes whose save is
-/// dropped all the same (a second face, or the speaker not seen saying it)
-/// comes back as `Err` with why, for the model to be told: left untold, it
-/// made up its own reason on lamp-52e6 (Fifth's run B on #5415, 5 Nov:
-/// "I need to know who you are first").
+/// dropped all the same (a second face seen saying it) comes back as
+/// [`SetupSave::Dropped`] with why, for the model to be told: left
+/// untold, it made up its own reason on lamp-52e6 (Fifth's run B on #5415, 5 Nov:
+/// "I need to know who you are first"). It runs only on a yes to their
+/// face (`known_faces::face_agreed`): a plain yes to the name said back
+/// keeps it held and has the face question asked first
+/// ([`SetupSave::AskFace`]).
 fn take_held_save(
     shared: &Shared,
     request: u64,
     heard: bool,
     scope: Option<&crate::memory_scope::ScopeLease>,
     now: Instant,
-) -> Option<Result<net::ToolCall, &'static str>> {
+) -> Option<SetupSave> {
     let mut hold = shared.held_save.lock().ok()?;
-    let held = hold.take()?;
-    if !heard || held.request >= request {
-        *hold = Some(held);
-        return None;
-    }
-    drop(hold);
+    let taken = hold.take();
+    let (held, called) = match taken {
+        Some(held) if !heard || held.request >= request => {
+            *hold = Some(held);
+            return None;
+        }
+        Some(held) => {
+            drop(hold);
+            (held, true)
+        }
+        // Nothing held: a plain yes to the face question the model called
+        // no save for runs one all the same, at setup only, and a plain yes
+        // to the name said back has that question asked ([`yes_save`]).
+        None => {
+            drop(hold);
+            match yes_save(shared, request, heard, scope, now)? {
+                Ok(save) => (save, false),
+                Err(name) => {
+                    eprintln!(
+                        "lamp-voice second: request {request}: their yes to the read-back asks the face question before any setup face save"
+                    );
+                    return Some(SetupSave::AskFace(name));
+                }
+            }
+        }
+    };
     let seen_speaking = crate::speaking_faces::line_seen(request);
     let name = held
         .call
@@ -11663,9 +12311,10 @@ fn take_held_save(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned();
-    let verdict = crate::known_faces::held_save_verdict(&name, &said_window(shared));
+    let said = said_window(shared);
+    let verdict = crate::known_faces::held_save_verdict(&name, &said);
     let plain_yes = verdict == crate::known_faces::HeldSaveVerdict::Runs;
-    // Only these two drop a plain yes the model should hear about.
+    // Only a second face drops a plain yes the model should hear about.
     let mut told = false;
     let why = if now.saturating_duration_since(held.at) > HELD_SAVE_FOR {
         "too late"
@@ -11681,36 +12330,148 @@ fn take_held_save(
         // the yes may be someone else's.
         told = plain_yes;
         "a second face seen at the yes"
-    } else if shared.forget_sight.is_some()
-        && seen_speaking
-            .as_ref()
-            .is_none_or(|line| line.speakers.len() != 1)
-    {
-        told = plain_yes;
-        "the speaker was not seen saying the yes"
     } else {
+        // No face seen saying the yes, or none in view, still runs it (the
+        // lead, 9 Nov: the owner may not face the lamp); the eyes then
+        // keep nothing and the model is told why.
         match verdict {
-            crate::known_faces::HeldSaveVerdict::Runs => {
+            crate::known_faces::HeldSaveVerdict::Runs
+                if !called || crate::known_faces::face_agreed(&name, &said) =>
+            {
+                if called {
+                    eprintln!(
+                        "lamp-voice second: request {request}: their yes to the face runs the setup face save held in request {}",
+                        held.request
+                    );
+                } else {
+                    eprintln!(
+                        "lamp-voice second: request {request}: their yes to the face runs the setup face save no call asked for"
+                    );
+                }
+                return Some(SetupSave::Runs(held.call));
+            }
+            // A yes to the name alone: the save waits on, for the yes to
+            // the face question the model is now told to ask.
+            crate::known_faces::HeldSaveVerdict::Runs
+                if crate::known_faces::yes_to_the_read_back(&name, &said) =>
+            {
                 eprintln!(
-                    "lamp-voice second: request {request}: their yes to the read-back runs the setup face save held in request {}",
+                    "lamp-voice second: request {request}: their yes to the read-back asks the face question before the setup face save held in request {}",
                     held.request
                 );
-                return Some(Ok(held.call));
+                if let Ok(mut hold) = shared.held_save.lock() {
+                    *hold = Some(HeldSave { request, ..held });
+                }
+                return Some(SetupSave::AskFace(name));
             }
+            crate::known_faces::HeldSaveVerdict::Runs => "not a plain yes to the face question",
             crate::known_faces::HeldSaveVerdict::Waits => "the lamp did not say the name back",
             crate::known_faces::HeldSaveVerdict::Drops => "not a plain yes to the read-back",
         }
     };
-    eprintln!(
-        "lamp-voice second: request {request}: dropped the held setup face save (held in request {}): {why}",
-        held.request
-    );
-    let_the_walk_go();
-    told.then_some(Err(why))
+    if called {
+        eprintln!(
+            "lamp-voice second: request {request}: dropped the held setup face save (held in request {}): {why}",
+            held.request
+        );
+        let_the_walk_go();
+    } else {
+        // Nothing was held, so the walk was never told to wait for it.
+        eprintln!(
+            "lamp-voice second: request {request}: no setup face save on their yes to the face: {why}"
+        );
+    }
+    told.then_some(SetupSave::Dropped(why))
+}
+
+/// What becomes of a setup face save on a turn ([`take_held_save`]).
+enum SetupSave {
+    /// Their yes to the face runs it, with no model call.
+    Runs(net::ToolCall),
+    /// A plain yes whose save is dropped all the same, and why, for the
+    /// model to be told.
+    Dropped(&'static str),
+    /// Their plain yes to the name said back (the name here), before any
+    /// yes to their face: the model is told to ask the face question, and
+    /// the face waits for its yes (the first builder's HOLD on #5700).
+    AskFace(String),
+}
+
+/// Notes that a face save kept a face now ([`yes_save`]).
+fn note_face_kept(shared: &Shared, now: Instant) {
+    if let Ok(mut kept) = shared.face_kept_at.lock() {
+        *kept = Some(now);
+    }
+}
+
+/// The setup face save a plain yes to their face runs when no save was
+/// called for it, so the face no longer waits on the model (#5684, the
+/// Walter trace: the model said "Now I'll take a quick look" with no call,
+/// the face wait ended "who you are" with the name only, and its call a
+/// request later kept nothing). Taken as a held one is, through the same
+/// gates, runner and check as a model call: only on a spoken turn, while
+/// onboarding's "who you are" is open, when this turn agrees to the face
+/// kept under the name said back and agreed to (`known_faces::face_agreed`:
+/// a plain yes to the face question after it, or a yes to the name that
+/// asks for the face itself), and with no face kept within
+/// [`HELD_SAVE_FOR`] (a save's step commits some seconds after it). A
+/// plain yes to the name said back alone is no yes to the face (the first
+/// builder's HOLD on #5700: setup asks "May I remember your face, so I
+/// know you next time?" only after it): `Err` with the name, for the
+/// model to ask that. The text is read first: the walk's small file only
+/// on such a yes.
+fn yes_save(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    now: Instant,
+) -> Option<Result<HeldSave, String>> {
+    if !heard {
+        return None;
+    }
+    let said = said_window(shared);
+    let (name, face) = match crate::known_faces::face_agreed_name(&said) {
+        Some(name) => (name, true),
+        None => (crate::known_faces::read_back_name(&said)?, false),
+    };
+    let kept_lately = shared
+        .face_kept_at
+        .lock()
+        .ok()
+        .and_then(|kept| *kept)
+        .is_some_and(|at| now.saturating_duration_since(at) <= HELD_SAVE_FOR);
+    if kept_lately {
+        return None;
+    }
+    let open = match &shared.setup_open {
+        Some(open) => open(),
+        None => crate::onboarding::file_from_environment()
+            .is_some_and(|file| crate::onboarding::who_you_are_open(&file)),
+    };
+    if !open {
+        return None;
+    }
+    if !face {
+        return Some(Err(name));
+    }
+    Some(Ok(HeldSave {
+        call: net::ToolCall {
+            id: format!("yes-save-{request}"),
+            name: crate::known_faces::REMEMBER.to_owned(),
+            args: serde_json::json!({ "name": name }),
+            extra: None,
+        },
+        request,
+        session: scope.map(|scope| scope.key().session),
+        at: now,
+    }))
 }
 
 /// The answer of a save a held one already ran for `name` in `request`,
-/// for a model call after the yes: never a second save.
+/// or within [`HELD_SAVE_FOR`] before it, for a model call after the yes:
+/// never a second save, on the yes or a turn later (#5684: the model
+/// called the save a request after the yes).
 fn saved_already(shared: &Shared, request: u64, call: &net::ToolCall) -> Option<Value> {
     if call.name != crate::known_faces::REMEMBER
         || call.args.get("replace").and_then(Value::as_bool) == Some(true)
@@ -11719,8 +12480,9 @@ fn saved_already(shared: &Shared, request: u64, call: &net::ToolCall) -> Option<
     }
     let name = call.args.get("name").and_then(Value::as_str)?.trim();
     let saved = shared.saved_by_hold.lock().ok()?;
-    let (at, kept, _) = saved.as_ref()?;
-    (*at == request && kept.eq_ignore_ascii_case(name))
+    let (at, kept, _, when) = saved.as_ref()?;
+    let recent = (shared.clock)().saturating_duration_since(*when) <= HELD_SAVE_FOR;
+    ((*at == request || recent) && kept.eq_ignore_ascii_case(name))
         .then(|| serde_json::json!({"remembered": true, "note": crate::remember::ALREADY_KEPT}))
 }
 
@@ -11997,22 +12759,15 @@ async fn run_tool(
         );
         return serde_json::json!({ "error": ONE_FACE_FORGET });
     }
-    let running = async {
-        match (&shared.scoped_tools, scope) {
-            (Some(run), Some(scope)) => {
-                run(
-                    request,
-                    heard,
-                    call.name.clone(),
-                    call.args.clone(),
-                    scope.clone(),
-                )
-                .await
-            }
-            (Some(_), None) => crate::tools::unavailable(),
-            (None, _) => (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await,
-        }
+    // A send runs to its answer even if a newer line cuts the turn, its
+    // receipt kept as its own (#5853).
+    let (attempt, args) = send_attempt(shared, request, call);
+    let running: BoxFuture<'static, Value> = match (&shared.scoped_tools, scope) {
+        (Some(run), Some(scope)) => run(request, heard, call.name.clone(), args, scope.clone()),
+        (Some(_), None) => Box::pin(std::future::ready(crate::tools::unavailable())),
+        (None, _) => (shared.tools)(request, heard, call.name.clone(), args),
     };
+    let running = sending(shared, (request, attempt), call, running, Value::clone);
     // A connected service can take seconds to answer (a mail box, a web
     // service): past the wait sound's time the person hears it, as for a
     // slow chat, never a silence (`crate::services::DEADLINE`).
@@ -12363,6 +13118,9 @@ async fn answer(
         request,
         heard_at,
         tags: shared.speech_tags.map(speech_tags::Tags::new),
+        line: std::iter::once(&said)
+            .chain(&notes)
+            .fold(String::new(), |all, part| all + part),
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -12426,11 +13184,12 @@ async fn answer(
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
         Taken::AskAgain => (None, Some(crate::remember::KEEP_ASKED_AGAIN.to_owned())),
     };
-    let (mut held_save_runs, held_save_dropped) =
+    let (mut held_save_runs, held_save_dropped, face_to_ask) =
         match take_held_save(shared, request, heard, scope.as_ref(), (shared.clock)()) {
-            Some(Ok(call)) => (Some(call), None),
-            Some(Err(why)) => (None, Some(why)),
-            None => (None, None),
+            Some(SetupSave::Runs(call)) => (Some(call), None, None),
+            Some(SetupSave::Dropped(why)) => (None, Some(why), None),
+            Some(SetupSave::AskFace(name)) => (None, None, Some(name)),
+            None => (None, None, None),
         };
     // A face rename held for their yes (`LAMP_NAMES_RENAME_YES`, #5485).
     let (mut held_rename_runs, held_rename_dropped) =
@@ -12532,6 +13291,7 @@ async fn answer(
                 && unseen_yes.is_none()
                 && held_save_runs.is_none()
                 && held_save_dropped.is_none()
+                && face_to_ask.is_none()
                 && held_rename_runs.is_none()
                 && held_rename_dropped.is_none()
                 && rename_note.is_none()
@@ -12743,6 +13503,8 @@ async fn answer(
         // Their yes to the read-back runs the setup face save held for it
         // ([`HeldSave`]), before round 1, through the same runner and check
         // as a model call; the model is told it is kept.
+        // When the held setup face save ended, if it ran.
+        let mut saved_at = None;
         if let Some(call) = held_save_runs.take() {
             let by_rule = shared
                 .hold
@@ -12754,6 +13516,12 @@ async fn answer(
                 );
             } else {
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
+                // The save is the eyes' wait (1.5-3.3 s on lamp-52e6), bounded
+                // by its own timeout, before round 1 is sent: round 1's start
+                // bound runs from its end, not the line's, or it is spent
+                // (lamp-52e6, request 9: the yes to the face ended "my
+                // thoughts are slow").
+                saved_at = Some(tokio::time::Instant::now());
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
                 }
@@ -12767,12 +13535,14 @@ async fn answer(
                         .unwrap_or_default()
                         .trim()
                         .to_owned();
+                    let now = (shared.clock)();
                     if let Ok(mut saved) = shared.saved_by_hold.lock() {
-                        *saved = Some((request, name, result.clone()));
+                        *saved = Some((request, name, result.clone(), now));
                     }
+                    note_face_kept(shared, now);
                     eprintln!("lamp-voice second: request {request}: ran the held setup face save");
                     messages.push(Message::system(format!(
-                        "(For you to know: they said yes to the name you said back, so their face is kept now, with this result: {result}. Say in a few words that you will know them, and do not call remember_my_face again for it.)"
+                        "(For you to know: they said yes to keeping their face, so it is kept now, with this result: {result}. Say in a few words that you will know them, and do not call remember_my_face again for it.)"
                     )));
                 } else {
                     eprintln!(
@@ -12780,7 +13550,7 @@ async fn answer(
                     );
                     let why = result["error"].as_str().unwrap_or("the eyes kept nothing");
                     messages.push(Message::system(format!(
-                        "(For you to know: they said yes to the name you said back, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
+                        "(For you to know: they said yes, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
                     )));
                 }
             }
@@ -12790,7 +13560,15 @@ async fn answer(
         // nor makes up a reason.
         if let Some(why) = held_save_dropped {
             messages.push(Message::system(format!(
-                "(For you to know: they said yes to the name you said back, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
+                "(For you to know: they said yes, but their face could not be kept: {why}. Do not say you will know their face; you may ask them to look at you and try again.)"
+            )));
+        }
+        // Their plain yes to the name said back, with no yes to their face
+        // yet: the model asks setup's face question, and the face waits for
+        // its yes ([`SetupSave::AskFace`]).
+        if let Some(name) = face_to_ask {
+            messages.push(Message::system(format!(
+                "(For you to know: they said yes to their name, {name}, and their face is not kept yet. Ask only this now, in the language you are speaking: \"May I remember your face, so I know you next time?\" Do not call remember_my_face, and do not say you will look at or know their face, until they say yes to it.)"
             )));
         }
         // Their yes to the new name runs the face rename held for it
@@ -12905,9 +13683,10 @@ async fn answer(
             );
             messages.extend(rounds);
         }
-        // Round 1's bounds run from here, or from its one ask again after a
-        // line lost on the network (`LAMP_RESEND_LOST_LINE`).
-        let mut from = begun;
+        // Round 1's bounds run from here (or from a held setup face save's
+        // end), or from its one ask again after a line lost on the network
+        // (`LAMP_RESEND_LOST_LINE`).
+        let mut from = saved_at.unwrap_or(begun);
         let mut resent = false;
         // A `not_for_me` not taken, once (#2191).
         let mut named_asked_again = false;
@@ -13110,7 +13889,16 @@ async fn answer(
                     } else {
                         begin_within(heard, shared.written_wait)
                     };
-                    let mut next = tokio::time::timeout_at(at(first_wait), stream.next()).await;
+                    // The wait sound stays timed from the line's end (or a
+                    // resend), not from a held face save's end: the person
+                    // hears it as soon as before, and the chat still has its
+                    // whole bound after it.
+                    let first_at = if cues.is_some() && !resent {
+                        begun + first_wait
+                    } else {
+                        at(first_wait)
+                    };
+                    let mut next = tokio::time::timeout_at(first_at, stream.next()).await;
                     if next.is_err()
                         && let Some(cues) = cues
                     {
@@ -13414,9 +14202,12 @@ async fn answer(
                         // An opening that may yet offer to keep waits for
                         // its sentence's end (K2): "Want me to keep" alone
                         // would be said before its offer is known.
+                        // So does a step word in the walk (#5890): its ask
+                        // is read whole before it is said or dropped.
                         if sentences.is_empty()
                             && !queue.started
                             && !crate::remember::may_offer_a_keep(split.pending())
+                            && !crate::onboarding::may_open_a_step(split.pending())
                         {
                             sentences.extend(split.clause().or_else(|| {
                                 shared.first_words.and_then(|words| split.words(words))
@@ -13961,11 +14752,6 @@ async fn answer(
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
-            turn_called.extend(
-                calls
-                    .iter()
-                    .map(|call| (call.name.clone(), call.args.clone())),
-            );
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 let named = heard
                     && shared
@@ -14002,6 +14788,20 @@ async fn answer(
                 }
                 continue;
             }
+            // Only calls that go on to run back a claim: a round declined
+            // above and asked once more ran none, so none of it is kept
+            // (Reviewer-three's after-merge P2 on #5215: `[not_for_me,
+            // set_timer]` then "Timer set." was said with nothing set).
+            // Where this batch starts in the claim evidence, and how many of
+            // its entries were taken out since: a call's own entry is found
+            // by its place, never by its name (#5326).
+            let batch_start = turn_called.len();
+            let mut batch_dropped = 0;
+            turn_called.extend(
+                calls
+                    .iter()
+                    .map(|call| (call.name.clone(), call.args.clone())),
+            );
             // A look asked by its own call (#1712): the coordinator takes the
             // turn's full look, and the turn ends here; its picture comes in
             // the look turn after it. Only in a turn someone spoke.
@@ -14411,6 +15211,16 @@ async fn answer(
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
+                // Words whose own write their go-ahead sent, answered again
+                // (#5853): never a second write, nor one prepared again.
+                if let Some(told) = sent_already(shared, request, &call.name) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the write their go-ahead asked for was already sent",
+                        call.name
+                    );
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
                 // A face save their yes already ran ([`HeldSave`]): never a
                 // second.
                 if let Some(told) = saved_already(shared, request, call) {
@@ -14498,14 +15308,22 @@ async fn answer(
                             .filter(|scope| audio_scope_current(scope, &context))
                         {
                             Some(scope) => {
-                                runner(
+                                let (attempt, args) = send_attempt(shared, request, call);
+                                let running = runner(
                                     context.clone(),
                                     lamp_gemini::ToolCall {
                                         id: call.id.clone(),
                                         name: call.name.clone(),
-                                        args: call.args.clone(),
+                                        args,
                                     },
                                     scope.clone(),
+                                );
+                                sending(
+                                    shared,
+                                    (request, attempt),
+                                    call,
+                                    running,
+                                    |answer: &crate::tools::ToolAnswer| answer.told.clone(),
                                 )
                                 .await
                             }
@@ -14547,6 +15365,9 @@ async fn answer(
                 // is held for that yes ([`HeldSave`]); any other answer to a
                 // save drops one held.
                 if call.name == crate::known_faces::REMEMBER {
+                    if answer.told["ok"] == true {
+                        note_face_kept(shared, (shared.clock)());
+                    }
                     if heard && crate::known_faces::refused_for_the_read_back(&answer.told) {
                         hold_save(shared, request, call, scope.as_ref(), (shared.clock)());
                     } else {
@@ -14583,6 +15404,10 @@ async fn answer(
                     just_kept = None;
                     offer_hold = crate::remember::OfferHold::default();
                     forgot_this_round = true;
+                    // Nor do they count as done: a dropped `set_timer` never
+                    // backs a "Timer set." in the clean round, and their
+                    // arguments are not kept (reviewer-three on #5326).
+                    turn_called.truncate(batch_start + call_index + 1 - batch_dropped);
                     // Later calls were planned from the context just discarded.
                     // Ask again from the person's words, never run those arguments.
                     break;
@@ -14642,10 +15467,9 @@ async fn answer(
                 // A ring refused because the ledger can't ring it (#5560) was
                 // never set: not a call of its kind, so the claim check holds
                 // a "Timer set." after it (`LAMP_ACTION_CLAIM_CHECKED`).
-                if crate::reminders::is_cannot_ring(&answer.told)
-                    && let Some(at) = turn_called.iter().rposition(|(name, _)| *name == call.name)
-                {
-                    turn_called.remove(at);
+                if crate::reminders::is_cannot_ring(&answer.told) {
+                    turn_called.remove(batch_start + call_index - batch_dropped);
+                    batch_dropped += 1;
                 }
                 // A carried line's keep held for their yes (#4508): its ask
                 // is the code's own, and is said (`LAMP_KEEP_QUIETLY`).
@@ -14705,6 +15529,9 @@ async fn answer(
             // Every call answered: the round goes with the words if a line
             // cuts them now (#5026). After a memory forget, no round before
             // it goes (#4848): they hold what the forget discarded.
+            // A send answered within its turn goes with the round, never
+            // again on its own ([`sent_with_words`]).
+            drop_sent_write(shared, Some(request));
             if forgot_this_round {
                 drop_carried_rounds(shared, request);
             } else {
@@ -14728,19 +15555,40 @@ async fn answer(
             // so itself, and the turn ends with no second round. One held,
             // refused or answered anything else counts short, and the turn
             // goes on as without the switch: its round 2 says what happened.
-            if may_keep_at_once
+            // In the owner's language the line is said only from its clip
+            // rendered ahead ([`FixedClips`]); not rendered yet, round 2 is
+            // asked as without the switch.
+            // An empty clip: English, said by the voice as the turn's piece.
+            let kept_line = match shared.language {
+                None => Some(Vec::new()),
+                Some(_) => shared.fixed_clips.kept(crate::keep_at_once::KEPT),
+            };
+            let plainly = may_keep_at_once
                 && kept_told.len() == calls.len()
                 && kept_told
                     .iter()
-                    .all(|told| crate::keep_at_once::kept_plainly(told, &heard_words))
-            {
+                    .all(|told| crate::keep_at_once::kept_plainly(told, &heard_words));
+            if plainly && let Some(clip) = kept_line {
                 let line = shared.fixed(crate::keep_at_once::KEPT);
                 eprintln!(
-                    "lamp-voice second: request {request} chat round {round}: {} keep(s) kept plainly for a line that only asks to keep; \"{line}\" said at once, and no round 2 is asked (LAMP_KEEP_ANSWERS_AT_ONCE)",
-                    calls.len()
+                    "lamp-voice second: request {request} chat round {round}: {} keep(s) kept plainly for a line that only asks to keep; \"{line}\" said at once{}, and no round 2 is asked (LAMP_KEEP_ANSWERS_AT_ONCE)",
+                    calls.len(),
+                    if clip.is_empty() {
+                        ""
+                    } else {
+                        " from its clip rendered ahead"
+                    }
                 );
-                queue.push(line.to_owned()).await?;
+                if clip.is_empty() {
+                    queue.push(line.to_owned()).await?;
+                } else {
+                    queue.push_clip(line, clip).await?;
+                }
                 return Ok(());
+            } else if plainly {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: the keep's line is not rendered ahead in the owner's language yet; round 2 answers (LAMP_KEEP_ANSWERS_AT_ONCE)"
+                );
             } else if may_keep_at_once {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: a keep was not kept plainly; round 2 says what happened (LAMP_KEEP_ANSWERS_AT_ONCE)"
@@ -15144,6 +15992,7 @@ async fn answer(
     if let Ok(mut in_flight) = shared.in_flight.lock() {
         in_flight.take_if(|carried| carried.request == request);
     }
+    sent_given_over(shared, request);
     // A spoken line the turn ended without answering: what the model left
     // alone, the busy room's talk. Not one the route gave up itself, its
     // chat not begun in time: that was said to the lamp, and held as the
@@ -15251,6 +16100,9 @@ struct Queue<'a> {
     /// The reply's tags (`LAMP_SECOND_SPEECH_TAGS`); `None`, pieces as
     /// written.
     tags: Option<speech_tags::Tags>,
+    /// The turn's line and notes: while the walk is under way, the step
+    /// words they do not say are not said ([`crate::onboarding::model_words`]).
+    line: String,
 }
 impl Drop for Queue<'_> {
     /// The reply's tags in the journal, counts only, once it said something.
@@ -15275,6 +16127,8 @@ impl Queue<'_> {
     }
 
     async fn push(&mut self, text: String) -> Result<(), Stop> {
+        let text =
+            crate::onboarding::model_words(text, &self.line, crate::onboarding::under_way_now());
         // With tags (`LAMP_SECOND_SPEECH_TAGS`), the voice is given `spoken`
         // and everything else the lamp's words, which carry none.
         let (spoken, text) = match &mut self.tags {
@@ -15323,6 +16177,37 @@ impl Queue<'_> {
         };
         let packets = start_speech(self.shared, self.speech, spoken, turn);
         self.send(text, packets).await
+    }
+
+    /// A fixed line (`line`) said from its clip rendered ahead, as the
+    /// answer's piece: the same as [`Self::push`], but the voice not asked.
+    async fn push_clip(&mut self, line: &str, clip: Vec<i16>) -> Result<(), Stop> {
+        self.announce().await?;
+        if !self.started {
+            eprintln!(
+                "lamp-voice second: request {} first piece to the voice {} ms after the words were heard, {} words, its clip rendered ahead",
+                self.request,
+                self.heard_at.elapsed().as_millis(),
+                line.split_whitespace().count()
+            );
+        }
+        self.started = true;
+        if let Ok(mut said) = self.shared.lamp_said.lock() {
+            if said.0 != self.request {
+                *said = (self.request, String::new());
+            }
+            said.1.push(' ');
+            said.1.push_str(line);
+        }
+        let (packets, queued) = mpsc::channel(SENTENCE_PACKETS);
+        self.speech.spawn(async move {
+            for part in clip.chunks(PACKET_SAMPLES) {
+                if packets.send(Ok(part.to_vec())).await.is_err() {
+                    break;
+                }
+            }
+        });
+        self.send(line.to_owned(), queued).await
     }
 
     async fn send(&mut self, text: String, packets: Packets) -> Result<(), Stop> {

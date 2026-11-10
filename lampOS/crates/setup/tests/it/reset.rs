@@ -312,6 +312,8 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
 /// #5358, Twelve's P2 on #5365: a reset that ends in a reboot wipes the kept
 /// journal and leaves the keep its mark with this boot's id, so the reboot's
 /// shutdown keeps nothing of the old owner's boot (`lamp-journal-keep`).
+/// Linux provides the boot id through procfs; the Mac has no such source.
+#[cfg(target_os = "linux")]
 #[test]
 fn a_reset_marks_this_boot_so_its_shutdown_keeps_no_journal() {
     let root = Root::new();
@@ -2386,6 +2388,29 @@ fn a_reset_in_place_stops_lamp_peek_and_leaves_it_off_for_setup() {
     assert!(
         start.iter().any(|unit| unit == "lamp-setup.service"),
         "{start:?}"
+    );
+}
+
+/// Relative selection used the current directory while no-follow deletion
+/// began at `/` (#4839's P3). Refuse before even looking for a package mark,
+/// including a nonexistent relative folder that used to return success.
+#[test]
+fn installed_skill_removal_refuses_relative_folders_before_reading_them() {
+    for folder in [
+        "",
+        ".",
+        "skills",
+        "../skills",
+        "no-such-relative-skills-folder",
+    ] {
+        let error = reset::remove_installed_skills(Path::new(folder)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{folder:?}");
+    }
+    let root = Root::new();
+    assert!(
+        reset::remove_installed_skills(&root.path("missing-skills"))
+            .unwrap()
+            .is_empty()
     );
 }
 

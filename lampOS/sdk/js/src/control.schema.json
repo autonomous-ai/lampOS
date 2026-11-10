@@ -22,7 +22,7 @@
       "maximum": 9007199254740991
     },
     "time": {
-      "description": "The lamp's local time with its offset (RFC 3339).",
+      "description": "A time in UTC, RFC 3339 with `Z` (`2026-10-27T08:40:01Z`), as lamp-control writes it; a client turns it into local time itself.",
       "type": "string",
       "format": "date-time"
     },
@@ -64,6 +64,7 @@
         "button",
         "time",
         "lamp.changed",
+        "body.state",
         "air.changed",
         "volume.changed"
       ]
@@ -1905,7 +1906,7 @@
         },
         "at": {
           "$ref": "#/$defs/time",
-          "description": "The lamp's local time, on the events about the room. welcome, lease and done may not carry it."
+          "description": "When it happened, in UTC (`…Z`), on the events about the room. welcome, lease and done may not carry it."
         }
       },
       "required": [
@@ -2068,6 +2069,25 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "name.heard"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "How sure the lamp's listener was that it heard its name, to a hundredth. A sound like the name can reach the lamp's own bar, so a program that acts on its own may want a higher one."
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "touch"
               }
             }
@@ -2196,6 +2216,64 @@
             },
             "required": [
               "lamp_state"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "body.state"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "joints": {
+                "type": "object",
+                "description": "Each joint the body read, named as the joints op names them.",
+                "properties": {
+                  "pitch": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "roll": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "yaw": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "shoulder": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "elbow": {
+                    "$ref": "#/$defs/body_joint"
+                  }
+                }
+              },
+              "lamp": {
+                "type": "object",
+                "description": "The lamp's own state beside the joints: the light it shows now, whether it talks, whether it is private.",
+                "properties": {
+                  "light": {
+                    "type": "object"
+                  },
+                  "talking": {
+                    "type": "boolean"
+                  },
+                  "private": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "light",
+                  "talking",
+                  "private"
+                ]
+              }
+            },
+            "required": [
+              "joints",
+              "lamp"
             ]
           }
         },
@@ -2778,6 +2856,57 @@
         "on"
       ],
       "additionalProperties": false
+    },
+    "body_joint": {
+      "description": "One joint in a body.state: where it is, from the body's own read.",
+      "type": "object",
+      "properties": {
+        "deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -360,
+          "maximum": 360,
+          "description": "Where it is, in degrees from its home, to a tenth, as get('body') counts them: from the found home for the head and base and the folded pose for the arm; yaw, shoulder, elbow and roll positive with more counts, pitch positive looking up. null until the body has said its limits."
+        },
+        "counts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4095,
+          "description": "Where it is, in the servo's own encoder counts: 4,096 a turn, 2,048 its middle."
+        },
+        "goal_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -360,
+          "maximum": 360,
+          "description": "Where it was last asked to be, in the same degrees as deg."
+        },
+        "load": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "How hard it works: the share of its servo's full strength, without a direction."
+        },
+        "moving": {
+          "type": "boolean",
+          "description": "Turning at 5 degrees a second or more."
+        },
+        "temp_c": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Its servo's temperature, from the body's once-a-second report; absent until the first."
+        }
+      },
+      "required": [
+        "deg",
+        "counts",
+        "moving"
+      ]
     }
   }
 }

@@ -865,4 +865,90 @@ mod tests {
             "# Swept by hand: yaw 855-3283, shoulder 2056-3989, elbow 3900-300 (across the seam), roll a full turn, pitch not read."
         );
     }
+
+    /// #5759: writes the shapes of `lamp.env` this build's own writers give,
+    /// and the first stand's record, into `LAMP_BODY_STORE_FIXTURES` (a
+    /// folder), as `tests/fixtures/stores/` keeps them. Run by hand when a
+    /// shape changes; every later build's readers are tested on what it
+    /// wrote (that folder's README).
+    #[test]
+    #[ignore = "writes the store fixtures; run by hand with LAMP_BODY_STORE_FIXTURES"]
+    fn write_the_store_fixtures() {
+        use crate::first_stand::{Outcome, Record, confirmed_lamp_env};
+        let folder = std::path::PathBuf::from(
+            std::env::var_os("LAMP_BODY_STORE_FIXTURES").expect("LAMP_BODY_STORE_FIXTURES"),
+        );
+        let day = "2026-11-09";
+        let read = rest_read(&inspection(LAMP_06C1, None)).unwrap();
+        let standing = lamp_env("lamp-06c1", &read, "2026-11-09T02:00Z").unwrap();
+        let seated = seated_lamp_env("lamp-06c1", &read, "2026-11-09T02:00Z").unwrap();
+        // The first stand's own write over a fresh rest read, then a sweep's line appended.
+        let mut stood = confirmed_lamp_env(&standing, 2633, 2603).unwrap();
+        stood.push_str(&swept_line(&[
+            Some(Swept::Arc {
+                start: 855,
+                end: 3283,
+                span: 2428,
+            }),
+            Some(Swept::Arc {
+                start: 2056,
+                end: 3989,
+                span: 1933,
+            }),
+            Some(Swept::Arc {
+                start: 3900,
+                end: 300,
+                span: 496,
+            }),
+            Some(Swept::Arc {
+                start: 1223,
+                end: 3237,
+                span: 2014,
+            }),
+            Some(Swept::Arc {
+                start: 1470,
+                end: 3103,
+                span: 1633,
+            }),
+        ]));
+        stood.push('\n');
+        for (name, text) in [
+            (format!("lamp-env-standing-{day}"), standing),
+            (format!("measured-env-seated-{day}"), seated),
+            (format!("lamp-env-stood-swept-{day}"), stood),
+        ] {
+            std::fs::write(folder.join(name), text).unwrap();
+        }
+        let records = [
+            (
+                "stood",
+                Record {
+                    asks: 1,
+                    outcome: Some(Outcome::Stood),
+                    at_unix_ms: Some(1_794_189_600_000),
+                    asked_at_unix_ms: Some(1_794_189_590_000),
+                    shoulder: Some(2633),
+                    elbow: Some(2603),
+                    why: None,
+                },
+            ),
+            (
+                "no-answer",
+                Record {
+                    asks: 2,
+                    outcome: Some(Outcome::NoAnswer),
+                    at_unix_ms: Some(1_794_189_600_000),
+                    asked_at_unix_ms: Some(1_794_189_590_000),
+                    shoulder: None,
+                    elbow: None,
+                    why: None,
+                },
+            ),
+        ];
+        for (name, record) in records {
+            record
+                .write(&folder.join(format!("first-stand-{name}-{day}.json")))
+                .unwrap();
+        }
+    }
 }

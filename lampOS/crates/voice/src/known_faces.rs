@@ -618,6 +618,162 @@ pub(crate) fn held_save_verdict(name: &str, said: &Said) -> HeldSaveVerdict {
     }
 }
 
+/// The name the lamp's last answer said back, when the turn in hand is a
+/// plain yes to it and no save was called for it (#5684, the Walter trace:
+/// "Name is Walter.", "Walter, did I get that right?", "Yes. That's my
+/// name.", and no call at all, so the face wait ended "who you are" with
+/// the name only). The name is the one the person's line before gave
+/// (`remember::named::name_in`), judged as a held save's is
+/// ([`held_save_verdict`]) on that last exchange only: an older read-back
+/// already had its answer. `None` for a correction, a question, the face
+/// question with the name folded in, or any other answer. Such a yes is to
+/// the name only: it asks the face question next, and keeps no face by
+/// itself ([`face_agreed`]).
+pub(crate) fn read_back_name(said: &Said) -> Option<String> {
+    let (person, _) = said.before.last()?;
+    let name = crate::remember::named::name_in(person)?;
+    let name = name.trim();
+    (!name.is_empty() && yes_to_the_read_back(name, said)).then(|| name.to_owned())
+}
+
+/// Whether the turn in hand is a plain yes to `name` said back in the
+/// lamp's last answer, that exchange alone ([`read_back_name`]).
+pub(crate) fn yes_to_the_read_back(name: &str, said: &Said) -> bool {
+    let Some(last) = said.before.last() else {
+        return false;
+    };
+    let joined = letters_as_word(name);
+    let name = joined.as_deref().unwrap_or(name);
+    let last = Said {
+        this: said.this.clone(),
+        before: vec![last.clone()],
+    };
+    said_back_and_agreed(name, &last)
+}
+
+/// What asks leave to remember, just before "remember": "May I …", "Do
+/// you want me to …".
+const ASKS_LEAVE: &[&[&str]] = &[
+    &["may", "i"],
+    &["can", "i"],
+    &["could", "i"],
+    &["shall", "i"],
+    &["should", "i"],
+    &["do", "you", "want", "me", "to"],
+    &["would", "you", "like", "me", "to"],
+    &["is", "it", "okay", "if", "i"],
+    &["is", "it", "ok", "if", "i"],
+];
+
+/// Words that turn a face question round, or make it a choice, so a yes
+/// to it keeps nothing: "Would you rather I didn't remember your face?",
+/// "Shall I not …?", "Should I remember your name or your face?", "…
+/// without your face?" (Fourteen's HOLDs on #5720).
+const TURNS_IT_ROUND: &[&str] = &[
+    "not", "never", "forget", "rather", "unless", "instead", "or", "without", "skip", "no",
+];
+
+/// The same in Vietnamese anywhere in the line ("Đừng nhớ …", "quên",
+/// "hay"/"hoặc" for a choice).
+const TURNS_IT_ROUND_VI: &[&str] = &[
+    "\u{111}\u{1eeb}ng",
+    "qu\u{ea}n",
+    "ch\u{1eb3}ng",
+    "hay",
+    "ho\u{1eb7}c",
+];
+
+/// Whether the lamp's line is setup's face question ("May I remember your
+/// face, so I know you next time?"), with or without the name in it: it
+/// asks leave to remember their face, the face right after "remember"
+/// ("your face", "the face"), and nothing in it turns that round
+/// (Fourteen's HOLDs on #5720: a yes to "Would you rather I didn't
+/// remember your face?" or "May I remember just your name, without your
+/// face?" kept the face). In Vietnamese ("Mình nhớ khuôn mặt bạn được
+/// không?") it is the "nhớ" right before "khuôn mặt", and the "không"
+/// that asks is after it; a "không" or "chưa" before it ("Mình nhớ tên
+/// thôi, không nhớ khuôn mặt nhé?") turns it round.
+fn asks_for_the_face(lamp: &str) -> bool {
+    let words = lower_words(lamp);
+    if !lamp.contains('?') {
+        return false;
+    }
+    if let Some(at) = words
+        .windows(3)
+        .position(|three| three == ["nh\u{1edb}", "khu\u{f4}n", "m\u{1eb7}t"])
+    {
+        return !words
+            .iter()
+            .any(|word| TURNS_IT_ROUND_VI.contains(&word.as_str()))
+            && !words[..at]
+                .iter()
+                .any(|word| ["kh\u{f4}ng", "ch\u{1b0}a"].contains(&word.as_str()));
+    }
+    let turned = words
+        .iter()
+        .any(|word| TURNS_IT_ROUND.contains(&word.as_str()) || word.ends_with("n't"));
+    !turned
+        && words.iter().enumerate().any(|(at, word)| {
+            word == "remember"
+                && matches!(
+                    words.get(at + 1..at + 3),
+                    Some([whose, face]) if (whose == "your" || whose == "the") && face == "face"
+                )
+                && ASKS_LEAVE
+                    .iter()
+                    .any(|leave| at >= leave.len() && words[at - leave.len()..at] == leave[..])
+        })
+}
+
+/// Whether the turn's own words ask for their face to be kept: "Yes.
+/// That's right. Please remember my face."
+fn asks_to_keep_the_face(turn: &str) -> bool {
+    let words = lower_words(turn);
+    words.iter().any(|word| word == "face")
+        && words
+            .iter()
+            .any(|word| ["remember", "keep", "save"].contains(&word.as_str()))
+}
+
+/// Whether the turn in hand agrees to their face kept under `name`, which
+/// a setup face save the voice runs with no model call needs (the first
+/// builder's HOLD on #5700: setup's skill asks "May I remember your face,
+/// so I know you next time?" only after a clear yes to the name, and keeps
+/// the face only after a clear yes to that). Either a plain yes to the face
+/// question in the lamp's last answer, with the name said back and agreed
+/// to before it, or a plain yes to the name said back whose own words ask
+/// for the face ("Yes. That's right. Please remember my face."). A yes to
+/// the name alone is no yes to the face.
+pub(crate) fn face_agreed(name: &str, said: &Said) -> bool {
+    let joined = letters_as_word(name);
+    let name = joined.as_deref().unwrap_or(name);
+    if yes_to_the_read_back(name, said) {
+        return asks_to_keep_the_face(&said.this);
+    }
+    let Some(((asked_after, lamp), earlier)) = said.before.split_last() else {
+        return false;
+    };
+    let agreed = Said {
+        this: asked_after.clone(),
+        before: earlier.to_vec(),
+    };
+    asks_for_the_face(lamp)
+        && said_back_and_agreed(name, &agreed)
+        && plain_yes_beside(name, &said.this, BESIDE_THE_SAVE)
+}
+
+/// The name a setup face save runs under with no save called
+/// ([`face_agreed`]): the latest name the person gave
+/// (`remember::named::name_in`) that the turn in hand agrees to keeping
+/// their face under.
+pub(crate) fn face_agreed_name(said: &Said) -> Option<String> {
+    said.before.iter().rev().find_map(|(person, _)| {
+        let name = crate::remember::named::name_in(person)?;
+        let name = name.trim();
+        (!name.is_empty() && face_agreed(name, said)).then(|| name.to_owned())
+    })
+}
+
 /// Whether a tool answer is one the name checks gave here, before the eyes
 /// were asked (`run_switched`): no name, a name not heard, the lamp's own
 /// name, no read-back's yes, or no yes to a new name. The voice's log says
@@ -6782,6 +6938,130 @@ mod tests {
             "That was a spellbinding story.",
         ] {
             assert!(!asks_to_spell(answer), "{answer}");
+        }
+    }
+
+    /// The first builder's HOLD on #5700: a setup face save run with no
+    /// model call needs a yes to the face, never the name's yes alone.
+    #[test]
+    fn a_face_is_agreed_only_by_a_yes_to_the_face() {
+        const READ_BACK: &str = "Walter, did I get that right?";
+        const FACE: &str = "May I remember your face, so I know you next time?";
+        let window = |exchanges: &[(&str, &str)], this: &str| Said {
+            this: this.into(),
+            before: exchanges
+                .iter()
+                .map(|(person, lamp)| ((*person).into(), (*lamp).into()))
+                .collect(),
+        };
+        // The name's yes alone is no yes to the face.
+        let said = window(&[("Name is Walter.", READ_BACK)], "Yes. That's my name.");
+        assert_eq!(read_back_name(&said).as_deref(), Some("Walter"));
+        assert!(!face_agreed("Walter", &said));
+        assert_eq!(face_agreed_name(&said), None);
+        // A yes to the name that asks for the face itself is.
+        let said = window(
+            &[("Name is Walter.", READ_BACK)],
+            "Yes. Please remember my face.",
+        );
+        assert_eq!(face_agreed_name(&said).as_deref(), Some("Walter"));
+        // So is a plain yes to the face question after the name's yes, with
+        // the name in it or not, in English or Vietnamese.
+        for face in [
+            FACE,
+            "Walter, may I remember your face?",
+            "M\u{ec}nh nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n \u{111}\u{1b0}\u{1ee3}c kh\u{f4}ng?",
+        ] {
+            let said = window(
+                &[
+                    ("Name is Walter.", READ_BACK),
+                    ("Yes. That's my name.", face),
+                ],
+                "Yes.",
+            );
+            assert_eq!(face_agreed_name(&said).as_deref(), Some("Walter"), "{face}");
+        }
+        // A no, a hedge or a question to it; the face question with no yes
+        // to the name before it, or after a correction; a line that only
+        // says it will look.
+        let asked = [
+            ("Name is Walter.", READ_BACK),
+            ("Yes. That's my name.", FACE),
+        ];
+        for (exchanges, this) in [
+            (&asked[..], "No."),
+            (&asked[..], "Not now."),
+            (&asked[..], "What for?"),
+            (
+                &[(
+                    "Name is Walter.",
+                    "Nice to meet you, Walter! May I remember your face?",
+                )][..],
+                "Yes.",
+            ),
+            (
+                &[("Name is Walter.", READ_BACK), ("No, it's Walt.", FACE)][..],
+                "Yes.",
+            ),
+            (
+                &[
+                    ("Name is Walter.", READ_BACK),
+                    (
+                        "Yes. That's my name.",
+                        "Now I'll take a quick look so I know your face.",
+                    ),
+                ][..],
+                "Okay.",
+            ),
+        ] {
+            assert_eq!(face_agreed_name(&window(exchanges, this)), None, "{this}");
+        }
+    }
+
+    /// Fourteen's HOLD on #5720: a yes to a line that asks NOT to keep the
+    /// face is no yes to the face, nor is a yes to a line that asks no leave.
+    #[test]
+    fn a_yes_to_a_face_question_turned_round_keeps_nothing() {
+        for face in [
+            "Would you rather I didn't remember your face?",
+            "I won't remember your face unless you want me to. Is that okay?",
+            "Shall I not remember your face?",
+            "Do you want me to forget your face, rather than remember it?",
+            "I can't remember your face yet. Should I just call you Walter?",
+            "May I remember your face, or would you rather I didn't?",
+            "M\u{ec}nh kh\u{f4}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n nh\u{e9}?",
+            "\u{110}\u{1eeb}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t m\u{ec}nh nh\u{e9}?",
+            // Fourteen's second HOLD: "remember" with something else
+            // than the face, or a choice.
+            "May I remember just your name, without your face?",
+            "May I remember your name, but skip your face?",
+            "Can I remember your voice only, no face?",
+            "Should I remember your name or your face?",
+            "Should I remember your face or your name?",
+            "M\u{ec}nh nh\u{1edb} t\u{ea}n th\u{f4}i, kh\u{f4}ng nh\u{1edb} khu\u{f4}n m\u{1eb7}t nh\u{e9}?",
+            "M\u{ec}nh nh\u{1edb} khu\u{f4}n m\u{1eb7}t hay t\u{ea}n b\u{1ea1}n?",
+        ] {
+            let said = Said {
+                this: "Yes.".into(),
+                before: vec![
+                    (
+                        "Name is Walter.".into(),
+                        "Walter, did I get that right?".into(),
+                    ),
+                    ("Yes. That's my name.".into(), face.into()),
+                ],
+            };
+            assert_eq!(face_agreed_name(&said), None, "{face}");
+        }
+        for face in [
+            "One more thing: may I remember your face now, so I can remember things for you?",
+            "Do you want me to remember your face?",
+            "M\u{ec}nh c\u{f3} th\u{1ec3} nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n kh\u{f4}ng?",
+            "M\u{ec}nh nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n \u{111}\u{1b0}\u{1ee3}c kh\u{f4}ng, \u{111}\u{1ec3} l\u{1ea7}n sau nh\u{1ead}n ra b\u{1ea1}n?",
+            "May I remember your face, so I know you next time?",
+            "Nice to meet you, Henry! May I remember your face?",
+        ] {
+            assert!(asks_for_the_face(face), "{face}");
         }
     }
 }

@@ -28,9 +28,11 @@ from typing import Any, Literal
 
 from lampos import Lamp, LampError, schema
 from lampos.client import SAY_MAX_BYTES
+from lampos.moves import POSES_STEP_MS, poses_to_frames
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import AnyUrl
+from .relink import Relink
 
 # The body's clips an agent is offered: the schema's `examples`, which leave
 # out `idle`, the lamp's own life, and `scanning`, a room sweep (CLAUDE.md
@@ -40,7 +42,7 @@ from pydantic import AnyUrl
 # left to lapse if `done` doesn't come (Nine, #3504 13:27).
 ACTION_LEASE_MS = 10_000
 # The body actions lamp-control ends with a `done` after its `{"to": "body"}`.
-DONE_FOLLOWS = {"look"}
+DONE_FOLLOWS = {"look", "joints"}
 # The longest `lamp_follow_hand` follows, in one call.
 MOST_FOLLOW_S = 60
 # Said in place of a starting `lamp_follow_hand` when a stop comes meanwhile.
@@ -226,6 +228,22 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     # Nine's nine/mcp-follow).
     follow_now: list = []
 
+    async def ended_on(ended: asyncio.Future, gone: asyncio.Future | None, timeout: float):
+        """`ended`'s result, or `asyncio.TimeoutError` after `timeout`. With
+        `gone` (the connection the request was sent on, `Relink.gone`), a
+        connection that ends first ends the wait `closed`: its `done` can't
+        come on another connection (Second's P2 on #5830)."""
+        if gone is None:
+            return await asyncio.wait_for(asyncio.shield(ended), timeout)
+        waiting = asyncio.ensure_future(asyncio.shield(ended))
+        done, _ = await asyncio.wait({waiting, gone}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+        if waiting in done:
+            return waiting.result()
+        waiting.cancel()
+        if gone in done:
+            raise ToolError("closed: the connection to the lamp closed before this ended; lamp-mcp connects again by itself")
+        raise asyncio.TimeoutError
+
     def held() -> list[str]:
         now = clock()
         for lease in [lease for lease, lapses in leases.items() if lapses <= now]:
@@ -309,6 +327,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             nonlocal asked
             asked = id_
 
+        gone = getattr(lamp, "gone", None)
         lamp.on("lease", follow)
         lamp.on("done", follow)
         try:
@@ -326,7 +345,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 # follow, once the head is there (docs/control.md, "Looking").
                 return f"{op} taken by the {sent['to']}; its lease lapses within {ACTION_LEASE_MS // 1000} s"
             try:
-                what, how, why_ended = await asyncio.wait_for(asyncio.shield(ended), ACTION_LEASE_MS / 1000)
+                what, how, why_ended = await ended_on(ended, gone, ACTION_LEASE_MS / 1000)
             except asyncio.TimeoutError:
                 # No `done` yet (the server sends it once actions reach the
                 # parts): the lease lapses by itself; it is never held open.
@@ -464,7 +483,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         ) -> str:
             """Turn the head: at the face in view, toward who said its name, ahead, or to `yaw`/`pitch`
             in degrees (right and up positive), within its reach. On a lamp today only `ahead` and
-            `yaw`/`pitch` are carried out, with lamp-control's `--lease-socket`."""
+            `yaw`/`pitch` are carried out, with lamp-control's `--lease-socket`; `face` and `name`
+            are refused, "not in this release: look at a face or a name"."""
             if at is None:
                 target: Any = {"yaw": yaw or 0.0, "pitch": pitch or 0.0}
             else:
@@ -478,6 +498,20 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             """A move of your own: `frames` of 5 joint offsets in counts (pitch, roll, yaw, shoulder,
             elbow), the first and last all 0, one every `step_ms` (40 to 1000), lasting 1.5 to 10 s. The body checks it."""
             return await with_body_lease("move", step_ms=step_ms, frames=frames)
+
+        @server.tool()
+        async def lamp_move_poses(poses: list[dict[str, float]], hold_ms: int = 400) -> str:
+            """A move through a few poses, in degrees from the standing pose, eased there and
+            back: each pose names the joints it turns, `pitch` (up positive), `roll`, `yaw`
+            (right positive), `shoulder` and `elbow` (up positive), e.g. [{"pitch": 10},
+            {"yaw": -8}]; a joint left out stays put. Each pose is held `hold_ms` (0 to 10000).
+            At most pitch and roll 17.6°, yaw 13.2°, shoulder and elbow 30.8°, and 10 s in all;
+            the body still holds each joint to its own bounds."""
+            try:
+                frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)
+            except LampError as error:
+                raise ToolError(f"bad_request: {error.why}") from error
+            return await with_body_lease("move", step_ms=POSES_STEP_MS, frames=frames)
 
         @server.tool()
         async def lamp_play(name: str) -> str:
@@ -496,7 +530,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         ) -> str:
             """Aim the joints you name, in degrees (−180 to 180), reached within `within_ms`
             (0 or more; the body's caps pace each step): head `pitch` and `roll`, base `yaw`, `shoulder`
-            and `elbow`. At least one.
+            and `elbow`. At least one. `roll`, `shoulder` and `elbow` are taken only while the lamp
+            stands; otherwise the tool says the body dropped them, and why.
             The body bounds each step as it does every move. A lamp that doesn't route `joints` yet
             says so, as the tool's error."""
             targets = {
@@ -547,15 +582,49 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     if allowed("speak"):
 
         @server.tool()
-        async def lamp_say(text: str, rephrase: bool = False) -> str:
+        async def lamp_say(text: str, rephrase: bool = False, wait: bool = False) -> str:
             """Say a line in the lamp's own voice, at most 900 bytes of UTF-8 (the voice's own cap;
             about 900 Latin letters, fewer in other scripts), exactly as written, once the person isn't
             talking; `rephrase` lets the lamp say it in its own words instead, which also waits until the
             lamp isn't talking with someone, as before. It isn't said while the lamp is private, or in
-            quiet hours where this lamp has them set."""
+            quiet hours where this lamp has them set. Returns once the lamp has taken it; with `wait`,
+            once it has been said ("said") or not ("dropped: why"), 120 s at most."""
             words("text", text)
-            await act("say", text=text, rephrase=True if rephrase else None)
-            return "said"
+            limits.take("say")
+            ended: asyncio.Future = asyncio.get_running_loop().create_future()
+            asked: int | None = None
+
+            def note(id_: int) -> None:
+                nonlocal asked
+                asked = id_
+
+            def heard(event: dict) -> None:
+                if event.get("re") == asked and not ended.done():
+                    ended.set_result(event)
+
+            # The connection it's sent on: a wait ends `closed` when that one
+            # ends, never on another connection's done (#5830's relink).
+            gone = getattr(lamp, "gone", None)
+            lamp.on("done", heard)
+            try:
+                fields = {"text": text, **({"rephrase": True} if rephrase else {})}
+                try:
+                    await lamp.request("say", on_id=note, **fields)
+                except LampError as error:
+                    raise refused(error) from error
+                # Taken is not said: the voice says it once the person isn't
+                # talking, or drops it (private, quiet hours, a stop).
+                if not wait:
+                    return "taken: the lamp says it once the person isn't talking"
+                try:
+                    done = await ended_on(ended, gone, MOST_WAIT_S)
+                except asyncio.TimeoutError:
+                    return f"taken; not said within {MOST_WAIT_S} s"
+                if done.get("how") == "finished":
+                    return "said"
+                return f"{done.get('how')}" + (f": {done['why']}" if done.get("why") else "")
+            finally:
+                lamp.off("done", heard)
 
         @server.tool()
         async def lamp_sound(name: str) -> str:
@@ -677,6 +746,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if event.get("re") == asked and not ended.done():
                     ended.set_result(event)
 
+            gone = getattr(lamp, "gone", None)
             lamp.on("done", heard)
             try:
                 try:
@@ -686,7 +756,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not wait:
                     return "turn started: the lamp answers the person's next line"
                 try:
-                    done = await asyncio.wait_for(asyncio.shield(ended), MOST_WAIT_S)
+                    done = await ended_on(ended, gone, MOST_WAIT_S)
                 except asyncio.TimeoutError:
                     return "turn started; not ended yet"
                 return f"turn {done.get('how')}" + (f": {done['why']}" if done.get("why") else "")
@@ -863,9 +933,12 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         for event in streamed:
             try:
                 await lamp.on(event, heard_any)
-            except LampError:
-                # An event the lamp doesn't say yet is left out, not fatal.
-                lamp.off(event, heard_any)
+            except LampError as error:
+                # The lamp away (`closed`, a restart): kept, so it is made
+                # again on the next connection (Second's P2 on #5830). An
+                # event the lamp doesn't say yet is left out, not fatal.
+                if error.code != "closed":
+                    lamp.off(event, heard_any)
 
     @server.resource("lamp://events", mime_type="application/json")
     async def events_stream() -> dict:
@@ -916,8 +989,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
 
 async def serve(lamp_id: str | None, client: str | None) -> None:
-    async with await Lamp.connect(lamp_id) as lamp:
-        await build(lamp, client=client).run_stdio_async()
+    # Connected again by itself after the lamp restarts (every update), so an
+    # agent's tools keep working for as long as lamp-mcp runs (`relink.py`).
+    lamp = await Relink.connect(lamp_id)
+    try:
+        await build(lamp, client=client).run_stdio_async()  # type: ignore[arg-type]
+    finally:
+        await lamp.close()
 
 
 def main(argv: list[str] | None = None) -> None:

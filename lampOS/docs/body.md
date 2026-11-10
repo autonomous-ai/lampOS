@@ -1143,6 +1143,16 @@ it a call changes nothing the body writes (test
   seen before or during it ends it, and the gaze has them. It takes the place
   of a shift at rest, never of another gesture.
 - It never searches: one glance, then it lets it go.
+- With `LAMP_NAME_WORDLESS_BAR=on` in its environment (#5385), only a
+  hearing at 0.99 or more is a call (`name_in::bar_from`). The body cannot
+  know whether words follow a hearing (the voice knows about 1.7 s later),
+  and on lamp-75c9 a hearing at 0.941 in the body's own move's sound, with
+  no words, turned and glanced. A real call under 0.99 still gets the
+  voice's own listening, which lifts the head from early in the line
+  (0.45 s into it on lamp-52e6, before the name is heard), so the first
+  thing seen is not later; only the glance with nobody in view, and the
+  two seconds a call adds while the voice rests, are left out. Off, as
+  before. Test: `with_the_wordless_bar_only_a_sure_hearing_is_a_call`.
 
 On lamp-52e6 on 2026-10-14, with calls published by hand and nobody in view
 ([verification](verification/look-at-name-lamp-52e6-20261014/)): standing,
@@ -1282,8 +1292,7 @@ mood socket, and says it again at least once every 1.5 s
   and followed at `--speed` through the same window and rules as every pose.
   Held while `reading` with it is said; a `reading` without it, or the pose
   let go, takes it away at the same speed. Nothing without `--gaze`, which
-  alone says how far a place in the picture is (so Skills refuses such a
-  call aloud when nothing listens on the gaze socket, skills.md), and nothing in any other
+  alone says how far a place in the picture is, and nothing in any other
   mood or paused. A `toward` past -1 to 1 turns nothing. The place is the
   model's, from the voice's look at the desk (Point the light,
   `skills/point-light`): the eyes find faces only. A body before this
@@ -1972,10 +1981,11 @@ answered `refused` with why and closed. Lines of JSON each way
 
 | Asked | Answered |
 |-------|----------|
-| `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held"}`, or `suspended` or `lost` as below |
+| `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held","tags":true}`, or `suspended` (also with `"tags":true`) or `lost` as below. `tags`: this body takes a `tag` on look and pose lines |
 | `{"let_go":true}` | `{"lease":"free"}` |
 | `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive, from the pose's own direction, as the gaze's look), `{"look":{"yaw":Y,"pitch":P,"from":"home"}}` (from where the head and base were found at start, as a computer's `joints` and `get` `body`: the body takes its pose's offset off, `body::aim_from_home`, and says `there` in the same frame), or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
 | `{"pose":{"roll":R,"shoulder":S,"elbow":E}}` (degrees, one at least; as `get('body')` counts them), while held | once, later: `{"pose":"there","roll":…,"shoulder":…,"elbow":…,"clamped":…}`, or `{"pose":"cut_short","why":…}`; at once while not held, while the body takes no pose, or for another pose: `{"pose":"refused","why":…}` |
+| A look or pose line with `"tag":N` (N an unsigned 64-bit integer, lamp-control's; any other `tag`, such as a string, a negative or a fraction, refuses the line, and that refusal carries no tag) | every answer to that line carries the same `"tag":N`: its `there`, `cut_short` or `refused`, and the `cut_short` of a line a newer one replaced carries the replaced line's own `tag`. A line refused at once can overtake one still owed, so a holder pairs answers by `tag`, not by order. A line without `tag` is answered as before, with none |
 | `{"limp":true}` or `{"limp":false}`, while held | at once: `{"limp":"on"}` or `{"limp":"off"}`; `{"limp":"refused","why":…}` while not held; and unasked, once, `{"limp":"off","why":…}` when the hold ends |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
 
@@ -1987,9 +1997,15 @@ cut to `--reach`'s yaw (or `--gaze-reach`'s, if larger) and to `--reach`'s up
 and down, and said `clamped` when cut. The body eases the head there as the
 gaze's own look, in the gaze's place, and keeps it there while held: nothing
 of the head rests, relaxes or sleeps meanwhile, and every pose's bounds still
-hold. It is `there` once the head and base are within 6 counts (`THERE_WITHIN`)
-of goals that have not moved for 10 steps (`THERE_STEPS`, 0.2 s). A look not
-there in 5 s (`LONGEST_LOOK`, something holds the head), another look, a
+hold. It is judged against where the pose wants each joint (`Glimpse::wanted`),
+not the eased goal or one a rest wrote where a joint stopped: `there` once the
+head and base are within 6 counts (`THERE_WITHIN`) and have not moved for 10
+steps (`THERE_STEPS`, 0.2 s); `there` too, from where they stopped and
+`clamped` past half a degree, once stopped within `REST_SLACK` (24 counts) and
+still for 50 steps (`REST_STOPPED_STEPS`, 1 s), as a resting head stops short
+against its weight (lamp-75c9 on 7 Nov: 17 counts at load 80, cut short after
+5 s before this). A look not there in 5 s (`LONGEST_LOOK`; said with how many
+counts short when past the slack), another look, a
 conversation or the lease's end cuts it short. A conversation keeps the aim for
 when the lease is held again; any other end drops it, and the head goes back
 to the pose's own direction. The head is woken to move only when the look
@@ -2002,8 +2018,8 @@ Tests: `a_held_lamp_looks_where_its_holder_asks_and_comes_back_when_let_go`,
 `the_lease_door_aims_its_holders_look_and_says_when_it_is_there`.
 
 **A holder's pose** (`lease::Posing`, the protocol's `joints` past yaw and
-pitch; no lamp-control code sends it yet, so `joints` still refuses roll,
-shoulder and elbow until that routing lands): the head's roll from the found home and the shoulder and the elbow
+pitch; lamp-control sends a `joints`' roll, shoulder and elbow as it,
+docs/control.md): the head's roll from the found home and the shoulder and the elbow
 from the folded arm, in degrees, each rising with counts, as `get('body')`
 says them. A joint not named keeps where it is. The body takes it only while
 held and standing still at its full height (a lamp given `--stand`) with no

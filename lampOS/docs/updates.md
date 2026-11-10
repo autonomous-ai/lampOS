@@ -653,6 +653,16 @@ each under the quiet rule. A round
    "the channel cannot be reached", not a round held for good (#830). One
    lookup runs at a time: while one that ran over has not ended, a round
    starts none and says "an earlier name lookup has not ended".
+   **A busy channel is asked again.** Every file a round reads, the
+   manifest and each part's files alike, is asked for again after 2, 5 and
+   10 s when the channel answered 5xx or gave no answer and nothing of the
+   file had come yet, each wait only if it ends within the file's own
+   900 s (`fetch::AGAIN_AFTER`, `again_while_busy`). On 9 Nov from 12:30
+   GitHub's release downloads answered 504 to about six tries in ten, and
+   since a round needs every file, lamp-74ff refused five rounds in a row,
+   each on another file (the lead's proposal on #1711). A missing file
+   (404), any other answer, or a file cut short half way refuses as before:
+   its bytes are already written, and its SHA-256 check throws them away.
 3. **The build.** The envelope's key fingerprint must be the lamp's and
    its signature must match the manifest's bytes. Then, before anything
    else of the manifest is read, its `min_updater`: one above this
@@ -1306,6 +1316,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `the settings writer refreshed has proved itself (its back ended well): the copy before is removed` | a refreshed writer's first `back` ended well |
 | `the settings writer refreshed is put back (its back failed): the copy before is the writer again` | a refreshed writer's first `back` failed |
 | `the settings writer refreshed is put back (its first apply failed): the copy before is the writer again, and this lamp-update may be asked to be it again` | a refreshed writer's first `apply` failed: the build is refused, the writer is not (#5539) |
+| `lamp-update: <why>; asking again in N s` | the channel answered 5xx or gave no answer before any of a file came: it is asked for again after 2, 5 and then 10 s, within the file's own time; the round goes on if a later try brings it |
 | `the settings writer could not be put back or proved (…): …` | either of those two asked of the unit, and it failed |
 | `the settings writer's back failed in a run that began before it was refreshed: the next back judges it` | the failed `back` may be the copy before's, so nothing is put back for it |
 | **The journal** (`acting`, at the round's start) | |
@@ -2761,9 +2772,18 @@ own choice, the queue and the exit note a crash came from, and the login a
 ping rotated, `rotated.json`); the controls (`controls.json`, the product's
 pins file, read with `--touch`, and the pins file prepare gives a lamp moved
 from V1, read without it); the skills turned off (`off`, read by lamp-skills at
-a start and by lamp-cloud for the app); and lamp-records (a voice session
-folder, taken as a session with nothing refused). The other parts follow, by
-harm.
+a start and by lamp-cloud for the app); lamp-records (a voice session
+folder, taken as a session with nothing refused); and the body (#5759): the
+lamp's own poses, `/etc/lampOS/body/lamp.env`, in each shape its writers give
+and as lamp-06c1 and lamp-fc4b hold it, started from the product unit and read
+by the let-go, the generic package's seated `measured.env` started from its
+own unit, and the first stand's record, read so a lamp that stood never asks
+again. Not kept, and why: setup's reset plan is a build's own setting, and
+install keeps every SHA-256 it has had (`install::RESET_PLAN`);
+lamp-policy's `--log-dir` is written and never read back; the output caps
+are off in the product (`LAMP_OUTPUT_CAPS`), so no lamp holds them yet,
+and their fixture is owed before that switch goes on. The other parts follow,
+by harm.
 
 **Published Controls single-implementation replay check** (#2809): the
 Controls `release_pair` target selects pinned 6408/6498
