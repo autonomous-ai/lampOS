@@ -1669,7 +1669,7 @@ it.
 
 **One alert per stage of a round,** from `update/status`: `started` (the
 first phase after `idle` that goes on to fetch; a round that only checks
-says nothing), then `done` (`switched`), `failed`, `refused`, `rolled-back`
+says nothing), then `done` (`switched`, or `held`: kept with lamp-body held as before, #6113), `failed`, `refused`, `rolled-back`
 `self-switched` (lamp-update took its newer self; read below) or `self-confirmed` (its new
 self confirmed that switch; a self-switch has this confirmation alert once
 lamp-update says it, and it breaks a repeating streak like `done`), or `self-put-back` (the old
