@@ -947,3 +947,30 @@ và `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
 | `trigger.days` | không | Các ngày trong tuần (giờ địa phương) mà cửa sổ `during` mở: một danh sách không rỗng gồm `"mon"` đến `"sun"`, `"weekdays"` (thứ Hai đến thứ Sáu) và `"weekend"` (thứ Bảy và Chủ nhật), hoặc chỉ một tên (`days = "weekdays"`); một ngày nêu hai lần vẫn là một ngày. Chỉ đi cùng `during` (`days goes with during`); tên khác bị từ chối khi nạp (`days: "funday" is not a day: …`), danh sách rỗng cũng vậy (`days names no day`). Mỗi ngày làm việc lúc 7 giờ: `during = { from = "07:00", to = "07:30" }`, `days = "weekdays"`, `once_per_day = true`. Ngày là ngày địa phương mà `during` và `once_per_day` vốn dùng; giờ sau nửa đêm của cửa sổ qua đêm thuộc về ngày cửa sổ mở (`23:00` đến `02:00` của thứ Sáu vẫn giữ lúc 01:00 sáng thứ Bảy, không giữ lúc 01:00 sáng thứ Sáu). Ngoài các ngày đó, trigger coi như ngoài cửa sổ: không giữ, việc theo dõi đang chạy bị đặt lại, và một `yields_to` trỏ tới nó không chờ. Kiểm thử (`crates/skills/tests/it/daily_engine.rs`): `a_weekday_trigger_runs_on_monday_at_seven_and_not_on_saturday`, `a_weekend_trigger_runs_on_saturday_and_sunday_only`, `an_overnight_window_runs_on_the_day_it_opened`, `days_are_checked_at_load` |
 
 Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).
+
+## Socket gọi kỹ năng phân biệt bên gọi (#6128)
+
+`/run/lampos-skills/call.sock` là đường của giọng nói tới các kỹ năng, nhưng
+chương trình nào tới được thư mục đó cũng có thể kết nối: `skill call NAME`
+của lamp-tasks, và Hermes trên đèn khi lamp-update cho nó thấy thư mục này
+(`LAMP_HERMES_SKILLS`, bật mặc định trên đèn sản phẩm, xem `docs/install.md`,
+"Hermes on the lamp"). Các quy tắc dưới đây là điều làm cho mặc định bật đó an toàn.
+Với mỗi kết nối, `lamp-skills` đọc danh tính của bên kia (`SO_PEERCRED`) và
+cgroup của nó, như với lệnh `guard` của lamp-cloud. Mọi bên không phải unit
+của lamp-voice (`/lampos.slice/lampos-voice.slice/lamp-voice.service`,
+`package::VOICE_LINK`) đều theo ba quy tắc:
+
+- `requested_audio_context` là biên nhận của giọng nói cho một âm thanh người
+  dùng đã nói ra để yêu cầu, chương trình khác không được tự tạo: từ bên khác
+  nó bị bỏ đi, nên kỹ năng phát âm thanh trả lời như khi không có ngữ cảnh
+  ("Requested audio is disabled or has no spoken context.").
+- `audio_authorize` và `audio_finish` bị từ chối (`watch::NOT_THE_VOICE`).
+- Khi đèn đang ở chế độ riêng tư (giọng nói bị tắt mic vì riêng tư hoặc đang
+  ngủ, hay công tắc riêng tư đóng trên `voice/privacy`, như
+  `routine::kept_asleep` đọc), một `call` bị từ chối kèm lý do
+  (`watch::PRIVATE_FOR_OTHERS`). Lệnh gọi của chính giọng nói không bị chặn ở
+  đây: giọng nói tự giữ các lượt của nó theo quyền riêng tư.
+
+Danh tính bên gọi chỉ đọc được trên Linux; ở nơi khác không bên nào là giọng
+nói. `LAMP_SKILLS_ANY_ASKER=on` trong môi trường của chính lamp-skills (không
+unit nào đặt nó) coi mọi bên là giọng nói, chỉ dùng cho các bài kiểm thử.
