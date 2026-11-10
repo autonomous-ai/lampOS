@@ -1310,7 +1310,20 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        `deploy/harness/`, and updates `product.rs`'s `include_bytes!` paths
        and constants: `MANIFEST_SHA256`, `VERSION`, `INSTALLER_SHA256` and
        each `MANIFESTS` entry's `sha256`. Tests hold every constant to its
-       file.
+       file. CI opens that PR by itself (#5957 part 1,
+       `.github/workflows/lampos-harness-pin.yml`): once a day (01:00 UTC,
+       or by hand) it reads `product::ORIGIN`, and when its `cli.version` is
+       a newer plain version than `product::VERSION` it copies the six
+       files, checks every linux-arm64 file they name against its SHA-256
+       (and size), updates `product.rs` and this section's version and date,
+       runs `cargo test -p lamp-update --lib harness_install`, and installs
+       that pin in an ARM64 container from the copies on `127.0.0.1`
+       (`harness version` says the new version, `harness --help` runs). It
+       then opens one PR onto lamp-voice with the workflow's own token, and
+       closes an older pin PR it opened. It never merges: a reader reads it,
+       a push starts its own CI (a PR opened by that token starts none), and
+       it merges only after its row "Each Harness pin move" in
+       `lamp-runs.md` passes (#5957 (b)).
      - **A newer pin moves an older Harness** (#5957; no switch of its own,
        it follows `LAMP_HARNESS_AT_ONBOARDING` and the build's default).
        After a reached round, Harness there and recorded `installed` with a
