@@ -444,11 +444,16 @@ fn dropped(
     changes: &Option<Arc<crate::settings::Changes>>,
     reports: &Option<Arc<crate::reports::Shared>>,
     onboarding_done: &mut Option<crate::onboarding_done::Done>,
+    onboarding_step: &mut Option<crate::onboarding_step::Steps>,
 ) {
     let again = handed.lost();
     // Whatever was not acked went with the connection: the walk's end too.
     if let Some(done) = onboarding_done {
         done.lost();
+    }
+    // Looked at again with the walk's end on the next connection (#5979).
+    if let Some(steps) = onboarding_step {
+        steps.lost();
     }
     let services = std::mem::take(&mut handed.services_lost);
     if let Some(shared) = lamp.services() {
@@ -633,11 +638,30 @@ async fn session(
                                 .to_string();
                             handed.publish(&client, account.fd_channel.as_str(), pushed, None);
                         }
+                        // Each walk step's end (#5979): only while connected,
+                        // best effort, tried once and never waiting on an
+                        // ack. Before the walk's end, on the same look (one
+                        // `looked`, both lost with the connection), so the
+                        // last step's event goes ahead of `onboarding.done`;
+                        // neither waits on the other.
+                        let looked = std::time::Instant::now();
+                        if connected
+                            && let Some(steps) = onboarding_step.as_mut()
+                            && let Some((walk_id, ended)) = steps.due(looked, crate::chat::now_ms(), || lamp.onboarding_steps())
+                        {
+                            for ended in ended {
+                                let event = me
+                                    .data(&now(), crate::onboarding_step::KIND, &Ok(Some(crate::onboarding_step::data(walk_id, &ended))))
+                                    .to_string();
+                                let took = handed.publish(&client, account.fd_channel.as_str(), event, None);
+                                say.line(&steps.tried(&ended, took));
+                            }
+                        }
                         // The walk's end (#5812): only while connected, and
                         // kept until the broker's ack.
                         if connected
                             && let Some(done) = onboarding_done.as_mut()
-                            && let Some(at) = done.due(std::time::Instant::now(), || lamp.onboarding())
+                            && let Some(at) = done.due(looked, || lamp.onboarding())
                         {
                             let event = me
                                 .data(&now(), crate::onboarding_done::KIND, &Ok(Some(crate::onboarding_done::data(at))))
@@ -646,21 +670,6 @@ async fn session(
                             if handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
                                 done.handed(at);
                                 say.line(&format!("{}: handed to the client, at {at}", crate::onboarding_done::KIND));
-                            }
-                        }
-                        // Each walk step's end (#5979): only while connected,
-                        // best effort, after the walk's end, tried once and
-                        // never waiting on an ack.
-                        if connected
-                            && let Some(steps) = onboarding_step.as_mut()
-                            && let Some((walk_id, ended)) = steps.due(std::time::Instant::now(), crate::chat::now_ms(), || lamp.onboarding_steps())
-                        {
-                            for ended in ended {
-                                let event = me
-                                    .data(&now(), crate::onboarding_step::KIND, &Ok(Some(crate::onboarding_step::data(walk_id, &ended))))
-                                    .to_string();
-                                let took = handed.publish(&client, account.fd_channel.as_str(), event, None);
-                                say.line(&steps.tried(&ended, took));
                             }
                         }
                         if texting {
@@ -750,7 +759,14 @@ async fn session(
             say.line(&line);
         }
         let Some(polled) = polled else {
-            dropped(&mut handed, lamp, &changes, &reports, &mut onboarding_done);
+            dropped(
+                &mut handed,
+                lamp,
+                &changes,
+                &reports,
+                &mut onboarding_done,
+                &mut onboarding_step,
+            );
             connected = false;
             for line in std::mem::take(&mut handed.journal) {
                 say.line(&line);
@@ -844,7 +860,14 @@ async fn session(
             Ok(_) => {}
             Err(error) => {
                 connected = false;
-                dropped(&mut handed, lamp, &changes, &reports, &mut onboarding_done);
+                dropped(
+                    &mut handed,
+                    lamp,
+                    &changes,
+                    &reports,
+                    &mut onboarding_done,
+                    &mut onboarding_step,
+                );
                 for line in std::mem::take(&mut handed.journal) {
                     say.line(&line);
                 }
@@ -2863,6 +2886,20 @@ mod tests {
         }
         assert_eq!(told[1]["data"]["outcome"], "not_available");
         assert_eq!(dones(&seen).len(), 1, "{seen:?}");
+        // The heartbeat has the last step ended and the walk's end dated:
+        // the steps go first, then `onboarding.done` (#5979's done-when).
+        let kinds: Vec<_> = publishes(&seen)
+            .into_iter()
+            .filter(|(_, reply)| {
+                reply["kind"] == "onboarding.step" || reply["kind"] == "onboarding.done"
+            })
+            .map(|(_, reply)| reply["kind"].as_str().unwrap_or_default().to_owned())
+            .collect();
+        assert_eq!(
+            kinds,
+            ["onboarding.step", "onboarding.step", "onboarding.done"],
+            "{seen:?}"
+        );
         // lamp-cloud restarts: its steps sent already, nothing more.
         let start = std::time::Instant::now();
         let (seen, _) = lines_against(Broker::Takes, lamp_steps(now, Some(dir.path())), |_| {
