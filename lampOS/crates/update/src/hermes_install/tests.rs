@@ -509,27 +509,37 @@ fn the_wrapper_gives_hermes_its_own_pid_namespace_and_proc() {
     }
 }
 
-/// The namespace script hides both of [`HIDDEN`] before Hermes runs, drops
-/// back to the caller's ids in a nested namespace, and refuses to run in
-/// the lamp's own user namespace (or anywhere it cannot read its map).
+/// The namespace script refuses to run in the lamp's own user namespace
+/// (or anywhere it cannot read its map), names the allow-list it shows,
+/// and drops back to the caller's ids in a nested namespace.
 #[test]
-fn the_namespace_script_hides_the_credentials_and_refuses_outside_its_namespace() {
+fn the_namespace_script_shows_only_what_is_allowed_and_refuses_outside_its_namespace() {
     assert!(NS_TEXT.starts_with("#!/bin/sh\n"));
-    let hermes = NS_TEXT.find(&format!("{HERMES} \"$@\"")).unwrap();
-    for hidden in HIDDEN {
-        let mount = NS_TEXT
-            .find(&format!(
-                "mount -t tmpfs -o size=4k,mode=0555 none {hidden} || exit 1"
-            ))
-            .unwrap_or_else(|| panic!("{hidden} not hidden"));
-        assert!(mount < hermes);
-    }
-    assert!(NS_TEXT.contains("exec /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" "));
-    assert!(NS_TEXT.contains("[ \"$count\" != 4294967295 ] ||"));
+    assert!(NS_TEXT.contains(&format!(
+        "H={PLACE} W={WORK} K={SKILLS} S=/tmp/.lampos-ns\n"
+    )));
+    assert_eq!(ALLOWED, [PLACE, WORK, SKILLS]);
     assert!(
-        TOKEN.starts_with(&format!("{}/", HIDDEN[1])),
+        HERMES.starts_with(&format!("{PLACE}/")) && HERMES_HOME.starts_with(&format!("{PLACE}/"))
+    );
+    let hermes = NS_TEXT.find(&format!("{HERMES} \"$@\"")).unwrap();
+    for over in OVERLAID {
+        let tmpfs = NS_TEXT
+            .find(&format!(",nosuid,nodev,noexec none {over} ||"))
+            .unwrap_or_else(|| panic!("{over} not overlaid"));
+        let ro = NS_TEXT
+            .find(&format!(
+                "mount -o remount,ro,nosuid,nodev,noexec {over} ||"
+            ))
+            .unwrap_or_else(|| panic!("{over} not read-only"));
+        assert!(tmpfs < ro && ro < hermes, "{over}");
+    }
+    assert!(
+        TOKEN.starts_with("/var/lib/") && !ALLOWED.iter().any(|a| TOKEN.starts_with(a)),
         "the token's own file is hidden too"
     );
+    assert!(NS_TEXT.contains("exec /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" "));
+    assert!(NS_TEXT.contains("[ \"$count\" != 4294967295 ] ||"));
     // Outside a namespace (and on a host with no /proc), nothing runs.
     let folder = tempfile::tempdir().unwrap();
     let printer = folder.path().join("unshare");
@@ -558,6 +568,318 @@ fn the_namespace_script_hides_the_credentials_and_refuses_outside_its_namespace(
     {
         assert!(!out.status.success());
         assert!(!String::from_utf8_lossy(&out.stdout).contains("ran"));
+    }
+}
+
+/// `lampos`'s groups (video, audio, dialout, i2c) can't be dropped under
+/// `--map-root-user`, so each device they open is covered by `/dev/null`:
+/// the camera, the mic, the servo and serial ports, I2C, SPI and GPIO.
+/// `/tmp`, `/var/tmp` and `/dev/shm` are shared on the lamp: Hermes gets
+/// its own, before anything is staged there.
+#[test]
+fn the_namespace_script_hides_the_devices_and_gives_hermes_its_own_tmp() {
+    let hermes = NS_TEXT.find(&format!("{HERMES} \"$@\"")).unwrap();
+    let devices = NS_TEXT
+        .lines()
+        .find(|line| line.starts_with("for d in /dev/"))
+        .unwrap();
+    assert_eq!(devices, format!("for d in {}; do", DEVICES.join(" ")));
+    for wanted in [
+        "/dev/video*",
+        "/dev/media*",
+        "/dev/snd/*",
+        "/dev/ttyACM*",
+        "/dev/ttyUSB*",
+        "/dev/i2c-*",
+        "/dev/spidev*",
+        "/dev/gpiochip*",
+    ] {
+        assert!(DEVICES.contains(&wanted), "{wanted}");
+    }
+    let bind = NS_TEXT
+        .find("  [ -c \"$d\" ] || continue\n  mount --bind /dev/null \"$d\" || fail \"$d not hidden\"\ndone\n")
+        .unwrap();
+    assert!(bind < hermes);
+    assert_eq!(PRIVATE, ["/tmp", "/var/tmp", "/dev/shm"]);
+    let staged = NS_TEXT.find("mkdir -m 0700 \"$S\"").unwrap();
+    for private in PRIVATE {
+        let tmpfs = NS_TEXT
+            .find(&format!("mode=1777,nosuid,nodev none {private} ||"))
+            .unwrap_or_else(|| panic!("{private} not its own"));
+        assert!(tmpfs < staged, "{private}");
+    }
+}
+
+/// The reviewer's allow-list check (Thirteen's P1 on #6093): every
+/// runtime, state and writable folder under `/run` or `/var/lib` of each
+/// product unit run as `lampos`, and every folder the lamp's tmpfiles make
+/// `lampos`'s, is under one of [`OVERLAID`] and inside none of
+/// [`ALLOWED`], so a new service is hidden from Hermes with no change
+/// here. A service folder above an allowed one (lamp-tasks' state folder,
+/// above [`WORK`]) shows Hermes only the empty read-only folders down to
+/// it. Hermes's own folder, its work folder and the skills are shown.
+#[test]
+fn no_lampos_service_folder_is_visible_to_hermes() {
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut folders = Vec::new();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|ext| ext != "service") {
+            continue;
+        }
+        let text = fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = text.lines().map(str::trim).collect();
+        if !lines.contains(&"User=lampos") {
+            continue;
+        }
+        for line in lines {
+            let Some((key, value)) = line.split_once('=') else {
+                continue;
+            };
+            for word in value.split_whitespace() {
+                let name = word.split(':').next().unwrap();
+                match key {
+                    "RuntimeDirectory" => folders.push(format!("/run/{name}")),
+                    "StateDirectory" => folders.push(format!("/var/lib/{name}")),
+                    "ReadWritePaths" => {
+                        let name = name.trim_start_matches(['-', '+']);
+                        if name.starts_with("/run/") || name.starts_with("/var/lib/") {
+                            folders.push(name.to_owned());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    let tmpfiles = fs::read_to_string(product.join("lampos.conf")).unwrap();
+    for line in tmpfiles.lines() {
+        let words: Vec<&str> = line.split_whitespace().collect();
+        if words.len() >= 5
+            && !line.starts_with('#')
+            && (words[3] == "lampos" || words[4] == "lampos")
+        {
+            folders.push(words[1].to_owned());
+        }
+    }
+    for wanted in [
+        "/run/lampos-eyes",
+        "/var/lib/lampos-eyes",
+        "/run/lampos-body",
+        "/var/lib/lampos-tasks",
+        "/var/lib/lampos-cloud",
+        "/run/lampos-bus",
+        "/run/lampos-photos",
+    ] {
+        assert!(folders.iter().any(|f| f == wanted), "{wanted} not read");
+    }
+    let under =
+        |path: &str, folder: &str| path == folder || path.starts_with(&format!("{folder}/"));
+    for folder in &folders {
+        assert!(
+            OVERLAID.iter().any(|over| under(folder, over)),
+            "{folder} is not under an overlay"
+        );
+        assert!(
+            !ALLOWED.iter().any(|allowed| under(folder, allowed)),
+            "{folder}, a lampos service's, is visible to Hermes"
+        );
+    }
+    for allowed in ALLOWED {
+        assert!(
+            OVERLAID.iter().any(|over| under(allowed, over)),
+            "{allowed}"
+        );
+    }
+    assert!(!under(TOKEN, PLACE) && !under(TOKEN, WORK) && !under(TOKEN, SKILLS));
+}
+
+/// The namespace script run under `sh` with every mount stubbed, on a
+/// stand-in root: it makes Hermes's own `/tmp` first, stages what stays
+/// visible there, lays the overlays, moves the staged mounts back (the
+/// skills and `resolv.conf` read-only, with the flags they had), makes
+/// the overlays read-only, and only then runs Hermes with `HOME` its own
+/// folder. Nothing but [`ALLOWED`] and `resolv.conf` is put back. Any
+/// step failing ends it with Hermes not run.
+#[test]
+fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
+    let folder = tempfile::tempdir().unwrap();
+    let base = folder.path().to_string_lossy().into_owned();
+    let at = |path: &str| format!("{base}/root{path}");
+    let stubs = folder.path().join("stubs");
+    fs::create_dir_all(&stubs).unwrap();
+    let log = folder.path().join("log");
+    let resolv = at("/run/systemd/resolve/stub-resolv.conf");
+    for made in [
+        WORK,
+        SKILLS,
+        "/etc/lampOS",
+        "/dev/shm",
+        "/run/systemd/resolve",
+    ] {
+        fs::create_dir_all(at(made)).unwrap();
+    }
+    fs::write(&resolv, "nameserver 127.0.0.53\n").unwrap();
+    let uid_map = folder.path().join("uid_map");
+    fs::write(&uid_map, "         0        996          1\n").unwrap();
+    let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; readlink) echo \"$RESOLV\";; unshare) echo \"HOME=$HOME\";; esac\n";
+    for name in [
+        "mount", "findmnt", "mkdir", "rmdir", "rm", "touch", "readlink", "unshare",
+    ] {
+        let path = stubs.join(name);
+        fs::write(&path, stub).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    // Each path the script names, moved under the stand-in root in one
+    // pass (placeholders first, so no root is moved twice).
+    let mut text = NS_TEXT.to_owned();
+    let moved = [
+        "/var/tmp",
+        "/var/lib",
+        "/etc/lampOS",
+        "/etc/resolv.conf",
+        "/dev/shm",
+        "/tmp",
+        "/run",
+    ];
+    for (n, path) in moved.iter().enumerate() {
+        text = text.replace(path, &format!("\u{1}{n}\u{1}"));
+    }
+    for (n, path) in moved.iter().enumerate() {
+        text = text.replace(&format!("\u{1}{n}\u{1}"), &at(path));
+    }
+    let text = text
+        .replace("/proc/self/uid_map", &uid_map.to_string_lossy())
+        .replace("/usr/bin/unshare", &stubs.join("unshare").to_string_lossy());
+    let script = folder.path().join("hermes-ns");
+    fs::write(&script, text).unwrap();
+    let run = |fail_on: &str| {
+        let _ = fs::remove_file(&log);
+        let out = std::process::Command::new("/bin/sh")
+            .arg(&script)
+            .args(["chat", "-q", "a b"])
+            .current_dir(at(WORK))
+            .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+            .env("LOG", &log)
+            .env("FAIL_ON", fail_on)
+            .env("RESOLV", &resolv)
+            .env("HOME", "/somewhere-else")
+            .env("LAMP_NS_UID", "996")
+            .env("LAMP_NS_GID", "994")
+            .output()
+            .unwrap();
+        let lines: Vec<String> = fs::read_to_string(&log)
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        (out, lines)
+    };
+    let (out, lines) = run("");
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!("HOME={}\n", at(PLACE)),
+        "Hermes's HOME is its own folder"
+    );
+    let find = |wanted: &str| {
+        lines
+            .iter()
+            .position(|line| line == wanted)
+            .unwrap_or_else(|| panic!("no `{wanted}` in {lines:#?}"))
+    };
+    let stage = at("/tmp/.lampos-ns");
+    let order = [
+        format!(
+            "mount -t tmpfs -o size=256m,mode=1777,nosuid,nodev none {}",
+            at("/tmp")
+        ),
+        format!("mkdir -m 0700 {stage} {stage}/h {stage}/w {stage}/k"),
+        format!("mount --bind {} {stage}/h", at(PLACE)),
+        format!("mount --bind {} {stage}/w", at(WORK)),
+        format!("mount --bind {} {stage}/k", at(SKILLS)),
+        format!("mount --bind {resolv} {stage}/r"),
+        format!(
+            "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
+            at("/run")
+        ),
+        format!(
+            "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
+            at("/var/lib")
+        ),
+        format!(
+            "mount -t tmpfs -o size=4k,mode=0555,nosuid,nodev,noexec none {}",
+            at("/etc/lampOS")
+        ),
+        format!("mount --move {stage}/h {}", at(PLACE)),
+        format!("mount --move {stage}/w {}", at(WORK)),
+        format!("mount --move {stage}/k {}", at(SKILLS)),
+        format!(
+            "mount -o remount,bind,ro,nosuid,nodev,relatime {}",
+            at(SKILLS)
+        ),
+        format!("mount --move {stage}/r {resolv}"),
+        format!("mount -o remount,bind,ro,nosuid,nodev,relatime {resolv}"),
+        format!("rmdir {stage}/h {stage}/w {stage}/k {stage}"),
+        format!("mount -o remount,ro,nosuid,nodev,noexec {}", at("/run")),
+        format!("mount -o remount,ro,nosuid,nodev,noexec {}", at("/var/lib")),
+        format!(
+            "mount -o remount,ro,nosuid,nodev,noexec {}",
+            at("/etc/lampOS")
+        ),
+        format!(
+            "unshare --user --map-user=996 --map-group=994 {} chat -q a b",
+            at(HERMES)
+        ),
+    ];
+    let places: Vec<usize> = order.iter().map(|line| find(line)).collect();
+    assert!(places.windows(2).all(|two| two[0] < two[1]), "{lines:#?}");
+    assert_eq!(*places.last().unwrap(), lines.len() - 1, "Hermes last");
+    let shown: Vec<&str> = lines
+        .iter()
+        .filter_map(|line| line.strip_prefix("mount --move "))
+        .map(|line| line.rsplit(' ').next().unwrap())
+        .collect();
+    let allowed: Vec<String> = ALLOWED
+        .iter()
+        .map(|path| at(path))
+        .chain([resolv.clone()])
+        .collect();
+    assert_eq!(
+        shown,
+        allowed.iter().map(String::as_str).collect::<Vec<_>>()
+    );
+    // Each step failing ends it before Hermes runs.
+    for fail_on in [
+        format!("none {}", at("/tmp")),
+        format!("none {}", at("/var/tmp")),
+        "mkdir -m 0700".to_owned(),
+        format!("--bind {}", at(PLACE)),
+        format!("--bind {}", at(WORK)),
+        format!("--bind {}", at(SKILLS)),
+        format!("--bind {resolv}"),
+        format!("none {}", at("/run")),
+        format!("none {}", at("/var/lib")),
+        format!("none {}", at("/etc/lampOS")),
+        format!("mount --move {stage}/h"),
+        format!("mount --move {stage}/w"),
+        format!("mount --move {stage}/k"),
+        format!("mount --move {stage}/r"),
+        "findmnt".to_owned(),
+        "remount,bind,ro".to_owned(),
+        "rmdir".to_owned(),
+        format!("remount,ro,nosuid,nodev,noexec {}", at("/run")),
+        format!("remount,ro,nosuid,nodev,noexec {}", at("/var/lib")),
+        format!("remount,ro,nosuid,nodev,noexec {}", at("/etc/lampOS")),
+    ] {
+        let (out, lines) = run(&fail_on);
+        assert!(!out.status.success(), "{fail_on}: {lines:#?}");
+        assert!(
+            !lines.iter().any(|line| line.starts_with("unshare ")),
+            "{fail_on}: Hermes ran"
+        );
     }
 }
 
