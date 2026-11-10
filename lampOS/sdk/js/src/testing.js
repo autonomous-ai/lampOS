@@ -431,12 +431,39 @@ export class FakeLamp {
     this.port = this.https.address().port;
   }
 
+  // A `Lamp` paired with this fake and connected, for a test of your own
+  // program: no code, pin or keyring to set up. Its keyring is a folder of its
+  // own (removed by `stop()`, your LAMPOS_HOME untouched), and `stop()` closes it.
+  // Call it again for a second computer.
+  //
+  //   const fake = await FakeLamp.start();
+  //   const lamp = await fake.connect();
+  //   await lamp.say('hello');
+  //   assert.deepEqual(fake.asked('say'), [{ text: 'hello' }]);
+  async connect({ name = 'test app' } = {}) {
+    const { Lamp } = await import('./client.js');
+    const { Keyring } = await import('./keys.js');
+    const folder = mkdtempSync(join(tmpdir(), 'lampos-fake-'));
+    (this.folders ??= []).push(folder);
+    const keyring = new Keyring(folder);
+    await Lamp.pair(this.code, this.host, { pin: this.pin, port: this.port, name, keyring });
+    const lamp = await Lamp.connect(undefined, { keyring });
+    (this.connected ??= []).push(lamp);
+    return lamp;
+  }
+
   async stop() {
+    // A test may have dropped or closed it already (a lease held on a dead
+    // socket): that must not mask the test's own result.
+    for (const lamp of this.connected ?? []) await lamp.close().catch(() => {});
+    this.connected = [];
     for (const ws of [...this.listening.keys()]) this.stopListening(ws);
     for (const ws of this.wss.clients) ws.terminate();
     await new Promise((resolve) => this.wss.close(resolve));
     this.https.closeAllConnections();
     await new Promise((resolve) => this.https.close(resolve));
+    for (const folder of this.folders ?? []) rmSync(folder, { recursive: true, force: true });
+    this.folders = [];
   }
 
   // The fields of every `op` request taken, oldest first.

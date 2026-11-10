@@ -1832,3 +1832,27 @@ test('the microphone streams 20 ms blocks with the microphone grant only, says l
     await assert.rejects(lamp.microphoneStream(true), byCode.no_grant);
   });
 });
+
+test('fake.connect() gives a connected lamp with its own keyring and stop() cleans up', async () => {
+  const home = folder();
+  const before = process.env.LAMPOS_HOME;
+  process.env.LAMPOS_HOME = join(home, 'own'); // a test must not touch the developer's own
+  const fake = await FakeLamp.start();
+  try {
+    const lamp = await fake.connect();
+    const other = await fake.connect({ name: 'second computer' });
+    const reply = await lamp.say('hello');
+    assert.deepEqual(fake.asked('say'), [{ text: 'hello' }]);
+    assert.ok(reply.ok !== false && other !== lamp);
+    assert.equal(fake.folders.length, 2);
+    assert.ok(fake.folders.every((f) => existsSync(f)));
+    await other.close(); // the test closed one itself: stop() must not trip on it
+    const folders = [...fake.folders];
+    await fake.stop();
+    assert.ok(folders.every((f) => !existsSync(f)));
+    assert.equal(existsSync(join(home, 'own')), false);
+    await assert.rejects(lamp.say('after the fake is gone'));
+  } finally {
+    if (before === undefined) delete process.env.LAMPOS_HOME; else process.env.LAMPOS_HOME = before;
+  }
+});
