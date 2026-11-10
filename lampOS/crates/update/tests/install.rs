@@ -1807,7 +1807,7 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
     }
 }
 
-/// A skill added from a file in the app, on a spoken yes (#5080): the
+/// A skill added from a file in the app, on at once (#5080, #5977): the
 /// switch is on in both parts that read it, `lamp-cloud` (the kind, with
 /// the skills page) and `lamp-voice` (the app-make socket, with the maker
 /// and the say service), once each.

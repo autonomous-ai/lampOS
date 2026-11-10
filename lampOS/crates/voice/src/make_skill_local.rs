@@ -947,7 +947,7 @@ light = { dim = 1 }
         assert_eq!(told["on"], true, "{told}");
         assert_eq!(
             told["next"],
-            "Say exactly: \"I made evening dim, and it's on.\" Ask nothing about putting it on."
+            "Say exactly: \"I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking. Say \"take it off\" to take it off.\" Ask nothing about putting it on."
         );
         assert!(!told.to_string().contains("Shall I"), "{told}");
         assert!(told["uses"].as_str().unwrap().contains("light"), "{told}");
@@ -1456,7 +1456,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let sentence = "Gmail isn't linked yet: link it in the app, under Skills, then \
                         Connectors, and the skill will start then.";
         let (on, link) = (
-            next.find("I made morning mail, and it's on.").expect(next),
+            next.find("I made morning mail, and it's on: reads your latest mail at eight")
+                .expect(next),
             next.find(sentence).expect(next),
         );
         assert!(on < link, "{next}");
