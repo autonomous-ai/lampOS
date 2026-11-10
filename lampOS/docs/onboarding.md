@@ -299,6 +299,21 @@ walk set up before it was dated, or not yet ended, has none.
 (`onboarding.done`, [cloud.md](cloud.md), "Setup done, told to the app").
 Test: `onboarding::tests::the_walks_end_is_dated_once_and_kept`.
 
+**Each walk step's end is dated, for the app** (#5979). A walk takes an id,
+`Progress::walk_id`, the Unix ms its first step is asked. A redo of one step
+keeps it; a redo of the whole walk clears it (`Progress::redone`), and its
+first step asked sets a new one. A re-offer after the walk never sets one, so
+a lamp whose walk ended before this build has none. Each step's end keeps
+when, in Unix ms, beside its outcome (`Kept::ended_at_unix_ms`); a step parked
+out of the walk's order has none. `onboarding/pending` carries the committed
+`walk_id` and `steps_ended`: `[{step, outcome, at}]` of the four walk steps
+(`where_you_sit`, `who_you_are`, `touch`, `how_you_sound`) that ended, in the
+order they ended, with the walk's own outcome (`done`, `skipped`, `failed` or
+`not_available`; never `later`, which is offered again). No names, no words.
+lamp-cloud tells the app each end once (`onboarding.step`, [cloud.md](cloud.md),
+"Each setup step, told to the app"). Test:
+`onboarding::tests::the_walks_steps_end_in_order_under_one_walk_id`.
+
 **A fixed line is said even when the chat is late.** These lines still go to
 the model as a written turn, and on the second route a turn whose chat has
 not begun in time used to end unanswered, the walk's line unsaid (lamp-52e6,
@@ -977,7 +992,8 @@ preferences) hold no invitation, so a skill that keeps out of setup, as Head
 pat and Head pat wiggle do, gates on `walk` as well as on `invitations`.
 An older voice leaves it out, read as false. It also says `done_at_unix_ms`
 once the walk has handed out its done line (#5812, "The walk's end is dated
-once, for the app" above).
+once, for the app" above), and `walk_id` and `steps_ended` (#5979, "Each walk
+step's end is dated, for the app" above).
 
 Privacy is led first, before step 1, whenever it is available, though its
 record keeps the table's place. It is available only with a verified switch

@@ -57,6 +57,7 @@ impl Store {
                     framing: None,
                     offered_at_unix_s: None,
                     later_offers: 0,
+                    ended_at_unix_ms: None,
                 },
             );
         }
@@ -1257,6 +1258,7 @@ fn persisted_samples_are_validated_on_load() {
                     framing: None,
                     offered_at_unix_s: None,
                     later_offers: 0,
+                    ended_at_unix_ms: None,
                 },
             );
         },
@@ -1661,7 +1663,8 @@ fn a_sentence_said_close_with_its_words_covering_it_ends_the_step_done_and_keeps
             "privacy_discard_pending",
             "privacy_invitation_tries",
             "sentence_prompts",
-            "steps"
+            "steps",
+            "walk_id"
         ]
     );
 }
@@ -1973,6 +1976,7 @@ fn a_later_re_offer_of_how_you_sound_begins_with_the_call_part() {
             framing: None,
             offered_at_unix_s: None,
             later_offers: 0,
+            ended_at_unix_ms: None,
         },
     );
     walk.begin_later_offer(Step::HowYouSound);
