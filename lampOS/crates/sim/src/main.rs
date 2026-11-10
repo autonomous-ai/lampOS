@@ -23,7 +23,26 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] | lamp-sim code DIR | lamp-sim servo DIR";
+/// Every grant, as lamp-control names them: the sim is a developer's own desk
+/// lamp, so its pairing gives all of them unless `--grants` says fewer.
+const ALL_GRANTS: &str =
+    "body,light,speak,look,hear,sound,skills,air,device,camera,microphone,notes";
+
+/// A short id of the lamp's folder, so that two virtual lamps (or one made
+/// again elsewhere) are two lamps to a computer's key store, not one.
+fn lamp_name(dir: &Path) -> String {
+    let full = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_owned());
+    let hash = full
+        .as_os_str()
+        .as_encoded_bytes()
+        .iter()
+        .fold(0xcbf29ce484222325u64, |h, b| {
+            (h ^ u64::from(*b)).wrapping_mul(0x100000001b3)
+        });
+    format!("virtual-{:06x}", hash & 0xff_ffff)
+}
+
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -34,6 +53,10 @@ fn option(args: &[String], name: &str) -> Option<String> {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.iter().skip(1).any(|a| a == "--help" || a == "-h") || args.len() == 1 {
+        println!("{USAGE}");
+        return;
+    }
     if let Some(done) = stimulus(&args) {
         if let Err(error) = done {
             eprintln!("lamp-sim: {error}");
@@ -68,6 +91,7 @@ fn stimulus(args: &[String]) -> Option<std::io::Result<()>> {
         ("sound", [class, dir]) if lamp_sim::stimuli::SOUND_CLASSES.contains(&class.as_str()) => {
             ("sound", class.clone(), dir)
         }
+        ("touch", [kind, dir]) if kind == "tap" || kind == "pet" => ("touch", kind.clone(), dir),
         ("hand", [dir]) => ("hand", "wave".to_owned(), dir),
         ("air", [words @ .., dir]) if !words.is_empty() => ("air", words.join(" "), dir),
         _ => return None,
@@ -76,6 +100,11 @@ fn stimulus(args: &[String]) -> Option<std::io::Result<()>> {
         return Some(Err(std::io::Error::other(
             "air takes key=value words: pm1_0 pm2_5 pm4_0 pm10 humidity temperature co2_ppm",
         )));
+    }
+    if what == "people" && text.trim() == "0" {
+        eprintln!(
+            "lamp-sim: nobody in view; person.arrived comes from `people 1` only after person.left, which needs 5 s of nobody (arrival itself wants 3 s since the last face; watch.rs)"
+        );
     }
     Some(std::fs::write(Path::new(dir).join(file), text))
 }
@@ -121,6 +150,13 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
                 .unwrap_or_default()
         });
     let listen = option(args, "--listen").unwrap_or_else(|| "127.0.0.1:7731".to_owned());
+    // Say so here, not as a pairing failure later: another lamp-sim (or any
+    // program) already has the door's address.
+    if let Err(error) = std::net::TcpListener::bind(&listen) {
+        return Err(std::io::Error::other(format!(
+            "cannot listen on {listen}: {error} (another lamp-sim runs there? pick another with --listen 127.0.0.1:PORT)"
+        )));
+    }
     let bus_root = dir.join("bus");
     let _ = std::fs::remove_dir_all(&bus_root);
     // The servo bus, on its own thread.
@@ -260,7 +296,7 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
                 "--boot-id",
                 &boot_id,
                 "--name",
-                "virtual",
+                &lamp_name(dir),
                 "--bus-root",
                 &bus_root.display().to_string(),
             ])
@@ -409,6 +445,14 @@ fn body_command(bin: &Path, dir: &Path, bus_root: &Path) -> std::io::Result<Comm
             "--torque",
             "on",
         ]);
+    // On a desktop lamp-control runs as the developer, not as `lampos` under
+    // systemd, so lamp-body must be told to let this user hold the body (its
+    // own opt-in, never passed by a product unit). A lamp-body from before that
+    // option does not start: its reason is in body.log.
+    command.args([
+        "--lease-holder-uid",
+        &rustix::process::getuid().as_raw().to_string(),
+    ]);
     command
         .stdout(
             std::fs::OpenOptions::new()
@@ -468,7 +512,7 @@ fn code(dir: &Path, args: &[String]) -> std::io::Result<()> {
                 .and_then(|p| p.parent().map(Path::to_path_buf))
                 .unwrap_or_default()
         });
-    let grants = option(args, "--grants").unwrap_or_else(|| "body,light,speak,look".to_owned());
+    let grants = option(args, "--grants").unwrap_or_else(|| ALL_GRANTS.to_owned());
     let status = watched(bin.join("lamp-control"))
         .args([
             "code",
@@ -481,6 +525,21 @@ fn code(dir: &Path, args: &[String]) -> std::io::Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(std::io::Error::other("lamp-control did not give a code"))
+        Err(std::io::Error::other(
+            "lamp-control did not give a code (is `lamp-sim run` running for this DIR?)",
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_folder_names_its_own_lamp() {
+        let (a, b) = (Path::new("/tmp/lamp-sim-a"), Path::new("/tmp/lamp-sim-b"));
+        assert_ne!(lamp_name(a), lamp_name(b));
+        assert_eq!(lamp_name(a), lamp_name(a));
+        assert!(lamp_name(a).starts_with("virtual-") && lamp_name(a).len() == 14);
     }
 }
