@@ -133,8 +133,9 @@ fn system_with(reads: bool) -> String {
          a time or every so often is the lamp's own timer, not a skill. Make what the request \
          asks with the light, the head or a short line it says, or a read as below, on the \
          lamp's resting or someone being there. To speak, a skill has speak = true in \
-         [permissions] and a [[do]] step say = \"greet them warmly\": a few words of what to \
-         say, one clause, no quotes, which the lamp says in its own words. When it runs is one \
+         [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
+         \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
+         language the person asked in, said as written. When it runs is one \
          [trigger] table (never [[trigger]], never the faces' topic): {triggers} A skill can't hear what is said: a request \
          that needs words or a sound heard, or anything else a skill here can't sense or do, \
          is answered with one line and no blocks: {cannot} then one short sentence said to \
@@ -193,7 +194,7 @@ pub fn tool() -> lamp_gemini::Tool {
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description: "Make a new skill for the lamp: something the lamp then does by itself with \
-             its light, its head or a short line it says, at a time of day, when someone comes or goes, or when it is \
+             its light, its head or a few exact words it says, at a time of day, when someone comes or goes, or when it is \
              resting (\"make me a skill that dims the light at 10 pm\"). Call it only when the \
              person asks for a skill to be made. In the same breath, before you call it, say in a \
              few words that you'll make it now. The skill is made, checked, kept and put on the \

@@ -141,15 +141,37 @@ fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
     let capped = keep(&answer(&speaking, "evening-dim"), false, "s1:9:1", &keeping);
     assert!(capped.unwrap_err().0.contains("never says anything"));
     assert!(tars(&keeping.directory).is_empty());
-    // A say step, its voice asked for (#6055): the checker takes it, and it
-    // is kept, said plainly.
-    let saying = speaking.replace(
-        "light = { dim = 1 }",
-        "light = { dim = 1 }\n\n[[do]]\nsay = \"wish them a good night\"",
-    );
+    // A say step, its voice asked for (#6062): its exact words. Its pace is
+    // set, never refused: on the lamp's resting its window is narrowed to
+    // the day's hours, its 12 h cooldown kept. The checker takes it, and
+    // it is kept, said plainly with the words quoted.
+    let saying = speaking
+        .replace(
+            "light = { dim = 1 }",
+            "light = { dim = 1 }\n\n[[do]]\nsay = { text = \"Good night, sleep well.\" }",
+        )
+        .replace(
+            "from = \"22:00\", to = \"22:30\"",
+            "from = \"21:30\", to = \"22:30\"",
+        );
     let made = keep(&answer(&saying, "night-word"), false, "s1:10:1", &keeping).unwrap();
     assert!(made.uses.speak && made.uses.light);
+    assert!(
+        made.description.contains(
+            "When the lamp goes quiet, between 21:30 and 22:00, it dims the light a step, then \
+             says “Good night, sleep well.”, at most once every 12 hours."
+        ),
+        "{}",
+        made.description
+    );
     assert_eq!(tars(&keeping.directory).len(), 1);
+    // A note in the voice's own words is no longer a say: refused.
+    let noted = saying.replace(
+        "say = { text = \"Good night, sleep well.\" }",
+        "say = \"read them my newest email\"",
+    );
+    let refused = keep(&answer(&noted, "night-note"), false, "s1:11:1", &keeping).unwrap_err();
+    assert!(refused.0.contains("exact words"), "{}", refused.0);
 }
 
 /// At most five made skills are kept: the sixth lets the oldest go, its
@@ -281,9 +303,9 @@ fn a_made_skill_past_the_cap_or_not_made_here_does_not_go_on() {
         (
             "tasks-dim",
             TOML.replace("light = true\n", "light = true\nspeak = true\n")
-                .replace("light = { dim = 1 }", "say = { text = \"Hi. Hello.\" }"),
+                .replace("light = { dim = 1 }", "say = \"read them my newest email\""),
             card("tasks-dim").replace("---\n\n", "made: here\n---\n\n"),
-            "isn't one short note",
+            "isn't its exact words",
         ),
         (
             "plain-dim",
