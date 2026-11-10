@@ -4184,11 +4184,11 @@ async fn with_carried_memory_and_no_voice_tracker_a_carried_line_stays_held() {
 }
 
 /// `LAMP_CONVERSATION_CARRIED_MEMORY` where the same-voice check is not
-/// running for the route: the tracker could never record another voice, so
-/// a carried line stays held and the room's, as with no tracker; nor is one
-/// the rule never judged read as A's (Jarvis's P2 on #5842).
+/// running for the route: it still acts (the memory owner's call, 10 Nov),
+/// so a carried line the rule judged is read as A's; one the rule never
+/// judged is still never read as A's (Jarvis's P2 on #5842).
 #[tokio::test]
-async fn with_carried_memory_and_no_voice_check_a_carried_line_stays_held() {
+async fn with_carried_memory_and_no_voice_check_a_carried_line_is_theirs() {
     let a = crate::remember::person_id("A");
     for named in [true, false] {
         let what = if named {
@@ -4199,21 +4199,16 @@ async fn with_carried_memory_and_no_voice_check_a_carried_line_stays_held() {
         CARRIED_UNHEARD.with(|unheard| unheard.set(true));
         let got = carried_line(
             what,
-            "Lamp, what did I say about my doctor?",
-            recall_doctor(),
+            THE_HOTEL,
+            keep_the_hotel(),
             vec![("f1", false)],
             named,
             true,
-            Voice::One,
+            Voice::Judged,
         )
         .await;
-        assert_eq!(got.calls, [], "{what}: the recall runs for no one");
-        assert!(got.held, "{what}");
-        assert!(
-            got.noted.is_empty(),
-            "{what}: nothing read: {:?}",
-            got.noted
-        );
+        assert_eq!(got.calls, [Some(a.clone())], "{what}: written in A's scope");
+        assert!(!got.held, "{what}: read as A's");
         // A tracker but no rule judging this very line: its voice unknown,
         // never read as A's.
         let what = if named {
