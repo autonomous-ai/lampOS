@@ -162,7 +162,7 @@ pub const REPLY_NAMED_FLAG: &str = "--tasks-reply-named";
 /// (`lamp_tasks::harness::MOST_SESSION_BYTES`).
 const MOST_SESSION_BYTES: usize = 128;
 /// [`START`]'s `session` parameter with [`REPLY_NAMED_FLAG`].
-const SESSION: &str = "Only if the person means earlier work, not a new session: how they said it, its name or what it worked on (\"the book program one\"). Never guessed.";
+const SESSION: &str = "Only for earlier work, not new: as they said it, its name or what it worked on (\"the book program one\"). A change to work handed over in this talk is that work. Never guessed.";
 /// Where the second route reads whether a line whose own words ask one of
 /// the staff by name to do something ("ask Claude Code to …") has its
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
@@ -841,12 +841,30 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
             json!({"type": "string", "description": SESSION}),
         );
     }
+    let mut start_description = start_description;
     if lamp {
         start_parameters["properties"]["where"] = json!({
             "type": "string",
             "enum": [LAMP_TARGET, "computer"],
             "description": WHERE
         });
+        // Measured with tools/task-pick-eval.sh (#5978): the lamp does the
+        // work by default, so the description says what is handed over and
+        // what is not, a short ask is enough, and `who` is for a name said.
+        start_parameters["properties"]["task"]["description"] = json!(TASK_SHORT);
+        if let Some(who) = start_parameters["properties"]
+            .get_mut(WHO)
+            .and_then(|who| who.get_mut("description"))
+            && let Some(said) = who.as_str()
+        {
+            // Nobody named is the lamp's Hermes now, not the computer's agent.
+            let said = said.replace(
+                &format!("Leave it out if they named nobody: then {default} does it."),
+                "Leave it out if they named nobody.",
+            );
+            *who = json!(format!("{said}{WHO_ON_THE_LAMP}"));
+        }
+        start_description = on_the_lamp_description(place, staff);
     }
     let mut tools = vec![
         Tool {
@@ -923,6 +941,43 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
         tools.extend(crate::sign_in::tools());
     }
     tools
+}
+
+/// What `who`'s description gains while the lamp has its own target
+/// (#5978): an agent named sends the work to a computer, so it is never
+/// given for work the lamp does, or for a session or a computer named.
+const WHO_ON_THE_LAMP: &str = " Only a name they said: never for work done here on the lamp, for a session or for \"my computer\".";
+
+/// [`START`]'s description while the tasks part has the lamp's own target
+/// (#5978): work that takes more than a quick answer is handed over, here
+/// to the lamp's Hermes unless a computer or an agent on it is named, and
+/// what the lamp answers or does itself never is. Measured with
+/// `tools/task-pick-eval.sh` (`docs/tasks.md`).
+fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
+    let all = if staff.is_empty() {
+        CLAUDE_CODE.to_owned()
+    } else {
+        names(staff, "and")
+    };
+    let with_who = if choosing(place, staff) {
+        ", with who will do it,"
+    } else {
+        ""
+    };
+    format!(
+        "Hand work to an agent: Hermes here on the lamp, or {all} on the person's {}. Call it \
+         for work that takes more than a quick answer: writing or changing code, files or \
+         documents, research written up, a job of several steps, and whenever they ask one of \
+         their agents to do something. Never for what you can answer in a few words, a story or \
+         joke told aloud, or what your own functions do (your light, reminders, the time, the \
+         weather). A session they name (\"the book program one\") gets `session`, never a recall, \
+         and `where` only if they name a machine (computer, Mac, laptop, PC). Don't ask for \
+         details or who first. {} You can do this: \
+         never say you cannot open files or work on their computer; if they ask you to start an \
+         agent without saying what for, ask in a few words and call this with their answer.",
+        computer(place),
+        read_back(place.lead_in, with_who, place.one_yes)
+    )
 }
 
 /// What [`CHECK`]'s description gains with [`NOW_FLAG`]: progress and work
@@ -1115,16 +1170,28 @@ pub fn session_note(place: &Place) -> Option<String> {
     } else {
         String::new()
     };
+    // With the lamp's own target (#5978), work to be written, coded or
+    // researched is handed over even when nobody is named: to Hermes here.
+    let (yours, lamp) = if lamp_there() {
+        (
+            "a story, a poem or an answer told aloud",
+            " Work to be written down, coded or looked into and written up (a file, a document, \
+         a script, a summary) is not told aloud: hand it over with start_agent_task even when \
+         they name nobody; Hermes here on the lamp does it unless they name their computer.",
+        )
+    } else {
+        ("a story, a poem or anything else", "")
+    };
     Some(format!(
         "\nWhen the person asks to have {whom} do something, it is theirs to do, not yours: \
          hand it over with start_agent_task every time, whatever it is, a story or a poem as \
          much as code, even one you could tell yourself, and even in the middle of a story you \
          are telling. Never do it yourself instead. A name that comes to you garbled, such as \
          \"Claude Co\" for Claude Code, still names them. Work on their {computer} is \
-         theirs too, named or not.{accounts}{questions} But a story, a poem or anything else they ask of you that \
+         theirs too, named or not.{accounts}{questions} But {yours} they ask of you that \
          names neither {whom} nor work on their {computer}, however long, is yours: tell \
          it yourself, gladly, and never offer it to {whom} or ask whether {whom} should, even \
-         after you handed something over earlier in this conversation."
+         after you handed something over earlier in this conversation.{lamp}"
     ))
 }
 
@@ -3287,6 +3354,11 @@ fn nonce() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_nanos())
 }
+
+/// The request a spoken line makes with these functions, for
+/// `tools/task-pick-eval.sh` (#5978).
+#[cfg(test)]
+mod pick_dump;
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -5904,6 +5976,70 @@ pub(crate) mod tests {
             member("office-codex", "codex"),
         ]
     }
+    /// #5978, measured with tools/task-pick-eval.sh: while the lamp has
+    /// its own target, start_agent_task says the lamp's Hermes does work by
+    /// default and what is never handed over, a short ask is enough, and
+    /// `who` is only for a name said; the session note hands written work
+    /// over. Without the target, all of it is as before.
+    #[test]
+    fn with_the_lamps_target_the_hand_over_says_what_goes_where() {
+        let mut at = place(Path::new("/run/t"), true);
+        at.asked = true;
+        at.lead_in = true;
+        at.staff_note = true;
+        at.named_only = true;
+        at.reply_named = true;
+        let staff = vec![member("office", "claude")];
+        let start = |lamp: bool| {
+            declared_on(&at, &staff, lamp)
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .unwrap()
+        };
+        let (off, on) = (start(false), start(true));
+        assert_eq!(off, declared(&at, &staff)[0]);
+        assert!(on.validate().is_ok());
+        for words in [
+            "Hermes here on the lamp, or Claude Code on the person's office computer",
+            "more than a quick answer",
+            "Never for what you can answer in a few words, a story or joke told aloud",
+            "your light, reminders, the time, the weather",
+            "`where` only if they name a machine (computer, Mac, laptop, PC)",
+            "Don't ask for details or who first",
+        ] {
+            assert!(on.description.contains(words), "{words}");
+            assert!(!off.description.contains(words), "{words}");
+        }
+        let parameters = on.parameters.unwrap();
+        assert_eq!(parameters["properties"]["task"]["description"], TASK_SHORT);
+        let who = parameters["properties"]["who"]["description"]
+            .as_str()
+            .unwrap();
+        assert!(who.ends_with(WHO_ON_THE_LAMP), "{who}");
+        assert!(!who.contains("then Claude Code does it"), "{who}");
+        assert!(SESSION.contains("A change to work handed over in this talk is that work"));
+        let note = |there: bool| {
+            LAMP_THERE_HERE.with(|here| here.set(Some(there)));
+            let note = session_note(&at).unwrap();
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            note
+        };
+        let (before, lamp) = (note(false), note(true));
+        assert!(
+            before.contains("a story, a poem or anything else"),
+            "{before}"
+        );
+        assert!(!before.contains("Hermes"), "{before}");
+        assert!(
+            lamp.contains("a story, a poem or an answer told aloud"),
+            "{lamp}"
+        );
+        assert!(lamp.ends_with(
+            "hand it over with start_agent_task even when they name nobody; Hermes here on the \
+             lamp does it unless they name their computer."
+        ));
+    }
+
     /// `start_agent_task` says the staff's note names who only with the
     /// note on and work asked of the staff; otherwise it is as before.
     #[test]
@@ -7029,10 +7165,21 @@ pub(crate) mod tests {
                     switched.now = now;
                     // `LAMP_TASKS_ONE_YES`'s read-back sentence (#5169).
                     switched.one_yes = one_yes;
-                    for tool in super::declared(&switched, &staff) {
+                    // The lamp's own target (#5978) changes start_agent_task's
+                    // description and parameters; with the session's too.
+                    switched.reply_named = true;
+                    for (lamp, tool) in super::declared(&switched, &staff)
+                        .into_iter()
+                        .map(|tool| (false, tool))
+                        .chain(
+                            declared_on(&switched, &staff, true)
+                                .into_iter()
+                                .map(|tool| (true, tool)),
+                        )
+                    {
                         if tool.validate().is_err() {
                             refused.push(format!(
-                                "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}, correct {correct}, now {now}, one yes {one_yes}: {} bytes",
+                                "{} with {} of the staff, lamp {lamp}, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}, correct {correct}, now {now}, one yes {one_yes}: {} bytes",
                                 tool.name,
                                 staff.len(),
                                 tool.description.len()
