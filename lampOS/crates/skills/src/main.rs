@@ -5124,6 +5124,9 @@ mod tests {
                     folders.push(path);
                 } else if let Ok(text) = std::fs::read_to_string(&path) {
                     files += 1;
+                    // A unit's `ExecStart=` may continue over a backslash and a newline:
+                    // read it as the one line systemd runs.
+                    let text = text.replace("\\\n", " ");
                     for flag in ["--push-dir", "--dev-dir"] {
                         assert!(
                             !text
