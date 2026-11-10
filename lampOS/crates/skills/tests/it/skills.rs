@@ -875,7 +875,8 @@ fn a_read_step_reads_only_what_its_permissions_list() {
             "speak = true\nservices = { google_calendar = \"write\" }\n",
             "",
             CALENDAR,
-            "only \"read\"; a skill never writes to a service",
+            // A write is #6066's, and only with its switch on.
+            "a skill's writes are off on this lamp (LAMP_SKILL_WRITES is not on)",
         ),
         (
             "send-only",
