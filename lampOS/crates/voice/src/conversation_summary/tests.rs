@@ -736,6 +736,48 @@ fn a_forget_from_the_app_drops_the_waiting_write_with_the_summary_off() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
+/// Jarvis's P3 on #6073: with the running summary off, memory's forget of
+/// a person from the app also drops the service records the voice holds
+/// of theirs (`LAMP_SERVICE_RECORDS`), mail text included, so nothing of
+/// them is told after it (`LAMP_SERVICE_RECORDS_TOLD`).
+#[test]
+fn a_forget_from_the_app_drops_the_held_service_records_with_the_summary_off() {
+    use crate::service_records as records;
+    let root = std::path::PathBuf::from(format!("/tmp/lvs-forgot-r-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+    let mut memory = bus
+        .publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            "memory",
+        )
+        .unwrap();
+    let person = crate::remember::person_id("Octavia records");
+    records::on_for_test(true);
+    records::read(
+        &person,
+        &serde_json::json!({"service":"gmail","what":"search","query":"party"}),
+        &serde_json::json!({"quoted":[]}),
+    );
+    let theirs = || records::held().iter().any(|record| record.person == person);
+    assert!(theirs(), "held");
+    memory
+        .publish_json(
+            1,
+            &lamp_msgs::MemoryForgot {
+                person: Some(person.clone()),
+            },
+        )
+        .unwrap();
+    memory_forgot_waiting(&mut forgot, 1_000_000);
+    assert!(!theirs(), "dropped");
+    records::on_for_test(false);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 /// The reviewer-lead's P2 on #4479: memory's forget from the app
 /// (`memory/forgot`) reaches the conversation as a voice-tool forget does:
 /// a person's, the room's ("everyone") or every person's drops the thread,

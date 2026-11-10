@@ -351,28 +351,95 @@ impl Days {
     /// [`LIST_MOST`]).
     pub fn service_records(&self, person: &Person, limit: usize) -> Result<Vec<Value>> {
         owner_only(person)?;
-        let mut statement = self.db.prepare(
-            "SELECT key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by FROM service_records WHERE person=?1 ORDER BY changed_unix_ms DESC, asked_unix_ms DESC, key LIMIT ?2",
+        let mut statement = self.db.prepare(&format!(
+            "SELECT {COLUMNS} FROM service_records WHERE person=?1 ORDER BY changed_unix_ms DESC, asked_unix_ms DESC, key LIMIT ?2"
+        ))?;
+        let rows = statement.query_map(
+            params![person.as_str(), limit.min(LIST_MOST) as i64],
+            listed,
         )?;
-        let rows =
-            statement.query_map(params![person.as_str(), limit.min(LIST_MOST) as i64], |r| {
-                let detail: String = r.get(5)?;
-                let links: String = r.get(9)?;
-                Ok(json!({
-                    "key": r.get::<_, String>(0)?,
-                    "service": r.get::<_, String>(1)?,
-                    "action": r.get::<_, String>(2)?,
-                    "status": r.get::<_, String>(3)?,
-                    "reason": r.get::<_, String>(4)?,
-                    "detail": serde_json::from_str::<Value>(&detail).unwrap_or_else(|_| json!({})),
-                    "result_id": r.get::<_, String>(6)?,
-                    "asked_unix_ms": r.get::<_, i64>(7)?,
-                    "changed_unix_ms": r.get::<_, i64>(8)?,
-                    "links": serde_json::from_str::<Value>(&links).unwrap_or_else(|_| json!([])),
-                    "replaced_by": r.get::<_, String>(10)?,
-                }))
-            })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// `person`'s records whose words match `about` (a recall's words, the
+    /// voice's `LAMP_SERVICE_RECORDS_TOLD`), whatever their age: the most
+    /// words matched first, then the latest change; at most `limit` (and
+    /// [`LIST_MOST`]). A word matches a record's word lower case, without
+    /// accents, as its singular, or as the start of a longer one
+    /// ("octavia" finds `octaviabmu@gmail.com`); small words ("the",
+    /// "that", "did") match nothing.
+    pub fn service_records_about(
+        &self,
+        person: &Person,
+        about: &str,
+        limit: usize,
+    ) -> Result<Vec<Value>> {
+        owner_only(person)?;
+        let wanted: Vec<String> = folded(about)
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|word| word.len() > 1 && !SMALL_WORDS.contains(word))
+            .map(|word| singular(if word == "email" { "mail" } else { word }))
+            .collect();
+        if wanted.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut scored: Vec<(usize, i64, i64, String)> = {
+            let mut statement = self.db.prepare(
+                "SELECT key, service||' '||action||' '||reason||' '||result_id, detail, changed_unix_ms, asked_unix_ms FROM service_records WHERE person=?1",
+            )?;
+            let rows = statement.query_map([person.as_str()], |r| {
+                let mut text: String = r.get(1)?;
+                let detail: String = r.get(2)?;
+                text.push(' ');
+                if let Ok(detail) = serde_json::from_str::<Value>(&detail) {
+                    words_of(&detail, &mut text);
+                }
+                Ok((
+                    r.get::<_, String>(0)?,
+                    text,
+                    r.get::<_, i64>(3)?,
+                    r.get::<_, i64>(4)?,
+                ))
+            })?;
+            let mut scored = Vec::new();
+            for row in rows {
+                let (key, text, changed, asked) = row?;
+                let text = folded(&text);
+                let words: Vec<String> = text
+                    .split(|c: char| !c.is_alphanumeric())
+                    .filter(|word| !word.is_empty())
+                    .map(singular)
+                    .collect();
+                let score = wanted
+                    .iter()
+                    .filter(|want| {
+                        words.iter().any(|word| {
+                            word.as_str() == want.as_str()
+                                || (want.len() >= 4 && word.starts_with(want.as_str()))
+                        })
+                    })
+                    .count();
+                if score > 0 {
+                    scored.push((score, changed, asked, key));
+                }
+            }
+            scored
+        };
+        scored.sort_by(|a, b| (b.0, b.1, b.2, &a.3).cmp(&(a.0, a.1, a.2, &b.3)));
+        scored.truncate(limit.min(LIST_MOST));
+        let mut found = Vec::new();
+        for (_, _, _, key) in scored {
+            let mut statement = self.db.prepare_cached(&format!(
+                "SELECT {COLUMNS} FROM service_records WHERE person=?1 AND key=?2"
+            ))?;
+            if let Some(record) = statement
+                .query_row(params![person.as_str(), key], listed)
+                .optional()?
+            {
+                found.push(record);
+            }
+        }
+        Ok(found)
     }
 
     /// The records of `person` about every key word of any of `about`
@@ -430,6 +497,38 @@ impl Days {
         Ok(removed)
     }
 }
+
+/// A record's columns, as [`listed`] reads them.
+const COLUMNS: &str = "key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by";
+
+/// One record of [`COLUMNS`], as a list gives it.
+fn listed(r: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
+    let detail: String = r.get(5)?;
+    let links: String = r.get(9)?;
+    Ok(json!({
+        "key": r.get::<_, String>(0)?,
+        "service": r.get::<_, String>(1)?,
+        "action": r.get::<_, String>(2)?,
+        "status": r.get::<_, String>(3)?,
+        "reason": r.get::<_, String>(4)?,
+        "detail": serde_json::from_str::<Value>(&detail).unwrap_or_else(|_| json!({})),
+        "result_id": r.get::<_, String>(6)?,
+        "asked_unix_ms": r.get::<_, i64>(7)?,
+        "changed_unix_ms": r.get::<_, i64>(8)?,
+        "links": serde_json::from_str::<Value>(&links).unwrap_or_else(|_| json!([])),
+        "replaced_by": r.get::<_, String>(10)?,
+    }))
+}
+
+/// Words a recall's search of the records passes over: they would match
+/// every record.
+const SMALL_WORDS: [&str; 52] = [
+    "the", "an", "that", "this", "these", "those", "to", "for", "of", "my", "me", "you", "your",
+    "did", "do", "does", "it", "its", "about", "with", "on", "in", "at", "what", "which",
+    "happened", "and", "or", "is", "was", "were", "are", "be", "from", "we", "our", "us", "he",
+    "she", "they", "them", "there", "any", "some", "again", "please", "lamp", "hey", "ok", "okay",
+    "one", "thing",
+];
 
 /// Past [`MOST_PER_PERSON`], `person`'s record changed longest ago goes.
 fn trim(tx: &Transaction<'_>, person: &Person) -> Result<()> {
@@ -847,6 +946,80 @@ mod tests {
             .collect();
         kept.sort();
         assert_eq!(kept, ["d1", "p2"]);
+    }
+
+    /// `LAMP_SERVICE_RECORDS_TOLD`: a recall's words find the record they
+    /// are about, whatever its age (past the 50 latest a list gives), with
+    /// all its details; the best match first; small words find nothing;
+    /// another person's never.
+    #[test]
+    fn a_recall_finds_a_record_by_its_words_whatever_its_age() {
+        let (_scratch, mut store) = Scratch::new("about");
+        let year_ago = NOW - 365 * DAY_MS;
+        let mut party = put(
+            OWNER,
+            "party",
+            "cancelled",
+            "the lamp answered after the read-back with no send",
+            year_ago,
+        );
+        party["asked_unix_ms"] = json!(year_ago);
+        send(&mut store, party);
+        let mail = json!({
+            "op":"service_record","person":OWNER,"key":"mail","service":"gmail",
+            "action":"send_mail","status":"done","result_id":"m-77",
+            "detail":{"to":["octaviabmu@gmail.com"],"subject":"Sunday","text":"Hi Octavia, see you Sunday"},
+            "asked_unix_ms":year_ago + 1,"changed_unix_ms":year_ago + 1,
+        });
+        send(&mut store, mail);
+        send(&mut store, put(OTHER, "theirs", "done", "", NOW));
+        // Sixty newer asks, so neither is among the latest a list gives.
+        for n in 0..60u64 {
+            let drive = json!({
+                "op":"service_record","person":OWNER,"key":format!("d{n}"),"service":"google_drive",
+                "action":"search","status":"no_result","detail":{"query":"invoice"},
+                "asked_unix_ms":NOW + n,"changed_unix_ms":NOW + n,
+            });
+            send(&mut store, drive);
+        }
+        let latest = records(&mut store, OWNER);
+        assert!(
+            latest
+                .iter()
+                .all(|r| r["key"] != "party" && r["key"] != "mail")
+        );
+        let about = |store: &mut Days, words: &str| -> Vec<Value> {
+            let found = send(
+                store,
+                json!({"op":"service_records","person":OWNER,"about":words,"limit":5}),
+            );
+            assert_eq!(found["ok"], true, "{found}");
+            found["records"].as_array().unwrap().clone()
+        };
+        let found = about(&mut store, "that party event");
+        assert_eq!(
+            found.first().map(|r| r["key"].clone()),
+            Some(json!("party")),
+            "{found:?}"
+        );
+        assert_eq!(found[0]["status"], "cancelled");
+        assert_eq!(
+            found[0]["reason"],
+            "the lamp answered after the read-back with no send"
+        );
+        assert_eq!(found[0]["detail"]["start"], "2026-11-15T19:00:00+07:00");
+        let found = about(&mut store, "the email to Octavia");
+        assert_eq!(
+            found.first().map(|r| r["key"].clone()),
+            Some(json!("mail")),
+            "{found:?}"
+        );
+        assert_eq!(found[0]["detail"]["text"], "Hi Octavia, see you Sunday");
+        assert_eq!(found[0]["result_id"], "m-77");
+        assert_eq!(about(&mut store, "the parties").len(), 1);
+        assert!(about(&mut store, "birthday").is_empty());
+        assert!(about(&mut store, "did you do that").is_empty());
+        assert!(about(&mut store, "invoice").len() <= 5);
     }
 
     /// Bounded: past the most a person keeps, the record changed longest

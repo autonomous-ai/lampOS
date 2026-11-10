@@ -1264,7 +1264,8 @@ fn owner_among(
 }
 
 /// Whether the owner is the only face the eyes see now
-/// (`known_faces::most_faces_lately`); no count is not alone.
+/// (`known_faces::most_faces_lately`); no count is not alone. One of the
+/// checks for the owner's service records told in full ([`records_in_full`]).
 fn owner_alone() -> bool {
     crate::known_faces::most_faces_lately() == Some(1)
 }
@@ -1277,6 +1278,40 @@ pub fn read_in_full(alone: bool, likeness: Option<f32>, seen_owner: bool) -> boo
     seen_owner
         && alone
         && likeness.is_some_and(|likeness| likeness >= crate::same_voice::SERVICES_SAME_FROM)
+}
+
+/// Whether the owner's service records are told in full
+/// (`service_records::told`), as a read is said in full: in the private
+/// room, or [`read_in_full`]'s three checks. `likeness` is asked only for
+/// the owner seen saying the line alone in view.
+pub(crate) fn told_in_full(
+    private_room: bool,
+    alone: bool,
+    seen_owner: bool,
+    likeness: impl FnOnce() -> Option<f32>,
+) -> bool {
+    private_room || (alone && seen_owner && read_in_full(alone, likeness(), seen_owner))
+}
+
+/// [`told_in_full`] for the line `request` of the owner `owner` (memory
+/// id): the read's checks, its voice asked once of the second route's
+/// judge (the owner's enrolled print when they have one, else the
+/// conversation's voice) and never waited for, so a print not made yet
+/// tells the brief form; no judge, brief.
+pub(crate) fn records_in_full(request: u64, owner: &str) -> bool {
+    told_in_full(
+        crate::person::private_room(),
+        owner_alone(),
+        seen_saying_owner(request, owner).0,
+        || {
+            let ask = if crate::owner_voice::enrolled(owner).is_some() {
+                VoiceAsk::Owner(request)
+            } else {
+                VoiceAsk::Conversation(request)
+            };
+            judge().and_then(|judge| judge(ask))
+        },
+    )
 }
 
 /// Whether the owner's face (memory id `owner`) was seen saying the line

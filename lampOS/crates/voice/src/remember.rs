@@ -10692,13 +10692,77 @@ impl DaysClient {
             }
         }
         let mut told = json!({"found":found,"untrusted":true,"scope":BOTH_SCOPE});
-        if ids.is_empty() {
+        // Their service records that the words fit, whatever their age
+        // (`LAMP_SERVICE_RECORDS_TOLD`).
+        let taken = told.to_string().len();
+        let records = deadline.checked_sub(started.elapsed()).and_then(|left| {
+            self.records_recalled(request, person, left, (now, zone), lease, taken)
+        });
+        if let Some(records) = records {
+            told["service_records"] = records;
+        } else if ids.is_empty() {
             told["note"] = json!("Nothing about that in what I remember.");
         }
         if partial {
             mark_partial_span(&mut told);
         }
         Some((told, ids))
+    }
+
+    /// `LAMP_SERVICE_RECORDS_TOLD`: `person`'s service records that a
+    /// recall's words fit, searched in the memory whatever their age
+    /// (`service_records` with `about`), as `service_records::told`
+    /// tells them. Only for a line that passes the services' owner check
+    /// (`services::owner_of`, never the one-face rule) as `person`'s; without
+    /// the read's checks not had (`services::records_in_full`), the status
+    /// only.
+    /// None with the switch off, no words, or no answer in `left`; at most
+    /// what is left of the answer's room past `room_taken`.
+    fn records_recalled(
+        &self,
+        request: &Value,
+        person: &str,
+        left: Duration,
+        (now, zone): (u64, Option<&LocalTime>),
+        lease: Option<&crate::memory_scope::ScopeLease>,
+        room_taken: usize,
+    ) -> Option<Value> {
+        use crate::service_records::told;
+        if !told::on() {
+            return None;
+        }
+        let about = request["query"]
+            .as_str()
+            .map(str::trim)
+            .filter(|about| !about.is_empty())?;
+        let owner = crate::services::owner_of(lease)?;
+        if told::person_for(&owner).as_deref() != Some(person) {
+            return None;
+        }
+        let in_full = crate::services::records_in_full(lease?.key().request, &owner);
+        let answer = exchange_within(
+            &self.socket,
+            &told::about_request(person, about),
+            left,
+            lease,
+            told::FOUND_ANSWER_BYTES,
+        )?;
+        let offset = zone.map_or(0, |zone| zone.offset_minutes_at(now));
+        // Within what the recall's answer has room for.
+        let room = lamp_gemini::MAX_TOOL_JSON_BYTES
+            .saturating_sub(room_taken + 64)
+            .min(told::RECALL_BYTES);
+        let found = told::recall_told(&answer, in_full, now, offset, room)?;
+        eprintln!(
+            "lamp-voice provider: a recall is told {} service record(s), {} (LAMP_SERVICE_RECORDS_TOLD)",
+            found["records"].as_array().map_or(0, Vec::len),
+            if in_full {
+                "in full"
+            } else {
+                "the status only"
+            }
+        );
+        Some(found)
     }
 
     /// Nonblocking handoff. Provenance is captured here, never when a queued

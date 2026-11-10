@@ -2081,6 +2081,53 @@ the store's side in [memory-days](memory-days.md)):
 - **Off**, nothing is kept or written, and the receipts are kept exactly as
   before.
 
+### Records told (`LAMP_SERVICE_RECORDS_TOLD`, off unless set)
+
+With `LAMP_SERVICE_RECORDS_TOLD=on` too (the second route only; it acts only
+with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
+`crates/voice/src/service_records/told.rs`), the lamp knows what it did:
+
+- **The note.** Each spoken line that passes the owner check (`owner_of`,
+  as `OWNER_ONLY`; never the memory's one-face rule) is told the owner's
+  recent records beside it, one line each, the latest first:
+  `Calendar · create 'Hamburger party' · Sun 15 Nov 19:00–22:00 · cancelled:
+  the lamp answered after the read-back with no send · today 15:40`,
+  `Drive · search 'Sunday' · no result · today 15:34`. The latest 5, plus any still `prepared` or `failed` changed
+  in the last 7 days, at most 10 lines and 1,200 bytes (the oldest lines go
+  first, and how many is said). With them the rule: "Your past service
+  actions are listed with their status. Never claim something was done
+  unless its record says done; never say you can't do something a record
+  shows you did." Read from what the voice holds, never waited for; after a
+  start the owner's records are asked of the memory once beside the turns
+  (an answer asked before a forget that ran since is dropped), and a write
+  left `prepared` by the restart is `timed_out` ("no send came before the
+  lamp restarted"). A note of five calendar or mail lines is
+  about 700 bytes.
+- **Recall.** `recall`'s words search all the owner's records in the memory,
+  whatever their age (`service_records` with `about`, at most 5), and the
+  answer carries them under `service_records`: each one's line, status,
+  reason, when, and what it was asked with (a write's in full).
+- **Who hears.** In full only as a read is said in full
+  (`services::told_in_full`, the same checks as `read_in_full`): the
+  owner's face seen saying the line, the owner the one face in view, and
+  the line in the conversation's voice (the owner's enrolled print when
+  they have one) at 0.55 or over, asked once and never waited for. Any of
+  them missing or not known yet, the note and recall give each record's
+  service, status and when only, never what it was about, its reason or
+  what a read found. In the private room (`LAMP_PRIVATE_ROOM`) they are
+  always in full, as reads are.
+- **Quoted data.** What a read found is the service's data every time it is
+  shown: its first title marked «…» in the note with `DATA_NOTE`, and the
+  finds under `quoted` with `DATA_NOTE` in recall.
+- **An app forget.** Memory's forget of a person from the app drops the
+  records the voice holds of theirs, with the running summary on or off
+  (`conversation_summary::memory_forgot_waiting` as well as
+  `memory_forgot_from`), so nothing of theirs is told after it.
+- One journal line a told note or recall: counts, bytes and in full or not,
+  never content. **Off**, nothing is told and recall is as before. The rule's
+  effect on what the model says is still to be measured on the real model on
+  lamp-06c1.
+
 ## The voice is told what is linked (`LAMP_SERVICES_TOLD`, #5523, off unless set)
 
 A marketing tester linked a service in the app's Connectors on 6 Nov and

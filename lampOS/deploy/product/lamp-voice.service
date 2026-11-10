@@ -599,6 +599,9 @@ Environment=LAMP_MEMORY_DOUBT_UNDOES=on
 # a played correction is either replaced or kept alone, so its earlier:true is not reachable as played.
 # LAMP_SERVICE_RECORDS stays off (connector records, PR 1a): each linked-service ask kept in memory with its status,
 # until its lamp check on lamp-06c1 (create, cancel, ask; restart; forget about it; time to first audio) passes.
+# LAMP_SERVICE_RECORDS_TOLD stays off too (PR 1b): the owner's turns told their recent records, recall searching them,
+# acting only with LAMP_SERVICE_RECORDS; until its lamp check on lamp-06c1 (create an event, cancel it, "what happened
+# with the party?"; restart lamp-voice, ask again; time to first audio) passes and its rule is measured on the real model.
 Environment=LAMP_MEMORY_STRENGTH=on
 Environment=LAMP_MEMORY_PROFILE=on
 # The nightly pass (extraction plan C, step B; docs/memory.md, "The nightly pass"): 03:00 to 06:00 local, after

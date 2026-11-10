@@ -420,8 +420,15 @@ pub fn memory_forgot(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> usiz
 /// `8c1cbd4268`: the forget reached the write only through the summary's
 /// reader). How many there were.
 pub fn memory_forgot_waiting(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> usize {
-    let forgets = forgot
-        .forgotten(now_us)
+    let forgotten = forgot.forgotten(now_us);
+    // The service records the voice holds of each (`LAMP_SERVICE_RECORDS`),
+    // as [`memory_forgot_from`] drops them with the summary on: an app's
+    // forget of a person reaches them here too (Jarvis's P3 on #6073), so
+    // what the records tell (`LAMP_SERVICE_RECORDS_TOLD`) never keeps them.
+    for person in &forgotten {
+        crate::service_records::forgot(person.as_deref());
+    }
+    let forgets = forgotten
         .iter()
         .filter(|person| memory_forgot_talk(person.as_deref()))
         .count();

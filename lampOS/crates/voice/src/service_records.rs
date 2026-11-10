@@ -143,6 +143,8 @@ pub struct Ledger {
     receipts: VecDeque<Receipt>,
     records: VecDeque<Record>,
     made: u64,
+    /// How many forgets ran (`forgot`, `forgot_about`).
+    forgets: u64,
 }
 
 /// The record changes waiting to be written, oldest first: one a key, the
@@ -820,6 +822,7 @@ pub fn forgot(person: Option<&str>) {
             .map(|record| record.key.clone())
             .collect();
         ledger.records.retain(|record| !theirs(record));
+        ledger.forgets += 1;
         for receipt in &mut ledger.receipts {
             if receipt
                 .record
@@ -920,6 +923,7 @@ pub fn forgot_about(person: &str, about: &[Vec<String>]) {
             .map(|record| record.key.clone())
             .collect();
         ledger.records.retain(|record| !gone.contains(&record.key));
+        ledger.forgets += 1;
         for receipt in &mut ledger.receipts {
             if receipt
                 .record
@@ -936,6 +940,12 @@ pub fn forgot_about(person: &str, about: &[Vec<String>]) {
             .waiting
             .retain(|record| !gone.contains(&record.key) && !matches(record));
     });
+}
+
+/// How many forgets ran: the list after a start ([`told::merge`]) is
+/// dropped when one ran since it was asked.
+pub fn forgets() -> u64 {
+    kept::ledger(|ledger| ledger.forgets)
 }
 
 /// The records held now, oldest first (tests and the note of PR 1b).
@@ -1051,6 +1061,8 @@ fn start_saver() {
 
 #[cfg(test)]
 fn start_saver() {}
+
+pub mod told;
 
 #[cfg(test)]
 mod tests;

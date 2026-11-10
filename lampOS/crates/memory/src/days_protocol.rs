@@ -296,12 +296,17 @@ enum Extra {
         replaced_by: String,
     },
     /// `LAMP_SERVICE_RECORDS`: a known person's records, the latest change
-    /// first (`Days::service_records`).
+    /// first (`Days::service_records`); with `about` (the voice's
+    /// `LAMP_SERVICE_RECORDS_TOLD`, a recall's words), those its words
+    /// match, the best first, whatever their age
+    /// (`Days::service_records_about`).
     ServiceRecords {
         #[serde(default)]
         person: Who,
         #[serde(default)]
         limit: Option<u64>,
+        #[serde(default)]
+        about: Option<String>,
     },
     /// `LAMP_SERVICE_RECORDS`: the records about a forget's key words
     /// removed (`Days::service_records_forget`).
@@ -1098,9 +1103,17 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             )?;
             json!({"ok":true,"status":kept})
         }
-        Extra::ServiceRecords { person, limit } => {
+        Extra::ServiceRecords {
+            person,
+            limit,
+            about,
+        } => {
             let limit = limit.unwrap_or(crate::service_records::LIST_MOST as u64) as usize;
-            json!({"ok":true,"records":store.service_records(&one(person)?, limit)?})
+            let records = match about {
+                Some(about) => store.service_records_about(&one(person)?, &about, limit)?,
+                None => store.service_records(&one(person)?, limit)?,
+            };
+            json!({"ok":true,"records":records})
         }
         Extra::ServiceRecordsForget { person, about } => {
             json!({"ok":true,"removed":store.service_records_forget(&one(person)?, &about)?})

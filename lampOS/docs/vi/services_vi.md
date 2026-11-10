@@ -2128,6 +2128,54 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   `memory-days_vi.md`).
 - Tắt: không giữ, không ghi gì.
 
+### Báo lại các bản ghi (`LAMP_SERVICE_RECORDS_TOLD`, tắt trừ khi bật)
+
+Khi bật thêm `LAMP_SERVICE_RECORDS_TOLD=on` (chỉ tuyến thứ hai; chỉ có tác
+dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b,
+`crates/voice/src/service_records/told.rs`), đèn biết mình đã làm gì:
+
+- **Ghi chú.** Mỗi câu nói qua kiểm tra chủ (`owner_of`, như `OWNER_ONLY`;
+  không bao giờ là quy tắc một khuôn mặt của memory) được báo kèm các bản
+  ghi gần đây của chủ, mỗi bản một dòng, mới nhất trước, ví dụ
+  `Calendar · create 'Hamburger party' · Sun 15 Nov 19:00–22:00 · cancelled:
+  the lamp answered after the read-back with no send · today 15:40`,
+  `Drive · search 'Sunday' · no result · today 15:34`. Gồm 5
+  bản mới nhất, cộng các bản còn
+  `prepared` hay `failed` đổi trong 7 ngày qua, tối đa 10 dòng và 1.200 byte
+  (dòng cũ nhất bỏ trước, và nói bỏ bao nhiêu). Kèm quy tắc: "Your past
+  service actions are listed with their status. Never claim something was
+  done unless its record says done; never say you can't do something a
+  record shows you did." Đọc từ những gì voice giữ, không bao giờ chờ; sau
+  khi khởi động, các bản ghi của chủ được hỏi memory một lần bên cạnh các
+  lượt (câu trả lời hỏi trước một lần quên chạy sau đó bị bỏ), và một lần
+  ghi còn `prepared` qua lần khởi động lại thành `timed_out` ("no send came
+  before the lamp restarted"). Một ghi chú năm dòng lịch hay thư khoảng 700
+  byte.
+- **Recall.** Các từ của `recall` tìm trong mọi bản ghi của chủ ở memory,
+  bất kể cũ đến đâu (`service_records` với `about`, tối đa 5), và câu trả
+  lời mang chúng dưới `service_records`: dòng, trạng thái, lý do, thời điểm
+  và những gì được hỏi (lần ghi thì đầy đủ).
+- **Ai được nghe.** Chỉ đầy đủ như một lần đọc được nói đầy đủ
+  (`services::told_in_full`, cùng các kiểm tra của `read_in_full`): mặt chủ
+  được thấy đang nói câu đó, chủ là khuôn mặt duy nhất trong tầm nhìn, và
+  câu nói đúng giọng của cuộc trò chuyện (bản giọng đã đăng ký của chủ nếu
+  có) từ 0,55 trở lên, hỏi một lần và không bao giờ chờ. Thiếu hay chưa
+  biết bất kỳ điều nào, ghi chú và recall chỉ nói dịch vụ, trạng thái và
+  thời điểm của mỗi bản ghi, không bao giờ nội dung, lý do hay những gì lần
+  đọc tìm thấy. Trong phòng riêng (`LAMP_PRIVATE_ROOM`) luôn đầy đủ, như các
+  lần đọc.
+- **Dữ liệu được trích.** Những gì lần đọc tìm thấy luôn là dữ liệu của dịch
+  vụ: tiêu đề đầu tiên được đánh dấu «…» trong ghi chú cùng `DATA_NOTE`, và
+  các kết quả nằm dưới `quoted` cùng `DATA_NOTE` trong recall.
+- **Quên từ ứng dụng.** Khi memory quên một người theo yêu cầu từ ứng dụng,
+  các bản ghi voice giữ của người đó bị bỏ, dù tóm tắt chạy bật hay tắt
+  (`conversation_summary::memory_forgot_waiting` cũng như
+  `memory_forgot_from`), nên sau đó không còn gì của họ được báo.
+- Mỗi ghi chú hay recall được báo một dòng nhật ký: số lượng, byte và có đầy
+  đủ hay không, không bao giờ nội dung. **Tắt**, không báo gì và recall như
+  trước. Tác dụng của quy tắc lên lời model nói vẫn cần đo trên model thật
+  trên lamp-06c1.
+
 ## Giọng nói được báo những gì đã liên kết (`LAMP_SERVICES_TOLD`, #5523, tắt trừ khi bật)
 
 Ngày 6/11 một người thử của nhóm marketing liên kết một dịch vụ trong mục

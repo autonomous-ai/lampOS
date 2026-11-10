@@ -664,7 +664,14 @@ unchanged.
   `detail` is an object of at most 16 KiB; `reason` is tidied to 200 bytes,
   `result_id` (the service's id of what was made, an event id) to 512.
 - `service_records {person, limit?}` lists them, the latest change first,
-  at most 50.
+  at most 50. With `about` (the voice's `LAMP_SERVICE_RECORDS_TOLD`, a
+  recall's words), it gives instead the records those words match, whatever
+  their age: the most words matched first, then the latest change. A word
+  matches a record's word (service, action, reason, result id or any text of
+  the detail) lower case, without accents, as a singular, or, at four letters
+  or more, as the start of a longer one ("octavia" finds
+  `octaviabmu@gmail.com`); "email" is "mail"; small words ("the", "that",
+  "did", "you") match nothing, so words of only those find none.
 - `service_records_forget {person, about}` removes the records with every
   key word of any subject of `about` (lists of words), compared lower case,
   without accents and as singulars, in the service, action, reason, result

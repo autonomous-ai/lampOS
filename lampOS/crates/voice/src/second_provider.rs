@@ -1622,6 +1622,9 @@ struct Shared {
     /// With `LAMP_SERVICES_TOLD=on`: the note for the owner's line naming
     /// what is linked in the app's Connectors ([`Engine::telling_what_is_linked`]).
     linked: Option<Remembered>,
+    /// With `LAMP_SERVICE_RECORDS_TOLD=on`: the note for the owner's line
+    /// with their recent service records ([`Engine::telling_service_records`]).
+    records: Option<Remembered>,
     /// What memory holds that may fit a spoken request's words
     /// ([`Engine::remembering`]).
     remembered: Option<Remembered>,
@@ -4354,6 +4357,7 @@ impl Engine {
                 staff: None,
                 place: None,
                 linked: None,
+                records: None,
                 remembered: None,
                 dont_know: None,
                 event_turn: None,
@@ -5791,6 +5795,17 @@ impl Engine {
     pub fn telling_what_is_linked(mut self, linked: Remembered) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.linked = Some(linked);
+        }
+        self
+    }
+
+    /// A spoken request is asked with the owner's recent service records
+    /// beside it, when the line is the owner's (`LAMP_SERVICE_RECORDS_TOLD=on`,
+    /// `crate::service_records::told`): read from what the voice holds, no
+    /// wait. Before any turn only.
+    pub fn telling_service_records(mut self, records: Remembered) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.records = Some(records);
         }
         self
     }
@@ -9737,6 +9752,12 @@ async fn spoken(
         .linked
         .as_ref()
         .and_then(|linked| linked(request, &text, scope.as_ref()));
+    // The owner's recent service records, beside the owner's own line alone
+    // (`LAMP_SERVICE_RECORDS_TOLD`): what the voice holds, no wait.
+    let records = shared
+        .records
+        .as_ref()
+        .and_then(|records| records(request, &text, scope.as_ref()));
     // What memory holds for these words: the prepared chat's, when it was
     // begun on them (so its round still stands), else asked now, off the
     // runtime's thread (Fourth's P3 on #2229).
@@ -9888,6 +9909,7 @@ async fn spoken(
         .chain(staff)
         .chain(place)
         .chain(linked)
+        .chain(records)
         .chain(remembered)
         .chain(named)
         .chain(wake)
