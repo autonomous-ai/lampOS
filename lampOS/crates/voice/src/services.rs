@@ -679,7 +679,7 @@ pub fn send_awaited(words: &str) -> bool {
 /// 10 Nov, "Lamp, cancel that." after a read-back was answered "Cancel what
 /// exactly? I have several things set", with no call, as the model weighed
 /// it against the lamp's reminders.
-pub const CANCEL_WORDS: [&str; 22] = [
+pub const CANCEL_WORDS: [&str; 20] = [
     "cancel",
     "cancel that",
     "cancel it",
@@ -697,8 +697,6 @@ pub const CANCEL_WORDS: [&str; 22] = [
     "huỷ",
     "hủy đi",
     "huỷ đi",
-    "huy",
-    "huy di",
     "đừng gửi",
     "thôi đừng gửi",
     "thôi khỏi gửi",
@@ -736,7 +734,7 @@ pub fn says_cancel(words: &str) -> Option<&'static str> {
     }
     let joined = words.join(" ");
     CANCEL_WORDS.contains(&joined.as_str()).then(|| {
-        if !joined.is_ascii() || joined.starts_with("huy") {
+        if !joined.is_ascii() {
             CANCELLED_SAID_VI
         } else {
             CANCELLED_SAID
@@ -753,26 +751,50 @@ pub fn cancel_awaited(words: &str) -> bool {
     says_cancel(words).is_some()
         && kept::pending(|pending| {
             pending.as_ref().is_some_and(|kept| {
-                kept.began_clear && kept.at.elapsed() <= PENDING_FOR && !kept.service.is_empty()
+                kept.began_clear && answers_the_read_back(kept, None, None, Instant::now())
             })
         })
 }
 
-/// A plain cancel in `request` while another request's write waits for its
-/// "send" (#5958): the write is forgotten, so nothing can send it (a later
+/// Whether a line of `request` (`None`: not yet told) by `owner` (when
+/// known) is the reply the waiting write `kept` asked for (Thirteen's P2 on
+/// #5967, Reviewer-two's HOLD): the very next line after its read-back,
+/// uncut, nothing the lamp answered between, by the one who asked, within
+/// [`PENDING_FOR`]. A "Cancel that." after the lamp answered "Remind me at
+/// 9" is the model's, and so is another person's "Cancel.".
+fn answers_the_read_back(
+    kept: &Pending,
+    request: Option<u64>,
+    owner: Option<&str>,
+    now: Instant,
+) -> bool {
+    request.is_none_or(|request| kept.request != request)
+        && kept.other.is_none_or(|other| Some(other) == request)
+        && !kept.service.is_empty()
+        && !kept.cut
+        && person_lines(kept) <= 1
+        && owner.is_none_or(|owner| owner == kept.person)
+        && now.saturating_duration_since(kept.at) <= PENDING_FOR
+}
+
+/// A plain cancel in `request`, by `owner` when known, as the very reply a
+/// waiting write's read-back asked for ([`answers_the_read_back`], #5958): the write is forgotten, so nothing can send it (a later
 /// `send_id` finds [`NOTHING_WAITING`]; `lamp-services` lets its own copy
 /// lapse after [`PENDING_FOR`]), and the line the lamp says for it is given,
 /// in the cancel word's language, said with no chat. `None`, and nothing
 /// changed, for any other line or with no write waiting: "cancel my 9
 /// o'clock reminder" is the model's, as before.
-pub fn cancel_waiting(request: u64, words: &str, now: Instant) -> Option<&'static str> {
+pub fn cancel_waiting(
+    request: u64,
+    words: &str,
+    owner: Option<&str>,
+    now: Instant,
+) -> Option<&'static str> {
     let said = says_cancel(words)?;
     kept::pending(|pending| {
-        let kept = pending.as_ref().filter(|kept| {
-            kept.request != request
-                && !kept.service.is_empty()
-                && now.saturating_duration_since(kept.at) <= PENDING_FOR
-        })?;
+        let kept = pending
+            .as_ref()
+            .filter(|kept| answers_the_read_back(kept, Some(request), owner, now))?;
         eprintln!(
             "lamp-voice: request {request}: a waiting write cancelled by a plain cancel (#5958): the lamp says so itself, no chat asked (prepared in request {})",
             kept.request
@@ -2274,7 +2296,7 @@ mod tests {
         ] {
             pending_for_test(Some(waiting()));
             assert_eq!(
-                cancel_waiting(11, said, Instant::now()),
+                cancel_waiting(11, said, Some("ann"), Instant::now()),
                 Some(CANCELLED_SAID),
                 "{said}"
             );
@@ -2301,10 +2323,10 @@ mod tests {
                 NOTHING_WAITING
             );
         }
-        for said in ["Hủy đi.", "Thôi, đừng gửi.", "huy"] {
+        for said in ["Hủy đi.", "Thôi, đừng gửi.", "Huỷ."] {
             pending_for_test(Some(waiting()));
             assert_eq!(
-                cancel_waiting(11, said, Instant::now()),
+                cancel_waiting(11, said, None, Instant::now()),
                 Some(CANCELLED_SAID_VI),
                 "{said}"
             );
@@ -2319,18 +2341,44 @@ mod tests {
         ] {
             pending_for_test(Some(waiting()));
             assert_eq!(
-                cancel_waiting(request, said, Instant::now()),
+                cancel_waiting(request, said, None, Instant::now()),
                 None,
                 "{said}"
             );
             assert!(kept::pending(|pending| pending.is_some()), "{said}");
         }
+        // "Huy" is a name, never a cancel.
+        assert_eq!(says_cancel("Huy."), None);
+        // Thirteen's P2 on #5967: not the read-back's very next line (the
+        // lamp answered "Remind me at 9" between), another person's, or a
+        // cut read-back: the model's, and the write is left as it is.
+        pending_for_test(Some(waiting()));
+        line_began(Some(11), Instant::now());
+        lamp_said(11, "A timer is set.", Instant::now());
+        line_began(Some(12), Instant::now());
+        assert_eq!(
+            cancel_waiting(12, "Cancel that.", None, Instant::now()),
+            None
+        );
+        assert!(kept::pending(|pending| pending.is_some()));
+        pending_for_test(Some(waiting()));
+        assert_eq!(
+            cancel_waiting(11, "Cancel.", Some("bob"), Instant::now()),
+            None
+        );
+        let mut cut = waiting();
+        cut.cut = true;
+        pending_for_test(Some(cut));
+        assert_eq!(cancel_waiting(11, "Cancel.", None, Instant::now()), None);
         // No write waiting, or one past its two minutes: the model's.
         pending_for_test(None);
-        assert_eq!(cancel_waiting(11, "Cancel that.", Instant::now()), None);
+        assert_eq!(
+            cancel_waiting(11, "Cancel that.", None, Instant::now()),
+            None
+        );
         pending_for_test(Some(waiting()));
         let late = Instant::now() + PENDING_FOR + Duration::from_secs(1);
-        assert_eq!(cancel_waiting(11, "Cancel that.", late), None);
+        assert_eq!(cancel_waiting(11, "Cancel that.", None, late), None);
         pending_for_test(None);
     }
 
@@ -2343,6 +2391,7 @@ mod tests {
         assert!(!cancel_awaited("Cancel."));
         let mut kept = Pending::new("id", 10, Instant::now(), "Send an email.", "ann");
         kept.service = "gmail".to_owned();
+        kept.spoken_from = Some(Instant::now() - Duration::from_secs(60));
         pending_for_test(Some(kept.clone()));
         assert!(!cancel_awaited("Cancel."));
         voice_began(11, false, false, Instant::now());
