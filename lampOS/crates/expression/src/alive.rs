@@ -158,7 +158,12 @@ pub struct Alive {
     pub energy: f32,
     pub breath: Breath,
     pub drift: Drift,
-    pub work: WorkLight,
+    /// Someone close and still under the light stills the idle layer while
+    /// they work. Absent: no work gate, the breath and drift go on with a
+    /// person close and still (#5955, the lead, 10 Nov; the product has
+    /// none).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work: Option<WorkLight>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sleep: Option<Sleep>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -294,13 +299,14 @@ impl Alive {
                 "a drift moves the head only, within 0.06 radians of rest either way with zero between, slowly",
             ));
         }
-        let work = self.work;
         // A share above nothing and at most `most` (never NaN).
         let share = |value: f32, most: f32| value > 0.0 && value <= most;
-        let sound = share(work.face_area, 1.0)
-            && share(work.still, 0.5)
-            && (1_000_000..=60_000_000).contains(&work.still_us)
-            && work.hold_us <= 600_000_000;
+        let sound = self.work.is_none_or(|work| {
+            share(work.face_area, 1.0)
+                && share(work.still, 0.5)
+                && (1_000_000..=60_000_000).contains(&work.still_us)
+                && work.hold_us <= 600_000_000
+        });
         if !sound {
             return Err(wrong(
                 "work light needs a face area in 0..1, stillness in 0..0.5, 1..60 s still and at most 600 s held",
@@ -1123,10 +1129,15 @@ impl Life {
         if scheduled && self.asleep() && !self.night(stamp_us) {
             self.called();
         }
+        // No work light: nobody close and still is ever working (#5955).
+        let Some(work) = self.alive.work else {
+            self.anchor = None;
+            return;
+        };
         let area = |face: &&lamp_msgs::Face| (face.xmax - face.xmin) * (face.ymax - face.ymin);
         let close = seen
             .iter()
-            .filter(|face| area(face) >= self.alive.work.face_area)
+            .filter(|face| area(face) >= work.face_area)
             .max_by(|a, b| area(a).total_cmp(&area(b)));
         let Some(face) = close else {
             self.anchor = None;
@@ -1135,10 +1146,10 @@ impl Life {
         let middle = [(face.xmin + face.xmax) / 2.0, (face.ymin + face.ymax) / 2.0];
         match self.anchor {
             Some((from, since))
-                if (middle[0] - from[0]).abs() <= self.alive.work.still
-                    && (middle[1] - from[1]).abs() <= self.alive.work.still =>
+                if (middle[0] - from[0]).abs() <= work.still
+                    && (middle[1] - from[1]).abs() <= work.still =>
             {
-                if stamp_us.saturating_sub(since) >= self.alive.work.still_us {
+                if stamp_us.saturating_sub(since) >= work.still_us {
                     self.worked = Some(stamp_us);
                 }
             }
@@ -1341,8 +1352,10 @@ impl Life {
     }
 
     fn working(&self, now_us: u64) -> bool {
-        self.worked
-            .is_some_and(|at| now_us.saturating_sub(at) <= self.alive.work.hold_us)
+        self.alive.work.is_some_and(|work| {
+            self.worked
+                .is_some_and(|at| now_us.saturating_sub(at) <= work.hold_us)
+        })
     }
 
     fn drift_now(&self, now_us: u64, pace: f64) -> BodyOffsets {
