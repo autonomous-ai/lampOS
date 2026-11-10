@@ -45,6 +45,15 @@ Linux linker: the OrangePi 4 Pro (A76/A55) figures are to measure.
 - Built with `no_module`, `no_closure`, `no_custom_syntax`, and `eval`,
   `Fn`, `call` and `curry` disabled, so every function a script calls is
   named in its text. `unchecked` (no limits) is never on.
+- The bare engine has operators, `if`, `while`, `loop`, maps and string
+  `+`, but no ranges for `for`, no `len`. Any library is added function by
+  function: Rhai's own core package has a blocking `sleep`, which no
+  script gets.
+- The spike, `crates/skill-code` (not in the image): `check` and `run`
+  with these limits, `light` and `say`; its tests stop an endless loop by
+  fuel and by wall time, refuse a doubling string, a growing array and
+  endless recursion, and refuse an unknown call (`send_text`) before
+  anything runs.
 
 ## The lamp API: one host function per step kind
 

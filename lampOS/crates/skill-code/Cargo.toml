@@ -1,0 +1,23 @@
+[package]
+name = "lamp-skill-code"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "A spike: a skill's own script run in a sandbox (docs/skill-code.md, #6071). Not wired, not in the product image."
+
+[dependencies]
+# Pure Rust, no native code (docs/skill-code.md, "The runtime and the
+# language"). `internals` for the walk that names every call a script makes;
+# no modules, closures or custom syntax, so every call is named in its text.
+# Never `unchecked`: it drops every limit.
+rhai = { version = "=1.27.0", default-features = false, features = [
+    "std",
+    "internals",
+    "no_module",
+    "no_closure",
+    "no_custom_syntax",
+] }
+
+[lints]
+workspace = true
