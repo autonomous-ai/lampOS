@@ -363,6 +363,30 @@ pub fn token_page(why: &str) -> String {
     )
 }
 
+/// Monitor mode's way in (`/in`), showing nothing of the lamp. With
+/// `post`, its script wipes the link's fragment from the address and the
+/// history, posts the code in it once, and opens `/` on a session cookie;
+/// otherwise it says why.
+pub fn way_in_page(why: &str, post: bool) -> String {
+    let script = if post {
+        "<script>const said=document.getElementById('said');\
+         const code=location.hash.slice(1);history.replaceState(null,'','/in');\
+         if(!code){said.textContent='Open the dev monitor from its link in the app.';}\
+         else{fetch('/in',{method:'POST',headers:{'Content-Type':\
+         'application/x-www-form-urlencoded'},body:'code='+encodeURIComponent(code)})\
+         .then(r=>r.ok?location.replace('/'):r.text().then(t=>{said.textContent=t;}))\
+         .catch(()=>{said.textContent='The lamp did not answer.';});}</script>"
+    } else {
+        ""
+    };
+    page(
+        "dev monitor",
+        None,
+        false,
+        &format!("<p id=\"said\">{}</p>{script}", escape(why)),
+    )
+}
+
 /// A whole page around `body`, asked for again every `refresh` seconds,
 /// with the views' links when `nav` (not on the page that asks for the
 /// token, which shows nothing of the lamp).

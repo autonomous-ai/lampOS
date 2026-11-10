@@ -6,6 +6,7 @@ use lamp_msgs::{
     HealthItem, JointState, Level, RoomPresence, Speech, VoiceState,
 };
 use lamp_peek::{
+    monitor::{Conn, Monitor},
     page,
     serve::{self, Peek},
     units::UnitRow,
@@ -71,6 +72,20 @@ impl Rig {
         token: Option<&str>,
         units: Arc<dyn Fn() -> Vec<UnitRow> + Send + Sync>,
     ) -> Self {
+        Self::built(name, token, units, None)
+    }
+
+    /// In monitor mode, as if every request came from `peer` to `local`.
+    fn monitor(name: &str, monitor: Arc<Monitor>, conn: Conn) -> Self {
+        Self::built(name, None, Arc::new(Vec::new), Some((monitor, conn)))
+    }
+
+    fn built(
+        name: &str,
+        token: Option<&str>,
+        units: Arc<dyn Fn() -> Vec<UnitRow> + Send + Sync>,
+        monitor: Option<(Arc<Monitor>, Conn)>,
+    ) -> Self {
         // A root short enough for a socket's path, which the system's own
         // temporary directory on a Mac is not.
         let root = PathBuf::from(format!("/tmp/lpk-{name}-{}", std::process::id()));
@@ -102,7 +117,12 @@ impl Rig {
             token: token.map(str::to_owned),
             sessions: root.join("sessions"),
             units,
+            monitor: monitor.as_ref().map(|(monitor, _)| Arc::clone(monitor)),
         });
+        let mut router = serve::router(peek);
+        if let Some((_, conn)) = monitor {
+            router = router.layer(axum::extract::connect_info::MockConnectInfo(conn));
+        }
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -113,7 +133,7 @@ impl Rig {
                 .unwrap();
             runtime.block_on(async move {
                 let listener = tokio::net::TcpListener::from_std(listener).unwrap();
-                axum::serve(listener, serve::router(peek)).await.unwrap();
+                axum::serve(listener, router).await.unwrap();
             });
         });
         Self {
@@ -1048,4 +1068,209 @@ fn the_units_are_read_once_however_many_ask_at_once() {
         assert!(body.contains("lamp-voice.service"), "{body}");
     }
     assert_eq!(reads.load(Ordering::SeqCst), 1);
+}
+
+/// Monitor mode's lamp names, as a lamp called `lamp-test` has them.
+fn monitor_names() -> Arc<Monitor> {
+    Arc::new(Monitor::new(vec![
+        "lamp-test.local".to_owned(),
+        "lamp-test".to_owned(),
+    ]))
+}
+
+fn conn(peer: &str, local: &str) -> Conn {
+    Conn {
+        peer: peer.parse().unwrap(),
+        local: local.parse().unwrap(),
+    }
+}
+
+/// Monitor mode (#5883): a peer off the local network, or a `Host` that is
+/// not the lamp's own name or address, gets 403 and nothing of the lamp,
+/// on every view and on the way in.
+#[test]
+fn monitor_mode_refuses_an_off_lan_peer_and_a_foreign_host() {
+    let far = Rig::monitor(
+        "mon-far",
+        monitor_names(),
+        conn("203.0.113.9:50000", "192.168.1.5:80"),
+    );
+    for view in VIEWS.iter().chain(&["/in", "/events"]) {
+        let (status, _, body) = far.ask_as("lamp-test.local", "GET", view, "", "");
+        assert_eq!(status, 403, "{view}: {body}");
+        assert!(body.contains("own network"), "{view}: {body}");
+    }
+    let (status, _, _) = far.ask_as("lamp-test.local", "POST", "/in", "", "code=x");
+    assert_eq!(status, 403);
+    drop(far);
+    let near = Rig::monitor(
+        "mon-near",
+        monitor_names(),
+        conn("192.168.1.20:50000", "192.168.1.5:80"),
+    );
+    for host in [
+        "rebound.example",
+        "lamp-test.local.example",
+        "localhost",
+        "127.0.0.1",
+        "192.168.1.6",
+    ] {
+        let (status, _, body) = near.ask_as(host, "GET", "/in", "", "");
+        assert_eq!(status, 403, "{host}: {body}");
+        assert!(body.contains("own name or address"), "{host}: {body}");
+    }
+    for host in ["lamp-test.local", "LAMP-TEST.local:80", "192.168.1.5"] {
+        let (status, _, body) = near.ask_as(host, "GET", "/in", "", "");
+        assert_eq!(status, 200, "{host}: {body}");
+        // Without a session, the page shows nothing of the lamp.
+        let (status, _, body) = near.ask_as(host, "GET", "/bus", "", "");
+        assert_eq!(status, 401, "{host}: {body}");
+        assert!(!body.contains("voice/"), "{host}: {body}");
+    }
+}
+
+/// A free port on this machine, for the binary to take.
+fn free_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port()
+}
+
+/// The binary in monitor mode on `port`, once it answers.
+fn monitor_binary(root: &Path, port: u16) -> std::process::Child {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-peek"));
+    command
+        .env_clear()
+        .env("LAMP_BUS_ROOT", root.join("bus"))
+        .env("LAMP_PEEK", "monitor")
+        .env("LAMP_PEEK_LISTEN", format!("127.0.0.1:{port}"))
+        .env("LAMP_PEEK_ADMIN_SOCKET", root.join("admin.sock"))
+        .env("LAMP_PEEK_SESSIONS", root.join("sessions"))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let child = command.spawn().unwrap();
+    let started = Instant::now();
+    while TcpStream::connect(("127.0.0.1", port)).is_err() || !root.join("admin.sock").exists() {
+        assert!(started.elapsed() < WAIT, "lamp-peek did not start");
+        thread::sleep(Duration::from_millis(10));
+    }
+    child
+}
+
+/// A code from the admin socket, as lamp-cloud asks for one.
+fn admin_code(root: &Path) -> String {
+    let mut stream = std::os::unix::net::UnixStream::connect(root.join("admin.sock")).unwrap();
+    let mut code = String::new();
+    stream.read_to_string(&mut code).unwrap();
+    code.trim().to_owned()
+}
+
+/// `method path` to the binary on `port`, as `127.0.0.1`.
+fn ask_port(port: u16, method: &str, path: &str, headers: &str, body: &str) -> (u16, String) {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream.set_read_timeout(Some(WAIT)).unwrap();
+    write!(
+        stream,
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\
+         Content-Length: {}\r\n{headers}\r\n{body}",
+        body.len()
+    )
+    .unwrap();
+    let mut text = String::new();
+    stream.read_to_string(&mut text).unwrap();
+    let status = text.split(' ').nth(1).unwrap().parse().unwrap();
+    (status, text)
+}
+
+/// Off by default: with `LAMP_PEEK` unset or anything but `on`/`monitor`,
+/// the binary ends, nothing listens and no admin socket is made.
+#[test]
+fn monitor_mode_is_off_by_default_and_nothing_listens() {
+    let root = PathBuf::from(format!("/tmp/lpk-moff-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("bus")).unwrap();
+    let port = free_port();
+    for switch in [None, Some("off"), Some("MONITOR"), Some("monitor ")] {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-peek"));
+        command
+            .env_clear()
+            .env("LAMP_BUS_ROOT", root.join("bus"))
+            .env("LAMP_PEEK_LISTEN", format!("127.0.0.1:{port}"))
+            .env("LAMP_PEEK_ADMIN_SOCKET", root.join("admin.sock"));
+        if let Some(switch) = switch {
+            command.env("LAMP_PEEK", switch);
+        }
+        let (code, said) = ended(command);
+        assert_eq!(code, Some(0), "{switch:?}: {said}");
+        assert!(said.contains("off (LAMP_PEEK is not on)"), "{said}");
+        assert!(
+            TcpStream::connect(("127.0.0.1", port)).is_err(),
+            "{switch:?}"
+        );
+        assert!(!root.join("admin.sock").exists(), "{switch:?}");
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+/// The way in: a code from the admin socket opens one browser once, never
+/// in the address; its session cookie opens the views; the same code again
+/// is refused; and after a restart the cookie opens nothing.
+#[test]
+fn monitor_mode_a_code_opens_once_and_its_cookie_dies_with_a_restart() {
+    let root = PathBuf::from(format!("/tmp/lpk-mcode-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("bus")).unwrap();
+    let port = free_port();
+    let mut peek = monitor_binary(&root, port);
+    let mode = fs::metadata(root.join("admin.sock"))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o600, "{mode:o}");
+    let (status, text) = ask_port(port, "GET", "/bus", "", "");
+    assert_eq!(status, 401, "{text}");
+    let (status, text) = ask_port(port, "GET", "/in", "", "");
+    assert_eq!(status, 200, "{text}");
+    assert!(text.contains("location.hash") && text.contains("replaceState"));
+    let code = admin_code(&root);
+    assert_eq!(code.len(), 64, "{code}");
+    // In the address it is refused, even right, and is not spent.
+    let (status, text) = ask_port(port, "GET", &format!("/in?code={code}"), "", "");
+    assert_eq!(status, 400, "{text}");
+    let form = "Content-Type: application/x-www-form-urlencoded\r\n";
+    let (status, text) = ask_port(port, "POST", "/in", form, &format!("code={code}"));
+    assert_eq!(status, 204, "{text}");
+    let cookie = text
+        .lines()
+        .find_map(|line| line.strip_prefix("set-cookie: "))
+        .unwrap_or_else(|| panic!("no cookie: {text}"));
+    assert!(
+        cookie.starts_with("peek_session=")
+            && cookie.ends_with("; HttpOnly; SameSite=Strict; Path=/"),
+        "{cookie}"
+    );
+    assert!(!cookie.contains(&code), "the session is not the code");
+    let session = cookie.split(';').next().unwrap().to_owned();
+    let with = format!("Cookie: {session}\r\n");
+    for view in VIEWS {
+        let (status, text) = ask_port(port, "GET", view, &with, "");
+        assert_eq!(status, 200, "{view}: {text}");
+    }
+    let (status, text) = ask_port(port, "POST", "/in", form, &format!("code={code}"));
+    assert_eq!(status, 401, "{text}");
+    assert!(text.contains("used or is out of date"), "{text}");
+    assert!(!text.to_lowercase().contains("set-cookie"), "{text}");
+    // The static token's form does not open it.
+    let (status, _) = ask_port(port, "POST", "/token", form, &format!("token={TOKEN}"));
+    assert_eq!(status, 401);
+    peek.kill().unwrap();
+    peek.wait().unwrap();
+    let mut peek = monitor_binary(&root, port);
+    let (status, text) = ask_port(port, "GET", "/bus", &with, "");
+    assert_eq!(status, 401, "a session outlived a restart: {text}");
+    peek.kill().unwrap();
+    peek.wait().unwrap();
+    fs::remove_dir_all(root).unwrap();
 }
