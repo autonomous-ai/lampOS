@@ -62,7 +62,7 @@ pub const TALK_NOTES_MOST: usize = 4;
 pub const TALK_NOTES_BYTES: usize = 12_800;
 /// A talk note as `talk_notes` gives it: its id, its day and its text.
 pub type TalkNote = (u64, String, String);
-const DAY_MS: u64 = 86_400_000;
+pub(crate) const DAY_MS: u64 = 86_400_000;
 /// Times a kept thing was said again (#4753) waiting for the line that said
 /// them, at most this many ([`Days::said_pending`]).
 const SAID_PENDING: usize = 64;
@@ -204,6 +204,14 @@ pub struct Days {
     /// are kept as observations inside each exchange's write
     /// ([`crate::taste_rules`]). Off unless [`Self::enable_taste_rules`].
     taste_rules: bool,
+    /// Each forget about a thing of a person's service records
+    /// ([`crate::service_records`]): whose, its subjects and when, so a
+    /// record asked before it that matches it is refused. Never on disk,
+    /// since it names what was forgotten; the voice drops its waiting
+    /// changes before it sends the forget, so only one already in flight
+    /// can come after it. The oldest goes past
+    /// [`crate::service_records::FORGOT_ABOUT_HELD`].
+    pub(crate) records_forgot_about: std::collections::VecDeque<(String, Vec<Vec<String>>, u64)>,
     _held: File,
 }
 
@@ -273,6 +281,7 @@ impl Days {
             now,
             set_aside,
             said_pending: std::collections::VecDeque::new(),
+            records_forgot_about: std::collections::VecDeque::new(),
             taste_rules: false,
             _held: held,
         };
@@ -1450,6 +1459,7 @@ impl Days {
     pub fn forget_all(&mut self, person: Option<&Person>) -> Result<u64> {
         let tx = self.db.transaction()?;
         let count = empty(&tx, person)?;
+        crate::service_records::mark_forgot(&tx, person, self.now)?;
         tx.commit()?;
         self.forget_set_aside()?;
         Ok(count)
@@ -1472,6 +1482,7 @@ impl Days {
         let removed = empty(&tx, Some(person))?;
         let ruled = empty(&tx, Some(&rules))?;
         tx.execute("DELETE FROM speakers WHERE speaker=?1", [person.as_str()])?;
+        crate::service_records::mark_forgot(&tx, Some(person), self.now)?;
         tx.commit()?;
         self.forget_set_aside()?;
         Ok((removed, ruled))
@@ -3481,6 +3492,10 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         "DELETE FROM roles WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],
     )?;
+    // Their service records too (the voice's `LAMP_SERVICE_RECORDS`),
+    // counted, so a forget of someone who kept only records still says it
+    // removed something.
+    let count = count + crate::service_records::empty(tx, person)?;
     tx.execute(
         "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],

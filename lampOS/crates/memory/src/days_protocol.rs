@@ -272,6 +272,44 @@ enum Extra {
         #[serde(default)]
         person: Who,
     },
+    /// The voice's `LAMP_SERVICE_RECORDS` (connector records, PR 1a): one
+    /// service record put, new or updated in place
+    /// (`Days::service_record_put`). A known person's only.
+    ServiceRecord {
+        #[serde(default)]
+        person: Who,
+        key: String,
+        service: String,
+        action: String,
+        status: String,
+        #[serde(default)]
+        reason: String,
+        #[serde(default)]
+        detail: Option<Value>,
+        #[serde(default)]
+        result_id: String,
+        asked_unix_ms: u64,
+        changed_unix_ms: u64,
+        #[serde(default)]
+        links: Vec<String>,
+        #[serde(default)]
+        replaced_by: String,
+    },
+    /// `LAMP_SERVICE_RECORDS`: a known person's records, the latest change
+    /// first (`Days::service_records`).
+    ServiceRecords {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        limit: Option<u64>,
+    },
+    /// `LAMP_SERVICE_RECORDS`: the records about a forget's key words
+    /// removed (`Days::service_records_forget`).
+    ServiceRecordsForget {
+        #[serde(default)]
+        person: Who,
+        about: Vec<Vec<String>>,
+    },
     /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
     Adopt {
         #[serde(default)]
@@ -1028,6 +1066,45 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             store.forget_mark(&one(person)?)?;
             json!({"ok":true})
         }
+        Extra::ServiceRecord {
+            person,
+            key,
+            service,
+            action,
+            status,
+            reason,
+            detail,
+            result_id,
+            asked_unix_ms,
+            changed_unix_ms,
+            links,
+            replaced_by,
+        } => {
+            let kept = store.service_record_put(
+                &one(person)?,
+                &crate::service_records::RecordIn {
+                    key,
+                    service,
+                    action,
+                    status,
+                    reason,
+                    detail,
+                    result_id,
+                    asked_unix_ms,
+                    changed_unix_ms,
+                    links,
+                    replaced_by,
+                },
+            )?;
+            json!({"ok":true,"status":kept})
+        }
+        Extra::ServiceRecords { person, limit } => {
+            let limit = limit.unwrap_or(crate::service_records::LIST_MOST as u64) as usize;
+            json!({"ok":true,"records":store.service_records(&one(person)?, limit)?})
+        }
+        Extra::ServiceRecordsForget { person, about } => {
+            json!({"ok":true,"removed":store.service_records_forget(&one(person)?, &about)?})
+        }
         Extra::Adopt { person, to, ids } => {
             let to = one(Who::Id(to))?;
             let moved = store.adopt(&one(person)?, &to, &ids)?;
@@ -1072,6 +1149,9 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "role_end",
             "role_set_session",
             "role_end_session",
+            "service_record",
+            "service_records",
+            "service_records_forget",
         ];
         const OLD: &[&str] = &[
             "append",

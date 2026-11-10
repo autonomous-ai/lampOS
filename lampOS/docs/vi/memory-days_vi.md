@@ -307,6 +307,39 @@ thứ tự: không giữ, nói hay đọc thêm gì, không gọi mô hình, kh�
 liệu. Không có trường này, ghi chú giống hệt trước, từng byte. Memory cũ từ
 chối trường này (`deny_unknown_fields`).
 
+## Bản ghi dịch vụ (`service_record`, `LAMP_SERVICE_RECORDS` của voice)
+
+Công tắc `LAMP_SERVICE_RECORDS` của voice (mặc định tắt; kế hoạch bản ghi
+connector, PR 1a, 10/11) giữ một bản ghi cho mỗi việc một người đã biết nhờ
+một dịch vụ liên kết làm, trong bảng `service_records(person, key, service,
+action, status, reason, detail, result_id, asked_unix_ms, changed_unix_ms,
+links, replaced_by)`, khóa `(person, key)`, tạo `IF NOT EXISTS`,
+`user_version` giữ nguyên.
+
+- `service_record {...}` thêm một bản ghi, hoặc cập nhật tại chỗ cùng `key`
+  khi nó còn `prepared`. Trạng thái khác `prepared` là cuối cùng: lần ghi
+  sau giữ nguyên nó (chỉ `replaced_by` còn đặt được), câu trả lời nói trạng
+  thái được giữ. Các trạng thái: `prepared`, `done`, `cancelled`, `refused`,
+  `failed`, `timed_out`, `no_result`. `detail` là object tối đa 16 KiB.
+- `service_records {person, limit?}` liệt kê, thay đổi mới nhất trước, tối
+  đa 50.
+- `service_records_forget {person, about}` xóa các bản ghi có mọi từ khóa
+  của một chủ đề (chữ thường, bỏ dấu, số ít): `{ok:true,removed}`.
+- **Bản ghi được hỏi trước một lần quên bị từ chối** `forgotten`: khi
+  `asked_unix_ms` trước lần `forget_all` hay `forget_person` mới nhất của
+  người đó (hoặc `forget_all` của mọi người), lưu trong
+  `service_records_forgot(person, at_unix_ms)` (`''` cho mọi người: chỉ id và
+  thời điểm, nên còn sau khi khởi động lại), hoặc trước một
+  `service_records_forget` có chủ đề khớp với nó (chỉ giữ trong bộ nhớ, 64 lần
+  gần nhất, vì các từ nói điều đã quên). Nhờ vậy một thay đổi voice gửi trước
+  lần quên mà memory nhận sau đó không bao giờ được giữ; thay đổi hỏi sau thì
+  vẫn được giữ.
+
+Chỉ người đã biết (id `p-`) có bản ghi; còn lại bị từ chối `bad_person`.
+Giữ đến khi bị quên: hết hạn theo ngày, hết hạn khi không dùng, tidy và
+nightly không đọc bảng này. `forget_all` và `forget_person` xóa chúng. Tối đa
+10.000 bản ghi một người. Memory cũ trả `unknown_op`.
+
 ## Vai được giao (`role`, `LAMP_MEMORY_ROLE`)
 
 Với `role:true` trong `session_open` (công tắc `LAMP_MEMORY_ROLE` của voice,

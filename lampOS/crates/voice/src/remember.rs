@@ -1661,6 +1661,39 @@ pub fn forget_all_on() -> bool {
 /// their own memory goes too, as their `forget_everything` would empty it,
 /// in their scope alone, never the room's. Off, with no Days memory, or on
 /// a line of the room's, `told` is as it was.
+/// A forget about's answer `told` with the service records it removed too
+/// (`LAMP_SERVICE_RECORDS`): none, as it was; some, it says how many, and
+/// that nothing sent or created at a service is undone. Never a record's
+/// words.
+pub(crate) fn records_forgotten(told: (Value, bool), records: Option<u64>) -> (Value, bool) {
+    let Some(records) = records.filter(|records| *records > 0) else {
+        return told;
+    };
+    let (mut answer, answered) = told;
+    let note = format!(
+        "{records} record(s) of what you did with their linked services are forgotten too. Anything already sent or created at a service stays there: forgetting does not undo it."
+    );
+    if answer["forgotten"] == true {
+        answer["records"] = json!(records);
+        answer["records_note"] = json!(note);
+        (answer, answered)
+    } else {
+        (
+            json!({"forgotten": true, "records": records, "note": note}),
+            true,
+        )
+    }
+}
+
+/// The Days memory's socket, when this worker has the Days client: where
+/// the service records are written (`crate::service_records`).
+#[cfg(not(test))]
+pub(crate) fn days_socket() -> Option<PathBuf> {
+    DAYS.get()
+        .and_then(Option::as_ref)
+        .map(|client| client.socket.clone())
+}
+
 pub fn forget_face_memory(
     told: (Value, bool),
     lease: &crate::memory_scope::ScopeLease,
@@ -9818,6 +9851,15 @@ impl DaysClient {
             // it is written after it, and what the writer has in hand is
             // let finish first, within a little of the call's time.
             if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
+                // Their service record changes still waiting go before
+                // forget everything is sent (`LAMP_SERVICE_RECORDS`,
+                // Jarvis's P2 on #6073); the memory refuses one asked
+                // before it that was already sent.
+                if call.name == FORGET_EVERYTHING
+                    && let Some(person) = person
+                {
+                    crate::service_records::unsent(person);
+                }
                 self.hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                 self.hand_ons.settle(
                     deadline
@@ -9843,6 +9885,14 @@ impl DaysClient {
             let Some(answer) = answer else {
                 return lost((gone(), false));
             };
+            // Forget everything answered ok: the service records the voice
+            // holds of theirs go, whatever the answer says next.
+            if call.name == FORGET_EVERYTHING
+                && answer["ok"] == true
+                && let Some(person) = person
+            {
+                crate::service_records::forgot(Some(person));
+            }
             // Its kind, for the call's journal line (#2510).
             if call.name == REMEMBER && self.replaces.load(Ordering::Acquire) {
                 noted::answered(&answer);
@@ -10172,6 +10222,64 @@ impl DaysClient {
     /// is: uncertain until each removal is acknowledged, and journalling
     /// stops after a confirmed one.
     fn forget_about(
+        &self,
+        about: &Value,
+        person: Option<&str>,
+        until: Instant,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+        named: bool,
+    ) -> (Value, bool) {
+        let records = self.forget_records_about(about, person, until);
+        let told = self.forget_kept_about(about, person, until, lease, named);
+        records_forgotten(told, records)
+    }
+
+    /// `LAMP_SERVICE_RECORDS`: a known person's service records about
+    /// `about` removed in the memory (`service_records_forget`), before
+    /// the kept things are looked through, with the switch on or off: how
+    /// many went, `None` with no known person or no answer. The records the voice
+    /// holds of theirs go too, so none is written again.
+    fn forget_records_about(
+        &self,
+        about: &Value,
+        person: Option<&str>,
+        until: Instant,
+    ) -> Option<u64> {
+        // Asked with the switch off too: records kept while it was on stay
+        // in the memory until forgotten (Thirteen's P2 on #6073). An older
+        // memory answers `unknown_op`, and none are said removed.
+        let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
+        let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
+            .into_iter()
+            .map(|(_, words)| words)
+            .collect();
+        if words.is_empty() {
+            return None;
+        }
+        // What still waits to be written about it goes first, so a writer
+        // in backoff never writes it after the forget (Jarvis's P2 on
+        // #6073); the memory refuses one already sent, asked before it.
+        crate::service_records::unsent_about(person, &words);
+        let left = until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())?;
+        let answer = bounded_exchange(
+            &self.socket,
+            &json!({"op":"service_records_forget","person":person,"about":words}),
+            left,
+        )?;
+        let removed = answer["removed"]
+            .as_u64()
+            .filter(|_| answer["ok"] == true)?;
+        // Answered: the copies held here go, removed there or not.
+        crate::service_records::forgot_about(person, &words);
+        eprintln!(
+            "lamp-voice provider: a forget about removed {removed} service records (LAMP_SERVICE_RECORDS)"
+        );
+        Some(removed)
+    }
+
+    fn forget_kept_about(
         &self,
         about: &Value,
         person: Option<&str>,
@@ -17441,6 +17549,152 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// `LAMP_SERVICE_RECORDS`: a record of a party search waiting while
+    /// the records writer is in backoff, the memory down. A forget about
+    /// the party that finds no record in the memory still takes it, held
+    /// and waiting, so nothing is written after the forget (Jarvis's P2 on
+    /// #6073).
+    #[test]
+    fn a_forget_about_during_the_records_backoff_leaves_nothing_written_after() {
+        use crate::service_records as records;
+        const OWNER: &str = "p-0123456789abcdef";
+        records::on_for_test(true);
+        records::forgot(None);
+        records::read(
+            OWNER,
+            &json!({"service":"gmail","what":"search","query":"party"}),
+            &json!({"quoted":[]}),
+        );
+        assert_eq!(records::save_next(|_| None), records::Saved::Down);
+        assert_eq!(records::waiting().len(), 1);
+        let (socket, served) = memory("records-forget-about", 3, |request| {
+            match request["op"].as_str() {
+                Some("service_records_forget") => json!({"ok":true,"removed":0}),
+                Some("forget_mark") => json!({"ok":true}),
+                Some("kept") => json!({"ok":true,"entries":[]}),
+                _ => json!({"ok":false}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about":"party"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(OWNER),
+        );
+        assert!(answered, "{told}");
+        let read = served.join().unwrap();
+        assert_eq!(read[0]["op"], "service_records_forget", "{read:?}");
+        assert!(records::waiting().is_empty(), "{:?}", records::waiting());
+        assert!(records::held().is_empty(), "{:?}", records::held());
+        assert_eq!(
+            records::save_next(|line| panic!("written after the forget: {line}")),
+            records::Saved::Nothing
+        );
+        records::on_for_test(false);
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// A record kept while `LAMP_SERVICE_RECORDS` was on is still forgotten
+    /// with it off: the forget about asks the memory to remove it, and the
+    /// model is told how many went (Thirteen's P2 on #6073).
+    #[test]
+    fn a_forget_about_with_the_records_switch_off_still_removes_the_kept_ones() {
+        use crate::service_records as records;
+        const OWNER: &str = "p-0123456789abcdef";
+        records::on_for_test(false);
+        records::forgot(None);
+        let (socket, served) = memory("records-forget-about-off", 2, |request| match request["op"]
+            .as_str()
+        {
+            Some("service_records_forget") => json!({"ok":true,"removed":1}),
+            Some("forget_mark") => json!({"ok":true}),
+            Some("kept") => json!({"ok":true,"entries":[]}),
+            _ => json!({"ok":false}),
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about":"party"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(OWNER),
+        );
+        assert!(answered, "{told}");
+        served.join().unwrap();
+        // The removed count is the memory's answer to the records forget.
+        assert_eq!(told["records"], 1, "{told}");
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// The same for forget everything: the person's waiting record goes
+    /// before the forget is sent, so one whose answer is lost (it may have
+    /// emptied the memory) leaves nothing to write after it; answered, the
+    /// records held go too.
+    #[test]
+    fn a_forget_everything_during_the_records_backoff_leaves_nothing_written_after() {
+        use crate::service_records as records;
+        const OWNER: &str = "p-0123456789abcdef";
+        records::on_for_test(true);
+        records::forgot(None);
+        let search = || {
+            records::read(
+                OWNER,
+                &json!({"service":"gmail","what":"search","query":"party"}),
+                &json!({"quoted":[]}),
+            );
+            assert_eq!(records::save_next(|_| None), records::Saved::Down);
+            assert_eq!(records::waiting().len(), 1);
+        };
+        search();
+        // Lost: no answer understood.
+        let (socket, served) = memory("records-forget-all-lost", 1, |_| json!(null));
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        let run = || {
+            client.run_at(
+                &call(FORGET_EVERYTHING, json!({})),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(OWNER),
+            )
+        };
+        let _ = run();
+        assert_eq!(served.join().unwrap()[0]["op"], "forget_all");
+        assert!(records::waiting().is_empty(), "{:?}", records::waiting());
+        assert_eq!(
+            records::save_next(|line| panic!("written after the forget: {line}")),
+            records::Saved::Nothing
+        );
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+        // Answered: held and waiting, all gone.
+        records::forgot(None);
+        search();
+        let (socket, served) = memory("records-forget-all", 1, |_| json!({"ok":true,"removed":0}));
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        let _ = client.run_at(
+            &call(FORGET_EVERYTHING, json!({})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(OWNER),
+        );
+        assert_eq!(served.join().unwrap().len(), 1);
+        assert!(records::waiting().is_empty());
+        assert!(records::held().is_empty(), "{:?}", records::held());
+        records::on_for_test(false);
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
     /// #2176, `LAMP_MEMORY_FORGET_ABOUT`: "forget what I said about my
     /// bicycle" lists the scope's kept things, forgets each with every key
     /// word by its id, and never another kept thing or the last kept thing
@@ -23193,18 +23447,27 @@ mod tests {
             std::env::temp_dir().join(format!("lamp-remember-{name}-{}.sock", std::process::id()));
         let _ = std::fs::remove_file(&socket);
         let listener = UnixListener::bind(&socket).unwrap();
+        // With the records switch off on this test's thread, the forget
+        // about's own records forget (sent whatever the switch, Thirteen's
+        // P2 on #6073) is answered but neither counted nor given back, so
+        // the forget tests written before it read what they did.
+        let records_on = crate::service_records::on();
         let served = std::thread::spawn(move || {
             let mut read = Vec::new();
-            for _ in 0..requests {
+            while read.len() < requests {
                 let (mut stream, _) = listener.accept().unwrap();
                 let mut line = String::new();
                 BufReader::new(stream.try_clone().unwrap())
                     .read_line(&mut line)
                     .unwrap();
                 let request: Value = serde_json::from_str(&line).unwrap();
-                stream
-                    .write_all(format!("{}\n", answer(&request)).as_bytes())
-                    .unwrap();
+                let wrote = stream.write_all(format!("{}\n", answer(&request)).as_bytes());
+                if !records_on && request["op"] == "service_records_forget" {
+                    // An answer the test's fake never meant for it may be
+                    // let go unread.
+                    continue;
+                }
+                wrote.unwrap();
                 read.push(line);
             }
             read
