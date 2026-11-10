@@ -3616,6 +3616,35 @@ after a take-over, but now for every turn:
   `a keep said back to a yes with no remember is a claim`,
   `remember::tests::a_keep_said_back_on_a_yes_is_a_hard_claim` and
   `remember::tests::a_reply_that_says_it_kept_something_is_known_by_its_opening`.
+  **A "Kept" after a yes whose `remember` kept nothing** (10 Nov rerun on
+  lamp-06c1, build 11211): "Yes. Please keep that.", seen spoken with no
+  offer waiting, called `remember`, which kept nothing and told the model
+  so (`heard::YES_ALONE`, "Never say it was kept."), yet round 2 said
+  "Kept—the office plant gets watered on Mondays." (S4, request 54: a room
+  fact from ten minutes before) and "Fifty-three, kept as your lucky
+  number." (S14, request 103). Neither opening was read as a claim, so
+  both were said. A refused `remember` sets no keep for the turn, so the
+  claim check above already holds a claim made after it; it only had to
+  see these two shapes. "Kept" (or "I've kept") before a dash, with or
+  without a space ("Kept—…", "Kept – …", "Kept - …"), is now a hard claim
+  on any line; on a line that is only a yes, so is "kept", "saved" or
+  "remembered" in a claim's own shape anywhere in the sentence: after "I",
+  "I've" or "I have" ("Fifty-three, I've kept it."), set off by a mark before
+  "as your" ("Fifty-three, kept as your lucky number."; "Pip is kept as
+  your goldfish's name." stays none) or before "that"/"it" "for
+  you" (`remember::kept_in_a_claims_shape`). A keep word as a plain
+  participle mid-sentence is none, whatever mark comes before it (Third's
+  HOLD on #5994: "Your plant, kept outdoors, needs watering.", "kept under
+  the mat", "kept refrigerated" are said as they came), nor a word joined
+  by a hyphen ("well-kept", "kept-up"), a state kept ("The light, kept on
+  since noon, …", "I've kept it dim."; a state word inside a clause about a
+  person is the fact's, so "I've kept that you like bright light." is a
+  claim, Fourth's P3 on #5994) or a reminder or setting saved. The
+  model's word choice is the cause, and the tool result told it the truth:
+  the gate is in code, not in the prompt. Tests:
+  `a_kept_said_after_a_yes_whose_remember_kept_nothing_is_never_said`,
+  `a_kept_as_a_plain_word_after_a_yes_is_said` and
+  `remember::tests::a_kept_before_a_dash_or_opening_a_clause_is_a_hard_claim`.
   **A face said saved counts the same** (`LAMP_MEMORY_KEEP_ASKED=on`, its
   switch; #5141 row 8). On lamp-0c4e on 3 Nov the model said "hold still
   while I take your face in" with no `remember_my_face` call, and no face
