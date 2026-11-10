@@ -2009,8 +2009,11 @@ pub fn on_line(made: &Made) -> String {
 }
 
 /// What the voice's model is told to say of a made skill: `line`'s
-/// content in the language of the conversation, the skill's name and any
-/// service's name kept as written and nothing added (the owner, 10 Nov:
+/// content in the language of the conversation, every part of it (what it
+/// does, when, and what it uses or reads: with no spoken yes, the only
+/// read-back the person hears; Thirteen's and App Only's P2 on #6032),
+/// the skill's name and any service's name kept as written and nothing
+/// added (the owner, 10 Nov:
 /// "đồng bộ luôn"; a fixed English line said as it is, "Say exactly",
 /// was English to a person speaking Vietnamese). The model is the voice
 /// itself, whose character already speaks the owner's language
@@ -2018,8 +2021,9 @@ pub fn on_line(made: &Made) -> String {
 /// by the say service's note for an app's or a file's skill.
 pub fn in_their_language(line: &str) -> String {
     format!(
-        "Tell the person this, in the language of the conversation, keeping the skill's name \
-         and any service's name as written, and adding nothing else: \"{line}\""
+        "Tell the person this, in the language of the conversation, every part of it, leaving \
+         nothing out: what the skill does, when, and what it uses or reads. Keep the skill's \
+         name and any service's name as written, and add nothing else: \"{line}\""
     )
 }
 
@@ -3644,12 +3648,29 @@ body = { gesture = "nod" }
             "{ask}"
         );
         assert!(!ask.contains("Say exactly") && !ask.contains("isn't linked yet"));
-        let told = in_their_language("I made morning mail, and it's on.");
+        // Thirteen's and App Only's P2 on #6032: every part is told, the
+        // uses and reads too, the only read-back with no spoken yes.
+        let line = on_line(&Made {
+            name: "morning-mail".into(),
+            version: "1.0.0".into(),
+            sha256: "a".repeat(64),
+            description: "Reads your latest mail at eight.".into(),
+            uses: Uses {
+                speak: true,
+                reads: Some("gmail".into()),
+                ..Default::default()
+            },
+            package: "morning-mail.tar".into(),
+        });
+        assert!(line.contains("reading your Gmail"), "{line}");
+        let told = in_their_language(&line);
         assert!(
             told.starts_with("Tell the person this, in the language of the conversation")
-                && told.contains("keeping the skill's name and any service's name as written")
-                && told.contains("adding nothing else")
-                && told.ends_with(": \"I made morning mail, and it's on.\""),
+                && told.contains("every part of it, leaving nothing out")
+                && told.contains("what the skill does, when, and what it uses or reads")
+                && told.contains("Keep the skill's name and any service's name as written")
+                && told.contains("add nothing else")
+                && told.ends_with(&format!(": \"{line}\"")),
             "{told}"
         );
         assert_eq!(needs_link_ask(&[]), None);

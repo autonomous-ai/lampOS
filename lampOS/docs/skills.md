@@ -2289,8 +2289,10 @@ gone ([switches.md](switches.md)). What happens:
    Kept, it is put on at once (step 8), and the model is told its name,
    whether it is on, what it does (said plainly as above) and what it uses
    ("its light and whether it is talking"), and to tell one short line in
-   the language of the conversation, the skill's and any service's name
-   kept as written and nothing added (`made_skill::in_their_language`; the
+   the language of the conversation, every part of it, leaving nothing
+   out (what it does, when, and what it uses or reads: Thirteen's and App
+   Only's P2 on #6032), the skill's and any service's name kept as written
+   and nothing added (`made_skill::in_their_language`; the
    owner, 10 Nov, "đồng bộ luôn": no longer "Say exactly" in English to a
    person who speaks Vietnamese), and ask nothing about putting it on:
    "I made evening dim, and it's on." (`made_skill::on_line`), or, when it couldn't be put on, "I made it

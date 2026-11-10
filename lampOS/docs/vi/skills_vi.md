@@ -209,8 +209,10 @@ sau:
    nhờ bằng giọng nói chính là lời hỏi). Khi đã giữ, kỹ năng được bật ngay
    (bước 8), và mô hình được báo tên, đã bật hay chưa, kỹ năng làm gì (được
    nói rõ như trên) và dùng gì ("đèn của nó và việc nó có đang nói hay
-   không"), và được dặn nói một câu ngắn bằng ngôn ngữ của cuộc trò chuyện, giữ
-   nguyên tên kỹ năng và tên dịch vụ, không thêm gì
+   không"), và được dặn nói một câu ngắn bằng ngôn ngữ của cuộc trò chuyện, đủ mọi
+   phần, không bỏ sót (kỹ năng làm gì, khi nào, dùng hay đọc gì: P2 của
+   Thirteen và App Only trên #6032), giữ nguyên tên kỹ năng và tên dịch vụ,
+   không thêm gì
    (`made_skill::in_their_language`; chủ đèn, 10/11, "đồng bộ luôn": không
    còn "Say exactly" bằng tiếng Anh với người nói tiếng Việt), không hỏi gì
    về việc bật:
