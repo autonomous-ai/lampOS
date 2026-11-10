@@ -1,3 +1,23 @@
+## 2026-11-10 — hand docs read; volume restore needs two repairs
+
+- READ-OK #6003 9e8e18249, comment 6760785885: all five docs lines
+  checked against body Hold parsing, Control refusal mapping and topic
+  readers. diff check passes. No native or device test claimed. P3: the
+  old fast-loop assertion also remains in Control's module comment.
+- HOLD #6008 952afd4eb, comment 6760862581. The new restore accepts
+  Ok(0) from downward rounding and Ok(41) with a ceiling of 40. Two
+  public Volume/Mixer regressions fail; probe retained, edits removed.
+  Its twenty retries count sleeps but exclude mixer work: current built
+  Actions with a local 300 ms failing mixer shim took 12.672 s before
+  the restore-failure log and serving, above the documented five seconds.
+  Baseline fmt, strict Actions lint and full package 143 pass / 2 ignored.
+  Initial probe moved-value compile error and stale-binary timing attempt
+  retained separately; neither counted as runtime evidence. No lamp run.
+- Reading #6006 bb5b1a1df independently, claim 6760886007: recovery of
+  an interrupted ask after the cutting line only declines. Source read
+  underway, exact-head local gate running. Default-on and played rows
+  remain separate. Three own carries retain their published heads.
+
 ## 2026-11-10 — all three ARM gates green; ordinary-answer review finding
 
 - #5969 at 5dcb60eec: ARM 42765411943 passed 15,008 tests / 113 skipped
