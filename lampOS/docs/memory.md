@@ -1384,10 +1384,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `remember::doubted::tests`,
   `second_provider::tests::a_keep_its_own_round_doubts_is_not_run`.
 - **A doubt right after the keep takes it back** (C37,
-  `LAMP_MEMORY_DOUBT_UNDOES=on`, the second route; off unless set, and
-  off in the product: on by the memory owner's call on 5 Nov, then off
-  again the same night (#5454) until the matcher passes the readers'
-  keep closings). On lamp-06c1 on 5 Nov
+  `LAMP_MEMORY_DOUBT_UNDOES=on`, the second route; off unless set, and on
+  in the product by the memory owner's call A on 11 Nov: on by their call
+  on 5 Nov, off again the same night (#5454) until the matcher passed the
+  readers' keep closings). On lamp-06c1 on 5 Nov
   round 1 was a bare `remember` and round 2 said "Was that 'rhinodulus'
   right — I want to be sure", with "rhinodulus" already kept (id 391).
   With the switch, the Days memory, `LAMP_MEMORY_FORGET_ALL` and the eyes'
@@ -1400,9 +1400,34 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   keep (`doubted::UNDO_WITHIN`), for a known person only: nobody known,
   the room's keep stays. If that round called more, the model is told
   `doubted::UNDONE_NOTE` first. The journal says "taken back" or why not.
+  On lamp-06c1 on 10 Nov, twice, "ranunculus" was heard as "renunctinus",
+  kept in round 1, and round 2 asked "Kept as you said it … is that
+  ranunculus?". A round asking whether a kept word was another
+  (`doubted::offered_word`: "is that …?", "is it …?", "was it …?", "did
+  you mean …?", "do you mean …?", "did you say …?", opening a sentence or
+  clause and ending with "?" within 40 bytes, one word in it that differs
+  from exactly one kept word by at most half its letters, with the same
+  first letter, never "everything", "right" and the like) is a doubt too:
+  the keep is taken back, and their yes keeps the call with the asked word
+  in place of the kept one (`doubted::corrected`: "Their favorite flower
+  is a ranunculus."). A no keeps nothing. The same question beside a
+  `remember` in its own round means that keep is not run. On a line its
+  person's by their face alone in view
+  (`LAMP_PERSON_SCOPE_ONE_FACE_READS`) that person may take back their own
+  keep this way, though no other forget runs there: the second route
+  marks the one forget by the just-kept id on the line's scope
+  (`ScopeLease::mark_own_keep_undone`), which both its own check and the
+  memory route let through. Their yes there still needs their face seen
+  saying it. A keep another person made, or one of an earlier turn, is
+  never taken back.
   Tests:
   `held_forget::a_keep_the_next_round_doubts_is_taken_back_until_their_yes`,
-  `held_forget::a_doubted_keep_stays_without_the_eyes`.
+  `held_forget::a_doubted_keep_stays_without_the_eyes`,
+  `held_forget::a_keep_its_next_round_offers_another_word_for_waits_for_their_yes_to_that_word`,
+  `held_forget::a_keep_beside_a_question_offering_another_word_is_not_run`,
+  `person_scope_seen::a_lone_known_faces_line_takes_back_its_own_keep_its_next_round_doubts`,
+  `memory_scope::tests::only_the_marked_own_keeps_forget_undoes_it`,
+  `remember::doubted::tests`.
 - **A plain keep is answered at once** (`LAMP_KEEP_ANSWERS_AT_ONCE=on`,
   the second route; off unless set, C59). A spoken line that only asks to
   keep something ("Remember that my dentist is on Tuesday."), whose first
