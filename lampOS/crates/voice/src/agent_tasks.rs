@@ -394,6 +394,33 @@ fn lamp_there() -> bool {
     LAMP_THERE.load(Ordering::Relaxed)
 }
 
+/// Whether `start_agent_task` was last declared with the lamp's words
+/// (`where`, new work to Hermes here, #5978), kept so a call naming no
+/// machine still goes to the lamp when [`LAMP_THERE`] went false since.
+#[cfg_attr(test, allow(dead_code))]
+static DECLARED_WITH_THE_LAMP: AtomicBool = AtomicBool::new(false);
+
+/// Keeps whether the tools were just declared with the lamp's words; a
+/// test keeps its own, on its own thread.
+fn declare_with_the_lamp(lamp: bool) {
+    #[cfg(test)]
+    {
+        tests::DECLARED_HERE.with(|here| here.set(lamp));
+    }
+    #[cfg(not(test))]
+    DECLARED_WITH_THE_LAMP.store(lamp, Ordering::Relaxed);
+}
+
+/// Whether the tools were last declared with the lamp's words.
+fn declared_with_the_lamp() -> bool {
+    #[cfg(test)]
+    {
+        tests::DECLARED_HERE.with(std::cell::Cell::get)
+    }
+    #[cfg(not(test))]
+    DECLARED_WITH_THE_LAMP.load(Ordering::Relaxed)
+}
+
 /// Whether a hand-over goes to the lamp's own Hermes (#5978): `where`
 /// `"lamp"`, or, while the lamp has its target, anything but `where`
 /// `"computer"` or an agent on a computer named (`who`), which go to a
@@ -401,7 +428,11 @@ fn lamp_there() -> bool {
 /// lamp has its target, Hermes is the lamp's own Hermes, never a
 /// computer's. Without the lamp's target, only `where` `"lamp"` or `who`
 /// the lamp, which the tasks part then refuses as no such target; Hermes
-/// named then is a computer's, as before.
+/// named then is a computer's, as before. `there` is whether the lamp has
+/// its target now or the tool was declared with the lamp's words: a call
+/// naming no machine from such a declaration goes to the lamp even when the
+/// target went away since, and is then said not set up, never sent to a
+/// computer.
 fn on_the_lamp_now(args: &Value, there: bool) -> bool {
     let said = |key: &str| {
         args.get(key)
@@ -449,7 +480,9 @@ static READING: OnceLock<()> = OnceLock::new();
 /// The functions a session is told of: with [`WHO_FLAG`], for the staff as
 /// last read.
 pub fn tools(place: &Place) -> Vec<Tool> {
-    declared_on(place, &staff_now(place), lamp_there())
+    let lamp = lamp_there();
+    declare_with_the_lamp(lamp);
+    declared_on(place, &staff_now(place), lamp)
 }
 
 fn staff_now(place: &Place) -> Vec<Member> {
@@ -2617,7 +2650,7 @@ fn run_for(
             // by default while the tasks part has it, unless the person
             // named their computer or an agent on it; never a staff member,
             // so never looked for among them.
-            let on_the_lamp = on_the_lamp_now(&call.args, lamp_there());
+            let on_the_lamp = on_the_lamp_now(&call.args, lamp_there() || declared_with_the_lamp());
             let member = if on_the_lamp {
                 None
             } else {
@@ -3370,6 +3403,10 @@ pub(crate) mod tests {
         /// this thread only ([`super::lamp_there`], #5978).
         pub(crate) static LAMP_THERE_HERE: std::cell::Cell<Option<bool>> =
             const { std::cell::Cell::new(None) };
+        /// Whether the tools were last declared with the lamp's words, for
+        /// a test on this thread only ([`super::declared_with_the_lamp`]).
+        pub(crate) static DECLARED_HERE: std::cell::Cell<bool> =
+            const { std::cell::Cell::new(false) };
     }
     /// A last step or an ask never brings a folder or a username to the
     /// model (the reviewer-lead's P2 on #5118).
@@ -8833,6 +8870,57 @@ pub(crate) mod tests {
                 json!("lamp")
             ]
         );
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #5978, the Reviewer-lead's P3 on #6094: declared with the lamp's
+    /// words ("new work goes to Hermes here"), then the lamp's target gone
+    /// before the call, a call naming no machine still goes to the lamp and
+    /// is said not set up; nothing is prepared on a computer.
+    #[test]
+    fn declared_with_the_lamp_an_unnamed_call_never_goes_to_a_computer() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory = std::env::temp_dir().join(format!("agent-gone-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status),
+                ("request.sock", json!({"ok":false,"error":"target"})),
+            ],
+        );
+        let at = place(&directory, false);
+        LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+        let start = tools(&at)
+            .into_iter()
+            .find(|tool| tool.name == START)
+            .unwrap();
+        assert_eq!(
+            start.parameters.unwrap()["properties"]["where"]["enum"],
+            json!(["lamp", "computer"])
+        );
+        LAMP_THERE_HERE.with(|here| here.set(Some(false)));
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task":"Write a poem"}),
+        };
+        let told = run(&at, &call, 8, true, PEER_WAIT).0;
+        LAMP_THERE_HERE.with(|here| here.set(None));
+        DECLARED_HERE.with(|here| here.set(false));
+        assert_eq!(told, json!({"error": LAMP_NOT_SET_UP}));
+        let prepared: Vec<Value> = seen
+            .try_iter()
+            .filter(|line| line["op"] == "prepare")
+            .map(|line| line["target"].clone())
+            .collect();
+        assert_eq!(prepared, [json!("lamp")]);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }
