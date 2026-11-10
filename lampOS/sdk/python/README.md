@@ -15,7 +15,9 @@ and what to do ([more](../README.md#on-a-customer-lamp-today)):
 - **Joints and play:** `joints` takes `yaw` and `pitch` only; `roll`, `shoulder` and `elbow` are refused, and so is `play`. Use `look`, `gesture` or `move`.
 - **Limp and pose:** the body's limp and hold-a-pose can't be reached from a computer.
 - **No mDNS:** `lamp find` finds nothing. Pair with `--host lamp-xxxx.local` (the lamp's host name) or its IP address; the address is kept for later connects.
-- **Event times are UTC:** `at` ends in `Z`. Convert to local time yourself.
+- **Event times are UTC:** `at` ends in `Z`. Convert to local time yourself:
+  `datetime.fromisoformat(event["at"].replace("Z", "+00:00")).astimezone()`. Key a "today" by your own
+  clock (`datetime.date.today()`), not by `at`'s date: UTC's day turns over at 08:00 in Shenzhen.
 
 Also: a motion asked while the last one sent through lamp-control plays is refused `busy` with `retry_ms` (wait, ask again), and a `look` on a resting lamp may end `cut_short` with no hand on it.
 
