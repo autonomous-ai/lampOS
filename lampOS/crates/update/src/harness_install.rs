@@ -107,12 +107,15 @@ pub const UNIT: &str = "lamp-update-harness.service";
 /// (#5978, [`crate::hermes_install`]; `-`: a lamp without that folder
 /// still installs Harness). Its bound is past Harness's installer
 /// ([`install::INSTALLER_WITHIN`]) and the steps around it, with Hermes
-/// after it: an hour.
+/// after it: an hour. `MemoryHigh=1200M` (#5978): past it the kernel
+/// reclaims the one-shot's own memory and throttles it, never kills it,
+/// so a 4 GB lamp keeps about 1.2 GB available for its own parts (the
+/// `products` stage alone took `MemAvailable` down to about 868 MB).
 pub const TEXT: &str = "\
 # lamp-update-harness: puts Harness on the lamp before its sign-in, with Harness's own installer, installed only
 # (lampOS/docs/install.md, \"Harness before the sign-in\", #5197). Written and started by a round of lamp-update
 # with LAMP_HARNESS_AT_ONBOARDING=on, whose own sandbox cannot write /usr/local/bin or Harness's home; never
-# enabled. Outside lampos.target, as lamp-update is. With LAMP_HERMES_ON_LAMP=on it puts the pinned Hermes there
+# enabled. Outside lampos.target, as lamp-update is. With Hermes on (LAMP_HERMES_ON_LAMP) it puts the pinned Hermes there
 # after Harness, as lampos, with its wrapper in /usr/local/bin and its namespace script in /usr/local/lib/lampos
 # (lampOS/docs/install.md, \"Hermes on the lamp\", #5978).
 [Unit]
@@ -135,6 +138,7 @@ IOWriteBandwidthMax=/var/lib 8M
 IOReadBandwidthMax=/var/lib 16M
 IOWriteIOPSMax=/var/lib 200
 IOReadIOPSMax=/var/lib 400
+MemoryHigh=1200M
 NoNewPrivileges=yes
 ProtectSystem=full
 ReadWritePaths=/usr/local/bin -/usr/local/lib/lampos
