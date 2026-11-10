@@ -75,6 +75,19 @@ pub const LIST_SAID: &str = list_said!();
 /// `list_reminders`' description.
 pub const LIST_DESCRIBED: &str = concat!(list_before!(), " ", list_asked!(), " ", list_said!());
 
+/// Told beside a list whose `said_recently` holds one just said, with its
+/// id (C68): it may still be snoozed or cancelled.
+pub const JUST_SAID: &str = "A said_recently item with an id was just said and can still be changed: 'snooze it' or 'again in N minutes' is snooze_reminder, 'cancel it' is cancel_reminder, with that id.";
+
+/// How long a snooze is when the person gives no length ("snooze it"):
+/// five minutes, as the lamp says it.
+pub const SNOOZE_DEFAULT_SECONDS: u64 = 300;
+
+/// Told when a snooze or cancel names a one-time reminder said longer ago
+/// than `lamp_schedule::engine::SAID_SNOOZABLE_MS`, or already snoozed or
+/// cancelled since (C68): nothing changed.
+pub const SAID_TOO_LONG_AGO: &str = "That reminder was already said, and it can no longer be snoozed or cancelled: nothing was snoozed or cancelled now. Say so plainly, never that it is snoozed; if they still want it, offer to set it again.";
+
 /// Voice reserves 16 bytes in its provider's 4096-byte tool-result allowance.
 pub const MAX_RESULT_BYTES: usize = 4096 - 16;
 pub const NAMES: [&str; 6] = [
@@ -152,7 +165,7 @@ pub fn catalog_with(every: bool) -> Vec<Function> {
         ),
         function(
             NAMES[5],
-            "Postpone the selected currently due occurrence by whole seconds. This preserves a repeating reminder's original schedule. Use an ID from the current list.",
+            "Postpone the selected currently due occurrence by whole seconds. This preserves a repeating reminder's original schedule. Use an ID from the current list. A one-time reminder just said (said_recently with an id) is set again that many seconds from now. 'Snooze it' with no length is 300 seconds. Never say it is snoozed unless this returns committed.",
             json!({"id":id,"seconds":seconds}),
             json!(["id", "seconds"]),
         ),
@@ -471,6 +484,16 @@ impl Adapter {
                     )?;
                     let items = listed["items"].as_array().cloned().unwrap_or_default();
                     matches.extend(items.iter().filter(|item| by_text(item, &text)).cloned());
+                    // One just said, which may still be cancelled (C68).
+                    let said = listed["said_recently"]
+                        .as_array()
+                        .cloned()
+                        .unwrap_or_default();
+                    matches.extend(
+                        said.iter()
+                            .filter(|one| one["id"].is_u64() && by_text(one, &text))
+                            .cloned(),
+                    );
                     match (
                         listed["complete"].as_bool(),
                         listed["next_after_id"].as_u64(),
@@ -505,7 +528,17 @@ impl Adapter {
         // beside the first). Other mutations use Status. No conflict or
         // uncertain mutation is retried.
         let before = match (&call, &asker) {
-            (Call::Snooze { id, .. }, _) => self.ask(&Request::Get { id: *id }, deadline)?,
+            (Call::Snooze { id, .. }, _) => {
+                match self.ask_raw(&Request::Get { id: *id }, deadline)? {
+                    Ok(reply) => reply,
+                    // Gone from the set list: one just said, from the said
+                    // record, may still be snoozed (C68).
+                    Err(refusal) if refusal["error"] == "not_found" => {
+                        self.said_again(*id, asker.as_ref(), deadline)?
+                    }
+                    Err(refusal) => return Err(refused(&refusal, false)),
+                }
+            }
             (Call::Set { .. }, Some(asker)) => match self.ask_raw(
                 &Request::ListSet {
                     after_id: 0,
@@ -549,19 +582,26 @@ impl Adapter {
             },
             Call::Cancel { id } => Request::Cancel { guard, id, asker },
             Call::Snooze { id, seconds } => {
-                let item = item(&before["item"]).map_err(|_| Failure::Unavailable)?;
-                if item.id != id {
-                    return Err(Failure::Unavailable);
-                }
-                // For a line, Schedule says first whether it is theirs at
-                // all: someone else's is not found, never "not due".
-                if item.state != "pending" && asker.is_none() {
-                    return Err(Failure::NotPending);
-                }
+                let delivery = match before["said_delivery"].as_u64() {
+                    Some(delivery) => delivery,
+                    None => {
+                        let item = item(&before["item"]).map_err(|_| Failure::Unavailable)?;
+                        if item.id != id {
+                            return Err(Failure::Unavailable);
+                        }
+                        // For a line, Schedule says first whether it is
+                        // theirs at all: someone else's is not found, never
+                        // "not due".
+                        if item.state != "pending" && asker.is_none() {
+                            return Err(Failure::NotPending);
+                        }
+                        item.delivery
+                    }
+                };
                 Request::Snooze {
                     guard,
                     id,
-                    delivery: item.delivery,
+                    delivery,
                     seconds,
                     asker,
                 }
@@ -570,7 +610,20 @@ impl Adapter {
                 unreachable!("list and a cancel by text resolved before mutation")
             }
         };
-        let response = self.ask(&request, deadline)?;
+        let response = match (self.ask(&request, deadline), &request) {
+            // Said longer ago than its window: told so, never only "no
+            // longer active" (C68).
+            (
+                Err(Failure::NotFound),
+                Request::Cancel { id, asker, .. } | Request::Snooze { id, asker, .. },
+            ) => {
+                return Err(match self.said_again(*id, asker.as_ref(), deadline) {
+                    Err(Failure::SaidTooLongAgo) => Failure::SaidTooLongAgo,
+                    _ => Failure::NotFound,
+                });
+            }
+            (response, _) => response?,
+        };
         let mut done = committed(&request, &response)?;
         let new = done["id"].as_u64();
         let same: Vec<_> = same
@@ -582,6 +635,47 @@ impl Adapter {
             done["note"] = json!(SAME_WORDS);
         }
         Ok(done)
+    }
+}
+
+impl Adapter {
+    /// The one-time item `id` just said, from the said record as `asker`'s
+    /// line hears it, to snooze (C68): that page, its store and revision,
+    /// with `said_delivery`, the delivery said. One said longer ago than
+    /// `lamp_schedule::engine::SAID_SNOOZABLE_MS` is
+    /// [`Failure::SaidTooLongAgo`]; none of that id, or an older Schedule,
+    /// [`Failure::NotFound`].
+    fn said_again(
+        &self,
+        id: u64,
+        asker: Option<&Asker>,
+        deadline: Instant,
+    ) -> Result<Value, Failure> {
+        let request = Request::ListSet {
+            after_id: 0,
+            limit: 8,
+            pending_only: false,
+            asker: asker.cloned(),
+        };
+        let Ok(mut page) = self.ask_raw(&request, deadline)? else {
+            return Err(Failure::NotFound);
+        };
+        let said = page["said"].as_array().cloned().unwrap_or_default();
+        let mut found = false;
+        for one in said.iter().filter(|one| one["id"].as_u64() == Some(id)) {
+            found = true;
+            if one["can_snooze_or_cancel"] == true
+                && let Some(delivery) = one["delivery"].as_u64().filter(|d| *d > 0)
+            {
+                page["said_delivery"] = json!(delivery);
+                return Ok(page);
+            }
+        }
+        Err(if found {
+            Failure::SaidTooLongAgo
+        } else {
+            Failure::NotFound
+        })
     }
 }
 
@@ -671,6 +765,9 @@ enum Failure {
     Conflict,
     NotFound,
     NotPending,
+    /// A one-time reminder said longer ago than it may be snoozed or
+    /// cancelled ([`SAID_TOO_LONG_AGO`]).
+    SaidTooLongAgo,
     BadTime,
     Full,
 }
@@ -698,6 +795,7 @@ fn failure(why: Failure) -> Value {
             "not_pending",
             "That exact reminder is not currently due. Please list the current reminders before choosing one to snooze.",
         ),
+        Failure::SaidTooLongAgo => ("said_too_long_ago", SAID_TOO_LONG_AGO),
         Failure::BadTime => (
             "bad_time",
             "I cannot set that time just now. Please clarify the date, time zone or repeated clock time, and check that my clock is ready.",
@@ -1292,8 +1390,15 @@ fn said_recently(
             (Some(day), Some(clock)) => (Some(day), Some(clock)),
             _ => (None, None),
         };
-        views.push(json!({"text":text,"kind":kind,"said_day":said_day,"said_clock":said_clock,
-            "due_day":due_day,"due_clock":due_clock,"on_time":on_time,"waiting_for_answer":waiting}));
+        let mut view = json!({"text":text,"kind":kind,"said_day":said_day,"said_clock":said_clock,
+            "due_day":due_day,"due_clock":due_clock,"on_time":on_time,"waiting_for_answer":waiting});
+        // Just said, so it may still be snoozed or cancelled by its id (C68).
+        if one["can_snooze_or_cancel"] == true
+            && let Some(id) = one["id"].as_u64().filter(|id| *id > 0)
+        {
+            view["id"] = json!(id);
+        }
+        views.push(view);
     }
     let mut kept = Vec::new();
     for view in &views {
@@ -1301,6 +1406,7 @@ fn said_recently(
         let mut probe = listed.clone();
         probe["said_recently"] = json!(kept);
         probe["said_complete"] = json!(false);
+        probe["said_note"] = json!(JUST_SAID);
         reserve(&mut probe, pending_only, hidden);
         if probe.to_string().len() > MAX_RESULT_BYTES {
             kept.pop();
@@ -1308,6 +1414,9 @@ fn said_recently(
         }
     }
     listed["said_complete"] = json!(kept.len() == views.len());
+    if kept.iter().any(|one| one.get("id").is_some()) {
+        listed["said_note"] = json!(JUST_SAID);
+    }
     listed["said_recently"] = json!(kept);
     Ok(())
 }

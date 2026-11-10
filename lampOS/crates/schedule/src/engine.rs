@@ -70,6 +70,13 @@ pub const REMINDER_TOO_LATE_MS: u64 = 2 * 3_600_000;
 /// late and acknowledged at 10:01). Reads past the cut-off don't renew it,
 /// so a held or muted one is dropped at most this long after it.
 pub const OFFERED_HOLD_MS: u64 = 60_000;
+/// A one-time reminder or timer just said may still be snoozed or
+/// cancelled for this long after it was said (C68, lamp-06c1 on 11 Nov at
+/// 01:30: "Call the plumber." was said, "snooze it" came 9 s later, and with
+/// the reminder already gone from the set list nothing could be snoozed). A
+/// person answers a reminder at once or not at all: two minutes holds that
+/// answer, and after it a "snooze it" or "cancel it" changes nothing.
+pub const SAID_SNOOZABLE_MS: i64 = 2 * 60_000;
 /// The said record holds at most this many reminders and timers...
 pub const SAID_KEPT: usize = 20;
 /// ...and none said longer ago than this.
@@ -228,6 +235,12 @@ struct Said {
     person: Option<String>,
     /// Said late ([`SAID_LATE_MS`]) and nobody has answered a line since.
     waiting: bool,
+    /// The one-time item as it was when said, while it may still be
+    /// snoozed or cancelled ([`SAID_SNOOZABLE_MS`]); taken by that snooze or
+    /// cancel, and left out once the window has passed. Optional stored
+    /// metadata, so no `schema` bump: a build from before leaves it out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    again: Option<Box<Item>>,
 }
 
 impl Said {
@@ -243,8 +256,24 @@ impl Said {
     fn visible(&self, asker: Option<&Asker>) -> bool {
         self.room || asker.is_none_or(|asker| asker.may_see(self.person.as_deref()))
     }
+    /// It may still be snoozed or cancelled at `now`: said within the last
+    /// [`SAID_SNOOZABLE_MS`], and neither snoozed nor cancelled since.
+    fn again_at(&self, now: &ClockSample) -> bool {
+        self.again.is_some()
+            && (0..=SAID_SNOOZABLE_MS).contains(&now.unix_ms.saturating_sub(self.said_unix_ms))
+    }
     fn valid(&self, next_id: u64) -> bool {
-        self.id > 0
+        self.again.as_ref().is_none_or(|item| {
+            item.id == self.id
+                && item.delivery > 0
+                && item.pending.is_none()
+                && item.snooze.is_none()
+                && item.deadline.repeat.is_none()
+                && item.deadline.check().is_ok()
+                && valid_text(&item.text)
+                && valid_request_id(&item.request_id)
+                && item.person == self.person
+        }) && self.id > 0
             && self.id < next_id
             && valid_text(&self.text)
             && (time::MIN_UNIX_MS..=time::MAX_UNIX_MS).contains(&self.due_unix_ms)
@@ -261,6 +290,9 @@ impl Said {
 /// [`SAID_KEPT`] are left.
 fn remember_said(record: &mut Vec<Said>, said: Said, now: &ClockSample) {
     record.retain(|kept| kept.kept_at(now));
+    for kept in record.iter_mut().filter(|kept| !kept.again_at(now)) {
+        kept.again = None;
+    }
     record.push(said);
     while record.len() > SAID_KEPT {
         let oldest = record
@@ -946,6 +978,7 @@ impl<P: Persistence> Engine<P> {
             };
             eprintln!("{line}");
             dropped.waiting = false;
+            dropped.again = None;
             remember_said(&mut next.dropped_late, dropped, now);
             if !removed {
                 index += 1;
@@ -1071,7 +1104,7 @@ impl<P: Persistence> Engine<P> {
         let (_, late_by_ms) = self.late(&next.items[index], now);
         let shown = Self::shown(&next.items[index], now);
         let item = &next.items[index];
-        let said = Said {
+        let mut said = Said {
             id: item.id,
             room: item.rooms(),
             timer: item.timer(),
@@ -1082,6 +1115,7 @@ impl<P: Persistence> Engine<P> {
             late_by_ms,
             person: item.person.clone(),
             waiting: late_by_ms.is_none_or(|ms| ms > SAID_LATE_MS),
+            again: None,
         };
         match time::next_ahead(&item.deadline, now).map_err(bad_time)? {
             Some(deadline) => {
@@ -1096,7 +1130,12 @@ impl<P: Persistence> Engine<P> {
                 Ok((said, false))
             }
             None => {
-                next.items.remove(index);
+                let item = next.items.remove(index);
+                said.again = Some(Box::new(Item {
+                    pending: None,
+                    snooze: None,
+                    ..item
+                }));
                 Ok((said, true))
             }
         }
@@ -1399,10 +1438,17 @@ impl<P: Persistence> Engine<P> {
                 json!({"id":id,"delivery":1,"due_unix_ms":deadline.unix_ms,"local":deadline.local})
             }
             Request::Cancel { id, asker, .. } => {
-                let index = find_for(&next, *id, asker.as_ref())?;
-                let delivery = next.items[index].delivery;
-                next.items.remove(index);
-                json!({"cancelled":true,"id":id,"delivery":delivery})
+                // Just said: ended for good, never said again (C68).
+                if let Some(again) = take_said(&mut next, *id, asker.as_ref(), now) {
+                    eprintln!("schedule: id {id} cancelled just after it was said");
+                    let delivery = again.delivery;
+                    json!({"cancelled":true,"id":id,"delivery":delivery})
+                } else {
+                    let index = find_for(&next, *id, asker.as_ref())?;
+                    let delivery = next.items[index].delivery;
+                    next.items.remove(index);
+                    json!({"cancelled":true,"id":id,"delivery":delivery})
+                }
             }
             Request::Snooze {
                 id,
@@ -1411,8 +1457,28 @@ impl<P: Persistence> Engine<P> {
                 asker,
                 ..
             } => {
-                find_for(&next, *id, asker.as_ref())?;
-                let index = find_pending(&next, *id, *delivery)?;
+                // Just said: set again, as it was, then snoozed (C68).
+                let index = if let Some(again) = take_said(&mut next, *id, asker.as_ref(), now) {
+                    if again.delivery != *delivery {
+                        return Err(err(
+                            "stale_delivery",
+                            "That exact delivery is not pending; read the current item.",
+                        ));
+                    }
+                    if next.items.len() + next.unread.len() >= MAX_ITEMS {
+                        return Err(err(
+                            "full",
+                            "There are already 128 active reminders and timers; cancel or acknowledge one.",
+                        ));
+                    }
+                    let at = next.items.partition_point(|i| i.id < *id);
+                    next.items.insert(at, *again);
+                    eprintln!("schedule: id {id} snoozed just after it was said");
+                    at
+                } else {
+                    find_for(&next, *id, asker.as_ref())?;
+                    find_pending(&next, *id, *delivery)?
+                };
                 let until = time::resolve(&When::After { seconds: *seconds }, now, &self.zone)
                     .map_err(bad_time)?;
                 let item = &mut next.items[index];
@@ -1519,6 +1585,14 @@ impl<P: Persistence> Engine<P> {
                 "on_time": said.late_by_ms.is_some_and(|ms| ms <= SAID_LATE_MS),
                 "waiting_for_answer": said.waiting_at(now),
             }));
+            // Just said (C68): its id and delivery, to snooze or cancel it
+            // by, and until when.
+            if let Some(again) = said.again.as_ref().filter(|_| said.again_at(now)) {
+                let view = views.last_mut().expect("just pushed");
+                view["can_snooze_or_cancel"] = json!(true);
+                view["delivery"] = json!(again.delivery);
+                view["until_unix_ms"] = json!(said.said_unix_ms + SAID_SNOOZABLE_MS);
+            }
             probe["said"] = json!(views);
             if serde_json::to_vec(&self.reply(probe.clone()))
                 .map_err(storage)?
@@ -1604,6 +1678,25 @@ fn find_for(state: &State, id: u64, asker: Option<&Asker>) -> Result<usize, Erro
         ));
     }
     Ok(index)
+}
+/// The one-time item `id` said within [`SAID_SNOOZABLE_MS`] of `now`, that
+/// `asker`'s line may see, taken from the said record to be snoozed or
+/// cancelled (C68). None while an item `id` is still set, or once its
+/// window has passed: a "snooze it" then changes nothing.
+fn take_said(
+    state: &mut State,
+    id: u64,
+    asker: Option<&Asker>,
+    now: &ClockSample,
+) -> Option<Box<Item>> {
+    if state.items.iter().any(|i| i.id == id) {
+        return None;
+    }
+    let at = state
+        .said
+        .iter()
+        .rposition(|s| s.id == id && s.again_at(now) && s.visible(asker))?;
+    state.said[at].again.take()
 }
 fn find_pending(state: &State, id: u64, delivery: u64) -> Result<usize, Error> {
     let index = find(state, id)?;
