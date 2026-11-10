@@ -43,7 +43,8 @@ programs with `LAMPOS_HOME=~/.lampsim/virtual/sdk` (or the `--dir` you gave) and
 the screen, with no special mode: the same Python and JavaScript SDK calls and lamp-mcp tools, the same
 refusals and limits.
 
-What is not the real thing: it moves no real servo and draws no real ring, a `sound` clip is silence,
+What is not the real thing: it moves no real servo and draws no real ring, a `sound` clip is played by the host's
+`paplay`, `aplay`, `afplay` or `ffplay` where there is one (else a short silence),
 there are no face, hand or sound-class models (the room's people, hands, words and air are made with
 `lamp-sim people|hear|hand|air`), and the body's numbers are one lamp's. A lamp check on a real
 lamp stays a lamp check. To see where it differs from the SDK's own fake or from a real lamp, run
