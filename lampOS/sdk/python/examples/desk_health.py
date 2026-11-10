@@ -52,7 +52,10 @@ async def main():
             elif since is not None:
                 spell = time.monotonic() - since
                 since = None
-                await keep(spell)
+                try:
+                    await keep(spell)
+                except LampError as refused:
+                    print(f"not now: {refused}")  # notes paused, over its limits...
             wake.set()  # an event wakes the loop, so a clear air puts the light out at once
 
         await lamp.on("air.changed", changed)
