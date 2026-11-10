@@ -640,66 +640,339 @@ light = { dim = 1 }
         (root, keeping)
     }
 
-    /// A chat service on a local port: each request in turn gets the next
-    /// of `replies`, an HTTP status and, for a 200, the text streamed in
-    /// two pieces. How many requests came.
+    // The URL key distinguishes concurrent fixtures, not later reuse of a port.
+    fn fixture_key(url: &str) -> String {
+        format!("make-skill-fixture-{url}")
+    }
+
+    type FixtureRead = Result<Option<(tokio::net::TcpStream, Vec<u8>)>, String>;
+
+    async fn fixture_request(mut socket: tokio::net::TcpStream, key: String) -> FixtureRead {
+        use tokio::io::AsyncReadExt;
+        const CAP: usize = 64 * 1024;
+        // Once authenticated, truncation/timeout must fail the fixture visibly.
+        let mut authenticated = false;
+        let read = async {
+            let mut bytes = Vec::new();
+            let mut head_end = None;
+            let mut length = None;
+            loop {
+                if let (Some(end), Some(len)) = (head_end, length)
+                    && bytes.len() >= end + len
+                {
+                    return Ok(Some(bytes[end..end + len].to_vec()));
+                }
+                if bytes.len() == CAP {
+                    return if authenticated {
+                        Err("authenticated chat exceeds request cap".into())
+                    } else {
+                        Ok(None)
+                    };
+                }
+                let mut buffer = [0u8; 4096];
+                let room = buffer.len().min(CAP - bytes.len());
+                let n = match socket.read(&mut buffer[..room]).await {
+                    Ok(n) => n,
+                    Err(error) => {
+                        return if authenticated {
+                            Err(format!("authenticated chat read failed: {error}"))
+                        } else {
+                            Ok(None)
+                        };
+                    }
+                };
+                if n == 0 {
+                    return if authenticated {
+                        Err("authenticated chat body is incomplete".into())
+                    } else {
+                        Ok(None)
+                    };
+                }
+                bytes.extend_from_slice(&buffer[..n]);
+                if head_end.is_some() {
+                    continue;
+                }
+                let Some(boundary) = bytes.windows(4).position(|part| part == b"\r\n\r\n") else {
+                    continue;
+                };
+                let end = boundary + 4;
+                let head = match std::str::from_utf8(&bytes[..boundary]) {
+                    Ok(head) => head,
+                    Err(_) => return Ok(None),
+                };
+                let mut lines = head.split("\r\n");
+                if lines.next() != Some("POST /v1/chat/completions HTTP/1.1") {
+                    return Ok(None);
+                }
+                let headers: Vec<_> = lines.collect();
+                let expected = format!("Bearer {key}");
+                let authorization: Vec<_> = headers
+                    .iter()
+                    .filter_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("authorization")
+                            .then_some(value.trim())
+                    })
+                    .collect();
+                if authorization.as_slice() != [expected.as_str()] {
+                    return Ok(None);
+                }
+                authenticated = true;
+                let mut content_length = None;
+                for line in headers {
+                    let (name, value) = line
+                        .split_once(':')
+                        .ok_or("malformed authenticated header")?;
+                    if name.eq_ignore_ascii_case("transfer-encoding") {
+                        return Err("authenticated chat uses unsupported transfer encoding".into());
+                    }
+                    if name.eq_ignore_ascii_case("content-length") {
+                        if content_length.is_some() {
+                            return Err("duplicate authenticated content length".into());
+                        }
+                        let value = value.trim();
+                        if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+                            return Err("invalid authenticated content length".into());
+                        }
+                        content_length = Some(
+                            value
+                                .parse::<usize>()
+                                .map_err(|_| "authenticated content length overflow")?,
+                        );
+                    }
+                }
+                let len = content_length.ok_or("authenticated chat has no content length")?;
+                if end.checked_add(len).is_none_or(|total| total > CAP) {
+                    return Err("authenticated chat exceeds request cap".into());
+                }
+                head_end = Some(end);
+                length = Some(len);
+            }
+        };
+        let result = tokio::time::timeout(std::time::Duration::from_secs(2), read).await;
+        match result {
+            Ok(Ok(Some(body))) => Ok(Some((socket, body))),
+            Ok(Ok(None)) => Ok(None),
+            Ok(Err(error)) => Err(error),
+            Err(_) if authenticated => Err("authenticated chat read deadline expired".into()),
+            Err(_) => Ok(None),
+        }
+    }
+
+    /// Only this fixture's authenticated chat requests consume scripted replies.
+    /// Foreign probes have bounded readers; malformed authenticated chats fail.
     pub(crate) fn service(replies: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<usize>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{address}/v1/");
+        let key = fixture_key(&url);
         let served = std::thread::spawn(move || {
-            let mut count = 0;
-            for (status, text) in replies {
-                let (mut socket, _) = listener.accept().unwrap();
-                count += 1;
-                let mut request = Vec::new();
-                let mut buffer = [0; 8192];
-                // The head, then the body by its length.
-                loop {
-                    let n = socket.read(&mut buffer).unwrap();
-                    request.extend_from_slice(&buffer[..n]);
-                    let seen = String::from_utf8_lossy(&request).to_string();
-                    if let Some((head, body)) = seen.split_once("\r\n\r\n") {
-                        let length = head
-                            .lines()
-                            .find_map(|line| {
-                                line.to_ascii_lowercase()
-                                    .strip_prefix("content-length:")
-                                    .map(|value| value.trim().parse::<usize>().unwrap())
-                            })
-                            .unwrap_or(0);
-                        if body.len() >= length {
-                            assert!(body.contains(made_skill::BRIEF_HEAD), "{body}");
-                            assert!(!body.contains("\"tools\""), "{body}");
-                            break;
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async move {
+                use tokio::io::AsyncWriteExt;
+                let listener = tokio::net::TcpListener::from_std(listener).unwrap();
+                let mut readers = tokio::task::JoinSet::<FixtureRead>::new();
+                let mut count = 0;
+                for (status, text) in replies {
+                    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+                    let (mut socket, body) = loop {
+                        tokio::select! {
+                            biased;
+                            _ = tokio::time::sleep_until(deadline) => panic!("no authenticated skill chat within 10 seconds"),
+                            completed = readers.join_next(), if !readers.is_empty() => {
+                                let read = completed.expect("reader present").expect("fixture reader panicked").expect("invalid authenticated skill chat");
+                                if let Some(chat) = read { break chat; }
+                            }
+                            accepted = listener.accept(), if readers.len() < 16 => {
+                                let (socket, _) = accepted.unwrap();
+                                readers.spawn(fixture_request(socket, key.clone()));
+                            }
                         }
-                    }
-                    if n == 0 {
-                        break;
+                    };
+                    count += 1;
+                    let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
+                    assert!(body.contains(made_skill::BRIEF_HEAD), "{body}");
+                    assert!(!body.contains("\"tools\""), "{body}");
+                    let reply = if status == 200 {
+                        let (first, rest) = text.split_at(text.len() / 2);
+                        let chunk = |words: &str| format!("data: {}\n\n", json!({"choices": [{"delta": {"content": words}}]}));
+                        format!("HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n{}{}data: [DONE]\n\n", chunk(first), chunk(rest))
+                    } else {
+                        format!("HTTP/1.1 {status} Nope\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+                    };
+                    tokio::time::timeout(std::time::Duration::from_secs(2), socket.write_all(reply.as_bytes())).await.expect("fixture response deadline expired").expect("fixture response write failed");
+                }
+                // Match the existing script lifetime. Pending connections do not
+                // extend it; this does not claim to detect late extra chats.
+                readers.abort_all();
+                while let Some(result) = readers.join_next().await {
+                    match result {
+                        Err(error) if error.is_cancelled() => {}
+                        Err(error) => panic!("fixture reader panicked: {error}"),
+                        Ok(Err(error)) => panic!("invalid authenticated skill chat: {error}"),
+                        Ok(Ok(_)) => {}
                     }
                 }
-                let reply = if status == 200 {
-                    let (first, rest) = text.split_at(text.len() / 2);
-                    let chunk = |words: &str| {
-                        format!(
-                            "data: {}\n\n",
-                            json!({"choices": [{"delta": {"content": words}}]})
-                        )
-                    };
-                    format!(
-                        "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n{}{}data: [DONE]\n\n",
-                        chunk(first),
-                        chunk(rest)
-                    )
-                } else {
-                    format!(
-                        "HTTP/1.1 {status} Nope\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
-                    )
-                };
-                socket.write_all(reply.as_bytes()).unwrap();
-            }
-            count
+                count
+            })
         });
-        (format!("http://{address}/v1/"), served)
+        (url, served)
+    }
+
+    #[test]
+    fn discovery_does_not_consume_the_skill_chat_reply() {
+        let (root, keeping) = keeping("discovery-control");
+        let (url, served) = service(vec![(200, good())]);
+        let address = url
+            .strip_prefix("http://")
+            .unwrap()
+            .trim_end_matches("/v1/");
+        let mut discovery = std::net::TcpStream::connect(address).unwrap();
+        discovery
+            .set_read_timeout(Some(std::time::Duration::from_secs(3)))
+            .unwrap();
+        discovery
+            .write_all(b"GET /v1/models HTTP/1.1\r\nHost: fixture\r\n\r\n")
+            .unwrap();
+        let mut response = Vec::new();
+        let _ = discovery.read_to_end(&mut response);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        let joined = served.join();
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            joined.is_ok(),
+            "discovery consumed or crashed the chat plan"
+        );
+        assert_eq!(joined.unwrap(), 1);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+    }
+
+    fn fixture_socket(url: &str) -> std::net::TcpStream {
+        let address = url
+            .strip_prefix("http://")
+            .unwrap()
+            .trim_end_matches("/v1/");
+        let socket = std::net::TcpStream::connect(address).unwrap();
+        socket
+            .set_read_timeout(Some(std::time::Duration::from_secs(3)))
+            .unwrap();
+        socket
+            .set_write_timeout(Some(std::time::Duration::from_secs(3)))
+            .unwrap();
+        socket
+    }
+
+    fn fixture_exchange(url: &str, request: &str) -> Vec<u8> {
+        let mut socket = fixture_socket(url);
+        socket.write_all(request.as_bytes()).unwrap();
+        socket.shutdown(std::net::Shutdown::Write).unwrap();
+        let mut response = Vec::new();
+        match socket.read_to_end(&mut response) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {}
+            Err(error) => panic!("fixture response failed: {error}"),
+        }
+        response
+    }
+
+    fn fixture_chat(url: &str, body: &str) -> String {
+        format!(
+            "POST /v1/chat/completions HTTP/1.1\r\nHost: fixture\r\naUtHoRiZaTiOn: Bearer {}\r\nContent-Length: {}\r\n\r\n{body}",
+            fixture_key(url),
+            body.len()
+        )
+    }
+
+    #[test]
+    fn foreign_and_idle_requests_leave_genuine_duplicate_chats_counted() {
+        let (url, served) = service(vec![(200, "First.".into()), (200, "Second.".into())]);
+        let idle = fixture_socket(&url);
+        let mut partial = fixture_socket(&url);
+        partial.write_all(b"GET /v1/models HTTP/1.1\r\n").unwrap();
+        for (path, key) in [
+            ("GET /v1/models", fixture_key(&url)),
+            ("POST /wrong-path", fixture_key(&url)),
+            ("POST /v1/chat/completions", "foreign-key".into()),
+        ] {
+            let request = format!(
+                "{path} HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer {key}\r\nContent-Length: 0\r\n\r\n"
+            );
+            assert!(fixture_exchange(&url, &request).is_empty());
+        }
+        let body =
+            json!({"messages": [{"role": "user", "content": made_skill::BRIEF_HEAD}]}).to_string();
+        let request = fixture_chat(&url, &body);
+        let began = std::time::Instant::now();
+        let first = fixture_exchange(&url, &request);
+        let second = fixture_exchange(&url, &request);
+        eprintln!(
+            "two authenticated chats with idle/partial probes: {:?}",
+            began.elapsed()
+        );
+        // Each identical genuine request consumes its own scripted reply.
+        assert!(String::from_utf8(first).unwrap().contains("Fir"));
+        assert!(String::from_utf8(second).unwrap().contains("Sec"));
+        assert_eq!(served.join().unwrap(), 2);
+        drop((idle, partial));
+    }
+
+    #[test]
+    fn authenticated_bad_chat_bodies_still_fail_the_fixture() {
+        for body in [
+            "{}".to_owned(),
+            format!("{} \"tools\"", made_skill::BRIEF_HEAD),
+        ] {
+            let (url, served) = service(vec![(200, "Unused.".into())]);
+            assert!(fixture_exchange(&url, &fixture_chat(&url, &body)).is_empty());
+            assert!(
+                served.join().is_err(),
+                "invalid authenticated body was ignored"
+            );
+        }
+    }
+
+    #[test]
+    fn authenticated_bad_framing_still_fails_the_fixture() {
+        for headers in [
+            "",
+            "Content-Length: nope\r\n",
+            "Content-Length: 1\r\nContent-Length: 1\r\n",
+            "Content-Length: 99999999999999999999999999999\r\n",
+            "Content-Length: 65536\r\n",
+            "Content-Length: 100\r\n",
+            "Transfer-Encoding: chunked\r\n",
+        ] {
+            let (url, served) = service(vec![(200, "Unused.".into())]);
+            let request = format!(
+                "POST /v1/chat/completions HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer {}\r\n{headers}\r\nx",
+                fixture_key(&url)
+            );
+            assert!(fixture_exchange(&url, &request).is_empty());
+            assert!(
+                served.join().is_err(),
+                "invalid authenticated framing was ignored: {headers:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn authenticated_body_timeout_still_fails_the_fixture() {
+        let (url, served) = service(vec![(200, "Unused.".into())]);
+        let mut socket = fixture_socket(&url);
+        let request = format!(
+            "POST /v1/chat/completions HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer {}\r\nContent-Length: 100\r\n\r\nx",
+            fixture_key(&url)
+        );
+        socket.write_all(request.as_bytes()).unwrap();
+        // Keep the write half open: the reader must expire, not rely on EOF.
+        let mut response = Vec::new();
+        socket.read_to_end(&mut response).unwrap();
+        assert!(response.is_empty());
+        assert!(served.join().is_err(), "authenticated timeout was ignored");
     }
 
     /// A manage helper at `socket` that puts on whatever made skill it is
@@ -723,9 +996,8 @@ light = { dim = 1 }
     pub(crate) fn chat_at(
         url: String,
     ) -> impl Fn() -> Result<Chat, String> + Send + Sync + 'static {
-        move || {
-            Chat::with(&url, "m", "secret", Arc::new(Vec::new)).map_err(|error| error.to_string())
-        }
+        let key = fixture_key(&url);
+        move || Chat::with(&url, "m", &key, Arc::new(Vec::new)).map_err(|error| error.to_string())
     }
 
     const REQUEST: &str = "make me a skill that dims the light at 10 pm";
