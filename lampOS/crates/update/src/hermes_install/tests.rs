@@ -529,7 +529,7 @@ fn the_namespace_script_shows_only_what_is_allowed_and_refuses_outside_its_names
             .unwrap_or_else(|| panic!("{over} not overlaid"));
         let ro = NS_TEXT
             .find(&format!(
-                "mount -o remount,ro,nosuid,nodev,noexec {over} ||"
+                "mount -o remount,bind,ro,nosuid,nodev,noexec {over} ||"
             ))
             .unwrap_or_else(|| panic!("{over} not read-only"));
         assert!(tmpfs < ro && ro < hermes, "{over}");
@@ -823,10 +823,16 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
         format!("mount --move {stage}/r {resolv}"),
         format!("mount -o remount,bind,ro,nosuid,nodev,relatime {resolv}"),
         format!("rmdir {stage}/h {stage}/w {stage}/k {stage}"),
-        format!("mount -o remount,ro,nosuid,nodev,noexec {}", at("/run")),
-        format!("mount -o remount,ro,nosuid,nodev,noexec {}", at("/var/lib")),
         format!(
-            "mount -o remount,ro,nosuid,nodev,noexec {}",
+            "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
+            at("/run")
+        ),
+        format!(
+            "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
+            at("/var/lib")
+        ),
+        format!(
+            "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
             at("/etc/lampOS")
         ),
         format!(
@@ -870,9 +876,9 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
         "findmnt".to_owned(),
         "remount,bind,ro".to_owned(),
         "rmdir".to_owned(),
-        format!("remount,ro,nosuid,nodev,noexec {}", at("/run")),
-        format!("remount,ro,nosuid,nodev,noexec {}", at("/var/lib")),
-        format!("remount,ro,nosuid,nodev,noexec {}", at("/etc/lampOS")),
+        format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/run")),
+        format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/var/lib")),
+        format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/etc/lampOS")),
     ] {
         let (out, lines) = run(&fail_on);
         assert!(!out.status.success(), "{fail_on}: {lines:#?}");
