@@ -120,17 +120,22 @@ const AUDIO: &[&str] = &[
     "nhac",
     "bai",
 ];
-/// "Something" names a recording only before one of these ("play something
-/// calm", "put on something relaxing"); "play something with me" does not.
+/// "Something" names a recording only with one of these within
+/// [`MOOD_WITHIN`] words after it ("play something calm", "play me something
+/// to relax", "play something to help me sleep"); "play something with me"
+/// does not.
 const MOODS: &[&str] = &[
     "relaxing", "calm", "calming", "quiet", "soft", "soothing", "gentle", "peaceful", "chill",
+    "relax", "unwind", "sleep",
 ];
+/// How many words after "something" a [`MOODS`] word may come.
+const MOOD_WITHIN: usize = 4;
 
 /// Whether `said`, the line that led to a requested-audio call, plainly asks
 /// to play something (#5764). Some sentence of it must start, past greetings
 /// ([`BEFORE`]) and at most one lead-in ([`LEAD_INS`]), with an ask
-/// ([`ASKS`]) for a recording ([`AUDIO`], or "something" before a
-/// [`MOODS`] word), and no word of the whole line may be one of [`NOT`]. On lamp-52e6 on 9 Nov, "Lamp, I
+/// ([`ASKS`]) for a recording ([`AUDIO`], or "something" with a
+/// [`MOODS`] word soon after), and no word of the whole line may be one of [`NOT`]. On lamp-52e6 on 9 Nov, "Lamp, I
 /// listened to some relaxing music on the train this morning, it was really
 /// nice." got a `use_skill` call to the relaxing-music skill: talk about
 /// music, not an ask, so it is refused here, not left to the skill's text.
@@ -174,8 +179,10 @@ pub fn asks_to_play(said: &str) -> bool {
                 AUDIO.contains(&word.as_str())
                     || (word == "something"
                         && asked
-                            .get(i + 1)
-                            .is_some_and(|next| MOODS.contains(&next.as_str())))
+                            .iter()
+                            .skip(i + 1)
+                            .take(MOOD_WITHIN)
+                            .any(|next| MOODS.contains(&next.as_str())))
             })
     })
 }
@@ -318,6 +325,12 @@ mod tests {
             "Please play a quiet recording.",
             "Lamp, mở nhạc thư giãn đi.",
             "Bật nhạc cho mình nhé.",
+            // #5802: lamp-52e6 on 10 Nov, clips relax and relax2.
+            "Lamp, play me something to relax.",
+            "Lamp, can you play some relaxing music?",
+            "Play something to help me sleep.",
+            "Put on something calm.",
+            "Could you put on something to help me unwind?",
         ] {
             assert!(asks_to_play(ask), "{ask}");
         }
