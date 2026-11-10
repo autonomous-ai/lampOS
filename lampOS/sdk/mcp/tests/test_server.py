@@ -149,9 +149,20 @@ def test_every_op_of_the_schema_is_sent_by_a_tool(tmp_path):
 
 def test_play_joints_and_sound_each_send_their_op(tmp_path):
     async def go():
-        async with connected(tmp_path, grants=("body", "speak")) as (fake, _, session):
+        async with connected(tmp_path, grants=("body", "speak", "skills", "light")) as (fake, _, session):
+            # A move recorded in a pushed skill (`moves/wave.json`), played by name.
+            skill = tmp_path / "desk-wave"
+            (skill / "moves").mkdir(parents=True)
+            (skill / "SKILL.md").write_text("---\nname: desk-wave\ndescription: A test skill.\n---\n")
+            (skill / "skill.toml").write_text('version = "0.1.0"\n[permissions]\nlight = true\n')
+            frames = [[0, 0, count, 0, 0] for count in (0, 50, 100, 50, 0, 50, 100, 50, 0)]
+            (skill / "moves" / "wave.json").write_text(json.dumps({"name": "wave", "step_ms": 1000, "frames": frames}))
+            pushed = await session.call_tool("lamp_skill_push", {"folder": str(skill)})
+            assert not pushed.isError, text(pushed)
             assert not (await session.call_tool("lamp_play", {"name": "wave"})).isError
             assert fake.asked("play") == [{"name": "wave"}]
+            assert not (await session.call_tool("lamp_play", {"name": "wave", "skill": "desk-wave"})).isError
+            assert fake.asked("play")[-1] == {"name": "wave", "skill": "desk-wave"}
             # The door takes yaw and pitch today; roll, shoulder and elbow wait
             # for the body's goal stream (parts.rs), in its words.
             elbow = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "elbow": -5})
@@ -189,7 +200,7 @@ def test_body_tools_in_a_row_reuse_the_held_lease_rather_than_be_refused_busy(tm
             for _ in range(2):
                 moved = await session.call_tool("lamp_move", {"step_ms": 500, "frames": frames})
                 assert not moved.isError, text(moved)
-            played = await session.call_tool("lamp_play", {"name": "wave"})
+            played = await session.call_tool("lamp_look", {"at": "ahead"})
             assert not played.isError, text(played)
             assert len(fake.asked("lease.take")) == 1 and len(fake.asked("lease.renew")) == 2
 
@@ -253,8 +264,8 @@ def test_a_done_that_comes_before_its_answer_is_read_still_ends_the_tool(tmp_pat
         # The fake says `done` right after its answer.
         async with connected(tmp_path, grants=("body",)) as (fake, _, session):
             started = asyncio.get_running_loop().time()
-            played = await session.call_tool("lamp_play", {"name": "wave"})
-            assert not played.isError and text(played) == "play finished"
+            played = await session.call_tool("lamp_look", {"at": "ahead"})
+            assert not played.isError and "finished" in text(played), text(played)
             assert asyncio.get_running_loop().time() - started < 5
             assert fake.asked("lease.release") and not fake.leases
 
