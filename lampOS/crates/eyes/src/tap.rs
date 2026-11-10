@@ -21,6 +21,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, SyncSender, TrySendError};
 use std::time::Duration;
 
+use lamp_ipc::caller::Caller;
+
 /// The sizes a reader may ask for: the camera's own MJPEG modes at 25 fps.
 pub const SIZES: [(u32, u32); 2] = [(640, 480), (1_280, 720)];
 /// The capture rate while a reader is connected.
@@ -51,6 +53,8 @@ struct Reader {
 /// The socket, and its one reader with the size it asked for.
 pub struct Tap {
     listener: UnixListener,
+    /// Who may read: by the kernel's naming of the connector, never its word.
+    may: Who,
     reader: Option<Reader>,
     /// Frames handed to the writer, and dropped for a full queue, for the
     /// reader now, for the journal.
@@ -58,15 +62,38 @@ pub struct Tap {
     pub dropped: u64,
 }
 
+/// Whether a caller the kernel named may read the frames.
+type Who = Box<dyn Fn(Option<&Caller>) -> bool + Send>;
+
+/// Who may read the frames: `lamp-control.service` run as `lampos`, or root,
+/// as the kernel names them (SO_PEERCRED and the pid's cgroup, as the body's
+/// lease door does, #3504 phase 0), not any other process running as
+/// `lampos` (banana's P3 on #5894).
+pub fn reader_may(caller: Option<&Caller>, lampos: Option<u32>) -> bool {
+    caller.is_some_and(|caller| {
+        caller.uid == 0
+            || (Some(caller.uid) == lampos
+                && caller.unit.as_deref() == Some("lamp-control.service"))
+    })
+}
+
 impl Tap {
-    /// Listens at `path` (a stale socket is replaced), for its owner only.
+    /// Listens at `path` (a stale socket is replaced), for lamp-control only
+    /// ([`reader_may`]).
     pub fn bind(path: &Path) -> io::Result<Self> {
+        let lampos = lamp_ipc::caller::uid_named("lampos");
+        Self::bind_allowing(path, Box::new(move |caller| reader_may(caller, lampos)))
+    }
+
+    /// Listens at `path` for the readers `may` lets in.
+    pub fn bind_allowing(path: &Path, may: Who) -> io::Result<Self> {
         let _ = std::fs::remove_file(path);
         let listener = UnixListener::bind(path)?;
         std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
         listener.set_nonblocking(true)?;
         Ok(Self {
             listener,
+            may,
             reader: None,
             sent: 0,
             dropped: 0,
@@ -82,6 +109,10 @@ impl Tap {
     /// while one is connected, or one asking a size there isn't, is closed.
     pub fn accept(&mut self) -> Option<String> {
         let (stream, _) = self.listener.accept().ok()?;
+        // Before anything else, and before a byte of it is read.
+        if !(self.may)(lamp_ipc::caller::of_stream(&stream).as_ref()) {
+            return Some("refused a frames reader: only lamp-control may read".to_owned());
+        }
         if self.reader.is_some() {
             return Some("refused a second frames reader".to_owned());
         }
@@ -202,7 +233,7 @@ mod tests {
     #[test]
     fn a_reader_gets_each_frame_whole_and_a_second_is_refused() {
         let path = socket();
-        let mut tap = Tap::bind(&path).unwrap();
+        let mut tap = Tap::bind_allowing(&path, Box::new(|_| true)).unwrap();
         assert_eq!(tap.size(), None);
         let mut reader = UnixStream::connect(&path).unwrap();
         reader.write_all(b"640x480\n").unwrap();
@@ -230,7 +261,7 @@ mod tests {
     #[test]
     fn a_slow_reader_loses_frames_never_its_stream_and_the_eyes_never_wait() {
         let path = socket();
-        let mut tap = Tap::bind(&path).unwrap();
+        let mut tap = Tap::bind_allowing(&path, Box::new(|_| true)).unwrap();
         let mut reader = UnixStream::connect(&path).unwrap();
         reader.write_all(b"1280x720\n").unwrap();
         tap.accept().unwrap();
@@ -255,7 +286,7 @@ mod tests {
     #[test]
     fn a_reader_that_goes_or_asks_a_size_there_isnt_is_let_go() {
         let path = socket();
-        let mut tap = Tap::bind(&path).unwrap();
+        let mut tap = Tap::bind_allowing(&path, Box::new(|_| true)).unwrap();
         let mut wrong = UnixStream::connect(&path).unwrap();
         wrong.write_all(b"1280x960\n").unwrap();
         assert!(tap.accept().unwrap().starts_with("refused a frames reader"));
@@ -280,7 +311,7 @@ mod tests {
     #[test]
     fn frames_queued_for_a_slow_reader_are_not_sent_after_the_end() {
         let path = socket();
-        let mut tap = Tap::bind(&path).unwrap();
+        let mut tap = Tap::bind_allowing(&path, Box::new(|_| true)).unwrap();
         let mut reader = UnixStream::connect(&path).unwrap();
         reader.write_all(b"1280x720\n").unwrap();
         tap.accept().unwrap();
@@ -310,5 +341,49 @@ mod tests {
             total < 4_000_000 + 4,
             "{total} bytes came after the end: more than the one frame being written"
         );
+    }
+
+    /// Banana's P3 on #5894: the socket is lamp-control's, not any process
+    /// running as `lampos`.
+    #[test]
+    fn only_lamp_control_may_read_the_frames() {
+        let caller = |uid, unit: Option<&str>| Caller {
+            pid: 7,
+            uid,
+            unit: unit.map(str::to_owned),
+        };
+        let lampos = Some(990);
+        assert!(reader_may(
+            Some(&caller(990, Some("lamp-control.service"))),
+            lampos
+        ));
+        assert!(reader_may(Some(&caller(0, None)), lampos));
+        // Another unit of lampos, no unit at all, another user's lamp-control,
+        // or nobody named: refused.
+        assert!(!reader_may(
+            Some(&caller(990, Some("lamp-voice.service"))),
+            lampos
+        ));
+        assert!(!reader_may(Some(&caller(990, None)), lampos));
+        assert!(!reader_may(
+            Some(&caller(1000, Some("lamp-control.service"))),
+            lampos
+        ));
+        assert!(!reader_may(None, lampos));
+        assert!(!reader_may(
+            Some(&caller(990, Some("lamp-control.service"))),
+            None
+        ));
+        // At the socket: this test process is no lamp-control service, so
+        // the product's own door turns it away, and keeps no reader.
+        let path = socket();
+        let mut tap = Tap::bind(&path).unwrap();
+        let mut stranger = UnixStream::connect(&path).unwrap();
+        stranger.write_all(b"640x480\n").unwrap();
+        assert_eq!(
+            tap.accept().as_deref(),
+            Some("refused a frames reader: only lamp-control may read")
+        );
+        assert_eq!(tap.size(), None);
     }
 }
