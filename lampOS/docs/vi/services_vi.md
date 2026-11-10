@@ -207,7 +207,7 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
-  | `{"op":"skill_write_approve","skill":"<name>","writes":[...]}`, lời đồng ý của ứng dụng cho các lần ghi của kỹ năng tự tạo (với `LAMP_SKILL_WRITES=on`; "Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...],"sha256"?}`, lời đồng ý của ứng dụng cho các lần ghi của kỹ năng tự tạo (với `LAMP_SKILL_WRITES=on`; `sha256`, không bắt buộc, là package được nói lại, bị từ chối nếu không phải package đang cài; "Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
 
   Một dòng có trường mà op của nó không nhận, hoặc một code mà danh mục không
   biết, bị từ chối mà không lặp lại nó.
@@ -1989,8 +1989,13 @@ toàn bộ):
   nó chờ trong bộ nhớ của giọng nói 120 s (`crate::skill_write_yes`). Một
   lời đồng ý bằng bất kỳ lời nào, do mô hình phán đoán, là một lệnh gọi
   `make_skill` chỉ với `approve_id` nó được đưa, trong một yêu cầu nghe
-  được sau đó trên route thứ hai. Khi đó chính giọng nói gọi
-  `skill_write_approve` (`services::skill_write_approve`). Các repository
+  được sau đó trên route thứ hai, khi lời của chính đèn trong một câu trả
+  lời, như đã phát và không bị cắt, đã có trọn câu nói lại của mỗi lần ghi
+  (nếu không thì nói lại và tiếp tục chờ). Khi đó chính giọng nói gọi
+  `skill_write_approve` (`services::skill_write_approve`), với `sha256`
+  của package đã được nói lại: `lamp-services` từ chối "the skill on the
+  lamp is not the one said back" khi một package khác đang được cài. Các
+  repository
   `public` trong câu trả lời được nói là "anyone can see" những gì nó
   đăng. Trong lúc chờ lời đồng ý, một dòng chỉ gồm lời của chính đèn, bắt
   đầu khi đèn đang nói hoặc trong 1,5 s đuôi tiếng vọng, bị giữ cả trong
