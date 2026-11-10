@@ -959,8 +959,8 @@ mod tests {
     /// often did not say it was Lamp, and did not know it had a camera, a
     /// speaker or a microphone. Both say its name first, as the line a role
     /// is told after (`crate::chosen_voice`), how to answer "who or what are
-    /// you?", and its eye, voice and ears; only the version without a
-    /// camera says the eye is closed and not to pretend to see.
+    /// you?", and its eye, voice and ears; the version without a camera
+    /// says no picture reaches it, without claiming the eye is closed.
     #[test]
     fn both_instructions_tell_the_lamp_its_name_eye_voice_and_microphone() {
         for instruction in [CHAT_INSTRUCTION, CAMERA_CHAT_INSTRUCTION] {
