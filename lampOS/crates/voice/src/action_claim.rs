@@ -58,16 +58,18 @@
 //! pm.", "The light's staying on until ten.", "It'll stay on until ten."):
 //! "It stays on until you say otherwise.", "Keeping it on until ten would
 //! waste power." and "It's on until ten." (whose "it" may be anything) are
-//! none. For bare keeping/leaving, clock and decimal punctuation stays
-//! inside the time; a comma is not a claim's end. Advice after the time
-//! and a comma-led question are none. A trailing numeric period waits for
-//! lookahead or model completion because it may still begin a decimal;
-//! other word runs keep their existing streaming decisions. A colour said
-//! ("My light is blue now.") is still no claim, nor is any sentence the run
-//! opens that ends in a '?'. A clock's ':' or '.' is inside its time ("until
-//! 10:30"), and a comma after a run leaves it to the sentence's own end
-//! ("Keeping it on until ten, would that help?" is none; Fourth's HOLD on
-//! #5910). Beside any call a worded claim stands, so work
+//! none. Numeric clock and decimal punctuation stays inside the time for
+//! all worded runs; a trailing numeric mark waits for lookahead or model
+//! completion. Limit extraction still reads the separate numeric parts.
+//! Ordinary end slots defer a comma or other non-sentence mark to the
+//! sentence's end, so "Okay, louder, right?" is none. Bare keeping/leaving
+//! and duration-state replies additionally close at the time and optional
+//! unit: "It stays on for ten minutes after a tap." is an explanation.
+//! After a comma these narrow runs allow only "as you asked" or "as
+//! requested", followed by an end slot that still rejects a question.
+//! A colour said ("My light is blue now.") is still no claim, nor is any
+//! sentence the run opens that ends in a '?'. Beside any call a worded
+//! claim stands, so work
 //! another tool did stands ("I've added a reminder to your calendar."
 //! beside `service_write`), unless it says a limit: a clock after "until",
 //! "till" or "at", or a length after "for" or "in" ([`worded_limit`]). A
@@ -1034,7 +1036,7 @@ fn read_as_asked(said: &str) -> (bool, bool, bool) {
 /// After the run, the sentence it opens must not end in a '?'. Each run is
 /// tied to a family with a call behind it, and never a colour said ("My
 /// light is blue now." also answers a colour question).
-const WORDED: [(&str, Claim); 65] = [
+const WORDED: [(&str, Claim); 74] = [
     // "Timer set for one minute.", "Reminder set."
     ("timer|reminder|alarm set|started", Claim::Schedule),
     ("timer's|reminder's|alarm's set|started", Claim::Schedule),
@@ -1134,7 +1136,7 @@ const WORDED: [(&str, Claim); 65] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp stays|stay on|off for #",
+        "the|my|your light|lights|lamp stays|stay on|off for @ %",
         Claim::LightKept,
     ),
     (
@@ -1142,7 +1144,7 @@ const WORDED: [(&str, Claim); 65] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp will stay on|off for #",
+        "the|my|your light|lights|lamp will stay on|off for @ %",
         Claim::LightKept,
     ),
     (
@@ -1150,13 +1152,13 @@ const WORDED: [(&str, Claim); 65] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp is|are staying on|off for #",
+        "the|my|your light|lights|lamp is|are staying on|off for @ %",
         Claim::LightKept,
     ),
     // GO-159 (lamp-52e6, 11091): "keeping" said bare ("Got it, keeping
     // the light on until ten."), closing at its time so talk about keeping
     // it on ("Keeping it on until ten would waste power.") is none.
-    // These alone use a complete numeric time and its close: a clock's
+    // These use a complete numeric time and its close: a clock's
     // colon, a decimal point, or a comma must not end the claim early.
     (
         "keeping|leaving * light|lights|lamp|it on|off until|till|for @ ~",
@@ -1175,38 +1177,60 @@ const WORDED: [(&str, Claim); 65] = [
     // the light said as "it" ("It'll stay on until ten."): each with a time
     // after "until", "till" or "for", so "It stays on until you say
     // otherwise." and "The light is on until you turn it off." are none.
+    // Duration states close at the time and optional unit, as bare keeping
+    // does: "It stays on for ten minutes after a tap." describes behavior.
+    // Keep numeric punctuation inside the duration and reject comma-led
+    // continuations or questions before releasing a claim decision.
     (
-        "the|my|your light|lights|lamp is|are on|off until|till|for #",
+        "the|my|your light|lights|lamp is|are on|off until|till #",
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp will be|remain on|off until|till|for #",
+        "the|my|your light|lights|lamp is|are on|off for @ %",
         Claim::LightKept,
     ),
     (
-        "the|my|your light's|lamp's on|off until|till|for #",
+        "the|my|your light|lights|lamp will be|remain on|off until|till #",
         Claim::LightKept,
     ),
     (
-        "the|my|your light's|lamp's staying on|off until|till|for #",
+        "the|my|your light|lights|lamp will be|remain on|off for @ %",
         Claim::LightKept,
     ),
     (
-        "the|my|your light'll|lamp'll stay|be|remain on|off until|till|for #",
-        Claim::LightKept,
-    ),
-    ("it stays|remains on|off until|till|for #", Claim::LightKept),
-    (
-        "it'll stay|remain on|off until|till|for #",
+        "the|my|your light's|lamp's on|off until|till #",
         Claim::LightKept,
     ),
     (
-        "it will stay|remain on|off until|till|for #",
+        "the|my|your light's|lamp's on|off for @ %",
         Claim::LightKept,
     ),
+    (
+        "the|my|your light's|lamp's staying on|off until|till #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light's|lamp's staying on|off for @ %",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light'll|lamp'll stay|be|remain on|off until|till #",
+        Claim::LightKept,
+    ),
+    (
+        "the|my|your light'll|lamp'll stay|be|remain on|off for @ %",
+        Claim::LightKept,
+    ),
+    ("it stays|remains on|off until|till #", Claim::LightKept),
+    ("it stays|remains on|off for @ %", Claim::LightKept),
+    ("it'll stay|remain on|off until|till #", Claim::LightKept),
+    ("it'll stay|remain on|off for @ %", Claim::LightKept),
+    ("it will stay|remain on|off until|till #", Claim::LightKept),
+    ("it will stay|remain on|off for @ %", Claim::LightKept),
     // Not "it's staying": a streamed "It's" ("It's 9:39.") would wait a
     // word longer to be judged.
-    ("it is staying on|off until|till|for #", Claim::LightKept),
+    ("it is staying on|off until|till #", Claim::LightKept),
+    ("it is staying on|off for @ %", Claim::LightKept),
     // Said as it is done (#5215's rest): "Turning it up.", "Setting a timer
     // for one minute." Each closes at the sentence's end; a timer's "for"
     // only with a time, and a unit, after it: "Turning it off and on again
@@ -1357,7 +1381,11 @@ fn tokens(text: &str, ended: bool, clocks: bool) -> Vec<Token<'_>> {
         // #5910); at the end of text still streaming it may yet be one.
         if clocks
             && matches!(c, ':' | '.')
-            && start.is_some_and(|from| text[from..at].bytes().all(|b| b.is_ascii_digit()))
+            && start.is_some_and(|from| {
+                text[from..at]
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || matches!(b, b':' | b'.'))
+            })
         {
             match chars.peek() {
                 Some((_, next)) if next.is_ascii_digit() => continue,
@@ -1402,8 +1430,10 @@ enum Slot<'a> {
     /// The end, a '.' or '!', or another mark (a comma) whose sentence
     /// then ends with no '?'.
     End,
-    /// A bare kept time's sentence end, never its comma or clock colon.
+    /// A kept time's sentence end, allowing only a bounded acknowledgement after a comma.
     TimeEnd,
+    /// An optional duration unit followed by the narrow kept-time ending.
+    DurationEnd,
     /// A mark that is not a '?' (after a lead-in).
     Mark,
     /// A time: a word that opens with a digit, one of [`NUMBER_WORDS`],
@@ -1428,6 +1458,7 @@ fn slots(pattern: &str) -> Vec<Slot<'_>> {
             "$" => Slot::End,
             "#" => Slot::Time,
             "~" => Slot::TimeEnd,
+            "%" => Slot::DurationEnd,
             "@" => Slot::ClockTime,
             words => Slot::Words(words),
         })
@@ -1496,10 +1527,52 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
             // #5910).
             Some(Token::Mark(_, _)) => fits(&[], tokens, at + 1, more),
         },
+        // Match a duration state's shared prefix once, instead of parsing
+        // three full word runs for its optional unit on every streamed piece.
+        Slot::DurationEnd => {
+            let endings: [&[Slot<'_>]; 3] = [
+                &[Slot::TimeEnd],
+                &[
+                    Slot::Words("second|seconds|minute|minutes|hour|hours"),
+                    Slot::TimeEnd,
+                ],
+                &[
+                    Slot::Words("a|an"),
+                    Slot::Words("minute|hour"),
+                    Slot::TimeEnd,
+                ],
+            ];
+            any_of(
+                endings
+                    .into_iter()
+                    .map(|ending| fits(ending, tokens, at, more)),
+            )
+        }
         Slot::TimeEnd => match tokens.get(at) {
             None if more => None,
             None | Some(Token::Mark('.' | '!', _)) => Some(true),
-            Some(Token::Mark(',', _)) if more && at + 1 == tokens.len() => None,
+            // A bounded acknowledgement still claims the timed hold, but
+            // descriptive comma continuations do not. Its own ending must
+            // also be checked so "as you asked, right?" never passes early.
+            Some(Token::Mark(',', _)) => any_of([
+                fits(
+                    &[
+                        Slot::Words("as"),
+                        Slot::Words("you"),
+                        Slot::Words("asked"),
+                        Slot::End,
+                    ],
+                    tokens,
+                    at + 1,
+                    more,
+                ),
+                fits(
+                    &[Slot::Words("as"), Slot::Words("requested"), Slot::End],
+                    tokens,
+                    at + 1,
+                    more,
+                ),
+            ]),
             Some(_) => Some(false),
         },
         Slot::Mark => match tokens.get(at) {
@@ -2178,6 +2251,63 @@ pub(crate) mod tests {
         );
     }
 
+    #[test]
+    fn duration_states_close_before_they_claim_a_kept_light() {
+        let descriptions = [
+            "It stays on for ten minutes after a tap.",
+            "The light is on for five seconds when you tap it.",
+            "Your light will be on for two hours each evening on the schedule you set.",
+            "The light stays on for ten minutes after a tap.",
+            "The lamp will stay off for two hours each evening.",
+            "My light is staying on for ten minutes because of the schedule.",
+            "The light's on for 1.5 minutes after a tap.",
+            "Your lamp'll remain off for two hours, would that help?",
+            "It remains on for half an hour after a tap.",
+            "It is staying off for ten minutes when idle.",
+            "The light's staying on for ten minutes after a tap.",
+            "It'll stay on for ten minutes after a tap.",
+            "It will remain off for ten minutes when idle.",
+        ];
+        for reply in descriptions {
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+            for (end, _) in reply.char_indices() {
+                assert_ne!(
+                    claim_as(&reply[..end], false, true),
+                    Some(Some(Claim::LightKept)),
+                    "premature claim: {:?}",
+                    &reply[..end]
+                );
+            }
+            assert_eq!(claim_as(reply, true, false), Some(None), "{reply:?}");
+        }
+        for reply in [
+            "It stays on for ten minutes.",
+            "The light is on for five seconds.",
+            "Your light will be on for two hours.",
+            "It remains on for half an hour.",
+            "The light stays on for tonight.",
+            "The light's on for 1.5 minutes.",
+            "Your lamp'll remain off for two hours.",
+            "It is staying off for ten minutes.",
+            "The light is on until ten.",
+            "Your light will be on until 10 pm.",
+        ] {
+            assert_eq!(
+                claim_as(reply, true, true),
+                Some(Some(Claim::LightKept)),
+                "{reply:?}"
+            );
+            for (end, _) in reply.char_indices() {
+                assert_ne!(
+                    claim_as(&reply[..end], false, true),
+                    Some(None),
+                    "premature nonclaim: {:?}",
+                    &reply[..end]
+                );
+            }
+        }
+    }
+
     /// GO-159 (lamp-52e6, 11091): "keep the light on until ten" with the
     /// worded runs on still got its claim 7 of 8 times and the worded guard
     /// never fired, so the model's replies opened with shapes the runs
@@ -2263,6 +2393,9 @@ pub(crate) mod tests {
             "Leaving it on for 1.5 hours wastes power.",
             "Leaving it on for 1.5 hours, would that help?",
             "Keeping it on until ten, as a habit, wastes power.",
+            "Keeping it on until ten, as you asked, right?",
+            "Keeping it on until ten, as requested, would that help?",
+            "Keeping it on until 10:30.5 would waste power.",
         ] {
             assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
             for end in reply.char_indices().map(|(at, _)| at).chain([reply.len()]) {
@@ -2288,6 +2421,10 @@ pub(crate) mod tests {
             "Leaving it on for 1.5 hours.",
             "Leaving it on for 1.5hours.",
             "Keeping it on until noon.",
+            "Keeping it on until ten, as you asked.",
+            "Keeping it on until ten, as requested.",
+            "Keeping it on until ten, as requested, thanks.",
+            "Keeping it on until ten, as you asked, thanks.",
             "Keeping it on for the night.",
             "Leaving it on for half an hour.",
             "Keeping it on until 10. 30 minutes should be enough.",
