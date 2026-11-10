@@ -300,6 +300,10 @@ Environment=LAMP_RING_ASLEEP=on
 # legacy_head, as install's head_touch_comes_whole_and_never_beside_the_old_engines_head holds. Merged only after
 # a person's try on lamp-52e6: a tap, a hold, and sleep and wake (#1798).
 Environment=LAMP_HEAD_TOUCH=on
+# A hand's 3 s hold says "Going to sleep. Tap my head to wake me." in the owner's language before the mute (#3748,
+# #6028): the speech cache's kept line at the hold's 2 s mark, the breath in the quiet hours (22:00 to 07:00) or
+# while the line is not kept yet. The mute comes once the cue has played, at most 6 s after the hold.
+Environment=LAMP_SLEEP_LINE=on
 Environment=LAMP_RESTORED_MUTE=on
 # The privacy slide is the lamp's sleep and wake (migrate-P4, #5182): closing it lays the lamp down, and open for 1 s
 # it wakes as at a tap, with no touch; a POWER mute stays. The lead's yes on 6 Nov, after lamp-e82d's row at 10441.
