@@ -1154,7 +1154,7 @@ key step and the single shared switch to change after it.
 ## A made skill sent to the Store (fourteen-P13, `skills.share`, `skills.shared`, `skills.unshare`)
 
 Off unless `LAMP_SKILLS_SHARE=on` in `lamp-cloud`'s unit, with the skills
-page (`LAMP_SKILLS_PAGE=on`) and `LAMP_CLOUD`; no product unit sets it.
+page (`LAMP_SKILLS_PAGE=on`) and `LAMP_CLOUD`; the product unit `deploy/product/lamp-cloud.service` sets it (with the skills page).
 `system.info`'s `can` names the three kinds only then, and only with the
 backend's base and the lamp's key at start (`crate::share::Store`). The
 first builder gave it to Fourteen on Queue #3997 (30 Oct 15:5x); the
