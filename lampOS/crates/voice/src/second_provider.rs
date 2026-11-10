@@ -2940,6 +2940,18 @@ fn seen_saying(parts: &[Part]) -> Option<String> {
         .then_some(first)
 }
 
+/// The known person every part of `parts` was settled as said by, seen or
+/// read as carried ([`crate::memory_scope::said_line`]), the same one for
+/// all; `None` for none, or any part unsettled or another's.
+fn said_saying(parts: &[Part]) -> Option<String> {
+    let mut said = parts
+        .iter()
+        .map(|part| crate::memory_scope::said_line(part.request).map(|(person, _)| person));
+    let first = said.next()??;
+    said.all(|person| person.as_deref() == Some(first.as_str()))
+        .then_some(first)
+}
+
 #[cfg(test)]
 mod seen_saying_tests {
     use super::*;
@@ -2964,6 +2976,33 @@ mod seen_saying_tests {
         assert_eq!(seen_saying(&[part(a), part(other)]), None);
         assert_eq!(seen_saying(&[part(unseen)]), None);
         assert_eq!(seen_saying(&[]), None);
+    }
+
+    /// lamp-0c4e, 10 Nov: words read as a carried person's are theirs for
+    /// a held line answering them, as words seen said are; a chain only
+    /// when every part was settled as the same person's, seen or read.
+    #[test]
+    fn words_are_said_by_a_person_only_when_every_part_was_settled_as_theirs() {
+        use crate::memory_scope::{SaidAs, mark_said_line};
+        let part = |request| Part {
+            request,
+            text: "what do I like to drink".into(),
+            at: Instant::now(),
+            lines: 1,
+        };
+        let (read, seen, unsettled, other) = (9_211, 9_212, 9_213, 9_214);
+        mark_said_line(read, Some(("p-a", SaidAs::ReadCarried)));
+        mark_said_line(seen, Some(("p-a", SaidAs::Seen)));
+        mark_said_line(other, Some(("p-b", SaidAs::ReadCarried)));
+        assert_eq!(said_saying(&[part(read)]).as_deref(), Some("p-a"));
+        assert_eq!(
+            said_saying(&[part(read), part(seen)]).as_deref(),
+            Some("p-a")
+        );
+        assert_eq!(seen_saying(&[part(read)]), None, "read, not seen");
+        assert_eq!(said_saying(&[part(read), part(unsettled)]), None);
+        assert_eq!(said_saying(&[part(read), part(other)]), None);
+        assert_eq!(said_saying(&[]), None);
     }
 }
 
@@ -4715,20 +4754,19 @@ impl Engine {
         self
     }
 
-    /// [`Self::reading_carried`] only where another voice can be heard:
-    /// `hears`, the same-voice check runs for this route (its printer
-    /// started for every rule). Without it the tracker would never record a
-    /// voice, so "no other voice" would always hold (Jarvis's P2 on #5842,
-    /// as the Reviewer-lead's P2 on #4610 for
-    /// [`Self::carrying_past_silent_where_heard`]): a carried line stays as
-    /// before, said once at start with why.
+    /// [`Self::reading_carried`] where no voice print is taken for every
+    /// rule (`hears` false, the product's `LAMP_SAME_VOICE_FOR=services`):
+    /// the switch still acts (the memory owner's call, 10 Nov, after lamp-3e83
+    /// held "It's correct." for a seen yes on a carried line). Another voice
+    /// is then told apart only by the rule's other signs and the faces, as
+    /// for a lone known face's read; said once at start. Before, it stayed
+    /// inactive (Jarvis's P2 on #5842).
     pub(crate) fn reading_carried_where_heard(mut self, hears: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         if shared.carried_memory && !hears {
             eprintln!(
-                "lamp-voice second: LAMP_CONVERSATION_CARRIED_MEMORY is inactive: the same-voice check is not running here; a carried line stays held and the room's"
+                "lamp-voice second: LAMP_CONVERSATION_CARRIED_MEMORY acts with no voice print for the rules: another voice is told apart only by the rule's other signs and the faces"
             );
-            shared.carried_memory = false;
         }
         self
     }
@@ -8959,18 +8997,26 @@ async fn spoken(
     // conversation's. Another voice shown, or the rule never heard this
     // line, and it is the room's after all, before anything is told or kept
     // with it.
+    // A line with no words of its own whose only reason is that the rule
+    // never heard it waits for the words it may answer in its place: those
+    // keep the scope their own line settled (below, lamp-0c4e, 10 Nov).
+    let mut unheard_empty: Option<&'static str> = None;
     if carried_past_silent
         && let (Some(lease), Some(another)) = (scope.as_ref(), shared.past_silent.as_ref())
         && let Some(why) = carried_past_silent_undone(shared.heed.is_some(), heed_ran, another)
     {
-        lease.narrow_to_room();
-        eprintln!(
-            "lamp-voice second: request {request}: carried, then {why}: told and kept as the room's (LAMP_CONVERSATION_CARRIES_PAST_SILENT)"
-        );
-        if prepared.take().is_some() {
+        if empty && !another() {
+            unheard_empty = Some("LAMP_CONVERSATION_CARRIES_PAST_SILENT");
+        } else {
+            lease.narrow_to_room();
             eprintln!(
-                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+                "lamp-voice second: request {request}: carried, then {why}: told and kept as the room's (LAMP_CONVERSATION_CARRIES_PAST_SILENT)"
             );
+            if prepared.take().is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+                );
+            }
         }
     }
     // `LAMP_PERSON_SCOPE_ONE_FACE`: a line whose keep was theirs by their
@@ -8997,8 +9043,11 @@ async fn spoken(
     // the rule never judged (held, empty, its own echo, or no rule): whether
     // another voice said it is unknown, so it is the room's after all, keeps
     // and all (Jarvis's P2 on #5842: fail closed unless a voice check ran on
-    // this very line).
-    if carried_memory
+    // this very line). One with no words of its own waits for the words it
+    // may answer in its place (`unheard_empty`).
+    if carried_memory && !heed_ran && empty && scope.is_some() {
+        unheard_empty.get_or_insert("LAMP_CONVERSATION_CARRIED_MEMORY");
+    } else if carried_memory
         && !heed_ran
         && let Some(scope) = scope.as_ref()
     {
@@ -9032,6 +9081,23 @@ async fn spoken(
                 "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
             );
         }
+    }
+    // Read as its carried person's, every check on its own voice done: its
+    // words are theirs so, for a held line that answers them in its place
+    // once they are cut short (`memory_scope::SaidAs::ReadCarried`). A
+    // narrow after this takes the mark off.
+    if carried_memory
+        && unheard_empty.is_none()
+        && let Some(lease) = scope.as_ref()
+        && lease.reads_carried()
+        && let Some(person) = lease
+            .scope()
+            .and_then(crate::memory_scope::ScopeSnapshot::person)
+    {
+        crate::memory_scope::mark_said_line(
+            request,
+            Some((person, crate::memory_scope::SaidAs::ReadCarried)),
+        );
     }
     // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
     // heard as "Stop them." was asked of the model, which said "Stop who?",
@@ -9170,6 +9236,46 @@ async fn spoken(
             }
             to_a_person.is_none()
         });
+    // A line with no words of its own, carried, that the rule never heard
+    // (above): it asks nothing of its own, so it adds no doubt to whose
+    // words it answers in its place. Words cut short whose every part was
+    // settled as the person it is carried for (`said_saying`) are answered
+    // in that scope, theirs as their own line was; any other, or none, and
+    // it is the room's, as before (lamp-0c4e, 10 Nov, requests 238 and 239:
+    // a carried ask read with 3 hits, cut by a 0-word line, was answered
+    // as the room's: "nothing in my memory says that"). A later narrow
+    // still makes it the room's.
+    if let Some(switch) = unheard_empty
+        && let Some(lease) = scope.as_ref()
+        // Narrowed since by a real sign (another voice): the room's already.
+        && lease.scope().is_some_and(|scope| scope.person().is_some())
+    {
+        let theirs = carried
+            .as_ref()
+            .and_then(|carried| said_saying(&carried.parts).map(|person| (carried, person)))
+            .filter(|(_, person)| {
+                lease.carried_for() == Some(person.as_str())
+                    && lease
+                        .scope()
+                        .is_some_and(|scope| scope.person() == Some(person.as_str()))
+            });
+        if let Some((carried, _)) = theirs {
+            eprintln!(
+                "lamp-voice second: request {request}: carried, no words of its own: request {}'s words, cut short, keep the scope they were settled in, the person's ({switch})",
+                carried.request
+            );
+        } else {
+            lease.narrow_to_room();
+            eprintln!(
+                "lamp-voice second: request {request}: carried, then the rule never heard its voice: told and kept as the room's ({switch})"
+            );
+            if prepared.take().is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+                );
+            }
+        }
+    }
     // The turn's verdict, as the journal says it above (#1155): only for a
     // turn something judged, and never for one with nothing heard.
     if let Some(told) = shared.verdicts.as_ref().filter(|_| !empty) {

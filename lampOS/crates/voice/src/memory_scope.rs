@@ -578,36 +578,65 @@ static ONE_FACE_LINES: Mutex<std::collections::VecDeque<(u64, String, bool)>> =
     Mutex::new(std::collections::VecDeque::new());
 const ONE_FACE_LINES_MOST: usize = 64;
 
-/// Lines a known person's own face was seen speaking, by request, with
-/// that person's memory id ([`mark_seen_line`]): read after the line is
-/// over, when its lease is gone, by a held line answering its words in its
-/// place ([`ScopeLease::answer_words_seen`]). A narrow takes a line off.
-static SEEN_LINES: Mutex<std::collections::VecDeque<(u64, String)>> =
+/// How a line's words were settled as a known person's, once its own
+/// checks were done ([`mark_said_line`]): their own face seen saying it
+/// (`Seen`), or carried in full for their conversation and read as theirs,
+/// the rule having judged its voice (`ReadCarried`,
+/// `LAMP_CONVERSATION_CARRIED_MEMORY`). A held line answering those words
+/// in its place, cut short, answers them in that settled scope, never in a
+/// narrower one its own lack of words gave it (lamp-0c4e, 10 Nov).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SaidAs {
+    Seen,
+    ReadCarried,
+}
+
+/// Lines settled as a known person's, by request, with that person's
+/// memory id and how ([`mark_said_line`]): read after the line is over,
+/// when its lease is gone, by a held line answering its words in its place
+/// ([`ScopeLease::answer_words_seen`], `second_provider::said_saying`). A
+/// narrow takes a line off.
+static SETTLED_LINES: Mutex<std::collections::VecDeque<(u64, String, SaidAs)>> =
     Mutex::new(std::collections::VecDeque::new());
+
+/// `request`'s line was settled as `person`'s, so (`SaidAs`), or (`None`)
+/// no longer so (a narrow).
+pub fn mark_said_line(request: u64, said: Option<(&str, SaidAs)>) {
+    let mut lines = SETTLED_LINES.lock().unwrap_or_else(|e| e.into_inner());
+    lines.retain(|(line, _, _)| *line != request);
+    if let Some((person, how)) = said {
+        if lines.len() == ONE_FACE_LINES_MOST {
+            lines.pop_front();
+        }
+        lines.push_back((request, person.to_owned(), how));
+    }
+}
 
 /// `request`'s line was seen spoken by `person`'s own face, or (`None`) no
 /// longer so (a narrow).
 pub fn mark_seen_line(request: u64, person: Option<&str>) {
-    let mut lines = SEEN_LINES.lock().unwrap_or_else(|e| e.into_inner());
-    lines.retain(|(line, _)| *line != request);
-    if let Some(person) = person {
-        if lines.len() == ONE_FACE_LINES_MOST {
-            lines.pop_front();
-        }
-        lines.push_back((request, person.to_owned()));
-    }
+    mark_said_line(request, person.map(|person| (person, SaidAs::Seen)));
 }
 
-/// Whose own face was seen speaking `request`'s line, as last marked
-/// ([`mark_seen_line`]); `None` for any other line, one narrowed, or one
+/// Whose `request`'s line was settled as, and how, as last marked
+/// ([`mark_said_line`]); `None` for any other line, one narrowed, or one
 /// forgotten past [`ONE_FACE_LINES_MOST`].
-pub fn seen_line(request: u64) -> Option<String> {
-    SEEN_LINES
+pub fn said_line(request: u64) -> Option<(String, SaidAs)> {
+    SETTLED_LINES
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .iter()
-        .find(|(line, _)| *line == request)
-        .map(|(_, person)| person.clone())
+        .find(|(line, _, _)| *line == request)
+        .map(|(_, person, how)| (person.clone(), *how))
+}
+
+/// Whose own face was seen speaking `request`'s line, as last marked
+/// ([`mark_seen_line`]); `None` for any other line, one only read as
+/// carried, one narrowed, or one forgotten past [`ONE_FACE_LINES_MOST`].
+pub fn seen_line(request: u64) -> Option<String> {
+    said_line(request)
+        .filter(|(_, how)| *how == SaidAs::Seen)
+        .map(|(person, _)| person)
 }
 
 /// `request`'s line is `person`'s keep by the one-face rule, or (`None`)
@@ -819,8 +848,8 @@ impl ScopeLease {
         if one_face.take().is_some() {
             mark_one_face_line(self.context.key.request, None);
         }
-        // Nor were its words theirs, seen said ([`seen_line`]).
-        mark_seen_line(self.context.key.request, None);
+        // Nor were its words theirs, seen said or read ([`said_line`]).
+        mark_said_line(self.context.key.request, None);
     }
 
     /// A line narrowed to the room ([`Self::narrow_to_room`]) with no face
@@ -1861,6 +1890,15 @@ mod tests {
         );
         scope.lease().narrow_to_room();
         assert_eq!(seen_line(request), None, "a narrow takes it off");
+        // Read as carried: said, not seen; a narrow takes it off too.
+        mark_said_line(request, Some(("p-a", SaidAs::ReadCarried)));
+        assert_eq!(
+            said_line(request),
+            Some(("p-a".to_owned(), SaidAs::ReadCarried))
+        );
+        assert_eq!(seen_line(request), None, "read, not seen");
+        scope.lease().narrow_to_room();
+        assert_eq!(said_line(request), None, "a narrow takes it off");
     }
 
     fn key(worker: u8) -> RequestKey {
