@@ -1,3 +1,22 @@
+## 2026-11-10 — music delta has both reads; onboarding translation finding
+
+- #5975 f725248cd now has Reviewer-two READ-OK 6761719255 and Fourth
+  READ-OK 6761729265; both qualify the later-retraction delta. Linux/docs
+  pass, ARM 42775079932 remains running. Raw evidence logs contain trailing
+  blank/whitespace lines noted as nonblocking by Reviewer-two; runtime
+  formatting passes. No full green ARM or device claim yet.
+- HOLD #6013 09029af44, comment 6761808051: actual resolved Japanese,
+  Chinese and Korean FACE_ASK lines all fail asks_for_the_face (native
+  0 pass / 3 fail). The same rule feeds lamp_words and face_agreed; the
+  authored every-language test covers en/vi only. Duplicate translation
+  key at 1035/1096 also shadows the new wording. Separate from lead's
+  written-history HOLD 6761696636; that history defect is not my finding.
+- #6013 own fmt, strict Voice all-target Clippy, existing face_question
+  filter 11/11 (1.87 s), docs 192/1899/0 pass; validation follow-up
+  6761860105. Temporary tests removed and review worktree clean. Probe/log
+  retained at /private/tmp/third-6013-language-probe.{txt,log}. No full
+  Voice or lamp claim, and no author implementation changed by Third.
+
 ## 2026-11-10 — default sway repair verified; reminder train running
 
 - READ-OK #6002 7046b27a2, comment 6761669963, lifts Third's P2.
