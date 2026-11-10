@@ -200,7 +200,7 @@ pub fn take(
 
 /// What the lamp says aloud once a skill added from a file is on: its
 /// name, that it was added from a file and not from the Skills Store, and
-/// that it's on, then what it does and uses and how to take it off, as a
+/// that it's on, then what it does and uses, as a
 /// made skill's line says (Thirteen's P3 on #5985: no yes is asked).
 pub fn on_line(made: &Made) -> String {
     let made_line = made_skill::on_line(made);
@@ -346,7 +346,7 @@ mod tests {
         let line = on_line(&made);
         assert_eq!(
             line,
-            "I added tea tip from a file, not from the Skills Store, and it's on: only when you ask for it, it answers in its own words, as its file tells it, and never on its own. Say \"take it off\" to take it off."
+            "I added tea tip from a file, not from the Skills Store, and it's on: only when you ask for it, it answers in its own words, as its file tells it, and never on its own."
         );
         // Its words are the lamp's plain ones, never the file's.
         assert!(!line.contains("SECRET-WORDS"), "{line}");
