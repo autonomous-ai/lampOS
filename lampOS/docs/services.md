@@ -762,6 +762,24 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   its own, with no call, and the "send" after it found nothing; the
   function's own rule now says never to say a read-back that no call gave in
   the same turn.
+- **A plain cancel is the lamp's, with no model choice** (#5958). On
+  lamp-9adf on 10 Nov, "Lamp, cancel that." after a read-back was answered
+  "Cancel what exactly? I have several things set", with no call: the model
+  weighed it against the lamp's reminders. Now, while another request's
+  write waits (at most 2 minutes since it was prepared), a line whose words
+  are a plain cancel (`CANCEL_WORDS`, fillers and "no", "wait", "actually"
+  aside: "cancel", "cancel that", "never mind", "don't send it", "stop,
+  don't send it", "hủy đi", "đừng gửi" and the like) forgets the write
+  (`services::cancel_waiting`), and the second route says the lamp's own
+  line, with no chat asked: "Okay, cancelled. Nothing was sent." (`CANCELLED_SAID`),
+  or "Vâng, đã hủy. Chưa gửi gì cả." (`CANCELLED_SAID_VI`) for a Vietnamese
+  cancel word. A later `send_id` finds `NOTHING_WAITING`, so nothing can send
+  it; `lamp-services` lets its own copy lapse at 2 minutes. The journal says
+  "a waiting write cancelled by a plain cancel". "Cancel my 9 o'clock
+  reminder", or a cancel with no write waiting, is the model's as before. A
+  bare "Cancel." while a write waits is the person's answer to the
+  read-back, never held as a short sound (`services::cancel_awaited`, as for
+  a plain send: only a line begun clear of the lamp's voice).
 - **The send's voice score is journaled**: "a send's voice beside request N's:
   cosine 0.64" (or "no print"), a score only, never a print.
 - **The read-back must have been heard in full.** The lamp's words must hold
