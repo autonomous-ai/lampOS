@@ -21039,6 +21039,7 @@ mod tests {
     /// thread, and its mark goes with the turn.
     #[test]
     fn a_forget_confirmation_cannot_reenter_the_next_turns_history() {
+        let _one = crate::provider_worker::tests::one_thread();
         let request = u64::MAX - 704;
         let mut thread = crate::thread::THREAD.lock().unwrap();
         let before = std::mem::take(&mut *thread);
@@ -21056,9 +21057,8 @@ mod tests {
             None,
             None,
         );
-        // Only this turn's words are looked for: the thread is the process's
-        // own, and another test's turn may write to it between these lines
-        // (it failed so in a module run beside #4700's turns, 31 Oct).
+        // Only the forgotten reply is checked. The shared conversation
+        // stays protected through the complete fixture and its restoration.
         assert!(
             !crate::thread::THREAD
                 .lock()
