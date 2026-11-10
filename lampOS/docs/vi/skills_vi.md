@@ -284,7 +284,7 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
    nghe khi chỉ bật công tắc này (và chỉ trả lời yêu cầu này; `make` và
    `ready` vẫn thuộc `LAMP_APP_MAKE_SKILL`). Socket chỉ trả lời
    `lamp-cloud`: bên gọi được đọc bằng `SO_PEERCRED`, chỉ
-   `lamp-cloud.service` chạy dưới user của voice được trả lời, mọi bên gọi
+   `lamp-cloud.service` chạy dưới user `lampos` được trả lời (`app_make::APP_CALLER_USER`; voice chạy bằng root), mọi bên gọi
    khác bị đóng không trả lời (`app_make::app_caller_may`; P2 của App Only
    trên #5985: không còn lời "có", nên không phần nào khác trong nhóm được
    bật kỹ năng). Một dòng tối đa 8 KiB. Mỗi
@@ -499,7 +499,7 @@ năng), nên sau khi khởi động lại nó được hỏi tiếp và ứng d�
 6. **Bật ngay, không cần lời "có" nói thành tiếng** (#5977; chủ đèn,
    10/11): sau khi socket trả lời `kept`, nó được bật qua helper quản lý
    (`made_skill::put_on`), rồi được nói qua dịch vụ say: "I added NAME from
-   a file, not from the Skills Store, and it's on."
+   a file, not from the Skills Store, and it's on: WHAT IT DOES, using WHAT IT USES. Say \"take it off\" to take it off."
    (`upload_skill::on_line`), hoặc "I added a skill from a file but
    couldn't put it on: <lý do>." (`upload_skill::not_on_line`).
 7. **Helper quản lý kiểm tra lại** (`install_made`): thẻ có `added: file`
