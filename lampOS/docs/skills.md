@@ -1670,7 +1670,8 @@ for it.
   SHA-256 has changed`). Then it reads those same bytes as the package, so
   nothing is read twice. Its `skill.toml` is held again to a made skill's
   cap (`lamp_voice::made_skill::capped`, the voice's own: light, body, and
-  only `voice/state` and `room/presence`), and its `SKILL.md` must say
+  only `voice/state`, `room/presence`, `humans/faces/tracked`,
+  `room/stood_up` and `clock/local`), and its `SKILL.md` must say
   `made: here`. Then it is installed as any package is, under the same lock
   and wait, with two differences:
   - **It never takes the place of a skill put on another way** (the
@@ -2104,6 +2105,13 @@ gone ([switches.md](switches.md)). What happens:
    - The request is at most 480 bytes, refused if longer, never cut, and
      the model is asked nothing then.
    - Nothing else of the conversation goes with it.
+   - It names the triggers and gestures only as "one [trigger] as listed
+     (coming to the desk is room/presence)" and `gesture = "nod"` "or one
+     listed": the system prompt lists each (`TRIGGER_MEANINGS`,
+     `made_skill::gesture_names`). So the longest brief is 1,160 bytes
+     (`MOST_BRIEF_BYTES`, 1,340 before) and a repair's check lines 735
+     (`MOST_REPAIR_BYTES`, 560 before), the six triggers' meanings whole
+     in it; the two still fit the tasks part's 2,000 bytes.
 3. **Written by the lamp's own model.** The brief goes to the second
    route's chat (`llm_*`, the relay or the person's own DeepSeek), with no
    tools, streamed, on a thread and runtime of its own, at most 30 s
@@ -2114,14 +2122,19 @@ gone ([switches.md](switches.md)). What happens:
    (`make_skill_local::EXAMPLE`, `example-only`: cyan at level 2 for 25 s
    on someone being there, named as an example of the form, "never answer
    with it") and told
-   that a skill can't keep time, and how it speaks (below, #6055, #6062: `speak = true`, a cooldown of an hour or more, and one `say = { text = "Welcome back!" }` of the exact words in the language the person asked in): on lamp-9adf on 2 Nov, before
+   that a reminder at a time or every so often is the lamp's own timer,
+   not a skill, while a skill runs at a time only each day, by the clock
+   trigger; each trigger it may have and each gesture by name; and how it speaks (below, #6055, #6062: `speak = true`, a cooldown of an hour or more, and one `say = { text = "Welcome back!" }` of the exact words in the language the person asked in): on lamp-9adf on 2 Nov, before
    both, its first two skills were refused for a trigger field and a light
    step the check didn't know. Its answer must be exactly two fenced
    blocks, `skill.toml` and `SKILL.md`, at most 8 KiB each.
 4. **Held to what a made skill may use** (the coordinator's cap, 19 Oct):
    - `kind` installable, with a version;
    - `[permissions]` with only `light`, `body`, `speak`, and `topics`
-     among `voice/state` and `room/presence`;
+     among `voice/state`, `room/presence`, `humans/faces/tracked` and
+     `room/stood_up` (presence alone, `lamp_skills::PRESENCE_TOPICS`: a
+     made skill's trigger reads no field of the faces, so never who) and
+     `clock/local` (lamp-skills' own clock, `LOCAL_CLOCK_TOPIC`);
    - no function for the model (`tool`);
    - `[ask] policy` only `nudge`, never a hello, news or a reminder;
    - messages, the look, known faces, actions and any other topic are
@@ -2244,7 +2257,7 @@ gone ([switches.md](switches.md)). What happens:
      yourself until it works"). When the check refuses an answer, it goes
      back to the model before anything is said: the same brief again with
      the check's lines before the request, every line joined with " / ",
-     the skill's folder replaced by `<folder>`, cut to 560 bytes
+     the skill's folder replaced by `<folder>`, cut to 735 bytes
      (`made_skill::repair_brief`). They are the model's own skill read
      back to it, never the conversation. Up to
      `make_skill_local::MOST_REPAIRS` (3) times, each begun only while
@@ -2292,15 +2305,20 @@ gone ([switches.md](switches.md)). What happens:
      says the same: `lamp-voice: a made skill can't be said plainly:
      <part>`. A trigger's refusal goes on with the triggers it can have,
      each with what it means (`SAYABLE_TRIGGERS`): someone comes or comes
-     back to the desk is `room/presence`, `someone`, `true` (back after the
-     desk was empty a while: `when = "appears"`, `absent_for`); the desk
-     left, `false`; the lamp going quiet, `voice/state`, `state`,
-     `"resting"`. On lamp-74ff, 10 Nov 17:39, an app make of "glow green
+     back to the desk is `room/presence`, `someone`, `true` (back after a
+     while away: `when = "appears"`, `absent_for`); the desk left,
+     `false`; the lamp going quiet, `voice/state`, `state`, `"resting"`; a
+     face coming into view, `humans/faces/tracked` with no field and
+     `when = "appears"`; someone getting up, `room/stood_up`, `sitting_s`
+     above 0; every day at 22:00, `clock/local`, `known`, `true`,
+     `rearm = "ends"`, `during = { from = "22:00", to = "22:01" }`. The
+     part named is cut to 110 bytes. On lamp-74ff, 10 Nov 17:39, an app make of "glow green
      when I come back to my desk" was written on the faces, as the built-in
      welcome back is, and refused twice, its repair told only the keys a
      trigger may have. The making model's system prompt says the same
-     meanings before it writes (`TRIGGER_MEANINGS`), and the brief says
-     "someone comes or comes back to the desk is room/presence". Any other
+     meanings before it writes (`TRIGGER_MEANINGS`), with "coming to the
+     desk is room/presence, never the faces", and the brief says "coming
+     to the desk is room/presence". Any other
      part's refusal goes on with `PLAIN_ONLY`; with reads on, with
      `PLAIN_OR_READ` too: for a read of a linked service, only one `[[do]]`
      step, that service's read step exactly as the system prompt lists
@@ -2313,15 +2331,54 @@ gone ([switches.md](switches.md)). What happens:
        would run otherwise than the words is never kept (Thirteen's and
        Mobile's P2 on #5042);
      - a trigger written as `[[trigger]]`, or with any key but `topic`,
-       `field`, `equals`, `for`, `cooldown`, `rearm`, `during`, `when` and
-       `absent_for`, or other than resting or someone being there or not;
-       `when` only `"present"` or `"appears"` (said as `rearm = "ends"`
-       is); `absent_for` only with `"appears"` on someone coming to the
-       desk, as `lamp-skills` counts it only then: "When someone comes
-       back to the desk after it was empty for 5 minutes";
+       `field`, `equals`, `above`, `for`, `cooldown`, `rearm`, `during`,
+       `when` and `absent_for`, or other than these six; `when` only
+       `"present"` or `"appears"` (said as `rearm = "ends"` is), `rearm`
+       only `"ends"` (or `"leaves"`, the same); `absent_for` only with
+       `"appears"` on someone coming to the desk or a face, as
+       `lamp-skills` counts it only then: "When someone comes back to the
+       desk after it was empty for 5 minutes";
+       - **a face coming into view** (`humans/faces/tracked`, no `field`,
+         `equals`, `each`, `key`, `near` or `present`: any face, never
+         whose; `known_faces` stays refused by the cap), only with
+         `when = "appears"` or `rearm = "ends"`, since faces come many
+         times a second: "When the lamp sees a face, after seeing none",
+         with `for` "When the lamp has seen a face for 3 seconds, …", with
+         `absent_for` "… after seeing none for 10 minutes". A face lost
+         for a moment and seen again is seen again: no `gap` is said or
+         kept;
+       - **someone getting up** (`room/stood_up`, which the eyes say once
+         a departure of the person sitting at the desk, with
+         `LAMP_ACTIVITY=on`), only as Watch you leave tests it,
+         `field = "sitting_s"`, `above = 0`, with no `for` or
+         `absent_for` (the message lasts 5 s): "When someone sitting at
+         the desk gets up";
+       - **a time each day** (`clock/local`, lamp-skills' own clock, as
+         its daily triggers are written): `field = "known"`,
+         `equals = true`, `rearm = "ends"` and a `during` of exactly one
+         minute, `{ from = "22:00", to = "22:01" }` (`HH:MM`; 23:59 to
+         00:00 too), no `for`, `absent_for` or `when = "appears"`: "Every
+         day at 22:00". Any longer window, a time not `HH:MM`, or a day of
+         the week (`days`, which lamp-skills has no form of) is refused;
+       - `above` on any other trigger;
      - a step other than one light (`colour`, `level`, `for`, or `dim`
-       alone), one gesture (`nod`, `curious`) or one say of exact words as
-       above, said with its words quoted whole, so a comma in them can't
+       alone), one gesture or one say of exact words as above. A gesture is any of
+       the body's clips `lamp_skills::gesture_known` takes (all of
+       `lamp_body::clips::ALL` but `idle`), one a step, said by what it
+       does (`made_skill::GESTURES`): nod "nods", headshake "shakes its
+       head", greeting "lifts its head and arm in a greeting", laugh "tips
+       its head back in a laugh", shy "dips its head shyly", stretching
+       "stretches its arm up", acknowledge "gives a quick bow", curious
+       "looks up, curious", happy "wiggles happily", caring "droops slowly
+       and gently", surprised "recoils in surprise", confused "dips and
+       turns, puzzled", sleepy "droops sleepily", excited "bounces up
+       twice, excited", scanning "looks all round the room", dance_chill
+       "sways in a slow dance", dance_groove "bounces in a groove dance",
+       dance_hype "dances fast with its whole body", dance_waltz "leans in
+       a slow waltz", dance_jazz "bobs its head in a jazz dance". A clip
+       with no saying, `idle`, a name the body hasn't, or a table of clips
+       is refused; a test holds every clip but `idle` to a saying. A say is
+       said with its words quoted whole, so a comma in them can't
        blur into what follows (the readers' P3 on #6062): "When someone has
        been at the desk for 5 seconds, it says “Welcome back!”, at most
        once an hour." A say step it can't say is named in the repair with
@@ -2335,7 +2392,8 @@ gone ([switches.md](switches.md)). What happens:
        minute" as any quiet minute from 22:00 to 22:30, under its own
        description of what was asked.
    - **What no skill can do.** The model is told that a skill can't hear
-     what is said: a request that needs words or a sound heard, or
+     what is said, nor who someone is: a request that needs words or a
+     sound heard, a face known by name, or
      anything else no made skill can sense or do, is answered `cannot:`
      then one short sentence said to the person, in plain words, why,
      ending with what to ask instead when there is one (for a reminder at a

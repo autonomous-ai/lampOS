@@ -45,10 +45,26 @@ pub const DIRECTORY: &str = "/var/lib/lampOS/voice/made-skills";
 /// The program that checks and packs them: `lamp-skills`, as the product
 /// installs it.
 pub const PROGRAM: &str = "/opt/lampOS/skills/current/lamp-skills";
-/// The topics a made skill may read: whether the voice is talking, and
-/// whether someone is at the lamp. Nothing it reads is about a person's
-/// words, face or picture.
-pub const TOPICS: [&str; 2] = ["voice/state", "room/presence"];
+/// The topics a made skill may read: whether the voice is talking,
+/// whether someone is at the lamp, whether a face is in view and someone
+/// stood up from the desk (`lamp_skills::PRESENCE_TOPICS`, presence alone:
+/// its trigger reads no field of the faces, so never who), and the local
+/// clock (`lamp_skills::LOCAL_CLOCK_TOPIC`, which lamp-skills makes itself).
+/// Nothing it reads is about a person's words, identity or picture.
+pub const TOPICS: [&str; 5] = [
+    "voice/state",
+    "room/presence",
+    FACES_TOPIC,
+    STOOD_UP_TOPIC,
+    CLOCK_TOPIC,
+];
+/// The faces in view, `humans/faces/tracked`.
+const FACES_TOPIC: &str = lamp_msgs::Faces::TOPIC;
+/// The eyes' word that the person at the desk stood up to leave.
+const STOOD_UP_TOPIC: &str = lamp_msgs::StoodUp::TOPIC;
+/// lamp-skills' own local clock, `lamp_skills::LOCAL_CLOCK_TOPIC` written
+/// out: this crate can't name it, lamp-skills depends on this one.
+const CLOCK_TOPIC: &str = "clock/local";
 /// How long after a kept skill is marked to go on ([`goes_on`]) the manage
 /// helper still puts it on, by its own clock: the voice asks the helper
 /// right after marking it, so a kept SHA-256 is never put on later by any
@@ -193,16 +209,14 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     }
     let read = if reads { " Or one read, as above." } else { "" };
     Ok(format!(
-        "{BRIEF_HEAD} for the request at the end. Reply with only two fenced blocks, \
+        "{BRIEF_HEAD} for the request. Reply with only two fenced blocks, \
          ```skill.toml and ```SKILL.md. skill.toml: \
          kind = \"installable\", version = \"1.0.0\", no name key; [permissions] \
-         light, body, speak = true as used, topics voice/state, room/presence; \
-         one [trigger]: someone comes or comes back to the desk is room/presence (field \
-         \"someone\", equals true; false: the desk left), quiet is voice/state (field \
-         \"state\", equals \"resting\"); with for, cooldown, rearm = \"ends\"; a time of day as the \
-         trigger's during = {{ from = \"22:00\", to = \"22:30\" }}; \
+         light, body, speak = true as used, its topic; one [trigger] as listed (coming to \
+         the desk is room/presence), with for, cooldown, rearm = \"ends\"; window: \
+         during = {{ from = \"22:00\", to = \"22:30\" }}; \
          [ask] policy = \"nudge\"; [[do]]: light = {{ colour, level 1-5, for }} or \
-         {{ dim = 1 }}, body = {{ gesture = \"nod\" or \"curious\" }}, say = {{ text = \
+         {{ dim = 1 }}, body = {{ gesture = \"nod\" }} or one listed, say = {{ text = \
          \"Hi!\" }} (exact words, asker's language).{read} SKILL.md: \
          front matter name (lowercase, hyphens) and description. \
          {REQUEST_MARK}{request}"
@@ -229,13 +243,16 @@ const REPAIR_ASK: &str = " Answer again with both blocks, fixed. ";
 /// The check's lines a repair carries, at most, in bytes: with the longest
 /// request the brief stays within 2,000 bytes (the first
 /// builder on #3126, 23 Oct 13:07). 560 since the brief says what each
-/// trigger means (lamp-74ff, 10 Nov: "come back to my desk").
-pub const MOST_REPAIR_BYTES: usize = 560;
+/// trigger means (lamp-74ff, 10 Nov: "come back to my desk"); 735 since a
+/// made skill has six triggers ([`SAYABLE_TRIGGERS`]), the brief shorter
+/// by as much, its triggers and gestures told in the system prompt
+/// (`make_skill_local`): the two still within the tasks part's 2,000.
+pub const MOST_REPAIR_BYTES: usize = 735;
 /// The longest a [`brief`] is with the longest request, any service's
 /// read step included: no longer half the tasks part's 2,000 bytes, but
 /// small enough that its repair, with the [`REPAIR_MARK`], the check's
 /// [`MOST_REPAIR_BYTES`] and the ask, still fits that bound.
-pub const MOST_BRIEF_BYTES: usize = 1_340;
+pub const MOST_BRIEF_BYTES: usize = 1_160;
 const _: () = assert!(
     MOST_BRIEF_BYTES + REPAIR_MARK.len() + MOST_REPAIR_BYTES + REPAIR_ASK.len()
         <= crate::agent_tasks::MOST_TASK_BYTES
@@ -446,6 +463,9 @@ impl Uses {
                 match topic.as_str() {
                     "voice/state" => "whether it is talking",
                     "room/presence" => "whether someone is at the desk",
+                    FACES_TOPIC => "whether it sees a face",
+                    STOOD_UP_TOPIC => "someone getting up from the desk",
+                    CLOCK_TOPIC => "the time of day",
                     other => other,
                 }
                 .to_owned(),
@@ -559,8 +579,8 @@ pub fn capped_with(text: &str, reads: bool) -> Result<(String, Uses), Refused> {
 /// What a repair is told when [`capped`] refused.
 const CAPPED_ONLY: &str = "kind = \"installable\", version = \"1.0.0\", no [tool]; \
                            [permissions] only light, body and speak = true as its steps use \
-                           them (speak for a say step), topics only voice/state and \
-                           room/presence; [ask] policy = \"nudge\"; a say is one \
+                           them (speak for a say step), topics only its trigger's; [ask] \
+                           policy = \"nudge\"; a say is one \
                            say = { text = \"the exact words\" }, in the request's language";
 
 /// The most of a made skill's say text ([`say_text`]): one or two short
@@ -1084,7 +1104,7 @@ const SAY_TEXT_PART: &str =
 const UNSAID_PART: &str = "Can't be said plainly: ";
 
 /// The most of the part named in a repair: its keys may be many.
-const MOST_UNSAID_PART_BYTES: usize = 130;
+const MOST_UNSAID_PART_BYTES: usize = 110;
 
 /// A key or a topic as the journal and a repair name it: a plain name, or
 /// "another" for anything else (a key may be any text the model wrote).
@@ -1251,10 +1271,12 @@ fn trigger_named(trigger: &toml::Table) -> String {
 
 /// When a skill's one `[trigger]` runs, in plain words, and the trigger;
 /// or the part that can't be said, by its topic and keys ([`Unsaid`]).
-/// Three triggers are said: someone comes to the desk (or comes back,
-/// after it was empty a while), the desk is left, and the lamp goes quiet;
-/// each with its `for`, `rearm`, `during` and `cooldown` (said after the
-/// steps).
+/// Six triggers are said: someone comes to the desk (or comes back, after
+/// it was empty a while), the desk is left, the lamp goes quiet, a face
+/// comes into view (after none, or none for a while), someone at the desk
+/// gets up, and a time of day, each day; each with its `for`, `rearm`,
+/// `during` and `cooldown` (said after the steps) as lamp-skills counts
+/// them for that topic.
 fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Table), String> {
     // The keys a trigger said may have; any other is named.
     let unknown = |trigger: &toml::Table| {
@@ -1268,6 +1290,7 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
             "during",
             "when",
             "absent_for",
+            "above",
         ];
         let unknown: Vec<&String> = trigger
             .keys()
@@ -1320,6 +1343,14 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         ),
         None => None,
     };
+    // `rearm = "ends"` (or `"leaves"`, the same): once each time it holds.
+    let rearmed = matches!(
+        trigger.get("rearm").map(toml::Value::as_str),
+        Some(Some("ends" | "leaves"))
+    );
+    if trigger.contains_key("rearm") && !rearmed {
+        return Err(its("rearm"));
+    }
     let someone = |equals: bool| {
         (
             Some("room/presence"),
@@ -1332,7 +1363,69 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         text_of("field"),
         trigger.get("equals").cloned(),
     );
+    // `above` only on someone standing up, its one test.
+    if trigger.contains_key("above") && topic.0 != Some(STOOD_UP_TOPIC) {
+        return Err(its("above"));
+    }
     let mut said = match (lasting, absent) {
+        // Each day at a time (lamp-skills' own clock, `clock/local`): the
+        // built-in daily triggers' shape, known local time held once
+        // (`rearm`) in a window of one minute, so it runs once at that
+        // minute; never a window's while, nor a week's day (lamp-skills
+        // has none).
+        (lasting, absent) if topic.0 == Some(CLOCK_TOPIC) => {
+            let at = (topic.1 == Some("known")
+                && topic.2 == Some(toml::Value::Boolean(true))
+                && lasting.is_none()
+                && absent.is_none()
+                && rearmed
+                && !appears)
+                .then(|| trigger.get("during").and_then(one_minute))
+                .flatten()
+                .ok_or_else(|| {
+                    its("test, rearm and during: known = true, rearm = \"ends\", during of one minute")
+                })?;
+            return Ok((format!("Every day at {at}"), trigger));
+        }
+        // A face comes into view (`humans/faces/tracked` with no field
+        // test: any face, never whose), once each time (`appears`, or
+        // `rearm`), after none, or none for `absent_for`, which
+        // lamp-skills counts only with `appears`.
+        (lasting, absent) if topic.0 == Some(FACES_TOPIC) => {
+            if topic.1.is_some() || topic.2.is_some() {
+                return Err(its(
+                    "field and equals: a face in view has no test, never who",
+                ));
+            }
+            if !appears && !rearmed {
+                return Err(its("when, which is \"appears\""));
+            }
+            let none = match absent {
+                Some(absent) => format!("after seeing none for {absent}"),
+                None => "after seeing none".to_owned(),
+            };
+            match lasting {
+                Some(lasting) => format!("When the lamp has seen a face for {lasting}, {none}"),
+                None => format!("When the lamp sees a face, {none}"),
+            }
+        }
+        // Someone at the desk gets up to leave (`room/stood_up`, one
+        // message a departure, lasting 5 s): every departure, as Watch you
+        // leave tests it (`sitting_s` above 0), never held a while.
+        (None, None) if topic.0 == Some(STOOD_UP_TOPIC) => {
+            let above = trigger.get("above").and_then(|line| match line {
+                toml::Value::Integer(line) => Some(*line as f64),
+                toml::Value::Float(line) => Some(*line),
+                _ => None,
+            });
+            if topic.1 != Some("sitting_s") || topic.2.is_some() || above != Some(0.0) {
+                return Err(its("field and above: sitting_s above 0"));
+            }
+            "When someone sitting at the desk gets up".to_owned()
+        }
+        (_, _) if topic.0 == Some(STOOD_UP_TOPIC) => {
+            return Err(its("for or absent_for, which a getting up never lasts"));
+        }
         (lasting, None)
             if topic.0 == Some("voice/state")
                 && topic.1 == Some("state")
@@ -1373,6 +1466,24 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
     Ok((said, trigger))
 }
 
+/// A `during` of one minute, `{ from = "22:00", to = "22:01" }`: its
+/// `from`, as lamp-skills reads a time of day (`HH:MM`, 00:00 to 23:59).
+fn one_minute(during: &toml::Value) -> Option<String> {
+    let during = during.as_table().filter(|during| during.len() == 2)?;
+    let minute = |key: &str| {
+        let text = during.get(key)?.as_str()?;
+        let (hours, minutes) = text.split_once(':')?;
+        let digits = |part: &str| part.len() == 2 && part.bytes().all(|b| b.is_ascii_digit());
+        if !digits(hours) || !digits(minutes) {
+            return None;
+        }
+        let (hours, minutes): (u32, u32) = (hours.parse().ok()?, minutes.parse().ok()?);
+        (hours < 24 && minutes < 60).then_some((text, hours * 60 + minutes))
+    };
+    let ((from, start), (_, end)) = (minute("from")?, minute("to")?);
+    (end == (start + 1) % (24 * 60)).then(|| from.to_owned())
+}
+
 /// The longest [`plainly`] says: one breath, and with [`left_out`]'s
 /// words still within [`MOST_DESCRIPTION_CHARS`], so nothing is cut.
 const MOST_PLAIN_CHARS: usize = 200;
@@ -1381,10 +1492,13 @@ const MOST_PLAIN_CHARS: usize = 200;
 /// [`SAYABLE_TRIGGERS`] and [`TRIGGER_MEANINGS`] alike.
 macro_rules! trigger_meanings {
     () => {
-        "someone comes or comes back to the desk: topic \"room/presence\", field \
-         \"someone\", equals true (back after the desk was empty a while: when = \"appears\", \
-         absent_for = \"5m\"); the desk is left: equals false; the lamp goes quiet: topic \
-         \"voice/state\", field \"state\", equals \"resting\"."
+        "each as topic, field, test: someone comes or comes back to the desk: \
+         \"room/presence\", \"someone\", equals true (back after a while away: \
+         when = \"appears\", absent_for = \"5m\"); the desk left: equals false; the lamp goes \
+         quiet: \"voice/state\", \"state\", equals \"resting\"; a face comes into view: \
+         \"humans/faces/tracked\", no field, when = \"appears\"; someone gets up: \
+         \"room/stood_up\", \"sitting_s\", above = 0; every day at 22:00: \"clock/local\", \
+         \"known\", equals true, rearm = \"ends\", during = { from = \"22:00\", to = \"22:01\" }."
     };
 }
 
@@ -1392,7 +1506,7 @@ macro_rules! trigger_meanings {
 /// trigger.
 const PLAIN_ONLY: &str = "Write only kind, version, needs, permissions, one [trigger], [ask] \
                           and [[do]], and at most a few [[do]] steps, each one light, one \
-                          body gesture or one say = { text = \"the exact words\" } (with \
+                          listed body gesture or one say = { text = \"the exact words\" } (with \
                           speak = true), as the request names them";
 
 /// What a repair is told when [`plainly`] refused the trigger: the ones it
@@ -1401,9 +1515,9 @@ const PLAIN_ONLY: &str = "Write only kind, version, needs, permissions, one [tri
 /// welcome back's is (lamp-74ff, 10 Nov 17:39). `make_skill_local`'s
 /// system prompt tells the making model the same before it writes.
 pub const SAYABLE_TRIGGERS: &str = concat!(
-    "One [trigger] table, not [[trigger]], one of: ",
+    "One [trigger] table, one of: ",
     trigger_meanings!(),
-    " Beside it only for, cooldown, rearm = \"ends\", during; drop any other part named."
+    " Beside it only for, cooldown, rearm = \"ends\", during."
 );
 
 /// The triggers [`plainly`] says, each with what it means, for the making
@@ -1505,10 +1619,62 @@ fn step_plainly(step: &toml::Value) -> Option<String> {
         body.len(),
         body.get("gesture").and_then(|gesture| gesture.as_str()),
     ) {
-        (1, Some("nod")) => Some("nods".to_owned()),
-        (1, Some("curious")) => Some("looks up, curious".to_owned()),
+        (1, Some(gesture)) => gesture_said(gesture).map(str::to_owned),
         _ => None,
     }
+}
+
+/// Each gesture a made skill may name, one a step, as the person hears it:
+/// the body's clips that `lamp_skills::gesture_known` takes (all of
+/// `lamp_body::clips::ALL` but `idle`, the body's own), said by what each
+/// does (docs/body.md's tables). A clip with no saying here is refused, so
+/// one added to the body is never played unsaid; a test holds every clip
+/// to one.
+const GESTURES: [(&str, &str); 20] = [
+    ("nod", "nods"),
+    ("headshake", "shakes its head"),
+    ("greeting", "lifts its head and arm in a greeting"),
+    ("laugh", "tips its head back in a laugh"),
+    ("shy", "dips its head shyly"),
+    ("stretching", "stretches its arm up"),
+    ("acknowledge", "gives a quick bow"),
+    ("curious", "looks up, curious"),
+    ("happy", "wiggles happily"),
+    ("caring", "droops slowly and gently"),
+    ("surprised", "recoils in surprise"),
+    ("confused", "dips and turns, puzzled"),
+    ("sleepy", "droops sleepily"),
+    ("excited", "bounces up twice, excited"),
+    ("scanning", "looks all round the room"),
+    ("dance_chill", "sways in a slow dance"),
+    ("dance_groove", "bounces in a groove dance"),
+    ("dance_hype", "dances fast with its whole body"),
+    ("dance_waltz", "leans in a slow waltz"),
+    ("dance_jazz", "bobs its head in a jazz dance"),
+];
+
+/// A gesture as the person hears it, if a made skill may name it: one of
+/// the body's clips but `idle` (`lamp_skills::gesture_known`, which this
+/// crate can't call: lamp-skills depends on it), with a saying.
+fn gesture_said(name: &str) -> Option<&'static str> {
+    if name == "idle" || lamp_body::clips::named(name).is_none() {
+        return None;
+    }
+    GESTURES
+        .iter()
+        .find(|(clip, _)| *clip == name)
+        .map(|(_, said)| *said)
+}
+
+/// The gestures a made skill may name, for the making model:
+/// "nod, headshake, …".
+pub fn gesture_names() -> String {
+    GESTURES
+        .iter()
+        .filter(|(name, _)| gesture_said(name).is_some())
+        .map(|(name, _)| *name)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// A skill's duration, `"20s"`, `"1m"`, `"12h"`: its count and its unit.
@@ -3159,11 +3325,24 @@ light = { dim = 1 }
             let text = TOML.replace("light = true\n", &format!("light = true\n{wider}\n"));
             assert!(capped(&text).unwrap_err().0.contains(why), "{wider}");
         }
-        let faces = TOML.replace(
+        // Presence and the clock: a face in view, someone getting up, the
+        // time of day; never what is heard nor a picture.
+        let presence = TOML.replace(
             "[\"voice/state\"]",
-            "[\"voice/state\", \"humans/faces/tracked\"]",
+            "[\"humans/faces/tracked\", \"room/stood_up\", \"clock/local\"]",
         );
-        assert!(capped(&faces).unwrap_err().0.contains("read more"));
+        assert_eq!(
+            capped(&presence).unwrap().1.spoken(),
+            "its light, whether it sees a face, someone getting up from the desk and the time \
+             of day"
+        );
+        for wider in ["camera/frame", "ears/classes", "name/heard"] {
+            let text = TOML.replace("[\"voice/state\"]", &format!("[\"{wider}\"]"));
+            assert!(
+                capped(&text).unwrap_err().0.contains("read more"),
+                "{wider}"
+            );
+        }
         let heard = TOML.replace("[\"voice/state\"]", "[\"voice/heard\"]");
         assert!(capped(&heard).unwrap_err().0.contains("read more"));
         let tool = format!("tool = \"dim_now\"\n{TOML}");
@@ -3700,12 +3879,12 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(lines.contains(SAYABLE_TRIGGERS), "{lines}");
         assert!(
             lines.contains(
-                "someone comes or comes back to the desk: topic \"room/presence\", field \
-                 \"someone\", equals true"
+                "someone comes or comes back to the desk: \"room/presence\", \"someone\", \
+                 equals true"
             ),
             "{lines}"
         );
-        assert!(lines.contains("the lamp goes quiet: topic \"voice/state\""));
+        assert!(lines.contains("the lamp goes quiet: \"voice/state\""));
         assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
         // One [trigger] table, on the faces: the topic and its keys named.
         let one = back.replace("[[trigger]]", "[trigger]").replace(
@@ -3736,6 +3915,174 @@ light = { colour = "green", level = 3, for = "20s" }
             "When someone has been back at the desk for 3 seconds, after it was empty for 5 \
              minutes, it glows green at level 3 for 20 seconds, at most once every 20 minutes."
         );
+    }
+
+    /// A made skill with `trigger` and one `step`, reading presence and the
+    /// clock, its light and its body.
+    fn made_with(trigger: &str, step: &str) -> String {
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\nlight = true\n\
+             body = true\ntopics = [\"humans/faces/tracked\", \"room/stood_up\", \
+             \"clock/local\"]\n\n[trigger]\n{trigger}\n[ask]\npolicy = \"nudge\"\n\n\
+             [[do]]\n{step}\n"
+        )
+    }
+
+    /// A face coming into view (never whose), someone at the desk getting
+    /// up, and a time each day are said as lamp-skills runs them, and kept.
+    #[test]
+    fn a_face_a_getting_up_and_a_time_each_day_are_said() {
+        let kept_and_said = |trigger: &str, step: &str, said: &str| {
+            let text = made_with(trigger, step);
+            assert!(capped_with(&text, false).is_ok(), "{text}");
+            assert_eq!(plainly_with(&text, false).unwrap(), said);
+        };
+        let face = "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n";
+        kept_and_said(
+            &format!("{face}cooldown = \"1h\"\n"),
+            "body = { gesture = \"greeting\" }",
+            "When the lamp sees a face, after seeing none, it lifts its head and arm in a \
+             greeting, at most once an hour.",
+        );
+        kept_and_said(
+            &format!("{face}for = \"3s\"\nabsent_for = \"10m\"\n"),
+            "light = { colour = \"warm\", level = 2, for = \"20s\" }",
+            "When the lamp has seen a face for 3 seconds, after seeing none for 10 minutes, it \
+             glows warm at level 2 for 20 seconds.",
+        );
+        kept_and_said(
+            "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\nwhen = \"appears\"\n",
+            "body = { gesture = \"headshake\" }",
+            "When someone sitting at the desk gets up, it shakes its head.",
+        );
+        let clock = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n";
+        kept_and_said(
+            &format!("{clock}during = {{ from = \"22:00\", to = \"22:01\" }}\n"),
+            "light = { dim = 1 }",
+            "Every day at 22:00, it dims the light a step.",
+        );
+        kept_and_said(
+            &format!(
+                "{clock}during = {{ from = \"23:59\", to = \"00:00\" }}\ncooldown = \"12h\"\n"
+            ),
+            "body = { gesture = \"sleepy\" }",
+            "Every day at 23:59, it droops sleepily, at most once every 12 hours.",
+        );
+    }
+
+    /// What lamp-skills would run otherwise than said, or that reads who
+    /// someone is, is refused: a face by a field or a list (a name, a known
+    /// face), a face held while in view, a getting up held a while, a time
+    /// over a window or on a week's day (lamp-skills has none).
+    #[test]
+    fn a_face_by_who_a_window_or_a_weekday_is_refused() {
+        let part =
+            |trigger: &str| match plainly_with(&made_with(trigger, "light = { dim = 1 }"), false) {
+                Err(Refused(why, Some(lines))) => {
+                    assert_eq!(why, UNSAID);
+                    assert!(lines.contains(SAYABLE_TRIGGERS), "{lines}");
+                    assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+                    lines
+                }
+                other => panic!("{trigger}: {other:?}"),
+            };
+        let faces = "Can't be said plainly: trigger topic humans/faces/tracked";
+        let face = "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n";
+        assert!(
+            part(&format!("{face}field = \"name\"\nequals = \"Alex\"\n")).starts_with(&format!(
+                "{faces}, its field and equals: a face in view has no test, never who."
+            ))
+        );
+        assert!(
+            part(&format!("{face}each = \"faces\"\nkey = \"known\"\n"))
+                .starts_with(&format!("{faces}, keys each, key."))
+        );
+        assert!(part(&format!("{face}near = 0.2\n")).starts_with(&format!("{faces}, keys near.")));
+        assert!(
+            part("topic = \"humans/faces/tracked\"\nfor = \"5s\"\n")
+                .starts_with(&format!("{faces}, its when"))
+        );
+        let known = made_with(face, "light = { dim = 1 }")
+            .replace("body = true\n", "body = true\nknown_faces = true\n");
+        assert!(
+            capped_with(&known, false)
+                .unwrap_err()
+                .0
+                .contains("more than the light")
+        );
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        assert!(part(&format!("{stood}for = \"10s\"\n")).contains("its for or absent_for"));
+        assert!(part(&stood.replace("above = 0", "above = 600")).contains("its field and above"));
+        let clock = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\n";
+        let at = "during = { from = \"22:00\", to = \"22:01\" }\n";
+        let clocked = "Can't be said plainly: trigger topic clock/local";
+        for trigger in [
+            format!("{clock}{at}"),
+            format!("{clock}rearm = \"ends\"\nduring = {{ from = \"22:00\", to = \"22:30\" }}\n"),
+            format!("{clock}rearm = \"ends\"\nduring = {{ from = \"9:00\", to = \"9:01\" }}\n"),
+            format!("{clock}rearm = \"ends\"\nfor = \"1m\"\n{at}"),
+            format!("{clock}rearm = \"ends\"\n"),
+        ] {
+            assert!(
+                part(&trigger).starts_with(&format!("{clocked}, its test, rearm and during")),
+                "{trigger}"
+            );
+        }
+        assert!(
+            part(&format!("{clock}rearm = \"ends\"\n{at}days = [\"mon\"]\n"))
+                .starts_with(&format!("{clocked}, keys days."))
+        );
+        assert!(
+            part("topic = \"voice/state\"\nfield = \"state\"\nabove = 0\n").contains("its above")
+        );
+    }
+
+    /// Every gesture lamp-skills plays for a skill (the body's clips but
+    /// `idle`) has a saying, one a step; a name the body hasn't, `idle`, or
+    /// a table of clips is refused.
+    #[test]
+    fn every_gesture_of_the_body_is_said_and_no_other() {
+        let clips: Vec<&str> = lamp_body::clips::ALL
+            .iter()
+            .map(|clip| clip.name)
+            .filter(|name| *name != "idle")
+            .collect();
+        for name in &clips {
+            assert!(gesture_said(name).is_some(), "{name} has no saying");
+        }
+        assert_eq!(gesture_names(), clips.join(", "));
+        let presence = "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n";
+        let said = |gesture: &str| {
+            plainly_with(
+                &made_with(presence, &format!("body = {{ gesture = \"{gesture}\" }}")),
+                false,
+            )
+        };
+        for (gesture, saying) in [
+            ("dance_waltz", "leans in a slow waltz"),
+            ("laugh", "tips its head back in a laugh"),
+            ("scanning", "looks all round the room"),
+            ("nod", "nods"),
+        ] {
+            assert_eq!(
+                said(gesture).unwrap(),
+                format!("When someone comes to the desk, it {saying}.")
+            );
+        }
+        for refused in ["moonwalk", "idle", "dip", "tilt_left", "Nod"] {
+            match said(refused) {
+                Err(Refused(why, Some(lines))) => {
+                    assert_eq!(why, UNSAID);
+                    assert!(lines.starts_with("Can't be said plainly: [[do]] step 1, body"));
+                    assert!(lines.contains("listed body gesture"), "{lines}");
+                }
+                other => panic!("{refused}: {other:?}"),
+            }
+        }
+        let two = made_with(presence, "body = { gesture = \"nod\", move = \"wave\" }");
+        assert!(plainly_with(&two, false).is_err());
+        let table = made_with(presence, "body = { gesture = { calm = [\"nod\"] } }");
+        assert!(plainly_with(&table, false).is_err());
     }
 
     /// `lamp-skills` counts a trigger's `absent_for` only with
@@ -3790,10 +4137,7 @@ light = { colour = "green", level = 3, for = "20s" }
     fn the_brief_and_the_triggers_say_what_coming_back_to_the_desk_is() {
         let brief = brief("glow green when I come back to my desk").unwrap();
         assert!(
-            brief.contains(
-                "one [trigger]: someone comes or comes back to the desk is room/presence (field \
-                 \"someone\", equals true; false: the desk left)"
-            ),
+            brief.contains("one [trigger] as listed (coming to the desk is room/presence)"),
             "{brief}"
         );
         assert!(TRIGGER_MEANINGS.contains("someone comes or comes back to the desk"));
