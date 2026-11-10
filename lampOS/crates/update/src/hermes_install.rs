@@ -1,8 +1,9 @@
 //! Hermes put on the lamp after Harness (#5978; docs/install.md, "Hermes on
-//! the lamp"): on by default on a lamp installed as the product
-//! ([`PRODUCT_DEFAULT`] is on: the product owner's decision, 10 Nov);
-//! `LAMP_HERMES_ON_LAMP=off` in lamp-update's own unit turns it off, and
-//! any other lamp has it only with `on` there.
+//! the lamp"): off on every lamp unless `LAMP_HERMES_ON_LAMP=on` in
+//! lamp-update's own unit ([`PRODUCT_DEFAULT`] is off: the product turns
+//! it on only after the first builder's default-on read on the capped
+//! build's lamp-c0a4 numbers: privacy held through the install, first
+//! answers within ~300 ms of rest, no ask lost); `off` there keeps it off.
 //! It rides on Harness before the sign-in ([`crate::harness_install`]):
 //! with that off, Hermes is off as well.
 //!
@@ -88,9 +89,11 @@ use std::{
 /// The switch, in lamp-update's own unit: `on` exactly.
 pub const SWITCH: &str = "LAMP_HERMES_ON_LAMP";
 /// Whether a lamp installed as the product installs Hermes with [`SWITCH`]
-/// unset: on, the product owner's decision (10 Nov); `off` turns it off.
-/// Any other lamp with it unset is off.
-pub const PRODUCT_DEFAULT: bool = true;
+/// unset: off, until the first builder's default-on read on the capped
+/// build's lamp-c0a4 numbers (privacy held through the install, first
+/// answers within ~300 ms of rest, no ask lost). Any other lamp with it
+/// unset is off too.
+pub const PRODUCT_DEFAULT: bool = false;
 
 /// Where the install is, in lamp-update's records (0600), next to
 /// Harness's [`harness_install::RECORD`]. lamp-update's own: not said on
