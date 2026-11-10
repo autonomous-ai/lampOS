@@ -217,7 +217,7 @@ in: head pitch, head roll, base yaw, shoulder, elbow, `step_ms` apart. The
 runtime refuses the skill, and says why, unless the move is what the body
 takes: a name of 1 to 32 of `a-z`, `0-9`, `-`, `_` that is not one of the
 body's gestures (nor `called`); `step_ms` 40 to 1000 and 1.5 to 10 s in all;
-the first and last frame all zeros; no joint farther than 200, 200, 150,
+the first and last frame all zeros; no joint farther than 200, 200, 250,
 350, 350 counts, nor faster than 900, 1,300, 1,000, 800, 800 counts a
 second. The body plays it only on a standing lamp, never while it is paused,
 held or slumped, and refuses it whole if a frame would tip the lamp past V1's

@@ -220,7 +220,7 @@ test('LAMPOS_LOG=debug logs each frame with its secrets redacted', async () => {
 // the Python SDK's test has the same list).
 const UNPLAYABLE = [
   [[[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 200, 'frames: a move this body cannot play: it lasts 600 ms, not 1500 to 10000'],
-  [[[0, 0, 0, 0, 0], [0, 0, 251, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 251 counts, farther than 250, this lamp's yaw reach (--reach)"],
+  [[[0, 0, 0, 0, 0], [0, 0, 1301, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 1301 counts, farther than 1300, this lamp's yaw reach (--reach)"],
   [[[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 1000, null], // 2 s: one the body plays
   [[...Array(7).fill([0, 0, 0, 0, 0]), ...Array(8).fill([0, 0, 0, 0, 300]), [0, 0, 0, 0, 0]], 100, 'frames: a move this body cannot play: frame 7 asks joint 4 for 3000 counts a second, faster than 800'],
   [[[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 500, 'frames: start and end at home, all five 0'],
@@ -235,7 +235,7 @@ test('the move rules are the body\'s and lamp-control\'s own', async (t) => {
   if (!existsSync(body) || !existsSync(door)) return t.skip('the Rust crates are not beside this copy');
   const [bodyText, doorText] = [readFileSync(body, 'utf8'), readFileSync(door, 'utf8')];
   const numbers = (text) => [...text.matchAll(/[0-9][0-9_]*(?:\.[0-9]+)?/g)].map((m) => Number(m[0].replaceAll('_', '')));
-  assert.deepEqual(numbers(bodyText.match(/pub const FARTHEST: \[i16; 5\] = \[([^\]]*)\]/)[1]), MOVE_FARTHEST);
+  assert.deepEqual(numbers(bodyText.match(/pub const CEILING: \[u16; 5\] = \[([^\]]*)\]/)[1]), MOVE_FARTHEST);
   assert.deepEqual(numbers(bodyText.match(/pub const FASTEST: \[f32; 5\] = \[([^\]]*)\]/)[1]), MOVE_FASTEST);
   const shortest = numbers(bodyText.match(/const SHORTEST_US: u64 = ([0-9_]+);/)[1])[0];
   const longest = numbers(bodyText.match(/const LONGEST_US: u64 = ([0-9_]+);/)[1])[0];
@@ -251,7 +251,8 @@ test('the fake refuses a move the body would drop, with its words, before the le
   for (const [frames, stepMs, refusal] of UNPLAYABLE) assert.equal(moveRefusal(stepMs, frames), refusal, JSON.stringify(frames));
   assert.equal(moveRefusal(20, PLAYABLE), 'step_ms: from 40 to 1000');
   assert.equal(moveRefusal(500, [[0, 0, 0, 0, 0]]), 'frames: at least 2');
-  await withLamp({}, async (lamp, fake) => {
+  // An app-reach lamp takes a move up to the ceiling (the 1301 above is past it).
+  await withLamp({ appReach: true }, async (lamp, fake) => {
     // Refused before the lease is asked for, as lamp-control's protocol.rs checks it.
     await assert.rejects(lamp.move(UNPLAYABLE[0][0], 200), (error) => error instanceof byCode.bad_request && error.message.includes('a move this body cannot play: it lasts 600 ms'));
     await lamp.withLease(['body'], async () => {
@@ -1844,8 +1845,8 @@ test('poses a move cannot make are refused with the joint, before sending', asyn
     [[{ nose: 3 }], "'nose' is not a joint"],
     [[{ pitch: true }], 'pitch must be a number of degrees'],
     [[{ pitch: NaN }], 'pitch must be a number of degrees'],
-    [[{ pitch: 40 }], 'pitch 40° is farther than a move may take it, 17.6° either way'],
-    [[{ yaw: -23 }], 'yaw -23° is farther than a move may take it, 22.0° either way'],
+    [[{ pitch: 130 }], 'pitch 130° is farther than a move may take it, 114.3° either way'],
+    [[{ yaw: -130 }], 'yaw -130° is farther than a move may take it, 114.3° either way'],
     [Array(12).fill({ shoulder: 30, elbow: -30 }), "longer than a move's 10000"],
   ]) {
     assert.throws(() => posesToFrames(poses), (error) => error instanceof LampError && error.code === 'bad_request' && error.message.includes(words), words);
@@ -1853,7 +1854,7 @@ test('poses a move cannot make are refused with the joint, before sending', asyn
   assert.throws(() => posesToFrames([{ yaw: 2 }], { holdMs: -1 }), /holdMs/);
   await withLamp({}, async (lamp, fake) => {
     await lamp.withLease(['body'], async () => {
-      await assert.rejects(lamp.movePoses([{ pitch: 40 }]), /farther than a move may take it/);
+      await assert.rejects(lamp.movePoses([{ pitch: 130 }]), /farther than a move may take it/);
       assert.deepEqual(fake.asked('move'), []);
       await lamp.movePoses([{ pitch: 10 }, { yaw: -8 }], { holdMs: 200 });
     }, { forMs: 5000 });
@@ -1957,5 +1958,18 @@ test('a missing camera or microphone grant says the app does not grant it; anoth
     await assert.rejects(lamp.cameraSnapshot(), (error) => error instanceof byCode.no_grant
       && error.why === 'not granted: camera (the app does not grant it yet: only a pairing code made on the lamp itself carries it)');
     await assert.rejects(lamp.say('x'), (error) => error instanceof byCode.no_grant && error.why === 'not granted: speak');
+  });
+});
+
+test('the fake holds a move to the caps every shipped lamp has unless told it has app reach', async () => {
+  const ramp = [0, 150, 300, 450, 600, 681];
+  const sway = [...ramp, ...ramp.toReversed()].map((n) => [0, 0, n, 0, 0]);
+  await withLamp({}, async (lamp) => {
+    await lamp.withLease(['body'], async () => {
+      await assert.rejects(lamp.move(sway, 200), (error) => error instanceof byCode.bad_request && error.why.includes("joint 2 300 counts, farther than 250, this lamp's yaw reach (--reach)"));
+    }, { forMs: 5000 });
+  });
+  await withLamp({ appReach: true }, async (lamp) => {
+    await lamp.withLease(['body'], async () => { await lamp.move(sway, 200); }, { forMs: 5000 });
   });
 });

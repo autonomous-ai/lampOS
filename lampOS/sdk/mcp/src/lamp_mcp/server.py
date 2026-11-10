@@ -529,7 +529,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             back: each pose names the joints it turns, `pitch` (up positive), `roll`, `yaw`
             (right positive), `shoulder` and `elbow` (up positive), e.g. [{"pitch": 10},
             {"yaw": -8}]; a joint left out stays put. Each pose is held `hold_ms` (0 to 10000).
-            At most pitch and roll 17.6°, yaw 22.0° (13.2° on 11091), shoulder and elbow 30.8°, and 10 s in all;
+            At most pitch and roll 114.3°, yaw 114.3°, shoulder and elbow 87.9° at most before sending (what any lamp may take; the lamp's own reach is the body's and the door refuses past it with the reach in its words: pitch and roll 17.6°, yaw 22.0° (13.2° on 11091), shoulder and elbow 30.8° on a lamp as shipped, 90% of the hardware's range on a dev lamp, and the anti-tip rule still holds), and 10 s in all;
             the body still holds each joint to its own bounds."""
             try:
                 frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)

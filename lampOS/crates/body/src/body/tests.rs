@@ -3062,6 +3062,16 @@ fn gesture_run(
     gesture_run_over(clip, ask_at, seconds, prepare, None)
 }
 
+/// 75c9's servos' own stored limits, read on 10 Nov 2026 (`own_ranges` of its
+/// exit report), by `Joint::index`: yaw, shoulder, elbow, roll, pitch.
+const LAMP_75C9_RANGES: [(u16, u16); 5] = [
+    (820, 3_268),
+    (0, 4_095),
+    (0, 4_095),
+    (897, 3_153),
+    (1_457, 3_029),
+];
+
 /// [`gesture_run`], with a holder's look (`Asked::aim`, as `{"look":…}` on
 /// the lamp's lease socket) at `yaw` counts from the pose's own direction from the
 /// given moment on: the lamp is turned that far, as a look at a person turns
@@ -3073,7 +3083,7 @@ fn gesture_run_over(
     prepare: impl FnOnce(&mut Lamp),
     looking: Option<(Duration, f32)>,
 ) -> (BodyReport, Lamp, Vec<Step>) {
-    gesture_run_yaw(clip, ask_at, seconds, prepare, looking, None)
+    gesture_run_full(clip, ask_at, seconds, prepare, looking, Knobs::default())
 }
 
 /// [`gesture_run_over`], the base's yaw reach set to `yaw` counts when given: 40, what a lamp
@@ -3101,7 +3111,83 @@ fn gesture_run_glancing(
     yaw: Option<f32>,
     glancing: bool,
 ) -> (BodyReport, Lamp, Vec<Step>) {
+    gesture_run_full(
+        clip,
+        ask_at,
+        seconds,
+        prepare,
+        looking,
+        Knobs {
+            yaw,
+            glancing,
+            ..Knobs::default()
+        },
+    )
+}
+
+/// [`gesture_run_over`], with `LAMP_BODY_APP_REACH` on for a lamp whose servos
+/// store `ranges` (`LAMP_75C9_RANGES`) when given.
+fn gesture_run_app(
+    clip: &'static Clip,
+    ask_at: Duration,
+    seconds: u64,
+    prepare: impl FnOnce(&mut Lamp),
+    looking: Option<(Duration, f32)>,
+    ranges: Option<[(u16, u16); 5]>,
+) -> (BodyReport, Lamp, Vec<Step>) {
+    gesture_run_full(
+        clip,
+        ask_at,
+        seconds,
+        prepare,
+        looking,
+        Knobs {
+            ranges: ranges.map(|ranges| (ranges, true)),
+            ..Knobs::default()
+        },
+    )
+}
+
+/// What a gesture run sets besides the clip and the clock.
+#[derive(Default)]
+struct Knobs {
+    /// The base's yaw reach, 40 for a lamp started without `--reach`.
+    yaw: Option<f32>,
+    /// The servos' stored ranges, and whether the lamp read them at start
+    /// (`Limits::own_ranges`); the switch is on whenever ranges are given.
+    ranges: Option<([(u16, u16); 5], bool)>,
+    /// The mood is Resting, as on a lamp whose computer plays a move; else Speaking.
+    resting: bool,
+    /// A second clip, asked at this time (after the first has ended).
+    then: Option<(Duration, &'static Clip)>,
+    /// `--rest-glance` is on and Expression is asking something small all the time, as it does on a lamp
+    /// at rest (a glance under way).
+    glancing: bool,
+}
+
+fn gesture_run_full(
+    clip: &'static Clip,
+    ask_at: Duration,
+    seconds: u64,
+    prepare: impl FnOnce(&mut Lamp),
+    looking: Option<(Duration, f32)>,
+    knobs: Knobs,
+) -> (BodyReport, Lamp, Vec<Step>) {
+    let Knobs {
+        yaw,
+        ranges,
+        resting,
+        then,
+        glancing,
+    } = knobs;
     let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
+    let own_ranges = ranges.is_some_and(|(_, read)| read);
+    let ranges = ranges.map(|(ranges, _)| ranges);
+    if let Some(ranges) = ranges {
+        for (servo, range) in lamp.servos.iter_mut().zip(ranges) {
+            servo.range = range;
+        }
+    }
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
     prepare(&mut lamp);
@@ -3115,6 +3201,8 @@ fn gesture_run_glancing(
         yaw: yaw.unwrap_or(limits.yaw),
         // 40 is `Limits::FOLDED`'s: the lamp started without `--reach`.
         yaw_unset: yaw == Some(Limits::FOLDED.yaw),
+        own_ranges,
+        app_reach: ranges.is_some(),
         rest_glance: glancing,
         ..limits
     })
@@ -3123,6 +3211,7 @@ fn gesture_run_glancing(
     let expression_at = clock.time.clone();
     let seen_at = clock.time.clone();
     let mut asked_once = false;
+    let mut then_asked = false;
     let mut seen = Vec::new();
     let report = run_alive(
         &mut lamp,
@@ -3133,7 +3222,7 @@ fn gesture_run_glancing(
         None,
         || {
             Some((
-                if glancing {
+                if resting || glancing {
                     Mood::Resting
                 } else {
                     Mood::Speaking
@@ -3144,10 +3233,12 @@ fn gesture_run_glancing(
         move || {
             let due = !asked_once && time.get() >= ask_at;
             asked_once |= due;
+            let second = then.filter(|(at, _)| !then_asked && time.get() >= *at);
+            then_asked |= second.is_some();
             Asked {
                 toward: None,
                 seen: None,
-                gesture: due.then_some(clip),
+                gesture: due.then_some(clip).or(second.map(|(_, clip)| clip)),
                 expression: (glancing && expression_at.get() >= Duration::from_secs(6))
                     .then_some([-30.0, 0.0, 0.0]),
                 called: false,
@@ -4591,6 +4682,438 @@ fn a_lamp_without_a_reach_plays_an_accepted_150_count_sway_whole() {
         high >= rested + 148 && low + 148 <= rested,
         "swayed {low} to {high} from {rested}, cut short of 150 either way"
     );
+}
+
+/// One joint leaned `reach` counts one way and back over 8 s (a second a step,
+/// no step over half the lean), the rest still.
+macro_rules! lean_clip {
+    ($name:literal, $joint:literal, $reach:literal) => {{
+        static LEAN: Clip = Clip {
+            name: $name,
+            step_ms: 1_000,
+            frames: &{
+                let mut frames = [[0i16; 5]; 9];
+                frames[1][$joint] = $reach / 2;
+                frames[2][$joint] = $reach;
+                frames[3][$joint] = $reach / 2;
+                frames[5][$joint] = $reach / 2;
+                frames[6][$joint] = $reach;
+                frames[7][$joint] = $reach / 2;
+                frames
+            },
+        };
+        &LEAN
+    }};
+}
+
+/// How far a joint's goal went either way of where it rested while the lean played, from the
+/// `pick`ed goal of each step: (the most under, the most over).
+fn leaned(seen: &[Step], name: &str, rested: u16, pick: &dyn Fn(&Step) -> u16) -> (u16, u16) {
+    let during: Vec<u16> = seen
+        .iter()
+        .filter(|step| step.1 == Some(name))
+        .map(pick)
+        .collect();
+    (
+        rested.saturating_sub(*during.iter().min().unwrap_or(&rested)),
+        during
+            .iter()
+            .max()
+            .unwrap_or(&rested)
+            .saturating_sub(rested),
+    )
+}
+
+/// The person, 14:04 on 10 Nov: a move may take each joint 90% of its hardware range from the
+/// pose; on 75c9 the base 1,072 down and 1,127 up (its range 820..3,268 from the pose's 2,015),
+/// where the 22 degrees of `--reach` held it to 250. A sway of 1,000 either way is played whole.
+#[test]
+fn with_the_app_reach_a_yaw_sway_of_a_thousand_counts_is_played_whole() {
+    static SWAY: Clip = Clip {
+        name: "sway",
+        step_ms: 1_000,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 0, -500, 0, 0],
+            [0, 0, -1_000, 0, 0],
+            [0, 0, -500, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 500, 0, 0],
+            [0, 0, 1_000, 0, 0],
+            [0, 0, 500, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    let (report, _, seen) = gesture_run_app(
+        &SWAY,
+        Duration::from_secs(8),
+        20,
+        |_| {},
+        None,
+        Some(LAMP_75C9_RANGES),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(
+        (report.gestures, report.gestures_dropped),
+        (1, 0),
+        "{report:?}"
+    );
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[2];
+    let (under, over) = leaned(&seen, "sway", rested, &|step| step.2[2]);
+    assert!(
+        under >= 990 && over >= 990,
+        "swayed {under} under and {over} over: cut short"
+    );
+    assert!(
+        under <= 1_010 && over <= 1_010,
+        "swayed {under} under and {over} over: past what was asked"
+    );
+}
+
+/// The head's roll: a lamp whose `--reach` roll is 1 does not tilt in a gesture (its round head
+/// turns about its own axis, which nobody sees); an app's move may roll it, 90% of the range.
+#[test]
+fn with_the_app_reach_a_roll_of_nine_hundred_counts_is_played_whole() {
+    let lean = lean_clip!("roll", 1, 900);
+    let (report, _, seen) = gesture_run_app(
+        lean,
+        Duration::from_secs(8),
+        20,
+        |_| {},
+        None,
+        Some(LAMP_75C9_RANGES),
+    );
+    assert_eq!(
+        (report.gestures, report.gestures_dropped),
+        (1, 0),
+        "{report:?}"
+    );
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[1];
+    let (_, over) = leaned(&seen, "roll", rested, &|step| step.2[1]);
+    assert!(over >= 890, "rolled {over} of 900");
+}
+
+/// The head's pitch up: the floor (1,670, a lamp-4ace servo's own limit) held it to 230 counts from
+/// the standing pose's 1,900; with the app reach it is the servo's own stored limit (75c9: 1,457)
+/// less the margin: a lean of 380 up is played whole.
+#[test]
+fn with_the_app_reach_the_head_pitches_up_to_its_own_range_not_the_floor() {
+    let lean = lean_clip!("up", 0, -380);
+    let (report, _, seen) = gesture_run_app(
+        lean,
+        Duration::from_secs(8),
+        20,
+        |_| {},
+        None,
+        Some(LAMP_75C9_RANGES),
+    );
+    assert_eq!(
+        (report.gestures, report.gestures_dropped),
+        (1, 0),
+        "{report:?}"
+    );
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[0];
+    let (under, _) = leaned(&seen, "up", rested, &|step| step.2[0]);
+    assert!(under >= 370, "pitched up {under} of 380");
+}
+
+/// The arm: the app's reach on the shoulder toward folded is 918 counts (90% of the window, 1,020 from
+/// the standing pose's 2,650 down to the folded 2,050 less the margin). The anti-tip rule (22 mm
+/// off the base's axis) stands as it was and decides what the arm may do from the pose it is in, and
+/// on this pose it refuses a shoulder alone past about 300 counts: a lean of 800, inside the reach,
+/// is refused by it whole (the run going on) and not by the reach; one of 1,000, past the reach, is
+/// dropped by the reach before the rule is asked. So the arm's usable reach is the rule's, not 90%.
+#[test]
+fn with_the_app_reach_the_arm_is_still_held_by_the_anti_tip_rule() {
+    let run = |lean: &'static Clip| {
+        gesture_run_app(
+            lean,
+            Duration::from_secs(8),
+            20,
+            |_| {},
+            None,
+            Some(LAMP_75C9_RANGES),
+        )
+    };
+    let (report, _, seen) = run(lean_clip!("tips", 3, -800));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.tipping.refused, 1, "{:?}", report.tipping);
+    assert_eq!(report.gestures_dropped, 0, "{report:?}");
+    assert!(seen.iter().all(|step| step.1 != Some("tips")));
+    let (report, _, seen) = run(lean_clip!("past", 3, -1_000));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.gestures_dropped, 1, "{report:?}");
+    assert_eq!(report.tipping.refused, 0, "{:?}", report.tipping);
+    assert!(seen.iter().all(|step| step.1 != Some("past")));
+}
+
+/// A move past the reach the body computed is dropped whole and said, never played cut short.
+#[test]
+fn with_the_app_reach_a_move_past_it_is_dropped_whole() {
+    let lean = lean_clip!("past", 2, 1_200);
+    let (report, _, seen) = gesture_run_app(
+        lean,
+        Duration::from_secs(8),
+        20,
+        |_| {},
+        None,
+        Some(LAMP_75C9_RANGES),
+    );
+    // Asked (counted), then dropped whole at its start: no step of it was played.
+    assert_eq!(report.gestures_dropped, 1, "{report:?}");
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[2];
+    assert!(
+        seen.iter()
+            .all(|step| step.1 != Some("past") && step.2[2].abs_diff(rested) < 10),
+        "the base moved"
+    );
+}
+
+#[test]
+fn with_the_switch_on_and_the_ranges_unread_a_move_past_todays_reach_is_dropped_and_said() {
+    // The servos hold ranges, but the lamp did not read them (`own_ranges`
+    // off): its reach is not known, so a 600-count sway (past
+    // `GESTURE_REACH`) is dropped whole with its reason, not cut short.
+    let lean = lean_clip!("unknown", 2, 600);
+    let (report, _, seen) = gesture_run_full(
+        lean,
+        Duration::from_secs(8),
+        20,
+        |_| {},
+        None,
+        Knobs {
+            ranges: Some((LAMP_75C9_RANGES, false)),
+            ..Knobs::default()
+        },
+    );
+    assert_eq!(report.app_reach, None, "{report:?}");
+    assert_eq!(report.gestures_dropped, 1, "{report:?}");
+    assert!(
+        seen.iter().all(|step| step.1 != Some("unknown")),
+        "it played"
+    );
+}
+
+/// A one-sided 90-degree sway as the SDK's `move_poses` makes it at a 0.4 share (50 ms frames,
+/// 1,024 counts of yaw out, held, and back; 9.3 s), as run 3 asked it of lamp-75c9 (15:34).
+#[test]
+fn with_the_app_reach_a_ninety_degree_one_sided_sway_at_50_ms_is_played() {
+    let mut frames = vec![[0i16; 5]];
+    let ease = |from: f32, to: f32, steps: usize, frames: &mut Vec<[i16; 5]>| {
+        for step in 1..=steps {
+            let t = step as f32 / steps as f32;
+            let at = from + (to - from) * (1.0 - (std::f32::consts::PI * t).cos()) / 2.0;
+            frames.push([0, 0, at.round() as i16, 0, 0]);
+        }
+    };
+    ease(0.0, 1_024.0, 80, &mut frames);
+    for _ in 0..8 {
+        frames.push([0, 0, 1_024, 0, 0]);
+    }
+    ease(1_024.0, 0.0, 80, &mut frames);
+    let clip: &'static Clip = Box::leak(Box::new(Clip {
+        name: "ninety",
+        step_ms: 50,
+        frames: Box::leak(frames.into_boxed_slice()),
+    }));
+    let (report, _, seen) = gesture_run_app(
+        clip,
+        Duration::from_secs(8),
+        24,
+        |_| {},
+        None,
+        Some(LAMP_75C9_RANGES),
+    );
+    let most = seen
+        .iter()
+        .filter(|step| step.1 == Some("ninety"))
+        .map(|step| step.2[2])
+        .max()
+        .unwrap_or(0);
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[2];
+    assert_eq!(report.gestures_dropped, 0, "{report:?}");
+    assert!(
+        most > rested + 900,
+        "the base went {} counts",
+        most.saturating_sub(rested)
+    );
+}
+
+/// Lead, 16:21 on 10 Nov, run 4 on lamp-75c9: YAW80R and YAW80L were taken ("starts: yaw offsets
+/// 0..910"), played their 8 s and ended with the base's goal at 2001 throughout. A computer's move is
+/// played while the mood is Resting, nothing wakes a base that has arrived and gone to sleep, and
+/// the asleep joint skipped its goal before the move's offset was laid over it. The move wakes it.
+#[test]
+fn a_move_over_a_resting_lamp_wakes_a_base_that_has_gone_to_sleep() {
+    let mut frames = vec![[0i16; 5]];
+    for step in 1..=40 {
+        frames.push([0, 0, (step * 20) as i16, 0, 0]);
+    }
+    for step in (0..40).rev() {
+        frames.push([0, 0, (step * 20) as i16, 0, 0]);
+    }
+    let clip: &'static Clip = Box::leak(Box::new(Clip {
+        name: "wide",
+        step_ms: 100,
+        frames: Box::leak(frames.into_boxed_slice()),
+    }));
+    // The first move, then the same one 12 s after it has ended: the base has arrived and slept.
+    let (report, _, seen) = gesture_run_full(
+        clip,
+        Duration::from_secs(8),
+        40,
+        |_| {},
+        None,
+        Knobs {
+            ranges: Some((LAMP_75C9_RANGES, true)),
+            resting: true,
+            then: Some((Duration::from_secs(24), clip)),
+            ..Knobs::default()
+        },
+    );
+    assert_eq!(report.gestures_dropped, 0, "{report:?}");
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[2];
+    let most = seen
+        .iter()
+        .filter(|step| step.1 == Some("wide") && step.0 > Duration::from_secs(24))
+        .map(|step| step.2[2])
+        .max()
+        .unwrap_or(0);
+    assert!(
+        most > rested + 600,
+        "the second move took the base's goal {} counts from {rested}",
+        most.saturating_sub(rested)
+    );
+}
+
+/// Lead, 16:47, run 5 on lamp-75c9 (trace): every move after the first was taken, its gesture layer
+/// wanted 683 counts of yaw, and the base's goal stayed the look's own (2025). Expression's rest glance
+/// was under way (`glance_from`), and "the base is not turned for a glance" skipped the base whole, the
+/// move's offset with it. A move turns the base over a glance. NOTE: in this harness the glance has ended
+/// (`glance_from` is None) by the time the move starts, so this test passes with or without the fix; it
+/// holds the behaviour, it does not reproduce the lamp (run 6's trace prints `glance` to settle it).
+#[test]
+fn a_move_turns_the_base_over_a_rest_glance_that_does_not() {
+    let mut frames = vec![[0i16; 5]];
+    for step in 1..=34 {
+        frames.push([0, 0, (step * 20) as i16, 0, 0]);
+    }
+    for step in (0..34).rev() {
+        frames.push([0, 0, (step * 20) as i16, 0, 0]);
+    }
+    let clip: &'static Clip = Box::leak(Box::new(Clip {
+        name: "wide",
+        step_ms: 100,
+        frames: Box::leak(frames.into_boxed_slice()),
+    }));
+    let (report, _, seen) = gesture_run_full(
+        clip,
+        Duration::from_secs(5),
+        20,
+        |_| {},
+        None,
+        Knobs {
+            ranges: Some((LAMP_75C9_RANGES, true)),
+            resting: true,
+            glancing: true,
+            ..Knobs::default()
+        },
+    );
+    assert_eq!(report.gestures_dropped, 0, "{report:?}");
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(5))
+        .unwrap()
+        .2[2];
+    let most = seen
+        .iter()
+        .filter(|step| step.1 == Some("wide"))
+        .map(|step| step.2[2])
+        .max()
+        .unwrap_or(0);
+    assert!(
+        most > rested + 600,
+        "over a glance the base's goal went {} counts from {rested}",
+        most.saturating_sub(rested)
+    );
+}
+
+/// Leo's P2 on #6184: a servo that stores the whole turn (`0..=4095`, uncalibrated, as `own_window`
+/// reads it) has no hardware range to take 90% of; that joint keeps today's reach, the others get
+/// theirs.
+#[test]
+fn an_uncalibrated_head_joint_keeps_todays_reach_under_the_app_reach() {
+    // yaw, shoulder, elbow, roll, pitch: the base and the pitch store the whole turn.
+    let ranges = [(0, 4_095), (0, 4_095), (0, 4_095), (897, 3_153), (0, 4_095)];
+    let reach = app_reach_of(&ranges, None, None, 150);
+    let today = crate::moves::Reach::today(150);
+    assert_eq!(reach.low[2], today.low[2], "{reach:?}");
+    assert_eq!(reach.high[2], today.high[2], "{reach:?}");
+    assert_eq!(reach.low[0], today.low[0], "{reach:?}");
+    assert_eq!(reach.high[0], today.high[0], "{reach:?}");
+    // The calibrated roll (897..3153 from a pose of 2048) is 90% of its room on each side.
+    assert_eq!((reach.low[1], reach.high[1]), (1_035, 994), "{reach:?}");
+}
+
+/// The same on a body: with the base's servo storing the whole turn, a sway of 1,000 counts (played
+/// whole where the base is calibrated) is dropped, as a lamp without the switch drops it.
+#[test]
+fn with_the_app_reach_an_uncalibrated_base_still_drops_a_sway_past_todays_reach() {
+    static SWAY: Clip = Clip {
+        name: "sway",
+        step_ms: 1_000,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 0, -500, 0, 0],
+            [0, 0, -1_000, 0, 0],
+            [0, 0, -500, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    let mut ranges = LAMP_75C9_RANGES;
+    ranges[0] = (0, 4_095);
+    let (report, _, _) = gesture_run_app(
+        &SWAY,
+        Duration::from_secs(8),
+        16,
+        |_| {},
+        None,
+        Some(ranges),
+    );
+    assert_eq!(report.gestures_dropped, 1, "{report:?}");
+}
+
+#[test]
+fn the_report_carries_app_reach_only_with_the_switch_on() {
+    let off = lean_clip!("off", 2, 100);
+    let (report, _, _) = gesture_run_over(off, Duration::from_secs(8), 12, |_| {}, None);
+    assert!(report.app_reach.is_none());
+    let text = serde_json::to_string(&report).unwrap();
+    assert!(!text.contains("app_reach"), "{text}");
 }
 
 /// Second's P2 on #6002 (14:41): a lamp configured with a yaw reach under 150 keeps it. With a look

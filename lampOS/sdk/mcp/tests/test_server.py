@@ -1622,9 +1622,9 @@ def test_a_move_through_poses_is_the_sdks_frames_and_a_pose_it_cant_make_is_refu
 
     async def go():
         async with connected(tmp_path, grants=("body",)) as (fake, _, session):
-            refused = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 40}]})
+            refused = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 130}]})
             assert refused.isError
-            assert text(refused).endswith("bad_request: pose 1: pitch 40° is farther than a move may take it, 17.6° either way")
+            assert text(refused).endswith("bad_request: pose 1: pitch 130° is farther than a move may take it, 114.3° either way")
             assert "bad_request: bad_request" not in text(refused)
             assert not fake.asked("move") and not fake.asked("lease.take")
             moved = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 10}, {"yaw": -8}], "hold_ms": 200})

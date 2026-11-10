@@ -16,14 +16,20 @@ MOVE_FRAMES_MIN = 2
 MOVE_LASTS_MS = (1_500, 10_000)
 # Head pitch, head roll, base yaw, shoulder, elbow: counts from rest, and
 # counts a second.
-MOVE_FARTHEST = (200, 200, 250, 350, 350)
+# The most any lamp may take a joint either way (lamp_body::moves::CEILING: more than 90% of any
+# lamp's hardware range, so that this never refuses what a lamp's body would take); each lamp's own
+# reach is the body's (the door refuses a move past it, with the reach in its words).
+MOVE_FARTHEST = (1_300, 1_300, 1_300, 1_000, 1_000)
+# What a skill's move may take a joint (lamp_body::moves::FARTHEST, as the load-time check has it).
+SKILL_FARTHEST = (200, 200, 250, 350, 350)
 MOVE_FASTEST = (900.0, 1_300.0, 1_000.0, 800.0, 800.0)
 
 
-def move_why(step_ms: int, frames: list[list[int]]) -> str | None:
+def move_why(step_ms: int, frames: list[list[int]], farthest: tuple[int, ...] | None = None) -> str | None:
     """Why lamp-body's `moves::check` refuses a move of these steps and frames,
     in its words, at its first problem; None for one it plays. lamp-control
     holds a computer's `move` to the same check (protocol.rs, #4217)."""
+    farthest = MOVE_FARTHEST if farthest is None else farthest
     if not MOVE_STEP_MS[0] <= step_ms <= MOVE_STEP_MS[1]:
         return f"step_ms {step_ms} is not from 40 to 1000"
     lasts = max(len(frames) - 1, 0) * step_ms
@@ -34,16 +40,16 @@ def move_why(step_ms: int, frames: list[list[int]]) -> str | None:
     step = step_ms / 1_000
     for at, (before, after) in enumerate(zip(frames, frames[1:]), start=1):
         for joint in range(5):
-            if abs(after[joint]) > MOVE_FARTHEST[joint]:
-                reach = ", this lamp's yaw reach (--reach)" if joint == 2 else ""
-                return f"frame {at} takes joint {joint} {after[joint]} counts, farther than {MOVE_FARTHEST[joint]}{reach}"
+            if abs(after[joint]) > farthest[joint]:
+                reach = ", this lamp's yaw reach (--reach)" if joint == 2 else ", this lamp's reach"
+                return f"frame {at} takes joint {joint} {after[joint]} counts, farther than {farthest[joint]}{reach}"
             speed = abs(after[joint] - before[joint]) / step
             if speed > MOVE_FASTEST[joint] + 2 / step:
                 return f"frame {at} asks joint {joint} for {speed:.0f} counts a second, faster than {MOVE_FASTEST[joint]:.0f}"
     return None
 
 
-def move_refusal(step_ms: int, frames: list[list[int]]) -> str | None:
+def move_refusal(step_ms: int, frames: list[list[int]], farthest: tuple[int, ...] | None = None) -> str | None:
     """lamp-control's refusal of a computer's `move` (protocol.rs), in its
     words, as `bad_request`: its own shape first, then the body's check;
     None for one it takes."""
@@ -53,7 +59,7 @@ def move_refusal(step_ms: int, frames: list[list[int]]) -> str | None:
         return f"frames: at least {MOVE_FRAMES_MIN}"
     if frames[0] != [0] * 5 or frames[-1] != [0] * 5:
         return "frames: start and end at home, all five 0"
-    why = move_why(step_ms, frames)
+    why = move_why(step_ms, frames, farthest)
     return None if why is None else f"frames: a move this body cannot play: {why}"
 
 

@@ -125,7 +125,8 @@ Ranges, from lamp-control and the body:
   `dance_waltz`, `dance_jazz`.
 - **move:** 2 frames at least (at most what 10 s allows: 251 at 40 ms) of 5 joints (pitch, roll, yaw, shoulder, elbow) in
   counts from home, first and last all 0; `step_ms` 40–1,000; 1.5 to 10 s
-  in all; each joint within reach (200, 200, 150, 350, 350 counts) and speed.
+  in all; each joint within reach (200, 200, 250, 350, 350 counts on a lamp as shipped;
+  a lamp with `LAMP_BODY_APP_REACH` takes 90% of its hardware, up to 1,300, 1,300, 1,300, 1,000, 1,000) and speed.
 - **clips:** a WAV of 16-bit mono PCM at 24 kHz, up to 30 s, no sample past
   −12 dBFS and no 10 ms past −30 dBFS RMS; a name of a lowercase letter,
   then lowercase letters, digits, `_` or `-`, never `hum`. Up to 64 clips and
