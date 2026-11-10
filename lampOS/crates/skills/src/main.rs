@@ -4158,9 +4158,18 @@ impl SearchStop {
     /// none when `voice/heard` can't be read.
     fn words(&mut self) -> Option<bool> {
         let asked = self.asked.as_ref();
-        self.heard
-            .as_mut()
-            .map(|heard| Self::spoke(heard, asked, true))
+        let heard = self.heard.as_mut()?;
+        while let Some(message) = heard.recv(Duration::ZERO).ok()? {
+            let speech = message.parse::<Speech>().ok()?;
+            let later = match (speech.request, asked) {
+                (Some(turn), Some((boot, asked))) if boot == &message.header.boot => turn > *asked,
+                _ => true,
+            };
+            if speech.finished && later && speech.text.chars().any(char::is_alphanumeric) {
+                return Some(true);
+            }
+        }
+        Some(false)
     }
 }
 
@@ -4274,8 +4283,9 @@ fn held_back(sent: &mut Sent, bus: &Bus) -> Option<String> {
 /// line). So a cut is watched for at most CUT_SETTLES: finished words heard
 /// of a later turn than the call's are a person speaking, and the line
 /// stays cut; the voice speaking again with none is the line said again
-/// in the sound's place, and its end is the line's, by the same rules,
-/// once. Neither within CUT_SETTLES, or the voice not known: cut.
+/// in the sound's place, once. That replay must reach fresh Resting;
+/// unknown state, unreadable words or a deadline cannot complete it.
+/// Neither within CUT_SETTLES, or the voice not known: cut.
 fn spoken(bus: &Bus) -> (String, bool) {
     // Subscribed before the line: words heard over it are kept for the cut.
     let mut heard = SearchStop::new(bus);
@@ -4366,24 +4376,52 @@ fn spoken(bus: &Bus) -> (String, bool) {
             Some(_) => clock::sleep(POLL),
         }
     }
-    let mut spoke = false;
-    let again = line(clock::now(), &mut || {
-        spoke = spoke || heard.words() == Some(true);
-        spoke
-    });
-    // Words that came as the line said again ended count too.
-    spoke = spoke || heard.words() == Some(true);
-    match again {
-        _ if spoke => (format!("{how}; cut by words"), true),
-        None => still(),
-        Some(true) => (
-            format!("{how}; cut again: the line said again was cut too"),
-            true,
-        ),
-        Some(false) => (
-            format!("{how}; a cut with no words: the line was said again, then made"),
-            false,
-        ),
+    let resumed = clock::now();
+    loop {
+        match heard.words() {
+            Some(true) => return (format!("{how}; cut by words"), true),
+            None => return (format!("{how}; cut, and voice/heard can't be read"), true),
+            Some(false) => {}
+        }
+        if elapsed(resumed) >= SAY_TIMEOUT {
+            return (
+                format!("{how}; cut: the line said again did not finish in time"),
+                true,
+            );
+        }
+        match state() {
+            Some(Voice::Resting) => {
+                // Drain again at completion: words arriving with Resting
+                // still cancel. A failed read is not an empty queue.
+                return match heard.words() {
+                    Some(false) => (
+                        format!("{how}; a cut with no words: the line was said again, then made"),
+                        false,
+                    ),
+                    Some(true) => (format!("{how}; cut by words"), true),
+                    None => (format!("{how}; cut, and voice/heard can't be read"), true),
+                };
+            }
+            Some(Voice::Listening) => {
+                return (
+                    format!("{how}; cut again: the line said again was cut too"),
+                    true,
+                );
+            }
+            None => {
+                return (
+                    format!("{how}; cut, and the voice's state is not known"),
+                    true,
+                );
+            }
+            Some(Voice::Thinking) if elapsed(resumed) >= LINE_LONGEST => {
+                return (
+                    format!("{how}; cut: the line said again never reached resting"),
+                    true,
+                );
+            }
+            Some(_) => clock::sleep(POLL),
+        }
     }
 }
 

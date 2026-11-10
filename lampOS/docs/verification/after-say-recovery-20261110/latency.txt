@@ -1,0 +1,14 @@
+
+running 1 test
+lamp-skills: the skills a person turned off kept in /tmp/tp85qO0R/state: []
+lamp-skills: skills from /tmp/tp85qO0R/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 700 ms later; cut, and the voice's state is not known; the line was cut (the voice went from speaking to listening): nothing after it is made
+resumed cancellation first: 21638 us
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 705 ms later; cut, and the voice's state is not known; the line was cut (the voice went from speaking to listening): nothing after it is made
+resumed cancellation repeated: 14232 us
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 429 filtered out; finished in 2.04s
+

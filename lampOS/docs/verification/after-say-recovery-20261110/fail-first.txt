@@ -1,0 +1,77 @@
+
+running 6 tests
+lamp-skills: the skills a person turned off kept in /tmp/tp70OQRK/state: []
+lamp-skills: skills from /tmp/tp70OQRK/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: the voice was still speaking; show short: 3 frames shown; light given back to on blue at 3: done
+
+thread 'skills::a_resumed_say_still_speaking_at_timeout_makes_nothing_after_it' (108030201) panicked at crates/skills/tests/it/skills.rs:8758:5:
+["purple", "pink", "green", "blue"]; after the say: the voice was still speaking; show short: 3 frames shown; light given back to on blue at 3: done
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+skills::a_resumed_say_still_speaking_at_timeout_makes_nothing_after_it --- FAILED
+lamp-skills: the skills a person turned off kept in /tmp/tpPBiIH8/state: []
+lamp-skills: skills from /tmp/tpPBiIH8/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 704 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+
+thread 'skills::a_resumed_say_still_thinking_makes_nothing_after_it' (108030332) panicked at crates/skills/tests/it/skills.rs:8746:5:
+["purple", "pink", "green", "blue"]; after the say: spoken from 0 ms after the call, the turn over 704 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+skills::a_resumed_say_still_thinking_makes_nothing_after_it --- FAILED
+lamp-skills: the skills a person turned off kept in /tmp/tpLMzUos/state: []
+lamp-skills: skills from /tmp/tpLMzUos/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 715 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+
+thread 'skills::a_resumed_say_with_a_stale_heartbeat_makes_nothing_after_it' (108031310) panicked at crates/skills/tests/it/skills.rs:8722:5:
+["purple", "pink", "green", "blue"]; after the say: spoken from 0 ms after the call, the turn over 715 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+skills::a_resumed_say_with_a_stale_heartbeat_makes_nothing_after_it --- FAILED
+lamp-skills: the skills a person turned off kept in /tmp/tpUhGuzj/state: []
+lamp-skills: skills from /tmp/tpUhGuzj/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 699 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+
+thread 'skills::a_resumed_say_with_malformed_state_makes_nothing_after_it' (108031867) panicked at crates/skills/tests/it/skills.rs:8734:5:
+["purple", "pink", "green", "blue"]; after the say: spoken from 0 ms after the call, the turn over 699 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+skills::a_resumed_say_with_malformed_state_makes_nothing_after_it --- FAILED
+lamp-skills: the skills a person turned off kept in /tmp/tpOT2z8v/state: []
+lamp-skills: skills from /tmp/tpOT2z8v/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 699 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+
+thread 'skills::a_resumed_say_with_malformed_words_at_resting_makes_nothing_after_it' (108032001) panicked at crates/skills/tests/it/skills.rs:8782:5:
+["purple", "pink", "green", "blue"]; after the say: spoken from 0 ms after the call, the turn over 699 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+skills::a_resumed_say_with_malformed_words_at_resting_makes_nothing_after_it --- FAILED
+lamp-skills: the skills a person turned off kept in /tmp/tpJuOCmD/state: []
+lamp-skills: skills from /tmp/tpJuOCmD/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 698 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+
+thread 'skills::a_resumed_say_with_malformed_words_makes_nothing_after_it' (108032114) panicked at crates/skills/tests/it/skills.rs:8770:5:
+["purple", "pink", "green", "blue"]; after the say: spoken from 0 ms after the call, the turn over 698 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+skills::a_resumed_say_with_malformed_words_makes_nothing_after_it --- FAILED
+
+failures:
+
+failures:
+    skills::a_resumed_say_still_speaking_at_timeout_makes_nothing_after_it
+    skills::a_resumed_say_still_thinking_makes_nothing_after_it
+    skills::a_resumed_say_with_a_stale_heartbeat_makes_nothing_after_it
+    skills::a_resumed_say_with_malformed_state_makes_nothing_after_it
+    skills::a_resumed_say_with_malformed_words_at_resting_makes_nothing_after_it
+    skills::a_resumed_say_with_malformed_words_makes_nothing_after_it
+
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 423 filtered out; finished in 16.25s
+
+error: test failed, to rerun pass `-p lamp-skills --test it`

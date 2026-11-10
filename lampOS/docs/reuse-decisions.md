@@ -2292,3 +2292,28 @@ this projection's narrower explicit budgets, followed by authoritative serde
 seeds. Retain complete original bytes and copy only selected facts. No new JSON
 parser, State store, dependency, missing-file inference, filesystem reader or
 shared privileged framework is introduced. See the [projection profile](ordinary-product-context.md).
+
+## Require a completed replay before after-say actions (2026-11-10)
+
+For the #5902 carry, inspected V1 `hal/drivers/motors/range_demo.py`
+(`_wait_for_tts`, `run`) and `hal/test/test_range_demo.py`. V1 bounds its
+best-effort speaking-flag wait and checks an abort event before each leg;
+missing TTS and timeout permit the performance to proceed. Its test helper
+stubs sleeps and body arrival. This is a baseline for bounded waits and
+cancellation, not evidence of resumed-speech completion.
+
+Keep the existing lampOS initial-line behavior and six-second window for a
+wordless cut to resume, with at most one replay. Change only that replay's
+completion: require a fresh explicit `Resting` state and a successful final
+read of heard words. Unknown/stale/malformed state, unreadable heard data,
+another cut, and the existing 180-second speech deadline cancel the after
+steps. The four-second initial-line Thinking fallback is not proof that a
+replay finished. Reuse the current bus subscriber, state freshness check and
+20 ms poll; introduce no retry, thread, network call or additional wait.
+
+Host target: under 250 ms from publishing invalid resumed state to the
+cancelled run's done event, first and repeated calls. Measured locally:
+21.638 ms first / 14.232 ms repeated; see the [verification record](verification/after-say-recovery-20261110/README.md). The three-second heartbeat
+freshness window is separate from reaction time. Tests using authored bus
+events cannot establish acoustic or motor latency; no device run has been
+performed for this carry.
