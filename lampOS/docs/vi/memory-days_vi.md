@@ -1239,3 +1239,21 @@ là lời tự nhận (P3 của Fourth trên #5994). Lời tự nhận đó khô
 mô hình được hỏi lại một lần, lần thứ hai thì lamp nói «I didn't keep that.
 Tell me again and I'll remember it.». Chi tiết ở
 [second-voice.md](../second-voice.md).
+
+## Lời bị cắt giữ phạm vi mà câu của nó đã định (lamp-0c4e, 10/11)
+
+Trên lamp-0c4e, một câu hỏi được mang theo (yêu cầu 238, về trà nhài) đã
+được đọc là của người đó, với 3 kết quả bộ nhớ, rồi bị một câu không có lời
+(239) cắt ngang trước khi câu trả lời được phát; 239 trả lời lời của 238
+thay cho nó. Quy tắc giọng nói không bao giờ xét một câu không có lời, nên
+`LAMP_CONVERSATION_CARRIED_MEMORY` thu hẹp 239 về phòng, và lamp nói «không
+có gì trong bộ nhớ». Nay mỗi câu đã được định là của một người, sau mọi
+kiểm tra giọng của chính nó, được đánh dấu là của ai và theo cách nào
+(`memory_scope::mark_said_line`; thu hẹp về phòng thì xóa dấu). Một câu được
+mang theo, không có lời, mà lý do thu hẹp duy nhất là quy tắc chưa nghe nó
+(của công tắc này hoặc của `LAMP_CONVERSATION_CARRIES_PAST_SILENT`), sẽ chờ
+lời nó trả lời thay: nếu mọi phần của lời đó đã được định là của đúng người
+mà câu này được mang theo cho (`second_provider::said_saying`), nó giữ phạm
+vi của người đó; nếu không, nó là của phòng như trước. Câu có lời mà không
+quy tắc nào xét vẫn là của phòng, và một giọng khác xuất hiện vẫn thu hẹp về
+phòng. Chi tiết ở [memory.md](../memory.md).
