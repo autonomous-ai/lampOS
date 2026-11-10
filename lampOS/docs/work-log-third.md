@@ -1,3 +1,21 @@
+## 2026-11-10 — later music retractions repaired and published
+
+- #5975 f725248cd: exact whole-word scratch that / changed my mind now
+  retract an earlier recording ask; unrelated-word positives preserved.
+  Two native classifier tests fail first; actual Engine matrix fails first
+  at the direct Scratch-that row, not every new row. After repair: 2/2,
+  music 33/33, requested audio 68 passed / 2 ignored. Fmt/strict Voice
+  all-target Clippy/docs 192/1900/0 pass. Evidence retained in the PR.
+- Host admission diagnostic 256 calls: first/max 253.262 us, p95 46.061 us,
+  below 1 ms, function including folding/allocation, excluding provider and
+  playback. No acoustic or before/after speedup claim.
+- Published repair with delta READ-ASK 6761587874 to Fourth/Reviewer-two;
+  prior f75 reads and ARM do not qualify the new delta. Fresh ARM
+  42775079932 and Linux 42775079934 running; docs 42775079925 passed.
+  Draft/OFF and played/Store/default gates remain. No device action.
+- Ten answered #6002 HOLD with 7046b27a2 in Queue 6761568532; reread
+  underway. #5997 code read clear, behavior reader replacement still owed.
+
 ## 2026-11-10 — default sway regression; music cancellation follow-up
 
 - HOLD #6002 2d0502148, comment 6761333572: no --reach admits a
