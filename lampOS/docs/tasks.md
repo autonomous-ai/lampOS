@@ -1551,7 +1551,10 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     the lamp unless they name their computer. The read-back and the yes
     are as before (one yes for a named session too): "Hermes on the lamp".
     Asked for with no `lamp` target, it says that isn't set up and nothing
-    goes to a computer instead. A finished task's news adds that it was
+    goes to a computer instead. A call naming no machine from a tool
+    declared with the lamp's words goes to the lamp even when the `lamp`
+    target went away since (the lamp's reading went stale): it is said not
+    set up, never sent to a computer. A finished task's news adds that it was
     done here on the lamp ("I did it here on the lamp"); a session joined
     on a computer is told as that computer's.
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
