@@ -299,6 +299,41 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let (looks, looked) = tokio::sync::mpsc::unbounded_channel();
     let follow = lamp_control::body_lease::Follower::default();
     let on_lease = lease_socket.is_some().then(|| (looks, follow.clone()));
+    // Whether a hand is wanted (`humans/hands/wanted`): true while a
+    // computer's `look` at `hand` stands, for the eyes to look for one only
+    // then (hands.rs).
+    if let (Some(bus), true) = (&bus, lease_socket.is_some()) {
+        match bus.publisher_declared(
+            lamp_msgs::HandsWanted::TOPIC,
+            &lamp_msgs::HandsWanted::declaration(),
+            "control",
+        ) {
+            Ok(mut publisher) => {
+                let held = follow.clone();
+                let spawned = std::thread::Builder::new()
+                    .name("hands-wanted".into())
+                    .spawn(move || {
+                        lamp_control::hands::run(
+                            held,
+                            move |wanted| {
+                                let word = lamp_msgs::HandsWanted { wanted };
+                                if let Err(error) =
+                                    publisher.publish_json(lamp_ipc::monotonic_us(), &word)
+                                {
+                                    eprintln!("lamp-control: whether a hand is wanted was not told: {error}");
+                                }
+                            },
+                            Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                            lamp_control::hands::LOOK_EVERY,
+                        );
+                    });
+                if let Err(error) = spawned {
+                    eprintln!("lamp-control: no hand is asked of the eyes: {error}");
+                }
+            }
+            Err(error) => eprintln!("lamp-control: no hand is asked of the eyes: {error}"),
+        }
+    }
     let sink_for_ears = sink.clone();
     // The microphone stream is off unless the owner switches it on: no unit
     // sets it (docs/control.md, "The microphone").

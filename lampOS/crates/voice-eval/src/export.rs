@@ -698,6 +698,8 @@ const BUS_TOPICS: &[&str] = &[
     "eyes/camera_closed",
     "humans/faces/tracked",
     "humans/familiar",
+    "humans/hands/tracked",
+    "humans/hands/wanted",
     "humans/seems",
     "lamp/health",
     "lamp/online",
