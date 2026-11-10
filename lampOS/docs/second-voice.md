@@ -6699,7 +6699,10 @@ from the Tiers night, #5000) once a run for a made-up person on a made-up
 day of 12 lines, through the second route's relay (`deepseek_base_url`,
 the relay's own credential), with the night's own bounds. With
 `LAMP_NIGHTLY_MEMORY` set to a lamp-memory binary that has the nightly ops,
-it runs that binary on a fresh folder of its own and prints Days' accepted
+it runs that binary on a fresh folder of its own, made 0700 whatever the
+umask (lamp-memory refuses a store folder others can enter; C108 on
+lamp-06c1, 10 Nov: under the default umask the folder was 755 and the probe
+ran only with `umask 077`), and prints Days' accepted
 and dropped counts per kind and the drop reasons; without it, what the
 model proposed per kind. `LAMP_MEMORY_NIGHTLY_PATTERNS` and
 `LAMP_MEMORY_NIGHTLY_FEELINGS` are read as the voice reads them. Counts

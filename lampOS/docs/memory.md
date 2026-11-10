@@ -3078,7 +3078,8 @@ night away).
   --nightly` runs one pass for a made-up person on a made-up day (12 lines)
   through the relay. With `LAMP_NIGHTLY_MEMORY` naming a lamp-memory binary
   with the nightly ops, it starts that binary on a fresh folder of its own
-  (never the lamp's memory), writes the day and prints Days' accepted and
+  (never the lamp's memory), made 0700 whatever the umask (C108: lamp-memory
+  refuses a store folder others can enter), writes the day and prints Days' accepted and
   dropped counts per kind and the reasons; without it, the model's proposed
   counts per kind.
 - **Tests:** `nightly::tests` (the hours, quiet and slide; people and days;
