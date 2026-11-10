@@ -1121,3 +1121,14 @@ lamp.
 Ý tưởng quan sát có liên kết nguồn, chép đúng lời của người nói, là sự thật
 kèm trích dẫn nguyên văn của thiết kế Tiers
 ([memory-tiers.md](../memory-tiers.md)), ở đây không dùng mô hình.
+
+## Tên của khuôn mặt và tên chủ đèn trong ứng dụng
+
+Với `LAMP_SECOND_FACE_NAME_ONLY` (vẫn tắt mặc định), tên trong ứng dụng
+chỉ được nói là một tên khác của người đang có mặt khi phản hồi được phép
+biết tên đó **và** mã bộ nhớ của khuôn mặt khớp tên đã nhập hoặc tên chủ đèn
+đã lưu khi cài đặt. Trong phòng riêng, đèn có thể được phép biết tên chủ
+đèn nhưng không vì thế được gọi một khách đã biết bằng tên của chủ đèn.
+Khách vẫn được gọi bằng tên khuôn mặt của họ. Khi tắt công tắc, nội dung
+hướng dẫn giữ nguyên. Xem [quy tắc tên trong bộ nhớ](../memory.md) và
+[tuyến giọng nói thứ hai](../second-voice.md).

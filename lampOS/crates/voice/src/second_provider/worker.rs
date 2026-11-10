@@ -5516,8 +5516,8 @@ pub(crate) fn known_person_for(
 ///
 /// With `only` (`LAMP_SECOND_FACE_NAME_ONLY`, #5484), told as the name
 /// to call them ([`crate::face_name_only::note`]), with the owner's
-/// `typed` name from the app when this reply is told it too (Thirteen's
-/// P2 on #5516): on lamp-29e7 a running summary's "The person's name is
+/// `typed` name from the app only for the owner's face, when this reply
+/// is told it too (Thirteen's P2 on #5516): on lamp-29e7 a running summary's "The person's name is
 /// A" won over the face name B. Off, the Live route's note.
 pub(crate) fn known_name_told_as(
     on: bool,
@@ -5540,6 +5540,16 @@ pub(crate) fn known_name_told_as(
         "lamp-voice second: the seen speaker's known face's name is told to this reply (LAMP_SECOND_FACE_NAME)"
     );
     if only {
+        // Permission to disclose the app name (including a private room)
+        // does not make it this face's name. Use the already-read typed
+        // name and the cached saved owner, the two identities owner_ids
+        // recognizes, without rereading the typed-name file here.
+        let typed = typed.filter(|typed| {
+            person == Some(crate::known_faces::memory_person(typed).as_str())
+                || crate::known_faces::owner_now().is_some_and(|owner| {
+                    person == Some(crate::known_faces::memory_person(&owner).as_str())
+                })
+        });
         return format!("\n\n{}", crate::face_name_only::note(&name, typed));
     }
     format!("\n\n{}", crate::known_faces::note(&name))
@@ -22300,6 +22310,48 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A private-room reply may disclose the owner's typed name without
+    /// making it the known guest's own name (Reviewer-lead, #5918).
+    #[test]
+    fn a_private_room_guest_never_inherits_the_owners_typed_name() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let dir = std::env::temp_dir().join(format!("lv-face-name-guest-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let known = dir.join("known");
+        let typed_file = dir.join("typed");
+        std::fs::write(&typed_file, "Bree").unwrap();
+        crate::person::set_for_test(Some(typed_file));
+        crate::person::set_private_room_for_test(Some(true));
+        crate::known_faces::owner_for_test(Some(Some("Bryony".to_owned())));
+        for (name, owner) in [("Guest", false), ("Bree", true), ("Bryony", true)] {
+            std::fs::write(&known, name).unwrap();
+            let person = crate::known_faces::memory_person(name);
+            let disclosed = crate::person::told_to_line(
+                "Bree",
+                crate::person::InView {
+                    person: Some(&person),
+                    faces: Some(1),
+                },
+            );
+            assert!(!disclosed.is_empty(), "private room tells the typed name");
+            let note = known_name_told_as(true, true, Some(&known), Some(&person), Some("Bree"));
+            assert!(note.contains(&format!("This person is {name}")), "{note}");
+            assert_eq!(
+                note.contains("Their name in the app"),
+                owner && name != "Bree",
+                "{note}"
+            );
+            if !owner {
+                assert!(!note.contains("Bree"), "{note}");
+            }
+        }
+        crate::known_faces::owner_for_test(None);
+        crate::person::set_private_room_for_test(None);
+        crate::person::set_for_test(None);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// Thirteen's P2 on #5516: the owner's face saved as Bryony, the name
     /// typed in the app Bree (told to this reply too), and a running summary
     /// saying "The user's name is Ashby". With `LAMP_SECOND_FACE_NAME_ONLY`
@@ -22316,7 +22368,9 @@ mod tests {
         let bryony = crate::known_faces::memory_person("Bryony");
         let summary = "Key facts:\n- The user's name is Ashby.\n";
         crate::conversation_summary::keep_for_test(Some(&bryony), Some(summary));
+        crate::known_faces::owner_for_test(Some(Some("Bryony".to_owned())));
         let face = known_name_told_as(true, true, Some(&known), Some(&bryony), Some("Bree"));
+        crate::known_faces::owner_for_test(None);
         assert!(face.contains("This person is Bryony"), "{face}");
         assert!(face.contains("Their name in the app is Bree"), "{face}");
         assert!(!face.contains("the only name"), "{face}");

@@ -814,8 +814,10 @@ conversation beyond its exchanges, and for how long:
   note as kept is unchanged, and past the room its matched name lines are
   left out, never the whole note. A known face's turn is told its face name as the
   name to call them ("This person is B", `face_name_only::note`), with the
-  owner's typed name from the app beside it as theirs too when the reply is
-  told it. A "call me A" with no face is used while its line is in view and
+  owner's typed name from the app beside it as theirs too only when the reply
+  is told it and the face matches that typed name's memory id or the saved
+  owner's memory id. A private room may disclose the app name to a guest,
+  but never makes it the guest's name. A "call me A" with no face is used while its line is in view and
   marked once the summary folds it: meant, since a rename is #5485's
   confirm. On lamp-29e7
   (4 Nov) a summary's "The person's name is A" beat the face name B. Tests:
