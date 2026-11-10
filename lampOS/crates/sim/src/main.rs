@@ -16,7 +16,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera=always] [--microphone] | lamp-sim code DIR | lamp-sim servo DIR";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera=always] [--microphone] | lamp-sim code DIR | lamp-sim servo DIR";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -58,6 +58,9 @@ fn stimulus(args: &[String]) -> Option<std::io::Result<()>> {
     let (file, text, dir) = match (what, rest) {
         ("people", [n, dir]) if n.parse::<u8>().is_ok() => ("people", n.clone(), dir),
         ("hear", [text, dir]) => ("hear", text.clone(), dir),
+        ("sound", [class, dir]) if lamp_sim::stimuli::SOUND_CLASSES.contains(&class.as_str()) => {
+            ("sound", class.clone(), dir)
+        }
         ("hand", [dir]) => ("hand", "wave".to_owned(), dir),
         ("air", [words @ .., dir]) if !words.is_empty() => ("air", words.join(" "), dir),
         _ => return None,

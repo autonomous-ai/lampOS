@@ -4,13 +4,43 @@
 //! writes and the running lamp takes (and removes) within 200 ms, then says
 //! on the bus as the part that senses it would. No model runs.
 use lamp_bus::{Bus, Kind, Publisher};
-use lamp_msgs::{AirFeel, AirState, Speech};
+use lamp_msgs::{
+    AirFeel, AirState, OwnVoiceEvidence, SoundClasses, SoundScores, SoundWindow, Speech,
+};
 use serde_json::{Value, json};
 use std::{
     io,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
+
+/// The sound classes lamp-control reads from `ears/classes`.
+pub const SOUND_CLASSES: [&str; 4] = ["music", "laughter", "door", "footsteps"];
+/// A sound set by hand is said this often, and for this long.
+const SOUND_EVERY: Duration = Duration::from_millis(500);
+const SOUND_FOR: Duration = Duration::from_millis(1500);
+
+/// The ears' message with `class` scored 0.9 (`heard`) or nothing heard.
+fn sound_scores(class: &str, heard: bool, now_us: u64) -> SoundClasses {
+    let at = |name: &str| if heard && name == class { 0.9 } else { 0.0 };
+    SoundClasses::Scored {
+        model_id: "lamp-sim".to_owned(),
+        window: SoundWindow {
+            start_us: now_us.saturating_sub(960_000),
+            end_us: now_us,
+            completed_us: now_us,
+            capture_epoch: 1,
+        },
+        scores: SoundScores {
+            speech: 0.0,
+            music: at("music"),
+            laughter: at("laughter"),
+            door: at("door"),
+            footsteps: at("footsteps"),
+        },
+        own_voice: OwnVoiceEvidence::Clear,
+    }
+}
 
 /// The air is said this often while a reading is set, as the sensor does.
 const AIR_EVERY: Duration = Duration::from_secs(5);
@@ -22,6 +52,9 @@ pub struct Stimuli {
     dir: PathBuf,
     heard: Publisher,
     hands: Publisher,
+    sounds: Publisher,
+    sound_on: Option<(String, Instant)>,
+    sound_said: Option<Instant>,
     air: Publisher,
     air_set: Option<AirState>,
     air_said: Option<Instant>,
@@ -34,6 +67,13 @@ impl Stimuli {
             dir: dir.to_owned(),
             heard: bus.publisher(Speech::TOPICS[0], Kind::Event, "voice")?,
             hands: bus.publisher("humans/hands/tracked", Kind::Event, "eyes")?,
+            sounds: bus.publisher_declared(
+                SoundClasses::TOPIC,
+                &SoundClasses::declaration(),
+                "ears",
+            )?,
+            sound_on: None,
+            sound_said: None,
             air: bus.publisher_declared(AirState::TOPIC, &AirState::declaration(), "air")?,
             air_set: None,
             air_said: None,
@@ -52,6 +92,31 @@ impl Stimuli {
                 request: None,
             };
             self.heard.publish_json(now_us, &words)?;
+        }
+        if let Some(class) = take(&self.dir.join("sound")) {
+            let class = class.trim().to_owned();
+            if SOUND_CLASSES.contains(&class.as_str()) {
+                self.sound_on = Some((class, Instant::now()));
+                self.sound_said = None;
+            } else {
+                // A file written by hand: it would score every class zero, silently.
+                eprintln!(
+                    "lamp-sim: sound {class:?} is not one of {SOUND_CLASSES:?}; nothing heard"
+                );
+            }
+        }
+        // The class is heard for 1.5 s (scored 0.9, said every 500 ms as the ears
+        // do), then said gone, so that the next one is news again.
+        if let Some((class, since)) = self.sound_on.clone()
+            && self.sound_said.is_none_or(|at| at.elapsed() >= SOUND_EVERY)
+        {
+            let over = since.elapsed() >= SOUND_FOR;
+            self.sounds
+                .publish_json(now_us, &sound_scores(&class, !over, now_us))?;
+            self.sound_said = Some(Instant::now());
+            if over {
+                self.sound_on = None;
+            }
         }
         if take(&self.dir.join("hand")).is_some() {
             self.wave = Some((0, Instant::now()));
@@ -116,6 +181,21 @@ pub fn air_of(text: &str) -> Option<AirState> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_sound_set_by_hand_is_a_valid_message_that_scores_only_its_class() {
+        for class in SOUND_CLASSES {
+            let heard = sound_scores(class, true, 5_000_000);
+            assert!(heard.check().is_ok(), "{class}");
+            let json = serde_json::to_value(&heard).unwrap();
+            for other in SOUND_CLASSES {
+                let score = json["scores"][other].as_f64().unwrap();
+                assert_eq!(score > 0.5, other == class, "{class} / {other}");
+            }
+            let gone = serde_json::to_value(sound_scores(class, false, 6_000_000)).unwrap();
+            assert_eq!(gone["scores"][class].as_f64(), Some(0.0));
+        }
+    }
 
     #[test]
     fn a_reading_is_words_and_its_feel_follows_the_carbon_dioxide() {

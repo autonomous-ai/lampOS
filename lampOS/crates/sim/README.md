@@ -63,6 +63,7 @@ in the lamp's folder, which the running lamp takes within 200 ms:
 ```sh
 lamp-sim people 0 DIR          # nobody in view; then `people 1` for person.arrived (about 5 s apart)
 lamp-sim hear "good night lamp" DIR   # voice/heard, finished: a registered phrase fires
+lamp-sim sound door DIR        # a door is heard for 1.5 s (sound.heard; music, laughter, door or footsteps)
 lamp-sim hand DIR              # a hand waves across the picture for 1.5 s (humans/hands/tracked)
 lamp-sim air pm2_5=41 co2_ppm=1350 DIR   # an air reading, said every 5 s; feel follows the carbon dioxide
 ```
@@ -70,6 +71,6 @@ lamp-sim air pm2_5=41 co2_ppm=1350 DIR   # an air reading, said every 5 s; feel 
 ## Known gaps
 
 - A `sound` clip is a short silence, not played.
-- No hand, name, touch or sound-class events (no ears or eyes models run).
+- No ears or eyes models run: hands, sound classes and phrases are made by hand (above); no name, touch or real face events.
 - The body's home counts are lamp-fc4b's, fixed in `main.rs`.
 - Windows and macOS: not built or tried (`lamp-body`'s runtime is Linux only).
