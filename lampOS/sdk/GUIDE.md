@@ -437,6 +437,7 @@ SDK and the pairing that `lamp pair` made. Reference: `sdk/mcp/README.md`
 pip install ./lampOS/sdk/python ./lampOS/sdk/mcp
 lamp pair <code> --pin <pin> --host <lamp address>   # once
 claude mcp add lamp -- lamp-mcp                       # or any MCP client
+# An MCP client often starts it without your environment: --home PATH names the folder `lamp pair` used (mcp/README.md)
 ```
 
 **Tools follow the grants.** A tool is offered only when the pairing has the

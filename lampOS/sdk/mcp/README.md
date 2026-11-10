@@ -22,6 +22,21 @@ and what to do ([more](../README.md#on-a-customer-lamp-today-stable-10824)):
 
 Also: a gesture, move or feeling asked while another motion plays is refused `busy` (`try again in N ms`), and `lamp_look` on a resting lamp may end `cut_short` with no hand on it.
 
+**The MCP client's config.** Most MCP clients start lamp-mcp **without your shell's environment**, so `LAMPOS_HOME` is lost and
+the pairing isn't found: the client then shows only "Connection closed". Give the folder `lamp pair` used with `--home`:
+
+```json
+{ "mcpServers": { "lamp": { "command": "lamp-mcp", "args": ["--home", "/home/you/.config/lampos"] } } }
+```
+
+If the client can't find `lamp-mcp` on its PATH (it often starts with a short one), name the virtualenv's python instead, which needs no PATH:
+`{ "command": "/home/you/lampos-venv/bin/python", "args": ["-m", "lamp_mcp", "--home", "/home/you/.config/lampos"] }`.
+
+(`claude mcp add lamp -- lamp-mcp --home /home/you/.config/lampos`; the default folder is `~/.config/lampos`, so `--home` is only
+needed when you paired with a `LAMPOS_HOME` of your own, or when the client's `HOME` isn't yours.) An unpaired start says so in one
+line on stderr, naming the folder it looked in, and exits with code 2:
+`lamp-mcp: not_paired: no pairing here for that lamp: run `lamp pair` first; looked in …: if the pairing is elsewhere, give --home PATH …`.
+
 `--lamp ID` picks a lamp when this computer is paired with more than one, and
 `--client NAME` names this computer in the lamp's leases and journal. `--verbose` prints every frame to and from the lamp on stderr, with the SDK's
 `LAMPOS_LOG=debug` and its redaction: proofs, signatures, keys, nonces and pins
@@ -49,7 +64,6 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 |---|---|---|---|---|---|---|
 | `lamp_state` | `which` | list of strings | some of `presence`, `light`, `mood`, `lamp`, `air`, `device`, `body`; a state the grants don't allow is refused | every state the grants allow | none (`presence`: look, `air`: air, `device`: device) | no |
 | `lamp_wait_for` | `events` | list of strings, required | some of `person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `phrase.heard`, `name.heard`, `sound.heard`, `hand`, `touch`, `button`, `time`, `lamp.changed`, `air.changed`; one the grants don't allow is refused before anything is sent | — | the event's: `person.*` and `hand` look, `phrase.heard` and `name.heard` hear, `sound.heard` sound, `air.changed` air | no |
-| `lamp_wait_for` | `events` | list of strings, required | some of `person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `phrase.heard`, `name.heard`, `sound.heard`, `hand`, `touch`, `button`, `time`, `lamp.changed`; one the grants don't allow is refused before anything is sent | — | the event's: `person.*` and `hand` look, `phrase.heard` and `name.heard` hear, `sound.heard` sound | no |
 | | `phrases` | list of strings | the phrases to listen for; required with `phrase.heard` | none | | |
 | | `timeout_s` | number | 0 to 120; more waits 120 | 60 | | |
 | `lamp_express` | `feeling` | string, required | a feeling of the `feelings` skill: `glad`, `lively` or `low` (the lamp refuses another) | — | body, light | no |

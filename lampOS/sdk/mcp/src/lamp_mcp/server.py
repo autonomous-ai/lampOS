@@ -20,13 +20,15 @@ import base64
 import collections
 import importlib.metadata
 import os
+import sys
 import socket
 import time
 import unicodedata
 from pathlib import Path
 from typing import Any, Literal
 
-from lampos import Lamp, LampError, schema
+from lampos import Lamp, LampError, keys, schema
+from lampos.errors import NotPaired
 from lampos.client import SAY_MAX_BYTES
 from lampos.moves import POSES_STEP_MS, poses_to_frames
 from mcp.server.fastmcp import FastMCP, Image
@@ -1064,16 +1066,39 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--lamp", help="the lamp's id, when this computer is paired with more than one")
     parser.add_argument("--client", help="how this computer is named in the lamp's leases and journal")
     parser.add_argument(
+        "--home",
+        metavar="PATH",
+        help="the folder `lamp pair` kept this computer's pairing in (LAMPOS_HOME). An MCP client often starts "
+        "lamp-mcp without your environment, so give it here",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="every frame to and from the lamp on stderr, secrets redacted (LAMPOS_LOG=debug)",
     )
     args = parser.parse_args(argv)
+    if args.home:
+        # Set before anything reads the keyring (the SDK reads it at each use).
+        os.environ["LAMPOS_HOME"] = args.home
     if args.verbose:
         # The SDK reads it at each frame; stderr, since stdout is the MCP stream.
         os.environ["LAMPOS_LOG"] = "debug"
     try:
         asyncio.run(serve(args.lamp, args.client))
+    except NotPaired as error:
+        # An MCP client strips the environment, so LAMPOS_HOME is often lost and the pairing not found, and the
+        # client shows only "Connection closed": one clear line on stderr (stdout is the MCP stream), exit code 2.
+        print(
+            f"lamp-mcp: {error.code}: {error}; looked in {keys.home()}: if the pairing is elsewhere, give "
+            "--home PATH (or set LAMPOS_HOME) in the MCP client's config",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(2) from None
     except LampError as error:
         # Said on stderr: stdout is the MCP stream.
         raise SystemExit(f"lamp-mcp: {error}") from None
+
+
+if __name__ == "__main__":
+    main()
