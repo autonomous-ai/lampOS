@@ -413,6 +413,14 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
   `feel`; at most once every 5 s. Grant `air`. In today's build, lamp run pending.
 - `volume.changed`: `level` (0–100), `muted`. Grant `speak`. In today's build; lamp run on 10824
   pending.
+- `lamp.said`: a line the lamp said out loud: `text`, `by` (`lamp`, or `computer` for a line this
+  computer had it say, which comes back to it alone), `source` (`reply`, `exact`, `cached`), and
+  `cut: true` when it was cut short (talked over, stopped: the text may not have been said in
+  full). Grant `speech`. In development: next build, not yet seen on a lamp. Today it brings the
+  lamp's fixed phrases ("Going to sleep now") and a computer's own say; a reply of the lamp's
+  model comes only once the voice says it was said to the owner (a guest's, another known
+  person's and a private-room reply are never sent). It never has what a person says to it.
+  What it sends can't be taken back and the computer may pass it on; the grant words say so.
 - `lease`: `lease`, `state` (`held`, `suspended`, `lost`), `why` (`conversation`, `hand`,
   `stop_heard`, `private`, `paused`, `asleep`, `expired`, `taken_by_owner_app`, `revoked`,
   `released`, `slumped`). Sent to the lease's holder. Works today (9 Nov 2026).
@@ -504,7 +512,7 @@ await Lamp.keep_connected(setup)
 
 - **Subscribe** to the events you want: `await lamp.on("person.arrived", handler)` (Python), `await lamp.on('person.arrived', handler)` (JS). The SDK sends one `subscribe` for the connection and calls your handler for each event. `lamp.off(event, handler)` unsubscribes once the last handler is gone. Lower level: `lamp.subscribe(events, phrases)` / `lamp.unsubscribe(events)`. MCP: `lamp_events` (poll with `since`, `wait_s`) and `lamp_wait_for`.
 - **An event** is one JSON message with `ev`, e.g. `{"ev": "person.arrived", "count": 1, "near": 0.3, "at": "2026-11-09T08:45:17Z"}`. Events about the room carry `at`, **in UTC** (it ends in `Z`). `welcome`, `lease` and `done` may not carry it.
-- **Each event needs its grant**: `person.*`, `hand`: `look`; `phrase.heard`, `name.heard`: `hear`; `sound.heard`: `sound`; `air.changed`: `air`; `volume.changed`: `speak`; `touch`, `button`, `lamp.changed`: none. Subscribing without the grant is refused `no_grant`, naming it.
+- **Each event needs its grant**: `person.*`, `hand`: `look`; `phrase.heard`, `name.heard`: `hear`; `sound.heard`: `sound`; `air.changed`: `air`; `volume.changed`: `speak`; `lamp.said`: `speech`; `touch`, `button`, `lamp.changed`: none. Subscribing without the grant is refused `no_grant`, naming it.
 - **Phrases.** `phrase.heard` needs the phrases to listen for: at most 16 across a program's connections, each at most 64 characters and of 8 letters at least, and at most 6 changes a minute. Matching is on the lamp, against the recognizer's words: lowercase, apostrophes dropped, the phrase as a run of whole words inside the line, whether the recognizer joins or splits them ("goodnight" / "good night"), and with one "s" more on the heard last word ("lamps" for the phrase "lamp"; the next build). Register the singular to catch both. Anything else the recognizer writes differently is a miss, so register the variants you expect. A handler given `phrases` hears only those phrases (Python `on(..., phrases=[...])`, JS `on(..., { phrases })`); a handler given none hears every phrase the program listens for. The program is told which of its phrases was heard, never what else was said. These caps are the `hear` grant's privacy bound.
 - **What a program can't subscribe to:** the lamp's internal topics. Inside the lamp, its parts talk over a local message bus (`docs/bus.md`): the eyes, the voice, the body, the light each publish their own topics. That bus never leaves the lamp, and a program never joins it. `lamp-control` reads the topics it needs and turns them into the events above, so a program sees a curated, granted view. A program can't publish to the bus either.
 - **Delivery:** one program connection receives each event it subscribed to, as it happens; nothing is queued for a program that isn't connected. A program that reconnects subscribes again.
@@ -513,7 +521,7 @@ await Lamp.keep_connected(setup)
 |---|---|
 | `name.heard` | **works today** (verified 9 Nov 2026, a computer received it on the customer build) |
 | `phrase.heard` | **next build** (a test lamp, 10 Nov 2026: one played line told three of a computer's phrases). The customer build misses a phrase when the recognizer joins its words ("Goodnight") or adds an "s" to its last word ("lamps"); the next build matches both (register the singular). A phrase still matches only the recognizer's words, so keep phrases short and register the variants you expect |
-| `lamp.changed`, `touch`, `button`, `person.*`, `hand`, `sound.heard`, `air.changed`, `volume.changed`, `body.state` | see "Every function" and "Each part of the lamp" |
+| `lamp.changed`, `touch`, `button`, `person.*`, `hand`, `sound.heard`, `air.changed`, `volume.changed`, `lamp.said`, `body.state` | see "Every function" and "Each part of the lamp" |
 
 **The planned topics for a brain** (planned): a brain on the lamp gets the same events through its own local socket, plus, with the owner's consent, the lines the person speaks to the lamp while the brain holds the conversation lease.
 

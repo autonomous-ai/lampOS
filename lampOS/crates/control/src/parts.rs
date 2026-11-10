@@ -833,6 +833,10 @@ impl Lamp {
         let mut line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
         if !rephrase {
             line["exact"] = json!(true);
+            // Who had it said, so the voice can tell `lamp.said` to this
+            // computer alone; a voice from before refuses it and the line
+            // is said again without (`say_to_voice`).
+            line["by"] = json!(client);
         }
         self.say_to_voice(client, re, line)
     }
@@ -1111,17 +1115,30 @@ impl Lamp {
         // connection). The outcome comes when the turn ends, as `done`; a
         // voice that can't be reached is a `done` dropped, with why.
         std::thread::spawn(move || {
-            let (how, why) = match ask_voice_for_say(&path, &line, &says, &client, number) {
-                Ok(Some(stream)) => {
-                    let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
-                    outcome(BufReader::new(stream))
-                }
-                Ok(None) => ("dropped", Some(format!("dropped: {STOPPED_BY_ASKER}"))),
-                Err(error) => (
-                    "dropped",
-                    Some(format!("the voice did not take it: {error}")),
-                ),
-            };
+            let attempt =
+                |line: &Value| match ask_voice_for_say(&path, line, &says, &client, number) {
+                    Ok(Some(stream)) => {
+                        let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
+                        outcome(BufReader::new(stream))
+                    }
+                    Ok(None) => ("dropped", Some(format!("dropped: {STOPPED_BY_ASKER}"))),
+                    Err(error) => (
+                        "dropped",
+                        Some(format!("the voice did not take it: {error}")),
+                    ),
+                };
+            let mut result = attempt(&line);
+            // A voice from before `by` refuses the field it doesn't know as
+            // no say request: said again without it, so a computer's line
+            // is still said (only `lamp.said` can't name it then).
+            if line.get("by").is_some()
+                && result.1.as_deref() == Some(&format!("refused: {NOT_ITS_PROTOCOL}"))
+            {
+                let mut plain = line.clone();
+                plain.as_object_mut().map(|fields| fields.remove("by"));
+                result = attempt(&plain);
+            }
+            let (how, why) = result;
             forget_say(&says, &client, number);
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
@@ -2109,7 +2126,7 @@ mod tests {
         let asked = voice.join().unwrap();
         assert_eq!(
             asked,
-            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000, "exact": true})
+            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000, "exact": true, "by": "c_1"})
         );
         for _ in 0..200 {
             if !told.lock().unwrap().is_empty() {
@@ -2123,6 +2140,58 @@ mod tests {
                 "c_1".to_owned(),
                 json!({"ev": "done", "re": 14, "how": "finished"})
             )
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A voice from before `by` refuses the field as no say request: the
+    /// line is said again without it, and the computer's `done` is the
+    /// second try's, not a refusal.
+    #[test]
+    fn a_voice_that_refuses_by_is_asked_again_without_it() {
+        let dir = dir("say-older");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            let mut asked = Vec::new();
+            for answer in [
+                r#"{"outcome":"refused","why":"not a say request"}"#,
+                r#"{"outcome":"spoken"}"#,
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                let mut out = &stream;
+                writeln!(out, "{answer}").unwrap();
+            }
+            asked
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        lamp.act(
+            "c_1",
+            14,
+            &op(r#"{"id":14,"op":"say","text":"Build passed."}"#),
+            0,
+        )
+        .unwrap();
+        let asked = voice.join().unwrap();
+        assert_eq!(asked[0]["by"], "c_1");
+        assert!(asked[1].get("by").is_none(), "{:?}", asked[1]);
+        assert_eq!(asked[1]["text"], "Build passed.");
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            told.lock().unwrap()[0].1,
+            json!({"ev": "done", "re": 14, "how": "finished"})
         );
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -46,6 +46,8 @@ SHOWN = frozenset({
     # value and a prefix are secret above, never shown.
     "notes", "found", "deleted", "keys", "count", "total", "keys_max", "bytes_max", "key_max_bytes", "value_max_bytes",
     "writes", "reads",
+    # `lamp.said`: who had the line said and whether it was cut (its `text` is summarised above).
+    "by", "cut",
     # A computer's own clips (`sound.upload`, `sound.list`, `sound.remove`)
     # and hello's limits for them: names, sizes and lengths, never the bytes; a
     # pushed skill's whole hash and each part's number (`skill.push`).

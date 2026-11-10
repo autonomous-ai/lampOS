@@ -34,6 +34,8 @@ export const SHOWN = new Set([
   // A computer's own notes (`notes.*`) and hello's limits for them: whether a key was found or deleted, how many it
   // keeps and the bounds; a key, a value and a prefix are secret above, never shown.
   'notes', 'found', 'deleted', 'keys', 'count', 'total', 'keys_max', 'bytes_max', 'key_max_bytes', 'value_max_bytes', 'writes', 'reads',
+  // `lamp.said`: who had the line said and whether it was cut (its `text` is summarised).
+  'by', 'cut',
   // A computer's own clips (`sound.upload`, `sound.list`, `sound.remove`) and hello's limits for them: names, sizes
   // and lengths, never the bytes; a pushed skill's whole hash and each part's number (`skill.push`).
   'sound', 'sounds', 'removed', 'ms', 'sha256', 'part', 'rate_hz', 'clip_max_ms', 'clip_max_bytes',

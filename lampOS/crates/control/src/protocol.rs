@@ -112,6 +112,10 @@ pub enum Grant {
     /// `notes.delete`, `notes.list`): only its own, gone with its revoke
     /// (docs/control.md, "Notes").
     Notes,
+    /// Every line the lamp says out loud, as `lamp.said`: its own words and
+    /// what it reads to the person, never what a person says to it
+    /// (docs/control.md, "What the lamp says").
+    Speech,
 }
 
 impl Grant {
@@ -138,6 +142,9 @@ impl Grant {
             }
             Self::Notes => {
                 "can keep small notes of its own on the lamp, which stay until it is let go"
+            }
+            Self::Speech => {
+                "can read everything the lamp says out loud, which can be personal: it includes what it repeats back to you and what it reads to you from your mail and calendar, never what you say to it; every computer you give this to reads the same lines; what it has sent can't be taken back, and the computer may pass it on"
             }
         }
     }
@@ -181,6 +188,9 @@ pub enum EventKind {
     /// Where each joint is, up to 25 a second, and the lamp's own state.
     #[serde(rename = "body.state")]
     BodyState,
+    /// A line the lamp said out loud: `text`, `by`, `source`, `cut`.
+    #[serde(rename = "lamp.said")]
+    LampSaid,
 }
 
 impl EventKind {
@@ -197,6 +207,7 @@ impl EventKind {
             Self::AirChanged => Some(Grant::Air),
             Self::VolumeChanged => Some(Grant::Speak),
             Self::BodyState => Some(Grant::Body),
+            Self::LampSaid => Some(Grant::Speech),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
         }
     }
@@ -1480,6 +1491,7 @@ mod tests {
             Grant::Camera,
             Grant::Microphone,
             Grant::Notes,
+            Grant::Speech,
         ]
         .into_iter()
         .map(|grant| (json!(grant), grant.shown()))
@@ -1519,6 +1531,10 @@ mod tests {
                 (
                     json!("notes"),
                     "can keep small notes of its own on the lamp, which stay until it is let go"
+                ),
+                (
+                    json!("speech"),
+                    "can read everything the lamp says out loud, which can be personal: it includes what it repeats back to you and what it reads to you from your mail and calendar, never what you say to it; every computer you give this to reads the same lines; what it has sent can't be taken back, and the computer may pass it on"
                 ),
             ]
         );
@@ -1732,5 +1748,8 @@ mod tests {
         assert_eq!(op.needs(), vec![Grant::Speak]);
         assert_eq!(StateKind::Volume.needs(), Some(Grant::Speak));
         assert_eq!(EventKind::VolumeChanged.needs(), Some(Grant::Speak));
+        // Every line the lamp says needs its own grant, not `speak`: what a
+        // computer has the lamp say is not the same as reading all it says.
+        assert_eq!(EventKind::LampSaid.needs(), Some(Grant::Speech));
     }
 }

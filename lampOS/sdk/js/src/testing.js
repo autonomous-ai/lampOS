@@ -786,7 +786,7 @@ export class FakeLamp {
     hand: 'look',
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound',
     'air.changed': 'air',
-    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak',
+    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak', 'lamp.said': 'speech',
   };
   static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'speak', body: 'body' };
 

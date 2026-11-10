@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
       "enum": [
         "body",
         "light",
@@ -40,7 +40,8 @@
         "device",
         "camera",
         "microphone",
-        "notes"
+        "notes",
+        "speech"
       ]
     },
     "part": {
@@ -67,7 +68,8 @@
         "lamp.changed",
         "body.state",
         "air.changed",
-        "volume.changed"
+        "volume.changed",
+        "lamp.said"
       ]
     },
     "state_name": {
@@ -2691,6 +2693,47 @@
             "required": [
               "level",
               "muted"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "lamp.said"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "What the lamp said out loud, as written (for a reply, what the model wrote; see cut)."
+              },
+              "by": {
+                "enum": [
+                  "lamp",
+                  "computer"
+                ],
+                "description": "Who had it said: the lamp itself, or a computer's own say (back to that computer alone)."
+              },
+              "source": {
+                "enum": [
+                  "reply",
+                  "exact",
+                  "cached"
+                ],
+                "description": "A reply of the lamp's model, a computer's word-for-word say, or one of the lamp's fixed phrases."
+              },
+              "cut": {
+                "const": true,
+                "description": "Present only when the line was cut short (talked over, stopped): text may not have been said in full."
+              }
+            },
+            "required": [
+              "text",
+              "by",
+              "source"
             ]
           }
         },
