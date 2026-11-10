@@ -4129,7 +4129,21 @@ after a take-over, but now for every turn:
   or the rule), its turn answers the words cut short in its place, within
   30 s (`CARRY_WITHIN`): `request M is held, so request N's words, cut
   short by it, are answered in its place`. If it is let out, it is answered
-  itself and they are let go. With `LAMP_NAME_SAID_TO_A_PERSON=on` they are
+  itself and they are let go. With `LAMP_CUT_ASK_ANSWERED=on` (#5961), words
+  a line let out cut short and did not join or tell first wait on its answer
+  (`request N's words, cut short, wait on request M's answer: answered in
+  its place if it only declines`): if that answer only declines
+  (`not_for_me`, nothing said, run or done), the turn is not ended and they
+  are answered in its place, as a held line's are (`request M only
+  declined, so request N's words, cut short by it, are answered in its
+  place (LAMP_CUT_ASK_ANSWERED)`); any other answer lets them go, as
+  before. Never the lamp's name it was not shown said by, nor words said
+  to a person. On lamp-52e6 on 10 Nov at 09:5x (core w3) an 8-word ask was
+  cut 0.9 s after it ended by a 1-word line, in a busy room with no face
+  seen, so not joined; the model declined the one word and the ask was
+  never answered. Tests: `an ask cut by a line that only declines is
+  answered in its place` and `an ask cut by a line that calls a tool is
+  let go`. With `LAMP_NAME_SAID_TO_A_PERSON=on` they are
   let go, not answered in a held line's place, when they open with a word
   said to a person ("Ma'am, could …") or the held line does ("Sir, what time
   is this?") and they don't call the lamp; their unplayed answers leave the
