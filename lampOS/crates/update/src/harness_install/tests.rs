@@ -1566,7 +1566,19 @@ fn versions_are_compared_as_dotted_numbers() {
 /// nothing asked, nothing started.
 #[test]
 fn an_equal_newer_or_unknown_version_is_left_alone() {
-    for version in [Some(product::VERSION), Some("0.6.10"), Some("1.0.0"), None] {
+    // Newer than the pin, whatever the pin is: CI moves it by itself
+    // (`.github/workflows/lampos-harness-pin.yml`, #5957 part 1), so a
+    // fixed "newer" version would one day be older than the pin.
+    let (major, rest) = product::VERSION.split_once('.').unwrap();
+    let (minor, patch) = rest.split_once('.').unwrap();
+    let patch_newer = format!("{major}.{minor}.{}", patch.parse::<u64>().unwrap() + 1);
+    let major_newer = format!("{}.0.0", major.parse::<u64>().unwrap() + 1);
+    for version in [
+        Some(product::VERSION),
+        Some(patch_newer.as_str()),
+        Some(major_newer.as_str()),
+        None,
+    ] {
         let lamp = Lamp::new();
         lamp.harness_there();
         installed_at(&lamp, version, 1);
