@@ -371,6 +371,55 @@ impl Shared {
                 Some(socket) => crate::push::ask_helper(&socket, &ask.request, ask.wait()),
                 None => Err("no manage socket given".to_owned()),
             };
+            // The moves of the package an install took, read before the door
+            // deletes it, and kept for `play` before the answer is sent; the
+            // moves of a skill removed are deleted. Off the door's lock: a
+            // file or two.
+            let folders = {
+                let door = shared.door.lock().expect("door");
+                door.moves_folder().zip(door.pushed_package())
+            };
+            let helper_done = answer.as_ref().is_ok_and(|said| said.get("done").is_some());
+            let mut found = None;
+            if let (Some((folder, package)), true) = (&folders, helper_done) {
+                let store = crate::pushed_moves::Moves::new(folder.clone());
+                match ask.kind {
+                    crate::push::AskKind::Install => {
+                        found = std::fs::read(package).ok().and_then(|bytes| {
+                            crate::pushed_moves::found_in(&bytes, &lamp_body::moves::check)
+                                .map_err(|why| {
+                                    eprintln!("lamp-control: skill.push: its moves: {why}")
+                                })
+                                .ok()
+                        });
+                        // Kept under the door's lock and only while the pairing is the
+                        // one the install was asked under: a revoke in between has
+                        // deleted the computer's folder, and keeping would write it
+                        // back (nine's P2 on #6039). A file or two, a few ms.
+                        if let Some(moves) = found.take() {
+                            let door = shared.door.lock().expect("door");
+                            if door.rev_of(&ask.client) != ask.rev {
+                                eprintln!(
+                                    "lamp-control: skill.push: its moves not kept: the pairing changed"
+                                );
+                            } else {
+                                if let Err(error) = store.keep(&ask.client, &moves) {
+                                    eprintln!(
+                                        "lamp-control: skill.push: keeping its moves: {error}"
+                                    );
+                                }
+                                found = Some(moves);
+                            }
+                        }
+                    }
+                    crate::push::AskKind::Remove => {
+                        if let Some(name) = ask.request["remove_pushed"]["name"].as_str() {
+                            store.remove_skill(&ask.client, name);
+                        }
+                    }
+                    crate::push::AskKind::List => {}
+                }
+            }
             // A pairing changed while the install was with the helper: its
             // change may have been served first, so the door tells it
             // again now, after the install (Fourteen's P2 on #3910).
@@ -383,7 +432,13 @@ impl Shared {
             }
             shared.tell_helper();
             if let Some(outbox) = outbox.upgrade() {
-                let _ = outbox.send(ask.answer(answer));
+                let mut reply = ask.answer(answer);
+                if reply["ok"] == true
+                    && let Some(found) = &found
+                {
+                    reply["moves"] = found.told();
+                }
+                let _ = outbox.send(reply);
             }
         });
     }

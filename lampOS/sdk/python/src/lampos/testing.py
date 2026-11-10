@@ -46,7 +46,7 @@ from websockets.exceptions import ConnectionClosed
 
 from . import schema
 from .keys import HELLO, b64, pin_of, proof, unb64
-from .moves import MOVE_FARTHEST, SKILL_FARTHEST, move_refusal
+from .moves import MOVE_FARTHEST, SKILL_FARTHEST, move_refusal, move_why
 
 # The fake's camera picture: the smallest whole JPEG (start and end markers).
 FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
@@ -486,6 +486,45 @@ def _not_granted(missing: list[str]) -> str:
     if any(g in ("camera", "microphone") for g in missing):
         return f"{said} (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
     return said
+
+
+def _pushed_moves(tar, skill: str) -> tuple[dict, list[tuple[str, str]]]:
+    """The `moves/NAME.json` of a pushed package, as lamp-control keeps them
+    (`pushed_moves::found_in`): each held to a move's check, the ones that
+    fail left out with why, at most 64 by name."""
+    import re
+
+    kept: dict[str, dict] = {}
+    left: list[tuple[str, str]] = []
+    prefix = f"{skill}/moves/"
+    files = sorted(
+        (m for m in tar.getmembers() if m.isfile() and m.name.startswith(prefix) and m.name.endswith(".json")
+         and "/" not in m.name[len(prefix):-5]),
+        key=lambda m: m.name,
+    )
+    for member in files:
+        stem = member.name[len(prefix):-5]
+        if len(kept) >= 64:
+            left.append((stem, "more than 64 moves: the first 64 by name are kept"))
+        elif member.size > 256 * 1024:
+            left.append((stem, "more than 262144 bytes"))
+        elif not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", stem):
+            left.append((stem, "a name of a letter then letters, digits, _ and -, at most 32"))
+        else:
+            try:
+                body = json.loads(tar.extractfile(member).read())
+                if not isinstance(body, dict) or set(body) != {"name", "step_ms", "frames"}:
+                    raise ValueError("a move is exactly name, step_ms and frames")
+            except ValueError as error:
+                left.append((stem, f"not a move: {error}"))
+                continue
+            if body["name"] != stem:
+                left.append((stem, f"the file is moves/{stem}.json but the move's name is {body['name']!r}"))
+            elif (why := move_why(body["step_ms"], body["frames"])) is not None:
+                left.append((stem, why))
+            else:
+                kept[stem] = {"step_ms": body["step_ms"], "frames": body["frames"]}
+    return kept, sorted(left)
 
 
 class FakeLamp:
@@ -1230,6 +1269,7 @@ class FakeLamp:
         with tarfile.open(fileobj=io.BytesIO(data)) as tar:
             names = tar.getnames()
             manifest = json.loads(tar.extractfile("lamp-skill.json").read())
+            moves, left_out = _pushed_moves(tar, manifest["name"])
         if names[0] != "lamp-skill.json" or manifest["name"] != request["name"]:
             await self._refuse(ws, id_, "refused", "not a package of that skill")
             return
@@ -1254,8 +1294,14 @@ class FakeLamp:
             "pushed_at_unix_ms": int(at.timestamp() * 1000),
             "author": None,
             "client": client,
+            # The moves of its `moves/` kept for `play` (lamp-control's
+            # `pushed_moves`): this fake's, never listed.
+            "moves": moves,
         }
-        await self._ok(ws, id_, skill={**skill, "asks": [], "shown": []})
+        await self._ok(
+            ws, id_, skill={**skill, "asks": [], "shown": []},
+            moves={"kept": sorted(moves), "left_out": [{"name": n, "why": w} for n, w in left_out]},
+        )
 
     async def _op(self, ws, client: str, request: dict) -> None:
         op, id_ = request["op"], request["id"]
@@ -1325,6 +1371,33 @@ class FakeLamp:
             self.stop_following(ws)
             self._stop_listening(ws)
             await self._ok(ws, id_)
+        elif op == "play":
+            # As lamp-control: one of this computer's pushed skills' moves,
+            # sent as a `move` is (the body takes it; with motion_done a `done` follows).
+            name, skill = request["name"], request.get("skill")
+            mine = {n: s.get("moves", {}) for n, s in sorted(self.pushed.items()) if s["client"] == client}
+            if skill is not None:
+                if not mine.get(skill):
+                    why = f"no skill {skill} of yours has recorded moves"
+                elif name not in mine[skill]:
+                    why = f"no move {name} in your skill {skill}"
+                else:
+                    why = None
+            else:
+                have = [n for n, moves in mine.items() if name in moves]
+                why = (
+                    f"no move {name} in your pushed skills: skill.push one with moves/{name}.json" if not have
+                    else f"the move {name} is in more than one of your skills ({', '.join(have)}): say which with skill"
+                    if len(have) > 1 else None
+                )
+            if why:
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", why)
+                return
+            await self._ok(ws, id_, to="body")
+            # Sent as a move: with motion_done its `done` follows.
+            if self.motion_done and self.auto_done:
+                await self.done(id_)
         elif op in ("gesture", "move"):
             # As lamp-control routes them: the body takes them; with
             # motion_done a `done` follows once the body says it ended
@@ -1451,7 +1524,7 @@ class FakeLamp:
         elif op == "skill.push":
             await self._push(ws, client, id_, request)
         elif op == "skill.list":
-            await self._ok(ws, id_, skills=[{k: v for k, v in s.items() if k != "client"} for s in self.pushed.values() if s["client"] == client])
+            await self._ok(ws, id_, skills=[{k: v for k, v in s.items() if k not in ("client", "moves")} for s in self.pushed.values() if s["client"] == client])
         elif op == "skill.remove":
             kept = self.pushed.get(request["name"])
             if not kept or kept["client"] != client:

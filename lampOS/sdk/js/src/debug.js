@@ -40,7 +40,7 @@ export const SHOWN = new Set([
   'by', 'cut',
   // A computer's own clips (`sound.upload`, `sound.list`, `sound.remove`) and hello's limits for them: names, sizes
   // and lengths, never the bytes; a pushed skill's whole hash and each part's number (`skill.push`).
-  'sound', 'sounds', 'removed', 'ms', 'sha256', 'part', 'rate_hz', 'clip_max_ms', 'clip_max_bytes',
+  'sound', 'sounds', 'removed', 'moves', 'kept', 'left_out', 'ms', 'sha256', 'part', 'rate_hz', 'clip_max_ms', 'clip_max_bytes',
   'part_max_chars', 'parts_max', 'clips_max', 'store_max_bytes',
   // `light`'s own colours (the ring, pixel by pixel) and hello's ring.
   'brightness', 'fade_ms', 'pixels', 'rgb', 'ring',

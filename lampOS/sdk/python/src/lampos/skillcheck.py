@@ -272,12 +272,43 @@ def _move(path: Path, where: Path, report: Report) -> None:
                 return
 
 
-def _files(folder: Path, report: Report) -> None:
+def _referenced_moves(rules: object) -> set[str]:
+    """The moves a skill's own rules play (`do.body.move`): the lamp loads
+    these with the skill and refuses the skill if one fails."""
+    found: set[str] = set()
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "move" and isinstance(value, str):
+                    found.add(value)
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(rules)
+    return found
+
+
+def _files(folder: Path, report: Report, referenced: frozenset[str] | set[str] = frozenset()) -> None:
     _walk(folder, report)
     for path in sorted((folder / "moves").glob("*.json")):
         # lamp-body's `moves::load` passes over dot-names (a Mac's `._x.json`).
-        if not path.name.startswith("."):
-            _move(path, path.relative_to(folder), report)
+        if path.name.startswith("."):
+            continue
+        where = path.relative_to(folder)
+        if path.stem in referenced:
+            _move(path, where, report)
+            continue
+        # A recorded move for `play`, not played by the skill's own rules: the
+        # lamp installs the skill and leaves a move it refuses out, and says
+        # so (`push_skill`'s answer, `moves.left_out`), so here it is a
+        # warning, never stricter than the lamp.
+        scratch = Report(folder)
+        _move(path, where, scratch)
+        for error in scratch.errors:
+            report.warnings.append(f"{error} (a recorded move for `play`: the lamp leaves it out and installs the skill all the same)")
     for path in sorted((folder / "sounds").glob("*")):
         where = path.relative_to(folder)
         if path.is_symlink():
@@ -348,7 +379,7 @@ def check(folder: str | Path, *, shape_required: bool = True) -> Report:
         return report
     _skill_md(folder, report)
     rules = _skill_toml(folder, report, shape_required)
-    _files(folder, report)
+    _files(folder, report, _referenced_moves(rules))
     if isinstance(rules, dict):
         _permissions(rules, report)
     return report

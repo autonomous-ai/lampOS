@@ -425,9 +425,14 @@ pub enum Op {
     /// elbow, in the body's counts from home), starting and ending at home.
     #[serde(rename = "move")]
     Move { step_ms: u32, frames: Vec<[i32; 5]> },
-    /// A recorded move of the client's package, by name.
+    /// A recorded move of the client's pushed skills, by name (their
+    /// `moves/NAME.json`), `skill` saying which when two have the name.
     #[serde(rename = "play")]
-    Play { name: String },
+    Play {
+        name: String,
+        #[serde(default)]
+        skill: Option<String>,
+    },
     #[serde(rename = "joints")]
     Joints {
         lease: String,
@@ -776,8 +781,14 @@ impl Op {
             // Any gesture the body has, `idle` and `scanning` too: the body
             // answers a name it doesn't know (the owner's "no limits for
             // developers", 30 Oct).
-            Self::Gesture { name } | Self::Play { name } => {
+            Self::Gesture { name } => {
                 plain_name(name, "name")?;
+            }
+            Self::Play { name, skill } => {
+                plain_name(name, "name")?;
+                if let Some(skill) = skill {
+                    skill_name(skill).map_err(|why| why.replace("name", "skill"))?;
+                }
             }
             // The lamp's own short hum, or a clip of the computer's own by
             // its name; the recorded notices (no Wi-Fi) are never a
