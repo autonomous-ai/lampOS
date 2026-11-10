@@ -2,21 +2,24 @@
 
 Each of these cost someone a run on a real lamp.
 
-## On a customer lamp today (stable 10824)
+## On a customer lamp today (stable 11450)
 
-Customer lamps run stable build 10824. lamp-control is on every lamp and
-answers once the owner turns on developer access in the app. Five gaps:
+Customer lamps run stable build 11450 (lamp-voice `135bc417d4`, promoted 10
+Nov). lamp-control is on every lamp and answers once the owner turns on
+developer access in the app. Five gaps below. Already in 11450: skill push
+(from 11091; the owner says yes at the lamp), `joints` for `roll`, `shoulder` and `elbow`
+(the body's pose, only while the lamp stands), a head tap and pet as `touch`
+events, and a new motion that replaces the one playing.
 
-1. **Skill push is not yet on customer lamps.** `push_skill`, `skills`,
-   `remove_skill` (`lamp skill push/list/remove`, `lamp_skill_push`, …) are
-   refused, `refused`, "skill push is not on this lamp". Try a push on
-   `lamp fake`, or write the behaviour as a program that runs on the
-   computer while connected. `lamp skill check` works anywhere.
-2. **Joints and play.** `joints` takes `yaw` and `pitch` only; `roll`,
-   `shoulder` and `elbow` are refused, "not routed yet: …". With the body
-   silent for 15 s, name both yaw and pitch. `play` is refused, "not routed
-   yet: waits for client packages". Use `look`, `gesture` or `move`.
-   `sound` works.
+1. **A motion's end.** `wait=True` on `gesture`, `move` and `express` returns
+   when the lamp takes the motion, not when it ends; the next build ends it
+   at the body's `done` (hello's `limits.motion_done`). `look` and `joints`
+   with `wait=True` already return the body's `done`.
+2. **Play and a look at a face.** `play` is refused, "not routed yet: waits
+   for client packages". `look` at `face` and `name` are refused, "not in
+   this release". Send a recorded move as `move`; look at `ahead` or an
+   angle. With the body silent for 15 s, name both yaw and pitch in
+   `joints`. `sound` works.
 3. **Limp and pose** (letting the arm go limp, holding a pose) can't be
    reached from a computer.
 4. **No mDNS.** No lamp announces itself: `lamp find` finds nothing, and
@@ -26,19 +29,16 @@ answers once the owner turns on developer access in the app. Five gaps:
 5. **Event times are UTC.** `at` ends in `Z` (`2026-10-27T08:40:01Z`).
    Convert to local time yourself.
 
-And three more:
-- **A motion asked while another plays is refused `busy`**, "busy: a motion
-  plays for N ms more", with `retry_ms`, while the last gesture, move or
-  feeling's move lamp-control sent (from any computer) still plays; the
-  lamp's own motions don't count. Wait `retry_ms` and ask again. Builds after 10824 replace
-  the playing motion instead (below).
-- **`look` on a resting lamp may end `cut_short`**, "not there in time:
-  something holds the head", with no hand on it. Treat a `cut_short` close
-  to the target as arrived, ask again, or lift the head with a gesture
-  first. `look` at `name` is refused, "not in this release" (no sound
-  direction), and `face` is refused on 11091 and older, while on the next build
-  it turns once toward the face in view or ends `dropped` "no face in view";
-  `ahead`, a yaw and pitch, and `hand` work.
+And on older stables (10824 and before):
+- **A motion asked while another plays was refused `busy`**, "busy: a motion
+  plays for N ms more", with `retry_ms`: wait `retry_ms` and ask again. 11450
+  replaces the playing motion instead (below).
+- **`look` on a resting lamp could end `cut_short`**, "not there in time:
+  something holds the head", with no hand on it. From 11048 it ends `finished`
+  or `clamped` with where the head stopped. `look` at `name` is refused, "not in
+  this release" (no sound direction), and `face` is refused on 11450 and older,
+  while on the next build it turns once toward the face in view or ends
+  `dropped` "no face in view"; `ahead`, a yaw and pitch, and `hand` work.
 - **The camera** sends the eyes' newest frame, about 1 to 2 a second; the
   fast path (`fast: true`) is not on customer lamps.
 
@@ -68,7 +68,7 @@ against the gaps above, not only the fake.
 
 ## Body
 
-- **A new motion cuts the one playing short** (after stable 10824). A
+- **A new motion cuts the one playing short** (from stable 11048). A
   gesture, move or feeling's move asked while another plays (whoever asked
   it) replaces it, eased out from where the body is under its own caps.
   While the person is using the lamp (a conversation, a hand on it), the

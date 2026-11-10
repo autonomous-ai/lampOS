@@ -12,7 +12,7 @@ lamp fake --hands               # also waves a hand after each arrival
 ```
 
 Without `--everything` the fake answers as a customer lamp on stable 10824
-does: it takes `look` at `ahead`, `hand` or a yaw and pitch, and `joints`
+did (11450 also takes `joints` for `roll`, `shoulder` and `elbow`, while the lamp stands): it takes `look` at `ahead`, `hand` or a yaw and pitch, and `joints`
 naming only `yaw` and `pitch`; it refuses `play`
 (`lampos.testing.LAMP_CONTROL_REFUSES`) and `joints` naming `roll`,
 `shoulder` or `elbow` (`JOINTS_WAIT`), in lamp-control's words. The
