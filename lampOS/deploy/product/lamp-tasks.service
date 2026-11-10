@@ -25,9 +25,6 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin
 # A home lamp keeps the Harness its build pinned: Harness's own self-update is held, and a newer
 # Harness comes only through a new pin in a build (#5229, #5379; docs/tasks.md).
 Environment=LAMP_HARNESS_HOLD_UPDATES=on
-# A follow-up for a session --close-told already closed (#5978): it is found by its last ask with `harness show`
-# and reopened with `harness resume`, then the work is typed in, never a new session.
-Environment=LAMP_TASKS_RESUME_CLOSED=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks
