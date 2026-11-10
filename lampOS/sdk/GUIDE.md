@@ -14,7 +14,7 @@ rather than copying them:
 **Status words** used throughout:
 
 - **works today:** on customer lamps, shown on a test lamp running a customer
-  build (10824, 11048, 11091, 11308, or 11372, the customer build since 10 Nov 2026), with the date;
+  build (10824, 11048, 11091, 11308, 11372, or 11450, the customer build since 10 Nov 2026), with the date;
 - **in today's build, lamp run pending:** in the customer build's code (11091, 11308 or 11372),
   not yet shown on a lamp;
 - **next build:** built and merged (or in review, with its pull request); comes
@@ -191,7 +191,7 @@ refusals in the lamp's own words, and its status.
   fails with `code: why`. The words shown are copied from the lamp's code. `…` marks a part
   the lamp fills in, such as a number or a name.
 - **Status** has five words. *Works today* means shown on a test lamp on a customer
-  build (stable 10824, 11048, 11091, 11308, or 11372, stable since 10 Nov 2026), with the date. *In today's build, lamp run pending* means the code is
+  build (stable 10824, 11048, 11091, 11308, 11372, or 11450, stable since 10 Nov 2026), with the date. *In today's build, lamp run pending* means the code is
   on customer lamps (11091, 11308 or 11372) but no run shows it yet. *Next build* means it is on the
   development branch, not in 11372. *In development* means the lamp refuses it today and says
   so. *Planned* means it is named in the protocol but nothing serves it yet.
@@ -221,8 +221,8 @@ Op `get` takes `state`, a list of names. Each name comes back under `state`.
 |---|---|---|---|---|---|---|---|---|
 | `lamp.get("presence", "light", "mood", "lamp", ...)` | `lamp.get('presence', 'light', ...)` | `lamp_state(which)`; resources `lamp://state/<name>` | The states asked for: `presence` (how many in view, how near, never who), `light`, `mood`, `lamp` (talking, paused, private, asleep, the lease holder) | `presence` needs `look`; `light`, `mood`, `lamp` need none | `state`: at least one | `{presence: …, light: …, mood: …, lamp: …}` | `bad_request` "state: at least one"; `no_grant` "not granted: look" | works today (9 Nov 2026) |
 | `lamp.body_info()` | `lamp.bodyInfo()` | `lamp_state(["body"])` | State `body`: each joint (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`) with `deg` from its home, `min_deg`, `max_deg` and its counts; the speed, load and heat limits | `body` | `{known: false, why}` when the body said nothing in the last 15 s. The head's bounds are a folded lamp's: don't clamp a target to them | `{known: true, joints: {…}, …}` | `no_grant` "not granted: body" | works today (9 Nov 2026) |
-| `lamp.air()` | `lamp.air()` | `lamp_state(["air"])` | State `air`: `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature` (inside the base, not the room's), `feel` | `air` | `{known: false}` with no reading in the last 15 s | `{known: true, …}` | `no_grant` "not granted: air" | in today's build, lamp run pending |
-| `lamp.device()` | `lamp.device()` | `lamp_state(["device"])` | State `device`: the lamp's own computer: `cpu_load`, `memory_used`, `disk_free`, `uptime_s`, `temperature_c` | `device` | `{known: false}` with no reading in the last 15 s | `{known: true, …}` | `no_grant` "not granted: device" | in today's build, lamp run pending |
+| `lamp.air()` | `lamp.air()` | `lamp_state(["air"])` | State `air`: `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature` (inside the base, not the room's), `feel` | `air` | `{known: false}` with no reading in the last 15 s | `{known: true, …}` | `no_grant` "not granted: air" |in today's build, lamp run pending: lamp-75c9 cannot show it (10 Nov 2026, on 11450's lamp-control `get` of `air` answered `known: false` and no `air.changed` came: its base has no air reading); it needs a lamp with the air sensor |
+| `lamp.device()` | `lamp.device()` | `lamp_state(["device"])` | State `device`: the lamp's own computer: `cpu_load`, `memory_used`, `disk_free`, `uptime_s`, `temperature_c` | `device` | `{known: false}` with no reading in the last 15 s | `{known: true, …}` | `no_grant` "not granted: device" |works today (10 Nov 2026, lamp-75c9 with the lamp-control of build 11450): `get` of `device` answered `known: true` with `cpu_load`, `memory_used`, `disk_free`, `uptime_s` and `temperature_c` (eight zones, 75 to 82 °C) |
 | `lamp.get("volume")` | `lamp.get('volume')` | `lamp_state(["volume"])` | State `volume`: the speaker's `{level, muted}` | `speak` | `null` until the lamp has said it once | `{level, muted}` | `no_grant` "not granted: speak" | works today (9 Nov 2026): `{"level": 20, "muted": false}` read on a test lamp on the customer build |
 
 ### Events
@@ -337,8 +337,8 @@ pairing's current grants.
 | Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
 |---|---|---|---|---|---|---|---|---|
 | `lamp.volume(to=...)`, `lamp.volume(step="up")`, `lamp.volume(mute=True)` | `lamp.volume({ to })`, `lamp.volume({ step: 'up' })`, `lamp.volume({ mute: true })` | `lamp_volume(to, step, mute)` | Op `volume`: sets the speaker's volume, the person's own (the same as by voice or in the app) | `speak` | exactly one of `to` 0–100, `step` `up` or `down`, `mute` true or false | `{level, muted}`; a `volume.changed` event follows | `bad_request` "one of to, step or mute"; `bad_request` "to: from 0 to 100"; `refused` "the speaker's volume: …" | works today (9 Nov 2026): `to` answered in 62 ms, a `step` down in 115 ms (20 to 10), and `to` put it back, on a test lamp on the customer build |
-| `lamp.device()` | `lamp.device()` | `lamp_state(["device"])` | The lamp's own computer: processor load, memory, disk, temperatures (state `device`, 4.2) | `device` | — | `{known, cpu_load, memory_used, disk_free, uptime_s, temperature_c}` | `no_grant` "not granted: device" | in today's build, lamp run pending |
-| `lamp.air()`; `lamp.on("air.changed", ...)` | `lamp.air()`; `lamp.on('air.changed', ...)` | `lamp_state(["air"])`; `lamp_events` | The air at the sensor (state `air`, 4.2), and each change past a step | `air` | `air.changed` at most once every 5 s | as 4.2 | `no_grant` "not granted: air" | in today's build, lamp run pending |
+| `lamp.device()` | `lamp.device()` | `lamp_state(["device"])` | The lamp's own computer: processor load, memory, disk, temperatures (state `device`, 4.2) | `device` | — | `{known, cpu_load, memory_used, disk_free, uptime_s, temperature_c}` | `no_grant` "not granted: device" |works today (10 Nov 2026, lamp-75c9 with the lamp-control of build 11450): `get` of `device` answered `known: true` with `cpu_load`, `memory_used`, `disk_free`, `uptime_s` and `temperature_c` (eight zones, 75 to 82 °C) |
+| `lamp.air()`; `lamp.on("air.changed", ...)` | `lamp.air()`; `lamp.on('air.changed', ...)` | `lamp_state(["air"])`; `lamp_events` | The air at the sensor (state `air`, 4.2), and each change past a step | `air` | `air.changed` at most once every 5 s | as 4.2 | `no_grant` "not granted: air" |in today's build, lamp run pending: lamp-75c9 cannot show it (10 Nov 2026, on 11450's lamp-control `get` of `air` answered `known: false` and no `air.changed` came: its base has no air reading); it needs a lamp with the air sensor |
 | `lamp.stop()` | `lamp.stop()` | `lamp_stop()` | Op `stop`: ends what this computer asked for, now: its light, its says still waiting, its camera stream and a hand-follow (the SDKs and lamp-mcp also let go of the follow's lease) | — | doesn't lift a `listen.set` mute | ok | — | in today's build, lamp run pending |
 
 ### Errors
