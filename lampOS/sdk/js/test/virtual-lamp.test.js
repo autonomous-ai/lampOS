@@ -7,7 +7,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { parseArguments, pairingFrom, riggedCad, start } from '../examples/twin/virtual-lamp.js';
+import { appCommands, parseArguments, pairingFrom, portFree, riggedCad, start } from '../examples/twin/virtual-lamp.js';
 
 const testing = new URL('../src/testing.js', import.meta.url).href;
 
@@ -46,6 +46,17 @@ test('the launcher reads its arguments and the pairing code it is given', () => 
   assert.throws(() => pairingFrom('{"nope":1}'), /no pairing code/);
 });
 
+test('the twin opens in a window of its own where a Chromium-based browser can be asked for one', () => {
+  const url = 'http://localhost:8737/?t=abc';
+  const linux = appCommands(url, 'linux');
+  assert.deepEqual(linux[0], ['google-chrome', [`--app=${url}`, '--window-size=1100,720']]);
+  assert.ok(linux.some(([program]) => program === 'chromium'));
+  assert.deepEqual(appCommands(url, 'darwin')[0], ['open', ['-na', 'Google Chrome', '--args', `--app=${url}`, '--window-size=1100,720']]);
+  assert.equal(appCommands(url, 'win32')[0][0], 'cmd');
+  assert.deepEqual(appCommands(url, 'plan9'), [], 'no window where nothing is known: the default browser opens it');
+  assert.deepEqual(parseArguments(['--browser']).flags, ['--browser']);
+});
+
 test('one command: the lamp, the pairing and the twin on it, and all of it stops together', async (t) => {
   const folder = mkdtempSync(join(tmpdir(), 'vlamp-'));
   t.after(() => rmSync(folder, { recursive: true, force: true }));
@@ -79,4 +90,20 @@ test('a twin without its rigged CAD is said before anything starts', async (t) =
   assert.equal(riggedCad(pointer), false);
   assert.equal(riggedCad(join(folder, 'nope.glb')), false);
   await assert.rejects(start({ 'lamp-sim': '/no/such/lamp-sim', glb: pointer, flags: ['--no-open'] }, () => {}), /no rigged CAD here.*git lfs pull/);
+});
+
+test('a busy port is said before anything starts', async (t) => {
+  // A stub rigged CAD: the check for the real one (an LFS file CI doesn't pull) comes first.
+  const folder = mkdtempSync(join(tmpdir(), 'vlamp-port-'));
+  t.after(() => rmSync(folder, { recursive: true, force: true }));
+  const glb = join(folder, 'lamp.glb');
+  writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
+  const holder = createServer();
+  const port = await new Promise((resolve) => holder.listen(0, '127.0.0.1', () => resolve(holder.address().port)));
+  try {
+    assert.equal(await portFree(port), false);
+    await assert.rejects(start({ 'lamp-sim': '/no/such/lamp-sim', port: String(port), glb, flags: ['--no-open'] }, () => {}), /door port \d+ is in use.*--port/);
+    await assert.rejects(start({ 'lamp-sim': '/no/such/lamp-sim', 'twin-port': String(port), port: String(await freePort()), glb, flags: ['--no-open'] }, () => {}), /page port \d+ is in use.*--twin-port/);
+  } finally { await new Promise((resolve) => holder.close(resolve)); }
+  assert.equal(await portFree(port), true);
 });
