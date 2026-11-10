@@ -2008,6 +2008,21 @@ pub fn on_line(made: &Made) -> String {
     format!("I made {name}, and it's on: {does}{using}.")
 }
 
+/// What the voice's model is told to say of a made skill: `line`'s
+/// content in the language of the conversation, the skill's name and any
+/// service's name kept as written and nothing added (the owner, 10 Nov:
+/// "đồng bộ luôn"; a fixed English line said as it is, "Say exactly",
+/// was English to a person speaking Vietnamese). The model is the voice
+/// itself, whose character already speaks the owner's language
+/// (`crate::language::instruction`). Used by the voice's tool answer and
+/// by the say service's note for an app's or a file's skill.
+pub fn in_their_language(line: &str) -> String {
+    format!(
+        "Tell the person this, in the language of the conversation, keeping the skill's name \
+         and any service's name as written, and adding nothing else: \"{line}\""
+    )
+}
+
 /// What the lamp says when a kept skill couldn't be put on: why, in the
 /// plain words [`put_on`] gives.
 pub fn not_on_line(why: &str) -> String {
@@ -3629,6 +3644,14 @@ body = { gesture = "nod" }
             "{ask}"
         );
         assert!(!ask.contains("Say exactly") && !ask.contains("isn't linked yet"));
+        let told = in_their_language("I made morning mail, and it's on.");
+        assert!(
+            told.starts_with("Tell the person this, in the language of the conversation")
+                && told.contains("keeping the skill's name and any service's name as written")
+                && told.contains("adding nothing else")
+                && told.ends_with(": \"I made morning mail, and it's on.\""),
+            "{told}"
+        );
         assert_eq!(needs_link_ask(&[]), None);
     }
 }

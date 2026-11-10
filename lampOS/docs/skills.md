@@ -2232,7 +2232,8 @@ gone ([switches.md](switches.md)). What happens:
      answer, with no fenced block, is whole as it is (never asked again as
      one cut short) and is told as not made with that reason as it is
      (#5977; the owner, 10 Nov: "say clearly why"): the app shows it as
-     `why`, and the voice says "I couldn't make that: " and the reason. It
+     `why`, and the voice tells "I couldn't make that: " and the reason, in
+     the language of the conversation (`made_skill::in_their_language`). It
      is at most 240 characters (`made_skill::CANNOT`), cut where a sentence
      ends, or else where a word ends, never mid-word and never with "…"
      (on lamp-74ff a reason cut at 120 ended "beyond s…"); nothing is kept.
@@ -2287,9 +2288,12 @@ gone ([switches.md](switches.md)). What happens:
    with no spoken yes; the app's MAKE IT and the voice ask are the ask).
    Kept, it is put on at once (step 8), and the model is told its name,
    whether it is on, what it does (said plainly as above) and what it uses
-   ("its light and whether it is talking"), and to say exactly one short
-   line and ask nothing about putting it on: "I made evening dim, and it's
-   on." (`made_skill::on_line`), or, when it couldn't be put on, "I made it
+   ("its light and whether it is talking"), and to tell one short line in
+   the language of the conversation, the skill's and any service's name
+   kept as written and nothing added (`made_skill::in_their_language`; the
+   owner, 10 Nov, "đồng bộ luôn": no longer "Say exactly" in English to a
+   person who speaks Vietnamese), and ask nothing about putting it on:
+   "I made evening dim, and it's on." (`made_skill::on_line`), or, when it couldn't be put on, "I made it
    but couldn't put it on: <why>." (`made_skill::not_on_line`, with
    `not_on` in the make's answer). "Shall I put it on the lamp?" is never
    said, no ask is queued, and nothing waits for a yes: the asked-in-answer,
@@ -2410,7 +2414,11 @@ to say aloud what it made; without either the app socket isn't started
    it is put on at once through the manage helper, as by voice
    (`made_skill::put_on`, "Made by voice", step 8), and the lamp says one
    short line through the say service's own asks at a good moment within
-   an hour (`app_make::say_line`): "I made evening dim, and it's on: <what it does>, using its light."
+   an hour (`app_make::say_line`), sent as a `note` told in the language
+   of the conversation with the names kept as written
+   (`made_skill::in_their_language`; the voice's character already speaks
+   the owner's language; a note past the say service's 900 bytes is sent
+   as `text`, as written): "I made evening dim, and it's on: <what it does>, using its light."
    (`made_skill::on_line`), or "I made it but couldn't put it on: <why>."
    (`made_skill::not_on_line`). Nothing is asked and nothing waits for a
    yes; what became of the line is only logged.
@@ -2505,7 +2513,8 @@ restart it is asked about again and the app is still told:
 6. **Put on at once, with no spoken yes** (#5977; the owner, 10 Nov), as a
    skill typed in the app and made here: once the socket has answered
    `kept`, it is put on through the manage helper (`made_skill::put_on`),
-   then said through the say service's own asks, at a good moment: "I
+   then told through the say service's own asks, at a good moment, as a
+   note in the language of the conversation (`app_make::say_line`): "I
    added NAME from a file, not from the Skills Store, and it's on: WHAT IT
    DOES, using WHAT IT USES."
    (`upload_skill::on_line`), or "I added a skill from a file but couldn't
@@ -2589,7 +2598,8 @@ rewrites a word of it (`made_skill::Written`, `made_skill::keep_written`,
    (`made_skill::put_on`), which holds it again to its cap
    (`made_skill::put_on_cap`: a written skill's when it has a function,
    else a made one's) and to `made: here`. Then the lamp says through the
-   say service's own asks, at a good moment, "I made NAME, and it's on: WHAT IT DOES, using WHAT IT USES."
+   say service's own asks, at a good moment, in the language of the
+   conversation (`app_make::say_line`), "I made NAME, and it's on: WHAT IT DOES, using WHAT IT USES."
    (`made_skill::on_line`), or why it couldn't. `skills.made` tells the
    app `making`, `on` or `not_kept` (with why, a taken name or a put-on
    that failed among them), with `"written": true`; the skills page shows it in "Made on this lamp" with

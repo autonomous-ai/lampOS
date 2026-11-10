@@ -481,7 +481,10 @@ fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Val
                 "on": on.is_ok(),
                 "description": made.description,
                 "uses": made.uses.spoken(),
-                "next": format!("Say exactly: \"{line}\"{link} Ask nothing about putting it on.")
+                "next": format!(
+                    "{}{link} Ask nothing about putting it on.",
+                    made_skill::in_their_language(&line)
+                )
             });
             if let Err(why) = on {
                 told["not_on"] = json!(why);
@@ -496,7 +499,7 @@ fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Val
         // instead, or the lamp's own plain reason.
         Err(Refused(why, _)) => json!({
             "error": format!("the skill couldn't be made: {why}"),
-            "next": format!("Say exactly: \"{}\"", couldnt_make_line(&why))
+            "next": made_skill::in_their_language(&couldnt_make_line(&why))
         }),
     }
 }
@@ -993,10 +996,18 @@ light = { dim = 1 }
         let told = make(REQUEST, &keeping, chat_at(url), NOW);
         assert_eq!(told["made"], "evening-dim", "{told}");
         assert_eq!(told["on"], true, "{told}");
+        // The owner, 10 Nov ("đồng bộ luôn"): its content, told in the
+        // conversation's language, never "Say exactly" in English.
         assert_eq!(
             told["next"],
-            "Say exactly: \"I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking.\" Ask nothing about putting it on."
+            format!(
+                "{} Ask nothing about putting it on.",
+                made_skill::in_their_language(
+                    "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking."
+                )
+            )
         );
+        assert!(!told["next"].as_str().unwrap().contains("Say exactly"));
         assert!(!told.to_string().contains("Shall I"), "{told}");
         assert!(told["uses"].as_str().unwrap().contains("light"), "{told}");
         let entry = &made_skill::entries(&keeping.directory)[0];
@@ -1018,8 +1029,12 @@ light = { dim = 1 }
         assert_eq!(told["not_on"], "the lamp's skills couldn't be reached");
         assert_eq!(
             told["next"],
-            "Say exactly: \"I made it but couldn't put it on: the lamp's skills couldn't be \
-             reached.\" Ask nothing about putting it on."
+            format!(
+                "{} Ask nothing about putting it on.",
+                made_skill::in_their_language(
+                    "I made it but couldn't put it on: the lamp's skills couldn't be reached."
+                )
+            )
         );
         assert!(!any_on(&keeping.directory));
         assert_eq!(served.join().unwrap(), 1);
@@ -1088,7 +1103,7 @@ light = { dim = 1 }
         );
         assert_eq!(
             told["next"],
-            "Say exactly: \"I couldn't make that: a skill can't hear what is said.\""
+            made_skill::in_their_language("I couldn't make that: a skill can't hear what is said.")
         );
         assert_eq!(served.join().unwrap(), 1);
         assert!(made_skill::entries(&keeping.directory).is_empty());
@@ -1548,7 +1563,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert!(on < link, "{next}");
         assert!(!next.contains("isn't linked yet"), "{next}");
-        assert_eq!(next.matches("Say exactly").count(), 1, "{next}");
+        assert!(!next.contains("Say exactly"), "{next}");
         for linked in [Some(vec!["gmail".to_owned()]), None] {
             let needs = made_skill::needs_link(&gmail.uses, || linked.clone());
             let answer = told(Ok(gmail.clone()), Ok(()), needs.as_deref());
