@@ -1070,6 +1070,9 @@ fn said_kept_claim(rest: &str, whole: bool) -> Option<bool> {
         .filter(|word| !word.is_empty())
         .map(|word| (word.as_ptr() as usize - sentence.as_ptr() as usize, word))
         .collect();
+    if kept_in_a_claims_shape(sentence, &words) {
+        return Some(true);
+    }
     let filler = |words: &mut Vec<(usize, &str)>| {
         while words
             .last()
@@ -1111,6 +1114,76 @@ fn said_kept_claim(rest: &str, whole: bool) -> Option<bool> {
         SAID_KEPT_AFTER.contains(&word) || word.ends_with("'s")
     };
     Some(marked || after)
+}
+
+/// What after a keep word says a state kept, not a thing kept ("I've kept
+/// it on since noon."): never a said-back keep ([`kept_in_a_claims_shape`]).
+const KEPT_STATE: &[&str] = &[
+    "on", "off", "up", "going", "running", "quiet", "short", "low", "dim", "bright", "warm",
+    "open", "shut", "closed",
+];
+
+/// A subject opening a clause after a keep word ("I've kept that you like
+/// warm tea."): a [`KEPT_STATE`] word after it is the fact's, not a state
+/// kept.
+const KEPT_CLAUSE_SUBJECT: &[&str] = &[
+    "you", "you're", "you've", "he", "she", "they", "we", "he's", "she's", "they're",
+];
+
+/// Whether `sentence`, split into its `words` with their offsets, says
+/// "kept", "saved" or "remembered" in a claim's own shape anywhere in it
+/// ([`said_kept_claim`]): after "I" or "I've" ("Fifty-three, I've kept
+/// it."), set off by a mark before "as your" ("Fifty-three, kept as your
+/// lucky number."; "Pip is kept as your goldfish's name." is none),
+/// or before "that"/"it" "for you" ("Blue, kept that for you."). lamp-06c1,
+/// build 11211, 10 Nov rerun, S14 request 103: "Yes. Please keep that."
+/// answered "Fifty-three, kept as your lucky number." after a `remember`
+/// that kept nothing, and it was said: the keep word was not the
+/// sentence's last. A keep word as a plain participle in the middle of a
+/// sentence is none, whatever mark comes before it (Third's HOLD on #5994:
+/// "Your plant, kept outdoors, needs watering.", "Your key, kept under the
+/// mat, …", "The milk, kept refrigerated, …"), nor a joined word
+/// ("well-kept"), a state kept after "I" ([`KEPT_STATE`]: "I've kept it
+/// dim.", but not a state word inside a clause about a person,
+/// [`KEPT_CLAUSE_SUBJECT`]) or a reminder or setting saved ([`SAID_SAVED_NOT_KEPT`]). "Kept"
+/// opening the reply is [`keep_claim_of`]'s.
+fn kept_in_a_claims_shape(sentence: &str, words: &[(usize, &str)]) -> bool {
+    words.iter().enumerate().any(|(index, &(at, word))| {
+        if !matches!(word, "kept" | "saved" | "remembered")
+            || sentence[..at].ends_with('-')
+            || (word == "saved"
+                && words
+                    .iter()
+                    .any(|(_, word)| SAID_SAVED_NOT_KEPT.contains(word)))
+        {
+            return false;
+        }
+        let next: Vec<&str> = words[index + 1..].iter().map(|(_, word)| *word).collect();
+        let before = |back: usize| index.checked_sub(back).map(|at| words[at].1);
+        let by_me = before(1) == Some("i've")
+            || before(1) == Some("i")
+            || (before(1) == Some("have") && before(2) == Some("i"));
+        // A state is the kept thing's own, before any clause about a
+        // person: "I've kept it dim." is none, "I've kept that you like
+        // bright light." a claim (Fourth's P3 on #5994).
+        let stated = by_me
+            && !next
+                .iter()
+                .take_while(|word| !KEPT_CLAUSE_SUBJECT.contains(word))
+                .any(|word| KEPT_STATE.contains(word));
+        // Set off by a mark, never after its subject: "Pip is kept as your
+        // goldfish's name." states it.
+        let set_off = {
+            let before = sentence[..at].trim_end();
+            before.is_empty()
+                || before.ends_with([',', ':', '\u{2014}', '\u{2013}'])
+                || before.ends_with(" -")
+        };
+        let as_yours = set_off && next.starts_with(&["as", "your"]);
+        let for_you =
+            next.len() >= 3 && matches!(next[0], "that" | "it") && next[1..3] == ["for", "you"];
+        stated || as_yours || for_you
+    })
 }
 
 /// [`claims_a_keep`] with the kind of claim: `None` while undecided,
@@ -1248,7 +1321,16 @@ fn keep_claim_of(reply: &str, whole: bool, faces: bool, yes: bool) -> Option<Opt
             {
                 return Some(Some(kind(*soft)));
             }
-            let marked = after.starts_with(['.', '!', ':', ',']);
+            // A dash ends it too, with or without a space before it
+            // ("Kept\u{2014}the office plant \u{2026}", "Kept \u{2014} library now"; S4,
+            // 10 Nov rerun), and a hyphen with spaces ("Kept - \u{2026}"), never
+            // one joining a word ("kept-up").
+            let marked = after.starts_with(['.', '!', ':', ',', '\u{2014}', '\u{2013}'])
+                || after.strip_prefix(' ').is_some_and(|after| {
+                    after.starts_with(['\u{2014}', '\u{2013}'])
+                        || after.starts_with("- ")
+                        || (whole && after == "-")
+                });
             let word = after
                 .trim_start()
                 .split(|c: char| !c.is_alphanumeric() && c != '\'')
@@ -1258,9 +1340,11 @@ fn keep_claim_of(reply: &str, whole: bool, faces: bool, yes: bool) -> Option<Opt
             if (*bare && (marked || (whole && after.trim().is_empty()))) || object {
                 return Some(Some(kind(*soft)));
             }
-            // Still coming: the end, or a word that may yet be an object.
+            // Still coming: the end, a hyphen that may yet be a dash, or a
+            // word that may yet be an object.
             if after.is_empty()
                 || (after.starts_with(' ') && after.trim().is_empty())
+                || after == " -"
                 || (after.starts_with(' ')
                     && !after.trim_start().contains(|c: char| !c.is_alphanumeric())
                     && OBJECTS.iter().any(|object| object.starts_with(word)))
@@ -14327,6 +14411,84 @@ mod tests {
             claims_a_keep_said("What should I keep? ", false, false, true),
             Some(false)
         );
+    }
+
+    /// lamp-06c1, build 11211, 10 Nov rerun: "Kept\u{2014}the office plant
+    /// gets watered on Mondays." (S4, request 54) and "Fifty-three, kept as
+    /// your lucky number." (S14, request 103) answered a yes whose
+    /// `remember` kept nothing, and neither was read as a claim. "Kept"
+    /// before a dash, with or without a space, is a hard claim on any line;
+    /// on a line that is only a yes, so is a keep word in a claim's own
+    /// shape ("kept as your", "I've kept", "kept that for you"). A keep
+    /// word as a plain participle (Third's HOLD on #5994: "Your plant, kept
+    /// outdoors, needs watering."), a kept light, a well-kept thing and a
+    /// reminder saved are none.
+    #[test]
+    fn a_kept_before_a_dash_or_opening_a_clause_is_a_hard_claim() {
+        for reply in [
+            "Kept\u{2014}the office plant gets watered on Mondays.",
+            "Kept \u{2014} library now, not the bakery.",
+            "Okay, kept \u{2013} your bike is blue.",
+            "Kept - your bike is blue.",
+            "I've kept \u{2014} your bike is blue.",
+        ] {
+            for yes in [true, false] {
+                assert_eq!(
+                    keep_claim_said(reply, false, yes),
+                    Some(KeepClaim::Hard),
+                    "{reply}"
+                );
+            }
+        }
+        for reply in [
+            "Fifty-three, kept as your lucky number.",
+            "Fifty-three \u{2014} saved as your lucky number.",
+            "Blue, kept that for you.",
+            "Fifty-three, I've kept it.",
+            "Fifty-three, I\u{2019}ve kept it.",
+            "Fifty-three, I have kept it.",
+            "Sure thing, I kept that.",
+            "Blue, I've remembered it.",
+            // Fourth's P3 on #5994: a state word inside the fact kept is
+            // not a state kept.
+            "Blue, I've kept that you like bright light.",
+            "Blue, I've kept that you like warm tea.",
+            "Blue, I've kept that they keep the window open.",
+        ] {
+            assert_eq!(
+                keep_claim_said(reply, false, true),
+                Some(KeepClaim::Hard),
+                "{reply}"
+            );
+            // Only on a line that is only a yes.
+            assert_eq!(keep_claim_said(reply, false, false), None, "{reply}");
+        }
+        for reply in [
+            "It's a well-kept secret.",
+            "The light, kept on since noon, is warm.",
+            "Okay, your reminder, saved for seven.",
+            "Fifty-three, kept as your lucky number?",
+            "Kept-up gardens are lovely.",
+            // Third's HOLD on #5994: "kept" as a plain participle.
+            "Your plant, kept outdoors, needs watering.",
+            "Your key, kept under the mat, opens the side door.",
+            "The milk, kept refrigerated, lasts a week.",
+            "Your bike: kept as blue as ever.",
+            "Your notes \u{2014} saved for later \u{2014} are on the shelf.",
+            "The plant, remembered fondly, was a fern.",
+            "Blue, I've kept it dim for you.",
+            "Okay, I've kept your lamp on.",
+            "Sure, I kept the window open for you.",
+        ] {
+            assert_eq!(keep_claim_said(reply, false, true), None, "{reply}");
+        }
+        // While the sentence streams it waits.
+        assert_eq!(
+            claims_a_keep_said("Fifty-three, kept as your", false, false, true),
+            None
+        );
+        assert_eq!(claims_a_keep_said("Kept", false, false, false), None);
+        assert_eq!(claims_a_keep_said("Kept ", false, false, false), None);
     }
 
     /// lamp-06c1, build 10226, 5 Nov: "Yes. Please keep that." answered
