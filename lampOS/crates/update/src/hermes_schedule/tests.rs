@@ -328,3 +328,17 @@ fn the_quiet_stretch_is_ten_minutes_of_the_quiet_gate() {
     assert!(quiet_stretch(&quiet, 21 * MIN - 1000).is_err());
     assert_eq!(quiet_stretch(&quiet, 21 * MIN), Ok(()));
 }
+
+/// The bus takes a subscriber named `[a-z][a-z0-9_]{0,31}` only: c0a4 refused
+/// `update-hermes`, and the quiet stretch then never heard the voice.
+#[test]
+fn the_listener_has_a_name_the_bus_takes() {
+    let name = super::LISTENER;
+    assert!((1..=32).contains(&name.len()), "{name}");
+    assert!(name.as_bytes()[0].is_ascii_lowercase(), "{name}");
+    assert!(
+        name.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'),
+        "{name}"
+    );
+}

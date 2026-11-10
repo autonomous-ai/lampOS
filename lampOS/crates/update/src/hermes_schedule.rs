@@ -282,7 +282,7 @@ pub fn quiet_stretch(quiet: &Quiet, now_ms: u64) -> Result<(), String> {
 
 /// The name the watch subscribes to the voice under, beside the rounds'
 /// own (`crate::world::NAME`).
-pub const LISTENER: &str = "update-hermes";
+pub const LISTENER: &str = "update_hermes";
 
 /// `serve`'s watch: a thread that hears the voice from its start, so a
 /// round can ask whether it has been quiet for [`QUIET_STRETCH`]
