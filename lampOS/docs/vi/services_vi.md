@@ -790,6 +790,25 @@ by service: …" của nó được nói trên tham số `action`.
   đọc lại mà không gọi hàm, và câu "send" sau đó không thấy gì; luật riêng
   của hàm giờ nói không bao giờ được nói một phần đọc lại mà không lệnh gọi
   nào trong cùng lượt đưa ra.
+- **Một câu huỷ trơn là của đèn, không để mô hình chọn** (#5958). Trên
+  lamp-9adf ngày 10/11, câu "Lamp, cancel that." sau phần đọc lại được trả
+  lời "Cancel what exactly? I have several things set", không có lệnh gọi
+  nào: mô hình cân nó với các nhắc việc của đèn. Giờ, khi một lệnh ghi của
+  request khác đang chờ (tối đa 2 phút từ lúc chuẩn bị), một câu mà lời là
+  một câu huỷ trơn (`CANCEL_WORDS`, bỏ qua từ đệm và "no", "wait",
+  "actually": "cancel", "cancel that", "never mind", "don't send it",
+  "stop, don't send it", "hủy đi", "đừng gửi" và tương tự) sẽ quên lệnh ghi
+  đó (`services::cancel_waiting`), và route thứ hai nói câu của chính đèn,
+  không hỏi chat: "Okay, cancelled. Nothing was sent." (`CANCELLED_SAID`),
+  hoặc "Vâng, đã hủy. Chưa gửi gì cả." (`CANCELLED_SAID_VI`) với từ huỷ
+  tiếng Việt. Một `send_id` sau đó gặp `NOTHING_WAITING`, nên không gì gửi
+  được nó; `lamp-services` để bản của nó tự hết hạn sau 2 phút. Journal ghi
+  "a waiting write cancelled by a plain cancel". "Cancel my 9 o'clock
+  reminder", hay một câu huỷ khi không có lệnh ghi nào chờ, vẫn do mô hình
+  trả lời như trước. Một câu "Cancel." trơn khi có lệnh ghi đang chờ là câu
+  trả lời của người đó cho phần đọc lại, không bao giờ bị giữ như một âm
+  ngắn (`services::cancel_awaited`, như với một câu gửi trơn: chỉ câu bắt
+  đầu không đè lên giọng của đèn).
 - **Điểm giọng của câu gửi được ghi vào journal**: "a send's voice beside
   request N's: cosine 0.64" (hoặc "no print"), chỉ là điểm, không bao giờ là
   dấu giọng.
