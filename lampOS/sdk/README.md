@@ -23,6 +23,32 @@ none): `git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.gi
 - The protocol: [`docs/control.md`](../docs/control.md) and
   [`docs/control.schema.json`](../docs/control.schema.json)
 
+## Try it without a lamp: the virtual desktop lamp
+
+A lamp that runs on your computer, drawn in 3D, that the SDKs and lamp-mcp drive like a real one: the
+real `lamp-control` (pairing, grants, leases, rates, refusals, events) and the real `lamp-body` (its
+limits, speeds, gestures and lease) run as they are, on a simulated body. Only the hardware is
+stood in for: the servos, the light ring, the speaker, and the camera, microphone and the room's
+people, air and hands, by your computer's camera and microphone or by hand. Linux for now.
+
+```sh
+cd lampOS
+cargo build -p lamp-sim -p lamp-body -p lamp-control
+cd sdk/js && npm ci
+node examples/twin/virtual-lamp.js --lamp-sim ../../target/debug/lamp-sim
+```
+
+It prints the twin's URL and opens it, and pairs this computer in a keyring of its own: run your
+programs with `LAMPOS_HOME=~/.lampsim/virtual/sdk` (or the `--dir` you gave) and they drive the lamp on
+the screen, with no special mode: the same Python and JavaScript SDK calls and lamp-mcp tools, the same
+refusals and limits.
+
+What is not the real thing: it moves no real servo and draws no real ring, a `sound` clip is silence,
+there are no face, hand or sound-class models (the room's people, hands, words and air are made with
+`lamp-sim people|hear|hand|air`), and the body's numbers are one lamp's. A lamp check on a real
+lamp stays a lamp check. To see where it differs from the SDK's own fake or from a real lamp, run
+`node conformance/conformance.js --compare` in `sdk/js`; the same steps run against any of them.
+
 ## On a customer lamp today
 
 Customer lamps run the stable build, **11372** since 10 Nov, 16:40;
