@@ -35,6 +35,8 @@ const EXAMPLE_RUNS = {
   'follow.js': [[], 'arrived', ['lease.take', ['look', { at: 'face' }]]],
   'follow-hand.js': [[], 'hand', ['lease.take', ['look', { at: 'hand' }]]],
   'heat-watch.js': [[], 'hot', [['light', { colour: 'orange', level: 2, pattern: 'pulse' }]]],
+  // Stuffy air, a short wait (DESK_STUFFY_AFTER_S below), one line said, then the glow.
+  'desk-health.js': [[], 'stuffy', ['say', ['light', { colour: 'orange', level: 2, pattern: 'breathe' }]]],
   'greet.js': [[], 'arrived', [['gesture', { name: 'greeting' }]]],
   'notes.js': [[], null, [['notes.get', { key: 'runs' }], ['notes.set', { key: 'runs', value: 1 }], ['light', { colour: 'warm', level: 1 }]]],
   'phrase.js': [[], 'phrase', [['light', { colour: 'warm', level: 2, pattern: 'breathe' }], ['gesture', { name: 'nod' }]]],
@@ -67,6 +69,7 @@ test('every example runs against a fake lamp and sends what it is for', async ()
   assert.deepEqual(readdirSync(examples).filter((f) => f.endsWith('.js') && f !== 'tour.js').sort(), Object.keys(EXAMPLE_RUNS).sort());
   const nudges = {
     air: (fake) => fake.setAir({ pm2_5: 41, co2_ppm: 1350, feel: 'stuffy' }),
+    stuffy: (fake) => fake.setAir({ co2_ppm: 1500, feel: 'stuffy' }),
     arrived: (fake) => fake.emit('person.arrived', { count: 1, near: 0.3 }),
     // In real time, as the lamp tells it: the example looks every 0.2 s.
     hand: (fake) => fake.emitHandTrack(handTrack('wave', { seconds: 1 }), { realtime: true }),
@@ -81,7 +84,7 @@ test('every example runs against a fake lamp and sends what it is for', async ()
       const home = folder();
       await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
       // Not execFileSync: the fake answers on this process's event loop.
-      const child = spawn(process.execPath, [new URL(name, examples).pathname, ...args], { cwd: WRITES_FILES.has(name) ? home : sdkJs, env: { ...process.env, LAMPOS_HOME: home } });
+      const child = spawn(process.execPath, [new URL(name, examples).pathname, ...args], { cwd: WRITES_FILES.has(name) ? home : sdkJs, env: { ...process.env, LAMPOS_HOME: home, DESK_STUFFY_AFTER_S: "1" } });
       let out = '';
       child.stdout.on('data', (chunk) => { out += chunk; });
       child.stderr.on('data', (chunk) => { out += chunk; });
