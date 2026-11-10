@@ -4159,6 +4159,20 @@ pub struct Engine {
     /// ([`Engine::forgetting_on_privacy`]).
     privacy: Option<(bool, u64, bool, u64)>,
     on_privacy: Option<Box<dyn FnMut() + Send>>,
+    /// Whether the camera is allowed in the last authority installed
+    /// ([`Engine::telling_the_eye`], #5530).
+    eye: Option<Arc<AtomicBool>>,
+}
+
+/// The camera permission in the installed authority ([`Engine::privacy`],
+/// #5530), logged initially and when it changes. Selecting the camera-aware
+/// character also requires a usable look route.
+pub(crate) fn eye_line(open: bool) -> &'static str {
+    if open {
+        "camera permission is allowed (#5530)"
+    } else {
+        "camera permission is denied (#5530)"
+    }
 }
 
 /// The busy room as this route hears it, in this process's one room
@@ -4380,6 +4394,7 @@ impl Engine {
             memory_camera_generation: None,
             privacy: None,
             on_privacy: None,
+            eye: None,
         }
     }
 
@@ -4401,10 +4416,25 @@ impl Engine {
         self
     }
 
+    /// `eye` is kept to whether the camera is allowed (on, its privacy
+    /// slide open) in each authority installed, so a spoken turn is told
+    /// the camera's character only while it is (#5530,
+    /// `worker::character_now`). Before any turn only.
+    pub fn telling_the_eye(mut self, eye: Arc<AtomicBool>) -> Self {
+        self.eye = Some(eye);
+        self
+    }
+
     /// The camera's and the microphone's permission and generation from an
     /// installed authority; a change from the last tells
     /// [`Self::forgetting_on_privacy`]'s hook.
     pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
+        if let Some(eye) = &self.eye {
+            let first = self.privacy.is_none();
+            if eye.swap(now.0, Ordering::Relaxed) != now.0 || first {
+                eprintln!("lamp-voice second: {}", eye_line(now.0));
+            }
+        }
         if self.privacy.replace(now).is_some_and(|was| was != now) {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).

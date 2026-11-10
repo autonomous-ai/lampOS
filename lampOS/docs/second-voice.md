@@ -2600,7 +2600,23 @@ When the coordinator switches (below):
 `worker::serve`:
 
 - **Character:** the instruction of the Live route's `provider.json`
-  (`ProviderConfig::instruction`, the version without a camera), then the
+  (`ProviderConfig::instruction`), the camera's version while the route has
+  a look and the eye is open (the camera allowed in the last authority the
+  coordinator installed, so on and with its privacy slide open), and the
+  version without one otherwise, which says no picture reaches it ("if
+  asked what you see, say you can't see right now", `config::NO_PICTURE`;
+  no claim about the eye, since texts, a turn after a forget and Live with
+  no picture are told it too, with the camera perhaps on) and not to
+  pretend to see (`worker::character_now`, `Engine::telling_the_eye`;
+  #5530: this route always took the version without a camera). Chosen for
+  each turn as its request is built, so a slide closed between two turns
+  tells the next one it can't see now. At the first authority and when its
+  camera permission changes, the journal says `lamp-voice second: camera
+  permission is allowed (#5530)` or `… camera permission is denied (#5530)`
+  (`second_provider::eye_line`). This reports permission, not the selected
+  character: without a usable look route, the no-picture version still applies.
+  A [Vietnamese note](vi/second-voice_vi.md) describes this distinction.
+  Texts and the instruction after a forget keep the version without a camera. Then the
   time and place (the time as the request is built, "Second only" below),
   then the memory note (the
   Days note frozen for the process, or the memory writer's, read for each
@@ -5681,7 +5697,13 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
   are not) and told "When you would look, call take_a_look"
-  (`worker::LOOK_CALL_NOTE`). It is one of the core within the route's bound of 48:
+  (`worker::LOOK_CALL_NOTE`), in the camera's version of the character
+  only (`worker::spoken_version`): the version without one says no picture
+  reaches it, without claiming the physical eye is closed. A turn without
+  camera permission is not also told to look (#5530). The
+  function stays offered; called with the eye closed, the lamp says "Let
+  me look." and the look turn, with no still within 2.6 s, says the eye
+  was shut (`speak_up::NO_LOOK_NOTE`). It is one of the core within the route's bound of 48:
   a list at the bound before it keeps it, and the bound cuts the next in
   its order instead (`fetch_page` first), said once as every cut is
   (`past the bound of 48, left out: …`). Added after the bound before, a

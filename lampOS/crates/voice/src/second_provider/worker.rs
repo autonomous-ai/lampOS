@@ -1506,6 +1506,40 @@ pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool
     format!("{character}{SPOKEN_NOTE}{look}{memory}{before}")
 }
 
+/// [`spoken_character`] for one version of the instruction: `camera` for
+/// the camera's, told while the eye is open ([`character_now`]). Only that
+/// version is told [`LOOK_CALL_NOTE`]: the one without a camera says no
+/// picture reaches it, and told both, a closed-eye turn called take_a_look, said
+/// "Let me look." and only 2.6 s on that its eye was shut
+/// (`speak_up::NO_LOOK_NOTE`, #5530). The function stays offered either way.
+pub(crate) fn spoken_version(
+    character: &str,
+    camera: bool,
+    look_by_call: bool,
+    memory: bool,
+) -> String {
+    spoken_character(character, camera && look_by_call, memory)
+}
+
+/// The spoken turn's character, `blind` (the version without a camera) or
+/// `seeing` (the camera's), by whether this route has a look (`look`) and
+/// the eye is open now (`eye`: the camera allowed in the last authority
+/// installed, [`Engine::telling_the_eye`]). This route always took the
+/// version without one, "Do not pretend to see", whatever the camera was
+/// doing (#5530).
+pub(crate) fn character_now<'a>(
+    blind: &'a str,
+    seeing: &'a str,
+    look: bool,
+    eye: &std::sync::atomic::AtomicBool,
+) -> &'a str {
+    if look && eye.load(std::sync::atomic::Ordering::Relaxed) {
+        seeing
+    } else {
+        blind
+    }
+}
+
 /// The look's function (#1712): a spoken turn with a full look looks by it.
 pub(crate) fn look_tool() -> lamp_gemini::Tool {
     lamp_gemini::Tool {
@@ -2055,6 +2089,8 @@ pub fn serve(
 ) -> io::Result<()> {
     let provider = crate::config::ProviderConfig::load(provider_config)?;
     let character = provider.instruction(false)?;
+    // The camera's version, told while the eye is open (#5530).
+    let seeing = provider.instruction(true)?;
     // The unit's Gemini endpoint and voice over the file's (#1712).
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
@@ -2470,8 +2506,13 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let forget_character = provider.instruction_without_person(false)?;
-    let [character, forget_character] = [character, forget_character].map(|character| {
-        let character = spoken_character(&character, look_by_call, tools.memory.is_some());
+    let [character, seeing, forget_character] = [
+        (character, false),
+        (seeing, true),
+        (forget_character, false),
+    ]
+    .map(|(character, camera)| {
+        let character = spoken_version(&character, camera, look_by_call, tools.memory.is_some());
         // Nothing said beside a call the acting part answers at once
         // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
         let character = quiet_with_calls(
@@ -2618,6 +2659,13 @@ pub fn serve(
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
     let no_owner = NoOwnerTold::default();
+    // Whether the camera is allowed now, kept by the engine from each
+    // authority installed (`Engine::telling_the_eye`), and whether this
+    // route has a look at all: a spoken turn is told the camera's
+    // character only with both (#5530).
+    let eye = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let eye_told = eye.clone();
+    let look = files.look.is_some();
     let told_for = memory_context_carried(
         sessions,
         socket,
@@ -2774,6 +2822,8 @@ pub fn serve(
             } else {
                 String::new()
             };
+            // The camera's character only while the eye is open (#5530).
+            let character = character_now(&character, &seeing, look, &eye_told).to_owned();
             let told = |character: String| {
                 with_typed_name(
                     character,
@@ -2925,6 +2975,7 @@ pub fn serve(
         runner.clone(),
     )
     .with_after_forget_instruction(forget_character)
+    .telling_the_eye(eye)
     .with_memory_scope(boots.own, face_cache.clone(), scoped_runner, scoped_system)
     .reading_the_lease_for_the_name(lease_system)
     .checking_sounds(checked)
@@ -20759,6 +20810,56 @@ mod tests {
         assert_eq!(told_now(), 2, "a mute");
     }
 
+    /// #5530: the eye a spoken turn's character is chosen by follows the
+    /// camera in each authority installed: closed until one allows it,
+    /// open while it does, closed again at a close (the privacy slide).
+    #[tokio::test]
+    async fn the_eye_follows_the_camera_in_each_authority_installed() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let boot = BootId::new([7; 16]).unwrap();
+        let at = |us| MonoTime::from_micros(us);
+        let mut owner = Controller::new(boot, at(10_000));
+        owner
+            .set_microphone_permission(at(10_000), Permission::Allowed)
+            .unwrap();
+        let eye = Arc::new(AtomicBool::new(false));
+        let mut engine = Engine::new(
+            Arc::new(Silent),
+            Told::default,
+            Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+        )
+        .telling_the_eye(eye.clone());
+        let mut gate = Gate::new(boot, 10_000);
+        let open = || eye.load(Ordering::Relaxed);
+        gate.install(10_000, owner.snapshot(at(10_000)).unwrap(), &mut engine)
+            .unwrap();
+        assert!(!open(), "the camera not yet allowed");
+        for (now_us, camera, expected) in [
+            (20_000, Permission::Allowed, true),
+            (30_000, Permission::Denied, false),
+            (40_000, Permission::Allowed, true),
+        ] {
+            owner.set_camera_permission(at(now_us), camera).unwrap();
+            gate.install(now_us, owner.snapshot(at(now_us)).unwrap(), &mut engine)
+                .unwrap();
+            assert_eq!(open(), expected, "{camera:?} at {now_us}");
+        }
+    }
+
+    /// The journal reports installed permission, not selection of a camera
+    /// character: a route without a look remains blind even when allowed.
+    #[test]
+    fn the_journal_reports_camera_permission_without_claiming_a_character() {
+        assert_eq!(
+            crate::second_provider::eye_line(true),
+            "camera permission is allowed (#5530)"
+        );
+        assert_eq!(
+            crate::second_provider::eye_line(false),
+            "camera permission is denied (#5530)"
+        );
+    }
+
     #[tokio::test]
     async fn requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry() {
         const NOW: u64 = 10_000_000;
@@ -26523,6 +26624,48 @@ mod tests {
             spoken.contains("never by a word heard at the start of what they said"),
             "{spoken}"
         );
+    }
+
+    /// #5530 (Friday's report on #5385): this route always took the version
+    /// without a camera, "Do not pretend to see", whatever the camera was
+    /// doing. The camera's version is told only while the route has a look
+    /// and the eye is open (the camera allowed, the privacy slide open);
+    /// otherwise, and once it closes, the version without one.
+    #[test]
+    fn the_camera_version_is_told_only_while_the_eye_is_open() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let (blind, seeing) = (
+            crate::config::CHAT_INSTRUCTION,
+            crate::config::CAMERA_CHAT_INSTRUCTION,
+        );
+        let eye = AtomicBool::new(true);
+        assert_eq!(super::character_now(blind, seeing, true, &eye), seeing);
+        assert_eq!(super::character_now(blind, seeing, false, &eye), blind);
+        eye.store(false, Ordering::Relaxed);
+        assert_eq!(super::character_now(blind, seeing, true, &eye), blind);
+        assert_eq!(super::character_now(blind, seeing, false, &eye), blind);
+    }
+
+    /// #5530: the version without a camera says no picture reaches it, so it
+    /// is never also told to look by calling take_a_look; the camera's version
+    /// is, with a full look. A closed-eye turn that called it was answered
+    /// "Let me look." and, 2.6 s on, that the eye was shut
+    /// (`speak_up::NO_LOOK_NOTE`).
+    #[test]
+    fn the_look_line_is_told_only_in_the_camera_version() {
+        let (blind, seeing) = (
+            crate::config::CHAT_INSTRUCTION,
+            crate::config::CAMERA_CHAT_INSTRUCTION,
+        );
+        for memory in [false, true] {
+            let closed = super::spoken_version(blind, false, true, memory);
+            assert!(closed.contains(crate::config::NO_PICTURE), "{closed}");
+            assert!(!closed.contains("take_a_look"), "{closed}");
+            let open = super::spoken_version(seeing, true, true, memory);
+            assert!(open.contains(super::LOOK_CALL_NOTE), "{open}");
+            let no_look = super::spoken_version(seeing, true, false, memory);
+            assert!(!no_look.contains("take_a_look"), "{no_look}");
+        }
     }
 
     /// #1712: the name note, as the Live route gives it: the model is told
