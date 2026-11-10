@@ -2237,10 +2237,12 @@ gone ([switches.md](switches.md)). What happens:
    - **What the runtime can't do yet** is answered "I can't do that yet:"
      and what, never refused by a rule, and never repaired away
      (`made_skill::CANT_YET`; said as it is, without "I couldn't make
-     that:"). Today: a step that sends a message or writes to a service
-     ("sending a message or writing to a linked service"; no step sends
-     one: a text is a watch's, and lamp-skills takes a service as `"read"`
-     only), a write in `services` ("writing to a linked service"), a move
+     that:"). Today: a step that sends a message ("sending a message or
+     writing to a linked service"; a text is a watch's), with
+     `LAMP_SKILL_WRITES` off a `write` step or a `"write"` in `services`
+     ("sending or writing on its own"; on, one is carried, below), a write
+     to a service no made skill writes to ("writing to your <Service> on
+     its own"), a move
      of its own ("a move of its own") or a sound other than the hum (a made
      skill carries no file but its two), with reads off any service
      ("reading your linked services"), and a trigger on what is heard, a
@@ -2379,10 +2381,91 @@ gone ([switches.md](switches.md)). What happens:
    `cannot: Not possible yet: a skill can't use your mail, calendar or other
    services, even ones already linked. You can ask me for it yourself any
    time.` Either way `lamp-skills`' check holds whatever is kept to reads
-   of a service with reads; a write in `services` is answered "I can't do
-   that yet: writing to a linked service", and with reads off any
-   `services` "I can't do that yet: reading your linked services"
-   ([services.md](services.md), "A made skill's read"). Kept, a skill whose step reads a service not
+   of a service with reads; with reads off a `"read"` in `services` is
+   answered "I can't do that yet: reading your linked services"
+   ([services.md](services.md), "A made skill's read").
+   The write of a linked service (#6066, the owner's lift of rule (b) on
+   10 Nov, with the first builder's conditions of 21:44;
+   `LAMP_SKILL_WRITES=on` in `lamp-voice`, passed to both routes, as in
+   `lamp-services`, `lamp-skills` and its manage helper; off in every
+   product unit). Off, a `"write"` in `services` or a `write` step is
+   answered "I can't do that yet: sending or writing on its own", never
+   repaired, and the system prompt tells the making model to answer such
+   a request so (`cannot:`). On:
+   - **What it may carry** (`made_skill::capped`): one `write` step, the
+     skill's only one, with `[permissions] services = { <code> = "write" }`,
+     for the kinds `lamp-services` sends (`skill_writes::KINDS`: a mail, a
+     calendar event, a GitHub issue or comment, a Linear issue, an Asana
+     task, a Figma comment); its content checked as `lamp-services` checks
+     it. Another service's write is "I can't do that yet: writing to your
+     <Service> on its own"; a write not fixed whole, ungranted or of
+     another kind goes back for repair (`made_skill::WRITE_NOT_FIXED`).
+     The system prompt lists the kinds and their keys
+     (`make_skill_local::write_rules`); the brief adds "Or one write, as
+     above." (or "Or a read/write as above."), still within 1,160
+     bytes.
+   - **Its words are the request's own** (`made_skill::write_from_request`,
+     at `keep_asked`, which now takes the request, `made_skill::Asked`):
+     every `subject`, `text` and `title` must be said in the person's
+     request, word for word in order, case, spacing, punctuation and
+     quotes aside (a quoted span is just its words). Never from a read, the
+     web or memory; the system prompt says so. Every place (`repo`,
+     `team_id`, `project`, `workspace`, a Figma `id`, a `calendar` other
+     than `primary`, an issue's `number`) must be named in the request, so
+     no GitHub repository the request didn't name.
+   - **Its recipients** (`to`, `cc`, `attendees`): each the linked
+     account's own address (`services_connected`'s account for that
+     service, either Gmail for the other, asked once a make begins with
+     the switch on, `services::linked_accounts`), or an address the
+     request says, as written or spoken ("mai at example dot com"). A
+     contact's name alone is no address: the lamp keeps no contact book,
+     so the model answers "cannot:" and asks for the address. Anything
+     else goes back for repair, the person hearing
+     `made_skill::WRITE_NOT_SAID`; the repair's lines name the rule and
+     the person's own addresses, never a value of the request, and the
+     journal names the field only.
+   - **The say-back, whole** (`made_skill::write_plainly`): when it runs,
+     where it goes, every recipient, every text quoted in full ("it mails
+     mai@example.com from your Gmail, subject “Leaving”, saying “I'm
+     leaving now.”"), how often, its manners, and last
+     `made_skill::WAITS_FOR_YES`, " It waits for you to agree before it
+     sends anything." It ends on no word to repeat and has no "yes" in it.
+     Said whole, up to 1,400 characters (`MOST_WRITE_PLAIN_CHARS`), never
+     cut, and the line is "I made leaving mail: …", never "it's on". The
+     uses add "your Gmail, sending to mai@example.com", and the app's
+     `uses` carry `writes` and `sends_to` for the list's "sends to …"
+     (the list's text lives in the app, not in this repository).
+   - **The yes** (`crate::skill_write_yes`): once the skill is on (the
+     approval binds the installed package), its writes' exact contents,
+     kept beside it in the index (`made_skill::writes_of`), wait in memory
+     for 120 s with an `approve_id` the model is given, never the
+     approval itself. If the person's next words agree, in any words (the
+     model judges, as #6009 has a waiting mail's send judged), the model
+     calls `make_skill` with only that id; the voice itself then calls
+     `skill_write_approve` (`services::skill_write_approve`, the one place
+     it does). Taken once, only in a later heard request, on the second
+     route (`services::sends_here`), never on a line held as the lamp's
+     own echo. A decline, a wait or a change calls nothing, so nothing is
+     approved; a change is a new make. `lamp-services`' answer names the
+     public GitHub repositories, and the model then says "anyone can see"
+     what it posts there. No identity check: whoever is at the lamp is
+     its owner.
+   - **The echo hold** (`second_provider::own_echo::yes_echo`): while the
+     yes is awaited, a line made only of the lamp's own words, in runs its
+     answer says in order, begun over its voice or within the 1.5 s tail,
+     is held whatever its length, its name or a question, with
+     `LAMP_SECOND_OWN_ECHO` on or off and in the private room; its request
+     is kept and an approval in it refused.
+   - **"I sent …"** (`crate::skill_writes_told`): the second route asks
+     `skill_writes_sent` off the line's path, at most every 5 s, as a
+     heard line comes, and the next heard line is told each send since the
+     last told, once: "I sent your 'leaving mail' mail to mai at 18:02."
+     (the sent-log keeps a recipient's local part only). The told-up-to
+     mark is `writes-told.json` in the made skills' folder, marked before
+     it is told; with no mark, only the last day's sends.
+   - **Taking it off** is unchanged, by voice or in the app; to `lamp-services`
+     a removed or changed package waits for a new yes.
+   Kept, a skill whose step reads a service not
    linked now (`services_connected`, asked once, at most 500 ms) is still
    kept, and the make tells it: by voice, `needs_link` in the make's
    answer, and after the line that it's on the model is asked to tell the
@@ -2719,9 +2802,11 @@ Tests:
   `the_models_cannot_reason_is_told_never_journaled` (#5985: told in full,
   journaled as `MODELS_CANNOT_JOURNALED`), and
   `the_system_prompt_carries_the_rules_of_a_read` (one service at most,
-  read only, the listed steps, `cannot:` otherwise; off, none). The made,
-  not-on and not-made tests also take the line said for a cut turn, the
-  same words, once.
+  read only, the listed steps, `cannot:` otherwise; off, none);
+  `a_made_write_is_said_back_whole_and_waits_for_a_later_yes` and
+  `the_system_prompt_and_function_carry_a_write_only_with_its_switch`
+  (#6066). The made, not-on and not-made tests also take the line said for
+  a cut turn, the same words, once.
 - `second_provider::worker::made_line`:
   `a_make_whose_turn_was_cut_still_says_its_line_once` and
   `a_make_whose_turn_waits_never_uses_the_say_service`;
@@ -2731,6 +2816,16 @@ Tests:
   call, the question again), with
   `a_wordless_cut_while_another_call_runs_still_asks` as its control; and
   `app_make::tests::a_voice_make_line_is_asked_on_the_say_socket`.
+- `made_skill::tests` for a write (#6066):
+  `a_write_is_carried_only_with_its_switch`,
+  `a_writes_say_back_is_whole_and_ends_on_its_wait`,
+  `a_writes_words_and_recipients_are_the_requests_own`;
+  `skill_write_yes::tests` (a later heard yes approves once; an echo, the
+  make's own request, an unheard, stale or other id, or the Live route
+  approves nothing; a decline or a change approves nothing);
+  `own_echo::yes_tests::the_say_backs_own_words_in_its_tail_are_held`;
+  `skill_writes_told::tests` (each send told once after the mark, said
+  with its time).
 - `made_skill::tests`: the brief within 1,340 bytes (so its repair fits the
   tasks part's 2,000), `every_request_is_briefed_and_the_model_judges_it`
   (a service, a write or two services are briefed, never refused by a
