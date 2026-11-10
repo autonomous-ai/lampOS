@@ -2447,6 +2447,7 @@ EXAMPLE_RUNS = {
     "pomodoro.py": ([], None, (("light", {"colour": "warm", "level": 2}),)),
     "push_skill.py": (["../examples/hello-skill"], None, ("skill.push",)),
     # Pixel 0 white, a green pixel walking, the whole ring blue, given back.
+    "touch.py": ([], "tap", (("light", {"colour": "warm", "level": 3}),)),
     "ring_walk.py": (["50"], None, (
         ("light", {"pixels": lambda px: isinstance(px, list) and px[0] == "#ffffff" and set(px[1:]) == {"#000000"}}),
         ("light", {"pixels": lambda px: isinstance(px, list) and px.count("#00ff00") == 1}),
@@ -2485,6 +2486,7 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
         # hand, and it waits on for one (Python 3.10 CI on #5864).
         "hand": lambda fake: fake.emit_hand_track(hand_track("wave", seconds=1.0), realtime=True),
         "phrase": lambda fake: fake.emit("phrase.heard", phrase="good night lamp"),
+        "tap": lambda fake: fake.emit("touch", kind="tap"),
     }
 
     async def one(name, home):

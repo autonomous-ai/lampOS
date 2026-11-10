@@ -38,6 +38,7 @@ const EXAMPLE_RUNS = {
   'phrase.js': [[], 'phrase', [['light', { colour: 'warm', level: 2, pattern: 'breathe' }], ['gesture', { name: 'nod' }]]],
   'pomodoro.js': [[], null, [['light', { colour: 'warm', level: 2 }]]],
   'push-skill.js': [['../examples/hello-skill'], null, ['skill.push']],
+  'touch.js': [[], 'tap', [['light', { colour: 'warm', level: 3 }]]],
   // Pixel 0 white, a green pixel walking, the whole ring blue, given back.
   'ring-walk.js': [['50'], null, [
     ['light', { pixels: (px) => Array.isArray(px) && px[0] === '#ffffff' && px.slice(1).every((c) => c === '#000000') }],
@@ -68,6 +69,7 @@ test('every example runs against a fake lamp and sends what it is for', async ()
     // In real time, as the lamp tells it: the example looks every 0.2 s.
     hand: (fake) => fake.emitHandTrack(handTrack('wave', { seconds: 1 }), { realtime: true }),
     phrase: (fake) => fake.emit('phrase.heard', { phrase: 'good night lamp' }),
+    tap: (fake) => fake.emit('touch', { kind: 'tap' }),
   };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await Promise.all(Object.entries(EXAMPLE_RUNS).map(async ([name, [args, nudge, ops, refusal]]) => {
