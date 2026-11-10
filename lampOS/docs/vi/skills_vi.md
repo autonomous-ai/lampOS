@@ -965,10 +965,14 @@ của lamp-voice (`/lampos.slice/lampos-voice.slice/lamp-voice.service`,
   nó bị bỏ đi, nên kỹ năng phát âm thanh trả lời như khi không có ngữ cảnh
   ("Requested audio is disabled or has no spoken context.").
 - `audio_authorize` và `audio_finish` bị từ chối (`watch::NOT_THE_VOICE`).
-- Khi đèn đang ở chế độ riêng tư (giọng nói bị tắt mic vì riêng tư hoặc đang
-  ngủ, hay công tắc riêng tư đóng trên `voice/privacy`, như
-  `routine::kept_asleep` đọc), một `call` bị từ chối kèm lý do
-  (`watch::PRIVATE_FOR_OTHERS`). Lệnh gọi của chính giọng nói không bị chặn ở
+- Một `call` chỉ được phục vụ khi có tín hiệu riêng tư còn mới và cho phép
+  thu âm (`routine::private_for_others`): lease `voice/privacy` mới nhất hợp
+  lệ, theo đồng hồ của lần khởi động này và chưa hết hạn, cho phép với công
+  tắc đọc là mở (hoặc đèn không có công tắc trượt), và giọng nói không bị tắt
+  mic vì riêng tư cũng không đang ngủ. Ngược lại nó bị từ chối kèm lý do
+  (`watch::PRIVATE_FOR_OTHERS`); tín hiệu thiếu hoặc đã cũ ("the privacy
+  reading is not known") được coi là riêng tư, không phải mở, như chính giọng
+  nói coi nó (P2 của Thirteen trên #6159). Lệnh gọi của chính giọng nói không bị chặn ở
   đây: giọng nói tự giữ các lượt của nó theo quyền riêng tư.
 
 Danh tính bên gọi chỉ đọc được trên Linux; ở nơi khác không bên nào là giọng
