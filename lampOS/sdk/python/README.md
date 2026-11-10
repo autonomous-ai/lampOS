@@ -185,7 +185,18 @@ asyncio.run(main())
   `seen: false` 1 s after the last), and `FakeLamp.emit_hand_track(track,
   realtime=)` says them. `lamp fake --hands` waves a hand for 3 s after
   each arrival and answers a look at it.
-- **In your tests:** `lampos.testing.FakeLamp(grants=...)` is the same fake
+- **In your tests:** `await fake.connect()` gives a `Lamp` already paired with
+  the fake (its own temporary keyring, closed and removed with the fake), so a
+  test of your program needs no code, pin or `LAMPOS_HOME`:
+
+  ```python
+  async with FakeLamp() as fake:
+      lamp = await fake.connect()
+      await lamp.say("hello")
+      assert fake.asked("say") == [{"text": "hello"}]
+  ```
+
+  `lampos.testing.FakeLamp(grants=...)` is the same fake
   lamp: `emit(event, **fields)`, `refuse_next(op, code, why)`,
   `done(re)`, `lease_event(lease, state, why)`, and `requests` /
   `received` for what it took. Its `light` keeps lamp-control's pattern levels

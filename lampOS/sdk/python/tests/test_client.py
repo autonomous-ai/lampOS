@@ -2724,3 +2724,25 @@ def test_a_microphone_block_is_its_header_and_the_samples_as_data():
     block = binary_frame(len(header).to_bytes(4, "big") + header + samples)
     assert (block["ev"], block["sequence"], block["lost"]) == ("microphone.audio", 7, 2)
     assert block["data"] == samples and len(samples) == 640
+
+
+def test_fake_connect_gives_a_connected_lamp_with_its_own_keyring_and_cleans_up(tmp_path, monkeypatch):
+    monkeypatch.setenv("LAMPOS_HOME", str(tmp_path / "home"))  # a test must not touch the developer's own
+
+    async def scenario():
+        async with FakeLamp() as fake:
+            lamp = await fake.connect()
+            other = await fake.connect(name="second computer")
+            reply = await lamp.say("hello")
+            assert fake.asked("say") == [{"text": "hello"}]
+            assert reply["ok"] and other is not lamp
+            await other.close()  # the test closed one itself: the fake's exit must not trip on it
+            folders = list(fake._folders)
+            assert len(folders) == 2 and all(Path(folder).is_dir() for folder in folders)
+        return lamp, folders
+
+    lamp, folders = run(scenario())
+    assert not any(Path(folder).exists() for folder in folders)  # their keyrings are gone
+    assert not (tmp_path / "home").exists()  # LAMPOS_HOME was never written
+    with pytest.raises(LampError):
+        run(lamp.say("after the fake is gone"))
