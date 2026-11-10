@@ -40,12 +40,24 @@ pub enum Action {
     },
     /// One write tool of an MCP service, called with these arguments.
     Mcp { tool: String, arguments: Value },
+    /// One upload on the service's write list, before its token: a POST of
+    /// `body` as `content_type` (Google Drive's new file, `multipart/related`).
+    Upload {
+        url: String,
+        content_type: String,
+        body: String,
+    },
 }
 
 /// A write checked and read back, waiting for its "send".
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pending {
     pub service: &'static str,
+    /// The link it was prepared with ([`link_of`]), set by the service's
+    /// `write` (0 here, which no link is): the send goes only with that
+    /// same link, never with one that replaced it while the read-back
+    /// waited (Reviewer-three's P1 on #5825).
+    pub link: u64,
     pub action: Action,
     pub read_back: String,
     /// The linked account it was prepared as ([`Entry::account`]): a link
@@ -53,6 +65,31 @@ pub struct Pending {
     /// nothing (Reviewer-two on #5982: a draft prepared as one account was
     /// saved into the next one linked).
     pub account: String,
+}
+
+/// Which account a link is, by what a replacement link changes and a
+/// token refresh keeps: its code, kind, client, account, extras, static
+/// key, and its refresh token (its access token when it has none). Never
+/// 0. A rotated refresh token reads as another link, which only cancels.
+pub fn link_of(entry: &Entry) -> u64 {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    let token = if entry.refresh_token.is_empty() {
+        &entry.access_token
+    } else {
+        &entry.refresh_token
+    };
+    (
+        &entry.connector,
+        &entry.auth_type,
+        &entry.client_id,
+        &entry.user_email,
+        &entry.credentials,
+        &entry.api_key,
+        token,
+    )
+        .hash(&mut hasher);
+    hasher.finish().max(1)
 }
 
 /// What each service writes, by `action`, for the tools' description.
@@ -75,6 +112,10 @@ pub const ACTIONS: &[(&str, &str)] = &[
     ("figma", "comment {id, text}"),
     ("figma-api", "comment {id, text}"),
     ("facebook", "page_post {text}"),
+    (
+        "google_drive",
+        "create_doc or create_file {title, text}, create_sheet {title, rows}",
+    ),
 ];
 
 /// What a Gmail link that can't save a draft answers `save_draft`: a
@@ -82,6 +123,27 @@ pub const ACTIONS: &[(&str, &str)] = &[
 /// are the voice's interim line (#5962), so the person still hears the
 /// send it offers.
 pub const NO_DRAFTS: &str = "this Gmail link can't save drafts: only one linked with an app password can. Say \"I can't save a draft yet. I can read it back and send it when you say 'send it'.\"";
+/// Google Drive's one write: a new file in My Drive, its metadata and its
+/// content in one `multipart/related` upload, answered with its id, name
+/// and link. Drive turns a `text/plain` part into a Google Doc and a
+/// `text/csv` part into a Google Sheet when the metadata names one.
+pub const DRIVE_UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink";
+/// The Google scopes that may make a file in Drive: the whole Drive, or
+/// `drive.file`, the files this app made or the owner picked for it (the
+/// product's Drive link holds `drive.file`, never `drive.readonly`).
+pub const DRIVE_WRITE_SCOPES: &[&str] = &[
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file",
+];
+/// What a Drive write is told when its link holds no scope that may make a
+/// file, or records none: refused at the first call, before any read-back
+/// or "send", so the person hears to link again rather than "not sent"
+/// after the whole file.
+pub const DRIVE_NO_WRITE_SCOPE: &str = "This Google Drive link can't make files. To let the lamp make one, link Google Drive again in the app: Skills, then Connectors.";
+/// The most rows a new Google Sheet is made with.
+pub const ROWS_MOST: usize = 50;
+/// The most columns in each of its rows.
+pub const COLUMNS_MOST: usize = 10;
 
 /// What an MCP service writes, for the tools' description.
 pub const MCP_ACTIONS: &str = "call {tool, arguments}";
@@ -192,15 +254,37 @@ pub fn prepare_mcp(
         ));
     }
     crate::mcp::write_allowed(service.code, name, &arguments)?;
-    Ok(Pending {
+    fits(Pending {
         account: entry.account(),
         service: service.code,
+        link: 0,
         read_back: crate::mcp::read_back(service, entry, tool, &arguments),
         action: Action::Mcp {
             tool: name.to_owned(),
             arguments,
         },
     })
+}
+
+/// The most bytes a read-back takes as JSON (quoted, escaped): with the
+/// prepare's `send_id`, `sent` and the voice's own words to say it, what
+/// the model is given stays within its 4,096-byte tool answer
+/// (`lamp_gemini::MAX_TOOL_JSON_BYTES`; a voice test holds this). Every
+/// write's caps are checked first; this is the whole read-back's, so rows
+/// of blank cells, each said, can't outgrow the answer (Reviewer-three's
+/// P2 on #5825).
+pub const READ_BACK_JSON_MOST: usize = 3_584;
+
+/// What a write is told when its read-back would not fit.
+pub const READ_BACK_TOO_LONG: &str = "that is too long to read back in one go, so nothing was prepared: ask for a shorter text or a smaller sheet, or make it in parts";
+
+/// `pending`, if its read-back fits [`READ_BACK_JSON_MOST`].
+fn fits(pending: Pending) -> Result<Pending, String> {
+    if json!(pending.read_back).to_string().len() <= READ_BACK_JSON_MOST {
+        Ok(pending)
+    } else {
+        Err(READ_BACK_TOO_LONG.into())
+    }
 }
 
 fn text<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
@@ -292,6 +376,7 @@ fn http(
     Ok(Pending {
         account: String::new(),
         service: code,
+        link: 0,
         action: Action::Http {
             method,
             url: reads::url(base(code)?, segments, query)?,
@@ -302,16 +387,19 @@ fn http(
 }
 
 /// A write checked and read back, or why not. `entry` is the linked
-/// account it is made as, and the write is bound to it.
+/// account it is made as, and the write is bound to it. Its read-back fits
+/// [`READ_BACK_JSON_MOST`].
 pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
-    prepare_unbound(code, args, entry).map(|pending| Pending {
-        account: entry.account(),
-        ..pending
-    })
+    prepare_unbounded(code, args, entry)
+        .map(|pending| Pending {
+            account: entry.account(),
+            ..pending
+        })
+        .and_then(fits)
 }
 
-/// [`prepare`], its account not yet bound.
-fn prepare_unbound(code: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
+/// [`prepare`], its account not yet bound and its read-back not yet bounded.
+fn prepare_unbounded(code: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
     let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
     let code = service.code;
     let action = text(args, "action").ok_or("the write needs its action")?;
@@ -326,6 +414,7 @@ fn prepare_unbound(code: &str, args: &Value, entry: &Entry) -> Result<Pending, S
             Ok(Pending {
                 account: String::new(),
                 service: code,
+                link: 0,
                 read_back: format!(
                     "Send an email from {} to {}{copy}. Subject: \"{}\". It says: \"{}\". Only the people named get it.",
                     entry.account(),
@@ -344,6 +433,7 @@ fn prepare_unbound(code: &str, args: &Value, entry: &Entry) -> Result<Pending, S
             Ok(Pending {
                 account: String::new(),
                 service: code,
+                link: 0,
                 read_back: format!(
                     "Save a draft to {}{copy}, in the Gmail Drafts of {}. Subject: \"{}\". It says: \"{}\". Nothing is sent.",
                     out.to.join(", "),
@@ -504,6 +594,9 @@ fn prepare_unbound(code: &str, args: &Value, entry: &Entry) -> Result<Pending, S
                 ),
             )
         }
+        ("google_drive", "create_doc" | "create_sheet" | "create_file") => {
+            drive_create(action, args, entry)
+        }
         ("facebook", "page_post") => {
             let page = page_id(entry);
             if page == "me" {
@@ -561,6 +654,282 @@ fn outgoing(args: &Value) -> Result<(Outgoing, String), String> {
         },
         copy,
     ))
+}
+
+/// What a Google Drive write makes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DriveKind {
+    /// A Google Doc, from plain text.
+    Doc,
+    /// A Google Sheet, from rows as CSV.
+    Sheet,
+    /// A plain text file.
+    Text,
+}
+
+impl DriveKind {
+    /// The new file's own type, in its metadata.
+    fn file_type(self) -> &'static str {
+        match self {
+            Self::Doc => "application/vnd.google-apps.document",
+            Self::Sheet => "application/vnd.google-apps.spreadsheet",
+            Self::Text => "text/plain",
+        }
+    }
+
+    /// The type of the content uploaded, which Drive converts.
+    fn content_type(self) -> &'static str {
+        match self {
+            Self::Sheet => "text/csv",
+            Self::Doc | Self::Text => "text/plain",
+        }
+    }
+
+    /// What a person hears it called.
+    fn said(self) -> &'static str {
+        match self {
+            Self::Doc => "Google Doc",
+            Self::Sheet => "Google Sheet",
+            Self::Text => "text file",
+        }
+    }
+}
+
+/// A new Drive file's `multipart/related` body: its metadata (`name` and
+/// its type, no parent, so My Drive), then `content`, split by `boundary`,
+/// which neither may hold.
+pub fn drive_upload(kind: DriveKind, name: &str, content: &str, boundary: &str) -> String {
+    let metadata = json!({"name": name, "mimeType": kind.file_type()});
+    format!(
+        "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n--{boundary}\r\nContent-Type: {}; charset=UTF-8\r\n\r\n{content}\r\n--{boundary}--\r\n",
+        kind.content_type()
+    )
+}
+
+/// Rows as CSV (RFC 4180): a cell with a comma, a quote or a line break
+/// quoted, its quotes doubled; rows split by CRLF.
+pub fn csv(rows: &[Vec<String>]) -> String {
+    rows.iter()
+        .map(|row| {
+            row.iter()
+                .map(|cell| {
+                    if cell.contains([',', '"', '\n', '\r']) {
+                        format!("\"{}\"", cell.replace('"', "\"\""))
+                    } else {
+                        cell.clone()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(",")
+        })
+        .collect::<Vec<_>>()
+        .join("\r\n")
+}
+
+/// A new sheet's rows: a list of lists of cells (text, numbers, true or
+/// false), or that list as JSON text; none for an empty sheet. At most
+/// [`ROWS_MOST`] rows of [`COLUMNS_MOST`] cells, [`TEXT_MOST`] characters
+/// in all, and no cell a formula.
+fn rows(args: &Value) -> Result<Vec<Vec<String>>, String> {
+    const SHAPE: &str = "rows is a list of rows, each a list of cells";
+    let parsed;
+    let given = match args.get("rows") {
+        None | Some(Value::Null) => return Ok(Vec::new()),
+        Some(Value::Array(rows)) => rows,
+        Some(Value::String(text)) => {
+            parsed = serde_json::from_str::<Value>(text).map_err(|_| SHAPE)?;
+            parsed.as_array().ok_or(SHAPE)?
+        }
+        Some(_) => return Err(SHAPE.into()),
+    };
+    if given.len() > ROWS_MOST {
+        return Err(format!("a new sheet has at most {ROWS_MOST} rows"));
+    }
+    let mut rows = Vec::new();
+    let mut characters = 0;
+    for row in given {
+        let row = row.as_array().ok_or(SHAPE)?;
+        if row.len() > COLUMNS_MOST {
+            return Err(format!(
+                "a new sheet's row has at most {COLUMNS_MOST} cells"
+            ));
+        }
+        let mut cells = Vec::new();
+        for cell in row {
+            let cell = match cell {
+                Value::String(text) => text.trim().to_owned(),
+                Value::Number(number) => number.to_string(),
+                Value::Bool(flag) => flag.to_string(),
+                Value::Null => String::new(),
+                _ => return Err("a cell is text or a number".into()),
+            };
+            if formula_like(&cell) {
+                return Err(
+                    "a cell is never a formula: none begins with =, +, - or @, but a plain number such as -5"
+                        .into(),
+                );
+            }
+            if cell
+                .chars()
+                .any(|c| c.is_control() && c != '\n' && c != '\t')
+            {
+                return Err("a cell is plain text".into());
+            }
+            characters += cell.chars().count();
+            cells.push(cell);
+        }
+        rows.push(cells);
+    }
+    if characters > TEXT_MOST {
+        return Err(format!(
+            "a new sheet's cells hold at most {TEXT_MOST} characters"
+        ));
+    }
+    Ok(rows)
+}
+
+/// Whether a sheet's cell (trimmed) could be read as a formula: one
+/// beginning with `=`, `+`, `-` or `@`, which a CSV import may evaluate,
+/// unless it is a plain signed number (`-5`, `+3.2`, `-1.5e-7`), which a
+/// sheet only ever reads as a number: no name, reference or operator past
+/// its sign.
+fn formula_like(cell: &str) -> bool {
+    match cell.as_bytes().first() {
+        Some(b'=' | b'@') => true,
+        Some(b'+' | b'-') => !plain_number(&cell[1..]),
+        _ => false,
+    }
+}
+
+/// `digits[.digits][e[+|-]digits]`, nothing else.
+fn plain_number(text: &str) -> bool {
+    let digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    let (mantissa, exponent) = match text.split_once(['e', 'E']) {
+        Some((mantissa, exponent)) => (
+            mantissa,
+            Some(exponent.strip_prefix(['+', '-']).unwrap_or(exponent)),
+        ),
+        None => (text, None),
+    };
+    let mantissa = match mantissa.split_once('.') {
+        Some((whole, part)) => digits(whole) && digits(part),
+        None => digits(mantissa),
+    };
+    mantissa && exponent.is_none_or(digits)
+}
+
+/// The words between two cells of a row in the read-back, so a cell that
+/// holds a comma ("2%, cold") is still heard as one cell.
+pub const CELL_BREAK: &str = "; then ";
+
+/// Rows as the read-back says them: " Row 1: a; then b." each, an empty
+/// cell "blank".
+fn rows_said(rows: &[Vec<String>]) -> String {
+    rows.iter()
+        .enumerate()
+        .map(|(at, row)| {
+            let cells: Vec<&str> = row
+                .iter()
+                .map(|cell| if cell.is_empty() { "blank" } else { cell })
+                .collect();
+            format!(" Row {}: {}.", at + 1, cells.join(CELL_BREAK))
+        })
+        .collect()
+}
+
+/// Whether `entry`'s scopes hold one of [`DRIVE_WRITE_SCOPES`], each taken
+/// whole (a list kept as one spaced string read alike). No scope recorded
+/// is no write: such a link may be read-only, and linking it again
+/// through the app records its scopes.
+pub fn drive_may_write(entry: &Entry) -> bool {
+    entry
+        .scopes
+        .iter()
+        .flat_map(|scopes| scopes.split_whitespace())
+        .any(|scope| DRIVE_WRITE_SCOPES.contains(&scope))
+}
+
+/// A new Google Doc, Sheet or text file in My Drive, read back whole: its
+/// kind, its name and every word or cell in it. Nothing is edited, moved,
+/// shared, deleted or overwritten: Drive's one write makes a new file.
+fn drive_create(action: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
+    if !drive_may_write(entry) {
+        return Err(DRIVE_NO_WRITE_SCOPE.into());
+    }
+    let heading = title(args, "title")?;
+    let (kind, name, content, holding) = match action {
+        "create_sheet" => {
+            let rows = rows(args)?;
+            let holding = match rows.len() {
+                0 => ", empty.".to_owned(),
+                1 => format!(", with one row.{}", rows_said(&rows)),
+                many => format!(", with {many} rows.{}", rows_said(&rows)),
+            };
+            (DriveKind::Sheet, heading.to_owned(), csv(&rows), holding)
+        }
+        "create_doc" | "create_file" => {
+            let text = body(args, "text")?;
+            let (kind, name) = if action == "create_doc" {
+                (DriveKind::Doc, heading.to_owned())
+            } else if heading.to_ascii_lowercase().ends_with(".txt") {
+                (DriveKind::Text, heading.to_owned())
+            } else {
+                (DriveKind::Text, format!("{heading}.txt"))
+            };
+            (
+                kind,
+                name,
+                text.to_owned(),
+                format!(", saying: \"{text}\"."),
+            )
+        }
+        _ => return Err("the lamp doesn't make that in Google Drive".into()),
+    };
+    let mut boundary = format!("lamp-{}", random_id());
+    while name.contains(&boundary) || content.contains(&boundary) {
+        boundary = format!("lamp-{}", random_id());
+    }
+    Ok(Pending {
+        account: String::new(),
+        service: "google_drive",
+        link: 0,
+        read_back: format!(
+            "Make a new {} named \"{name}\" in your Google Drive{holding} Only you can see it, unless your Drive shares new files.",
+            kind.said()
+        ),
+        action: Action::Upload {
+            url: DRIVE_UPLOAD.to_owned(),
+            content_type: format!("multipart/related; boundary={boundary}"),
+            body: drive_upload(kind, &name, &content, &boundary),
+        },
+    })
+}
+
+/// The new file's name and link from Drive's answer, each only when it is
+/// plain: the link Google's own (`https://docs.google.com/…` or
+/// `https://drive.google.com/…`), never anything else the answer holds.
+pub fn made(answer: &str) -> Value {
+    let answer: Value = serde_json::from_str(answer).unwrap_or_default();
+    let mut made = serde_json::Map::new();
+    if let Some(name) = answer.get("name").and_then(Value::as_str).filter(|name| {
+        name.chars().count() <= TITLE_MOST + 4 && !name.chars().any(char::is_control)
+    }) {
+        made.insert("name".into(), json!(name));
+    }
+    if let Some(link) = answer
+        .get("webViewLink")
+        .and_then(Value::as_str)
+        .filter(|link| {
+            link.len() <= 512
+                && ["https://docs.google.com/", "https://drive.google.com/"]
+                    .iter()
+                    .any(|google| link.starts_with(google))
+                && !link.chars().any(|c| c.is_control() || c.is_whitespace())
+        })
+    {
+        made.insert("link".into(), json!(link));
+    }
+    Value::Object(made)
 }
 
 fn repo(args: &Value) -> Result<(&str, &str), String> {
@@ -906,6 +1275,364 @@ mod tests {
                 .contains("save_draft {to, cc, subject, text} (app password link only)")
         );
         assert!(!actions("gmail-app").contains("save_draft"));
+    }
+
+    /// The product's Drive link, as the backend sends it: `drive.file` and
+    /// the account's identity.
+    fn drive() -> Entry {
+        Entry {
+            auth_type: "oauth".into(),
+            scopes: vec![
+                "https://www.googleapis.com/auth/drive.file".into(),
+                "openid".into(),
+                "https://www.googleapis.com/auth/userinfo.email".into(),
+                "https://www.googleapis.com/auth/userinfo.profile".into(),
+            ],
+            ..Entry::default()
+        }
+    }
+
+    /// A Drive link that can't make a file is refused at the first call,
+    /// before any read-back, in words that say to link again (Thirteen's
+    /// P2 on #5825); `drive.file` or `drive` may.
+    #[test]
+    fn a_drive_write_needs_a_scope_that_makes_files_before_any_read_back() {
+        let ask = json!({"action":"create_doc","title":"Trip plan","text":"Day 1: Hue."});
+        let with = |scopes: &[&str]| Entry {
+            scopes: scopes.iter().map(|scope| (*scope).to_owned()).collect(),
+            ..drive()
+        };
+        for refused in [
+            with(&[]),
+            with(&["https://www.googleapis.com/auth/drive.readonly", "openid"]),
+            with(&["https://www.googleapis.com/auth/drive.metadata.readonly"]),
+            with(&["https://www.googleapis.com/auth/drive.file.evil"]),
+            with(&["drive.file"]),
+            Entry::default(),
+        ] {
+            assert_eq!(
+                prepare("google_drive", &ask, &refused).unwrap_err(),
+                DRIVE_NO_WRITE_SCOPE,
+                "{:?}",
+                refused.scopes
+            );
+        }
+        assert!(DRIVE_NO_WRITE_SCOPE.contains("link Google Drive again in the app"));
+        for may in [
+            drive(),
+            with(&["https://www.googleapis.com/auth/drive"]),
+            with(&["openid https://www.googleapis.com/auth/drive.file"]),
+        ] {
+            assert!(
+                prepare("google_drive", &ask, &may).is_ok(),
+                "{:?}",
+                may.scopes
+            );
+        }
+        // Every create is checked, a sheet and a text file too.
+        for action in ["create_sheet", "create_file"] {
+            let ask = json!({"action":action,"title":"T","text":"t","rows":[["a"]]});
+            assert_eq!(
+                prepare("google_drive", &ask, &with(&[])).unwrap_err(),
+                DRIVE_NO_WRITE_SCOPE
+            );
+            assert!(prepare("google_drive", &ask, &drive()).is_ok());
+        }
+    }
+
+    /// A cell that a CSV import could evaluate is refused: `=`, `+`, `-`
+    /// or `@` first, unless it is a plain signed number.
+    #[test]
+    fn a_sheet_cell_is_never_read_as_a_formula() {
+        for cell in [
+            "=1+1",
+            " =1+1",
+            "+1+1",
+            "-1+cmd|' /C calc'!A0",
+            "-A1",
+            "+SUM(A1:A2)",
+            "@SUM(A1)",
+            "-",
+            "+",
+            "-5.",
+            "-.5",
+            "-5e",
+            "-5e+",
+            "-1.2.3",
+            "- 5",
+        ] {
+            let ask = json!({"action":"create_sheet","title":"T","rows":[[cell]]});
+            assert!(prepare("google_drive", &ask, &drive()).is_err(), "{cell}");
+        }
+        for cell in [
+            "-5", "+3.2", "-1.5e-7", "+2E10", "5-3", "a=b", "2%", "x@y.co",
+        ] {
+            let ask = json!({"action":"create_sheet","title":"T","rows":[[cell]]});
+            assert!(prepare("google_drive", &ask, &drive()).is_ok(), "{cell}");
+        }
+        // A negative number given as a number is kept.
+        let ask = json!({"action":"create_sheet","title":"T","rows":[[-5, 3.5]]});
+        let sheet = prepare("google_drive", &ask, &drive()).unwrap();
+        assert!(sheet.read_back.contains("Row 1: -5; then 3.5."));
+    }
+
+    fn upload(pending: &Pending) -> (&str, &str, &str) {
+        let Action::Upload {
+            url,
+            content_type,
+            body,
+        } = &pending.action
+        else {
+            panic!("an upload");
+        };
+        (url, content_type, body)
+    }
+
+    /// The owner's ask made into one new Drive file, its whole content
+    /// read back first, on Drive's one upload route (#5385).
+    #[test]
+    fn drive_makes_a_doc_a_sheet_or_a_text_file_read_back_whole() {
+        let doc = prepare(
+            "google_drive",
+            &json!({"action":"create_doc","title":"Trip plan","text":"Day 1: Hue.\nDay 2: Hoi An."}),
+            &drive(),
+        )
+        .unwrap();
+        assert_eq!(doc.service, "google_drive");
+        assert_eq!(
+            doc.read_back,
+            "Make a new Google Doc named \"Trip plan\" in your Google Drive, saying: \"Day 1: Hue.\nDay 2: Hoi An.\". Only you can see it, unless your Drive shares new files."
+        );
+        let (url, content_type, body) = upload(&doc);
+        assert_eq!(
+            url,
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink"
+        );
+        let boundary = content_type
+            .strip_prefix("multipart/related; boundary=")
+            .unwrap();
+        assert!(
+            boundary.starts_with("lamp-") && boundary.len() == 37,
+            "{boundary}"
+        );
+        assert_eq!(
+            body,
+            drive_upload(
+                DriveKind::Doc,
+                "Trip plan",
+                "Day 1: Hue.\nDay 2: Hoi An.",
+                boundary
+            )
+        );
+        // On Drive's write list and host, never its read list.
+        let (host, path) = crate::net::split(url).unwrap();
+        assert!(catalog::host_allowed("google_drive", &host));
+        assert!(catalog::write_allowed("google_drive", Method::Post, &path));
+        assert!(catalog::read_allowed("google_drive", Method::Post, &path, None).is_err());
+
+        let sheet = prepare(
+            "google_drive",
+            &json!({"action":"create_sheet","title":"Groceries","rows":[["Item","Note","Count"],["Milk","2%, cold",2],["Eggs","say \"free range\"\nlarge",null]]}),
+            &drive(),
+        )
+        .unwrap();
+        assert_eq!(
+            sheet.read_back,
+            "Make a new Google Sheet named \"Groceries\" in your Google Drive, with 3 rows. Row 1: Item; then Note; then Count. Row 2: Milk; then 2%, cold; then 2. Row 3: Eggs; then say \"free range\"\nlarge; then blank. Only you can see it, unless your Drive shares new files."
+        );
+        let (_, content_type, body) = upload(&sheet);
+        let boundary = content_type
+            .strip_prefix("multipart/related; boundary=")
+            .unwrap();
+        let csv_text =
+            "Item,Note,Count\r\nMilk,\"2%, cold\",2\r\nEggs,\"say \"\"free range\"\"\nlarge\",";
+        assert_eq!(
+            body,
+            drive_upload(DriveKind::Sheet, "Groceries", csv_text, boundary)
+        );
+        assert!(body.contains("\"mimeType\":\"application/vnd.google-apps.spreadsheet\""));
+        assert!(body.contains("Content-Type: text/csv; charset=UTF-8\r\n\r\nItem,Note,Count\r\n"));
+        // Rows given as JSON text read alike; none makes an empty sheet.
+        let as_text = prepare(
+            "google_drive",
+            &json!({"action":"create_sheet","title":"Groceries","rows":"[[\"Item\",\"Note\",\"Count\"],[\"Milk\",\"2%, cold\",2],[\"Eggs\",\"say \\\"free range\\\"\\nlarge\",null]]"}),
+            &drive(),
+        )
+        .unwrap();
+        assert_eq!(as_text.read_back, sheet.read_back);
+        let empty = prepare(
+            "google_drive",
+            &json!({"action":"create_sheet","title":"Budget"}),
+            &drive(),
+        )
+        .unwrap();
+        assert!(
+            empty
+                .read_back
+                .contains("\"Budget\" in your Google Drive, empty.")
+        );
+
+        let file = prepare(
+            "google_drive",
+            &json!({"action":"create_file","title":"notes","text":"Call the plumber"}),
+            &drive(),
+        )
+        .unwrap();
+        assert!(
+            file.read_back
+                .starts_with("Make a new text file named \"notes.txt\" in your Google Drive, saying: \"Call the plumber\".")
+        );
+        let (_, content_type, body) = upload(&file);
+        let boundary = content_type
+            .strip_prefix("multipart/related; boundary=")
+            .unwrap();
+        assert_eq!(
+            body,
+            format!(
+                "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{{\"mimeType\":\"text/plain\",\"name\":\"notes.txt\"}}\r\n--{boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nCall the plumber\r\n--{boundary}--\r\n"
+            )
+        );
+        let named = prepare(
+            "google_drive",
+            &json!({"action":"create_file","title":"todo.TXT","text":"x"}),
+            &drive(),
+        )
+        .unwrap();
+        assert!(named.read_back.contains("\"todo.TXT\""));
+        // Each ask its own boundary.
+        assert_ne!(upload(&doc).1, upload(&named).1);
+    }
+
+    #[test]
+    fn a_drive_write_is_bounded_and_only_makes_a_new_file() {
+        let long_row: Vec<String> = (0..COLUMNS_MOST + 1).map(|at| at.to_string()).collect();
+        let many_rows: Vec<Vec<&str>> = (0..ROWS_MOST + 1).map(|_| vec!["a"]).collect();
+        let full_rows: Vec<Vec<String>> = (0..ROWS_MOST).map(|_| vec!["x".repeat(61)]).collect();
+        for args in [
+            json!({"action":"create_doc","text":"no title"}),
+            json!({"action":"create_doc","title":"   ","text":"blank title"}),
+            json!({"action":"create_doc","title":"Two\nlines","text":"t"}),
+            json!({"action":"create_doc","title":"x".repeat(TITLE_MOST + 1),"text":"t"}),
+            json!({"action":"create_doc","title":"T"}),
+            json!({"action":"create_doc","title":"T","text":"x".repeat(TEXT_MOST + 1)}),
+            json!({"action":"create_file","title":"T","text":"a\u{7}b"}),
+            json!({"action":"create_sheet","title":"T","rows":[long_row]}),
+            json!({"action":"create_sheet","title":"T","rows":many_rows}),
+            json!({"action":"create_sheet","title":"T","rows":full_rows}),
+            json!({"action":"create_sheet","title":"T","rows":[["=IMPORTDATA(\"https://x.test\")"]]}),
+            json!({"action":"create_sheet","title":"T","rows":[[" =1+1"]]}),
+            json!({"action":"create_sheet","title":"T","rows":[[{"a":1}]]}),
+            json!({"action":"create_sheet","title":"T","rows":["not a row"]}),
+            json!({"action":"create_sheet","title":"T","rows":"not json"}),
+            json!({"action":"create_sheet","title":"T","rows":7}),
+            // Never an edit, a move, a share, a delete or an overwrite.
+            json!({"action":"update","id":"x","text":"t"}),
+            json!({"action":"share","id":"x","to":"a@b.co"}),
+            json!({"action":"delete","id":"x"}),
+            json!({"action":"move","id":"x"}),
+            json!({"action":"create_folder","title":"T"}),
+        ] {
+            let refused = prepare("google_drive", &args, &drive());
+            assert!(refused.is_err(), "{args}");
+        }
+        // Every cap met, yet a read-back too long for the voice's answer
+        // is refused in plain words: the worst case, 50 rows of 10 blank
+        // cells (each said "blank"), and full cells alike (Reviewer-three's
+        // P2 on #5825).
+        let sheet = |cell: &str, count: usize| {
+            let rows: Vec<Vec<String>> = (0..count)
+                .map(|_| vec![cell.to_owned(); COLUMNS_MOST])
+                .collect();
+            json!({"action":"create_sheet","title":"x".repeat(TITLE_MOST),"rows":rows})
+        };
+        for args in [sheet("", ROWS_MOST), sheet(&"x".repeat(6), ROWS_MOST)] {
+            assert!(rows(&args).is_ok(), "within each cap");
+            assert_eq!(
+                prepare("google_drive", &args, &drive()).unwrap_err(),
+                READ_BACK_TOO_LONG
+            );
+        }
+        // A text at its cap whose quotes double as JSON, too.
+        assert_eq!(
+            prepare(
+                "google_drive",
+                &json!({"action":"create_doc","title":"T","text":"\"".repeat(TEXT_MOST)}),
+                &drive()
+            )
+            .unwrap_err(),
+            READ_BACK_TOO_LONG
+        );
+        // What is prepared always fits, up to the largest sheet that does.
+        let most = (1..=ROWS_MOST)
+            .take_while(|&count| prepare("google_drive", &sheet("", count), &drive()).is_ok())
+            .last()
+            .unwrap();
+        assert!(most >= 20, "{most}");
+        let fitted = prepare("google_drive", &sheet("", most), &drive()).unwrap();
+        assert!(json!(fitted.read_back).to_string().len() <= READ_BACK_JSON_MOST);
+        for args in [
+            json!({"action":"create_doc","title":"x".repeat(TITLE_MOST),"text":"x".repeat(TEXT_MOST)}),
+            json!({"action":"create_file","title":"x".repeat(TITLE_MOST),"text":"x".repeat(TEXT_MOST)}),
+        ] {
+            assert!(prepare("google_drive", &args, &drive()).is_ok(), "{args}");
+        }
+        let unknown = prepare(
+            "google_drive",
+            &json!({"action":"delete","id":"x"}),
+            &drive(),
+        )
+        .unwrap_err();
+        assert!(
+            unknown.contains("create_doc or create_file {title, text}"),
+            "{unknown}"
+        );
+    }
+
+    #[test]
+    fn csv_quotes_commas_quotes_and_line_breaks() {
+        let rows = vec![
+            vec![
+                "plain".to_owned(),
+                "a,b".to_owned(),
+                "say \"hi\"".to_owned(),
+            ],
+            vec![
+                "two\nlines".to_owned(),
+                "cr\rhere".to_owned(),
+                String::new(),
+            ],
+        ];
+        assert_eq!(
+            csv(&rows),
+            "plain,\"a,b\",\"say \"\"hi\"\"\"\r\n\"two\nlines\",\"cr\rhere\","
+        );
+        assert_eq!(csv(&[]), "");
+    }
+
+    #[test]
+    fn drives_answer_gives_the_name_and_googles_own_link_only() {
+        assert_eq!(
+            made(
+                r#"{"id":"1a","name":"Trip plan","webViewLink":"https://docs.google.com/document/d/1a/edit?usp=drivesdk"}"#
+            ),
+            json!({"name":"Trip plan","link":"https://docs.google.com/document/d/1a/edit?usp=drivesdk"})
+        );
+        assert_eq!(
+            made(r#"{"name":"n.txt","webViewLink":"https://drive.google.com/file/d/2b/view"}"#)["link"],
+            "https://drive.google.com/file/d/2b/view"
+        );
+        for link in [
+            "https://evil.test/document/d/1a",
+            "https://docs.google.com.evil.test/x",
+            "http://docs.google.com/document/d/1a",
+            "https://docs.google.com/a b",
+            "javascript:alert(1)",
+        ] {
+            let answer = json!({"name":"n","webViewLink":link}).to_string();
+            assert_eq!(made(&answer), json!({"name":"n"}), "{link}");
+        }
+        assert_eq!(made("not json"), json!({}));
+        assert_eq!(made(r#"{"name":"a\nb"}"#), json!({}));
     }
 
     #[test]
