@@ -720,6 +720,21 @@ def test_a_light_kept_for_seconds_is_asked_again_until_its_time_or_a_stop(tmp_pa
     run(go())
 
 
+def test_a_kept_light_ends_on_an_express(tmp_path):
+    """eighth's P3 on #6170: an express lights too, so a kept colour must not come back over it."""
+
+    async def go():
+        async with connected(tmp_path, grants=("body", "light", "speak", "look")) as (fake, lamp, session):
+            lamp.limits["hold_max_ms"] = 2000
+            await session.call_tool("lamp_light", {"colour": "warm", "level": 2, "keep_for_s": 60})
+            await session.call_tool("lamp_express", {"feeling": "glad"})
+            before = len(fake.asked("light"))
+            await asyncio.sleep(2.5)
+            assert len(fake.asked("light")) == before  # nothing asks the colour again over the express
+
+    run(go())
+
+
 def test_every_time_argument_says_its_unit_in_the_tool_description(tmp_path):
     """The desk-app friction log, 10 Nov: the tools mix `for_ms`, `seconds`, `wait_s` and `timeout_s`, and an agent
     guessed `seconds` for a light. Each such tool says its unit, so a guess is one read away."""

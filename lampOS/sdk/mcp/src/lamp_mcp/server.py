@@ -19,6 +19,7 @@ import asyncio
 import base64
 import collections
 import importlib.metadata
+import math
 import os
 import sys
 import socket
@@ -473,6 +474,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         @server.tool()
         async def lamp_express(feeling: str, strength: float = 0.5) -> str:
             """Show a feeling in the body and the light, as the lamp shows its own: glad, lively or low. `strength` 0 to 1: from 0.5 up the lamp's whole move, a smaller step of it below."""
+            await end_light_keep()  # it lights too: a light kept by lamp_light must not come back over it
             await act("express", feeling=feeling, strength=strength)
             return f"expressing {feeling}"
 
@@ -585,8 +587,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 return
             try:
                 await lamp.light(colour, level, max(1, min(int(remaining * 1000), hold_ms)), pattern)
-            except LampError:
-                return  # the lamp refused: the hold is over, the next lamp_light says why
+            except Exception:  # a refusal, or a closed connection: the hold is over, the next lamp_light says why
+                return
 
     if allowed("light"):
 
@@ -608,6 +610,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             if keep_for_s is None:
                 await act("light", colour=colour, level=level, for_ms=min(for_ms, 30_000), pattern=pattern)
                 return f"{colour} light for {min(for_ms, 30_000)} ms"
+            if not math.isfinite(keep_for_s):
+                raise ToolError("bad_request: keep_for_s is a number of seconds, 1 to 600")
             keep_s = min(max(keep_for_s, 1.0), 600.0)
             await act("light", colour=colour, level=level, for_ms=min(int(keep_s * 1000), hold_ms), pattern=pattern)
             if keep_s * 1000 > hold_ms:
