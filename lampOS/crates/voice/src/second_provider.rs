@@ -10022,7 +10022,13 @@ fn send_outcome_only(told: &Value) -> Value {
     if *told == crate::tools::unavailable() {
         crate::tools::unavailable()
     } else {
-        serde_json::json!({"sent": told["sent"] == true})
+        // A saved draft's receipt keeps its success, never as "sent"
+        // (Reviewer-two's HOLD on #5982 at `447e218c55`).
+        if told["sent"] != true && told["saved"] == true {
+            serde_json::json!({"sent": false, "saved": true})
+        } else {
+            serde_json::json!({"sent": told["sent"] == true})
+        }
     }
 }
 
@@ -10033,11 +10039,13 @@ struct SendAttempt {
 }
 
 const SENT_REDACTED_NOTE: &str = "(For you to know: their earlier write was already sent. Its details were forgotten. Confirm only that it was sent; do not reconstruct its contents or call service_write again for it.)";
+/// [`SENT_REDACTED_NOTE`] for a draft that was saved, never called sent.
+const SAVED_REDACTED_NOTE: &str = "(For you to know: their earlier draft was already saved, not sent. Its details were forgotten. Confirm only that it was saved as a draft; do not reconstruct its contents or call service_write again for it.)";
 const SEND_REDACTED_REFUSED_NOTE: &str = "(For you to know: the earlier write was not sent. Its details were forgotten; do not reconstruct or describe them.)";
 
 /// Told the model answering words again whose own write their go-ahead
 /// sent (#5853), beside the send's call and result.
-const SENT_WRITE_NOTE: &str = "(For you to know: their go-ahead already sent the write they asked for; its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)";
+const SENT_WRITE_NOTE: &str = "(For you to know: their go-ahead already sent the write they asked for (or, for a draft, saved it); its service_write call and result are given with their words. Say in a few words what was done; do not call service_write again for it.)";
 /// The same, when the send's answer did not come within
 /// [`crate::services::DEADLINE`]: sent, its result not known, never "nothing
 /// was sent".
@@ -10051,7 +10059,7 @@ const SEND_NOT_KNOWN: &str = "Not run: whether the write their go-ahead asked fo
 const SENDS_KEPT: usize = 8;
 /// What a `service_write` is told in a turn answering words whose write was
 /// sent ([`sent_already`]): nothing runs, so no new read-back follows.
-const ALREADY_SENT: &str = "Not run: the write their go-ahead asked for was already sent. Do not prepare it again; confirm only that it was sent.";
+const ALREADY_SENT: &str = "Not run: the write their go-ahead asked for was already sent (or, for a draft, saved). Do not prepare it again; confirm only that it was sent (or, for a draft, saved).";
 
 /// A new attempt id for `call` of `request` when it is a write's send
 /// ([`crate::services::may_send`]), and its arguments marked with it
@@ -10089,7 +10097,7 @@ fn refused(sent: &SentWrite) -> bool {
     sent.told
         .borrow()
         .as_ref()
-        .is_some_and(|told| told["sent"] != true && *told != crate::tools::unavailable())
+        .is_some_and(|told| !crate::services::went(told) && *told != crate::tools::unavailable())
 }
 
 /// `running`, `call` of `request`'s turn: a write's send (`attempt` from
@@ -10298,19 +10306,24 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
         })
         .collect();
     let redacted = tries.iter().any(|tried| tried.call.is_none());
+    // A saved draft is a success too: its repeat is refused as a sent
+    // write's is (Reviewer-two's HOLD on #5982 at `447e218c55`).
     let confirmed = tries
+        .iter()
+        .any(|tried| tried.got == Got::Told && crate::services::went(&tried.told));
+    let only_saved = !tries
         .iter()
         .any(|tried| tried.got == Got::Told && tried.told["sent"] == true);
     let asked = tries.iter().any(|tried| tried.got == Got::Asked);
     let unknown = tries.iter().any(|tried| tried.got == Got::Unknown);
     let note = if tries
         .iter()
-        .any(|tried| tried.got == Got::Told && tried.told["sent"] == true)
+        .any(|tried| tried.got == Got::Told && crate::services::went(&tried.told))
     {
-        Some(if redacted {
-            SENT_REDACTED_NOTE
-        } else {
-            SENT_WRITE_NOTE
+        Some(match (redacted, only_saved) {
+            (true, true) => SAVED_REDACTED_NOTE,
+            (true, false) => SENT_REDACTED_NOTE,
+            (false, _) => SENT_WRITE_NOTE,
         })
     } else if asked {
         Some(if redacted {
@@ -10332,6 +10345,7 @@ async fn sent_with_words(shared: &Shared, origins: &[u64], request: u64) -> Sent
         match note {
             Some(SENT_WRITE_NOTE) => "the sent one and each try's own result",
             Some(SENT_REDACTED_NOTE) => "only confirmation of the earlier send",
+            Some(SAVED_REDACTED_NOTE) => "only confirmation of the earlier saved draft",
             Some(SEND_REDACTED_REFUSED_NOTE) => "only the earlier refusal",
             Some(SENT_UNKNOWN_NOTE) => "a send whose result is not known",
             Some(_) => "a send not known to have gone",

@@ -4,6 +4,8 @@
 //! and a random `send_id`; nothing is sent. The same `send_id` with
 //! `"said":"send"` sends exactly that write, once. Anything else, a second
 //! try or a late one, sends nothing. Off unless `LAMP_SERVICES_WRITE=on`.
+//! Gmail's `save_draft`, over an app password's link only, goes the same
+//! two phases and is saved in Drafts, never sent.
 use crate::catalog::{self, FACEBOOK_VERSION, Method};
 use crate::mail::{self, Outgoing};
 use crate::reads::{self, page_id};
@@ -28,6 +30,8 @@ pub const RECIPIENTS_MOST: usize = 20;
 pub enum Action {
     /// A mail through Gmail's SMTP.
     Mail(Outgoing),
+    /// A mail saved in Gmail's Drafts over IMAP, never sent.
+    Draft(Outgoing),
     /// One HTTP call on the service's write list, before its token.
     Http {
         method: Method,
@@ -44,11 +48,19 @@ pub struct Pending {
     pub service: &'static str,
     pub action: Action,
     pub read_back: String,
+    /// The linked account it was prepared as ([`Entry::account`]): a link
+    /// replaced by another account's before the "send" sends or saves
+    /// nothing (Reviewer-two on #5982: a draft prepared as one account was
+    /// saved into the next one linked).
+    pub account: String,
 }
 
 /// What each service writes, by `action`, for the tools' description.
 pub const ACTIONS: &[(&str, &str)] = &[
-    ("gmail", "send_mail {to, cc, subject, text}"),
+    (
+        "gmail",
+        "send_mail {to, cc, subject, text}, save_draft {to, cc, subject, text} (app password link only)",
+    ),
     ("gmail-app", "send_mail {to, cc, subject, text}"),
     (
         "google_calendar",
@@ -64,6 +76,12 @@ pub const ACTIONS: &[(&str, &str)] = &[
     ("figma-api", "comment {id, text}"),
     ("facebook", "page_post {text}"),
 ];
+
+/// What a Gmail link that can't save a draft answers `save_draft`: a
+/// Google sign-in's (`gmail-app`, or `gmail` made with one). Its own words
+/// are the voice's interim line (#5962), so the person still hears the
+/// send it offers.
+pub const NO_DRAFTS: &str = "this Gmail link can't save drafts: only one linked with an app password can. Say \"I can't save a draft yet. I can read it back and send it when you say 'send it'.\"";
 
 /// What an MCP service writes, for the tools' description.
 pub const MCP_ACTIONS: &str = "call {tool, arguments}";
@@ -175,6 +193,7 @@ pub fn prepare_mcp(
     }
     crate::mcp::write_allowed(service.code, name, &arguments)?;
     Ok(Pending {
+        account: entry.account(),
         service: service.code,
         read_back: crate::mcp::read_back(service, entry, tool, &arguments),
         action: Action::Mcp {
@@ -271,6 +290,7 @@ fn http(
     read_back: String,
 ) -> Result<Pending, String> {
     Ok(Pending {
+        account: String::new(),
         service: code,
         action: Action::Http {
             method,
@@ -282,8 +302,16 @@ fn http(
 }
 
 /// A write checked and read back, or why not. `entry` is the linked
-/// account it is made as.
+/// account it is made as, and the write is bound to it.
 pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
+    prepare_unbound(code, args, entry).map(|pending| Pending {
+        account: entry.account(),
+        ..pending
+    })
+}
+
+/// [`prepare`], its account not yet bound.
+fn prepare_unbound(code: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
     let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
     let code = service.code;
     let action = text(args, "action").ok_or("the write needs its action")?;
@@ -294,36 +322,39 @@ pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, Strin
     match (code, action) {
         // An app password's link or a Google sign-in's, sent alike.
         ("gmail" | "gmail-app", "send_mail") => {
-            let to = addresses(args, "to")?;
-            let cc = addresses(args, "cc")?;
-            if to.is_empty() {
-                return Err("the mail needs at least one address in to".into());
-            }
-            if to.len() + cc.len() > RECIPIENTS_MOST {
-                return Err(format!("a mail goes to at most {RECIPIENTS_MOST} people"));
-            }
-            let subject = title(args, "subject")?;
-            let text = body(args, "text")?;
-            let copy = if cc.is_empty() {
-                String::new()
-            } else {
-                format!(", with a copy to {}", cc.join(", "))
-            };
+            let (out, copy) = outgoing(args)?;
             Ok(Pending {
+                account: String::new(),
                 service: code,
                 read_back: format!(
-                    "Send an email from {} to {}{copy}. Subject: \"{subject}\". It says: \"{text}\". Only the people named get it.",
+                    "Send an email from {} to {}{copy}. Subject: \"{}\". It says: \"{}\". Only the people named get it.",
                     entry.account(),
-                    to.join(", ")
+                    out.to.join(", "),
+                    out.subject,
+                    out.text,
                 ),
-                action: Action::Mail(Outgoing {
-                    to,
-                    cc,
-                    subject: subject.to_owned(),
-                    text: text.to_owned(),
-                }),
+                action: Action::Mail(out),
             })
         }
+        // The owner's ask of 10 Nov: a mail drafted by voice saved in
+        // Gmail's Drafts, over the app password's IMAP (APPEND); a Google
+        // sign-in's link has no `gmail.compose` here and saves none.
+        ("gmail", "save_draft") if !entry.oauth() => {
+            let (out, copy) = outgoing(args)?;
+            Ok(Pending {
+                account: String::new(),
+                service: code,
+                read_back: format!(
+                    "Save a draft to {}{copy}, in the Gmail Drafts of {}. Subject: \"{}\". It says: \"{}\". Nothing is sent.",
+                    out.to.join(", "),
+                    entry.account(),
+                    out.subject,
+                    out.text,
+                ),
+                action: Action::Draft(out),
+            })
+        }
+        ("gmail" | "gmail-app", "save_draft") => Err(NO_DRAFTS.into()),
         ("google_calendar", "create_event") => {
             let calendar = text(args, "calendar").unwrap_or("primary");
             if calendar.len() > 256 || calendar.contains(['/', '\\']) {
@@ -501,6 +532,35 @@ pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, Strin
             })
         }
     }
+}
+
+/// A mail's recipients, subject and text, each checked, and the words
+/// that say its copies in a read-back.
+fn outgoing(args: &Value) -> Result<(Outgoing, String), String> {
+    let to = addresses(args, "to")?;
+    let cc = addresses(args, "cc")?;
+    if to.is_empty() {
+        return Err("the mail needs at least one address in to".into());
+    }
+    if to.len() + cc.len() > RECIPIENTS_MOST {
+        return Err(format!("a mail goes to at most {RECIPIENTS_MOST} people"));
+    }
+    let subject = title(args, "subject")?.to_owned();
+    let text = body(args, "text")?.to_owned();
+    let copy = if cc.is_empty() {
+        String::new()
+    } else {
+        format!(", with a copy to {}", cc.join(", "))
+    };
+    Ok((
+        Outgoing {
+            to,
+            cc,
+            subject,
+            text,
+        },
+        copy,
+    ))
 }
 
 fn repo(args: &Value) -> Result<(&str, &str), String> {
@@ -792,6 +852,60 @@ mod tests {
         ] {
             assert!(prepare(code, &args, &gmail()).is_err(), "{code} {args}");
         }
+    }
+
+    /// The owner's ask of 10 Nov: `save_draft` is prepared as `send_mail`
+    /// is, read back as a draft that sends nothing, and only over an app
+    /// password's link; a Google sign-in's Gmail is told it can't.
+    #[test]
+    fn a_draft_is_read_back_as_a_draft_and_only_for_an_app_password() {
+        let args = json!({
+            "action": "save_draft",
+            "to": ["mom@home.test"],
+            "subject": "Dinner",
+            "text": "Home by 7.\nLove",
+        });
+        let pending = prepare("gmail", &args, &gmail()).unwrap();
+        assert_eq!(
+            pending.read_back,
+            "Save a draft to mom@home.test, in the Gmail Drafts of me@home.test. Subject: \"Dinner\". It says: \"Home by 7.\nLove\". Nothing is sent."
+        );
+        assert_eq!(
+            pending.action,
+            Action::Draft(Outgoing {
+                to: vec!["mom@home.test".into()],
+                cc: Vec::new(),
+                subject: "Dinner".into(),
+                text: "Home by 7.\nLove".into(),
+            })
+        );
+        // Checked as a send is.
+        for bad in [
+            json!({"action":"save_draft","subject":"s","text":"t"}),
+            json!({"action":"save_draft","to":"a@b.co","subject":"s\r\nBcc: x@y.z","text":"t"}),
+            json!({"action":"save_draft","to":"a@b.co","subject":"s"}),
+        ] {
+            assert!(prepare("gmail", &bad, &gmail()).is_err(), "{bad}");
+        }
+        // A Google sign-in's link, either name: refused with the interim line.
+        let signed_in = gmail_scoped(json!(["https://www.googleapis.com/auth/gmail.send"]));
+        for code in ["gmail", "gmail-app"] {
+            assert_eq!(prepare(code, &args, &signed_in), Err(NO_DRAFTS.to_owned()));
+        }
+        assert!(NO_DRAFTS.contains("I can't save a draft yet."));
+        // Told only as gmail's, the app password's.
+        let actions = |code: &str| {
+            ACTIONS
+                .iter()
+                .find(|(service, _)| *service == code)
+                .unwrap()
+                .1
+        };
+        assert!(
+            actions("gmail")
+                .contains("save_draft {to, cc, subject, text} (app password link only)")
+        );
+        assert!(!actions("gmail-app").contains("save_draft"));
     }
 
     #[test]

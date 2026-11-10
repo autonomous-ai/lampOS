@@ -1,10 +1,12 @@
 //! Gmail on the lamp: a small IMAP client (LOGIN, LIST, EXAMINE, UID SEARCH,
-//! UID FETCH of headers and text, LOGOUT) over TLS to `imap.gmail.com:993`,
-//! and SMTP over TLS to `smtp.gmail.com:465` (AUTH PLAIN or LOGIN, one
-//! message). `recent` reads the inbox; `search` reads All Mail, as Gmail's
-//! own search does (the mailbox LIST flags `\All`, else the inbox). A
-//! mailbox is only ever opened with EXAMINE, read-only, and every body is
-//! fetched with `BODY.PEEK`, so reading marks nothing read.
+//! UID FETCH of headers and text, APPEND of one draft, LOGOUT) over TLS to
+//! `imap.gmail.com:993`, and SMTP over TLS to `smtp.gmail.com:465` (AUTH
+//! PLAIN or LOGIN, one message). `recent` reads the inbox; `search` reads
+//! All Mail, as Gmail's own search does (the mailbox LIST flags `\All`, else
+//! the inbox); `drafts` reads Drafts (the mailbox LIST flags `\Drafts`, else
+//! `[Gmail]/Drafts`). A mailbox is only ever opened with EXAMINE, read-only,
+//! and every body is fetched with `BODY.PEEK`, so reading marks nothing
+//! read. A draft is saved with APPEND to Drafts alone, never sent.
 //!
 //! One-time codes and security mails (sign-in codes, password resets,
 //! sign-in alerts, verification) are found by [`is_security_mail`]: the
@@ -40,6 +42,11 @@ pub const WITHIN: Duration = Duration::from_secs(20);
 pub const CONNECT_WITHIN: Duration = Duration::from_secs(5);
 /// The longest protocol line read.
 const LINE_MOST: usize = 65_536;
+/// The most untagged responses taken while a literal waits for its `+`.
+const UNTAGGED_BEFORE_MOST: usize = 100;
+/// How long LOGOUT's answer is waited for: past a saved draft or a read,
+/// its answer changes nothing.
+const LOGOUT_WITHIN: Duration = Duration::from_secs(2);
 /// The longest literal read (an attachment's part, fetched at most
 /// [`attachments::ATTACHMENT_FETCH`]; a PDF's, at most
 /// [`attachments::PDF_FETCH`], raises it for that fetch alone), and all of
@@ -88,6 +95,9 @@ impl Failure {
 pub struct MailItem {
     pub id: String,
     pub from: String,
+    /// Whom a draft is to; empty for any other mail, whose `To` is mostly
+    /// the person's own address.
+    pub to: String,
     pub subject: String,
     pub date: String,
     pub text: String,
@@ -100,15 +110,17 @@ pub struct MailItem {
 pub enum MailAsk {
     /// The newest mails, at most this many.
     Recent(usize),
+    /// The newest drafts in Drafts, at most this many (over IMAP only).
+    Drafts(usize),
     /// Gmail's own search words (`X-GM-RAW`), at most this many.
     Search(String, usize),
     /// One mail by its id (over IMAP its UID in the inbox, or
-    /// [`ALL_MAIL_ID`] and its UID in All Mail; Gmail's own id over the
-    /// REST API), with its text.
+    /// [`ALL_MAIL_ID`] and its UID in All Mail, or [`DRAFTS_ID`] and its UID
+    /// in Drafts; Gmail's own id over the REST API), with its text.
     Message(String),
 }
 
-/// One message to send, from the account itself.
+/// One message to send, or to save as a draft, from the account itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Outgoing {
     pub to: Vec<String>,
@@ -117,7 +129,7 @@ pub struct Outgoing {
     pub text: String,
 }
 
-/// What reads and sends mail; a fake in tests.
+/// What reads, sends and saves drafts of mail; a fake in tests.
 pub trait Mail {
     fn login(&self, user: &str, pass: &str) -> impl Future<Output = Result<(), Failure>>;
     fn read(
@@ -142,6 +154,13 @@ pub trait Mail {
         id: &str,
         pick: &Pick,
     ) -> impl Future<Output = Result<Option<MailItem>, Failure>>;
+    /// `out` saved in the account's Drafts, never sent.
+    fn draft(
+        &self,
+        user: &str,
+        pass: &str,
+        out: &Outgoing,
+    ) -> impl Future<Output = Result<(), Failure>>;
 }
 
 mod attachments;
@@ -1871,17 +1890,33 @@ pub struct Imap<S> {
 /// so the id carries which one, and `message` and `attachment` open that
 /// one again.
 pub const ALL_MAIL_ID: &str = "all";
+/// Before a UID from Drafts in a mail's id over IMAP (`draft12`).
+pub const DRAFTS_ID: &str = "draft";
+/// Drafts' English name, where a draft goes when no mailbox LIST flags
+/// `\Drafts`.
+pub const DRAFTS_FALLBACK: &str = "[Gmail]/Drafts";
 
-/// A mail's id over IMAP: whether its UID is All Mail's, and the UID.
-pub(crate) fn imap_id(id: &str) -> Option<(bool, u32)> {
-    let (in_all, uid) = match id.strip_prefix(ALL_MAIL_ID) {
-        Some(uid) => (true, uid),
-        None => (false, id),
+/// Which mailbox a mail's id over IMAP names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Folder {
+    Inbox,
+    AllMail,
+    Drafts,
+}
+
+/// A mail's id over IMAP: the mailbox its UID is in, and the UID.
+pub(crate) fn imap_id(id: &str) -> Option<(Folder, u32)> {
+    let (folder, uid) = if let Some(uid) = id.strip_prefix(ALL_MAIL_ID) {
+        (Folder::AllMail, uid)
+    } else if let Some(uid) = id.strip_prefix(DRAFTS_ID) {
+        (Folder::Drafts, uid)
+    } else {
+        (Folder::Inbox, id)
     };
     if uid.is_empty() || !uid.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    Some((in_all, uid.parse().ok()?))
+    Some((folder, uid.parse().ok()?))
 }
 
 /// Whether `id` is one an IMAP list gives.
@@ -1910,6 +1945,19 @@ fn imap_unquoted(text: &str) -> Option<(String, &str)> {
 /// `[Gmail]/All Mail` does. The name may come quoted, as an atom or as a
 /// literal.
 fn all_mail_name(response: &Response) -> Option<String> {
+    special_name(response, "\\All")
+}
+
+/// The mailbox a `LIST` response names when it is flagged `\Drafts` (RFC
+/// 6154), as [`all_mail_name`] reads `\All`: a Vietnamese account's Drafts
+/// is `[Gmail]/Th&AbA- nh&AOE-p` ("Thư nháp").
+fn drafts_name(response: &Response) -> Option<String> {
+    special_name(response, "\\Drafts")
+}
+
+/// The mailbox a `LIST` response names when it is flagged `used` and can
+/// be opened.
+fn special_name(response: &Response, used: &str) -> Option<String> {
     if !response.text.get(..7)?.eq_ignore_ascii_case("* LIST ") {
         return None;
     }
@@ -1919,7 +1967,7 @@ fn all_mail_name(response: &Response) -> Option<String> {
             .split_whitespace()
             .any(|flag| flag.eq_ignore_ascii_case(name))
     };
-    if !flagged("\\All") || flagged("\\Noselect") || flagged("\\NonExistent") {
+    if !flagged(used) || flagged("\\Noselect") || flagged("\\NonExistent") {
         return None;
     }
     // The hierarchy delimiter: one quoted character, or NIL.
@@ -2063,6 +2111,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
     ) -> Result<Vec<Response>, Failure> {
         self.tag += 1;
         let tag = format!("A{}", self.tag);
+        let mut untagged = Vec::new();
         match literal {
             None => {
                 self.write(format!("{tag} {command}\r\n").as_bytes())
@@ -2071,16 +2120,35 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
             Some(literal) => {
                 self.write(format!("{tag} {command} {{{}}}\r\n", literal.len()).as_bytes())
                     .await?;
-                let go_on = self.response().await?;
-                if !go_on.text.starts_with('+') {
-                    return Err(Failure::Refused);
+                // Untagged responses may come before the go-ahead (RFC
+                // 3501 2.2.1: Gmail may say "* OK Still connected"); kept
+                // as the command's, at most [`UNTAGGED_BEFORE_MOST`]. A
+                // tagged answer is a refusal, a `* BYE` the end.
+                loop {
+                    let go_on = self.response().await?;
+                    if go_on.text.starts_with('+') {
+                        break;
+                    }
+                    if go_on.text.starts_with("* ")
+                        && !go_on.text[2..]
+                            .get(..3)
+                            .is_some_and(|bye| bye.eq_ignore_ascii_case("BYE"))
+                        && untagged.len() < UNTAGGED_BEFORE_MOST
+                    {
+                        untagged.push(go_on);
+                        continue;
+                    }
+                    return Err(if go_on.text.starts_with(&format!("{tag} ")) {
+                        Failure::Refused
+                    } else {
+                        Failure::Unreached
+                    });
                 }
                 let mut rest = literal.to_vec();
                 rest.extend_from_slice(b"\r\n");
                 self.write(&rest).await?;
             }
         }
-        let mut untagged = Vec::new();
         loop {
             let response = self.response().await?;
             if let Some(status) = response.text.strip_prefix(&format!("{tag} ")) {
@@ -2121,26 +2189,55 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
     /// none when no mailbox is (the account shows no All Mail over IMAP)
     /// or the LIST is refused.
     pub async fn all_mail(&mut self) -> Result<Option<String>, Failure> {
+        self.listed(all_mail_name).await
+    }
+
+    /// LIST "" "*": the name of Drafts, the mailbox flagged `\Drafts`, else
+    /// [`DRAFTS_FALLBACK`].
+    pub async fn drafts(&mut self) -> Result<String, Failure> {
+        Ok(self
+            .listed(drafts_name)
+            .await?
+            .unwrap_or_else(|| DRAFTS_FALLBACK.to_owned()))
+    }
+
+    /// LIST "" "*": the first mailbox `name` finds; none when none is, or
+    /// the LIST is refused.
+    async fn listed(
+        &mut self,
+        name: fn(&Response) -> Option<String>,
+    ) -> Result<Option<String>, Failure> {
         match self.run("LIST \"\" \"*\"", None).await {
-            Ok(listed) => Ok(listed.iter().find_map(all_mail_name)),
+            Ok(listed) => Ok(listed.iter().find_map(name)),
             Err(Failure::Refused) => Ok(None),
             Err(_) => Err(Failure::Unreached),
         }
     }
 
-    /// EXAMINE of the mailbox a mail's id names: All Mail for `in_all`,
-    /// else the inbox. False, nothing opened, when All Mail is no longer
-    /// shown over IMAP (no such mail here).
-    pub async fn examine_named(&mut self, in_all: bool) -> Result<bool, Failure> {
-        let mailbox = if in_all {
-            self.all_mail().await?
-        } else {
-            Some("INBOX".to_owned())
+    /// EXAMINE of the mailbox a mail's id names: All Mail, Drafts (found
+    /// by its `\Drafts` flag, else [`DRAFTS_FALLBACK`]) or the inbox. False,
+    /// nothing opened, when All Mail is no longer shown over IMAP (no such
+    /// mail here).
+    pub(crate) async fn examine_named(&mut self, folder: Folder) -> Result<bool, Failure> {
+        let mailbox = match folder {
+            Folder::AllMail => self.all_mail().await?,
+            Folder::Drafts => Some(self.drafts().await?),
+            Folder::Inbox => Some("INBOX".to_owned()),
         };
         match mailbox {
             Some(mailbox) => self.examine(&mailbox).await.map(|()| true),
             None => Ok(false),
         }
+    }
+
+    /// APPEND: `message` saved in `mailbox` flagged `\Draft \Seen`, as a
+    /// draft the person has seen; a refusal is [`Failure::Unreached`].
+    pub async fn append_draft(&mut self, mailbox: &str, message: &[u8]) -> Result<(), Failure> {
+        let mailbox = imap_quoted(mailbox).ok_or(Failure::Unreached)?;
+        self.run(&format!("APPEND {mailbox} (\\Draft \\Seen)"), Some(message))
+            .await
+            .map(|_| ())
+            .map_err(|_| Failure::Unreached)
     }
 
     /// UID SEARCH: every UID found, oldest first. `words` are Gmail's own
@@ -2194,7 +2291,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
         let fetched = self
             .run(
                 &format!(
-                    "UID FETCH {set} (UID BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] BODY.PEEK[TEXT]<0.{text_most}>{structure})"
+                    "UID FETCH {set} (UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] BODY.PEEK[TEXT]<0.{text_most}>{structure})"
                 ),
                 None,
             )
@@ -2235,6 +2332,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
                     MailItem {
                         id: uid.to_string(),
                         from: field("from"),
+                        to: field("to"),
                         subject: field("subject"),
                         date: field("date"),
                         text,
@@ -2253,13 +2351,14 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
 
     /// LOGOUT, its answer not waited on for long.
     pub async fn logout(&mut self) {
-        let _ = tokio::time::timeout(Duration::from_secs(2), self.run("LOGOUT", None)).await;
+        let _ = tokio::time::timeout(LOGOUT_WITHIN, self.run("LOGOUT", None)).await;
     }
 }
 
 /// A whole read: login, the mailbox opened read-only (`recent` the inbox;
-/// `search` All Mail, else the inbox; `message` the one its id names), the
-/// search or the one mail, logout.
+/// `search` All Mail, else the inbox; `drafts` Drafts; `message` the one its
+/// id names), the search or the one mail, logout. Only a draft keeps whom
+/// it is to.
 pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
     stream: S,
     user: &str,
@@ -2269,7 +2368,7 @@ pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
     let mut imap = Imap::new(stream);
     imap.greet().await?;
     imap.login(user, pass).await?;
-    let items = match ask {
+    let mut items = match ask {
         MailAsk::Recent(most) => {
             imap.examine("INBOX").await?;
             let uids = imap.search(None).await?;
@@ -2289,9 +2388,20 @@ pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
             }
             items
         }
+        MailAsk::Drafts(most) => {
+            let drafts = imap.drafts().await?;
+            imap.examine(&drafts).await?;
+            let uids = imap.search(None).await?;
+            let newest = &uids[uids.len().saturating_sub(*most)..];
+            let mut items = imap.fetch(newest, PREVIEW_FETCH, PREVIEW_MOST).await?;
+            for item in &mut items {
+                item.id = format!("{DRAFTS_ID}{}", item.id);
+            }
+            items
+        }
         MailAsk::Message(id) => {
-            let (in_all, uid) = imap_id(id).ok_or(Failure::Unreached)?;
-            if imap.examine_named(in_all).await? {
+            let (folder, uid) = imap_id(id).ok_or(Failure::Unreached)?;
+            if imap.examine_named(folder).await? {
                 let mut items = imap.fetch(&[uid], MESSAGE_FETCH, TEXT_MOST).await?;
                 for item in &mut items {
                     item.id.clone_from(id);
@@ -2303,8 +2413,69 @@ pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
             }
         }
     };
+    let drafts = match ask {
+        MailAsk::Drafts(_) => true,
+        MailAsk::Message(id) => imap_id(id).is_some_and(|(folder, _)| folder == Folder::Drafts),
+        _ => false,
+    };
+    if !drafts {
+        for item in &mut items {
+            item.to.clear();
+        }
+    }
     imap.logout().await;
     Ok(items)
+}
+
+/// The whole of one draft's save up to APPEND's tagged OK, connecting
+/// and TLS included: well inside the 20 s the voice waits for a services
+/// call (`lamp-voice`'s `services::DEADLINE`, its test holding this at
+/// least 3 s under it), so a draft saved is never told the person as
+/// unavailable (Reviewer-two on #5982: 5 s TCP, 5 s TLS, 20 s exchange and
+/// 2 s LOGOUT could end past it).
+pub const DRAFT_WITHIN: Duration = Duration::from_secs(15);
+
+/// One draft saved on the stream `connect` gives: login, Drafts found by
+/// its `\Drafts` flag (else [`DRAFTS_FALLBACK`]), `message` appended to it
+/// as a draft, all within `within`. Nothing is sent: no SMTP is spoken, and
+/// APPEND only files a message. APPEND's tagged OK is the save, answered
+/// at once: LOGOUT runs after, apart, at most [`LOGOUT_WITHIN`], and
+/// whatever it answers, or none, never delays or undoes the save (RFC 3501
+/// 6.3.11).
+pub async fn draft_over<S, C>(
+    connect: C,
+    user: &str,
+    pass: &str,
+    message: &[u8],
+    within: Duration,
+) -> Result<(), Failure>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    C: Future<Output = Result<S, Failure>>,
+{
+    let mut imap = tokio::time::timeout(within, async {
+        let mut imap = Imap::new(connect.await?);
+        imap.greet().await?;
+        imap.login(user, pass).await?;
+        let drafts = imap.drafts().await?;
+        imap.append_draft(&drafts, message).await?;
+        Ok::<_, Failure>(imap)
+    })
+    .await
+    .map_err(|_| Failure::Unreached)??;
+    tokio::spawn(async move { imap.logout().await });
+    Ok(())
+}
+
+/// [`draft_over`] on a stream already open.
+pub async fn save_draft<S: AsyncRead + AsyncWrite + Unpin + Send + 'static>(
+    stream: S,
+    user: &str,
+    pass: &str,
+    message: &[u8],
+    within: Duration,
+) -> Result<(), Failure> {
+    draft_over(async { Ok(stream) }, user, pass, message, within).await
 }
 
 /// A login and nothing more, for `set`.
@@ -2676,6 +2847,7 @@ pub fn api_item(text: &str, whole: bool) -> Option<MailItem> {
     Some(MailItem {
         id: id.to_owned(),
         from: field("from"),
+        to: String::new(),
         subject: field("subject"),
         date: field("date"),
         text,
@@ -2762,10 +2934,24 @@ impl Mail for Gmail {
         .await
         .map_err(|_| Failure::Unreached)?
     }
+
+    async fn draft(&self, user: &str, pass: &str, out: &Outgoing) -> Result<(), Failure> {
+        let id = crate::writes::random_id();
+        let text = message(user, out, &rfc5322_date(crate::now_secs()), &id);
+        // One budget from connecting to APPEND's OK; LOGOUT after it apart.
+        draft_over(
+            connect(IMAP_HOST, IMAP_PORT),
+            user,
+            pass,
+            &text,
+            DRAFT_WITHIN,
+        )
+        .await
+    }
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use tokio::io::duplex;
 
@@ -2779,20 +2965,40 @@ mod tests {
     }
 
     /// A server that answers a script: for each line the client sends, the
-    /// next canned reply; all the client sent is returned.
+    /// next canned reply; all the client sent is returned. A line ending
+    /// in an IMAP literal's `{n}` is answered, then its `n` bytes and the
+    /// line's end are read as the next line, whatever lines they hold.
     async fn scripted(
         server: tokio::io::DuplexStream,
         greeting: &str,
         replies: Vec<String>,
     ) -> String {
+        scripted_holding(server, greeting, replies, Duration::ZERO).await
+    }
+
+    /// [`scripted`], then the connection held open `hold` with nothing
+    /// more said: a server that never answers the client's next line.
+    pub(crate) async fn scripted_holding(
+        server: tokio::io::DuplexStream,
+        greeting: &str,
+        replies: Vec<String>,
+        hold: Duration,
+    ) -> String {
         let mut io = BufReader::new(server);
         let mut heard = String::new();
+        let mut literal = None;
         io.get_mut().write_all(greeting.as_bytes()).await.unwrap();
         for reply in replies {
             let mut line = String::new();
+            if let Some(size) = literal.take() {
+                let mut bytes = vec![0; size];
+                io.read_exact(&mut bytes).await.unwrap();
+                line.push_str(&String::from_utf8_lossy(&bytes));
+            }
             if io.read_line(&mut line).await.unwrap() == 0 {
                 break;
             }
+            literal = literal_size(line.trim_end_matches(['\r', '\n']));
             // DATA's message comes as many lines, up to the lone dot.
             if heard.ends_with("DATA\r\n") {
                 while line != ".\r\n" {
@@ -2804,6 +3010,7 @@ mod tests {
             heard.push_str(&line);
             io.get_mut().write_all(reply.as_bytes()).await.unwrap();
         }
+        tokio::time::sleep(hold).await;
         heard
     }
 
@@ -2977,7 +3184,9 @@ mod tests {
 
     /// A UID FETCH's answer for one mail, tagged `tag`.
     fn fetched(tag: &str, uid: u32, from: &str, subject: &str, text: &str) -> String {
-        let header = format!("From: {from}\r\nSubject: {subject}\r\nDate: Mon, 2 Nov 2026\r\n\r\n");
+        let header = format!(
+            "From: {from}\r\nTo: mom@home.test\r\nSubject: {subject}\r\nDate: Mon, 2 Nov 2026\r\n\r\n"
+        );
         format!(
             "* 1 FETCH (UID {uid} BODY[HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] {{{}}}\r\n{header} BODY[TEXT]<0> {{{}}}\r\n{text})\r\n{tag} OK done\r\n",
             header.len(),
@@ -3028,6 +3237,8 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].id, "all7");
         assert_eq!(items[0].subject, "Order 4417 shipped");
+        // A received mail's To is not kept: only a draft's is.
+        assert_eq!(items[0].to, "");
         let lines: Vec<&str> = heard.lines().collect();
         assert_eq!(lines[1], "A2 LIST \"\" \"*\"");
         assert_eq!(lines[2], format!("A3 EXAMINE {all}"));
@@ -3093,6 +3304,244 @@ mod tests {
         );
         assert_eq!(items.unwrap(), Vec::new());
         assert!(!heard.contains("EXAMINE") && !heard.contains("FETCH"));
+    }
+
+    /// Gmail's LIST of a Vietnamese account with its Drafts: `[Gmail]/Thư
+    /// nháp`, in modified UTF-7.
+    pub(crate) const LIST_VI_DRAFTS: &str = "* LIST (\\HasNoChildren) \"/\" \"INBOX\"\r\n\
+        * LIST (\\HasChildren \\Noselect) \"/\" \"[Gmail]\"\r\n\
+        * LIST (\\Drafts \\HasNoChildren) \"/\" \"[Gmail]/Th&AbA- nh&AOE-p\"\r\n\
+        * LIST (\\All \\HasNoChildren) \"/\" \"[Gmail]/T&HqU-t c&HqM- th&AbA-\"\r\n";
+
+    /// One draft saved against a script, and all the client sent.
+    fn scripted_draft(message: &[u8], replies: Vec<String>) -> (Result<(), Failure>, String) {
+        let (client, server) = duplex(1 << 16);
+        run(async {
+            let server = tokio::spawn(scripted(server, "* OK Gimap ready\r\n", replies));
+            let saved = save_draft(client, "a@b.c", "pw", message, WITHIN).await;
+            (saved, server.await.unwrap())
+        })
+    }
+
+    /// The owner's ask of 10 Nov: a mail drafted by voice is saved in
+    /// Drafts, found by its `\Drafts` flag however it is named, with one
+    /// APPEND of the whole message as a literal, flagged a draft; nothing
+    /// is sent, no mailbox is opened, nothing is changed or deleted.
+    #[test]
+    fn a_draft_is_appended_to_drafts_and_never_sent() {
+        let out = Outgoing {
+            to: vec!["mom@home.test".into()],
+            cc: Vec::new(),
+            subject: "Bữa tối".into(),
+            text: "Home by 7.\n.\nLove".into(),
+        };
+        let text = message("a@b.c", &out, &rfc5322_date(0), "id1");
+        let (saved, heard) = scripted_draft(
+            &text,
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI_DRAFTS}A2 OK listed\r\n"),
+                "+ go ahead\r\n".into(),
+                "A3 OK [APPENDUID 7 12] appended\r\n".into(),
+                "* BYE\r\nA4 OK\r\n".into(),
+            ],
+        );
+        saved.unwrap();
+        let lines: Vec<&str> = heard.lines().collect();
+        assert_eq!(lines[0], "A1 LOGIN \"a@b.c\" \"pw\"");
+        assert_eq!(lines[1], "A2 LIST \"\" \"*\"");
+        assert_eq!(
+            lines[2],
+            format!(
+                "A3 APPEND \"[Gmail]/Th&AbA- nh&AOE-p\" (\\Draft \\Seen) {{{}}}",
+                text.len()
+            )
+        );
+        // The literal is the whole message, then the command's end.
+        let literal = std::str::from_utf8(&text).unwrap();
+        assert!(heard.contains(&format!("{}}}\r\n{literal}\r\nA4 LOGOUT\r\n", text.len())));
+        for part in [
+            "From: a@b.c\r\nTo: mom@home.test\r\n",
+            "Subject: =?UTF-8?B?",
+            "Date: Thu, 01 Jan 1970 00:00:00 +0000\r\n",
+            "Message-ID: <id1@lamp.local>\r\n",
+            "Content-Type: text/plain; charset=utf-8\r\n",
+        ] {
+            assert!(literal.contains(part), "{part}");
+        }
+        for never in [
+            "EXAMINE",
+            "SELECT",
+            "STORE",
+            "EXPUNGE",
+            "DELETE",
+            "MAIL FROM",
+            "RCPT",
+        ] {
+            assert!(!heard.contains(never), "{never}");
+        }
+        // No mailbox flagged `\Drafts`: Gmail's English name.
+        let (saved, heard) = scripted_draft(
+            &text,
+            vec![
+                "A1 OK\r\n".into(),
+                "* LIST (\\HasNoChildren) \"/\" \"INBOX\"\r\nA2 OK\r\n".into(),
+                "+ go ahead\r\n".into(),
+                "A3 OK appended\r\n".into(),
+                "A4 OK\r\n".into(),
+            ],
+        );
+        saved.unwrap();
+        assert_eq!(
+            heard.lines().nth(2),
+            Some(
+                format!(
+                    "A3 APPEND \"[Gmail]/Drafts\" (\\Draft \\Seen) {{{}}}",
+                    text.len()
+                )
+                .as_str()
+            )
+        );
+        // An APPEND refused before its literal: not saved, and said as not
+        // reached, never as a refused password.
+        let (saved, heard) = scripted_draft(
+            &text,
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI_DRAFTS}A2 OK listed\r\n"),
+                "A3 NO [TRYCREATE] planted words\r\n".into(),
+            ],
+        );
+        assert_eq!(saved, Err(Failure::Unreached));
+        assert!(!heard.contains("From: a@b.c"));
+    }
+
+    /// Reviewer-two on #5982 (RFC 3501 2.2.1): untagged responses may come
+    /// before APPEND's go-ahead; they are taken and the draft is saved. A
+    /// `* BYE` there, or a tagged NO, saves nothing.
+    #[test]
+    fn untagged_responses_before_appends_go_ahead_are_taken() {
+        let text = b"From: a@b.c\r\nSubject: s\r\n\r\nt\r\n";
+        let (saved, heard) = scripted_draft(
+            text,
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI_DRAFTS}A2 OK listed\r\n"),
+                "* OK Still connected\r\n* 3 EXISTS\r\n+ Ready for literal\r\n".into(),
+                "A3 OK [APPENDUID 7 12] appended\r\n".into(),
+                "A4 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(saved, Ok(()));
+        assert!(heard.contains("From: a@b.c\r\nSubject: s\r\n\r\nt\r\n\r\nA4 LOGOUT"));
+        let (saved, heard) = scripted_draft(
+            text,
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI_DRAFTS}A2 OK listed\r\n"),
+                "* OK Still connected\r\n* BYE going away\r\n".into(),
+            ],
+        );
+        assert_eq!(saved, Err(Failure::Unreached));
+        assert!(!heard.contains("From: a@b.c"));
+    }
+
+    /// Reviewer-two on #5982 (RFC 3501 6.3.11): APPEND's tagged OK is the
+    /// save, answered at once; a server that never answers LOGOUT after
+    /// it leaves the draft saved, and the answer never waits for LOGOUT.
+    #[test]
+    fn a_held_logout_after_appends_ok_leaves_the_draft_saved() {
+        let text = b"From: a@b.c\r\nSubject: s\r\n\r\nt\r\n";
+        let (client, server) = duplex(1 << 16);
+        let started = std::time::Instant::now();
+        let saved = run(async {
+            tokio::spawn(scripted_holding(
+                server,
+                "* OK Gimap ready\r\n",
+                vec![
+                    "A1 OK\r\n".into(),
+                    format!("{LIST_VI_DRAFTS}A2 OK listed\r\n"),
+                    "+ go ahead\r\n".into(),
+                    "A3 OK [APPENDUID 7 12] appended\r\n".into(),
+                ],
+                Duration::from_secs(30),
+            ));
+            save_draft(client, "a@b.c", "pw", text, Duration::from_millis(500)).await
+        });
+        assert_eq!(saved, Ok(()));
+        // Answered at APPEND's OK, LOGOUT not waited on.
+        let took = started.elapsed();
+        assert!(took < Duration::from_millis(500), "{took:?}");
+    }
+
+    /// "Read my drafts": Drafts found by its flag and read read-only, each
+    /// draft with whom it is to and an id (`draft12`) that reads it again.
+    #[test]
+    fn drafts_are_read_from_drafts_read_only() {
+        let drafts = "\"[Gmail]/Th&AbA- nh&AOE-p\"";
+        let (items, heard) = scripted_read(
+            MailAsk::Drafts(5),
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI_DRAFTS}A2 OK listed\r\n"),
+                "A3 OK [READ-ONLY] examined\r\n".into(),
+                "* SEARCH 11 12\r\nA4 OK\r\n".into(),
+                fetched("A5", 12, "Me <a@b.c>", "Dinner", "Home by 7"),
+                "A6 OK\r\n".into(),
+            ],
+        );
+        let items = items.unwrap();
+        assert_eq!(items[0].id, "draft12");
+        assert_eq!(items[0].to, "mom@home.test");
+        assert_eq!(items[0].text, "Home by 7");
+        let lines: Vec<&str> = heard.lines().collect();
+        assert_eq!(lines[1], "A2 LIST \"\" \"*\"");
+        assert_eq!(lines[2], format!("A3 EXAMINE {drafts}"));
+        assert_eq!(lines[3], "A4 UID SEARCH ALL");
+        assert!(lines[4].starts_with("A5 UID FETCH 11,12 (UID BODY.PEEK[HEADER.FIELDS (FROM TO "));
+        assert!(!heard.contains("SELECT") && !heard.contains("STORE"));
+        // Its id reads that draft, in Drafts, whole.
+        let (items, heard) = scripted_read(
+            MailAsk::Message("draft12".into()),
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI_DRAFTS}A2 OK listed\r\n"),
+                "A3 OK [READ-ONLY] examined\r\n".into(),
+                fetched("A4", 12, "Me <a@b.c>", "Dinner", "Home by 7"),
+                "A5 OK\r\n".into(),
+            ],
+        );
+        let items = items.unwrap();
+        assert_eq!(items[0].id, "draft12");
+        assert_eq!(items[0].to, "mom@home.test");
+        assert_eq!(
+            heard.lines().nth(2),
+            Some(format!("A3 EXAMINE {drafts}").as_str())
+        );
+        assert!(
+            heard
+                .lines()
+                .nth(3)
+                .unwrap()
+                .contains("BODY.PEEK[TEXT]<0.65536>")
+        );
+        assert!(imap_id_ok("draft12") && !imap_id_ok("draft") && !imap_id_ok("draftx"));
+        // Drafts is found by its flag, as All Mail is by its own.
+        let name = |text: &str| {
+            drafts_name(&Response {
+                text: text.to_owned(),
+                literals: Vec::new(),
+            })
+        };
+        assert_eq!(
+            name("* LIST (\\HasNoChildren \\drafts) \"/\" \"[Gmail]/Brouillons\"").as_deref(),
+            Some("[Gmail]/Brouillons")
+        );
+        assert_eq!(name("* LIST (\\All) \"/\" \"[Gmail]/All Mail\""), None);
+        assert_eq!(
+            name("* LIST (\\Drafts \\Noselect) \"/\" \"[Gmail]/Drafts\""),
+            None
+        );
     }
 
     #[test]
