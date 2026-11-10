@@ -1,3 +1,13 @@
+## 2026-11-10 10:59 ICT — train evidence checked; dependent cancellation gates continue
+
+Independently downloaded train 767 ARM run 42748358747. Its actual checkout is 2678905c0d, merging train 397a7eaed into 90d9948c4. The log reports 14,981 passed / 112 skipped in 298.242 s, with all 26 make-skill fixture tests and 20 sent-write tests explicitly passing, plus 13 process cases. Third separately checked tree equality in Queue comment 6758360245. The train remains open in the latest API response; no merge, promote or device action by Fourth. Published #5932 stays unchanged while in the train; its supplemental native failures remain recorded.
+
+The frozen cancellation carry on 22d876382 / 4d86 passed Memory and Voice Eval after Cloud. Voice Eval has 379 library, eight binary and 238 integration cases passing (625 total); its command took 287.405 s. Update integration is still active, followed by the remaining dependent packages and workspace build. Earlier full Voice and light-call latency failures remain failures. Current-base qualification follows completion; no checkout mutation or duplicate Cargo job.
+
+Queued branches are locally rebased onto 90d9948c4, not pushed or claimed qualified there: letter-A 07b3b689a, provider b1ddec9f8, playback 87aff7388, Peek c099a0e4c, photo 62bafa1ae, fixture bc978851e and combined matcher c1312d500 plus its five-file repair. Playback's shared TTS cache and docs changed only by the upstream reset patch; all four own range-diff rows remain equal. Matcher native gates are queued and its strict 1 ms elapsed target remains unmet.
+
+Read the Queue through 10:58 ICT. Friday owns private-room conversation work #5966; Fourth is not duplicating it. #5946 has Thirteen's read and still awaits its assigned privacy reader; source intake is not a Fourth approval. Disk has 4.5 GiB free; Fourth's only substantial target is the active 9 GiB shared cache, so it is retained. Log-only diff check; no new links.
+
 ## 2026-11-10 10:13 ICT — fixture ready; cancellation failures retained; combined matcher correction
 
 #5932 is ready at0212cb91c. Current-head Reviewer-two READ-OK6757187801, ARM42741341824 (10,592 selected passed/59 skipped/236.850 s), Linux Clippy42741341613 and Docs42741341651 pass. All26 fixture/14app and all six locally failing identities explicitly passed on ARM. Merge84751398b and authorhead share treef56f38bd1, parents4d86+0212. The failed native full and integration runs remain in the body; readiness uses joining.md's unchanged timed-process exception, not a claimed native pass or cause diagnosis. NEXT TRAIN6757370526. Closed superseded own #5913 in6757382981 for repaired #5935; retained its branch and negative evidence. No issue acceptance or stable closure.
