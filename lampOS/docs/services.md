@@ -263,7 +263,7 @@ refresh goes to the lamp's backend, never to Google).
 
 | Code | Name | Hosts | Reads (`what`) | Writes (`action`) |
 |---|---|---|---|---|
-| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}` |
+| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `drafts {count}` (an app password only), `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}`, `save_draft {to, cc, subject, text}` (an app password only) |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | none: it only sends | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | none |
@@ -351,7 +351,15 @@ heard line only, nothing kept.
   mail only within its mailbox, so an id from All Mail carries it: `all41`
   is UID 41 in All Mail, a bare `41` UID 41 in the inbox. `message {id}`
   opens the mailbox its id names again (for `all…`, the `LIST` again; with
-  All Mail gone since, nothing is read). A list is at most 10 mails, 300
+  All Mail gone since, nothing is read). `drafts {count}` reads Drafts (the
+  owner's ask of 10 Nov: "read my drafts"): the `LIST` finds the mailbox
+  flagged `\Drafts`, whatever its name (`[Gmail]/Drafts`,
+  `[Gmail]/Th&AbA- nh&AOE-p` for "Thư nháp"), else `[Gmail]/Drafts`, then
+  `EXAMINE` and `UID SEARCH ALL`, newest first; its ids are `draft12` (UID
+  12 in Drafts), which `message {id}` reads again in Drafts. Every fetch asks
+  for To too, but only a draft keeps it (`"to"` in its item: whom a draft
+  is to is what it is about); a received mail's To is dropped, and a read
+  cut to who and what about leaves it out. A list is at most 10 mails, 300
   characters of each; `message {id}` (an id a list gave) up to 3,000. Text
   comes from a plain part first, else HTML with its tags taken out;
   quoted-printable, base64 and RFC 2047 words are decoded. 5 s to connect,
@@ -359,6 +367,30 @@ heard line only, nothing kept.
 - **Writes:** SMTP over TLS to `smtp.gmail.com:465`: `EHLO`, `AUTH PLAIN`
   (else `LOGIN`), `MAIL`, `RCPT` for each recipient, `DATA`, `QUIT`. One plain
   text message in UTF-8, its body in base64, from the account itself.
+- **Drafts** (`save_draft`, the owner's ask of 10 Nov): a mail drafted by
+  voice is saved in Gmail's Drafts, never sent. It is checked as
+  `send_mail` is (the same `to`, `cc`, `subject`, `text`, at most 20
+  recipients) and read back as "Save a draft to <to>[, with a copy to
+  <cc>], in the Gmail Drafts of <account>. Subject: "<subject>". It says:
+  "<text>". Nothing is sent." On the same spoken confirm as a send (below),
+  IMAP over TLS to `imap.gmail.com:993`: `LOGIN`, `LIST "" "*"` for the
+  mailbox flagged `\Drafts` (else `[Gmail]/Drafts`), one `APPEND <Drafts>
+  (\Draft \Seen) {n}` with the message as its literal (the same message
+  SMTP sends: From the account, To, Cc, Subject as an RFC 2047 word when
+  not ASCII, Date, Message-ID, plain text in UTF-8, its body in base64),
+  `LOGOUT`. Untagged responses before `APPEND`'s `+` ("* OK Still
+  connected") are taken, at most 100 (RFC 3501 2.2.1); a `* BYE` or a tagged
+  NO there saves nothing. `APPEND`'s tagged OK is the save, answered at
+  once: the whole save up to it, connecting and TLS included, has one budget
+  of 15 s (`mail::DRAFT_WITHIN`, at least 3 s inside the voice's 20 s
+  `services::DEADLINE`, so a saved draft is never told as unavailable), and
+  `LOGOUT` runs after the answer, apart, at most 2 s, its answer or none
+  never delaying or undoing the save (RFC 3501 6.3.11). No SMTP is
+  spoken and no mailbox is opened. The answer is
+  `{"sent": false, "saved": true, "service": "Gmail"}`; a refused `APPEND`
+  is "not saved: Gmail couldn't be reached". The prepare's `next` says
+  "Nothing is saved yet. Read read_back to the person in full; save the
+  draft only if their next words say save or send."
 - The password is only in the `LOGIN` and `AUTH` lines. A failure is said as
   one of the two phrases above, never with what the server said.
 
@@ -404,7 +436,13 @@ heard line only, nothing kept.
 - **Writes:** on a spoken "send", one `POST
   /gmail/v1/users/me/messages/send` (`users.messages.send`, the only route on
   its write list) with `{"raw": <base64url>}`: the same plain text message
-  SMTP sends, from the account itself.
+  SMTP sends, from the account itself. No draft and no drafts read: a
+  `save_draft` is refused before anything is held or called, with
+  `writes::NO_DRAFTS`, "this Gmail link can't save drafts: only one linked
+  with an app password can. Say "I can't save a draft yet. I can read it
+  back and send it when you say 'send it'."", and `drafts` with "this Gmail
+  link reads no drafts: only one linked with an app password does" (the
+  link holds no `gmail.compose`).
 - **Scopes** it needs from Google: `gmail.readonly` for the profile, the
   list (with `q`) and each get, and `gmail.send` for a send (`gmail.modify`
   or `https://mail.google.com/` cover both). IMAP is not used because it takes
@@ -438,7 +476,8 @@ account's identity and `gmail.send` only, no `gmail.readonly`.
 - **Writes:** `send_mail`, read back and sent as `gmail`'s, on a spoken
   "send": one `POST /gmail/v1/users/me/messages/send` from the account
   itself, never SMTP; unless `gmail` is linked with an app password
-  (below). 401 or 403: "not sent: Google refused the Gmail sign-in".
+  (below). A `save_draft` is refused with
+  `writes::NO_DRAFTS`, as a Google sign-in's `gmail` is. 401 or 403: "not sent: Google refused the Gmail sign-in".
 - **With both linked**, a read goes only through `gmail`. The read
   function's description says `gmail-app: none, it only sends: reads use
   gmail`. One rule holds for every Gmail read and write: an app password
@@ -793,8 +832,13 @@ Off unless `LAMP_SERVICES_WRITE=on`. Two phases (`writes.rs`):
    follows: `said` other than "send" answers `{"sent": false, "cancelled":
    true}`; a wrong, used or late id, "nothing is waiting to be sent: it was
    cancelled, already sent or over two minutes old"; an id of another
-   service, refused. The journal says only "a confirmed write to <code> was
-   sent".
+   service, refused. A write is bound to the linked account it was
+   prepared as (`Pending::account`, `Entry::account`): if the link was
+   replaced by another account's since, nothing goes, "not sent: the
+   <Service> link changed; nothing was sent" ("not saved: the Gmail link
+   changed; nothing was saved" for a draft); the same account linked again
+   still goes (Reviewer-two on #5982). The journal says only "a confirmed
+   write to <code> was sent".
 
 One write waits at a time (a new one replaces it), for 120 s. Bounds: a text
 at most 3,000 characters (line breaks kept), a subject or title one line of
@@ -838,28 +882,30 @@ change"). Any other 401 or 403 keeps its words.
 The model is told of `service_write`, first in its description
 (`WRITE_RULE`, then the rule every services function has, below):
 "Only when the person asks you, now, to send or post something; an ask to
-draft, write or reply to a mail or message is one, never a remember. No
-draft yet: say "I can't save a draft yet. I can read it back and send it when
-you say 'send it'." Call it first without send_id: it sends nothing and gives
-a read_back. Say that read_back in full, word for word, then ask for "send
-it". Call it again with its send_id only if their very next words are that;
+draft, write or reply to a mail or message is one, never a remember. A mail
+draft: gmail's action save_draft; if refused, say what the call said. Call it
+first without send_id: it sends nothing and gives a read_back. Say that
+read_back in full, word for word, then ask for "send it" (a draft: "save
+it"). Call it again with its send_id only if their very next words are that;
 anything else cancels it. Never say a read-back yourself: only one this call
 gave in this turn; a new write, or the same one again, needs a new call.
 Never say you can't use their services: refuse only for a reason a call
 gave."
 
-An ask to draft a mail is an ask to send it, and said plainly as no draft:
-Gmail has no draft here (`send_mail` only; a real draft needs the
-`gmail.compose` scope, a backend change taken up apart from #5962), so such an
-ask is prepared and read back as any write, nothing is saved as a draft, and
-the person is told "I can't save a draft yet. I can read it back and send it
-when you say 'send it'." It is never a `remember`: on lamp-3e83 on 10 Nov the
+An ask to draft a mail is a write: since the owner's ask of 10 Nov, with
+Gmail linked by an app password it is `save_draft`, prepared and read back
+as any write and saved in Gmail's Drafts on a plain "save it" or "send it"
+(above, "Drafts"), never sent. A Google sign-in's Gmail link (`gmail-app`, or
+`gmail` made with one) holds no `gmail.compose` and saves none: its
+`save_draft` is refused with the call's own reason, which carries the line
+to say, "I can't save a draft yet. I can read it back and send it when you
+say 'send it'." It is never a `remember`: on lamp-3e83 on 10 Nov the
 model called `remember` three times for a draft before it wrote, and the
 draft ended in "shall I send it?". On lamp-29e7 on 9 Nov "Draft a new email
 for me" was refused with no call ("I cannot touch your mail") and, asked why,
 "Because I'm a lamp."; the rule said nothing of drafts, nor where a refusal's
-reason comes from. The whole rule with the shared one is 1,000 of the
-description's 1,024 bytes, which leaves 23 for `lamp-services`' own words
+reason comes from. The whole rule with the shared one is 997 of the
+description's 1,024 bytes, which leaves 26 for `lamp-services`' own words
 for the write: whole sentences only, so its "action, by service: …" list is
 told on the `action` parameter.
 
@@ -892,7 +938,12 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   in full, word for word, leaving nothing out, then ask them to say "send
   it" (in Vietnamese "ừ, gửi đi giúp tôi") to send it. Send
   only if their next words are that."; an id with no read-back is dropped
-  and never sent.
+  and never sent. A write prepared with `action` `save_draft` is kept as a
+  draft (`Pending::draft`), and the model is told instead
+  `SAVE_READ_BACK_NEXT`, "Nothing is saved yet, and nothing is ever sent.
+  Say read_back in full, word for word, leaving nothing out, then ask them
+  to say "save it" (in Vietnamese "lưu đi") to save it as a draft. Save only
+  if their next words are that."
 - **What the lamp said of it:** every word the lamp says in that request
   after the write is prepared is kept with it, as said, on both routes
   (`thread::Thread::lamp_for` → `services::lamp_said`).
@@ -915,7 +966,8 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   prepared and 30 s (`SEND_WITHIN`, `send_by`) since the lamp last said a
   word of it, or since the read-back could have finished playing at 600 ms a
   word, if later (after the lamp asks once more, since that asking alone);
-  and the person's words in this turn are a plain send. Otherwise the model
+  and the person's words in this turn are a plain send, or for a draft a
+  plain send or a plain save (`confirms`). Otherwise the model
   is told `CANCELLED`, "Not sent, and cancelled: I send only on a plain
   "send" said to me right after I read the message back. Say it was not
   sent." The journal names each check that failed ("a send cancelled: …"), and
@@ -971,7 +1023,9 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   read-back said whole and uncut, its "send" still in time, keeps the write
   waiting (`services::nudge_waiting`): the second route says the lamp's own
   line, with no chat asked, "Say 'send it' to send it." (`SAY_SEND_IT`, or
-  "Nói 'gửi đi' để gửi nhé." for a Vietnamese one), and the "send" is timed
+  "Nói 'gửi đi' để gửi nhé." for a Vietnamese one; for a draft "Say 'save
+  it' to save the draft." (`SAY_SAVE_IT`) or "Nói 'lưu đi' để lưu nháp
+  nhé."), and the "send" is timed
   from it, as after the lamp asks once more. Once per write. It never sends:
   "go ahead" alone is still no send. A bare one is the person's answer to the
   read-back, as a bare cancel is (`services::cancel_awaited`). The journal
@@ -982,7 +1036,8 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   what it had been told. While a write waits (at most 2 minutes), each later
   turn's notes carry it, in memory only, with the write
   (`services::waiting_note`): its service and its whole read-back (at most
-  1,500 bytes), that only a plain "send it" sends it, and that a change is a
+  1,500 bytes), that only a plain "send it" sends it (for a draft, "a Gmail
+  draft" that only a plain "save it" saves), and that a change is a
   new `service_write` with the whole message changed, never an ask for
   anything it holds. Read results stay private as before.
 - **The send's voice score is journaled**: "a send's voice beside request N's:
@@ -1074,8 +1129,15 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   counted: every other check above is unchanged.
 - **After a send** the model is told one fixed line: "Say only that it was
   sent, in the conversation's language." when the service answered
-  `sent: true`, else "Say only that it was not sent, in the conversation's
-  language."
+  `sent: true`; "Say only that it was saved as a draft in their Gmail
+  Drafts, not sent, in the conversation's language." (`SAVED_NEXT`) when it
+  answered `saved: true`, so the lamp says "Saved as a draft.", never
+  "sent"; "Say only that the draft was not saved, in the conversation's
+  language." (`NOT_SAVED_NEXT`) for an error beginning "not saved"; else
+  "Say only that it was not sent, in the conversation's language." A saved
+  draft is a done write as a sent one is (`services::went`): its receipt is
+  never undone nor let go first, and a cut turn's note says the go-ahead
+  "already sent the write they asked for (or, for a draft, saved it)".
 - **A send cut while awaited is never answered as nothing done** (#5853,
   lamp-9adf, 9 Nov). On the second route a send's call runs to its answer
   even when a newer line cuts the turn, and the line that answers those
@@ -1107,8 +1169,16 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   without "it" are speech-to-text's: on lamp-9adf on 9 Nov the owner's "Go
   ahead and send it." came as "Go ahead and send", and the write was prepared
   and read back again (#5846).
+- **A plain save** (`says_save`), for a draft alone: the same words taken
+  the same way, and what is left exactly one of `save`, `save it`, `save
+  that`, `save the draft`, `save it as a draft`, `save a draft`, `save
+  draft`, `lưu`, `lưu đi`, `lưu nháp`, `lưu lại`, `luu`, `luu di`, `luu
+  nhap` (`SAVE_WORDS`): each has "save", "lưu" or "luu" in it and none
+  "don't". It confirms a waiting draft as a plain send does, and never a
+  send: "save it" after a mail's read-back cancels it. "don't save it" and
+  "đừng lưu" save nothing.
 - **A plain send is heard as an answer** (`send_awaited`). While a write
-  waits, a plain send counts as answering the lamp, however the read-back's
+  waits, a plain send (for a draft, a plain save too) counts as answering the lamp, however the read-back's
   last sentence reads. So it isn't held as a short sound or as the room's lone
   words, even with nobody in view. This applies only to a line known to have
   begun clear of the lamp's words. One begun over its voice, within 1.5 s
@@ -1610,7 +1680,7 @@ still refused (`OWNER_ONLY`).
   hosts above; a link on any other is refused.
 - `lamp-services.service` is installed but off on every lamp, and none of
   this has run on a lamp: the cgroup checks under the real sockets, the IMAP
-  and SMTP exchanges with Gmail, Gmail's REST API with a Google sign-in (and
+  and SMTP exchanges with Gmail (a draft's `APPEND` among them), Gmail's REST API with a Google sign-in (and
   which scopes the backend's Gmail sign-in asks for), the backend's
   `get-message` and refresh, and each service's own API.
 
@@ -1623,7 +1693,18 @@ lookalike host), reads only on the allow-list, writes only on the write list;
 every GraphQL mutation refused; Gmail's IMAP read-only (`EXAMINE`,
 `BODY.PEEK`), its search in All Mail (found by its `\All` flag under a
 localized name, else the inbox), `recent` in the inbox and `message` in
-the mailbox its id names, and SMTP's one message after `AUTH`; `set`
+the mailbox its id names, `drafts` in Drafts (found by its `\Drafts` flag
+under a localized name) with whom each is to and an id that reads it
+again, a draft's one `APPEND` of the whole message as a literal flagged
+`(\Draft \Seen)` to Drafts (else `[Gmail]/Drafts`) with no SMTP and no
+mailbox opened, a refused `APPEND` said as not reached, untagged responses before its
+`+` taken and a `* BYE` there saving nothing, a held `LOGOUT` after its OK
+leaving the draft saved and never waited on, a draft acknowledged near the
+end of its budget answered saved before the voice stops waiting, a write prepared as one account never going as the
+next linked, `save_draft` read
+back as a draft, checked as a send, saved once on its confirm with nothing
+sent and answered `saved`, and refused for a Google sign-in's link with
+nothing held, and SMTP's one message after `AUTH`; `set`
 keeping nothing on a refused Gmail login; a Gmail Google sign-in checked at
 `set` with its profile (refused, unreached, its account taken from it),
 read through the REST API (the inbox list, a search in all mail and its

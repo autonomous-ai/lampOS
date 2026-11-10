@@ -271,7 +271,7 @@ backend của đèn, không bao giờ đến Google).
 
 | Code | Tên | Host | Đọc (`what`) | Ghi (`action`) |
 |---|---|---|---|---|
-| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}` |
+| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `drafts {count}` (chỉ mật khẩu ứng dụng), `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}`, `save_draft {to, cc, subject, text}` (chỉ mật khẩu ứng dụng) |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | không có: nó chỉ gửi | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | không có |
@@ -364,7 +364,15 @@ giữ gì.
   một thư trong hộp thư của nó, nên id của một thư từ All Mail mang theo điều
   đó: `all41` là UID 41 trong All Mail, `41` trơn là UID 41 trong hộp thư
   đến. `message {id}` mở lại đúng hộp thư mà id nêu (với `all…`, lại `LIST`;
-  nếu All Mail đã không còn, không gì được đọc). Một danh sách tối đa 10 thư,
+  nếu All Mail đã không còn, không gì được đọc). `drafts {count}` đọc Drafts
+  (yêu cầu của chủ đèn ngày 10/11: "read my drafts"): `LIST` tìm hộp thư được
+  đánh dấu `\Drafts`, dù tên nó là gì (`[Gmail]/Drafts`,
+  `[Gmail]/Th&AbA- nh&AOE-p` cho "Thư nháp"), nếu không thì `[Gmail]/Drafts`,
+  rồi `EXAMINE` và `UID SEARCH ALL`, mới nhất trước; id của chúng là
+  `draft12` (UID 12 trong Drafts), mà `message {id}` đọc lại trong Drafts.
+  Mỗi lần fetch đều xin cả To, nhưng chỉ một bản nháp giữ nó (`"to"` trong
+  mục của nó: gửi cho ai là điều bản nháp nói về); To của một thư nhận được
+  bị bỏ, và một lần đọc rút gọn còn ai và về việc gì thì bỏ nó ra. Một danh sách tối đa 10 thư,
   mỗi thư 300 ký tự; `message {id}` (id mà một danh sách đưa ra) đến 3,000.
   Nội dung lấy từ phần văn bản thuần trước, nếu không
   thì từ HTML đã bỏ thẻ; quoted-printable, base64 và các từ RFC 2047 được giải
@@ -373,6 +381,30 @@ giữ gì.
   không thì `LOGIN`), `MAIL`, `RCPT` cho mỗi người nhận, `DATA`, `QUIT`. Một
   thư văn bản thuần bằng UTF-8, thân thư ở dạng base64, gửi từ chính tài
   khoản đó.
+- **Nháp** (`save_draft`, yêu cầu của chủ đèn ngày 10/11): một thư soạn bằng
+  giọng nói được lưu vào Drafts của Gmail, không bao giờ được gửi. Nó được
+  kiểm tra như `send_mail` (cùng `to`, `cc`, `subject`, `text`, tối đa 20
+  người nhận) và được đọc lại là "Save a draft to <to>[, with a copy to
+  <cc>], in the Gmail Drafts of <account>. Subject: "<subject>". It says:
+  "<text>". Nothing is sent." Với cùng câu xác nhận nói ra như một lần gửi
+  (ở dưới), IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `LIST "" "*"`
+  tìm hộp thư được đánh dấu `\Drafts` (nếu không thì `[Gmail]/Drafts`), một
+  `APPEND <Drafts> (\Draft \Seen) {n}` với thư là literal của nó (cùng thư
+  mà SMTP gửi: From là tài khoản, To, Cc, Subject là một từ RFC 2047 khi
+  không phải ASCII, Date, Message-ID, văn bản thuần UTF-8, thân thư dạng
+  base64), `LOGOUT`. Các phản hồi không gắn tag trước dấu `+` của `APPEND`
+  ("* OK Still connected") được nhận, tối đa 100 (RFC 3501 2.2.1); một `* BYE`
+  hay một NO có tag ở đó thì không lưu gì. OK có tag của `APPEND` là lần
+  lưu, được trả lời ngay: toàn bộ lần lưu đến nó, kể cả kết nối và TLS, có
+  một ngân sách 15 s (`mail::DRAFT_WITHIN`, nằm trong 20 s
+  `services::DEADLINE` của giọng nói ít nhất 3 s, nên một bản nháp đã lưu
+  không bao giờ bị báo là không dùng được), và `LOGOUT` chạy sau câu trả
+  lời, riêng, tối đa 2 s, câu trả lời của nó hay không có gì cũng không bao
+  giờ làm chậm hay huỷ lần lưu (RFC 3501 6.3.11). Không nói SMTP và không mở hộp thư nào. Câu trả lời là
+  `{"sent": false, "saved": true, "service": "Gmail"}`; một `APPEND` bị từ
+  chối là "not saved: Gmail couldn't be reached". `next` của bước chuẩn bị
+  nói "Nothing is saved yet. Read read_back to the person in full; save the
+  draft only if their next words say save or send."
 - Mật khẩu chỉ nằm trong các dòng `LOGIN` và `AUTH`. Một lỗi được nói bằng
   một trong hai câu ở trên, không bao giờ kèm điều máy chủ đã nói.
 
@@ -420,7 +452,13 @@ giữ gì.
 - **Ghi:** khi có câu "send" nói ra, một `POST
   /gmail/v1/users/me/messages/send` (`users.messages.send`, route duy nhất
   trong danh sách ghi của nó) với `{"raw": <base64url>}`: cùng thư văn bản
-  thuần mà SMTP gửi, từ chính tài khoản đó.
+  thuần mà SMTP gửi, từ chính tài khoản đó. Không có nháp và không đọc nháp:
+  một `save_draft` bị từ chối trước khi bất cứ gì được giữ hay gọi, với
+  `writes::NO_DRAFTS`, "this Gmail link can't save drafts: only one linked
+  with an app password can. Say "I can't save a draft yet. I can read it
+  back and send it when you say 'send it'."", và `drafts` với "this Gmail
+  link reads no drafts: only one linked with an app password does" (liên
+  kết không có `gmail.compose`).
 - **Scope** nó cần từ Google: `gmail.readonly` cho profile, danh sách (có
   `q`) và từng lần lấy, và `gmail.send` cho một lần gửi (`gmail.modify` hoặc
   `https://mail.google.com/` bao cả hai). IMAP không được dùng vì nó chỉ nhận
@@ -455,7 +493,8 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
 - **Ghi:** `send_mail`, được đọc lại và gửi như của `gmail`, khi có câu
   "send" nói ra: một `POST /gmail/v1/users/me/messages/send` từ chính tài
   khoản đó, không bao giờ qua SMTP; trừ khi `gmail` được liên kết bằng mật
-  khẩu ứng dụng (xem dưới). 401 hoặc 403: "not sent: Google refused the
+  khẩu ứng dụng (xem dưới). Một `save_draft` bị
+  từ chối với `writes::NO_DRAFTS`, như `gmail` của một đăng nhập Google. 401 hoặc 403: "not sent: Google refused the
   Gmail sign-in".
 - **Khi cả hai được liên kết**, một lần đọc chỉ qua `gmail`. Mô tả của hàm
   đọc ghi `gmail-app: none, it only sends: reads use gmail`. Một quy tắc áp
@@ -831,8 +870,13 @@ Tắt trừ khi `LAMP_SERVICES_WRITE=on`. Hai pha (`writes.rs`):
    tiếp: `said` khác "send" thì trả lời `{"sent": false, "cancelled":
    true}`; một id sai, đã dùng hoặc quá hạn thì "nothing is waiting to be
    sent: it was cancelled, already sent or over two minutes old"; một id của
-   dịch vụ khác thì bị từ chối. Journal chỉ ghi "a confirmed write to <code>
-   was sent".
+   dịch vụ khác thì bị từ chối. Một lần ghi gắn với tài khoản đã liên kết
+   lúc nó được chuẩn bị (`Pending::account`, `Entry::account`): nếu từ đó
+   liên kết bị thay bằng liên kết của tài khoản khác, không gì đi cả, "not
+   sent: the <Service> link changed; nothing was sent" ("not saved: the
+   Gmail link changed; nothing was saved" với một bản nháp); cùng tài khoản
+   được liên kết lại thì vẫn đi (Reviewer-two trên #5982). Journal chỉ ghi
+   "a confirmed write to <code> was sent".
 
 Mỗi lúc chỉ một lần ghi chờ (lần mới thay lần cũ), trong 120 s. Giới hạn: một
 văn bản tối đa 3,000 ký tự (giữ dấu xuống dòng), một tiêu đề thư hay tiêu đề
@@ -876,28 +920,30 @@ this change"). Mọi 401 hoặc 403 khác giữ lời của nó.
 Mô hình được nói về `service_write`, trước tiên trong mô tả của nó
 (`WRITE_RULE`, rồi đến luật mà mọi hàm dịch vụ đều có, ở dưới):
 "Only when the person asks you, now, to send or post something; an ask to
-draft, write or reply to a mail or message is one, never a remember. No
-draft yet: say "I can't save a draft yet. I can read it back and send it when
-you say 'send it'." Call it first without send_id: it sends nothing and gives
-a read_back. Say that read_back in full, word for word, then ask for "send
-it". Call it again with its send_id only if their very next words are that;
+draft, write or reply to a mail or message is one, never a remember. A mail
+draft: gmail's action save_draft; if refused, say what the call said. Call it
+first without send_id: it sends nothing and gives a read_back. Say that
+read_back in full, word for word, then ask for "send it" (a draft: "save
+it"). Call it again with its send_id only if their very next words are that;
 anything else cancels it. Never say a read-back yourself: only one this call
 gave in this turn; a new write, or the same one again, needs a new call.
 Never say you can't use their services: refuse only for a reason a call
 gave."
 
-Một yêu cầu soạn nháp thư là một yêu cầu gửi nó, và được nói thẳng là chưa
-có nháp: ở đây Gmail không có nháp (chỉ có `send_mail`; một nháp thật cần
-scope `gmail.compose`, một thay đổi backend làm riêng ngoài #5962), nên một
-yêu cầu như vậy được chuẩn bị và đọc lại như mọi lệnh ghi, không gì được lưu
-thành nháp, và người đó được nói "I can't save a draft yet. I can read it back
-and send it when you say 'send it'." Nó không bao giờ là một `remember`: trên
+Một yêu cầu soạn nháp thư là một lệnh ghi: từ yêu cầu của chủ đèn ngày 10/11,
+khi Gmail được liên kết bằng mật khẩu ứng dụng, nó là `save_draft`, được chuẩn
+bị và đọc lại như mọi lệnh ghi và được lưu vào Drafts của Gmail khi có câu
+"save it" hay "send it" trơn (ở trên, "Nháp"), không bao giờ được gửi. Một
+liên kết Gmail bằng đăng nhập Google (`gmail-app`, hay `gmail` tạo bằng nó)
+không có `gmail.compose` và không lưu nháp: `save_draft` của nó bị từ chối
+với lý do của chính lệnh gọi, mang câu cần nói, "I can't save a draft yet. I
+can read it back and send it when you say 'send it'." Nó không bao giờ là một `remember`: trên
 lamp-3e83 ngày 10 tháng 11, mô hình gọi `remember` ba lần cho một bản nháp
 trước khi ghi, và bản nháp kết thúc bằng "shall I send it?". Trên lamp-29e7
 ngày 9 tháng 11, "Draft a new email for me" bị từ chối mà không có lệnh gọi nào
 ("I cannot touch your mail") và, khi được hỏi tại sao, "Because I'm a lamp.";
 luật không nói gì về nháp, cũng không nói lý do của một lời từ chối đến từ
-đâu. Toàn bộ luật cùng luật chung là 1,000 trong 1,024 byte của mô tả, chừa 23
+đâu. Toàn bộ luật cùng luật chung là 997 trong 1,024 byte của mô tả, chừa 26
 byte cho lời riêng của `lamp-services` cho hàm ghi: chỉ những câu trọn vẹn,
 nên danh sách "action, by service: …" của nó được nói trên tham số `action`.
 
@@ -931,7 +977,12 @@ nên danh sách "action, by service: …" của nó được nói trên tham s�
   for word, leaving nothing out, then ask them to say "send it"
   (in Vietnamese "ừ, gửi đi giúp tôi") to send it. Send only if their next
   words are that."; một id không có phần đọc lại bị bỏ và không
-  bao giờ được gửi.
+  bao giờ được gửi. Một lệnh ghi được chuẩn bị với `action` `save_draft`
+  được giữ là một bản nháp (`Pending::draft`), và mô hình được báo thay vào
+  đó `SAVE_READ_BACK_NEXT`, "Nothing is saved yet, and nothing is ever sent.
+  Say read_back in full, word for word, leaving nothing out, then ask them
+  to say "save it" (in Vietnamese "lưu đi") to save it as a draft. Save only
+  if their next words are that."
 - **Những gì đèn đã nói về nó:** mọi lời đèn nói trong yêu cầu đó sau khi lần
   ghi được chuẩn bị được giữ cùng nó, đúng như đã nói, trên cả hai tuyến
   (`thread::Thread::lamp_for` → `services::lamp_said`).
@@ -955,7 +1006,7 @@ nên danh sách "action, by service: …" của nó được nói trên tham s�
   được chuẩn bị; đó là cùng chủ đèn đã yêu cầu; tối đa 2 phút kể từ khi chuẩn
   bị và 30 s (`SEND_WITHIN`, `send_by`) kể từ khi đèn nói lời cuối của nó, hoặc
   kể từ khi phần đọc lại có thể đã phát xong với 600 ms mỗi từ, nếu muộn hơn
-  (sau khi đèn hỏi lại, chỉ tính từ lần hỏi đó); và lời của người đó trong lượt này là một câu gửi thuần. Nếu không, mô hình được báo
+  (sau khi đèn hỏi lại, chỉ tính từ lần hỏi đó); và lời của người đó trong lượt này là một câu gửi thuần, hay với một bản nháp là một câu gửi thuần hoặc một câu lưu thuần (`confirms`). Nếu không, mô hình được báo
   `CANCELLED`, "Not sent, and cancelled: I send only on a plain "send" said
   to me right after I read the message back. Say it was not sent." Journal
   ghi tên từng điều kiện không đạt ("a send cancelled: …"), và mỗi lần từ
@@ -1011,7 +1062,8 @@ nên danh sách "action, by service: …" của nó được nói trên tham s�
   được nói trọn và không bị cắt, khi câu "send" vẫn còn kịp, sẽ giữ lệnh ghi
   chờ (`services::nudge_waiting`): route thứ hai nói câu của chính đèn, không
   hỏi chat, "Say 'send it' to send it." (`SAY_SEND_IT`, hay "Nói 'gửi đi'
-  để gửi nhé." với lời tiếng Việt), và câu "send" được tính giờ từ đó, như
+  để gửi nhé." với lời tiếng Việt; với một bản nháp "Say 'save it' to save
+  the draft." (`SAY_SAVE_IT`) hay "Nói 'lưu đi' để lưu nháp nhé."), và câu "send" được tính giờ từ đó, như
   sau khi đèn hỏi lại một lần. Mỗi lệnh ghi một lần. Nó không bao giờ gửi:
   "go ahead" một mình vẫn không phải câu gửi. Một câu trơn như vậy là câu
   trả lời của người đó cho phần đọc lại, như một câu huỷ trơn
@@ -1023,7 +1075,8 @@ nên danh sách "action, by service: …" của nó được nói trên tham s�
   nó đã được nói. Khi một lệnh ghi đang chờ (tối đa 2 phút), ghi chú của mỗi
   lượt sau mang nó, chỉ trong bộ nhớ, cùng lệnh ghi (`services::waiting_note`):
   dịch vụ của nó và toàn bộ phần đọc lại (tối đa 1,500 byte), rằng chỉ một
-  câu "send it" trơn mới gửi nó, và rằng một thay đổi là một `service_write`
+  câu "send it" trơn mới gửi nó (với một bản nháp, "a Gmail draft" mà chỉ
+  một câu "save it" trơn mới lưu), và rằng một thay đổi là một `service_write`
   mới với toàn bộ thư đã đổi, không bao giờ hỏi lại điều nó đã giữ. Kết quả
   đọc vẫn riêng tư như trước.
 - **Điểm giọng của câu gửi được ghi vào journal**: "a send's voice beside
@@ -1114,9 +1167,17 @@ nên danh sách "action, by service: …" của nó được nói trên tham s�
   được tính, mỗi câu một lần. Câu của người nói luôn được tính: mọi kiểm tra
   khác ở trên giữ nguyên.
 - **Sau một lần gửi** mô hình được báo một câu cố định: "Say only that it was
-  sent, in the conversation's language." khi dịch vụ trả lời `sent: true`,
-  nếu không thì "Say only that it was not sent, in the conversation's
-  language." (nói bằng ngôn ngữ của cuộc trò chuyện).
+  sent, in the conversation's language." khi dịch vụ trả lời `sent: true`;
+  "Say only that it was saved as a draft in their Gmail Drafts, not sent, in
+  the conversation's language." (`SAVED_NEXT`) khi nó trả lời `saved: true`,
+  nên đèn nói "Saved as a draft.", không bao giờ nói "sent"; "Say only that
+  the draft was not saved, in the conversation's language."
+  (`NOT_SAVED_NEXT`) với một lỗi bắt đầu bằng "not saved"; nếu không thì
+  "Say only that it was not sent, in the conversation's language." (nói
+  bằng ngôn ngữ của cuộc trò chuyện). Một bản nháp đã lưu là một lệnh ghi
+  đã xong như một lần đã gửi (`services::went`): biên nhận của nó không bao
+  giờ bị huỷ hay bị bỏ trước, và ghi chú của một lượt bị cắt nói lời đồng ý
+  "already sent the write they asked for (or, for a draft, saved it)".
 - **Một lần gửi bị cắt khi còn đang chờ không bao giờ được trả lời như thể
   chưa làm gì** (#5853, lamp-9adf, 9/11). Trên tuyến thứ hai, lệnh gọi của
   một lần gửi vẫn chạy đến khi có câu trả lời dù một câu mới hơn cắt lượt,
@@ -1149,8 +1210,16 @@ nên danh sách "action, by service: …" của nó được nói trên tham s�
   không có "it" là của speech-to-text: trên lamp-9adf ngày 9/11 câu "Go ahead
   and send it." của chủ đèn đến thành "Go ahead and send", và lần ghi bị
   chuẩn bị và đọc lại lần nữa (#5846).
+- **Một câu lưu thuần** (`says_save`), chỉ cho một bản nháp: cùng các từ được
+  xử lý cùng cách, và phần còn lại đúng là một trong `save`, `save it`, `save
+  that`, `save the draft`, `save it as a draft`, `save a draft`, `save
+  draft`, `lưu`, `lưu đi`, `lưu nháp`, `lưu lại`, `luu`, `luu di`, `luu
+  nhap` (`SAVE_WORDS`): câu nào cũng có "save", "lưu" hoặc "luu" và không câu
+  nào có "don't". Nó xác nhận một bản nháp đang chờ như một câu gửi thuần,
+  và không bao giờ xác nhận một lần gửi: "save it" sau phần đọc lại của một
+  thư sẽ huỷ nó. "don't save it" và "đừng lưu" không lưu gì.
 - **Một câu gửi thuần được nghe là câu trả lời** (`send_awaited`). Khi một lệnh
-  ghi đang chờ, một câu gửi thuần được tính là trả lời đèn, bất kể câu cuối
+  ghi đang chờ, một câu gửi thuần (với một bản nháp, cả một câu lưu thuần) được tính là trả lời đèn, bất kể câu cuối
   của phần đọc lại ra sao. Vì vậy nó không bị giữ lại như một âm thanh ngắn hay
   vài từ lẻ của căn phòng, kể cả khi không có ai trong tầm nhìn. Điều này chỉ áp
   dụng cho câu được biết là bắt đầu tách khỏi lời của đèn. Câu bắt đầu đè lên
@@ -1650,7 +1719,7 @@ không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
   trên; một liên kết trên host khác bị từ chối.
 - `lamp-services.service` đã được cài nhưng tắt trên mọi đèn, và chưa phần
   nào ở đây chạy trên một đèn: các kiểm tra cgroup dưới socket
-  thật, các trao đổi IMAP và SMTP với Gmail, REST API của Gmail với một đăng
+  thật, các trao đổi IMAP và SMTP với Gmail (trong đó có `APPEND` của một bản nháp), REST API của Gmail với một đăng
   nhập Google (và các scope mà đăng nhập Gmail của backend yêu cầu),
   `get-message` và làm mới của backend, và API riêng của từng dịch vụ.
 
@@ -1663,8 +1732,20 @@ code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật
 phép, ghi chỉ trong danh sách ghi; mọi mutation GraphQL bị từ chối; IMAP của
 Gmail chỉ-đọc (`EXAMINE`, `BODY.PEEK`), tìm kiếm của nó trong All Mail (tìm
 theo dấu `\All` dưới một tên theo ngôn ngữ, nếu không thì hộp thư đến),
-`recent` trong hộp thư đến và `message` trong hộp thư mà id của nó nêu, và
-SMTP một thư sau `AUTH`; `set`
+`recent` trong hộp thư đến và `message` trong hộp thư mà id của nó nêu,
+`drafts` trong Drafts (tìm theo dấu `\Drafts` dưới một tên theo ngôn ngữ)
+cùng người nhận của từng bản và một id đọc lại được nó, một `APPEND` duy
+nhất của bản nháp với cả thư là literal được đánh dấu `(\Draft \Seen)` vào
+Drafts (nếu không thì `[Gmail]/Drafts`), không SMTP và không mở hộp thư nào,
+một `APPEND` bị từ chối được nói là không kết nối được, các phản hồi không
+gắn tag trước dấu `+` của nó được nhận và một `* BYE` ở đó không lưu gì, một
+`LOGOUT` bị giữ sau OK của nó vẫn để bản nháp đã lưu và không bao giờ bị
+chờ, một bản nháp được xác nhận gần cuối ngân sách của nó được trả lời đã
+lưu trước khi giọng nói thôi chờ, một lần ghi chuẩn bị
+với một tài khoản không bao giờ đi với tài khoản liên kết sau, `save_draft` được
+đọc lại là một bản nháp, kiểm tra như một lần gửi, lưu một lần khi được xác
+nhận mà không gửi gì và trả lời `saved`, và bị từ chối với liên kết đăng nhập
+Google mà không giữ gì, và SMTP một thư sau `AUTH`; `set`
 không giữ gì khi đăng nhập Gmail bị từ chối; một đăng nhập Google của Gmail
 được kiểm tra ở `set` bằng profile của nó (bị từ chối, không kết nối được,
 tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, một tìm

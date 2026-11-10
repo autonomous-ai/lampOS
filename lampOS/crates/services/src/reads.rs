@@ -235,7 +235,7 @@ fn graphql(base: &str, query: &str, variables: Option<&Value>) -> Result<Plan, S
 pub const WHATS: &[(&str, &str)] = &[
     (
         "gmail",
-        "recent {count}, search {query}, message {id}, attachment {id, name|index} (text/CSV/HTML/PDF)",
+        "recent {count}, search {query}, drafts {count}, message {id}, attachment {id, name|index}",
     ),
     ("gmail-app", "none, it only sends: reads use gmail"),
     // No `calendars`: the link holds only `calendar.events`, and Google
@@ -284,8 +284,18 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
         return Ok(Plan::Mail(match what {
             "recent" => MailAsk::Recent(count(args)),
             "search" => MailAsk::Search(words(args, "query", what)?.to_owned(), count(args)),
-            // Over IMAP a UID, the inbox's or All Mail's (`all41`, from a
-            // search); Gmail's own id with a Google sign-in.
+            // Drafts, over the app password's IMAP alone: the owner's ask
+            // of 10 Nov was to save a voice draft and read it back.
+            "drafts" if entry.oauth() => {
+                return Err(
+                    "this Gmail link reads no drafts: only one linked with an app password does"
+                        .into(),
+                );
+            }
+            "drafts" => MailAsk::Drafts(count(args)),
+            // Over IMAP a UID, the inbox's, All Mail's (`all41`, from a
+            // search) or Drafts' (`draft12`); Gmail's own id with a Google
+            // sign-in.
             "message" => {
                 let id = needed(args, "id", what)?;
                 let fits = if entry.oauth() {
@@ -628,6 +638,10 @@ pub fn mail_item(item: &MailItem) -> Value {
                     .collect();
             }
         }
+    }
+    // Only a draft's: whom it is to is what it is about.
+    if !item.to.is_empty() {
+        quoted["to"] = json!(item.to);
     }
     quoted
 }
@@ -1227,10 +1241,25 @@ mod tests {
             Plan::Mail(MailAsk::Search("from:mom".into(), COUNT_MOST))
         );
         assert!(plan("gmail", &json!({"what":"message","id":"x"}), &entry(), 0).is_err());
-        // Over IMAP an inbox UID or an All Mail one a search gave.
+        // Drafts over IMAP; a Google sign-in's link reads none.
+        assert_eq!(
+            plan("gmail", &json!({"what":"drafts","count":2}), &entry(), 0).unwrap(),
+            Plan::Mail(MailAsk::Drafts(2))
+        );
+        let signed_in = Entry::from_set(
+            "gmail",
+            &json!({"auth_type":"oauth","access_token":"t","expires_in":3600}),
+            0,
+        )
+        .unwrap();
+        assert!(plan("gmail", &json!({"what":"drafts"}), &signed_in, 0).is_err());
+        // Over IMAP an inbox UID, an All Mail one a search gave, or a
+        // Drafts one.
         for (id, fits) in [
             ("41", true),
             ("all41", true),
+            ("draft12", true),
+            ("draft", false),
             ("all", false),
             ("allx", false),
             ("+41", false),
@@ -1444,6 +1473,7 @@ mod tests {
         let code = MailItem {
             id: "7".into(),
             from: "Bank <no-reply@bank.test>".into(),
+            to: String::new(),
             subject: "Your sign-in code".into(),
             date: "d".into(),
             text: "Use 482913 to sign in".into(),
@@ -1458,6 +1488,7 @@ mod tests {
         let plain = MailItem {
             id: "8".into(),
             from: "Mom".into(),
+            to: String::new(),
             subject: "Dinner".into(),
             date: "d".into(),
             text: "At 7".into(),
@@ -1642,6 +1673,7 @@ mod tests {
             mail_item(&MailItem {
                 id: "1".into(),
                 from: "Ana <ana@example.com>".into(),
+                to: String::new(),
                 subject: subject.into(),
                 date: "Tue, 03 Nov 2026 10:15:30 +0700".into(),
                 text: text.into(),
