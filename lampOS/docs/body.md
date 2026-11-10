@@ -2049,7 +2049,13 @@ stopped (its position still within a count) within 50 counts of it
 88 and 152). One stopped farther short is held by something: the pose stays
 owed and is cut short in time. `there` says the degrees the positions
 reached, sag and all, and `clamped` when the window or the reach cut the
-goal by more than half a degree. A pose not there in 6 s (`LONGEST_POSE`) is
+goal by more than half a degree, or when a joint stopped more than 2 degrees
+(`POSE_SHORT_WITHIN`) short of what was asked, measured from where it reached, for the joints the line named
+(an arm joint not named is not judged: a standing arm sags on its own weight; a
+roll whose goal still moves is not settled)
+(lamp-75c9: an elbow asked 43.0 degrees stood at 39.5 and was said unclamped
+before: a `there` that says reached while short is a silent failure).
+`a_pose_that_stopped_short_of_what_was_asked_says_clamped`. A pose not there in 6 s (`LONGEST_POSE`) is
 cut short, "something holds the arm". A conversation keeps it for when the lease is
 held again; any other end lets it go, back to the stand. Tests:
 `a_held_standing_lamp_takes_its_holders_pose_inside_the_arms_window`,

@@ -579,6 +579,10 @@ pub const POSE_SAG_WITHIN: f32 = 50.0;
 /// How near (degrees) the pose the body applies must be to the asked one,
 /// for `there` to say it as asked rather than `clamped`.
 const POSE_KEPT_WITHIN: f32 = 0.5;
+/// How near (degrees) a joint must have reached the pose asked, as its
+/// position says, for `there` not to say `clamped`: one stopped farther short
+/// (its own weight at a stand: 3.5 degrees of the elbow on lamp-75c9) is said.
+const POSE_SHORT_WITHIN: f32 = 2.0;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -604,8 +608,12 @@ struct PoseOwed {
     since: Instant,
     settled: u32,
     arm_goals: Option<[u16; 2]>,
+    /// The roll's goal the step before: a roll still easing is not settled.
+    roll_goal: Option<u16>,
     /// The roll's and the arm's positions the step before.
     positions: Option<[u16; 3]>,
+    /// The joints the line named (roll, shoulder, elbow): the only ones `clamped` judges.
+    named: [bool; 3],
     /// The line's `tag`, echoed in its answer.
     tag: Option<u64>,
 }
@@ -684,7 +692,9 @@ impl Posing {
             since: now,
             settled: 0,
             arm_goals: None,
+            roll_goal: None,
             positions: None,
+            named: named.map(|joint| joint.is_some()),
             tag,
         });
         before
@@ -740,16 +750,28 @@ impl Posing {
             });
             let still = asked.arm_goals.is_some_and(|before| {
                 (0..2).all(|index| before[index].abs_diff(seen.arm_goals[index]) <= 1)
-            });
+            }) && asked
+                .roll_goal
+                .is_some_and(|before| before.abs_diff(seen.roll.0) <= 1);
             asked.arm_goals = Some(seen.arm_goals);
+            asked.roll_goal = Some(seen.roll.0);
             asked.positions = Some(positions);
             let near = arrived;
             asked.settled = if near && still { asked.settled + 1 } else { 0 };
             if asked.settled >= THERE_STEPS {
+                let named = asked.named;
                 self.asked = None;
                 let wanted = self.pose.unwrap_or(posed);
-                let clamped =
-                    (0..3).any(|index| (posed[index] - wanted[index]).abs() > POSE_KEPT_WITHIN);
+                // `clamped` is the body keeping the pose off what was asked, or a joint
+                // stopped short of it, measured from where it reached (banana's run on
+                // lamp-75c9: "elbow back" asked 43.0, there at 39.5, said unclamped).
+                // A joint the line did not name is not judged: a standing arm sags on its own
+                // weight (banana's P2 on cdaa6ed2a5).
+                let clamped = (0..3).any(|index| {
+                    (posed[index] - wanted[index]).abs() > POSE_KEPT_WITHIN
+                        || (named[index]
+                            && (seen.reached[index] - wanted[index]).abs() > POSE_SHORT_WITHIN)
+                });
                 // Said as reached: a developer sees the sag.
                 return Some(with_tag(pose_there(seen.reached, clamped), tag));
             }
@@ -1623,6 +1645,110 @@ mod tests {
         let said = posing.end("let go");
         assert_eq!(said, None, "nothing owed");
         assert_eq!(posing.pose(), None, "the lease's end lets the pose go");
+    }
+
+    /// Lead, 16:10 on 10 Nov, from banana's run on lamp-75c9: "elbow back" was asked 43.0 and said there at
+    /// 39.5 with `clamped` false. `clamped` is measured from where the joint reached as well as from the
+    /// pose the body wrote: a joint stopped short of what was asked (by more than `POSE_SHORT_WITHIN`,
+    /// here its own weight at a stand) says `clamped`, and one within it does not.
+    #[test]
+    fn a_pose_that_stopped_short_of_what_was_asked_says_clamped() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        for (reached_elbow, clamped) in [(39.5, true), (42.5, false), (47.0, true), (43.0, false)] {
+            posing.ask(
+                br#"{"pose":{"elbow":43.0}}"#,
+                true,
+                Ok([0.0, 52.7, 43.0]),
+                now,
+            );
+            let mut answer = None;
+            for _ in 0..=THERE_STEPS {
+                let there = Some(PoseSeen {
+                    reached: [0.0, 52.7, reached_elbow],
+                    ..seen([0.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+                });
+                answer = posing.step(Ok(()), there, now);
+            }
+            let answer = value(&answer.expect("there"));
+            assert_eq!(answer["pose"], "there");
+            assert_eq!(answer["elbow"], reached_elbow, "{answer}");
+            assert_eq!(
+                answer["clamped"], clamped,
+                "reached {reached_elbow}: {answer}"
+            );
+        }
+    }
+
+    /// Banana's P2 on cdaa6ed2a5: only the joints the line named are judged. An elbow-only pose on an
+    /// arm whose shoulder sags 3 degrees on its own weight at the stand is not `clamped` for the shoulder.
+    #[test]
+    fn a_pose_judges_only_the_joints_it_named_for_clamped() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        posing.ask(
+            br#"{"pose":{"elbow":43.0}}"#,
+            true,
+            Ok([0.0, 52.7, 43.0]),
+            now,
+        );
+        let mut answer = None;
+        for _ in 0..=THERE_STEPS {
+            let there = Some(PoseSeen {
+                reached: [0.0, 49.6, 43.0],
+                ..seen([0.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+            });
+            answer = posing.step(Ok(()), there, now);
+        }
+        let answer = value(&answer.expect("there"));
+        assert_eq!(answer["shoulder"], 49.6);
+        assert_eq!(answer["clamped"], false, "{answer}");
+        // The named joint short is still said.
+        posing.ask(
+            br#"{"pose":{"elbow":43.0}}"#,
+            true,
+            Ok([0.0, 52.7, 43.0]),
+            now,
+        );
+        let mut answer = None;
+        for _ in 0..=THERE_STEPS {
+            let there = Some(PoseSeen {
+                reached: [0.0, 49.6, 39.5],
+                ..seen([0.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+            });
+            answer = posing.step(Ok(()), there, now);
+        }
+        assert_eq!(value(&answer.expect("there"))["clamped"], true);
+    }
+
+    /// Banana's P3 on cdaa6ed2a5: a roll whose goal is still easing is not settled, so its `there` is never
+    /// judged mid-ease.
+    #[test]
+    fn a_pose_is_not_there_while_the_rolls_goal_still_moves() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        posing.ask(
+            br#"{"pose":{"roll":5.0}}"#,
+            true,
+            Ok([0.0, 52.7, 43.0]),
+            now,
+        );
+        for step in 0..=THERE_STEPS * 2 {
+            let easing = Some(PoseSeen {
+                roll: (2_044 + 5 * step as u16, 2_044 + 5 * step as u16),
+                ..seen([5.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+            });
+            assert_eq!(posing.step(Ok(()), easing, now), None, "step {step}");
+        }
+        let mut answer = None;
+        for _ in 0..=THERE_STEPS + 1 {
+            let still = Some(PoseSeen {
+                roll: (2_100, 2_100),
+                ..seen([5.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+            });
+            answer = answer.or(posing.step(Ok(()), still, now));
+        }
+        assert_eq!(value(&answer.expect("there once still"))["pose"], "there");
     }
 
     /// A limp is taken only while held, said at once, and any end of the
