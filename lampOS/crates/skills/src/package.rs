@@ -2894,11 +2894,11 @@ pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 /// skill put on once kept (#1685). Any other part in the group `lampos` may
 /// connect, but is refused before its line is read (the reviewer's P3 on
 /// #2429), as the keys helper does (`lamp_setup::keys`, #2167).
-pub const ASKERS: [&str; 3] = [
-    APP_LINK,
-    "/lampos.slice/lampos-voice.slice/lamp-voice.service",
-    CONTROL,
-];
+pub const ASKERS: [&str; 3] = [APP_LINK, VOICE_LINK, CONTROL];
+/// `lamp-voice`, where the system's manager puts it: also the only peer
+/// whose requested-audio contexts and private audio ops lamp-skills' call
+/// socket takes (#6128, `watch::from_the_voice`).
+pub const VOICE_LINK: &str = "/lampos.slice/lampos-voice.slice/lamp-voice.service";
 /// `lamp-cloud`, the owner's app's link, where the system's manager puts
 /// it: also the only peer whose `guard.on` and `guard.off` lamp-skills'
 /// call socket takes (#2562, `watch::from_the_app`).

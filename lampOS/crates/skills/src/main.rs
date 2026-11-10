@@ -1136,7 +1136,7 @@ fn serve(
     }
     let (ask, asks) = waking::<ToolAsk>(&waker);
     if let Some(tools) = tools {
-        listen(tools, ask.clone(), audio.clone())?;
+        listen(tools, ask.clone(), audio.clone(), runner.bus.clone())?;
     }
     let (skip, skips) = waking::<Skip>(&waker);
     if let Some(path) = &options.clock_control {
@@ -1404,7 +1404,7 @@ fn serve(
                 }
             }
             if let Some(tools) = tools {
-                keep_tools(tools, &ask, &engine, &audio)?;
+                keep_tools(tools, &ask, &engine, &audio, &runner.bus)?;
             }
             let _ = out.alive();
         }
@@ -3106,6 +3106,7 @@ fn keep_tools(
     asks: &Waking<ToolAsk>,
     engine: &Engine,
     audio: &Arc<Mutex<Authority>>,
+    bus: &Bus,
 ) -> io::Result<()> {
     if dir.join("call.sock").exists() {
         return Ok(());
@@ -3119,7 +3120,7 @@ fn keep_tools(
             ),
         ));
     }
-    listen(dir, asks.clone(), audio.clone())?;
+    listen(dir, asks.clone(), audio.clone(), bus.clone())?;
     write_tools(dir, engine);
     eprintln!(
         "lamp-skills: {} had no call.sock: made again",
@@ -3187,10 +3188,47 @@ fn from_the_app(stream: &UnixStream) -> bool {
     }
 }
 
+/// Whether the peer on `stream` is lamp-voice, by its credentials
+/// (`SO_PEERCRED`) and its cgroup ([`watch::from_the_voice`]), as
+/// [`from_the_app`] tells lamp-cloud; or, with `LAMP_SKILLS_ANY_ASKER=on`
+/// in this program's own environment, any peer, for the tests. Peer
+/// credentials are read on Linux only; elsewhere no peer is the voice.
+fn from_the_voice(stream: &UnixStream) -> bool {
+    if std::env::var(lamp_skills::package::ANY_ASKER).as_deref() == Ok("on") {
+        return true;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        rustix::net::sockopt::socket_peercred(stream).is_ok_and(|peer| {
+            std::fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
+                .is_ok_and(|cgroup| watch::from_the_voice(&cgroup))
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = stream;
+        false
+    }
+}
+
 /// Listens on `dir/call.sock` as the actions part does: one line in
 /// (`{"op":"call","name":...,"args":{...}}`), one line out, the main loop
 /// answering. And the owner's app's `{"op":"guard","turn":...}` ([`app_turn`]).
-fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io::Result<()> {
+///
+/// The caller is told apart (#6128): only lamp-voice's unit
+/// ([`from_the_voice`]) has its `requested_audio_context` taken and its
+/// `audio_authorize` and `audio_finish` served, as those are the voice's
+/// socket receipts. Any other peer (lamp-tasks' `skill call`, the lamp's
+/// Hermes) has its context dropped, so a requested sound answers as with
+/// none, its audio ops refused ([`watch::NOT_THE_VOICE`]), and its `call`
+/// refused while the lamp is private ([`lamp_skills::routine::kept_asleep`],
+/// [`watch::PRIVATE_FOR_OTHERS`]).
+fn listen(
+    dir: &Path,
+    asks: Waking<ToolAsk>,
+    audio: Arc<Mutex<Authority>>,
+    bus: Bus,
+) -> io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let socket = dir.join("call.sock");
     let _ = std::fs::remove_file(&socket);
@@ -3205,10 +3243,22 @@ fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io
                 let mut line = String::new();
                 BufReader::new((&stream).take(8_192)).read_line(&mut line)?;
                 let call: serde_json::Value = serde_json::from_str(&line).unwrap_or_default();
+                let voice = from_the_voice(&stream);
                 if matches!(
                     call["op"].as_str(),
                     Some("audio_authorize" | "audio_finish")
                 ) {
+                    if !voice {
+                        eprintln!(
+                            "lamp-skills: {} refused: the peer is not the voice",
+                            call["op"].as_str().unwrap_or_default()
+                        );
+                        return writeln!(
+                            &stream,
+                            "{}",
+                            json!({"ok": false, "error": watch::NOT_THE_VOICE})
+                        );
+                    }
                     let result = serde_json::from_value::<RequestedAudioOperation>(call)
                         .map_err(|_| "invalid private audio operation".to_owned())
                         .and_then(|op| {
@@ -3225,6 +3275,14 @@ fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io
                 }
                 let context = match call.get("requested_audio_context") {
                     None => None,
+                    // Another program's context is no receipt of the voice:
+                    // dropped, so the call answers as with none.
+                    Some(_) if !voice => {
+                        eprintln!(
+                            "lamp-skills: a requested audio context from a peer that is not the voice dropped"
+                        );
+                        None
+                    }
                     Some(context) => {
                         match serde_json::from_value::<RequestedAudioContext>(context.clone()) {
                             Ok(context) if context.check().is_ok() => Some(context),
@@ -3238,6 +3296,18 @@ fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io
                         }
                     }
                 };
+                // Another program's call is not served while the lamp is
+                // private: the voice holds its own turns to privacy.
+                if !voice
+                    && call["op"].as_str() == Some("call")
+                    && let Some(why) = lamp_skills::routine::kept_asleep(&bus)
+                {
+                    eprintln!(
+                        "lamp-skills: a call from a peer that is not the voice refused: {why}"
+                    );
+                    let error = format!("{}: {why}", watch::PRIVATE_FOR_OTHERS);
+                    return writeln!(&stream, "{}", json!({"ok": false, "error": error}));
+                }
                 let (reply, told) = mpsc::channel();
                 let admission = Admission::default();
                 // A tool's call never names the app's kinds: those come by

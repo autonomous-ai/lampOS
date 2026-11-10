@@ -1355,6 +1355,7 @@ struct Service {
     tools: std::path::PathBuf,
     clock: std::path::PathBuf,
     stderr: std::path::PathBuf,
+    bus: std::path::PathBuf,
     _runtime: tempfile::TempDir,
 }
 
@@ -1385,6 +1386,20 @@ impl Service {
     }
 
     fn with_limits(root: &Path, switch: &str, limits: bool) -> Self {
+        Self::spawn(root, switch, limits, true)
+    }
+
+    /// Served as to a peer that is not lamp-voice's unit (#6128): no
+    /// `LAMP_SKILLS_ANY_ASKER`, so the test's own process, in no lamp
+    /// unit's cgroup, is another program (lamp-tasks' `skill call`, the
+    /// lamp's Hermes).
+    fn not_the_voice(root: &Path, switch: &str) -> Self {
+        Self::spawn(root, switch, false, false)
+    }
+
+    /// `voice`: the call socket takes any peer as lamp-voice
+    /// (`LAMP_SKILLS_ANY_ASKER=on`, the tests' stand-in for its cgroup).
+    fn spawn(root: &Path, switch: &str, limits: bool, voice: bool) -> Self {
         let plain = root.join("plain-fixture");
         fs::create_dir(&plain).unwrap();
         fs::write(
@@ -1425,6 +1440,7 @@ impl Service {
             .env("LAMP_SKILL_ROUTINES", if limits { "on" } else { "off" })
             .env("LAMP_OUTPUT_CAPS", if limits { "on" } else { "off" })
             .env("LAMP_SKILLS_ASK", "skip")
+            .env(package::ANY_ASKER, if voice { "on" } else { "" })
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(fs::File::create(&stderr).unwrap())
@@ -1435,6 +1451,7 @@ impl Service {
             tools,
             clock,
             stderr,
+            bus,
             _runtime: runtime,
         };
         service.until_catalog(|tools| tools.iter().any(|tool| tool["name"] == "plain_fixture"));
@@ -1682,4 +1699,102 @@ rest = { op = "cancel" }
             .iter()
             .any(|tool| tool["name"] == "play_fixture")
     );
+}
+
+/// #6128: a peer that is not lamp-voice's unit (the lamp's Hermes through
+/// `lamp-tasks skill call`) is told apart. Its `requested_audio_context` is
+/// dropped, so a requested sound answers as with none, while the voice's
+/// same context is taken; its `audio_authorize` and `audio_finish` are
+/// refused, even with an offer the voice was given. A plain call is served.
+#[test]
+fn only_the_voice_gives_requested_audio_context_and_audio_ops() {
+    let (_dir, path) = fixture();
+    let voice = Service::start(path.parent().unwrap(), "on");
+    let offer = voice.offer(1);
+    drop(voice);
+    let (_other_dir, path) = fixture();
+    let other = Service::not_the_voice(path.parent().unwrap(), "on");
+    assert_eq!(
+        other.call(json!({"op":"call","name":"plain_fixture","args":{}}))["ok"],
+        true
+    );
+    let response = other.call(json!({
+        "op":"call", "name":"play_fixture", "args":{},
+        "requested_audio_context":context(1, lamp_ipc::monotonic_us())
+    }));
+    // The very answer to a call that gave no context at all.
+    let none = other.call(json!({"op":"call","name":"play_fixture","args":{}}));
+    assert_eq!(response, none);
+    assert_eq!(response["ok"], false, "{response}");
+    assert!(
+        response["error"]
+            .as_str()
+            .unwrap()
+            .contains("no spoken context"),
+        "{response}"
+    );
+    for op in [
+        json!({"op":"audio_authorize","offer":offer,"phase":"start"}),
+        json!({"op":"audio_finish","offer":offer,"outcome":"cancelled"}),
+    ] {
+        let response = other.call(op);
+        assert_eq!(response["ok"], false, "{response}");
+        assert_eq!(
+            response["error"],
+            lamp_skills::watch::NOT_THE_VOICE,
+            "{response}"
+        );
+    }
+    // Refused before its line is parsed as an op: even a malformed one.
+    assert_eq!(
+        other.call(json!({"op":"audio_authorize"}))["error"],
+        lamp_skills::watch::NOT_THE_VOICE
+    );
+}
+
+/// #6128: while the lamp is private (the voice muted for privacy, or the
+/// privacy switch closed), a call from a peer that is not the voice is
+/// refused with why; the voice's own call is still served (it holds its
+/// turns to privacy itself). Opened again, the other peer is served.
+#[test]
+fn another_programs_call_is_refused_while_the_lamp_is_private() {
+    use lamp_msgs::VoiceMute;
+    let plain = json!({"op":"call","name":"plain_fixture","args":{}});
+    for voice in [false, true] {
+        let (_dir, path) = fixture();
+        let service = if voice {
+            Service::start(path.parent().unwrap(), "on")
+        } else {
+            Service::not_the_voice(path.parent().unwrap(), "on")
+        };
+        let bus = lamp_bus::Bus::new(&service.bus).unwrap();
+        let mut mute = bus
+            .publisher_declared(VoiceMute::TOPIC, &VoiceMute::declaration(), "voice")
+            .unwrap();
+        let said = |muted: bool| VoiceMute {
+            muted,
+            reason: None,
+            muted_by: None,
+            control: false,
+            hears_name: false,
+        };
+        mute.publish_json(lamp_ipc::monotonic_us(), &said(true))
+            .unwrap();
+        let response = service.call(plain.clone());
+        if voice {
+            assert_eq!(response["ok"], true, "{response}");
+        } else {
+            assert_eq!(response["ok"], false, "{response}");
+            let error = response["error"].as_str().unwrap();
+            assert!(
+                error.starts_with(lamp_skills::watch::PRIVATE_FOR_OTHERS),
+                "{response}"
+            );
+            assert!(error.contains("muted for privacy"), "{response}");
+        }
+        mute.publish_json(lamp_ipc::monotonic_us(), &said(false))
+            .unwrap();
+        let response = service.call(plain.clone());
+        assert_eq!(response["ok"], true, "{voice}: {response}");
+    }
 }
