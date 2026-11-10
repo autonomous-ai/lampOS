@@ -150,11 +150,39 @@ def _check(op: str, fields: dict) -> None:
             raise LampError(f"{field} {value!r}: one of {', '.join(names)}", code="bad_request")
     for value in fields.get("events", ()):
         if value not in schema.events():
-            raise LampError(f"no event {value!r}", code="bad_request")
+            raise _no_event(value)
     # A lease's parts; a `sound.upload`'s or `skill.push`'s `parts` is a count.
     for value in fields.get("parts", ()) if op == "lease.take" else ():
         if value not in schema.parts():
             raise LampError(f"no part {value!r}", code="bad_request")
+
+
+def _no_event(name: str, *, on: bool = False) -> LampError:
+    """The refusal for a name that is no event, with the event the name was
+    meant for when it is a lease's or a look's end (`lease.ended` is `lease`,
+    state `lost`)."""
+    if name in ("lease", "done"):
+        # Known to `on`, but sent to you with no subscription.
+        return LampError(
+            f"no event {name!r} to subscribe to: it comes without subscribing, "
+            f"hear it with lamp.on({name!r}, handler)",
+            code="bad_request",
+        )
+    if name.startswith("lease"):
+        hint = (
+            "a lease's changes come as the event 'lease' (state held, suspended or lost, "
+            "and why): lamp.on('lease', handler)"
+        )
+    elif name.startswith("done"):
+        hint = "the end of a look or a move comes as the event 'done': lamp.on('done', handler)"
+    else:
+        if on:
+            # What `on` takes: the schema's, the streams' and the two that come unasked.
+            names = sorted({*schema.events(), *CAMERA_EVENTS, *MICROPHONE_EVENTS})
+            hint = f"one of {', '.join(names)}, or 'lease' or 'done'"
+        else:
+            hint = f"one of {', '.join(sorted(schema.events()))}"
+    return LampError(f"no event {name!r}: {hint}", code="bad_request")
 
 
 def binary_frame(message: bytes) -> dict:
@@ -739,7 +767,7 @@ class Lamp:
         the event's grant). Not awaited, a refusal is raised by
         `wait_closed` instead, never lost."""
         if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS):
-            raise LampError(f"no event {event!r}", code="bad_request")
+            raise _no_event(event, on=True)
         _short_phrase(phrases)
         self._handlers[event].append(handler)
         if phrases:

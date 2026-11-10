@@ -291,6 +291,37 @@ def test_request_tells_its_id_before_sending_so_an_early_done_can_be_matched(tmp
     run(go())
 
 
+def test_a_name_that_is_no_event_says_which_event_it_meant(tmp_path):
+    """`lease.ended` is the event `lease` (state `lost`), the end of a look is
+    `done`; `lease` and `done` come with no subscription (blue's desk-app log)."""
+
+    async def go():
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(LampError) as lost:
+                    lamp.on("lease.ended", lambda event: None)
+                assert lost.value.code == "bad_request"
+                assert "no event 'lease.ended'" in str(lost.value)
+                assert "lamp.on('lease', handler)" in str(lost.value)
+                assert "lost" in str(lost.value)
+                with pytest.raises(LampError) as end:
+                    lamp.on("done.finished", lambda event: None)
+                assert "lamp.on('done', handler)" in str(end.value)
+                with pytest.raises(LampError) as other:
+                    lamp.on("camera.zoomed", lambda event: None)
+                assert "person.arrived" in str(other.value) and "'lease' or 'done'" in str(other.value)
+                # `on` also takes the streams' events: its list is all it accepts.
+                assert "camera.frame" in str(other.value) and "microphone.audio" in str(other.value)
+                # Not a subscription: `lease` and `done` are sent without one.
+                with pytest.raises(LampError) as sub:
+                    await lamp.subscribe(["lease"])
+                assert "without subscribing" in str(sub.value)
+                assert fake.asked("subscribe") == []
+
+    asyncio.run(go())
+
+
 def test_greet_a_person_who_arrives(tmp_path):
     async def go():
         async with FakeLamp(grants=("body", "look")) as fake:
