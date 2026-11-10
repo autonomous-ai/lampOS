@@ -574,8 +574,10 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             for_ms: int = 10_000,
             pattern: Literal[tuple(schema.patterns())] | None = None,  # type: ignore[valid-type]
         ) -> str:
-            """Light the ring for at most 30 s: one of its colours, `level` 1 to 5, steady or a pattern.
-            The person's own light comes back after; at night the lamp dims it."""
+            """Light the ring for `for_ms` milliseconds (30,000 at most, 10,000 by default): one of its
+            colours, `level` 1 to 5, steady or a pattern. The person's own light comes back after, or
+            at once with lamp_stop; at night the lamp dims it. To hold a light longer, call again
+            before it ends."""
             await act("light", colour=colour, level=level, for_ms=min(for_ms, 30_000), pattern=pattern)
             return f"{colour} light for {min(for_ms, 30_000)} ms"
 
@@ -587,7 +589,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             for_ms: int = 10_000,
             fade_ms: int | None = None,
         ) -> dict:
-            """Light the ring in your own colours for at most 30 s: `pixels`, one "#rrggbb" per pixel from
+            """Light the ring in your own colours for `for_ms` milliseconds (30,000 at most, 10,000 by
+            default): `pixels`, one "#rrggbb" per pixel from
             pixel 0 around the ring (the lamp's count, `ring_pixels` in the answer), or `rgb`, one "#rrggbb"
             for the whole ring; `brightness` 0 to 100; `fade_ms` how slowly the ring comes into the light
             (the lamp takes 1000 to 60000). A turn's face, the privacy marks and the person's own
@@ -847,7 +850,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_follow_hand(seconds: float = 10) -> dict:
-            """Turn the head after the hand the lamp sees, for up to `seconds` (60 at most), and say how it
+            """Turn the head after the hand the lamp sees, for up to `seconds` (a number of seconds, 60 at most), and say how it
             ended: the hand gone (none in view for 1 s), the time up, or the lamp taking its body back
             (someone touched or talked to it). Says how many times the lamp told where the hand was and where
             it last was, as shares of the picture: never a picture or whose hand. lamp_follow_stop, called
@@ -1017,7 +1020,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     @server.tool()
     async def lamp_events(since: int = 0, wait_s: float = 0) -> dict:
         """The events the lamp said after `since` (a `seq`; 0 for all kept), newest last, and `latest`.
-        With `wait_s` (120 at most), waits that long for one if none is there yet. Every event the
+        With `wait_s` (seconds, 120 at most), waits that long for one if none is there yet. Every event the
         grants let this computer hear, but phrases (`lamp_wait_for` takes those): presence, hands,
         touch, the button, the lamp's state, sounds."""
         await start_stream()
