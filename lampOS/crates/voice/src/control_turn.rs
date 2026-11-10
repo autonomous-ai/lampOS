@@ -233,7 +233,9 @@ impl ControlTurns {
     pub fn prompt(&mut self, asker: Ticket) -> Ticket {
         let continues = self.replace();
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-        let (said, answered) = Ticket::own(asker.skill());
+        // Cut, as the asker's own say would be, when its computer cancels
+        // the start ([`crate::say::CANCEL_LINE`]).
+        let (said, answered) = Ticket::own_for(&asker);
         self.turn = Some(Turn {
             id,
             continues,
@@ -249,6 +251,12 @@ impl ControlTurns {
     /// (`ProviderInput::TurnOpened`). A line over the prompt answers it, and
     /// one more while the first is unanswered goes on with it.
     pub fn admitted(&mut self, request: u64, at_us: u64) -> bool {
+        // Checked first, as the coordinator admits a line before its pass's
+        // tick: a turn its computer has cancelled takes no line (Second's
+        // P2 on #5870, e1db6ae37e).
+        if self.ended_if_cancelled() {
+            return false;
+        }
         let Some(turn) = self.turn.as_mut() else {
             return false;
         };
@@ -292,6 +300,9 @@ impl ControlTurns {
         persons_sounding: bool,
         quiet: bool,
     ) {
+        if self.ended_if_cancelled() {
+            return;
+        }
         let Some(turn) = self.turn.as_mut() else {
             return;
         };
@@ -366,6 +377,27 @@ impl ControlTurns {
         }
     }
 
+    /// Its computer cancelled the start on its own connection, whatever the
+    /// phase: lamp-control's `turn.end` for a start the door hasn't seen
+    /// begin (Second's P2 on #5870). Ended then, before any line is admitted
+    /// or the window opens: its prompt is cut with it, and a line the person
+    /// begins after it is theirs, never the turn's. Whether it ended.
+    fn ended_if_cancelled(&mut self) -> bool {
+        let Some(turn) = self.turn.as_mut() else {
+            return false;
+        };
+        if !turn.asker.as_ref().is_some_and(Ticket::stopped_by_asker) {
+            return false;
+        }
+        eprintln!(
+            "lamp-voice: the skill {} cancelled turn {}: ended by its computer",
+            turn.skill, turn.id
+        );
+        turn.tell(Outcome::Dropped(ENDED_BY_COMPUTER.to_owned()));
+        self.turn = None;
+        true
+    }
+
     /// Whether a `turn: "end"` naming `id` ends something: its prompt, its
     /// open window, or the conversation that grew from it, not yet over.
     pub fn ends(&self, id: u64) -> bool {
@@ -423,6 +455,97 @@ mod tests {
 
     fn answers(answered: &mpsc::Receiver<Answer>) -> Vec<Answer> {
         answered.try_iter().collect()
+    }
+
+    /// Second's P2 on #5870: lamp-control cancels a start of its
+    /// computer's it hasn't seen begin, on the start's own connection. The
+    /// voice ends it whatever it had made of it: while its prompt is said
+    /// (the prompt cut with it, its window never opening) or once its
+    /// window opened. A line the person begins after is never the turn's.
+    #[test]
+    fn a_start_its_computer_cancels_ends_while_prompting_or_open() {
+        use crate::say::cancel_of_test;
+        use std::sync::atomic::Ordering;
+
+        let ended = |answered: &mpsc::Receiver<Answer>| {
+            answers(answered).into_iter().any(|answer| {
+                matches!(answer, Answer::Done(Outcome::Dropped(why)) if why == ENDED_BY_COMPUTER)
+            })
+        };
+        // Its prompt being said.
+        let (asker, answered) = ticket_for_test(crate::say::TURN_SKILL);
+        let cancel = cancel_of_test(&asker);
+        let mut turns = ControlTurns::default();
+        let said = turns.prompt(asker);
+        turns.tick(S, None, false, true);
+        assert!(turns.going_on());
+        cancel.store(true, Ordering::Release);
+        assert!(said.stopped_by_asker(), "the prompt is cut with its turn");
+        turns.tick(2 * S, None, false, true);
+        assert!(!turns.going_on());
+        assert!(ended(&answered));
+        // Its prompt then said whole opens nothing, and the person's next
+        // line is theirs.
+        said.answer(Outcome::Spoken);
+        turns.tick(3 * S, None, false, true);
+        assert!(!turns.going_on());
+        assert!(!turns.admitted(1, 3 * S));
+
+        // Its window just opened, its `begun` not yet read at the door.
+        let (asker, answered) = ticket_for_test(crate::say::TURN_SKILL);
+        let cancel = cancel_of_test(&asker);
+        let mut turns = ControlTurns::default();
+        turns.open(asker, 10 * S);
+        cancel.store(true, Ordering::Release);
+        turns.tick(10 * S + 1_000, None, false, true);
+        assert!(!turns.going_on());
+        assert!(ended(&answered));
+        assert!(!turns.admitted(2, 11 * S));
+    }
+
+    /// Second's P2 on #5870 at e1db6ae37e: the coordinator admits a line
+    /// before its pass's tick, so a cancel already set must stop the
+    /// admission itself, not only the next tick. In production order (a
+    /// line offered first, then the tick), a cancelled turn takes no line,
+    /// whether its prompt was being said or its window was open; it is
+    /// ended there, its computer told, and the line is the person's.
+    #[test]
+    fn a_cancelled_start_takes_no_line_admitted_before_its_tick() {
+        use crate::say::cancel_of_test;
+        use std::sync::atomic::Ordering;
+
+        let ended = |answered: &mpsc::Receiver<Answer>| {
+            answers(answered).into_iter().any(|answer| {
+                matches!(answer, Answer::Done(Outcome::Dropped(why)) if why == ENDED_BY_COMPUTER)
+            })
+        };
+        // Its prompt being said: a line over it would open the window.
+        let (asker, answered) = ticket_for_test(crate::say::TURN_SKILL);
+        let cancel = cancel_of_test(&asker);
+        let mut turns = ControlTurns::default();
+        let _said = turns.prompt(asker);
+        cancel.store(true, Ordering::Release);
+        assert!(
+            !turns.admitted(1, S),
+            "a cancelled prompting turn took a line"
+        );
+        assert!(!turns.going_on());
+        assert!(ended(&answered));
+        turns.tick(S, None, false, true);
+        assert!(!turns.going_on());
+
+        // Its window open.
+        let (asker, answered) = ticket_for_test(crate::say::TURN_SKILL);
+        let cancel = cancel_of_test(&asker);
+        let mut turns = ControlTurns::default();
+        turns.open(asker, 10 * S);
+        cancel.store(true, Ordering::Release);
+        assert!(
+            !turns.admitted(2, 10 * S + 1_000),
+            "a cancelled open turn took a line"
+        );
+        assert!(!turns.going_on());
+        assert!(ended(&answered));
     }
 
     #[test]

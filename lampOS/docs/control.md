@@ -787,9 +787,39 @@ listening. The person wins over each, as "Who wins" says.
   `turn.end` still ends that conversation.
 - **`turn.end`** sends `{"skill":"control","turn":"end","id":N}` with the id
   of this computer's latest begun turn. With no turn of its own it is
-  refused `busy`, "not this computer's turn", and the voice isn't asked;
-  with no id kept and a start asked that the voice hasn't begun yet,
-  `busy`, "this computer's turn has not begun yet". The
+  refused `busy`, "not this computer's turn", and the voice isn't asked.
+  **A start of its own the door hasn't seen begin** is ended first,
+  whatever earlier turn's id is kept (lamp-75c9, 9 Nov: a `turn.end` 2 s
+  after a `turn.start` sent the earlier turn's id and was refused "not this
+  computer's turn"). The door can't tell a start the voice still has
+  waiting from one whose prompt it is saying, or whose window it has just
+  opened (Second's P2 on #5870), so it never answers from its own view: it
+  writes `{"cancel":true}` on that start's own say-socket connection (as it
+  connects, if it hasn't yet), and the voice ends the start in whichever
+  phase it is: let go while it waits, with no cue and no window; its prompt
+  cut and its window never opened; or its window closed, a line the person
+  begins after it being theirs. All pending starts share one two-second
+  budget, begun when the end is accepted, for cancellation writes and voice
+  receipts. The writes and waits run off the door's lock. A blocked write
+  half-closes that connection's request side, which drops a start still
+  queued at the voice. EOF does not cancel a prompt or turn already begun;
+  the response side stays open for its actual receipt. A start not connected
+  yet retains its cancellation and sends it when it connects.
+  The reply is `{"turn":"ended","started":N}` (the latest pending start's
+  request) only after every start supplies an explicit voice outcome;
+  `refused`, "the turn had already finished", if one finished instead;
+  `refused`, "the voice did not say within 2 s whether it ended", if the
+  shared budget expires. EOF, read failure, a missing outcome or an outcome
+  for another operation is uncertainty and is refused, never confirmed as
+  ended. A refused reply does not retract the cancellation request, but
+  does not guarantee that a blocked or failed cancel reached an already-begun
+  turn. The start's `done` is
+  `dropped`, "ended by this computer before it began", when the voice let
+  it go waiting, else `dropped: ended by the computer` (tests
+  `a_turn_end_ends_its_own_start_still_waiting`,
+  `a_turn_end_while_its_prompt_is_said_ends_the_turn_at_the_voice`; the
+  voice's `a_start_its_computer_cancels_ends_while_prompting_or_open`).
+  Otherwise the
   reply waits for the voice: `{"turn":"ended","started":18}` (the
   `turn.start` it ended) on `ended`; the voice's "not this computer's turn"
   is the same `busy`; anything else is `refused` with the voice's why. The
