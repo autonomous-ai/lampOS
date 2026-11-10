@@ -26,6 +26,14 @@ use std::{sync::Arc, time::Duration};
 
 /// The longest one answer is waited for, from the request to its end.
 pub const WRITE_WITHIN: Duration = Duration::from_secs(30);
+/// The most times a refused answer goes back to the model with what was
+/// refused (the owner, 10 Nov: "re-run it yourself until it works"; one,
+/// before: lamp-74ff's "come back to my desk" failed its one repair).
+pub const MOST_REPAIRS: usize = 3;
+/// The longest a make goes on: no repair is begun once one more answer
+/// ([`WRITE_WITHIN`]) would end past it. 120 s, the longest a make with
+/// one repair could take before (two answers, each asked once more).
+pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
 /// The most of an answer read: two files of at most 8 KiB, and the fences.
 const MOST_ANSWER_BYTES: usize = 20 * 1024;
 /// What a made skill's answer is kept from: this, and when it was made.
@@ -105,6 +113,7 @@ fn system() -> String {
 fn system_with(reads: bool) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
     let services = services(reads);
+    let triggers = made_skill::TRIGGER_MEANINGS;
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
          blocks and nothing else. Use only the keys and values the request names, written as \
@@ -112,7 +121,8 @@ fn system_with(reads: bool) -> String {
          the form only: never answer with it. A skill can't speak \
          (but to read a linked service aloud, as below) or keep time by itself: a reminder at a time or every so often is the lamp's own \
          timer, not a skill. Make what the request asks with the light or the head, or a \
-         read as below, on the lamp's resting or someone being there. A skill can't hear what is said: a request \
+         read as below, on the lamp's resting or someone being there. When it runs is one \
+         [trigger] table (never [[trigger]], never the faces' topic): {triggers} A skill can't hear what is said: a request \
          that needs words or a sound heard, or anything else a skill here can't sense or do, \
          is answered with one line and no blocks: {cannot} then one short sentence said to \
          the person, in plain words, why, ending with what to ask instead when there is one; \
@@ -349,7 +359,7 @@ pub fn make_with(
 
 /// The skill for `request` (its `brief` made already) written by the
 /// model `chat` gives and kept in `keeping` as made from `from`; a
-/// refused one asked once more with the check's lines. Blocking: the model
+/// refused one asked again with what was refused, up to [`MOST_REPAIRS`] times. Blocking: the model
 /// is asked on a thread of its own. Shared by the voice's `make_skill` and
 /// the app's typed ask (`crate::app_make`).
 pub fn make_kept(
@@ -385,7 +395,7 @@ fn made_and_journaled(
             Ok(text) if is_example(&text) => {
                 eprintln!("lamp-voice: a skill made here: the model gave back the example");
                 Err(Refused(
-                    "it gave back the lamp's own example, not what was asked".into(),
+                    "the lamp's model gave back its own example, not what was asked; try asking again".into(),
                     Some(EXAMPLE_GIVEN_BACK.into()),
                 ))
             }
@@ -397,13 +407,30 @@ fn made_and_journaled(
         }
     };
     let mut made = kept(ask(Arc::clone(&chat), brief));
-    // Refused by the lamp's check, or the example given back: its lines go
-    // back to the model once (`made_skill::repair_brief`).
-    if let Err(Refused(_, Some(lines))) = &made
-        && let Ok(repair) = made_skill::repair_brief(request, lines)
-    {
-        eprintln!("lamp-voice: a skill made here: the check's lines go back to the model once");
-        made = kept(ask(chat, repair));
+    // Refused by the lamp's check, by `plainly`, as TOML that can't be
+    // read, or the example given back: its lines go back to the model, up
+    // to [`MOST_REPAIRS`] times (`made_skill::repair_brief`; the owner,
+    // 10 Nov: "re-run it yourself until it works"), each begun only while
+    // one more answer still fits [`MAKE_WITHIN`].
+    for round in 1..=MOST_REPAIRS {
+        let Err(Refused(why, Some(lines))) = &made else {
+            break;
+        };
+        if began.elapsed() + WRITE_WITHIN > MAKE_WITHIN {
+            eprintln!(
+                "lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}: no time left, \
+                 not asked"
+            );
+            break;
+        }
+        let Ok(repair) = made_skill::repair_brief(request, lines) else {
+            break;
+        };
+        // What was refused, in the lamp's own words: the part itself (its
+        // keys and topic, or the check's first line) is journaled where it
+        // was refused, never the model's lines.
+        eprintln!("lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}: {why}");
+        made = kept(ask(Arc::clone(&chat), repair));
     }
     let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
     (made, line)
@@ -499,19 +526,8 @@ fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Val
         // instead, or the lamp's own plain reason.
         Err(Refused(why, _)) => json!({
             "error": format!("the skill couldn't be made: {why}"),
-            "next": made_skill::in_their_language(&couldnt_make_line(&why))
+            "next": made_skill::not_made_in_their_language(&made_skill::not_made_line(&why))
         }),
-    }
-}
-
-/// What the lamp says of a skill it couldn't make: "I couldn't make
-/// that:" and why, as it is, ending as a sentence (#5977).
-fn couldnt_make_line(why: &str) -> String {
-    let why = why.trim();
-    if why.ends_with(['.', '!', '?']) {
-        format!("I couldn't make that: {why}")
-    } else {
-        format!("I couldn't make that: {why}.")
     }
 }
 
@@ -1103,7 +1119,9 @@ light = { dim = 1 }
         );
         assert_eq!(
             told["next"],
-            made_skill::in_their_language("I couldn't make that: a skill can't hear what is said.")
+            made_skill::not_made_in_their_language(
+                "I couldn't make that: a skill can't hear what is said."
+            )
         );
         assert_eq!(served.join().unwrap(), 1);
         assert!(made_skill::entries(&keeping.directory).is_empty());
@@ -1271,12 +1289,72 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let told = make(REQUEST, &keeping, chat_at(url), NOW);
         assert_eq!(told["made"], "evening-dim", "{told}");
         assert_eq!(served.join().unwrap(), 2);
-        // Refused twice: said as not made, and asked no third time.
-        let (url, served) = service(vec![(200, bad.clone()), (200, bad)]);
+        // Refused every time: said as not made, plainly, after its last
+        // repair, and asked no more.
+        let (url, served) = service(vec![(200, bad.clone()); 1 + MOST_REPAIRS]);
         let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
         assert!(told.get("made").is_none(), "{told}");
-        assert_eq!(served.join().unwrap(), 2);
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_PASSED)
+        );
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner, 10 Nov: "re-run it yourself until it works". A skill the
+    /// lamp can't say plainly (lamp-74ff's "come back to my desk" on the
+    /// faces) goes back with the part named and the triggers it can have,
+    /// up to [`MOST_REPAIRS`] times: twice refused, the third answer is
+    /// kept; refused every time, the person is told plainly, with what to
+    /// try.
+    #[test]
+    fn a_skill_it_cant_say_is_repaired_up_to_three_times() {
+        let (root, keeping) = keeping("plainly-repairs");
+        let faces = good().replace(
+            "topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n",
+            "topic = \"humans/faces/tracked\"\nnear = 0.14\n",
+        );
+        assert!(faces != good());
+        let (url, served) = service(vec![
+            (200, faces.clone()),
+            (200, faces.clone()),
+            (200, good()),
+        ]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 3);
+        let (url, served) = service(vec![(200, faces); 1 + MOST_REPAIRS]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::UNSAID)
+        );
+        assert_eq!(
+            told["next"],
+            made_skill::not_made_in_their_language(&made_skill::not_made_line(made_skill::UNSAID))
+        );
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The making model is told, before it writes, what each trigger means:
+    /// someone coming back to the desk is room/presence, never the faces.
+    #[test]
+    fn the_system_prompt_says_what_coming_back_to_the_desk_is() {
+        for reads in [true, false] {
+            let system = system_with(reads);
+            assert!(
+                system.contains(&format!(
+                    "When it runs is one [trigger] table (never [[trigger]], never the faces' \
+                     topic): {}",
+                    made_skill::TRIGGER_MEANINGS
+                )),
+                "{system}"
+            );
+        }
     }
 
     /// lamp-9adf, 3 Nov: a skill.toml that isn't TOML (a bare word as a
@@ -1291,13 +1369,16 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let told = make(REQUEST, &keeping, chat_at(url), NOW);
         assert_eq!(told["made"], "evening-dim", "{told}");
         assert_eq!(served.join().unwrap(), 2);
-        let (url, served) = service(vec![(200, bad.clone()), (200, bad)]);
+        let (url, served) = service(vec![(200, bad); 1 + MOST_REPAIRS]);
         let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
         assert!(
-            told["error"].as_str().unwrap().contains("can't be read"),
+            told["error"]
+                .as_str()
+                .unwrap()
+                .contains("the lamp can't read"),
             "{told}"
         );
-        assert_eq!(served.join().unwrap(), 2);
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -1369,7 +1450,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     #[test]
     fn the_example_given_back_twice_keeps_nothing() {
         let (root, keeping) = keeping("example-twice");
-        let (url, served) = service(vec![(200, EXAMPLE.to_owned()), (200, EXAMPLE.to_owned())]);
+        let (url, served) = service(vec![(200, EXAMPLE.to_owned()); 1 + MOST_REPAIRS]);
         let told = make(
             "when I come back to my desk, glow warm",
             &keeping,
@@ -1379,10 +1460,10 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(told.get("made").is_none(), "{told}");
         assert_eq!(
             told["error"],
-            "the skill couldn't be made: it gave back the lamp's own example, not what was asked",
+            "the skill couldn't be made: the lamp's model gave back its own example, not what was asked; try asking again",
             "{told}"
         );
-        assert_eq!(served.join().unwrap(), 2);
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }

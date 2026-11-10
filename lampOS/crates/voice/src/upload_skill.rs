@@ -390,7 +390,7 @@ mod tests {
         assert!(refused(triggered).contains("starts on its own"));
         let no_tool = "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nlight = true\n\
                        [[do]]\nlight = { colour = \"cyan\" }\n";
-        assert!(refused(no_tool).contains("no function"));
+        assert!(refused(no_tool).contains("no tool"));
         let wider = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
                      [permissions]\nlight = true\nmessages = true\n[[do]]\nlight = { colour = \"cyan\" }\n";
         assert!(refused(wider).contains("more than the light"));

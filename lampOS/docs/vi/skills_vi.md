@@ -116,15 +116,22 @@ sau:
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi
    cài. Một kỹ năng làm nhiều hơn những gì nó khai báo bị từ chối ở đó.
-   - **Sửa một lần** (#2813 phần 2). Khi bước kiểm tra từ chối một câu trả
-     lời, nó được gửi lại cho mô hình một lần, trước khi nói gì: bản hướng
-     dẫn cũ, kèm các dòng của bước kiểm tra (thư mục được thay bằng
-     `<folder>`, tối đa 600 byte) trước lời yêu cầu của người dùng
-     (`made_skill::repair_brief`). Câu trả lời đó được giữ, hoặc được nói là
-     không tạo được; không bao giờ có lần thứ ba. Chỉ lỗi của bước kiểm tra
-     (hoặc của phần nói rõ bên dưới, hoặc khi trả lại chính ví dụ) được
-     sửa; sai định dạng hay xin dùng nhiều hơn đèn và đầu thì được nói là
-     không tạo được ngay.
+   - **Sửa tối đa ba lần** (#2813 phần 2; ba lần từ chủ đèn, 10/11: "tự
+     chạy lại cho đến khi được"). Khi bước kiểm tra từ chối một câu trả
+     lời, nó được gửi lại cho mô hình trước khi nói gì: bản hướng dẫn cũ,
+     kèm các dòng của bước kiểm tra (thư mục được thay bằng `<folder>`, tối
+     đa 560 byte) trước lời yêu cầu của người dùng
+     (`made_skill::repair_brief`). Tối đa `make_skill_local::MOST_REPAIRS`
+     (3) lần, mỗi lần chỉ bắt đầu khi thêm một câu trả lời (30 s) vẫn kết
+     thúc trong `MAKE_WITHIN` (120 s); journal ghi `a made skill's repair N
+     of 3: <why>` mỗi lượt. Lỗi của bước kiểm tra, của phần nói rõ bên
+     dưới, của giới hạn quyền (lý do của đèn và những gì kỹ năng tự tạo
+     được có, `CAPPED_ONLY`), TOML không đọc được, hoặc khi trả lại chính ví
+     dụ đều được sửa; sai định dạng thì được nói là không tạo được ngay.
+     Điều người dùng nghe và ứng dụng hiển thị là lời dễ hiểu kèm điều nên
+     thử, không bao giờ tên tệp hay tên phần (`made_skill::NOT_PASSED`,
+     `NOT_READABLE`, `NOT_A_SKILLS_FORM`, `MODEL_CUT_OFF`, `UNSAID`); phần
+     chính xác bị từ chối chỉ nằm trong journal và lần sửa.
    - **Không bao giờ là ví dụ** (lamp-9adf, 3/11 16:15: "when I come back
      to my desk, glow warm" được trả lời bằng đúng nguyên văn ví dụ, ánh
      cyan, được giữ và hỏi; lần thử lại ra đúng các byte đó). Câu trả lời có
@@ -147,11 +154,31 @@ sau:
      (nên `[quiet]`, `[[while]]`, `most_a_day`, `[budget]`, `[rest]` khiến
      kỹ năng chạy khác lời nói không bao giờ được giữ, P2 của Thirteen và
      Mobile trên #5042), và câu dài hơn 200 ký tự (nói đủ hoặc không nói,
-     không bao giờ cắt). Cũng vậy, trigger có khóa nào ngoài `topic`, `field`, `equals`, `for`,
-     `cooldown`, `rearm` và `during`, trigger khác "đèn nghỉ" hoặc "có/không
-     có người", hay bước khác một lệnh đèn (`colour`, `level`, `for`, hoặc
-     chỉ `dim`) hoặc một cử chỉ (`nod`, `curious`) đều bị từ chối, và được
-     sửa một lần như lỗi của bước kiểm tra (dòng của `PLAIN_ONLY`; khi bật
+     không bao giờ cắt). Cũng vậy, trigger viết thành `[[trigger]]`, có
+     khóa nào ngoài `topic`, `field`, `equals`, `for`, `cooldown`, `rearm`,
+     `during`, `when` và `absent_for` (`when` chỉ `"present"` hoặc
+     `"appears"`; `absent_for` chỉ với `"appears"` khi có người đến bàn,
+     vì `lamp-skills` chỉ tính nó khi đó: "When someone comes back to the
+     desk after it was empty for 5 minutes"), trigger khác "đèn nghỉ" hoặc
+     "có/không có người", hay bước khác một lệnh đèn (`colour`, `level`,
+     `for`, hoặc chỉ `dim`) hoặc một cử chỉ (`nod`, `curious`) đều bị từ
+     chối. Người dùng được nói `made_skill::UNSAID` (lời dễ hiểu, gợi ý nói
+     khi nào chạy, như 'when I come to my desk', và làm gì, như 'glow
+     green'). Lần sửa nêu phần không nói được, chỉ bằng các khóa và topic
+     của trigger, không bao giờ giá trị ("Can't be said plainly: trigger
+     topic humans/faces/tracked, keys gap, near"), và journal ghi như vậy:
+     `lamp-voice: a made skill can't be said plainly: <part>`. Lỗi của
+     trigger kèm các trigger được phép và nghĩa của từng cái
+     (`SAYABLE_TRIGGERS`): có người đến hoặc quay lại bàn là
+     `room/presence`, `someone`, `true` (quay lại sau khi bàn trống một
+     lúc: `when = "appears"`, `absent_for`); rời bàn là `false`; đèn yên
+     lặng là `voice/state`, `state`, `"resting"`. Trên lamp-74ff, 17:39 ngày
+     10/11, một lần tạo từ ứng dụng "glow green when I come back to my
+     desk" được viết trên khuôn mặt như kỹ năng chào mừng có sẵn, và bị từ
+     chối hai lần vì lần sửa chỉ được nói các khóa được phép. System prompt
+     của mô hình tạo nói các nghĩa này trước khi viết (`TRIGGER_MEANINGS`),
+     và bản hướng dẫn nói "someone comes or comes back to the desk is
+     room/presence". Lỗi của phần khác kèm dòng của `PLAIN_ONLY`; khi bật
      đọc, thêm `PLAIN_OR_READ`: với kỹ năng đọc một dịch vụ đã liên kết,
      chỉ một bước `[[do]]`, đúng bước đọc của dịch vụ đó như system
      prompt liệt kê. Trên
@@ -240,8 +267,9 @@ sau:
    Việc gỡ một kỹ năng đã tạo (gỡ trong ứng dụng, hoặc `{"off": NAME}`) vẫn
    như cũ.
 9. **Thời gian chờ** (P3 của Reviewer-lead trên #4914): lời gọi giữ lượt tối
-   đa 30 giây một lần hỏi; với một lần thử lại sau lỗi và một lần sửa sau khi
-   bị từ chối, nhiều nhất khoảng 120 giây.
+   đa 30 giây một lần hỏi, với một lần thử lại sau lỗi; các lần sửa sau khi
+   bị từ chối chỉ bắt đầu khi thêm một lần hỏi vẫn kết thúc trong
+   `make_skill_local::MAKE_WITHIN`, 120 giây.
 
 Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến sau.
 
@@ -273,7 +301,17 @@ lời "có" nói thành tiếng (#5977; nút MAKE IT của ứng dụng là lờ
 - `{"make": {"words", "request_id"}}`: chữ thành cùng bản hướng dẫn (tối đa
   480 byte) và được mô hình của đèn tạo ngay trên một luồng riêng
   (`make_skill_local::make_kept`, `app_make::make_here`), được ghi là tạo từ
-  `local:app:<ms>:1`: `making`, rồi `on`, hoặc `not_kept` kèm lý do.
+  `local:app:<ms>:1`: `making`, rồi `on`, hoặc `not_kept` kèm lý do. Không
+  tạo được (hoặc kỹ năng viết trong ứng dụng không giữ được), đèn cũng nói
+  ra, `made_skill::not_made_line` ("I couldn't make that: " rồi lý do kèm
+  điều nên thử), như một note bằng ngôn ngữ của cuộc trò chuyện
+  (`not_made_in_their_language`). Mọi note như vậy bắt đầu bằng
+  `made_skill::ALREADY_DONE` ("đã xong, không gọi công cụ nào, nhất là
+  make_skill; chỉ nói"): trên lamp-74ff, 17:43 ngày 10/11, mô hình coi note
+  của một kỹ năng đã tạo là yêu cầu và gọi `make_skill`. Một câu bị bỏ khi
+  đang nói (17:40: bị lời nói cắt, `user_interrupted`) được hỏi lại một lần
+  trong thời gian còn lại (`app_make::say_line`); bị bỏ lần nữa thì journal
+  ghi là chưa nói được.
 - `{"ready": {}}`: `{"ready": true}` ngay, vì đèn tự tạo; `lamp-cloud` ghi
   `skills.make` vào `can` chỉ cần có công tắc, nên nút "Make a skill" của ứng
   dụng hiện ngay.
