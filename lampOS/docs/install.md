@@ -221,8 +221,8 @@ owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`),
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
-equal, Laugh glance parked out of both): twenty-nine folders are installed,
-twenty enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+equal, Laugh glance parked out of both): thirty-one folders are installed,
+twenty-two enabled (Bedtime and Morning and Comfort break are off by their own files, the seven of `PRODUCT_SKILLS_OFF` by install), one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is on: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's

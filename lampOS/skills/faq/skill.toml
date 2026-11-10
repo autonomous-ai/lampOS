@@ -1,0 +1,33 @@
+# How to use the lamp (#5790): a person asks "how do I...", "what can you
+# do", "where do I link my calendar", "help", and the lamp answers from its
+# own product knowledge, `knowledge.md` beside this file, never from the
+# model's guesses (V1's `skills/faq`: never invent a control, never ask for
+# a password in chat). Started by its tool alone, reached through
+# `use_skill`: a person asked. It only tells: no light, no move, no switch
+# turned on. Each answer names whether the skills it speaks of are on this
+# lamp now (lamp-skills knows which are installed, on, off or snoozed); a
+# switch another part reads it cannot know, so the file says "if it's on
+# for your lamp" there. Nothing in it is anyone's: the same words for
+# whoever is at the lamp.
+needs = ["voice"]
+# Comes with the lamp (docs/skills.md, "Core and installable skills").
+kind = "core"
+version = "1.0.0"
+tool = "lamp_help"
+# The file whose section the choice names is told after the note (#5790,
+# docs/skills.md, "knowledge"). Its sections are the choice's words.
+knowledge = "knowledge.md"
+
+# Its line alone: nothing it reads, nothing it moves or lights.
+[permissions]
+speak = true
+
+[choice]
+name = "topic"
+about = "What they asked about; abilities for anything else."
+one_of = ["abilities", "connectors", "controls", "light", "reminders", "nudges", "guard_mode", "skills", "updates", "unplug", "memory", "setup"]
+default = "abilities"
+
+# The model's line: what it is told to do with the section that follows.
+[[do]]
+say = "Answer their question from the lamp's own notes below and nothing else, in one to three short spoken sentences, in the language they spoke. If the notes don't say it, say plainly that you can't do that yet or don't know, and never guess a button, screen, setting or feature. Change nothing yourself: say where the setting is, or offer the skill that does it. Never ask for a password, key, code or token. A skill the last line says is off or not on this lamp: say it isn't on for this lamp, never that it works. Say a skill's name as plain words."
