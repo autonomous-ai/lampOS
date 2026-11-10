@@ -2398,6 +2398,37 @@ fn a_sound_is_asked_of_the_voice_and_its_refusal_is_said_in_the_event() {
     assert_eq!(refused.lights.len(), 0, "nothing made with a sound refused");
 }
 
+/// A skill's reminder (#6066): its run asks the actions part for what is set
+/// before it sets anything, and with a list it can't read sets nothing.
+const REMINDS: &str = r#"
+[trigger]
+topic = "humans/faces/tracked"
+when = "appears"
+[ask]
+policy = "hello"
+[[do]]
+remind = { at = "22:00", words = "Time to drink some water." }
+[permissions]
+topics = ["humans/faces/tracked"]
+actions = ["set_reminder"]
+"#;
+
+#[test]
+fn a_remind_step_is_made_through_the_actions_part() {
+    let seen = the_program_with(REMINDS, true, &[], 3, 1, 4);
+    assert_eq!(stages(&seen.events).last(), Some(&SkillStage::Done));
+    let done = &seen.events[3].why;
+    assert!(
+        done.contains("remind at 22:00: not set, what is set could not be read"),
+        "{done}"
+    );
+    assert_eq!(seen.lights.len(), 1, "{:?}", seen.lights);
+    let asked: serde_json::Value = serde_json::from_str(&seen.lights[0]).unwrap();
+    assert_eq!(asked["name"], "list_reminders");
+    assert!(asked.get("caller").is_none());
+    assert!(seen.asked.is_none(), "a remind says nothing itself");
+}
+
 #[test]
 fn a_say_never_begun_moves_nothing_and_changes_no_light() {
     let seen = the_program(true, &[r#"{"outcome":"expired"}"#]);
