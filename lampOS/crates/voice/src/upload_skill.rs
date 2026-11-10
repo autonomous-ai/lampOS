@@ -393,17 +393,10 @@ mod tests {
         assert!(refused(no_tool).contains("no tool"));
         let wider = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
                      [permissions]\nlight = true\nmessages = true\n[[do]]\nlight = { colour = \"cyan\" }\n";
-        // Past the old cap (#6066): kept, its outbound grant said back.
-        let wide = "---\nname: glow-wide\ndescription: Glows.\n---\n";
-        let kept = take(&place, &keeping, Some(wider), wide, NOW - 1).unwrap();
-        assert!(kept.uses.messages);
-        assert!(
-            kept.description
-                .contains("and it may send a message to your phone"),
-            "{}",
-            kept.description
-        );
-        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        // A skill added from a file keeps the cap from before #6066 (App
+        // Only's P2 on #6103): the lift is for a skill made on the lamp.
+        assert!(refused(wider).contains("more than the light and the head"));
+        assert!(made_skill::entries(&keeping.directory).is_empty());
         // Within the cap, asked for only: kept, its light said plainly.
         let good = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
                     [permissions]\nlight = true\n[[do]]\nlight = { colour = \"cyan\", for = \"20s\" }\n";
