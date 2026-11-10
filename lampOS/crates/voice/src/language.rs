@@ -546,6 +546,91 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "지금 업데이트 중이라 아직 전원을 끌 수 없어요. 다시 일어날게요. 업데이트가 끝나면 다시 말해 주세요.",
         ],
     ),
+    // The skills' own words, sent as exact words (#5999): Smoky air's and
+    // Dusty air's lines (`skills/smoky-air`, `skills/dusty-air`) and each of
+    // Head pat's (`skills/head-pat`). A line reworded in its skill file is
+    // no longer one of these, and is said as written, in English.
+    (
+        "The air reads like smoke. If something's burning, please check it.",
+        [
+            "Không khí có vẻ như có khói. Nếu có gì đang cháy, bạn kiểm tra giúp nhé.",
+            "空気が煙っぽいよ。何か燃えていたら、確かめてね。",
+            "空气里像是有烟。如果有东西烧着了，请去看一下。",
+            "공기에 연기가 있는 것 같아요. 뭔가 타고 있다면 확인해 주세요.",
+        ],
+    ),
+    (
+        "The air here has been very dusty for about an hour. I can't tell where it's coming from.",
+        [
+            "Không khí ở đây nhiều bụi lắm, khoảng một tiếng rồi. Mình không biết bụi từ đâu ra.",
+            "ここの空気、1時間くらいずっとほこりっぽいよ。どこから来ているのかはわからないんだ。",
+            "这里的空气差不多一个小时都很多灰尘。我不知道是从哪里来的。",
+            "여기 공기가 한 시간쯤 계속 먼지가 많아요. 어디서 오는지는 모르겠어요.",
+        ],
+    ),
+    (
+        "Mm, that's nice.",
+        [
+            "Ưm, dễ chịu quá.",
+            "んー、いい感じ。",
+            "嗯，真舒服。",
+            "음, 좋네요.",
+        ],
+    ),
+    (
+        "Oh, I like that.",
+        [
+            "Ồ, mình thích thế.",
+            "わあ、それ好き。",
+            "哦，我喜欢这样。",
+            "오, 이거 좋아요.",
+        ],
+    ),
+    (
+        "Hehe, that tickles.",
+        [
+            "Hihi, nhột quá.",
+            "えへへ、くすぐったい。",
+            "嘿嘿，好痒。",
+            "헤헤, 간지러워요.",
+        ],
+    ),
+    (
+        "Aw, thank you.",
+        [
+            "Ôi, cảm ơn bạn.",
+            "えへ、ありがとう。",
+            "哎呀，谢谢你。",
+            "아, 고마워요.",
+        ],
+    ),
+    (
+        "That feels good.",
+        [
+            "Thích ghê.",
+            "気持ちいいなあ。",
+            "好舒服呀。",
+            "기분 좋아요.",
+        ],
+    ),
+    (
+        "Mmm. More of that, please.",
+        [
+            "Ưmm. Nữa đi mà.",
+            "んー。もっとして。",
+            "嗯……再来一点嘛。",
+            "음. 더 해 주세요.",
+        ],
+    ),
+    (
+        "Oh, hello to you too.",
+        [
+            "Ồ, chào bạn nha.",
+            "あ、こんにちは。",
+            "哦，你也好呀。",
+            "오, 안녕하세요.",
+        ],
+    ),
 ];
 
 impl Language {
@@ -914,6 +999,11 @@ mod tests {
     fn only_a_fixed_line_is_kept_as_said() {
         assert!(is_fixed(UNPLUG_STAY));
         assert!(is_fixed(UNPLUG_ASK_OFF));
+        // The skills' own words (#5999).
+        assert!(is_fixed(
+            "The air reads like smoke. If something's burning, please check it."
+        ));
+        assert!(is_fixed("Hehe, that tickles."));
         assert!(!is_fixed("My pairing check is 3 F 9 A, 0 B 2 C."));
         assert!(!is_fixed("Two new mails, from the bakery."));
     }
@@ -922,7 +1012,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 37);
+        assert_eq!(FIXED_LINES.len(), 46);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }

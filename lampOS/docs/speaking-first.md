@@ -739,7 +739,7 @@ applied, and its speech-to-text language). A hit is played with no
 network. A miss is rendered once through the speech service the voice
 already speaks with (`Tts::speak`, ElevenLabs through the relay), within
 5 s, written whole (a temporary file, fsync, rename, the folder fsynced:
-the lamp is unplugged after a shutdown) and played; at most 48 lines and
+the lamp is unplugged after a shutdown) and played; at most 64 lines and
 20 s each are kept, a line past 20 s is played but not kept. A line written
 to a full cache first makes room (#4883): the oldest files go, never one of
 the owner's current fixed lines (those the voice warms at start, under this

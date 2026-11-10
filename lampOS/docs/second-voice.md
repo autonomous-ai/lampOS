@@ -254,7 +254,7 @@ empty or past 20 s is not kept and never asked for again in that run
 start must be online for them, and until then each line is said in
 English, read again from the file each time it is chosen
 (`TtsCache::owners_kept`, never a render on the voice's loop). The cache
-keeps up to 48 lines; a line written to a full cache drops the oldest
+keeps up to 64 lines; a line written to a full cache drops the oldest
 files, never the owner's current fixed lines, so a change of language
 always finds room for its own (#4883, speaking-first.md). A failure notice said from the cache keeps the
 release's kind in its record, with `wav_sha256` `speech-cache:<key>`: no

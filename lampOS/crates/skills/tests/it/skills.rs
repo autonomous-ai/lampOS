@@ -9831,6 +9831,81 @@ fn exact_words_reach_the_voice_unchanged_at_their_priority() {
     assert!(done.contains("light given back to on blue at 3"), "{done}");
 }
 
+/// #5999: the skills' word-for-word lines (Smoky air's, Dusty air's and each
+/// of Head pat's) reach the voice as its exact words (`exact: true`), which
+/// the voice takes as a line said as written, never a chat turn the model
+/// may decline or reword; and each is one of the voice's fixed lines, so it
+/// is said in the owner's language and kept in the thread as the lamp's.
+#[test]
+fn the_skills_word_for_word_lines_reach_the_voice_as_exact_fixed_lines() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+    let (mut exact_asks, mut fixed_lines) = (0, 0);
+    for name in ["smoky-air", "dusty-air", "head-pat"] {
+        let file: toml::Table =
+            toml::from_str(&fs::read_to_string(root.join(name).join("skill.toml")).unwrap())
+                .unwrap();
+        let say = file["do"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|step| step.get("say"))
+            .and_then(toml::Value::as_table)
+            .unwrap_or_else(|| panic!("{name} says a table"))
+            .clone();
+        let lines: Vec<String> = match &say["text"] {
+            toml::Value::String(line) => vec![line.clone()],
+            toml::Value::Array(lines) => lines
+                .iter()
+                .map(|line| line.as_str().unwrap().to_owned())
+                .collect(),
+            other => panic!("{name}: {other:?}"),
+        };
+        let quoted: Vec<String> = lines.iter().map(|line| format!("'''{line}'''")).collect();
+        let mut table = match quoted.as_slice() {
+            [one] => format!("text = {one}"),
+            many => format!("text = [{}]", many.join(", ")),
+        };
+        if let Some(priority) = say.get("priority").and_then(toml::Value::as_integer) {
+            table.push_str(&format!(", priority = {priority}"));
+        }
+        if let Some(expires) = say.get("expires").and_then(toml::Value::as_str) {
+            table.push_str(&format!(", expires = \"{expires}\""));
+        }
+        let skill = format!(
+            "[trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\n[ask]\npolicy = \"hello\"\n\
+             [[do]]\nsay = {{ {table} }}\n"
+        );
+        let seen = the_program_with(
+            &skill,
+            true,
+            &[r#"{"event":"begun","at_us":5}"#, r#"{"outcome":"spoken"}"#],
+            3,
+            1,
+            4,
+        );
+        let wire = seen
+            .asked
+            .unwrap_or_else(|| panic!("{name}: nothing asked"));
+        let asked: serde_json::Value = serde_json::from_str(&wire).unwrap();
+        let text = asked["text"].as_str().unwrap_or_default();
+        assert!(lines.iter().any(|line| line == text), "{name}: {asked}");
+        assert!(asked.get("note").is_none(), "{name}: {asked}");
+        // The voice's own reading of the ask: the exact path, no chat turn.
+        let request = lamp_voice::say::parse_from(&wire, lamp_voice::say::Caller::Other).unwrap();
+        if asked["exact"] == true
+            && request.words == lamp_voice::say::Words::Exact(text.into())
+            && request.words.turn().is_none()
+        {
+            exact_asks += 1;
+        }
+        fixed_lines += lines
+            .iter()
+            .filter(|line| lamp_voice::language::is_fixed(line))
+            .count();
+    }
+    assert_eq!((exact_asks, fixed_lines), (3, 9));
+}
+
 /// A nudge started by a stuffy room, as the nudges' limits are tested with
 /// (#1685): `top` is the limits, `trigger` added to the trigger.
 fn nudge_skill(dir: &Path, name: &str, top: &str, trigger: &str) -> lamp_skills::Skill {
