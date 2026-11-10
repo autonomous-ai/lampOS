@@ -144,6 +144,69 @@ pub fn scrub(text: &str, secret: &str) -> String {
         .replace(&encoded, "[credential]")
 }
 
+/// The client every service call is made with: no redirect followed (one
+/// comes back as its own status), bounded in time, its own TLS. Only a
+/// test against a local server passes `https_only` false.
+pub fn client(https_only: bool) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .tls_backend_preconfigured(tls()?)
+        .https_only(https_only)
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(WITHIN)
+        .connect_timeout(CONNECT_WITHIN)
+        .build()
+        .map_err(|_| "HTTPS client setup".to_owned())
+}
+
+/// `call` sent on `client`: its answer's status, kept headers and at most
+/// `call.most` bytes of its body. An error never names the URL.
+pub async fn send_on(client: &reqwest::Client, call: Call) -> Result<Reply, String> {
+    let most = call.most;
+    let method = match call.method {
+        Method::Get => reqwest::Method::GET,
+        Method::Post => reqwest::Method::POST,
+        Method::Patch => reqwest::Method::PATCH,
+        Method::Put => reqwest::Method::PUT,
+    };
+    let mut request = client.request(method, &call.url);
+    for (name, value) in &call.headers {
+        request = request.header(name, value);
+    }
+    if let Some(body) = call.body {
+        request = request.body(body);
+    }
+    // reqwest's errors name the URL: dropped whole.
+    let mut response = tokio::time::timeout(WITHIN, request.send())
+        .await
+        .map_err(|_| "the service didn't answer in time".to_owned())?
+        .map_err(|_| "the service couldn't be reached".to_owned())?;
+    let status = response.status().as_u16();
+    let headers = KEPT_HEADERS
+        .iter()
+        .filter_map(|name| {
+            let value = response.headers().get(*name)?.to_str().ok()?;
+            (value.len() <= HEADER_MOST).then(|| ((*name).to_owned(), value.to_owned()))
+        })
+        .collect();
+    let mut body = Vec::new();
+    while let Some(chunk) = tokio::time::timeout(WITHIN, response.chunk())
+        .await
+        .map_err(|_| "the service didn't answer in time".to_owned())?
+        .map_err(|_| "the service's answer broke off".to_owned())?
+    {
+        let room = most.saturating_sub(body.len());
+        body.extend_from_slice(&chunk[..chunk.len().min(room)]);
+        if body.len() >= most {
+            break;
+        }
+    }
+    Ok(Reply {
+        status,
+        body,
+        headers,
+    })
+}
+
 /// The real sender: a client made for each call (no connection outlives
 /// the request's own runtime), https only, no redirect.
 #[derive(Clone, Copy, Debug, Default)]
@@ -151,57 +214,7 @@ pub struct Https;
 
 impl Http for Https {
     async fn send(&self, call: Call) -> Result<Reply, String> {
-        let client = reqwest::Client::builder()
-            .tls_backend_preconfigured(tls()?)
-            .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
-            .timeout(WITHIN)
-            .connect_timeout(CONNECT_WITHIN)
-            .build()
-            .map_err(|_| "HTTPS client setup".to_owned())?;
-        let most = call.most;
-        let method = match call.method {
-            Method::Get => reqwest::Method::GET,
-            Method::Post => reqwest::Method::POST,
-            Method::Patch => reqwest::Method::PATCH,
-        };
-        let mut request = client.request(method, &call.url);
-        for (name, value) in &call.headers {
-            request = request.header(name, value);
-        }
-        if let Some(body) = call.body {
-            request = request.body(body);
-        }
-        // reqwest's errors name the URL: dropped whole.
-        let mut response = tokio::time::timeout(WITHIN, request.send())
-            .await
-            .map_err(|_| "the service didn't answer in time".to_owned())?
-            .map_err(|_| "the service couldn't be reached".to_owned())?;
-        let status = response.status().as_u16();
-        let headers = KEPT_HEADERS
-            .iter()
-            .filter_map(|name| {
-                let value = response.headers().get(*name)?.to_str().ok()?;
-                (value.len() <= HEADER_MOST).then(|| ((*name).to_owned(), value.to_owned()))
-            })
-            .collect();
-        let mut body = Vec::new();
-        while let Some(chunk) = tokio::time::timeout(WITHIN, response.chunk())
-            .await
-            .map_err(|_| "the service didn't answer in time".to_owned())?
-            .map_err(|_| "the service's answer broke off".to_owned())?
-        {
-            let room = most.saturating_sub(body.len());
-            body.extend_from_slice(&chunk[..chunk.len().min(room)]);
-            if body.len() >= most {
-                break;
-            }
-        }
-        Ok(Reply {
-            status,
-            body,
-            headers,
-        })
+        send_on(&client(true)?, call).await
     }
 }
 
@@ -277,5 +290,94 @@ mod tests {
             "a [credential] b [credential]"
         );
         assert_eq!(scrub("x", ""), "x");
+    }
+
+    /// The shared sender honors the per-call cap, including Spotify's PUT
+    /// path; the old fixed BODY_MOST would return all ten bytes here.
+    #[tokio::test]
+    async fn shared_sender_caps_get_and_put_response_bodies() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        for method in [Method::Get, Method::Put] {
+            let identity = tempfile::tempdir().unwrap();
+            let path = format!(
+                "/bounded-{}",
+                identity.path().file_name().unwrap().to_str().unwrap()
+            );
+            let owned_path = path.clone();
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let server = std::thread::spawn(move || {
+                use std::time::{Duration, Instant};
+                let deadline = Instant::now() + Duration::from_secs(5);
+                while Instant::now() < deadline {
+                    let mut peer = match listener.accept() {
+                        Ok((peer, _)) => peer,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(Duration::from_millis(5));
+                            continue;
+                        }
+                        Err(error) => panic!("accept failed: {error}"),
+                    };
+                    // A foreign discovery connection cannot occupy this fixture
+                    // indefinitely or count as the request under test.
+                    let header_deadline = deadline.min(Instant::now() + Duration::from_millis(250));
+                    let mut request = Vec::new();
+                    while request.len() < 8192 && !request.ends_with(b"\r\n\r\n") {
+                        let left = header_deadline.saturating_duration_since(Instant::now());
+                        if left.is_zero() {
+                            break;
+                        }
+                        peer.set_read_timeout(Some(left)).unwrap();
+                        let mut byte = [0];
+                        if peer.read_exact(&mut byte).is_err() {
+                            break;
+                        }
+                        request.push(byte[0]);
+                    }
+                    let target = request
+                        .split(|byte| *byte == b'\n')
+                        .next()
+                        .and_then(|line| std::str::from_utf8(line).ok())
+                        .and_then(|line| line.split_whitespace().nth(1));
+                    if target != Some(owned_path.as_str()) {
+                        continue;
+                    }
+                    assert!(request.ends_with(b"\r\n\r\n"), "owned headers incomplete");
+                    let left = deadline.saturating_duration_since(Instant::now());
+                    assert!(!left.is_zero(), "owned response missed deadline");
+                    peer.set_write_timeout(Some(left)).unwrap();
+                    peer.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\n0123456789").unwrap();
+                    return request;
+                }
+                panic!("owned request missing before fixture deadline");
+            });
+            // An unrelated request arriving first must not satisfy the test.
+            let mut probe = std::net::TcpStream::connect(address).unwrap();
+            probe
+                .set_write_timeout(Some(std::time::Duration::from_secs(1)))
+                .unwrap();
+            probe
+                .write_all(b"GET /discovery HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                .unwrap();
+            drop(probe);
+            let mut request = call(method, &format!("http://{address}{path}"));
+            request.most = 3;
+            let reply = send_on(&client(false).unwrap(), request).await;
+            // Join even if the client failed: the server's own deadline bounds
+            // cleanup and prevents a detached fixture from reaching later tests.
+            let wire = server.join().unwrap();
+            let reply = reply.unwrap();
+            assert_eq!(reply.status, 200);
+            assert_eq!(reply.body, b"012");
+            let verb = match method {
+                Method::Get => "GET",
+                Method::Put => "PUT",
+                _ => unreachable!(),
+            };
+            assert!(wire.starts_with(format!("{verb} {path} ").as_bytes()));
+        }
     }
 }

@@ -1,7 +1,8 @@
 //! `lamp-services`: the person's linked services on the lamp (Queue #4710).
 //! V1's token connectors (Gmail, Google Calendar and Drive, Figma, GitHub,
 //! Linear, Asana, Ahrefs, a Facebook Page) and its MCP ones (Slack,
-//! monday.com, HubSpot, Amplitude) and Notion's, through `mcp.rs`, their
+//! monday.com, HubSpot, Amplitude) and Notion's, through `mcp.rs`, and
+//! Spotify's what-is-playing behind its own switch (`spotify.rs`), their
 //! tokens kept by this one root process in `/var/lib/lampos-services`, never
 //! in a log, the journal, the bus, the conversation or the model.
 //!
@@ -20,6 +21,7 @@ pub mod reads;
 pub mod refresh;
 pub mod serve;
 pub mod spoken;
+pub mod spotify;
 pub mod store;
 pub mod tools;
 pub mod writes;

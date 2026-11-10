@@ -191,6 +191,12 @@ impl Entry {
                 return Err("Gmail's Google sign-in needs the account's email");
             }
         }
+        // Spotify's link is its refresh token and client id, renewed on the
+        // lamp itself, never through the backend.
+        let mut entry = entry;
+        if code == crate::spotify::CODE {
+            crate::spotify::check_set(&mut entry)?;
+        }
         // An MCP link's address and header are checked before it is kept:
         // its token goes only to the service's own MCP host.
         if let Some(service) = catalog::service(code).filter(|service| service.mcp.is_some()) {

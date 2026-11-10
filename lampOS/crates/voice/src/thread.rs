@@ -1723,6 +1723,13 @@ impl Thread {
     /// the lamp's words, now and as the lamp goes on, so none of a mail, an
     /// event or a page reaches the thread's file, a later turn, the memory's
     /// journal or the running summary, which never has it at all.
+    /// Whether request `request`'s exchange is kept private
+    /// ([`Self::private_for`]).
+    #[cfg(test)]
+    pub fn is_private(&self, request: u64) -> bool {
+        self.private.contains(&request)
+    }
+
     pub fn private_for(&mut self, request: u64) {
         if !self.private.contains(&request) {
             if self.private.len() == LINES {

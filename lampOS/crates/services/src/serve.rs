@@ -9,6 +9,7 @@ use crate::mcp::{self, Client, Endpoint};
 use crate::net::{self, Call, Http};
 use crate::reads::{self, ANSWER_MOST, Asker, Plan};
 use crate::refresh::Backend;
+use crate::spotify::{self, Spotify};
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
 use crate::{spoken, tools};
@@ -163,7 +164,7 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
     let name = value
         .get("name")
         .and_then(Value::as_str)
-        .filter(|name| [tools::CONNECTED, tools::READ, tools::WRITE].contains(name))
+        .filter(|name| [tools::CONNECTED, tools::READ, tools::WRITE, tools::PLAY].contains(name))
         .ok_or("no such function")?;
     let args = match value.get("args") {
         None | Some(Value::Null) => json!({}),
@@ -185,6 +186,13 @@ pub struct Services<H, M> {
     /// `LAMP_SKILL_READS=on`: `lamp-skills` may call the tools' socket, for
     /// `service_read` alone ([`Services::skill_tool`]).
     pub skill_reads: bool,
+    /// `LAMP_SERVICES_SPOTIFY=on`: Spotify may be linked and read (#5460).
+    pub spotify_on: bool,
+    /// `LAMP_SERVICES_PLAYBACK=on`, with `spotify_on`: the voice's
+    /// `service_play` may control Spotify's playback (#5460).
+    pub playback_on: bool,
+    /// Spotify's access token, in memory only.
+    pub spotify: Spotify,
     pub desk: Desk,
 }
 
@@ -282,8 +290,23 @@ impl<H: Http, M: Mail> Services<H, M> {
             backend,
             write_on,
             skill_reads: false,
+            spotify_on: false,
+            playback_on: false,
+            spotify: Spotify::default(),
             desk: Desk::default(),
         }
+    }
+
+    /// With `LAMP_SERVICES_SPOTIFY` as `on` gives it.
+    pub fn with_spotify(mut self, on: bool) -> Self {
+        self.spotify_on = on;
+        self
+    }
+
+    /// With `LAMP_SERVICES_PLAYBACK` as `on` gives it.
+    pub fn with_playback(mut self, on: bool) -> Self {
+        self.playback_on = on;
+        self
     }
 
     /// With `LAMP_SKILL_READS` as `on` gives it.
@@ -296,6 +319,8 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// it (a code and what happened, never a secret).
     pub async fn admin(&self, line: &str) -> (Value, String) {
         let refused = |why: &str| json!({"ok": false, "error": why});
+        // A refusal the app's tile tells by its code (`data.code`).
+        let coded = |why: &str, code: &str| json!({"ok": false, "error": why, "code": code});
         let asked = match parse_admin(line.trim_end_matches(['\r', '\n'])) {
             Ok(asked) => asked,
             Err(why) => return (refused(&why), format!("a request refused: {why}")),
@@ -307,6 +332,9 @@ impl<H: Http, M: Mail> Services<H, M> {
             ),
             Admin::Wipe => {
                 self.desk.forget(None);
+                // Spotify's link changes with the store, under its change:
+                // no playback begun before acts after (#5796).
+                let _changing = self.spotify.change().await;
                 match self.store.wipe() {
                     Ok(()) => (json!({"ok": true}), "every service unlinked".into()),
                     Err(error) => (
@@ -317,6 +345,11 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             Admin::Remove(code) => {
                 self.desk.forget(Some(&code));
+                let _changing = if code == spotify::CODE {
+                    Some(self.spotify.change().await)
+                } else {
+                    None
+                };
                 match self.store.remove(&code) {
                     Ok(()) => (json!({"ok": true}), format!("{code} unlinked")),
                     Err(error) => (
@@ -326,6 +359,13 @@ impl<H: Http, M: Mail> Services<H, M> {
                 }
             }
             Admin::Set { code, connector } => {
+                if code == spotify::CODE && !self.spotify_on {
+                    let why = spotify::OFF;
+                    return (
+                        coded(why, "not_allowed"),
+                        format!("{code} not linked: {why}"),
+                    );
+                }
                 let entry = match Entry::from_set(&code, &connector, crate::now_secs()) {
                     Ok(entry) => entry,
                     Err(why) => return (refused(why), format!("{code} not linked: {why}")),
@@ -354,7 +394,25 @@ impl<H: Http, M: Mail> Services<H, M> {
                         return (refused(why), format!("gmail not linked: {why}"));
                     }
                 }
-                match self.store.keep(&entry) {
+                // Spotify's link is proved by one renewal at Spotify itself,
+                // its rotated refresh token the one kept, all under one
+                // change of its link: a playback begun for the old link
+                // never acts on the new (#5796).
+                let mut changing = None;
+                if code == spotify::CODE {
+                    let changing = changing.insert(self.spotify.change().await);
+                    if let Err(refusal) =
+                        Spotify::link_in(changing, &self.http, &mut entry, crate::now_secs()).await
+                    {
+                        return (
+                            coded(refusal.words(), refusal.code()),
+                            format!("{code} not linked: {}", refusal.words()),
+                        );
+                    }
+                }
+                let kept = self.store.keep(&entry);
+                drop(changing);
+                match kept {
                     Ok(()) => (
                         json!({"ok": true, "connector": code, "scopes": entry.scopes}),
                         format!("{code} linked"),
@@ -380,16 +438,28 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// ([`reads::owner_mails_quoted`]).
     async fn tool_as(&self, line: &str, asker: Asker) -> Value {
         let answer = match parse_tool(line.trim_end_matches(['\r', '\n'])) {
-            Err(why) => Err(why),
-            Ok((name, args)) => match name.as_str() {
-                tools::CONNECTED => Ok(self.connected()),
-                tools::READ => self.read(&args, asker).await,
-                _ => self.write(&args).await,
-            },
+            Err(why) => Err(spotify::Refused {
+                words: why,
+                code: "",
+            }),
+            Ok((name, args)) => {
+                let plain = |answer: Result<Value, String>| {
+                    answer.map_err(|words| spotify::Refused { words, code: "" })
+                };
+                match name.as_str() {
+                    tools::CONNECTED => Ok(self.connected()),
+                    tools::READ => plain(self.read(&args, asker).await),
+                    tools::PLAY => self.play(&args).await,
+                    _ => plain(self.write(&args).await),
+                }
+            }
         };
+        // Playback's refusals carry a code beside their words (`code`); an
+        // older voice reads `error` alone.
         let answer = match answer {
             Ok(result) => json!({"ok": true, "result": result}),
-            Err(why) => json!({"ok": false, "error": why}),
+            Err(refused) if refused.code.is_empty() => json!({"ok": false, "error": refused.words}),
+            Err(refused) => json!({"ok": false, "error": refused.words, "code": refused.code}),
         };
         if answer.to_string().len() < ANSWER_MOST {
             answer
@@ -875,6 +945,15 @@ impl<H: Http, M: Mail> Services<H, M> {
         }) {
             return Err(why.into());
         }
+        // Spotify is read and renewed by its own client, its access token
+        // never through `call` (its kept token is the refresh token).
+        // Its display name and padded/case-varied code obey that boundary too.
+        if asked.is_some_and(|name| name.trim().eq_ignore_ascii_case(spotify::CODE)) {
+            if !self.spotify_on {
+                return Err(spotify::OFF.into());
+            }
+            return self.spotify.read(&self.http, &self.store, args).await;
+        }
         let (service, entry) = self.linked(args).await?;
         if service.mcp.is_some() {
             return self.mcp_read(service, &entry, args).await;
@@ -953,7 +1032,42 @@ impl<H: Http, M: Mail> Services<H, M> {
         .await
     }
 
+    /// `service_play` (#5460): Spotify's playback on the person's active
+    /// device, only with `LAMP_SERVICES_SPOTIFY` and `LAMP_SERVICES_PLAYBACK`
+    /// both on, else `not_allowed` and nothing asked. No read-back: it is
+    /// playback, not a send. Only the voice calls it ([`Self::skill_tool`]
+    /// refuses a made skill).
+    async fn play(&self, args: &Value) -> Result<Value, spotify::Refused> {
+        let refused = |words: &str, code| spotify::Refused {
+            words: words.to_owned(),
+            code,
+        };
+        if args.get("service").and_then(Value::as_str) != Some(spotify::CODE) {
+            return Err(refused("only Spotify is played", "invalid"));
+        }
+        if !self.spotify_on {
+            return Err(refused(spotify::OFF, "not_allowed"));
+        }
+        if !self.playback_on {
+            return Err(refused(spotify::NO_PLAYBACK, "not_allowed"));
+        }
+        self.spotify.play(&self.http, &self.store, args).await
+    }
+
     async fn write(&self, args: &Value) -> Result<Value, String> {
+        // Spotify is never written: its playback is `service_play`'s, and
+        // nothing is prepared or sent here.
+        if args
+            .get("service")
+            .and_then(Value::as_str)
+            .is_some_and(|name| name.trim().eq_ignore_ascii_case(spotify::CODE))
+        {
+            return Err(if self.spotify_on && self.playback_on {
+                spotify::PLAY_NOT_WRITE.into()
+            } else {
+                spotify::NO_PLAYBACK.into()
+            });
+        }
         if !self.write_on {
             return Err("writing to services is off on this lamp".into());
         }
@@ -1802,6 +1916,377 @@ mod tests {
 
     fn read_line(args: Value) -> String {
         json!({"op":"call","name":"service_read","args":args}).to_string()
+    }
+
+    /// Spotify (#5460) behind `LAMP_SERVICES_SPOTIFY`: off, a link is
+    /// refused with its code and a read is refused, nothing called; on, a
+    /// refused renewal at `set` keeps nothing and says its code; a write,
+    /// and a made skill's read, are refused either way.
+    #[test]
+    fn spotify_needs_its_switch_and_never_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let link = json!({"connector":"spotify","auth_type":"pat","api_key":"rt-planted",
+                          "credentials":{"client_id":"abc123","scopes":"user-read-currently-playing"}});
+        let off = services(dir.path(), "{}", true);
+        let (answer, said) = run(off.admin(&set_line("spotify", link.clone())));
+        assert_eq!(
+            answer,
+            json!({"ok": false, "error": spotify::OFF, "code": "not_allowed"})
+        );
+        assert!(!said.contains("planted"));
+        let read = run(off.tool(&read_line(
+            json!({"service":"spotify","what":"now_playing"}),
+        )));
+        assert_eq!(read, json!({"ok": false, "error": spotify::OFF}));
+        assert!(off.http.calls.lock().unwrap().is_empty());
+        assert!(off.store.load("spotify").is_none());
+        // On, with a token answer the lamp can't use: refused, coded,
+        // nothing kept, and only Spotify's token route asked.
+        let on = services(dir.path(), "{}", true).with_spotify(true);
+        let (answer, _) = run(on.admin(&set_line("spotify", link)));
+        assert_eq!(
+            answer,
+            json!({"ok": false, "error": spotify::UNREACHED, "code": "unreached"})
+        );
+        assert!(on.store.load("spotify").is_none());
+        let calls = on.http.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].url, "https://accounts.spotify.com/api/token");
+        let write = json!({"op":"call","name":"service_write",
+                           "args":{"service":"spotify","action":"play"}});
+        assert_eq!(
+            run(on.tool(&write.to_string())),
+            json!({"ok": false, "error": spotify::NO_PLAYBACK})
+        );
+        let skill = run(on.skill_tool(&read_line(
+            json!({"service":"spotify","what":"now_playing"}),
+        )));
+        assert!(skill["error"].as_str().unwrap().contains("can't read yet"));
+        assert_eq!(on.http.calls.lock().unwrap().len(), 1);
+        // The product's unit leaves it off.
+        let unit = include_str!("../../../deploy/product/lamp-services.service");
+        assert!(!unit.contains(spotify::ENVIRONMENT));
+    }
+
+    /// Code and display-name spellings take the same dedicated Spotify
+    /// path, including with a retained link while its switch is off.
+    #[test]
+    fn spotify_read_aliases_share_the_special_path_and_off_refusal() {
+        let mut differences = Vec::new();
+        for spotify_on in [false, true] {
+            for retained in [false, true] {
+                let mut results = Vec::new();
+                for name in ["spotify", "Spotify", " SPOTIFY "] {
+                    let dir = tempfile::tempdir().unwrap();
+                    let mut service = services(dir.path(), "{}", true).with_spotify(spotify_on);
+                    service.backend = crate::refresh::Backend::new(
+                        "https://backend.example",
+                        "test-key",
+                        "test-device",
+                    );
+                    if retained {
+                        let mut entry = Entry::from_set("spotify", &json!({
+                            "connector":"spotify", "auth_type":"pat", "api_key":"rt-synthetic",
+                            "credentials":{"client_id":"abc123", "scopes":"user-read-currently-playing"}
+                        }), crate::now_secs()).unwrap();
+                        spotify::check_set(&mut entry).unwrap();
+                        assert!(
+                            !entry.needs_refresh(crate::now_secs()),
+                            "Spotify never uses generic refresh"
+                        );
+                        service.store.keep(&entry).unwrap();
+                    }
+                    let result =
+                        run(service.tool(&read_line(json!({"service":name,"what":"now_playing"}))));
+                    let urls: Vec<String> = service
+                        .http
+                        .calls
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .map(|call| call.url.clone())
+                        .collect();
+                    assert!(
+                        urls.iter()
+                            .all(|url| url == "https://accounts.spotify.com/api/token"),
+                        "never generic backend: {urls:?}"
+                    );
+                    if !spotify_on || !retained {
+                        assert!(urls.is_empty(), "{name}: {urls:?}");
+                    }
+                    results.push((result, urls));
+                }
+                for (alias, result) in ["Spotify", " SPOTIFY "].into_iter().zip(&results[1..]) {
+                    if result != &results[0] {
+                        differences.push(format!("on={spotify_on} retained={retained} alias={alias:?}: {result:?} != {:?}", results[0]));
+                    }
+                }
+            }
+        }
+        assert!(differences.is_empty(), "{}", differences.join("\n"));
+    }
+
+    /// A display-name alias must never send the stored Spotify refresh
+    /// token through the generic GET path, even with Spotify enabled.
+    #[test]
+    fn spotify_alias_generic_get_never_sends_a_retained_refresh_token() {
+        let mut sent = Vec::new();
+        for spotify_on in [false, true] {
+            for alias in ["Spotify", " SPOTIFY "] {
+                let dir = tempfile::tempdir().unwrap();
+                let service = services(dir.path(), "{}", true).with_spotify(spotify_on);
+                let mut entry = Entry::from_set("spotify", &json!({
+                    "connector":"spotify", "auth_type":"pat", "api_key":"rt-synthetic-alias-probe",
+                    "credentials":{"client_id":"abc123", "scopes":"user-read-currently-playing"}
+                }), crate::now_secs()).unwrap();
+                spotify::check_set(&mut entry).unwrap();
+                assert!(!entry.needs_refresh(crate::now_secs()));
+                service.store.keep(&entry).unwrap();
+                let result = run(service.tool(&read_line(json!({
+                    "service":alias, "what":"get", "path":"/v1/me/player/currently-playing"
+                }))));
+                let calls = service.http.calls.lock().unwrap();
+                if !calls.is_empty() {
+                    let refresh_in_authorization = calls.iter().any(|call| {
+                        call.headers.iter().any(|(name, value)| {
+                            name.eq_ignore_ascii_case("authorization")
+                                && value.contains("rt-synthetic-alias-probe")
+                        })
+                    });
+                    sent.push(format!(
+                        "spotify_on={spotify_on}, alias={alias:?}, refresh_in_authorization={refresh_in_authorization}, result={result}, calls={calls:?}"
+                    ));
+                }
+            }
+        }
+        assert!(
+            sent.is_empty(),
+            "generic GET escaped Spotify dispatch: {}",
+            sent.join("\n")
+        );
+    }
+
+    #[test]
+    fn spotify_write_aliases_never_prepare_or_refresh_a_retained_link() {
+        let mut differences = Vec::new();
+        for spotify_on in [false, true] {
+            for playback_on in [false, true] {
+                for write_on in [false, true] {
+                    let dir = tempfile::tempdir().unwrap();
+                    let mut service = services(dir.path(), "{}", write_on)
+                        .with_spotify(spotify_on)
+                        .with_playback(playback_on);
+                    service.backend = crate::refresh::Backend::new(
+                        "https://backend.example",
+                        "test-key",
+                        "test-device",
+                    );
+                    let mut entry = Entry::from_set("spotify", &json!({
+                        "connector":"spotify", "auth_type":"pat", "api_key":"rt-synthetic",
+                        "credentials":{"client_id":"abc123", "scopes":"user-modify-playback-state"}
+                    }), crate::now_secs()).unwrap();
+                    spotify::check_set(&mut entry).unwrap();
+                    assert!(!entry.needs_refresh(crate::now_secs()));
+                    service.store.keep(&entry).unwrap();
+                    let write = |name: &str| {
+                        json!({"op":"call","name":"service_write",
+                        "args":{"service":name,"action":"play"}})
+                        .to_string()
+                    };
+                    let expected = run(service.tool(&write("spotify")));
+                    for alias in ["Spotify", " SPOTIFY "] {
+                        let result = run(service.tool(&write(alias)));
+                        if result != expected {
+                            differences.push(format!("spotify={spotify_on} playback={playback_on} write={write_on} alias={alias:?}: {result} != {expected}"));
+                        }
+                    }
+                    assert!(
+                        service.http.calls.lock().unwrap().is_empty(),
+                        "writes must never ask any HTTP service"
+                    );
+                }
+            }
+        }
+        assert!(differences.is_empty(), "{}", differences.join("\n"));
+    }
+
+    /// Spotify's playback (#5460) needs both switches: with either off it is
+    /// `not_allowed` in plain words and nothing is asked; a made skill can
+    /// never call it, whatever is on; a write of Spotify is never one.
+    #[test]
+    fn spotify_playback_needs_both_switches_and_is_never_a_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        let play = |args: Value| json!({"op":"call","name":"service_play","args":args}).to_string();
+        let pause = play(json!({"service":"spotify","action":"pause"}));
+        let off = services(dir.path(), "{}", true).with_playback(true);
+        assert_eq!(
+            run(off.tool(&pause)),
+            json!({"ok": false, "error": spotify::OFF, "code": "not_allowed"})
+        );
+        let no_playback = services(dir.path(), "{}", true).with_spotify(true);
+        assert_eq!(
+            run(no_playback.tool(&pause)),
+            json!({"ok": false, "error": spotify::NO_PLAYBACK, "code": "not_allowed"})
+        );
+        let on = services(dir.path(), "{}", true)
+            .with_spotify(true)
+            .with_playback(true)
+            .with_skill_reads(true);
+        // Not linked: said so, with where to link it.
+        let unlinked = run(on.tool(&pause));
+        assert_eq!(unlinked["code"], "not_linked");
+        assert!(unlinked["error"].as_str().unwrap().contains("Connectors"));
+        // Only Spotify is played.
+        let other = run(on.tool(&play(json!({"service":"gmail","action":"pause"}))));
+        assert_eq!(other["code"], "invalid");
+        // A made skill's call is refused at the door, all switches on.
+        assert_eq!(
+            run(on.skill_tool(&pause)),
+            json!({"ok": false, "error": SKILL_READS_ONLY})
+        );
+        // A write of Spotify points to playback, and is never prepared.
+        let write = json!({"op":"call","name":"service_write",
+                           "args":{"service":"spotify","action":"play"}});
+        assert_eq!(
+            run(on.tool(&write.to_string())),
+            json!({"ok": false, "error": spotify::PLAY_NOT_WRITE})
+        );
+        for services in [&off, &no_playback, &on] {
+            assert!(services.http.calls.lock().unwrap().is_empty());
+        }
+        // The product's unit leaves it off.
+        let unit = include_str!("../../../deploy/product/lamp-services.service");
+        assert!(!unit.contains(spotify::PLAYBACK_ENVIRONMENT));
+    }
+
+    /// Spotify, faked by route: the token route answers at once, a search
+    /// says it arrived and waits for a go before it answers one track, and
+    /// a player call answers 204. Every call is kept.
+    struct GatedSpotify {
+        calls: Mutex<Vec<Call>>,
+        arrived: Mutex<std::sync::mpsc::Sender<()>>,
+        go: Mutex<std::sync::mpsc::Receiver<()>>,
+    }
+
+    impl Http for GatedSpotify {
+        async fn send(&self, call: Call) -> Result<Reply, String> {
+            self.calls.lock().unwrap().push(call.clone());
+            let body = if call.url.contains("/api/token") {
+                r#"{"access_token":"acc-planted","token_type":"Bearer","expires_in":3600}"#
+            } else if call.url.contains("/v1/search") {
+                self.arrived.lock().unwrap().send(()).unwrap();
+                self.go.lock().unwrap().recv().unwrap();
+                r#"{"tracks":{"items":[{"name":"Clair de Lune","uri":"spotify:track:4u7EnebtmKWzUH433cf5Qv","artists":[{"name":"Debussy"}]}]}}"#
+            } else {
+                return Ok(Reply {
+                    status: 204,
+                    ..Reply::default()
+                });
+            };
+            Ok(Reply {
+                status: 200,
+                body: body.as_bytes().to_vec(),
+                ..Reply::default()
+            })
+        }
+    }
+
+    /// A play of "Clair de Lune" held at its search while `between` changes
+    /// the link through the admin door; then let go. What the play was
+    /// answered, and every call made.
+    fn play_across(between: impl FnOnce(&Services<GatedSpotify, FakeMail>)) -> (Value, Vec<Call>) {
+        let dir = tempfile::tempdir().unwrap();
+        let (arrived, arrival) = std::sync::mpsc::channel();
+        let (go, gone) = std::sync::mpsc::channel();
+        let services = Arc::new(
+            Services::new(
+                Store(dir.path().join("s")),
+                GatedSpotify {
+                    calls: Mutex::default(),
+                    arrived: Mutex::new(arrived),
+                    go: Mutex::new(gone),
+                },
+                FakeMail::default(),
+                None,
+                true,
+            )
+            .with_spotify(true)
+            .with_playback(true),
+        );
+        let link = json!({"connector":"spotify","auth_type":"pat","api_key":"rt-planted-1",
+                          "credentials":{"client_id":"abc123",
+                          "scopes":"user-read-currently-playing user-modify-playback-state"}});
+        let (answer, _) = run(services.admin(&set_line("spotify", link)));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let playing = services.clone();
+        let play = std::thread::spawn(move || {
+            let line = json!({"op":"call","name":"service_play","args":
+                {"service":"spotify","action":"play","query":"Clair de Lune"}});
+            run(playing.tool(&line.to_string()))
+        });
+        arrival
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the search arrived");
+        between(&services);
+        go.send(()).unwrap();
+        let answered = play.join().unwrap();
+        let calls = services.http.calls.lock().unwrap().clone();
+        (answered, calls)
+    }
+
+    fn played(calls: &[Call]) -> bool {
+        calls.iter().any(|call| call.url.contains("/v1/me/player/"))
+    }
+
+    /// Reviewer-three's P2 on #5796: an unlink that succeeds while a play
+    /// waits on its search leaves nothing to play; the play is refused as
+    /// not linked and Spotify's player is never asked.
+    #[test]
+    fn reviewer_three_unlink_during_search_prevents_playback() {
+        let (answered, calls) = play_across(|services| {
+            let (answer, _) = run(services.admin(r#"{"op":"remove","code":"spotify"}"#));
+            assert_eq!(answer, json!({"ok": true}));
+            assert!(services.store.load("spotify").is_none());
+        });
+        assert_eq!(answered["ok"], false, "{answered}");
+        assert_eq!(answered["code"], "not_linked", "{answered}");
+        assert!(!played(&calls), "the player was asked after the unlink");
+        // A wipe, the same.
+        let (answered, calls) = play_across(|services| {
+            let (answer, _) = run(services.admin(r#"{"op":"wipe"}"#));
+            assert_eq!(answer, json!({"ok": true}));
+        });
+        assert_eq!(answered["code"], "not_linked", "{answered}");
+        assert!(!played(&calls));
+    }
+
+    /// A relink while a play waits on its search: the old request never
+    /// acts on the account that replaced it.
+    #[test]
+    fn a_relink_during_search_prevents_the_old_requests_playback() {
+        let (answered, calls) = play_across(|services| {
+            let other = json!({"connector":"spotify","auth_type":"pat","api_key":"rt-other",
+                               "credentials":{"client_id":"abc123",
+                               "scopes":"user-modify-playback-state"}});
+            let (answer, _) = run(services.admin(&set_line("spotify", other)));
+            assert_eq!(answer["ok"], true, "{answer}");
+            assert_eq!(services.store.load("spotify").unwrap().api_key, "rt-other");
+        });
+        assert_eq!(
+            answered,
+            json!({"ok": false, "error": spotify::CHANGED, "code": "changed"})
+        );
+        assert!(!played(&calls), "the old request played on the new link");
+        // With nothing changed, the same play plays once.
+        let (answered, calls) = play_across(|_| {});
+        assert_eq!(answered["result"]["done"], "playing", "{answered}");
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|call| call.url.ends_with("/v1/me/player/play"))
+                .count(),
+            1
+        );
     }
 
     #[test]
