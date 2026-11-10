@@ -795,7 +795,9 @@ by service: …" của nó được nói trên tham số `action`.
   Thirteen và HOLD của Reviewer-two trên #5967): đúng câu ngay sau phần đọc
   lại, phần đọc lại không bị cắt, đèn không trả lời gì ở giữa, và do chính
   người đã yêu cầu nói khi biết người nói là ai; mọi câu "Cancel that." khác
-  là của mô hình. Trên
+  là của mô hình. Khi biết người nói (`speaker_of`: ngoài phòng riêng là
+  khuôn mặt đã biết của câu, của chủ hay của người khác, nên câu "Cancel."
+  của một người khác đã biết là của mô hình; trong phòng riêng là chủ). Trên
   lamp-9adf ngày 10/11, câu "Lamp, cancel that." sau phần đọc lại được trả
   lời "Cancel what exactly? I have several things set", không có lệnh gọi
   nào: mô hình cân nó với các nhắc việc của đèn. Giờ, khi một lệnh ghi của
