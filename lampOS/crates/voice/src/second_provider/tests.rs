@@ -5170,86 +5170,57 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
 }
 
 /// #5553: on lamp-9adf on 6 Nov, with nobody in view, "Send." after a
-/// read-back was held as a short sound. While a write waits for it, a plain
-/// send is answered; with none waiting it is held, and so is any other word.
+/// read-back was held as a short sound, and "Cancel." on 10 Nov (#5958).
+/// While a write waits, any answer is the model's to judge (the owner, 10
+/// Nov: no word lists): asked, never said by the lamp itself; with none
+/// waiting it is held.
 #[tokio::test]
-async fn a_checked_sound_is_answered_only_as_the_send_a_waiting_write_asked_for() {
-    let waiting = || crate::services::Pending {
-        began_clear: true,
-        ..crate::services::Pending::new("id", 8, std::time::Instant::now(), "Send a mail.", "ann")
-    };
-    crate::services::pending_for_test(Some(waiting()));
-    let (labels, asked) = sound_turn(true, true, "Send.").await;
-    assert!(
-        labels.iter().any(|label| label.starts_with("audio:")),
-        "{labels:?}"
-    );
-    assert_eq!(asked, 1);
-    crate::services::pending_for_test(Some(waiting()));
-    assert_eq!(sound_turn(true, true, "Bien.").await.1, 0);
-    crate::services::pending_for_test(None);
-    assert_eq!(sound_turn(true, true, "Send.").await.1, 0);
-}
-
-/// #5958: on lamp-9adf on 10 Nov, "Lamp, cancel that." after a read-back
-/// was answered "Cancel what exactly?", with no call, and a bare "Cancel."
-/// was held as a short sound. While a write waits, a plain cancel forgets it
-/// and the lamp says so in its own words, the chat never asked; with none
-/// waiting, the line is the model's as before.
-#[tokio::test]
-async fn a_plain_cancel_of_a_waiting_write_is_said_by_the_lamp_with_no_chat() {
+async fn a_checked_sound_is_answered_while_a_waiting_write_asks_for_an_answer() {
     let waiting = || crate::services::Pending {
         began_clear: true,
         service: "gmail".to_owned(),
         ..crate::services::Pending::new("id", 8, std::time::Instant::now(), "Send a mail.", "ann")
     };
-    for (marked, heard) in [(true, "Cancel."), (false, "Lamp, cancel that.")] {
+    for heard in ["Send.", "Cancel.", "Yes, send it."] {
         crate::services::pending_for_test(Some(waiting()));
-        let (labels, asked) = sound_turn(true, marked, heard).await;
-        assert_eq!(asked, 0, "{heard}: {labels:?}");
-        assert!(
-            labels.contains(&format!("said:{}", crate::services::CANCELLED_SAID)),
-            "{heard}: {labels:?}"
-        );
-        assert!(labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+        let (labels, asked) = sound_turn(true, true, heard).await;
         assert!(
             labels.iter().any(|label| label.starts_with("audio:")),
-            "{labels:?}"
+            "{heard}: {labels:?}"
         );
-        assert!(crate::services::send_state(0).is_none());
-        crate::services::pending_for_test(None);
+        assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+        assert_eq!(asked, 1, "{heard}");
     }
-    // No write waiting: the model's, as before.
-    let (labels, asked) = sound_turn(true, false, "Lamp, cancel that.").await;
-    assert_eq!(asked, 1, "{labels:?}");
-    assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+    crate::services::pending_for_test(None);
+    assert_eq!(sound_turn(true, true, "Send.").await.1, 0);
 }
 
 /// #5962: on lamp-3e83 on 10 Nov "ok, go ahead" after a read-back got "go
-/// ahead with what?". Right after a read-back said whole, the lamp asks for
-/// the plain send itself, the chat never asked, and the write keeps waiting.
+/// ahead with what?". The owner, 10 Nov: a natural agreement sends. The
+/// lamp says no line of its own for it ("Say 'send it'" is gone): the chat
+/// is asked, told the waiting write, and its `service_write` sends it; a
+/// bare "Yes." is no short sound while a write waits.
 #[tokio::test]
-async fn a_go_ahead_after_a_read_back_is_asked_for_send_it_with_no_chat() {
+async fn a_go_ahead_after_a_read_back_goes_to_the_chat_with_no_nudge() {
     let now = std::time::Instant::now();
     let mut kept = crate::services::Pending {
         began_clear: true,
         service: "gmail".to_owned(),
         ..crate::services::Pending::new("id", 8, now, "Send a mail.", "ann")
     };
-    kept.spoken = "Send a mail. Say send it.".to_owned();
+    kept.spoken = "Send a mail. Shall I send it?".to_owned();
     kept.spoken_from = Some(now - std::time::Duration::from_secs(4));
     kept.spoken_at = Some(now - std::time::Duration::from_secs(3));
-    crate::services::pending_for_test(Some(kept));
-    let (labels, asked) = sound_turn(true, false, "Ok, go ahead.").await;
-    assert_eq!(asked, 0, "{labels:?}");
-    assert!(
-        labels.contains(&format!("said:{}", crate::services::SAY_SEND_IT)),
-        "{labels:?}"
-    );
-    assert!(
-        crate::services::waiting_note(9, Some("ann"), now).is_some(),
-        "still waits"
-    );
+    for (marked, heard) in [(false, "Ok, go ahead."), (true, "Yes.")] {
+        crate::services::pending_for_test(Some(kept.clone()));
+        let (labels, asked) = sound_turn(true, marked, heard).await;
+        assert_eq!(asked, 1, "{heard}: {labels:?}");
+        assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+        assert!(
+            crate::services::waiting_note(9, Some("ann"), now).is_some(),
+            "{heard}: still waits for the chat's send"
+        );
+    }
     crate::services::pending_for_test(None);
 }
 
@@ -18183,6 +18154,79 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
             })),
             "on {on}"
         );
+    }
+}
+
+/// lamp-3e83, 10 Nov: the owner's "go ahead and send it" after the lamp's
+/// "Say 'go ahead and send it'" was held as the lamp's own echo, and the
+/// write never went. After a read-back ending "Say 'yes, send it' to send
+/// it.", the person's "Yes, send it." begun after the lamp's words reaches
+/// the model while the write waits, and the model's send with its send_id
+/// passes the gate; with no write waiting it is held as the echo as before.
+#[tokio::test(start_paused = true)]
+async fn a_yes_after_a_waiting_read_back_is_never_held_as_the_lamps_echo() {
+    const READ_BACK: &str = "Send an email to Bob saying hi. Say 'yes, send it' to send it.";
+    for waits in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Email Bob hi.".to_owned()),
+                    Ok("Yes, send it.".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![text(READ_BACK), Ok(ChatEvent::Done)],
+                    vec![text("Sent."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.holding_own_echo(true);
+        spoken_turn(&mut engine);
+        turn(&mut engine).await;
+        let mut kept = crate::services::Pending::new(
+            "s1",
+            1,
+            std::time::Instant::now(),
+            "Send an email to Bob saying hi.",
+            "ann",
+        );
+        kept.service = "gmail".to_owned();
+        kept.spoken_from = Some(std::time::Instant::now() - Duration::from_secs(60));
+        crate::services::pending_for_test(waits.then_some(kept));
+        spoken_turn_as(&mut engine, 2);
+        let labels = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        assert_eq!(
+            asked,
+            if waits { 2 } else { 1 },
+            "waits {waits}: {labels:?}"
+        );
+        if waits {
+            assert!(labels.contains(&"said:Sent.".to_owned()), "{labels:?}");
+            let mut pending = crate::services::pending_for_test_take();
+            let send = lamp_gemini::ToolCall {
+                id: "c".to_owned(),
+                name: crate::services::WRITE.to_owned(),
+                args: json!({"service": "gmail", "send_id": "s1"}),
+            };
+            let turn = crate::services::Turn {
+                heard: true,
+                owner: Some("ann"),
+                sends: true,
+                seen_owner: true,
+            };
+            let sent =
+                crate::services::gate(&mut pending, &send, 2, &turn, std::time::Instant::now())
+                    .expect("the send goes");
+            assert_eq!(sent.args["send_id"], "s1");
+            assert_eq!(sent.args["said"], "send");
+        }
+        crate::services::pending_for_test(None);
     }
 }
 

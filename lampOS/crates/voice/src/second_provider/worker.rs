@@ -3837,15 +3837,14 @@ pub fn serve(
             heeding.telling_another_voice(another_voice.clone());
         }
         // The connected services ask whose voice a line is in
-        // (`crate::services::VoiceAsk`): a send only in the voice that asked,
-        // a read in full only in the conversation's.
+        // (`crate::services::VoiceAsk`): a read in full only in the
+        // conversation's or the owner's enrolled one.
         {
             let heeding = heeding.clone();
             crate::services::judging_voices(Arc::new(move |ask| {
                 let mut heeding = heeding.lock().ok()?;
                 let voices = heeding.kept_voices()?;
                 match ask {
-                    crate::services::VoiceAsk::Alike(a, b) => voices.alike(a, b),
                     crate::services::VoiceAsk::Conversation(request) => {
                         voices.likeness_so_far(request)
                     }
@@ -9922,11 +9921,9 @@ impl Heeding {
             attention.name_heard_scored(at_us, score);
         }
         attention.heard(heard);
-        // A read-back asks for its "send", or its cancel (#5958), however
-        // its last sentence reads (`services::send_awaited`).
-        let lamp_asked = signs.lamp_asked
-            || crate::services::send_awaited(heard)
-            || crate::services::cancel_awaited(heard);
+        // A read-back asks for an answer, however its last sentence reads
+        // (`services::answer_awaited`).
+        let lamp_asked = signs.lamp_asked || crate::services::answer_awaited(heard);
         attention.lamp_asked(lamp_asked);
         let busy = signs.room == crate::room_told::Room::Busy;
         attention.set_near(signs.near);
@@ -27304,14 +27301,16 @@ mod tests {
             assert_eq!(heeding.conversation_note_for(9).is_some(), !held, "{heard}");
         }
         // #5553: the same lone words are the person's while a write waits
-        // for its "send", and a plain send alone.
+        // for the answer its read-back asked for, whatever they say: the
+        // model judges them (the owner, 10 Nov).
         for (heard, waiting, held) in [
             ("Send it.", true, false),
             ("Send it.", false, true),
-            ("Oh wow.", true, true),
+            ("Oh wow.", true, false),
         ] {
             crate::services::pending_for_test(waiting.then(|| crate::services::Pending {
                 began_clear: true,
+                service: "gmail".to_owned(),
                 ..crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
             }));
             let mut heeding = super::Heeding::new(false, false, None, None);
@@ -27330,6 +27329,7 @@ mod tests {
         for (ended_ago_us, held) in [(0, true), (10_000_000, false)] {
             crate::services::pending_for_test(Some(crate::services::Pending {
                 spoken_from: Some(Instant::now() - Duration::from_secs(60)),
+                service: "gmail".to_owned(),
                 ..crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
             }));
             let mut heeding = super::Heeding::new(false, false, None, None);

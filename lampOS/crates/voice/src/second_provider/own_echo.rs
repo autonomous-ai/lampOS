@@ -29,6 +29,10 @@
 //! ([`crate::remarks::questions`] with at least one word that is not the
 //! lamp's: "Did you say five o'clock?"), begins after the lamp's words when
 //! they ended on a question ("Yes, start it." after "Shall I start it?"), or
+//! begins after the lamp's words while a write waits for the answer its
+//! read-back asked for ([`crate::services::write_waits`]: lamp-3e83, 10 Nov,
+//! the owner's "go ahead and send it" after the lamp's "Say 'go ahead and
+//! send it'" was held as its echo and the write never went), or
 //! answers an offer in the answer ([`OFFERS`]): begun after the lamp's
 //! words, or over its voice with a word the lamp did not say. Only a line
 //! heard over the lamp's voice that is nothing but the offer's own words is
@@ -84,6 +88,9 @@ pub(super) struct Line<'a> {
     pub over_the_lamps_voice: bool,
     /// Only the lamp's name was called (`ProviderInput::Called`).
     pub called: bool,
+    /// A write waits for the answer its read-back asked for
+    /// ([`crate::services::write_waits`]).
+    pub write_waits: bool,
 }
 
 /// The lamp's latest answer so far: its request, its words sent to the
@@ -214,6 +221,8 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
         Some("it is a question of its own")
     } else if !line.over_the_lamps_voice && said.words.trim_end().ends_with('?') {
         Some("it began after the lamp's question")
+    } else if !line.over_the_lamps_voice && line.write_waits {
+        Some("it began after a read-back that waits for its answer")
     } else if (!line.over_the_lamps_voice || m < n) && offers(said.words) {
         Some("it answers the lamp's offer")
     } else {
@@ -266,6 +275,7 @@ mod tests {
             began_us,
             over_the_lamps_voice,
             called: false,
+            write_waits: false,
         }
     }
 
@@ -656,5 +666,34 @@ mod tests {
             judge(&line(heard, 0, false), Some(&said())),
             Echo::Answered(Some(_))
         ));
+    }
+
+    /// lamp-3e83, 10 Nov: after a read-back ending "Say 'yes, send it' to
+    /// send it.", the person's "Yes, send it." begun after the lamp's words
+    /// is theirs while the write waits; over the lamp's voice it is still
+    /// its echo, and with no write waiting it is held as before.
+    #[test]
+    fn a_reply_to_a_waiting_read_back_is_the_persons() {
+        let read_back = Said {
+            words: "Send an email to Bob saying hi. Say 'yes, send it' to send it.",
+            ..said()
+        };
+        let after = |write_waits| Line {
+            write_waits,
+            ..line("Yes, send it.", UNTIL_US + 300_000, false)
+        };
+        assert!(matches!(
+            judge(&after(true), Some(&read_back)),
+            Echo::Answered(Some(journal)) if journal.contains("waits for its answer")
+        ));
+        assert!(matches!(
+            judge(&after(false), Some(&read_back)),
+            Echo::Held(_)
+        ));
+        let over = Line {
+            write_waits: true,
+            ..line("Yes, send it.", 9_000_000, true)
+        };
+        assert!(matches!(judge(&over, Some(&read_back)), Echo::Held(_)));
     }
 }
