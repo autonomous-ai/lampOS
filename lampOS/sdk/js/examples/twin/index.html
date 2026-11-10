@@ -245,7 +245,7 @@ function connect() {
     const share = on ? Math.min(5, Math.max(1, light.level ?? 3)) / 5 : 0;
     const tint = new THREE.Color(...(on ? TINTS[light.colour] : [0.13, 0.13, 0.13]));
     disc.material.color.copy(on ? tint.clone().multiplyScalar(0.4 + 0.6 * share) : tint);
-    const pixels = Array.isArray(lamp.light?.shows?.pixels) && lamp.light.shows.pixels.length === RING.pixels ? lamp.light.shows.pixels : null;
+    const pixels = Array.isArray(lamp.light?.shows?.pixels) && lamp.light.shows.pixels.length === RING.pixels && lamp.light.shows.pixels.every((hex) => /^#[0-9a-f]{6}$/i.test(hex)) ? lamp.light.shows.pixels : null;
     // The ring's pixels are capped (120 of 255) as the real ring's are, and a flat dot has no bloom, so
     // the dots are drawn brighter than the lamp says (display only, like the glow).
     pixelDots.forEach((dot, i) => { dot.material.color.set(pixels ? pixels[i] : disc.material.color); dot.material.color.multiplyScalar(DOT_GAIN); });
