@@ -34,24 +34,35 @@ const WAIT: Duration = Duration::from_secs(5);
 /// How long the service is given to do what it must not: close untold.
 const NOTHING_FOR: Duration = Duration::from_millis(300);
 
-/// The one clock both parts read: the tasks part's monotonic time, and the
-/// voice's (`start_with_clock`). Only ever stepped forward.
-static NOW_MS: AtomicU64 = AtomicU64::new(1_000);
-
-fn voice_clock() -> Option<BootClock> {
-    Some(BootClock {
-        boot_id: "test-boot".into(),
-        ms: NOW_MS.load(Ordering::SeqCst),
-    })
+/// Each expansion owns the clock shared by one fixture's tasks service and
+/// voice reader. TaskNews accepts a function pointer, so separate statics
+/// keep fixtures isolated without changing its production API.
+macro_rules! clock {
+    () => {{
+        static NOW_MS: AtomicU64 = AtomicU64::new(1_000);
+        fn voice_clock() -> Option<BootClock> {
+            Some(BootClock {
+                boot_id: "test-boot".into(),
+                ms: NOW_MS.load(Ordering::SeqCst),
+            })
+        }
+        Shared {
+            now: &NOW_MS,
+            voice: voice_clock,
+        }
+    }};
 }
 
-#[derive(Clone)]
-struct Shared;
+#[derive(Clone, Copy)]
+struct Shared {
+    now: &'static AtomicU64,
+    voice: fn() -> Option<BootClock>,
+}
 impl Clock for Shared {
     fn sample(&self) -> io::Result<Sample> {
         Ok(Sample {
             boot_id: "test-boot".into(),
-            monotonic_ms: NOW_MS.load(Ordering::SeqCst),
+            monotonic_ms: self.now.load(Ordering::SeqCst),
         })
     }
 }
@@ -85,6 +96,7 @@ impl Adapter for Harness {
 struct Place {
     root: PathBuf,
     config: Config,
+    clock: Shared,
     stop: Arc<AtomicBool>,
     closes: Arc<Mutex<Vec<String>>>,
     serving: Option<JoinHandle<io::Result<()>>>,
@@ -93,7 +105,7 @@ struct Place {
 }
 
 impl Place {
-    fn new(name: &str) -> Self {
+    fn new(name: &str, clock: Shared) -> Self {
         let flushing = crate::disk_flush::flushing();
         let root = PathBuf::from(format!("/tmp/lvt-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
@@ -129,6 +141,7 @@ impl Place {
         let mut place = Self {
             root,
             config,
+            clock,
             stop: Arc::new(AtomicBool::new(false)),
             closes: Arc::new(Mutex::new(Vec::new())),
             serving: None,
@@ -141,9 +154,14 @@ impl Place {
     /// The tasks part, started on its store.
     fn serve(&mut self) {
         self.stop = Arc::new(AtomicBool::new(false));
-        let (config, stop, closes) = (self.config.clone(), self.stop.clone(), self.closes.clone());
+        let (config, stop, closes, clock) = (
+            self.config.clone(),
+            self.stop.clone(),
+            self.closes.clone(),
+            self.clock,
+        );
         self.serving = Some(thread::spawn(move || {
-            serve_with_adapter(config, Shared, stop, move |_| Ok(Harness(closes)))
+            serve_with_adapter(config, clock, stop, move |_| Ok(Harness(closes)))
         }));
         self.until(|| self.ask(json!({"op":"status"}))["ok"] == true);
     }
@@ -193,17 +211,32 @@ impl Place {
         }
     }
 
+    fn prepare(&self) -> Value {
+        let prepared =
+            self.ask(json!({"op":"prepare","guard":self.guard(),"text":TASK,"target":"coding"}));
+        assert_eq!(prepared["ok"], true, "{prepared}");
+        prepared
+    }
+
+    fn confirm(&self, prepared: &Value) -> Value {
+        let session = self.ask(json!({"op":"status"}))["summary"]["session_id"].clone();
+        self.trusted(
+            json!({"op":"confirm","guard":self.guard(),"id":prepared["id"],
+            "prepared_digest":prepared["prepared_digest"],"session_id":session}),
+        )
+    }
+
+    fn advance(&self, ms: u64) {
+        self.clock.now.fetch_add(ms, Ordering::SeqCst);
+    }
+
     /// Handed over as the voice does it (prepared, then the person's yes on
     /// the trusted socket), and its agent's answer read and kept. Not
     /// tracked: a timeout names which of its two waits ran out.
     fn handed_and_read(&self) -> Value {
-        let prepared =
-            self.ask(json!({"op":"prepare","guard":self.guard(),"text":TASK,"target":"coding"}));
-        assert_eq!(prepared["ok"], true, "{prepared}");
+        let prepared = self.prepare();
         let id = prepared["id"].clone();
-        let session = self.ask(json!({"op":"status"}))["summary"]["session_id"].clone();
-        let confirmed = self.trusted(json!({"op":"confirm","guard":self.guard(),"id":id,
-            "prepared_digest":prepared["prepared_digest"],"session_id":session}));
+        let confirmed = self.confirm(&prepared);
         assert_eq!(confirmed["ok"], true, "{confirmed}");
         self.until(|| self.task(&id)["task"]["dispatch"]["state"] == "accepted");
         let observe = self.ask(json!({"op":"observe","guard":self.guard(),"id":id}));
@@ -242,7 +275,7 @@ impl Place {
     /// be due three times over.
     #[track_caller]
     fn nothing_closed(&self, id: &Value) {
-        NOW_MS.fetch_add(3 * CLOSE_RETRY_MS, Ordering::SeqCst);
+        self.advance(3 * CLOSE_RETRY_MS);
         thread::sleep(NOTHING_FOR);
         assert!(self.closed().is_empty(), "closed untold");
         assert!(self.task(id)["observations"][0]["told"].is_null());
@@ -266,14 +299,14 @@ impl Drop for Place {
 /// observation `told`, and closes the harness the lamp started, once.
 #[test]
 fn news_heard_whole_closes_the_harness_it_was_of() {
-    let place = Place::new("heard");
+    let place = Place::new("heard", clock!());
     let id = place.handed_and_read();
     let mut news = TaskNews::start_with_clock(
         place.tasks(),
         place.root.join("told"),
         None,
         false,
-        voice_clock,
+        place.clock.voice,
     )
     .unwrap();
     let key = place.told(&mut news, &id);
@@ -297,14 +330,14 @@ fn news_heard_whole_closes_the_harness_it_was_of() {
 /// hand-over's news is of no observation, and is never sent itself.
 #[test]
 fn news_heard_while_the_tasks_part_is_down_is_told_once_it_is_back() {
-    let mut place = Place::new("down");
+    let mut place = Place::new("down", clock!());
     let id = place.handed_and_read();
     let mut news = TaskNews::start_with_clock(
         place.tasks(),
         place.root.join("told"),
         None,
         false,
-        voice_clock,
+        place.clock.voice,
     )
     .unwrap();
     let key = place.told(&mut news, &id);
@@ -318,4 +351,31 @@ fn news_heard_while_the_tasks_part_is_down_is_told_once_it_is_back() {
     let task = place.task(&id);
     assert!(task["observations"][0]["told"].is_object(), "{task}");
     assert_eq!(place.closed(), [AGENT]);
+}
+
+/// One test's no-close interval must not expire another fixture's fresh
+/// preparation. Both services are real; no scheduler timing is needed.
+#[test]
+fn one_fixture_cannot_expire_another_fixtures_confirmation() {
+    let waiting = Place::new("clock-waiting", clock!());
+    let sibling = Place::new("clock-sibling", clock!());
+    let sibling_task = sibling.handed_and_read();
+    let prepared = waiting.prepare();
+    sibling.nothing_closed(&sibling_task);
+    let confirmed = waiting.confirm(&prepared);
+    drop(sibling);
+    drop(waiting);
+    assert_eq!(confirmed["ok"], true, "{confirmed}");
+}
+
+/// Isolating fixtures must preserve the production expiry rule.
+#[test]
+fn a_fixtures_own_clock_still_expires_its_confirmation() {
+    let place = Place::new("clock-expiry", clock!());
+    let prepared = place.prepare();
+    place.advance(3 * CLOSE_RETRY_MS);
+    let confirmed = place.confirm(&prepared);
+    drop(place);
+    assert_eq!(confirmed["ok"], false, "{confirmed}");
+    assert_eq!(confirmed["error"], "stale_confirmation", "{confirmed}");
 }
