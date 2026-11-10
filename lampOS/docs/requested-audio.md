@@ -251,8 +251,14 @@ being read past the clash spin, the speaker was muted, silent or its state
 unknown, its state changed, was stale, or was read after the check's own
 time, its Skills lease lapsed, it was past its time, Skills refused its start or a renewal, or its recording
 couldn't be read or wasn't the one offered. It also comes when the turn's
-output settles and its confirmation failed, was empty, had a gap or never
-retired. Before #5764 this end said nothing: on lamp-52e6 on 9 Nov (10883)
+output settles and its confirmation failed, was empty or never retired. A
+playback gap in the confirmation does not end it: a gap is late words, not
+cut ones, and retirement means all of them played. On lamp-52e6 on 10 Nov
+(request 3) the wait sound played 1.5 s after the line and the two-piece
+confirmation 4.5 s after that, while the chat's second round ran; the zeros
+between them were counted as a gap and the recording was cancelled with
+"the confirmation had a gap". A gapped confirmation still leaves its news
+unacknowledged, as any gapped reply does. Before #5764 this end said nothing: on lamp-52e6 on 9 Nov (10883)
 three triggered requests played nothing and the journal said nothing. `request N: requested audio
 revoked: <why>` comes from the coordinator, when the turn is revoked.
 
@@ -462,8 +468,9 @@ Stop, interruption/new owner, microphone privacy closure, capture gap, speaker m
 invalid speaker state, definition revocation, daemon loss and deadline expiry
 are terminal for the item. Reopening microphone privacy, unmuting or restarting a daemon
 does not resume it. A completed model generation or accepted final chunk is
-not confirmation retirement: Voice requires the matching speaker completion,
-with no gap, before selecting media under the same spoken owner.
+not confirmation retirement: Voice requires the matching speaker completion
+before selecting media under the same spoken owner. A gap in the
+confirmation delays it and does not cancel the recording.
 
 ## Source example and validation boundary
 
