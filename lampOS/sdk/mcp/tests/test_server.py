@@ -694,6 +694,32 @@ def test_an_action_handed_to_a_part_ends_at_once(tmp_path):
     run(go())
 
 
+def test_a_light_kept_for_seconds_is_asked_again_until_its_time_or_a_stop(tmp_path):
+    """The desk-app friction log, 10 Nov: a light could not be held past 30 s without calling again."""
+
+    async def go():
+        async with connected(tmp_path) as (fake, lamp, session):
+            lamp.limits["hold_max_ms"] = 2000  # a lamp that holds a light 2 s, so the test needn't wait 15 s
+            result = await session.call_tool("lamp_light", {"colour": "warm", "level": 2, "keep_for_s": 4.5})
+            assert not result.isError and "kept for 4.5 s" in text(result)
+            assert len(fake.asked("light")) == 1 and fake.asked("light")[0]["for_ms"] == 2000
+            await asyncio.sleep(5.5)
+            asks = fake.asked("light")
+            assert len(asks) >= 3, asks  # at 0 s, 1 s, 2 s, 3 s, 4 s: the last for what was left
+            assert all(a["for_ms"] <= 2000 for a in asks) and asks[-1]["for_ms"] < 2000
+            count = len(asks)
+            await asyncio.sleep(1.5)
+            assert len(fake.asked("light")) == count  # over, nothing asks again
+            # A stop ends a kept light at once.
+            await session.call_tool("lamp_light", {"colour": "blue", "level": 2, "keep_for_s": 60})
+            before = len(fake.asked("light"))
+            await session.call_tool("lamp_stop", {})
+            await asyncio.sleep(2.5)
+            assert len(fake.asked("light")) == before
+
+    run(go())
+
+
 def test_every_time_argument_says_its_unit_in_the_tool_description(tmp_path):
     """The desk-app friction log, 10 Nov: the tools mix `for_ms`, `seconds`, `wait_s` and `timeout_s`, and an agent
     guessed `seconds` for a light. Each such tool says its unit, so a guess is one read away."""
@@ -703,6 +729,7 @@ def test_every_time_argument_says_its_unit_in_the_tool_description(tmp_path):
             tools = {t.name: t for t in (await session.list_tools()).tools}
             for name, argument, unit in (
                 ("lamp_light", "for_ms", "milliseconds"),
+                ("lamp_light", "keep_for_s", "seconds"),
                 ("lamp_ring", "for_ms", "milliseconds"),
                 ("lamp_events", "wait_s", "seconds"),
                 ("lamp_wait_for", "timeout_s", "seconds"),
@@ -1067,7 +1094,7 @@ def test_an_argument_a_tool_does_not_take_is_refused(tmp_path):
                 assert tool.inputSchema.get("additionalProperties") is False, tool.name
             wrong = await session.call_tool("lamp_light", {"colour": "warm", "for_s": 5})
             assert wrong.isError
-            assert text(wrong) == "bad_request: lamp_light takes no for_s; it takes colour, for_ms, level, pattern"
+            assert text(wrong) == "bad_request: lamp_light takes no for_s; it takes colour, for_ms, keep_for_s, level, pattern"
             assert fake.asked("light") == []
             stop = await session.call_tool("lamp_stop", {"now": True})
             assert stop.isError
