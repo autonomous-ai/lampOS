@@ -92,12 +92,20 @@ sau:
      #6103): `most_a_day` vào 1-6, `[budget]` luôn là `wellbeing` với
      `per_hour` 1-2 (không khóa nào khác), và `[rest] after_ignored` vào
      1-3 (0 hay âm thành 1); `[quiet]` luôn là 22:00-08:00, chỉ bỏ khi
-     `during` của trigger nằm trọn trong 08:00-22:00 hoặc dài nhiều nhất 3
-     giờ, là giờ người dùng tự nói, chạy đúng như đã nói dù là ban đêm (phán
-     quyết của điều phối viên trên #6103: "dim the light at ten",
+     `during` của trigger nằm trọn trong 08:00-22:00, hoặc chạy vào giờ mà
+     chính lời yêu cầu nêu: nhiều nhất 3 giờ, nằm trong một khoảng mà
+     `made_skill::asked_windows` đọc từ lời người dùng ("from 22:00 to
+     22:30"; một giờ đơn lẻ, "at 10 pm", "at ten tonight", "lúc 10 giờ tối",
+     là giờ đó và một giờ sau; "at ten" trống không thì sáng hoặc tối), do
+     bộ tạo (`make_skill_local`) truyền vào `made_skill::keep_asked`. Khi đó
+     nó chạy đúng như đã nói dù là ban đêm ("dim the light at ten tonight",
      22:00-22:30, chạy lúc 22:10; kiểm thử
-     `a_made_evening_dim_runs_at_ten_past_ten`); `during` rộng hơn, như cả
-     ngày, vẫn giữ nó. Các mức sàn của #6062 và #6070
+     `a_made_evening_dim_runs_at_ten_past_ten`). Khoảng do mô hình tự chọn
+     (yêu cầu không nêu giờ), hay khoảng rộng hơn như cả ngày, vẫn giữ nó
+     (phần tiếp theo của HOLD của Thirteen trên #6103; kiểm thử
+     `the_night_stays_quiet_unless_its_window_is_within_the_day`,
+     `the_times_a_request_names_are_read_from_its_words`). Các mức sàn của
+     #6062 và #6070
      (`made_skill::say_paced`: một giờ cho câu nói, một phút vắng mặt cho
      khuôn mặt, một phút cho việc đứng dậy, một giờ cho không khí ngột
      ngạt) cũng áp dụng. Trigger theo khuôn mặt của một người cụ thể (khóa
@@ -109,7 +117,15 @@ sau:
      and rests till morning if ignored twice."
      (`made_skill::manners_plainly`; cái ở dạng đèn không đặt được thì không
      nói được và được sửa). Kỹ năng tạo ra được cài vào thư mục kỹ năng của
-     đèn, không phải thư mục pushed, nên được vào nhóm. Kiểm thử:
+     đèn, không phải thư mục pushed, nên được vào nhóm. Nó chỉ được giữ khi
+     có đủ cả bốn ở đúng các giá trị này và không có quyền thừa
+     (`made_skill::manners_kept`, P2 của Thirteen và App Only trên
+     355d255189): khóa có dấu chấm (`quiet.from`, `permissions.messages`) và
+     chuỗi nhiều dòng được đặt như mọi dạng khác, còn dạng đèn không đặt
+     được (một `permissions = { … }` viết liền) thì không nói được, là
+     "parts manners", và được sửa, không bao giờ được giữ khi thiếu chừng
+     mực. Kiểm thử:
+     `a_skill_is_never_kept_without_its_manners_whatever_its_shape`,
      `a_self_starting_made_skill_is_given_manners_not_refused`,
      `a_made_skills_manners_are_clamped_to_their_bounds`,
      `the_night_stays_quiet_unless_its_window_is_within_the_day`, và
