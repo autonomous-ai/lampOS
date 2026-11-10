@@ -157,8 +157,10 @@ or "to help me relax/unwind/sleep", with only please/now/on afterward.
 "Lamp, play me something to relax." and "Play something to help me sleep."
 ask; "Play something like chess to relax." and "Play something with me to
 relax." do not. A line with "don't", "not", "never", "no", "stop", "cancel",
-"actually", "wait", "maybe", "đừng", "thôi" or the phrase "forget it"
-anywhere, in any sentence, does not ask. Otherwise Voice drops the offer and
+"actually", "wait", "maybe", "đừng", "thôi" or a whole-word phrase
+"forget it", "scratch that" or "changed my mind" anywhere, in any sentence,
+does not ask. These phrases override an earlier request; "scratch" or
+"changed" alone does not cancel a request. Otherwise Voice drops the offer and
 tells the model `{"error": NOT_ASKED_TO_PLAY}`: nothing plays, and it must
 not say it is playing. It is never told the skill's confirmation. This
 check is in code, so a skill's "only when explicitly asked" text is no longer

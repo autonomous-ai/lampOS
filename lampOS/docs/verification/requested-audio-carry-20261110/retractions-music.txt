@@ -1,0 +1,5 @@
+
+running 33 tests
+.................................
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 5499 filtered out; finished in 0.77s
+

@@ -175,3 +175,46 @@ formatting and strict Voice all-target Clippy passed (empty output, exit 0);
 6.83 s. Current docs: 192 documents, 1900 links, zero broken. The added
 evidence commit changes no runtime or tests. Fresh CI and the required
 reads still qualify the resulting published head separately.
+
+## Later spoken retractions (Fourth's follow-up)
+
+On published head `f75e3da9456a3b07b7cf4ecdbb2c467a1536ae49`,
+“Play some music. Scratch that.” and “Play some music. I changed my mind.”
+still authorized a recording. The same two new classifier tests
+[failed before](retractions-before.txt) and [passed after](retractions-after.txt).
+The actual Engine matrix [failed before](retractions-engine-before.txt) at
+its first new direct “Scratch that” case (one recording offered instead of
+zero). That stopped the matrix: it does not prove that every new case was
+observed failing before the repair.
+
+The bounded whole-word retraction list now includes “scratch that” and
+“changed my mind” alongside “forget it”. The actual Engine matrix covers
+both direct and wrapped calls, including “I've changed my mind” and positive
+controls with unrelated “scratch” and “changed my playlist”. This remains a
+conservative whole-line veto, not a general natural-language intent parser.
+
+Local checks after the repair, on the same `c29008d21` base:
+
+- `cargo fmt --all --check`: passed. An initial invocation from the repository
+  root [failed to find Cargo.toml](retractions-fmt-initial.txt); the first
+  correctly located check [found a wrapping difference](retractions-fmt.txt).
+  After `cargo fmt -p lamp-voice`, the repeated check passed.
+- `cargo clippy -q -p lamp-voice --all-targets -- -D warnings`: passed,
+  empty output, completed gate exit 0.
+- `cargo test -q -p lamp-voice --lib retracts_the_recording_ask`:
+  two passed, 0.00 s.
+- `cargo test -q -p lamp-voice --lib music -- --test-threads=1`:
+  [33 passed](retractions-music.txt), 0.77 s, including the expanded Engine matrix.
+- `cargo test -q -p lamp-voice --lib requested_audio -- --test-threads=1`:
+  [68 passed / two ignored manual diagnostics](retractions-requested.txt), 7.10 s.
+- `cargo test -q -p lamp-voice --lib requested_audio::tests::recording_retraction_admission_latency -- --exact --ignored --nocapture`:
+  [one passed](retractions-latency.txt). Across 256 alternating positive and
+  negative admissions, first/max 253.262 us, p95 46.061 us, within the
+  preselected 1 ms host target. The boundary includes folding/allocation and
+  phrase checks inside `asks_to_play`, excluding input allocation, provider,
+  IPC and playback. No before/after speedup or acoustic latency is claimed.
+
+Docs links: 192 documents / 1900 links / zero broken before this evidence
+append. The earlier green ARM run and reads qualify `f75e3da94`, not this
+runtime delta; fresh CI and delta reads are required. The PR stays draft and
+`LAMP_REQUESTED_AUDIO` stays off. No device work was performed.
