@@ -2106,17 +2106,40 @@ gone ([switches.md](switches.md)). What happens:
    (`make_skill_local::EXAMPLE`, `example-only`: cyan at level 2 for 25 s
    on someone being there, named as an example of the form, "never answer
    with it") and told
-   that a skill can't speak or keep time: on lamp-9adf on 2 Nov, before
+   that a skill can't keep time, and how it speaks (below, #6055): on lamp-9adf on 2 Nov, before
    both, its first two skills were refused for a trigger field and a light
    step the check didn't know. Its answer must be exactly two fenced
    blocks, `skill.toml` and `SKILL.md`, at most 8 KiB each.
 4. **Held to what a made skill may use** (the coordinator's cap, 19 Oct):
    - `kind` installable, with a version;
-   - `[permissions]` with only `light`, `body`, and `topics` among
-     `voice/state` and `room/presence`;
+   - `[permissions]` with only `light`, `body`, `speak`, and `topics`
+     among `voice/state` and `room/presence`;
    - no function for the model (`tool`);
    - `[ask] policy` only `nudge`, never a hello, news or a reminder;
-   - speaking, messages, the look and any other topic are refused.
+   - messages, the look, known faces, actions and any other topic are
+     refused.
+   - **It may speak** (#6055, the app owner, 10 Nov: "Say hello when I sit
+     down at my desk", the app's own example, was refused or repaired into
+     a light). `speak = true` with one `[[do]]` step
+     `say = "greet them warmly"` (one say a skill, as `lamp-skills` takes
+     it), alone or beside light and gesture steps: a note the voice says in its own words, in the conversation's
+     language, as any skill's note is (`do.say`, through the say service,
+     the run asked of the Policy as a nudge). The note is a string of one
+     clause, at most 60 characters (`made_skill::MOST_SAY_NOTE_CHARS`),
+     with no quotes (an apostrophe inside a word is kept), no `.`, `!`,
+     `?`, `;` or `:` but one at its end, no braces and no control
+     character (`made_skill::say_note`); never a `{ text }`, a list of
+     lines or `{ from = ... }`. A say that isn't such a note is refused
+     ("what it would say isn't one short note; try saying it in a few
+     words, like 'greet me warmly'"), two say steps ("it would say more
+     than one line"), a say step without `speak = true`
+     ("it would say something without asking for its voice") and
+     `speak = true` with no say step and no read ("it asks for its voice
+     but never says anything"), each repaired as the cap's refusal is.
+     The cap holds it again in the manage helper (`put_on_cap`), so a
+     kept package that says anything else is never put on. A skill that
+     reads a linked service keeps its own rule below: one read step and
+     nothing else.
    Widening this is the lead's call. The one widening (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
    `lamp-skills-manage@`, on in the product units): `services` naming one linked
@@ -2180,8 +2203,12 @@ gone ([switches.md](switches.md)). What happens:
      (`made_skill::repair_brief`). They are the model's own skill read
      back to it, never the conversation. Up to
      `make_skill_local::MOST_REPAIRS` (3) times, each begun only while
-     one more answer (30 s) still ends within `MAKE_WITHIN` (120 s, the
-     longest a make with one repair could take before); the journal says
+     one more round still ends within `MAKE_WITHIN` (120 s, the longest a
+     make with one repair could take before): a round is two answers of
+     30 s at worst (`ROUND_WITHIN`), since a cut or failed answer is asked
+     once more, so no repair begins past 60 s and the make ends by 120 s
+     (the readers' P2 on #6054: guarded by one answer, a repair begun at
+     89 s could end near 149 s while the voice held the turn); the journal says
      `a made skill's repair N of 3: <why>` each round. A refusal by the
      check is repaired, by the plain words below, by the cap (a skill
      asking for more than the light and the head: the cap's reason and
@@ -2248,7 +2275,13 @@ gone ([switches.md](switches.md)). What happens:
        desk, as `lamp-skills` counts it only then: "When someone comes
        back to the desk after it was empty for 5 minutes";
      - a step other than one light (`colour`, `level`, `for`, or `dim`
-       alone) or one gesture (`nod`, `curious`);
+       alone), one gesture (`nod`, `curious`) or one say note as above,
+       said with its note in its own clause, no inner quotes: "When
+       someone has been at the desk for 5 seconds, it says a short line in
+       its own words: greet them warmly, at most once an hour." A say
+       step it can't say is named in the repair with what a say is ("[[do]]
+       step 1, say: one short note, a few words, one clause, no quotes"),
+       and `PLAIN_ONLY` says a step may be one say with `speak = true`;
      - words over 200 characters: said whole or not at all, never cut
        before a step or the cooldown. On lamp-0c89 the lamp's model had
        kept "when someone says good night, dim the light slowly over a
