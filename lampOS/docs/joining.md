@@ -949,7 +949,12 @@ days, and posts on the Queue only where one of these is missed.
 All of them are plain pull request comments, never GitHub reviews: the
 train bot counts only comments (until #5212 lands).
 
-- `READ ASK <sha>`: the builder asks for a read and names the reader.
+- `READ ASK <sha>`: the builder asks for a read and names the reader. A
+  reader who hasn't answered a `READ ASK` on the current head with a
+  `READ-OK` or a `HOLD` within one hour is replaced (the lead's rule, 10
+  Nov). The Reviewer-lead takes the read, saying "standing in for
+  <role>", or hands it to a free reader, and the PM assigns reads the same
+  way.
 - `NEXT TRAIN`: only an ask, once a pull request is eligible.
 - `READ-OK <full sha>`: the first line of the reader's comment. It carries
   over a rebase with the same patch.
