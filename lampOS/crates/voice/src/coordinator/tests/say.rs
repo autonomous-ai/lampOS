@@ -1164,6 +1164,61 @@ fn an_exact_line_plays_through_the_rooms_speech() {
     assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
 }
 
+/// #5999 (the Reviewer-lead's HOLD on #6111): a skill's step's exact line,
+/// asked `quiet`, keeps the quiet its priority bought it as a say: Dusty
+/// air's nudge (priority 5) waits while two people talk in the room and
+/// for [`crate::say::QUIET_US`] since the last turn, unanswered, and is
+/// said once the room is quiet.
+#[test]
+fn a_skills_exact_line_waits_for_the_rooms_quiet_then_is_said() {
+    let (mut says, answered) = crate::say::Says::quiet_exact_for_test(
+        "dusty-air",
+        vec![400; 480],
+        crate::say::NORMAL_PRIORITY,
+    );
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let rest = sound_now(&mut owner, &reply, &admission, &says);
+    for (held, why) in [
+        (
+            crate::say::SoundNow {
+                listening: true,
+                conversing: false,
+                ..rest
+            },
+            "someone in the room is speaking",
+        ),
+        (
+            crate::say::SoundNow {
+                since_turn_us: crate::say::QUIET_US - 1,
+                conversing: false,
+                ..rest
+            },
+            "the last turn is nearer than its quiet",
+        ),
+    ] {
+        assert!(
+            !take_exact(&mut says, &held, &mut owner, &mut reply, &mut trace),
+            "{why}"
+        );
+        assert!(reply.is_none(), "{why}");
+        assert!(answered.try_recv().is_err(), "{why}: still waiting");
+    }
+    let quiet = crate::say::SoundNow {
+        conversing: false,
+        ..rest
+    };
+    assert!(take_exact(
+        &mut says, &quiet, &mut owner, &mut reply, &mut trace
+    ));
+    assert_eq!(
+        reply.as_ref().unwrap().notice.origin(),
+        SpeechOrigin::ExactLine
+    );
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+}
+
 /// An exact line asked while the lamp is muted is refused at once, with
 /// why, and nothing plays.
 #[test]

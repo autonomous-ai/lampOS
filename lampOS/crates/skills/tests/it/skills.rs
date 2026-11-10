@@ -9825,6 +9825,10 @@ fn exact_words_reach_the_voice_unchanged_at_their_priority() {
     assert_eq!(asked["expires_in_ms"], 120_000);
     assert_eq!(asked["skill"], "hello");
     assert!(asked.get("note").is_none(), "{asked}");
+    // #5999: a made skill's words are no fixed line: they stay a `text` the
+    // voice says through its turn, translated and kept in the thread, never
+    // its exact path.
+    assert!(asked.get("exact").is_none(), "{asked}");
     let done = &seen.events[3].why;
     assert!(done.contains("light warm: done"), "{done}");
     assert!(done.contains("say: spoken"), "{done}");
@@ -9890,10 +9894,13 @@ fn the_skills_word_for_word_lines_reach_the_voice_as_exact_fixed_lines() {
         let text = asked["text"].as_str().unwrap_or_default();
         assert!(lines.iter().any(|line| line == text), "{name}: {asked}");
         assert!(asked.get("note").is_none(), "{name}: {asked}");
+        // It still waits for the room's quiet its priority buys, as a say.
+        assert_eq!(asked["quiet"], true, "{name}: {asked}");
         // The voice's own reading of the ask: the exact path, no chat turn.
         let request = lamp_voice::say::parse_from(&wire, lamp_voice::say::Caller::Other).unwrap();
         if asked["exact"] == true
             && request.words == lamp_voice::say::Words::Exact(text.into())
+            && request.quiet
             && request.words.turn().is_none()
         {
             exact_asks += 1;

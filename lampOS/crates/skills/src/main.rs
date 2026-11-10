@@ -5418,9 +5418,13 @@ fn made_here(skills: &[lamp_skills::Skill], dir: &Path) -> HashSet<String> {
 /// (`made`, #6062) asks with `made`: the voice takes only its exact text,
 /// framed as quoted and untrusted, with no functions and no memory, so its
 /// words never run as an instruction; its note is refused there.
-/// A step's own words (`text`) go as the voice's exact words (#5999, as
-/// #5777's unplug lines): said as written, never a chat turn the model may
-/// decline or reword.
+/// A step's own words (`text`) that are one of the voice's fixed lines
+/// (`lamp_voice::language::is_fixed`: Smoky air's, Dusty air's, Head pat's)
+/// go as the voice's exact words (#5999, as #5777's unplug lines), said as
+/// written in the owner's language, never a chat turn the model may decline
+/// or reword, and `quiet`: they still wait for the room's quiet their
+/// priority buys. Any other skill's `text` (a made, routine or Store
+/// skill's) stays a say the voice translates and keeps in its thread.
 fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
     let (mut ask, note) = match call {
         Call::Say(note) => (
@@ -5436,8 +5440,13 @@ fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
         ask["who"] = json!(true);
     }
     // A made skill's text goes `made` alone, never exact (#6062).
-    if !made && !note {
+    if !made
+        && let Call::Words(words) = call
+        && words.exact
+        && lamp_voice::language::is_fixed(&words.words)
+    {
         ask["exact"] = json!(true);
+        ask["quiet"] = json!(true);
     }
     Some(ask)
 }
