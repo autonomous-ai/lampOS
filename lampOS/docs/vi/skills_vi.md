@@ -193,7 +193,7 @@ sau:
    (bước 8), và mô hình được báo tên, đã bật hay chưa, kỹ năng làm gì (được
    nói rõ như trên) và dùng gì ("đèn của nó và việc nó có đang nói hay
    không"), và được dặn nói đúng một câu ngắn, không hỏi gì về việc bật:
-   "I made evening dim, and it's on." (`made_skill::on_line`), hoặc khi
+   "I made evening dim, and it's on: <what it does>, using its light. Say \"take it off\" to take it off." (`made_skill::on_line`), hoặc khi
    không bật được, "I made it but couldn't put it on: <lý do>."
    (`made_skill::not_on_line`, kèm `not_on` trong câu trả lời). Câu "Shall
    I put it on the lamp?" không bao giờ được nói, không có lời hỏi nào được
@@ -251,7 +251,7 @@ lời "có" nói thành tiếng (#5977; nút MAKE IT của ứng dụng là lờ
   dụng hiện ngay.
 - Khi đã giữ, kỹ năng được bật ngay qua helper quản lý, như bằng giọng nói,
   rồi đèn nói một câu ngắn qua dịch vụ nói, vào lúc thích hợp trong vòng một
-  giờ (`app_make::say_line`): "I made evening dim, and it's on.", hoặc "I
+  giờ (`app_make::say_line`): "I made evening dim, and it's on: <what it does>, using its light. Say \"take it off\" to take it off.", hoặc "I
   made it but couldn't put it on: <lý do>.". Không hỏi gì, không chờ lời
   "có".
 - `{"made": {"request_id"}}`: trạng thái của lời nhờ từ ứng dụng: `making`
@@ -282,7 +282,12 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
 1. **Yêu cầu.** `lamp-cloud` gửi `{"written": {"name", "when",
    "instructions", "request_id"}}` tới socket app-make, socket này cũng
    nghe khi chỉ bật công tắc này (và chỉ trả lời yêu cầu này; `make` và
-   `ready` vẫn thuộc `LAMP_APP_MAKE_SKILL`). Một dòng tối đa 8 KiB. Mỗi
+   `ready` vẫn thuộc `LAMP_APP_MAKE_SKILL`). Socket chỉ trả lời
+   `lamp-cloud`: bên gọi được đọc bằng `SO_PEERCRED`, chỉ
+   `lamp-cloud.service` chạy dưới user của voice được trả lời, mọi bên gọi
+   khác bị đóng không trả lời (`app_make::app_caller_may`; P2 của App Only
+   trên #5985: không còn lời "có", nên không phần nào khác trong nhóm được
+   bật kỹ năng). Một dòng tối đa 8 KiB. Mỗi
    trường được cắt khoảng trắng hai đầu và giữ nguyên phần giữa
    (`Written::new`): tên bắt đầu bằng chữ thường, rồi chữ thường, số và
    `-`, tối đa 40 byte (để tên hàm vừa 48 byte của lamp-skills); `when` một
@@ -327,7 +332,7 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
    (`made_skill::put_on`), helper kiểm lại giới hạn
    (`made_skill::put_on_cap`: của kỹ năng viết khi có hàm, nếu không thì
    của kỹ năng tự tạo) và `made: here`. Rồi đèn nói qua dịch vụ nói, vào
-   lúc thích hợp, "I made NAME, and it's on." (`made_skill::on_line`), hoặc
+   lúc thích hợp, "I made NAME, and it's on: WHAT IT DOES, using WHAT IT USES. Say \"take it off\" to take it off." (`made_skill::on_line`), hoặc
    lý do không bật được. `skills.made` báo cho ứng dụng `making`, `on` hoặc
    `not_kept` (kèm lý do, trong đó có tên đã dùng hay việc bật thất bại), với
    `"written": true`; trang kỹ năng hiển thị nó trong "Made on this lamp"

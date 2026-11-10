@@ -146,8 +146,8 @@ pub const PRODUCT: &[(&str, &str)] = &[
     ),
     // The skills' manage helper (#1722, #2414): root's, started by its
     // socket for each connection, so the socket is enabled and the template
-    // never is. lamp-cloud's skills.remove and a made skill's spoken yes
-    // (#1685) ask it.
+    // never is. lamp-cloud's skills.remove and a made skill going on once
+    // kept (#1685, #5977) ask it.
     (
         "lamp-skills-manage.socket",
         include_str!("../../../deploy/product/lamp-skills-manage.socket"),

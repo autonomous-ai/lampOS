@@ -713,6 +713,7 @@ pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
         Some(asks),
         crate::make_skill_local::own_chat,
         PathBuf::from(crate::skill_words::INSTALLED),
+        app_caller_is_lamp_cloud,
     ) {
         Ok(()) => eprintln!(
             "lamp-voice: an app's skill: listening at {} (made: {}, written: {})",
@@ -727,11 +728,30 @@ pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
     }
 }
 
+/// The one unit the app-make socket answers (App Only's P2 on #5985).
+pub const APP_CALLER_UNIT: &str = "lamp-cloud.service";
+
+/// Whether a caller the kernel named may use the app-make socket: only
+/// [`APP_CALLER_UNIT`] run as `own_uid`, as the tasks part's app route
+/// holds it (#5379); a caller whose unit can't be read is refused.
+pub fn app_caller_may(caller: Option<&lamp_ipc::caller::Caller>, own_uid: u32) -> bool {
+    caller.is_some_and(|caller| {
+        caller.uid == own_uid && caller.unit.as_deref() == Some(APP_CALLER_UNIT)
+    })
+}
+
+/// [`app_caller_may`] with this process's own uid: the socket's check on a
+/// lamp.
+pub fn app_caller_is_lamp_cloud(caller: Option<&lamp_ipc::caller::Caller>) -> bool {
+    app_caller_may(caller, rustix::process::geteuid().as_raw())
+}
+
 /// Listen at `path`, opened to `group` if given, on a thread of its own:
 /// each client in turn, its line read within [`LINE_WAIT`], answered as far
 /// as `on` lets; each make written by the model `chat` gives, each written
 /// skill kept taking no name of a skill in `installed`, each put on at
 /// once, and its line said through `asks`.
+#[allow(clippy::too_many_arguments)]
 pub fn serve(
     path: &Path,
     group: Option<u32>,
@@ -740,17 +760,27 @@ pub fn serve(
     asks: Option<crate::say::OwnAsks>,
     chat: ChatFrom,
     installed: PathBuf,
+    caller_may: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
 ) -> io::Result<()> {
     let (listener, bound) = crate::say::bind(path, group)?;
     std::thread::Builder::new()
         .name("lamp-voice-app-make-socket".into())
         .spawn(move || {
             let _bound = bound;
-            accept(&listener, on, &keeping, asks.as_ref(), chat, &installed);
+            accept(
+                &listener,
+                on,
+                &keeping,
+                asks.as_ref(),
+                chat,
+                &installed,
+                caller_may,
+            );
         })?;
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn accept(
     listener: &UnixListener,
     on: On,
@@ -758,6 +788,7 @@ fn accept(
     asks: Option<&crate::say::OwnAsks>,
     chat: ChatFrom,
     installed: &Path,
+    caller_may: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
 ) {
     // A skill added from a file (`LAMP_SKILL_UPLOAD=on`), on this socket.
     let upload = crate::upload_skill::from_environment();
@@ -766,6 +797,16 @@ fn accept(
         let Ok(mut stream) = stream else {
             continue;
         };
+        // Only lamp-cloud, for the app (App Only's P2 on #5985): with no
+        // spoken yes, any other part in the socket's group could put a
+        // skill on with no person; closed with no answer.
+        let caller = lamp_ipc::caller::of_stream(&stream);
+        if !caller_may(caller.as_ref()) {
+            eprintln!(
+                "lamp-voice: the app-make socket refused a caller that isn't {APP_CALLER_UNIT}"
+            );
+            continue;
+        }
         let _ = stream.set_read_timeout(Some(LINE_WAIT));
         let _ = stream.set_write_timeout(Some(LINE_WAIT));
         let mut line = String::new();
@@ -840,6 +881,32 @@ fn accept(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// App Only's P2 on #5985: with no spoken yes, only lamp-cloud (its
+    /// unit, run as the voice's own user) may use the app-make socket; any
+    /// other part, another user or a caller not read is refused.
+    #[test]
+    fn only_lamp_cloud_may_ask_the_app_make_socket() {
+        let caller = |unit: Option<&str>, uid| lamp_ipc::caller::Caller {
+            pid: 1,
+            uid,
+            unit: unit.map(str::to_owned),
+        };
+        assert!(app_caller_may(
+            Some(&caller(Some(APP_CALLER_UNIT), 990)),
+            990
+        ));
+        assert!(!app_caller_may(
+            Some(&caller(Some("lamp-tasks.service"), 990)),
+            990
+        ));
+        assert!(!app_caller_may(
+            Some(&caller(Some(APP_CALLER_UNIT), 0)),
+            990
+        ));
+        assert!(!app_caller_may(Some(&caller(None, 990)), 990));
+        assert!(!app_caller_may(None, 990));
+    }
 
     const NOW: u64 = 1_800_000_000_000;
     /// Making from words on, written skills off.
@@ -1087,6 +1154,7 @@ mod tests {
             None,
             no_model,
             dir.join("skills"),
+            |_| true,
         )
         .unwrap();
         let ask = |line: &str| {
@@ -1198,7 +1266,12 @@ mod tests {
             said.push(line.to_owned());
         });
         assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(said, ["I made evening dim, and it's on."]);
+        assert_eq!(
+            said,
+            [
+                "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking. Say \"take it off\" to take it off."
+            ]
+        );
         assert!(!said[0].contains("Shall I"), "{said:?}");
         let told = status(&keeping.directory, Some("r1"), at);
         assert_eq!(told["state"], "on", "{told}");
@@ -1464,7 +1537,12 @@ mod tests {
         write_here(&keeping, &written, "w1", at, &installed, |line| {
             said = Some(line.to_owned());
         });
-        assert_eq!(said.as_deref(), Some("I made study mode, and it's on."));
+        assert_eq!(
+            said.as_deref(),
+            Some(
+                "I made study mode, and it's on: when you ask for it (when I say study mode), the lamp follows the instructions you wrote: Dim the light, using its voice. Say \"take it off\" to take it off."
+            )
+        );
         let told = status(&keeping.directory, Some("w1"), at);
         assert_eq!(told["state"], "on", "{told}");
         assert_eq!(
