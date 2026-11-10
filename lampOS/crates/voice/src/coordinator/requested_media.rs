@@ -8,6 +8,8 @@ pub(super) struct RequestedMedia {
     /// Set only by microphone admission, never Written/Reminder/local turns.
     spoken: bool,
     offered: bool,
+    /// At least one validated answer-speech packet, never just a wait cue.
+    pub(super) spoken_audio: bool,
     binding: Option<RequestedAudioContext>,
     pub(super) confirmation_retired_at_us: Option<u64>,
     ticket: Option<crate::requested_audio::Ticket>,
@@ -195,6 +197,10 @@ impl Reply {
             ),
             (!self.had_audio, "the confirmation was empty"),
             (
+                !self.media.spoken_audio,
+                "the confirmation had no spoken audio",
+            ),
+            (
                 self.media.confirmation_retired_at_us.is_none(),
                 "the confirmation never retired",
             ),
@@ -244,6 +250,7 @@ impl Reply {
             && self.media.confirmation_retired_at_us.is_some()
             && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
             && self.had_audio
+            && self.media.spoken_audio
             && let Some(ticket) = self.media.ticket.as_mut()
             && ticket.may_play(at_us)
         {
@@ -289,6 +296,7 @@ impl Reply {
             })
             && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
             && self.had_audio
+            && self.media.spoken_audio
             && self.playback_gaps == 0
     }
 }

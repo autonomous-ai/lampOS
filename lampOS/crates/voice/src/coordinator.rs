@@ -1507,6 +1507,13 @@ impl Reply {
         });
     }
 
+    /// Called after the current request and packet bounds have been checked.
+    /// Text alone cannot prove speech: TTS may leave a piece unsaid.
+    fn append_provider_packet(&mut self, samples: Vec<i16>, received_at_us: u64, spoken: bool) {
+        self.media.spoken_audio |= spoken && !samples.is_empty();
+        self.append_provider_audio(samples, received_at_us);
+    }
+
     fn append_provider_audio(&mut self, samples: Vec<i16>, received_at_us: u64) {
         self.media.confirmation_retired_at_us = None;
         if !samples.is_empty()
@@ -8489,6 +8496,7 @@ fn conversation_with_gate_inner(
                 }
                 ProviderOutput::Audio {
                     request,
+                    spoken,
                     sequence,
                     provider_event_at_us,
                     source_frames,
@@ -8565,7 +8573,7 @@ fn conversation_with_gate_inner(
                             )?;
                         }
                         let received_frames = samples.len();
-                        current.append_provider_audio(samples, received_at_us);
+                        current.append_provider_packet(samples, received_at_us, spoken);
                         record(
                             trace,
                             json!({"kind":"provider_audio_enqueued","turn":request,
@@ -18396,6 +18404,7 @@ mod tests {
     fn provider_audio(sequence: u64, samples: Vec<i16>) -> ProviderOutput {
         ProviderOutput::Audio {
             request: 1,
+            spoken: true,
             sequence,
             provider_event_at_us: monotonic_us(),
             source_frames: samples.len(),

@@ -1,0 +1,18 @@
+
+running 5 tests
+
+thread 'coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance' (107457600) panicked at crates/voice/src/coordinator/tests/endpoint_session.rs:1792:59:
+LAMP_ENDPOINT_WORKER
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance --- FAILED
+requested audio packet append spoken=false: first=32550 ns, p95=1935 ns, max=32550 ns; 256 fresh replies; excludes input-sample allocation, IPC and playback
+requested audio packet append spoken=true: first=2206 ns, p95=2199 ns, max=13092 ns; 256 fresh replies; excludes input-sample allocation, IPC and playback
+....
+failures:
+
+failures:
+    coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 5491 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
