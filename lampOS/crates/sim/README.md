@@ -43,7 +43,7 @@ never with more than one person in view, only while the ring shows the mark.
 | `servo` | five simulated STS3215 servos on a pty (`servo.rs`): the packets, registers, a goal followed at the servo's speed; found folded at lamp-fc4b's measured home (a file for another lamp is to come) |
 | Ring (`ring.rs`) | light claims by priority, `light/state` and `light/drawn`, the camera and microphone marks drawn and said (`light/mark_drawn`) as the real ring does; the 32 pixels are written to `DIR/ring.json` (whole files) for a viewer. No quiet hours or current cap |
 | Skills manage socket (`manage.rs`) | `DIR/manage.sock`, as systemd's `lamp-skills-manage.socket`: one REAL `lamp-skills asked` per connection (on the lamp folder's own `skills`, `skills-state`, `skills-dev`, `state/push`), so `skill.push`, `skill.list` and `skill.remove` are checked by the lamp's own code. As on no lamp: it runs as the developer, any peer may ask (`LAMP_SKILLS_ANY_ASKER=on`), the Store is off, and a pushed skill is not run by lamp-sim. On only when `lamp-skills` is beside `lamp-sim` |
-| Voice (`voice.rs`) | the say socket: `begun`, the host's `say`/`espeak-ng`/`espeak` if there is one (the text on its stdin), else a silent wait as long as the line, then `spoken`; one line at a time (a second `say` waits), and a `stop` cuts the speech off and drops the waiting ones. The volume socket stores the level and does not apply it |
+| Voice (`voice.rs`) | the say socket: `begun`, the host's `say`/`espeak-ng`/`espeak` if there is one (the text on its stdin), else a silent wait as long as the line, then `spoken`; a computer's sound clip is played by the host's `paplay`/`aplay`/`afplay`/`ffplay`; one line at a time (a second `say` waits), and a `stop` cuts the speech off and drops the waiting ones. The volume socket stores the level and does not apply it |
 | People (`people.rs`) | `humans/faces/tracked` from the number in `DIR/people` (one if absent), no face model |
 
 ## Keeping it up
@@ -71,7 +71,6 @@ lamp-sim air pm2_5=41 co2_ppm=1350 DIR   # an air reading, said every 5 s; feel 
 
 ## Known gaps
 
-- A `sound` clip is a short silence, not played.
 - No ears or eyes models run: hands, sound classes and phrases are made by hand (above); no name, touch or real face events.
 - The body's home counts are lamp-fc4b's, fixed in `main.rs`.
 - Windows and macOS: not built or tried (`lamp-body`'s runtime is Linux only).
