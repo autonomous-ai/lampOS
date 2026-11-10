@@ -503,8 +503,10 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         ) -> str:
             """Turn the head: at the face in view, toward who said its name, ahead, or to `yaw`/`pitch`
             in degrees (right and up positive), within its reach. On a lamp today only `ahead` and
-            `yaw`/`pitch` are carried out, with lamp-control's `--lease-socket`; `face` and `name`
-            are refused, "not in this release: look at a face or a name"."""
+            `yaw`/`pitch` are carried out, with lamp-control's `--lease-socket`; `name` is
+            refused, "not in this release" (the lamp has no sound direction), and
+            `face` turns once toward the face in view on the next build (customer
+            build 11091 and older refuse it) or ends `dropped`, "no face in view"."""
             if at is None:
                 target: Any = {"yaw": yaw or 0.0, "pitch": pitch or 0.0}
             else:

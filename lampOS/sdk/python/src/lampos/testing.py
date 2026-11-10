@@ -95,11 +95,15 @@ def _certificate() -> tuple[bytes, bytes]:
     return cert.public_bytes(serialization.Encoding.PEM), pem_key
 
 
-# `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
+# `look`'s targets lamp-control doesn't route, in parts.rs's words: `name`
+# (the lamp has no sound direction). A lamp-control before the face look
+# (stable 11091 and older) refuses `face` too: `face_look=False`.
 LOOK_WAITS = {
-    "face": "not in this release: look at a face or a name",
-    "name": "not in this release: look at a face or a name",
+    "name": "not in this release: look at who said the lamp's name (the lamp has no sound direction)",
 }
+LOOK_FACE_OLD = "not in this release: look at a face or a name"
+# What the body says when it has no face to turn to.
+NO_FACE_IN_VIEW = "no face in view"
 
 # What lamp-control refuses today, in its own words (crates/control/src/
 # parts.rs, `waits_for`): pass it as `refuses=` for a fake that answers as a
@@ -448,6 +452,8 @@ class FakeLamp:
         refuses: dict[str, str] | None = None,
         follows_hand: bool = True,
         motion_done: bool = True,
+        face_look: bool = True,
+        face: dict[str, float] | None = None,
     ):
         self.code = code
         # True says `motion_done` in hello's limits and ends a gesture or a
@@ -461,6 +467,12 @@ class FakeLamp:
         # False answers a look at `hand` as a lamp-control from before #4183
         # does: taken, with no `follow`, and nothing follows it.
         self.follows_hand = follows_hand
+        # False answers a look at `face` as a lamp-control before it does
+        # (refused, LOOK_FACE_OLD). `face` is where a face is from the head,
+        # `{"yaw": .., "pitch": ..}` in degrees: a look at it is one turn
+        # there; none, and the look is dropped, "no face in view".
+        self.face_look = face_look
+        self.face = face
         # gesture, move (with motion_done) and play end with `done` at once;
         # False leaves it to the test (`done`).
         self.auto_done = auto_done
@@ -744,7 +756,7 @@ class FakeLamp:
         for ws, re in mutes.values():
             await ws.send(json.dumps({"ev": "done", "re": re, "how": "cut_short", "why": "a hand on the head"}))
 
-    async def _look_done(self, ws: ServerConnection, id_: int, yaw: float, pitch: float) -> None:
+    async def _look_done(self, ws: ServerConnection, id_: int, yaw: float, pitch: float, drop: str | None = None) -> None:
         """A look the door takes (`{"to": "body"}`), and the body's answer as
         its `done`: there, or, while the computer's body lease is suspended (a
         conversation), dropped as the body says it (body_lease.rs `done_of`)."""
@@ -754,6 +766,8 @@ class FakeLamp:
         suspended = any(h["ws"] is ws and "body" in h["parts"] and h.get("state") == "suspended" for h in self.leases.values())
         if suspended:
             await self._send_done(id_, {"how": "dropped", "why": "the body is not held"})
+        elif drop is not None:
+            await self._send_done(id_, {"how": "dropped", "why": drop})
         else:
             await self._send_done(id_, {"how": "finished", "yaw": yaw, "pitch": pitch, "clamped": False})
 
@@ -1162,12 +1176,17 @@ class FakeLamp:
             if move is not None and self.motion_done and self.auto_done:
                 await self.done(id_)
         elif op == "look":
-            # As lamp-control with --lease-socket (parts.rs `look`): `face`
-            # and `name` aren't routed; `hand` is followed until a stop,
-            # another look or the lease ends, so no `done` follows it; the
-            # body takes the rest, and its `done` says where the head got to.
+            # As lamp-control with --lease-socket (parts.rs `look`): `name`
+            # isn't routed (nor `face`, with `face_look=False`); `hand` is
+            # followed until a stop, another look or the lease ends, so no
+            # `done` follows it; the body takes the rest, and its `done` says
+            # where the head got to. A `face` is one turn toward `self.face`,
+            # or dropped, "no face in view", when none is set.
             if isinstance(request["at"], str) and request["at"] in LOOK_WAITS:
                 await self._refuse(ws, id_, "refused", LOOK_WAITS[request["at"]])
+                return
+            if request["at"] == "face" and not self.face_look:
+                await self._refuse(ws, id_, "refused", LOOK_FACE_OLD)
                 return
             # Another look ends a following. At `hand`, the body follows the
             # hand, waiting while it's gone; `follows_hand=False` is a
@@ -1181,6 +1200,12 @@ class FakeLamp:
                 lease = next(l for l, h in self.leases.items() if h["ws"] is ws and "body" in h["parts"])
                 self.following[id(ws)] = (ws, lease)
                 await self._ok(ws, id_, to="body", follow="hand")
+                return
+            if request["at"] == "face":
+                if self.face is None:
+                    await self._look_done(ws, id_, 0.0, 0.0, drop=NO_FACE_IN_VIEW)
+                else:
+                    await self._look_done(ws, id_, self.face["yaw"], self.face["pitch"])
                 return
             at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
             await self._look_done(ws, id_, at["yaw"], at["pitch"])

@@ -52,11 +52,15 @@ export function toneBlock(sequence, hz = 440, level = 1000) {
 
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
 
-// `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
+// `look`'s targets lamp-control doesn't route, in parts.rs's words: `name`
+// (the lamp has no sound direction). A lamp-control before the face look
+// (stable 11091 and older) refuses `face` too: `faceLook: false`.
 export const LOOK_WAITS = {
-  face: 'not in this release: look at a face or a name',
-  name: 'not in this release: look at a face or a name',
+  name: "not in this release: look at who said the lamp's name (the lamp has no sound direction)",
 };
+export const LOOK_FACE_OLD = 'not in this release: look at a face or a name';
+// What the body says when it has no face to turn to.
+export const NO_FACE_IN_VIEW = 'no face in view';
 
 // What lamp-control refuses today, in its own words (crates/control/src/
 // parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
@@ -354,10 +358,10 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true, motionDone = true } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null } = {}) {
     // `followsHand: false` answers a look at `hand` as a lamp-control from
     // before #4183 does: taken, with no `follow`, and nothing follows it.
-    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone });
+    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone, faceLook, face });
     this.asker = new Map();
     this.lamp = { id: lampId, name, v: schema.VERSION };
     this.clients = new Map();
@@ -591,13 +595,15 @@ export class FakeLamp {
   // A look the door takes ({ to: 'body' }), and the body's answer as its
   // `done`: there, or, while the computer's body lease is suspended (a
   // conversation), dropped as the body says it (body_lease.rs `done_of`).
-  lookDone(ws, id, yaw, pitch) {
+  lookDone(ws, id, yaw, pitch, drop) {
     this.ok(ws, id, { to: 'body' });
     if (!this.autoDone) return undefined;
     const suspended = [...this.leases.values()].some((h) => h.ws === ws && h.parts.includes('body') && h.state === 'suspended');
     ws.send(JSON.stringify(suspended
       ? { ev: 'done', re: id, how: 'dropped', why: 'the body is not held' }
-      : { ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
+      : drop
+        ? { ev: 'done', re: id, how: 'dropped', why: drop }
+        : { ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
     return undefined;
   }
 
@@ -958,11 +964,15 @@ export class FakeLamp {
         return undefined;
       }
       case 'look': {
-        // As lamp-control with --lease-socket (parts.rs `look`): `face` and
-        // `name` aren't routed; `hand` is followed until a stop, another look
-        // or the lease ends, so no `done` follows it; the body takes the rest,
-        // and its `done` says where the head got to.
+        // As lamp-control with --lease-socket (parts.rs `look`): `name` isn't
+        // routed (nor `face`, with `faceLook: false`, a lamp-control before
+        // it); `hand` is followed until a stop, another look or the lease
+        // ends, so no `done` follows it; the body takes the rest, and its
+        // `done` says where the head got to. A `face` is one turn toward
+        // `this.face` ({ yaw, pitch }: where the face is from the head, in
+        // degrees), or dropped, "no face in view", when none is set.
         if (typeof request.at === 'string' && LOOK_WAITS[request.at]) return this.refuse(ws, id, 'refused', LOOK_WAITS[request.at]);
+        if (request.at === 'face' && !this.faceLook) return this.refuse(ws, id, 'refused', LOOK_FACE_OLD);
         // Another look ends a following.
         this.stopFollowing(ws);
         if (request.at === 'hand') {
@@ -972,6 +982,11 @@ export class FakeLamp {
           const [lease] = [...this.leases].find(([, h]) => h.ws === ws && h.parts.includes('body')) ?? [];
           this.following.set(ws, { lease });
           return this.ok(ws, id, { to: 'body', follow: 'hand' });
+        }
+        if (request.at === 'face') {
+          this.stopFollowing(ws);
+          if (!this.face) return this.lookDone(ws, id, 0, 0, NO_FACE_IN_VIEW);
+          return this.lookDone(ws, id, this.face.yaw, this.face.pitch);
         }
         const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
         return this.lookDone(ws, id, yaw, pitch);
