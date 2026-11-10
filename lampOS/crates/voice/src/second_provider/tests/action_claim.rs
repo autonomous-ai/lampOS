@@ -484,6 +484,29 @@ fn a_kept_light_said_as_it_or_will_stay_twice_with_no_call_says_it_was_not_done(
     }
 }
 
+/// Fourth's HOLD on #5910: talk or a question about keeping the light on,
+/// with a clock or a comma inside ("Keeping it on until ten, would that
+/// help?"), is said as it is with no call; "Keeping it on until 10:30." is
+/// held and said not done.
+#[test]
+fn a_kept_light_with_a_clock_or_a_comma_is_judged_at_its_sentences_end() {
+    let heard = "Hey Lamp, keep the light on until ten.";
+    for answer in [
+        "Keeping it on until 10:30 would waste power.",
+        "Keeping it on until ten, would that help?",
+    ] {
+        let on = worded(heard, saying(answer), vec![]);
+        assert_eq!((on.asked, on.ran.len()), (1, 0), "{answer}");
+        assert!(!told_claim(&on), "{answer}: {:?}", on.notes);
+        assert_eq!(on, claimed(true, heard, saying(answer), vec![]), "{answer}");
+    }
+    let claim = "Keeping it on until 10:30.";
+    let went = worded(heard, saying(claim), vec![saying(claim)]);
+    assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
+    assert_eq!((went.asked, went.ran.len()), (2, 0));
+    assert!(told_claim(&went), "{:?}", went.notes);
+}
+
 /// A turn that made its call is untouched by the worded claims, byte for
 /// byte: the words beside the call, and after it. A limit said ("for one
 /// minute") is one the call carried.
