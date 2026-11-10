@@ -8698,8 +8698,10 @@ async fn spoken(
         && text.chars().any(char::is_alphanumeric)
         && shared.asked.as_ref().is_some_and(|asked| asked(request));
     // So too the plain "send" a prepared write waits for: the read-back asked
-    // for it (`services::send_awaited`).
-    let send_awaited = marked && crate::services::send_awaited(&text);
+    // for it (`services::send_awaited`), and its plain cancel (#5958,
+    // `services::cancel_awaited`).
+    let send_awaited =
+        marked && (crate::services::send_awaited(&text) || crate::services::cancel_awaited(&text));
     let answers = asked_by_the_lamp || send_awaited;
     if asked_by_the_lamp {
         eprintln!(
@@ -8707,7 +8709,7 @@ async fn spoken(
         );
     } else if send_awaited {
         eprintln!(
-            "lamp-voice second: request {request}: a short sound that is the send a waiting write asked for: judged as a line"
+            "lamp-voice second: request {request}: a short sound that is the send or cancel a waiting write asked for: judged as a line"
         );
     }
     let held = marked && !answers;
@@ -13282,6 +13284,13 @@ async fn answer(
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
         .flatten();
+    // A plain cancel of a write waiting for its "send" (#5958): the write is
+    // forgotten and the lamp says so itself, with no chat, so the model never
+    // weighs "cancel that" against the lamp's reminders.
+    let cancelled = (heard && own.is_none())
+        .then(|| crate::services::cancel_waiting(request, &said, Instant::now()))
+        .flatten();
+    let own = own.or(cancelled.map(str::to_owned));
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
     // round 1.
@@ -13350,9 +13359,15 @@ async fn answer(
             return Err(Stop::Gone);
         }
         if let Some(words) = own {
-            eprintln!(
-                "lamp-voice second: request {request} is the onboarding walk's own line; its words are said, no chat asked"
-            );
+            if cancelled.is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request} cancelled a waiting write; the lamp's own words are said, no chat asked"
+                );
+            } else {
+                eprintln!(
+                    "lamp-voice second: request {request} is the onboarding walk's own line; its words are said, no chat asked"
+                );
+            }
             shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
             queue.push(words).await?;
             return Ok(());
