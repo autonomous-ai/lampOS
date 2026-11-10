@@ -173,6 +173,7 @@ pub mod room_told;
 pub mod rules;
 pub mod run_write_yes;
 pub mod said_as_heard;
+pub mod said_scope;
 pub mod same_voice;
 pub mod say;
 pub mod search_pushed;

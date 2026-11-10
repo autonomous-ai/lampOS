@@ -139,7 +139,10 @@ impl Lamp {
         let stamp = self.stamp(at);
         self.send(Input::Room {
             stamp,
-            value: RoomState { state: Room::Quiet },
+            value: RoomState {
+                state: Room::Quiet,
+                another_voice: None,
+            },
         });
         self.engine.tick(at)
     }

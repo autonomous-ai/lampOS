@@ -68,6 +68,7 @@ fn tell(lines: &Mutex<Publisher>, asked: &Value) {
         app: Some(by.to_owned()),
         request: None,
         cut: false,
+        scope: None,
     };
     let mut lines = lines
         .lock()
@@ -548,6 +549,7 @@ mod tests {
                 app: Some("c_7".to_owned()),
                 request: None,
                 cut: false,
+                scope: None,
             }
         );
         assert!(heard.recv(Duration::from_millis(300)).unwrap().is_none());

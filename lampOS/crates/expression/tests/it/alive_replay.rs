@@ -107,7 +107,10 @@ fn quiet(minutes: u64) -> Vec<u8> {
             at_us,
             input: Input::Room {
                 stamp: stamp(at_us),
-                value: RoomState { state: Room::Quiet },
+                value: RoomState {
+                    state: Room::Quiet,
+                    another_voice: None,
+                },
             },
         });
         if at_us.is_multiple_of(600_000) {
