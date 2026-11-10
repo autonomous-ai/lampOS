@@ -1023,12 +1023,15 @@ kết của chủ đèn, bất kỳ dịch vụ nào có thứ để đọc, khi
 `lamp-services` (`/run/lampos-services/tools/call.sock`, hoặc
 `LAMP_SKILLS_SERVICES_SOCKET`): `lamp-services` nhận ra nó qua cgroup và chỉ
 nhận `service_read` từ nó ("Ba phần và các socket của chúng", bên trên). Những
-gì dịch vụ trả về không đến mô hình nào: `lamp-skills` nói nó như văn bản
+gì dịch vụ trả về không đến mô hình ngôn ngữ nào: `lamp-skills` nói nó như văn bản
 chính xác qua socket say của giọng nói (không bao giờ là một lượt của mô hình,
 chờ khi có người đang nói với đèn, bị từ chối khi đèn tạm dừng hay tắt tiếng),
 nên nó vẫn là dữ liệu trích dẫn và không gì hành động theo nó được, đúng như
 `AFTER_READ` đòi hỏi. Cổng gửi của giọng nói không nằm trên đường này; cổng
-của kỹ năng bên dưới thay cho nó.
+của kỹ năng bên dưới thay cho nó. Nhà cung cấp tổng hợp giọng nói được cấu hình
+vẫn có thể nhận đúng văn bản được nói, gồm tiêu đề sự kiện, người gửi và
+chủ đề thư, để tạo âm thanh; lời nói cố định không có nghĩa là việc tổng hợp
+giọng nói chỉ diễn ra trên đèn.
 
 **Dịch vụ nào.** Mọi dịch vụ trong catalogue có một việc đọc dạng cố định,
 và không dịch vụ nào chỉ gửi (`lamp_services::spoken::not_readable`):
@@ -1121,6 +1124,11 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
 rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>").
+Khung giờ của trigger quy định khi nào lượt đọc đến hạn, không phải giờ
+buộc phải ngừng nói. Lượt đọc đang chờ có thể nói sau khung giờ đó, trong
+cùng một giờ chờ tính từ lúc đến hạn, nếu cổng vẫn mở; giờ yên lặng và các
+kiểm tra trước mỗi dòng vẫn áp dụng.
+
 **Mỗi lần chỉ một lượt đọc** (`service_read::Turns`, #5618): một lượt đọc chỉ
 bắt đầu khi giữ được lượt duy nhất của đèn, và giữ nó từ lúc cổng mở tới dòng
 cuối. Lượt này rảnh khi không có lượt đọc nào của kỹ năng khác đang giữ và đã
@@ -1132,7 +1140,7 @@ giờ ("skipped: another read under way"), không bao giờ bắt đầu một g
 Nếu không có quy tắc này, hai lượt đọc của hai kỹ năng cùng chờ ở cổng (Morning
 agenda và Morning mail khi có khách) sẽ nói xen kẽ từng dòng của nhau. Mỗi kỹ năng đọc một lần
 mỗi ngày địa phương (giữ trong bộ nhớ của `lamp-skills`, nên khởi động lại thì
-quên). Trong lúc lượt chạy chờ cổng, và sau khi đến hạn cho tới nửa đêm địa
+quên và có thể cho phép đọc lại trong ngày đó). Trong lúc lượt chạy chờ cổng, và sau khi đến hạn cho tới nửa đêm địa
 phương, trigger của kỹ năng không được ghi là triggered hay hỏi Policy mỗi
 lần nó giữ: cơ hội bị bỏ với một dòng journal mỗi lần giữ, `<skill> not run:
 its read is still under way` hoặc `... its read came due once today already`
