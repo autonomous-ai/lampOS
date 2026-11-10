@@ -782,7 +782,7 @@ A test lamp sent all five joints in each event, and `lamp` with `light`, `talkin
 
 ## Plan and status
 
-Last verified 9 Nov 2026, on a test lamp running a customer build: 10824 unless a row names 11048.
+Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless a row names 11048 or 11091.
 
 | What | Status | Notes |
 |---|---|---|
