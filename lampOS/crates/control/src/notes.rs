@@ -247,7 +247,7 @@ impl Notes {
         };
         Ok(Step::Later(Box::new(move || {
             let _writing = writing;
-            let written = save(&folder, &client, &after);
+            let written = guarded(|| save(&folder, &client, &after));
             let mut inner = shared.lock().expect("notes");
             if inner.epoch.get(&client).copied().unwrap_or(0) != epoch {
                 // Let go while it was written: not a file of it stays, nor
@@ -309,6 +309,19 @@ fn remove_files(folder: &Path, client: &str) {
             _ => {}
         }
     }
+}
+
+/// A write step run so that a panic in it is an answer, not a lost one: the
+/// asker gets `refused`, and the journal's stderr says that it panicked, never
+/// what the note held (nine's P3 on #6022).
+fn guarded(step: impl FnOnce() -> Result<(), Error>) -> Result<(), Error> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(step)).unwrap_or_else(|_| {
+        eprintln!("lamp-control: notes: a write panicked");
+        Err(Error::new(
+            ErrorCode::Refused,
+            "the lamp could not keep the note",
+        ))
+    })
 }
 
 /// `client`'s notes written whole: a temporary file, synced, renamed over the
@@ -719,5 +732,13 @@ mod tests {
         notes.put(A, "j", &json!(1)).unwrap();
         assert_eq!(notes.get(A, "k").unwrap(), None);
         assert_eq!(notes.get(A, "j").unwrap(), Some(json!(1)));
+    }
+
+    #[test]
+    fn a_write_that_panics_answers_refused_and_says_nothing_of_the_note() {
+        let error = guarded(|| panic!("secret-value-in-the-panic")).unwrap_err();
+        assert_eq!(error.code, ErrorCode::Refused);
+        assert!(!format!("{error:?}").contains("secret-value"));
+        assert_eq!(guarded(|| Ok(())), Ok(()));
     }
 }
