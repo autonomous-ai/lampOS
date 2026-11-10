@@ -143,7 +143,7 @@ pub const AFTER_READ: &str = "Not done: after reading from a linked service, I d
 /// alone ([`brief`]).
 pub const BRIEF_NOTE: &str = "Someone else may be here: say only how many there are, who they are from and what they are about, never what they say.";
 /// What the model is told after a write is prepared.
-const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then say \"Say 'yes, send it' to send it.\" (in Vietnamese \"Nói 'gửi đi' để gửi nhé.\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't send: say it's cancelled, or prepare the changed one anew.";
+pub(crate) const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then say \"Say 'yes, send it' to send it.\" (in Vietnamese \"Nói 'gửi đi' để gửi nhé.\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't send: say it's cancelled, or prepare the changed one anew.";
 /// What the model is told after a Gmail draft is prepared (`save_draft`):
 /// it is saved, never sent, so the lamp asks for "save it".
 pub const SAVE_READ_BACK_NEXT: &str = "Nothing is saved yet, and nothing is ever sent. Say read_back in full, word for word, leaving nothing out, then say \"Say 'yes, save it' to save it as a draft.\" (in Vietnamese \"Nói 'lưu đi' để lưu nháp nhé.\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't save: say it's cancelled, or prepare the changed one anew.";
@@ -219,6 +219,16 @@ pub fn tools(folder: &Path) -> Vec<Tool> {
                     .and_then(Value::as_object_mut)
             {
                 properties.remove("said");
+                // Redo from a record (`LAMP_SERVICE_REDO`): offered only on.
+                if crate::service_records::redo::on() {
+                    properties.insert(
+                        crate::service_records::redo::FIELD.into(),
+                        json!({
+                            "type": "string",
+                            "description": crate::service_records::redo::DESCRIPTION,
+                        }),
+                    );
+                }
             }
             tool
         })
@@ -1026,6 +1036,15 @@ pub fn gate(
         if !turn.seen_owner {
             return Err(json!({ "error": NOT_SEEN_SAYING }));
         }
+        // Redone from a record (`LAMP_SERVICE_REDO`): every saved detail
+        // filled in, only what the call gave laid over it; the read-back
+        // and its send below stay as for any write.
+        if call.name == WRITE
+            && let Err(why) =
+                crate::service_records::redo::fill(turn.owner.unwrap_or_default(), &mut call.args)
+        {
+            return Err(json!({ "error": why }));
+        }
         return Ok(call);
     };
     let Some(kept) = pending.take() else {
@@ -1172,6 +1191,10 @@ pub fn answered(
                 READ_BACK_NEXT
             });
             *pending = Some(kept);
+            // A follow-up to a sent mail (`LAMP_SERVICE_REDO`): said plainly.
+            if let Some(note) = crate::service_records::redo::note(owner, &call.args) {
+                told["follow_up"] = json!(note);
+            }
         }
         // An id with nothing to read back is never sent.
         (Some(_), _) => {
@@ -1469,6 +1492,12 @@ pub fn run(
     let private_room = crate::person::private_room();
     let owner = owner_of(lease);
     let judge = judge();
+    // A write redone from a record made before the voice started: read from
+    // the memory first, off the gate's lock, for the owner's line alone
+    // (`LAMP_SERVICE_REDO`).
+    if call.name == WRITE && heard {
+        crate::service_records::redo::bring(owner.as_deref(), &call.args);
+    }
     // A send, with the model's id.
     let send_id = given_send_id(call).is_some();
     // With the owner's enrolled print (`LAMP_SAME_VOICE_FOR=services`,

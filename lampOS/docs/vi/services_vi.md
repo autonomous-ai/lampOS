@@ -2128,6 +2128,40 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   `memory-days_vi.md`).
 - Tắt: không giữ, không ghi gì.
 
+### Làm lại hay sửa từ một bản ghi (`LAMP_SERVICE_REDO`, tắt trừ khi bật)
+
+Với `LAMP_SERVICE_REDO=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ tuyến thứ
+hai; riêng nó thì không làm gì; kế hoạch bản ghi connector, PR 1d),
+`service_write` nhận `from_record`, khóa của một bản ghi dịch vụ, nên câu
+"làm lại lúc 8 giờ tối" sau một sự kiện đã hủy không cần nói lại gì
+(`crates/voice/src/service_records/redo.rs`):
+
+- **Điền đủ, rồi mới đổi.** Trong cổng, sau các kiểm tra nghe thấy, chủ đèn
+  (`OWNER_ONLY`) và nhìn thấy, voice điền mọi chi tiết bản ghi của chủ đã
+  lưu và chỉ đè lên những trường lệnh gọi đưa ra, mỗi trường nguyên vẹn
+  ("thêm cả Mai" đưa cả danh sách người dự), giữ dịch vụ và hành động của
+  chính bản ghi (khác thì bị từ chối). Sau đó dịch vụ chuẩn bị nó, rồi phần
+  đọc lại và lệnh gửi diễn ra y như mọi lệnh ghi.
+- **Bản ghi nào.** Một lệnh ghi `cancelled`, `failed`, `timed_out` hay
+  `refused` thì làm lại được. Một thư `done` không bao giờ bị sửa: một thư
+  tiếp theo gửi cùng những người ấy được dựng từ nó (`Re:` tiêu đề của nó
+  trừ khi lệnh gọi đưa tiêu đề khác, cùng nội dung mới của lệnh gọi; không
+  có thì mô hình được bảo hỏi), và câu trả lời mang `follow_up`, bảo mô hình
+  nói rõ thư đã gửi thì không sửa được. Một sự kiện lịch `done` bị từ chối:
+  sửa một sự kiện đã tạo là một hành động riêng. Một lần đọc, mọi lệnh ghi
+  `done` khác, và một bản ghi có nội dung bị cắt mà không đưa nội dung mới
+  cũng bị từ chối.
+- **Liên kết.** `links` của bản ghi mới chỉ đến bản cũ, và bản cũ nhận
+  `replaced_by` (trạng thái cuối của nó giữ nguyên), cả hai được ghi vào bộ
+  nhớ.
+- **Chỉ của chủ.** Chỉ tìm các bản ghi của chính chủ. Một bản ghi có từ
+  trước khi voice khởi động được đọc từ bộ nhớ Days (`service_records`, tối
+  đa 50, tối đa 1,5 giây) trước cổng, chỉ cho câu nói nghe thấy của chủ.
+- **Nhật ký.** Mỗi lần điền một dòng: khóa, trạng thái cũ, bao nhiêu trường
+  đổi và có phải thư tiếp theo không; không bao giờ một chữ nào của nó.
+- **Tắt** (bất kỳ công tắc nào), `from_record` không được đưa ra, và lệnh
+  ghi được nhận đúng như đã yêu cầu.
+
 ## Giọng nói được báo những gì đã liên kết (`LAMP_SERVICES_TOLD`, #5523, tắt trừ khi bật)
 
 Ngày 6/11 một người thử của nhóm marketing liên kết một dịch vụ trong mục

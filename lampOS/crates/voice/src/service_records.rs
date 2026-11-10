@@ -107,6 +107,10 @@ pub struct Record {
     pub send_id: Option<String>,
     /// When it was prepared, for [`expire`].
     pub prepared_at: Option<Instant>,
+    /// The records it was redone from (`LAMP_SERVICE_REDO`, [`redo`]).
+    pub links: Vec<String>,
+    /// The record redone from it, once one is ([`redo`]).
+    pub replaced_by: String,
 }
 
 impl Record {
@@ -124,6 +128,8 @@ impl Record {
             "result_id": self.result_id,
             "asked_unix_ms": self.asked_ms,
             "changed_unix_ms": self.changed_ms,
+            "links": self.links,
+            "replaced_by": self.replaced_by,
         })
     }
 }
@@ -275,10 +281,13 @@ fn write_detail(args: &Value) -> Value {
     let mut detail = Map::new();
     if let Some(args) = args.as_object() {
         for (key, value) in args {
-            if !matches!(
+            let own = matches!(
                 key.as_str(),
                 "service" | "action" | "send_id" | "said" | crate::services::ATTEMPT
-            ) {
+            );
+            // The record redone from is a link, not a detail (`LAMP_SERVICE_REDO`).
+            let redone_from = key == redo::FIELD && redo::on();
+            if !own && !redone_from {
                 detail.insert(key.clone(), value.clone());
             }
         }
@@ -526,9 +535,9 @@ pub fn prepared(owner: &str, service: &str, args: &Value, send_id: &str, now: In
         return;
     };
     let at = unix_ms();
-    let record = kept::ledger(|ledger| {
+    let (record, redone) = kept::ledger(|ledger| {
         let key = ledger.new_key(at);
-        ledger.add(Record {
+        let mut record = Record {
             key,
             person,
             service: tidy(service, 64),
@@ -541,9 +550,17 @@ pub fn prepared(owner: &str, service: &str, args: &Value, send_id: &str, now: In
             changed_ms: at,
             send_id: Some(send_id.to_owned()),
             prepared_at: Some(now),
-        })
+            links: Vec::new(),
+            replaced_by: String::new(),
+        };
+        // Redone from a record (`LAMP_SERVICE_REDO`): linked both ways.
+        let redone = redo::link(ledger, &mut record, args);
+        (ledger.add(record), redone)
     });
     save(record);
+    if let Some(redone) = redone {
+        save(redone);
+    }
 }
 
 /// The waiting write `send_id` let go, or answered: its record given
@@ -609,6 +626,8 @@ pub fn ended(
             changed_ms: at,
             send_id: None,
             prepared_at: None,
+            links: Vec::new(),
+            replaced_by: String::new(),
         })
     });
     save(record);
@@ -665,6 +684,8 @@ pub fn read(owner: &str, args: &Value, told: &Value) {
             changed_ms: at,
             send_id: None,
             prepared_at: None,
+            links: Vec::new(),
+            replaced_by: String::new(),
         })
     });
     save(record);
@@ -1051,6 +1072,8 @@ fn start_saver() {
 
 #[cfg(test)]
 fn start_saver() {}
+
+pub mod redo;
 
 #[cfg(test)]
 mod tests;

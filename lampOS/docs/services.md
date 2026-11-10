@@ -2081,6 +2081,40 @@ the store's side in [memory-days](memory-days.md)):
 - **Off**, nothing is kept or written, and the receipts are kept exactly as
   before.
 
+### Redo or edit from a record (`LAMP_SERVICE_REDO`, off unless set)
+
+With `LAMP_SERVICE_REDO=on` beside `LAMP_SERVICE_RECORDS=on` (the second
+route only; alone it does nothing; the connector records plan, PR 1d),
+`service_write` takes `from_record`, a service record's key, so "do it
+again at 8 PM" after a cancelled event needs nothing repeated
+(`crates/voice/src/service_records/redo.rs`):
+
+- **Filled, then the change.** Inside the gate, after its heard, owner
+  (`OWNER_ONLY`) and seen checks, the voice fills in every detail the
+  owner's record saved and lays over it only the fields the call gave,
+  each whole ("add Mai too" gives the whole attendee list), keeping the
+  record's own service and action (another is refused). Then the services
+  prepare it, and the read-back and its send go on exactly as for any
+  write.
+- **Which records.** A `cancelled`, `failed`, `timed_out` or `refused`
+  write redoes. A `done` mail is never changed: a follow-up to the same
+  people is built from it (`Re:` its subject unless the call gives one, the
+  call's new text; with none, the model is told to ask for it), and its
+  answer carries `follow_up`, telling the model to say plainly that a sent
+  mail can't be changed. A `done` calendar event is refused: changing a
+  created event is a separate action. A read, any other `done` write, and
+  a record whose text was cut with no new text given are refused too.
+- **Linked.** The new record's `links` name the old one, and the old one
+  gets `replaced_by` (its final status stays), both written to the memory.
+- **Only the owner's.** Only the owner's own records are found. A record
+  made before the voice started is read from the Days memory
+  (`service_records`, at most 50, 1.5 s at most) before the gate, for the
+  owner's heard line alone.
+- **Journal.** One line a fill: the key, the old status, how many fields
+  changed and whether it is a follow-up; never a word of it.
+- **Off** (either switch), `from_record` is not offered, and a write is
+  taken exactly as asked.
+
 ## The voice is told what is linked (`LAMP_SERVICES_TOLD`, #5523, off unless set)
 
 A marketing tester linked a service in the app's Connectors on 6 Nov and
