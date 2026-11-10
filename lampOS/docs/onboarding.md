@@ -448,7 +448,11 @@ next time?". If the model has not asked it once a name and a yes are in,
 the walk asks it itself, once, after 3 s of quiet (`START_QUIET_US`): a
 fixed note the model says (`skill::FACE_ASK`, translated as the walk's other
 lines), so it is in the chat history, and its plain yes runs the save in the
-worker with no call (`yes_save`, #5684). The walk knows the question was
+worker with no call (`yes_save`, #5684): the names window
+(`Thread::names_window`) keeps that written question as the lamp's words
+after the line before it, so the read-back stays inside its two exchanges
+(`known_faces::SAID_EXCHANGES`); any other written note is still no one's
+words (the Reviewer-lead's HOLD on #6013). The walk knows the question was
 said from the lamp's own words (`Onboarding::lamp_words`, by
 `known_faces::asks_for_the_face`, the worker's rule), and asks nothing after
 a no; the face wait runs from the question (#5931: on lamp-52e6 on 10 Nov two
