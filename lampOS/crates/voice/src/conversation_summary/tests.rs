@@ -693,6 +693,49 @@ fn a_held_exchange_never_reaches_the_summary_or_the_talk_note() {
     );
 }
 
+/// Reviewer-two's HOLD on #5968 at `8c1cbd4268`: with the running summary
+/// off, memory's forget from the app still drops the write waiting for its
+/// send, through the worker's own reader (`memory_forgot_waiting`); a rules
+/// scope's forget, or another part's, leaves it.
+#[test]
+fn a_forget_from_the_app_drops_the_waiting_write_with_the_summary_off() {
+    let root = std::path::PathBuf::from(format!("/tmp/lvs-forgot-w-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+    let publisher = |source| {
+        bus.publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            source,
+        )
+        .unwrap()
+    };
+    let (mut memory, mut eyes) = (publisher("memory"), publisher("eyes"));
+    let told = |person: Option<&str>| lamp_msgs::MemoryForgot {
+        person: person.map(str::to_owned),
+    };
+    let waiting = || crate::services::Pending {
+        service: "gmail".to_owned(),
+        ..crate::services::Pending::new("id", 0, Instant::now(), "Send a mail.", "ann")
+    };
+    crate::services::pending_for_test(Some(waiting()));
+    eyes.publish_json(1, &told(None)).unwrap();
+    memory.publish_json(1, &told(Some("r-house"))).unwrap();
+    assert_eq!(memory_forgot_waiting(&mut forgot, 1_000_000), 0);
+    assert!(
+        crate::services::pending_for_test_is_some(),
+        "not the conversation's"
+    );
+    memory
+        .publish_json(2, &told(Some(&crate::remember::person_id("Tom"))))
+        .unwrap();
+    assert_eq!(memory_forgot_waiting(&mut forgot, 2_000_000), 1);
+    assert!(!crate::services::pending_for_test_is_some(), "dropped");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 /// The reviewer-lead's P2 on #4479: memory's forget from the app
 /// (`memory/forgot`) reaches the conversation as a voice-tool forget does:
 /// a person's, the room's ("everyone") or every person's drops the thread,

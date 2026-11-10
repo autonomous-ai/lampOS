@@ -4138,7 +4138,9 @@ impl Engine {
         let (out, output) = mpsc::channel(OUTPUT_QUEUE);
         Self {
             shared: Arc::new(Shared {
-                services,
+                // Every chat the engine asks, by any of the services' ways,
+                // goes through [`LettingGo`].
+                services: Arc::new(LettingGo(services)),
                 tools,
                 scoped_tools: None,
                 requested_audio: None,
@@ -4348,6 +4350,9 @@ impl Engine {
     /// [`Self::forgetting_on_privacy`]'s hook.
     pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
         if self.privacy.replace(now).is_some_and(|was| was != now) {
+            // A write read back and waiting for its send goes too
+            // (Thirteen's P2 on #5968).
+            crate::services::forget_waiting();
             if self.shared.remember_speaker {
                 crate::remember_speaker::forget();
                 if let Some(eyes) = &self.shared.enrollment_sight {
@@ -9528,7 +9533,16 @@ async fn spoken(
     // A task prepared and waiting for a yes: this route's history keeps the
     // words of its last exchanges, not its calls, so the model is told, or a
     // yes is taken as a new hand-over (#1712).
-    let waiting = shared.task_waiting.as_ref().and_then(|note| note(request));
+    // And a write read back and waiting for its "send", with what it holds
+    // (#5962): never asked for again.
+    let waiting = shared
+        .task_waiting
+        .as_ref()
+        .and_then(|note| note(request))
+        .or_else(|| {
+            let owner = crate::services::owner_of(scope.as_ref());
+            crate::services::waiting_note(request, owner.as_deref(), Instant::now())
+        });
     // Let out only as the conversation going on: it may be people's talk.
     let alone = shared
         .conversation_alone
@@ -12190,6 +12204,106 @@ fn chat_watching(
     }
 }
 
+/// `messages` as each chat is asked, every round and every try: a waiting
+/// write's note whose write a forget or a privacy change has dropped since
+/// it was taken is let go (`services::waiting_note_stands`; Reviewer-two's
+/// HOLDs at `285f844b9e` and `6be2fc0fc7`: a forget between a turn's
+/// rounds, or before a delayed second try, still reached the chat).
+fn forgotten_notes_let_go(mut messages: Vec<Message>) -> Vec<Message> {
+    messages.retain(|message| {
+        message.role != "system"
+            || message
+                .words()
+                .is_none_or(crate::services::waiting_note_stands)
+    });
+    messages
+}
+
+/// The engine's services with [`forgotten_notes_let_go`] on every chat's
+/// messages as it is asked: `chat`, `chat_only`, `chat_without`,
+/// `chat_watched` and a delayed `chat_second_try` alike, so no way of asking
+/// skips it (Reviewer-two's HOLD at `6be2fc0fc7`).
+struct LettingGo(Arc<dyn Services>);
+
+impl Services for LettingGo {
+    fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+        self.0.listen()
+    }
+    fn chat(
+        &self,
+        messages: Vec<Message>,
+    ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+        self.0.chat(forgotten_notes_let_go(messages))
+    }
+    fn chat_only(
+        &self,
+        messages: Vec<Message>,
+        only: &'static [&'static str],
+    ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+        self.0.chat_only(forgotten_notes_let_go(messages), only)
+    }
+    fn chat_without(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+    ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+        self.0
+            .chat_without(forgotten_notes_let_go(messages), without)
+    }
+    fn chat_watched(
+        &self,
+        messages: Vec<Message>,
+        told: ChatTold,
+        watch: net::Watch,
+    ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+        self.0
+            .chat_watched(forgotten_notes_let_go(messages), told, watch)
+    }
+    fn chat_second_try(
+        &self,
+        messages: Vec<Message>,
+        told: ChatTold,
+        watch: net::Watch,
+    ) -> Option<futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>> {
+        self.0
+            .chat_second_try(forgotten_notes_let_go(messages), told, watch)
+    }
+    fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
+        self.0.declares(messages, without, name)
+    }
+    fn speak(
+        &self,
+        text: String,
+    ) -> futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>> {
+        self.0.speak(text)
+    }
+    fn speak_for(
+        &self,
+        text: String,
+        turn: net::Turn,
+    ) -> futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>> {
+        self.0.speak_for(text, turn)
+    }
+    fn spoken(&self, request: u64) {
+        self.0.spoken(request);
+    }
+    fn sees(&self) -> bool {
+        self.0.sees()
+    }
+    fn warm(&self) -> BoxFuture<'static, ()> {
+        self.0.warm()
+    }
+    fn open_speech_ahead(&self, request: u64) {
+        self.0.open_speech_ahead(request);
+    }
+    fn turn_begins(&self) {
+        self.0.turn_begins();
+    }
+    fn link_back(&self) {
+        self.0.link_back();
+    }
+}
+
 /// How [`chat_for`] tells a chat its functions.
 fn told_for(scope: Option<&crate::memory_scope::ScopeLease>) -> ChatTold {
     match withheld(scope) {
@@ -13584,15 +13698,20 @@ async fn answer(
     // A plain cancel of a write waiting for its "send" (#5958): the write is
     // forgotten and the lamp says so itself, with no chat, so the model never
     // weighs "cancel that" against the lamp's reminders.
-    // Only for a turn still current (Thirteen's P3 on #5967: a dropped turn
-    // never takes the write and says nothing), and by the one who asked.
-    let cancelled =
-        (heard && own.is_none() && scope.as_ref().is_none_or(|scope| scope.is_current()))
-            .then(|| {
-                let owner = crate::services::speaker_of(scope.as_ref());
-                crate::services::cancel_waiting(request, &said, owner.as_deref(), Instant::now())
-            })
-            .flatten();
+    // So too a plain "go ahead" right after the read-back (#5962): the lamp
+    // asks itself for the plain send, and the write waits. Only for a turn
+    // still current (Thirteen's P3 on #5967: a dropped turn never takes the
+    // write and says nothing), and by the one who asked.
+    let cancelled = (heard
+        && own.is_none()
+        && scope.as_ref().is_none_or(|scope| scope.is_current()))
+    .then(|| {
+        let owner = crate::services::speaker_of(scope.as_ref());
+        let now = Instant::now();
+        crate::services::cancel_waiting(request, &said, owner.as_deref(), now)
+            .or_else(|| crate::services::nudge_waiting(request, &said, owner.as_deref(), now))
+    })
+    .flatten();
     let own = own.or(cancelled.map(str::to_owned));
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
@@ -13664,7 +13783,7 @@ async fn answer(
         if let Some(words) = own {
             if cancelled.is_some() {
                 eprintln!(
-                    "lamp-voice second: request {request} cancelled a waiting write; the lamp's own words are said, no chat asked"
+                    "lamp-voice second: request {request} answered a waiting write; the lamp's own words are said, no chat asked"
                 );
             } else {
                 eprintln!(
@@ -13700,6 +13819,12 @@ async fn answer(
         {
             notes.push(line);
         }
+        // A waiting write's note taken before a forget or a privacy change
+        // is let go (Thirteen's P2 on #5968), here after the turn's last
+        // wait before its chat: from here to the chat's ask nothing waits
+        // (Reviewer-two's HOLD at `e8d16c10d3`: a forget during the event
+        // note's read still reached the chat).
+        notes.retain(|note| crate::services::waiting_note_stands(note));
         let mut messages = cut_event(shared, told).messages();
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
