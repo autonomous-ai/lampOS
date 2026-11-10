@@ -29,13 +29,6 @@
 //! ([`crate::remarks::questions`] with at least one word that is not the
 //! lamp's: "Did you say five o'clock?"), begins after the lamp's words when
 //! they ended on a question ("Yes, start it." after "Shall I start it?"), or
-//! begins after the lamp's words with a word the lamp did not say while a
-//! write waits for the answer its read-back asked for
-//! ([`crate::services::write_waits`]: lamp-3e83, 10 Nov, the owner's "go
-//! ahead and send it" after the lamp's "Say 'go ahead and send it'" was held
-//! as its echo and the write never went; a line of only the read-back's
-//! words within the tail is still held, so the room's echo of it never
-//! sends), or
 //! answers an offer in the answer ([`OFFERS`]): begun after the lamp's
 //! words, or over its voice with a word the lamp did not say. Only a line
 //! heard over the lamp's voice that is nothing but the offer's own words is
@@ -91,9 +84,6 @@ pub(super) struct Line<'a> {
     pub over_the_lamps_voice: bool,
     /// Only the lamp's name was called (`ProviderInput::Called`).
     pub called: bool,
-    /// A write waits for the answer its read-back asked for
-    /// ([`crate::services::write_waits`]).
-    pub write_waits: bool,
 }
 
 /// The lamp's latest answer so far: its request, its words sent to the
@@ -224,13 +214,6 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
         Some("it is a question of its own")
     } else if !line.over_the_lamps_voice && said.words.trim_end().ends_with('?') {
         Some("it began after the lamp's question")
-    } else if !line.over_the_lamps_voice && line.write_waits && m < n {
-        // Only with a word of its own: a line of nothing but the
-        // read-back's words, inside the tail, may be the room returning
-        // its "yes, send it", which would send with nobody speaking (App
-        // Only's P1 on #6009). A person who said exactly those words on
-        // the lamp's last one is held once and says it again.
-        Some("it began after a read-back that waits for its answer")
     } else if (!line.over_the_lamps_voice || m < n) && offers(said.words) {
         Some("it answers the lamp's offer")
     } else {
@@ -283,7 +266,6 @@ mod tests {
             began_us,
             over_the_lamps_voice,
             called: false,
-            write_waits: false,
         }
     }
 
@@ -676,51 +658,33 @@ mod tests {
         ));
     }
 
-    /// lamp-3e83, 10 Nov: after a read-back ending "Say 'yes, send it' to
-    /// send it.", the person's "Okay yes, send it." begun after the lamp's
-    /// words, with a word of their own, is theirs while the write waits;
-    /// over the lamp's voice it is still its echo, and with no write
-    /// waiting it is held as before.
+    /// A read-back waiting for its answer is judged as any line of the
+    /// lamp's (App Only's and Thirteen's P1s on #6009): within the tail, its
+    /// own "Yes, send it." returned by the room is held, and with a word
+    /// before it ("Um, yes, send it.", an ASR filler) its own run is taken
+    /// out, so the model gets "Um" and never the lamp's agreement. After the
+    /// tail it is the person's, as any line is.
     #[test]
-    fn a_reply_to_a_waiting_read_back_is_the_persons() {
+    fn the_lamps_own_send_phrase_from_the_room_never_reaches_the_model() {
         let read_back = Said {
             words: "Send an email to Bob saying hi. Say 'yes, send it' to send it.",
             ..said()
         };
-        let after = |heard, write_waits| Line {
-            write_waits,
-            ..line(heard, UNTIL_US + 300_000, false)
-        };
+        let at = |heard, began_us| line(heard, began_us, false);
         assert!(matches!(
-            judge(&after("Okay yes, send it.", true), Some(&read_back)),
-            Echo::Answered(Some(journal)) if journal.contains("waits for its answer")
+            judge(&at("Yes, send it.", UNTIL_US + 300_000), Some(&read_back)),
+            Echo::Held(_)
         ));
-        assert!(!matches!(
-            judge(&after("Okay yes, send it.", false), Some(&read_back)),
-            Echo::Answered(Some(journal)) if journal.contains("waits for its answer")
-        ));
-        // App Only's P1 on #6009: the room returning the read-back's own
-        // "Yes, send it." within the tail is held, write waiting or not, so
-        // the lamp never sends on its own echo.
-        for waits in [true, false] {
-            assert!(matches!(
-                judge(&after("Yes, send it.", waits), Some(&read_back)),
-                Echo::Held(_)
-            ));
-        }
-        // After the tail it is the person's, as any line is.
-        let late = Line {
-            write_waits: true,
-            ..line("Yes, send it.", UNTIL_US + TAIL_US + 100_000, false)
-        };
         assert!(matches!(
-            judge(&late, Some(&read_back)),
+            judge(&at("Um, yes, send it.", UNTIL_US + 300_000), Some(&read_back)),
+            Echo::Stripped(kept, _) if kept == "Um,"
+        ));
+        assert!(matches!(
+            judge(
+                &at("Yes, send it.", UNTIL_US + TAIL_US + 100_000),
+                Some(&read_back)
+            ),
             Echo::Answered(Some(_))
         ));
-        let over = Line {
-            write_waits: true,
-            ..line("Yes, send it.", 9_000_000, true)
-        };
-        assert!(matches!(judge(&over, Some(&read_back)), Echo::Held(_)));
     }
 }

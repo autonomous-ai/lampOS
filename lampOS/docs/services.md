@@ -1339,18 +1339,16 @@ read-back not cut or talked over.
   (`began_in`) stays, and refuses the send as `NOT_READ_BACK`. On lamp-29e7
   on 9 Nov the read-back's own "go ahead and send it", heard back, was
   counted as the first line, and the owner said "send" five times.
-- **An answer to a waiting read-back is never held as the echo** (lamp-3e83,
-  10 Nov). After the lamp's "Say 'go ahead and send it'", the owner's "go
-  ahead and send it", begun just after the lamp's words, held only the
-  lamp's own words and was held as its echo ("its answer is held back: the
-  lamp's own echo"), so the write never went. While a write waits for its
-  answer (`services::write_waits`: the very next line after an uncut
-  read-back, under 2 minutes), `own_echo` takes a line begun after the
-  lamp's words as the person's ("it began after a read-back that waits for
-  its answer"), so "Yes, send it." after "Say 'yes, send it' to send it."
-  reaches the model and its send goes. A line heard over the lamp's voice
-  is still judged as before, so the read-back's own words heard back over
-  it (lamp-29e7) are still held.
+- **The read-back's own words heard back never agree for the person**
+  (App Only's and Thirteen's P1s on #6009). A waiting write's read-back is
+  judged by `own_echo` as any line of the lamp's: within its 1.5 s tail the
+  room returning "Yes, send it." is held, and "Um, yes, send it." (an ASR
+  filler) has its own run taken out, so the model gets "Um," and never the
+  lamp's agreement; with no voice check left on the send, this is what keeps
+  the lamp from sending on its own echo. A person who says the phrase word
+  for word right on the lamp's last word is held once and says it again
+  (lamp-3e83, 10 Nov); one who adds a word ("Okay, yes, send it.") reaches
+  the model as "Okay,", and one who begins after the tail as said.
 - **After a send** the model is told one fixed line: "Say only that it was
   sent, in the conversation's language." when the service answered
   `sent: true`; "Say only that the file was made in their Google Drive,

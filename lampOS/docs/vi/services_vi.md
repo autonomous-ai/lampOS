@@ -1406,18 +1406,16 @@ bị cắt hay bị nói đè.
   giữ nguyên, và từ chối lần gửi là `NOT_READ_BACK`. Trên lamp-29e7 ngày 9/11,
   chính câu "go ahead and send it" của phần đọc lại vọng lại được tính là câu
   đầu tiên, và chủ đèn phải nói "send" năm lần.
-- **Câu trả lời cho một phần đọc lại đang chờ không bao giờ bị giữ là tiếng
-  vọng** (lamp-3e83, 10/11). Sau câu "Say 'go ahead and send it'" của đèn,
-  câu "go ahead and send it" của chủ đèn, bắt đầu ngay sau lời của đèn, chỉ
-  chứa lời của chính đèn và bị giữ là tiếng vọng của nó ("its answer is held
-  back: the lamp's own echo"), nên lần ghi không bao giờ được gửi. Khi một
-  lệnh ghi đang chờ câu trả lời (`services::write_waits`: câu ngay sau một
-  phần đọc lại không bị cắt, chưa tới 2 phút), `own_echo` coi một câu bắt
-  đầu sau lời của đèn là của người nói ("it began after a read-back that
-  waits for its answer"), nên "Yes, send it." sau "Say 'yes, send it' to send
-  it." đến được mô hình và lần gửi của nó đi. Một câu nghe đè lên giọng của
-  đèn vẫn được xét như trước, nên chính lời của phần đọc lại vọng lại đè lên
-  nó (lamp-29e7) vẫn bị giữ.
+- **Chính lời của phần đọc lại vọng lại không bao giờ đồng ý thay người
+  nói** (P1 của App Only và Thirteen trên #6009). Phần đọc lại của một lệnh
+  ghi đang chờ được `own_echo` xét như mọi câu của đèn: trong 1,5 s đuôi của
+  nó, "Yes, send it." do phòng vọng lại bị giữ, và "Um, yes, send it." (một
+  từ đệm của ASR) bị bỏ đoạn lời của đèn, nên mô hình chỉ nhận "Um," và
+  không bao giờ nhận lời đồng ý của đèn; vì lần gửi không còn kiểm tra giọng,
+  chính điều này giữ đèn không gửi theo tiếng vọng của nó. Người nói đúng
+  từng chữ ngay khi đèn vừa dứt bị giữ một lần và nói lại (lamp-3e83,
+  10/11); người thêm một từ ("Okay, yes, send it.") đến mô hình là "Okay,",
+  và người bắt đầu sau đuôi thì như đã nói.
 - **Sau một lần gửi** mô hình được báo một câu cố định: "Say only that it was
   sent, in the conversation's language." khi dịch vụ trả lời `sent: true`;
   "Say only that the file was made in their Google Drive, with its name from
