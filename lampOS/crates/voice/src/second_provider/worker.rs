@@ -12230,6 +12230,22 @@ fn thread_and_history_told(
                 Some(person) if room_lines => {
                     thread.recent_with_room_lines(person, now, HISTORY_WITHIN, HISTORY_EXCHANGES)
                 }
+                // A private room (`LAMP_PRIVATE_ROOM=on`, the owner's call on
+                // 6 Nov: whoever speaks is the owner): the room's turn is told
+                // the conversation of the person last heard, the room's lines
+                // among it marked, so a line no face was read speaking never
+                // loses the talk (lamp-3e83, 10 Nov 09:52).
+                None if crate::person::private_room() => {
+                    match thread.conversation_of(now, HISTORY_WITHIN) {
+                        Some(person) => thread.recent_with_room_lines(
+                            &person,
+                            now,
+                            HISTORY_WITHIN,
+                            HISTORY_EXCHANGES,
+                        ),
+                        None => thread.recent_for(None, now, HISTORY_WITHIN, HISTORY_EXCHANGES),
+                    }
+                }
                 _ => thread.recent_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES),
             },
         )
@@ -21257,6 +21273,61 @@ mod tests {
         crate::thread::THREAD.lock().unwrap().forget();
         let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true);
         assert!(forgotten.is_empty(), "a forget drops the room's lines too");
+    }
+
+    /// lamp-3e83, 10 Nov 09:52: a mail read back in the owner's thread, then
+    /// their next line, their face the one in view but not read speaking,
+    /// was the room's and told only the room's thread: the lamp asked for
+    /// the address and the text again, and "ok, go ahead" got "go ahead with
+    /// what?". In a private room (`LAMP_PRIVATE_ROOM=on`, whoever speaks is
+    /// the owner) the room's turn is told the conversation of the person
+    /// last heard; with the switch off, only the room's, as before.
+    #[test]
+    fn in_a_private_room_the_rooms_turn_is_told_the_owners_conversation() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person("Draft an email to my team.", true, now);
+            thread.lamp_for(1, "Who should it go to?", now, Some(&a));
+            thread.person("Saying the build is ready.", true, now);
+            thread.lamp_for(2, "Here it is: … Say go ahead and send it.", now, Some(&a));
+            thread.person("Wait, add a thank you.", true, now);
+            thread.lamp_for(3, "Added it.", now, None);
+        }
+        let users = |history: &[Message]| -> Vec<Message> {
+            history
+                .iter()
+                .filter(|message| message.role == "user")
+                .cloned()
+                .collect()
+        };
+        crate::person::set_private_room_for_test(Some(true));
+        let (_, private) = thread_and_history_told(0, None, None, None, false);
+        assert_eq!(
+            users(&private),
+            [
+                Message::user("Draft an email to my team."),
+                Message::user("Saying the build is ready."),
+                Message::user(format!("{SAID_IN_THE_ROOM} Wait, add a thank you.")),
+            ],
+            "the room's turn: the owner's conversation, the room's line marked"
+        );
+        crate::person::set_private_room_for_test(Some(false));
+        let (_, shared) = thread_and_history_told(0, None, None, None, false);
+        assert_eq!(
+            users(&shared),
+            [Message::user("Wait, add a thank you.")],
+            "off: the room's alone"
+        );
+        crate::person::set_private_room_for_test(None);
+        crate::thread::THREAD.lock().unwrap().forget();
+        crate::person::set_private_room_for_test(Some(true));
+        let (_, empty) = thread_and_history_told(0, None, None, None, false);
+        assert!(empty.is_empty(), "nobody's conversation: nothing");
+        crate::person::set_private_room_for_test(None);
     }
 
     /// #3997's cut-in proposal: an answer cut while it played and kept as

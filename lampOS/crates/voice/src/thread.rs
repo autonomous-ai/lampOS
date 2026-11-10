@@ -1862,6 +1862,22 @@ impl Thread {
         recent
     }
 
+    /// The known person of the newest exchange of theirs within `within` of
+    /// `now`, if any: under `LAMP_PRIVATE_ROOM=on` the room's turn is told
+    /// that person's conversation ([`Self::recent_with_room_lines`]), as the
+    /// lamp's one owner is whoever speaks (the owner, 10 Nov, after lamp-3e83's
+    /// draft at 09:52: a read-back in the owner's thread, then their next
+    /// line, the one face in view but not read speaking, told the room's
+    /// thread, which held no address, body or read-back, so the lamp asked
+    /// for them again and "go ahead" got "go ahead with what?").
+    pub fn conversation_of(&self, now: Instant, within: Duration) -> Option<String> {
+        self.exchanges
+            .iter()
+            .rev()
+            .take_while(|exchange| now.saturating_duration_since(exchange.at) <= within)
+            .find_map(|exchange| exchange.whose.clone())
+    }
+
     /// What to tell a new session, if anything was said lately, in at most
     /// `room` bytes: the latest exchanges that fit, in the order they went,
     /// of the person the session is opened for ([`Self::opening`]) only.
