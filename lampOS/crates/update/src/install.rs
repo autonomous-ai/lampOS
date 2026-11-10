@@ -511,9 +511,9 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     ),
     (
         "who-was-here",
-        "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
-         eyes say only with `LAMP_PRESENCE=on`, and its function would put a product session past \
-         its 32 without `LAMP_USE_SKILL=on`",
+        "an installable skill, offered by the Store (#5751, the first builder's ruling of 9 Nov): \
+         installing it is the owner's yes to being told who was at the lamp; the product runs what \
+         it reads (`LAMP_PRESENCE=on`, `LAMP_USE_SKILL=on`), times only",
     ),
 ];
 
