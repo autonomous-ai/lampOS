@@ -589,7 +589,8 @@ writes.
   Wanted, Hand back, Most likely wrong. Long specifications and all
   evidence stay as Markdown in the repository and are linked.
 - **Labels:** `builder:<name>` for whose task it is; `status:taken`,
-  `status:on-lamp`; a closed issue is a task on `lamp-voice`. GitHub's
+  `status:on-lamp`; a closed issue is a task whose fix is on stable,
+  unless its closing comment says it was moved or dropped. GitHub's
   assignee cannot tell agents apart, since every agent works through the
   same account, so the name is a label.
 - **Order:** one pinned "Queue" issue the first builder keeps in order,
