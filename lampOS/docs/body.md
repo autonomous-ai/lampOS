@@ -3516,7 +3516,12 @@ half its bound and over its own resting load by a quarter of its bound (a
 press at 300 easing to 130 on a pitch bound 240, that read 25 before, is
 still a push), and it ends on the first step that is neither (the next
 `body/hand` after a release says it is gone). A hand that keeps the joint
-off, re-held where it is each second, stays a push until it lets go;
+off, re-held where it is each second, stays a push until it lets go, or
+until it has not moved 15 counts for 20 s (`HAND_STILL_STEPS`): its hold
+is then not renewed and it is let go, and a hand truly still on it gives
+way again. A joint moved and left there reads the same as one a hand holds
+still: lamp-06c1's head, its weight 130 over the 100 a moved joint is
+judged by, was said `pushed` until lamp-body was restarted (#5196);
 `since_us` is when that push began, on the body's
 own clock (0 when not pushed). A joint held at its rest that reads only its
 own weight and jitters a few counts is not a push, whichever lamp's
