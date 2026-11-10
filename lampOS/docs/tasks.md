@@ -1631,6 +1631,38 @@ waiting hand-over goes after the try that works, or after the last) and
 `the_daemon_is_started_with_harness_start`. The
 voice's side (`sign_in_computer`, `sign_in_answer`) is its own PR.
 
+## Hermes' settings on the lamp (#5978, `hermes_config`)
+
+`lamp_tasks::hermes_config::write(HERMES_HOME, port, token)` merges what
+Hermes on the lamp needs into its own two files, and nothing else. Nothing
+calls it yet: the lamp as a target (#5978, part 3) runs it before a Hermes
+task, with lamp-cloud's forwarder port (7741) and its local token
+(`/var/lib/lampos-cloud/hermes-token`, docs/cloud.md, "Hermes' DeepSeek,
+forwarded on the lamp").
+
+- `config.yaml`: `model.provider: "custom:lamp"` and
+  `model.default: "deepseek-flash"` (the voice's DeepSeek model), with any
+  `model.base_url`, `model.api_key` or `model.api_mode` from another provider
+  removed; `providers.lamp` with `base_url:
+  "http://127.0.0.1:7741/v1/deepseek"`, `api_mode: "chat_completions"`
+  (DeepSeek's OpenAI-compatible chat), `key_env: "LAMP_HERMES_TOKEN"` and
+  `default_model: "deepseek-flash"`; and `approvals.mode: "manual"`, so
+  Hermes asks before a dangerous command (lamp-tasks never says yes to it
+  by itself). The values are quoted: PyYAML would read a bare `off` or `on`
+  as a boolean.
+- `.env`: one `LAMP_HERMES_TOKEN=<token>` line, the forwarder's local
+  token, never the relay's key; every other line kept.
+- **Kept:** every other key and line, Harness's `hooks:` block above all
+  (openharness `engines/hermes/contract.ts`), comments, and other providers.
+  Running it again changes nothing, and a file already right is not
+  written. A written file is 0600, written beside the old one and renamed
+  over it.
+- **Refused:** the workspace has no YAML crate, so the merge is line-based
+  over block-style YAML, as Hermes and Harness write it. A file it can't
+  merge safely (a tab, a document marker, a key twice, a list or anchor
+  where a mapping is set, a top level that isn't a mapping) is left as it
+  is, and nothing is written, `.env` included.
+
 ## Devin (#1854)
 
 `devin` is Devin's own terminal program on the person's computer, which
