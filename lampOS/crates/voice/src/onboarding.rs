@@ -7224,7 +7224,7 @@ mod tests {
         assert!(room.wait(19 * S, None).is_empty());
         assert!(room.walk.rising(room.at));
         let invite = own_line(INVITE.to_owned());
-        assert_eq!(room.wait(5 * S, None), [invite.clone()]);
+        assert_eq!(room.wait(5 * S, None), std::slice::from_ref(&invite));
         // Its own line: the second route says these words, asking no chat.
         assert_eq!(
             own_words(&invite),
