@@ -44,6 +44,8 @@ struct Reader {
     size: (u32, u32),
     frames: SyncSender<Vec<u8>>,
     alive: Arc<AtomicBool>,
+    /// A handle on the socket, so [`Tap::end`] can cut a write in progress.
+    stream: std::os::unix::net::UnixStream,
 }
 
 /// The socket, and its one reader with the size it asked for.
@@ -97,11 +99,19 @@ impl Tap {
         let (frames, queued) = mpsc::sync_channel::<Vec<u8>>(QUEUED);
         let alive = Arc::new(AtomicBool::new(true));
         let writing = alive.clone();
+        let Ok(handle) = stream.try_clone() else {
+            return Some("refused a frames reader: no socket handle".to_owned());
+        };
         let mut stream = stream;
         let started = std::thread::Builder::new()
             .name("frames".into())
             .spawn(move || {
                 for frame in queued {
+                    // Ended while this frame waited: not sent (the permit
+                    // behind the reader has lapsed).
+                    if !writing.load(Ordering::SeqCst) {
+                        break;
+                    }
                     let length = u32::try_from(frame.len()).unwrap_or(u32::MAX).to_be_bytes();
                     if stream
                         .write_all(&length)
@@ -120,6 +130,7 @@ impl Tap {
             size,
             frames,
             alive,
+            stream: handle,
         });
         (self.sent, self.dropped) = (0, 0);
         Some(format!("a frames reader at {} by {}", size.0, size.1))
@@ -150,9 +161,14 @@ impl Tap {
         ))
     }
 
-    /// The reader, gone or not keeping up: it is let go, and its writer ends.
+    /// The reader, gone or not keeping up: it is let go, and its writer ends
+    /// at once: frames still queued are never sent, and a write in progress
+    /// is cut, so nothing reaches the reader after the permit lapsed.
     pub fn end(&mut self) {
-        self.reader = None;
+        if let Some(reader) = self.reader.take() {
+            reader.alive.store(false, Ordering::SeqCst);
+            let _ = reader.stream.shutdown(std::net::Shutdown::Both);
+        }
     }
 }
 
@@ -256,5 +272,43 @@ mod tests {
         }
         assert!(said.unwrap().starts_with("the frames reader went"));
         assert_eq!(tap.size(), None);
+    }
+
+    /// Limit 2 of #5894 (Second's note): frames queued for a slow reader are
+    /// not sent after `end`, and a frame being written is cut, so at most
+    /// what the reader's socket already held can be read.
+    #[test]
+    fn frames_queued_for_a_slow_reader_are_not_sent_after_the_end() {
+        let path = socket();
+        let mut tap = Tap::bind(&path).unwrap();
+        let mut reader = UnixStream::connect(&path).unwrap();
+        reader.write_all(b"1280x720\n").unwrap();
+        tap.accept().unwrap();
+        // 4 MB frames: the socket takes none whole, so the writer is stuck
+        // in the first and two more wait in the queue.
+        let frame = vec![9u8; 4_000_000];
+        for _ in 0..3 {
+            tap.send(&frame);
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        tap.end();
+        assert_eq!(tap.size(), None);
+        // Read what is left: it ends (EOF or reset), and never holds a whole
+        // frame after the end.
+        reader
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut total = 0usize;
+        let mut buffer = vec![0u8; 65_536];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) | Err(_) => break,
+                Ok(read) => total += read,
+            }
+        }
+        assert!(
+            total < 4_000_000 + 4,
+            "{total} bytes came after the end: more than the one frame being written"
+        );
     }
 }
