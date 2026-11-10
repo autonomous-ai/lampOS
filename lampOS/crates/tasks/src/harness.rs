@@ -1462,9 +1462,12 @@ impl Cli {
     /// session the lamp closed after its done line could never be found by
     /// its work. `harness show --json` gives a stopped harness's last ask
     /// (commands.ts 746-790); it is read for at most the
-    /// [`MOST_STOPPED_READ`] newest stopped rows ([`stopped_newest`]), each
-    /// within what is left of the launch's bound less the reply's floor
-    /// twice, and matched as a live row's asks are ([`by_its_work`]). One
+    /// [`MOST_STOPPED_READ`] newest stopped rows ([`stopped_newest`]), the
+    /// shows run together, one thread each (about 2.3 s each on lamp-c0a4,
+    /// 10 Nov, so four in turn cost about 9.2 s), each within what was left
+    /// of the launch's bound less the reply's floor when they began (none
+    /// with less than the floor twice left); their results are taken newest
+    /// first and matched as a live row's asks are ([`by_its_work`]). One
     /// fits: [`Named::Stopped`]; more than one: `session_ambiguous`, never
     /// guessed; none, or the words name no work: `session_not_found`. A
     /// show that fails or can't be read is passed over, as a row whose ask
@@ -1481,25 +1484,51 @@ impl Cli {
             return Ok(Named::Refused("session_not_found"));
         }
         let said_words = words_of(session);
+        let left = self.config.launch_timeout.saturating_sub(began.elapsed());
+        if left < REPLY_FLOOR * 2 {
+            return Ok(Named::Refused("session_not_found"));
+        }
+        let within = (left - REPLY_FLOOR).min(self.config.read_timeout);
+        let rows: Vec<(Value, String)> = stopped_newest(listed)
+            .into_iter()
+            .filter_map(|row| {
+                let id = row["id"].as_str()?.to_owned();
+                Some((row, id))
+            })
+            .collect();
+        // The shows run together, one thread each (at most
+        // MOST_STOPPED_READ): on lamp-c0a4 each took about 2.3 s, so four in
+        // turn cost about 9.2 s of a follow-up. Their results are taken
+        // back newest first, as before.
+        let shown: Vec<Result<Reply, RunError>> = std::thread::scope(|scope| {
+            let reads: Vec<_> = rows
+                .iter()
+                .map(|(_, id)| {
+                    scope.spawn(move || {
+                        self.run(
+                            &[
+                                "show".into(),
+                                "--machine".into(),
+                                machine.into(),
+                                id.into(),
+                                "--json".into(),
+                            ],
+                            within,
+                        )
+                    })
+                })
+                .collect();
+            reads
+                .into_iter()
+                // A show that panicked panics here, as it did in turn.
+                .map(|read| {
+                    read.join()
+                        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+                })
+                .collect()
+        });
         let mut asked: Vec<Value> = Vec::new();
-        for mut row in stopped_newest(listed) {
-            let left = self.config.launch_timeout.saturating_sub(began.elapsed());
-            if left < REPLY_FLOOR * 2 {
-                break;
-            }
-            let Some(id) = row["id"].as_str().map(str::to_owned) else {
-                continue;
-            };
-            let shown = self.run(
-                &[
-                    "show".into(),
-                    "--machine".into(),
-                    machine.into(),
-                    id.clone().into(),
-                    "--json".into(),
-                ],
-                (left - REPLY_FLOOR).min(self.config.read_timeout),
-            );
+        for ((mut row, id), shown) in rows.into_iter().zip(shown) {
             seen.took(&shown);
             let ask = match shown {
                 Ok(reply) if reply.success => parse_observation(&reply.stdout, &id)
