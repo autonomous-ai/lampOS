@@ -960,12 +960,60 @@ def test_the_lamps_limits_are_kept_here_too():
         limits.take("gesture")
 
 
-def test_an_unpaired_computer_is_told_in_one_line(tmp_path, monkeypatch):
+def test_an_unpaired_computer_is_told_in_one_line_and_exits_with_its_own_code(tmp_path, monkeypatch, capsys):
+    """An MCP client strips the environment, so LAMPOS_HOME is lost and the pairing isn't found; the client sees only
+    'Connection closed'. The one stderr line says which folder was looked in and how to point at the right one."""
     from lamp_mcp.server import main
 
+    monkeypatch.delenv("LAMPOS_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    with pytest.raises(SystemExit, match=r"^lamp-mcp: not_paired: .*lamp pair"):
+    with pytest.raises(SystemExit) as stopped:
         main([])
+    assert stopped.value.code == 2
+    said = capsys.readouterr().err.strip()
+    assert said.startswith("lamp-mcp: not_paired: ") and "lamp pair" in said, said
+    assert "\n" not in said
+    assert str(tmp_path / ".config" / "lampos") in said and "--home" in said and "LAMPOS_HOME" in said
+
+
+def test_python_dash_m_runs_lamp_mcp_with_no_path_needed():
+    """An MCP client config can name the venv's python and `-m lamp_mcp`, which needs no PATH; both forms run main()."""
+    import os
+    import subprocess
+    import sys
+
+    src = str(Path(__file__).resolve().parents[1] / "src")
+    sdk = str(Path(__file__).resolve().parents[2] / "python" / "src")
+    env = {"PYTHONPATH": os.pathsep.join([src, sdk]), "HOME": "/nonexistent"}
+    for args in (["-m", "lamp_mcp"], ["-m", "lamp_mcp.server"]):
+        ran = subprocess.run([sys.executable, *args, "--help"], env=env, capture_output=True, text=True, timeout=30)
+        assert ran.returncode == 0 and "usage: lamp-mcp" in ran.stdout and "--home" in ran.stdout, (args, ran.stderr)
+
+
+def test_home_points_at_the_pairing_folder_when_the_client_strips_the_environment(tmp_path, monkeypatch, capsys):
+    import lamp_mcp.server as server_module
+
+    seen = {}
+
+    async def serve(lamp_id, client):
+        import os
+
+        seen["home"] = os.environ.get("LAMPOS_HOME")
+
+    monkeypatch.delenv("LAMPOS_HOME", raising=False)
+    monkeypatch.setattr(server_module, "serve", serve)
+    server_module.main(["--home", str(tmp_path / "pairs")])
+    assert seen["home"] == str(tmp_path / "pairs")
+    # Not given: the environment's own, or the default, is left alone.
+    monkeypatch.setenv("LAMPOS_HOME", "/from/env")
+    server_module.main([])
+    assert seen["home"] == "/from/env"
+    # An unpaired --home is the one the line names.
+    monkeypatch.undo()
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with pytest.raises(SystemExit) as stopped:
+        server_module.main(["--home", str(tmp_path / "nowhere")])
+    assert stopped.value.code == 2 and str(tmp_path / "nowhere") in capsys.readouterr().err
 
 
 def test_verbose_turns_the_sdks_debug_log_on_and_stdout_stays_the_mcp_stream(monkeypatch, capsys):
