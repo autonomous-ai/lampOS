@@ -521,6 +521,21 @@ light on); Expression's
 `the_nights_sleep_says_asleep_for_the_rings_face_until_it_wakes`
 (`alive_engine.rs`). Not shown on a lamp.
 
+### The reset's red (#5929)
+
+While the reset button is held, the ring worker reads its time from
+Controls' `controls/touch_state` (`held_us`, given only for an armed,
+enabled button, so a line resting pressed shows nothing) and shows, in place
+of the face, a computer's pixels and the shutdown's warning
+(`ring_worker::reset_warning`): nothing under 2 s; from 2 s the whole ring
+blinks red `(24, 0, 0)`, half a second lit and half dark by Controls' count;
+from 5 s (`RESET_HOLD_US`) steady red: let go now and the lamp resets. Red is
+no colour of the setup light, so it is not read as setup. Let go before 5 s,
+the red goes at the next frame (Controls' state lapses within 300 ms at
+worst). Not behind a switch: wherever the voice runs with a bus. With no voice
+there is no red, and the reset still runs (setup.md). Tests:
+`reset_warning_tests` (`ring_worker.rs`). Not shown on a lamp.
+
 ### The setup light (#806)
 
 While a lamp is not set up, no voice runs, so the ring belongs to

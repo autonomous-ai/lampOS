@@ -309,6 +309,87 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
     );
 }
 
+/// #5929: a reset a person asked for says `reset::RESET_STARTING` first,
+/// with nothing of the reset done yet (no journal, the marker there, no
+/// command run), within `reset::SAY_WITHIN`; then the reset runs as before.
+#[test]
+fn a_reset_asked_by_a_hold_is_said_before_anything_is_done() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake::default();
+    let calls = Rc::clone(&fake.calls);
+    let mut said = Vec::new();
+    let steps = reset::said_then_reset(
+        &plan,
+        &mut fake,
+        |line, within| {
+            assert!(!plan.journal.exists());
+            assert!(plan.marker.exists());
+            assert!(calls.borrow().is_empty());
+            said.push((line.to_owned(), within));
+            Ok(())
+        },
+        |_| {},
+    )
+    .unwrap();
+    assert_eq!(
+        said,
+        [(reset::RESET_STARTING.to_owned(), reset::SAY_WITHIN)]
+    );
+    assert_eq!(reset::RESET_STARTING, "Factory reset starting.");
+    assert!(reset::SAY_WITHIN <= Duration::from_secs(6));
+    assert_eq!(
+        &steps[..3],
+        [Step::Journal, Step::MarkerRemoved, Step::Stopped]
+    );
+    wiped(&root);
+}
+
+/// #5929: a line not said (no voice, muted, not in time) never holds the
+/// reset back: it runs all the same, and the journal says why.
+#[test]
+fn a_reset_line_not_said_still_resets() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut lines = Vec::new();
+    let steps = reset::said_then_reset(
+        &plan,
+        &mut Fake::default(),
+        |_, _| Err("the voice's say service is not there".into()),
+        |line| lines.push(line.to_owned()),
+    )
+    .unwrap();
+    assert!(steps.contains(&Step::Stopped));
+    wiped(&root);
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("not said") && line.contains("not there")),
+        "{lines:?}"
+    );
+}
+
+/// #5929: a reset carried on from its journal (a power cut after the hold)
+/// says nothing: the person's hold was a boot ago.
+#[test]
+fn a_reset_carried_on_from_its_journal_says_nothing() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    fs::write(&plan.journal, b"{}").unwrap();
+    let mut asked = false;
+    reset::said_then_reset(
+        &plan,
+        &mut Fake::default(),
+        |_, _| {
+            asked = true;
+            Ok(())
+        },
+        |_| {},
+    )
+    .unwrap();
+    assert!(!asked);
+}
+
 /// #5358, Twelve's P2 on #5365: a reset that ends in a reboot wipes the kept
 /// journal and leaves the keep its mark with this boot's id, so the reboot's
 /// shutdown keeps nothing of the old owner's boot (`lamp-journal-keep`).
