@@ -352,7 +352,8 @@ pub fn turned_on(toml: &str) -> String {
 /// ships, not what was chosen on the lamp. A `skill.toml` the build ships
 /// off becomes [`turned_on`] when [`ON`] names its skill, or when the lamp's
 /// own file turns it on and is not the build's before (`recorded`, or
-/// `writing`), or is already this build turned on. One the lamp turned off
+/// `writing`). A file a build wrote on (a build before shipped the skill
+/// on) is the build's, not a choice, and goes off. One the lamp turned off
 /// again (changed, and off) leaves [`ON`]. A name in [`ON`] the build no
 /// longer carries is dropped, and said once. With `keep`, [`ON`] is
 /// written when this changes it (lamp-skills' state folder must be there);
@@ -404,7 +405,10 @@ pub fn keep_turned_on<'a>(
         if let Some(now) = now {
             let sha = manifest::sha256_hex(now.as_bytes());
             let builds = recorded.get(path) == Some(&sha) || writing.get(path) == Some(&sha);
-            if says_on(&now) && (!builds || now == turned_on(text)) {
+            // A file a build wrote on is the build's, never a choice, even
+            // when it is this build turned on (a build before shipped it
+            // on): a person's turn-on is [`ON`]'s, or a file not the build's.
+            if says_on(&now) && !builds {
                 on.insert(name.to_owned());
             } else if !says_on(&now) && !builds {
                 on.remove(name);
@@ -856,5 +860,60 @@ mod tests {
             .filter(|path| path.starts_with(&format!("{FOLDER}/")))
             .collect();
         assert!(carried.is_empty(), "{carried:?}");
+    }
+
+    /// A skill a build shipped on and the next build ships off (a lamp that
+    /// took a build with its switch on, then one listing it in
+    /// `PRODUCT_SKILLS_OFF`): the file the build wrote is the build's, not
+    /// a person's choice, so it ends off. A person's turn-on (named in
+    /// [`ON`]) and a file turned on by hand stay on through the same
+    /// update; a file changed on the lamp and off stays as it is.
+    #[test]
+    fn only_a_persons_turn_on_outlives_the_build_turning_a_skill_off() {
+        let off = format!("{}name = \"x\"\n", crate::install::OFF_LINE);
+        let shipped_on = turned_on(&off);
+        let path = format!("{FOLDER}/x/skill.toml");
+        let run = |lamp_file: &str, recorded_sha: Option<&str>, on_names: &str| {
+            let folder = tempfile::tempdir().unwrap();
+            let root = folder.path();
+            let at = on_root(root, &path);
+            fs::create_dir_all(at.parent().unwrap()).unwrap();
+            fs::write(&at, lamp_file).unwrap();
+            let on_file = on_root(root, ON);
+            fs::create_dir_all(on_file.parent().unwrap()).unwrap();
+            fs::write(&on_file, on_names).unwrap();
+            let recorded: BTreeMap<String, String> = recorded_sha
+                .map(|sha| (path.clone(), sha.to_owned()))
+                .into_iter()
+                .collect();
+            let mut text = off.clone();
+            keep_turned_on(
+                root,
+                [(path.as_str(), &mut text)],
+                &recorded,
+                &BTreeMap::new(),
+                true,
+                &mut |_| {},
+            )
+            .unwrap();
+            (says_on(&text), fs::read_to_string(&on_file).unwrap())
+        };
+        let build_on = manifest::sha256_hex(shipped_on.as_bytes());
+        // The build before wrote it on, and no one chose it: off.
+        assert_eq!(
+            run(&shipped_on, Some(&build_on), ""),
+            (false, String::new())
+        );
+        // A person turned it on (the app or a voice: lamp-skills' set, kept
+        // in ON): on.
+        assert_eq!(
+            run(&shipped_on, Some(&build_on), "x\n"),
+            (true, "x\n".into())
+        );
+        // Turned on by hand, not the build's file: on, and kept in ON.
+        assert_eq!(run(&shipped_on, None, ""), (true, "x\n".into()));
+        // Changed on the lamp and off: left as it is, out of ON.
+        let edited = format!("{off}# mine\n");
+        assert_eq!(run(&edited, Some(&build_on), "x\n"), (false, String::new()));
     }
 }

@@ -1074,10 +1074,14 @@ lamp-skills, for good. `crates/update/src/product_skills.rs`:
   someone turned on stays on** (the first builder on #2585): an update
   changes what the build ships, not what was chosen on the lamp. For a
   `skill.toml` the build ships off, a lamp file that turns it on and is
-  not the build's before (or is already this build turned on) puts its
-  name in `/var/lib/lampos-skills-state/on`, beside `off` (one name a line,
+  not the build's before puts its name in
+  `/var/lib/lampos-skills-state/on`, beside `off` (one name a line,
   written whole beside and renamed, 0644, read never through a link). One
-  the lamp turned off again takes it out. Every skill `on` names is then
+  the lamp turned off again takes it out. A file a build wrote on (a build
+  before shipped the skill on, then this one ships it off, as
+  `PRODUCT_SKILLS_OFF` does) is the build's, not a choice: it goes off
+  unless `on` names it (the app's or a voice's turn-on, lamp-skills' set).
+  Every skill `on` names is then
   written turned on: install's off line taken out and a top-level
   `enabled = false` made `true`. A lamp with no `on` has none, as before;
   an updater from before never reads it. A name the build no longer

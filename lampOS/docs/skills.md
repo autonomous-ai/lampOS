@@ -1386,7 +1386,9 @@ helper and writes the name in `on` at once. The next
 install or round sees that, keeps the name in `--state-dir`'s `on` (one
 name a line, beside `off`, written whole, 0644), and writes the build's
 file turned on. A skill named in `on` is written turned on even when its
-file is gone or the build's file changes. Editing the file back to off
+file is gone or the build's file changes. A file a build before wrote on
+(it shipped the skill on) is no turn-on: when a build ships it off, it goes
+off unless `on` names it. Editing the file back to off
 takes the name out of `on`; the app's `skills.off` does that edit, takes
 the name out of `on` and puts it in `off`. A lamp with no `on` has none turned on, as
 before. A skill the build no longer carries leaves `on` with one journal
