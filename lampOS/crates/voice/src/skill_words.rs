@@ -232,6 +232,14 @@ pub struct NewsWords {
     /// without it says the built-in words.
     #[serde(default = "failed_busy")]
     pub failed_busy: String,
+    /// ...or did not, as the earlier session the person named is closed
+    /// (lamp-tasks' `session_closed`, Harness's `NOT_RUNNING`, or
+    /// `session_stopped`, `serve --reply-named`, #5535): nothing was typed
+    /// and nothing new started, and the person is told how to open it
+    /// again or to ask for a new one. A skill without it says the built-in
+    /// words.
+    #[serde(default = "failed_closed")]
+    pub failed_closed: String,
     /// A hand-over that went into an earlier session of the person's, by
     /// its name (lamp-tasks' `serve --reply-named`, #5535): `{asked}`,
     /// `{who}` and `{session}`, so a wrong one is heard at once. A skill
@@ -299,6 +307,12 @@ fn failed_busy() -> String {
     "The work the person asked you to hand over, \"{asked}\", did not reach {who}: {who} on {computer} is busy with something else right now, so it was not given to it. Tell them that in one plain, light sentence, with no technical words, and to ask you again once it is done.".into()
 }
 
+/// [`NewsWords::failed_closed`]'s words, built in: the first builder's
+/// ruling on #5784's follow-up, said as it is.
+fn failed_closed() -> String {
+    "The work the person asked you to hand over, \"{asked}\", did not reach {who}: the earlier session they named is closed, so nothing was typed into it and nothing new was started. Tell them in these words, and nothing more: \"That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project.\"".into()
+}
+
 /// [`NewsWords::joined`]'s words, built in.
 fn joined() -> String {
     "The work the person asked you to hand over, \"{asked}\", went to {who} in their earlier session \"{session}\", not a new one. Tell them that in one short, plain sentence, naming that session, with no technical words, and that they can tell you if it's the wrong one.".into()
@@ -353,6 +367,7 @@ impl NewsWords {
             failed_signed_out: failed_signed_out(),
             failed_no_prompt: failed_no_prompt(),
             failed_busy: failed_busy(),
+            failed_closed: failed_closed(),
             joined: joined(),
             joined_asked: joined_asked(),
             answered: answered(),
@@ -437,6 +452,7 @@ impl NewsWords {
                     &self.failed_busy,
                     &["asked", "computer", "who", "who"],
                 ),
+                ("failed_closed", &self.failed_closed, &["asked", "who"]),
                 ("joined", &self.joined, &["asked", "session", "who"]),
                 (
                     "joined_asked",
@@ -523,6 +539,7 @@ impl NewsWords {
                 ("failed_signed_out", note(&self.failed_signed_out, &[])),
                 ("failed_no_prompt", note(&self.failed_no_prompt, &[])),
                 ("failed_busy", note(&self.failed_busy, &[])),
+                ("failed_closed", note(&self.failed_closed, &[])),
                 ("answered", note(&self.answered, &done)),
                 ("answered_cut", note(&self.answered_cut, &done)),
                 (
@@ -725,6 +742,7 @@ mod tests {
                     "failed_signed_out = ",
                     "failed_no_prompt = ",
                     "failed_busy = ",
+                    "failed_closed = ",
                     "answered = ",
                     "answered_cut = ",
                 ]
@@ -745,6 +763,8 @@ mod tests {
         assert_eq!(read.failed_signed_out, failed_signed_out());
         assert_eq!(read.failed_no_prompt, failed_no_prompt());
         assert_eq!(read.failed_busy, failed_busy());
+        assert_eq!(read.failed_closed, failed_closed());
+        assert_eq!(NewsWords::in_dir(&skills()).failed_closed, failed_closed());
         let installed = NewsWords::in_dir(&skills());
         assert_eq!(installed.failed_folder, failed_folder());
         assert_eq!(installed.failed_signed_out, failed_signed_out());
