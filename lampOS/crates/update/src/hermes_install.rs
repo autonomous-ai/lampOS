@@ -268,9 +268,9 @@ if [ -n "$W" ]; then mkdir -p "$W" && mount --move "$S/w" "$W" || fail "$W not s
 if [ -n "$K" ]; then mkdir -p "$K" && mount --move "$S/k" "$K" && ro "$K" || fail "$K not shown"; fi
 if [ -n "$R" ]; then mkdir -p "${R%/*}" && touch "$R" && mount --move "$S/r" "$R" && ro "$R" || fail "$R not shown"; fi
 rm -f "$S/r" && rmdir "$S/h" "$S/w" "$S/k" "$S" || fail "staging left"
-mount -o remount,ro,nosuid,nodev,noexec /run || fail "/run not read-only"
-mount -o remount,ro,nosuid,nodev,noexec /var/lib || fail "/var/lib not read-only"
-if [ -d /etc/lampOS ]; then mount -o remount,ro,nosuid,nodev,noexec /etc/lampOS || fail "/etc/lampOS not read-only"; fi
+mount -o remount,bind,ro,nosuid,nodev,noexec /run || fail "/run not read-only"
+mount -o remount,bind,ro,nosuid,nodev,noexec /var/lib || fail "/var/lib not read-only"
+if [ -d /etc/lampOS ]; then mount -o remount,bind,ro,nosuid,nodev,noexec /etc/lampOS || fail "/etc/lampOS not read-only"; fi
 for d in /dev/video* /dev/media* /dev/v4l-subdev* /dev/snd/* /dev/ttyACM* /dev/ttyUSB* /dev/ttyS* /dev/ttyAMA* /dev/i2c-* /dev/spidev* /dev/gpiochip* /dev/hidraw* /dev/fb* /dev/dri/*; do
   [ -c "$d" ] || continue
   mount --bind /dev/null "$d" || fail "$d not hidden"
