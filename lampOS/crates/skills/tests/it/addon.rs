@@ -352,6 +352,8 @@ fn the_program(on: bool) -> (Vec<AddonProposal>, Vec<SkillEvent>, bool) {
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
     let clock = (!on).then(|| super::skills::Clock::at(root));
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     for (flag, path) in [
         ("--dir", root.join("skills")),
         ("--bus-root", root.join("bus")),
@@ -523,6 +525,8 @@ fn a_say_decided_told(
     let bus = Bus::new(root.join("bus")).unwrap();
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     for (flag, path) in [
         ("--dir", root.join("skills")),
         ("--bus-root", root.join("bus")),
@@ -739,6 +743,8 @@ fn a_fifth_say(drop_the_four: bool) -> String {
     let bus = Bus::new(root.join("bus")).unwrap();
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     for (flag, path) in [
         ("--dir", root.join("skills")),
         ("--bus-root", root.join("bus")),

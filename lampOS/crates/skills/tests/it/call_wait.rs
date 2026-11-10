@@ -109,6 +109,8 @@ fn a_tool_call_is_answered_while_the_program_listens_on_three_topics() {
     }
     let tools = root.join("tools");
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command.args([
         "--dir".as_ref(),
         skills.as_os_str(),
