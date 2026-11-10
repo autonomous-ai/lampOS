@@ -30,13 +30,17 @@ const STEPS = [
   ['gesture bad name', 'body', (lamp) => lamp.gesture('NOT A GESTURE!')],
   ['look without a lease', 'body', (lamp) => lamp.look({ yaw: 5, pitch: 0 })],
   ['look under a lease', 'body', (lamp) => lamp.withLease(['body'], () => lamp.look({ yaw: 3, pitch: 0 }, { wait: true }))],
+  // A gesture plays, then a look is asked under a lease: a real body takes the lease back
+  // while it stands up for the gesture (`lease_lost`); the SDK's fake never does.
+  ['gesture, then look under a lease', 'body', async (lamp) => { await lamp.gesture('nod'); return lamp.withLease(['body'], () => lamp.look({ yaw: 2, pitch: 0 }, { wait: true })); }],
   ['say', 'speak', (lamp) => lamp.say('hello')],
   ['stop', null, (lamp) => lamp.stop()],
 ];
 
 // A look on a resting lamp ends `cut_short` on a real body (the SDK README
-// says so), where the SDK's fake finishes it: a known difference, not a finding.
-export const EXPECTED = new Set(['look under a lease']);
+// says so), and one asked while a gesture plays loses its lease, where the SDK's
+// fake finishes both: known differences, not findings.
+export const EXPECTED = new Set(['look under a lease', 'gesture, then look under a lease']);
 
 export async function run(lamp) {
   const rows = [];
@@ -70,7 +74,7 @@ async function onPaired() {
   try { return await run(lamp); } finally { await lamp.close(); }
 }
 
-const show = (rows) => rows.map((r) => `${r.name.padEnd(22)} ${r.result.padEnd(12)} ${(r.fields ?? []).join(',').padEnd(28)} ${String(r.ms).padStart(6)} ms`).join('\n');
+const show = (rows) => rows.map((r) => `${r.name.padEnd(34)} ${r.result.padEnd(12)} ${(r.fields ?? []).join(',').padEnd(28)} ${String(r.ms).padStart(6)} ms`).join('\n');
 
 // A step differs when it was taken in one and refused in the other, or refused with another code, or answered with other fields.
 export function differences(left, right) {
