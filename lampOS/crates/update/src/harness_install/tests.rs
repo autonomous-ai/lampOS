@@ -2411,7 +2411,10 @@ fn a_kept_copy_already_there_stops_nothing() {
 
 /// The one-shot (Harness's install, then Hermes's) yields to the lamp's own
 /// services, as lamp-update does: on lamp-c0a4 on 10 Nov a Hermes install at
-/// the default priority stalled lamp-controls' privacy reading (#5978).
+/// the default priority stalled lamp-controls' privacy reading (#5978). Its
+/// memory is held under `MemoryHigh` (throttled past it, never killed, as
+/// no `MemoryMax` is set), so a 4 GB lamp keeps about 1.2 GB available: the
+/// capped install's `products` stage took `MemAvailable` to about 868 MB.
 #[test]
 fn the_one_shot_runs_below_the_lamps_services() {
     let lines: Vec<&str> = TEXT.lines().collect();
@@ -2424,10 +2427,18 @@ fn the_one_shot_runs_below_the_lamps_services() {
         "IOReadBandwidthMax=/var/lib 16M",
         "IOWriteIOPSMax=/var/lib 200",
         "IOReadIOPSMax=/var/lib 400",
+        "MemoryHigh=1200M",
     ] {
         assert!(
             lines.contains(&wanted),
             "{wanted} missing from the one-shot"
+        );
+    }
+    // Throttled, never killed: no hard cap, no swap cap.
+    for unwanted in ["MemoryMax=", "MemorySwapMax=", "MemoryLimit="] {
+        assert!(
+            !lines.iter().any(|line| line.starts_with(unwanted)),
+            "{unwanted} in the one-shot"
         );
     }
 }
