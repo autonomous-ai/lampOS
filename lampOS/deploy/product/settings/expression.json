@@ -356,12 +356,6 @@
         "head_pitch": 0.0
       }
     },
-    "work": {
-      "face_area": 0.04,
-      "still": 0.05,
-      "still_us": 5000000,
-      "hold_us": 30000000
-    },
     "sleep": {
       "night": [
         1380,
