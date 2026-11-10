@@ -150,6 +150,15 @@ fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
     let made = keep(&answer(&saying, "night-word"), false, "s1:10:1", &keeping).unwrap();
     assert!(made.uses.speak && made.uses.light);
     assert_eq!(tars(&keeping.directory).len(), 1);
+    // The lamp's own soft hum, its built-in cue: the checker takes it with
+    // no file packed beside it, and it is kept.
+    let humming = speaking.replace(
+        "light = { dim = 1 }",
+        "light = { dim = 1 }\n\n[[do]]\ncue = \"hum\"",
+    );
+    let made = keep(&answer(&humming, "night-hum"), false, "s1:11:1", &keeping).unwrap();
+    assert!(made.uses.speak && made.uses.light);
+    assert_eq!(tars(&keeping.directory).len(), 2);
 }
 
 /// At most five made skills are kept: the sixth lets the oldest go, its

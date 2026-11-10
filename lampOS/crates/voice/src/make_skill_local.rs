@@ -134,7 +134,9 @@ fn system_with(reads: bool) -> String {
          asks with the light, the head or a short line it says, or a read as below, on the \
          lamp's resting or someone being there. To speak, a skill has speak = true in \
          [permissions] and a [[do]] step say = \"greet them warmly\": a few words of what to \
-         say, one clause, no quotes, which the lamp says in its own words. When it runs is one \
+         say, one clause, no quotes, which the lamp says in its own words. Its one sound is a \
+         soft hum: a [[do]] step cue = \"hum\", with speak = true, never beside a say; it has no \
+         other sound and no sound file. When it runs is one \
          [trigger] table (never [[trigger]], never the faces' topic): {triggers} A skill can't hear what is said: a request \
          that needs words or a sound heard, or anything else a skill here can't sense or do, \
          is answered with one line and no blocks: {cannot} then one short sentence said to \
@@ -1380,6 +1382,17 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 )),
                 "{system}"
             );
+        }
+    }
+
+    /// The making model is told the lamp's one sound, its soft hum, and
+    /// that it has no other.
+    #[test]
+    fn the_system_prompt_names_the_one_sound() {
+        for reads in [true, false] {
+            let system = system_with(reads);
+            assert!(system.contains("a [[do]] step cue = \"hum\""), "{system}");
+            assert!(system.contains("no other sound and no sound file"));
         }
     }
 

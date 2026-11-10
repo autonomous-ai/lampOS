@@ -82,6 +82,26 @@ sau:
      nên một gói đã giữ mà nói điều gì khác không bao giờ được bật. Kỹ năng
      đọc một dịch vụ liên kết giữ quy tắc riêng của nó dưới đây: một bước
      đọc và không gì khác.
+   - **Kỹ năng được phát một âm thanh: chỉ tiếng ngân nhẹ của chính đèn.**
+     Không có âm thanh kỹ năng nào được cài trên đèn dưới dạng tệp (không
+     kỹ năng có sẵn nào có thư mục `sounds/`, còn các tệp WAV trong image
+     là thông báo nói của giọng nói, chỉ root dùng), và mô hình tạo kỹ năng
+     không viết được âm thanh. Vì vậy âm thanh duy nhất của kỹ năng tự tạo
+     là cue có sẵn của giọng nói: một bước `[[do]]` `cue = "hum"`
+     (`do.cue`, `lamp-skills` nhận trong kỹ năng không có tool, giọng nói
+     tạo ở mức nhỏ cố định qua các cổng của dịch vụ say), với `speak =
+     true`, một mình hoặc cạnh bước đèn và cử chỉ, được nói là "hums
+     softly". Nó dùng chung một chỗ `say`: một cue và một `say`, hay hai
+     cue, bị từ chối ("it would say more than one line or play more than
+     one sound"), và cue không có `speak = true` bị từ chối như `say`. Mọi
+     cue khác, đường dẫn hay tên tệp, hoặc bất kỳ bước `sound` nào đều bị
+     từ chối ("it would play a sound the lamp doesn't have; the one sound a
+     made skill plays is its soft hum", `made_skill::SOUND_NOT_SHIPPED`):
+     âm thanh là danh sách cố định theo tên (`made_skill::SOUNDS`), mô hình
+     không bao giờ đưa âm thanh hay đường dẫn, và không có gì được đóng gói
+     cạnh `skill.toml`. Kiểm thử: `a_made_skill_may_play_the_lamps_soft_hum`,
+     `a_sound_the_lamp_doesnt_ship_is_refused`, và trong `tests/it/made.rs`
+     `lamp-skills pack` thật giữ một kỹ năng như vậy.
    Mở rộng giới hạn này là quyết định của trưởng nhóm. Lần mở rộng duy nhất
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
    `lamp-skills-manage@`, bật trong các unit sản phẩm): `services` nêu một dịch vụ
@@ -196,7 +216,11 @@ sau:
      greet them warmly, at most once an hour." Bước `say` không nói được
      thì lần sửa nêu nó cùng thế nào là một `say` ("[[do]] step 1, say: one
      short note, a few words, one clause, no quotes"), và `PLAIN_ONLY` nói
-     một bước có thể là một `say` với `speak = true`. Người dùng được nói `made_skill::UNSAID` (lời dễ hiểu, gợi ý nói
+     một bước có thể là một `say` với `speak = true`, hoặc tiếng ngân
+     `cue = "hum"`, được nói là "hums softly" ("When someone has been at
+     the desk for 5 seconds, it hums softly, at most once an hour."); bước
+     âm thanh khác được nêu trong lần sửa kèm `its one sound is cue =
+     "hum"` (`made_skill::SOUND_PART`). Người dùng được nói `made_skill::UNSAID` (lời dễ hiểu, gợi ý nói
      khi nào chạy, như 'when I come to my desk', và làm gì, như 'glow
      green'). Lần sửa nêu phần không nói được, chỉ bằng các khóa và topic
      của trigger, không bao giờ giá trị ("Can't be said plainly: trigger
