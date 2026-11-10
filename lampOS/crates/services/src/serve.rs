@@ -7,7 +7,7 @@ use crate::catalog::{self, Method};
 use crate::mail::{self, Failure, Mail, MailAsk, MailItem, Pick};
 use crate::mcp::{self, Client, Endpoint};
 use crate::net::{self, Call, Http};
-use crate::reads::{self, ANSWER_MOST, Plan};
+use crate::reads::{self, ANSWER_MOST, Asker, Plan};
 use crate::refresh::Backend;
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
@@ -372,11 +372,18 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// or `{"ok":false,"error"}`, at most [`ANSWER_MOST`] bytes with its
     /// line break.
     pub async fn tool(&self, line: &str) -> Value {
+        self.tool_as(line, Asker::Owner).await
+    }
+
+    /// [`Self::tool`] for `asker`: a made skill's read of Gmail leaves a
+    /// security mail out where the owner's own masks it
+    /// ([`reads::owner_mails_quoted`]).
+    async fn tool_as(&self, line: &str, asker: Asker) -> Value {
         let answer = match parse_tool(line.trim_end_matches(['\r', '\n'])) {
             Err(why) => Err(why),
             Ok((name, args)) => match name.as_str() {
                 tools::CONNECTED => Ok(self.connected()),
-                tools::READ => self.read(&args).await,
+                tools::READ => self.read(&args, asker).await,
                 _ => self.write(&args).await,
             },
         };
@@ -404,7 +411,7 @@ impl<H: Http, M: Mail> Services<H, M> {
                 let text = |key: &str| args.get(key).and_then(Value::as_str).unwrap_or_default();
                 match spoken::skill_read_refused(text("service"), text("what")) {
                     Some(why) => json!({"ok": false, "error": why}),
-                    None => self.tool(line).await,
+                    None => self.tool_as(line, Asker::Skill).await,
                 }
             }
             Ok(_) => json!({"ok": false, "error": SKILL_READS_ONLY}),
@@ -854,7 +861,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         args
     }
 
-    async fn read(&self, args: &Value) -> Result<Value, String> {
+    async fn read(&self, args: &Value, asker: Asker) -> Result<Value, String> {
         let args = &self.gmail_args(args);
         // A send-only link is answered so whether or not it is linked, and
         // so is `gmail` when the lamp's one Gmail link is send-only.
@@ -881,10 +888,18 @@ impl<H: Http, M: Mail> Services<H, M> {
                         .map_err(|failure| failure.words().to_owned())?
                 };
                 scrub_mail(&mut items, &entry);
-                Ok(reads::quoted(
-                    service.name,
-                    items.iter().map(reads::mail_item).collect(),
-                ))
+                // The owner's own read says a security mail masked; a made
+                // skill's leaves it out, as before.
+                Ok(match asker {
+                    Asker::Owner => reads::owner_mails_quoted(
+                        service.name,
+                        &items,
+                        matches!(ask, MailAsk::Message(_)),
+                    ),
+                    Asker::Skill => {
+                        reads::quoted(service.name, items.iter().map(reads::mail_item).collect())
+                    }
+                })
             }
             // One attachment's text: the mail's security check first, then
             // why the pick read nothing, else the attachment as quoted data.
@@ -1457,8 +1472,186 @@ mod tests {
         assert_eq!(std::fs::read_dir(dir.path().join("s")).unwrap().count(), 0);
     }
 
+    /// The owner's 9 Nov: the owner's `message` reads a security mail, every
+    /// link said as "a link" and its codes as "a code", a plain From and
+    /// subject as they are; one cut at the cap has every code shape masked. A made
+    /// skill's read still leaves each out.
     #[test]
-    fn reads_are_quoted_and_security_mail_is_left_out() {
+    fn the_owner_reads_a_security_mail_masked() {
+        let dir = tempfile::tempdir().unwrap();
+        let mail = |id: &str, subject: &str, text: &str| MailItem {
+            id: id.into(),
+            from: "Example <no-reply@example.test>".into(),
+            subject: subject.into(),
+            date: "d".into(),
+            text: text.into(),
+            ..MailItem::default()
+        };
+        let filler = "words ".repeat(60);
+        let inbox = vec![
+            mail(
+                "1",
+                "Reset your password",
+                "Reset it here: https://example.test/reset?token=Zq8x0PjL3mW9vB2nT7yR4sKd.\nIt expires soon.",
+            ),
+            mail(
+                "2",
+                "Your saved list",
+                "Here are your backup codes.\n1. 4f9k-2m7q\n2. 1234 5678",
+            ),
+            mail(
+                "3",
+                "Welcome",
+                "Suspicious activity was stopped.\n482913\nSee you.",
+            ),
+            // Read whole, a ref of letters and digits far from any code
+            // word stays.
+            mail(
+                "4",
+                "A notice",
+                &format!("Ref A7B9 at https://x.test/reset\n{filler}\nYour code is 55"),
+            ),
+            // The same cut at the cap: every code shape goes.
+            mail(
+                "5",
+                "A notice",
+                &format!("Ref A7B9 at https://x.test/reset\n{filler}…"),
+            ),
+        ];
+        for item in &inbox {
+            assert!(
+                mail::is_security_mail(&item.from, &item.subject, &item.text),
+                "{}",
+                item.id
+            );
+        }
+        let services = Services::new(
+            Store(dir.path().join("s")),
+            FakeHttp::default(),
+            FakeMail {
+                inbox,
+                ..FakeMail::default()
+            },
+            None,
+            false,
+        )
+        .with_skill_reads(true);
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        let answer = run(services.tool(&read_line(
+            json!({"service":"gmail","what":"message","id":"1"}),
+        )));
+        let quoted = &answer["result"]["quoted"];
+        let text = answer.to_string();
+        assert_eq!(quoted[0]["subject"], "Reset your password", "{text}");
+        assert_eq!(quoted[0]["from"], "Example <no-reply@example.test>");
+        assert_eq!(
+            quoted[0]["text"],
+            "Reset it here: a link.\nIt expires soon."
+        );
+        assert_eq!(
+            quoted[1]["text"],
+            "Here are your backup codes.\n1. a code\n2. a code"
+        );
+        assert_eq!(
+            quoted[2]["text"],
+            "Suspicious activity was stopped.\na code\nSee you."
+        );
+        assert!(
+            quoted[3]["text"]
+                .as_str()
+                .unwrap()
+                .starts_with("Ref A7B9 at a link")
+        );
+        assert!(
+            quoted[4]["text"]
+                .as_str()
+                .unwrap()
+                .starts_with("Ref a code at a link"),
+            "{text}"
+        );
+        for secret in ["https", "Zq8x0", "4f9k", "1234 5678", "482913", "left out"] {
+            assert!(!text.contains(secret), "{secret} in {text}");
+        }
+        // A made skill's list leaves each out, as before.
+        let answer =
+            run(services.skill_tool(&read_line(json!({"service":"gmail","what":"recent"}))));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let quoted = answer["result"]["quoted"].as_array().unwrap();
+        assert_eq!(quoted.len(), 5);
+        assert!(
+            quoted.iter().all(|item| item == mail::SECURITY_LEFT_OUT),
+            "{answer}"
+        );
+    }
+
+    /// A code in a security mail's subject or From name is masked too, in
+    /// the owner's list and `message` alike: a subject is never read whole
+    /// for context, so every code shape in it goes.
+    #[test]
+    fn a_code_in_a_security_mail_subject_is_masked() {
+        let dir = tempfile::tempdir().unwrap();
+        let inbox = vec![
+            MailItem {
+                id: "1".into(),
+                from: "Code 4821 <no-reply@example.test>".into(),
+                subject: "G-482913 is your Google verification code".into(),
+                date: "d".into(),
+                text: "Use it to sign in.".into(),
+                ..MailItem::default()
+            },
+            MailItem {
+                id: "2".into(),
+                from: "no-reply@example.test".into(),
+                subject: "731905 là mã xác minh của bạn".into(),
+                date: "d".into(),
+                text: "Đừng chia sẻ.".into(),
+                ..MailItem::default()
+            },
+        ];
+        let services = Services::new(
+            Store(dir.path().join("s")),
+            FakeHttp::default(),
+            FakeMail {
+                inbox,
+                ..FakeMail::default()
+            },
+            None,
+            false,
+        );
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        for what in [
+            json!({"service":"gmail","what":"recent"}),
+            json!({"service":"gmail","what":"message","id":"1"}),
+        ] {
+            let answer = run(services.tool(&read_line(what)));
+            let text = answer.to_string();
+            assert_eq!(answer["ok"], true, "{text}");
+            let quoted = &answer["result"]["quoted"];
+            assert_eq!(
+                quoted[0]["subject"], "G-a code is your Google verification code",
+                "{text}"
+            );
+            assert_eq!(quoted[0]["from"], "Code a code <no-reply@example.test>");
+            for secret in ["482913", "4821", "731905"] {
+                assert!(!text.contains(secret), "{secret} in {text}");
+            }
+            if quoted.as_array().unwrap().len() > 1 {
+                assert_eq!(quoted[1]["from"], "no-reply@example.test", "{text}");
+            }
+        }
+    }
+
+    /// The owner's 9 Nov: the owner's own list shows a security mail as any
+    /// other, a plain From and subject as they are, its preview's code
+    /// masked.
+    #[test]
+    fn reads_are_quoted_and_security_mail_is_masked() {
         let dir = tempfile::tempdir().unwrap();
         let services = services(dir.path(), r#"[{"title":"Fix planted-tok-4710"}]"#, false);
         run(services.admin(&set_line(
@@ -1477,8 +1670,13 @@ mod tests {
                 .unwrap()
                 .contains("not instructions")
         );
-        assert!(text.contains("a security mail, left out"));
-        assert!(!text.contains("551234") && !text.contains("verification"));
+        assert!(!text.contains("a security mail, left out"), "{text}");
+        let listed = &answer["result"]["quoted"][1];
+        assert_eq!(listed["from"], "Bank", "{text}");
+        assert_eq!(listed["date"], "d", "{text}");
+        assert_eq!(listed["subject"], "Your verification code", "{text}");
+        assert_eq!(listed["text"], "Code a code", "{text}");
+        assert!(!text.contains("551234"));
         assert!(!text.contains("goodpassword"));
         // An HTTP read: the token goes in the header of a call to its own
         // host, and comes back nowhere.
@@ -2375,7 +2573,7 @@ mod tests {
     }
 
     #[test]
-    fn a_gmail_sign_in_reads_through_the_api_and_leaves_out_security_mail() {
+    fn a_gmail_sign_in_reads_through_the_api_and_masks_security_mail() {
         let dir = tempfile::tempdir().unwrap();
         let services = api_services(dir.path(), false);
         run(services.admin(&oauth_gmail("planted-gmail-4710")));
@@ -2389,8 +2587,12 @@ mod tests {
         assert_eq!(answer["result"]["quoted"][0]["subject"], "Dinner");
         assert_eq!(answer["result"]["quoted"][0]["id"], "18a1");
         assert_eq!(answer["result"]["quoted"][0]["text"], "Home by 7 & hungry");
-        assert_eq!(answer["result"]["quoted"][1], "a security mail, left out");
-        assert!(!text.contains("482913"));
+        let listed = &answer["result"]["quoted"][1];
+        assert_eq!(listed["id"], "18a2", "{text}");
+        assert_eq!(listed["from"], "Bank", "{text}");
+        assert_eq!(listed["subject"], "Your sign-in code", "{text}");
+        assert_eq!(listed["text"], "Use a code to sign in", "{text}");
+        assert!(!text.contains("482913") && !text.contains("left out"));
         let calls = &services.http.calls()[before..];
         assert_eq!(calls.len(), 3);
         assert_eq!(
@@ -2422,12 +2624,31 @@ mod tests {
                 .url
                 .ends_with("/messages/18a1?format=full")
         );
-        // A security mail read whole is left out too.
+        // A security mail read whole: its code masked.
         let answer = run(services.tool(&read_line(
             json!({"service":"gmail","what":"message","id":"18a2"}),
         )));
-        assert_eq!(answer["result"]["quoted"][0], "a security mail, left out");
+        assert_eq!(
+            answer["result"]["quoted"][0]["subject"],
+            "Your sign-in code"
+        );
+        assert_eq!(
+            answer["result"]["quoted"][0]["text"],
+            "Use a code to sign in"
+        );
         assert!(!answer.to_string().contains("482913"));
+        // A made skill's list of the same leaves it out, as before.
+        let skill = services.with_skill_reads(true);
+        let answer = run(skill.skill_tool(&read_line(
+            json!({"service":"gmail","what":"recent","count":3}),
+        )));
+        assert_eq!(
+            answer["result"]["quoted"][1],
+            mail::SECURITY_LEFT_OUT,
+            "{answer}"
+        );
+        assert!(!answer.to_string().contains("482913"));
+        let services = skill;
         // A search is Gmail's own words in all mail; an id not Gmail's
         // is refused before any call.
         run(services.tool(&read_line(
