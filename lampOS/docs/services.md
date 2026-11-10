@@ -766,8 +766,10 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   the reply the read-back asked for (`answers_the_read_back`, Thirteen's P2
   and Reviewer-two's HOLD on #5967): the very next line after it, the
   read-back uncut, nothing the lamp answered between, and by the one who
-  asked when the line's person is known; any other "Cancel that." is the
-  model's. On
+  asked when the line's person is known (`speaker_of`: outside a private
+  room the line's known face, the owner's or another's, so a known other's
+  "Cancel." is the model's; in a private room the owner); any other
+  "Cancel that." is the model's. On
   lamp-9adf on 10 Nov, "Lamp, cancel that." after a read-back was answered
   "Cancel what exactly? I have several things set", with no call: the model
   weighed it against the lamp's reminders. Now, while another request's

@@ -1241,6 +1241,18 @@ pub(crate) fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Optio
     owner_among(lease, &crate::person::owner_ids())
 }
 
+/// Who said a line, for a reply to a waiting write ([`cancel_waiting`]): in the private room the owner, as [`owner_of`];
+/// outside it the line's known face, the owner's or anyone else's, so a
+/// known other is never taken for an unknown speaker (Reviewer-two's HOLD
+/// on #5967 at `a0e82daeaf`: `owner_of` is `None` for a known Bob too).
+/// `None` only when no known face holds the line (the room's scope).
+pub(crate) fn speaker_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    if crate::person::private_room() {
+        return owner_of(lease);
+    }
+    lease?.scope()?.person().map(str::to_owned)
+}
+
 /// [`owner_of`] outside the private room, with the owner's memory ids
 /// `owners`: the line's person when it is one of them, the line not held.
 /// Never a line that is theirs only by their face alone in view
@@ -1328,6 +1340,12 @@ pub fn judging_voices(judge: VoiceJudge) {
     let _ = JUDGE.set(judge);
     #[cfg(test)]
     JUDGE.with(|cell| *cell.borrow_mut() = Some(judge));
+}
+
+/// Whether a write waits for its "send", for a test on this thread.
+#[cfg(test)]
+pub(crate) fn pending_for_test_is_some() -> bool {
+    kept::pending(|pending| pending.is_some())
 }
 
 /// Sets the write waiting for its "send", for a test on this thread.
