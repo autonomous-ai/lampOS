@@ -1074,13 +1074,15 @@ pub fn install(skills: &Path, state: Option<&Path>, from: &Path) -> Result<Strin
     )
 }
 
-/// A skill made on this lamp by voice (`lamp_voice::made_skill`, #1685),
-/// put on at its person's spoken yes, which is bound to its package's
-/// SHA-256 (the lead, 20 Oct 08:37 on #1711): the voice asks with that hash
-/// alone. The package is the one the voice's made-skills folder `made`
-/// names with that hash in its index; its bytes are read once and hashed,
-/// and those same bytes are then read as a package, so what goes on is what
-/// the person said yes to. Its `skill.toml` is held again to a made skill's
+/// A skill made on this lamp by voice or in the app
+/// (`lamp_voice::made_skill`, #1685), put on as soon as the voice kept and
+/// checked it, with no spoken yes (the owner, 10 Nov: a made skill goes on
+/// with no spoken yes; the app's MAKE IT and the voice ask are the ask, #5977),
+/// bound to its package's SHA-256: the voice asks with that hash alone.
+/// The package is the one the voice's made-skills folder `made` names with
+/// that hash in its index; its bytes are read once and hashed, and those
+/// same bytes are then read as a package, so what goes on is what was
+/// kept and checked. Its `skill.toml` is held again to a made skill's
 /// cap (`lamp_voice::made_skill::capped`: light, body, two topics), or a
 /// skill written in the app's (`lamp_voice::made_skill::written_capped`:
 /// one function whose answer is the person's instructions), and its
@@ -1099,12 +1101,13 @@ pub fn install_made(
     install_made_at(skills, state, made, sha256, wait, now_unix_ms)
 }
 
-/// [`install_made`] at `now_unix_ms`: only the made skill the lamp asked
-/// about last, within `lamp_voice::made_skill::PUT_ON_WITHIN` and not yet
-/// on, as the voice's own `put_on` (the first builder on #2602, 22 Oct
-/// 10:1x). A kept SHA-256 asked for later, or one not asked about at all,
-/// puts nothing on, whoever asks. The time is the helper's, never the
-/// asker's.
+/// [`install_made`] at `now_unix_ms`: only a made skill the voice marked
+/// to go on (`lamp_voice::made_skill::goes_on`, its narrow "put on as made"
+/// entry, written right before it asks) within
+/// `lamp_voice::made_skill::GOES_ON_WITHIN` and not yet on (the first
+/// builder on #2602, 22 Oct 10:1x, kept for the mark). A kept SHA-256 asked
+/// for later, or one never marked, puts nothing on, whoever asks. The time
+/// is the helper's, never the asker's.
 pub fn install_made_at(
     skills: &Path,
     state: Option<&Path>,
@@ -1134,12 +1137,10 @@ pub fn install_made_at(
     else {
         return Err("not installed: no made skill is kept with that SHA-256".into());
     };
-    if lamp_voice::made_skill::waiting(made, now_unix_ms).map(|(_, asked)| asked)
-        != Some(sha256.to_owned())
-    {
+    if lamp_voice::made_skill::going_on(made, sha256, now_unix_ms).is_none() {
         return Err(format!(
-            "not installed: the lamp didn't ask about that made skill last, within {} s",
-            lamp_voice::made_skill::PUT_ON_WITHIN.as_secs()
+            "not installed: the lamp didn't mark that made skill to go on, within {} s",
+            lamp_voice::made_skill::GOES_ON_WITHIN.as_secs()
         ));
     }
     let path = made.join(file);
@@ -1192,8 +1193,8 @@ pub fn install_made_at(
         return Err(format!("not installed: {name:?} is not a skill's name"));
     }
     let _held = locked_within(skills, wait)?;
-    // A person's yes to their own made skill never takes the place of a
-    // skill they put on another way (Guard mode, Look for my keys, one from
+    // A person's own made skill never takes the place of a skill they put
+    // on another way (Guard mode, Look for my keys, one from
     // a store) without a word (the reviewer's P3 on #2414): only one made
     // here is replaced, and the one in the way is named.
     let there = skills.join(&name);
@@ -1213,7 +1214,7 @@ pub fn install_made_at(
     }
     let swept = swept(skills);
     let files = std::mem::take(&mut package.files);
-    // What binds these bytes is the person's yes, by their SHA-256, not a
+    // What binds these bytes is their SHA-256, kept and checked here, not a
     // signature (the reviewer's P3 on #2414).
     put_in(
         skills,
@@ -1228,10 +1229,7 @@ pub fn install_made_at(
     .map(|said| {
         said.replace(
             NO_SIGNATURE,
-            &format!(
-                "bound to the person's yes by its SHA-256, {}",
-                &sha256[..12]
-            ),
+            &format!("made here and bound by its SHA-256, {}", &sha256[..12]),
         )
     })
 }
@@ -2893,7 +2891,7 @@ pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 /// The units that may ask the manage helper, where the system's manager
 /// puts them (each one's `Slice=` in its product unit): `lamp-cloud`, for
 /// the app's remove and a Store install, and `lamp-voice`, for a made
-/// skill's spoken yes (#1685). Any other part in the group `lampos` may
+/// skill put on once kept (#1685). Any other part in the group `lampos` may
 /// connect, but is refused before its line is read (the reviewer's P3 on
 /// #2429), as the keys helper does (`lamp_setup::keys`, #2167).
 pub const ASKERS: [&str; 3] = [
@@ -3008,9 +3006,9 @@ pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
 ///   [`install_from_url`]: only
 ///   over https, only signed with the Store's key, never core.
 ///   Without a `store`, refused;
-/// - `{"install_made": SHA256}`, a skill made here by voice put on from the
-///   voice's made-skills folder `made`, at its person's spoken yes
-///   ([`install_made`]);
+/// - `{"install_made": SHA256}`, a skill made here put on from the
+///   voice's made-skills folder `made` as soon as the voice kept it and
+///   marked it to go on, with no spoken yes ([`install_made`]);
 /// - `{"off": NAME}` or `{"on": NAME}`, the app's off and on (#2815), kept
 ///   in `state` (the running program's `--state-dir`) by [`turn`]: a skill
 ///   that is part of the lamp itself is refused with why;

@@ -1521,7 +1521,7 @@ for it.
 - **Only two parts may ask** (the reviewer's P3 on #2429): before reading
   the line, the helper takes its peer's credentials (`SO_PEERCRED`) and
   `/proc/<pid>/cgroup`. Only `lamp-cloud` (the app's remove, a Store
-  install) and `lamp-voice` (a made skill's spoken yes, #1685), each at
+  install) and `lamp-voice` (a made skill put on once kept, #1685), each at
   the system's place for it, are answered, and `lamp-control` for skills
   pushed from a computer alone (`package::Asker`: it asks nothing else,
   and nothing else asks those, "only lamp-control asks for pushed skills,
@@ -1640,27 +1640,27 @@ for it.
   only after its fetch, at most 25 s, and its checks, under the 40 s
   `lamp-cloud` waits for an install), then refuses, `the lamp's skills
   can't be changed now`, with nothing done.
-- **A skill made here, put on at its person's yes** (#1685; the lead, 20
-  Oct 08:37 on #1711: a spoken yes bound to the package's SHA-256, the
-  helper installing only those bytes, re-checked and capped). The voice
-  asks `{"install_made": SHA256}`, 64 lowercase hex, and nothing else
-  (`package::install_made`). The helper finds the package the voice's
-  made-skills folder (`/var/lib/lampOS/voice/made-skills`, root's, 0700,
-  read by the helper as its owner) names with that hash in its
-  `made.json`. Only the made skill the lamp asked about last, within
-  120 s (`PUT_ON_WITHIN`) and not yet on, goes on: the voice's own
-  `made_skill::waiting`, read by the helper's clock, never the asker's (the
-  first builder on #2602, 22 Oct 10:1x). The newest ask is taken first,
-  whatever became of it: once it is on, or with the clock before it,
-  nothing waits, and an older ask never stands in for it (reviewer-two's P2
-  on #2874). A kept one never asked about, one asked about too long ago, or
-  an older one after another was asked about, is refused (`the lamp didn't ask about that made skill last, within
-  120 s`), so a kept SHA-256 is never put on later by any path. It reads
-  its bytes once and hashes them, and a package
-  whose hash has changed is refused (`its SHA-256 has changed`). Then it
-  reads those same bytes as the package, so nothing is read twice. Its
-  `skill.toml` is held again to a made skill's cap
-  (`lamp_voice::made_skill::capped`, the voice's own: light, body, and
+- **A skill made here, put on as soon as it is kept** (#1685; the owner,
+  10 Nov: a made skill goes on with no spoken yes; the app's MAKE IT and
+  the voice ask are the ask; the helper installing only the kept bytes,
+  re-checked and capped). The voice asks `{"install_made": SHA256}`, 64
+  lowercase hex, and nothing else (`package::install_made`). The helper
+  finds the package the voice's made-skills folder
+  (`/var/lib/lampOS/voice/made-skills`, root's, 0700, read by the helper as
+  its owner) names with that hash in its `made.json`. Only a made skill the
+  voice marked to go on (`goes_on_at_unix_ms`, written by
+  `made_skill::goes_on` right before it asks: the narrow "put on as made"
+  entry, no yes faked) within 30 s (`GOES_ON_WITHIN`) and not yet on goes
+  on: the voice's own `made_skill::going_on`, read by the helper's clock,
+  never the asker's (the first builder on #2602, 22 Oct 10:1x, kept for the
+  mark). A kept one never marked, one marked too long ago, one marked after
+  the helper's now (a clock gone back) or one on already is refused (`the
+  lamp didn't mark that made skill to go on, within 30 s`), so a kept
+  SHA-256 is never put on later by any path. It reads its bytes once and
+  hashes them, and a package whose hash has changed is refused (`its
+  SHA-256 has changed`). Then it reads those same bytes as the package, so
+  nothing is read twice. Its `skill.toml` is held again to a made skill's
+  cap (`lamp_voice::made_skill::capped`, the voice's own: light, body, and
   only `voice/state` and `room/presence`), and its `SKILL.md` must say
   `made: here`. Then it is installed as any package is, under the same lock
   and wait, with two differences:
@@ -1669,7 +1669,7 @@ for it.
     say `made: here` (Guard mode, Look for my keys, a store one) stays, and
     the answer names it (`… is already on the lamp, put on another way`).
     Only a skill made here before is replaced.
-  - Its done line says it is bound to the person's yes by its SHA-256, not
+  - Its done line says it was made here and is bound by its SHA-256, not
     that it carries no signature.
   - **One added from a file** (`added: file` in its `SKILL.md`, "Added from
     a file" below) is held to `capped_added` instead, and never takes the
@@ -1678,8 +1678,8 @@ for it.
   `…never_takes_the_place_of_one_put_on_another_way`,
   `…whose_package_changed_does_not_go_on`,
   `…past_the_cap_or_not_made_here_does_not_go_on`,
-  `…goes_on_only_within_its_ask_and_only_the_newest`,
-  `…once_the_newest_is_on_an_older_ask_puts_nothing_on`.
+  `…goes_on_only_within_its_mark`,
+  `…goes_on_through_the_helper_with_no_yes`.
 - **Why this and not the others** (the least new surface):
   - **Not the running `lamp-skills`.** It runs as `lampos`, the same user
     as `lamp-cloud`, reading the folder under `ProtectSystem=strict`.
@@ -1698,13 +1698,13 @@ for it.
   `lampos` may ask for a remove, never of a core skill. A group of
   `lamp-cloud`'s own would narrow that; it needs `lamp-update install` to
   make the group, and is not done here.
-- **On a lamp by `lamp-update install`** (#1685, for a made skill's spoken
-  yes): the two units are in its install list (`install::PRODUCT`), the
+- **On a lamp by `lamp-update install`** (#1685, for a made skill put on
+  once kept): the two units are in its install list (`install::PRODUCT`), the
   socket enabled and the template never, since systemd starts one for each
   connection (`the_skills_manage_socket_is_enabled_and_its_template_is_not`).
   A round never adds a unit (updates.md), so a lamp installed before #2429
   (lamp-0c89 too) has the helper only after `sudo lamp-update install …`
-  once; until then a remove and a made skill's yes are refused there.
+  once; until then a remove and a made skill's put-on are refused there.
   Not yet tried on a lamp. Tested on a Mac: `tests/it/package.rs` and
   `tests/it/store.rs` run the real program on a Unix socket and refuse a core
   skill, bad names, a URL that is not https, a Store that speaks no TLS,
@@ -2069,10 +2069,11 @@ only maker: a computer's agent no longer makes one (the first builder, 3 Nov,
 on the Queue), and `LAMP_MAKE_SKILL_LOCAL`, which chose between the two, is
 gone ([switches.md](switches.md)). What happens:
 
-1. **The voice's own two functions.** `make_skill(request)` and
-   `put_on_made_skill` are the voice's own, declared once and routed to
-   `Route::MakeLocal`, with a tasks part or without one; the tasks part
-   never declares them, and a skill is never handed to a computer.
+1. **The voice's own function.** `make_skill(request)` is the voice's
+   own, declared once and routed to `Route::MakeLocal`, with a tasks part
+   or without one; the tasks part never declares it, and a skill is never
+   handed to a computer. There is no `put_on_made_skill` since #5977: a
+   made skill goes on as soon as it is kept (step 8).
    `make_skill` makes at once, with no read-back: the model says in a few
    words that it is making it, and the person waits. The switch is given to
    the second route's worker only (`process.rs`), which keeps the chat's
@@ -2120,15 +2121,15 @@ gone ([switches.md](switches.md)). What happens:
    other service's reads listed but whole texts and free-form reads), its
    time of day the request's (the trigger's `during` shown as `HH:MM`,
    only for a time the request names: lamp-9adf's played check, 5 Nov,
-   was made with a shown 08:00 to 08:30 it never named), and its
-   spoken yes names the service, what it reads and the condition, "when
+   was made with a shown 08:00 to 08:30 it never named), and what it does
+   is said with the service, what it reads and the condition, "when
    you're alone with the lamp, it reads you tomorrow's Google Calendar:
    how many events, then each time and title." Off, any request that
    names a service is `NOT_A_SERVICE`, as before ([services.md](services.md),
    "A made skill's read"). Kept, a skill whose step reads a service not
    linked now (`services_connected`, asked once, at most 500 ms) is still
    kept, and the make tells it: by voice, `needs_link` in the make's
-   answer and one sentence said before the ask, "Gmail isn't linked yet:
+   answer and one sentence said after the line that it's on, "Gmail isn't linked yet:
    link it in the app, under Skills, then Connectors, and the skill will
    start then."; from the app, `needs_link: [{"code", "name"}]` in
    `skills.made`. With `lamp-services` not answering, neither, and the
@@ -2136,8 +2137,8 @@ gone ([switches.md](switches.md)). What happens:
 5. **Checked.** The card is marked `made: here` (`lamp-cloud`'s "Made on
    this lamp" group) and by its maker, `made_by: voice` or `made_by: app`
    (`made_skill::Maker`, from what it is kept as made from: an app's ask's
-   `local:app:…` is the app's), inside the package, so its SHA-256 and the
-   yes cover it; a `made` or `made_by` line the model wrote is dropped. The
+   `local:app:…` is the app's), inside the package, so the SHA-256 it is
+   put on by covers it; a `made` or `made_by` line the model wrote is dropped. The
    opt-in health report counts a made skill by this marker
    (`cloud.md`, "Skills, counted"). Then `lamp-skills pack` (#1698) checks the folder:
    every check a load makes, its permissions among them, and the package
@@ -2201,18 +2202,28 @@ gone ([switches.md](switches.md)). What happens:
    - **What no skill can do.** The model is told that a skill can't hear
      what is said: a request that needs words or a sound heard, or
      anything else no made skill can sense or do, is answered `cannot:`
-     and why, never stood in for by something else, and no time of day is
-     added that the request didn't name. Such an answer, with no fenced
-     block, is whole as it is (never asked again as one cut short) and is
-     told as not made, "a skill can't do that: " and the model's reason, at
-     most 120 characters (`made_skill::CANNOT`); nothing is kept. When part
+     then one short sentence said to the person, in plain words, why,
+     ending with what to ask instead when there is one (for a reminder at a
+     time or every so often: "Ask me for a reminder instead, like 'remind
+     me every hour to stand up'."), never stood in for by something else,
+     and no time of day is added that the request didn't name. Such an
+     answer, with no fenced block, is whole as it is (never asked again as
+     one cut short) and is told as not made with that reason as it is
+     (#5977; the owner, 10 Nov: "say clearly why"): the app shows it as
+     `why`, and the voice says "I couldn't make that: " and the reason. It
+     is at most 240 characters (`made_skill::CANNOT`), cut where a sentence
+     ends, or else where a word ends, never mid-word and never with "…"
+     (on lamp-74ff a reason cut at 120 ended "beyond s…"); nothing is kept.
+     The journal says it too: `lamp-voice: a skill made here wasn't kept in
+     N ms: <why>` (#5977), the lamp's or the model's words, never the
+     person's request. When part
      of a request can't be done ("dim slowly over a minute"), the model
      makes the rest and adds a line outside the blocks that begins
      `left out:` (`made_skill::LEFT_OUT`, #5041). It is said after what
      the skill does, in a fixed frame as the maker's note, one clause with
      no quotes, at most 120 characters ("… it dims the light a step. The
      maker notes what it couldn't do: dimming slowly."), so it can't read
-     as more of what runs, and a yes is to that too. It is in the
+     as more of what runs, and the person hears that too. It is in the
      package's description as well. Both markers are read in any case.
    - Tests: `made_skill::tests::what_it_does_is_said_from_its_toml`,
      `what_it_cant_say_is_refused_with_lines_for_a_repair`,
@@ -2248,61 +2259,35 @@ gone ([switches.md](switches.md)). What happens:
    One that doesn't pass is told as not made ("the skill couldn't be made:
    …"), with no technical words for the person, and nothing is kept. The
    files are never read out.
-7. **Told, and asked.** Kept, the model is told its name, what it does
-   (said plainly as above) and what it would use ("its light and whether
-   it is talking"), and to ask, word for word, "Shall I put it on the
-   lamp?" in the same answer. It is not kept as asked then (the
-   Reviewer-lead's P2 on #4914): only when a yes comes right after an
-   answer of the lamp's that said the ask, within 120 s, does
-   `put_on_made_skill` first keep it asked (`made_skill::asked_in_answer`,
-   with the words and age of one exchange, `Thread::answered_last_but`, #4880's rule)
-   and then put that SHA-256 on. It is dated at the yes, not at the answer
-   (`make_skill_local::asked_at_yes`, the Reviewer-lead's second P2): the
-   answer's age runs from its first piece ("I'll make it now"), said
-   before the call kept the skill, and the ask comes later in it. A yes
-   after a cut-in ("wait, make it 11") or after an answer that asked
-   something else puts nothing on.
-   - A skill made here whose ask was cut (lamp-9adf, 2 Nov 17:08: a sound
-     right after it was kept ended the answer before the ask) is "untold".
-     While it is the only one, kept within `UNTOLD_WITHIN` (10 minutes),
-     the second route notes it to the model, which then says what it does
-     and asks (`make_skill_local::untold_note`). A yes counts only the
-     untold skills kept in those 10 minutes, so an older cut one never
-     holds back a later skill (`make_skill_local::asked_at_yes`).
-   - Once a skill was asked (its ask said whole, by the voice or the app's
-     spoken ask), a yes puts it on only while the lamp has said nothing
-     since the ask, or its last answer was the ask: a yes to another
-     question the lamp asked meanwhile ("For ten minutes?") puts nothing on
-     (`make_skill_local::yes_is_to_the_ask`, the Reviewer-lead's P2 on
-     #4971). The model is then told to ask once more in the ask's own
-     words (`make_skill_local::not_to_the_ask`), so the next yes counts: an
-     ask in other words ("shall I put the red glow on the lamp?") was
-     refused at every yes (lamp-9adf, 2 Nov 22:26). The ask counts in any
-     case and inside a sentence (`made_skill::says_the_ask`): "Just to be
-     sure: shall I put it on the lamp?" was refused once for its small "s"
-     (22:51).
-8. **Put on at a spoken yes** (the lead, 20 Oct 08:37 on #1711: a spoken
-   yes bound to the SHA-256, an exception to the 18:33 "only signed
-   packages" ruling for a skill made here alone; the app doesn't confirm
-   too). On the person's yes the model calls `put_on_made_skill`
-   (`made_skill::put_on`):
-   - only a yes said out loud counts (`heard`): a typed one, or one the lamp
-     wrote, puts nothing on;
-   - only a plain yes (the words heard in the line, as the held forget's,
-     `known_faces::plain_agreement`): "No, not yet" the model took for a
-     yes puts nothing on;
-   - only the newest ask, within 120 s of it (`PUT_ON_WITHIN`, as a
-     hand-over's yes);
-   - the voice sends the manage helper that skill's SHA-256 alone
-     (`{"install_made": SHA256}`, "The manage helper" above), which
-     installs only those bytes, held again to this cap;
-   - on the second route, while one waits, each request is told so
-     (`made_skill::waiting_note`), since the route keeps words, not calls;
-   - the person hears that it's on, that it couldn't be put on (also with
-     no helper to ask), or, with no answer from a helper asked within 8 s,
-     that it is being put on;
-   - never without `LAMP_MAKE_SKILL`, whatever the model calls: without it
-     the two functions are nobody's.
+7. **Told, never asked** (#5977; the owner, 10 Nov: a made skill goes on
+   with no spoken yes; the app's MAKE IT and the voice ask are the ask).
+   Kept, it is put on at once (step 8), and the model is told its name,
+   whether it is on, what it does (said plainly as above) and what it uses
+   ("its light and whether it is talking"), and to say exactly one short
+   line and ask nothing about putting it on: "I made evening dim, and it's
+   on." (`made_skill::on_line`), or, when it couldn't be put on, "I made it
+   but couldn't put it on: <why>." (`made_skill::not_on_line`, with
+   `not_on` in the make's answer). "Shall I put it on the lamp?" is never
+   said, no ask is queued, and nothing waits for a yes: the asked-in-answer,
+   untold and yes-to-the-ask rules of #4880, #4914 and #4971 are gone with
+   it. The person's own ask to make the skill stays the ask.
+8. **Put on at once** (`made_skill::put_on`): the voice marks the kept
+   skill to go on (`goes_on_at_unix_ms`, `made_skill::goes_on`) by its own
+   clock and sends the manage helper that skill's SHA-256 alone
+   (`{"install_made": SHA256}`, "The manage helper" above), which installs
+   only those bytes, held again to this cap, and only within 30 s of the
+   mark (`GOES_ON_WITHIN`). The helper is waited for at most 8 s. Answered
+   done, the skill is marked `on`; otherwise it stays off and why is kept
+   beside it as `not_on`, in plain words:
+   - no helper to ask: "the lamp's skills couldn't be reached";
+   - no answer within 8 s: "the lamp didn't say in time whether it is on"
+     (the helper may still put it on);
+   - a skill of that name put on another way: "a skill called evening dim
+     is already on the lamp";
+   - any other refusal: "the lamp's check didn't let it on".
+   Never without `LAMP_MAKE_SKILL`, whatever the model calls: without it
+   `make_skill` is nobody's. Taking a made skill off (the app's remove, or
+   `{"off": NAME}`) is unchanged.
 9. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, and with the one more try after a failure and the
    one repair after a refusal, two asks of two tries each: about 120 s at
@@ -2315,30 +2300,35 @@ gone ([switches.md](switches.md)). What happens:
 Removing a made skill by voice is still to come.
 
 Tests:
-- `make_skill_local::tests`: a good answer kept and asked only after an
-  answer that said the ask, a refused one keeping nothing, a 404 and a cut
-  answer asked once more, a brief refused asking nothing, the switch alone
-  routing and declaring the two functions with a tasks part or without
-  one, and `with_no_tasks_part_a_skill_is_made_and_put_on_by_voice` (made,
-  asked, and put on by a plain spoken yes through a manage helper, on a
-  lamp with no tasks part at all).
+- `make_skill_local::tests`: `a_good_answer_is_kept_and_put_on_with_no_yes`
+  (the line said is the "it's on" one, and the helper is asked for its
+  SHA-256), `a_kept_skill_not_put_on_is_said_with_why_and_stays_off`, a
+  refused one keeping nothing, a 404 and a cut answer asked once more, a
+  brief refused asking nothing, the switch alone routing and declaring
+  `make_skill` (and never `put_on_made_skill`) with a tasks part or
+  without one, `with_no_tasks_part_a_skill_is_made_and_put_on_by_voice`,
+  and `the_journal_says_why_a_make_was_not_kept` (#5977: the journal line
+  `lamp-voice: a skill made here wasn't kept in N ms: <why>`, the lamp's
+  own words, never the request; lamp-74ff's app make said no reason).
 - `made_skill::tests`: the brief within 1,300 bytes (so its repair fits the
   tasks part's 2,000), exactly two files, the
   cap, each wider use refused, the card marked, nothing kept without the
-  checker, the ask's window, the spoken and plain yes, no helper, the
-  helper's refusal and silence.
+  checker, `a_kept_skill_goes_on_at_once_by_its_sha256_with_no_yes`,
+  `only_a_fresh_mark_lets_a_kept_skill_go_on` and
+  `a_kept_skill_not_put_on_stays_off_and_says_why` (no helper, the
+  helper's silence and refusal, a name put on another way).
 - `crates/skills/tests/it/made.rs`, with the real `lamp-skills`: checked,
   packed and kept 0700 by its SHA-256; a step it doesn't declare refused;
   at most five kept; and
-  `made::a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper` (the
+  `made::a_made_skill_goes_on_through_the_helper_with_no_yes` (the
   voice's call through the real helper).
 
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
-The same maker, from words typed in the app; put on only as above, by a
-spoken yes at the lamp (the lead's ruling on #1711; the first builder on
-#2602, 22 Oct 10:3x). It needs `LAMP_MAKE_SKILL=on` and the say service
-(`LAMP_SAY=on`), to ask aloud; without either the app socket isn't started
+The same maker, from words typed in the app; put on as above, at once,
+with no spoken yes (#5977; the owner, 10 Nov: the app's MAKE IT is the
+ask). It needs `LAMP_MAKE_SKILL=on` and the say service (`LAMP_SAY=on`),
+to say aloud what it made; without either the app socket isn't started
 (`crate::app_make`). No tasks part is asked, and none is needed.
 
 1. `lamp-voice` listens at `LAMP_APP_MAKE_SOCKET`
@@ -2355,7 +2345,7 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    the words too long; an id sent before, of the newest 100; or one still
    being made: one at a time, and one "making" for 30 minutes is let go).
    It is kept as made from `local:app:<ms>:1` (the ask's task
-   `local:app:<ms>`, so `skills.made` finds it): `making`, then `kept`, or
+   `local:app:<ms>`, so `skills.made` finds it): `making`, then `on`, or
    `not_kept` with why.
 3. `{"ready": {}}` (fourteen-P15): `{"ready": true}` at once: the lamp
    makes it itself. It reads nothing of the asks. `lamp-cloud` asks it every
@@ -2365,7 +2355,8 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    from the app, as running totals, `{"made_by_voice": {"kept", "on",
    "refused", "left_off"}, "made_by_app": {...}}`, for `lamp-cloud`'s opt-in health
    report (`cloud.md`, "Skills, counted"; `made_counts::counts`). `kept`,
-   `on` and `left_off` are read from the made skills' index, each skill
+   `on` and `left_off` (kept and not put on, its `not_on`; or asked about
+   before #5977 and never said yes to) are read from the made skills' index, each skill
    counted once by its SHA-256 under the maker its `from` says (`local:app:…`
    or `written:app:…` the app's, `local:…` the voice's); `refused`, an ask
    that made nothing, is counted on an atomic per maker where it is told
@@ -2378,49 +2369,39 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    skill on the lamp has is on its card, so the answer names no package.
    Deleted, under its lock, by the manage helper's `forget_counts` at the
    person's no (`made_counts::forget`). Tests: `made_counts::tests`.
-4. **Told aloud.** Kept, the lamp says aloud, through the say service's own
-   asks at a good moment within an hour (`app_make::ask_line`, `say_ask`):
-   "I made the skill you typed in the app." with what it does, then exactly
-   "Shall I put it on the lamp?". That turn is a written turn, so the
-   thread keeps its words as the lamp's answer. Only a yes right after it
-   puts the skill on, and nothing from the app puts it on
-   (`app_make::ask_answered`, Mobile's HOLD on #4963):
-   - **Said whole** (the say service's `spoken`): the skill is kept as asked
-     at that moment, however long the ask waited in the queue, so a plain
-     spoken yes within 120 s puts it on (`put_on_made_skill`, and the
-     manage helper's own check, #2874), and with silence `skills.made`
-     turns from `asked` to `left_off`.
-   - **Begun but not said whole** (dropped, expired or refused): nothing is
-     kept as asked. It stays untold, its 10 minutes (`UNTOLD_WITHIN`)
-     counted from when the ask was last begun aloud
-     (`ask_begun_at_unix_ms`), not from when it was kept, so an ask queued
-     past 10 minutes is still noted to the model, which asks again. A yes
-     then counts only right after an answer of the lamp's that said the ask
-     (`asked_at_yes`), and a yes after anything else puts nothing on.
-   A no, a typed yes or silence leaves it off.
+4. **Put on at once, then told aloud** (#5977; the owner, 10 Nov: a made
+   skill goes on with no spoken yes; the app's MAKE IT is the ask). Kept,
+   it is put on at once through the manage helper, as by voice
+   (`made_skill::put_on`, "Made by voice", step 8), and the lamp says one
+   short line through the say service's own asks at a good moment within
+   an hour (`app_make::say_line`): "I made evening dim, and it's on."
+   (`made_skill::on_line`), or "I made it but couldn't put it on: <why>."
+   (`made_skill::not_on_line`). Nothing is asked and nothing waits for a
+   yes; what became of the line is only logged.
 5. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
-   only, never a skill made by voice. `state` is `making`, `kept` (not yet
-   asked about aloud), `asked` (the offer a spoken yes would put on now:
-   the newest, within its 120 s, `made_skill::waiting`, #2874), `on`,
-   `left_off` (asked, and no longer that offer) or `not_kept` with `why`
-   (the maker's plain words). Once kept: `name`, `description`, `version`,
-   `uses` (`light`, `body`, `topics`, and `speak`, true only for a skill
-   written in the app) and `sha256`, what the lamp asks about. `{"state": "none"}` with no ask.
+   only, never a skill made by voice. `state` is `making` (being made, or
+   kept and being put on), `on`, or `not_kept` with `why` in plain words:
+   the maker's, "it couldn't be put on: <why>" for a kept skill the helper
+   didn't put on (its `not_on`), or "it wasn't put on" for one kept more
+   than 30 minutes ago and never put on (`app_make::why_not`). A new ask
+   is never `kept`, `asked` or `left_off`; a skill asked about before
+   #5977 and never said yes to still reads `left_off`. Once kept: `name`,
+   `description`, `version`, `uses` (`light`, `body`, `topics`, and
+   `speak`, true only for a skill written in the app) and `sha256`.
+   `{"state": "none"}` with no ask.
 6. Kept beside the made skills, root's, 0700: `app.json`, the newest five
    asks, each its request id, when, its task and why it wasn't kept. Never
    the words. Every writer (the socket's admission and the making thread)
    holds one lock (`.app.lock`, `flock`) across its read, decision and
    write, and writes through a file of its own, so no ask is lost.
 
-Tests: `app_make::tests` (the states, a superseded offer left off, not kept
-and why, one at a time and bounded, the socket's lines and `ready` at once,
-a make through the real socket with no model to ask told not kept and why,
-overlapping writers losing nothing, the socket's group, and on a lamp with
-no tasks part at all a typed ask made, kept, asked aloud and put on by the
-plain spoken yes right after that ask, a yes after anything else putting
-nothing on, one not kept told why with nothing said, and an ask said whole
-15 minutes after it was kept made `asked` then `left_off` with silence,
-while a dropped one stays `kept` and is noted to the model). The app's side
+Tests: `app_make::tests` (the states, `making` then `on` or `not_kept` with
+why, an old ask's `left_off`, one at a time and bounded, the socket's lines
+and `ready` at once, a make through the real socket with no model to ask
+told not kept and why, overlapping writers losing nothing, the socket's
+group, `made_here_goes_on_at_once_with_no_ask_said` on a lamp with no tasks
+part at all, `made_here_and_not_put_on_says_why_and_tells_the_app`, and one
+not kept told why with nothing said). The app's side
 is `skills.make` and `skills.made` in `lamp-cloud` ([cloud.md](cloud.md),
 "A skill typed in the app").
 
@@ -2436,10 +2417,11 @@ signature ("add it from the Skill Store"), a `run.py` or any file but
 `skill.toml` and `SKILL.md`, a SHA-256, size or id that isn't the one
 uploaded, and a name on the lamp. Then, on the app-make socket (a line of
 at most 64 KiB, `{"upload": {"skill_md", "skill_toml"?}}`, taken only with
-the switch in `lamp-voice`'s unit and the say service there to ask; and
-`{"added": {"sha256"}}`, its state, `kept`, `asked`, `on`, `left_off` or
+the switch in `lamp-voice`'s unit and the say service there to say it; and
+`{"added": {"sha256"}}`, its state, `kept` (being put on), `on`, `left_off`
+(kept and not put on, its `not_on`; or asked about before #5977) or
 `none`, which `lamp-cloud` asks until it is on or left off, so the backend
-hears `success` only after the spoken yes). The same upload again while it
+hears `success` only once it is on). The same upload again while it
 is in flight joins it (answered `starting`, one result for both), never
 `BUSY`; and what is in flight is kept in `lamp-cloud`'s state folder (id,
 kind, SHA-256 and state only, never the skill's name or words), so after a
@@ -2484,12 +2466,13 @@ restart it is asked about again and the app is still told:
    `"uploaded": true`, never the Store's; checked and packed by `lamp-skills pack`; kept beside the made
    skills from `upload:<ms>` with `"added": "file"` in `made.json`, at most
    five made or added (`KEPT_MOST`).
-6. **Asked aloud, put on only at a spoken yes**, as a skill typed in the app
-   and made here: through the say service's own asks, at a good moment, "A
-   skill called NAME was added in the app from a file, not from the Skills
-   Store." with what `plainly` says, then exactly "Shall I put it on the
-   lamp?" (`upload_skill::ask_line`). Said whole, it waits 120 s for a plain
-   spoken yes (`put_on_made_skill`); nothing from the app puts it on.
+6. **Put on at once, with no spoken yes** (#5977; the owner, 10 Nov), as a
+   skill typed in the app and made here: once the socket has answered
+   `kept`, it is put on through the manage helper (`made_skill::put_on`),
+   then said through the say service's own asks, at a good moment: "I
+   added NAME from a file, not from the Skills Store, and it's on."
+   (`upload_skill::on_line`), or "I added a skill from a file but couldn't
+   put it on: <why>." (`upload_skill::not_on_line`).
 7. **The manage helper holds it again** (`install_made`): a card that says
    `added: file` is held to `capped_added`, and never takes the place of any
    skill, a made one's neither ("… a skill added from a file never takes its
@@ -2499,16 +2482,17 @@ The files' words are never in the journal.
 
 Tests: `upload_skill::tests` (a bare SKILL.md taken as a trigger-less
 written skill; a trigger, no function or more than a made skill may use
-refused; a taken name refused; never on before the spoken yes; the socket's
-line with the switch off, without the say service, and kept) and, with the
+refused; a taken name refused; on at once with no yes, or `left_off` with
+why without a helper; the socket's line with the switch off, without the
+say service, kept and then `on`) and, with the
 real `lamp-skills`,
 `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
 
 #### Written in the app (`LAMP_SKILL_WRITTEN=on`, off)
 
 Off unless `LAMP_SKILL_WRITTEN=on` in `lamp-voice`'s unit, with
-`LAMP_MAKE_SKILL=on` (the made skills' folder and `put_on_made_skill`) and
-the say service (`LAMP_SAY=on`, to ask aloud); and in `lamp-cloud`'s, with
+`LAMP_MAKE_SKILL=on` (the made skills' folder and its put-on) and
+the say service (`LAMP_SAY=on`, to say it aloud); and in `lamp-cloud`'s, with
 the skills page, for the app's `skills.write` ([cloud.md](cloud.md), "A
 skill written in the app"). Approved on the Queue by the first builder
 (3 Nov, 14:33). The person writes a skill in their own words, V1's
@@ -2552,9 +2536,8 @@ rewrites a word of it (`made_skill::Written`, `made_skill::keep_written`,
 3. **Held and kept as a made skill is** (`made_skill::keep_written`): a
    name a skill on the lamp has (`/var/lib/lampOS/skills/NAME`, or pushed,
    `/var/lib/lampOS/skills-dev/NAME`) is refused; a kept one of that name
-   not on, asked about or not, is replaced by the new one, its package and
-   its offer with it (a spoken no leaves no mark, so a fix sent after it
-   goes at once, and a late yes puts nothing on);
+   not on is replaced by the new one, its package and its mark to go on
+   with it, so a fix sent after it goes at once;
    then the cap (`written_capped`: exactly
    that shape, the note framed as above and within the same bounds),
    `lamp-skills pack`, and the same keep, at most five made skills, as
@@ -2563,30 +2546,27 @@ rewrites a word of it (`made_skill::Written`, `made_skill::keep_written`,
 4. **Said plainly** (`plainly`, extended for this shape alone): "When you
    ask for it (WHEN), the lamp follows the instructions you wrote:
    INSTRUCTIONS…", the `when` cut to 60 characters and the instructions to
-   70, each at a whole word, so it stays one breath. Kept, the lamp asks
-   aloud through the say service's own asks, at a good moment: "I kept the
-   skill you wrote in the app, NAME. When you ask … Shall I put it on the
-   lamp?" (`app_make::written_ask_line`). It uses "its voice".
-5. **Put on only at the person's spoken yes**, as made skills are: the ask
-   is dated when said whole, and only a plain spoken yes within 120 s puts
-   it on by its SHA-256 (`put_on_made_skill`). The manage helper holds it
-   again to its cap (`made_skill::put_on_cap`: a written skill's when it
-   has a function, else a made one's) and to `made: here`. Before that yes
-   nothing is in the skills folder, so its function is declared to no
-   model. `skills.made` tells the app `making`, `kept`, `asked`, `on`,
-   `left_off` or `not_kept` (with why, a taken name among them), with
-   `"written": true`; the skills page shows it in "Made on this lamp" with
+   70, each at a whole word, so it stays one breath. It uses "its voice".
+5. **Put on at once, with no spoken yes** (#5977; the owner, 10 Nov), as
+   made skills are: by its SHA-256 through the manage helper
+   (`made_skill::put_on`), which holds it again to its cap
+   (`made_skill::put_on_cap`: a written skill's when it has a function,
+   else a made one's) and to `made: here`. Then the lamp says through the
+   say service's own asks, at a good moment, "I made NAME, and it's on."
+   (`made_skill::on_line`), or why it couldn't. `skills.made` tells the
+   app `making`, `on` or `not_kept` (with why, a taken name or a put-on
+   that failed among them), with `"written": true`; the skills page shows it in "Made on this lamp" with
    `"written": true`, never as one from the Store.
 
 Tests: `made_skill::tests::a_written_skill_*` (the function with the text
-as written and no trigger, plainly said; kept, and nothing waiting or
-declared before it is asked; no name a skill has; the bounds; nothing but
+as written and no trigger, plainly said; kept, and nothing marked or
+declared by keeping alone; no name a skill has; the bounds; nothing but
 its answer, kept or put on), `app_make::tests::a_written_skill_*` (the
 switch, the text handed on as written, refusals before anything is
-recorded; kept, told to the app as written, asked aloud, a taken name told
-why and nothing said), lamp-skills'
-`made::a_written_skill_passes_the_real_checker_and_is_put_on_only_when_asked`
-(the real checker packs it; refused before the ask; once on, it loads as a
+recorded; kept, put on, told to the app as on and written, the "it's on"
+line said, a taken name told why and nothing said), lamp-skills'
+`made::a_written_skill_passes_the_real_checker_and_is_put_on_only_once_marked`
+(the real checker packs it; refused before it is marked to go on; once on, it loads as a
 function with no trigger), and `lamp-cloud`'s
 `make_skill::tests::a_written_skill_is_handed_to_the_voice_as_written` and
 `written_fields_are_held_as_lamp_voice_holds_them`.

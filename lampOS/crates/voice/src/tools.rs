@@ -859,11 +859,11 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if let Some(place) = &settings.tasks {
         tools.extend(crate::agent_tasks::tools(place));
     }
-    // A skill made by the lamp's own model: its two functions are the
-    // voice's own, with or without the tasks part.
+    // A skill made by the lamp's own model: its function is the voice's
+    // own, with or without the tasks part. It goes on as soon as it is
+    // kept, so there is no function to put it on (the owner, 10 Nov).
     if settings.make_skill {
         tools.push(crate::make_skill_local::tool());
-        tools.push(crate::made_skill::put_on_tool());
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
@@ -1154,8 +1154,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
                 .flatten(),
         );
     }
-    if settings.make_skill && (name == crate::made_skill::MAKE || name == crate::made_skill::PUT_ON)
-    {
+    if settings.make_skill && name == crate::made_skill::MAKE {
         return Route::MakeLocal;
     }
     if crate::agent_tasks::is_tool(name) {
@@ -2083,7 +2082,7 @@ fn run_call_with_scope(
         ),
         Route::MakeLocal => (
             "the lamp's own model",
-            (crate::make_skill_local::answer(call, request, heard), true),
+            (crate::make_skill_local::answer(call), true),
         ),
         Route::Schedule(directory) => (
             "the schedule through the executive",

@@ -2868,8 +2868,6 @@ pub fn serve(
         .tasks
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on());
-    // Made by the lamp's own model.
-    let making_skills = tools.make_skill;
     let declines = tools.decline;
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
@@ -3537,24 +3535,12 @@ pub fn serve(
             crate::agent_tasks::named_ask(&place, words)
         }));
     }
-    // A hand-over waiting for its yes, with the tasks part (#1712).
-    // And a made skill waiting for its yes to be put on (`crate::made_skill`),
-    // or made and not yet asked about.
-    if has_tasks || making_skills {
+    // A hand-over waiting for its yes, with the tasks part (#1712). A made
+    // skill waits for nothing: it goes on as soon as it is kept (the owner,
+    // 10 Nov), so it is never noted.
+    if has_tasks {
         engine = engine.noting_a_task_waiting(Arc::new(move |request| {
-            crate::agent_tasks::pending_note(request, Instant::now()).or_else(|| {
-                making_skills
-                    .then(|| {
-                        let now_unix_ms = SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map_or(0, |since| since.as_millis() as u64);
-                        let directory = std::path::Path::new(crate::made_skill::DIRECTORY);
-                        crate::made_skill::waiting_note(directory, now_unix_ms).or_else(|| {
-                            crate::make_skill_local::untold_note(directory, now_unix_ms)
-                        })
-                    })
-                    .flatten()
-            })
+            crate::agent_tasks::pending_note(request, Instant::now())
         }));
     }
     // A look reads the eyes' look file with the Live route's bounds: a full

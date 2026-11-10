@@ -140,8 +140,8 @@ lamp says so.
 | `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
 | `skills.camera` (`{"name", "allow": bool}`) | with `LAMP_SKILLS_PAGE=on` (#3504's piece C, "The owner's yes to a skill's camera" below): the owner's yes to the skill seeing the camera's picture, given (`allow` true) or taken back, past the app's warning, asked of root's manage helper as off and on are and kept in `lamp-skills`' `camera`; the reply is `skills.list`'s, read after it, with `camera: {name, allowed}`, what was kept for that name, on the lamp or not (#4099). A name that is not a skill's is refused, and `allow` that isn't a JSON bool is `allow must be true or false`. Without the switch, V1's "not on this lamp" |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
-| `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below; on in the product, fourteen-P15), and named in `can` only while lamp-voice's maker answers `ready` (asked every 60 s; the lamp's own model makes it, so the voice says yes at once, and the button can show up to 60 s after lamp-voice starts): `skills.make` (`{"words", "request_id"}`, the words at most 480 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `kept`, `asked`, `on`, `left_off`, `not_kept` with `why`), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
-| `skills.upload.<upload_id>` (`upload_id` the first 16 lowercase hex of the file's SHA-256; no file inline) | with `LAMP_SKILL_UPLOAD=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill added from a file" below); `can` names it `skills.upload`: answered `starting` at once, which keeps the file on the backend; the file is taken from the backend's `get-message` for that kind, checked and handed to `lamp-voice`, and a second reply of the same kind follows once it settles: `success` with `{"state": "on", "upload_id", "added": "file", "uploaded": true, "name", "description", "version", "sha256", "may_use"}` once a spoken yes put it on, or `failure` with why (a check, or left off at the lamp). Either deletes the file on the backend; with no reply it is gone after a day. Nothing from the app puts it on |
+| `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below; on in the product, fourteen-P15), and named in `can` only while lamp-voice's maker answers `ready` (asked every 60 s; the lamp's own model makes it, so the voice says yes at once, and the button can show up to 60 s after lamp-voice starts): `skills.make` (`{"words", "request_id"}`, the words at most 480 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `on`, `not_kept` with `why`; `left_off` only for an ask from before #5977, when a kept skill waited for a spoken yes), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
+| `skills.upload.<upload_id>` (`upload_id` the first 16 lowercase hex of the file's SHA-256; no file inline) | with `LAMP_SKILL_UPLOAD=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill added from a file" below); `can` names it `skills.upload`: answered `starting` at once, which keeps the file on the backend; the file is taken from the backend's `get-message` for that kind, checked and handed to `lamp-voice`, and a second reply of the same kind follows once it settles: `success` with `{"state": "on", "upload_id", "added": "file", "uploaded": true, "name", "description", "version", "sha256", "may_use"}` once it is on (at once, with no spoken yes, since #5977), or `failure` with why (a check, or not put on at the lamp). Either deletes the file on the backend; with no reply it is gone after a day. Nothing from the app puts it on |
 | `skills.write` | with `LAMP_SKILL_WRITTEN=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill written in the app" below; off), named in `can` on the switch alone, with `skills.made`: `{"name", "when", "instructions", "request_id"}`, a skill the person wrote in their own words, held to the voice's bounds and sent to `lamp-voice`'s app-make socket as `{"written": {...}}`, which keeps it as written, with no model; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` tells what became of it, with `"written": true`. Nothing from the app puts it on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
@@ -650,12 +650,13 @@ journal says each change ("making a skill is ready" or "not ready"),
 never more.
 
 `skills.made` goes through these states: `making` while the model
-writes, `kept` once the check took it, `asked` once the lamp has said its
-ask aloud whole (dated then, however long it waited for a good moment),
-then `on` at a plain spoken yes within 120 s, or `left_off` with none;
-`not_kept` with why. An ask begun but not said whole leaves it `kept`
-until the lamp asks again ([skills.md](skills.md)). Nothing from the app puts it on, as
-before ([skills.md](skills.md), "Asked for in the app").
+writes and while the kept skill is put on, then `on` once it is on, with
+no spoken yes (#5977; the owner, 10 Nov: the app's MAKE IT is the ask), or
+`not_kept` with why: not made, not kept, or kept and not put on
+([skills.md](skills.md), "Asked for in the app"). A new ask is never
+`kept`, `asked` or `left_off`; only one asked about before #5977 and never
+said yes to reads `left_off`. `lamp-cloud` passes the state through as the
+voice tells it.
 
 - **`skills.make`** (`{"words", "request_id"}`): the words, trimmed, 1 to
   480 bytes, and a request id, are sent to `lamp-voice`'s app-make socket
@@ -668,26 +669,23 @@ before ([skills.md](skills.md), "Asked for in the app").
   reached on the lamp now" (no answer within 2 s). The journal never has
   the words.
 - **`skills.made`** (`{"request_id"}`, or `{}` for the newest): the app's
-  own ask only, never a skill made by voice. `state` is `making`, `kept`
-  (not yet asked about aloud), `asked` (the offer a spoken yes would put on
-  now: the newest, within its 120 s), `on`, `left_off` (asked, and no longer
-  that offer: its 120 s passed, or another made skill was asked about
-  since; a spoken no shows as `asked` until then) or `not_kept`, with
-  `why` in the maker's plain words. Once kept: `name`,
-  `description`, `version`, `sha256` (what the lamp asks about) and
+  own ask only, never a skill made by voice. `state` is `making`, `on` or
+  `not_kept`, with `why` in plain words (the maker's, or "it couldn't be
+  put on: …"); `left_off` only for an ask from before #5977. Once kept:
+  `name`, `description`, `version`, `sha256` (what the helper put on) and
   `may_use`, the skills page's rows (`skills::may_use`). With no ask,
   `{"state": "none"}`. A skill made here is also told with `needs_link`,
   the linked services it reads that weren't linked when it was made:
   `[{"code": "gmail", "name": "Gmail"}]`, or `[]` with none missing (and
   for a skill that reads none); absent when `lamp-services` couldn't say, or before the check
-  is kept, a moment after `kept` first shows ([services.md](services.md),
-  "Not linked when it is made"). The skill is kept and asked about either
-  way; the app can show where to link it (Skills, then Connectors).
-- **Put on only by a spoken yes at the lamp** (the lead's ruling on #1711,
-  20 Oct 08:37): the lamp tells the kept skill aloud at a good moment with
-  someone there, and only a spoken yes within 120 s of that ask puts it on,
-  checked again by the manage helper (#2874). Nothing the app sends puts a
-  skill on, and a typed yes doesn't either.
+  is kept ([services.md](services.md), "Not linked when it is made"). The
+  skill is kept and put on either way; the app can show where to link it
+  (Skills, then Connectors).
+- **Put on at once, with no spoken yes** (#5977; the owner, 10 Nov: the
+  app's MAKE IT is the ask): kept and checked, the voice puts it on through
+  the manage helper, which checks it again (its cap, `made: here`, its
+  SHA-256), and the lamp then says one short line, "I made NAME, and it's
+  on.", or why it couldn't.
 
 - **The played check** (`MAKE_FROM=app tools/played/make-skill.sh LABEL
   FIXTURE both`, with `CLOUD=` an ARM64 `lamp-cloud` from the same build):
@@ -735,8 +733,8 @@ first builder (3 Nov, 14:33). No computer and no model: `can` names
   a written one, and `may_use` naming `speak` (its voice: the call's answer
   is the person's instructions). A name a skill on the lamp or a kept made
   skill already has is `not_kept`, with why.
-- **Put on only by a spoken yes at the lamp**, as above. On the skills
-  page it is in `made_here` with `"written": true`.
+- **Put on at once, with no spoken yes**, as above. On the skills page it
+  is in `made_here` with `"written": true`.
 
 Tests: `make_skill::tests::a_written_skill_is_handed_to_the_voice_as_written`,
 `make_skill::tests::written_fields_are_held_as_lamp_voice_holds_them`,
@@ -1283,14 +1281,16 @@ is Backend3's.
    (`/var/lib/lampOS/skills-dev`) is refused, never replaced.
 5. **Handed to the voice** on `/run/lampos-app-make/make.sock`:
    `{"upload": {"skill_md", "skill_toml"?}}`, waited for at most 25 s.
-   `lamp-voice` holds it to a made skill's checks and its own, keeps it and
-   asks aloud ([skills.md](skills.md), "Added from a file"), and answers
-   `{"kept": {...}}` or `{"refused": WHY}`.
+   `lamp-voice` holds it to a made skill's checks and its own, keeps it,
+   answers `{"kept": {...}}` or `{"refused": WHY}`, then puts it on at
+   once, with no spoken yes (#5977), and says so aloud ([skills.md](skills.md),
+   "Added from a file").
 6. **Settled** (`Uploads::settle`): `lamp-cloud` asks `{"added": {"sha256"}}`
-   every 5 s, for at most 2 h (the ask may wait an hour for a good moment,
-   then 120 s for the yes): `on` is `success`; `left_off` is `failure`, "it
-   wasn't put on: there was no spoken yes at the lamp"; let go, or never
-   asked within the wait, is `failure` too. The next upload need not wait
+   every 5 s, for at most 2 h: `on` is `success`; `left_off` (since #5977,
+   kept and not put on by the manage helper) is `failure`, said with
+   `lamp-cloud`'s own words, "it wasn't put on: there was no spoken yes at
+   the lamp", which still name the yes (`upload::LEFT_OFF`, not changed
+   here); let go, or not on within the wait, is `failure` too. The next upload need not wait
    for it.
 7. **The result** goes to the app as the kind's second reply, on the
    broker's own loop while online, and is said again if the connection
@@ -1503,7 +1503,7 @@ words or files, nor a made skill's SHA-256.
 | `day.on`, `day.kept_off` | skills on at the day's last reading, and kept on the lamp but not on (turned off, shipped off, an add-on with add-ons off, or one that does not load), by source | the skills folder with `lamp-skills`' own loader and its off file, as the skills page reads them; a made skill's maker from its own card |
 | `day.runs` | runs that day (the lamp's local day), by source | `lamp-skills`' running totals, `runs.json` in its `--state-dir` (`skills.md`, "Runs, counted"), made skills' by the maker on each card |
 | `day.store`, `day.store_rest` | the Store's runs that day by package SHA-256 (`installed_from`), the 50 most run, the rest summed | the same file |
-| `day.made_by_voice`, `day.made_by_app` | asks to make a skill that day, by voice and from the owner's app: `kept` (a made skill kept), `on` (put on by a spoken yes), `refused` (made nothing), `left_off` (asked about and not put on) | the voice's running totals per maker (`counts.json` beside the made skills), asked on its app-make socket with `{"counts": {}}`, within 1 s; a voice from before it counted the app's says only `made_by_voice` |
+| `day.made_by_voice`, `day.made_by_app` | asks to make a skill that day, by voice and from the owner's app: `kept` (a made skill kept), `on` (put on, at once since #5977), `refused` (made nothing), `left_off` (kept and couldn't be put on, or asked about before #5977 and not put on) | the voice's running totals per maker (`counts.json` beside the made skills), asked on its app-make socket with `{"counts": {}}`, within 1 s; a voice from before it counted the app's says only `made_by_voice` |
 
 - **Sources** are map keys: `core`, `store` (the Skills Store), `made_voice`
   and `made_app` (made on this lamp, asked for by voice or in the owner's
@@ -1513,7 +1513,7 @@ words or files, nor a made skill's SHA-256.
   is a new key under the same schema. So are the outcomes.
 - **A made skill's maker is on its own card:** the voice writes `made_by:
   voice` or `made_by: app` beside `made: here` in its `SKILL.md` when it
-  packs it, inside the package, so the SHA-256 and the spoken yes cover it
+  packs it, inside the package, so the SHA-256 it is put on by covers it
   (`lamp_voice::made_skill::Maker`); a skill written in the app (`written:
   app`) is the app's too. `lamp-skills` counts each run by the card it
   loaded, and the report reads the same card, so neither asks the voice
