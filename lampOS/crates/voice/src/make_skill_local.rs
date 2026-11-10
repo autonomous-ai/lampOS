@@ -441,7 +441,20 @@ fn couldnt_make_line(why: &str) -> String {
 
 /// A call of [`made_skill::MAKE`], in the product's places: made, kept and
 /// put on at once ([`make`]).
-pub fn answer(call: &lamp_gemini::ToolCall) -> Value {
+/// What a `make_skill` call in a turn nobody spoke (`heard` false: the
+/// lamp's own event turn, a hand-over, or the model's own idea) is told:
+/// nothing is made or kept (Thirteen's P2 on #5985: with no spoken yes, the
+/// person's own spoken ask is the only consent on the voice path).
+pub const NOT_ASKED_ALOUD: &str =
+    "a skill is made only when the person asks for one out loud, or with MAKE IT in the app";
+
+pub fn answer(call: &lamp_gemini::ToolCall, heard: bool) -> Value {
+    if !heard {
+        eprintln!(
+            "lamp-voice: a skill wasn't made: no one asked for it aloud in this turn (#5985)"
+        );
+        return serde_json::json!({ "error": NOT_ASKED_ALOUD });
+    }
     let now_unix_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
@@ -458,6 +471,23 @@ pub(crate) mod tests {
     use std::io::{Read, Write};
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
+
+    /// Thirteen's P2 on #5985: with no spoken yes, a `make_skill` call in a
+    /// turn nobody spoke (the lamp's own event turn, a hand-over, the
+    /// model's own idea) makes and keeps nothing and puts nothing on; it is
+    /// told why. A heard turn goes on to make it, as the tests below.
+    #[test]
+    fn a_make_in_a_turn_nobody_spoke_makes_and_puts_on_nothing() {
+        let call = lamp_gemini::ToolCall {
+            id: "c1".to_owned(),
+            name: crate::made_skill::MAKE.to_owned(),
+            args: serde_json::json!({"request": "Glow green when I come back to my desk."}),
+        };
+        assert_eq!(
+            answer(&call, false),
+            serde_json::json!({"error": NOT_ASKED_ALOUD})
+        );
+    }
 
     const TOML: &str = r#"kind = "installable"
 version = "1.0.0"
