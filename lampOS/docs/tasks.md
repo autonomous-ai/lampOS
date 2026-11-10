@@ -3028,7 +3028,8 @@ A skill is made by the lamp's own model, never handed to a computer's agent
 [skills.md](skills.md#made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
 The tasks part declares no `make_skill` or `put_on_made_skill`, and the
 worker's `--tasks-make-skill` flag is gone: `LAMP_MAKE_SKILL=on` alone gives
-the voice its own two functions, with a tasks part or without one, and an
+the voice its own function, `make_skill` (`put_on_made_skill` is gone since
+#5977: a made skill goes on as soon as it is kept), with a tasks part or without one, and an
 app's typed skill (`LAMP_APP_MAKE_SKILL`) is made the same way, never handed
 over. The made skills' news words (`made`, `not_kept`) and their repair through
 a task are gone with it. A task whose words are a skill's brief, handed over

@@ -3,7 +3,7 @@
 //! is packed and kept in a 0700 folder with its SHA-256, at most five;
 //! what does more than it declares, or more than a made skill may, is not.
 use lamp_skills::package::{self, asked as asked_helper, install_made, install_made_at};
-use lamp_voice::made_skill::{KEPT_MOST, Keeping, Made, PUT_ON_WITHIN, keep, offered};
+use lamp_voice::made_skill::{GOES_ON_WITHIN, KEPT_MOST, Keeping, Made, goes_on, keep};
 use sha2::{Digest, Sha256};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
@@ -46,6 +46,7 @@ fn keeping(dir: &Path) -> Keeping {
     Keeping {
         directory: dir.join("made"),
         program: env!("CARGO_BIN_EXE_lamp-skills").into(),
+        manage: dir.join("manage.sock"),
     }
 }
 
@@ -57,9 +58,10 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
-/// The lamp has just asked to put on the made skill `sha256`.
-fn offer(keeping: &Keeping, sha256: &str) {
-    offered(&keeping.directory, sha256, now_ms()).unwrap();
+/// The voice has just marked the made skill `sha256` to go on, as it does
+/// right before it asks the helper.
+fn mark(keeping: &Keeping, sha256: &str) {
+    goes_on(&keeping.directory, sha256, now_ms()).unwrap();
 }
 
 fn tars(dir: &Path) -> Vec<String> {
@@ -165,9 +167,10 @@ fn at_most_five_made_skills_are_kept() {
     assert!(kept.iter().any(|name| name.starts_with("evening-dim-6-")));
 }
 
-/// A made skill put on at its person's yes, bound to its package's SHA-256
-/// (the lead, 20 Oct 08:37 on #1711): the manage helper's `install_made`
-/// takes the package the voice kept with that hash, and installs it.
+/// A made skill put on as soon as it is kept, with no yes (the owner,
+/// 10 Nov), bound to its package's SHA-256: the manage helper's
+/// `install_made` takes the package the voice kept and marked with that
+/// hash, and installs it.
 #[test]
 fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -175,7 +178,7 @@ fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
-    offer(&keeping, &made.sha256);
+    mark(&keeping, &made.sha256);
     let wait = std::time::Duration::from_millis(200);
     // Another hash puts nothing on.
     let other = "0".repeat(64);
@@ -207,11 +210,11 @@ fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
     );
     let done = answer["done"].as_str().unwrap();
     assert!(
-        done.contains("bound to the person's yes by its SHA-256") && !done.contains("signature"),
+        done.contains("made here and bound by its SHA-256") && !done.contains("signature"),
         "{done}"
     );
     assert!(skills.join("evening-dim").join("skill.toml").is_file());
-    // It keeps the SHA-256 its person said yes to, as any package's.
+    // It keeps the SHA-256 it was kept with, as any package's.
     assert_eq!(
         package::installed_from(&skills.join("evening-dim")).map(|kept| kept.sha256),
         Some(made.sha256.clone())
@@ -223,8 +226,8 @@ fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
     );
 }
 
-/// The bytes put on are the bytes the yes was for: a package changed after
-/// it was kept is refused, and nothing goes on.
+/// The bytes put on are the bytes kept and checked: a package changed
+/// after it was kept is refused, and nothing goes on.
 #[test]
 fn a_made_skill_whose_package_changed_does_not_go_on() {
     let dir = tempfile::tempdir().unwrap();
@@ -232,7 +235,7 @@ fn a_made_skill_whose_package_changed_does_not_go_on() {
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
-    offer(&keeping, &made.sha256);
+    mark(&keeping, &made.sha256);
     let mut bytes = fs::read(&made.package).unwrap();
     bytes.push(0);
     fs::write(&made.package, &bytes).unwrap();
@@ -288,7 +291,7 @@ fn a_made_skill_past_the_cap_or_not_made_here_does_not_go_on() {
             "package": packed.file_name().unwrap().to_str().unwrap(),
         }));
         fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
-        offer(&keeping, &sha256);
+        mark(&keeping, &sha256);
         let refused = install_made(
             &skills,
             None,
@@ -302,8 +305,8 @@ fn a_made_skill_past_the_cap_or_not_made_here_does_not_go_on() {
     }
 }
 
-/// A person's yes to their own made skill never takes the place of a skill
-/// they put on another way (the reviewer's P3 on #2414): one of the same
+/// A person's own made skill never takes the place of a skill they put on
+/// another way (the reviewer's P3 on #2414): one of the same
 /// name, from a store, stays, and the made one is refused with its name.
 /// One made here before is replaced.
 #[test]
@@ -318,7 +321,7 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
     fs::write(store.join("SKILL.md"), card("evening-dim")).unwrap();
     package::install(&skills, None, &store).unwrap();
     let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
-    offer(&keeping, &made.sha256);
+    mark(&keeping, &made.sha256);
     let wait = std::time::Duration::from_millis(200);
     let refused = install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap_err();
     assert!(
@@ -341,7 +344,7 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
         &keeping,
     )
     .unwrap();
-    offer(&keeping, &again.sha256);
+    mark(&keeping, &again.sha256);
     // A made skill put in place under a name the owner said yes to the
     // camera for takes that yes away (#3504's piece C).
     let state = dir.path().join("state");
@@ -363,11 +366,12 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
     assert_eq!(fs::read_to_string(&camera).unwrap(), "");
 }
 
-/// End to end: the lamp makes a skill, asks to put it on, and on a spoken
-/// yes the voice's `put_on` asks the real manage helper, which puts that
-/// package on. The helper's socket is the one the voice dials.
+/// End to end: the lamp makes a skill and puts it on at once, with no
+/// yes (the owner, 10 Nov): the voice's `put_on_within` marks it and asks
+/// the real manage helper, which puts that package on. The helper's socket
+/// is the one the voice dials.
 #[test]
-fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
+fn a_made_skill_goes_on_through_the_helper_with_no_yes() {
     assert_eq!(
         lamp_voice::made_skill::MANAGE_SOCKET,
         package::MANAGE_SOCKET
@@ -377,8 +381,6 @@ fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     let made = keep(&answer(TOML, "evening-dim"), false, "local:7", &keeping).unwrap();
-    let now = now_ms();
-    offered(&keeping.directory, &made.sha256, now).unwrap();
     let socket = dir.path().join("manage.sock");
     let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
     let (served, helper_made) = (skills.clone(), keeping.directory.clone());
@@ -396,25 +398,44 @@ fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
         )
         .unwrap()
     });
-    let told = lamp_voice::made_skill::put_on_within(
+    let on = lamp_voice::made_skill::put_on_within(
         &keeping.directory,
         &socket,
-        Some("Yes, please."),
-        now + 1_000,
+        &made.sha256,
+        now_ms(),
         std::time::Duration::from_secs(60),
     );
     assert!(helper.join().unwrap(), "the helper put it on");
-    assert_eq!(told["put_on"], "evening-dim", "{told}");
+    assert_eq!(on.as_deref(), Ok("evening-dim"));
     assert!(skills.join("evening-dim").join("skill.toml").is_file());
+    // On, it is put on by nobody again: the helper refuses it, and the
+    // voice asks no helper.
+    let refused = install_made(
+        &skills,
+        None,
+        &keeping.directory,
+        &made.sha256,
+        std::time::Duration::from_millis(200),
+    )
+    .unwrap_err();
+    assert!(refused.contains("didn't mark that made skill"), "{refused}");
+    let again = lamp_voice::made_skill::put_on_within(
+        &keeping.directory,
+        &dir.path().join("nobody.sock"),
+        &made.sha256,
+        now_ms(),
+        std::time::Duration::from_secs(1),
+    );
+    assert_eq!(again.as_deref(), Ok("evening-dim"));
 }
 
-/// The manage helper puts a made skill on only as the voice's own `put_on`
-/// would (the first builder on #2602, 22 Oct 10:1x): the newest the lamp
-/// asked about, within `PUT_ON_WITHIN`, by the helper's clock. A kept one
-/// never asked about, one asked about too long ago, or an older one after
-/// another was asked about, puts nothing on, whoever asks.
+/// The manage helper puts a made skill on only as the voice's own
+/// `put_on` marks it: within `GOES_ON_WITHIN` of its mark, by the helper's
+/// clock, and not on already. A kept one never marked, one marked too long
+/// ago, or one marked after the helper's now (a clock gone back), puts
+/// nothing on, whoever asks; another's mark lets only that one on.
 #[test]
-fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
+fn a_made_skill_goes_on_only_within_its_mark() {
     let dir = tempfile::tempdir().unwrap();
     let keeping = keeping(dir.path());
     let skills = dir.path().join("skills");
@@ -422,64 +443,31 @@ fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
     let wait = std::time::Duration::from_millis(200);
     let first = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
     let second = keep(&answer(TOML, "morning-glow"), false, "s1:8:1", &keeping).unwrap();
-    let not_asked = |refused: String| {
+    let not_marked = |refused: String| {
         assert!(
-            refused.contains("didn't ask about that made skill last"),
+            refused.contains("didn't mark that made skill to go on"),
             "{refused}"
         );
     };
-    // Kept, never asked about.
-    not_asked(
-        install_made_at(
-            &skills,
-            None,
-            &keeping.directory,
-            &first.sha256,
-            wait,
-            10_000,
-        )
-        .unwrap_err(),
-    );
-    // Asked about, then too long ago.
-    offered(&keeping.directory, &first.sha256, 10_000).unwrap();
-    let within = PUT_ON_WITHIN.as_millis() as u64;
-    not_asked(
-        install_made_at(
-            &skills,
-            None,
-            &keeping.directory,
-            &first.sha256,
-            wait,
-            10_000 + within + 1,
-        )
-        .unwrap_err(),
-    );
-    // Another asked about since: only the newest.
-    offered(&keeping.directory, &second.sha256, 20_000).unwrap();
-    not_asked(
-        install_made_at(
-            &skills,
-            None,
-            &keeping.directory,
-            &first.sha256,
-            wait,
-            20_001,
-        )
-        .unwrap_err(),
-    );
+    let install = |made: &Made, now: u64| {
+        install_made_at(&skills, None, &keeping.directory, &made.sha256, wait, now)
+    };
+    // Kept, never marked.
+    not_marked(install(&first, 10_000).unwrap_err());
+    // Marked, then too long ago.
+    goes_on(&keeping.directory, &first.sha256, 10_000).unwrap();
+    let within = GOES_ON_WITHIN.as_millis() as u64;
+    not_marked(install(&first, 10_000 + within + 1).unwrap_err());
+    // Marked after the helper's now: a clock gone back.
+    not_marked(install(&first, 9_999).unwrap_err());
+    // Another marked once the first's mark ran out: that one alone goes on.
+    let later = 10_000 + within + 1_000;
+    goes_on(&keeping.directory, &second.sha256, later).unwrap();
+    not_marked(install(&first, later + 1).unwrap_err());
     assert!(!skills.join("evening-dim").exists());
-    let done = install_made_at(
-        &skills,
-        None,
-        &keeping.directory,
-        &second.sha256,
-        wait,
-        20_001,
-    )
-    .unwrap();
+    let done = install(&second, later + 1).unwrap();
     assert!(done.contains("morning-glow"), "{done}");
-    // Put on, as the voice marks it after the helper's done: the older ask
-    // never stands in for it (reviewer-two's P2 on #2874).
+    // Put on, as the voice marks it after the helper's done: never again.
     let index = keeping.directory.join(lamp_voice::made_skill::INDEX);
     let mut entries: Vec<serde_json::Value> =
         serde_json::from_slice(&fs::read(&index).unwrap()).unwrap();
@@ -489,131 +477,13 @@ fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
         }
     }
     fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
-    not_asked(
-        install_made_at(
-            &skills,
-            None,
-            &keeping.directory,
-            &first.sha256,
-            wait,
-            20_002,
-        )
-        .unwrap_err(),
-    );
-    // Two asks and a clock gone back between them: neither, never the
-    // older one in the newer's place.
-    let dir = tempfile::tempdir().unwrap();
-    let keeping = self::keeping(dir.path());
-    let older = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
-    let newer = keep(&answer(TOML, "morning-glow"), false, "s1:8:1", &keeping).unwrap();
-    offered(&keeping.directory, &older.sha256, 10_000).unwrap();
-    offered(&keeping.directory, &newer.sha256, 20_000).unwrap();
-    for made in [&older, &newer] {
-        not_asked(
-            install_made_at(
-                &skills,
-                None,
-                &keeping.directory,
-                &made.sha256,
-                wait,
-                19_999,
-            )
-            .unwrap_err(),
-        );
-    }
-    // A clock that went back before the ask counts as no ask.
-    let dir = tempfile::tempdir().unwrap();
-    let keeping = self::keeping(dir.path());
-    let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
-    offered(&keeping.directory, &made.sha256, 30_000).unwrap();
-    not_asked(
-        install_made_at(
-            &skills,
-            None,
-            &keeping.directory,
-            &made.sha256,
-            wait,
-            29_999,
-        )
-        .unwrap_err(),
-    );
-}
-
-/// The real sequence (reviewer-two's P2 on #2874): two asks, the newest put
-/// on by a spoken yes through the voice's `put_on` and the real helper,
-/// which marks it on; then the older one is put on by nobody, neither by
-/// the helper asked for it nor by another spoken yes.
-#[test]
-fn once_the_newest_is_on_an_older_ask_puts_nothing_on() {
-    let dir = tempfile::tempdir().unwrap();
-    let keeping = keeping(dir.path());
-    let skills = dir.path().join("skills");
-    fs::create_dir_all(&skills).unwrap();
-    let older = keep(&answer(TOML, "evening-dim"), false, "local:7", &keeping).unwrap();
-    let newer = keep(&answer(TOML, "morning-glow"), false, "local:8", &keeping).unwrap();
-    let now = now_ms();
-    offered(&keeping.directory, &older.sha256, now - 2_000).unwrap();
-    offered(&keeping.directory, &newer.sha256, now - 1_000).unwrap();
-    let socket = dir.path().join("manage.sock");
-    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
-    let (served, helper_made) = (skills.clone(), keeping.directory.clone());
-    let helper = std::thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
-        asked_helper(
-            &served,
-            &helper_made,
-            &served.join("no-state"),
-            std::time::Duration::from_secs(2),
-            None,
-            None,
-            &stream,
-            &stream,
-        )
-        .unwrap()
-    });
-    let told = lamp_voice::made_skill::put_on_within(
-        &keeping.directory,
-        &socket,
-        Some("Yes, please."),
-        now,
-        std::time::Duration::from_secs(60),
-    );
-    assert!(helper.join().unwrap(), "the helper put it on");
-    assert_eq!(told["put_on"], "morning-glow", "{told}");
-    let refused = install_made(
-        &skills,
-        None,
-        &keeping.directory,
-        &older.sha256,
-        std::time::Duration::from_millis(200),
-    )
-    .unwrap_err();
-    assert!(
-        refused.contains("didn't ask about that made skill last"),
-        "{refused}"
-    );
-    assert!(!skills.join("evening-dim").exists());
-    let again = lamp_voice::made_skill::put_on_within(
-        &keeping.directory,
-        &socket,
-        Some("Yes, please."),
-        now + 1,
-        std::time::Duration::from_secs(1),
-    );
-    assert!(
-        again["error"].as_str().unwrap().contains("nothing waiting")
-            || again["error"]
-                .as_str()
-                .unwrap()
-                .contains("no skill made here"),
-        "{again}"
-    );
+    not_marked(install(&second, later + 2).unwrap_err());
 }
 
 /// A skill added from a file (`lamp_voice::upload_skill`): a bare SKILL.md
 /// becomes a written skill the real `lamp-skills pack` takes, trigger-less
-/// and asked for by its function alone; the helper puts it on only at the
-/// lamp's ask, held to the added cap, and never in another skill's place,
+/// and asked for by its function alone; the helper puts it on only once
+/// the voice marked it to go on, held to the added cap, and never in another skill's place,
 /// a made one's neither.
 #[test]
 fn a_skill_added_from_a_file_is_checked_and_never_takes_a_place() {
@@ -630,21 +500,21 @@ fn a_skill_added_from_a_file_is_checked_and_never_takes_a_place() {
     let bytes = String::from_utf8_lossy(&fs::read(&made.package).unwrap()).into_owned();
     assert!(bytes.contains("made: here") && bytes.contains("added: file"));
     let wait = std::time::Duration::from_millis(200);
-    // Not asked about yet: nothing goes on.
+    // Not marked to go on yet: nothing goes on.
     let refused = install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap_err();
-    assert!(refused.contains("didn't ask about"), "{refused}");
-    offer(&keeping, &made.sha256);
+    assert!(refused.contains("didn't mark"), "{refused}");
+    mark(&keeping, &made.sha256);
     install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap();
     let toml = fs::read_to_string(skills.join("tea-tip").join("skill.toml")).unwrap();
     assert!(
         toml.contains("tool = \"tea_tip\"") && !toml.contains("[trigger]"),
         "{toml}"
     );
-    // A made skill of the same name, kept and asked about: an added one
+    // A made skill of the same name, kept and put on: an added one
     // in its place is refused, and the other way the made one is not
     // replaced by an added one either.
     let made_dim = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
-    offer(&keeping, &made_dim.sha256);
+    mark(&keeping, &made_dim.sha256);
     install_made(&skills, None, &keeping.directory, &made_dim.sha256, wait).unwrap();
     let folder = dir.path().join("src").join("evening-dim");
     fs::create_dir_all(&folder).unwrap();
@@ -668,7 +538,7 @@ fn a_skill_added_from_a_file_is_checked_and_never_takes_a_place() {
         "package": packed.file_name().unwrap().to_str().unwrap(),
     }));
     fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
-    offer(&keeping, &sha256);
+    mark(&keeping, &sha256);
     let refused = install_made(&skills, None, &keeping.directory, &sha256, wait).unwrap_err();
     assert!(refused.contains("never takes its place"), "{refused}");
     assert!(
@@ -680,11 +550,11 @@ fn a_skill_added_from_a_file_is_checked_and_never_takes_a_place() {
 
 /// A skill written in the app (`LAMP_SKILL_WRITTEN`), its files written by
 /// the voice from the person's words: the real checker packs it, it is put
-/// on only once the lamp has asked, and then it loads as a function for the
+/// on only once the voice marked it to go on, and then it loads as a function for the
 /// model with no trigger, described with what it does, its steps nothing
 /// but the answer.
 #[test]
-fn a_written_skill_passes_the_real_checker_and_is_put_on_only_when_asked() {
+fn a_written_skill_passes_the_real_checker_and_is_put_on_only_once_marked() {
     let dir = tempfile::tempdir().unwrap();
     let keeping = keeping(dir.path());
     let skills = dir.path().join("skills");
@@ -714,14 +584,14 @@ fn a_written_skill_passes_the_real_checker_and_is_put_on_only_when_asked() {
     )
     .unwrap_err();
     assert!(
-        refused.contains("didn't ask about that made skill last"),
+        refused.contains("didn't mark that made skill to go on"),
         "{refused}"
     );
     assert!(
         !skills.join("study-mode").exists(),
-        "never declared before the yes"
+        "never declared before it is marked to go on"
     );
-    offer(&keeping, &made.sha256);
+    mark(&keeping, &made.sha256);
     install_made_at(
         &skills,
         None,

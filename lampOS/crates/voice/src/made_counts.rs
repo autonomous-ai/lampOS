@@ -11,10 +11,11 @@
 //! - `kept`, `on` and `left_off` are read from the made skills' own index
 //!   ([`crate::made_skill::INDEX`]) when `lamp-cloud` asks ([`counts`]),
 //!   under the maker its `from` says ([`Maker::of`]): a made skill counts
-//!   once as kept, once as on when a spoken yes put it on, and once as left
-//!   off when it was asked about and is no longer the offer a yes would put
-//!   on. Each is remembered by its SHA-256 in [`FILE`], so it is counted
-//!   once.
+//!   once as kept, once as on when it went on (at once, with no spoken
+//!   yes, since the owner's 10 Nov), and once as left off when it couldn't
+//!   be put on (its `not_on`), or was asked about before that and never
+//!   said yes to. Each is remembered by its SHA-256 in [`FILE`], so it is
+//!   counted once.
 //! - `refused`, an ask that made nothing, is never in the index: it is
 //!   counted where it is told ([`refused`], the voice's turn or the app's
 //!   make), on an atomic per maker, and added to [`FILE`] at most every
@@ -226,9 +227,8 @@ fn once(total: &mut u64, seen: &mut Vec<String>, sha256: &str) {
 /// `{"made_by_voice": {"kept", "on", "refused", "left_off"}, "made_by_app":
 /// {...}}`, the running totals per maker. Only numbers; never a name, a
 /// word or a package.
-pub fn counts(directory: &Path, now_unix_ms: u64) -> Value {
+pub fn counts(directory: &Path) -> Value {
     let entries = made_skill::entries(directory);
-    let waiting = made_skill::waiting(directory, now_unix_ms).map(|(_, sha256)| sha256);
     let maker_of = |entry: &Value| Maker::of(entry["from"].as_str().unwrap_or_default());
     let sha_of = |entry: &Value| {
         entry["sha256"]
@@ -249,8 +249,8 @@ pub fn counts(directory: &Path, now_unix_ms: u64) -> Value {
             once(&mut count.kept, &mut seen.kept, &sha256);
             if entry["on"] == true {
                 once(&mut count.on, &mut seen.on, &sha256);
-            } else if entry["offered_at_unix_ms"].as_u64().is_some()
-                && waiting.as_deref() != Some(sha256.as_str())
+            } else if entry.get("not_on").is_some()
+                || entry["offered_at_unix_ms"].as_u64().is_some()
             {
                 once(&mut count.left_off, &mut seen.left_off, &sha256);
             }
@@ -317,19 +317,25 @@ mod tests {
                 json!({"on": true, "offered_at_unix_ms": now - 9_000}),
             ),
             entry("written:app:8:1", 'f', json!({"on": true})),
-            // The offer a yes would put on now: not left off yet.
-            entry("local:4", 'e', json!({"offered_at_unix_ms": now - 1_000})),
+            // Kept and couldn't be put on: left off.
+            entry(
+                "local:4",
+                'e',
+                json!({"goes_on_at_unix_ms": now - 1_000, "not_on": "the lamp's check didn't let it on"}),
+            ),
+            // Being put on now: not left off.
+            entry("local:5", '9', json!({"goes_on_at_unix_ms": now - 1_000})),
         ];
         fs::write(
             dir.join(made_skill::INDEX),
             serde_json::to_vec(&entries).unwrap(),
         )
         .unwrap();
-        let told = counts(&dir, now);
+        let told = counts(&dir);
         let made = &told["made_by_voice"];
         assert_eq!(
             (&made["kept"], &made["on"], &made["left_off"]),
-            (&json!(4), &json!(1), &json!(1)),
+            (&json!(5), &json!(1), &json!(2)),
             "{told}"
         );
         let app = &told["made_by_app"];
@@ -339,16 +345,13 @@ mod tests {
             "{told}"
         );
         // Asked again: nothing counted twice, under either maker.
-        let again = counts(&dir, now);
+        let again = counts(&dir);
         for maker in ["made_by_voice", "made_by_app"] {
             for count in ["kept", "on", "left_off"] {
                 assert_eq!(again[maker][count], told[maker][count], "{again}");
             }
         }
-        // The offer's time ends: left off once more.
-        let later = counts(&dir, now + 200_000);
-        assert_eq!(later["made_by_voice"]["left_off"], 2, "{later}");
-        let text = fs::read_to_string(dir.join(FILE)).unwrap() + &later.to_string();
+        let text = fs::read_to_string(dir.join(FILE)).unwrap() + &again.to_string();
         for secret in ["ann", "Ann", "22:00", "x.tar"] {
             assert!(!text.contains(secret), "{secret} in {text}");
         }
@@ -367,7 +370,7 @@ mod tests {
         assert!(REFUSED_VOICE.load(Ordering::Relaxed) >= 2);
         assert!(REFUSED_APP.load(Ordering::Relaxed) >= 1);
         assert!(!dir.join(FILE).exists());
-        let told = counts(&dir, 1);
+        let told = counts(&dir);
         assert!(
             told["made_by_voice"]["refused"].as_u64().unwrap() >= 2,
             "{told}"

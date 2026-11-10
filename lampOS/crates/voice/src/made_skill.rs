@@ -11,14 +11,14 @@
 //! [`Maker`] (`made_by: voice` or `made_by: app`), and checked
 //! and packed by `lamp-skills pack` (#1698), the checker an install uses.
 //! The package is kept in the voice's own folder ([`DIRECTORY`], 0700, at
-//! most [`KEPT_MOST`]), with its SHA-256 and what it asks to use. The lamp
-//! then says what it would do, what it asks to use, and asks [`ASK_TO_PUT_ON`]
-//! (the lead, 20 Oct 08:37 on #1711: a spoken yes bound to the SHA-256, an
-//! exception to the "only signed packages" ruling of 19 Oct 18:33 for a
-//! skill made here alone). The ask is kept beside the package ([`offered`]);
-//! on the person's spoken yes within [`PUT_ON_WITHIN`] the model calls
-//! [`PUT_ON`], and [`put_on`] asks `lamp-skills`' manage helper for that
-//! hash alone, which installs only those bytes, held again to the cap.
+//! most [`KEPT_MOST`]), with its SHA-256 and what it asks to use. Once
+//! kept, it goes on at once, with no spoken yes (the owner, 10 Nov: a made
+//! skill goes on with no spoken yes; the app's MAKE IT and the voice ask
+//! are the ask, #5977): [`put_on`] marks it to go on ([`goes_on`]) and asks
+//! `lamp-skills`' manage helper for that hash alone, which installs only
+//! those bytes, held again to the cap, and only for a hash marked so
+//! within [`GOES_ON_WITHIN`]. The lamp then says [`on_line`], or
+//! [`not_on_line`] with why it isn't on.
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -49,18 +49,11 @@ pub const PROGRAM: &str = "/opt/lampOS/skills/current/lamp-skills";
 /// whether someone is at the lamp. Nothing it reads is about a person's
 /// words, face or picture.
 pub const TOPICS: [&str; 2] = ["voice/state", "room/presence"];
-/// What the lamp says of a skill it made, word for word.
-pub const ASK_TO_PUT_ON: &str = "Shall I put it on the lamp?";
-/// Whether the lamp's words said [`ASK_TO_PUT_ON`], in any case: the model
-/// runs it into a sentence ("Just to be sure: shall I put it on the
-/// lamp?", lamp-9adf, 2 Nov 22:51), and that ask is the same ask.
-pub fn says_the_ask(said: &str) -> bool {
-    said.to_lowercase().contains(&ASK_TO_PUT_ON.to_lowercase())
-}
-/// The function the model calls on the person's spoken yes to [`ASK_TO_PUT_ON`].
-pub const PUT_ON: &str = "put_on_made_skill";
-/// A yes counts this long after the lamp asked, as a hand-over's does.
-pub const PUT_ON_WITHIN: Duration = crate::agent_tasks::CONFIRM_WITHIN;
+/// How long after a kept skill is marked to go on ([`goes_on`]) the manage
+/// helper still puts it on, by its own clock: the voice asks the helper
+/// right after marking it, so a kept SHA-256 is never put on later by any
+/// path. No person's yes is waited for (the owner, 10 Nov).
+pub const GOES_ON_WITHIN: Duration = Duration::from_secs(30);
 /// The manage helper's socket, `lamp_skills::package::MANAGE_SOCKET`
 /// (lamp-skills' tests hold the two the same): root's, which puts a made
 /// skill on by its SHA-256 alone.
@@ -77,11 +70,16 @@ const MOST_DESCRIPTION_CHARS: usize = 400;
 /// How an answer begins that makes nothing: what was asked is more than a
 /// made skill can sense or do.
 pub const CANNOT: &str = "cannot:";
-/// The most of the model's reason said with it, or of what it left out.
+/// The most of what the model left out, said with what it does.
 const MOST_CANNOT_CHARS: usize = 120;
+/// The most of the model's `cannot:` reason, said to the person as it is:
+/// room for one short sentence and what to ask instead (#5977: on
+/// lamp-74ff, 10 Nov, a reason cut at 120 characters ended "beyond s…" and
+/// never said what to ask; the owner: "phải nói rõ tại sao không được").
+const MOST_CANNOT_REASON_CHARS: usize = 240;
 /// How a line outside the blocks begins that names what was asked and
 /// isn't in the skill ("left out: dimming slowly; it dims in one step"):
-/// said after what it does, so a yes is to what was left out too.
+/// said after what it does, so the person hears what was left out too.
 pub const LEFT_OUT: &str = "left out:";
 /// The file that keeps what was made, in [`DIRECTORY`].
 pub const INDEX: &str = "made.json";
@@ -536,15 +534,18 @@ fn after_word<'a>(line: &'a str, word: &str) -> Option<&'a str> {
 /// and no other fenced block; each at most [`MOST_FILE_BYTES`].
 pub fn files(answer: &str) -> Result<Files, Refused> {
     // The model's word that no made skill can do what was asked (it can't
-    // hear words said, say anything, or keep time by itself): said as
-    // that, never stood in for by something else.
+    // hear words said, say anything, or keep time by itself): its reason,
+    // one sentence to the person with what to ask instead, is the refusal
+    // as it is, the app showing it and the voice saying it (#5977), never
+    // stood in for by something else and never cut mid-word.
     if let Some(why) = after_word(answer.trim_start(), CANNOT)
         && !answer.contains("```")
     {
-        return Err(Refused::new(format!(
-            "a skill can't do that: {}",
-            cut_chars(why, MOST_CANNOT_CHARS)
-        )));
+        let why = cut_sentences(why, MOST_CANNOT_REASON_CHARS);
+        if !why.is_empty() {
+            return Err(Refused::new(why));
+        }
+        return Err(Refused::new("a skill can't do that"));
     }
     let mut toml = None;
     let mut card = None;
@@ -1501,10 +1502,9 @@ fn written_plainly(table: &toml::Table) -> Option<String> {
 /// [`Written::card`]), held to [`written_capped`], checked and packed by
 /// `lamp-skills pack`, and kept as a made skill is, at most [`KEPT_MOST`].
 /// A name any skill on the lamp has (in `installed`, or pushed beside it)
-/// is refused; a kept one of that name not on, asked about or not, is
-/// replaced, its offer with it. Kept once: asked again, the kept one is
-/// given back.
-/// Nothing is put on: only the person's spoken yes does ([`put_on`]).
+/// is refused; a kept one of that name not on is replaced. Kept once:
+/// asked again, the kept one is given back. Nothing is put on here: the
+/// caller puts it on next ([`put_on`]).
 pub fn keep_written(
     written: &Written,
     from: &str,
@@ -1543,11 +1543,8 @@ pub fn keep_written(
         Ok(said),
         false,
     )?;
-    // A kept one of that name not on the lamp, asked about or not, gives way
-    // to the person's newer words: a spoken no leaves no mark, so a fix sent
-    // after it must not wait out the old ask (Seventh's P2 on #5072). Its
-    // offer goes with it, so a late yes puts nothing on; the new one is
-    // asked about on its own.
+    // A kept one of that name not on the lamp gives way to the person's
+    // newer words (Seventh's P2 on #5072): the new one goes on in its place.
     if let Err(why) = forget_others(&keeping.directory, name, from) {
         eprintln!("lamp-voice: an older kept skill of that name stays: {why}");
     }
@@ -1583,11 +1580,13 @@ fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
     Ok(())
 }
 
-/// Where made skills are kept, and the program that checks them.
+/// Where made skills are kept, the program that checks them, and the
+/// manage helper's socket that puts a kept one on ([`put_on`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Keeping {
     pub directory: PathBuf,
     pub program: PathBuf,
+    pub manage: PathBuf,
 }
 
 /// Whether the switch is on in this process's environment: the
@@ -1609,6 +1608,7 @@ impl Keeping {
         on.then(|| Self {
             directory: PathBuf::from(DIRECTORY),
             program: PathBuf::from(PROGRAM),
+            manage: PathBuf::from(MANAGE_SOCKET),
         })
     }
 }
@@ -1618,8 +1618,8 @@ impl Keeping {
 pub struct Made {
     pub name: String,
     pub version: String,
-    /// The package's SHA-256, lowercase hex: what a yes to put it on would
-    /// be bound to.
+    /// The package's SHA-256, lowercase hex: what the manage helper puts
+    /// on, those bytes alone.
     pub sha256: String,
     pub description: String,
     pub uses: Uses,
@@ -2141,230 +2141,174 @@ fn write_index(directory: &Path, entries: &[Value]) -> io::Result<()> {
     fs::rename(&new, directory.join(INDEX))
 }
 
-/// Keep, beside the package whose SHA-256 is `sha256`, that the lamp asked
-/// [`ASK_TO_PUT_ON`] at `now_unix_ms`: what a yes is held to ([`put_on`]).
-/// Only the newest ask waits; another skill asked about later takes its
-/// place.
-pub fn offered(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<()> {
+/// Mark the kept skill `sha256` to go on at `now_unix_ms`, as
+/// `goes_on_at_unix_ms` beside its package: the narrow "put on as made"
+/// entry the manage helper holds `install_made` to ([`going_on`]), written
+/// by the voice alone, right before it asks the helper. No yes is faked:
+/// a made skill goes on with no spoken yes (the owner, 10 Nov: the app's
+/// MAKE IT and the voice ask are the ask, #5977). Whether one was marked.
+pub fn goes_on(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<bool> {
     let mut entries = index(directory);
     let mut found = false;
     for entry in &mut entries {
         if entry["sha256"] == sha256 {
-            entry["offered_at_unix_ms"] = json!(now_unix_ms);
+            entry["goes_on_at_unix_ms"] = json!(now_unix_ms);
+            if let Some(entry) = entry.as_object_mut() {
+                entry.remove("not_on");
+            }
             found = true;
         }
     }
     if found {
         write_index(directory, &entries)?;
     }
-    Ok(())
+    Ok(found)
 }
 
-/// The made skill `sha256`'s ask was begun aloud at `now_unix_ms` (a say
-/// turn of the lamp's own, crate::app_make): kept as `ask_begun_at_unix_ms`,
-/// from which an untold skill's window is counted
-/// (`make_skill_local::UNTOLD_WITHIN`), so an ask queued long is still
-/// answerable once said.
-pub fn ask_begun(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<()> {
-    let mut entries = index(directory);
-    let mut found = false;
-    for entry in &mut entries {
-        if entry["sha256"] == sha256 {
-            entry["ask_begun_at_unix_ms"] = json!(now_unix_ms);
-            found = true;
-        }
-    }
-    if found {
-        write_index(directory, &entries)?;
-    }
-    Ok(())
-}
-
-/// The lamp's own answer said [`ASK_TO_PUT_ON`] `ago` before now, with
-/// `lamp_said` its words: the model, asked whether the skill is ready, may
-/// say it before the news is told (lamp-9adf, 31 Oct 09:32: "Is the skill I
-/// asked for ready yet?" was answered "… Shall I put it on the lamp?", and
-/// the plain yes after it found nothing waiting). Then the one made skill
-/// never asked about, not on and kept after the newest ask, is kept as
-/// asked when that answer was said, so [`waiting`] holds the yes to the
-/// usual [`PUT_ON_WITHIN`] (the first builder, 2 Nov 10:1x; the
-/// Reviewer-lead's P2 on #4880: only the turn right after the lamp itself
-/// asked, never a yes to another question). With two or more such skills
-/// the answer may have named any of them, so none is kept (the
-/// Reviewer-lead's second P2 on #4880): a yes then finds nothing waiting,
-/// as before. Whether one was kept so.
-pub fn asked_in_answer(
-    directory: &Path,
-    lamp_said: &str,
-    ago: Duration,
-    now_unix_ms: u64,
-) -> io::Result<bool> {
-    if !says_the_ask(lamp_said) || ago > PUT_ON_WITHIN {
-        return Ok(false);
-    }
-    let entries = index(directory);
-    let asked_at = entries
-        .iter()
-        .filter_map(|entry| entry["offered_at_unix_ms"].as_u64())
-        .max()
-        .unwrap_or(0);
-    let said_at = now_unix_ms.saturating_sub(ago.as_millis() as u64);
-    let untold: Vec<&serde_json::Value> = entries
-        .iter()
-        .filter(|entry| entry["offered_at_unix_ms"].as_u64().is_none() && entry["on"] != true)
-        .filter(|entry| {
-            entry["at_unix_ms"]
-                .as_u64()
-                .is_some_and(|kept_at| kept_at > asked_at && kept_at <= said_at)
-        })
-        .collect();
-    let [only] = untold.as_slice() else {
-        return Ok(false);
-    };
-    match only["sha256"].as_str() {
-        Some(sha256) => offered(directory, sha256, said_at).map(|()| true),
-        None => Ok(false),
-    }
-}
-
-/// The made skill the lamp asked about within [`PUT_ON_WITHIN`] before
-/// `now_unix_ms` and not yet on: its name and SHA-256. The newest ask
-/// alone: once it is on, or out of its time, none. lamp-skills' manage
-/// helper holds `install_made` to it too, by its own clock, so a kept
-/// SHA-256 is never put on later by any path.
-pub fn waiting(directory: &Path, now_unix_ms: u64) -> Option<(String, String)> {
-    let within = PUT_ON_WITHIN.as_millis() as u64;
-    // The newest ask first, whatever became of it: once it is on, or with
-    // the clock before it, nothing waits, and an older ask never stands in
-    // for it (reviewer-two's P2 on #2874).
-    let (at, entry) = index(directory)
+/// The name of the kept skill `sha256` if it was marked to go on
+/// ([`goes_on`]) within [`GOES_ON_WITHIN`] before `now_unix_ms` and is not
+/// on yet: what lamp-skills' manage helper holds `install_made` to, by its
+/// own clock. A kept SHA-256 never marked, marked too long ago, marked
+/// after `now_unix_ms` (a clock gone back) or on already is none.
+pub fn going_on(directory: &Path, sha256: &str, now_unix_ms: u64) -> Option<String> {
+    let within = GOES_ON_WITHIN.as_millis() as u64;
+    index(directory)
         .into_iter()
-        .filter_map(|entry| Some((entry["offered_at_unix_ms"].as_u64()?, entry)))
-        .max_by_key(|(at, _)| *at)?;
-    (entry["on"] != true && at <= now_unix_ms && now_unix_ms - at <= within).then(|| {
-        (
-            entry["name"].as_str().unwrap_or_default().to_owned(),
-            entry["sha256"].as_str().unwrap_or_default().to_owned(),
-        )
-    })
+        .find(|entry| entry["sha256"] == sha256)
+        .filter(|entry| entry["on"] != true)
+        .filter(|entry| {
+            entry["goes_on_at_unix_ms"]
+                .as_u64()
+                .is_some_and(|at| at <= now_unix_ms && now_unix_ms - at <= within)
+        })
+        .map(|entry| entry["name"].as_str().unwrap_or_default().to_owned())
 }
 
-/// The note a request is given while a made skill waits for its yes (the
-/// second route keeps its exchanges' words, not their calls, as
-/// `agent_tasks::pending_note` says): without it a yes is a yes to nothing.
-pub fn waiting_note(directory: &Path, now_unix_ms: u64) -> Option<String> {
-    waiting(directory, now_unix_ms).map(|(name, _)| {
-        format!(
-            "(For you to know, not to answer: you have asked the person whether to put the skill \"{name}\" on the lamp. If they say yes now, call {PUT_ON}; if they say no, don't, and it stays off.)"
-        )
-    })
-}
-
-/// The function the model calls on the person's yes to [`ASK_TO_PUT_ON`].
-pub fn put_on_tool() -> lamp_gemini::Tool {
-    lamp_gemini::Tool {
-        name: PUT_ON.into(),
-        description: format!(
-            "Put on the lamp the skill it just made, which you asked about (\"{ASK_TO_PUT_ON}\"). \
-             Call it only when the person has just said yes to that question out loud."
-        ),
-        parameters: None,
-        silent: false,
+/// Why the kept skill `sha256` didn't go on, in plain words, kept beside it
+/// as `not_on`: the app's and the counts' "not on" ([`crate::app_make`],
+/// [`crate::made_counts`]).
+fn not_on(directory: &Path, sha256: &str, why: &str) {
+    let mut entries = index(directory);
+    let mut found = false;
+    for entry in &mut entries {
+        if entry["sha256"] == sha256 && entry["on"] != true {
+            entry["not_on"] = json!(why);
+            found = true;
+        }
+    }
+    if found && let Err(error) = write_index(directory, &entries) {
+        eprintln!("lamp-voice: a made skill not on, and why not kept: {error}");
     }
 }
 
-/// On the person's yes ([`PUT_ON`]), put on the made skill waiting for it,
-/// by its SHA-256 alone, through the manage helper at `socket`, which
-/// installs only those bytes, held again to the cap. Only a yes said out
-/// loud counts, and only a plain one (`said`: the words heard in the line,
-/// `None` for one not heard). The lead's decision is a spoken yes, so a
-/// typed one, or one the lamp wrote, puts nothing on, and neither does a
-/// "no, not yet" the model took for a yes (the reviewer's P3 on #2424, as
-/// the held forget's plain yes). What the model is told.
-pub fn put_on(directory: &Path, socket: &Path, said: Option<&str>, now_unix_ms: u64) -> Value {
-    put_on_within(directory, socket, said, now_unix_ms, PUT_ON_WAIT)
+/// What the lamp says once a made skill is on: one short line, its name
+/// (the owner, 10 Nov: no "Shall I put it on the lamp?" any more).
+pub fn on_line(made: &Made) -> String {
+    format!("I made {}, and it's on.", spoken_name(&made.name))
 }
 
-/// [`put_on`], waiting at most `wait` for the helper.
+/// What the lamp says when a kept skill couldn't be put on: why, in the
+/// plain words [`put_on`] gives.
+pub fn not_on_line(why: &str) -> String {
+    format!("I made it but couldn't put it on: {why}.")
+}
+
+/// A skill's name as it is said: its dashes as spaces.
+pub fn spoken_name(name: &str) -> String {
+    name.replace('-', " ")
+}
+
+/// Put the made skill `made`, just kept and checked, on the lamp at once
+/// (the owner, 10 Nov: a made skill goes on with no spoken yes; the app's
+/// MAKE IT and the voice ask are the ask, #5977): marked to go on by the lamp's
+/// own clock ([`goes_on`]), then asked of the manage helper at
+/// `keeping.manage` by its SHA-256 alone, which installs only those bytes,
+/// held again to the cap ([`put_on_within`]). On; or why not, in plain
+/// words, kept beside it.
+pub fn put_on(keeping: &Keeping, made: &Made) -> Result<(), String> {
+    let now_unix_ms = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
+    put_on_within(
+        &keeping.directory,
+        &keeping.manage,
+        &made.sha256,
+        now_unix_ms,
+        PUT_ON_WAIT,
+    )
+    .map(|_| ())
+}
+
+/// [`put_on`] of the kept skill `sha256` in `directory`, marked at
+/// `now_unix_ms`, through the helper at `socket`, waiting at most `wait`
+/// for it: its name once on, or why not, in plain words, kept beside it
+/// as `not_on`. One on already is on.
 pub fn put_on_within(
     directory: &Path,
     socket: &Path,
-    said: Option<&str>,
+    sha256: &str,
     now_unix_ms: u64,
     wait: Duration,
-) -> Value {
-    let Some(said) = said else {
-        return json!({
-            "error": "only a yes said out loud puts a made skill on the lamp",
-            "next": "Tell them in a few words to say yes out loud at the lamp to put it on."
-        });
+) -> Result<String, String> {
+    let Some(entry) = index(directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256)
+    else {
+        return Err("the lamp no longer has it".into());
     };
-    if !crate::known_faces::plain_agreement(said) {
-        return json!({
-            "error": "what they said was not a plain yes",
-            "next": "Ask them once more, in a few words, whether to put it on the lamp."
-        });
+    let name = entry["name"].as_str().unwrap_or_default().to_owned();
+    if entry["on"] == true {
+        return Ok(name);
     }
-    let Some((name, sha256)) = waiting(directory, now_unix_ms) else {
-        return json!({
-            "error": "no skill made here is waiting for a yes",
-            "next": "Tell them in a few words that there is nothing waiting to be put on."
-        });
+    let refused = |why: String| {
+        eprintln!("lamp-voice: a made skill was not put on: {name}: {why}");
+        not_on(directory, sha256, &why);
+        Err(why)
     };
+    if let Err(error) = goes_on(directory, sha256, now_unix_ms) {
+        eprintln!("lamp-voice: a made skill: its mark to go on not kept: {error}");
+        return refused("the lamp couldn't keep it".into());
+    }
     // A helper not there (no socket, or nobody listening) never puts it on:
     // only one asked and silent may still (the reviewer's P3 on #2424).
     let Some(answer) = crate::tools::reached(socket, &json!({ "install_made": sha256 }), wait)
     else {
-        eprintln!("lamp-voice: a made skill: no skills helper to put it on: {name}");
-        return json!({
-            "error": "it couldn't be put on",
-            "next": "Tell them in one short sentence that it couldn't be put on the lamp, with no technical words."
-        });
+        return refused("the lamp's skills couldn't be reached".into());
     };
     match answer.as_ref().map(|answer| answer.get("done").is_some()) {
-        // No answer in time: the helper may still put it on, so the person
-        // is told that, not that it failed.
-        None => {
-            eprintln!("lamp-voice: a made skill: the skills helper didn't answer in time: {name}");
-            json!({
-                "error": "the lamp didn't say in time whether it is on",
-                "next": "Tell them in a few words that it is being put on, and that they can ask in a minute whether it is on."
-            })
-        }
+        // No answer in time: the helper may still put it on.
+        None => refused("the lamp didn't say in time whether it is on".into()),
         Some(true) => {
             let mut entries = index(directory);
             for entry in &mut entries {
-                if entry["sha256"] == sha256.as_str() {
+                if entry["sha256"] == sha256 {
                     entry["on"] = json!(true);
+                    if let Some(entry) = entry.as_object_mut() {
+                        entry.remove("not_on");
+                    }
                 }
             }
             if let Err(error) = write_index(directory, &entries) {
                 eprintln!("lamp-voice: a made skill is on, but not marked so: {error}");
             }
             eprintln!("lamp-voice: a made skill is on the lamp: {name}, sha256 {sha256}");
-            json!({
-                "put_on": name,
-                "next": "Tell them in a few words that it is on the lamp now."
-            })
+            Ok(name)
         }
         Some(false) => {
             let why = answer
                 .as_ref()
                 .and_then(|answer| answer["refused"].as_str())
                 .unwrap_or("");
-            eprintln!("lamp-voice: a made skill was not put on: {name}: {why}");
             // One they put on another way has its name (#2414): said, not
             // replaced.
-            if why.contains("put on another way") {
-                return json!({
-                    "error": format!("a skill called {name} is already on the lamp, put on another way"),
-                    "next": format!("Tell them in one short sentence that a skill called {name} is already on the lamp, so this one wasn't put on in its place.")
-                });
+            if why.contains("put on another way") || why.contains("never takes its place") {
+                return refused(format!(
+                    "a skill called {} is already on the lamp",
+                    spoken_name(&name)
+                ));
             }
-            json!({
-                "error": "it couldn't be put on",
-                "next": "Tell them in one short sentence that it couldn't be put on the lamp, with no technical words."
-            })
+            eprintln!("lamp-voice: the skills helper refused a made skill: {why}");
+            refused("the lamp's check didn't let it on".into())
         }
     }
 }
@@ -2393,6 +2337,44 @@ fn cut_words(text: &str, most: usize) -> String {
             _ => cut,
         },
         None => cut,
+    }
+}
+
+/// `text` on one line, at most `most` characters, cut only where a
+/// sentence ends, or else where a word ends, never mid-word and never with
+/// "…": what is left ends as a sentence (#5977).
+fn cut_sentences(text: &str, most: usize) -> String {
+    let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let Some((at, _)) = line.char_indices().nth(most) else {
+        return line;
+    };
+    let head = &line[..at];
+    // A sentence ends at '.', '!' or '?' followed by a space (or at the cut,
+    // when the next character is a space).
+    let next_is_space = line[at..].starts_with(' ');
+    let ends = head
+        .char_indices()
+        .rev()
+        .filter(|&(index, c)| {
+            matches!(c, '.' | '!' | '?')
+                && (head[index + c.len_utf8()..].starts_with(' ')
+                    || (index + c.len_utf8() == head.len() && next_is_space))
+        })
+        .map(|(index, c)| index + c.len_utf8())
+        .next();
+    if let Some(end) = ends {
+        return head[..end].to_owned();
+    }
+    let words = if next_is_space {
+        head
+    } else {
+        head.rsplit_once(' ').map_or("", |(words, _)| words)
+    };
+    let words = words.trim_end_matches([',', ';', ':', '-', ' ']);
+    if words.is_empty() {
+        String::new()
+    } else {
+        format!("{words}.")
     }
 }
 
@@ -2763,7 +2745,7 @@ light = { dim = 1 }
         [[do]]\nread = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }\n";
 
     /// #5288: its cap takes one linked service, as a read, and its voice
-    /// for saying it, only with the switch on; its spoken yes names the
+    /// for saying it, only with the switch on; what it does is said with the
     /// service, what it reads and the condition it reads under.
     #[test]
     fn a_read_skill_is_held_to_one_service_read_and_said_with_its_condition() {
@@ -3169,21 +3151,52 @@ body = { gesture = "nod" }
         else {
             panic!("a cannot answer is refused with no repair");
         };
-        assert_eq!(
-            why,
-            "a skill can't do that: a skill can't hear words like \"good night\"."
-        );
+        assert_eq!(why, "a skill can't hear words like \"good night\".");
         let long = format!("cannot: {}", "x ".repeat(200));
-        assert!(files(&long).unwrap_err().0.chars().count() < 160);
+        assert!(files(&long).unwrap_err().0.chars().count() <= MOST_CANNOT_REASON_CHARS + 1);
         let both = format!("cannot: no\n{}", answer(TOML, CARD));
         assert!(files(&both).is_ok());
         // In any case (Mobile's P3 on #5042).
-        assert!(
-            files("Cannot: hear words.")
-                .unwrap_err()
-                .0
-                .ends_with(": hear words.")
+        assert_eq!(files("Cannot: hear words.").unwrap_err().0, "hear words.");
+        assert_eq!(files("cannot:   ").unwrap_err().0, "a skill can't do that");
+    }
+
+    /// #5977, lamp-74ff on 10 Nov: a `cannot:` about time keeps its whole
+    /// sentence and what to ask instead, as the person is told it, where
+    /// 120 characters cut it at "beyond s…".
+    #[test]
+    fn a_cannot_about_time_keeps_its_whole_sentence() {
+        let reason = "A skill can't keep track of time by itself, every hour or at a set time, \
+                      since it has no timers of its own beyond someone coming or going. Ask me \
+                      for a reminder instead, like 'remind me every hour to stand up'.";
+        let Err(Refused(why, None)) = files(&format!("cannot: {reason}")) else {
+            panic!("refused");
+        };
+        assert_eq!(why, reason);
+        assert!(!why.contains('…'), "{why}");
+    }
+
+    /// A reason past its bound is cut where a sentence ends, else where a
+    /// word ends, never mid-word and never with "…" (#5977).
+    #[test]
+    fn a_long_cannot_is_cut_at_a_sentence_or_word_end() {
+        let sentences = format!("{} Then more. {}", "One.", "word ".repeat(80));
+        assert_eq!(cut_sentences(&sentences, 40), "One. Then more.");
+        let words = "a skill cannot keep track of time intervals like every hour by itself";
+        assert_eq!(
+            cut_sentences(words, 40),
+            "a skill cannot keep track of time."
         );
+        assert_eq!(
+            cut_sentences(words, 38),
+            "a skill cannot keep track of time."
+        );
+        assert_eq!(cut_sentences("short one", 40), "short one");
+        assert_eq!(cut_sentences("unbroken", 3), "");
+        let Err(Refused(why, None)) = files(&format!("cannot: {}", "word ".repeat(100))) else {
+            panic!("refused");
+        };
+        assert!(why.ends_with("word.") && !why.contains('…'), "{why}");
     }
 
     /// The model's `left out:` is said in a fixed frame as its own note,
@@ -3234,6 +3247,7 @@ body = { gesture = "nod" }
             Some(Keeping {
                 directory: PathBuf::from(DIRECTORY),
                 program: PathBuf::from(PROGRAM),
+                manage: PathBuf::from(MANAGE_SOCKET),
             })
         );
         assert_eq!(Keeping::when(false), None);
@@ -3249,6 +3263,7 @@ body = { gesture = "nod" }
         let keeping = Keeping {
             directory: dir.clone(),
             program: dir.join("no-such-program"),
+            manage: dir.join("manage.sock"),
         };
         let kept = keep(&answer(TOML, CARD), false, "s:1:2", &keeping);
         assert_eq!(kept.unwrap_err().0, "the lamp couldn't check it");
@@ -3309,6 +3324,7 @@ body = { gesture = "nod" }
         let keeping = Keeping {
             directory: dir.join("made"),
             program,
+            manage: dir.join("manage.sock"),
         };
         let refused = keep(&answer(TOML, CARD), false, "s:1:2", &keeping).unwrap_err();
         assert_eq!(refused.0, "it doesn't pass the lamp's check");
@@ -3392,6 +3408,7 @@ body = { gesture = "nod" }
         let keeping = Keeping {
             directory: dir.join("made"),
             program,
+            manage: dir.join("manage.sock"),
         };
         let began = Instant::now();
         let kept = keep(&answer(TOML, CARD), false, "s:1:4", &keeping);
@@ -3588,8 +3605,6 @@ body = { gesture = "nod" }
         })
     }
 
-    /// The ask waits [`PUT_ON_WITHIN`], the newest ask alone, and the note
-    /// says which skill a yes would put on.
     /// A package left half moved in by a crash is deleted, but never one
     /// another keep is moving in right now: only one older than any keep
     /// takes (Fourteen's P2 on #3662: two readers keep the same answers).
@@ -3614,177 +3629,123 @@ body = { gesture = "nod" }
         let _ = fs::remove_dir_all(&dir);
     }
 
-    /// lamp-9adf, 31 Oct 09:32: the news of `posture-glow` untold, asked "Is
-    /// the skill I asked for ready yet?", the model said the ask in its own
-    /// answer, and the yes after it found nothing waiting. Now that answer
-    /// keeps the newest untold skill as asked when it was said, so the yes
-    /// is held to the usual two minutes; another question's yes, an answer
-    /// too long ago, or an older skill than the newest ask, keeps nothing
-    /// (the Reviewer-lead's P2 on #4880).
+    /// A kept skill goes on at once, with no yes (the owner, 10 Nov): the
+    /// helper is asked for its SHA-256 alone, it is marked to go on and
+    /// then on, and once on, asking again asks the helper nothing.
     #[test]
-    fn the_lamps_own_answer_saying_the_ask_keeps_the_untold_skill_asked() {
-        let dir = scratch("mk-in-answer");
+    fn a_kept_skill_goes_on_at_once_by_its_sha256_with_no_yes() {
+        let dir = scratch("mk-on");
         let made = dir.join("made");
-        fs::create_dir_all(&made).unwrap();
-        let kept = |name: &str, sha: char, at: u64| {
-            json!({"name": name, "sha256": sha.to_string().repeat(64),
-                   "package": format!("{name}.tar"), "from": format!("s1:{at}:1"),
-                   "at_unix_ms": at})
-        };
-        write_index(
-            &made,
-            &[
-                kept("evening-dim", 'a', 1_000),
-                kept("posture-glow", 'b', 2_000),
-            ],
-        )
-        .unwrap();
-        let answer = format!("It glows warm once an hour. {ASK_TO_PUT_ON}");
-        let now = 300_000;
-        // Another question's yes keeps nothing.
+        two_kept(&made);
+        let socket = dir.join("manage.sock");
+        let asked = helper(&socket, r#"{"done": "installed evening-dim"}"#);
+        let wait = Duration::from_secs(5);
+        let on = put_on_within(&made, &socket, &"a".repeat(64), 2_000, wait);
+        assert_eq!(on.as_deref(), Ok("evening-dim"));
+        let asked: Value = serde_json::from_str(&asked.join().unwrap()).unwrap();
+        assert_eq!(asked, json!({"install_made": "a".repeat(64)}));
+        let entries = index(&made);
+        assert_eq!(entries[0]["on"], true);
+        assert_eq!(entries[0]["goes_on_at_unix_ms"], 2_000);
         assert!(
-            !asked_in_answer(
-                &made,
-                "Shall I set that reminder?",
-                Duration::from_secs(5),
-                now
-            )
-            .unwrap()
+            entries[1].get("goes_on_at_unix_ms").is_none(),
+            "{entries:?}"
         );
-        assert_eq!(waiting(&made, now), None);
-        // Said too long ago keeps nothing.
-        assert!(
-            !asked_in_answer(&made, &answer, PUT_ON_WITHIN + Duration::from_secs(1), now).unwrap()
-        );
-        assert_eq!(waiting(&made, now), None);
-        // Two untold: the answer may have named either ("is evening-dim
-        // ready?"), so neither is asked, and a yes finds nothing waiting.
-        assert!(!asked_in_answer(&made, &answer, Duration::from_secs(5), now).unwrap());
-        assert_eq!(waiting(&made, now), None);
-        // One untold after the newest ask: it is asked then, and waits.
-        offered(&made, &"a".repeat(64), 1_500).unwrap();
-        assert!(asked_in_answer(&made, &answer, Duration::from_secs(5), now).unwrap());
-        let newest = Some(("posture-glow".to_owned(), "b".repeat(64)));
-        assert_eq!(waiting(&made, now), newest);
-        assert_eq!(index(&made)[1]["offered_at_unix_ms"], json!(now - 5_000));
-        // Asked now, the older untold one never takes its place.
-        assert!(!asked_in_answer(&made, &answer, Duration::from_secs(1), now + 1_000).unwrap());
-        assert_eq!(waiting(&made, now + 1_000), newest);
+        assert_eq!(going_on(&made, &"a".repeat(64), 2_000), None, "on now");
+        // On already: on, and no helper is asked (none listens now).
+        let again = put_on_within(&made, &socket, &"a".repeat(64), 3_000, wait);
+        assert_eq!(again.as_deref(), Ok("evening-dim"));
+        let line = on_line(&Made {
+            name: "evening-dim".into(),
+            version: "1.0.0".into(),
+            sha256: "a".repeat(64),
+            description: String::new(),
+            uses: Uses::default(),
+            package: PathBuf::new(),
+        });
+        assert_eq!(line, "I made evening dim, and it's on.");
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// The manage helper's own rule: a kept skill goes on only within
+    /// [`GOES_ON_WITHIN`] of its mark, by the helper's clock, never one
+    /// never marked, marked too long ago, marked after now, or on already.
     #[test]
-    fn only_the_newest_ask_waits_and_only_for_two_minutes() {
-        let dir = scratch("mk-wait");
+    fn only_a_fresh_mark_lets_a_kept_skill_go_on() {
+        let dir = scratch("mk-going");
         let made = dir.join("made");
         two_kept(&made);
-        assert_eq!(waiting_note(&made, 1_000), None);
-        offered(&made, &"a".repeat(64), 1_000).unwrap();
-        offered(&made, &"b".repeat(64), 5_000).unwrap();
-        let within = PUT_ON_WITHIN.as_millis() as u64;
+        let (a, b) = ("a".repeat(64), "b".repeat(64));
+        assert_eq!(going_on(&made, &a, 1_000), None, "never marked");
+        assert!(goes_on(&made, &a, 1_000).unwrap());
+        assert!(!goes_on(&made, &"c".repeat(64), 1_000).unwrap(), "not kept");
+        let within = GOES_ON_WITHIN.as_millis() as u64;
+        assert_eq!(going_on(&made, &a, 1_000).as_deref(), Some("evening-dim"));
         assert_eq!(
-            waiting(&made, 6_000),
-            Some(("morning-glow".to_owned(), "b".repeat(64)))
+            going_on(&made, &a, 1_000 + within).as_deref(),
+            Some("evening-dim")
         );
-        let note = waiting_note(&made, 6_000).unwrap();
-        assert!(
-            note.contains("\"morning-glow\"") && note.contains(PUT_ON),
-            "{note}"
-        );
-        assert_eq!(
-            waiting(&made, 5_000 + within),
-            Some(("morning-glow".to_owned(), "b".repeat(64)))
-        );
-        assert_eq!(waiting(&made, 5_001 + within), None);
-        // An ask for a SHA-256 nothing kept changes nothing.
-        offered(&made, &"c".repeat(64), 7_000).unwrap();
-        assert_eq!(waiting(&made, 7_000).unwrap().0, "morning-glow");
+        assert_eq!(going_on(&made, &a, 1_001 + within), None, "too long ago");
+        assert_eq!(going_on(&made, &a, 999), None, "a clock gone back");
+        assert_eq!(going_on(&made, &b, 1_000), None, "another, never marked");
+        let mut entries = index(&made);
+        entries[0]["on"] = json!(true);
+        write_index(&made, &entries).unwrap();
+        assert_eq!(going_on(&made, &a, 1_000), None, "on already");
+        let _ = fs::remove_dir_all(&dir);
     }
 
-    /// On a spoken yes, the helper is asked for the waiting skill's SHA-256
-    /// alone, and once it is on, nothing waits.
+    /// A kept skill that couldn't be put on stays off, and why is said in
+    /// plain words and kept beside it (`not_on`): no helper, a helper
+    /// silent, a refusal, and a skill of that name put on another way.
     #[test]
-    fn a_spoken_yes_asks_the_helper_for_that_sha256_and_nothing_else() {
-        let dir = scratch("mk-yes");
+    fn a_kept_skill_not_put_on_stays_off_and_says_why() {
+        let dir = scratch("mk-not-on");
         let made = dir.join("made");
         two_kept(&made);
-        offered(&made, &"a".repeat(64), 1_000).unwrap();
-        let socket = dir.join("manage.sock");
-        let asked = helper(&socket, r#"{"done": "installed evening-dim"}"#);
-        let told = put_on(&made, &socket, Some("Yes."), 2_000);
-        assert_eq!(told["put_on"], "evening-dim", "{told}");
-        let asked: Value = serde_json::from_str(&asked.join().unwrap()).unwrap();
-        assert_eq!(asked, json!({"install_made": "a".repeat(64)}));
-        assert_eq!(waiting(&made, 2_000), None, "on, so nothing waits");
-        let again = put_on(&made, &socket, Some("Yes."), 2_000);
+        let a = "a".repeat(64);
+        let wait = Duration::from_secs(5);
+        let nobody = put_on_within(&made, &dir.join("nobody.sock"), &a, 2_000, wait);
         assert_eq!(
-            again["error"], "no skill made here is waiting for a yes",
-            "{again}"
+            nobody,
+            Err("the lamp's skills couldn't be reached".to_owned())
         );
-    }
-
-    /// A yes not said out loud, or no ask waiting, asks the helper nothing;
-    /// a helper's refusal leaves the skill off and still waiting.
-    #[test]
-    fn no_spoken_yes_or_no_ask_puts_nothing_on_and_a_refusal_is_told() {
-        let dir = scratch("mk-no");
-        let made = dir.join("made");
-        two_kept(&made);
-        let socket = dir.join("nobody.sock");
-        let told = put_on(&made, &socket, Some("Yes."), 2_000);
-        assert_eq!(
-            told["error"], "no skill made here is waiting for a yes",
-            "{told}"
-        );
-        offered(&made, &"a".repeat(64), 1_000).unwrap();
-        let typed = put_on(&made, &socket, None, 2_000);
-        assert_eq!(
-            typed["error"], "only a yes said out loud puts a made skill on the lamp",
-            "{typed}"
-        );
-        let not_yes = put_on(&made, &socket, Some("No, not yet."), 2_000);
-        assert_eq!(
-            not_yes["error"], "what they said was not a plain yes",
-            "{not_yes}"
-        );
-        // No helper there: it is not being put on (the reviewer's P3 on #2424).
-        let nobody = put_on(&made, &socket, Some("Yes."), 2_000);
-        assert_eq!(nobody["error"], "it couldn't be put on", "{nobody}");
+        assert_eq!(index(&made)[0]["not_on"], nobody.unwrap_err().as_str());
+        assert_ne!(index(&made)[0]["on"], true);
         // A helper asked and silent may still put it on.
         let socket = dir.join("silent.sock");
         let _listening = std::os::unix::net::UnixListener::bind(&socket).unwrap();
-        let silent = put_on_within(
-            &made,
-            &socket,
-            Some("Yes."),
-            2_000,
-            Duration::from_millis(200),
-        );
+        let silent = put_on_within(&made, &socket, &a, 2_000, Duration::from_millis(200));
         assert_eq!(
-            silent["error"], "the lamp didn't say in time whether it is on",
-            "{silent}"
+            silent,
+            Err("the lamp didn't say in time whether it is on".to_owned())
         );
         let socket = dir.join("manage.sock");
         let asked = helper(
             &socket,
             r#"{"refused": "not installed: its SHA-256 has changed"}"#,
         );
-        let refused = put_on(&made, &socket, Some("Yes."), 2_000);
+        let refused = put_on_within(&made, &socket, &a, 2_000, wait);
         asked.join().unwrap();
-        assert_eq!(refused["error"], "it couldn't be put on", "{refused}");
-        assert_eq!(waiting(&made, 2_000).unwrap().0, "evening-dim");
+        assert_eq!(refused, Err("the lamp's check didn't let it on".to_owned()));
         let socket = dir.join("in-the-way.sock");
         let asked = helper(
             &socket,
             r#"{"refused": "not installed: evening-dim is already on the lamp, put on another way, and a skill made here doesn't take its place"}"#,
         );
-        let in_the_way = put_on(&made, &socket, Some("Yes."), 2_000);
+        let in_the_way = put_on_within(&made, &socket, &a, 2_000, wait);
         asked.join().unwrap();
+        let why = in_the_way.unwrap_err();
+        assert_eq!(why, "a skill called evening dim is already on the lamp");
         assert_eq!(
-            in_the_way["error"],
-            "a skill called evening-dim is already on the lamp, put on another way",
-            "{in_the_way}"
+            not_on_line(&why),
+            "I made it but couldn't put it on: a skill called evening dim is already on the lamp."
         );
+        assert_eq!(index(&made)[0]["not_on"], why.as_str());
+        assert_ne!(index(&made)[0]["on"], true);
+        let gone = put_on_within(&made, &socket, &"c".repeat(64), 2_000, wait);
+        assert_eq!(gone, Err("the lamp no longer has it".to_owned()));
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// Now, as the index's times are kept.
@@ -3851,12 +3812,11 @@ body = { gesture = "nod" }
         assert!(card.ends_with(&format!("---\n{INSTRUCTIONS}\n")), "{card}");
     }
 
-    /// Kept as a made skill is, with what it does said plainly; nothing
-    /// waits for a yes until the lamp has asked, and nothing goes into the
-    /// skills folder: the function is declared only once a spoken yes puts
-    /// it on.
+    /// Kept as a made skill is, with what it does said plainly; keeping
+    /// alone marks nothing to go on and puts nothing into the skills
+    /// folder: [`put_on`] does, next.
     #[test]
-    fn a_written_skill_is_kept_and_waits_for_nothing_before_it_is_asked() {
+    fn a_written_skill_is_kept_and_nothing_goes_on_by_keeping_alone() {
         let (root, keeping) = crate::make_skill_local::tests::keeping("written-kept");
         let installed = root.join("skills");
         fs::create_dir_all(&installed).unwrap();
@@ -3868,25 +3828,24 @@ body = { gesture = "nod" }
         );
         assert_eq!(made.uses.spoken(), "its voice");
         assert_eq!(index(&keeping.directory)[0]["uses"]["speak"], true);
-        assert_eq!(waiting(&keeping.directory, now_ms()), None);
+        assert_eq!(going_on(&keeping.directory, &made.sha256, now_ms()), None);
         assert_eq!(fs::read_dir(&installed).unwrap().count(), 0);
         // The same ask again: the kept one.
         let again = keep_written(&study_mode(), "written:app:1:1", &keeping, &installed).unwrap();
         assert_eq!(again, made);
-        // Asked about: only then does a yes find it.
-        offered(&keeping.directory, &made.sha256, now_ms()).unwrap();
+        // Marked to go on: only then may the helper put it on.
+        goes_on(&keeping.directory, &made.sha256, now_ms()).unwrap();
         assert_eq!(
-            waiting(&keeping.directory, now_ms()).map(|(name, _)| name),
+            going_on(&keeping.directory, &made.sha256, now_ms()),
             Some("study-mode".to_owned())
         );
         let _ = fs::remove_dir_all(&root);
     }
 
     /// A name any skill on the lamp has, installed or pushed, is refused, and
-    /// nothing is kept. A kept one of that name not on, asked about or not,
-    /// is replaced by the new one, its package and its offer with it: a no
-    /// leaves no mark, so a fix sent after it goes at once (Seventh's P2 on
-    /// #5072).
+    /// nothing is kept. A kept one of that name not on, marked to go on or
+    /// not, is replaced by the new one, its package and its mark with it,
+    /// so a fix sent after it goes at once (Seventh's P2 on #5072).
     #[test]
     fn a_written_skill_takes_no_name_a_skill_has() {
         let (root, keeping) = crate::make_skill_local::tests::keeping("written-taken");
@@ -3907,16 +3866,16 @@ body = { gesture = "nod" }
         let entries = index(&keeping.directory);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0]["from"], "written:app:3:1");
-        // Asked about and said no to, within its time: a fix goes at once,
-        // and the old offer is gone, so a late yes puts nothing on.
-        offered(&keeping.directory, &first.sha256, now_ms()).unwrap();
-        assert!(waiting(&keeping.directory, now_ms()).is_some());
+        // Marked to go on and not on (the helper refused it): a fix goes at
+        // once, and the old mark is gone with it.
+        goes_on(&keeping.directory, &first.sha256, now_ms()).unwrap();
+        assert!(going_on(&keeping.directory, &first.sha256, now_ms()).is_some());
         let fixed = keep_written(&study_mode(), "written:app:3:2", &keeping, &installed).unwrap();
         assert_eq!(index(&keeping.directory).len(), 1);
-        assert_eq!(waiting(&keeping.directory, now_ms()), None);
-        // Its ask ran out with no yes: the new one takes its place too.
-        let long_ago = now_ms() - PUT_ON_WITHIN.as_millis() as u64 - 1_000;
-        offered(&keeping.directory, &fixed.sha256, long_ago).unwrap();
+        assert_eq!(index(&keeping.directory)[0]["from"], "written:app:3:2");
+        // Its mark ran out, not on: the new one takes its place too.
+        let long_ago = now_ms() - GOES_ON_WITHIN.as_millis() as u64 - 1_000;
+        goes_on(&keeping.directory, &fixed.sha256, long_ago).unwrap();
         let first = fixed;
         // An older one of that name, said no to, with a package of its own.
         let older = keeping.directory.join("study-mode-0.9.0-000000000000.tar");
@@ -3924,7 +3883,7 @@ body = { gesture = "nod" }
         let mut entries = index(&keeping.directory);
         entries.insert(
             0,
-            json!({"from": "written:app:0:1", "name": "study-mode", "package": "study-mode-0.9.0-000000000000.tar", "sha256": "0", "offered_at_unix_ms": long_ago}),
+            json!({"from": "written:app:0:1", "name": "study-mode", "package": "study-mode-0.9.0-000000000000.tar", "sha256": "0", "goes_on_at_unix_ms": long_ago}),
         );
         write_index(&keeping.directory, &entries).unwrap();
         let rewritten =
@@ -3938,7 +3897,7 @@ body = { gesture = "nod" }
         // package stands for both, and it stays while one names it.
         assert_eq!(second.package, first.package);
         assert!(second.package.exists());
-        offered(&keeping.directory, &second.sha256, long_ago).unwrap();
+        goes_on(&keeping.directory, &second.sha256, long_ago).unwrap();
         let third = keep_written(&rewritten, "written:app:5:1", &keeping, &installed).unwrap();
         assert_eq!(third.package, second.package);
         assert!(third.package.exists());

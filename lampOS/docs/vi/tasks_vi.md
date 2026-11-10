@@ -10,7 +10,9 @@ Một kỹ năng được tạo bởi chính mô hình của đèn, không bao g
 trên máy tính (người xây dựng đầu tiên, 3/11, trên Queue;
 [skills_vi.md](skills_vi.md)). Phần tasks không khai báo `make_skill` hay
 `put_on_made_skill`, và cờ `--tasks-make-skill` của worker đã bị bỏ: chỉ cần
-`LAMP_MAKE_SKILL=on` là giọng nói có hai hàm của riêng nó, có hay không có phần
+`LAMP_MAKE_SKILL=on` là giọng nói có hàm của riêng nó, `make_skill`
+(`put_on_made_skill` đã bị bỏ từ #5977: kỹ năng đã tạo được bật ngay khi được
+giữ lại), có hay không có phần
 tasks, và một kỹ năng gõ trong ứng dụng (`LAMP_APP_MAKE_SKILL`) cũng được tạo
 như vậy, không bao giờ được giao đi. Các câu tin của kỹ năng đã tạo (`made`,
 `not_kept`) và việc sửa nó qua một việc giao cũng bị bỏ theo. Một việc mà lời
