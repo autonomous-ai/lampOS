@@ -2749,6 +2749,8 @@ EXAMPLE_RUNS = {
     "follow.py": ([], "arrived", ("lease.take", ("look", {"at": "face"}))),
     "follow_hand.py": ([], "hand", ("lease.take", ("look", {"at": "hand"}))),
     "heat_watch.py": ([], "hot", (("light", {"colour": "orange", "level": 2, "pattern": "pulse"}),)),
+    # Stuffy air, a short wait (DESK_STUFFY_AFTER_S below), one line said, then the glow.
+    "desk_health.py": ([], "stuffy", ("say", ("light", {"colour": "orange", "level": 2, "pattern": "breathe"}))),
     "greet.py": ([], "arrived", (("gesture", {"name": "greeting"}),)),
     "notes.py": ([], None, (("notes.get", {"key": "runs"}), ("notes.set", {"key": "runs", "value": 1}), ("light", {"colour": "warm", "level": 1}))),
     "phrase.py": ([], "phrase", (("light", {"colour": "warm", "level": 2, "pattern": "breathe"}), ("gesture", {"name": "nod"}))),
@@ -2788,6 +2790,7 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
     assert {path.name for path in examples.glob("*.py")} - {"tour.py"} == set(EXAMPLE_RUNS)
     nudges = {
         "air": lambda fake: fake.set_air(pm2_5=41.0, co2_ppm=1350, feel="stuffy"),
+        "stuffy": lambda fake: fake.set_air(co2_ppm=1500, feel="stuffy"),
         "arrived": lambda fake: fake.emit("person.arrived", count=1, near=0.3),
         # Paced as a lamp says them, as the JS test does: all at once, the
         # track's last `seen: false` can land before the example waits for a
@@ -2804,7 +2807,7 @@ def test_every_example_runs_against_a_fake_lamp_and_sends_what_it_is_for(tmp_pat
             await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring(home))
             ran = await asyncio.create_subprocess_exec(
                 sys.executable, str(examples / name), *args, cwd=home if name in WRITES_FILES else examples.parent,
-                env={**os.environ, "LAMPOS_HOME": str(home), "PYTHONUNBUFFERED": "1"},
+                env={**os.environ, "LAMPOS_HOME": str(home), "PYTHONUNBUFFERED": "1", "DESK_STUFFY_AFTER_S": "1"},
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
             )
             said = asyncio.ensure_future(ran.communicate())
