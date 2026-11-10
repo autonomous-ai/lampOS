@@ -997,6 +997,70 @@ def test_the_fake_refuses_a_move_the_body_would_drop_with_its_words_before_the_l
     run(go())
 
 
+LIGHT_REFUSALS = [
+    ({"rgb": "#ff8000", "for_ms": 1000, "fade_ms": 500}, "fade_ms: from 1000 to 60000"),
+    ({"rgb": "#ff8000", "for_ms": 1000, "fade_ms": 60001}, "fade_ms: from 1000 to 60000"),
+    ({"rgb": "#ff8000", "for_ms": 30001}, "for_ms: from 1 to 30000"),
+    ({"rgb": "#ff8000", "for_ms": 0}, "for_ms: from 1 to 30000"),
+    ({"rgb": "#ff8000", "for_ms": 1000, "brightness": 101}, "brightness: from 0 to 100"),
+    ({"rgb": "ff8000", "for_ms": 1000}, "rgb: #rrggbb"),
+    ({"pixels": ["#000000"] * 31, "for_ms": 1000}, "pixels: 32 of them, one per pixel of the ring"),
+    ({"pixels": ["#000000"] * 33, "for_ms": 1000}, "pixels: 32 of them, one per pixel of the ring"),
+    ({"pixels": ["#000000"] * 31 + ["red"], "for_ms": 1000}, "pixels: each #rrggbb"),
+    ({"pixels": ["#000000"] * 31 + ["#00000"], "for_ms": 1000}, "pixels: each #rrggbb"),
+    ({"rgb": "#ff8000", "colour": "red", "level": 3, "for_ms": 1000}, "one of colour, rgb or pixels"),
+    ({"for_ms": 1000}, "one of colour, rgb or pixels"),
+    ({"colour": "mauve", "level": 3, "for_ms": 1000}, "colour: one of yellow, red, green, blue, cyan, purple, orange, pink, white, warm"),
+    ({"colour": "red", "level": 6, "for_ms": 1000}, "level: from 1 to 5, with colour"),
+    ({"colour": "red", "for_ms": 1000}, "level: from 1 to 5, with colour"),
+    ({"colour": "red", "level": 3, "brightness": 50, "for_ms": 1000}, "brightness goes with rgb or pixels; colour has level"),
+    ({"rgb": "#ff8000", "level": 3, "for_ms": 1000}, "level and pattern go with colour"),
+]
+LIGHT_TAKEN = [
+    {"rgb": "#FF8000", "for_ms": 1, "fade_ms": 1000},
+    {"rgb": "#ff8000", "for_ms": 30000, "fade_ms": 60000, "brightness": 0},
+    {"pixels": ["#000000"] * 32, "for_ms": 1000, "brightness": 100},
+    {"colour": "warm", "level": 3, "for_ms": 1000},
+]
+
+
+def test_light_refusal_is_lamp_controls_words_in_its_order():
+    from lampos.testing import light_refusal
+
+    for fields, refusal in LIGHT_REFUSALS:
+        assert light_refusal({"op": "light", **fields}) == refusal, fields
+    for fields in LIGHT_TAKEN:
+        assert light_refusal({"op": "light", **fields}) is None, fields
+
+
+@pytest.mark.parametrize("schema_check", [True, False])
+def test_the_fake_refuses_a_light_the_lamp_would_refuse_with_or_without_jsonschema(tmp_path, monkeypatch, schema_check):
+    import lampos.client
+
+    # Sent past the client's own check, as another computer's code might (a ring
+    # light with a fade of 500 ms was refused by a real lamp but taken by this
+    # fake when jsonschema was not installed).
+    monkeypatch.setattr(lampos.client, "_check", lambda op, fields: None)
+
+    async def go():
+        async with FakeLamp() as fake:
+            if not schema_check:
+                fake._validator = None
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for fields, refusal in LIGHT_REFUSALS:
+                    with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                        await lamp.request("light", **fields)
+                    if not schema_check or "colour" not in fields:
+                        assert raised.value.why == refusal, fields
+                for fields in LIGHT_TAKEN:
+                    await lamp.request("light", **fields)
+                # The connection is still good, and only the taken lights were shown.
+                assert len(fake.asked("light")) == len(LIGHT_TAKEN)
+
+    run(go())
+
+
 def test_poses_become_a_move_the_body_plays_eased_there_and_back():
     from lampos import poses_to_frames
     from lampos.moves import COUNTS_PER_DEGREE, MOVE_FASTEST, move_why

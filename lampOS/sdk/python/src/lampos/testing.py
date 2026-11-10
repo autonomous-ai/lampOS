@@ -321,6 +321,65 @@ def hand_events(track: list[dict]) -> list[tuple[int, dict]]:
     return events
 
 
+# lamp-control's `light` limits (protocol.rs, msgs' arbitration.rs): a ring
+# light's fade, how long it is held, the ring's pixels, the colour levels.
+LIGHT_FADE_MS = (1_000, 60_000)
+LIGHT_FOR_MS = (1, 30_000)
+LIGHT_LEVELS = (1, 5)
+RING_PIXELS = 32
+
+
+def _hex_rgb(text: Any) -> bool:
+    return (
+        isinstance(text, str)
+        and len(text) == 7
+        and text[0] == "#"
+        and all(c in "0123456789abcdefABCDEF" for c in text[1:])
+    )
+
+
+def light_refusal(request: dict) -> str | None:
+    """lamp-control's refusal of a computer's `light` (protocol.rs), in its
+    words, as `bad_request`, in its order; None for one it takes. Only for a
+    light it parses (whole numbers where it wants them): anything else is the
+    schema's to refuse."""
+    for field in ("level", "brightness", "fade_ms", "for_ms"):
+        value = request.get(field)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+            return None
+    colour, rgb, pixels = request.get("colour"), request.get("rgb"), request.get("pixels")
+    if sum(given is not None for given in (colour, rgb, pixels)) != 1:
+        return "one of colour, rgb or pixels"
+    if colour is not None:
+        if colour not in schema.colours():
+            return f"colour: one of {', '.join(schema.colours())}"
+        level = request.get("level")
+        if level is None or not LIGHT_LEVELS[0] <= level <= LIGHT_LEVELS[1]:
+            return f"level: from {LIGHT_LEVELS[0]} to {LIGHT_LEVELS[1]}, with colour"
+        if request.get("brightness") is not None:
+            return "brightness goes with rgb or pixels; colour has level"
+    else:
+        if request.get("level") is not None or request.get("pattern") is not None:
+            return "level and pattern go with colour"
+        brightness = request.get("brightness")
+        if brightness is not None and not 0 <= brightness <= 100:
+            return "brightness: from 0 to 100"
+    if rgb is not None and not _hex_rgb(rgb):
+        return "rgb: #rrggbb"
+    if pixels is not None:
+        if not isinstance(pixels, list) or len(pixels) != RING_PIXELS:
+            return f"pixels: {RING_PIXELS} of them, one per pixel of the ring"
+        if not all(_hex_rgb(pixel) for pixel in pixels):
+            return "pixels: each #rrggbb"
+    fade = request.get("fade_ms")
+    if fade is not None and not LIGHT_FADE_MS[0] <= fade <= LIGHT_FADE_MS[1]:
+        return f"fade_ms: from {LIGHT_FADE_MS[0]} to {LIGHT_FADE_MS[1]}"
+    for_ms = request.get("for_ms")
+    if for_ms is not None and not LIGHT_FOR_MS[0] <= for_ms <= LIGHT_FOR_MS[1]:
+        return f"for_ms: from {LIGHT_FOR_MS[0]} to {LIGHT_FOR_MS[1]}"
+    return None
+
+
 def _whole(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -634,6 +693,13 @@ class FakeLamp:
                     and _frames(request.get("frames"))
                 ):
                     refusal = move_refusal(request["step_ms"], request["frames"])
+                    if refusal is not None:
+                        await self._refuse(ws, id_, "bad_request", refusal)
+                        continue
+                # As lamp-control's protocol.rs for a light: its own limits, in its
+                # words, whether or not jsonschema is installed here.
+                if request.get("op") == "light" and id_ is not None:
+                    refusal = light_refusal(request)
                     if refusal is not None:
                         await self._refuse(ws, id_, "bad_request", refusal)
                         continue
