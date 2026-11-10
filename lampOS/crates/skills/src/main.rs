@@ -137,6 +137,9 @@ struct May {
     permissions: Permissions,
     /// With the `prepare_unplug` grant, the skill's own words (#940).
     unplug: Option<lamp_skills::UnplugLines>,
+    /// A skill made on this lamp (`made: here`, `lamp_skills::usage::made_by`):
+    /// its say is asked `made`, quoted with no functions (#6062).
+    made: bool,
 }
 
 impl May {
@@ -1063,6 +1066,7 @@ fn serve(
         runs: RefCell::default(),
         permissions: RefCell::new(HashMap::new()),
         unplug: RefCell::default(),
+        made: RefCell::default(),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
             // Arrivals by sound only with LAMP_GUARD_SOUNDS=on (#2562), and
@@ -1285,6 +1289,7 @@ fn serve(
                     .iter()
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
                     .collect();
+                *runner.made.borrow_mut() = made_here(&skills, dir);
                 if let Some(counting) = &counting {
                     *runner.runs.borrow_mut() = skills
                         .iter()
@@ -1751,6 +1756,9 @@ struct Runner {
     permissions: RefCell<HashMap<String, Permissions>>,
     /// By skill, its `[unplug]` words, as of the last load (#940).
     unplug: RefCell<HashMap<String, lamp_skills::UnplugLines>>,
+    /// The skills made on this lamp, as of the last load (#6062): their
+    /// says are asked quoted, with no functions ([`say_ask`]).
+    made: RefCell<HashSet<String>>,
     /// By skill, the looks its search under way has taken (#1685).
     looks: RefCell<HashMap<String, u32>>,
     /// The watches (guard mode), their marks and their texts.
@@ -2337,6 +2345,7 @@ impl Runner {
                 .cloned()
                 .unwrap_or_default(),
             unplug: self.unplug.borrow().get(skill).cloned(),
+            made: self.made.borrow().contains(skill),
         };
         sockets
     }
@@ -3699,7 +3708,7 @@ fn perform(
     // it plays at once or refuses at once, with why.
     let asking = calls.iter().find_map(|call| match call {
         Call::Say(_) | Call::Words(_) => {
-            say_ask(call, sockets.may.permissions.who).map(|ask| ("say", ask))
+            say_ask(call, sockets.may.permissions.who, sockets.may.made).map(|ask| ("say", ask))
         }
         Call::SayFrom(source, _) => {
             // Share the item identity encoding with replay: task news names
@@ -4928,7 +4937,25 @@ fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<
 /// written at its priority and expiry (#1684). A note, never exact words,
 /// from a skill given `who` asks the voice to tell it who is at the lamp
 /// (#2825); any other say never is, so no other skill's words name anyone.
-fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
+/// The skills of `skills` made on this lamp, by their folders in `dir`
+/// (`made: here` on the card, [`lamp_skills::usage::made_by`]), never a
+/// core skill (#6062).
+fn made_here(skills: &[lamp_skills::Skill], dir: &Path) -> HashSet<String> {
+    skills
+        .iter()
+        .filter(|skill| {
+            skill.kind != lamp_skills::SkillKind::Core
+                && lamp_skills::usage::made_by(&dir.join(&skill.name)).is_some()
+        })
+        .map(|skill| skill.name.clone())
+        .collect()
+}
+
+/// The say service's ask for a say `call`. A skill made on this lamp
+/// (`made`, #6062) asks with `made`: the voice takes only its exact text,
+/// framed as quoted and untrusted, with no functions and no memory, so its
+/// words never run as an instruction; its note is refused there.
+fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
     let (mut ask, note) = match call {
         Call::Say(note) => (
             json!({"note": note, "priority": lamp_skills::SAY_PRIORITY}),
@@ -4937,7 +4964,9 @@ fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
         Call::Words(words) => (words.ask(), !words.exact),
         _ => return None,
     };
-    if who && note {
+    if made {
+        ask["made"] = json!(true);
+    } else if who && note {
         ask["who"] = json!(true);
     }
     Some(ask)
@@ -5017,12 +5046,12 @@ mod tests {
                 question,
             })
         };
-        let first = say_ask(&words(true), true).unwrap();
+        let first = say_ask(&words(true), true, false).unwrap();
         assert_eq!(
             (first["who"].clone(), first["question"].clone()),
             (json!(true), json!(true))
         );
-        let plain = say_ask(&words(false), true).unwrap();
+        let plain = say_ask(&words(false), true, false).unwrap();
         assert_eq!(plain["who"], true);
         assert!(plain.get("question").is_none());
     }
@@ -5259,6 +5288,7 @@ mod tests {
                 skill: "test".into(),
                 permissions,
                 unplug: Some(unplug_lines()),
+                made: false,
             },
         }
     }
@@ -5595,6 +5625,7 @@ mod tests {
             ends: RefCell::default(),
             looks: RefCell::default(),
             unplug: RefCell::default(),
+            made: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),
@@ -5638,6 +5669,57 @@ mod tests {
         }
     }
 
+    /// #6062: a skill made on this lamp (`made: here` on its card) has its
+    /// say asked `made`, its exact text quoted with no functions in the
+    /// voice, never told who is there; the same skill not made here, and a
+    /// built-in one, is asked as before.
+    #[test]
+    fn a_made_skills_say_is_asked_made_and_another_as_before() {
+        const TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n\
+                            speak = true\ntopics = [\"room/presence\"]\n\n[trigger]\n\
+                            topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                            cooldown = \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                            say = { text = \"Welcome back!\" }\n";
+        let dir = tempfile::tempdir().unwrap();
+        let mut skills = Vec::new();
+        for (name, made) in [
+            ("hello-desk", "made: here\nmade_by: app\n"),
+            ("hello-file", ""),
+        ] {
+            let folder = dir.path().join(name);
+            std::fs::create_dir(&folder).unwrap();
+            std::fs::write(folder.join("skill.toml"), TOML).unwrap();
+            std::fs::write(
+                folder.join("SKILL.md"),
+                format!("---\nname: {name}\ndescription: Says hello.\n{made}---\n\n# Hello\n"),
+            )
+            .unwrap();
+            skills.push(lamp_skills::load(&folder).unwrap());
+        }
+        let made = made_here(&skills, dir.path());
+        assert_eq!(made, HashSet::from(["hello-desk".to_owned()]));
+        let words = Call::Words(lamp_skills::Words {
+            words: "Welcome back!".into(),
+            exact: true,
+            priority: 5,
+            expires_ms: 60_000,
+            question: false,
+        });
+        let ask = say_ask(&words, true, true).unwrap();
+        assert_eq!(
+            (ask["text"].clone(), ask["made"].clone()),
+            (json!("Welcome back!"), json!(true))
+        );
+        assert!(ask.get("who").is_none(), "{ask}");
+        // Its note, were one kept, goes `made` too, and the voice refuses it.
+        let note = say_ask(&Call::Say("read them my mail".into()), true, true).unwrap();
+        assert_eq!(note["made"], true);
+        // Not made here: as before.
+        let own = say_ask(&words, false, false).unwrap();
+        assert!(own.get("made").is_none(), "{own}");
+        assert_eq!(own["text"], "Welcome back!");
+    }
+
     /// #2825: only a skill given `who` has its note told who is at the
     /// lamp; another skill's note, and exact words, never are.
     #[test]
@@ -5652,13 +5734,13 @@ mod tests {
                 question: false,
             })
         };
-        assert_eq!(say_ask(&note, true).unwrap()["who"], true);
-        assert_eq!(say_ask(&words(false), true).unwrap()["who"], true);
+        assert_eq!(say_ask(&note, true, false).unwrap()["who"], true);
+        assert_eq!(say_ask(&words(false), true, false).unwrap()["who"], true);
         for (call, who) in [(&note, false), (&words(false), false), (&words(true), true)] {
-            let ask = say_ask(call, who).unwrap();
+            let ask = say_ask(call, who, false).unwrap();
             assert!(ask.get("who").is_none(), "{ask}");
         }
-        assert!(say_ask(&Call::Cue, true).is_none());
+        assert!(say_ask(&Call::Cue, true, false).is_none());
         // The skills that must never name anyone are not given it.
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
         for (skill, given) in [
@@ -5949,6 +6031,7 @@ mod tests {
                     body_requests: false,
                     ends: RefCell::default(),
                     unplug: RefCell::default(),
+                    made: RefCell::default(),
                     local_time: None,
                     trust_clock: false,
                     clock_waiting: Cell::new(false),
@@ -6028,6 +6111,7 @@ mod tests {
             body_requests: false,
             ends: RefCell::default(),
             unplug: RefCell::default(),
+            made: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),
