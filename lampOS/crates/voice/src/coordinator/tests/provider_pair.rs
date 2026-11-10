@@ -47,6 +47,8 @@ struct Paired {
     draining: bool,
     trace: SessionState,
     outputs: Vec<ProviderOutput>,
+    conversation_received: bool,
+    names_received: bool,
     dials: UnboundedReceiver<Dial>,
     worker: Option<JoinHandle<Result<()>>>,
 }
@@ -133,6 +135,8 @@ impl Paired {
             draining: false,
             trace: SessionState::default(),
             outputs: Vec::new(),
+            conversation_received: false,
+            names_received: false,
             dials,
             worker: Some(tokio::spawn(serve_coordinated_test(child, boot, provider))),
         };
@@ -192,6 +196,14 @@ impl Paired {
             self.flow.received().unwrap();
             observe_provider_output(&mut self.cloud, &mut self.reply, &event).unwrap();
             match &event {
+                ProviderOutput::ConversationState { .. } => {
+                    self.conversation_received = true;
+                    continue;
+                }
+                ProviderOutput::MachineNames { chunk } => {
+                    self.names_received = chunk.index + 1 == chunk.count;
+                    continue;
+                }
                 ProviderOutput::Audio {
                     request, samples, ..
                 } => {
@@ -247,9 +259,15 @@ impl Paired {
     }
 
     async fn ready(&mut self) -> Dial {
-        let mut dial = self.dial(false).await;
+        let mut dial = self.dial(true).await;
         dial.service.accept().await;
-        self.until(false, |rig| rig.cloud.available()).await;
+        // Startup state consumes real output credit. Drain and replenish it
+        // before beginning a test's deliberate two-packet/no-return window.
+        // Metadata is dispatched above, never treated as Ready or request output.
+        self.until(true, |rig| {
+            rig.cloud.available() && rig.conversation_received && rig.names_received
+        })
+        .await;
         assert_eq!(self.cloud.ready_session(), Some(dial.session.get()));
         assert!(self.outputs.is_empty(), "Ready is priority-only");
         dial
@@ -1543,7 +1561,14 @@ mod duplex_through_the_worker {
                 .unwrap()
             {
                 self.flow.received().unwrap();
-                self.outputs.push(event);
+                if matches!(
+                    event,
+                    ProviderOutput::ConversationState { .. } | ProviderOutput::MachineNames { .. }
+                ) {
+                    observe_provider_output(&mut self.cloud, &mut h.reply, &event).unwrap();
+                } else {
+                    self.outputs.push(event);
+                }
             }
             self.flow.replenish(0, &mut self.channels.control).unwrap();
             assert!(!self.worker.as_ref().unwrap().is_finished(), "worker ended");

@@ -53,6 +53,8 @@ const SAMPLES: usize = 100;
 /// Recorders whose loop has ended, still writing: waited for once, at the
 /// end of `main` ([`finish_all`]), after every device is closed, never in a
 /// loop's own way out.
+// Process ownership: written and read in each serve/worker process independently; this static
+// is not IPC.
 static ENDED: std::sync::Mutex<Vec<JoinHandle<()>>> = std::sync::Mutex::new(Vec::new());
 
 /// Wait, at most `longest`, for every ended loop's recorder to write what it

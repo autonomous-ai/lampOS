@@ -49,6 +49,7 @@ pub(crate) fn start_offline() -> bool {
 
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static START_OFFLINE_FOR_TEST: std::cell::Cell<Option<bool>> =
         const { std::cell::Cell::new(None) };
 }

@@ -144,6 +144,8 @@ thread_local! {
     /// coordinator to hand to [`TaskNews::not_heard`] at its next tick: a
     /// reply is let go in many places that hold no task news. Of the
     /// coordinator's own thread.
+    // Process ownership: written and read in serve and second-worker app-message reader,
+    // independent copies; this static is not IPC.
     static CUT_SHORT: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
@@ -561,6 +563,8 @@ pub struct ForTexts {
 /// is told at the lamp as before (the first builder, 19 Oct: another
 /// person's work must not reach the owner's phone). Kept in [`typed_file`]
 /// too, for a worker started again.
+// Process ownership: written and read in serve and second-worker app-message reader,
+// independent copies; this static is not IPC.
 static TYPED: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
 /// The file of the tasks asked for by text, beside the file of what was told.

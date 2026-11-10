@@ -133,6 +133,8 @@ struct Said {
     email: Option<String>,
     until: Option<Instant>,
 }
+// Process ownership: written and read in provider workers, plus independent serve news reader;
+// this static is not IPC.
 static SAID: Mutex<Said> = Mutex::new(Said {
     code: None,
     email: None,
@@ -805,6 +807,8 @@ const MOST_MARKED: usize = 16;
 
 /// In this worker: the tasks part's folder, when signing in by voice is on
 /// ([`crate::agent_tasks::SIGN_IN_FLAG`]).
+// Process ownership: the provider worker writes and reads its own sign-in state; written news
+// arrives through ProviderInput.
 static DIRECTORY: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 /// What the lamp's words in a request of a Live session that heard a
@@ -821,6 +825,8 @@ struct Marked {
     held: BTreeSet<u64>,
     lined: BTreeSet<u64>,
 }
+// Process ownership: the provider worker writes and reads its own sign-in state; written news
+// arrives through ProviderInput.
 static MARKED: Mutex<Marked> = Mutex::new(Marked {
     requests: BTreeSet::new(),
     held: BTreeSet::new(),
@@ -832,6 +838,8 @@ std::thread_local! {
     /// runs on one thread (its current-thread runtime), which sees both
     /// its connections and its words, so it is kept there: each test's
     /// worker has its own.
+    // Process ownership: the provider worker writes and reads its own sign-in state; written
+    // news arrives through ProviderInput.
     static HELD_SESSION: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
 }
 
@@ -983,6 +991,8 @@ pub fn leaving_live(request: u64, session: u64, text: String) -> String {
 
 /// In this worker: the person's words of the line being heard, held while
 /// a sign-in's code or account is kept ([`person_piece`]).
+// Process ownership: the provider worker writes and reads its own sign-in state; written news
+// arrives through ProviderInput.
 static PERSON: Mutex<String> = Mutex::new(String::new());
 /// The most of a line held: past it, what is held leaves.
 const MOST_HELD: usize = 4_000;

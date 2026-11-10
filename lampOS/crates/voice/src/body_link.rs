@@ -820,6 +820,7 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     fn listener() -> (UnixDatagram, PathBuf) {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: AtomicU32 = AtomicU32::new(0);
         let path = std::env::temp_dir().join(format!(
             "lamp-body-{}-{}.sock",

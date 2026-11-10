@@ -72,6 +72,7 @@ async fn run_timed(
     sight: bool,
     slow: Option<Duration>,
 ) -> (Vec<Value>, Vec<Vec<Message>>, Vec<String>) {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 9_000 + 100 * NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);

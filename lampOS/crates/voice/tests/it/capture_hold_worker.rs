@@ -141,6 +141,7 @@ struct Heard {
 /// workers starved each other, and 2 to 4 of 11 ended on that bound at their
 /// first frames (Eighth on #705, 18 October: `ReferenceBacklog after 0
 /// frames`, `Discontinuity(DeviceError) after 1 frames`). The lamp runs one.
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 struct Rig {
@@ -748,6 +749,7 @@ impl Rig {
 /// a short session pays its first use. nextest runs each test in its own
 /// process, so every test here pays this once (#823).
 fn warm_up() {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static WARM: Once = Once::new();
     WARM.call_once(|| {
         let signal = Signal::new(WARM_BLOCKS);

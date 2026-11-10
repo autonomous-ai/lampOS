@@ -94,6 +94,8 @@ struct Shared {
 #[derive(Clone, Default)]
 pub struct ControlMutes(Arc<Shared>);
 
+// Process ownership: written and read in serve/coordinator and its say socket threads; this
+// static is not IPC.
 static PROCESS: OnceLock<ControlMutes> = OnceLock::new();
 
 impl ControlMutes {

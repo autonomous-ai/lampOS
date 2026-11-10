@@ -241,6 +241,8 @@ struct Script {
     limit: Duration,
     /// No person's input: only authored skill output is under test.
     silent: bool,
+    /// A conversation deadline received from the provider before input.
+    conversation: bool,
     /// The person's speech is a voice, a 150 Hz tone, not a flat level, so
     /// the voice's tone can read it (`LAMP_VOICE_TONE`).
     voiced: bool,
@@ -340,6 +342,7 @@ impl Script {
             ignores_stop: None,
             limit: LIMIT,
             silent: false,
+            conversation: false,
             say_at_frame: None,
             say_later: None,
             voiced: false,
@@ -535,10 +538,12 @@ impl Peer {
 thread_local! {
     /// Memory, telling the voice it forgot a person once this many Ends have
     /// been sent (`memory/forgot`), on the bus `TEST_FORGOT_IN` reads.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_MEMORY_FORGETS: std::cell::RefCell<Option<(usize, String, lamp_bus::Publisher)>> =
         const { std::cell::RefCell::new(None) };
     /// The body, saying `body/hand` on the bus `TEST_HAND_IN` reads
     /// (`Script::push`), and whether it is pushed yet.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static TEST_BODY_HAND: std::cell::RefCell<Option<(bool, lamp_bus::Publisher)>> =
         const { std::cell::RefCell::new(None) };
 }
@@ -1740,6 +1745,7 @@ fn run(script: Script) -> Run {
     // a thread as it comes so that no subscriber's queue fills.
     let expression = script.expression.then(|| {
         use lamp_msgs::{VoiceProgress, VoiceSound};
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static RUNS: AtomicU64 = AtomicU64::new(0);
         let root = PathBuf::from(format!(
             "/tmp/lv-route-expr-{}-{}",
@@ -1796,6 +1802,19 @@ fn run(script: Script) -> Run {
     // The clock starts once every child has crossed its startup barrier;
     // the coordinator and the peers share it from here.
     let clock_scope = crate::scenario_clock::Scope::enter(limit * 2).unwrap();
+    if script.conversation {
+        let observed_at_us = monotonic_us();
+        for peer in &mut peers {
+            if matches!(peer.role, "provider" | "second") {
+                peer.queued.push_back(ProviderOutput::ConversationState {
+                    snapshot: crate::provider_state::conversation::Snapshot {
+                        observed_at_us,
+                        until_us: Some(observed_at_us + 45_000_000),
+                    },
+                });
+            }
+        }
+    }
     let origin = monotonic_us();
     // The step's own rule, on the step's own evidence: its Unix clock is
     // the scenario's origin at `UNIX`.
@@ -5309,30 +5328,21 @@ fn a_computers_turn_opens_after_the_lamps_own_words_alone_have_gone_quiet() {
 }
 
 /// A computer's turn asked while a conversation with the lamp goes on (the
-/// thread holds an exchange with the lamp's words in it) is refused at
+/// worker has published an unexpired conversation deadline) is refused at
 /// once, never queued behind it.
 #[test]
 fn a_computers_turn_is_refused_while_a_conversation_with_the_lamp_goes_on() {
     use crate::say::{Answer, Outcome};
     let _one = super::pilot_faults::one_session();
-    // The thread is the whole voice's: hold it from the other tests that
-    // read or reset it (`provider_worker::tests::one_thread`).
-    let _thread = crate::provider_worker::tests::one_thread();
     let (says, line, answered) = crate::say::Says::line_for_test(
         r#"{"skill":"control","turn":"start","text":"Ready?","expires_in_ms":60000}"#,
     );
     TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
-    {
-        let mut thread = crate::thread::THREAD.lock().unwrap();
-        *thread = crate::thread::Thread::new();
-        thread.person("What time is it?", true, std::time::Instant::now());
-        thread.lamp(9_000, "It's three o'clock.", std::time::Instant::now());
-        assert!(thread.going_on(std::time::Instant::now()));
-    }
     let run = run(Script {
         second: false,
         only: true,
         silent: true,
+        conversation: true,
         say_at_frame: Some((100, line)),
         written: Written::Said(12),
         mute_at_frame: Some(900),
@@ -5340,7 +5350,6 @@ fn a_computers_turn_is_refused_while_a_conversation_with_the_lamp_goes_on() {
         ..Script::question(Live::Answer(12))
     });
     TEST_SAYS.with(|given| given.borrow_mut().take());
-    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     let answered: Vec<_> = answered.try_iter().collect();
     assert_eq!(
         answered,

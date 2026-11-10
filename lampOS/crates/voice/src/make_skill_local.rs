@@ -218,6 +218,8 @@ async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
 /// The second worker's own configuration, as it read it at start (its
 /// file, the unit's endpoints, the person's own keys): what [`own_chat`]
 /// asks. Set once.
+// Process ownership: the second worker sets and reads this config. Serve app_make has its own
+// empty copy and own_chat deliberately loads its environment instead.
 static CONFIG: std::sync::OnceLock<crate::second_config::SecondConfig> = std::sync::OnceLock::new();
 
 /// Kept by the second worker as it starts, with the switch.

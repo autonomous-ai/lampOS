@@ -3,6 +3,7 @@ use std::fs as stdfs;
 
 #[cfg(target_os = "linux")]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static FIXTURE_ROOT: std::cell::RefCell<Option<(PathBuf, File)>> = const {
         std::cell::RefCell::new(None)
     };
@@ -186,6 +187,7 @@ mod linux {
     use std::fs::{OpenOptions, Permissions};
     use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
     use std::sync::atomic::{AtomicU64, Ordering};
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT: AtomicU64 = AtomicU64::new(0);
     struct Fixture {
         root: PathBuf,

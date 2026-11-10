@@ -32,20 +32,25 @@ const BOOT: &str = "eyes";
 thread_local! {
     /// A don't-know's search (`LAMP_MEMORY_DONT_KNOW_RECALLS`) the next
     /// [`lines_known`] on this thread is given, once.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static DONT_KNOW_FOUND: std::cell::RefCell<Option<crate::second_provider::Remembered>> =
         const { std::cell::RefCell::new(None) };
     /// `LAMP_PERSON_SCOPE_ONE_FACE_READS` ([`Engine::reading_by_one_face`])
     /// for the next [`lines_known`] on this thread, once.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ONE_FACE_READS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// `LAMP_CONVERSATION_CARRIED_MEMORY` ([`Engine::reading_carried`]) for
     /// the next [`lines_known`] on this thread, once.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static CARRIED_MEMORY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The same-voice check not running for the route
     /// ([`Engine::reading_carried_where_heard`]) for the next
     /// [`lines_known`] on this thread, once.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static CARRIED_UNHEARD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The murmured line's mouths the next [`lines_known`] on this thread
     /// reads in place of [`S4_OPENING_MOUTHS`], once.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static MURMUR_MOUTHS: std::cell::Cell<Option<&'static [lamp_msgs::SpeakingState]>> =
         const { std::cell::Cell::new(None) };
 }

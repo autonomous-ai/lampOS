@@ -56,6 +56,7 @@ fn now() -> MonoTime {
 struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         // Keep Unix socket names below the transport's path bound.
         let path = PathBuf::from(format!(
@@ -205,6 +206,7 @@ impl HeldUp {
 thread_local! {
     /// The running scenario's producer, for [`on_time`] to read once the
     /// scenario has failed and its rig is gone.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static RUNNING: RefCell<Option<HeldUp>> = const { RefCell::new(None) };
 }
 

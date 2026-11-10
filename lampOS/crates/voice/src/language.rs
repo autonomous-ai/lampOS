@@ -524,6 +524,8 @@ pub fn from_environment() -> Option<Language> {
 /// [`from_environment`], read once for this process: for checks made on
 /// every turn.
 pub fn at_start() -> Option<Language> {
+    // Process ownership: written and read in independent serve/worker processes; this static is
+    // not IPC.
     static CHOSEN: std::sync::OnceLock<Option<Language>> = std::sync::OnceLock::new();
     *CHOSEN.get_or_init(from_environment)
 }

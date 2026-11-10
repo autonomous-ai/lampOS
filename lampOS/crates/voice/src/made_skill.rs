@@ -1811,6 +1811,8 @@ fn packed_and_kept(
     // A folder of this call's own: two keeps at once in one process (two
     // readers of the same news, as #3662's test runs them) never share
     // its check's words.
+    // Process ownership: app maker in serve and voice maker in the second worker increment
+    // independent packing counters; no value crosses the process boundary.
     static MAKING: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let work = keeping.directory.join(format!(
         ".making-{}-{}",

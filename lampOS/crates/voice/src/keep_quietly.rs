@@ -63,12 +63,14 @@ use std::{
 
 /// Only the exact value `on`.
 pub const ENVIRONMENT: &str = "LAMP_KEEP_QUIETLY";
+// Process ownership: written and read in second provider worker; this static is not IPC.
 static ON: OnceLock<bool> = OnceLock::new();
 
 #[cfg(test)]
 thread_local! {
     /// The switch for one test's own thread ([`set_on_for_test`]): the
     /// process switch is read once, and other tests read it off.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -114,6 +116,7 @@ const MOST_SEEN: usize = 64;
 
 /// The lines a known person's own face, and no other, was seen saying:
 /// each request with that person's memory id. In memory only, bounded.
+// Process ownership: written and read in second provider worker; this static is not IPC.
 static SEEN: Mutex<VecDeque<(u64, String)>> = Mutex::new(VecDeque::new());
 
 /// Records whether `person` (a memory id) was seen saying request
@@ -820,6 +823,7 @@ impl Offers {
 }
 
 /// This process's [`Offers`].
+// Process ownership: written and read in second provider worker; this static is not IPC.
 pub static OFFERS: Mutex<Offers> = Mutex::new(Offers::new());
 
 /// One answer's limit on offers to keep, with the switch on.

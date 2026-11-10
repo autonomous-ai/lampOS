@@ -1286,6 +1286,7 @@ mod tests {
         sync::{Condvar, Mutex},
         time::Instant,
     };
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT: AtomicU64 = AtomicU64::new(0);
     struct Private(PathBuf);
     impl Private {

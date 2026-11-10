@@ -13,11 +13,13 @@
 use std::cell::RefCell;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static FLUSHES: RwLock<()> = RwLock::new(());
 
 thread_local! {
     /// This thread's share and how many `Flushing`s hold it. A second shared
     /// lock on one thread could wait behind a queued `timing` forever.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static HELD: RefCell<(usize, Option<RwLockReadGuard<'static, ()>>)> =
         const { RefCell::new((0, None)) };
 }

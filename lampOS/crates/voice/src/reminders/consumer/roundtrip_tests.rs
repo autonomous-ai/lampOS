@@ -49,6 +49,7 @@ fn clock_after(ms: u64) -> ClockSample {
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let path = fs::canonicalize("/tmp").unwrap().join(format!(
             "sr-{}-{}",

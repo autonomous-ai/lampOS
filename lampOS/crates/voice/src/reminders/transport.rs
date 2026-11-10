@@ -518,6 +518,7 @@ mod tests {
         time::{Duration, Instant},
     };
 
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT: AtomicU64 = AtomicU64::new(1);
     struct Scratch(PathBuf);
     impl Scratch {

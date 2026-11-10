@@ -135,19 +135,33 @@ impl Default for Summaries {
 }
 
 /// This process's notes.
+// Process ownership: written and read in second provider worker and its summary writer; this
+// static is not IPC.
 static SUMMARIES: Mutex<Summaries> = Mutex::new(Summaries::new());
 /// The summary's own thread, once it has a model ([`summarize_with`]).
+// Process ownership: written and read in second provider worker and its summary writer; this
+// static is not IPC.
 static QUEUE_TO: OnceLock<Queue> = OnceLock::new();
 /// Notes the model gave nothing for, or nothing in time.
+// Process ownership: written and read in second provider worker and its summary writer; this
+// static is not IPC.
 pub static FAILED: AtomicU64 = AtomicU64::new(0);
 /// Notes the model gave empty.
+// Process ownership: written and read in second provider worker and its summary writer; this
+// static is not IPC.
 pub static EMPTY: AtomicU64 = AtomicU64::new(0);
 /// Jobs dropped with the queue full.
+// Process ownership: written and read in second provider worker and its summary writer; this
+// static is not IPC.
 pub static DROPPED: AtomicU64 = AtomicU64::new(0);
 
 /// Talk notes kept at a conversation's end, and those not kept: the store
 /// refused, or a forget came first.
+// Process ownership: written and read in second provider worker and its summary writer; this
+// static is not IPC.
 pub static TALK_KEPT: AtomicU64 = AtomicU64::new(0);
+// Process ownership: written and read in second provider worker and its summary writer; this
+// static is not IPC.
 pub static TALK_NOT_KEPT: AtomicU64 = AtomicU64::new(0);
 
 struct Job {

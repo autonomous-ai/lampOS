@@ -68,12 +68,14 @@ pub const NEWER_TURN: &str = "a newer turn of its computer's";
 
 /// Turn ids, unique for the voice's life, so an id from an earlier
 /// conversation never names a later turn.
+// Process ownership: written and read in serve/coordinator; this static is not IPC.
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 #[cfg(test)]
 thread_local! {
     /// The id of the turn this thread last opened, for a test of the loop
     /// that ends it.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static LAST_OPENED: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 

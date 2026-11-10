@@ -23,6 +23,7 @@ const WALL: i64 = 1_791_964_800_000;
 struct Temp(PathBuf);
 impl Temp {
     fn new() -> Self {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static SEQUENCE: AtomicU64 = AtomicU64::new(0);
         let path = fs::canonicalize("/tmp").unwrap().join(format!(
             "vs-{}-{}",

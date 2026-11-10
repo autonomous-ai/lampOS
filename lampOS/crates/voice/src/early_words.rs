@@ -31,6 +31,8 @@ use std::{
 
 /// Only the exact value `on`, with the Days memory.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_EARLY_WORDS";
+// Process ownership: written and read in provider worker; Live populates SEEN; this static is
+// not IPC.
 static ON: OnceLock<bool> = OnceLock::new();
 
 /// Whether the room's early words may follow a lone face once known.
@@ -162,6 +164,8 @@ impl Seen {
 }
 
 /// This process's looks, fed by the route that reads the eyes.
+// Process ownership: written and read in provider worker; Live populates SEEN; this static is
+// not IPC.
 pub static SEEN: Mutex<Seen> = Mutex::new(Seen {
     run_from: None,
     last_look: None,

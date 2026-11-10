@@ -755,6 +755,7 @@ fn sound_now(
     let snapshot = owner.snapshot(now()).unwrap();
     skill_sound_now(
         SoundGates {
+            cloud: &CloudAvailability::default(),
             at_us: monotonic_us(),
             paused: false,
             snapshot: &snapshot,

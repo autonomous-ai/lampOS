@@ -557,6 +557,7 @@ fn speaker_finish_failure(speaker_late: bool, capture_late: bool) -> (String, Ve
     // One folder each: the module's three callers run in parallel, and two
     // named by the microsecond alone once found the same name taken
     // (`File exists`, seen 3 times in 45 runs of `termination::`; #1569 row 32).
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let output = std::env::temp_dir().join(format!(
         "lv-1620-{}-{}",

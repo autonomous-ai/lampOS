@@ -423,6 +423,8 @@ impl Service {
         // thread. Reusing this one process-lifetime pair prevents session or
         // privacy restarts from accumulating detached readers. Configuration
         // and construction failure are also fixed for this process lifetime.
+        // Process ownership: written and read in second provider worker; this static is not
+        // IPC.
         static SERVICE: OnceLock<Result<Arc<Service>, String>> = OnceLock::new();
         cached(&SERVICE, || {
             let skills = std::env::var_os(crate::tools::SKILLS_ENVIRONMENT).ok_or_else(|| {
@@ -1407,6 +1409,8 @@ mod tests {
     struct Home(PathBuf);
     impl Home {
         fn new() -> Self {
+            // Process ownership: this test process writes and reads this fixture state; not
+            // IPC.
             static NEXT: AtomicUsize = AtomicUsize::new(0);
             let path = std::env::temp_dir().join(format!(
                 "lamp-ra-{}-{}",

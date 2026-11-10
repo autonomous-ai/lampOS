@@ -5,6 +5,7 @@ use lamp_audio::ownership::PlaybackCursor;
 use std::{cell::RefCell, rc::Rc};
 
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static CLOCK: RefCell<std::rc::Weak<crate::scenario_clock::Scope>> =
         const { RefCell::new(std::rc::Weak::new()) };
 }

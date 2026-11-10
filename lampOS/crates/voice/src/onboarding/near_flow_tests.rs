@@ -18,6 +18,7 @@ const S: u64 = 1_000_000;
 const FLOOR: f32 = -60.0;
 
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NOW_MS: Cell<u64> = const { Cell::new(0) };
 }
 fn clock() -> u64 {

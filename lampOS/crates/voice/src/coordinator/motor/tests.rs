@@ -34,7 +34,9 @@ const SCENARIO_FINISHED: u64 = u64::MAX;
 /// Host bound for one side waiting on the other; never a protocol deadline.
 const SCENARIO_WATCHDOG: Duration = Duration::from_secs(30);
 
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static STEPPED: AtomicBool = AtomicBool::new(false);
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static STEPPED_NOW_US: AtomicU64 = AtomicU64::new(0);
 
 /// The child's clock: the parent's last step when stepped, the host otherwise.

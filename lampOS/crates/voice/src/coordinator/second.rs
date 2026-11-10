@@ -281,6 +281,7 @@ pub(super) fn route_flags_from_environment() -> io::Result<RouteFlags> {
 thread_local! {
     /// The routes' variables as a test sets them, in place of the
     /// process's own; `None`: the process's.
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     pub(super) static TEST_ENVIRONMENT: std::cell::RefCell<Option<Vec<(&'static str, OsString)>>> =
         const { std::cell::RefCell::new(None) };
 }
@@ -539,6 +540,12 @@ impl Route {
                 break;
             };
             self.flow.received()?;
+            if matches!(
+                event,
+                ProviderOutput::ConversationState { .. } | ProviderOutput::MachineNames { .. }
+            ) {
+                self.cloud.observe_state(&event, monotonic_us())?;
+            }
             if let ProviderOutput::Ended {
                 reason,
                 fault,

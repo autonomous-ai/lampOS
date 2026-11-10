@@ -45,6 +45,7 @@ type ForTest = Option<fn(u64) -> AccountState>;
 
 #[cfg(test)]
 thread_local! {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static FOR_TEST: std::cell::Cell<ForTest> = const { std::cell::Cell::new(None) };
 }
 

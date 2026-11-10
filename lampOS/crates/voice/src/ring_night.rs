@@ -256,6 +256,7 @@ mod tests {
 
     /// The last message `source` said on a real bus, `value` at `at_us`.
     fn said(source: &str, at_us: u64, value: &ExpressionState) -> Message {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "ring-night-{}-{}",
@@ -415,6 +416,7 @@ mod tests {
     fn resting_frames(asleep: Option<bool>, lit: bool) -> Vec<lamp_ring::EncodedFrame> {
         use lamp_turn_owner::{AdmissionState, CaptureState, Controller, MonoTime, Permission};
         let now = || MonoTime::from_micros(lamp_ipc::monotonic_us());
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "rnw-{}-{}",

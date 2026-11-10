@@ -10,6 +10,7 @@ use std::{
 };
 
 const MARKER: &str = "TEST-ONLY-PROVIDER-CONFIG-CREDENTIAL";
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static NEXT: AtomicU64 = AtomicU64::new(0);
 struct Private {
     root: PathBuf,

@@ -877,6 +877,7 @@ pub const CARRIED_LINES_KEEP_TALK_ENVIRONMENT: &str = "LAMP_CARRIED_LINES_KEEP_T
 /// [`CARRIED_LINES_KEEP_TALK_ENVIRONMENT`] on, read once from the
 /// environment ([`carried_lines_keep_talk_from`]).
 pub(crate) fn carried_lines_keep_talk() -> bool {
+    // Process ownership: written and read in second provider worker; this static is not IPC.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| carried_lines_keep_talk_from(|name| std::env::var(name).ok()))
 }
@@ -7323,7 +7324,9 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
     match event {
         // Owed even for a retired request, as a failure is: an A/B scores
         // every request (#1686's follow-up).
-        ProviderOutput::Ready { .. }
+        ProviderOutput::ConversationState { .. }
+        | ProviderOutput::MachineNames { .. }
+        | ProviderOutput::Ready { .. }
         | ProviderOutput::TurnFailed { .. }
         | ProviderOutput::Stages { .. }
         | ProviderOutput::ReminderDeferred { .. }

@@ -686,6 +686,8 @@ fn mean(lines: &[Line]) -> Option<Vec<f32>> {
 mod kept {
     use super::State;
     use std::sync::Mutex;
+    // Process ownership: the second worker enables and updates this enrollment state. Common
+    // worker tool readers use their own copy; Live has no enabled state here.
     static STATE: Mutex<Option<State>> = Mutex::new(None);
     pub fn state<R>(f: impl FnOnce(&mut Option<State>) -> R) -> R {
         f(&mut STATE
@@ -700,6 +702,7 @@ mod kept {
     use super::State;
     use std::cell::RefCell;
     thread_local! {
+        // Process ownership: this test process writes and reads this fixture state; not IPC.
         static STATE: RefCell<Option<State>> = const { RefCell::new(None) };
     }
     pub fn state<R>(f: impl FnOnce(&mut Option<State>) -> R) -> R {

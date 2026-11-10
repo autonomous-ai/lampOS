@@ -66,6 +66,7 @@ async fn run(turns: &[Turn], on: bool) -> Ran {
 
 /// [`run`], with one turn cut ([`Cut`]) while its forget waits to return.
 async fn run_cut(turns: &[Turn], on: bool, cut: Cut) -> Ran {
+    // Process ownership: this test process writes and reads this fixture state; not IPC.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 19_000 + 100 * NEXT.fetch_add(1, Ordering::Relaxed);

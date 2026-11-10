@@ -12,6 +12,7 @@ use std::{
 };
 
 const AT: u64 = 10_000_000;
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
 struct Test {

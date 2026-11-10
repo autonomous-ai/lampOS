@@ -342,6 +342,7 @@ fn read(path: &Path) -> Option<Vec<i16>> {
 /// is refused and its asker says the words another way. Made once per
 /// process: the say service and the hold's sleep line (#3748) share it.
 pub fn from_environment() -> Option<Arc<TtsCache>> {
+    // Process ownership: written and read in serve/coordinator; this static is not IPC.
     static SHARED: std::sync::OnceLock<Option<Arc<TtsCache>>> = std::sync::OnceLock::new();
     SHARED.get_or_init(made_from_environment).clone()
 }

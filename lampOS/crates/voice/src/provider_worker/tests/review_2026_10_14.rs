@@ -36,6 +36,7 @@ use std::sync::atomic::AtomicBool;
 /// How old a hearing is when it is said: see the module's notes.
 const AGO_US: u64 = 4_000_000;
 
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static TAKEN: AtomicBool = AtomicBool::new(false);
 struct Turn;
 impl Drop for Turn {

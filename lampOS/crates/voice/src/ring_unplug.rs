@@ -123,6 +123,8 @@ mod tests {
     }
     impl Fixture {
         fn new() -> Self {
+            // Process ownership: this test process writes and reads this fixture state; not
+            // IPC.
             static NEXT: AtomicU64 = AtomicU64::new(0);
             let root = std::env::temp_dir().join(format!(
                 "ring-unplug-{}-{}",

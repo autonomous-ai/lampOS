@@ -123,10 +123,18 @@ pub const REASONS: [&str; 16] = [
     "fingerprint",
 ];
 
+// Process ownership: written and read in serve/coordinator and its nightly thread; this static
+// is not IPC.
 static ON: AtomicBool = AtomicBool::new(false);
 /// Speech, a line, or the slide closing: each moves it on.
+// Process ownership: written and read in serve/coordinator and its nightly thread; this static
+// is not IPC.
 static STIRS: AtomicU64 = AtomicU64::new(0);
+// Process ownership: written and read in serve/coordinator and its nightly thread; this static
+// is not IPC.
 static LAST_STIR_US: AtomicU64 = AtomicU64::new(0);
+// Process ownership: written and read in serve/coordinator and its nightly thread; this static
+// is not IPC.
 static OPEN_AT_US: AtomicU64 = AtomicU64::new(0);
 
 /// Someone spoke, or a line was handed on: the night stops at once and

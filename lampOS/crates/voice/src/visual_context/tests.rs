@@ -8,6 +8,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static NEXT: AtomicU64 = AtomicU64::new(0);
 fn boot(n: u8) -> BootId {
     BootId::new([n; 16]).unwrap()

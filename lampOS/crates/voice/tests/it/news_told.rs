@@ -36,6 +36,7 @@ const NOTHING_FOR: Duration = Duration::from_millis(300);
 
 /// The one clock both parts read: the tasks part's monotonic time, and the
 /// voice's (`start_with_clock`). Only ever stepped forward.
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static NOW_MS: AtomicU64 = AtomicU64::new(1_000);
 
 fn voice_clock() -> Option<BootClock> {

@@ -10,9 +10,38 @@ use std::io;
 pub(super) struct CloudAvailability {
     latest: Option<ProviderLink>,
     output_ended: bool,
+    pub(super) conversation: crate::provider_state::conversation::Mirror,
+    names_receiver: crate::provider_state::names::NamesReceiver,
+    names_revision: Option<u64>,
+    names: crate::provider_state::names::ValidatedNames,
 }
 
 impl CloudAvailability {
+    /// State belongs to this worker incarnation, including while it is standby.
+    pub(super) fn observe_state(
+        &mut self,
+        event: &crate::provider_worker::ProviderOutput,
+        now_us: u64,
+    ) -> io::Result<()> {
+        use crate::provider_worker::ProviderOutput;
+        if self.output_ended {
+            return Err(invalid("worker state followed ordered Ended"));
+        }
+        match event {
+            ProviderOutput::ConversationState { snapshot } => {
+                self.conversation.observe(*snapshot, now_us)?
+            }
+            ProviderOutput::MachineNames { chunk } => {
+                if let Some(names) = self.names_receiver.receive(chunk.clone())? {
+                    self.names_revision = Some(chunk.revision);
+                    self.names = names;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub(super) fn observe(&mut self, link: ProviderLink, now_us: u64) -> io::Result<()> {
         link.validate(now_us)?;
         if let Some(previous) = self.latest {
@@ -101,6 +130,21 @@ impl CloudAvailability {
             )
             .then_some(fault),
             _ => None,
+        }
+    }
+}
+
+/// Only the active worker may publish labels to serve's task-news consumer.
+/// The boot key forces reset on replacement and reapplication on route swaps.
+#[derive(Default)]
+pub(super) struct ActiveNames {
+    applied: Option<(crate::coordinator::BootId, Option<u64>)>,
+}
+impl ActiveNames {
+    pub(super) fn sync(&mut self, boot: crate::coordinator::BootId, cloud: &CloudAvailability) {
+        let key = (boot, cloud.names_revision);
+        if self.applied != Some(key) && crate::agent_tasks::install_parent_names(&cloud.names) {
+            self.applied = Some(key);
         }
     }
 }
@@ -1162,5 +1206,391 @@ mod tests {
             )
             .unwrap();
         assert!(cloud.output_ended());
+    }
+}
+
+#[cfg(test)]
+mod state_boundary_tests {
+    use super::*;
+    use crate::provider_state::{conversation::Snapshot, names::NamesChunk};
+    use crate::provider_worker::ProviderOutput;
+
+    fn names(revision: u64, index: u8, count: u8, label: &str) -> ProviderOutput {
+        ProviderOutput::MachineNames {
+            chunk: NamesChunk {
+                revision,
+                index,
+                count,
+                enabled: true,
+                pairs: vec![(format!("target-{index}"), label.into())],
+            },
+        }
+    }
+
+    #[test]
+    fn conversation_metadata_expires_without_packets_and_survives_session_change() {
+        let mut cloud = CloudAvailability::default();
+        let event = ProviderOutput::ConversationState {
+            snapshot: Snapshot {
+                observed_at_us: 100,
+                until_us: Some(200),
+            },
+        };
+        // The only state on the wire is two clocks, never thread text/person IDs.
+        let encoded = serde_json::to_value(&event).unwrap();
+        assert_eq!(
+            encoded["snapshot"],
+            serde_json::json!({"observed_at_us":100,"until_us":200})
+        );
+        cloud.observe_state(&event, 100).unwrap();
+        for session in [1, 2] {
+            cloud
+                .observe(
+                    ProviderLink {
+                        revision: session,
+                        session,
+                        observed_at_us: 100 + session,
+                        source_clock: None,
+                        state: ProviderLinkState::Ready {
+                            setup_us: 0,
+                            attempts: 1,
+                            context: if session == 1 {
+                                crate::provider_link::LinkContext::Initial
+                            } else {
+                                crate::provider_link::LinkContext::Resumed
+                            },
+                            outage_started_at_us: (session > 1).then_some(100),
+                            after: (session > 1).then_some(Fault::Transport),
+                        },
+                    },
+                    100 + session,
+                )
+                .unwrap();
+            assert!(super::super::conversation_going_on(&cloud, 200));
+        }
+        assert!(!super::super::conversation_going_on(&cloud, 201));
+        assert!(!super::super::conversation_going_on(
+            &CloudAvailability::default(),
+            150
+        ));
+        cloud.end_output().unwrap();
+        assert!(cloud.observe_state(&event, 150).is_err());
+    }
+
+    #[test]
+    fn active_names_switch_boots_and_keep_incomplete_standby_private() {
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        struct Restore(crate::agent_tasks::MachineNames);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                assert!(crate::agent_tasks::apply_parent_snapshot(&self.0));
+            }
+        }
+        let _restore = Restore(crate::agent_tasks::machine_names_after(None).unwrap().1);
+        let boot = |n| crate::coordinator::BootId::new([n; 16]).unwrap();
+        let mut active = CloudAvailability::default();
+        active
+            .observe_state(&names(1, 0, 1, "Synthetic A"), 100)
+            .unwrap();
+        let mut standby = CloudAvailability::default();
+        standby
+            .observe_state(&names(1, 0, 2, "Synthetic B"), 100)
+            .unwrap();
+        let mut selected = ActiveNames::default();
+        selected.sync(boot(71), &active);
+        assert_eq!(
+            crate::agent_tasks::machine_name("target-0").as_deref(),
+            Some("Synthetic A")
+        );
+        // Switching to an incomplete new boot clears old labels; its partial
+        // labels are not yet usable by task_news's production lookup.
+        selected.sync(boot(72), &standby);
+        assert_eq!(crate::agent_tasks::machine_name("target-0"), None);
+        standby
+            .observe_state(&names(1, 1, 2, "Synthetic C"), 101)
+            .unwrap();
+        selected.sync(boot(72), &standby);
+        assert_eq!(
+            crate::agent_tasks::machine_name("target-0").as_deref(),
+            Some("Synthetic B")
+        );
+        selected.sync(boot(71), &active);
+        assert_eq!(
+            crate::agent_tasks::machine_name("target-0").as_deref(),
+            Some("Synthetic A")
+        );
+        selected.sync(boot(73), &CloudAvailability::default());
+        assert_eq!(crate::agent_tasks::machine_name("target-0"), None);
+        // Equal revision numbers belong to distinct boots, not a global clock.
+        selected.sync(boot(72), &standby);
+        assert_eq!(
+            crate::agent_tasks::machine_name("target-1").as_deref(),
+            Some("Synthetic C")
+        );
+    }
+}
+
+#[cfg(test)]
+mod state_host_timing {
+    use super::*;
+    use crate::{
+        provider_state::names::NamesChunk, provider_worker::ProviderOutput,
+        transport::WorkerChannels,
+    };
+    use std::time::{Duration, Instant};
+
+    #[test]
+    #[ignore = "synthetic host timing; run alone with --ignored --nocapture"]
+    fn synthetic_state_transport_and_observation_timing() {
+        struct Directory(std::path::PathBuf);
+        impl Drop for Directory {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let root = Directory(std::env::temp_dir().join(format!(
+            "state-timing-{}-{}",
+            std::process::id(),
+            lamp_ipc::monotonic_us()
+        )));
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&root.0)
+            .unwrap();
+        let parent_boot = crate::coordinator::BootId::new([81; 16]).unwrap();
+        let worker_boot = crate::coordinator::BootId::new([82; 16]).unwrap();
+        let mut parent =
+            WorkerChannels::bind(&root.0, "provider", parent_boot, worker_boot, false).unwrap();
+        let mut worker =
+            WorkerChannels::bind(&root.0, "provider", parent_boot, worker_boot, true).unwrap();
+        parent.connect(&root.0, "provider", false).unwrap();
+        worker.connect(&root.0, "provider", true).unwrap();
+        let mut conversation = CloudAvailability::default();
+        let mut local = Vec::new();
+        let mut transport = Vec::new();
+        for sample in 0..201 {
+            let now = lamp_ipc::monotonic_us();
+            let event = ProviderOutput::ConversationState {
+                snapshot: crate::provider_state::conversation::Snapshot {
+                    observed_at_us: now,
+                    until_us: Some(now + 45_000_000),
+                },
+            };
+            let start = Instant::now();
+            worker.data.send(&event).unwrap();
+            let end = Instant::now() + Duration::from_secs(1);
+            let received = loop {
+                if let Some(event) = parent.data.receive::<ProviderOutput>().unwrap() {
+                    break event;
+                }
+                assert!(Instant::now() < end);
+                std::thread::yield_now();
+            };
+            let handling = Instant::now();
+            super::super::observe_provider_output(&mut conversation, &mut None, &received).unwrap();
+            let elapsed = handling.elapsed();
+            assert!(super::super::conversation_going_on(
+                &conversation,
+                lamp_ipc::monotonic_us()
+            ));
+            let total = start.elapsed();
+            if sample == 0 {
+                eprintln!("conversation first invocation handler={elapsed:?} transport={total:?}");
+            } else {
+                local.push(elapsed);
+                transport.push(total);
+            }
+        }
+        local.sort();
+        transport.sort();
+        eprintln!(
+            "conversation repeated samples=200 handler_p50={:?} handler_p95={:?} handler_max={:?} transport_p50={:?} transport_p95={:?} transport_max={:?}",
+            local[100],
+            local[190],
+            local.last().unwrap(),
+            transport[100],
+            transport[190],
+            transport.last().unwrap()
+        );
+        assert!(local[190] < Duration::from_millis(1));
+        assert!(transport[190] < Duration::from_millis(10));
+        for size in [4usize, 800] {
+            let pairs: Vec<_> = (0..size)
+                .map(|i| {
+                    (
+                        format!("target-{i}"),
+                        format!("Synthetic {}", "x".repeat(40)),
+                    )
+                })
+                .collect();
+            let fixture = crate::agent_tasks::MachineNames {
+                enabled: true,
+                names: pairs.iter().cloned().collect(),
+            };
+            assert!(fixture.valid());
+            let bytes = serde_json::to_vec(&fixture).unwrap().len();
+            let mut cloud = CloudAvailability::default();
+            let mut handlers = Vec::new();
+            let mut transfers = Vec::new();
+            for revision in 1..=201 {
+                let count = pairs.len().div_ceil(64) as u8;
+                let events: Vec<_> = pairs
+                    .chunks(64)
+                    .enumerate()
+                    .map(|(index, pairs)| ProviderOutput::MachineNames {
+                        chunk: NamesChunk {
+                            revision,
+                            index: index as u8,
+                            count,
+                            enabled: true,
+                            pairs: pairs.to_vec(),
+                        },
+                    })
+                    .collect();
+                let start = Instant::now();
+                let mut largest_handler = Duration::ZERO;
+                for event in events {
+                    worker.data.send(&event).unwrap();
+                    let receive_by = Instant::now() + Duration::from_secs(1);
+                    let received = loop {
+                        if let Some(event) = parent.data.receive::<ProviderOutput>().unwrap() {
+                            break event;
+                        }
+                        assert!(Instant::now() < receive_by, "local datagram did not arrive");
+                        std::thread::yield_now();
+                    };
+                    let at = Instant::now();
+                    // The actual coordinator dispatch, including complete-map
+                    // installation in CloudAvailability, but not ActiveNames.
+                    super::super::observe_provider_output(&mut cloud, &mut None, &received)
+                        .unwrap();
+                    largest_handler = largest_handler.max(at.elapsed());
+                }
+                let elapsed = start.elapsed();
+                assert_eq!(cloud.names.snapshot(), &fixture);
+                if revision == 1 {
+                    eprintln!(
+                        "state host first invocation entries={size} bytes={bytes} handler_max={largest_handler:?} full_transfer={elapsed:?}"
+                    );
+                } else {
+                    handlers.push(largest_handler);
+                    transfers.push(elapsed);
+                }
+            }
+            handlers.sort();
+            transfers.sort();
+            eprintln!(
+                "state host repeated entries={size} samples={} handler_p50={:?} handler_p95={:?} handler_max={:?} full_transfer_p50={:?} full_transfer_p95={:?} full_transfer_max={:?}",
+                handlers.len(),
+                handlers[100],
+                handlers[190],
+                handlers.last().unwrap(),
+                transfers[100],
+                transfers[190],
+                transfers.last().unwrap()
+            );
+            assert!(
+                handlers[190] < Duration::from_millis(1),
+                "local handler p95 target"
+            );
+            assert!(
+                transfers[190] < Duration::from_millis(10),
+                "unloaded local transport+observation p95 target"
+            );
+        }
+    }
+    #[test]
+    #[ignore = "synthetic parent installation timing; run alone with --ignored --nocapture"]
+    fn synthetic_active_names_installation_timing() {
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        struct Restore(crate::agent_tasks::MachineNames);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                assert!(crate::agent_tasks::apply_parent_snapshot(&self.0));
+            }
+        }
+        let _restore = Restore(crate::agent_tasks::machine_names_after(None).unwrap().1);
+        let boot = crate::coordinator::BootId::new([83; 16]).unwrap();
+        let mut failures = Vec::new();
+        for size in [4usize, 798] {
+            let fixture = crate::agent_tasks::MachineNames {
+                enabled: true,
+                names: (0..size)
+                    .map(|i| (format!("target-{i:05}"), "x".repeat(64)))
+                    .collect(),
+            };
+            assert!(fixture.valid());
+            let bytes = serde_json::to_vec(&fixture).unwrap().len();
+            if size == 798 {
+                assert_eq!(bytes, 65_462);
+            }
+            let mut cloud = CloudAvailability::default();
+            let mut active = ActiveNames::default();
+            let mut installs = Vec::new();
+            let mut lookups = Vec::new();
+            let task = serde_json::json!({"target_alias":"target-00000"});
+            for revision in 1..=201 {
+                let label = if revision % 2 == 0 { "a" } else { "b" }.repeat(64);
+                let pairs: Vec<_> = fixture
+                    .names
+                    .keys()
+                    .map(|key| (key.clone(), label.clone()))
+                    .collect();
+                let count = pairs.len().div_ceil(64) as u8;
+                // Build and receive the completed revision before timing the
+                // separate parent install. No fixture validation is timed.
+                for (index, pairs) in pairs.chunks(64).enumerate() {
+                    let event = ProviderOutput::MachineNames {
+                        chunk: NamesChunk {
+                            revision,
+                            index: index as u8,
+                            count,
+                            enabled: true,
+                            pairs: pairs.to_vec(),
+                        },
+                    };
+                    super::super::observe_provider_output(&mut cloud, &mut None, &event).unwrap();
+                }
+                assert_eq!(cloud.names_revision, Some(revision));
+                let start = Instant::now();
+                active.sync(boot, &cloud);
+                let install = start.elapsed();
+                let start = Instant::now();
+                let told = crate::task_news::their_computer(&task);
+                let lookup = start.elapsed();
+                assert_eq!(told, format!("their {label}"));
+                if revision == 1 {
+                    eprintln!(
+                        "parent active names first invocation entries={size} bytes={bytes} install={install:?} task_news_lookup={lookup:?}"
+                    );
+                } else {
+                    installs.push(install);
+                    lookups.push(lookup);
+                }
+            }
+            installs.sort();
+            lookups.sort();
+            eprintln!(
+                "parent active names repeated entries={size} bytes={bytes} samples=200 install_p50={:?} install_p95={:?} install_max={:?} task_news_lookup_p50={:?} task_news_lookup_p95={:?} task_news_lookup_max={:?}",
+                installs[100],
+                installs[190],
+                installs.last().unwrap(),
+                lookups[100],
+                lookups[190],
+                lookups.last().unwrap()
+            );
+            if installs[190] >= Duration::from_millis(1) {
+                failures.push((size, installs[190]));
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "parent installation p95 exceeds 1ms: {failures:?}"
+        );
     }
 }

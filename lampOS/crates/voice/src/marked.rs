@@ -38,6 +38,7 @@ const REASON_BYTES: usize = 200;
 
 /// The serving voice's session folder, set once when it is made, so that
 /// the provider worker can be told it.
+// Process ownership: written and read in serve/coordinator; this static is not IPC.
 static SESSION: OnceLock<PathBuf> = OnceLock::new();
 
 /// The coordinator made its session folder. With the switch on, marks past

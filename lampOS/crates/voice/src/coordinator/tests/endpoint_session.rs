@@ -37,6 +37,7 @@ const PROCESS_FIXTURE_WATCHDOG: Duration = Duration::from_secs(12);
 /// peer step before advancing their clock.
 /// A test takes this slot before starting the endpoint worker whose timing it
 /// asserts, so other tests here cannot compete for the same scheduler slot.
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static ONE_SESSION: Mutex<()> = Mutex::new(());
 
 pub(super) fn one_session() -> std::sync::MutexGuard<'static, ()> {

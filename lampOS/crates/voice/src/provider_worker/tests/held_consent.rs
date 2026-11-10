@@ -16,6 +16,7 @@ use crate::provider_worker::seen_in_tests;
 use lamp_msgs::{ReportsBy, ReportsRequest, ReportsState};
 
 /// The tests here share [`crate::reports_stop::TEST_ROOT`]: one at a time.
+// Process ownership: this test process writes and reads this fixture state; not IPC.
 static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn quiet() -> (crate::room_told::Room, bool) {
