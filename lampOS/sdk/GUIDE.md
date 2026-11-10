@@ -813,6 +813,7 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 | Say word for word | works today (9 Nov 2026) | up to 900 bytes a line |
 | Own sound clips: upload, list, play, remove | works today (9 Nov 2026) | a clip must be quiet (peak -12 dBFS, -30 dBFS RMS over 10 ms) |
 | Gestures (19), feelings (3) | works today (9 Nov 2026) | |
+| A computer's own notes on the lamp (`notes.set`, `get`, `delete`, `list`) | next build (merged in train 777, 10 Nov 2026; seen on lamp-75c9 with a lamp-built binary, not a customer build) | on that lamp: a note read back after lamp-control restarted, one computer never reading another's, a revoke deleting them, a write holding the door's lock for 0.3 to 0.8 ms (the disk write runs off it). Needs the `notes` grant; 256 keys and 256 KiB a computer. Examples: `examples/notes.py`, `notes.js` |
 | Look ahead or to an angle; joints yaw and pitch | works today (9 Nov 2026) | |
 | Your own `move` | works today (9 Nov 2026) | |
 | Events: the name called (`name.heard`) | works today (9 Nov 2026) | about 1.9 s after the line ends |
