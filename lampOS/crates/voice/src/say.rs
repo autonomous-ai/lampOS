@@ -5246,6 +5246,70 @@ mod tests {
         drop(says);
         fs::remove_dir_all(&dir).unwrap();
     }
+    /// A failed cancel write may half-close its request side. EOF drops only
+    /// a still-queued start; it is not cancellation of an already-begun turn.
+    /// In both cases the response side can carry the actual voice outcome.
+    #[test]
+    fn a_pending_cancel_half_close_keeps_receipts_without_claiming_begun_cancellation() {
+        for begun in [false, true] {
+            let dir = socket_dir(if begun { "half-begun" } else { "half-waiting" });
+            let path = dir.join("say.sock");
+            let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
+            let stream = UnixStream::connect(&path).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            writeln!(
+                &stream,
+                r#"{{"skill":"control","turn":"start","expires_in_ms":30000}}"#
+            )
+            .unwrap();
+            let ready_by = Instant::now() + Duration::from_secs(2);
+            while !says.turn_start_waits(0) {
+                says.poll(0);
+                assert!(Instant::now() < ready_by, "start must reach voice queue");
+                thread::sleep(Duration::from_millis(5));
+            }
+            let gone = says.waiting[0].gone.as_ref().unwrap().clone();
+            let ticket = begun.then(|| says.take_turn_start(0).unwrap().2);
+            let mut reader = BufReader::new(&stream);
+            if let Some(ticket) = ticket.as_ref() {
+                ticket.begun_turn(0, 42);
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                assert_eq!(
+                    serde_json::from_str::<serde_json::Value>(&line).unwrap()["id"],
+                    42
+                );
+            }
+            stream.shutdown(std::net::Shutdown::Write).unwrap();
+            let gone_by = Instant::now() + Duration::from_secs(2);
+            while !gone.load(Ordering::Acquire) {
+                assert!(
+                    Instant::now() < gone_by,
+                    "voice watcher must observe request EOF"
+                );
+                thread::sleep(Duration::from_millis(5));
+            }
+            says.poll(0);
+            let expected = if let Some(ticket) = ticket {
+                assert!(!ticket.stopped_by_asker(), "EOF is not a cancel line");
+                ticket.answer(Outcome::Spoken);
+                Outcome::Spoken
+            } else {
+                assert!(!says.turn_start_waits(0));
+                Outcome::Dropped(ASKER_GONE.into())
+            };
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            assert_eq!(line.trim_end(), expected.line());
+            drop(reader);
+            drop(stream);
+            drop(says);
+            fs::remove_dir_all(&dir).unwrap();
+        }
+    }
+
     #[test]
     fn listen_is_lamp_controls_alone_with_nothing_else() {
         let words = |line: &str| parse(line).map(|request| request.words);

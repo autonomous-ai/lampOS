@@ -253,6 +253,18 @@ or at `stop`. The ring then shows the person's own light again.
 | `lamp.end_turn()` | `lamp.endTurn()` | `lamp_end_turn()` | Op `turn.end`: ends the turn this computer started and the conversation grown from it; never the person's or another computer's | `speak` | only this computer's turn | `{turn: "ended", started: <turn.start's id>}`; the start's `done` follows (`dropped` "ended by the computer" or `cut_short` "ended by this computer"; for a start not yet begun, `dropped` "ended by this computer before it began", or `dropped: ended by the computer` once its prompt was being said) | `busy` "not this computer's turn"; `refused` with the voice's why; for a start not yet begun, `refused` "the turn had already finished" or "the voice did not say within 2 s whether it ended" | works today (9 Nov 2026): a begun turn ended in 31 ms on build 10824. Known gap on 10824: sent before its `turn.start` has begun, it is refused `busy`. `stop()` drops a start still queued, but not one whose prompt is already being said. A fix is in review (#5870) |
 | `lamp.set_listening(on)` | `lamp.setListening(on)` | `lamp_set_listening(on)` | Op `listen.set`: `False` holds this computer's own mute, shown on the ring; `True` lifts only that mute | `hear` | never opens the person's switch, button mute or sleep; lifted when this computer goes, or by a hand on the head; `stop` doesn't lift it | `{mute: "held"}`, `{mute: "lifted"}` or `{mute: "nothing_held"}`; a hand on the head sends `done` `cut_short` "a hand on the head" | `busy` "this computer's mute is still being taken by the voice"; `refused` "the voice here doesn't take a computer's mute" | works today (9 Nov 2026): held in 62 ms, lifted in 8 ms on build 10824 |
 
+**Pending-turn cancellation, in review (host checks, 10 Nov 2026):** the
+`turn.end` repair uses one two-second budget for all pending starts' cancel
+writes and voice receipts, measured from dispatch. The door stays available
+while those writes and receipts wait. Each start must return an explicit
+terminal voice outcome before the reply can say `ended`; an already-spoken
+start is refused as `the turn had already finished`. A missing receipt, a
+stream containing only malformed messages, or an unexpected outcome is `refused`, including `the voice gave no outcome` or
+`the voice gave an unexpected say outcome`; transport failures retain their
+reason. Closing the request side alone does not prove cancellation of a turn already begun.
+These are the proposed host-verified semantics, not a claim that the customer
+build or a physical lamp has passed the repair.
+
 ### Sounds
 
 | Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |

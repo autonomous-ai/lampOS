@@ -71,7 +71,7 @@ use std::net::Shutdown;
 use std::os::unix::net::{UnixDatagram, UnixStream};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, mpsc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority};
 use serde_json::{Value, json};
@@ -93,9 +93,8 @@ pub const SAY_CANCEL: &str = r#"{"cancel":true}"#;
 pub const STOPPED_BY_ASKER: &str = "stopped by its asker";
 /// The longest the door's lock waits to write a cancel to the voice.
 const SAY_CANCEL_WITHIN: Duration = Duration::from_millis(100);
-/// The longest a `turn.end` for a start not yet begun waits for the voice to
-/// say what became of it, once cancelled on its connection: the voice's loop
-/// takes a cancel at its next pass, tens of ms.
+/// One budget for all pending starts' cancellation writes and voice receipts.
+/// The voice takes a cancel at its next pass, usually tens of ms.
 pub const TURN_CANCEL_WITHIN: Duration = Duration::from_secs(2);
 
 /// The says each client still waits on, by client and then by the say's
@@ -255,6 +254,9 @@ impl Voice {
     }
 }
 
+/// Only an explicit voice outcome is Ok; local transport loss stays Err.
+type SayReceipt = Result<(&'static str, Option<String>), String>;
+
 /// A computer's turn start not yet answered.
 struct Turn {
     seq: u64,
@@ -272,7 +274,7 @@ struct Turn {
     /// its window.
     ended: bool,
     /// The `turn.end`s waiting for its final answer, told it when it comes.
-    told: Vec<mpsc::Sender<(&'static str, Option<String>)>>,
+    told: Vec<mpsc::Sender<SayReceipt>>,
     /// The voice said `begun`: from then on a `turn.end` ends it by its id.
     begun: bool,
 }
@@ -840,7 +842,7 @@ impl Lamp {
                     }
                 }
             };
-            let (how, why) = match UnixStream::connect(&path)
+            let receipt = match UnixStream::connect(&path)
                 .and_then(|mut stream| writeln!(stream, "{line}").map(|()| stream))
             {
                 Ok(stream) => {
@@ -858,16 +860,16 @@ impl Lamp {
                         _ => false,
                     };
                     if !waits {
-                        let _ = stream.set_write_timeout(Some(SAY_CANCEL_WITHIN));
-                        let _ = writeln!(&stream, "{SAY_CANCEL}");
+                        cancel_turn_before(&stream, Instant::now() + SAY_CANCEL_WITHIN);
                     }
                     let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
                     outcome_with(BufReader::new(stream), begun)
                 }
-                Err(error) => (
-                    "dropped",
-                    Some(format!("the voice did not take it: {error}")),
-                ),
+                Err(error) => Err(format!("the voice did not take it: {error}")),
+            };
+            let (how, why, answered) = match receipt {
+                Ok((how, why)) => (how, why, true),
+                Err(why) => ("dropped", Some(why), false),
             };
             // A voice from before turns refuses the field it doesn't know.
             let why = why.map(|why| {
@@ -906,8 +908,15 @@ impl Lamp {
             } else {
                 (how, why)
             };
+            let receipt = if answered {
+                Ok((how, why.clone()))
+            } else {
+                Err(why
+                    .clone()
+                    .unwrap_or_else(|| "the voice gave no outcome".into()))
+            };
             for tell in told {
-                let _ = tell.send((how, why.clone()));
+                let _ = tell.send(receipt.clone());
             }
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
@@ -926,51 +935,76 @@ impl Lamp {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
         };
+        let cancel_by = Instant::now() + TURN_CANCEL_WITHIN;
         let begun = {
             let mut voice = self.voice.lock().expect("voice");
-            // A start of this computer's still waiting for the voice: ended
-            // here, before it began, by shutting its say-socket connection,
-            // which drops it at the voice (no cue, no window), as a computer
-            // gone does. Checked first: an earlier turn's id, kept past its
+            // Mark this computer's pending starts for cancellation under the
+            // state lock; their own connections are cancelled off that lock.
+            // Only the voice can confirm what phase each one reached.
+            // Checked first: an earlier turn's id, kept past its
             // end, must not take its place (lamp-75c9, 9 Nov: `turn.end` 2 s
             // after a `turn.start` was refused "not this computer's turn").
             if let Some(turns) = voice.turns.get_mut(client) {
                 let mut ending = Vec::new();
                 for turn in turns.iter_mut().filter(|turn| !turn.ended && !turn.begun) {
-                    // Cancelled on its own connection; not yet connected, its
-                    // thread cancels it as it connects.
-                    if let Some(waiting) = turn.waiting.as_ref() {
-                        let _ = waiting.set_write_timeout(Some(SAY_CANCEL_WITHIN));
-                        let _ = writeln!(&*waiting, "{SAY_CANCEL}");
-                    }
+                    // Keep the original for gone/revocation. The copy writes
+                    // off the door and voice locks; a not-yet-connected start
+                    // observes ended and cancels itself as it connects.
+                    let waiting = turn.waiting.as_ref().and_then(|stream| {
+                        match stream.try_clone() {
+                            Ok(copy) => Some(copy),
+                            Err(_) => {
+                                // EOF drops a start still queued at the voice.
+                                let _ = stream.shutdown(Shutdown::Write);
+                                None
+                            }
+                        }
+                    });
                     turn.ended = true;
                     let (tell, told) = mpsc::channel();
                     turn.told.push(tell);
-                    ending.push((turn.re, told));
+                    ending.push((turn.re, waiting, told));
                 }
-                if let Some(&(started, _)) = ending.last() {
+                if let Some(&(started, _, _)) = ending.last() {
                     // Answered only once the voice said what became of each:
                     // never from the door's own view, which can't tell a
                     // start still waiting from one whose prompt is said.
                     return Ok(Reply::Later(Box::new(move || {
-                        for (_, told) in ending {
-                            match told.recv_timeout(TURN_CANCEL_WITHIN) {
-                                Ok(("finished", _)) => {
+                        for (_, waiting, _) in &ending {
+                            if let Some(stream) = waiting {
+                                cancel_turn_before(stream, cancel_by);
+                            }
+                        }
+                        let timed_out = || {
+                            Error::new(
+                                ErrorCode::Refused,
+                                format!(
+                                    "the voice did not say within {} s whether it ended",
+                                    TURN_CANCEL_WITHIN.as_secs()
+                                ),
+                            )
+                        };
+                        for (_, _, told) in ending {
+                            let remaining = cancel_by.saturating_duration_since(Instant::now());
+                            if remaining.is_zero() {
+                                return Err(timed_out());
+                            }
+                            match told.recv_timeout(remaining) {
+                                Ok(Ok(("finished", _))) => {
                                     return Err(Error::new(
                                         ErrorCode::Refused,
                                         "the turn had already finished",
                                     ));
                                 }
-                                Ok(_) => {}
-                                Err(_) => {
+                                Ok(Ok(_)) => {}
+                                Ok(Err(why)) => return Err(Error::new(ErrorCode::Refused, why)),
+                                Err(mpsc::RecvTimeoutError::Disconnected) => {
                                     return Err(Error::new(
                                         ErrorCode::Refused,
-                                        format!(
-                                            "the voice did not say within {} s whether it ended",
-                                            TURN_CANCEL_WITHIN.as_secs()
-                                        ),
+                                        "the voice gave no outcome",
                                     ));
                                 }
+                                Err(mpsc::RecvTimeoutError::Timeout) => return Err(timed_out()),
                             }
                         }
                         Ok(json!({"turn": "ended", "started": started}))
@@ -1180,20 +1214,49 @@ fn forget_say(says: &Says, client: &str, number: u64) {
     }
 }
 
+/// Attempt every cancellation within the shared budget. A blocked or failed
+/// write half-closes the request side: the voice drops a start still queued,
+/// but EOF does not cancel one already begun. Its actual outcome can still
+/// arrive on the read side; EOF alone never confirms the end.
+fn cancel_turn_before(mut stream: &UnixStream, deadline: Instant) {
+    let sent = (|| -> std::io::Result<()> {
+        for mut bytes in [SAY_CANCEL.as_bytes(), b"\n"] {
+            while !bytes.is_empty() {
+                // Partial writes and interruptions cannot renew the budget.
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    return Err(std::io::ErrorKind::TimedOut.into());
+                }
+                stream.set_write_timeout(Some(remaining.min(SAY_CANCEL_WITHIN)))?;
+                let wrote = match stream.write(bytes) {
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    result => result?,
+                };
+                if wrote == 0 {
+                    return Err(std::io::ErrorKind::WriteZero.into());
+                }
+                bytes = &bytes[wrote..];
+            }
+        }
+        Ok(())
+    })();
+    if sent.is_err() {
+        let _ = stream.shutdown(Shutdown::Write);
+    }
+}
+
 /// The say socket's outcome, past the `begun` event, in the protocol's
 /// words (`done.how`: `finished`, `cut_short`, `dropped`; the Reviewer-lead's
 /// and harness-reviewer's P2 on #3805): `spoken` is `finished`; `dropped`,
 /// `expired`, `refused` and no outcome at all are `dropped`, the voice's
 /// own word and why in `why`.
 fn outcome(reader: impl std::io::BufRead) -> (&'static str, Option<String>) {
-    outcome_with(reader, |_| {})
+    outcome_with(reader, |_| {}).unwrap_or_else(|why| ("dropped", Some(why)))
 }
 
 /// As [`outcome`], each event before it (`begun`) handed to `event`.
-fn outcome_with(
-    reader: impl std::io::BufRead,
-    mut event: impl FnMut(&Value),
-) -> (&'static str, Option<String>) {
+/// Missing or unexpected outcomes remain transport/protocol uncertainty.
+fn outcome_with(reader: impl std::io::BufRead, mut event: impl FnMut(&Value)) -> SayReceipt {
     for line in reader.lines() {
         let Ok(line) = line else { break };
         let Ok(said) = serde_json::from_str::<Value>(&line) else {
@@ -1203,9 +1266,14 @@ fn outcome_with(
             event(&said);
             continue;
         }
-        let word = said["outcome"].as_str().unwrap_or("failed");
+        let Some(word) = said["outcome"].as_str() else {
+            continue;
+        };
+        if !matches!(word, "spoken" | "dropped" | "expired" | "refused") {
+            return Err("the voice gave an unexpected say outcome".into());
+        }
         if word == "spoken" {
-            return ("finished", None);
+            return Ok(("finished", None));
         }
         // A computer's turn ended because the person began talking with
         // the lamp in its window: the person wins, and the turn was cut
@@ -1216,15 +1284,15 @@ fn outcome_with(
             .filter(|why| CUT_SHORT_WHYS.contains(why))
             && word == "dropped"
         {
-            return ("cut_short", Some(why.to_owned()));
+            return Ok(("cut_short", Some(why.to_owned())));
         }
         let why = match said["why"].as_str() {
             Some(why) => format!("{word}: {why}"),
             None => word.to_owned(),
         };
-        return ("dropped", Some(why));
+        return Ok(("dropped", Some(why)));
     }
-    ("dropped", Some("the voice gave no outcome".to_owned()))
+    Err("the voice gave no outcome".to_owned())
 }
 
 /// `line` on a new say socket connection, and the voice's first outcome on
@@ -3201,5 +3269,255 @@ mod tests {
         assert!(open_for(&staying, Duration::from_millis(200)));
         say(&staying, r#"{"outcome":"spoken"}"#);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn a_pending_cancel_without_a_voice_outcome_is_not_confirmed_ended() {
+        let dir = dir("end-no-outcome");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let (events, _told) = kept();
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        lamp.act(
+            "c_1",
+            3,
+            &op(r#"{"id":3,"op":"turn.start","prompt":"Synthetic prompt."}"#),
+            0,
+        )
+        .unwrap();
+        let (start, _) = accepted(&listener);
+        let end = op(r#"{"id":5,"op":"turn.end"}"#);
+        let answer = later(lamp.reply("c_1", 5, &end, 0));
+        let mut cancel = String::new();
+        BufReader::new(&start).read_line(&mut cancel).unwrap();
+        assert_eq!(cancel.trim_end(), SAY_CANCEL);
+        // The transport ends without any voice outcome: cancellation was sent,
+        // but this connection supplied no authoritative completion receipt.
+        start.shutdown(std::net::Shutdown::Write).unwrap();
+        let result = answer.join().unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(result.is_err(), "ended without a voice outcome: {result:?}");
+    }
+
+    #[test]
+    fn pending_cancels_share_one_reply_deadline() {
+        let dir = dir("end-shared-deadline");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let (events, _told) = kept();
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        lamp.act("c_1", 3, &op(r#"{"id":3,"op":"turn.start"}"#), 0)
+            .unwrap();
+        let (first, _) = accepted(&listener);
+        lamp.act("c_1", 4, &op(r#"{"id":4,"op":"turn.start"}"#), 0)
+            .unwrap();
+        let (second, _) = accepted(&listener);
+        let end = op(r#"{"id":5,"op":"turn.end"}"#);
+        let began = std::time::Instant::now();
+        let answer = later(lamp.reply("c_1", 5, &end, 0));
+        for start in [&first, &second] {
+            let mut cancel = String::new();
+            BufReader::new(start).read_line(&mut cancel).unwrap();
+            assert_eq!(cancel.trim_end(), SAY_CANCEL);
+        }
+        // Each gap is below two seconds, but the second acknowledgment is
+        // outside the single two-second budget advertised for turn.end.
+        let peers = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(1300));
+            say(
+                &first,
+                r#"{"outcome":"dropped","why":"stopped by its asker"}"#,
+            );
+            std::thread::sleep(Duration::from_millis(1000));
+            say(
+                &second,
+                r#"{"outcome":"dropped","why":"stopped by its asker"}"#,
+            );
+        });
+        let result = answer.join().unwrap();
+        let took = began.elapsed();
+        peers.join().unwrap();
+        eprintln!("two pending cancels: reply returned after {took:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(
+            result.is_err(),
+            "accepted beyond shared deadline after {took:?}: {result:?}"
+        );
+    }
+    /// A slow voice must not keep the door's lock while its cancel is sent.
+    /// Fill the real Unix socket's send buffer, then time reply dispatch only.
+    #[test]
+    fn a_pending_cancel_write_is_off_the_door_lock() {
+        for sample in 0..3 {
+            let dir = dir(&format!("cancel-write-{sample}"));
+            let path = dir.join("say.sock");
+            let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+            let (events, told) = kept();
+            let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+            lamp.act("c_1", 3, &op(r#"{"id":3,"op":"turn.start"}"#), 0)
+                .unwrap();
+            let (peer, _) = accepted(&listener);
+            let ready_by = std::time::Instant::now() + Duration::from_secs(2);
+            let socket = loop {
+                let waiting = lamp
+                    .voice
+                    .lock()
+                    .unwrap()
+                    .turns
+                    .get("c_1")
+                    .and_then(|turns| turns.first())
+                    .and_then(|turn| turn.waiting.as_ref())
+                    .map(|stream| stream.try_clone().unwrap());
+                if let Some(socket) = waiting {
+                    break socket;
+                }
+                assert!(std::time::Instant::now() < ready_by, "start not registered");
+                std::thread::yield_now();
+            };
+            socket
+                .set_write_timeout(Some(Duration::from_millis(1)))
+                .unwrap();
+            let mut blocked = false;
+            for _ in 0..256 {
+                match (&socket).write(&[b'x'; 64 * 1024]) {
+                    Ok(n) => assert!(n > 0),
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                        ) =>
+                    {
+                        blocked = true;
+                        break;
+                    }
+                    Err(error) => panic!("filling the fixture socket: {error}"),
+                }
+            }
+            assert!(blocked, "fixture must establish write backpressure");
+            let began = std::time::Instant::now();
+            let reply = lamp.reply("c_1", 5, &op(r#"{"id":5,"op":"turn.end"}"#), 0);
+            let dispatch = began.elapsed();
+            let answer = later(reply);
+            // Release the fixture before asserting, including on the old code.
+            drop(peer);
+            drop(socket);
+            let result = answer.join().unwrap();
+            until_told(&told, 1);
+            let _ = std::fs::remove_dir_all(&dir);
+            eprintln!("cancel dispatch with write backpressure {sample}: {dispatch:?}");
+            assert!(dispatch < Duration::from_millis(50), "{dispatch:?}");
+            assert!(result.is_err(), "peer supplied no outcome: {result:?}");
+        }
+    }
+    #[test]
+    fn pending_cancel_receipts_require_explicit_outcomes_from_every_start() {
+        for (name, first, second, refusal) in [
+            (
+                "dropped-refused",
+                Some(r#"{"outcome":"dropped","why":"stopped by its asker"}"#),
+                Some(r#"{"outcome":"refused","why":"private"}"#),
+                None,
+            ),
+            (
+                "expired-dropped",
+                Some(r#"{"outcome":"expired"}"#),
+                Some(r#"{"outcome":"dropped","why":"stopped by its asker"}"#),
+                None,
+            ),
+            (
+                "finished",
+                Some(r#"{"outcome":"spoken"}"#),
+                Some(r#"{"outcome":"expired"}"#),
+                Some("already finished"),
+            ),
+            (
+                "one-missing",
+                Some(r#"{"outcome":"expired"}"#),
+                None,
+                Some("no outcome"),
+            ),
+            (
+                "no-field",
+                Some(r#"{}"#),
+                Some(r#"{"outcome":"expired"}"#),
+                Some("no outcome"),
+            ),
+            (
+                "wrong-kind",
+                Some(r#"{"outcome":"muted"}"#),
+                Some(r#"{"outcome":"expired"}"#),
+                Some("unexpected say outcome"),
+            ),
+            (
+                "malformed",
+                Some("not-json"),
+                Some(r#"{"outcome":"expired"}"#),
+                Some("no outcome"),
+            ),
+        ] {
+            let dir = dir(&format!("cancel-receipts-{name}"));
+            let path = dir.join("say.sock");
+            let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+            let (events, told) = kept();
+            let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+            let mut peers = Vec::new();
+            for re in [3, 4] {
+                lamp.act(
+                    "c_1",
+                    re,
+                    &op(&format!(r#"{{"id":{re},"op":"turn.start"}}"#)),
+                    0,
+                )
+                .unwrap();
+                peers.push(accepted(&listener).0);
+            }
+            let began = Instant::now();
+            let answer = later(lamp.reply("c_1", 5, &op(r#"{"id":5,"op":"turn.end"}"#), 0));
+            for peer in &peers {
+                let mut cancel = String::new();
+                BufReader::new(peer).read_line(&mut cancel).unwrap();
+                assert_eq!(cancel.trim_end(), SAY_CANCEL);
+            }
+            for (peer, outcome) in peers.into_iter().zip([first, second]) {
+                if let Some(outcome) = outcome {
+                    say(&peer, outcome);
+                }
+                drop(peer);
+            }
+            let result = answer.join().unwrap();
+            let elapsed = began.elapsed();
+            until_told(&told, 2);
+            let _ = std::fs::remove_dir_all(&dir);
+            eprintln!("pending cancel receipts {name}: reply after {elapsed:?}");
+            match refusal {
+                Some(why) => {
+                    let error = result.unwrap_err();
+                    assert_eq!(error.code, ErrorCode::Refused);
+                    assert!(error.why.contains(why), "{name}: {}", error.why);
+                }
+                None => assert_eq!(result.unwrap(), json!({"turn":"ended","started":4})),
+            }
+        }
+    }
+
+    #[test]
+    fn expired_pending_cancel_budget_half_closes_only_the_request_side() {
+        use std::io::Read as _;
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        peer.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+        cancel_turn_before(&client, Instant::now());
+        assert_eq!(
+            peer.read(&mut [0u8; 1]).unwrap(),
+            0,
+            "the request side reaches EOF"
+        );
+        say(
+            &peer,
+            r#"{"outcome":"dropped","why":"stopped by its asker"}"#,
+        );
+        assert_eq!(
+            outcome_with(BufReader::new(client), |_| {}),
+            Ok(("dropped", Some("dropped: stopped by its asker".into()))),
+            "the response side must remain readable"
+        );
     }
 }
