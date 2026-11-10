@@ -2292,7 +2292,14 @@ socket; `crates/voice/src/photo_faces.rs`):
   was asked isn't asked again, even after the voice restarts. The
   voice then says, once, as its own written turn (`photo_face_ask`): "Someone
   added your face from a photo, as NAME. Shall I remember you?" It doesn't
-  use the name as theirs unless they agree.
+  use the name as theirs unless they agree. In English these are the lamp's
+  own words, said as they are with no chat (`photo_faces::turn`,
+  `onboarding::said_as_is`), so nothing in the thread changes them: on
+  lamp-52e6 (10 Nov, #5907) the model, writing the ask, once said "I didn't
+  catch that. Try once more when I stop talking." and, for a photo added
+  again after a no, "I already asked, and you said no", and the yes after
+  that was never taken. In another language, or for a name with a `"`, the
+  model still says the question in its own words.
 - **Their spoken answer** calls `photo_face_yes` or `photo_face_no`. These
   run in the provider's worker, a process apart from the coordinator that
   asked, so they take the face from the eyes, the unconfirmed one
