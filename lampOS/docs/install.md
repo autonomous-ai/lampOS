@@ -1377,9 +1377,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          (`UPGRADE_RETRY_AFTER`). If the copy cannot be put back and
          Harness is then missing, the next round installs it as on a lamp
          without it.
-       - **Shown only in tests**; the move to a newer pin on a lamp, signed in and handing work over
-         after, was shown on lamp-c0a4 on 10 Nov (0.5.62 to 0.5.95, and 0.5.95
-         to 0.6.2 with #5978's row).
+       - **Shown in tests, and on lamp-c0a4 on 10 Nov** (the move to a newer pin, signed in and
+         handing work over after: 0.5.62 to 0.5.95, and 0.5.95 to 0.6.2 with #5978's row).
      - **Held there:** Harness's own self-update is held by lamp-tasks'
        `LAMP_HARNESS_HOLD_UPDATES` (tasks.md, "Harness held at its pinned
        version"). A Team account ignores it. With that switch on in
