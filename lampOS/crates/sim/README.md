@@ -11,6 +11,19 @@ Linux first (the real `lamp-body` runs only on Linux, and the bus is Unix
 sockets). Not a replacement for a lamp check: it moves no real servo and
 draws no real ring.
 
+## Quick start
+
+```sh
+BIN=target/debug            # or a folder with lamp-sim, lamp-body and lamp-control
+$BIN/lamp-sim run ~/.lampsim/b --bin-dir $BIN &       # the lamp, on 127.0.0.1:7731 (--listen to change)
+$BIN/lamp-sim code ~/.lampsim/b                       # a code and a pin (every grant; --grants a,b for fewer)
+python -m lampos.cli pair CODE --pin PIN --host 127.0.0.1     # the JS SDK and lamp-mcp pair the same way
+# then drive it as any lamp: lamp.gesture("nod"), lamp.light(...), lamp.say(...), look/joints under lamp.lease("body")
+$BIN/lamp-sim people 1 ~/.lampsim/b                   # someone in view; `hear`, `hand`, `touch`, `air` below
+```
+
+`lamp-sim --help` lists every command.
+
 ## Run it
 
 ```sh
@@ -26,6 +39,7 @@ a lock folder under `/tmp`), and short: Unix socket paths hold 103 bytes.
 |---|---|
 | `--bin-dir BIN` | where `lamp-body` and `lamp-control` are (default: beside `lamp-sim`) |
 | `--listen ADDR` | the door's address (default `127.0.0.1:7731`) |
+| `lamp-sim code DIR [--grants a,b]` | a pairing code; the grants default to every one (body, light, speak, look, hear, sound, skills, air, device, camera, microphone, notes), so say `--grants` for fewer |
 | `--camera=always` | the host camera (ffmpeg) is open for the lamp's whole life, as the eyes' is; the host camera light stays on. `--camera` opens it only while a computer's camera mark is on the ring (a mark seen in the last 1.5 s counts) and keeps it open 10 s after that, so it closes about 10 to 11.5 s after the mark is let go (lamp-sim passes lamp-control's `--camera-opens-on-demand`, docs/control.md "The camera"): the host camera light means someone is looking; snapshots and streams wait up to 3 s for the first frame |
 | `--microphone` | the host microphone (ffmpeg) feeds `mic1/audio`; it stays open for the lamp's life, so a macOS microphone indicator stays on; a computer still hears it only through `microphone.stream` and the ring's mark |
 
@@ -67,12 +81,15 @@ someone to do something. No model runs, so each is a command that writes a file
 in the lamp's folder, which the running lamp takes within 200 ms:
 
 ```sh
-lamp-sim people 0 DIR          # nobody in view; then `people 1` for person.arrived (about 5 s apart)
+lamp-sim people 0 DIR          # nobody in view; then `people 1` for person.arrived (`people 1` gives person.arrived only after person.left, which needs 5 s of nobody; arrival wants 3 s since the last face, never less: watch.rs `ABSENT_FOR_US`, `LEFT_AFTER_US`)
 lamp-sim hear "good night lamp" DIR   # voice/heard, finished: a registered phrase fires
 lamp-sim sound door DIR        # a door is heard for 1.5 s (sound.heard; music, laughter, door or footsteps)
+lamp-sim touch tap DIR         # a tap on the head (touch kind tap); `touch pet` is a pet
 lamp-sim hand DIR              # a hand waves across the picture for 1.5 s (humans/hands/tracked)
 lamp-sim air pm2_5=41 co2_ppm=1350 DIR   # an air reading, said every 5 s; feel follows the carbon dioxide
 ```
+
+Each lamp folder has its own lamp name, `virtual-` and six hex digits of the folder's path, so two virtual lamps are two lamps to a computer's key store. A second `lamp-sim run` on the same address says so and names `--listen`.
 
 ## Known gaps
 
