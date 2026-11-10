@@ -401,6 +401,19 @@ pub(crate) struct EverythingShown(());
 /// ([`crate::memory_scope::ScopeLease::release_held_keep`]).
 pub(crate) struct HeldKeepYes(());
 
+/// This request's own new keep, taken back on its own next round's doubt
+/// (`LAMP_MEMORY_DOUBT_UNDOES`, C37, [`undo_doubted_keep`]). Only this
+/// module makes one, so only that undo marks the one forget by id that may
+/// run on a line its person's by their face alone in view
+/// ([`crate::memory_scope::ScopeLease::mark_own_keep_undone`]).
+pub(crate) struct OwnKeepUndone(());
+
+/// [`OwnKeepUndone`] for a test of the scope's mark itself.
+#[cfg(test)]
+pub(crate) fn own_keep_undone_for_test() -> OwnKeepUndone {
+    OwnKeepUndone(())
+}
+
 /// [`EverythingShown`] for a test of the face step itself.
 #[cfg(test)]
 pub(crate) fn everything_shown_for_test() -> EverythingShown {
@@ -12082,7 +12095,9 @@ struct HeldForget {
     carried: bool,
     /// A carried line's held keep ([`hold_carried_keep`]): that line's
     /// heard words, which its person's seen yes keeps
-    /// ([`HeldKeepYes`]). `None` for every other held call.
+    /// ([`HeldKeepYes`]). A keep taken back on its own doubt
+    /// ([`undo_doubted_keep`]): the words its question asked about. `None`
+    /// for every other held call.
     line: Option<String>,
     /// A held keep whose answer was neither a yes nor a no
     /// (`known_faces::unclear_answer_to_keep`), asked about once more: the
@@ -12232,12 +12247,16 @@ fn one_face_refuses(name: &str, args: &Value, reminders: bool) -> bool {
 /// Whether `call` is refused on this scope by the one-face rule
 /// ([`one_face_refuses`]), by every runner.
 fn one_face_refused(scope: Option<&crate::memory_scope::ScopeLease>, call: &net::ToolCall) -> bool {
-    scope.is_some_and(crate::memory_scope::ScopeLease::forgets_need_mouth)
-        && one_face_refuses(
-            &call.name,
-            &call.args,
-            crate::tools::schedule_whose::one_face_on(),
-        )
+    scope.is_some_and(|scope| {
+        scope.forgets_need_mouth()
+            // The lamp taking back its own keep of this request on its own
+            // doubt ([`undo_doubted_keep`]): no one's forget.
+            && !(call.name == crate::remember::FORGET && scope.undoes_own_keep(&call.args))
+    }) && one_face_refuses(
+        &call.name,
+        &call.args,
+        crate::tools::schedule_whose::one_face_on(),
+    )
 }
 
 /// What a memory call on a gap-held line is told instead of running.
@@ -12512,6 +12531,21 @@ fn forget_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64,
     if scope.forgets_need_mouth() {
         return None;
     }
+    let person = scope.scope()?.person()?.to_owned();
+    Some((scope.key().session, person))
+}
+
+/// Whom a keep of this turn was made for, for its own next round's doubt
+/// to take it back (`LAMP_MEMORY_DOUBT_UNDOES`, C37): [`forget_asker`], or
+/// on a line its person's by their face alone in view
+/// (`LAMP_PERSON_SCOPE_ONE_FACE_READS`) that line's own person, since the
+/// lamp undoing its own keep a moment old forgets nothing they had (the
+/// memory owner's call A, 11 Nov). Never on a line held only by a gap.
+fn keep_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64, String)> {
+    if held_by_gap(scope) {
+        return None;
+    }
+    let scope = scope?;
     let person = scope.scope()?.person()?.to_owned();
     Some((scope.key().session, person))
 }
@@ -13007,7 +13041,7 @@ struct JustKept {
     call: net::ToolCall,
     id: u64,
     at: Instant,
-    /// Whom it was kept for, as a held forget names them ([`forget_asker`]).
+    /// Whom it was kept for ([`keep_asker`]).
     asker: Option<(u64, String)>,
 }
 
@@ -13018,19 +13052,25 @@ struct JustKept {
 /// it again as called. Only on a spoken turn, with the eyes' sight for a
 /// held keep's yes, for the same known person and scope it was kept in,
 /// within [`remember::doubted::UNDO_WITHIN`]. Whether it was taken back;
-/// the journal says why not, never words or ids.
+/// the journal says why not, never words or ids. With `offered`, the round
+/// asking whether a kept word was another
+/// ([`remember::doubted::offered_word`]: "is that ranunculus?"), their yes
+/// keeps the call with that word in place of the kept one. On a line its
+/// person's by their face alone in view the same person may take back their
+/// own keep this way ([`keep_asker`]); their yes still needs their face
+/// seen saying it.
 async fn undo_doubted_keep(
     shared: &Shared,
     request: u64,
     round: usize,
     heard: bool,
-    kept: &JustKept,
+    (kept, offered): (&JustKept, Option<(String, String)>),
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Result<bool, Stop> {
     if !shared.doubt_undoes {
         return Ok(false);
     }
-    let asker = forget_asker(scope);
+    let asker = keep_asker(scope);
     let now = (shared.clock)();
     let not = if !heard {
         Some("a turn the lamp wrote")
@@ -13053,7 +13093,17 @@ async fn undo_doubted_keep(
     let Some(asker) = asker else {
         return Ok(false);
     };
-    match hold_forget(shared, request, &kept.call, asker, now) {
+    // Their yes to "is that ranunculus?" keeps "ranunculus".
+    let held_call = match (&offered, kept.call.args["text"].as_str()) {
+        (Some((was, offered)), Some(text)) => {
+            let mut call = kept.call.clone();
+            call.args["text"] =
+                Value::from(crate::remember::doubted::corrected(text, was, offered));
+            call
+        }
+        _ => kept.call.clone(),
+    };
+    match hold_forget(shared, request, &held_call, asker, now) {
         Holding::Held => {}
         Holding::OneWaits | Holding::Stale => {
             eprintln!(
@@ -13067,6 +13117,11 @@ async fn undo_doubted_keep(
         && let Some(held) = hold.held.as_mut().filter(|held| held.request == request)
     {
         held.asked = true;
+        // Their yes ("Yes.") is to the lamp's question about these words,
+        // so the memory's route keeps them, as for a carried line's held
+        // keep, never "nothing to keep" for a line that is only a yes
+        // (`remember::heard::yes_alone`, `LAMP_MEMORY_KEEP_HEARD`).
+        held.line = held_call.args["text"].as_str().map(str::to_owned);
     }
     let forget = net::ToolCall {
         id: format!("{}-doubted", kept.call.id),
@@ -13074,6 +13129,10 @@ async fn undo_doubted_keep(
         args: serde_json::json!({ "source_id": kept.id }),
         ..kept.call.clone()
     };
+    // Its own keep's id alone may be forgotten on a lone face's line.
+    if let Some(scope) = scope {
+        scope.mark_own_keep_undone(&OwnKeepUndone(()), kept.id);
+    }
     let told = run_tool(shared, request, heard, &forget, scope).await;
     if scope.is_some_and(|scope| !scope.is_current()) {
         return Err(Stop::Gone);
@@ -15301,9 +15360,24 @@ async fn answer(
             // The round right after a new keep doubts what was heard
             // ("Was that 'rhinodulus' right?", C37): that keep is taken
             // back and held for their yes (`LAMP_MEMORY_DOUBT_UNDOES`).
+            // Or asks whether a kept word was another: "is that
+            // ranunculus?" after "renunctinus" was kept (lamp-06c1, 10 Nov),
+            // whose yes keeps the word asked.
             if let Some(kept) = just_kept.take().filter(|kept| kept.round + 1 == round)
-                && crate::remember::doubted::doubts_what_was_heard(&text)
-                && undo_doubted_keep(shared, request, round, heard, &kept, scope.as_ref()).await?
+                && let offered = crate::remember::doubted::offered_word(
+                    &text,
+                    kept.call.args["text"].as_str().unwrap_or_default(),
+                )
+                && (offered.is_some() || crate::remember::doubted::doubts_what_was_heard(&text))
+                && undo_doubted_keep(
+                    shared,
+                    request,
+                    round,
+                    heard,
+                    (&kept, offered),
+                    scope.as_ref(),
+                )
+                .await?
                 && !calls.is_empty()
             {
                 doubt_note = Some(crate::remember::doubted::UNDONE_NOTE);
@@ -15543,6 +15617,22 @@ async fn answer(
             // Its own words doubt what was heard: a keep in it is not run
             // (#3504 finding N5).
             let doubted = crate::remember::doubted::doubts_what_was_heard(&text);
+            // Or asks, beside the keep, whether its word was another ("is
+            // that ranunculus?" beside a keep of "renunctinus", C37): that
+            // keep is not run either.
+            let offers_another = |call: &net::ToolCall| {
+                crate::remember::doubted::offered_word(
+                    &text,
+                    call.args["text"].as_str().unwrap_or_default(),
+                )
+                .is_some()
+            };
+            let doubted_calls: Vec<bool> = calls
+                .iter()
+                .map(|call| {
+                    call.name == crate::remember::REMEMBER && (doubted || offers_another(call))
+                })
+                .collect();
             // A search begun with nothing said: the lamp says it is checking,
             // as it does for a look (`LAMP_SECOND_CHECKING_LINE`, #4684).
             let checking = shared.checking_line
@@ -15805,7 +15895,7 @@ async fn answer(
                 }
                 // A keep its own round's words doubt is not run (#3504
                 // finding N5): asked again, kept once they say it.
-                if call.name == crate::remember::REMEMBER && doubted {
+                if doubted_calls[call_index] {
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round}: {}",
                         crate::remember::doubted::SKIPPED
@@ -16050,7 +16140,7 @@ async fn answer(
                         call: call.clone(),
                         id,
                         at: (shared.clock)(),
-                        asker: forget_asker(scope.as_ref()),
+                        asker: keep_asker(scope.as_ref()),
                     });
                 }
                 if call.name != crate::remember::RECALL && did {
