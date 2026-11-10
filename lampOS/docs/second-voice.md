@@ -5100,8 +5100,14 @@ after a take-over, but now for every turn:
   (`person::someone_else_now`): another voice in the conversation (the
   rule's own `another_person`, told through `Heeding::telling_another_voice`),
   more than one face in view, one face the eyes don't know as the owner, or
-  the eyes knowing someone else. No face in view, the owner looking away, is
-  no sign. For the reply only: the line's scope, memory and every keep,
+  the eyes knowing someone else. No face in view, or no look, is nobody
+  known at the lamp and holds the name back too, unless the eyes knew the
+  owner's face lately (8 s, `known_faces::known_lately`: the owner just
+  looking away) or the line is carried as theirs (B5186, 10 Nov: with
+  nobody in view an off-camera "what's my name?" was told the owner's typed
+  name). The private room (`LAMP_PRIVATE_ROOM`) changes none of it. The
+  journal says why the owner was named and where the name came from
+  (typed at setup, or kept with their face), never the name. For the reply only: the line's scope, memory and every keep,
   recall and forget stay as the rule below decides. On lamp-29e7 (8250) the
   owner alone at the lamp right after setup asked "what's my name?" and was
   not answered: the camera read their mouth speaking on 2 of 18 lines, so no

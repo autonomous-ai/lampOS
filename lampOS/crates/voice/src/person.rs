@@ -132,8 +132,11 @@ thread_local! {
 /// ownership check runs. Telling who is speaking was not reliable enough:
 /// the lamp refused its own owner. The checks stay here, parked, for a
 /// later feature, and come back with this off. It changes who may use the
-/// linked services and hear the typed name and every reminder, nothing of
-/// memory's scopes (`crate::memory_scope`). `on` only, off unless set.
+/// linked services and every reminder, nothing of memory's scopes
+/// (`crate::memory_scope`) and nothing of the typed name: that stays the
+/// owner's own known face's ([`may_tell`], [`someone_else_now`]; B5186,
+/// 10 Nov: with nobody in view the lamp said the owner's typed name to an
+/// unseen speaker). `on` only, off unless set.
 pub const PRIVATE_ROOM_ENVIRONMENT: &str = "LAMP_PRIVATE_ROOM";
 
 #[cfg(test)]
@@ -216,11 +219,8 @@ pub struct InView<'a> {
 /// with no face in view included: a visitor the camera can't see (beside
 /// the lamp, turned away, a dark room) speaks there too (the
 /// reviewer-lead's P2 on #3050). An unknown face, another known face, two
-/// faces, or no look at all: never.
+/// faces, or no look at all: never, the private room too (B5186).
 pub fn may_tell(name: &str, seen: InView<'_>) -> bool {
-    if private_room() {
-        return true;
-    }
     match (seen.person, seen.faces) {
         (Some(person), Some(0 | 1)) => person == crate::known_faces::memory_person(name),
         _ => false,
@@ -257,8 +257,17 @@ pub fn told_from_bus(
     if let Some(line) = other_known_face(name, seen, &OTHER_KNOWN) {
         eprintln!("{line}");
     }
-    told_to_line(name, seen)
+    let told = told_to_line(name, seen);
+    if !told.is_empty() {
+        // Where a told name came from, never the name (B5186: a name said
+        // with no line saying where it came from).
+        eprintln!("{TOLD_TO_OWNER_LINE}");
+    }
+    told
 }
+
+/// Said each time a line is told the typed name ([`told_from_bus`]).
+pub const TOLD_TO_OWNER_LINE: &str = "lamp-voice: the typed setup name is told to this line: the owner's own known face, alone in view, is its person (LAMP_PERSON_NAME_OWNER_ONLY)";
 
 /// Whether a line that begins now, with `person`, may be told the typed
 /// name: [`told_from_bus`]'s judgement, counted nowhere.
@@ -605,8 +614,13 @@ pub fn by_default_owner(
 /// known face that isn't theirs), or the eyes knowing someone else. The
 /// owner is any of `owners` ([`by_default_owner`]), matched by memory
 /// person id (`known_faces::memory_person`), as the eyes' face and memory
-/// are keyed. No face in view, or no look at all, is no sign: the owner
-/// looking away is still the owner.
+/// are keyed. No face in view, or no look at all, with neither the owner's
+/// face known lately nor the line carried as theirs, is nobody known at the
+/// lamp, and holds the name back (B5186, 10 Nov: with nobody in view an
+/// unseen speaker's "what's my name?" was answered with the owner's typed
+/// name). The owner just looking away is still the owner while the eyes
+/// knew them lately (`known_faces::known_lately`) or the line is carried
+/// for them. The private room does not change it.
 ///
 /// `carried` is the person (a memory id) the line is carried for as their
 /// conversation going on (`ScopeLease::carried_for`, #4339: no face seen
@@ -632,9 +646,6 @@ pub fn someone_else_now(
     speaking_not_at_desk: bool,
     carried: Option<&str>,
 ) -> Option<&'static str> {
-    if private_room() {
-        return None;
-    }
     let owner_id = |id: &str| {
         owners
             .iter()
@@ -650,10 +661,29 @@ pub fn someone_else_now(
         Some("more than one face in view")
     } else if theirs == Some(false) {
         Some("a known face that isn't theirs")
-    } else if faces == Some(1) && theirs.is_none() && !carried {
+    } else if theirs == Some(true) || carried {
+        None
+    } else if faces == Some(1) {
         Some("an unknown face in view")
     } else {
-        None
+        Some("nobody known seen at the lamp")
+    }
+}
+
+/// Why the owner may be named by default, once [`someone_else_now`] found
+/// no one else: their face known lately (`known_now`), else the line
+/// carried as theirs. Said in the journal beside the reply (B5186).
+pub fn named_by_default_because(owners: &[String], known_now: Option<&str>) -> &'static str {
+    let theirs = known_now.is_some_and(|known| {
+        let known = crate::known_faces::memory_person(known);
+        owners
+            .iter()
+            .any(|owner| crate::known_faces::memory_person(owner) == known)
+    });
+    if theirs {
+        "the owner's own known face seen lately"
+    } else {
+        "the line carried as the owner's conversation going on"
     }
 }
 
@@ -904,10 +934,14 @@ mod tests {
         let at = |faces, known: Option<&str>, voice| {
             someone_else_now(&owners, faces, known, voice, false, None)
         };
-        // Alone, the face turned away or out of view, or no look at all.
-        assert_eq!(at(Some(0), None, false), None);
-        assert_eq!(at(None, None, false), None);
-        // Alone and seen as themselves.
+        // Nobody in view, or no look at all, with no face known lately:
+        // nobody known at the lamp (B5186).
+        assert_eq!(
+            at(Some(0), None, false),
+            Some("nobody known seen at the lamp")
+        );
+        assert_eq!(at(None, None, false), Some("nobody known seen at the lamp"));
+        // Alone and seen as themselves, or known lately and turned away.
         assert_eq!(at(Some(1), Some(owner), false), None);
         assert_eq!(at(Some(0), Some(owner), false), None);
         // A stranger's face in view.
@@ -1635,43 +1669,104 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// The private room (the owner's call, 6 Nov): whoever speaks is the
-    /// owner. An unknown face, another known face, two faces and another
-    /// voice each hold nothing back; with it off each still does.
+    /// The private room (the owner's call, 6 Nov) leaves the typed name
+    /// as it was (B5186): an unknown face, another known face, two faces,
+    /// another voice and nobody in view each hold it back, on or off; the
+    /// owner's own known face alone is still told it.
     #[test]
-    fn the_private_room_holds_nothing_back_from_whoever_speaks() {
+    fn the_private_room_never_gives_the_typed_name_to_whoever_speaks() {
         let owners = vec!["Example Name".to_owned()];
+        let owner = crate::known_faces::memory_person("Example Name");
         let cases = [
             (Some(1), None, false),
             (Some(1), Some("Robin"), false),
             (Some(2), None, false),
             (Some(0), None, true),
+            (Some(0), None, false),
+            (None, None, false),
         ];
-        set_private_room_for_test(Some(false));
-        for (faces, known, voice) in cases {
-            assert!(someone_else_now(&owners, faces, known, voice, false, None).is_some());
-        }
-        assert!(!may_tell(
-            "Example Name",
-            InView {
-                person: None,
-                faces: Some(2)
+        for on in [false, true] {
+            set_private_room_for_test(Some(on));
+            for (faces, known, voice) in cases {
+                assert!(
+                    someone_else_now(&owners, faces, known, voice, false, None).is_some(),
+                    "{on} {faces:?} {known:?} {voice}"
+                );
             }
-        ));
-        set_private_room_for_test(Some(true));
-        for (faces, known, voice) in cases {
+            for faces in [Some(2), Some(1), Some(0), None] {
+                assert!(
+                    !may_tell(
+                        "Example Name",
+                        InView {
+                            person: None,
+                            faces
+                        }
+                    ),
+                    "{on} {faces:?}"
+                );
+            }
+            assert!(may_tell(
+                "Example Name",
+                InView {
+                    person: Some(&owner),
+                    faces: Some(1)
+                }
+            ));
             assert_eq!(
-                someone_else_now(&owners, faces, known, voice, false, None),
+                someone_else_now(&owners, Some(1), Some("Example Name"), false, false, None),
                 None
             );
         }
-        assert!(may_tell(
-            "Example Name",
-            InView {
-                person: None,
-                faces: Some(2)
-            }
-        ));
+        set_private_room_for_test(None);
+    }
+
+    /// B5186 (lamp-06c1, build 11091, 10 Nov, case 3): nobody in view, an
+    /// off-camera "what's my name?" was answered with the owner's typed
+    /// name, in the product's private room with the name by default. The
+    /// line was the room's (no lease person) and no face was in view: neither
+    /// the line's note nor the by-default note may name anyone. Only the
+    /// owner's face known lately, or the line carried as theirs, does.
+    #[test]
+    fn nobody_in_view_is_never_told_the_typed_name() {
+        set_private_room_for_test(Some(true));
+        let (_, owners) = by_default_owner(Some("Long".to_owned()), None).unwrap();
+        for faces in [Some(0), None] {
+            assert_eq!(
+                told_to_line(
+                    "Long",
+                    InView {
+                        person: None,
+                        faces
+                    }
+                ),
+                "",
+                "{faces:?}"
+            );
+            assert_eq!(
+                someone_else_now(&owners, faces, None, false, false, None),
+                Some("nobody known seen at the lamp"),
+                "{faces:?}"
+            );
+            // The owner known lately, turned away: named.
+            assert_eq!(
+                someone_else_now(&owners, faces, Some("Long"), false, false, None),
+                None
+            );
+            assert_eq!(
+                named_by_default_because(&owners, Some("Long")),
+                "the owner's own known face seen lately"
+            );
+            // Carried as the owner's conversation going on: named.
+            let carried = crate::known_faces::memory_person("Long");
+            assert_eq!(
+                someone_else_now(&owners, faces, None, false, false, Some(&carried)),
+                None
+            );
+            assert_eq!(
+                named_by_default_because(&owners, None),
+                "the line carried as the owner's conversation going on"
+            );
+        }
         set_private_room_for_test(None);
     }
 
