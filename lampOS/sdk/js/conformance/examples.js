@@ -68,6 +68,7 @@ export const RUNS = [
 // camera, a skill folder. A new example must be in RUNS or here, so none is left untried.
 export const NOT_YET = {
   'camera.js': 'the camera open (lamp-sim --camera)', 'follow.js': 'someone arriving, then a look at a face the lamp does not take yet', 'push-skill.js': 'a skill folder and skill push on the lamp', 'tour.js': 'a run of its own (conformance.js covers its steps)',
+  'notes.js': 'a note kept across runs, then its count shown as the light (no black-box row yet; test/examples.test.js checks its asks)',
   'touch.js': 'a tap or pet on the head (lamp-sim has no touch stand-in yet)', 'heat-watch.js': 'a joint over its limit (not tried against lamp-sim yet)',
 };
 
