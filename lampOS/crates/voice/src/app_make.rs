@@ -1284,7 +1284,7 @@ mod tests {
         assert_eq!(
             said,
             [
-                "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking. Say \"take it off\" to take it off."
+                "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking."
             ]
         );
         assert!(!said[0].contains("Shall I"), "{said:?}");
@@ -1555,7 +1555,7 @@ mod tests {
         assert_eq!(
             said.as_deref(),
             Some(
-                "I made study mode, and it's on: when you ask for it (when I say study mode), the lamp follows the instructions you wrote: Dim the light, using its voice. Say \"take it off\" to take it off."
+                "I made study mode, and it's on: when you ask for it (when I say study mode), the lamp follows the instructions you wrote: Dim the light, using its voice."
             )
         );
         let told = status(&keeping.directory, Some("w1"), at);

@@ -947,7 +947,7 @@ light = { dim = 1 }
         assert_eq!(told["on"], true, "{told}");
         assert_eq!(
             told["next"],
-            "Say exactly: \"I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking. Say \"take it off\" to take it off.\" Ask nothing about putting it on."
+            "Say exactly: \"I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking.\" Ask nothing about putting it on."
         );
         assert!(!told.to_string().contains("Shall I"), "{told}");
         assert!(told["uses"].as_str().unwrap().contains("light"), "{told}");
