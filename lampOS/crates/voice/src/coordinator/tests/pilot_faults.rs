@@ -1097,6 +1097,7 @@ impl Peers {
                     | ProviderInput::CountOnly { .. }
                     | ProviderInput::StepCall { .. }
                     | ProviderInput::Onboarding { .. }
+                    | ProviderInput::WalkUnderWay { .. }
                     | ProviderInput::TurnOpened { .. }
                     | ProviderInput::WokenByName { .. },
                 )) => {}
