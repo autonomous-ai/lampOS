@@ -369,6 +369,49 @@ fn a_reset_line_not_said_still_resets() {
     );
 }
 
+/// #5929, Reviewer-two's P2 on #5941: with the real say helper, a voice
+/// that never takes its connections (its queue full) holds no part of the
+/// reset past `reset::SAY_WITHIN`: the line is not said and the reset runs.
+#[test]
+fn a_voice_that_never_answers_does_not_hold_the_reset() {
+    use rustix::net::{AddressFamily, SocketAddrUnix, SocketType};
+    let root = Root::new();
+    let plan = lamp(&root);
+    let socket = root.0.join("say.sock");
+    let address = SocketAddrUnix::new(&socket).unwrap();
+    let listener = rustix::net::socket(AddressFamily::UNIX, SocketType::STREAM, None).unwrap();
+    rustix::net::bind(&listener, &address).unwrap();
+    rustix::net::listen(&listener, 0).unwrap();
+    // Fill the queue, never accepted: a blocking connect now waits on Linux.
+    let mut queued = Vec::new();
+    for _ in 0..8 {
+        let one = std::os::unix::net::UnixStream::from(
+            rustix::net::socket(AddressFamily::UNIX, SocketType::STREAM, None).unwrap(),
+        );
+        one.set_nonblocking(true).unwrap();
+        if rustix::net::connect(&one, &address).is_err() {
+            break;
+        }
+        queued.push(one);
+    }
+    let mut lines = Vec::new();
+    let started = Instant::now();
+    let steps = reset::said_then_reset(
+        &plan,
+        &mut Fake::default(),
+        |line, within| lamp_setup::shutdown::say_through(&socket, line, within),
+        |line| lines.push(line.to_owned()),
+    )
+    .unwrap();
+    assert!(started.elapsed() <= reset::SAY_WITHIN + Duration::from_secs(1));
+    assert!(steps.contains(&Step::Stopped));
+    wiped(&root);
+    assert!(
+        lines.iter().any(|line| line.contains("not said")),
+        "{lines:?}"
+    );
+}
+
 /// #5929: a reset carried on from its journal (a power cut after the hold)
 /// says nothing: the person's hold was a boot ago.
 #[test]

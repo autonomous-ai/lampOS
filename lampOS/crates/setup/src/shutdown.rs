@@ -314,8 +314,8 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
 /// say service"): first `line` as `text` with `"cache": true`, played from
 /// the voice's speech cache (rendered ahead at its start, so no network is
 /// needed), then, if it was not played, `line` as `text` for the model,
-/// each from the skill `shutdown` at priority 9, both within `within`
-/// together; `Ok` only on a `{"outcome":"spoken"}`, played whole. Neither:
+/// each from the skill `shutdown` at priority 9, both (connecting, asking
+/// and waiting) within `within` together; `Ok` only on a `{"outcome":"spoken"}`, played whole. Neither:
 /// why, for each. Muted, paused or busy is the say service's own to judge.
 pub fn say_through(socket: &Path, line: &str, within: Duration) -> Result<(), String> {
     let until = Instant::now() + within;
@@ -331,6 +331,22 @@ pub fn say_through(socket: &Path, line: &str, within: Duration) -> Result<(), St
         .map_err(|then| format!("the cached line: {why}; the words: {then}"))
 }
 
+/// `socket` connected at once or not at all: a say listener whose queue is
+/// full is not waited on (a blocking connect would wait past any bound).
+/// A Unix stream connect that does not block completes or fails at once.
+fn connect_now(socket: &Path) -> io::Result<UnixStream> {
+    use rustix::net::{AddressFamily, SocketAddrUnix, SocketType};
+    let stream = UnixStream::from(rustix::net::socket(
+        AddressFamily::UNIX,
+        SocketType::STREAM,
+        None,
+    )?);
+    stream.set_nonblocking(true)?;
+    rustix::net::connect(&stream, &SocketAddrUnix::new(socket)?)?;
+    stream.set_nonblocking(false)?;
+    Ok(stream)
+}
+
 /// One ask of the say service, `words` with the skill, priority and expiry
 /// added, waited for until `until`.
 fn ask_once(socket: &Path, mut ask: serde_json::Value, until: Instant) -> Result<(), String> {
@@ -341,8 +357,11 @@ fn ask_once(socket: &Path, mut ask: serde_json::Value, until: Instant) -> Result
     ask["skill"] = "shutdown".into();
     ask["priority"] = 9.into();
     ask["expires_in_ms"] = (within.as_millis() as u64).into();
-    let mut stream = UnixStream::connect(socket)
+    let mut stream = connect_now(socket)
         .map_err(|why| format!("the voice's say service is not there: {why}"))?;
+    stream
+        .set_write_timeout(Some(within))
+        .map_err(|why| why.to_string())?;
     stream
         .write_all(format!("{ask}\n").as_bytes())
         .map_err(|why| format!("the say service did not take the ask: {why}"))?;
@@ -860,6 +879,32 @@ mod tests {
                 assert!(ask["expires_in_ms"].as_u64().unwrap() <= 300);
             }
         }
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A say listener that takes the connection and never reads holds a
+    /// write that does not fit its buffer: the write is bounded by the same
+    /// `within` as the answer, so a stuck voice never holds the caller.
+    #[test]
+    fn say_through_is_bounded_by_a_listener_that_never_reads() {
+        use std::os::unix::net::UnixListener;
+        let dir = std::env::temp_dir().join(format!("lss-stuck-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let socket = dir.join("say.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let within = Duration::from_millis(300);
+        // Larger than any socket buffer, so the write itself must wait.
+        let line = "a".repeat(4 << 20);
+        let (done, ended) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done.send(say_through(&socket, &line, within));
+        });
+        let held = listener.accept().unwrap();
+        let said = ended.recv_timeout(within + Duration::from_millis(500));
+        drop(held);
+        let said = said.expect("say_through was not bounded by its `within`");
+        assert!(said.is_err(), "{said:?}");
         let _ = std::fs::remove_dir_all(dir);
     }
 
