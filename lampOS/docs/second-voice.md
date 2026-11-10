@@ -2186,7 +2186,11 @@ order is kept. A written turn is the same from the chat on.
     `spoken_stop::JUST_AFTER` (3 s) of its end, is answered
     `spoken_stop::LINE` (`LAMP_SPOKEN_STOP_ENDS`); a cut-in that ended the
     answer and came back with no words, in a quiet room, is answered
-    `cut_in_wordless::LINE` (`LAMP_CUT_IN_WORDLESS_ASKS`). A cut-in whose
+    `cut_in_wordless::LINE` (`LAMP_CUT_IN_WORDLESS_ASKS`), except while a
+    skill an earlier line asked for by voice is still being made or its
+    line is still to be said (`Shared::quiet_for_a_make`, lamp-9adf, 11
+    Nov; skills.md, "A cut while it is made"): then the lamp stays quiet,
+    with `LAMP_CUT_IN_WORDLESS_RESUMES` too. A cut-in whose
     final words came back empty but had words on the way is taken as that
     stop when they are one, and otherwise is neither (#4938). Neither is asked
     of the model; both are rendered ahead (`FixedClips`) and played at once

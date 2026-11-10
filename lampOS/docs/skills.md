@@ -2661,6 +2661,24 @@ gone ([switches.md](switches.md)). What happens:
    then the voice's wait sound if `LAMP_SECOND_WAIT_CUE=on`; nothing else
    until the answer. Whether "Stop" ends the wait is measured in the played
    check on lamp-9adf (#4914) and written here with its result.
+10. **A cut while it is made** (lamp-9adf, staging 11625, 11 Nov 02:16 and
+    02:19: the lamp's own echo cut "I'll make it", the skill was made and
+    put on, and the person heard only "Um, excuse me, did anyone say
+    something?"). A newer line that cuts the turn ends the model's round
+    that would have said the line, but not the make: it goes on in the
+    second route's worker to its end (`worker::made_running`). Its line,
+    the same words the model is given ("I made evening dim, and it's on.",
+    "I made it but couldn't put it on: <why>." or "I couldn't make that:
+    <why>."; `make_skill_local::take_said_line`), is then said once through
+    the say service, as an app's make is (`app_make::say_line_at`: the same
+    note in the conversation's language, the skill name `voice-make`, at a
+    good moment within the hour, asked once more after a drop). A turn that
+    still waits gets the answer as before, and nothing goes to the say
+    service. With the say service off, the line is not said. While the
+    make is under way, or its line is still to be said
+    (`make_skill_local::Pending`), a wordless cut of a later line is never
+    answered "Um, excuse me, did anyone say something?"
+    (`Shared::quiet_for_a_make`, second-voice.md).
 
 Removing a made skill by voice is still to come.
 
@@ -2678,7 +2696,16 @@ Tests:
   `the_models_cannot_reason_is_told_never_journaled` (#5985: told in full,
   journaled as `MODELS_CANNOT_JOURNALED`), and
   `the_system_prompt_carries_the_rules_of_a_read` (one service at most,
-  read only, the listed steps, `cannot:` otherwise; off, none).
+  read only, the listed steps, `cannot:` otherwise; off, none). The made,
+  not-on and not-made tests also take the line said for a cut turn, the
+  same words, once.
+- `second_provider::worker::made_line`:
+  `a_make_whose_turn_was_cut_still_says_its_line_once` and
+  `a_make_whose_turn_waits_never_uses_the_say_service`;
+  `second_provider::tests::made_line`:
+  `a_wordless_cut_while_a_skill_is_made_never_asks_if_someone_spoke`, with
+  `a_wordless_cut_while_another_call_runs_still_asks` as its control; and
+  `app_make::tests::a_voice_make_line_is_asked_on_the_say_socket`.
 - `made_skill::tests`: the brief within 1,340 bytes (so its repair fits the
   tasks part's 2,000), `every_request_is_briefed_and_the_model_judges_it`
   (a service, a write or two services are briefed, never refused by a

@@ -558,7 +558,11 @@ one is chosen) and kept in the thread as the lamp's:
   audible answer (the yield committed): a yield that resumed sends no
   Start, so it stays silent; a wordless line begun in the clear (no answer
   cut), or one in a busy room (where a wordless yield is the
-  room's, `LAMP_CUT_IN_OVER_BED`) gets nothing. Asked at most once a minute
+  room's, `LAMP_CUT_IN_OVER_BED`) gets nothing, nor one while a skill
+  asked for by voice is still being made or its line is still to be said
+  (lamp-9adf, 11 Nov: the lamp's own echo cut "I'll make it", and the
+  question came in place of the made line; skills.md, "A cut while it is
+  made"). Asked at most once a minute
   (`cut_in_wordless::AGAIN_AFTER`): a second knock that cuts the question
   itself leaves the lamp quiet, never asking again and again. On in the
   product by the memory owner's call (4 Nov), with a known gap accepted
