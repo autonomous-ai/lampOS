@@ -1,3 +1,42 @@
+## 2026-11-10 — forget/send recovery repair published for independent review
+
+- Resumed on current context carry #5913 `b0e70d9540`, based on
+  `a2260fd1`. Third's earlier #5878 readiness was superseded by the later
+  receipt-recovery interaction: send → cut → admitted forget → cut could
+  restore call/result content. Corrected that PR's stale ready description.
+- Posted takeover/coordination before work; no published Twelve production
+  repair was present. Fourth confirmed no unpublished production collision.
+  Preserved the context carry and published Engine, late watcher,
+  unadmitted-control and services-fallback proof authors.
+- Published draft [#5935](https://github.com/autonomous-ai/lampOS/pull/5935),
+  head `25830cb0d058b61fb0b6a640395bfab5771f7f9d`. Shared content epochs and
+  synchronized final publication discard old receipt/batch display payloads
+  while retaining truthful send accounting and duplicate-send suppression.
+  Copied, evicted, late-registering and late-completing handles remain old;
+  a stale producer cannot acquire a fresh epoch by starting its send later.
+- Before repair: focused 9 passed / 3 intended failures. Final focused:
+  19 passed, including 18 functional checks and the manual host timing case.
+  Formatting, strict Clippy Voice + 13 dependents, workspace build and docs
+  pass. Binary/integration targets: 280 passed / 0 failed / 6 ignored;
+  doc-test command passed with zero doctests. Docs: 9 checker tests and
+  192 documents / 1,899 links / zero broken.
+- Broad Voice library: 5,475 passed / 5 failed / 18 ignored. Four motor
+  child-process timeouts and one reminder child handshake timeout all passed
+  individually with the same executable and unchanged timeouts. No broad
+  all-pass claim and no unrelated motor/reminder changes. Unedited outputs
+  and exact commands are in the
+  [verification record](https://github.com/autonomous-ai/lampOS/blob/25830cb0d058b61fb0b6a640395bfab5771f7f9d/lampOS/docs/verification/forget-send-ledger-20261110/README.md).
+- Host debug timing is limited: latest first empty clear 2.455 µs; saturated
+  512-receipt ledger p95 1.881 ms / max 1.972 ms, earlier max 4.325 ms.
+  Both saturated samples miss the initial <1 ms target. No release,
+  contention, physical-lamp, acoustic or end-to-end latency claim.
+- Docs CI 42732385598 passed. Native ARM64 42732385607 and Linux lint
+  42732385269 are running. Exact-head TWO READS requested from Second and
+  Fourth (6755802727), linked on #5913 (6755812137) and Queue (6755812602).
+  Third authored the repair and cannot count as an independent reader.
+  Existing HOLD remains; #5935 stays draft, #5913/#5878 remain open pending
+  independent disposition. No train/promote readiness or device access.
+
 ## 2026-11-09 — bounded touch-response check
 
 - With both face fixes ready and no assigned/unowned lamp interaction
