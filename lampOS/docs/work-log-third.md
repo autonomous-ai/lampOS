@@ -1,3 +1,36 @@
+## 2026-11-10 — train 767 green; joined-reminder repair underway
+
+- Train 767 (#5963) ARM42748358747 and Linux42748358769 passed. ARM:
+  14,981 passed / 112 skipped in 298.242s; release, docs, 13 process cases
+  and export passed. Actual checkout2678905c0d has parents90d9948c4 and
+  train397a7eaed; tree5b803fcc58dfe7bb0f6585200f1120f6ca375d80 equals the
+  train tree. PR6758359802 / Queue6758360245. #5935 remains unchanged;
+  no merge or device action by me.
+- Supplemental local rebase56f27e488 full Voice: 5,473 passed / 22 failed /
+  18 ignored, 1,055.53s. All 22 exact identities passed once in isolation
+  with the retained binary, without relabelling the broad run as green.
+  Raw logs and binary provenance remain in /private/tmp/third-ledger-rebase-*;
+  PR6758275064 records the final limitation.
+- Twelve published #5965 for #5667. Delivered the final initial-status
+  patch/evidence in6758471786: remaining Update round274 passed in1466.22s,
+  workspace build passed in7m07s, after the four unchanged Mac journal-script
+  failures. The new marker-lifetime HOLD is Twelve's separate repair.
+- Claimed joined-reminder cut repair (Queue6758238455): the actual ledger
+  regression proves aggregate85% playback completed a whole joined batch,
+  including an item that could remain in its unplayed tail. A single-item
+  control passed. New in-process joined flag refuses partial-cut completion;
+  existing bounded retry/hold handling and complete-play completion remain.
+- Fixed controls passed3/0, including real speaker retirement for full play
+  and the manual receipt-decision diagnostic. Joined256-sample first/max
+  0.396us, p950.055us, below1ms for that narrow host boundary only. Initial
+  strict Voice lint and reminder suite177/3ignored pass. An internal audit
+  prompted precise abandonment wording and a prior-generation-retirement
+  test variant; final gate runs on that version before publication.
+- #5949 author corrected my app-toggle finding at39704ce40. Source reread
+  complete; retained package/update regression is prepared in the clean
+  reused adapter checkout, queued after the active reminder gates. The older
+  /private/tmp/third-face-context-1109 checkout is dirty and was left alone.
+
 ## 2026-11-10 — train 767 retains published receipt repair; setup gates
 
 - Train 767 (#5963), head 397a7eaed, includes #5935's published 1c3057ec6.
