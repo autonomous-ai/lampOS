@@ -4171,13 +4171,17 @@ after a take-over, but now for every turn:
   fenced to "not running" once its lease is stale, so where the services
   got to with that very try (`services::send_state`, by its attempt id) is
   told instead: their answer, or the gate's refusal, never another try's.
-  Past the gate
-  with no answer, the note says it was sent and its result is not known
-  (`SENT_UNKNOWN_NOTE`); no answer within the bound and nothing at the
-  services, that whether it went is not known (`SEND_NOT_KNOWN_NOTE`, its
-  `service_write` told `SEND_NOT_KNOWN`); never that nothing was sent. In that line's turn a
-  `service_write` is not run: it is told `ALREADY_SENT`, so no new
-  read-back follows; the mark ends with the turn. A send refused by the
+  Past the gate with no answer, the note says it was sent and its result
+  is not known (`SENT_UNKNOWN_NOTE`); no answer within the bound and
+  nothing at the services, that whether it went is not known
+  (`SEND_NOT_KNOWN_NOTE`, its `service_write` told `SEND_NOT_KNOWN`);
+  never that nothing was sent. After a forget boundary, `Asked` also stays
+  uncertain and uses `SEND_NOT_KNOWN_NOTE` and `SEND_NOT_KNOWN`.
+  In that line's turn a `service_write` is not run: a confirmed send gets
+  `ALREADY_SENT`, asking only for confirmation that it was sent, without
+  reconstructing what was done. Before a forget boundary, `Asked` also
+  gets `ALREADY_SENT`. No new read-back follows; the mark ends with the
+  turn. A send refused by the
   gate, or answered "not running" before the services had it, goes with its
   result only, never told as sent. Words answered again may
   still be searched again, but are written once (`WriteOwner`; lamp-06c1, 26 Oct,
@@ -4445,14 +4449,30 @@ after a take-over, but now for every turn:
       outcomes of calls already run. It carries no earlier exchanges,
       memory notes, injected personal names, tool arguments or results,
       reasoning, per-turn notes, or picture. A confirmed held forget before
-      round 1 uses the same boundary. Earlier tool rounds retained for a
-      later turn are cleared at admission, before awaiting either the held
-      or ordinary forget call, alongside the pending rename. Cutting or
-      dropping the turn during that await cannot leave those rounds for
-      the next turn. The after-return reset still rebuilds the current
+      round 1 uses the same boundary. Admission advances the shared context
+      epoch and clears all retained earlier tool rounds, before awaiting
+      either the held or ordinary forget call, alongside the pending
+      rename. This clears the installed rounds and prevents stale copied
+      rounds from being installed later. Cutting or dropping the turn
+      during that await cannot leave those rounds for the next turn.
+      Earlier `SentWrite` records retain request, attempt, timing and
+      outcome accounting, but their display calls and results are scrubbed.
+      Handles cloned before the await, late registration or completion,
+      and `services::send_state` fallback cannot restore raw call IDs,
+      arguments or results. Final reconstruction and publication share
+      admission's synchronization boundary. Ordinary batches preserve their
+      producer context epoch when publishing finished rounds and registering
+      send receipts, including the requested-audio runner path. An old
+      batch that starts a send or finishes its round after admission cannot
+      regain permission to display its old content. A late genuine success may
+      update the fixed sent status; `Asked` and unknown outcomes remain
+      uncertain, and confirmed refusals remain refusals. Duplicate-send
+      guards survive without asking the model to reconstruct forgotten
+      details. The after-return reset still rebuilds the current
       turn's local messages with fixed outcomes. Calls held or refused
       before admission do not clear the context. Custom character-file
-      text remains configuration.
+      text remains configuration. This adds no deletion call, provider or
+      audio cancellation, or switch, and makes no device-verification claim.
       Calls left in that model batch are not run: their arguments came from
       the old context. The next round may plan the remaining work afresh,
       and is told not to repeat calls already run. Partial deletion and

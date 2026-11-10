@@ -1633,3 +1633,347 @@ async fn a_services_fallback_after_admitted_forget_keeps_status_without_private_
         "the redacted receipt must not promise its discarded call and result"
     );
 }
+
+// Append inside second_provider::tests::sent_write after the one-argument
+// forget_carried_context API lands. No network, clock sleeps, or model needed.
+fn ledger_boundary_engine() -> Engine {
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    // Isolate these receipts from the cfg(test) services store's other fixtures.
+    engine
+        .shared
+        .send_attempts
+        .store(0x5878_0000, Ordering::Relaxed);
+    engine
+}
+
+fn ledger_boundary_call() -> ToolCall {
+    call(
+        "ledger-private-call-canary",
+        crate::services::WRITE,
+        json!({"service":"google_drive", "send_id":"ledger-private-argument-canary"}),
+    )
+}
+
+/// Even an evicted ledger entry's captured watch and completion handle retain
+/// the old epoch; finishing its actual runner cannot publish private content.
+#[tokio::test]
+async fn forget_invalidates_a_snapshotted_send_handle_after_ledger_eviction() {
+    let engine = ledger_boundary_engine();
+    let shared = &engine.shared;
+    let call = ledger_boundary_call();
+    let (attempt, _) = send_attempt(shared, 100, &call);
+    assert!(attempt.is_some());
+    let (release, released) = tokio::sync::oneshot::channel::<Value>();
+    let running = sending(
+        shared,
+        (100, attempt),
+        &call,
+        Box::pin(async move { released.await.unwrap() }),
+        Value::clone,
+    );
+    let (content, told) = {
+        let sends = shared.sent_write.lock().unwrap();
+        (sends[0].content.clone(), sends[0].told.clone())
+    };
+    assert!(content.lock().unwrap().call.is_some());
+    drop_sent_write(shared, Some(100));
+    assert!(shared.sent_write.lock().unwrap().is_empty());
+    forget_carried_context(shared);
+    release
+        .send(json!({"sent":true,"detail":"ledger-private-result-canary"}))
+        .unwrap();
+    running.await;
+    assert!(content.lock().unwrap().call.is_none());
+    assert_eq!(*told.borrow(), Some(json!({"sent":true})));
+}
+
+/// An attempt is captured before constructing the runner. A boundary in that
+/// interval must redact registration as well as the later completion.
+#[tokio::test]
+async fn forget_redacts_late_registration_of_a_captured_send_attempt() {
+    let engine = ledger_boundary_engine();
+    let shared = &engine.shared;
+    let call = ledger_boundary_call();
+    let (attempt, _) = send_attempt(shared, 101, &call);
+    assert!(attempt.is_some());
+    forget_carried_context(shared);
+    let running = sending(
+        shared,
+        (101, attempt),
+        &call,
+        Box::pin(async { json!({"sent":true,"detail":"ledger-private-result-canary"}) }),
+        Value::clone,
+    );
+    {
+        let sends = shared.sent_write.lock().unwrap();
+        assert_eq!(sends.len(), 1);
+        assert!(sends[0].content.lock().unwrap().call.is_none());
+    }
+    running.await;
+    let sends = shared.sent_write.lock().unwrap();
+    assert_eq!(*sends[0].told.borrow(), Some(json!({"sent":true})));
+}
+
+/// A newer line may already hold old rounds when the prior forget is admitted.
+/// Both the installed copy and a subsequently restored stale snapshot lose
+/// tool rounds; neither transition discards the person's words or identity.
+#[tokio::test]
+async fn forget_clears_installed_and_later_restored_carried_rounds_but_keeps_words() {
+    let engine = ledger_boundary_engine();
+    let shared = &engine.shared;
+    let mut newer = Carried::own(
+        103,
+        "Please finish my question.".into(),
+        Instant::now(),
+        102,
+    );
+    let recall = call(
+        "ledger-private-recall-call",
+        crate::remember::RECALL,
+        json!({"query":"private"}),
+    );
+    newer.rounds = vec![
+        Message::assistant_calls(None, &[recall]),
+        Message::tool("ledger-private-recall-call", "ledger-private-recall-result"),
+    ];
+    put_in_flight(shared, newer);
+    let stale = shared.in_flight.lock().unwrap().as_ref().unwrap().clone();
+    assert!(!carried_rounds(shared, 103).is_empty());
+    forget_carried_context(shared);
+    {
+        let installed = shared.in_flight.lock().unwrap();
+        let current = installed.as_ref().unwrap();
+        assert_eq!(current.request, 103);
+        assert_eq!(current.said_by, 102);
+        assert_eq!(current.text(), "Please finish my question.");
+        assert!(current.rounds.is_empty());
+    }
+    assert!(
+        !stale.rounds.is_empty(),
+        "the restored snapshot really predates admission"
+    );
+    put_in_flight(shared, stale);
+    let installed = shared.in_flight.lock().unwrap();
+    let restored = installed.as_ref().unwrap();
+    assert_eq!(restored.request, 103);
+    assert_eq!(restored.said_by, 102);
+    assert_eq!(restored.text(), "Please finish my question.");
+    assert!(restored.rounds.is_empty());
+}
+
+/// Real receipt/runner states drive recovery after admission. Confirmed sends
+/// still prevent duplicates, uncertainty never claims success, and a refused
+/// send stays refused. None of the four paths publishes discarded tool data.
+#[tokio::test]
+async fn forgotten_send_outcomes_keep_only_fixed_notes_and_the_right_repeat_guard() {
+    let engine = ledger_boundary_engine();
+    let shared = &engine.shared;
+    for (index, state, expected_note, expected_guard) in [
+        (0, "sent", SENT_REDACTED_NOTE, Some(ALREADY_SENT)),
+        (1, "asked", SEND_NOT_KNOWN_NOTE, Some(SEND_NOT_KNOWN)),
+        (2, "unknown", SEND_NOT_KNOWN_NOTE, Some(SEND_NOT_KNOWN)),
+        (3, "refused", SEND_REDACTED_REFUSED_NOTE, None),
+    ] {
+        let origin = 110 + index * 2;
+        let resumed = origin + 1;
+        let call = ledger_boundary_call();
+        let (attempt, args) = send_attempt(shared, origin, &call);
+        assert!(attempt.is_some());
+        let (release, released) = tokio::sync::oneshot::channel::<Value>();
+        let running = sending(
+            shared,
+            (origin, attempt),
+            &call,
+            Box::pin(async move { released.await.unwrap() }),
+            Value::clone,
+        );
+        let completed = match state {
+            "sent" => Some(json!({"sent":true,"detail":"ledger-private-result-canary"})),
+            "refused" => Some(json!({"error":"ledger-private-refusal-canary"})),
+            _ => None,
+        };
+        // The pending cases expire only the accounting wait, not the runner.
+        // This exercises recovery without waiting for a real service deadline.
+        if completed.is_none() {
+            let mut sends = shared.sent_write.lock().unwrap();
+            sends.last_mut().unwrap().began =
+                tokio::time::Instant::now() - crate::services::DEADLINE;
+        }
+        if state == "asked" {
+            crate::services::keep_send_for_test(&args, None);
+        }
+        let mut completion = Some((release, running));
+        if let Some(result) = completed {
+            let (release, running) = completion.take().unwrap();
+            release.send(result).unwrap();
+            running.await;
+        }
+        put_in_flight(
+            shared,
+            Carried::own(
+                resumed,
+                "Go ahead and send it.".into(),
+                Instant::now(),
+                origin,
+            ),
+        );
+        forget_carried_context(shared);
+        match sent_with_words(shared, &[origin], resumed).await {
+            SentWith::Told(note) => assert_eq!(note, Some(expected_note), "{state}"),
+            _ => panic!("{state}: recovery did not produce its accounting note"),
+        }
+        assert_eq!(
+            sent_already(shared, resumed, crate::services::WRITE),
+            expected_guard.map(|error| json!({"error":error})),
+            "{state}"
+        );
+        assert!(
+            carried_rounds(shared, resumed).is_empty(),
+            "{state}: private tool round restored"
+        );
+        assert_eq!(
+            shared.in_flight.lock().unwrap().as_ref().unwrap().text(),
+            "Go ahead and send it."
+        );
+        if let Some((release, running)) = completion {
+            release.send(crate::tools::unavailable()).unwrap();
+            running.await;
+        }
+        drop_sent_write(shared, Some(origin));
+    }
+}
+
+/// A batch already running at admission cannot publish into the fresh context.
+#[tokio::test]
+async fn forget_rejects_an_older_batches_late_carried_round() {
+    let engine = ledger_boundary_engine();
+    let shared = &engine.shared;
+    put_in_flight(
+        shared,
+        Carried::own(120, "My question".into(), Instant::now(), 120),
+    );
+    let old_epoch = shared.send_content_epoch.load(Ordering::Acquire);
+    let old_round = vec![Message::tool("old-call-canary", "old-result-canary")];
+    forget_carried_context(shared);
+    carry_round(shared, 120, old_epoch, &old_round);
+    assert!(carried_rounds(shared, 120).is_empty());
+    let fresh_epoch = shared.send_content_epoch.load(Ordering::Acquire);
+    let fresh_round = vec![Message::tool("fresh-call", "fresh-result")];
+    carry_round(shared, 120, fresh_epoch, &fresh_round);
+    assert_eq!(carried_rounds(shared, 120).len(), 1);
+}
+/// Host-only admission timing, not device or end-to-end latency. The target is
+/// <1 ms for the synchronous boundary, reported rather than asserted. Engine,
+/// payloads, channels and ledger installation are prepared outside each timer.
+/// No active readers/writers contend for the locks in this diagnostic.
+#[tokio::test]
+#[ignore = "host timing diagnostic; run explicitly with --ignored --nocapture"]
+async fn forget_ledger_host_admission_latency_diagnostic() {
+    const EMPTY_SAMPLES: usize = 256;
+    const FULL_SAMPLES: usize = 64;
+    const ARG_BYTES: usize = 1_024;
+    const RESULT_BYTES: usize = 4_096;
+
+    fn report(label: &str, mut samples: Vec<Duration>) {
+        samples.sort_unstable();
+        let count = samples.len();
+        let median = samples[(count - 1) / 2];
+        let p95 = samples[(count * 95).div_ceil(100) - 1];
+        let max = samples[count - 1];
+        eprintln!(
+            "forget admission host {label}: n={count} median={:.3} us p95={:.3} us max={:.3} us; target <1000 us (diagnostic only)",
+            median.as_secs_f64() * 1_000_000.0,
+            p95.as_secs_f64() * 1_000_000.0,
+            max.as_secs_f64() * 1_000_000.0,
+        );
+    }
+
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let shared = &engine.shared;
+    assert!(shared.sent_write.lock().unwrap().is_empty());
+    assert!(shared.in_flight.lock().unwrap().is_none());
+    // This is the first boundary on this already-constructed engine. It does
+    // not include process startup, runtime initialization or cold device I/O.
+    let first_started = Instant::now();
+    forget_carried_context(shared);
+    let first = first_started.elapsed();
+    report("first call after engine setup, empty", vec![first]);
+
+    let mut empty = Vec::with_capacity(EMPTY_SAMPLES);
+    for _ in 0..EMPTY_SAMPLES {
+        let started = Instant::now();
+        forget_carried_context(shared);
+        empty.push(started.elapsed());
+    }
+    report("repeated empty", empty);
+
+    let entries = SENDS_KEPT * net::MOST_CALLS;
+    let argument = "a".repeat(ARG_BYTES);
+    let result = "r".repeat(RESULT_BYTES);
+    let mut full = Vec::with_capacity(FULL_SAMPLES);
+    for _ in 0..FULL_SAMPLES {
+        let epoch = shared.send_content_epoch.load(Ordering::Acquire);
+        let mut ledger = Vec::with_capacity(entries);
+        for index in 0..entries {
+            let call = call(
+                &format!("timing-call-{index}"),
+                crate::services::WRITE,
+                json!({"service":"google_drive","send_id":format!("timing-send-{index}"),"text":argument.clone()}),
+            );
+            let receipt = json!({"sent":true,"service":"google_drive","detail":result.clone()});
+            let (answered, told) = tokio::sync::watch::channel(Some(receipt));
+            ledger.push(SentWrite {
+                request: 1 + (index / net::MOST_CALLS) as u64,
+                attempt: 1 + index as u64,
+                content: Arc::new(Mutex::new(SendContent {
+                    call: Some(call),
+                    epoch,
+                    current: shared.send_content_epoch.clone(),
+                    answered,
+                })),
+                began: tokio::time::Instant::now(),
+                told,
+            });
+        }
+        // Replacing and dropping the preceding sample's ledger is untimed.
+        *shared.sent_write.lock().unwrap() = ledger;
+        let started = Instant::now();
+        forget_carried_context(shared);
+        full.push(started.elapsed());
+        // Verify the measured transition really did redact every fresh entry.
+        let ledger = shared.sent_write.lock().unwrap();
+        assert_eq!(ledger.len(), entries);
+        for sent in ledger.iter() {
+            assert!(sent.content.lock().unwrap().call.is_none());
+            assert_eq!(*sent.told.borrow(), Some(json!({"sent":true})));
+        }
+    }
+    eprintln!(
+        "forget admission host inputs: {SENDS_KEPT} requests x {} calls = {entries} receipt entries; each has {ARG_BYTES} ASCII argument bytes and {RESULT_BYTES} ASCII result bytes plus JSON/IDs; {} variable-content bytes total; no carried rounds, no lock contention; representative bounded payload, not maximum wire-response size",
+        net::MOST_CALLS,
+        entries * (ARG_BYTES + RESULT_BYTES),
+    );
+    report("saturated ledger", full);
+}
+
+/// A stale model batch remains old even when its send starts after admission.
+#[tokio::test]
+async fn forget_redacts_an_old_contexts_send_started_after_admission() {
+    let engine = ledger_boundary_engine();
+    let shared = &engine.shared;
+    let epoch = shared.send_content_epoch.load(Ordering::Acquire);
+    forget_carried_context(shared);
+    let call = ledger_boundary_call();
+    let (attempt, _) = send_attempt_in_context(shared, 130, &call, epoch);
+    sending(
+        shared,
+        (130, attempt),
+        &call,
+        Box::pin(async { json!({"sent": true, "detail": "old-context-result-canary"}) }),
+        Value::clone,
+    )
+    .await;
+    let ledger = shared.sent_write.lock().unwrap();
+    assert!(ledger[0].content.lock().unwrap().call.is_none());
+    assert_eq!(*ledger[0].told.borrow(), Some(json!({"sent": true})));
+}
