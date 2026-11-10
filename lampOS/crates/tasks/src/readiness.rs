@@ -138,7 +138,7 @@ impl Computer {
         if engine.cloud() {
             return None;
         }
-        if self.status.as_ref().is_some_and(|s| s.value == "offline") {
+        if self.offline() {
             return Some((
                 COMPUTER_OFFLINE,
                 "That computer seems to be asleep or offline; nothing was handed over.",
@@ -158,6 +158,11 @@ impl Computer {
             ));
         }
         None
+    }
+
+    /// Whether the computer is known offline.
+    pub fn offline(&self) -> bool {
+        self.status.as_ref().is_some_and(|s| s.value == "offline")
     }
 
     /// Whether `engine` wasn't found on this computer.
@@ -266,7 +271,9 @@ impl Known {
             .unwrap_or(wanted)
     }
 
-    /// The engine [`Known::chosen`] gives each machine, by machine id.
+    /// The engine [`Known::chosen`] gives each machine, by machine id: the
+    /// lamp's own (`current`) never, as it is no computer of the person's;
+    /// it is a target only with [`Known::lamp_with_hermes`].
     pub fn choices(
         &self,
         machines: &[AccountMachine],
@@ -275,6 +282,7 @@ impl Known {
     ) -> BTreeMap<String, EngineKind> {
         machines
             .iter()
+            .filter(|m| !m.current)
             .map(|m| {
                 (
                     m.machine_id.clone(),
@@ -282,6 +290,18 @@ impl Known {
                 )
             })
             .collect()
+    }
+}
+
+impl Known {
+    /// `LAMP_HERMES_ON_LAMP` (#5978): the lamp's own machine, the one
+    /// Harness marks `current`, where Hermes is known installed now (its
+    /// engines' look said `installed: true`); its id. None otherwise: not
+    /// looked at yet, Hermes not there, or the reading stale.
+    pub fn lamp_with_hermes(&self, machines: &[AccountMachine], now_ms: u64) -> Option<String> {
+        let lamp = machines.iter().find(|m| m.current)?;
+        let computer = self.computer(&lamp.machine_id, now_ms)?;
+        (computer.installed(EngineKind::Hermes) == Some(true)).then(|| lamp.machine_id.clone())
     }
 }
 
@@ -824,5 +844,34 @@ mod tests {
             probe_line(&Err("unreachable".into()), 30_001),
             "a computer's engines not read in 30001 ms (unreachable); what was known is kept"
         );
+    }
+
+    /// #5978: the lamp's own machine is the lamp only where its look said
+    /// Hermes is installed; never a choice for a computer's target.
+    #[test]
+    fn the_lamp_is_kept_only_where_hermes_is_known_installed() {
+        let lamp = AccountMachine {
+            current: true,
+            ..machine('a', Some("running"))
+        };
+        let listed = [lamp.clone(), machine('b', Some("running"))];
+        let mut known = Known::default();
+        known.listed(&listed, NOW);
+        assert_eq!(known.lamp_with_hermes(&listed, NOW), None, "not looked at");
+        known.probed(&lamp.machine_id, &[not_found("hermes")], NOW);
+        assert_eq!(known.lamp_with_hermes(&listed, NOW), None, "not there");
+        known.probed(&lamp.machine_id, &[row("hermes", Some(true), None)], NOW);
+        assert_eq!(
+            known.lamp_with_hermes(&listed, NOW),
+            Some(lamp.machine_id.clone())
+        );
+        assert_eq!(
+            known.lamp_with_hermes(&listed, NOW + STALE_AFTER_MS + 1),
+            None,
+            "stale"
+        );
+        // Only a computer's: the lamp's own machine gets no engine choice.
+        let chosen = known.choices(&listed, EngineKind::Claude, NOW);
+        assert_eq!(chosen.keys().collect::<Vec<_>>(), [&"b".repeat(32)]);
     }
 }

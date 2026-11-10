@@ -210,6 +210,14 @@ pub struct SetUpLater {
     /// computer is known offline, or its engine not found there or known not
     /// signed in ([`crate::readiness`]). Off unless set.
     pub engines: bool,
+    /// `LAMP_HERMES_ON_LAMP=on` (#5978), only with `engines`: the home
+    /// (`lampos`'s, as Harness's on the lamp) the lamp's own folder
+    /// [`LAMP_PROJECT`] is made under. The lamp's own machine is looked at
+    /// too, and kept as the target [`LAMP_TARGET`], engine Hermes, while
+    /// its look says Hermes is installed. A `prepare` goes there only when
+    /// asked for it, or when no computer of the person's is there but known
+    /// offline ([`crate::engine::Engine::lamp_on`]). `None`: off, as before.
+    pub lamp: Option<PathBuf>,
 }
 
 /// `serve --targets-from-machines` asks Harness for the machines once in
@@ -221,6 +229,11 @@ pub const MACHINES_EVERY_LOOKS: u32 = 5;
 /// #5541); one Harness still refuses for it is said with `serve
 /// --folder-missing` (#2840).
 pub const MACHINES_PROJECT: &str = "~/harnesses/lamp-tasks";
+/// `LAMP_HERMES_ON_LAMP` (#5978): the alias of the lamp's own machine as a
+/// target, with Hermes, and the folder it works in there. Never a
+/// computer's alias: a computer whose name makes `lamp` is `lamp-2`.
+pub const LAMP_TARGET: &str = "lamp";
+pub const LAMP_PROJECT: &str = "~/harnesses/lamp-tasks/lamp";
 
 /// How often `serve --set-up-later` looks at the targets and the sign-in.
 pub const SET_UP_LOOK_EVERY: Duration = Duration::from_secs(60);
@@ -1112,7 +1125,16 @@ fn owner<C: Clock>(
                             Ok(listed) => {
                                 let chosen = if engines_on {
                                     known.listed(&listed, unix_ms());
-                                    known.choices(&listed, wanted, unix_ms())
+                                    let mut chosen = known.choices(&listed, wanted, unix_ms());
+                                    // The lamp itself, with Hermes (#5978).
+                                    if let Some(home) = later.lamp.as_deref()
+                                        && let Some(lamp) =
+                                            known.lamp_with_hermes(&listed, unix_ms())
+                                    {
+                                        make_lamp_folder(home);
+                                        chosen.insert(lamp, EngineKind::Hermes);
+                                    }
+                                    chosen
                                 } else {
                                     BTreeMap::new()
                                 };
@@ -1125,11 +1147,17 @@ fn owner<C: Clock>(
                                 );
                                 if engines_on {
                                     // Each computer listed and each a
-                                    // target names, the lamp left out.
+                                    // target names, the lamp left out
+                                    // unless it may be one (#5978).
                                     let mut looked: BTreeSet<String> = listed
                                         .iter()
                                         .filter(|machine| !machine.current)
                                         .take(8)
+                                        .chain(
+                                            listed
+                                                .iter()
+                                                .filter(|machine| later.lamp.is_some() && machine.current),
+                                        )
                                         .map(|machine| machine.machine_id.clone())
                                         .collect();
                                     looked.extend(
@@ -1832,7 +1860,8 @@ fn app_sign_in_operation(
 
 /// The targets the person's machines give (`serve
 /// --targets-from-machines`): one for each machine but the lamp itself, at
-/// most 8, newest first as Harness lists them. The first is `office`, the
+/// most 8, newest first as Harness lists them (the lamp itself is kept only
+/// through [`write_targets_from_machines`]'s `chosen`, #5978). The first is `office`, the
 /// alias the voice asks for unless told another (`LAMP_TASKS_TARGET`); each
 /// other is its Harness name made into an alias (`MacBook Air` is
 /// `macbook-air`), or `computer` with none, and `-2`, `-3` … where two
@@ -1869,7 +1898,10 @@ fn label_of(label: &str) -> Option<String> {
 
 /// `chosen` gives a machine, by id, another engine than `engine`: the one
 /// that computer is known to have (`serve --engines-from-machines`, #5199,
-/// [`crate::readiness::Known::chosen`]). Empty without it.
+/// [`crate::readiness::Known::chosen`]). Empty without it. The lamp's own
+/// machine (`current`) is a target only where `chosen` gives it Hermes
+/// (`LAMP_HERMES_ON_LAMP`, #5978): [`LAMP_TARGET`] in [`LAMP_PROJECT`],
+/// with no name, and then at most 7 computers, so the file keeps its 8.
 fn from_machines(
     machines: &[AccountMachine],
     engine: EngineKind,
@@ -1877,7 +1909,17 @@ fn from_machines(
 ) -> (BTreeMap<String, Target>, BTreeMap<String, String>) {
     let mut targets = BTreeMap::new();
     let mut names = BTreeMap::new();
-    for (index, machine) in machines.iter().filter(|m| !m.current).take(8).enumerate() {
+    let lamp = machines
+        .iter()
+        .find(|m| m.current)
+        .filter(|m| chosen.get(&m.machine_id) == Some(&EngineKind::Hermes));
+    let most = if lamp.is_some() { 7 } else { 8 };
+    for (index, machine) in machines
+        .iter()
+        .filter(|m| !m.current)
+        .take(most)
+        .enumerate()
+    {
         let base = if index == 0 {
             "office".to_owned()
         } else {
@@ -1885,7 +1927,7 @@ fn from_machines(
         };
         let mut alias = base.clone();
         let mut next = 2;
-        while targets.contains_key(&alias) {
+        while targets.contains_key(&alias) || (lamp.is_some() && alias == LAMP_TARGET) {
             alias = format!("{base}-{next}");
             next += 1;
         }
@@ -1901,7 +1943,35 @@ fn from_machines(
             },
         );
     }
+    if let Some(lamp) = lamp {
+        targets.insert(
+            LAMP_TARGET.to_owned(),
+            Target {
+                machine_id: lamp.machine_id.clone(),
+                project: LAMP_PROJECT.into(),
+                engine: EngineKind::Hermes,
+            },
+        );
+    }
     (targets, names)
+}
+
+/// The lamp's own work folder, [`LAMP_PROJECT`] under `home`, `lampos`'s,
+/// as Harness's on the lamp (#5978): made here, 0700, since Harness makes
+/// only a `~/harnesses/<name>` folder. A failure is said; the hand-over
+/// then says the folder is missing.
+fn make_lamp_folder(home: &Path) {
+    let folder = home.join(LAMP_PROJECT.trim_start_matches("~/"));
+    if folder.is_dir() {
+        return;
+    }
+    if let Err(error) = fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&folder)
+    {
+        eprintln!("tasks: the lamp's own work folder not made: {error}");
+    }
 }
 
 /// The longest name a computer is told by (#1676).
@@ -2958,6 +3028,9 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     )
     .map_err(io::Error::other)?;
     engine.close_told(config.close_told);
+    engine.lamp_on(config.set_up_later.as_ref().is_some_and(|later| {
+        later.lamp.is_some() && later.engines && later.from_machines.is_some()
+    }));
     if let Some(version) = config.targets_newer {
         engine.targets_newer(version);
     }
@@ -4183,6 +4256,67 @@ mod tests {
         );
         let long = alias_of(&"x".repeat(80));
         assert_eq!(long.len(), 32);
+    }
+
+    /// #5978: the lamp's own machine is a target only where `chosen` gives
+    /// it Hermes: `lamp`, Hermes only, in its own folder, with no name; a
+    /// computer named so is `lamp-2`, and at most 7 computers keep the
+    /// file's 8. Given another engine, or none, it is left out as before.
+    #[test]
+    fn the_lamp_is_kept_only_with_hermes_chosen_for_it() {
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+            machine('c', "Lamp", false),
+        ];
+        let lamp = "a".repeat(32);
+        for engine in [EngineKind::Claude, EngineKind::Codex] {
+            let chosen = BTreeMap::from([(lamp.clone(), engine)]);
+            let (targets, _) = from_machines(&listed, EngineKind::Claude, &chosen);
+            assert!(
+                !targets.values().any(|t| t.machine_id == lamp),
+                "{engine:?}"
+            );
+            assert!(
+                targets.contains_key("lamp"),
+                "a computer named Lamp, as before"
+            );
+        }
+        let chosen = BTreeMap::from([(lamp.clone(), EngineKind::Hermes)]);
+        let (targets, names) = from_machines(&listed, EngineKind::Claude, &chosen);
+        assert_eq!(
+            targets.keys().collect::<Vec<_>>(),
+            ["lamp", "lamp-2", "office"]
+        );
+        assert_eq!(
+            targets["lamp"],
+            Target {
+                machine_id: lamp.clone(),
+                project: LAMP_PROJECT.into(),
+                engine: EngineKind::Hermes,
+            }
+        );
+        assert!(targets["lamp"].validate().is_ok());
+        assert_eq!(targets["lamp-2"].machine_id, "c".repeat(32));
+        assert_eq!(names.get("lamp"), None);
+        let mut many = vec![machine('a', "lamp", true)];
+        many.extend("bcdefghij".chars().map(|id| machine(id, "pc", false)));
+        let (eight, _) = from_machines(&many, EngineKind::Claude, &chosen);
+        assert_eq!(eight.len(), 8);
+        assert!(eight.contains_key("lamp"));
+        // Only the lamp: its target is written, not removed.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("targets.json");
+        let only = [machine('a', "lamp", true)];
+        assert!(
+            write_targets_from_machines(&path, &only, EngineKind::Claude, &chosen)
+                .unwrap()
+                .changed
+        );
+        assert_eq!(
+            read_targets(&path).unwrap().keys().collect::<Vec<_>>(),
+            ["lamp"]
+        );
     }
 
     /// #1676: the part writes the targets file only where it is its own: none
