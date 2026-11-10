@@ -91,3 +91,38 @@ shared target directory. Follow-up evidence commits change only these
 verification files; the runtime tested is the hash above. Full ARM and
 Linux CI qualification follows publication; no local full-Voice pass is
 claimed for this carry.
+
+## Selector regression found by ARM CI
+
+ARM run [42757338768](https://github.com/autonomous-ai/lampOS/actions/runs/42757338768)
+failed: 12,931 passed, one failed, 113 skipped, with the run stopped before
+all tests completed. The failed test was
+`replaced_warm_listeners_hear_current_words_and_current_music_identity`:
+“Now play the second recording.” was refused by the immediate-object
+classifier. The [raw failure excerpt](arm-42757338768-failure.txt) is retained;
+this run is not a full green ARM gate.
+
+The follow-up is on base `75da83b34`, rebased head `8719c0699`, with the
+selector repair still uncommitted when these local checks ran. The grammar
+accepts one bounded selector (`first`, `second`, `next`, `previous`, `last`,
+`another`, `different`) before the existing optional mood adjectives and
+required audio noun. Actual fixtures also use “Play a different recording.”
+and “Play another recording.” The warm fixture was not changed. Seven
+selector positives are covered by classifier tests and direct/wrapped Engine
+calls; unrelated-object negatives remain refused.
+
+- The same 46 classifier cases ran against extracted exact production
+  functions before and after: [seven mismatches before](selector-before.txt),
+  [zero after](selector-after.txt). These standalone Rust probes exercise
+  classification, not Engine behavior.
+- `cargo test -q -p lamp-voice --lib music -- --test-threads=1 --nocapture`:
+  [33 passed](selector-music.txt), 0.70 s.
+- `cargo test -q -p lamp-voice --lib requested_audio -- --test-threads=1 --nocapture`:
+  [66 passed, one ignored](selector-requested.txt), 7.51 s.
+- Formatting and `cargo clippy -q -p lamp-voice --all-targets -- -D warnings`
+  passed; the parent observed the completed gate's exit status 0. Both checks
+  produced empty output logs.
+
+These focused local results do not replace the failed ARM run or establish a
+new full-suite pass. No device or acoustic latency verification was performed
+for this selector follow-up.
