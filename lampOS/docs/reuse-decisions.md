@@ -1,5 +1,25 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Give office Peek only the projected Turns source (2026-11-09)
+
+V1's monitor (`system/web/src/pages/monitor/index.tsx`) combines live SSE,
+polling, configuration and actuator controls behind its existing application
+access. Keep the useful chronological Turns view, but do not carry its shared
+account or controls into an office diagnostic reader. Reuse Peek's existing
+Axum GET/token/Host checks, single-flight blocking Turns reader and one-second
+cache, plus Voice's landed producer-side shared-metadata projection and
+Records' reader-group policy. No new parser or bus gateway is needed.
+
+The explicit `sessions-only` mode constructs no bus, event watcher, unit scan
+or journal reader. Other panels say unavailable; a producer-side metadata-only
+bus remains a separately owned future contract. Preserve explicit `on` for
+the existing full diagnostic mode and off for every other value, so the older
+exact-on binary refuses the new mode safely. A separate office unit uses a
+dedicated account and only the session-reader group. No product unit or
+permission is widened by this patch. The target is a visible ordinary-file
+Turns update within two seconds; host controls and authorized lamp evidence
+are reported separately in [Peek](peek.md).
+
 ## Bind signed source to saved ordinary decisions without another executor (2026-10-28)
 
 Reuse the full existing Ed25519 manifest verifier at its compiled capability,

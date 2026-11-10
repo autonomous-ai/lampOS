@@ -22,6 +22,19 @@ own folder (`deploy/lamp-4ace/` is the worked example) is made from them:
    `systemctl enable lampos.target` for the lamp to start at power-up. Copied
    but not enabled, nothing starts.
 
+`lamp-peek.service` is an **office-only optional** projected-Turns reader
+(#5262), never a product unit. Do not include it when copying ordinary lamp
+parts. An authorized office operator provisions the non-login `lamp-peek`
+account/group and sole extra `lamp-session-readers` group, prepares Voice and
+Records' matching projected-session grant, then fills `@UNIT_ID@` and
+`@PEEK_SHA256@` and explicitly installs/enables it. It selects `sessions-only`;
+no raw bus, unit scan or journal source is opened. The legacy full diagnostic
+unit remains beside `crates/peek/` and must not replace this restricted unit.
+[Peek](../../docs/peek.md#dedicated-projected-turns-account-5262) describes
+historical-file checks, group provisioning, token rules and the pending lamp
+acceptance. It is outside `lampos.target`; no account or file permission is
+created merely by adding this template.
+
 `lamp-surround.service` is not part of `lampos.target`: it is what asks for
 an update, and stopping the lamp must not stop it. The keeper's own unit
 comes with `crates/keeper`, and is not part of the target for the same

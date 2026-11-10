@@ -7,7 +7,7 @@
 //! names in `Host`, so that no other page in the browser can reach it
 //! under a name of its own (DNS rebinding; the reviewer on #2150, P3 6).
 use crate::{
-    page,
+    Mode, page,
     turns::{ReadFailure, Snapshot, Turns},
     units::{self, UnitRow},
     view,
@@ -59,17 +59,41 @@ struct Served {
     turns_read: Arc<tokio::sync::Mutex<Option<(Instant, Snapshot)>>>,
 }
 
-/// What the views read.
-pub struct Peek {
+/// Sources available only in full mode. Session-only state cannot hold them.
+pub struct FullSources {
     pub bus: Bus,
     pub seen: Arc<Mutex<Seen>>,
-    /// Asked of every request when there is one.
-    pub token: Option<String>,
-    /// Where the voice keeps its sessions.
-    pub sessions: PathBuf,
-    /// The units, as `/status` lists them: systemd's on the lamp
-    /// ([`units::read`]), a stand-in in the tests.
     pub units: Arc<dyn Fn() -> Vec<UnitRow> + Send + Sync>,
+}
+
+pub enum Sources {
+    Full(FullSources),
+    SessionsOnly,
+}
+
+impl Sources {
+    /// Factories are called only in full mode, before the runtime starts.
+    pub fn for_mode(
+        mode: Mode,
+        bus: impl FnOnce() -> std::io::Result<Bus>,
+        units: impl FnOnce() -> Arc<dyn Fn() -> Vec<UnitRow> + Send + Sync>,
+    ) -> std::io::Result<Self> {
+        match mode {
+            Mode::SessionsOnly => Ok(Self::SessionsOnly),
+            Mode::Full => Ok(Self::Full(FullSources {
+                bus: bus()?,
+                seen: Arc::default(),
+                units: units(),
+            })),
+        }
+    }
+}
+
+/// What the views read. Session metadata is the only common source.
+pub struct Peek {
+    pub sources: Sources,
+    pub token: Option<String>,
+    pub sessions: PathBuf,
 }
 
 pub fn router(peek: Arc<Peek>) -> Router {
@@ -244,12 +268,18 @@ fn form_decoded(value: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-async fn index() -> Html<String> {
-    Html(page::main_page())
+async fn index(State(served): State<Arc<Served>>) -> Html<String> {
+    Html(match served.peek.sources {
+        Sources::SessionsOnly => page::sessions_main_page(),
+        Sources::Full(_) => page::main_page(),
+    })
 }
 
-async fn cam() -> Html<String> {
-    Html(view::cam_page())
+async fn cam(State(served): State<Arc<Served>>) -> Html<String> {
+    Html(match served.peek.sources {
+        Sources::SessionsOnly => page::unavailable("Camera"),
+        Sources::Full(_) => view::cam_page(),
+    })
 }
 
 async fn cam_svg(State(served): State<Arc<Served>>) -> Response {
@@ -262,6 +292,9 @@ async fn cam_svg(State(served): State<Arc<Served>>) -> Response {
 
 async fn bus(State(served): State<Arc<Served>>, request: Request) -> Html<String> {
     let peek = &served.peek;
+    let Sources::Full(sources) = &peek.sources else {
+        return Html(page::unavailable("Bus"));
+    };
     let filter = request.uri().query().and_then(|query| {
         query
             .split('&')
@@ -270,12 +303,12 @@ async fn bus(State(served): State<Arc<Served>>, request: Request) -> Html<String
     });
     let latest: Vec<_> = view::LATEST
         .iter()
-        .map(|topic| (*topic, peek.bus.latest(topic).ok().flatten()))
+        .map(|topic| (*topic, sources.bus.latest(topic).ok().flatten()))
         .collect();
     let now_unix_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
-    let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
+    let seen = sources.seen.lock().unwrap_or_else(PoisonError::into_inner);
     Html(view::bus_page(
         &latest,
         &seen,
@@ -285,6 +318,9 @@ async fn bus(State(served): State<Arc<Served>>, request: Request) -> Html<String
 }
 
 async fn status(State(served): State<Arc<Served>>) -> Html<String> {
+    if matches!(served.peek.sources, Sources::SessionsOnly) {
+        return Html(page::unavailable("Units and journal"));
+    }
     let (at, (rows, endpoint)) = status_now(&served).await;
     Html(view::status_page(&rows, endpoint.as_ref(), at.elapsed()))
 }
@@ -297,11 +333,14 @@ pub const SECTIONS_EVERY: u32 = 4;
 /// The units as last read, read again once they are [`STATUS_KEPT`] old:
 /// by one asker, while the others wait for what it reads.
 async fn status_now(served: &Arc<Served>) -> (Instant, Status) {
+    let Sources::Full(sources) = &served.peek.sources else {
+        return (Instant::now(), (Vec::new(), None));
+    };
     let mut status = served.status.lock().await;
     if let Some(kept) = status.as_ref().filter(|(at, _)| at.elapsed() < STATUS_KEPT) {
         return kept.clone();
     }
-    let (units, sessions) = (Arc::clone(&served.peek.units), served.peek.sessions.clone());
+    let (units, sessions) = (Arc::clone(&sources.units), served.peek.sessions.clone());
     let read = tokio::task::spawn_blocking(move || (units(), units::endpoint_worker(&sessions)))
         .await
         .unwrap_or_default();
@@ -347,11 +386,14 @@ async fn turns_now(served: &Arc<Served>) -> Snapshot {
 
 /// The camera's frame now, as `/cam.svg` draws it.
 fn frame(peek: &Peek) -> String {
+    let Sources::Full(sources) = &peek.sources else {
+        return view::cam_svg(Err(page::SESSIONS_UNAVAILABLE.to_owned()), None, None, None);
+    };
     let camera = {
-        let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
+        let seen = sources.seen.lock().unwrap_or_else(PoisonError::into_inner);
         view::camera(seen.camera.as_ref(), Instant::now())
     };
-    let read = |topic| peek.bus.latest(topic).ok().flatten();
+    let read = |topic| sources.bus.latest(topic).ok().flatten();
     match camera {
         Ok(()) => view::cam_svg(
             Ok(()),
@@ -368,6 +410,22 @@ fn frame(peek: &Peek) -> String {
 /// [`SECTIONS_EVERY`]th the other sections.
 async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
     let peek = &served.peek;
+    let Sources::Full(sources) = &peek.sources else {
+        if !count.is_multiple_of(SECTIONS_EVERY) {
+            return Vec::new();
+        }
+        let turns = turns_now(served).await;
+        return page::SECTIONS
+            .into_iter()
+            .map(|(id, name)| {
+                Event::default().event(id).data(if id == "turns" {
+                    page::turns(&turns)
+                } else {
+                    page::unavailable(name)
+                })
+            })
+            .collect();
+    };
     let mut events = vec![
         Event::default()
             .event("camera")
@@ -378,9 +436,9 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
     }
     let turns = turns_now(served).await;
     let (_, (units, _)) = status_now(served).await;
-    let read = |topic| peek.bus.latest(topic).ok().flatten();
+    let read = |topic| sources.bus.latest(topic).ok().flatten();
     let camera = {
-        let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
+        let seen = sources.seen.lock().unwrap_or_else(PoisonError::into_inner);
         view::camera(seen.camera.as_ref(), Instant::now())
     };
     // With the camera not open, nothing of what it saw is read.
@@ -397,7 +455,7 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         read(lamp_msgs::Health::TOPIC),
         read(lamp_msgs::JointState::TOPIC),
     );
-    let report = peek
+    let report = sources
         .seen
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
@@ -463,11 +521,13 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         let served = Arc::new(Served {
             peek: Arc::new(Peek {
-                bus: Bus::new(&root).unwrap(),
-                seen: Arc::default(),
+                sources: Sources::Full(FullSources {
+                    bus: Bus::new(&root).unwrap(),
+                    seen: Arc::default(),
+                    units: Arc::new(Vec::new),
+                }),
                 token: None,
                 sessions: root.join("sessions"),
-                units: Arc::new(Vec::new),
             }),
             status: tokio::sync::Mutex::new(None),
             turns: Arc::default(),

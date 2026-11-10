@@ -1,13 +1,13 @@
 //! `lamp-peek`: the read-only page on an office lamp (#2141, docs/peek.md).
-//! Off unless `LAMP_PEEK=on`. Answers on `LAMP_PEEK_LISTEN` (127.0.0.1:8077
+//! Off unless `LAMP_PEEK=on` or `LAMP_PEEK=sessions-only`. Answers on `LAMP_PEEK_LISTEN` (127.0.0.1:8077
 //! unless set); anywhere but this machine only with a token, from
 //! `$CREDENTIALS_DIRECTORY/peek-token` (`LoadCredential=peek-token:...`).
 use lamp_bus::Bus;
 use lamp_peek::{
-    DEFAULT_LISTEN, DEFAULT_SESSIONS, LISTEN, SESSIONS, SWITCH, TOKEN_CREDENTIAL, check_listen,
-    serve::{self, Peek},
-    switched_on, units,
-    watch::{self, Seen},
+    DEFAULT_LISTEN, DEFAULT_SESSIONS, LISTEN, Mode, SESSIONS, SWITCH, TOKEN_CREDENTIAL,
+    check_listen,
+    serve::{self, Peek, Sources},
+    units, watch,
 };
 use std::{
     env,
@@ -15,7 +15,7 @@ use std::{
     path::PathBuf,
     process::ExitCode,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicBool, Ordering},
     },
     thread,
@@ -30,10 +30,10 @@ fn token() -> Option<String> {
 }
 
 fn main() -> ExitCode {
-    if !switched_on(env::var(SWITCH).ok().as_deref()) {
-        eprintln!("lamp-peek: off ({SWITCH} is not on)");
+    let Some(mode) = Mode::from_switch(env::var(SWITCH).ok().as_deref()) else {
+        eprintln!("lamp-peek: off ({SWITCH} is neither on nor sessions-only)");
         return ExitCode::SUCCESS;
-    }
+    };
     let listen = env::var(LISTEN).unwrap_or_else(|_| DEFAULT_LISTEN.to_owned());
     let Ok(listen) = listen.parse::<SocketAddr>() else {
         eprintln!("lamp-peek: {LISTEN}={listen} is not an address and port");
@@ -44,7 +44,7 @@ fn main() -> ExitCode {
         eprintln!("lamp-peek: {why}");
         return ExitCode::from(2);
     }
-    match run(listen, token) {
+    match run(mode, listen, token) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("lamp-peek: {error}");
@@ -53,23 +53,26 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(listen: SocketAddr, token: Option<String>) -> std::io::Result<()> {
-    let bus = Bus::from_environment()?;
-    let seen = Arc::new(Mutex::new(Seen::default()));
+fn run(mode: Mode, listen: SocketAddr, token: Option<String>) -> std::io::Result<()> {
+    let sources = Sources::for_mode(mode, Bus::from_environment, || Arc::new(units::read))?;
     let stop = Arc::new(AtomicBool::new(false));
-    let watching = thread::Builder::new()
-        .name("lamp-peek-watch".into())
-        .spawn({
-            let (bus, seen, stop) = (bus.clone(), Arc::clone(&seen), Arc::clone(&stop));
-            move || watch::watch(&bus, &seen, &stop)
-        })?;
+    let watching = match &sources {
+        Sources::SessionsOnly => None,
+        Sources::Full(full) => Some(
+            thread::Builder::new()
+                .name("lamp-peek-watch".into())
+                .spawn({
+                    let (bus, seen, stop) =
+                        (full.bus.clone(), Arc::clone(&full.seen), Arc::clone(&stop));
+                    move || watch::watch(&bus, &seen, &stop)
+                })?,
+        ),
+    };
     let peek = Arc::new(Peek {
-        bus,
-        seen,
+        sources,
         token,
         sessions: env::var_os(SESSIONS)
             .map_or_else(|| PathBuf::from(DEFAULT_SESSIONS), PathBuf::from),
-        units: Arc::new(units::read),
     });
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -90,6 +93,6 @@ fn run(listen: SocketAddr, token: Option<String>) -> std::io::Result<()> {
             .await
     });
     stop.store(true, Ordering::Relaxed);
-    let watched = watching.join().unwrap_or(Ok(()));
+    let watched = watching.map_or(Ok(()), |watching| watching.join().unwrap_or(Ok(())));
     served.and(watched)
 }

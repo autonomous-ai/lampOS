@@ -27,7 +27,7 @@ pub mod units;
 pub mod view;
 pub mod watch;
 
-/// The switch: the page runs only when this is `on`.
+/// The switch: `on` enables all views; `sessions-only` reads turn metadata only.
 pub const SWITCH: &str = "LAMP_PEEK";
 /// Where it answers, as `address:port`.
 pub const LISTEN: &str = "LAMP_PEEK_LISTEN";
@@ -42,9 +42,25 @@ pub const LEAST_TOKEN_CHARS: usize = 16;
 pub const SESSIONS: &str = "LAMP_PEEK_SESSIONS";
 pub const DEFAULT_SESSIONS: &str = "/var/lib/lampOS/voice/sessions";
 
-/// Whether the switch is on: `on` and nothing else.
+/// Explicit source selection. Unknown values remain off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    Full,
+    SessionsOnly,
+}
+
+impl Mode {
+    pub fn from_switch(value: Option<&str>) -> Option<Self> {
+        match value {
+            Some("on") => Some(Self::Full),
+            Some("sessions-only") => Some(Self::SessionsOnly),
+            _ => None,
+        }
+    }
+}
+
 pub fn switched_on(value: Option<&str>) -> bool {
-    value == Some("on")
+    Mode::from_switch(value).is_some()
 }
 
 /// Whether the page may answer on `listen`: this machine always, anywhere
@@ -80,8 +96,14 @@ mod tests {
     }
 
     #[test]
-    fn only_on_switches_it_on() {
+    fn only_explicit_modes_switch_it_on() {
+        assert_eq!(Mode::from_switch(Some("on")), Some(Mode::Full));
+        assert_eq!(
+            Mode::from_switch(Some("sessions-only")),
+            Some(Mode::SessionsOnly)
+        );
         assert!(switched_on(Some("on")));
+        assert!(switched_on(Some("sessions-only")));
         for value in [None, Some(""), Some("1"), Some("ON"), Some("off")] {
             assert!(!switched_on(value), "{value:?}");
         }
