@@ -880,6 +880,36 @@ fn forget_this_boot(folder: &Path) {
     }
 }
 
+/// What the lamp says as a reset a person asked for begins (#5929, V1's
+/// "Factory reset starting"), in the owner's language from the voice's
+/// speech cache.
+pub use lamp_msgs::RESET_STARTING;
+
+/// The longest a reset waits for [`RESET_STARTING`] to be played whole: a
+/// cached line plays in under 2 s; a voice that is not there, refuses (the
+/// privacy switch, a pause) or has not said it by then never holds the reset.
+pub const SAY_WITHIN: std::time::Duration = std::time::Duration::from_secs(6);
+
+/// The reset a person asked for (`reset-now`): [`RESET_STARTING`] said
+/// first, through `say` within [`SAY_WITHIN`], while every part still runs
+/// and before anything of the reset is done, then [`reset`]. A reset already
+/// journalled (carried on after a power cut) says nothing. Said or not, the
+/// reset goes on; `log` says which.
+pub fn said_then_reset(
+    plan: &Plan,
+    effects: &mut impl Effects,
+    say: impl FnOnce(&str, std::time::Duration) -> Result<(), String>,
+    mut log: impl FnMut(&str),
+) -> io::Result<Vec<Step>> {
+    if !plan.journal.exists() {
+        match say(RESET_STARTING, SAY_WITHIN) {
+            Ok(()) => log(&format!("said: {RESET_STARTING}")),
+            Err(why) => log(&format!("not said ({why}); resetting all the same")),
+        }
+    }
+    reset(plan, effects)
+}
+
 /// Begin a reset: journal, remove the marker, stop the lamp, wipe, then start
 /// setup in place ([`stop_and_wait_keeping`]), or reboot where it can't.
 /// If the stop fails, reboot at once without wiping: setup finishes the wipe

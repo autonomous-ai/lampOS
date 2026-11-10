@@ -753,7 +753,8 @@ rendered: …`), and the asker says the words another way. Its samples are
 played as a skill's sound is, with the same gates. At start the voice
 renders the cache's fixed lines (`tts_cache::WARM`), the shutdown's
 `lamp_msgs::GOING_TO_SLEEP` first, then a hand's hold's sleep line
-`lamp_msgs::SLEEP_LINE` (#3748, `LAMP_SLEEP_LINE`, controls.md), on a
+`lamp_msgs::SLEEP_LINE` (#3748, `LAMP_SLEEP_LINE`, controls.md), then the
+factory reset's `lamp_msgs::RESET_STARTING` (#5929, setup.md), on a
 thread of its own, tried again until kept (after a minute, then twice as
 long each time, at most hourly; a line that renders empty or past 20 s is
 never asked for again in that run), so the first
