@@ -1,0 +1,44 @@
+
+running 7 tests
+lamp-skills: the skills a person turned off kept in /tmp/tp2OxURk/state: []
+lamp-skills: skills from /tmp/tp2OxURk/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 700 ms later; cut: the line said again did not finish in time; the line was cut (the voice went from speaking to listening): nothing after it is made
+.lamp-skills: the skills a person turned off kept in /tmp/tpdVONPu/state: []
+lamp-skills: skills from /tmp/tpdVONPu/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 692 ms later; cut: the line said again never reached resting; the line was cut (the voice went from speaking to listening): nothing after it is made
+.lamp-skills: the skills a person turned off kept in /tmp/tpD07AQM/state: []
+lamp-skills: skills from /tmp/tpD07AQM/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 701 ms later; cut, and the voice's state is not known; the line was cut (the voice went from speaking to listening): nothing after it is made
+.lamp-skills: the skills a person turned off kept in /tmp/tpW34O5g/state: []
+lamp-skills: skills from /tmp/tpW34O5g/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 701 ms later; cut, and the voice's state is not known; the line was cut (the voice went from speaking to listening): nothing after it is made
+.lamp-skills: the skills a person turned off kept in /tmp/tpGMHIkl/state: []
+lamp-skills: skills from /tmp/tpGMHIkl/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 714 ms later; cut, and voice/heard can't be read; the line was cut (the voice went from speaking to listening): nothing after it is made
+.lamp-skills: the skills a person turned off kept in /tmp/tpziFucy/state: []
+lamp-skills: skills from /tmp/tpziFucy/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 700 ms later; cut, and voice/heard can't be read; the line was cut (the voice went from speaking to listening): nothing after it is made
+.lamp-skills: the skills a person turned off kept in /tmp/tpUG3f5l/state: []
+lamp-skills: skills from /tmp/tpUG3f5l/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 699 ms later; cut, and the voice's state is not known; the line was cut (the voice went from speaking to listening): nothing after it is made
+resumed cancellation first: 18020 us
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 702 ms later; cut, and the voice's state is not known; the line was cut (the voice went from speaking to listening): nothing after it is made
+resumed cancellation repeated: 10475 us
+.
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 423 filtered out; finished in 10.89s
+
