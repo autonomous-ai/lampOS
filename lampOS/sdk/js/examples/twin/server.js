@@ -6,7 +6,7 @@
 //   node examples/twin/server.js --fake     # no lamp: a simulated body
 //   open the URL it prints: http://localhost:8737/?t=TOKEN
 //
-// Options: --port N (8737), --glb PATH (the repository's rigged CAD,
+// Options: --port N (8737), --ring-file PATH (see below), --glb PATH (the repository's rigged CAD,
 // robots/lamp/hardware/cad/glb/lamp.glb). A slider is a joint's degrees from
 // its home, as `body.state` and `get('body')` count them and `joints` takes
 // them; today the lamp takes `yaw` and `pitch`, and refuses `roll`,
@@ -45,7 +45,22 @@ const tell = (message) => {
   for (const page of pages) page.send(text);
 };
 let last = null;
-await lamp.on('body.state', (state) => {
+// `--ring-file PATH`: the virtual desktop lamp's ring pixels (lamp-sim's DIR/ring.json, 32 `#rrggbb`),
+// put in the light's `shows.pixels` until a lamp says them itself: the twin then draws the ring pixel
+// by pixel. It reads a file beside the lamp, not the lamp's door; it goes with the field it stands in for.
+const ringFile = options['ring-file'];
+const withRing = (state) => {
+  if (!ringFile) return state;
+  try {
+    const { pixels } = JSON.parse(readFileSync(ringFile, 'utf8'));
+    if (Array.isArray(pixels) && !state.lamp?.light?.shows?.pixels) {
+      return { ...state, lamp: { ...state.lamp, light: { ...state.lamp?.light, shows: { ...state.lamp?.light?.shows, pixels } } } };
+    }
+  } catch { /* no ring file yet, or half written: the one colour shows */ }
+  return state;
+};
+await lamp.on('body.state', (raw) => {
+  const state = withRing(raw);
   last = state;
   tell({ type: 'state', state });
 });
