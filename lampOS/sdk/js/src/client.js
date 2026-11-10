@@ -554,7 +554,7 @@ export class Lamp {
         // Said, not swallowed: a handler that throws (a refused `light` inside `person.arrived`, say) must not vanish
         // silently. Listen for 'handlerError' on `lamp.ws` to take it over.
         if (this.ws.listenerCount('handlerError') > 0) this.ws.emit('handlerError', error);
-        else console.error(`lampos: your handler for ${frame.ev} threw: ${error?.message ?? error}`);
+        else console.error(`lampos: your handler for ${frame.ev} threw: ${error?.stack ?? error}`);
       });
     }
   }
