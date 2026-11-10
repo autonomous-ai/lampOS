@@ -329,7 +329,14 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                 );
                 return Ok(true);
             }
-            let steps = reset::reset(&plan, &mut System)?;
+            // The line first, while the voice still runs (#5929).
+            let socket = lamp_setup::wifi_change::SayService::product().socket;
+            let steps = reset::said_then_reset(
+                &plan,
+                &mut System,
+                |line, within| lamp_setup::shutdown::say_through(&socket, line, within),
+                |line| eprintln!("lamp-setup: reset: {line}"),
+            )?;
             println!("{}", serde_json::json!({"enabled": true, "steps": steps}));
             Ok(true)
         }

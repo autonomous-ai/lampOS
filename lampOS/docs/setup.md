@@ -332,9 +332,18 @@ only logs a valid reset and `resume-reset` only says whether one is unfinished.
 paths; the name and Wi-Fi entries are where setup writes them, and the voice's
 key is not in it.
 
-V1 says "Factory reset starting" before it reboots; V2 does not yet speak: the
-voice is among the parts stopped. What the person sees is the lamp folding and
-going dark, then the hotspot coming back with the setup light (below). Where `resume-reset` and
+While the reset button is held, the voice's ring worker shows the hold
+counting (#5929, ring-choreography.md, "The reset's red"): nothing under 2 s,
+a soft red blinking from 2 s, steady red from 5 s. Let go before 5 s, the red
+goes and nothing is said or wiped. Let go after, `reset-now` first says
+`lamp_msgs::RESET_STARTING`, "Factory reset starting.", in the owner's
+language from the voice's speech cache (so with no network too), through the
+say service as the shutdown's last words (`reset::said_then_reset`,
+`shutdown::say_through`), waited for at most `reset::SAY_WITHIN` (6 s); only
+then the journal, the marker, the stop and the wipe. A line not said (no
+voice, the privacy switch, a pause, not in time) is journalled and the reset
+goes on; a reset carried on from its journal says nothing. Then the lamp
+folds and goes dark, and the hotspot comes back with the setup light (below). Where `resume-reset` and
 `watch-reset` run in the boot order, and with what rights, waits on the
 keeper's owner (the fifth builder, asked on #702).
 

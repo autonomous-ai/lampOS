@@ -133,6 +133,12 @@ pub mod consent;
 /// The ring's unplug light is soft green.
 pub const GOING_TO_SLEEP: &str = "Going to sleep now. Unplug me when my light turns green.";
 
+/// The factory reset's line (#5929, V1's "Factory reset starting"): said by
+/// `lamp-setup reset-now` when the reset button is let go after its 5 s,
+/// before the reset stops the voice, played from the voice's speech cache,
+/// which is keyed by these exact words.
+pub const RESET_STARTING: &str = "Factory reset starting.";
+
 /// The sleep line (#3748, `docs/controls.md`): said by a hand's hold on the
 /// head with `LAMP_SLEEP_LINE=on`, played from the voice's speech cache
 /// (rendered at start in the product voice), and by the `go_to_sleep`
