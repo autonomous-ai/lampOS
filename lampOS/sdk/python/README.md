@@ -56,7 +56,7 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
 example runs this way: `tour.py` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
-`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, `camera.py` (a pairing with `camera`: saves `snapshot.jpg` and a stream's `last-frame.jpg`), `curious.py` (a move of your own from poses), and `push_skill.py ../examples/hello-skill` (a pairing with `skills` and `speak`).
+`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, `camera.py` (a pairing with `camera`: saves `snapshot.jpg` and a stream's `last-frame.jpg`), `curious.py` (a move of your own from poses), `touch.py` (a tap lights the ring, a pet is answered with a feeling; a tap reaches a program from the next build), and `push_skill.py ../examples/hello-skill` (a pairing with `skills` and `speak`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light, `say` and `sound`
