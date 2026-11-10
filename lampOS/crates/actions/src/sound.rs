@@ -95,10 +95,39 @@ impl<M: Mixer> Volume<M> {
     }
 
     /// At a start, the level kept from before, set back: never past the
-    /// ceiling and never silent. Read back, as any write.
+    /// ceiling and never silent. Read back, as any write, and the read-back
+    /// itself must be in 1..=ceiling: a control that rounds a point down to
+    /// silence, or up past the ceiling, is not a level set back.
     pub fn restore(&mut self, kept: u8) -> Result<u8, String> {
-        let level = kept.clamp(1, self.ceiling());
-        self.write(level)
+        let ceiling = self.ceiling();
+        let now = self.write(kept.clamp(1, ceiling))?;
+        if (1..=ceiling).contains(&now) {
+            Ok(now)
+        } else {
+            self.record_observation(None);
+            Err(UNCONFIRMED.to_owned())
+        }
+    }
+
+    /// [`Volume::restore`], tried again `every` while it fails, a new try
+    /// begun only before `start_by` has passed: so the whole wait, mixer
+    /// calls included, is at most `start_by` plus one try (a set and a read,
+    /// each at most [`AMIXER_WAIT`]).
+    pub fn restore_within(
+        &mut self,
+        kept: u8,
+        start_by: Duration,
+        every: Duration,
+    ) -> Result<u8, String> {
+        let started = Instant::now();
+        loop {
+            let restored = self.restore(kept);
+            let elapsed = started.elapsed();
+            if restored.is_ok() || elapsed >= start_by {
+                return restored;
+            }
+            std::thread::sleep(every.min(start_by - elapsed));
+        }
     }
 
     /// The volume as last read from the mixer, with no new read: what
@@ -369,7 +398,7 @@ pub struct Amixer {
     pub control: String,
 }
 
-const AMIXER_WAIT: Duration = Duration::from_millis(800);
+pub const AMIXER_WAIT: Duration = Duration::from_millis(800);
 
 impl Amixer {
     fn run(&self, arguments: &[&str]) -> io::Result<String> {
@@ -488,6 +517,70 @@ pub(crate) mod tests {
         let mut quiet = at(100, 100).keeping(Box::new(told.clone()));
         assert!(matches!(quiet.up(), Outcome::Already(_)));
         assert_eq!(kept().len(), 4);
+    }
+
+    /// Rounds each write a point the way it is told, as a real control may.
+    struct Rounding {
+        level: u8,
+        by: i8,
+    }
+    impl Mixer for Rounding {
+        fn get(&mut self) -> io::Result<u8> {
+            Ok(self.level)
+        }
+        fn set(&mut self, level: u8) -> io::Result<()> {
+            self.level = (i16::from(level) + i16::from(self.by)).clamp(0, 100) as u8;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_restore_rounded_to_silence_or_past_the_ceiling_is_not_set_back() {
+        let mut down = Volume::new(Rounding { level: 100, by: -1 }, 100);
+        assert!(down.restore(1).is_err(), "rounded to silence");
+        assert_eq!(down.observed(), None);
+        let mut up = Volume::new(Rounding { level: 100, by: 1 }, 40);
+        assert!(up.restore(90).is_err(), "rounded past the ceiling");
+        // A point's rounding inside the bounds is still a level set back.
+        let mut inside = Volume::new(Rounding { level: 100, by: -1 }, 100);
+        assert_eq!(inside.restore(56), Ok(55));
+        let mut top = Volume::new(Rounding { level: 100, by: -1 }, 40);
+        assert_eq!(top.restore(90), Ok(39));
+    }
+
+    /// Takes `wait` over every call, then fails it: a control not made yet.
+    struct Slow {
+        wait: Duration,
+        calls: u32,
+    }
+    impl Mixer for Slow {
+        fn get(&mut self) -> io::Result<u8> {
+            self.calls += 1;
+            std::thread::sleep(self.wait);
+            Err(io::Error::other("no control yet"))
+        }
+        fn set(&mut self, _: u8) -> io::Result<()> {
+            self.calls += 1;
+            std::thread::sleep(self.wait);
+            Err(io::Error::other("no control yet"))
+        }
+    }
+
+    #[test]
+    fn a_slow_failing_control_holds_the_start_for_the_budget_and_one_try_at_most() {
+        let wait = Duration::from_millis(30);
+        let mut volume = Volume::new(Slow { wait, calls: 0 }, 100);
+        let started = Instant::now();
+        let start_by = Duration::from_millis(200);
+        assert!(
+            volume
+                .restore_within(60, start_by, Duration::from_millis(10))
+                .is_err()
+        );
+        let took = started.elapsed();
+        // One try is a failed set alone here: the budget plus that.
+        assert!(took < start_by + wait * 3, "{took:?}");
+        assert!(volume.mixer.calls >= 2, "tried again");
     }
 
     #[test]

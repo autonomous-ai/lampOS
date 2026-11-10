@@ -157,15 +157,8 @@ fn main() -> ExitCode {
             (Some(mut volume), Some(directory)) => {
                 use lamp_actions::kept_volume as kept;
                 if let Some(level) = kept::read(directory) {
-                    let mut restored = Err(String::new());
-                    for _ in 0..kept::RESTORE_TRIES {
-                        restored = volume.restore(level);
-                        if restored.is_ok() {
-                            break;
-                        }
-                        std::thread::sleep(kept::RESTORE_EVERY);
-                    }
-                    match restored {
+                    match volume.restore_within(level, kept::RESTORE_START_BY, kept::RESTORE_EVERY)
+                    {
                         Ok(now) => {
                             eprintln!("lamp-actions: the kept volume {level} is set back ({now})")
                         }

@@ -35,10 +35,17 @@ const NEW: &str = "kept-volume.new";
 /// How long the level must stay unchanged before it is written: a held
 /// "louder, louder, louder" is one write.
 pub const QUIET_FOR: Duration = Duration::from_millis(1_500);
-/// How many times, and how far apart, the start tries the control: it is
-/// made by the first open of the speaker (`lamp-cmedia-speaker`).
-pub const RESTORE_TRIES: u32 = 20;
+/// The start tries the control again while it fails (it is made by the
+/// first open of the speaker, `lamp-cmedia-speaker`), beginning a new try
+/// only within [`RESTORE_START_BY`]. With a try at most two mixer calls of
+/// [`crate::sound::AMIXER_WAIT`] (0.8 s) each, the start waits 5 s at most,
+/// mixer calls included.
+pub const RESTORE_START_BY: Duration = Duration::from_millis(3_400);
 pub const RESTORE_EVERY: Duration = Duration::from_millis(250);
+
+#[cfg(test)]
+const _: () =
+    assert!(RESTORE_START_BY.as_millis() + 2 * crate::sound::AMIXER_WAIT.as_millis() <= 5_000);
 
 /// Whether the switch is on.
 pub fn on(value: Option<&OsStr>) -> bool {
