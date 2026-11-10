@@ -22,6 +22,13 @@ The packages aren't on PyPI or npm yet (`pip install lampos` and
 `lamp-mcp` needs `lampos` in the same `pip` command, or pip looks for it on
 PyPI and fails.
 
+**An MCP client usually starts `lamp-mcp` without your shell's environment**, so
+`LAMPOS_HOME` is lost, the pairing isn't found, and the client shows only
+"Connection closed". Give the folder `lamp pair` used: `--home PATH` in the
+client's config (`claude mcp add lamp -- lamp-mcp --home ~/.config/lampos`), or
+`python -m lamp_mcp` from the venv's python when the client can't find `lamp-mcp`
+on its PATH. An unpaired start says in one stderr line which folder it looked in.
+
 **On a customer lamp (stable 10824)** five things are missing: skill push,
 joints past yaw and pitch and `play`, limp and pose, mDNS (pair with
 `--host`), and local event times (`at` is UTC). Read
