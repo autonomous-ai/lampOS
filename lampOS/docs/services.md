@@ -116,7 +116,7 @@ connected apps.
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 | `LAMP_CALENDAR_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_event` and `delete_event` answer "changing or cancelling a calendar event is off on this lamp" before anything is read, held or sent, and `tools.json` lists only `create_event` for Google Calendar ("Changing or cancelling a calendar event", below) |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
-| `LAMP_SKILL_WRITES=on` (#6066; off in every product unit) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, and `lamp-services` refuses `skill_write` and `skill_write_approve` ("A made skill's write", below) |
+| `LAMP_SKILL_WRITES=on` (#6066; off in every product unit) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -1755,13 +1755,14 @@ fails for it.
 
 The owner lifted #6066's rule (b) on 10 Nov: a made skill that starts
 itself may send a mail, add a calendar event, or open an issue, a task or
-a comment on a linked service with nobody asking at that moment. This is
-the runtime half (`lamp_services::skill_writes`,
-`lamp_skills::service_write`). The voice's yes path and its say-back come
-later, and so does the product unit. All of it is off unless
-`LAMP_SKILL_WRITES=on` (exactly `on`) is in the environment of
-`lamp-services` and `lamp-skills`, and of `lamp-skills-manage@`, which
-loads a skill as it installs it. Every product unit leaves it off.
+a comment on a linked service with nobody asking at that moment. The
+runtime half is `lamp_services::skill_writes` and
+`lamp_skills::service_write`; the voice's make, say-back, yes and "I
+sent …" are below ("The voice's side"); the product unit comes later.
+All of it is off unless `LAMP_SKILL_WRITES=on` (exactly `on`) is in the
+environment of `lamp-services`, `lamp-skills` and `lamp-skills-manage@`,
+which loads a skill as it installs it, and of `lamp-voice`, which passes
+it to both its routes. Every product unit leaves it off.
 
 **The step.** In `skill.toml` ([skills.md](skills.md)):
 
@@ -1910,17 +1911,50 @@ plain, with no display name), never the whole address. It holds no text,
 subject or title. The voice reads it with `skill_writes_sent`, its own
 call like the yes, as `{"sent": [{"skill", "service", "at", "to"}]}`, to
 tell the owner "I sent your arrival mail to boss at 18:02" the next time
-they are seen. That telling is not built yet.
+they are seen, as below.
+
+**The voice's side** ([skills.md](skills.md), "Made by voice", for the
+whole):
+
+- **Made only from the request's words.** A made skill carries one
+  `write` step only with the switch on; off, "I can't do that yet:
+  sending or writing on its own". Its subject, text and title are the
+  person's request's own words (case, spacing, punctuation and quotes
+  aside), never a read's, the web's or memory's; its recipients are the
+  linked account's own address (`services_connected`'s account,
+  `services::linked_accounts`) or an address the request says, written or
+  spoken; a repository, team, project or file is one the request names.
+  Anything else goes back to the making model for repair
+  (`made_skill::write_from_request`).
+- **Said back whole**, every recipient and the whole text quoted, when
+  and how often, ending "It waits for you to agree before it sends
+  anything." (`made_skill::WAITS_FOR_YES`): no word to repeat, no "yes".
+- **The yes.** Once the skill is on, its writes' exact contents wait in
+  the voice's memory for 120 s (`crate::skill_write_yes`). An agreement
+  in any words, judged by the model, is a `make_skill` call with only
+  the `approve_id` it was given, in a later heard request on the second
+  route. The voice then calls `skill_write_approve` itself
+  (`services::skill_write_approve`). Its answer's `public` repositories
+  are said as "anyone can see" what it posts. While the yes is awaited, a
+  line made only of the lamp's own words, begun over its voice or within
+  the 1.5 s echo tail, is held even in the private room
+  (`own_echo::yes_echo`), and an approval in its request is refused. A
+  decline, a wait or a change approves nothing. Who says yes is not
+  checked.
+- **"I sent …"** (`crate::skill_writes_told`). The second route asks
+  `skill_writes_sent` off the line's path, at most every 5 s, as a heard
+  line comes. The next heard line is told each send since the last one
+  told, once: "I sent your 'leaving mail' mail to mai at 18:02." The
+  told-up-to mark is `writes-told.json` in the voice's made skills'
+  folder.
 
 **Not done yet:**
 
-- The voice's yes path and the app's: saying a made skill's write back
-  and calling `skill_write_approve` on a yes (`lamp-cloud` has no kind
-  for it yet). The made skill's say-back of a
-  write is in `crates/voice/src/made_skill.rs`, which this change leaves
-  alone. Until then `put_on_cap` refuses a made skill with a `"write"`
-  permission.
-- Telling the owner of the sent-log.
+- The app's yes: `lamp-cloud` has no kind for `skill_write_approve` yet,
+  and the app's list shows a made skill's `uses.sends_to` ("sends to …")
+  only once the app does (its text lives in the app).
+- A contact named without an address: the lamp keeps no contact book, so
+  the making model asks for the address.
 - A product unit that sets `LAMP_SKILL_WRITES=on`.
 
 ## Refresh

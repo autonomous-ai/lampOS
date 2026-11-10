@@ -4,7 +4,7 @@
 //! what does more than it declares, or more than a made skill may, is not.
 use lamp_skills::package::{self, asked as asked_helper, install_made, install_made_at};
 use lamp_voice::made_skill::{
-    GOES_ON_WITHIN, KEPT_MOST, Keeping, Made, asked_windows, goes_on, keep, keep_asked,
+    Asked, GOES_ON_WITHIN, KEPT_MOST, Keeping, Made, goes_on, keep, keep_asked,
 };
 use sha2::{Digest, Sha256};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
@@ -804,7 +804,10 @@ fn a_made_evening_dim_runs_at_ten_past_ten() {
             false,
             &format!("s1:{name}:1"),
             &keeping,
-            &asked_windows(request),
+            &Asked {
+                request,
+                own: Vec::new(),
+            },
         )
         .unwrap();
         let now = now_ms();

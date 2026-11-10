@@ -119,7 +119,7 @@ dịch vụ.
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
 | `LAMP_CALENDAR_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_event` và `delete_event` của `service_write` trả lời "changing or cancelling a calendar event is off on this lamp" trước khi bất cứ gì được đọc, giữ hay gửi, và `tools.json` chỉ liệt kê `create_event` cho Google Calendar ("Đổi hoặc huỷ một sự kiện lịch", bên dưới) |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
-| `LAMP_SKILL_WRITES=on` (#6066; tắt trong mọi unit sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, và `lamp-services` từ chối `skill_write` và `skill_write_approve` ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
+| `LAMP_SKILL_WRITES=on` (#6066; tắt trong mọi unit sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -1805,12 +1805,13 @@ hỏng vì nó.
 Chủ đèn đã bỏ quy tắc (b) của #6066 vào ngày 10/11: một kỹ năng tự tạo tự
 khởi động có thể gửi một thư, thêm một sự kiện lịch, hoặc mở một issue, một
 task hay một bình luận trên một dịch vụ đã liên kết, dù lúc đó không ai yêu
-cầu. Đây là nửa runtime (`lamp_services::skill_writes`,
-`lamp_skills::service_write`). Đường "đồng ý" của giọng nói và câu nói lại
-của nó làm sau, unit sản phẩm cũng vậy. Mọi thứ đều tắt trừ khi
-`LAMP_SKILL_WRITES=on` (đúng `on`) có trong môi trường của `lamp-services`
-và `lamp-skills`, và của `lamp-skills-manage@`, nơi nạp kỹ năng khi cài nó.
-Mọi unit sản phẩm để nó tắt.
+cầu. Nửa runtime là `lamp_services::skill_writes` và
+`lamp_skills::service_write`; việc tạo, câu nói lại, lời đồng ý và "I sent
+…" của giọng nói ở bên dưới ("Phía giọng nói"); unit sản phẩm làm sau. Mọi
+thứ đều tắt trừ khi `LAMP_SKILL_WRITES=on` (đúng `on`) có trong môi trường
+của `lamp-services`, `lamp-skills` và `lamp-skills-manage@`, nơi nạp kỹ
+năng khi cài nó, và của `lamp-voice`, nơi chuyển nó cho cả hai route. Mọi
+unit sản phẩm để nó tắt.
 
 **Bước.** Trong `skill.toml` ([skills.md](../skills.md)):
 
@@ -1964,18 +1965,51 @@ ghi là địa chỉ thường, không có tên hiển thị), không bao giờ 
 Nó không giữ nội dung, chủ đề hay tiêu đề. Giọng nói đọc nó bằng
 `skill_writes_sent`, lệnh gọi riêng của nó như lần đồng ý, dưới dạng
 `{"sent": [{"skill", "service", "at", "to"}]}`, để nói với chủ đèn "I sent
-your arrival mail to boss at 18:02" vào lần tới thấy họ. Phần nói đó chưa
-làm.
+your arrival mail to boss at 18:02" vào lần tới thấy họ, như bên dưới.
+
+**Phía giọng nói** ([skills_vi.md](skills_vi.md), "Made by voice", cho
+toàn bộ):
+
+- **Chỉ tạo từ lời của yêu cầu.** Kỹ năng tự tạo chỉ mang một bước `write`
+  khi bật công tắc; khi tắt là "I can't do that yet: sending or writing on
+  its own". Chủ đề, nội dung và tiêu đề của nó là lời của chính yêu cầu
+  của người dùng (bỏ qua chữ hoa, khoảng trắng, dấu câu và dấu ngoặc kép),
+  không bao giờ từ một lần đọc, web hay bộ nhớ; người nhận là địa chỉ của
+  chính tài khoản đã liên kết (account trong `services_connected`,
+  `services::linked_accounts`) hoặc một địa chỉ yêu cầu nói ra, viết hay
+  đọc; repository, team, project hay tệp là cái yêu cầu nêu. Mọi thứ khác
+  quay lại mô hình tạo kỹ năng để sửa (`made_skill::write_from_request`).
+- **Nói lại trọn vẹn**, mọi người nhận và toàn bộ nội dung trích nguyên,
+  khi nào và bao lâu một lần, kết thúc bằng "It waits for you to agree
+  before it sends anything." (`made_skill::WAITS_FOR_YES`): không có từ để
+  lặp lại, không có "yes".
+- **Lời đồng ý.** Khi kỹ năng đã bật, nội dung chính xác các lần ghi của
+  nó chờ trong bộ nhớ của giọng nói 120 s (`crate::skill_write_yes`). Một
+  lời đồng ý bằng bất kỳ lời nào, do mô hình phán đoán, là một lệnh gọi
+  `make_skill` chỉ với `approve_id` nó được đưa, trong một yêu cầu nghe
+  được sau đó trên route thứ hai. Khi đó chính giọng nói gọi
+  `skill_write_approve` (`services::skill_write_approve`). Các repository
+  `public` trong câu trả lời được nói là "anyone can see" những gì nó
+  đăng. Trong lúc chờ lời đồng ý, một dòng chỉ gồm lời của chính đèn, bắt
+  đầu khi đèn đang nói hoặc trong 1,5 s đuôi tiếng vọng, bị giữ cả trong
+  phòng riêng (`own_echo::yes_echo`), và việc đồng ý trong yêu cầu của nó
+  bị từ chối. Từ chối, chờ hay thay đổi thì không đồng ý gì. Không kiểm tra
+  ai nói đồng ý.
+- **"I sent …"** (`crate::skill_writes_told`). Route thứ hai hỏi
+  `skill_writes_sent` ngoài đường đi của dòng, tối đa 5 s một lần, khi có
+  một dòng nghe được. Dòng nghe được tiếp theo được báo mỗi lần gửi kể từ
+  lần báo cuối, một lần: "I sent your 'leaving mail' mail to mai at
+  18:02." Mốc đã báo là `writes-told.json` trong thư mục kỹ năng tự tạo
+  của giọng nói.
 
 **Chưa làm:**
 
-- Đường đồng ý của giọng nói và của ứng dụng: nói lại lần ghi của kỹ năng
-  tự tạo và gọi `skill_write_approve` khi có lời đồng ý (`lamp-cloud` chưa
-  có kind cho việc này). Câu nói lại một lần ghi của kỹ
-  năng tự tạo nằm trong `crates/voice/src/made_skill.rs`, mà thay đổi này
-  không đụng tới. Cho đến lúc đó `put_on_cap` từ chối kỹ năng tự tạo có quyền
-  `"write"`.
-- Nói với chủ đèn về nhật ký đã gửi.
+- Lời đồng ý từ ứng dụng: `lamp-cloud` chưa có kind cho
+  `skill_write_approve`, và danh sách của ứng dụng chỉ hiện `uses.sends_to`
+  ("sends to …") của kỹ năng tự tạo khi ứng dụng làm (chữ của nó nằm trong
+  ứng dụng).
+- Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
+  bạ, nên mô hình tạo kỹ năng xin địa chỉ.
 - Một unit sản phẩm đặt `LAMP_SKILL_WRITES=on`.
 
 ## Làm mới

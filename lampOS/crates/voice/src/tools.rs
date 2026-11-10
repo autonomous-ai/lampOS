@@ -2082,7 +2082,7 @@ fn run_call_with_scope(
         ),
         Route::MakeLocal => (
             "the lamp's own model",
-            (crate::make_skill_local::answer(call, heard), true),
+            (crate::make_skill_local::answer(call, request, heard), true),
         ),
         Route::Schedule(directory) => (
             "the schedule through the executive",

@@ -21,8 +21,15 @@ fn make(name: &str, go: mpsc::Receiver<()>) -> impl FnOnce() -> ToolAnswer + Sen
     let asked = manage_helper(&keeping.manage);
     move || {
         let _ = go.recv();
-        let told =
-            crate::make_skill_local::make_with(REQUEST, &keeping, chat_at(url), NOW, || None);
+        let told = crate::make_skill_local::make_with(
+            0,
+            None,
+            REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
         assert_eq!(served.join().unwrap(), 1);
         assert!(asked.join().unwrap()["install_made"].is_string());
         let _ = std::fs::remove_dir_all(&root);

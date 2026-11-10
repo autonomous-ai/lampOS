@@ -8875,7 +8875,16 @@ async fn spoken(
     // The lamp's own words heard back (`LAMP_SECOND_OWN_ECHO`, #2997): held
     // as its echo when mostly its own; taken out at the line's start or end
     // when fewer, before the model is sent it. Judged before the rule.
-    let echo = if shared.own_echo && !empty && !held {
+    // While a made skill's writes wait for the yes (#6066), a line of only
+    // the lamp's own words in their echo tail is held, switch or not, even
+    // in the private room: the say-back heard back is never the yes.
+    let yes_echo = (!empty && !held && crate::skill_write_yes::awaited(std::time::Instant::now()))
+        .then(|| own_yes_echo_of(&shared, request, &text, &said, &marks))
+        .flatten();
+    let echo = if let Some(line) = yes_echo {
+        crate::skill_write_yes::echo_held(request);
+        own_echo::Echo::Held(line)
+    } else if shared.own_echo && !empty && !held {
         own_echo_of(&shared, request, &text, &said, &marks)
     } else {
         own_echo::Echo::Answered(None)
@@ -9763,6 +9772,8 @@ async fn spoken(
         .chain(staff)
         .chain(place)
         .chain(linked)
+        // A made skill's sends since the last told (#6066), once each.
+        .chain(crate::skill_writes_told::note_for(request))
         .chain(remembered)
         .chain(named)
         .chain(wake)
@@ -11324,6 +11335,37 @@ fn own_echo_of(
     let answer = shared.lamp_said.lock().ok().map(|said| said.clone());
     let until_us = shared.said_until_us.load(Ordering::Relaxed);
     own_echo::judge(
+        &own_echo::Line {
+            request,
+            heard,
+            began_us,
+            over_the_lamps_voice: marks.over_the_lamps_voice,
+            called: marks.called.load(Ordering::Acquire),
+        },
+        answer
+            .as_ref()
+            .map(|(of, words)| own_echo::Said {
+                request: *of,
+                words,
+                until_us,
+            })
+            .as_ref(),
+    )
+}
+
+/// [`own_echo::yes_echo`] for `request`'s words `heard`, as
+/// [`own_echo_of`] judges them: the journal's line when held.
+fn own_yes_echo_of(
+    shared: &Shared,
+    request: u64,
+    heard: &str,
+    said: &Mutex<(u64, u64)>,
+    marks: &Marks,
+) -> Option<String> {
+    let began_us = said.lock().map_or(0, |said| said.0);
+    let answer = shared.lamp_said.lock().ok().map(|said| said.clone());
+    let until_us = shared.said_until_us.load(Ordering::Relaxed);
+    own_echo::yes_echo(
         &own_echo::Line {
             request,
             heard,

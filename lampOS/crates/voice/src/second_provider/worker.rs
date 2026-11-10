@@ -2607,6 +2607,11 @@ pub fn serve(
     // never by `LAMP_SERVICES`, which isn't in its environment.
     let services_on = tools.services.is_some();
     let services_folder = tools.services.clone();
+    // A made skill's sends told at the next heard line (#6066), with
+    // `LAMP_SKILL_WRITES=on` and the services' folder.
+    if let Some(folder) = services_folder.clone() {
+        crate::skill_writes_told::start(folder, std::path::Path::new(crate::made_skill::DIRECTORY));
+    }
     if services_on {
         if let Some(bus) = files
             .bus_root
