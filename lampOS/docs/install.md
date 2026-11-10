@@ -1524,7 +1524,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        with `privacy_lost`. A lamp whose voice never said a reading is not
        judged by it. Looked at every 100 ms, a lapse shorter than that
        between two looks can be missed; a restart of the voice by an
-       update round during the install stops it too.
+       update round during the install stops it too. When no such lease
+       was seen in the install's first second (`NO_LEASE_SAID_AFTER`),
+       `serve` says once "Hermes's install runs with no privacy watch", so
+       a bus permission or a renamed topic is not silent. The stop takes
+       the install away, but does not by itself give the person the
+       microphones back: a voice that falls into its restart guard after
+       losing the reading stays muted until #6124's fix lands.
      A stopped install's ask is taken away with it (the one-shot is killed
      before it could); what it left in `/var/lib/lampos-hermes` is taken up
      by the next try, as a cut-off try's is, and the entry points are
