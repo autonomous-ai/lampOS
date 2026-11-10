@@ -1,3 +1,39 @@
+## 2026-11-10 — speech recovery passes; compound music repair; resource failures
+
+- #5902 carry: six process/bus regressions failed first, then passed after
+  requiring fresh Resting and readable heard data for replay completion.
+  Full serial Skills gate passed 675 tests / 10 ignored; fmt and strict
+  all-target Clippy passed. Positive completed replay still makes the
+  show. Invalid-state publication to cancellation was 21.638 ms first,
+  14.232 ms repeated on one host process, not acoustic/device timing.
+  Both commits rebased equal onto c29008d21, local ebea47ed7; current-base
+  qualification precedes publication. Original behavior/played reads remain.
+- #5969 published 31933971d passed ARM 42760836833: 14,986 passed /
+  113 skipped, 303.193 s, remaining stages green. Both reads present.
+  Comment 6759938302 records that result and corrects my missed Twelve
+  read. Equal-patch rebase is local 5dcb60eec on c29008d21; not pushed yet.
+- #5975 Second found music-trivia admission despite the positional fix.
+  Complete-object endings now reject five compound-object negatives;
+  identical 53-case exact-source probe goes five mismatches to zero.
+  Actual music33/requested66 (one ignored) pass on train 768. Strict
+  Clippy hit ENOSPC, then passed unchanged after cleanup. All eight
+  commits rebased equal onto c29008d21 at 02432e3a5; current gate runs.
+- Selector-head ARM 42761649338 first became unreadable when REST quota
+  exhausted. Its actual retrieved failure is inherited Control
+  microphone::never_while_someone_else_is_here, send(block(2)) SendError:
+  1,856 passed / one failed, 113 skipped, 37.800 s. Handed to #5839 owner
+  in 6760083885, with source-based race hypothesis explicitly not a
+  reproduction or harmless-flake verdict. No full green claim.
+- Disk fell twice to exhaustion, including a current music gate exit101
+  with no surviving diagnostic. Archived then removed my clean completed
+  5938/ledger checkouts and eleven old third-read-37xx/38xx worktrees;
+  every commit remains under a Third ref and evidence remains outside.
+  Removed only unlocked old completed Voice incremental cache entries,
+  preserving working/locked directories. Dirty and other builders'
+  checkouts untouched. Headroom recovered to about 4 GiB. Queue notice
+  6760021476; all failed runs remain distinct from reruns.
+- No lamp, provider-account, activation or deployment action.
+
 ## 2026-11-10 — music selector regression repaired; reminder second read
 
 - #5975 ARM 42757338768 exposed a real classifier regression: “Now play
