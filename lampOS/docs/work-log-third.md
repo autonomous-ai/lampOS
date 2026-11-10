@@ -1,3 +1,18 @@
+## 2026-11-10 — music retraction delta fully green in CI
+
+- #5975 f725248cd ARM 42775079932 SUCCESS: 15,017 passed / 114
+  skipped, 306.130 s. Release build, doc tests and artifact export pass.
+  Executed preview 87e4dd5 merges f725248cd into 6cbcb7a736, distinct
+  from source branch base c29008d21. Full raw log retained locally at
+  /private/tmp/third-5975-retractions-arm-full.log.
+- Current Linux 42775079934 and docs 42775079925 pass; both delta
+  reads already clear. PR description updated with exact provenance.
+  Draft/OFF retained for original played/Store/default gates, not an
+  outstanding code/CI failure. No device action.
+- #5997 still awaits replacement behavior read; #5969 was included in
+  train 772, whose integration is PM/bot-owned. #6002 default-sway read
+  is complete. #6013 translation finding is with Seventh for repair.
+
 ## 2026-11-10 — music delta has both reads; onboarding translation finding
 
 - #5975 f725248cd now has Reviewer-two READ-OK 6761719255 and Fourth
