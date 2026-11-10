@@ -38,6 +38,13 @@ sau:
    - Yêu cầu tối đa 480 byte; dài hơn thì bị từ chối, không bao giờ bị cắt,
      và khi đó không hỏi mô hình gì cả.
    - Không có gì khác của cuộc trò chuyện đi kèm.
+   - Bản hướng dẫn chỉ nêu trigger và cử chỉ là "one [trigger] as listed
+     (coming to the desk is room/presence)" và `gesture = "nod"` "or one
+     listed": system prompt liệt kê từng cái (`TRIGGER_MEANINGS`,
+     `made_skill::gesture_names`). Vì vậy bản hướng dẫn dài nhất là 1.160
+     byte (`MOST_BRIEF_BYTES`, trước là 1.340) và các dòng kiểm tra của một
+     lần sửa là 735 byte (`MOST_REPAIR_BYTES`, trước là 560), đủ chỗ cho
+     nghĩa của cả sáu trigger; tổng vẫn nằm trong 2.000 byte của phần tasks.
 3. **Mô hình của đèn viết.** Bản hướng dẫn được gửi tới chat của tuyến thứ
    hai (`llm_*`, relay hoặc DeepSeek riêng của người dùng), không có hàm,
    dạng stream, trên luồng và runtime riêng, tối đa 30 giây
@@ -47,14 +54,20 @@ sau:
    khác thì không. Mô hình được xem một kỹ năng hoàn chỉnh mà bước kiểm tra
    chấp nhận (`make_skill_local::EXAMPLE`, `example-only`: màu cyan mức 2
    trong 25 giây khi có người ở đó, được gọi rõ là ví dụ về hình thức,
-   "never answer with it") và được dặn rằng kỹ năng không
-   tự giữ giờ được, và cách nó nói (dưới đây, #6055, #6062: `speak = true`, cooldown từ một giờ trở lên, và một `say = { text = "Welcome back!" }` đúng nguyên văn, bằng ngôn ngữ người dùng đã hỏi). Câu trả lời phải đúng hai khối có rào,
+   "never answer with it") và được dặn rằng lời nhắc vào một giờ hay cứ
+   mỗi khoảng thời gian là bộ hẹn giờ của đèn, không phải kỹ năng, còn kỹ
+   năng chỉ chạy vào một giờ mỗi ngày bằng trigger đồng hồ; được nêu từng
+   trigger và từng cử chỉ theo tên; và cách nó nói (dưới đây, #6055, #6062: `speak = true`, cooldown từ một giờ trở lên, và một `say = { text = "Welcome back!" }` đúng nguyên văn, bằng ngôn ngữ người dùng đã hỏi). Câu trả lời phải đúng hai khối có rào,
    `skill.toml` và `SKILL.md`, mỗi khối tối đa 8 KiB.
 4. **Giới hạn những gì kỹ năng tạo ra được dùng** (giới hạn của điều phối
    viên, 19/10):
    - `kind` là installable, có phiên bản;
    - `[permissions]` chỉ có `light`, `body`, `speak`, và `topics` trong số
-     `voice/state` và `room/presence`;
+     `voice/state`, `room/presence`, `humans/faces/tracked` và
+     `room/stood_up` (chỉ sự hiện diện, `lamp_skills::PRESENCE_TOPICS`:
+     trigger của kỹ năng tạo ra không đọc trường nào của khuôn mặt, nên
+     không bao giờ biết là ai) và `clock/local` (đồng hồ của chính
+     lamp-skills, `LOCAL_CLOCK_TOPIC`);
    - không có hàm cho mô hình (`tool`);
    - `[ask] policy` chỉ là `nudge`, không bao giờ là lời chào, tin tức hay lời nhắc;
    - tin nhắn, cái nhìn, khuôn mặt quen, hành động và mọi chủ đề khác đều
@@ -180,7 +193,7 @@ sau:
      chạy lại cho đến khi được"). Khi bước kiểm tra từ chối một câu trả
      lời, nó được gửi lại cho mô hình trước khi nói gì: bản hướng dẫn cũ,
      kèm các dòng của bước kiểm tra (thư mục được thay bằng `<folder>`, tối
-     đa 560 byte) trước lời yêu cầu của người dùng
+     đa 735 byte) trước lời yêu cầu của người dùng
      (`made_skill::repair_brief`). Tối đa `make_skill_local::MOST_REPAIRS`
      (3) lần, mỗi lần chỉ bắt đầu khi thêm một lượt vẫn kết
      thúc trong `MAKE_WITHIN` (120 s): một lượt tối đa là hai câu trả lời
@@ -219,17 +232,50 @@ sau:
      kỹ năng chạy khác lời nói không bao giờ được giữ, P2 của Thirteen và
      Mobile trên #5042), và câu dài hơn 200 ký tự (nói đủ hoặc không nói,
      không bao giờ cắt). Cũng vậy, trigger viết thành `[[trigger]]`, có
-     khóa nào ngoài `topic`, `field`, `equals`, `for`, `cooldown`, `rearm`,
-     `during`, `when` và `absent_for` (`when` chỉ `"present"` hoặc
-     `"appears"`; `absent_for` chỉ với `"appears"` khi có người đến bàn,
-     vì `lamp-skills` chỉ tính nó khi đó: "When someone comes back to the
-     desk after it was empty for 5 minutes"), trigger khác "đèn nghỉ" hoặc
-     "có/không có người", hay bước khác một lệnh đèn (`colour`, `level`,
-     `for`, hoặc chỉ `dim`), một cử chỉ (`nod`, `curious`) hoặc một `say`
-     nguyên văn như trên đều bị từ chối. Bước `say` được nói với lời của nó
-     trong ngoặc kép, nguyên vẹn, để dấu phẩy bên trong không lẫn vào phần
-     nói sau (P3 của người đọc trên #6062): "When someone has been at the
-     desk for 5 seconds, it says “Welcome back!”, at most once an hour."
+     khóa nào ngoài `topic`, `field`, `equals`, `above`, `for`, `cooldown`,
+     `rearm`, `during`, `when` và `absent_for` (`when` chỉ `"present"` hoặc
+     `"appears"`; `rearm` chỉ `"ends"` hoặc `"leaves"`; `absent_for` chỉ với
+     `"appears"` khi có người đến bàn hoặc với khuôn mặt, vì `lamp-skills`
+     chỉ tính nó khi đó: "When someone comes back to the desk after it was
+     empty for 5 minutes"), trigger ngoài sáu trigger sau, hay bước khác
+     một lệnh đèn (`colour`, `level`, `for`, hoặc chỉ `dim`), một cử chỉ
+     hoặc một `say` nguyên văn như trên đều bị từ chối. Sáu trigger: đèn nghỉ;
+     có người đến (hoặc quay lại) bàn; rời bàn; **một khuôn mặt vào khung
+     hình** (`humans/faces/tracked`, không có `field`, `equals`, `each`,
+     `key`, `near` hay `present`: bất kỳ khuôn mặt nào, không bao giờ biết
+     là ai; `known_faces` vẫn bị giới hạn từ chối), chỉ với
+     `when = "appears"` hoặc `rearm = "ends"`: "When the lamp sees a face,
+     after seeing none", với `for` "When the lamp has seen a face for 3
+     seconds, …", với `absent_for` "… after seeing none for 10 minutes";
+     **có người đứng dậy** (`room/stood_up`, mắt nói một lần cho mỗi lần
+     người ngồi ở bàn rời đi, khi bật `LAMP_ACTIVITY=on`), chỉ như Watch you
+     leave kiểm tra, `field = "sitting_s"`, `above = 0`, không có `for` hay
+     `absent_for`: "When someone sitting at the desk gets up"; **một giờ
+     mỗi ngày** (`clock/local`, như các trigger hằng ngày của lamp-skills):
+     `field = "known"`, `equals = true`, `rearm = "ends"` và `during` đúng
+     một phút, `{ from = "22:00", to = "22:01" }` (`HH:MM`; cả 23:59 tới
+     00:00), không có `for`, `absent_for` hay `when = "appears"`: "Every day
+     at 22:00". Khung dài hơn, giờ không theo `HH:MM`, hay ngày trong tuần
+     (`days`, lamp-skills không có dạng nào cho nó) bị từ chối; `above` ở
+     trigger khác cũng vậy. Cử chỉ là bất kỳ clip nào của thân mà
+     `lamp_skills::gesture_known` nhận (mọi clip trong
+     `lamp_body::clips::ALL` trừ `idle`), một cử chỉ mỗi bước, nói theo việc
+     nó làm (`made_skill::GESTURES`): nod "nods", headshake "shakes its
+     head", greeting "lifts its head and arm in a greeting", laugh "tips its
+     head back in a laugh", shy "dips its head shyly", stretching "stretches
+     its arm up", acknowledge "gives a quick bow", curious "looks up,
+     curious", happy "wiggles happily", caring "droops slowly and gently",
+     surprised "recoils in surprise", confused "dips and turns, puzzled",
+     sleepy "droops sleepily", excited "bounces up twice, excited",
+     scanning "looks all round the room", dance_chill "sways in a slow
+     dance", dance_groove "bounces in a groove dance", dance_hype "dances
+     fast with its whole body", dance_waltz "leans in a slow waltz",
+     dance_jazz "bobs its head in a jazz dance". Clip không có câu nói,
+     `idle`, tên thân không có, hay bảng nhiều clip bị từ chối; một test
+     giữ mọi clip trừ `idle` phải có câu nói. Bước `say` được nói với lời
+     của nó trong ngoặc kép, nguyên vẹn, để dấu phẩy bên trong không lẫn vào
+     phần nói sau (P3 của người đọc trên #6062): "When someone has been at
+     the desk for 5 seconds, it says “Welcome back!”, at most once an hour."
      Bước `say` không nói được thì lần sửa nêu nó cùng thế nào là một `say`
      ("[[do]] step 1, say: say = { text = "the exact words" }, one or two
      short sentences, no quotes"), và `PLAIN_ONLY` nói một bước có thể là
@@ -243,13 +289,18 @@ sau:
      (`SAYABLE_TRIGGERS`): có người đến hoặc quay lại bàn là
      `room/presence`, `someone`, `true` (quay lại sau khi bàn trống một
      lúc: `when = "appears"`, `absent_for`); rời bàn là `false`; đèn yên
-     lặng là `voice/state`, `state`, `"resting"`. Trên lamp-74ff, 17:39 ngày
+     lặng là `voice/state`, `state`, `"resting"`; một khuôn mặt vào khung
+     hình là `humans/faces/tracked`, không có field, `when = "appears"`;
+     có người đứng dậy là `room/stood_up`, `sitting_s` trên 0; mỗi ngày lúc
+     22:00 là `clock/local`, `known`, `true`, `rearm = "ends"`,
+     `during = { from = "22:00", to = "22:01" }`. Phần được nêu tên bị cắt
+     ở 110 byte. Trên lamp-74ff, 17:39 ngày
      10/11, một lần tạo từ ứng dụng "glow green when I come back to my
      desk" được viết trên khuôn mặt như kỹ năng chào mừng có sẵn, và bị từ
      chối hai lần vì lần sửa chỉ được nói các khóa được phép. System prompt
      của mô hình tạo nói các nghĩa này trước khi viết (`TRIGGER_MEANINGS`),
-     và bản hướng dẫn nói "someone comes or comes back to the desk is
-     room/presence". Lỗi của phần khác kèm dòng của `PLAIN_ONLY`; khi bật
+     kèm "coming to the desk is room/presence, never the faces", và bản
+     hướng dẫn nói "coming to the desk is room/presence". Lỗi của phần khác kèm dòng của `PLAIN_ONLY`; khi bật
      đọc, thêm `PLAIN_OR_READ`: với kỹ năng đọc một dịch vụ đã liên kết,
      chỉ một bước `[[do]]`, đúng bước đọc của dịch vụ đó như system
      prompt liệt kê. Trên

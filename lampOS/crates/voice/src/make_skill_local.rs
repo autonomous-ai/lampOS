@@ -125,18 +125,22 @@ fn system_with(reads: bool) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
     let services = services(reads);
     let triggers = made_skill::TRIGGER_MEANINGS;
+    let gestures = made_skill::gesture_names();
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
          blocks and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
-         the form only: never answer with it. A skill can't keep time by itself: a reminder at \
-         a time or every so often is the lamp's own timer, not a skill. Make what the request \
-         asks with the light, the head or a short line it says, or a read as below, on the \
-         lamp's resting or someone being there. To speak, a skill has speak = true in \
+         the form only: never answer with it. A reminder at a time or every so often is the \
+         lamp's own timer, not a skill; a skill runs at a time only each day, by the clock \
+         trigger below. Make what the request \
+         asks with the light, the head or a short line it says, or a read as below, on \
+         one of the triggers below. To speak, a skill has speak = true in \
          [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
          \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
          language the person asked in, said as written. When it runs is one \
-         [trigger] table (never [[trigger]], never the faces' topic): {triggers} A skill can't hear what is said: a request \
+         [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
+         faces): {triggers} A body step is one gesture, one of: {gestures}. A skill can't hear \
+         what is said, nor who someone is: a request \
          that needs words or a sound heard, or anything else a skill here can't sense or do, \
          is answered with one line and no blocks: {cannot} then one short sentence said to \
          the person, in plain words, why, ending with what to ask instead when there is one; \
@@ -194,8 +198,8 @@ pub fn tool() -> lamp_gemini::Tool {
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description: "Make a new skill for the lamp: something the lamp then does by itself with \
-             its light, its head or a few exact words it says, at a time of day, when someone comes or goes, or when it is \
-             resting (\"make me a skill that dims the light at 10 pm\"). Call it only when the \
+             its light, its head or a few exact words it says, at a time each day, when someone comes or goes, a face comes \
+             into view, someone gets up, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Call it only when the \
              person asks for a skill to be made. In the same breath, before you call it, say in a \
              few words that you'll make it now. The skill is made, checked, kept and put on the \
              lamp at once: then say exactly the line you are told, nothing more."
@@ -1375,8 +1379,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             let system = system_with(reads);
             assert!(
                 system.contains(&format!(
-                    "When it runs is one [trigger] table (never [[trigger]], never the faces' \
-                     topic): {}",
+                    "When it runs is one [trigger] table (never [[trigger]]; coming to the \
+                     desk is room/presence, never the faces): {} A body step is one gesture, \
+                     one of: nod, headshake, ",
                     made_skill::TRIGGER_MEANINGS
                 )),
                 "{system}"
