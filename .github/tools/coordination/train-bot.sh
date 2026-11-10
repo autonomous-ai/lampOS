@@ -72,7 +72,7 @@ eligible() {
     # 4 Nov: with its reviews' bodies (#5212 part 1).
     coord_pr_comments $p $cf || { once comments$p "#$p left out: its comments can't be fetched"; continue; }
     fine head$p; fine comments$p
-    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710, and from 5 Nov #5385: lib.sh's COORD_QUEUE_ISSUES) whose first
+    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710, from 5 Nov #5385, from 10 Nov #6059: lib.sh's COORD_QUEUE_ISSUES) whose first
     # line is `HOLD <sha>` holds the PR whose head starts with that sha, until the same account posts a READ-OK on the
     # PR, after it, saying the HOLD is lifted or cleared (qholds.py, with markers.py's marker and lifting words). Train
     # 546 took #5013 on Fourteen's READ-OK while Seventh's "HOLD a13408fb8d…: lamp check pending" stood only on the Queue.
