@@ -87,9 +87,11 @@ sau:
    any time.` Dù thế nào, cap vẫn giữ những gì được giữ lại. Khi đã giữ, một kỹ năng có bước đọc một
    dịch vụ chưa liên kết lúc đó (`services_connected`, hỏi một lần, tối đa
    500 ms) vẫn được giữ, và việc tạo báo điều đó: tạo bằng giọng nói,
-   `needs_link` trong câu trả lời của việc tạo và một câu nói trước lời hỏi,
-   "Gmail isn't linked yet: link it in the app, under Skills, then
-   Connectors, and the skill will start then."; tạo từ ứng dụng,
+   `needs_link` trong câu trả lời của việc tạo, và sau câu báo đã bật, mô
+   hình được dặn nói với người dùng, bằng lời của nó và bằng ngôn ngữ của
+   cuộc trò chuyện, rằng kỹ năng sẽ chạy khi dịch vụ đó được liên kết trong
+   ứng dụng, ở Skills, rồi Connectors (`made_skill::needs_link_ask`; chủ
+   đèn, 10/11: không bao giờ là một câu tiếng Anh cố định); tạo từ ứng dụng,
    `needs_link: [{"code", "name"}]` trong `skills.made`. Khi `lamp-services`
    không trả lời thì không có cả hai, và việc tạo vẫn thành
    ([services_vi.md](services_vi.md), "Chưa liên kết lúc tạo").

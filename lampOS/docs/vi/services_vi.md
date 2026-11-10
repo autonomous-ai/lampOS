@@ -1225,7 +1225,7 @@ việc đọc dịch vụ không liệt kê) làm kỹ năng bị từ chối. P
 <service>".
 
 **Chưa liên kết lúc tạo** (`made_skill::needs_link`, không có công tắc: nó
-chỉ thêm một trường và một câu). Khi một kỹ năng tự tạo có đọc một dịch vụ
+chỉ thêm một trường và một lời dặn cho mô hình). Khi một kỹ năng tự tạo có đọc một dịch vụ
 đã được giữ, `lamp-voice` hỏi `lamp-services` `services_connected` trên
 socket tools (`services::linked_codes`, tối đa 500 ms; kỹ năng không đọc gì
 thì không hỏi gì). Mỗi code Gmail được tính là đã liên kết cho code kia,
@@ -1234,9 +1234,11 @@ Nếu dịch vụ nó đọc không có trong danh sách, kỹ năng vẫn đư�
 hỏi như trước, và:
 
 - tạo bằng giọng nói, câu trả lời của việc tạo có `needs_link`
-  (`[{"code", "name"}]`), và đèn nói một câu trước lời hỏi: "Gmail isn't
-  linked yet: link it in the app, under Skills, then Connectors, and the
-  skill will start then.";
+  (`[{"code", "name"}]`), và sau câu báo đã bật, mô hình được dặn nói với
+  người dùng, bằng lời của nó và bằng ngôn ngữ của cuộc trò chuyện, rằng kỹ
+  năng sẽ chạy khi Gmail được liên kết trong ứng dụng, ở Skills, rồi
+  Connectors (`made_skill::needs_link_ask`; chủ đèn, 10/11, "đồng bộ luôn":
+  không bao giờ là một câu tiếng Anh cố định nói nguyên văn);
 - tạo từ ứng dụng, lời yêu cầu giữ nó, và `skills.made` báo nó là
   `needs_link: [{"code": "gmail", "name": "Gmail"}]`, `[]` khi không thiếu
   gì.

@@ -428,7 +428,7 @@ fn service_name(code: &str) -> &str {
 
 /// The linked services a made skill reads that aren't linked now: for the
 /// app's finished make, `[{"code", "name"}]` (its `needs_link`), and the
-/// voice's [`needs_link_said`]. `linked` gives the codes linked now
+/// voice's [`needs_link_ask`]. `linked` gives the codes linked now
 /// (`crate::services::linked_codes`), asked only for a skill that reads
 /// one. Either Gmail code is linked by the other, as `lamp-services`
 /// reads it. Empty when nothing is missing; `None` when it can't be told,
@@ -451,20 +451,29 @@ pub fn needs_link(uses: &Uses, linked: impl FnOnce() -> Option<Vec<String>>) -> 
     Some(vec![json!({"code": code, "name": service_name(code)})])
 }
 
-/// What the lamp adds aloud for each of [`needs_link`]'s services: one
-/// short plain sentence where the person links it. None with none.
-pub fn needs_link_said(needs: &[Value]) -> Option<String> {
-    let said: Vec<String> = needs
+/// What the voice's model is asked to tell of [`needs_link`]'s services,
+/// in its own words and the conversation's language, never a fixed
+/// English sentence the lamp says as it is (the owner, 10 Nov: "đồng bộ
+/// luôn", as the `cannot:` reason is the model's own): that the skill
+/// starts once they are linked in the app, under Skills, then Connectors.
+/// The services themselves go with it as `needs_link`. None with none.
+pub fn needs_link_ask(needs: &[Value]) -> Option<String> {
+    let names: Vec<&str> = needs
         .iter()
         .filter_map(|need| need["name"].as_str())
-        .map(|name| {
-            format!(
-                "{name} isn't linked yet: link it in the app, under Skills, then Connectors, and \
-                 the skill will start then."
-            )
-        })
         .collect();
-    (!said.is_empty()).then(|| said.join(" "))
+    if names.is_empty() {
+        return None;
+    }
+    let (names, are) = (
+        names.join(" and "),
+        if names.len() == 1 { "is" } else { "are" },
+    );
+    Some(format!(
+        "Then tell the person, in your own words and in the language of the conversation, \
+         that the skill will start once {names} {are} linked in the app, under Skills, then \
+         Connectors (needs_link)."
+    ))
 }
 
 /// A made skill's `skill.toml` held to what one may use (the coordinator's
@@ -3607,13 +3616,19 @@ body = { gesture = "nod" }
             needs_link(&Uses::default(), || panic!("never asked")),
             Some(vec![])
         );
-        assert_eq!(
-            needs_link_said(&[json!({"code": "gmail", "name": "Gmail"})]).as_deref(),
-            Some(
-                "Gmail isn't linked yet: link it in the app, under Skills, then Connectors, and \
-                 the skill will start then."
-            )
+        // The owner, 10 Nov ("đồng bộ luôn"): the model is asked to tell
+        // it in its own words and the conversation's language, never given
+        // an English sentence to say as it is.
+        let ask = needs_link_ask(&[json!({"code": "gmail", "name": "Gmail"})]).unwrap();
+        assert!(
+            ask.contains("in your own words and in the language of the conversation")
+                && ask.contains(
+                    "the skill will start once Gmail is linked in the app, under \
+                                 Skills, then Connectors"
+                ),
+            "{ask}"
         );
-        assert_eq!(needs_link_said(&[]), None);
+        assert!(!ask.contains("Say exactly") && !ask.contains("isn't linked yet"));
+        assert_eq!(needs_link_ask(&[]), None);
     }
 }
