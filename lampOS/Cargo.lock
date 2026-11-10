@@ -2457,6 +2457,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-sim"
+version = "0.1.0"
+dependencies = [
+ "lamp-bus",
+ "lamp-ipc",
+ "lamp-msgs",
+ "rustix",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lamp-skills"
 version = "0.1.0"
 dependencies = [
