@@ -19800,6 +19800,31 @@ mod tests {
         }
     }
 
+    /// #5764, lamp-52e6 on 10 Nov: relaxing music was playing when the
+    /// speaker was muted. Its recording was revoked, the speaker dropped the
+    /// 360 frames still queued as a stale owner's, and that discard ended the
+    /// voice. A revoked recording's discard, or a privacy gap's, is its own.
+    #[test]
+    fn a_requested_recording_revoked_mid_play_drops_its_audio_without_ending_the_voice() {
+        for reason in ["requested_audio_revoked", "privacy_gap"] {
+            let (mut owner, current, _) = active_reply();
+            let affected = current.owner;
+            let mut reply = Some(current);
+            let mut trace = SessionState::default();
+            cancel_reply(&mut owner, &mut reply, &mut trace, reason).unwrap();
+            let mut event = discarded(affected, PlaybackDiscardReason::StaleOwner, false);
+            if let WorkerEvent::PlaybackDiscarded { queued_frames, .. } = &mut event {
+                *queued_frames = 360;
+            }
+            handle_playback_discard(&mut owner, &mut reply, &mut trace, event).unwrap();
+            let discard = (0..trace.len())
+                .map(|row| &trace[row])
+                .find(|row| row["kind"] == "playback_discarded")
+                .unwrap();
+            assert_eq!(discard["expected_cancellation"], true, "{reason}");
+        }
+    }
+
     /// The first builder's P1 on #1047: a stop said over the lamp's voice
     /// cancels as the hand's does, so the speaker's discard of the rest of
     /// its audio is expected and ends nothing, as for a head tap (#1024).

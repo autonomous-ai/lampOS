@@ -260,7 +260,10 @@ between them were counted as a gap and the recording was cancelled with
 "the confirmation had a gap". A gapped confirmation still leaves its news
 unacknowledged, as any gapped reply does. Before #5764 this end said nothing: on lamp-52e6 on 9 Nov (10883)
 three triggered requests played nothing and the journal said nothing. `request N: requested audio
-revoked: <why>` comes from the coordinator, when the turn is revoked.
+revoked: <why>` comes from the coordinator, when the turn is revoked. The
+speaker then drops the frames still queued for it, and that drop is the
+revocation's own: the recording stops and the voice goes on. On lamp-52e6
+on 10 Nov a mute 10 s into relaxing music ended the voice that way.
 
 The second route says the confirmation with the call and, with
 `LAMP_SECOND_SAID_ONCE`, nothing after its result, so a short confirmation
