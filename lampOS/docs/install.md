@@ -1437,11 +1437,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    **Hermes on the lamp** (#5978;
    `crates/update/src/hermes_install.rs`; `LAMP_HERMES_ON_LAMP` in
    `lamp-update.service`'s environment: set, on only when `on` exactly, so
-   any other value is off; unset, off on every lamp: the build's default
-   `PRODUCT_DEFAULT` is off, and the product turns it on only after the
-   first builder's default-on read on the capped build's lamp-c0a4
-   numbers (privacy held through the install, first answers within
-   ~300 ms of rest, no ask lost); no product unit sets it). Hermes (NousResearch
+   any other value is off and `off` turns a product lamp off; unset, on on
+   a lamp installed as the product, the build's default `PRODUCT_DEFAULT`
+   being on (the product owner's decision, 10 Nov, which the first builder
+   allows with the schedule below: it installs only in a quiet window,
+   gives way while someone speaks and stops if the privacy reading is
+   lost), and off on any other lamp; no product unit sets it). Hermes (NousResearch
    hermes-agent) is a coding agent Harness already knows as an engine.
    Harness finds an engine only by `command -v` in its user's login shell,
    so a `hermes` on `lampos`'s login `PATH` is all it needs: the wrapper
@@ -1461,7 +1462,68 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      records `installing` and starts `lamp-update-harness.service` itself,
      without waiting. With Harness missing it starts nothing: the one-shot
      Harness's step started installs Hermes right after Harness, in the
-     same run, and the record stays `absent` until then.
+     same run, and the record stays `absent` until then. Only in its
+     window, below; outside it the round writes no ask, takes back an
+     install ask an earlier round left (an ask to remove is kept), and
+     journals `Hermes 0.22.2 is not set up yet: it waits, <why>`.
+   - **The window** (`crates/update/src/hermes_schedule.rs`, the first
+     builder's rules for the default-on, 10 Nov). Measured on a 4 GB lamp
+     with an SD card, the install (about 2.4 GB of writes, 7 to 12 min)
+     slipped lamp-controls' 50 ms privacy reading and kept the voice's
+     microphones closed. A round starts it (or asks Harness's one-shot for
+     it) only when all of these hold:
+     - not the first round after lamp-update started (a boot, an update's
+       restart, its own switch);
+     - the setup walk not under way (the voice's onboarding file, as the
+       round's own walk hold reads it, `crates/update/src/walk.rs`);
+     - a quiet stretch: the voice seen resting on the bus and nobody heard
+       or answered for 10 min (`QUIET_STRETCH`), by the round's own quiet
+       gate (`voice/state`, `voice/heard`, `voice/said`, `voice/mute`,
+       `voice/privacy`, `crates/update/src/quiet.rs`), heard by a thread
+       of `serve` that listens from its start (subscribed as
+       `update-hermes`), so a stretch needs 10 min of listening;
+     - and either right after the setup walk ended: the walk's
+       `done_at_unix_ms` in the voice's onboarding file
+       (`/var/lib/lampOS/voice/onboarding/progress.json`, or the file the
+       voice unit's `LAMP_ONBOARDING_FILE` names), within 6 h
+       (`AFTER_WALK_LASTS`), for the first try since (a try recorded
+       `installing` or `failed` after it waits for the night); or the
+       quiet hour at night, 01:00 up to 05:00 local
+       (`NIGHT_FROM_MINUTE`, `NIGHT_TO_MINUTE`), in the lamp's zone
+       (`/etc/localtime`, which setup points at the phone's zone, read by
+       `lamp-local-time` as the other parts read it). A wall clock before
+       2026 is not set: no local time, so only the walk's window.
+     Harness's own install is not held by it. lamp-update's sandbox reads
+     all of these: `ProtectSystem=strict` keeps `/var/lib` and `/etc`
+     readable, and `/run/lampos-bus` is among its `ReadWritePaths`.
+   - **Gives way while it runs** (the same thread, every 100 ms, while the
+     record says `installing` and systemd says the one-shot is
+     `activating`):
+     - the voice not quiet (someone heard or answered, the voice not
+       resting, or not seen): `systemctl freeze lamp-update-harness.service`
+       (systemd 246 or later; the lamp has 252), journaled `Hermes's
+       install is frozen while the voice is not quiet: <why>`; thawed with
+       `systemctl thaw` once the quiet stretch (10 min) is back. Frozen
+       30 min in all (`MOST_FROZEN`), over one freeze or several, it is
+       stopped as `interrupted`, so with the install's own 7 to 12 min it
+       ends inside the unit's hour (`TimeoutStartSec` counts on while
+       frozen). A freeze or thaw systemd refuses stops it too, so the
+       one-shot is never left frozen; and a `serve` that starts thaws it
+       first, in case one ended mid-freeze;
+     - the privacy reading lost: once a fresh lease with the slide read
+       (or a lamp with no slide) was seen on `voice/privacy`, its newest
+       lease older than 250 ms (`LOST_AFTER`, its life being 50 ms), one
+       that no longer reads the slide, or one from another of the voice's
+       boots (it ended and started again): the one-shot is thawed and
+       stopped at once (`systemctl stop`), and the record written `failed`
+       with `privacy_lost`. A lamp whose voice never said a reading is not
+       judged by it. Looked at every 100 ms, a lapse shorter than that
+       between two looks can be missed; a restart of the voice by an
+       update round during the install stops it too.
+     A stopped install's ask is taken away with it (the one-shot is killed
+     before it could); what it left in `/var/lib/lampos-hermes` is taken up
+     by the next try, as a cut-off try's is, and the entry points are
+     written only as an install ends.
    - **The one-shot:** `lamp-update harness-install` runs Harness's install
      when Harness is missing (started for Hermes alone, Harness's record is
      left as it is), then Hermes's when the ask is there, whatever
@@ -1624,7 +1686,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      install as well. `/etc` is not writable. It runs at `Nice=10`,
      `IOSchedulingClass=idle` and `CPUWeight=20`, as lamp-update does, and
      is capped: `CPUQuota=150%`, writes 8 MB/s and 200 IOPS, reads 16 MB/s
-     and 400 IOPS on `/var/lib`'s card. On lamp-c0a4 on 10 Nov a Hermes
+     and 400 IOPS on `/var/lib`'s card, and `MemoryHigh=1200M`: past it
+     the kernel reclaims the one-shot's own memory and throttles it, never
+     kills it (no `MemoryMax`), so a 4 GB lamp keeps about 1.2 GB
+     available; with the other caps the `products` stage took
+     `MemAvailable` down to about 868 MB on lamp-c0a4. On lamp-c0a4 on 10 Nov a Hermes
      install at the default priority stalled lamp-controls' loop 93 ms past
      the privacy reading's 50 ms, and the voice kept the microphones closed
      until it was restarted. The lower priority alone did not stop it: the
@@ -1701,31 +1767,39 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `no_tools`,
      `no_userns`, `serve` (one of lamp-update's own steps: the installer's
      file, moving the old Hermes aside, making the folder), `timeout`,
-     `installer`, `version`, `config`, `entry`, `not_started`; `version`
+     `installer`, `version`, `config`, `entry`, `not_started`,
+     `privacy_lost` and `interrupted` (stopped by the watch above); `version`
      and `commit` with `installed`. Switch off, `serve` removes the record
      and the ask at its start; the entry points go as above.
    - **Tried again** by the first reached round 24 h after a failure
-     (`RETRY_AFTER`), or after `installing` for over 70 min; `serve` and
-     `not_started` at the next round. A failed install takes out the
+     (`RETRY_AFTER`), or after `installing` for over 70 min; `serve`,
+     `not_started`, `privacy_lost` and `interrupted` at the next round
+     whose window is open (`RETRY_IN_NEXT_WINDOW`): a failure after the
+     walk's window is tried in the quiet hour at night. Every retry waits
+     for its window. A failed install takes out the
      wrapper and the namespace script, but keeps its partial
      `/var/lib/lampos-hermes` (up to about 2.4 GB) until that retry 24 h
      later, which continues it when its checkout is at the pin or not made
      yet, and moves it aside (or removes it) otherwise; a `/var/lib/lampos-hermes.old` set aside
      before the failure stays until a later install's new Hermes runs.
    - **The parts' units** (`deploy/product`): unchanged; none sets
-     `LAMP_HERMES_ON_LAMP`, so the product's Hermes stays off until the
-     first builder's default-on read on the capped build's lamp-c0a4
-     numbers. Turning it on later means `LAMP_HERMES_ON_LAMP=on` in
-     lamp-update's unit (the install), in `lamp-cloud.service` (its
-     forwarder, which writes only its own state folder, so it needs no
-     other path and no group) and in `lamp-tasks.service`. lamp-tasks' `--engines-from-machines` (without
+     `LAMP_HERMES_ON_LAMP` in this change: lamp-update installs the
+     product's Hermes by its own default (on since the product owner's
+     decision, 10 Nov, with the window above), and
+     `LAMP_HERMES_ON_LAMP=off` in its unit turns that off. lamp-cloud's
+     forwarder (`LAMP_HERMES_ON_LAMP=on` in `lamp-cloud.service`, which
+     writes only its own state folder, so it needs no other path and no
+     group) and lamp-tasks' side (`lamp-tasks.service`) are turned on by
+     the units' own change. lamp-tasks' `--engines-from-machines` (without
      it the lamp's own Hermes is never looked for, and the lamp is no
      target) and `--reply-named`, `LAMP_TASKS_REPLY_NAMED` (lamp-voice) and
      `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) come with the routing that
      reads them (#6094).
-   - **Shown only in tests** (`hermes_install::tests`, the wrapper and the
-     namespace script run by `sh` there too). Not run on a lamp yet: the
-     whole install by lamp-update. Measured by hand on lamp-c0a4 (10 Nov,
+   - **Shown only in tests** (`hermes_install::tests`,
+     `hermes_schedule::tests`, the wrapper and the namespace script run by
+     `sh` there too). Not run on a lamp yet: the whole install by
+     lamp-update, its window, a freeze and thaw, and a stop on a lost
+     privacy reading. Measured by hand on lamp-c0a4 (10 Nov,
      the same installer as `lampos`, the same six stages): 557 s in all,
      +3.0 GB, inside each stage's 15-min bound and the unit's hour.
 

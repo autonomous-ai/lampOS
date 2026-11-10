@@ -1,9 +1,9 @@
 //! Hermes put on the lamp after Harness (#5978; docs/install.md, "Hermes on
-//! the lamp"): off on every lamp unless `LAMP_HERMES_ON_LAMP=on` in
-//! lamp-update's own unit ([`PRODUCT_DEFAULT`] is off: the product turns
-//! it on only after the first builder's default-on read on the capped
-//! build's lamp-c0a4 numbers: privacy held through the install, first
-//! answers within ~300 ms of rest, no ask lost); `off` there keeps it off.
+//! the lamp"): on by default on a lamp installed as the product
+//! ([`PRODUCT_DEFAULT`] is on: the product owner's decision, 10 Nov, which
+//! the first builder allows with the schedule of
+//! [`crate::hermes_schedule`]); `LAMP_HERMES_ON_LAMP=off` in lamp-update's
+//! own unit turns it off, and any other lamp has it only with `on` there.
 //! It rides on Harness before the sign-in ([`crate::harness_install`]):
 //! with that off, Hermes is off as well.
 //!
@@ -36,13 +36,15 @@
 //! sent to it.
 //!
 //! **When.** After a `serve` round that reached the channel, with the
-//! switch on and Hermes missing ([`present`]): the round writes [`ASK`].
+//! switch on and Hermes missing ([`present`]), and only in its window
+//! ([`crate::hermes_schedule::window`]): the round writes [`ASK`].
 //! With Harness there, it starts Harness's one-shot
 //! ([`crate::harness_install::UNIT`]) itself; with Harness missing, the
 //! one-shot Harness's own round starts installs Hermes right after
 //! Harness. A Hermes failure never fails Harness's install or the round:
 //! it is recorded in [`RECORD`], its entry points ([`WRAPPER`], [`NS`])
-//! taken out, and it is tried again [`RETRY_AFTER`] later. With the switch
+//! taken out, and it is tried again [`RETRY_AFTER`] later (one stopped by
+//! `serve`'s watch, [`carry_out`], in the next open window). With the switch
 //! off, a round that finds an entry point asks the one-shot to take them
 //! out ([`after_round_off`]); Hermes's folder stays.
 //!
@@ -84,11 +86,11 @@ use std::{
 /// The switch, in lamp-update's own unit: `on` exactly.
 pub const SWITCH: &str = "LAMP_HERMES_ON_LAMP";
 /// Whether a lamp installed as the product installs Hermes with [`SWITCH`]
-/// unset: off, until the first builder's default-on read on the capped
-/// build's lamp-c0a4 numbers (privacy held through the install, first
-/// answers within ~300 ms of rest, no ask lost). Any other lamp with it
-/// unset is off too.
-pub const PRODUCT_DEFAULT: bool = false;
+/// unset: on, the product owner's decision (10 Nov), under the first
+/// builder's schedule ([`crate::hermes_schedule`]: a quiet window, frozen
+/// while someone speaks, stopped when the privacy reading is lost); `off`
+/// turns it off. Any other lamp with it unset is off.
+pub const PRODUCT_DEFAULT: bool = true;
 
 /// Where the install is, in lamp-update's records (0600), next to
 /// Harness's [`harness_install::RECORD`]. lamp-update's own: not said on
@@ -379,8 +381,11 @@ impl HermesInstall {
     /// [`PLACE`]), past a stage's bound, a stage failed or left no `hermes`
     /// or a `hermes` that does not run, the checkout not at [`COMMIT`],
     /// Hermes's config not set, the wrapper or its namespace script not
-    /// written, the one-shot not started.
-    pub const ERRORS: [&str; 13] = [
+    /// written, the one-shot not started; stopped by lamp-update's watch
+    /// ([`crate::hermes_schedule::Watch`]) as the voice's privacy reading
+    /// was lost, or after it was frozen too long while the voice was not
+    /// quiet.
+    pub const ERRORS: [&str; 15] = [
         "pin_mismatch",
         "no_user",
         "no_space",
@@ -394,6 +399,8 @@ impl HermesInstall {
         "config",
         "entry",
         "not_started",
+        "privacy_lost",
+        "interrupted",
     ];
 
     fn new(install: &str, error: Option<&str>, at_unix_ms: u64) -> Self {
@@ -528,16 +535,21 @@ fn ask(records: &Path, remove: bool) -> io::Result<()> {
 /// After a round that reached the channel, with the switch on, and after
 /// Harness's own [`harness_install::after_round`]: Hermes there is recorded
 /// `installed` (once) and nothing runs. Missing, with no try under way and
-/// no recent failure, [`ASK`] is written; then with Harness there,
-/// `installing` is recorded and Harness's one-shot started without
-/// waiting (a unit not started is `not_started`), and with Harness missing
-/// nothing more: the one-shot Harness's round starts reads the ask after
-/// Harness. What was recorded is returned, none when nothing changed.
+/// no recent failure, it waits for its `window`
+/// ([`crate::hermes_schedule::window`]): closed, one line says why, and an
+/// install [`ASK`] an earlier round left is taken back, so a one-shot
+/// started for Harness alone does not run Hermes's install now. Open,
+/// [`ASK`] is written; then with Harness there, `installing` is recorded
+/// and Harness's one-shot started without waiting (a unit not started is
+/// `not_started`), and with Harness missing nothing more: the one-shot
+/// Harness's round starts reads the ask after Harness. What was recorded
+/// is returned, none when nothing changed.
 pub fn after_round(
     root: &Path,
     records: &Path,
     systemd: &mut dyn Systemd,
     now_unix_ms: u64,
+    window: Result<crate::hermes_schedule::Window, String>,
     say: &mut dyn FnMut(&str),
 ) -> Option<HermesInstall> {
     let before = record(records);
@@ -559,12 +571,25 @@ pub fn after_round(
             return None;
         }
         if said.install == "failed"
-            && !matches!(said.error.as_deref(), Some("serve" | "not_started"))
+            && !matches!(said.error.as_deref(), Some(error) if RETRY_IN_NEXT_WINDOW.contains(&error))
             && since(said) < RETRY_AFTER.as_millis() as u64
         {
             return None;
         }
     }
+    let window = match window {
+        Ok(window) => window,
+        Err(why) => {
+            if withhold(records) {
+                say("Hermes's install asked earlier is taken back: not its window");
+            }
+            say(&format!(
+                "Hermes {VERSION} is not set up yet: it waits, {why}"
+            ));
+            return None;
+        }
+    };
+    say(&format!("Hermes may be installed now: {}", window.name()));
     if let Err(error) = ask(records, false) {
         say(&format!(
             "Hermes is not installed: {ASK} not written: {error}"
@@ -598,6 +623,106 @@ pub fn after_round(
             Some(write(records, failed(now_unix_ms, "not_started")))
         }
     }
+}
+
+/// Failures tried again at the next round whose window is open, not
+/// [`RETRY_AFTER`] later: lamp-update's own (`serve`, `not_started`), and
+/// an install lamp-update's watch stopped (`privacy_lost`, `interrupted`),
+/// which a quieter window may finish.
+pub const RETRY_IN_NEXT_WINDOW: [&str; 4] = ["serve", "not_started", "privacy_lost", "interrupted"];
+
+/// An install [`ASK`] taken back (an ask to remove is kept): whether one
+/// was there.
+pub fn withhold(records: &Path) -> bool {
+    let Ok(bytes) = fs::read(records.join(ASK)) else {
+        return false;
+    };
+    let asked = serde_json::from_slice::<Ask>(&bytes).unwrap_or_default();
+    !asked.remove && fs::remove_file(records.join(ASK)).is_ok()
+}
+
+/// Whether a Hermes install is under way as the record says: what the
+/// watch looks at before it asks systemd.
+pub fn installing(records: &Path) -> bool {
+    record(records).is_some_and(|said| said.install == "installing")
+}
+
+/// The watch's `act` ([`crate::hermes_schedule::Watch::look`]) carried out
+/// on Harness's one-shot, only while systemd says it runs (`activating`):
+/// frozen (`systemctl freeze`) or thawed, or stopped (thawed first) and
+/// recorded `failed` with its error, with its [`ASK`] taken back. A freeze
+/// or thaw that systemd refuses stops the install, so the one-shot is
+/// never left frozen.
+pub fn carry_out(
+    act: &crate::hermes_schedule::Act,
+    records: &Path,
+    systemd: &mut dyn Systemd,
+    now_unix_ms: u64,
+    say: &mut dyn FnMut(&str),
+) -> Carried {
+    use crate::hermes_schedule::Act;
+    let unit = harness_install::UNIT;
+    if *act == Act::Nothing {
+        return Carried::Done;
+    }
+    let runs = systemd.states(&[unit.to_owned()]).is_ok_and(|states| {
+        states
+            .iter()
+            .any(|state| state.unit == unit && state.active == "activating")
+    });
+    if !runs {
+        return Carried::NotRunning;
+    }
+    let (error, why) = match act {
+        Act::Nothing => return Carried::Done,
+        Act::Freeze(why) => match systemd.freeze_harness_unit() {
+            Ok(()) => {
+                say(&format!(
+                    "Hermes's install is frozen while the voice is not quiet: {why}"
+                ));
+                return Carried::Done;
+            }
+            Err(refused) => ("interrupted", format!("{unit} not frozen: {refused}")),
+        },
+        Act::Thaw => match systemd.thaw_harness_unit() {
+            Ok(()) => {
+                say("Hermes's install goes on: the voice is quiet again");
+                return Carried::Done;
+            }
+            Err(refused) => ("interrupted", format!("{unit} not thawed: {refused}")),
+        },
+        Act::Stop { error, why } => (*error, why.clone()),
+    };
+    let _ = systemd.thaw_harness_unit();
+    if let Err(refused) = systemd.stop(unit) {
+        say(&format!("{unit} not stopped: {refused}"));
+    }
+    stopped(records, error, now_unix_ms);
+    say(&format!(
+        "Hermes's install is stopped ({error}): {why}; tried again in a later window"
+    ));
+    Carried::Stopped
+}
+
+/// What [`carry_out`] did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Carried {
+    /// Done as asked, or nothing asked.
+    Done,
+    /// The one-shot does not run (`activating`) as systemd says: nothing
+    /// done, and the watch starts again once it does.
+    NotRunning,
+    /// The install stopped and recorded `failed`.
+    Stopped,
+}
+
+/// An install the watch stopped: recorded `failed` with `error`, and its
+/// [`ASK`] taken away, as the one-shot was killed before it could.
+/// What it left in [`PLACE`] is taken up by the next try, as a cut-off
+/// try's is; the entry points are written only as an install ends.
+pub fn stopped(records: &Path, error: &str, now_unix_ms: u64) -> HermesInstall {
+    let _ = fs::remove_file(records.join(ASK));
+    write(records, failed(now_unix_ms, error))
 }
 
 /// After a round that reached the channel, with the switch off: an entry

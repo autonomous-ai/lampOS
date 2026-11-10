@@ -186,3 +186,30 @@ fn a_walk_not_written_yet_holds_when_the_voice_walks() {
     );
     assert_eq!(elsewhere.round(), held(1));
 }
+
+/// When the walk ended, for the Hermes install's window (#5978): its
+/// file's `done_at_unix_ms`, only once the walk is not under way; none
+/// without the file, without the field, or for a file that isn't JSON.
+#[test]
+fn the_walks_end_is_its_done_line_once_it_is_not_under_way() {
+    let lamp = Lamp::new();
+    assert_eq!(walk::ended_at_unix_ms(&lamp.config), None);
+    set_up(&lamp);
+    put(&lamp, walk::PROGRESS, &walked());
+    assert_eq!(walk::ended_at_unix_ms(&lamp.config), None, "not dated");
+    let dated = walked().replacen('{', r#"{"done_at_unix_ms":1794310000000,"#, 1);
+    put(&lamp, walk::PROGRESS, &dated);
+    assert_eq!(
+        walk::ended_at_unix_ms(&lamp.config),
+        Some(1_794_310_000_000)
+    );
+    let redo = TWO_STEPS_IN.replacen('{', r#"{"done_at_unix_ms":1794310000000,"#, 1);
+    put(&lamp, walk::PROGRESS, &redo);
+    assert_eq!(
+        walk::ended_at_unix_ms(&lamp.config),
+        None,
+        "a redo under way"
+    );
+    put(&lamp, walk::PROGRESS, "not json");
+    assert_eq!(walk::ended_at_unix_ms(&lamp.config), None);
+}

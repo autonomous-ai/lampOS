@@ -3276,12 +3276,21 @@ the round never waits for Harness's download. Its sandbox differs:
 namespace script), since Harness's home may not exist yet under
 `/var/lib`; network on; 3600 s since #5978 (1500 before). It runs
 `lamp-update harness-install`, which also installs the pinned Hermes
-after Harness, as `lampos`, with `LAMP_HERMES_ON_LAMP=on` in lamp-update's
-own unit (off unless set, on a product lamp too: its `PRODUCT_DEFAULT` is
-off until the first builder's default-on read on the capped build's
-lamp-c0a4 numbers; install.md, "Hermes on the lamp"); a round with that
+after Harness, as `lampos`, unless `LAMP_HERMES_ON_LAMP=off` in
+lamp-update's own unit (on by default on a product lamp: its
+`PRODUCT_DEFAULT` is on, the product owner's decision, 10 Nov; another
+lamp needs `on`; install.md, "Hermes on the lamp"); a round with that
 switch on and Harness already
-there starts the same unit for Hermes. `check-units` compares it with its own text
+there starts the same unit for Hermes. Hermes's install starts only in
+its window (`hermes_schedule::window`): not in the first round after
+lamp-update starts, not while the setup walk is under way, only after
+10 min with the voice resting and nobody heard, and then right after the
+walk ended or 01:00 to 05:00 local. While it runs, a thread of `serve`
+freezes the unit (`systemctl freeze`) as soon as the voice is not quiet,
+thaws it after 10 quiet min, stops it after 30 min frozen in all
+(`interrupted`) and stops it at once when the voice's privacy lease is
+lost (`privacy_lost`); both are tried in the next open window. The unit
+has `MemoryHigh=1200M` too, so a 4 GB lamp keeps about 1.2 GB available. `check-units` compares it with its own text
 as "the updater's", and a round never takes it for a part's unit. Its
 record, `harness-install.json`, is said on `update/status` as `harness`.
 The same unit moves a Harness older than the build's pin to it, when

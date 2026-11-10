@@ -65,6 +65,17 @@ pub trait Systemd {
     fn start_harness_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot start the Harness unit".to_owned())
     }
+    /// `systemctl freeze` of [`crate::harness_install::UNIT`], and only it
+    /// (#5978): its cgroup frozen while the voice is not quiet during
+    /// Hermes's install (systemd 246 and later). A systemd that cannot
+    /// refuses.
+    fn freeze_harness_unit(&mut self) -> Result<(), String> {
+        Err("this systemd cannot freeze the Harness unit".to_owned())
+    }
+    /// `systemctl thaw` of [`crate::harness_install::UNIT`], and only it.
+    fn thaw_harness_unit(&mut self) -> Result<(), String> {
+        Err("this systemd cannot thaw the Harness unit".to_owned())
+    }
     /// When [`crate::writer_swap::BACK_UNIT`]'s program last began, in Unix
     /// milliseconds to the second below (`ExecMainStartTimestamp`): none
     /// when it never began, or when systemd cannot say. A `failed` from a
@@ -219,6 +230,14 @@ impl Systemd for Systemctl {
             &["start", "--no-block", crate::harness_install::UNIT],
             JOURNAL_WITHIN,
         )
+    }
+
+    fn freeze_harness_unit(&mut self) -> Result<(), String> {
+        run(&["freeze", crate::harness_install::UNIT], JOURNAL_WITHIN)
+    }
+
+    fn thaw_harness_unit(&mut self) -> Result<(), String> {
+        run(&["thaw", crate::harness_install::UNIT], JOURNAL_WITHIN)
     }
 
     fn start_writer_unit(&mut self) -> Result<(), String> {
@@ -563,6 +582,12 @@ impl BusEars {
     /// that cannot be used is said once, and then nothing is heard: the
     /// voice can then not be judged quiet.
     pub fn new(root: &Path, say: &mut dyn FnMut(&str)) -> Self {
+        Self::named(root, NAME, say)
+    }
+
+    /// [`BusEars::new`], subscribed under `name`: the Hermes install's
+    /// watch listens beside the rounds' own ears (#5978).
+    pub fn named(root: &Path, name: &str, say: &mut dyn FnMut(&str)) -> Self {
         let bus = match Bus::new(root) {
             Ok(bus) => bus,
             Err(error) => {
@@ -579,7 +604,7 @@ impl BusEars {
             }
         };
         let mut subscribe =
-            |topic: &str, type_name: &str| match bus.subscribe_typed(topic, NAME, type_name) {
+            |topic: &str, type_name: &str| match bus.subscribe_typed(topic, name, type_name) {
                 Ok(subscriber) => Some(subscriber),
                 Err(error) => {
                     say(&format!("{topic} cannot be subscribed to: {error}"));
@@ -615,6 +640,34 @@ impl BusEars {
         Some(Heard::Slide {
             closed: lease.physical_muted == Some(true),
         })
+    }
+}
+
+impl BusEars {
+    /// The voice's newest privacy lease for the Hermes install's watch
+    /// (#5978): fresh within [`crate::hermes_schedule::LOST_AFTER`] and
+    /// valid, with its boot and what it reads of the slide; else gone.
+    pub fn lease(&self) -> crate::hermes_schedule::Lease {
+        use crate::hermes_schedule::{LOST_AFTER, Lease};
+        let Some(Ok(Some(message))) = self
+            .bus
+            .as_ref()
+            .map(|bus| bus.latest(MicrophonePrivacy::TOPIC))
+        else {
+            return Lease::Gone;
+        };
+        let age = unix_ms().saturating_sub(message.header.at_unix_ms);
+        if age > LOST_AFTER.as_millis() as u64 {
+            return Lease::Gone;
+        }
+        match message.parse::<MicrophonePrivacy>() {
+            Ok(lease) if lease.check().is_ok() => Lease::Fresh {
+                boot: format!("{}/{}", lease.session_id, lease.controller_boot),
+                physical: lease.physical_muted,
+                no_slide: lease.no_slide,
+            },
+            _ => Lease::Gone,
+        }
     }
 }
 
