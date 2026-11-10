@@ -4456,11 +4456,17 @@ after a take-over, but now for every turn:
       rounds from being installed later. Cutting or dropping the turn
       during that await cannot leave those rounds for the next turn.
       Earlier `SentWrite` records retain request, attempt, timing and
-      outcome accounting, but their display calls and results are scrubbed.
+      outcome accounting, but the epoch immediately invalidates publication
+      of their display calls and results. Bounded raw receipt payloads may
+      remain in memory until registration, completion or recovery scrubs
+      them, or eviction drops them; immediate RAM zeroization is not promised.
       Handles cloned before the await, late registration or completion,
       and `services::send_state` fallback cannot restore raw call IDs,
       arguments or results. Final reconstruction and publication share
-      admission's synchronization boundary. Ordinary batches preserve their
+      admission's synchronization boundary. No new I/O or task is added,
+      and receipt waits remain outside the publication lock. Recovery can
+      hold that lock while taking a receipt-content lock, so admission is
+      not guaranteed to be independent of contention. Ordinary batches preserve their
       producer context epoch when publishing finished rounds and registering
       send receipts, including the requested-audio runner path. An old
       batch that starts a send or finishes its round after admission cannot

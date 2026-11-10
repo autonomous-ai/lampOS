@@ -1,0 +1,101 @@
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 2.52s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 3.88s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 4.10s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 1.81s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 2.34s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 2.08s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue ... motor_cancel_priority_send_us=29
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 2.08s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 1.80s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit --test-threads=1 --nocapture
+
+running 1 test
+test reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 2.90s
+
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact reminders::transport::tests::claim_retention_boundary_fixture --test-threads=1 --nocapture
+
+running 1 test
+test reminders::transport::tests::claim_retention_boundary_fixture ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5508 filtered out; finished in 0.00s
+
+
+EXIT: 0

@@ -3443,11 +3443,17 @@ then use that person's scope:
   retained earlier tool rounds, before awaiting the call, alongside the
   pending rename. Copied rounds from an older epoch cannot be restored by
   a later turn, even if the forget's turn is cut or dropped during that
-  await. Earlier send records lose their display calls and results while
-  retaining request, attempt, timing and outcome accounting. A cloned
+  await. The epoch immediately prevents publication of earlier send
+  records' display calls and results while retaining request, attempt,
+  timing and outcome accounting. Bounded raw receipt payloads can remain
+  in memory until registration, completion or recovery scrubs them, or
+  eviction drops them; this is not immediate RAM zeroization. A cloned
   handle, late registration or completion, or service-receipt fallback
   cannot restore raw call IDs, arguments or results. Final publication is
-  synchronized with admission. Ordinary batches retain the epoch of the
+  synchronized with admission. This adds no I/O or task; receipt waits
+  stay outside the publication lock. Recovery can hold that lock while
+  taking a receipt-content lock, so admission latency can still depend on
+  contention. Ordinary batches retain the epoch of the
   context that produced them, both when publishing finished rounds and
   when registering a send receipt. Starting or finishing after admission
   cannot make an old batch's display content fresh again. A late confirmed send can still update the

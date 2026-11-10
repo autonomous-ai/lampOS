@@ -10311,13 +10311,9 @@ fn forget_carried_context(shared: &Shared) {
         carried.rounds.clear();
         carried.rounds_epoch = epoch;
     }
-    if let Ok(sent) = shared.sent_write.lock() {
-        for sent in sent.iter() {
-            if let Ok(mut content) = sent.content.lock() {
-                content.redact_if_old();
-            }
-        }
-    }
+    // Receipt publication is invalidated by the epoch immediately. Scrub
+    // each bounded payload at registration, completion or recovery rather
+    // than waiting for every receipt lock and deallocation on this path.
 }
 
 /// Drop this request's rounds again after the forget returns. Admission has
