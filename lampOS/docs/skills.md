@@ -409,7 +409,7 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
     lamp-skills remove [--dir DIR] [--state-dir DIR] NAME
     lamp-skills list [--dir DIR]
     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
-    lamp-skills asked [--dir DIR] [--key-file PATH]
+    lamp-skills asked [--dir DIR] [--key-file PATH] [--push-dir DIR] [--dev-dir DIR]
 
 (`install`, `remove`, `list` and `pack`: below, "Core and installable
 skills".)
@@ -1301,7 +1301,7 @@ product's skills folder is root's; the part itself only reads it, under
     lamp-skills remove [--dir DIR] [--state-dir DIR] NAME
     lamp-skills list [--dir DIR]
     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
-    lamp-skills asked [--dir DIR] [--key-file PATH]
+    lamp-skills asked [--dir DIR] [--key-file PATH] [--push-dir DIR] [--dev-dir DIR]
 
 `--dir` is `/var/lib/lampOS/skills` without it, the product unit's own
 `--dir` (`deploy/product/lamp-skills.service`): installable skills live
@@ -1494,7 +1494,11 @@ for it.
   with it, read-only), one capability, `CAP_DAC_OVERRIDE`
   (`CapabilityBoundingSet=`, for the app's off and on: the state folder is
   `lampos`'s, 0700, and root without it is held to that mode),
-  `NoNewPrivileges` and 60 s at most. `off`, `on` and `camera` are written beside
+  `NoNewPrivileges` and 60 s at most. `--push-dir DIR` and `--dev-dir DIR` are for a
+  desktop lamp only (the virtual lamp's own manage socket, `lamp-sim`): where lamp-control keeps
+  a pushed package for the helper (`/var/lib/lampos-control/push`) and where a pushed skill is
+  kept (`/var/lib/lampOS/skills-dev`); with neither, those are the paths, and no unit passes
+  them (a test checks every file under `deploy/`). `off`, `on` and `camera` are written beside
   and moved over, the file beside only ever made new and never through a
   link (`O_CREAT | O_EXCL | O_NOFOLLOW`; a link there is refused, its
   target untouched), and read never through a link (the reviewer's P2 on
