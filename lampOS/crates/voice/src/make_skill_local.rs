@@ -1108,11 +1108,18 @@ light = { dim = 1 }
         );
         assert!(!told["next"].as_str().unwrap().contains("Say exactly"));
         // The same line, as written, for a turn cut while it was made
-        // (lamp-9adf, 11 Nov): taken once.
+        // (lamp-9adf, 11 Nov): taken once, and exactly the line the model is
+        // told to say, whatever a later sentence (its manners) adds to it.
+        let said = take_said_line().expect("the made line is left for a cut turn");
+        assert!(
+            said.starts_with("I made evening dim, and it's on: "),
+            "{said}"
+        );
         assert_eq!(
-            take_said_line().as_deref(),
-            Some(
-                "I made evening dim, and it's on: when the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most once every 12 hours, using its light and whether it is talking."
+            told["next"],
+            format!(
+                "{} Ask nothing about putting it on.",
+                made_skill::in_their_language(&said)
             )
         );
         assert_eq!(take_said_line(), None);

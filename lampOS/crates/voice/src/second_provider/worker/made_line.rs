@@ -49,7 +49,12 @@ async fn a_make_whose_turn_was_cut_still_says_its_line_once() {
     })
     .await
     .unwrap();
-    assert_eq!(line.0.as_deref(), Ok(LINE));
+    // The made line as written; a later sentence (its manners) may follow.
+    assert!(
+        line.0.as_deref().is_ok_and(|l| l.starts_with(LINE)),
+        "{:?}",
+        line.0
+    );
     assert!(line.1.is_err(), "said once: {:?}", line.1);
 }
 
