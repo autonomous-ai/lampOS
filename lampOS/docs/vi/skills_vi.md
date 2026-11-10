@@ -652,3 +652,11 @@ Không bao giờ ghi nội dung tệp vào journal.
 Kiểm thử: `upload_skill::tests`, `upload::tests`,
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`
 và `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
+
+## Trigger theo ngày trong tuần (`trigger.days`, #6066)
+
+| Khóa | Bắt buộc | Ý nghĩa |
+|------|----------|---------|
+| `trigger.days` | không | Các ngày trong tuần (giờ địa phương) mà cửa sổ `during` mở: một danh sách không rỗng gồm `"mon"` đến `"sun"`, `"weekdays"` (thứ Hai đến thứ Sáu) và `"weekend"` (thứ Bảy và Chủ nhật), hoặc chỉ một tên (`days = "weekdays"`); một ngày nêu hai lần vẫn là một ngày. Chỉ đi cùng `during` (`days goes with during`); tên khác bị từ chối khi nạp (`days: "funday" is not a day: …`), danh sách rỗng cũng vậy (`days names no day`). Mỗi ngày làm việc lúc 7 giờ: `during = { from = "07:00", to = "07:30" }`, `days = "weekdays"`, `once_per_day = true`. Ngày là ngày địa phương mà `during` và `once_per_day` vốn dùng; giờ sau nửa đêm của cửa sổ qua đêm thuộc về ngày cửa sổ mở (`23:00` đến `02:00` của thứ Sáu vẫn giữ lúc 01:00 sáng thứ Bảy, không giữ lúc 01:00 sáng thứ Sáu). Ngoài các ngày đó, trigger coi như ngoài cửa sổ: không giữ, việc theo dõi đang chạy bị đặt lại, và một `yields_to` trỏ tới nó không chờ. Kiểm thử (`crates/skills/tests/it/daily_engine.rs`): `a_weekday_trigger_runs_on_monday_at_seven_and_not_on_saturday`, `a_weekend_trigger_runs_on_saturday_and_sunday_only`, `an_overnight_window_runs_on_the_day_it_opened`, `days_are_checked_at_load` |
+
+Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).

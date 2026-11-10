@@ -151,8 +151,9 @@ Keys of a trigger:
 - Timing: `for` (the test holds this long), `absent_for`, `gap`,
   `cooldown`, `wait` (at most 1 h), `rise = { by, within }`,
   `rearm` (`"leaves"`, `"ends"`, or `{ above | below, for }`).
-- `during` (a window), `once_per_day` (with a `name` and `during`),
-  `unless_heard`.
+- `during` (a window), `days` (with `during`: `["mon", "fri"]`,
+  `"weekdays"` or `"weekend"`, the days the window opens on),
+  `once_per_day` (with a `name` and `during`), `unless_heard`.
 - `yields_to = { skill, trigger }`: it gives way to another skill's
   trigger.
 - `sooner = { topic, field, above, for }`: a shorter `for` while that

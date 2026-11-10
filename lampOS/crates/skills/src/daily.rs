@@ -158,6 +158,58 @@ impl Window {
     }
 }
 
+/// The local days of the week a trigger's `during` window opens on (#6066):
+/// a bit a day, Monday the lowest. An overnight window's early hours belong
+/// to the day it opened, as [`Window::occurrence_day`] says.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Weekdays(u8);
+
+impl Weekdays {
+    const NAMES: [&'static str; 7] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+    /// `mon` to `sun`, `weekdays` (Monday to Friday) and `weekend`
+    /// (Saturday and Sunday). A day named twice is the same day. An empty
+    /// list and any other name are refused.
+    pub fn parse<S: AsRef<str>>(names: &[S]) -> Result<Self, String> {
+        if names.is_empty() {
+            return Err("days names no day".into());
+        }
+        let mut bits = 0u8;
+        for name in names {
+            let name = name.as_ref();
+            bits |= match name {
+                "weekdays" => 0b001_1111,
+                "weekend" => 0b110_0000,
+                _ => match Self::NAMES.iter().position(|day| *day == name) {
+                    Some(index) => 1 << index,
+                    None => {
+                        return Err(format!(
+                            "days: {name:?} is not a day: mon, tue, wed, thu, fri, sat, sun, weekdays or weekend"
+                        ));
+                    }
+                },
+            };
+        }
+        Ok(Self(bits))
+    }
+
+    /// Whether the local day `day` (days since 1970-01-01, a Thursday) is one
+    /// of them.
+    pub fn contains(&self, day: i64) -> bool {
+        self.0 & (1 << Self::index(day)) != 0
+    }
+
+    /// Monday 0 to Sunday 6.
+    fn index(day: i64) -> u32 {
+        (day + 3).rem_euclid(7) as u32
+    }
+
+    /// The local day's short name, `mon` to `sun`.
+    pub fn name(day: i64) -> &'static str {
+        Self::NAMES[Self::index(day) as usize]
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Moment {
     /// Local days since 1970-01-01, not a count of elapsed 24-hour periods.
