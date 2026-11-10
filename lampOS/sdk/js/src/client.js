@@ -767,7 +767,8 @@ export class Lamp {
   // `hum`, the lamp's own, or one of this computer's clips by name (`uploadSound`), once the person isn't talking.
   sound(name) { return this.act('sound', { name }); }
   // Keep a clip on the lamp as `name`, over one of the same name, to play with `sound(name)`: a WAV of 16-bit mono PCM
-  // at 24 kHz, at most 30 s, within the voice's loudness cap. `wav` is its bytes (a Buffer or Uint8Array) or a path.
+  // at 24 kHz, at most 30 s, within the voice's loudness cap: no sample past -12 dBFS and no 10 ms past -30 dBFS RMS (so a
+  // steady tone peaks near -27 dBFS at most). `wav` is its bytes (a Buffer or Uint8Array) or a path.
   // Sent in parts, as the lamp takes them; the lamp checks it whole and refuses it with why. Resolves to the clip as
   // kept: name, bytes, ms.
   async uploadSound(name, wav) {
