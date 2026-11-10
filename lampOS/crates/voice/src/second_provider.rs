@@ -13287,9 +13287,15 @@ async fn answer(
     // A plain cancel of a write waiting for its "send" (#5958): the write is
     // forgotten and the lamp says so itself, with no chat, so the model never
     // weighs "cancel that" against the lamp's reminders.
-    let cancelled = (heard && own.is_none())
-        .then(|| crate::services::cancel_waiting(request, &said, Instant::now()))
-        .flatten();
+    // Only for a turn still current (Thirteen's P3 on #5967: a dropped turn
+    // never takes the write and says nothing), and by the one who asked.
+    let cancelled =
+        (heard && own.is_none() && scope.as_ref().is_none_or(|scope| scope.is_current()))
+            .then(|| {
+                let owner = crate::services::owner_of(scope.as_ref());
+                crate::services::cancel_waiting(request, &said, owner.as_deref(), Instant::now())
+            })
+            .flatten();
     let own = own.or(cancelled.map(str::to_owned));
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
