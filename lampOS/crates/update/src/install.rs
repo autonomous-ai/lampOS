@@ -1210,8 +1210,17 @@ pub fn output_of(argv: &[String]) -> Result<String, String> {
 }
 
 /// Whether `argv` runs Harness's installer: the CDN's piped to `sh`, or a
-/// pinned install's checked copy, `sh <dir>/`[`PINNED_INSTALLER`].
+/// pinned install's checked copy, `sh <dir>/`[`PINNED_INSTALLER`]; or one
+/// stage of Hermes's checked copy, `bash <dir>/`
+/// [`crate::hermes_install::INSTALLER_FILE`] `--stage …` (#5978).
 pub fn runs_installer(argv: &[String]) -> bool {
+    let hermes = format!("/{}", crate::hermes_install::INSTALLER_FILE);
+    if argv
+        .windows(2)
+        .any(|pair| pair[0] == "bash" && pair[1].ends_with(&hermes))
+    {
+        return true;
+    }
     match argv {
         [.., sh, file] if sh == "sh" && file.ends_with(&format!("/{PINNED_INSTALLER}")) => true,
         [.., last] => last.contains(HARNESS_INSTALLER),
