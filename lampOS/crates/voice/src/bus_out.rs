@@ -1832,7 +1832,7 @@ mod tests {
                 ready: true,
             }],
             walk: true,
-            done_at_unix_ms: None,
+            ..Default::default()
         };
         let mut off = BusOut::on(&bus)
             .unwrap()

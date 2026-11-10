@@ -374,6 +374,12 @@ pub struct Kept {
     /// A `later` step's re-offers so far, at most [`MOST_LATER_OFFERS`].
     #[serde(default, skip_serializing_if = "is_zero")]
     pub later_offers: u8,
+    /// When the step last ended, in Unix ms (#5979): the app is told each
+    /// walk step's end from it (`lamp_msgs::OnboardingPending::steps_ended`).
+    /// None for a step parked out of the walk's order, or ended on a build
+    /// from before it. An older build reads past it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_at_unix_ms: Option<u64>,
 }
 
 /// A `later` step is offered again at most this many times (#3996): first
@@ -509,6 +515,13 @@ pub struct Progress {
     /// reset wipes it with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done_at_unix_ms: Option<u64>,
+    /// This walk's id, when it began in Unix ms (#5979): set as its first
+    /// step is asked, kept through a redo of one step, gone with a redo of
+    /// the whole walk, whose first step sets a new one. The app tells one
+    /// walk's steps from another's by it (lamp-cloud's `onboarding.step`).
+    /// A reset wipes it with the file. An older build reads past it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub walk_id: Option<u64>,
 }
 
 impl Progress {
@@ -589,6 +602,8 @@ mod steps_file {
         later_offers: u8,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         later: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ended_at_unix_ms: Option<u64>,
     }
 
     /// What a build from before `later` gave a step that ended with no
@@ -620,6 +635,7 @@ mod steps_file {
                     framing: kept.framing,
                     offered_at_unix_s: kept.offered_at_unix_s,
                     later_offers: kept.later_offers,
+                    ended_at_unix_ms: kept.ended_at_unix_ms,
                     later,
                 };
                 (name.as_str(), file)
@@ -650,6 +666,7 @@ mod steps_file {
                     framing: file.framing,
                     offered_at_unix_s: file.offered_at_unix_s,
                     later_offers: file.later_offers,
+                    ended_at_unix_ms: file.ended_at_unix_ms,
                 };
                 (name, kept)
             })
@@ -1845,6 +1862,7 @@ impl Onboarding {
             invitations,
             walk: false,
             done_at_unix_ms: self.committed.done_at_unix_ms,
+            ..Default::default()
         }
     }
 
@@ -2277,6 +2295,7 @@ impl Onboarding {
                         .get(Step::Privacy.name())
                         .filter(|_| outcome == Outcome::Later)
                         .map_or(0, |kept| kept.later_offers),
+                    ended_at_unix_ms: Some(unix_ms()),
                 },
             );
             self.desired.privacy_done_attempt = attempt_id;
@@ -2372,12 +2391,51 @@ impl Onboarding {
                 invitations: vec![offer],
                 walk: false,
                 done_at_unix_ms: self.committed.done_at_unix_ms,
+                ..Default::default()
             },
             None => self.privacy_pending(),
         };
         // Stepped aside for the pet response after "touch" (#4080).
         pending.walk = self.pet_response_until_us.is_none() && self.under_way().unwrap_or(true);
+        pending.walk_id = self.committed.walk_id;
+        pending.steps_ended = self.steps_ended();
         pending
+    }
+
+    /// The walk's four steps that ended, as committed, in the order they
+    /// ended (#5979): for the app, through lamp-cloud's `onboarding.step`.
+    /// Only with a walk id, and never a `later` step, which is offered
+    /// again; a step ended on a build from before this has no date and is
+    /// left out.
+    fn steps_ended(&self) -> Vec<lamp_msgs::OnboardingStepEnded> {
+        if self.committed.walk_id.is_none() {
+            return Vec::new();
+        }
+        let mut ended: Vec<_> = [
+            Step::WhereYouSit,
+            Step::WhoYouAre,
+            Step::Touch,
+            Step::HowYouSound,
+        ]
+        .into_iter()
+        .filter_map(|step| {
+            let kept = self
+                .committed
+                .steps
+                .get(step.name())
+                .filter(|kept| kept.outcome != Outcome::Later)?;
+            Some(lamp_msgs::OnboardingStepEnded {
+                step: step.name().to_owned(),
+                outcome: serde_json::to_value(kept.outcome)
+                    .ok()?
+                    .as_str()?
+                    .to_owned(),
+                at: kept.ended_at_unix_ms?,
+            })
+        })
+        .collect();
+        ended.sort_by_key(|ended| ended.at);
+        ended
     }
 
     pub(crate) fn take_invitation(&mut self, token: u64, now_us: u64) -> Option<String> {
@@ -3148,6 +3206,13 @@ impl Onboarding {
             }
             return self.ask_face_again(now_us, quiet_us, can_speak, face);
         };
+        // The walk begins with its first step asked, or a redo's (#5979): its
+        // id, kept till a redo of the whole walk. Not by a re-offer after it.
+        // Written with the walk's next save, never a write of its own, so no
+        // step waits on it; the app reads it only beside an ended step.
+        if self.desired.walk_id.is_none() && !self.walk_over() {
+            self.desired.walk_id = Some(unix_ms());
+        }
         if !self.step_available(step) {
             self.finish(step, Outcome::NotAvailable, None, now_us);
             return None;
@@ -3817,6 +3882,7 @@ impl Onboarding {
                 framing,
                 offered_at_unix_s,
                 later_offers,
+                ended_at_unix_ms: Some(unix_ms()),
             },
         );
         // The owner's #841 decision: giving way is the only onboarding
@@ -3907,6 +3973,7 @@ impl Onboarding {
                             framing: None,
                             offered_at_unix_s: None,
                             later_offers: 0,
+                            ended_at_unix_ms: None,
                         },
                     );
                     self.pending_records
@@ -5428,6 +5495,7 @@ mod tests {
             framing: None,
             offered_at_unix_s,
             later_offers,
+            ended_at_unix_ms: None,
         }
     }
 
@@ -5770,6 +5838,7 @@ mod tests {
                     framing: None,
                     offered_at_unix_s: Some(now),
                     later_offers: 0,
+                    ended_at_unix_ms: None,
                 },
             );
         }
@@ -5824,6 +5893,7 @@ mod tests {
                         framing: None,
                         offered_at_unix_s: Some(if sit { now - 86_400 } else { now }),
                         later_offers: 0,
+                        ended_at_unix_ms: None,
                     },
                 );
             }
@@ -8598,6 +8668,86 @@ mod tests {
         again.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(again.walk.kept().done_at_unix_ms, Some(at));
         assert_eq!(again.walk.pending().done_at_unix_ms, Some(at));
+    }
+
+    /// The app's step-by-step signal (#5979, `onboarding.step`): a walk
+    /// takes an id as its first step is asked; its four walk steps carry
+    /// their ends, in the order they ended, through a restart; a redo of one
+    /// step keeps the id, and a redo of the whole walk makes a new one.
+    #[test]
+    fn the_walks_steps_end_in_order_under_one_walk_id() {
+        let four = ["where_you_sit", "who_you_are", "touch", "how_you_sound"];
+        let mut room = Room::new("walk-id");
+        assert_eq!(room.walk.pending().walk_id, None);
+        walk_to_the_done_line(&mut room);
+        let id = room.walk.kept().walk_id.expect("the walk has an id");
+        let pending = room.walk.pending();
+        assert_eq!(pending.walk_id, Some(id));
+        let ended = pending.steps_ended;
+        let mut names: Vec<_> = ended.iter().map(|ended| ended.step.as_str()).collect();
+        names.sort_unstable();
+        let mut sorted = four;
+        sorted.sort_unstable();
+        assert_eq!(names, sorted, "{ended:?}");
+        assert!(
+            ended.windows(2).all(|two| two[0].at <= two[1].at),
+            "{ended:?}"
+        );
+        assert!(ended.iter().all(|ended| ended.at >= id), "{ended:?}");
+        assert!(
+            ended
+                .iter()
+                .all(|ended| ["done", "skipped", "failed", "not_available"]
+                    .contains(&ended.outcome.as_str())),
+            "{ended:?}"
+        );
+        // In the order they ended, whatever the walk's order: "where you
+        // sit" ending last is told last.
+        let file = room.walk.file.clone();
+        let mut progress: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        let last = ended.last().unwrap().at + 1;
+        progress["steps"]["where_you_sit"]["ended_at_unix_ms"] = last.into();
+        std::fs::write(&file, progress.to_string()).unwrap();
+        // The voice restarts: the id and the ends are read back.
+        let mut again = restarted(&room);
+        let pending = again.walk.pending();
+        assert_eq!(pending.walk_id, Some(id));
+        assert_eq!(pending.steps_ended.len(), 4);
+        assert_eq!(pending.steps_ended[3].step, "where_you_sit");
+        assert_eq!(pending.steps_ended[3].at, last);
+        // Real time passes, so a new id would show.
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        // A redo of one step keeps the walk's id; its end is told anew.
+        again.walk.redo_step(Step::WhoYouAre, again.at);
+        again.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(again.walk.kept().walk_id, Some(id));
+        assert!(
+            !again
+                .walk
+                .pending()
+                .steps_ended
+                .iter()
+                .any(|ended| ended.step == "who_you_are")
+        );
+        // A redo of the whole walk: a new id as its first step is asked,
+        // written with its first step's end, and nothing ended under it yet.
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({"step": "all"}),
+        };
+        assert!(run(&again.walk.file, &redo).1);
+        again.wait(S, Some(NEAR_MIDDLE));
+        let new = again.walk.desired.walk_id.expect("the redo has an id");
+        assert!(new > id, "{new} {id}");
+        assert!(again.walk.pending().steps_ended.is_empty());
+        // `restarted` turns the Harness line on, signed out.
+        walk_to(&mut again, skill::PREFERENCES_DONE_HARNESS);
+        let pending = again.walk.pending();
+        assert_eq!(pending.walk_id, Some(new));
+        assert_eq!(pending.steps_ended.len(), 4, "{pending:?}");
+        assert!(pending.steps_ended.iter().all(|ended| ended.at >= new));
     }
 
     /// #5488: signed in (or signed in and offline), or with no tasks part,
