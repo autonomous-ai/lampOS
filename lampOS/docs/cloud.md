@@ -143,7 +143,7 @@ lamp says so.
 | `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below; on in the product, fourteen-P15), and named in `can` only while lamp-voice's maker answers `ready` (asked every 60 s; the lamp's own model makes it, so the voice says yes at once, and the button can show up to 60 s after lamp-voice starts): `skills.make` (`{"words", "request_id"}`, the words at most 480 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `kept`, `asked`, `on`, `left_off`, `not_kept` with `why`), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `skills.upload.<upload_id>` (`upload_id` the first 16 lowercase hex of the file's SHA-256; no file inline) | with `LAMP_SKILL_UPLOAD=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill added from a file" below); `can` names it `skills.upload`: answered `starting` at once, which keeps the file on the backend; the file is taken from the backend's `get-message` for that kind, checked and handed to `lamp-voice`, and a second reply of the same kind follows once it settles: `success` with `{"state": "on", "upload_id", "added": "file", "uploaded": true, "name", "description", "version", "sha256", "may_use"}` once a spoken yes put it on, or `failure` with why (a check, or left off at the lamp). Either deletes the file on the backend; with no reply it is gone after a day. Nothing from the app puts it on |
 | `skills.write` | with `LAMP_SKILL_WRITTEN=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill written in the app" below; off), named in `can` on the switch alone, with `skills.made`: `{"name", "when", "instructions", "request_id"}`, a skill the person wrote in their own words, held to the voice's bounds and sent to `lamp-voice`'s app-make socket as `{"written": {...}}`, which keeps it as written, with no model; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` tells what became of it, with `"written": true`. Nothing from the app puts it on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
-| `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
+| `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"received": true}` for every parsed Eyes outcome; no enrollment or recognition result is returned. Input/local/transport failures remain errors. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
@@ -392,11 +392,23 @@ to others, and make it at 0700 if it is missing (`photo::ready`).
 - **Never kept:** the eyes read it once and remove it. lamp-cloud removes it
   too afterwards, answered or not, so a photo the eyes never took doesn't
   stay (`photos::add`).
-- **The answer** is the eyes': `added` (unconfirmed) or `remembered`.
-  Otherwise their reason in the person's words: no face, more than one
-  person, the face too small, not readable, known by another name, a name
-  that can't be kept, no room, photos not taken. `the lamp's eyes did not
-  answer` when they didn't.
+- **The answer is only a receipt:** every parsed Eyes reply produces the same
+  `success` with `data: {"received": true}`, including new/unconfirmed,
+  already-known, another name, name clash, full, no-face, unsupported and
+  unknown semantic outcomes. No identity, enrollment, pending store or future
+  question is promised. Invalid-JSON/missing Eyes replies remain `the lamp's eyes
+  did not answer`; input validation and a failed local handoff remain errors.
+  Valid JSON `null` or `{}` also receives the neutral receipt. This hides
+  result payloads, not differences in recognition or network timing. The
+  existing two-second timeout applies separately to socket reads and writes;
+  it is not a total connect, sync, exchange and cleanup deadline.
+- **App compatibility:** the existing app's `LampPhotoFaceReceived` displays
+  “Photo sent” / “The lamp got the photo” and does not add or confirm a face
+  locally. Its parser still accepts older `added`/`remembered` responses; new
+  Cloud accepts old and new Eyes response shapes without exposing them. An
+  app older than neutral-receipt support can report an unknown response and
+  must not infer an enrollment. The internal Eyes request/reply contract is
+  unchanged, and no feature or product unit is enabled by this correction.
 - **Then at the lamp** the voice asks the person once (`LAMP_PHOTO_FACES=on`
   in the voice, `docs/eyes.md`, "A face from a photo"). No answer or no
   deletes the face, and so do 30 days unconfirmed.
@@ -404,8 +416,11 @@ to others, and make it at 0700 if it is missing (`photo::ready`).
 Tests (`photos.rs`): the switch needs both absolute places; the name and
 the JPEG checked, too long, empty, not base64, not a JPEG and too large
 refused; the photo written 0600 as a new file, the eyes asked for it by
-name, and gone afterwards, also when nobody answers; the eyes' reasons said
-plainly.
+name, and gone afterwards, also when nobody answers; all semantic outcomes
+have an identical complete broker envelope, including private-name canaries;
+input, local handoff and malformed/absent transport answers remain failures.
+These host socket tests do not establish the held capture-origin, whole-interval
+speaker-consent or lamp acceptance parts of #5263.
 
 ## The faces it knows (#2192, `face.list` and `face.remove`)
 
