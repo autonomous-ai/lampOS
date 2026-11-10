@@ -1,3 +1,46 @@
+## 2026-11-10 — receipt repair ready, two independent reads and final native gates
+
+- #5935 `1c3057ec6eca72b168d6e5a5707d412e3f4d079e` is out of draft;
+  NEXT TRAIN 6757245799 and Queue 6757250509. Second READ-OK 6757061160
+  and Fourth READ-OK 6757161465 independently pass 21 send controls,
+  31 held-forget and 13 held-rename checks, strict Voice Clippy, formatting
+  and docs. Both measured the stated host admission boundary below 1 ms.
+  Fourth explicitly resolves the earlier restoration finding on this repair.
+- Final native ARM64 [42740406810](https://github.com/autonomous-ai/lampOS/actions/runs/42740406810)
+  passed **14,961 tests / 112 skipped**, 296.921s, including all 20 functional
+  send controls. Four workspace doctests, 13 process cases, release build,
+  example/provenance checks and export passed. Linux 42740406766 and docs
+  42740406869 passed too.
+- Actual ARM checkout `48fad31c3a7425bd9fa3a54d52320ec1b0042cd1`, parents
+  4d86f6f0d + 1c3057ec6, has tree `69baf8ad26be3b06e3aabc6ae0d945fc1b6a67fe`,
+  equal to the reviewed author head. Fresh origin/lamp-voice still 4d86f6f0d.
+  Historical host process failures remain recorded, not overwritten by CI.
+- Closed superseded own draft #5878 and linked replacement disposition on
+  Fourth's #5913 (6757259689), leaving its owner/PM to close that carry.
+  No merge, push to integration, device, activation or promote action.
+- #5945 carried READ-OK to 8ed41ce279 (6757059245): sole follow-up replaces
+  the invitation fixture clone with `std::slice::from_ref`; production
+  fixed-speech path unchanged. CI remains that PR's gate.
+- #5802 b2148739f review: exact-source classifier accepts a game request
+  “Play something like chess to relax.” as audio. Posted supplement6756955167
+  to Second's open object-binding HOLD, retaining the valid relaxation
+  positive and existing negative.
+- Separate actual coordinator probe found cue-only confirmation acceptance:
+  wait cue + gap + valid offer, no spoken confirmation pieces, complete and
+  retire remaining cue PCM; `prepare()` selects the recording. Filter
+  `wait_sound`: 8 passed / one new negative failed, 8.35s, exit101; the real
+  gapped-confirmation positive passed. HOLD6757158910. Temporary edit removed,
+  clean checkout; probe/patch/raw log in /private/tmp/third-5802-wait-only*.
+  This is selection/IPC evidence, no physical playback or model claim.
+- Continued second independent read of #5949: source caller off→on transition
+  can leave ON empty for a build-default-on core skill, so the next off
+  default loses the explicit choice. Real `package::turn` off/on followed by
+  public `keep_turned_on` with the recorded build hash reproduced it: zero
+  passed / one failed, 0.27s. Existing app-toggle control passed, 0.60s.
+  HOLD6757359201; reviewer-two independently found the same case. Temporary
+  edit removed, checkout clean; scratch probe/patch/log under
+  /private/tmp/third-5949-off-on*. No install or device action.
+
 ## 2026-11-10 — admission latency follow-up and onboarding review
 
 - Published #5935 at `1c3057ec6eca72b168d6e5a5707d412e3f4d079e` on
