@@ -4287,6 +4287,7 @@ fn flush_provider_input_with(
             | ProviderInput::StepCall { request, .. }
             | ProviderInput::Onboarding { request, .. }
             | ProviderInput::TurnOpened { request, .. }
+            | ProviderInput::WalkUnderWay { request, .. }
             | ProviderInput::WokenByName { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
@@ -6736,6 +6737,9 @@ fn conversation_with_gate_inner(
     // The last turn told the provider it began while onboarding was under
     // way, so a `go_to_sleep` it calls is answered not now.
     let mut onboarding_marked: Option<u64> = None;
+    // The walk's state as last told the provider worker, and the turn it
+    // was told with ([`walk_to_tell`], #5931).
+    let mut walk_told: Option<(u64, bool)> = None;
     // A turn held as unclear in a conversation, and when (#926): asked again
     // with a written turn once it is over.
     let mut asking = AskAgainState::default();
@@ -10699,6 +10703,12 @@ fn conversation_with_gate_inner(
                     if not_now {
                         onboarding_marked = reply.as_ref().map(|current| current.owner.turn());
                     }
+                    tell_walk(
+                        &mut provider_queue,
+                        &mut walk_told,
+                        reply.as_ref(),
+                        snapshot.microphone_generation(),
+                    );
                     // A line begun in a computer's turn is a call, as a tap
                     // is: told to the worker's rule right after its Start.
                     if let Some(current) = reply.as_ref() {
@@ -10948,6 +10958,12 @@ fn conversation_with_gate_inner(
                                     onboarding_marked =
                                         reply.as_ref().map(|current| current.owner.turn());
                                 }
+                                tell_walk(
+                                    &mut provider_queue,
+                                    &mut walk_told,
+                                    reply.as_ref(),
+                                    snapshot.microphone_generation(),
+                                );
                                 if took_over {
                                     took_over_turn =
                                         reply.as_ref().map(|current| current.owner.turn());
@@ -16357,6 +16373,42 @@ fn after_start(
         });
     }
     marks
+}
+
+/// Whether the provider worker is told the walk's state `now` (its turn in
+/// hand, under way or not), having been told `told` last: each turn while
+/// the walk is under way, so a worker started since learns it, and once
+/// when it is not, at the conversation's first turn (a worker may outlive
+/// one) or as the walk ends. Outside the walk nothing more is sent.
+fn walk_to_tell(told: Option<(u64, bool)>, now: (u64, bool)) -> bool {
+    told != Some(now) && (now.1 || told.map(|(_, on)| on) != Some(false))
+}
+
+/// The walk's state, told right after a person's line's Start (#5931): the
+/// model's replies drop its step words ([`crate::onboarding::model_words`])
+/// in the second route's worker, another process, which never reads the
+/// coordinator's. A line's Start is where a mark may go: a lamp's own turn
+/// is its start and end at once and takes none, and is answered as the
+/// worker was told last.
+fn tell_walk(
+    queue: &mut VecDeque<ProviderInput>,
+    told: &mut Option<(u64, bool)>,
+    reply: Option<&Reply>,
+    privacy_generation: u64,
+) {
+    // A local-only turn (#830) sends nothing.
+    let Some(current) = reply.filter(|current| current.local_only.is_none()) else {
+        return;
+    };
+    let now = (current.owner.turn(), crate::onboarding::under_way_now());
+    if walk_to_tell(*told, now) {
+        *told = Some(now);
+        queue.push_back(ProviderInput::WalkUnderWay {
+            request: now.0,
+            privacy_generation,
+            on: now.1,
+        });
+    }
 }
 
 /// Whether a request begun now is in the walk for `go_to_sleep`

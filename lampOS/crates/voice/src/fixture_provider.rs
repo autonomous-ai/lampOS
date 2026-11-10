@@ -467,6 +467,11 @@ impl FixtureProvider {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::WalkUnderWay {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::WokenByName {
                 request,
                 privacy_generation,
@@ -577,6 +582,7 @@ impl FixtureProvider {
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
             | ProviderInput::TurnOpened { .. }
+            | ProviderInput::WalkUnderWay { .. }
             | ProviderInput::WokenByName { .. } => {}
             ProviderInput::End { .. } => {
                 let input = self
