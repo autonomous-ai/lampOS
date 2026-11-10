@@ -432,6 +432,24 @@ delivery token, clears pending, and adds a new elapsed deadline. The original
 recurrence anchor remains unchanged. Acknowledging the snoozed occurrence
 advances from that original anchor, to its next occurrence still ahead.
 
+**A one-time reminder just said may still be snoozed or cancelled** (C68:
+lamp-06c1 at 11450, 11 Nov 01:30, "Call the plumber." was said, "snooze it"
+came 9 s later, and with the reminder already gone from the set list only
+`list_reminders` ran; the lamp said "Snoozing it for five minutes. Nothing
+is due right now, so there's nothing to snooze.", and the cancel after it
+found it "already gone"). For `SAID_SNOOZABLE_MS` (2 min) after it was said,
+its said-record entry keeps the item as it was (`Said::again`, optional
+stored metadata, so no `schema` bump), and survives a restart. `Snooze` of
+that id and its said delivery sets it again, as it was, then snoozes it: the
+delivery goes up by one and it is due `seconds` from now. `Cancel` of that id
+ends it for good, `cancelled` with its said delivery. Either takes the kept
+item, so it is snoozed or cancelled once. Whose it is reads as for any item
+(`Said::visible`): another person's line, or the room's for a person's own,
+gets `not_found`. After the window, or for a repeat (never in the said
+record), nothing changes: `not_found`. A ListSet's `said` entry in its
+window has `can_snooze_or_cancel`, its `delivery` and `until_unix_ms`. Tests:
+`a_one_time_reminder_just_said_*` (`crates/schedule/tests/it/engine.rs`).
+
 **After time off, a repeat is said once** (#811, the first builder's decision
 of 2026-10-16 13:21: a person who was away does not hear "late" N times).
 A pending repeat whose later occurrences have also passed is shown as its
@@ -726,7 +744,7 @@ are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
 | `repeat_reminder` | `text`, `time`, `every` | `weekday` (required for weekly), `zone` | `Set` with `Daily` or `Weekly` |
 | `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own, and the room's (set by no one) |
 | `cancel_reminder` | `id`, or `text` | none | `Cancel` of the selected whole item/series, only the line's own or the room's; by `text`, the one item whose text holds the words (case and edge spaces aside), resolved from the line's own list, else the matches named and nothing cancelled |
-| `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, only the line's own or the room's |
+| `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, or of a one-time one said within two minutes (its said delivery, from `ListSet`'s `said`), only the line's own or the room's |
 
 Text is 1–300 UTF-8 bytes, nonblank and without controls. Seconds are whole
 integers from 1 through 31,536,000. `time` is exact `HH:MM`; `day` is `today`,
@@ -805,7 +823,21 @@ and `waiting_for_answer`; `said_complete` is false when some did not fit
 the 4,080-byte result. Its description adds `LIST_SAID`: asked what was set
 earlier, use both lists, "I reminded you at 10:49 about the report", never
 none set. Only Voice's `list_reminders` has it (`list_set`); the app's list
-has none.
+has none. One said within the last two minutes (C68, above) also has its
+`id`, and the result `said_note` (`JUST_SAID`): "snooze it" or "again in N minutes" is `snooze_reminder` with it,
+"cancel it" `cancel_reminder` (by id, or by its words, which also match it).
+`snooze_reminder` on a gone id reads the line's said record for its
+delivery; said longer ago, or already snoozed or cancelled, a snooze or a
+cancel answers `said_too_long_ago` with `SAID_TOO_LONG_AGO` (nothing changed,
+never say it is snoozed), not only "no longer active". Its description says
+"snooze it" with no length is 300 seconds (`SNOOZE_DEFAULT_SECONDS`), and
+never to say it is snoozed unless the call returns committed; a reply that
+says so with no snooze is held (`LAMP_ACTION_CLAIM_CHECKED`,
+`action_claim::SNOOZED`). Tests: `a_reminder_just_said_*`,
+`a_snooze_after_the_window_does_nothing_and_says_so`,
+`another_persons_line_never_snoozes_or_cancels_a_reminder_just_said` and
+`the_0130_plumber_sequence_snoozes_then_cancels`
+(`crates/actions/tests/it/schedule.rs`).
 
 **The same timer asked for twice in a moment is one (29e7, 2 Nov).** One
 "remind me in 5 minutes" left two water timers there, ids 8 and 9, set

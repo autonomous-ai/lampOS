@@ -2399,3 +2399,139 @@ fn a_timer_offered_before_its_cut_off_and_acked_after_it_is_kept_as_said() {
 fn due_of(engine: &Engine<Disk>, at: &ClockSample) -> Option<u64> {
     due(engine, at).oldest.map(|oldest| oldest.id)
 }
+
+// C68, lamp-06c1 on 11 Nov at 01:30: "Call the plumber." was said, "snooze
+// it" came 9 s later, and the reminder, gone from the set list once said,
+// could not be snoozed. One just said may be snoozed or cancelled for
+// `SAID_SNOOZABLE_MS` after it, across a restart; never after.
+
+fn snooze_said(
+    engine: &mut Engine<Disk>,
+    at: &ClockSample,
+    id: u64,
+    delivery: u64,
+    asker: Option<Asker>,
+) -> Result<Value, lamp_schedule::engine::Error> {
+    engine.answer(
+        Request::Snooze {
+            guard: guard(engine),
+            id,
+            delivery,
+            seconds: 300,
+            asker,
+        },
+        at,
+    )
+}
+
+#[test]
+fn a_one_time_reminder_just_said_is_snoozed_again_within_its_window_across_a_restart() {
+    use lamp_schedule::engine::SAID_SNOOZABLE_MS;
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    let id = set(&mut e, &now(0), 60)["id"].as_u64().unwrap();
+    assert_eq!(ack_all(&mut e, &now(61_000)), 1);
+    let listed = said(&mut e, &now(70_000), None);
+    assert_eq!(listed[0]["can_snooze_or_cancel"], true, "{listed:?}");
+    assert_eq!(listed[0]["delivery"], 1);
+    assert_eq!(
+        listed[0]["until_unix_ms"],
+        listed[0]["said_unix_ms"].as_i64().unwrap() + SAID_SNOOZABLE_MS
+    );
+    // The service restarts 9 s after it was said: still snoozable.
+    let mut e = open(disk.clone(), &now(70_000));
+    let snoozed = snooze_said(&mut e, &now(70_000), id, 1, None).unwrap();
+    assert_eq!(snoozed["snoozed"], true, "{snoozed}");
+    assert_eq!(snoozed["delivery"], 2);
+    assert_eq!(snoozed["due_unix_ms"], WALL + 370_000);
+    assert_eq!(get(&mut e, &now(70_000), id)["snoozed"], true);
+    // Once: the said record no longer offers it.
+    assert!(said(&mut e, &now(71_000), None)[0]["can_snooze_or_cancel"].is_null());
+    // Due again five minutes on, and said once more.
+    e.tick(&now(370_000)).unwrap();
+    assert_eq!(due_of(&e, &now(370_000)), Some(id));
+    // A second store opens what this one wrote, receipt and all.
+    open(disk, &now(371_000));
+}
+
+#[test]
+fn a_one_time_reminder_said_longer_ago_than_its_window_is_never_snoozed_or_cancelled() {
+    use lamp_schedule::engine::SAID_SNOOZABLE_MS;
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    let id = set(&mut e, &now(0), 60)["id"].as_u64().unwrap();
+    ack_all(&mut e, &now(61_000));
+    let past = now(61_000 + SAID_SNOOZABLE_MS as u64 + 1);
+    let refused = snooze_said(&mut e, &past, id, 1, None).unwrap_err();
+    assert_eq!(refused.code, "not_found");
+    let refused = e
+        .answer(
+            Request::Cancel {
+                guard: guard(&e),
+                id,
+                asker: None,
+            },
+            &past,
+        )
+        .unwrap_err();
+    assert_eq!(refused.code, "not_found");
+    assert!(said(&mut e, &past, None)[0]["can_snooze_or_cancel"].is_null());
+    open(disk, &past);
+}
+
+#[test]
+fn a_one_time_reminder_just_said_is_cancelled_for_good_and_only_by_its_own_line() {
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    e.tick(&now(0)).unwrap();
+    let id = e
+        .answer(
+            Request::Set {
+                person: Some(ANN.into()),
+                guard: guard(&e),
+                text: "Call the plumber".into(),
+                when: When::After { seconds: 60 },
+            },
+            &now(0),
+        )
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    ack_all(&mut e, &now(61_000));
+    // Bo's line, and the room's, neither hear nor change Ann's.
+    for other in [asker(Some(BO), false), asker(None, false)] {
+        assert!(said(&mut e, &now(65_000), Some(other.clone())).is_empty());
+        let refused = snooze_said(&mut e, &now(65_000), id, 1, Some(other.clone())).unwrap_err();
+        assert_eq!(refused.code, "not_found");
+        let refused = e
+            .answer(
+                Request::Cancel {
+                    guard: guard(&e),
+                    id,
+                    asker: Some(other),
+                },
+                &now(65_000),
+            )
+            .unwrap_err();
+        assert_eq!(refused.code, "not_found");
+    }
+    let ann = Some(asker(Some(ANN), false));
+    let cancelled = e
+        .answer(
+            Request::Cancel {
+                guard: guard(&e),
+                id,
+                asker: ann.clone(),
+            },
+            &now(66_000),
+        )
+        .unwrap();
+    assert_eq!(cancelled["cancelled"], true, "{cancelled}");
+    assert_eq!(cancelled["delivery"], 1);
+    // Ended for good: not snoozed after, never due again.
+    let refused = snooze_said(&mut e, &now(67_000), id, 1, ann).unwrap_err();
+    assert_eq!(refused.code, "not_found");
+    e.tick(&now(400_000)).unwrap();
+    assert_eq!(due_of(&e, &now(400_000)), None);
+    open(disk, &now(400_000));
+}
