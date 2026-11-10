@@ -102,7 +102,7 @@ lamp.model.json.
 
 ## Check a lamp against the fake: conformance
 
-`conformance/conformance.js` runs the same twelve steps (state, light, gestures,
+`conformance/conformance.js` runs the same thirteen steps (state, light, gestures,
 looks, a lease, `say`, `stop`, and the refusals for a bad colour, level, gesture
 name and a look without a lease) through the public SDK only, and prints for each
 whether it was taken, the refusal's code, the reply's field names and the time it
