@@ -169,8 +169,8 @@ Python names first, JavaScript where it differs.
 | Hold the body | `lease.take/renew/release` | `lease("body")` / `withLease` | `lamp://lease`, held per call | done | Nine | not yet |
 | Built-in gestures | `gesture` | `gesture` | `lamp_gesture` | done | Nine | not yet |
 | A feeling in body and light | `express` | `express` | `lamp_express` | done (3 feelings) | Nine | not yet |
-| Look at face, hand, name, angle | `look` | `look` | `lamp_look` | done for `ahead`, an angle and `hand`; `face` and `name` "not in this release". On a resting lamp a look may end `cut_short` on stable 10824 (fixed on lamp-voice, #5711) | Nine | not yet |
-| Follow a hand | `look at hand` | `follow_hand` / `followHand` | `lamp_follow_hand`, `lamp_follow_stop` | done, on stable too | Nine | not yet |
+| Look at face, hand, name, angle | `look` | `look` | `lamp_look` | done for `ahead` and an angle; `hand` is in development (the lamp doesn't track hands yet, see Follow a hand); `face` and `name` "not in this release". On a resting lamp a look may end `cut_short` on stable 10824 (fixed on lamp-voice, #5711) | Nine | not yet |
+| Follow a hand | `look at hand` | `follow_hand` / `followHand` | `lamp_follow_hand`, `lamp_follow_stop` | in development: the door is in; nothing publishes `humans/hands/tracked` and lamp-body refuses `follow` | Nine | not yet |
 | Each joint (pitch, roll, yaw, shoulder, elbow) | `joints` | `joints` | `lamp_joints` | `yaw` and `pitch` only; `roll`, `shoulder`, `elbow` refused "not routed yet" | Ten | 75c9, 7 Nov, stable 10579: pitch alone went; roll refused (again 9 Nov, 10824) |
 | A move of your own | `move` | `move` | `lamp_move` | done | Nine | not yet |
 | A recorded move | `play` | `play` | `lamp_play` | in the clients; lamp-control refuses it, "not routed yet: waits for client packages" | Nine | refused as written: 75c9, 9 Nov, 10824 |
