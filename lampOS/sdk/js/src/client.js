@@ -529,7 +529,12 @@ export class Lamp {
       if (done) { this.done.delete(frame.re); done.resolve(frame); }
     }
     for (const handler of this.handlers.get(frame.ev) ?? []) {
-      Promise.resolve().then(() => handler(frame)).catch((error) => this.ws.emit('handlerError', error));
+      Promise.resolve().then(() => handler(frame)).catch((error) => {
+        // Said, not swallowed: a handler that throws (a refused `light` inside `person.arrived`, say) must not vanish
+        // silently. Listen for 'handlerError' on `lamp.ws` to take it over.
+        if (this.ws.listenerCount('handlerError') > 0) this.ws.emit('handlerError', error);
+        else console.error(`lampos: your handler for ${frame.ev} threw: ${error?.message ?? error}`);
+      });
     }
   }
 
