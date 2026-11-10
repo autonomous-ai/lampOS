@@ -1,3 +1,22 @@
+## 2026-11-10 — take stalled setup first-update repair
+
+- Took #5667 at 47017c360 after its initial-status P2 remained unanswered
+  since 9 November and V2 asked for an owner (Queue6757330842). No newer
+  head or existing carry found. Posted takeover6757422726 / Queue6757423158
+  before work; preserving First's one feature commit on
+  `third/setup-first-update-carry-1110`.
+- Narrow repair target: keep the initially observed active phase, from
+  either newest snapshot or first subscribed status, so its changed terminal
+  result ends the wait within the existing one-second look instead of an
+  unnecessary retry or 600-second timeout. Add fail-first controls, rebase
+  onto current runtime and gate. No activation, device or app-side work.
+- Existing train hold, two reads, default-on marker, app-side integration,
+  lamp latency/failure checks and 8474 sitting remain separate requirements.
+- Completed #5952 source/content read at e988c834 (6757402963): 16→18 pages,
+  15 unchanged including back cover; chapter-3 opening becomes three pages.
+  CSS/script byte-identical, extracted JavaScript syntax passes. Browser
+  unavailable, so no visual/mobile-layout or real-app-flow qualification.
+
 ## 2026-11-10 — receipt repair ready, two independent reads and final native gates
 
 - #5935 `1c3057ec6eca72b168d6e5a5707d412e3f4d079e` is out of draft;
