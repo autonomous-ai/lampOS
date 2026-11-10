@@ -565,6 +565,29 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 raise ToolError("bad_request: lamp_joints needs at least one of pitch, roll, yaw, shoulder, elbow")
             return await with_body_lease("joints", named=True, targets=targets, within_ms=within_ms)
 
+    # The light `lamp_light(keep_for_s=...)` keeps on past one ask's 30 s: one task at most, asking the
+    # lamp again at half its hold limit until the time is up, another light, or `lamp_stop`.
+    light_keep: list[asyncio.Task] = []
+
+    async def end_light_keep() -> None:
+        for task in light_keep:
+            task.cancel()
+        light_keep.clear()
+
+    async def keep_light(colour: str, level: int, pattern: str | None, keep_s: float, hold_ms: int) -> None:
+        clock_now = asyncio.get_running_loop().time
+        deadline = clock_now() + keep_s
+        every = max(1.0, hold_ms / 2000)
+        while True:
+            await asyncio.sleep(min(every, max(0.0, deadline - clock_now())))
+            remaining = deadline - clock_now()
+            if remaining <= 0:
+                return
+            try:
+                await lamp.light(colour, level, max(1, min(int(remaining * 1000), hold_ms)), pattern)
+            except LampError:
+                return  # the lamp refused: the hold is over, the next lamp_light says why
+
     if allowed("light"):
 
         @server.tool()
@@ -573,13 +596,23 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             level: int = 3,
             for_ms: int = 10_000,
             pattern: Literal[tuple(schema.patterns())] | None = None,  # type: ignore[valid-type]
+            keep_for_s: float | None = None,
         ) -> str:
             """Light the ring for `for_ms` milliseconds (30,000 at most, 10,000 by default): one of its
             colours, `level` 1 to 5, steady or a pattern. The person's own light comes back after, or
-            at once with lamp_stop; at night the lamp dims it. To hold a light longer, call again
-            before it ends."""
-            await act("light", colour=colour, level=level, for_ms=min(for_ms, 30_000), pattern=pattern)
-            return f"{colour} light for {min(for_ms, 30_000)} ms"
+            at once with lamp_stop; at night the lamp dims it. To keep the light on longer than 30
+            seconds, give `keep_for_s` seconds (600 at most) instead of `for_ms`: this server asks the
+            lamp again until then, and another light or lamp_stop ends it sooner."""
+            await end_light_keep()
+            hold_ms = int(lamp.limits.get("hold_max_ms", 30_000))
+            if keep_for_s is None:
+                await act("light", colour=colour, level=level, for_ms=min(for_ms, 30_000), pattern=pattern)
+                return f"{colour} light for {min(for_ms, 30_000)} ms"
+            keep_s = min(max(keep_for_s, 1.0), 600.0)
+            await act("light", colour=colour, level=level, for_ms=min(int(keep_s * 1000), hold_ms), pattern=pattern)
+            if keep_s * 1000 > hold_ms:
+                light_keep.append(asyncio.create_task(keep_light(colour, level, pattern, keep_s, hold_ms)))
+            return f"{colour} light kept for {keep_s:g} s"
 
         @server.tool()
         async def lamp_ring(
@@ -597,6 +630,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             light stay over it; at night the lamp dims it."""
             if (pixels is None) == (rgb is None):
                 raise ToolError("bad_request: give pixels or rgb, one of them")
+            await end_light_keep()
             try:
                 if pixels is not None:
                     await lamp.ring(pixels, for_ms=min(for_ms, 30_000), brightness=brightness, fade_ms=fade_ms)
@@ -935,6 +969,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     async def lamp_stop() -> str:
         """Stop everything this computer asked of the lamp, now, and let go of the body."""
         await end_follow()
+        await end_light_keep()
         await act("stop")
         for lease in held():
             leases.pop(lease, None)
