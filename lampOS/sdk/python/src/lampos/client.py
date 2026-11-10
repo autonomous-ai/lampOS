@@ -369,6 +369,29 @@ class Notes:
         return await self._lamp.notes_list(prefix)
 
 
+class LightHold:
+    """A light kept on by `Lamp.hold_light`: asked again every half of the hold
+    limit until `stop()` or a refusal."""
+
+    def __init__(self, lamp: "Lamp", colour: str, level: int, pattern: str | None, hold_ms: int, on_error: Callable | None):
+        self._task = asyncio.create_task(self._keep(lamp, colour, level, pattern, hold_ms, on_error))
+
+    async def _keep(self, lamp, colour, level, pattern, hold_ms, on_error) -> None:
+        while True:
+            await asyncio.sleep(max(1.0, hold_ms / 2000))
+            try:
+                await lamp.light(colour, level, hold_ms, pattern)
+            except LampError as error:
+                if on_error is not None:
+                    on_error(error)
+                else:
+                    warnings.warn(f"lampos: hold_light ended: {error}")
+                return
+
+    def stop(self) -> None:
+        self._task.cancel()
+
+
 class Lamp:
     """A connection to one paired lamp."""
 
@@ -859,6 +882,15 @@ class Lamp:
     async def light(self, colour: str, level: int, for_ms: int, pattern: str | None = None) -> dict:
         return await self._act("light", False, colour=colour, level=level, pattern=pattern, for_ms=for_ms)
 
+
+    async def hold_light(self, colour: str, level: int, pattern: str | None = None, *, on_error: Callable | None = None) -> "LightHold":
+        """Keeps a light on past the 30 s one ask lasts: asks it now and again
+        at half of the lamp's hold limit (`limits["hold_max_ms"]`) until
+        `stop()`. A later ask the lamp refuses ends the holding; the error goes
+        to `on_error` (else a warning)."""
+        hold_ms = int(self.limits.get("hold_max_ms", 30_000))
+        await self.light(colour, level, hold_ms, pattern)
+        return LightHold(self, colour, level, pattern, hold_ms, on_error)
     @property
     def ring_pixels(self) -> int | None:
         """How many pixels the ring has, from hello's limits (none from a lamp

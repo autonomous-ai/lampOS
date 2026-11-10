@@ -96,6 +96,7 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | light | `await lamp.light("green", 3, 10_000, pattern="breathe")` (no `pattern`: steady) | `lamp.light('green', 3, 10000, 'breathe')` (`undefined`: steady) | `lamp_light(colour, level, for_ms, pattern)` | light |
 | ring, pixel by pixel | `await lamp.ring(pixels, for_ms=3_000, brightness=50)`: `lamp.ring_pixels` colours (`"#rrggbb"` or `(r, g, b)`), from pixel 0 around the ring | `lamp.ring(pixels, { forMs: 3000, brightness: 50 })` (`lamp.ringPixels` of them) | `lamp_ring(pixels, rgb, brightness, for_ms)` | light |
 | one colour of your own | `await lamp.light_rgb("#ff8000", for_ms=10_000, brightness=40)` | `lamp.lightRgb('#ff8000', { forMs: 10000, brightness: 40 })` | | light |
+| keep a light on past 30 s | `holding = await lamp.hold_light("warm", 3)`; `holding.stop()` | `const holding = await lamp.holdLight('warm', 3)`; `holding.stop()` | asked again at half the hold limit; a refusal goes to `on_error` / `onError` | light |
 | say | `await lamp.say("Build passed.")` | `lamp.say('Build passed.')` | `lamp_say(text)` | speak |
 | a sound (`hum`, or a clip of yours) | `await lamp.sound(name)` | `lamp.sound(name)` | `lamp_sound(name)` | speak |
 | keep a clip on the lamp | `await lamp.upload_sound(name, "chime.wav")` | `lamp.uploadSound(name, bytes)` | `lamp_upload_sound(name, path)` | speak |

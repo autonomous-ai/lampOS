@@ -649,6 +649,22 @@ export class Lamp {
   // following too (parts.rs `joints`).
   joints(lease, withinMs, targets, { wait = false } = {}) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }, wait, () => this.#anotherLook()); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
+  // Keep a light on past the 30 s a single ask lasts: asks it now and again at half of the lamp's hold limit
+  // (`limits.hold_max_ms`) until `stop()`. `ask` is one of light()'s argument lists: `holdLight('warm', 3, 'breathe')`.
+  // A later ask that the lamp refuses ends the holding and is passed to `onError` (else logged), as a lease's loss.
+  async holdLight(colour, level, pattern, { onError } = {}) {
+    const holdMs = this.limits.hold_max_ms ?? 30_000;
+    const every = Math.max(1000, holdMs / 2);
+    const ask = () => this.light(colour, level, holdMs, pattern);
+    await ask();
+    let timer = setInterval(() => {
+      ask().catch((error) => {
+        clearInterval(timer);
+        if (onError) onError(error); else console.error(`lampos: holdLight ended: ${error?.message ?? error}`);
+      });
+    }, every);
+    return { stop: () => clearInterval(timer) };
+  }
   // How many pixels the ring has, from hello's limits (undefined from a lamp before pixel lights).
   get ringPixels() { return this.limits.ring?.pixels; }
   // Light the ring pixel by pixel for `forMs` (30 s at most): one colour per pixel, from pixel 0 around the ring,
