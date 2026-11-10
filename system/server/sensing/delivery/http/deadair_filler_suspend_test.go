@@ -1,6 +1,9 @@
 package http
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func startFillerTestRun(t *testing.T) (*FillerManager, string, *fillerRun) {
 	t.Helper()
@@ -101,14 +104,27 @@ func TestAssistantAndToolEventsDoNotCreateUnmarkedVoiceRuns(t *testing.T) {
 	}
 }
 
-func TestOneContinuationPreventsLaterToolFillers(t *testing.T) {
+func TestContinuationCapPreventsLaterToolFillers(t *testing.T) {
 	fm, id, run := startFillerTestRun(t)
 	fm.OnAssistantText(id)
-	// One continuation has consumed the slot after the reserved opening.
-	run.fired++
+	// Both continuations have consumed the slots after the reserved opening.
+	run.fired = MaxFillersPerTurn
 	fm.OnToolStart(id, "", "terminal")
 	fm.OnToolEnd(id)
 	if run.timer != nil || run.rearmPending {
-		t.Fatal("later tool events must not schedule a second continuation")
+		t.Fatal("later tool events must not schedule a third continuation")
+	}
+}
+
+func TestSecondContinuationIsAllowedInALongTurn(t *testing.T) {
+	fm, id, run := startFillerTestRun(t)
+	run.timer.Stop()
+	run.timer = nil
+	// The opening slot plus one continuation have been spent.
+	run.fired = 2
+	run.lastActivityAt = time.Time{}
+	fm.OnToolEnd(id)
+	if run.timer == nil {
+		t.Fatal("a long turn may speak a second continuation filler")
 	}
 }

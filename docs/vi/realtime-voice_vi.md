@@ -183,14 +183,18 @@ lượt, model sẽ:
 - **Delegate** bằng cách gọi tool `delegate_to_main` → dừng output realtime và
   chuyển đúng lời người dùng ở lượt hiện tại, giữ nguyên ngôn ngữ, tới OS server
   (→ runtime chính đang được chọn) để xử lý.
-  OS-server bỏ qua âm opening ngắn ("Ừm." ở tiếng Việt) cho lượt delegate;
-  lượt voice thông thường của agent chính vẫn giữ opening. Continuation chỉ dùng
-  âm ngắn ("Ừm..."), không chọn câu theo tool, và chờ
-  3,5 giây từ lúc bắt đầu lượt thông thường, hoặc từ tool đầu tiên với lượt
-  delegate (`FillerManager.MarkDelegatedVoiceRun`). Khi tool kết thúc, lịch phát
-  lại cộng phần cooldown 2,5 giây còn lại vào mốc 3,5 giây. Lượt delegate kết
-  thúc bằng NO_REPLY mà không bắt đầu tool sẽ im lặng.
-  Mỗi lượt có tối đa một continuation tự động, không phụ thuộc các tool tiếp theo.
+  OS-server bỏ qua âm opening ngắn cho lượt delegate
+  (`FillerManager.MarkDelegatedVoiceRun`). Continuation báo cho người dùng biết
+  yêu cầu vẫn đang được xử lý ("Đợi mình chút nhé." / "Mình vẫn đang làm nhé." ở
+  tiếng Việt, "One moment." / "Still working on it." ở tiếng Anh, theo đúng thứ
+  tự đó), không chọn câu
+  theo tool, và chờ 3,5 giây im lặng tính từ lúc bắt đầu lượt, cho cả lượt thường
+  lẫn lượt delegate: model realtime thường chuyển lượt mà không nói gì, còn tool
+  đầu tiên của agent chính có thể cách tới 8 giây. Khi tool kết thúc, lịch phát
+  lại cộng phần cooldown 2,5 giây còn lại vào mốc 3,5 giây. Phản ứng phần cứng
+  (`/emotion`, …) hủy filler đang chờ. Mỗi lượt có tối đa hai continuation tự
+  động (`MaxFillersPerTurn` = 3, gồm cả slot opening), không phụ thuộc các tool
+  tiếp theo.
 - **Từ chối rõ ràng** một turn chắc chắn không phải người nói với thiết bị bằng
   tool `reject_turn` → bỏ turn trước khi agent chính nhìn thấy STT text. Nó khác
   hẳn model im lặng: im lặng, timeout và lỗi transport vẫn fallback bình thường
@@ -1135,11 +1139,10 @@ hướng tới thiết bị.
 ### Filler tự động chỉ ở lượt mở hội thoại trên lamp Standard và Pro
 
 Tạm tắt phát opening filler của main agent: `PlayOpeningFillerNow` return sớm
-trước khi chọn hoặc gửi audio. Timer continuation của main cũng xóa timer đang
-chờ và return trước khi chọn hoặc phát filler. Giữ nguyên cả hai phần triển khai
-để có thể bật lại. Việc tạm tắt ưu tiên hơn điều kiện filler ở lượt mở bên dưới.
-Pool opening được giữ lại có cùng nội dung với continuation ở mọi ngôn ngữ hỗ trợ
-(tiếng Anh: `Hmm...`).
+trước khi chọn hoặc gửi audio; phần triển khai được giữ để có thể bật lại, và việc
+tạm tắt ưu tiên hơn điều kiện filler ở lượt mở bên dưới. Pool opening được giữ là
+một âm ngắn (tiếng Anh: `Hmm...`). Continuation filler của main agent đã phát lại
+(xem phần Delegate ở trên).
 
 Wait filler realtime tự động chỉ được bật sau khi chuẩn bị session và mở lượt
 thành công, kể cả nhánh STT đang drain. Khi session không khả dụng/hết quota

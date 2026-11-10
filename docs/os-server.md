@@ -1,15 +1,14 @@
 # OS Server API — Documentation
 
-Opening feedback is one short acknowledgment sound: English "Uhm.", Vietnamese
-"Ừm.", Japanese "うん。", and Simplified/Traditional Chinese "嗯。". Ordinary
-main-agent voice turns request it immediately before forwarding; delegated turns
-skip it. Continuation fillers use one short thinking sound (English "Hmm...",
-Vietnamese "Ừm...") and wait 3.5 seconds after turn start (after the first tool starts for delegated
-turns). Tool-end rearming adds any remaining 2.5-second cooldown to that delay.
-This timer does not delay opening feedback. Each turn permits at most one automatic continuation; later tool calls do not trigger more.
-The previous opening and continuation phrase pools have been removed. Automatic
-waiting fillers do not select tool-specific phrases. Explicit realtime/tool cues
-are unchanged.
+Opening feedback (one short thinking sound, English "Hmm...") is currently
+paused in `PlayOpeningFillerNow`. Continuation fillers tell the user the request
+is still being handled — English "One moment." / "Still working on it.",
+Vietnamese "Đợi mình chút nhé." / "Mình vẫn đang làm nhé.", in that order — and wait 3.5 seconds
+of silence after turn start, for ordinary and realtime-delegated turns alike.
+Tool-end rearming adds any remaining 2.5-second cooldown to that delay. Each turn
+permits at most two automatic continuations; later tool calls do not trigger
+more. Automatic waiting fillers do not select tool-specific phrases. Explicit
+realtime/tool cues are unchanged.
 
 For Standard and Pro lamp Automatic follow-ups, HAL may send optional sensing metadata
 `suppress_auto_fillers: true`. OS skips opening feedback and scheduled automatic

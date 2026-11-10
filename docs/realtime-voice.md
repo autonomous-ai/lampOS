@@ -189,14 +189,18 @@ STT pipeline. At end-of-turn the model either:
 - **Delegates** by calling the `delegate_to_main` tool, which stops realtime
   output and forwards the current user's faithfully understood words, in their
   spoken language, to the OS server (→ the selected main runtime) for the work.
-  OS-server skips the short opening acknowledgment ("Uhm." in English) for
-  delegated turns; ordinary main-agent voice turns retain it. Continuation
-  fillers use a short thinking sound ("Hmm..." in English), without tool-specific
-  phrases, and wait 3.5 seconds from ordinary turn start, or from the first tool
-  start for delegated turns (`FillerManager.MarkDelegatedVoiceRun`). Tool-end
-  rearming adds any remaining 2.5-second cooldown to the 3.5-second delay.
-  A delegated turn that ends with NO_REPLY without starting a tool stays silent.
-  Each turn permits at most one automatic continuation, regardless of later tools.
+  OS-server skips the short opening acknowledgment for delegated turns
+  (`FillerManager.MarkDelegatedVoiceRun`). Continuation fillers tell the user
+  the request is still being handled ("One moment." / "Still working on it." in
+  English, "Đợi mình chút nhé." / "Mình vẫn đang làm nhé." in Vietnamese, in that
+  order),
+  without tool-specific phrases, and wait 3.5 seconds of silence from turn start
+  for ordinary and delegated turns alike: the realtime model usually hands off
+  without speaking, and the main agent's first tool call can be 8 seconds away.
+  Tool-end rearming adds any remaining 2.5-second cooldown to the 3.5-second
+  delay. A hardware reaction (`/emotion`, …) cancels the pending filler. Each
+  turn permits at most two automatic continuations (`MaxFillersPerTurn` = 3,
+  including the reserved opening slot), regardless of later tools.
 - **Explicitly rejects** a high-confidence non-user turn by calling
   `reject_turn`, which drops the turn before the main agent sees its STT text.
   This is deliberately different from a silent completion: silence, timeout,
@@ -1174,11 +1178,10 @@ from speech addressed to the device.
 ### Opening-only automatic fillers on Standard and Pro lamps
 
 Main-agent opening filler playback is temporarily paused: `PlayOpeningFillerNow`
-returns before choosing or sending any audio. The main-agent continuation timer
-also clears its pending timer and returns before selecting or playing a filler.
-Both playback implementations are retained for re-enabling. These pauses take
-precedence over opening-turn eligibility below. The retained opening pool matches
-the continuation pool in every supported language (English: `Hmm...`).
+returns before choosing or sending any audio; the implementation is retained for
+re-enabling, and the pause takes precedence over opening-turn eligibility below.
+The retained opening pool is a short thinking sound (English: `Hmm...`).
+Main-agent continuation fillers play again (see Delegates above).
 
 Automatic realtime wait fillers are armed only after session preparation and
 turn admission succeed, including the early-STT drain path. Unavailable/quota

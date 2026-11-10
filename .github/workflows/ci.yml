@@ -67,6 +67,8 @@ jobs:
         run: python -B -m unittest discover -s runtimes/hermes -p '*_test.py' -v
       - name: Buddy helper tests (mock transport, no desktop actions)
         run: python -B -m unittest discover -s skills/computer-use/tests -p 'test_*.py' -v
+      - name: Radio drama helper tests (mock catalog and HAL, no network)
+        run: python -B -m unittest discover -s skills/radio-drama/tests -p 'test_*.py' -v
       - name: conformance suite (CTS — devices vs COMPATIBILITY.md)
         run: python -m unittest discover -s robots/contract/cts -v
       # Checks the setup.sh SKILLS_CATALOG block that TestCatalogMatchesTree cannot see.

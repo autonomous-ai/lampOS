@@ -27,14 +27,15 @@ var fillerRealtime = map[string][]string{
 	LangZhTW: {"嗯...", "呃..."},
 }
 
-// Continuation uses a short thinking sound without claiming a specific action.
+// Continuation tells the user the request is still being handled during a long
+// wait (spoken after FillerDelay of silence), without naming a specific action.
 var fillerContinuation = map[string][]string{
-	LangJA:   {"うーん…"},
-	LangKO:   {"음..."},
-	LangEN:   {"Hmm..."},
-	LangVI:   {"Ừm..."},
-	LangZhCN: {"嗯..."},
-	LangZhTW: {"嗯..."},
+	LangJA:   {"ちょっと待ってね。", "まだやってるよ。"},
+	LangKO:   {"잠깐만요.", "아직 하고 있어요."},
+	LangEN:   {"One moment.", "Still working on it."},
+	LangVI:   {"Đợi mình chút nhé.", "Mình vẫn đang làm nhé."},
+	LangZhCN: {"稍等一下。", "还在处理。"},
+	LangZhTW: {"稍等一下。", "還在處理。"},
 }
 
 // toolFillers maps lang -> FillerToolKey -> override pool.
