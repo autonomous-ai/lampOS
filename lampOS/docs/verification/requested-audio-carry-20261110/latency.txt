@@ -1,0 +1,7 @@
+
+running 1 test
+requested audio packet append spoken=false: first=26978 ns, p95=1281 ns, max=26978 ns; 256 fresh replies; excludes input-sample allocation, IPC and playback
+requested audio packet append spoken=true: first=1719 ns, p95=1248 ns, max=1725 ns; 256 fresh replies; excludes input-sample allocation, IPC and playback
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5495 filtered out; finished in 0.01s
+

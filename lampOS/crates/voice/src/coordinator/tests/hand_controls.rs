@@ -961,6 +961,7 @@ fn cancelled_request_tails_are_filtered_without_swallowing_new_requests_or_link_
                 waiting_for_barrier: false,
             },
             ProviderOutput::Audio {
+                spoken: true,
                 request,
                 sequence: 1,
                 provider_event_at_us: 1,

@@ -3997,7 +3997,12 @@ async fn a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear() {
     let mut engine = waiting(None, vec![vec![], vec![]]).hearing(hearing(&began));
     spoken_turn(&mut engine);
     // The wait sound's first packet: it is sounding when the line begins.
-    while !matches!(engine.next().await, ProviderOutput::Audio { .. }) {}
+    loop {
+        if let ProviderOutput::Audio { spoken, .. } = engine.next().await {
+            assert!(!spoken, "a wait cue cannot establish spoken confirmation");
+            break;
+        }
+    }
     engine.submit(start_over(2));
     assert_eq!(
         *began.lock().unwrap(),

@@ -19710,6 +19710,7 @@ mod tests {
     #[test]
     fn an_answer_ends_when_its_sound_has_all_been_played() {
         let audio = |request, samples: usize| ProviderOutput::Audio {
+            spoken: true,
             request,
             sequence: 0,
             provider_event_at_us: 0,

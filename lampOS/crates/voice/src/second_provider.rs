@@ -3423,6 +3423,7 @@ async fn play_fixed(
             );
         }
         ProviderOutput::Audio {
+            spoken: true,
             request,
             sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
             provider_event_at_us: monotonic_us(),
@@ -3889,6 +3890,7 @@ async fn say_resumed(shared: &Shared, request: u64, english: &'static str, rest:
                     );
                 }
                 let audio = ProviderOutput::Audio {
+                    spoken: true,
                     request,
                     sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
                     provider_event_at_us: monotonic_us(),
@@ -13622,6 +13624,7 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
     }
     for part in clip.chunks(PACKET_SAMPLES) {
         let audio = ProviderOutput::Audio {
+            spoken: false,
             request,
             sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
             provider_event_at_us: monotonic_us(),
@@ -16700,6 +16703,7 @@ async fn answer(
                 played = true;
                 for part in samples.chunks(PACKET_SAMPLES) {
                     let audio = ProviderOutput::Audio {
+                        spoken: answering,
                         request,
                         sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
                         provider_event_at_us: monotonic_us(),
