@@ -1,3 +1,31 @@
+## 2026-11-10 — default sway regression; music cancellation follow-up
+
+- HOLD #6002 2d0502148, comment 6761333572: no --reach admits a
+  150-count move but the new goal clamp uses default Limits::FOLDED.yaw
+  40. Actual body-loop test reaches 40; restoring only prior body.rs with
+  the same probe passes. Both 0.04 s. Patch/logs retained under
+  /private/tmp/third-6002-default-*; all temporary source edits removed.
+  Ask is consistent admission/playback defaults, not an unverified widening.
+- Independent #6002 fmt, strict Body/Control/Skills lint and docs 192/1899/0
+  pass. Full Body library failed 552 pass / 10 startup-timeout failures /
+  one ignored; supervisor sources unchanged, cause unproven. Focused moves
+  9/9, sway 3/3 and one isolated startup diagnostic 1/1 pass. No full rerun.
+  JS 96 pass / 2 skipped / 2 timeout cancellations; both isolated pass.
+  Python 159 pass / 1 skipped / 2 example import failures with relative
+  PYTHONPATH; both pass with absolute source path. Initial missing pytest/ws,
+  absent npm lockfile and unnecessary offline tomli attempts are retained.
+  No physical motion/clearance/load claim. Hardware checklist applied to
+  range, units and evidence; manufacturing artifacts unchanged.
+- #5975 received second independent READ-OK 6761217055 on f75e3da94.
+  Fourth then demonstrated Scratch that / changed my mind cancellations
+  ignored by the classifier (6761255984). Added two classifier regressions
+  and five direct/wrapped Engine matrix rows, including phrase-boundary
+  positives; fail-first run active before repair. Draft/OFF retained;
+  those reads do not automatically qualify the upcoming runtime delta.
+- #5997 code read is now READ-OK 6761301386 from Reviewer-two, after
+  replacement request 6761210023. Current ARM and host controls independently
+  checked. Room-behavior read and lamp check remain owed; still draft.
+
 ## 2026-11-10 — volume restore reread clears both demonstrated faults
 
 - READ-OK #6008 663ec9965, comment 6761178210, lifts Third's HOLD
