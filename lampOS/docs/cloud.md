@@ -2218,8 +2218,10 @@ As each step of the setup walk ends, the app is told, once. Behind
   these four keys only.
 - **When.** From `onboarding/pending`'s `walk_id` and `steps_ended`
   ([onboarding.md](onboarding.md)), read at most once a second on the tick,
-  only while connected, after `onboarding.done`'s look
-  (`crate::onboarding_step`). Each step's end, `(step, at)`, once per
+  only while connected, on the same look as `onboarding.done` and sent
+  before it, so a heartbeat with the last step ended and the walk's end dated
+  sends the step first, then `onboarding.done` (neither waits on the other's
+  ack; `crate::onboarding_step`). Each step's end, `(step, at)`, once per
   `walk_id`: what was tried is written to `$STATE_DIRECTORY/onboarding-step`
   (`{"walk_id", "steps": [{"step", "at"}]}`), so a restart doesn't send it
   again. A new `walk_id`, a redo of the whole walk, starts it over. A redo of
