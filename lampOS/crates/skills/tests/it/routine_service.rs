@@ -154,6 +154,8 @@ rest = {{ op = "wake" }}
         let say = UnixListener::bind(root.path().join("say.sock")).unwrap();
         say.set_nonblocking(true).unwrap();
         let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+        // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+        command.env("LAMP_SKILLS_ANY_ASKER", "on");
         command
             .env_clear()
             .env("LAMP_SKILL_ROUTINES", "on")

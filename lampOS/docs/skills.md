@@ -1118,11 +1118,15 @@ lamp-voice's unit (`/lampos.slice/lampos-voice.slice/lamp-voice.service`,
 - `audio_authorize` and `audio_finish` are refused
   (`watch::NOT_THE_VOICE`: "only the voice may authorize or finish requested
   audio").
-- While the lamp is private (the voice muted for privacy or asleep, or the
-  privacy switch closed on `voice/privacy`, as `routine::kept_asleep` reads
-  them), a `call` is refused with why (`watch::PRIVATE_FOR_OTHERS`: "the
-  lamp's skills are not called for another program while the lamp is
-  private: ..."). The voice's own calls are not held here: it holds its
+- A `call` is served only on a fresh privacy reading that permits capture
+  (`routine::private_for_others`): the newest `voice/privacy` lease valid,
+  on this boot's clock and not past its life, permitting with the switch
+  read open (or a lamp with no slide), and the voice neither muted for
+  privacy nor asleep. Otherwise it is refused with why
+  (`watch::PRIVATE_FOR_OTHERS`: "the lamp's skills are not called for
+  another program while the lamp is private: ..."), and a reading that is
+  missing or stale ("the privacy reading is not known") counts as private,
+  not open, as the voice itself treats it (Thirteen's P2 on #6159). The voice's own calls are not held here: it holds its
   turns to privacy itself.
 
 Peer credentials are read on Linux only; elsewhere no peer is the voice.

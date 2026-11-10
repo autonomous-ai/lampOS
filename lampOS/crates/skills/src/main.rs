@@ -3296,11 +3296,12 @@ fn listen(
                         }
                     }
                 };
-                // Another program's call is not served while the lamp is
-                // private: the voice holds its own turns to privacy.
+                // Another program's call is served only on a fresh privacy
+                // reading that permits capture: a missing or stale one is
+                // private too. The voice holds its own turns to privacy.
                 if !voice
                     && call["op"].as_str() == Some("call")
-                    && let Some(why) = lamp_skills::routine::kept_asleep(&bus)
+                    && let Some(why) = lamp_skills::routine::private_for_others(&bus)
                 {
                     eprintln!(
                         "lamp-skills: a call from a peer that is not the voice refused: {why}"
