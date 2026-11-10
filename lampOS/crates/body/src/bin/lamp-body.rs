@@ -57,6 +57,10 @@ struct Arguments {
     caller_caps: bool,
     /// `--lease-socket` (#3504, phase 0): where lamp-control holds the body.
     lease_socket: Option<PathBuf>,
+    /// `--lease-holder-uid N`: a caller running as this uid may also hold the
+    /// body by `--lease-socket`, whatever its unit. For the virtual lamp
+    /// (`lamp-sim`), where nothing runs under systemd; no product unit passes it.
+    lease_holder_uid: Option<u32>,
     /// `--hold-from FILE`: a hand on the head from a test input (#2668),
     /// for tests on a lamp only; no product unit passes it.
     hold_from: Option<PathBuf>,
@@ -206,6 +210,7 @@ fn parse_with(
     let mut arbitration = None;
     let mut caller_caps = None;
     let mut lease_socket = None;
+    let mut lease_holder_uid = None;
     let mut hold_from = None;
     while let Some(key) = args.next() {
         if key == "--help" {
@@ -247,6 +252,7 @@ fn parse_with(
                 || arbitration.is_some()
                 || caller_caps.is_some()
                 || lease_socket.is_some()
+                || lease_holder_uid.is_some()
                 || hold_from.is_some()
                 || args.next().is_some()
             {
@@ -475,6 +481,13 @@ fn parse_with(
             Some("--lease-socket") if lease_socket.is_none() => {
                 lease_socket = Some(PathBuf::from(value));
             }
+            Some("--lease-holder-uid") if lease_holder_uid.is_none() => {
+                // Not 0: root may hold already, and a uid of 0 here would read as a typo.
+                lease_holder_uid = match value.to_str().and_then(|text| text.parse::<u32>().ok()) {
+                    Some(uid) if uid != 0 => Some(uid),
+                    _ => return Err("--lease-holder-uid is a user id above 0"),
+                };
+            }
             Some("--arbitration") if arbitration.is_none() => {
                 arbitration = Some(match value.to_str() {
                     Some("on") => true,
@@ -664,10 +677,14 @@ fn parse_with(
         arbitration: arbitration.unwrap_or(false),
         caller_caps: caller_caps.unwrap_or(false),
         lease_socket,
+        lease_holder_uid,
         hold_from,
     };
     if result.limp && result.give_way.is_none() {
         return Err("--limp on needs --give-way return or stay");
+    }
+    if result.lease_holder_uid.is_some() && result.lease_socket.is_none() {
+        return Err("--lease-holder-uid needs --lease-socket");
     }
     if result.stand_roll.is_some() && result.standing.is_none() {
         return Err("--stand-roll needs --stand");
@@ -939,11 +956,18 @@ fn slumped_now(glimpse: &lamp_body::body::Glimpse) -> bool {
 }
 
 /// Who may hold the body by `--lease-socket`: `lamp-control.service` run
-/// as `lampos`, or root, as the kernel names them (#3504, phase 0).
+/// as `lampos`, or root, as the kernel names them (#3504, phase 0); and,
+/// only when `--lease-holder-uid` is given (the virtual lamp), any caller
+/// running as `extra`.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
-fn holder_may(caller: Option<&lamp_ipc::caller::Caller>, lampos: Option<u32>) -> bool {
+fn holder_may(
+    caller: Option<&lamp_ipc::caller::Caller>,
+    lampos: Option<u32>,
+    extra: Option<u32>,
+) -> bool {
     caller.is_some_and(|caller| {
         caller.uid == 0
+            || Some(caller.uid) == extra
             || (Some(caller.uid) == lampos
                 && caller.unit.as_deref() == Some("lamp-control.service"))
     })
@@ -1609,8 +1633,14 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 "lamp-body: the body may be held by lamp-control at {} (lampos {lampos:?})",
                 path.display()
             );
-            let mut door =
-                LeaseDoor::bind(path, Box::new(move |caller| holder_may(caller, lampos)))?;
+            let extra = arguments.lease_holder_uid;
+            if let Some(uid) = extra {
+                eprintln!("lamp-body: and by any caller running as uid {uid} (--lease-holder-uid)");
+            }
+            let mut door = LeaseDoor::bind(
+                path,
+                Box::new(move |caller| holder_may(caller, lampos, extra)),
+            )?;
             door.picture = arguments
                 .gaze
                 .as_ref()
@@ -3539,6 +3569,7 @@ mod tests {
                     unit: unit.map(str::to_owned),
                 }),
                 lampos,
+                None,
             )
         };
         assert!(may(Some("lamp-control.service"), 990));
@@ -3546,15 +3577,69 @@ mod tests {
         assert!(!may(Some("lamp-control.service"), 1000));
         assert!(!may(Some("lamp-skills.service"), 990));
         assert!(!may(None, 990));
-        assert!(!holder_may(None, lampos));
+        assert!(!holder_may(None, lampos, None));
         assert!(!holder_may(
             Some(&Caller {
                 pid: 7,
                 uid: 990,
                 unit: Some("lamp-control.service".into())
             }),
+            None,
             None
         ));
+    }
+
+    /// `--lease-holder-uid N` lets a caller of that uid hold the body, whatever its unit,
+    /// and nobody else; without it nothing changes.
+    #[test]
+    fn a_lease_holder_uid_lets_in_that_uid_only() {
+        use lamp_ipc::caller::Caller;
+        let caller = |uid, unit: Option<&str>| Caller {
+            pid: 7,
+            uid,
+            unit: unit.map(str::to_owned),
+        };
+        let lampos = Some(990);
+        assert!(holder_may(Some(&caller(1000, None)), lampos, Some(1000)));
+        assert!(holder_may(
+            Some(&caller(1000, Some("x.service"))),
+            None,
+            Some(1000)
+        ));
+        assert!(!holder_may(Some(&caller(1001, None)), lampos, Some(1000)));
+        assert!(!holder_may(Some(&caller(1000, None)), lampos, None));
+        assert!(!holder_may(None, lampos, Some(1000)));
+    }
+
+    #[test]
+    fn the_lease_holder_uid_is_a_user_id_above_0_given_once_with_a_lease_socket() {
+        let with = |more: &[&'static str]| parse(args(&[&FULL[..], more].concat()));
+        let socket = &["--lease-socket", "/run/lampos-body/lease.sock"][..];
+        assert_eq!(with(socket).unwrap().unwrap().lease_holder_uid, None);
+        assert_eq!(
+            with(&[socket, &["--lease-holder-uid", "1000"][..]].concat())
+                .unwrap()
+                .unwrap()
+                .lease_holder_uid,
+            Some(1000)
+        );
+        for refused in [
+            &["--lease-holder-uid", "1000"][..],
+            &["--lease-socket", "/a", "--lease-holder-uid", "0"],
+            &["--lease-socket", "/a", "--lease-holder-uid", "x"],
+            &["--lease-socket", "/a", "--lease-holder-uid", "-1"],
+            &["--lease-socket", "/a", "--lease-holder-uid"],
+            &[
+                "--lease-socket",
+                "/a",
+                "--lease-holder-uid",
+                "5",
+                "--lease-holder-uid",
+                "6",
+            ],
+        ] {
+            assert!(with(refused).is_err(), "{refused:?}");
+        }
     }
 
     /// While its holder has the base limp, a look is refused, never a

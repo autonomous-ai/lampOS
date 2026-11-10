@@ -1975,8 +1975,14 @@ The lamp programming protocol's server, `lamp-control`, keeps its own
 leases, clients and the 10-minute cap. The body knows one holder only.
 With `--lease-socket PATH` the body listens there for one stream at a time,
 and lets one in only if the kernel names it `lamp-control.service` run as
-`lampos`, or root (`lamp_ipc::caller`). A second, or anyone else, is
-answered `refused` with why and closed. Lines of JSON each way
+`lampos`, or root (`lamp_ipc::caller`); with `--lease-holder-uid N` (the
+virtual lamp's, where nothing runs under systemd; no product unit passes it),
+also any caller running as uid N, whatever its unit. The flag depends on the
+kernel naming the peer (Linux peer credentials): it cannot make an unidentified
+caller one, and it does not bypass the socket's filesystem permissions. "For
+the virtual lamp only" is a deployment rule (no product unit passes it), not
+something the body checks. A second, or anyone else, is answered `refused`
+with why and closed. Lines of JSON each way
 (`lamp_body::lease`):
 
 | Asked | Answered |
@@ -2247,6 +2253,7 @@ four rows, "Without it" is what `off` leaves.
 | `--arbitration on` | a gesture or a move may say who asks (`source`, `priority`), and one asked higher ends the one playing (see "Who may ask over whom") | as before: `source` and `priority` are ignored, and a gesture asked while another plays is dropped, except lamp-control's `replace`, which ends one at `skill` or lower (see "Gestures") | on or off |
 | `--caller-caps on` | who asks is the kernel's word: a gesture or a move is held to its unit's most, and the gaze socket takes sights from the eyes, skills or root only (see "Who asks, from the kernel") | as before: any process in group `lampos` may ask at any priority and send a sight | on or off |
 | `--lease-socket ABSOLUTE_PATH` | lamp-control may hold the body for up to 30 s at a time, renewed, while the lamp's own life stands back (see "Held by lamp-control") | no lease: nobody can ask the lamp's own life to stand back | a short absolute path |
+| `--lease-holder-uid N` | with `--lease-socket`: a caller running as user id N (above 0) may hold the body too, whatever its unit; for the virtual lamp only | only `lamp-control.service` as `lampos`, or root | a user id above 0, given once, and only with `--lease-socket` |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
 | `--head-stall-load LOAD` | the head pitch's stall bound, this lamp's own (see "Giving way to a hand": a head that holds more than 100 to stand) | 100 | 100 to 230 |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
