@@ -1474,8 +1474,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `/var/lib/lampos-hermes/.local/bin/hermes`, on no `PATH`. No unit, no
      service, no gateway, nothing at boot: Harness starts `hermes` in a
      pane only when a task is sent to it.
-   - **In a namespace that shows Hermes only its own folders, and the lamp
-     only through the skills.** Hermes
+   - **In a namespace that shows Hermes only its own folders.** Hermes
      runs shell commands the model chooses. As plain `lampos` they could
      reach every lamp service run as `lampos`: lamp-cloud's relay key (its
      systemd credential under `/run/credentials`, and lamp-cloud's state
@@ -1516,10 +1515,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
           there), and the file `/etc/resolv.conf` resolves to when it is
           under `/run` (such as `/run/systemd/resolve/stub-resolv.conf`),
           so names still resolve for the web and the forwarder stays on
-          TCP `127.0.0.1:7741`; and lamp-skills' tools folder
-          `/run/lampos-skills` (`tools.json` and `call.sock`, the voice's
-          `LAMP_SKILLS_DIR`) when it is there, skipped on a lamp without
-          lamp-skills. The work folder is Harness's project
+          TCP `127.0.0.1:7741`. The work folder is Harness's project
           `~/harnesses/lamp-tasks` in its home, not only its `lamp`
           subfolder (where lamp-tasks puts `AGENTS.md` and Harness starts
           Hermes), as Harness names the project and may start a task in
@@ -1527,11 +1523,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
           (its `store`, Harness's own files) is shown;
        3. an empty tmpfs over `/run`, `/var/lib` and `/etc/lampOS` (when
           there), the mount points made in it and the staged mounts moved
-          back; the skills, `/run/lampos-skills` and `resolv.conf`
-          remounted read-only with `remount,bind,ro` (with the flags they
-          had, as a user namespace may only add flags, and refuses a plain
-          `remount,ro`); a unix socket still connects on a read-only
-          mount; then
+          back; the skills and `resolv.conf` remounted read-only (with the
+          flags they had, as a user namespace may only add flags); then
           the three overlays remounted read-only;
        4. `/dev/null` bound over every character device matching
           `/dev/video*`, `/dev/media*`, `/dev/v4l-subdev*`, `/dev/snd/*`,
@@ -1549,22 +1542,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        In that nested user namespace the mounts are locked: Hermes cannot
        take them off. Any step failing ends it before Hermes runs.
      So Hermes sees its own folder, its work folder and the skills
-     (read-only), lamp-skills' `/run/lampos-skills` (read-only),
-     `resolv.conf`, its own `/tmp` and `/proc`, and the lamp's programs
-     (`/usr`, `/opt/lampOS`); no other lamp service's `/run` or `/var/lib`
-     folder (no other socket, no state, no credential), no
+     (read-only), `resolv.conf`, its own `/tmp` and `/proc`, and the
+     lamp's programs (`/usr`, `/opt/lampOS`); no lamp service's `/run` or
+     `/var/lib` folder (no socket, no state, no credential), no
      `/etc/lampOS`, no camera, mic, serial, I2C, SPI or GPIO device and no
      lamp process. A test (`no_lampos_service_folder_is_visible_to_hermes`)
      reads every `RuntimeDirectory=`, `StateDirectory=` and
      `ReadWritePaths=` under `/run` or `/var/lib` of the product units run
      as `lampos`, and the tmpfiles folders made `lampos`'s, and fails if
-     any of them but `/run/lampos-skills` is not hidden, so a new service
-     is hidden with no change. Its reach into the lamp is the voice's
-     model's (the product owner, 10 Nov): only through lamp-skills'
-     socket, with `lamp-tasks skill call NAME`
-     (`/opt/lampOS/tasks/current/lamp-tasks`), where lamp-skills applies
-     its cooldowns, pause and policy as for the voice; never a device or a
-     service's files.
+     any of them is not hidden, so a new service is hidden with no change.
+     Nothing under `/run` is shown to Hermes here: any reach of the lamp's
+     Hermes into the lamp's skills is #6128's, behind its own switch.
      Shown on lamp-c0a4 by hand (10 Nov, the earlier deny-list scripts):
      the key hidden; `umount` refused, nested too. As plain `lampos`, `ls
      /proc/<lamp-cloud pid>/root/run/credentials/lamp-cloud.service/`
