@@ -1610,7 +1610,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the switch off in lamp-update hands over as before.
      `lamp-cloud.service` has `LAMP_HERMES_ON_LAMP=on` for its forwarder;
      it writes only its own state folder, so it needs no other path and no
-     group. `lamp-voice.service` has `LAMP_TASKS_REPLY_NAMED=on`.
+     group. `LAMP_TASKS_REPLY_NAMED` (lamp-voice) and
+     `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) are turned on with the routing
+     that reads them (#6094).
    - **Shown only in tests** (`hermes_install::tests`, the wrapper and the
      namespace script run by `sh` there too). Not run on a lamp yet: the
      whole install by lamp-update. Measured by hand on lamp-c0a4 (10 Nov,
