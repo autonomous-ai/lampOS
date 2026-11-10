@@ -903,7 +903,7 @@ const HARNESS_DONE: &str = "harness-at-boot";
 /// Binaries a build carries that live in another part's folder: the voice
 /// starts its turn-end worker from its own (docs/endpoint-detection.md). A
 /// build without one is refused whole.
-const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
+pub(crate) const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 
 /// Tools put beside a part when the build carries them, and left out, said
 /// once, when it does not: the factory's steps run the body's from the
@@ -912,7 +912,8 @@ const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 /// does (the reviewer on #2249). The voice starts its same-voice check
 /// from its own folder, and only when `LAMP_SAME_VOICE_MODEL` is set
 /// (docs/same-voice.md); a build from before it shipped must still install.
-const BESIDE_IF_CARRIED: &[(&str, &[&str])] = &[
+/// A round puts them beside too when the build carries them (crate::round).
+pub(crate) const BESIDE_IF_CARRIED: &[(&str, &[&str])] = &[
     ("lamp-body", &["lamp-body-measure", "lamp-body-mood"]),
     ("lamp-voice", &["lamp-same-voice"]),
 ];
