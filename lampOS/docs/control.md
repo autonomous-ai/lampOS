@@ -527,7 +527,13 @@ connection closed), `slumped` (the body gave way under load and let go). Ids are
 
 - **Suspended** (`conversation`) is held again when the talk ends, if it
   hasn't lapsed. While suspended, the lease is still the holder's, so nobody
-  else may take the part, and its clock runs.
+  else may take the part, and its clock runs. A body op (`look`, `move`,
+  `play`, `joints`) under it is refused `busy`, "your lease on the body is
+  suspended while someone talks to the lamp: it is yours again when they
+  stop" (wait for the lease's `held` event, don't take another), and a
+  `lease.take` of the same part by the same computer says the same; only a
+  computer that never took one is told `no_lease`, and another computer's
+  take says "another computer holds the <part>".
 - **Lost:** an act on a lost lease is refused with how it ended.
 - **A voice restart** (an update, a crash, `systemctl restart lamp-voice`) stops its privacy lease for over a second, so every lease is lost with `private` ("Events": private 0.75 to 1.25 s after the last lease). A client takes its lease again once `lamp.changed` says `private` is false.
 
