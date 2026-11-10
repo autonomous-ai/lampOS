@@ -195,6 +195,9 @@ pub struct Unconfirmeds {
     seen: Vec<(String, Vec<Vec<f32>>)>,
     /// The last record's number given ([`Unconfirmed::record`]).
     records: u64,
+    /// A staging copy is still there that could not be removed: every look
+    /// ([`Self::expire`]) tries again, whether or not a face is kept.
+    staging_left: std::cell::Cell<bool>,
 }
 
 impl Unconfirmeds {
@@ -226,12 +229,18 @@ impl Unconfirmeds {
         };
         // A save cut between its write and its rename leaves its staging
         // copy, names and prints in it: never read, so removed.
-        let _ = std::fs::remove_file(Self::staging(&path));
+        let staging_left = !Self::drop_staging(&path);
+        if staging_left {
+            eprintln!(
+                "lamp-eyes: the staging copy of the faces from photos could not be removed; each look tries again"
+            );
+        }
         let mut faces = Self {
             path,
             kept,
             seen: Vec::new(),
             records: 0,
+            staging_left: std::cell::Cell::new(staging_left),
         };
         for at in 0..faces.kept.len() {
             faces.kept[at].record = faces.next_record();
@@ -258,6 +267,15 @@ impl Unconfirmeds {
         temporary.into()
     }
 
+    /// Removes the staging copy beside `path`; false when one is there and
+    /// could not be removed.
+    fn drop_staging(path: &Path) -> bool {
+        match std::fs::remove_file(Self::staging(path)) {
+            Ok(()) => true,
+            Err(error) => error.kind() == io::ErrorKind::NotFound,
+        }
+    }
+
     /// Written whole or not at all: a write or rename that fails removes
     /// its staging copy, so no print is left beside the file.
     fn save(&self) -> io::Result<()> {
@@ -279,9 +297,10 @@ impl Unconfirmeds {
             file.sync_all()?;
             std::fs::rename(&temporary, &self.path)
         })();
-        if written.is_err() {
-            let _ = std::fs::remove_file(&temporary);
-        }
+        // A renamed copy is gone; a failed one is removed, or left to the
+        // next look.
+        self.staging_left
+            .set(written.is_err() && !Self::drop_staging(&self.path));
         written
     }
 
@@ -426,8 +445,12 @@ impl Unconfirmeds {
     }
 
     /// Deletes those added [`UNCONFIRMED_FOR_S`] ago or more; how many. A
-    /// save that fails deletes none, so the next look tries again.
+    /// save that fails deletes none, so the next look tries again. A staging
+    /// copy left behind is removed first, kept faces or not.
     pub fn expire(&mut self, now_unix_s: u64) -> io::Result<usize> {
+        if self.staging_left.get() {
+            self.staging_left.set(!Self::drop_staging(&self.path));
+        }
         let before = self.kept.clone();
         self.kept
             .retain(|kept| now_unix_s.saturating_sub(kept.added_unix_s) < UNCONFIRMED_FOR_S);
@@ -1012,6 +1035,47 @@ mod tests {
         assert!(staging.ends_with("people.json.from-photos.new"));
         std::fs::write(&staging, br#"{"version":1,"unconfirmed":[]}"#).unwrap();
         assert!(Unconfirmeds::open(path.clone()).is_empty());
+        assert!(!staging.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A staging copy that can't be removed at start (here a folder in its
+    /// place) is tried again on every look, with no face from a photo kept
+    /// at all, and goes once it can be: its prints never wait for another
+    /// save.
+    #[test]
+    fn a_staging_copy_not_removed_at_start_goes_on_a_later_look_with_none_kept() {
+        let dir = folder("staging-retry");
+        let path = Unconfirmeds::beside(&dir.join("people.json"));
+        let staging = Unconfirmeds::staging(&path);
+        std::fs::create_dir_all(staging.join("blocker")).unwrap();
+        let mut faces = Unconfirmeds::open(path.clone());
+        assert!(faces.is_empty());
+        assert!(staging.exists());
+        assert_eq!(faces.expire(1_000).unwrap(), 0);
+        assert!(staging.exists());
+        // The way is clear again, the copy still there: the next look takes it.
+        std::fs::remove_dir_all(&staging).unwrap();
+        std::fs::write(&staging, br#"{"version":1,"unconfirmed":[]}"#).unwrap();
+        assert_eq!(faces.expire(1_001).unwrap(), 0);
+        assert!(!staging.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A save whose write fails and whose staging copy can't be removed
+    /// either leaves the copy to the next look, not to the next save.
+    #[test]
+    fn a_staging_copy_a_failed_save_could_not_remove_goes_on_a_later_look() {
+        let dir = folder("save-staging-retry");
+        let path = Unconfirmeds::beside(&dir.join("people.json"));
+        let staging = Unconfirmeds::staging(&path);
+        let mut faces = Unconfirmeds::open(path.clone());
+        std::fs::create_dir_all(staging.join("blocker")).unwrap();
+        assert!(faces.add("Tuan", unit(0), 1_000).is_err());
+        assert!(faces.is_empty());
+        std::fs::remove_dir_all(&staging).unwrap();
+        std::fs::write(&staging, b"prints").unwrap();
+        assert_eq!(faces.expire(1_001).unwrap(), 0);
         assert!(!staging.exists());
         std::fs::remove_dir_all(dir).unwrap();
     }
