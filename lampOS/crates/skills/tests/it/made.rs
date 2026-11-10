@@ -665,3 +665,147 @@ fn a_written_skill_passes_the_real_checker_and_is_put_on_only_once_marked() {
     let tools = lamp_skills::tools_file(std::slice::from_ref(&skill));
     assert_eq!(tools["tools"][0]["name"], "written_study_mode", "{tools}");
 }
+
+/// A made skill on `trigger` with one body `step`, reading presence and
+/// the clock, as the voice's model writes one.
+fn made_body(trigger: &str, step: &str) -> String {
+    format!(
+        "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"body\"]\n\n[permissions]\n\
+         topics = [\"humans/faces/tracked\", \"room/stood_up\", \"clock/local\"]\nbody = true\n\n\
+         [trigger]\n{trigger}\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n{step}\n"
+    )
+}
+
+/// The made skill's topics hold lamp-skills' own: the faces and getting up
+/// (`PRESENCE_TOPICS`) and the local clock lamp-skills makes, which the
+/// voice can't name and writes out (#6070, the Reviewer-lead's P3).
+#[test]
+fn a_made_skills_clock_and_presence_are_lamp_skills_own() {
+    use lamp_voice::made_skill::{CLOCK_TOPIC, TOPICS};
+    assert_eq!(CLOCK_TOPIC, lamp_skills::LOCAL_CLOCK_TOPIC);
+    assert!(TOPICS.contains(&lamp_skills::LOCAL_CLOCK_TOPIC));
+    for topic in lamp_skills::PRESENCE_TOPICS {
+        assert!(TOPICS.contains(&topic), "{topic}");
+    }
+}
+
+/// A face, a getting up and a time each day, each made by voice, paced and
+/// passed by the real `lamp-skills pack` and kept (#6070, the
+/// Reviewer-lead's P3): said as lamp-skills will run them.
+#[test]
+fn a_face_a_getting_up_and_a_clock_made_skill_are_packed_and_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    for (name, trigger, step, said) in [
+        (
+            "face-hello",
+            "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n",
+            "body = { gesture = \"greeting\" }",
+            "When the lamp sees a face, after seeing none for a minute, it lifts its head and \
+             arm in a greeting.",
+        ),
+        (
+            "stand-shake",
+            "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n",
+            "body = { gesture = \"headshake\" }",
+            "When someone sitting at the desk gets up, it shakes its head, at most once a \
+             minute.",
+        ),
+        (
+            "night-droop",
+            "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+             during = { from = \"23:59\", to = \"00:00\" }\n",
+            "body = { gesture = \"sleepy\" }",
+            "Every day at 23:59, it droops sleepily.",
+        ),
+    ] {
+        let toml = made_body(trigger, step);
+        let made = keep(
+            &answer(&toml, name),
+            false,
+            &format!("s1:{name}:1"),
+            &keeping,
+        )
+        .unwrap_or_else(|refused| panic!("{name}: {refused:?}"));
+        assert_eq!(made.name, name);
+        assert_eq!(made.description, said, "{name}");
+        assert!(made.uses.body, "{name}");
+    }
+    assert_eq!(tars(&keeping.directory).len(), 3);
+}
+
+/// #6070, the Reviewer-lead's P2: a made skill on a face coming into view
+/// that only moves, made by voice with no `absent_for`, kept, put on and
+/// run by the real engine. Someone at the desk who glances away for a frame
+/// is not greeted again; back after more than a minute away, they are.
+/// Unpaced, the glance would greet them again (CLAUDE.md rule 8).
+#[test]
+fn a_made_face_skill_greets_once_through_a_glance_away() {
+    const S: u64 = 1_000_000;
+    const FACE: &[u8] = br#"{"faces":[{"id":1,"xmin":0.4,"xmax":0.6,"ymin":0.3,"ymax":0.55}]}"#;
+    const NOBODY: &[u8] = br#"{"faces":[]}"#;
+    let toml = made_body(
+        "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n",
+        "body = { gesture = \"greeting\" }",
+    );
+    assert!(!toml.contains("absent_for"));
+    let greetings = |skill: lamp_skills::Skill| {
+        let mut engine = lamp_skills::Engine::new(vec![skill], true);
+        let mut at_s = Vec::new();
+        for at in 0..260u64 {
+            let faces = match at {
+                0..70 => NOBODY,
+                // A frame without the face: a glance away.
+                100 => NOBODY,
+                70..130 => FACE,
+                // Away 70 s, then back.
+                130..200 => NOBODY,
+                _ => FACE,
+            };
+            let mut runs = engine.tick(at * S);
+            runs.extend(engine.observe("humans/faces/tracked", at * S, faces, Some(2_000)));
+            if runs.iter().any(|run| {
+                run.events
+                    .iter()
+                    .any(|event| event.stage == lamp_msgs::SkillStage::Triggered)
+            }) {
+                at_s.push(at);
+            }
+        }
+        at_s
+    };
+    // Made by voice: paced, packed, kept, marked and put on, then loaded as
+    // lamp-skills loads what is on.
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let made = keep(&answer(&toml, "face-hello"), false, "s1:face:1", &keeping).unwrap();
+    let now = now_ms();
+    goes_on(&keeping.directory, &made.sha256, now).unwrap();
+    install_made_at(
+        &skills,
+        None,
+        &keeping.directory,
+        &made.sha256,
+        std::time::Duration::from_millis(200),
+        now + 1,
+    )
+    .unwrap();
+    let on = skills.join("face-hello");
+    assert!(
+        fs::read_to_string(on.join("skill.toml"))
+            .unwrap()
+            .contains("absent_for = \"1m\"")
+    );
+    assert_eq!(greetings(lamp_skills::load(&on).unwrap()), [70, 200]);
+    // Unpaced, the same skill greets the glance back at 101 s too.
+    let unpaced = dir.path().join("unpaced").join("face-hello");
+    fs::create_dir_all(&unpaced).unwrap();
+    fs::write(unpaced.join("skill.toml"), &toml).unwrap();
+    fs::write(unpaced.join("SKILL.md"), card("face-hello")).unwrap();
+    assert_eq!(
+        greetings(lamp_skills::load(&unpaced).unwrap()),
+        [70, 101, 200]
+    );
+}
