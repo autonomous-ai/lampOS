@@ -2218,9 +2218,11 @@ gone ([switches.md](switches.md)). What happens:
      is at most 240 characters (`made_skill::CANNOT`), cut where a sentence
      ends, or else where a word ends, never mid-word and never with "…"
      (on lamp-74ff a reason cut at 120 ended "beyond s…"); nothing is kept.
-     The journal says it too: `lamp-voice: a skill made here wasn't kept in
-     N ms: <why>` (#5977), the lamp's or the model's words, never the
-     person's request. When part
+     The journal says why too: `lamp-voice: a skill made here wasn't kept
+     in N ms: <why>` (#5977), the lamp's own words, never the person's
+     request; for the model's `cannot:` reason, which may echo the
+     person's words, only `made_skill::MODELS_CANNOT_JOURNALED` (Second's
+     HOLD on #5985). When part
      of a request can't be done ("dim slowly over a minute"), the model
      makes the rest and adds a line outside the blocks that begins
      `left out:` (`made_skill::LEFT_OUT`, #5041). It is said after what
@@ -2313,7 +2315,9 @@ Tests:
   without one, `with_no_tasks_part_a_skill_is_made_and_put_on_by_voice`,
   and `the_journal_says_why_a_make_was_not_kept` (#5977: the journal line
   `lamp-voice: a skill made here wasn't kept in N ms: <why>`, the lamp's
-  own words, never the request; lamp-74ff's app make said no reason).
+  own words, never the request; lamp-74ff's app make said no reason) and
+  `the_models_cannot_reason_is_told_never_journaled` (#5985: told in full,
+  journaled as `MODELS_CANNOT_JOURNALED`).
 - `made_skill::tests`: the brief within 1,300 bytes (so its repair fits the
   tasks part's 2,000), exactly two files, the
   cap, each wider use refused, the card marked, nothing kept without the

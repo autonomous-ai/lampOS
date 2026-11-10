@@ -160,8 +160,10 @@ sau:
      thì ở cuối một từ, không bao giờ cắt giữa từ và không bao giờ có "…"
      (trên lamp-74ff một lý do cắt ở 120 ký tự kết thúc bằng "beyond s…");
      không giữ gì. Nhật ký cũng ghi: `lamp-voice: a skill made here wasn't
-     kept in N ms: <lý do>` (#5977), lời của đèn hay của mô hình, không bao
-     giờ là lời nhờ của người dùng. Khi một phần của yêu cầu không làm được ("dim slowly over a
+     kept in N ms: <lý do>` (#5977), lời của chính đèn, không bao giờ là
+     lời nhờ của người dùng; với lý do `cannot:` của mô hình, có thể lặp
+     lại lời của người dùng, chỉ ghi `made_skill::MODELS_CANNOT_JOURNALED`
+     (HOLD của Second trên #5985). Khi một phần của yêu cầu không làm được ("dim slowly over a
      minute"), mô hình làm phần còn lại và thêm một dòng ngoài các khối bắt
      đầu bằng `left out:` (`made_skill::LEFT_OUT`); đèn nói dòng đó sau câu
      kỹ năng làm gì, trong một khung cố định như ghi chú của người tạo ("The
@@ -227,7 +229,9 @@ Kiểm thử: `make_skill_local::tests` (kể cả
 phần tasks, kỹ năng được tạo và được bật ngay mà không cần lời "có", và
 `the_journal_says_why_a_make_was_not_kept`: #5977, nhật ký ghi
 `lamp-voice: a skill made here wasn't kept in N ms: <lý do>` bằng lời của
-đèn, không bao giờ là lời của người dùng), `made_skill::tests`, và
+đèn, không bao giờ là lời của người dùng;
+`the_models_cannot_reason_is_told_never_journaled`: #5985, lý do được báo
+đầy đủ, nhật ký chỉ ghi `MODELS_CANNOT_JOURNALED`), `made_skill::tests`, và
 `crates/skills/tests/it/made.rs` với `lamp-skills` thật.
 
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)

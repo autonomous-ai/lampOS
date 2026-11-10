@@ -529,6 +529,18 @@ fn after_word<'a>(line: &'a str, word: &str) -> Option<&'a str> {
         .map(|_| &line[word.len()..])
 }
 
+/// Whether the model's answer is its word that no made skill can do what
+/// was asked ([`CANNOT`], and no fenced block): its reason is the model's
+/// own words, which may echo the person's, so it is told to the person and
+/// never journaled ([`MODELS_CANNOT_JOURNALED`]; Second's HOLD on #5985).
+pub fn says_cannot(answer: &str) -> bool {
+    after_word(answer.trim_start(), CANNOT).is_some() && !answer.contains("```")
+}
+
+/// What the journal says in place of the model's own `cannot:` reason.
+pub const MODELS_CANNOT_JOURNALED: &str =
+    "the lamp's model said no made skill can do it (its reason told, not journaled)";
+
 /// The two files of the model's answer: exactly one fenced block named
 /// `skill.toml` and one named `SKILL.md` (its info string's last word),
 /// and no other fenced block; each at most [`MOST_FILE_BYTES`].
@@ -538,8 +550,8 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
     // one sentence to the person with what to ask instead, is the refusal
     // as it is, the app showing it and the voice saying it (#5977), never
     // stood in for by something else and never cut mid-word.
-    if let Some(why) = after_word(answer.trim_start(), CANNOT)
-        && !answer.contains("```")
+    if says_cannot(answer)
+        && let Some(why) = after_word(answer.trim_start(), CANNOT)
     {
         let why = cut_sentences(why, MOST_CANNOT_REASON_CHARS);
         if !why.is_empty() {
