@@ -575,14 +575,17 @@ a product lamp, on by the build's default, #5229), the status
 carries `harness` (`lamp_msgs::HarnessInstall`), Harness put on the lamp
 before its sign-in (`docs/install.md`, "Harness before the sign-in"):
 `{"install": "absent"|"installing"|"installed"|"failed", "revision",
-"at_unix_ms", "version"?, "pinned"?, "error"?, "message"}`. `error`, with
+"at_unix_ms", "version"?, "pinned"?, "error"?, "from_version"?, "message"}`. `error`, with
 `failed` only, is one of `pin_unreadable`, `pin_fetch`, `pin_mismatch`,
 `timeout`, `installer`, `no_user`, `not_started`, `serve` (a pinned
 install's files not handed to the installer: no listener on 127.0.0.1, or
 no file for its script), `version` (a pinned install whose `harness
 version` is not the pinned one, or says none; Harness is there, but not as
-pinned); `message` is fixed
-plain English for `install` and `error` (`HarnessInstall::message_for`),
+pinned), `upgrade` (a move of an older Harness to a newer pin failed and
+the older one was put back, #5957); `from_version`, the older version, is
+there only with an `installing` that moves it ("Updating Harness on the
+lamp.") or with `failed` and `upgrade`, and absent otherwise; `message` is fixed
+plain English for `install` and `error` (`HarnessInstall::message_of`),
 shown by the app as it is; `revision` goes up by one at each change and
 never on a read. Without the switch, or from an older lamp-update, there
 is no `harness`, and the app shows no Harness step. lamp-cloud leaves out
@@ -592,7 +595,8 @@ app reads it by asking `update.status`, as lamp-cloud pushes nothing of it.
 A failed install is tried again after the next round that reaches the
 channel, up to date or not, so `update.check` is its retry; an `installer`
 or `no_user` failure only after 30 min; a `serve` failure at the next
-round; a `version` failure stays while Harness is there. Tests:
+round; a `version` failure stays while Harness is there; an `upgrade`
+failure is tried with the same pin after 24 h. Tests:
 `app_contract.rs`'s `the_software_update_is_answered_from_lamp_updates_status`.
 
 ### Check for update (#4153, `update.check`)

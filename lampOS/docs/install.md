@@ -1201,7 +1201,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      and every later one, with or without a lampOS update due. Only while
      nothing is at `/usr/local/bin/harness`, its link followed: a link whose
      target is gone counts as missing and is put there again; one already
-     there is recorded `installed` and nothing runs.
+     there is recorded `installed` and nothing runs, unless it is older than
+     the build's pin ("A newer pin moves an older Harness", below).
    - **How:** a round's own sandbox can't write `/usr/local/bin` or
      Harness's home, so, as with the settings writer, the round writes the
      fixed one-shot `lamp-update-harness.service` in `/etc/systemd/system`,
@@ -1308,6 +1309,76 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        and constants: `MANIFEST_SHA256`, `VERSION`, `INSTALLER_SHA256` and
        each `MANIFESTS` entry's `sha256`. Tests hold every constant to its
        file.
+     - **A newer pin moves an older Harness** (#5957; no switch of its own,
+       it follows `LAMP_HARNESS_AT_ONBOARDING` and the build's default).
+       After a reached round, Harness there and recorded `installed` with a
+       `version` older than the pin's `cli.version` is installed again by
+       the same one-shot, the same loopback files and the same hold, as
+       `lampos`, with Harness's home (and so its sign-in) kept. Versions are
+       compared as dotted numbers (`0.5.100` is newer than `0.5.39`); a
+       version missing or not plain digits and dots is left alone, and an
+       equal or newer one too. With the build's own pin the round compares
+       the versions itself. An env pin's version is known only once fetched,
+       so the round asks the one-shot when that pin differs from the one in
+       `harness-ask.json`, and the one-shot installs only if the fetched
+       `cli.version` is newer, else records `installed` as it was.
+       - **Not while Harness is in use:** a round waits, saying one line
+         (`Harness X is older than the pinned Y: moved at a later round,
+         …`), never an error, while `tasks/status`'s kept value lists a
+         task in `tasks` or `unread` (one that can't be read counts as in
+         use), or a Harness `login` (a sign-in by code), `new` or `reply`
+         (a hand-over or follow-up being sent) is among the lamp's
+         processes (`harness_install/busy.rs`; options before the verb,
+         as in `harness --json login`, are passed over). lamp-tasks' store is
+         private and never opened. The next idle round moves it.
+       - **The ask:** `harness-ask.json` gains `upgrade_from` (the
+         recorded version), so the one-shot moves the Harness that is there
+         instead of saying "already at …, nothing installed". The record
+         is `installing` with `from_version` and the words "Updating
+         Harness on the lamp.". An ask or record without the new fields
+         reads as before.
+       - **The move:** the one-shot reads `harness version` again (none:
+         left alone, `installed`). That version, not the record's (Harness
+         may have moved itself), is the `from_version` of the `installing`
+         record and of any `failed` `upgrade`. It checks the pinned files as
+         for a first install, then looks again whether Harness is in use: if
+         it is, it records `installed` at that version and a later round
+         moves it. Then it stops `lamp-tasks.service` and runs `harness
+         stop` (lamp-tasks starts the new daemon when it starts again).
+         Either stop failing, or `id -u` failing first, is "not now" in the
+         same way, with `systemctl start lamp-tasks.service` (a running one
+         is left as it is). A bus that can't be opened counts as in use. Then it keeps the Harness that is there: as
+         `lampos`, the folder of the `cli.js` its launcher runs, the
+         launcher, `~/.harness/runtime/current-{node,tmux,grid}` and the
+         `~/.local/bin/tmux` link are copied to
+         `~/.harness/lampos-upgrade-from`. Runtimes sit in folders named by
+         their version that the installer never removes, so these are what
+         the older Harness needs. The CLI folder is checked by its real path
+         (`pwd -P`, so `/./` or `//` change nothing): Harness's home,
+         `.harness`, `.local`, `.local/bin`, the kept copy, or a folder
+         above one of them is refused, here and again before a put-back, so
+         neither can remove the sign-in. A kept copy already there (a
+         put-back that failed) is the only good one: it is never removed,
+         and the move is refused (`upgrade`, nothing stopped or installed,
+         journaled `a kept copy waits at …`) until it is cleared by hand;
+         this is looked at before anything is stopped. The new copy is made at `<kept>.new` and
+         renamed only once whole. Then the installer runs.
+       - **Put back on failure:** the installer failing, or `harness
+         version` not the pinned one after it, puts the kept copy back (as
+         `lampos`) and records `failed` with `upgrade` and `from_version`,
+         "Harness couldn't be updated, so the lamp keeps the version it
+         had."; it is journaled whether `harness version` says the older
+         one again, and the kept copy is removed only when it does. A copy
+         not kept installs nothing (also `upgrade`). Either
+         way the launcher is pinned again (with the hold on) and lamp-tasks
+         started again. A failed move is tried again by a round with
+         another pin at once, or with the same pin after 24 h
+         (`UPGRADE_RETRY_AFTER`). If the copy cannot be put back and
+         Harness is then missing, the next round installs it as on a lamp
+         without it.
+       - **Shown only in tests**; the move from 0.5.39 to a newer pin on a
+         lamp, signed in and handing work over after, is a lamp row (#5957,
+         part 3).
      - **Held there:** Harness's own self-update is held by lamp-tasks'
        `LAMP_HARNESS_HOLD_UPDATES` (tasks.md, "Harness held at its pinned
        version"). A Team account ignores it. With that switch on in
@@ -1322,13 +1393,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        hundred bytes; not read past the cap, one line said; #5647).
    - **Said to the app:** `harness-install.json` in the records,
      `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
-     "error"?, "message"}` (`lamp_msgs::HarnessInstall`), on
+     "error"?, "from_version"?, "message"}` (`lamp_msgs::HarnessInstall`), on
      `update/status` as `harness` and in lamp-cloud's `update.status`
      (`docs/cloud.md`). `install` is `absent` (switch on, not tried yet),
      `installing`, `installed` or `failed`; `error` a fixed code
      (`pin_unreadable`, `pin_fetch`, `pin_mismatch`, `timeout`,
-     `installer`, `no_user`, `not_started`, `serve`, `version`); `message`
-     fixed words for
+     `installer`, `no_user`, `not_started`, `serve`, `version`,
+     `upgrade`); `from_version` only with an `installing` that moves an
+     older Harness, or a `failed` `upgrade` (#5957), absent otherwise;
+     `message` fixed words for
      them; `revision` one more at each change. Said within 2 s of a
      change, with the switch on. Switch off, `serve` removes the record, so
      no `harness`, and the status thread wakes once a minute, as before.
@@ -1339,7 +1412,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      more after it (`RETRY_AFTER`), so a broken installer isn't run after
      every round; an `update.check` within those 30 min starts no install.
      `serve` and the rest are tried at the next round. `version` is not
-     held either, but nothing is tried while Harness is there.
+     held either, but nothing is tried while Harness is there. `upgrade`
+     waits 24 h for the same pin, none for another.
    - **Shown only in tests** (`harness_install::tests`, the status and
      `app_contract` tests). Not run on a lamp: the one-shot's sandbox with
      the real installer, and a first onboarding with the switch on.
