@@ -1645,13 +1645,14 @@ fn a_stopped_session_is_found_by_its_last_ask_and_reopened_with_the_switch() {
         stopped_row(THIRD, lamp_made, "2026-11-10T03:00:00.000Z"),
         stopped_row(FOURTH, lamp_made, "2026-11-10T02:00:00.000Z"),
     ]);
+    // Answered by the row each show asks about: the shows run together.
     let shows = |asks: [&str; 4]| {
-        json!({"each":[
-            shown_stopped(AGENT, asks[0]),
-            shown_stopped(OTHER, asks[1]),
-            shown_stopped(THIRD, asks[2]),
-            shown_stopped(FOURTH, asks[3]),
-        ]})
+        json!({"by_arg":{
+            AGENT: shown_stopped(AGENT, asks[0]),
+            OTHER: shown_stopped(OTHER, asks[1]),
+            THIRD: shown_stopped(THIRD, asks[2]),
+            FOURTH: shown_stopped(FOURTH, asks[3]),
+        }})
     };
     let run = |on: bool, show: Value| {
         let mut rig = Rig::new();
@@ -1687,23 +1688,23 @@ fn a_stopped_session_is_found_by_its_last_ask_and_reopened_with_the_switch() {
         "Sort my notes",
         "Plan the trip",
     ];
-    // Off: said stopped, nothing reopened or typed. The four newest are read,
-    // newest first; the fifth is never read.
+    // Off: said stopped, nothing reopened or typed. The four newest are read
+    // (together, so in no set order); the fifth is never read.
     let (outcome, calls) = run(false, shows(moon));
     assert_eq!(outcome, not_sent("session_stopped"));
     assert_eq!(
         verbs(&calls),
         ["machines", "ps", "show", "show", "show", "show"]
     );
-    assert_eq!(
-        calls[2],
-        json!(["show", "--machine", MACHINE, AGENT, "--json"])
-    );
-    let shown: Vec<&str> = calls[2..]
+    assert!(calls[2..].contains(&json!(["show", "--machine", MACHINE, AGENT, "--json"])));
+    let mut shown: Vec<&str> = calls[2..]
         .iter()
         .map(|call| call[3].as_str().unwrap())
         .collect();
-    assert_eq!(shown, [AGENT, OTHER, THIRD, FOURTH]);
+    shown.sort_unstable();
+    let mut newest = [AGENT, OTHER, THIRD, FOURTH];
+    newest.sort_unstable();
+    assert_eq!(shown, newest);
     // On: reopened once, then typed into, and known by its last ask.
     let (outcome, calls) = run(true, shows(moon));
     assert_eq!(
@@ -1750,6 +1751,52 @@ fn a_stopped_session_is_found_by_its_last_ask_and_reopened_with_the_switch() {
     // A show that can't be read is passed over.
     let (outcome, _) = run(false, json!({"stdout":"not json\n"}));
     assert_eq!(outcome, not_sent("session_not_found"));
+}
+
+/// #5978, lamp-c0a4 on 10 Nov: each stopped row's `harness show` took about
+/// 2.3 s, and four read one after another cost about 9.2 s of a follow-up.
+/// They are read together: four shows of about 1 s each are all read in
+/// well under 4 s, and the one that fits is found as before.
+#[test]
+fn a_closed_sessions_last_asks_are_read_together() {
+    const THIRD: &str = "44444444-4444-4444-8444-444444444444";
+    const FOURTH: &str = "55555555-5555-4555-8555-555555555555";
+    let lamp_made = "lamp-0a1b2c3d";
+    let slow = |id: &str, ask: &str| {
+        let mut show = shown_stopped(id, ask);
+        show["delay_ms"] = json!(1000);
+        show
+    };
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"lamp","harnesses":[
+            stopped_row(AGENT, lamp_made, "2026-11-10T05:00:00.000Z"),
+            stopped_row(OTHER, lamp_made, "2026-11-10T04:00:00.000Z"),
+            stopped_row(THIRD, lamp_made, "2026-11-10T03:00:00.000Z"),
+            stopped_row(FOURTH, lamp_made, "2026-11-10T02:00:00.000Z"),
+        ],"next":[]})),
+        "show":{"by_arg":{
+            AGENT: slow(AGENT, "Fix the login page"),
+            OTHER: slow(OTHER, "Sort my notes"),
+            THIRD: slow(THIRD, "Write a short poem about the moon"),
+            FOURTH: slow(FOURTH, "Plan the trip"),
+        }},
+    }));
+    let mut request = launch();
+    request.session = Some("the moon poem".into());
+    let began = Instant::now();
+    let outcome = rig.cli().launch(&request);
+    let took = began.elapsed();
+    assert_eq!(outcome, not_sent("session_stopped"));
+    let shows = rig
+        .calls()
+        .iter()
+        .filter(|call| call["args"][0] == "show")
+        .count();
+    assert_eq!(shows, 4);
+    assert!(took < Duration::from_millis(2500), "took {took:?}");
 }
 
 /// #5978: words that name no work ("the one from before") read no stopped

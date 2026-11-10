@@ -165,10 +165,14 @@ is told, a follow-up by its work ("in the moon poem, add a line about
 the stars") would never find it (lamp-c0a4, 10 Nov). When no row fits by
 name, folder or work and the words name some work, the newest stopped
 rows of that machine (at most 4, `MOST_STOPPED_READ`, by `lastActive`;
-failed or offline ones are not read) are read one by one with `harness
-show --machine <id> <agent> --json` (its last turn only: `ask`, `answer`,
-`tools`, commands.ts 746-790), each within what is left of the launch
-bound less 2 s, and their last `ask` is matched by work the same way.
+failed or offline ones are not read) are read together, one thread
+each, with `harness show --machine <id> <agent> --json` (its last turn
+only: `ask`, `answer`, `tools`, commands.ts 746-790), each within what
+was left of the launch bound less 1 s when they began (none with under
+2 s left), and their last `ask` is matched by work the same way, newest
+first. On lamp-c0a4 on 10 Nov each show took about 2.3 s, so four read
+one after another cost about 9.2 s of a 22.8 s follow-up; together they
+cost about one show.
 One that fits is that stopped session; two are `session_ambiguous`; a
 show that fails or can't be read is passed over. A live row that fits by
 its work is taken without reading the stopped ones, so a stopped one
