@@ -185,6 +185,20 @@ pub trait Lamp {
         None
     }
 
+    /// The app's open onboarding page (#6076, `crate::onboarding_page`).
+    fn onboarding_page(&mut self, data: &Value) -> Result<Value, String> {
+        crate::onboarding_page::PAGES
+            .lock()
+            .map_err(|_| "the page cannot be kept".to_owned())?
+            .open(data, None, None)
+    }
+
+    /// The open page done now, its line handed to the voice: the reply's
+    /// `data` (#6076).
+    fn onboarding_page_done(&mut self) -> Option<Value> {
+        None
+    }
+
     /// lamp-voice's app-make socket, for a skill typed in the owner's app
     /// (`LAMP_APP_MAKE_SKILL=on` with the skills page, #2813,
     /// `crate::make_skill`).
@@ -475,10 +489,17 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 // And `onboarding.step` as each walk step ends (#5979),
                 // behind the same switch.
                 info["onboarding_step_supported"] = json!(true);
+                // And `onboarding.page`, its page done pushed (#6076).
+                info["onboarding_page_supported"] = json!(true);
             }
             some(info)
         }
         "system.version" => some(lamp.versions()),
+        // The app's open onboarding page (#6076), with `onboarding.done`'s
+        // switch.
+        crate::onboarding_page::KIND if lamp.onboarding_done().is_some() => {
+            lamp.onboarding_page(data).map(Some)
+        }
         "system.network" => some(lamp.network()),
         "volume.get" => lamp.volume().map(|volume| Some(json!(volume))),
         "volume.set" => {
@@ -1226,6 +1247,19 @@ pub mod tests {
         // #5979: `onboarding_step_supported` beside it, with the same switch.
         assert_eq!(told["onboarding_step_supported"], true);
         assert!(info.get("onboarding_step_supported").is_none(), "{info}");
+        // #6076: `onboarding_page_supported` beside them, with the same
+        // switch, and `onboarding.page` answered only then.
+        assert_eq!(told["onboarding_page_supported"], true);
+        assert!(info.get("onboarding_page_supported").is_none(), "{info}");
+        assert!(answer(&mut will, "onboarding.page", &json!({"page": "create"})).is_ok());
+        assert!(
+            answer(
+                &mut Fake::default(),
+                "onboarding.page",
+                &json!({"page": "create"})
+            )
+            .is_err()
+        );
         // #2937: a lamp that can't tell its reset says nothing of it; one
         // that can says hold or none.
         assert!(info.get("reset").is_none(), "{info}");

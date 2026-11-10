@@ -312,7 +312,10 @@ out of the walk's order has none. `onboarding/pending` carries the committed
 order they ended, with the walk's own outcome (`done`, `skipped`, `failed` or
 `not_available`; never `later`, which is offered again). No names, no words.
 lamp-cloud tells the app each end once (`onboarding.step`, [cloud.md](cloud.md),
-"Each setup step, told to the app"). Test:
+"Each setup step, told to the app"). After the walk, the app's own pages (Try,
+Add, Create) are said done by the lamp and go on by themselves (#6076,
+`onboarding.page` and `onboarding.page_done`, [cloud.md](cloud.md), "The app's
+onboarding pages, done on the lamp"). Test:
 `onboarding::tests::the_walks_steps_end_in_order_under_one_walk_id`.
 
 **A fixed line is said even when the chat is late.** These lines still go to
