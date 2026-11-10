@@ -362,6 +362,38 @@ test('phrases go with their subscription, and events carry only the phrase', asy
   });
 });
 
+test('a phrase handler hears only its own phrases, and one with none hears all', async () => {
+  await withLamp({ grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
+    const [started, finished, all] = [[], [], []];
+    const start = (event) => started.push(event.phrase);
+    await lamp.on('phrase.heard', start, { phrases: ['start studying'] });
+    await lamp.on('phrase.heard', async (event) => { finished.push(event.phrase); }, { phrases: ['all done here'] });
+    await lamp.on('phrase.heard', (event) => all.push(event.phrase));
+    fake.emit('phrase.heard', { phrase: 'start studying' });
+    fake.emit('phrase.heard', { phrase: 'All Done Here' });
+    await until(() => all.length === 2);
+    assert.deepEqual(started, ['start studying']);
+    assert.deepEqual(finished, ['All Done Here']);
+    // off() takes a filtered handler off by the handler itself.
+    await lamp.off('phrase.heard', start);
+    fake.emit('phrase.heard', { phrase: 'start studying' });
+    await until(() => all.length === 3);
+    assert.deepEqual(started, ['start studying']);
+  });
+});
+
+test('phrases compare lowercased as the lamp and the Python SDK do, not case-folded', async () => {
+  await withLamp({ grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
+    const heard = [];
+    await lamp.on('phrase.heard', (event) => heard.push(event.phrase), { phrases: ['Große Straße'] });
+    fake.emit('phrase.heard', { phrase: 'große straße' });
+    fake.emit('phrase.heard', { phrase: 'GROSSE STRASSE' });
+    await until(() => heard.length);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(heard, ['große straße']);
+  });
+});
+
 // The lamp's floor and its words (lamp-control's PHRASE_MIN_LETTERS, #3901),
 // with the phrases Fourteen tried there: a short one never leaves the computer.
 test('a phrase under the lamp\'s floor is refused before sending', async () => {

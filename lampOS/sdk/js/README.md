@@ -199,7 +199,16 @@ await lamp.closed();
 - **Events:** `await lamp.on(name, handler)` resolves once subscribed, and
   rejects with the lamp's refusal, `NoGrantError` without the event's grant:
   `person.*` needs `look`, `phrase.heard` needs `hear`. `lamp.off(name,
-  handler)`. Each needs its grant:
+  handler)`. A `phrase.heard` handler given `{ phrases }` hears only those; one
+  given none hears every phrase the program listens for:
+
+  ```js
+  await lamp.on('phrase.heard', start, { phrases: ['start studying'] }); // start() hears only this
+  await lamp.on('phrase.heard', stop, { phrases: ['all done here'] });   // stop() hears only this
+  await lamp.on('phrase.heard', log);                                    // log() hears both
+  ```
+
+  Each needs its grant:
 
   | event | fields | grant |
   |---|---|---|

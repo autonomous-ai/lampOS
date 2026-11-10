@@ -426,6 +426,59 @@ def test_phrases_go_with_their_subscription_and_events_carry_only_the_phrase(tmp
     run(go())
 
 
+def test_a_phrase_handler_hears_only_its_own_phrases_and_one_with_none_hears_all(tmp_path):
+    """The study-buddy friction log, 10 Nov: two handlers with their own phrases both fired on every phrase."""
+
+    async def go():
+        async with FakeLamp(grants=("body", "light", "speak", "hear")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                started, finished, any_phrase = [], [], []
+                start = lambda event: started.append(event["phrase"])  # noqa: E731
+
+                async def finish(event):  # a coroutine handler is filtered the same way
+                    finished.append(event["phrase"])
+
+                lamp.on("phrase.heard", start, phrases=["start studying"])
+                lamp.on("phrase.heard", finish, phrases=["all done here"])
+                lamp.on("phrase.heard", lambda event: any_phrase.append(event["phrase"]))
+                while len(fake.asked("subscribe")) < 3:
+                    await asyncio.sleep(0.01)
+                await fake.emit("phrase.heard", phrase="start studying")
+                await fake.emit("phrase.heard", phrase="All Done Here")  # the case the lamp says is not the handler's business
+                await asyncio.sleep(0.2)
+                assert started == ["start studying"]
+                assert finished == ["All Done Here"]
+                assert any_phrase == ["start studying", "All Done Here"]
+                # off() takes a filtered handler off by the handler itself.
+                lamp.off("phrase.heard", start)
+                await fake.emit("phrase.heard", phrase="start studying")
+                await asyncio.sleep(0.2)
+                assert started == ["start studying"]
+
+    run(go())
+
+
+def test_phrases_compare_lowercased_as_the_lamp_and_the_js_sdk_do_not_case_folded(tmp_path):
+    """lamp-control lowercases (`str::to_lowercase`); `casefold()` would turn "Straße" into "strasse" and the JS SDK's
+    `toLowerCase()` would not: one rule everywhere."""
+
+    async def go():
+        async with FakeLamp(grants=("body", "light", "speak", "hear")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                heard = []
+                lamp.on("phrase.heard", lambda event: heard.append(event["phrase"]), phrases=["Große Straße"])
+                while not fake.asked("subscribe"):
+                    await asyncio.sleep(0.01)
+                await fake.emit("phrase.heard", phrase="große straße")  # what the lamp says: lowercased
+                await fake.emit("phrase.heard", phrase="GROSSE STRASSE")  # not the same lowercase: not this handler's
+                await asyncio.sleep(0.2)
+                assert heard == ["große straße"]
+
+    run(go())
+
+
 # The lamp's floor and its words (lamp-control's PHRASE_MIN_LETTERS, #3901),
 # with the phrases Fourteen tried there: a short one never leaves the computer.
 SHORT_PHRASES = ["is a", "it is", "ok lamp", "you are", "i want to", "t\u00f4i mu\u1ed1n"]
