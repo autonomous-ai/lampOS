@@ -193,7 +193,7 @@ sau:
    (bước 8), và mô hình được báo tên, đã bật hay chưa, kỹ năng làm gì (được
    nói rõ như trên) và dùng gì ("đèn của nó và việc nó có đang nói hay
    không"), và được dặn nói đúng một câu ngắn, không hỏi gì về việc bật:
-   "I made evening dim, and it's on: <what it does>, using its light. Say \"take it off\" to take it off." (`made_skill::on_line`), hoặc khi
+   "I made evening dim, and it's on: <what it does>, using its light." (`made_skill::on_line`), hoặc khi
    không bật được, "I made it but couldn't put it on: <lý do>."
    (`made_skill::not_on_line`, kèm `not_on` trong câu trả lời). Câu "Shall
    I put it on the lamp?" không bao giờ được nói, không có lời hỏi nào được
@@ -251,7 +251,7 @@ lời "có" nói thành tiếng (#5977; nút MAKE IT của ứng dụng là lờ
   dụng hiện ngay.
 - Khi đã giữ, kỹ năng được bật ngay qua helper quản lý, như bằng giọng nói,
   rồi đèn nói một câu ngắn qua dịch vụ nói, vào lúc thích hợp trong vòng một
-  giờ (`app_make::say_line`): "I made evening dim, and it's on: <what it does>, using its light. Say \"take it off\" to take it off.", hoặc "I
+  giờ (`app_make::say_line`): "I made evening dim, and it's on: <what it does>, using its light.", hoặc "I
   made it but couldn't put it on: <lý do>.". Không hỏi gì, không chờ lời
   "có".
 - `{"made": {"request_id"}}`: trạng thái của lời nhờ từ ứng dụng: `making`
@@ -332,7 +332,7 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
    (`made_skill::put_on`), helper kiểm lại giới hạn
    (`made_skill::put_on_cap`: của kỹ năng viết khi có hàm, nếu không thì
    của kỹ năng tự tạo) và `made: here`. Rồi đèn nói qua dịch vụ nói, vào
-   lúc thích hợp, "I made NAME, and it's on: WHAT IT DOES, using WHAT IT USES. Say \"take it off\" to take it off." (`made_skill::on_line`), hoặc
+   lúc thích hợp, "I made NAME, and it's on: WHAT IT DOES, using WHAT IT USES." (`made_skill::on_line`), hoặc
    lý do không bật được. `skills.made` báo cho ứng dụng `making`, `on` hoặc
    `not_kept` (kèm lý do, trong đó có tên đã dùng hay việc bật thất bại), với
    `"written": true`; trang kỹ năng hiển thị nó trong "Made on this lamp"
@@ -499,7 +499,7 @@ năng), nên sau khi khởi động lại nó được hỏi tiếp và ứng d�
 6. **Bật ngay, không cần lời "có" nói thành tiếng** (#5977; chủ đèn,
    10/11): sau khi socket trả lời `kept`, nó được bật qua helper quản lý
    (`made_skill::put_on`), rồi được nói qua dịch vụ say: "I added NAME from
-   a file, not from the Skills Store, and it's on: WHAT IT DOES, using WHAT IT USES. Say \"take it off\" to take it off."
+   a file, not from the Skills Store, and it's on: WHAT IT DOES, using WHAT IT USES."
    (`upload_skill::on_line`), hoặc "I added a skill from a file but
    couldn't put it on: <lý do>." (`upload_skill::not_on_line`).
 7. **Helper quản lý kiểm tra lại** (`install_made`): thẻ có `added: file`
