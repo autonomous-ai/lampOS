@@ -507,6 +507,50 @@ fn a_kept_light_with_a_clock_or_a_comma_is_judged_at_its_sentences_end() {
     assert!(told_claim(&went), "{:?}", went.notes);
 }
 
+/// A help request can be phrased without a question opener. Its explanation
+/// must survive the actual held-speech path without a retry or not-done line,
+/// including when the stream pauses immediately after the duration.
+#[test]
+fn explanations_and_questions_are_said_without_an_action_retry() {
+    let heard = "Explain how the light behaves after a tap.";
+    assert!(!crate::action_claim::asked_as_a_question(heard));
+    for (opening, ending) in [
+        ("It stays on for ten minutes", " after a tap."),
+        ("The light is on for five seconds", " when you tap it."),
+        (
+            "Your light will be on for two hours",
+            " each evening on the schedule you set.",
+        ),
+        ("It'll stay on until 10.", "30, would that help?"),
+        ("The light is on until 10.", "30, isn't it?"),
+        ("Your light'll stay on for 1.", "5 hours, right?"),
+        ("Okay, louder,", " right?"),
+    ] {
+        let words = format!("{opening}{ending}");
+        for streamed in [false, true] {
+            let events = || {
+                if streamed {
+                    vec![text(opening), text(ending), Ok(ChatEvent::Done)]
+                } else {
+                    saying(&words)
+                }
+            };
+            let run =
+                |enabled| turn_with(true, enabled, true, heard, events(), vec![saying(&words)]);
+            let went = run(true);
+            assert_eq!(went, run(false), "{words}, streamed={streamed}");
+            let spoken: String = went
+                .said
+                .iter()
+                .map(|part| part.strip_prefix("said:").unwrap())
+                .collect();
+            assert_eq!(spoken, words, "{words}");
+            assert_eq!((went.asked, went.ran.len()), (1, 0), "{words}");
+            assert!(!told_claim(&went), "{words}: {:?}", went.notes);
+        }
+    }
+}
+
 /// A turn that made its call is untouched by the worded claims, byte for
 /// byte: the words beside the call, and after it. A limit said ("for one
 /// minute") is one the call carried.
