@@ -14,8 +14,8 @@ rather than copying them:
 **Status words** used throughout:
 
 - **works today:** on customer lamps, shown on a test lamp running a customer
-  build (10824, 11048, or 11091, the customer build since 9 Nov 2026, 23:01), with the date;
-- **in today's build, lamp run pending:** in the customer build's code (11091),
+  build (10824, 11048, 11091, 11308, or 11372, the customer build since 10 Nov 2026), with the date;
+- **in today's build, lamp run pending:** in the customer build's code (11091, 11308 or 11372),
   not yet shown on a lamp;
 - **next build:** built and merged (or in review, with its pull request); comes
   with the next update;
@@ -191,9 +191,9 @@ refusals in the lamp's own words, and its status.
   fails with `code: why`. The words shown are copied from the lamp's code. `…` marks a part
   the lamp fills in, such as a number or a name.
 - **Status** has five words. *Works today* means shown on a test lamp on a customer
-  build (stable 10824, 11048, or 11091, stable since 9 Nov 2026, 23:01), with the date. *In today's build, lamp run pending* means the code is
-  on customer lamps (11091) but no run shows it yet. *Next build* means it is on the
-  development branch, not in 11091. *In development* means the lamp refuses it today and says
+  build (stable 10824, 11048, 11091, 11308, or 11372, stable since 10 Nov 2026), with the date. *In today's build, lamp run pending* means the code is
+  on customer lamps (11091, 11308 or 11372) but no run shows it yet. *Next build* means it is on the
+  development branch, not in 11372. *In development* means the lamp refuses it today and says
   so. *Planned* means it is named in the protocol but nothing serves it yet.
 - **Every op but `pair` and `hello`** needs `hello` first on the connection (`no_hello`,
   "say hello first"). A missing grant is always `no_grant`, "not granted: …" with the grant's

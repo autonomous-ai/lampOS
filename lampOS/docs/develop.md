@@ -9,10 +9,11 @@ A developer's quick-start, for decision 1, developers first. It covers:
 The protocol itself is [control.md](control.md). The skill format is
 [skill-format.md](skill-format.md).
 
-**What runs today.** Customer lamps run the stable build, **10824**
-(lamp-voice `65991c7229`). Everything below works there, except what this
-table marks. The full list, with what to do instead, is in
-[sdk/README.md](../sdk/README.md#on-a-customer-lamp-today-stable-10824).
+**What runs today.** Customer lamps run the stable build, **11372** since
+10 Nov, 16:40. The table below was last checked row by row on **10824**
+(lamp-voice `65991c7229`), except skill push, which works from 11091 on and
+is marked so. Everything below works there, except what this table marks. The full list, with what to do instead, is in
+[sdk/README.md](../sdk/README.md#on-a-customer-lamp-today).
 
 | step | on a customer lamp (stable 10824) |
 |---|---|
@@ -25,7 +26,7 @@ table marks. The full list, with what to do instead, is in
 | `joints` | `yaw` and `pitch` only |
 | `play` | refused: "not routed yet: waits for client packages" |
 | `camera.snapshot`, `camera.stream` | works, local network only (not the fast frame path) |
-| `skill.push`, `lamp skill push/list/remove` | not yet on customer lamps: "skill push is not on this lamp" |
+| `skill.push`, `lamp skill push/list/remove` | works from 11091 on (the product unit passes `--manage-socket`), onto the developer's own lamp, with a yes at the lamp; refused on 10824 and older: "skill push is not on this lamp". No route to the Store from the SDK yet |
 | Signed skills (`keygen`, `pack --sign`, `install`) | not in this release |
 
 Event times (`at`) are UTC, `…Z`, on every build.
@@ -395,9 +396,10 @@ format 2 that is presence (someone there, how near), never the picture.
 
 ## 6. Push it, sign it, share it (not in this release)
 
-**Not on customer lamps yet.** The product lamp-control isn't started with
-`--manage-socket`, so on stable 10824 every push, list and remove is refused,
-"skill push is not on this lamp". Signing waits on blue's
+**Push works on the developer's own lamp from stable 11091 on** (the product
+lamp-control is started with `--manage-socket`); on 10824 and older every
+push, list and remove is refused, "skill push is not on this lamp". There is
+no route to the Store from the SDK yet (`lamp skill submit` waits for it). Signing waits on blue's
 `blue/sdk-skill-sign` in the SDK. Push, list and remove run against the fake
 lamp (`lamp fake`); the signing steps only against that branch's. On a real lamp, run the same behaviour as a program on your
 computer while it is connected (step 2).
