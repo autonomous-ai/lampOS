@@ -6609,7 +6609,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             if relaxed {
                 continue;
             }
-            let wanted = match glance_from {
+            // A glance does not turn the base, but a move from a computer does: while one plays the
+            // base is asked as if no glance were under way. Run 5 on lamp-75c9 (10 Nov): every move
+            // after the first was taken, the gesture layer wanted 683 counts of yaw, and the base's
+            // goal stayed where the look had it; with this, run 6 played them (to 88.9 degrees).
+            let glancing = glance_from.filter(|_| !(index == 2 && gesturing));
+            let wanted = match glancing {
                 // The base is not turned for a glance.
                 Some(_) if index == 2 => continue,
                 // From where it rested, by no more than the joint's own reach

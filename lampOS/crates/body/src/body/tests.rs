@@ -3059,6 +3059,19 @@ fn gesture_run(
     seconds: u64,
     prepare: impl FnOnce(&mut Lamp),
 ) -> (BodyReport, Lamp, Vec<Step>) {
+    gesture_run_glancing(clip, ask_at, seconds, prepare, false)
+}
+
+/// [`gesture_run`], and when `glancing`, on a lamp at rest (mood Resting) with `--rest-glance` whose
+/// Expression asks a small head glance without a break from 6 s on (the lamp has stood by then): the
+/// glance that begins takes the head out of rest (`glance_from`) and keeps it out, as on lamp-75c9.
+fn gesture_run_glancing(
+    clip: &'static Clip,
+    ask_at: Duration,
+    seconds: u64,
+    prepare: impl FnOnce(&mut Lamp),
+    glancing: bool,
+) -> (BodyReport, Lamp, Vec<Step>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
@@ -3069,8 +3082,13 @@ fn gesture_run(
         servo_speed: 1_000,
         servo_acceleration: 60,
     })
+    .map(|limits| Limits {
+        rest_glance: glancing,
+        ..limits
+    })
     .unwrap();
     let time = clock.time.clone();
+    let expression_at = clock.time.clone();
     let seen_at = clock.time.clone();
     let mut asked_once = false;
     let mut seen = Vec::new();
@@ -3081,7 +3099,16 @@ fn gesture_run(
         Some(HOME),
         Some(standing(100, 60)),
         None,
-        || Some((Mood::Speaking, 60)),
+        || {
+            Some((
+                if glancing {
+                    Mood::Resting
+                } else {
+                    Mood::Speaking
+                },
+                60,
+            ))
+        },
         move || {
             let due = !asked_once && time.get() >= ask_at;
             asked_once |= due;
@@ -3089,7 +3116,8 @@ fn gesture_run(
                 toward: None,
                 seen: None,
                 gesture: due.then_some(clip),
-                expression: None,
+                expression: (glancing && expression_at.get() >= Duration::from_secs(6))
+                    .then_some([-30.0, 0.0, 0.0]),
                 called: false,
                 still: false,
                 paused: false,
@@ -3119,6 +3147,48 @@ fn gesture_run(
         },
     );
     (report, lamp, seen)
+}
+
+/// Lead, 17:03 on 10 Nov, from run 6 on lamp-75c9: a computer's move over a lamp at rest was taken and its
+/// base offset dropped whenever a rest glance (Expression asking the head) was under way: "the base is not
+/// turned for a glance" skipped the base's whole goal, the move's yaw with it. A move turns the base.
+/// NOTE: this harness cannot hold a glance open through a move (the head's glance ends before the move
+/// plays), so the test passes without the fix too; the lamp's trace (run 6) is the proof, this one holds
+/// the behaviour.
+#[test]
+fn a_move_turns_the_base_while_a_rest_glance_is_under_way() {
+    static SWAY: Clip = Clip {
+        name: "sway",
+        step_ms: 500,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 0, 60, 0, 0],
+            [0, 0, 120, 0, 0],
+            [0, 0, 120, 0, 0],
+            [0, 0, 60, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    // Asked in the middle of an odd second, a glance under way.
+    let (report, _, seen) =
+        gesture_run_glancing(&SWAY, Duration::from_millis(9_300), 16, |_| {}, true);
+    assert_eq!(report.gestures_dropped, 0, "{report:?}");
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_millis(9_300))
+        .unwrap()
+        .2[2];
+    let most = seen
+        .iter()
+        .filter(|step| step.1 == Some("sway"))
+        .map(|step| step.2[2])
+        .max()
+        .unwrap_or(0);
+    assert!(
+        most >= rested + 100,
+        "the base's goal went {} counts from {rested}, the move asked 120",
+        most.saturating_sub(rested)
+    );
 }
 
 /// A lamp that stands at once and is in one mood throughout, asked by
