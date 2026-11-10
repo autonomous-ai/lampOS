@@ -18,7 +18,10 @@
 //! the Node runtime, tmux, grid and hn), served from the same listener: a
 //! pinned install fetches no script and no manifest from a server. A new
 //! Harness version is a PR that copies these files again and updates
-//! their constants.
+//! their constants: `deploy/harness/refresh-pin.sh` does both, run daily by
+//! `.github/workflows/lampos-harness-pin.yml`, which opens that PR; it
+//! merges only after a lamp row, at most one pin move to stable a week
+//! (#5957).
 //!
 //! Which lamp is the product's: one whose lamp-update unit is a regular
 //! file starting `/opt/lampOS/update/current/lamp-update`, the link naming

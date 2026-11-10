@@ -1,0 +1,352 @@
+name: lampOS Harness pin
+
+# Moves the build's own Harness pin by itself, as a pull request (#5957).
+# lamp-update compiles in byte-for-byte copies of Harness's CLI manifest, its
+# installer and four runtime manifests (lampOS/deploy/harness/,
+# crates/update/src/harness_install/product.rs; #5229). Every day this run
+# downloads them again with lampOS/deploy/harness/refresh-pin.sh. When the
+# CDN's `cli.version` is newer than the pin, it:
+#
+#   1. tests the new pin on Linux ARM64, as a lamp runs it: lamp-update's
+#      pin tests (the constants match the copies) and the pinned installer
+#      itself, fed only the copies from a listener on 127.0.0.1, as the
+#      one-shot does on a lamp, then `harness version` says the pinned
+#      version and `harness --help` exits 0;
+#   2. pushes the new pin to the bot's own branch `bot/harness-pin` and
+#      opens one pull request into lamp-voice, or updates the one already
+#      open. A branch that already carries the same patch (its patch-id
+#      against lamp-voice) is left alone: no push, no new runs, the body
+#      edited only if it changed. A branch with a commit the job did not
+#      make (a builder's fix) is never pushed over: the body says so and
+#      the run stops;
+#   3. after a push, starts "lampOS on ARM64" and "lampOS clippy" on that
+#      branch by hand (below: why), from a job of its own.
+#
+# The first builder's decision on #5957: the job may OPEN the pull request;
+# it merges only after a lamp row on 52e6 or c0a4 (the lamp moves from the
+# old version to the new, stays signed in, one hand-over and one follow-up
+# go through), and at most one pin move reaches stable a week. Nothing here
+# merges.
+#
+# A pull request opened with the run's GITHUB_TOKEN starts no `pull_request`
+# workflow (GitHub's rule against runs starting runs). The repository has no
+# app or bot token for this (the train bot runs from a builder's own `gh`,
+# .github/tools/coordination); its answer for a run that must start another
+# is a manual run with GITHUB_TOKEN (lampos-studio-watchdog.yml), so step 3
+# starts ARM64 and clippy on the bot's branch with `gh workflow run`. That
+# job alone has `actions: write`, checks nothing out and runs no repository
+# code. Their checks land on the branch's head commit, the pull request's
+# head, so the pull request shows them. A builder's push to the branch, or
+# closing and reopening the pull request by hand, also starts the ordinary
+# pull-request runs. The stable promotion (lampos-arm64.yml's
+# `promote_sequence`) needs that input and lamp-voice as the ref, and
+# publishing needs a push to lamp-voice: a manual run on bot/harness-pin
+# with no inputs, the only one made here, starts neither.
+#
+# The `push` step alone is handed the token (`persist-credentials: false`
+# on the checkout); the branch is the job's own.
+#
+# lamp-voice is the repository's default branch, so the `schedule` below
+# fires from it as it is.
+#
+# A pull request that changes the script or this file runs only the check:
+# the script against the real CDN with --check (read-only, nothing written),
+# bash -n and shellcheck.
+on:
+  schedule:
+    # 01:17 UTC, an off-minute: 08:17 in Vietnam.
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+  pull_request:
+    branches: ['lamp-voice']
+    paths:
+      - 'lampOS/deploy/harness/refresh-pin.sh'
+      - '.github/workflows/lampos-harness-pin.yml'
+
+# Read-only unless a job below asks for more.
+permissions:
+  contents: read
+
+concurrency:
+  # One pin run at a time, so two never race on bot/harness-pin; a pull
+  # request's check has its own group.
+  group: lampos-harness-pin-${{ github.event.pull_request.number || 'bot' }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request'
+    name: lampOS — the pin script, checked against the CDN (nothing written)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: bash -n and shellcheck
+        run: |
+          bash -n lampOS/deploy/harness/refresh-pin.sh
+          shellcheck lampOS/deploy/harness/refresh-pin.sh
+      - name: refresh-pin.sh --check
+        run: lampOS/deploy/harness/refresh-pin.sh --check
+
+  refresh:
+    if: github.event_name != 'pull_request' && github.repository == 'autonomous-ai/lampOS'
+    name: lampOS — is Harness newer than the pin?
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      changed: ${{ steps.pin.outputs.changed }}
+      old: ${{ steps.pin.outputs.old }}
+      new: ${{ steps.pin.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: lamp-voice
+          persist-credentials: false
+      - name: refresh-pin.sh
+        id: pin
+        run: |
+          version() { sed -n 's/^pub const VERSION: &str = "\(.*\)";$/\1/p' lampOS/crates/update/src/harness_install/product.rs; }
+          old="$(version)"
+          lampOS/deploy/harness/refresh-pin.sh --summary "$RUNNER_TEMP/summary.md"
+          new="$(version)"
+          git add -A lampOS/deploy/harness lampOS/crates/update/src/harness_install/product.rs
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Harness pin $old: the CDN names nothing newer." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git diff --cached --binary > "$RUNNER_TEMP/pin.patch"
+          cp "$RUNNER_TEMP/summary.md" "$RUNNER_TEMP/pin-summary.md"
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          { echo "changed=true"; echo "old=$old"; echo "new=$new"; } >> "$GITHUB_OUTPUT"
+      - if: steps.pin.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-pin
+          path: |
+            ${{ runner.temp }}/pin.patch
+            ${{ runner.temp }}/pin-summary.md
+          retention-days: 7
+
+  verify:
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    name: lampOS — the new pin on Linux ARM64 (pin tests, pinned install)
+    # The runner the ARM64 workflow's pull requests use (lampos-arm64.yml).
+    # Not in a container, so the installer runs as an ordinary user, as it
+    # does as `lampos` on a lamp.
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 60
+    steps:
+      - name: system packages
+        # tmux and procps: what the CLI runs, there before the installer, as
+        # on a lamp, so it installs no system package itself.
+        run: |
+          sudo apt-get -o DPkg::Lock::Timeout=300 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file tmux
+      - uses: actions/checkout@v4
+        with:
+          ref: lamp-voice
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: harness-pin
+          path: ${{ runner.temp }}/pin
+      - name: apply the new pin
+        run: git apply --index "$RUNNER_TEMP/pin/pin.patch"
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: restore the cache
+        # lamp-voice's newest ARM64 build (lampos-arm64.yml); restored, never saved.
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          key: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-arm64-u2204-
+      - name: unchanged source files get the cached build's times back
+        run: python3 -I .github/scripts/lampos-source-times.py
+      - name: lamp-update's pin tests (the constants match the copies)
+        working-directory: lampOS
+        run: cargo test --locked --release -p lamp-update --lib -- harness_install
+      - name: the pinned installer, fed only the copies, as a lamp's one-shot does
+        env:
+          WANT: ${{ needs.refresh.outputs.new }}
+        run: |
+          set -euo pipefail
+          serve="$(mktemp -d)"
+          home="$(mktemp -d)"
+          # Lay the copies out at the paths lamp-update's listener serves
+          # them at (product.rs MANIFESTS, serve.rs PATH), and say each
+          # variable's loopback URL, read from the source, not repeated here.
+          python3 -I - "$serve" > "$RUNNER_TEMP/pin.env" <<'PY'
+          import re, shutil, sys, os
+          serve = sys.argv[1]
+          rs = open("lampOS/crates/update/src/harness_install/product.rs").read()
+          path = re.search(r'pub const PATH: &str = "([^"]+)";',
+                           open("lampOS/crates/update/src/harness_install/serve.rs").read()).group(1)
+          inc = r'include_bytes!\("\.\./\.\./\.\./\.\./deploy/harness/([^"/]+)"\)'
+          files = [("HARNESS_METADATA_URL", path, re.search(r"pub const MANIFEST: &\[u8\] = " + inc, rs).group(1))]
+          files += re.findall(r'env: "([A-Z_]+)",\s*path: "([^"]+)",\s*bytes: ' + inc, rs)
+          assert len(files) == 5, files
+          for env, at, name in files:
+              os.makedirs(os.path.dirname(serve + at), exist_ok=True)
+              shutil.copyfile("lampOS/deploy/harness/" + name, serve + at)
+              print(f"{env}=http://127.0.0.1:18080{at}")
+          print("INSTALLER=lampOS/deploy/harness/" + re.search(r"pub const INSTALLER: &\[u8\] = " + inc, rs).group(1))
+          PY
+          cat "$RUNNER_TEMP/pin.env"
+          python3 -I -m http.server 18080 --bind 127.0.0.1 --directory "$serve" > "$RUNNER_TEMP/serve.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for _ in $(seq 50); do curl -fs -o /dev/null http://127.0.0.1:18080/ && break; sleep 0.2; done
+          installer="$(sed -n 's/^INSTALLER=//p' "$RUNNER_TEMP/pin.env")"
+          mapfile -t vars < <(grep '^HARNESS_' "$RUNNER_TEMP/pin.env")
+          # Unattended, as the one-shot runs it: no terminal, and
+          # HARNESS_INSTALL_ATTENDED unset, so the OpenCode step never runs.
+          env -u HARNESS_INSTALL_ATTENDED HOME="$home" PATH="/usr/local/bin:/usr/bin:/bin" "${vars[@]}" \
+            sh "$installer" </dev/null 2>&1 | tee "$RUNNER_TEMP/install.log"
+          echo "--- what the installer fetched from the listener"
+          cat "$RUNNER_TEMP/serve.log"
+          said="$(HOME="$home" "$home/.local/bin/harness" version | head -n 1)"
+          echo "harness version: $said"
+          printf '%s\n' "$said" | grep -Fqw -- "$WANT" || { echo "harness version says '$said', not $WANT" >&2; exit 1; }
+          HOME="$home" "$home/.local/bin/harness" --help > /dev/null
+          echo "Pinned install of Harness $WANT on Linux ARM64: \`harness version\` says \`$said\`, \`harness --help\` exits 0." >> "$GITHUB_STEP_SUMMARY"
+
+  propose:
+    needs: [refresh, verify]
+    if: needs.refresh.outputs.changed == 'true'
+    name: lampOS — open or update the pin's pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      pushed: ${{ steps.push.outputs.pushed }}
+    env:
+      GH_REPO: ${{ github.repository }}
+      BRANCH: bot/harness-pin
+      BOT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      OLD: ${{ needs.refresh.outputs.old }}
+      NEW: ${{ needs.refresh.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: lamp-voice
+          # History without file contents, for the branch's commits and its
+          # patch against lamp-voice; the repository is public, so fetches
+          # need no token.
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: harness-pin
+          path: ${{ runner.temp }}/pin
+      - name: the new pin's commit, and what bot/harness-pin already has
+        id: state
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email "$BOT_EMAIL"
+          git switch -q -c pin-candidate
+          git apply --index "$RUNNER_TEMP/pin/pin.patch"
+          git commit -q -m "lampOS: pin Harness $NEW (#5957)"
+          ours="$(git show HEAD | git patch-id --stable | cut -d' ' -f1)"
+          lease=""
+          state=new
+          if git fetch -q origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" 2>/dev/null; then
+            lease="$(git rev-parse "origin/$BRANCH")"
+            foreign="$(git log --format='%H %ae' "origin/lamp-voice..origin/$BRANCH" | grep -vF " $BOT_EMAIL" || true)"
+            theirs="$(git diff "origin/lamp-voice...origin/$BRANCH" | git patch-id --stable | cut -d' ' -f1)"
+            if [ -n "$foreign" ]; then
+              state=foreign
+              echo "bot/harness-pin has commits the pin job did not make:" >> "$GITHUB_STEP_SUMMARY"
+              printf '%s\n' "$foreign" | cut -c1-12 >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$theirs" = "$ours" ]; then
+              state=same
+            fi
+          fi
+          echo "bot/harness-pin: $state" >> "$GITHUB_STEP_SUMMARY"
+          { echo "state=$state"; echo "lease=$lease"; } >> "$GITHUB_OUTPUT"
+      - name: push
+        id: push
+        if: steps.state.outputs.state == 'new'
+        env:
+          TOKEN: ${{ github.token }}
+          LEASE: ${{ steps.state.outputs.lease }}
+        run: |
+          set -euo pipefail
+          # The bot's own branch, made again from lamp-voice; the lease
+          # refuses the push if anyone moved it since the fetch above.
+          git push -q --force-with-lease="refs/heads/$BRANCH:$LEASE" \
+            "https://x-access-token:${TOKEN}@github.com/${GH_REPO}.git" "HEAD:refs/heads/$BRANCH"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+      - name: open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATE: ${{ steps.state.outputs.state }}
+        run: |
+          set -euo pipefail
+          title="lampOS: pin Harness $NEW (#5957)"
+          {
+            echo "Part of #5957."
+            echo
+            echo "Opened by the daily pin job (\`.github/workflows/lampos-harness-pin.yml\`): Harness's CDN names $NEW; this build pinned $OLD."
+            echo
+            cat "$RUNNER_TEMP/pin/pin-summary.md"
+            echo
+            echo "Checked on Linux ARM64 before this was pushed: lamp-update's pin tests, and the pinned installer fed only these copies (\`harness version\` says $NEW, \`harness --help\` exits 0)."
+            echo
+            echo "**Merges only after a lamp row on 52e6 or c0a4** (the lamp moves from $OLD to $NEW, stays signed in, one hand-over and one follow-up go through), **at most one pin move to stable a week** (the first builder's decision on #5957)."
+            if [ "$STATE" = foreign ]; then
+              echo
+              echo "**Not updated:** \`bot/harness-pin\` has commits the pin job did not make, so the job did not push over them. The CDN now names $NEW; the branch's own pin is unchanged."
+            fi
+          } > "$RUNNER_TEMP/body.md"
+          number="$(gh pr list --head "$BRANCH" --base lamp-voice --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            # Compared without trailing newlines; edited only when it changed.
+            if [ "$(cat "$RUNNER_TEMP/body.md")" = "$(gh pr view "$number" --json body --jq .body)" ]; then
+              echo "pull request #$number: body unchanged" >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$STATE" = foreign ]; then
+              # The title stays the branch's; only the body says what happened.
+              gh pr edit "$number" --body-file "$RUNNER_TEMP/body.md"
+            else
+              gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+            fi
+          elif [ "$STATE" != foreign ]; then
+            # builder:first, as the train bot labels its own (.github/tools/coordination).
+            gh pr create --base lamp-voice --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md" --label builder:first
+          else
+            echo "bot/harness-pin has others' commits and no open pull request: nothing opened." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  start-runs:
+    needs: propose
+    if: needs.propose.outputs.pushed == 'true'
+    name: lampOS — start ARM64 and clippy on bot/harness-pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only this: no checkout, no repository code, one fixed branch, no inputs.
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: gh workflow run
+        run: |
+          gh workflow run lampos-arm64.yml --ref bot/harness-pin
+          gh workflow run lampos-clippy.yml --ref bot/harness-pin

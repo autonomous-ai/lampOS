@@ -1231,9 +1231,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never rewrites `lamp-update.service`, so a pin or switch written there
      would reach only a lamp installed after it. Instead the pinned Harness
      manifest itself is compiled into lamp-update (`product::MANIFEST`, from
-     `deploy/harness/cli-0.5.39.metadata.json`, a byte-for-byte copy of
+     `deploy/harness/cli-<version>.metadata.json`, a byte-for-byte copy of
      Harness's CDN manifest `https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json`
-     when it named 0.5.39). The signed manifest names lamp-update by its
+     when it named `product::VERSION`; 0.5.39 since #5229). The signed manifest names lamp-update by its
      SHA-256, so the build's Ed25519 signature covers the pin (#3693's
      decision (a): a sha256 pin in our signed manifest is enough, as Harness
      signs nothing). Nothing is fetched or hosted for it: the one-shot checks
@@ -1259,7 +1259,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        (`HARNESS_TMUX_METADATA_URL`), grid (`HARNESS_GRID_METADATA_URL`) and
        hn (`HARNESS_TUI_MANIFEST_URL`). Byte-for-byte copies of them and of
        the installer itself (`https://cdn.autonomous.ai/harness/cli/install.sh`)
-       are under `deploy/harness/`, copied on 5 Nov 2026, and compiled in
+       are under `deploy/harness/`, copied with the CLI manifest, and compiled in
        (`product::INSTALLER`, `product::MANIFESTS`), each with its
        SHA-256. Every pinned install, the build's own pin or the env pair,
        checks all five against their SHA-256s before anything runs
@@ -1280,6 +1280,27 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      - **A listener or file not made** (no listener on `127.0.0.1`, or the
        installer's file not written) is `serve`, not `installer`. It is
        tried again at the next round, with no 30-min wait.
+     - **How the pin moves** (#5957): a daily job
+       (`.github/workflows/lampos-harness-pin.yml`) runs
+       `deploy/harness/refresh-pin.sh`, which downloads the CLI manifest,
+       the installer and the four manifests again from the URLs
+       `product.rs` names. Only when the CDN's `cli.version` is newer than
+       `product::VERSION` does it write new copies (the version in each
+       name, the installer by its SHA-256's first 8 hex digits), remove the
+       old ones and rewrite `product.rs`'s names, SHA-256s and `VERSION`; it
+       stops if the new installer reads a manifest the pin does not copy.
+       The job then runs lamp-update's pin tests and the pinned installer,
+       fed only the copies from `127.0.0.1`, on Linux ARM64 (`harness
+       version` must say the new version, `harness --help` exit 0), and
+       opens or updates one pull request from `bot/harness-pin` into
+       lamp-voice, "lampOS: pin Harness <new> (#5957)"; a branch that
+       already carries the same patch is not pushed again, and one with a
+       builder's commit is never pushed over. That pull request
+       merges only after a lamp row on 52e6 or c0a4 (the lamp moves from
+       the old version to the new, stays signed in, one hand-over and one
+       follow-up go through), and at most one pin move reaches stable a
+       week (the first builder's decision on #5957). `refresh-pin.sh
+       --check` says what would change and writes nothing.
      - **Without a pin** (a builder's lamp, `harness-on`), the installer is
        still the CDN's, piped to `sh`, as before.
      - **Which lamp:** a product lamp is one whose `lamp-update.service` is a
