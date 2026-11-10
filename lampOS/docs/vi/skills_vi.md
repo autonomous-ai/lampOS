@@ -170,10 +170,12 @@ sau:
    - **Điều runtime chưa làm được** được trả lời "I can't do that yet:" và
      điều đó, không bao giờ bị từ chối vì một quy tắc, và không bị sửa mất
      (`made_skill::CANT_YET`; nói nguyên như vậy, không có "I couldn't make
-     that:"). Hiện nay: bước gửi tin nhắn hay ghi vào dịch vụ ("sending a
-     message or writing to a linked service"; chưa có bước nào gửi: tin
-     nhắn là của một watch, và lamp-skills chỉ nhận dịch vụ là `"read"`),
-     việc ghi trong `services` ("writing to a linked service"), một chuyển
+     that:"). Hiện nay: bước gửi tin nhắn ("sending a message or writing
+     to a linked service"; tin nhắn là của một watch), khi
+     `LAMP_SKILL_WRITES` tắt thì một bước `write` hay `"write"` trong
+     `services` ("sending or writing on its own"; khi bật thì mang được
+     một bước, xem bên dưới), việc ghi vào một dịch vụ mà kỹ năng tự tạo
+     không ghi vào ("writing to your <Service> on its own"), một chuyển
      động riêng ("a move of its own") hay âm thanh khác tiếng ngân (kỹ năng
      tạo ra không mang tệp nào ngoài hai tệp của nó), khi tắt đọc thì mọi
      dịch vụ ("reading your linked services"), và trigger theo điều nghe
@@ -308,10 +310,92 @@ sau:
    trả lời `cannot: Not possible yet: a skill can't use your mail, calendar or
    other services, even ones already linked. You can ask me for it yourself
    any time.` Dù thế nào, bước kiểm tra của `lamp-skills` vẫn giữ những gì
-   được giữ lại ở việc đọc một dịch vụ có thể đọc; việc ghi trong
-   `services` được trả lời "I can't do that yet: writing to a linked
-   service", và khi tắt đọc thì mọi `services` là "I can't do that yet:
-   reading your linked services". Khi đã giữ, một kỹ năng có bước đọc một
+   được giữ lại ở việc đọc một dịch vụ có thể đọc; khi tắt đọc thì một
+   `"read"` trong `services` là "I can't do that yet: reading your linked
+   services".
+   Việc ghi vào một dịch vụ liên kết (#6066, chủ đèn bỏ quy tắc (b) ngày
+   10/11, với các điều kiện của first builder lúc 21:44;
+   `LAMP_SKILL_WRITES=on` trong `lamp-voice`, được chuyển cho cả hai
+   route, cũng như trong `lamp-services`, `lamp-skills` và helper quản lý
+   của nó; tắt trong mọi unit sản phẩm). Khi tắt, một `"write"` trong
+   `services` hay một bước `write` được trả lời "I can't do that yet:
+   sending or writing on its own", không bao giờ bị sửa, và system prompt
+   dặn mô hình tạo kỹ năng trả lời yêu cầu đó như vậy (`cannot:`). Khi bật:
+   - **Được mang gì** (`made_skill::capped`): một bước `write`, bước duy
+     nhất của kỹ năng, với `[permissions] services = { <code> = "write" }`,
+     cho các loại `lamp-services` gửi (`skill_writes::KINDS`: thư, sự kiện
+     lịch, issue hay comment GitHub, issue Linear, task Asana, comment
+     Figma); nội dung được kiểm tra như `lamp-services` kiểm tra. Ghi vào
+     dịch vụ khác là "I can't do that yet: writing to your <Service> on
+     its own"; một lần ghi không cố định trọn vẹn, chưa được cấp quyền hay
+     thuộc loại khác thì quay lại để sửa (`made_skill::WRITE_NOT_FIXED`).
+     System prompt liệt kê các loại và khoá của chúng
+     (`make_skill_local::write_rules`); brief thêm "Or one write, as
+     above." (hoặc "Or a read/write as above."), vẫn trong 1.160
+     byte.
+   - **Lời của nó là lời của chính yêu cầu**
+     (`made_skill::write_from_request`, tại `keep_asked`, nay nhận yêu
+     cầu, `made_skill::Asked`): mọi `subject`, `text` và `title` phải có
+     trong yêu cầu của người dùng, đúng từng từ theo thứ tự, bỏ qua chữ
+     hoa, khoảng trắng, dấu câu và dấu ngoặc kép (một đoạn trong ngoặc kép
+     chỉ là các từ của nó). Không bao giờ lấy từ một lần đọc, web hay bộ
+     nhớ; system prompt nói vậy. Mọi nơi đến (`repo`, `team_id`,
+     `project`, `workspace`, `id` của Figma, `calendar` khác `primary`,
+     `number` của issue) phải được nêu trong yêu cầu, nên không có
+     repository GitHub nào mà yêu cầu không nêu.
+   - **Người nhận** (`to`, `cc`, `attendees`): mỗi người là địa chỉ của
+     chính tài khoản đã liên kết (account của dịch vụ đó trong
+     `services_connected`, Gmail nào cũng tính cho Gmail kia, hỏi một lần
+     khi bắt đầu tạo nếu bật, `services::linked_accounts`), hoặc một địa
+     chỉ yêu cầu nói ra, viết hay đọc ("mai at example dot com"). Chỉ tên
+     một người liên hệ thì không phải địa chỉ: đèn không giữ danh bạ, nên
+     mô hình trả lời "cannot:" và xin địa chỉ. Mọi thứ khác quay lại để
+     sửa, người dùng nghe `made_skill::WRITE_NOT_SAID`; các dòng sửa nêu
+     quy tắc và địa chỉ của chính người dùng, không bao giờ một giá trị của
+     yêu cầu, và journal chỉ nêu tên trường.
+   - **Nói lại trọn vẹn** (`made_skill::write_plainly`): khi nào chạy, gửi
+     đi đâu, mọi người nhận, mọi đoạn văn trích nguyên ("it mails
+     mai@example.com from your Gmail, subject “Leaving”, saying “I'm
+     leaving now.”"), bao lâu một lần, cách cư xử của nó, và cuối cùng
+     `made_skill::WAITS_FOR_YES`, " It waits for you to agree before it
+     sends anything." Nó không kết thúc bằng một từ để lặp lại và không có
+     "yes". Nói trọn, tối đa 1.400 ký tự (`MOST_WRITE_PLAIN_CHARS`), không
+     bao giờ cắt, và câu là "I made leaving mail: …", không bao giờ "it's
+     on". Phần dùng thêm "your Gmail, sending to mai@example.com", và
+     `uses` của ứng dụng có `writes` và `sends_to` cho dòng "sends to …"
+     của danh sách (chữ của danh sách nằm trong ứng dụng, không ở repo
+     này).
+   - **Lời đồng ý** (`crate::skill_write_yes`): khi kỹ năng đã bật (lời
+     đồng ý gắn với package đã cài), nội dung chính xác các lần ghi của nó,
+     giữ cạnh nó trong index (`made_skill::writes_of`), chờ trong bộ nhớ
+     120 s với một `approve_id` được đưa cho mô hình, không bao giờ chính
+     việc đồng ý. Nếu lời tiếp theo của người dùng đồng ý, bằng bất kỳ lời
+     nào (mô hình phán đoán, như #6009 để mô hình phán đoán lệnh gửi một
+     thư đang chờ), mô hình gọi `make_skill` chỉ với id đó; khi đó chính
+     giọng nói gọi `skill_write_approve` (`services::skill_write_approve`,
+     nơi duy nhất nó gọi). Chỉ nhận một lần, chỉ trong một yêu cầu nghe
+     được sau đó, trên route thứ hai (`services::sends_here`), không bao
+     giờ trên một dòng bị giữ là tiếng vọng của chính đèn. Từ chối, chờ hay
+     thay đổi thì không gọi gì, nên không gì được đồng ý; thay đổi là một
+     lần tạo mới. Câu trả lời của `lamp-services` nêu các repository GitHub
+     công khai, và khi đó mô hình nói "anyone can see" những gì nó đăng ở
+     đó. Không kiểm tra danh tính: ai ở bên đèn là chủ của nó.
+   - **Giữ tiếng vọng** (`second_provider::own_echo::yes_echo`): trong lúc
+     chờ lời đồng ý, một dòng chỉ gồm lời của chính đèn, theo các chuỗi mà
+     câu trả lời của nó nói theo thứ tự, bắt đầu khi đèn đang nói hoặc
+     trong 1,5 s đuôi, bị giữ dù dài bao nhiêu, có tên đèn hay là câu hỏi,
+     dù `LAMP_SECOND_OWN_ECHO` bật hay tắt và cả trong phòng riêng; yêu cầu
+     của nó được ghi lại và việc đồng ý trong đó bị từ chối.
+   - **"I sent …"** (`crate::skill_writes_told`): route thứ hai hỏi
+     `skill_writes_sent` ngoài đường đi của dòng, tối đa 5 s một lần, khi
+     có một dòng nghe được, và dòng nghe được tiếp theo được báo mỗi lần
+     gửi kể từ lần báo cuối, một lần: "I sent your 'leaving mail' mail to
+     mai at 18:02." (nhật ký đã gửi chỉ giữ phần trước `@` của người nhận).
+     Mốc đã báo là `writes-told.json` trong thư mục kỹ năng tự tạo, được ghi
+     trước khi báo; khi chưa có mốc, chỉ báo các lần gửi trong ngày qua.
+   - **Gỡ nó** không đổi, bằng giọng nói hay trong ứng dụng; với
+     `lamp-services` một package đã gỡ hay đã đổi chờ lời đồng ý mới.
+   Khi đã giữ, một kỹ năng có bước đọc một
    dịch vụ chưa liên kết lúc đó (`services_connected`, hỏi một lần, tối đa
    500 ms) vẫn được giữ, và việc tạo báo điều đó: tạo bằng giọng nói,
    `needs_link` trong câu trả lời của việc tạo, và sau câu báo đã bật, mô
@@ -634,8 +718,15 @@ phần tasks, kỹ năng được tạo và được bật ngay mà không cần
 `the_models_cannot_reason_is_told_never_journaled`: #5985, lý do được báo
 đầy đủ, nhật ký chỉ ghi `MODELS_CANNOT_JOURNALED`;
 `the_system_prompt_carries_the_rules_of_a_read`: tối đa một dịch vụ, chỉ đọc,
-các bước được liệt kê, ngoài ra là `cannot:`; khi tắt, không dịch vụ nào),
-`made_skill::tests` (kể cả `every_request_is_briefed_and_the_model_judges_it`:
+các bước được liệt kê, ngoài ra là `cannot:`; khi tắt, không dịch vụ nào;
+`a_made_write_is_said_back_whole_and_waits_for_a_later_yes` và
+`the_system_prompt_and_function_carry_a_write_only_with_its_switch`:
+#6066), các test ghi của #6066 (`made_skill::tests`:
+`a_write_is_carried_only_with_its_switch`,
+`a_writes_say_back_is_whole_and_ends_on_its_wait`,
+`a_writes_words_and_recipients_are_the_requests_own`;
+`skill_write_yes::tests`; `own_echo::yes_tests`;
+`skill_writes_told::tests`), `made_skill::tests` (kể cả `every_request_is_briefed_and_the_model_judges_it`:
 dịch vụ, việc ghi hay hai dịch vụ đều được soạn brief, không bị danh sách từ
 từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 `second_provider::worker::made_line`

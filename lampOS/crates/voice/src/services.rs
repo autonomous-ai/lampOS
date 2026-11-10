@@ -2123,6 +2123,90 @@ pub fn linked_codes(folder: &Path) -> Option<Vec<String>> {
     codes_in(&told)
 }
 
+/// Each service linked now, by code and account, asked of `lamp-services`
+/// on `folder`'s socket within [`LINKED_DEADLINE`]: a made skill's write
+/// may go to the person's own address (#6066). `None` when it can't be
+/// told. Blocking.
+pub fn linked_accounts(folder: &Path) -> Option<Vec<(String, String)>> {
+    let told = crate::tools::exchange(
+        &folder.join(crate::tools::CALL_SOCKET),
+        &json!({"op":"call","name":CONNECTED}),
+        LINKED_DEADLINE,
+    )?;
+    accounts_in(&told)
+}
+
+/// [`linked_accounts`]' list, from [`CONNECTED`]'s answer.
+fn accounts_in(told: &Value) -> Option<Vec<(String, String)>> {
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    let connected = told.get("result")?.get("connected")?.as_array()?;
+    Some(
+        connected
+            .iter()
+            .filter_map(|link| {
+                Some((
+                    link.get("service")?.as_str()?.to_owned(),
+                    link.get("account")?.as_str()?.to_owned(),
+                ))
+            })
+            .collect(),
+    )
+}
+
+/// How long the voice waits for `lamp-services` to keep a yes to a made
+/// skill's writes: it reads a GitHub repository's visibility first.
+pub const APPROVE_DEADLINE: Duration = Duration::from_secs(5);
+
+/// The person's yes to a made skill's writes (#6066), the voice's own call
+/// on `lamp-services`' tools socket, never offered to its model:
+/// `skill_write_approve` with the skill's name and each write's exact
+/// content, after the skill is on (the yes binds its installed package).
+/// Its result (`{"approved": N, "public": [repo, ...]}`), or why not, in
+/// `lamp-services`' words, which name no recipient or text. Blocking. The
+/// one place the voice makes this call, so a change of its shape is made
+/// here.
+pub fn skill_write_approve(folder: &Path, skill: &str, writes: &[Value]) -> Result<Value, String> {
+    let told = crate::tools::exchange(
+        &folder.join(crate::tools::CALL_SOCKET),
+        &json!({"op": "call", "name": lamp_services::skill_writes::APPROVE,
+                "args": {"skill": skill, "writes": writes}}),
+        APPROVE_DEADLINE,
+    )
+    .ok_or("the lamp's services didn't answer")?;
+    match told.get("ok").and_then(Value::as_bool) {
+        Some(true) => Ok(told.get("result").cloned().unwrap_or(Value::Null)),
+        _ => Err(told
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("the lamp's services refused it")
+            .to_owned()),
+    }
+}
+
+/// The owner's sent-log of made skills' writes (#6066), the voice's own
+/// call: `skill_writes_sent`'s list, each `{"skill", "service", "at",
+/// "to"}`, `to` a recipient's local part or a place, never a text. `None`
+/// when it can't be told. Blocking.
+pub fn skill_writes_sent(folder: &Path) -> Option<Vec<Value>> {
+    let told = crate::tools::exchange(
+        &folder.join(crate::tools::CALL_SOCKET),
+        &json!({"op": "call", "name": lamp_services::skill_writes::SENT}),
+        LINKED_DEADLINE,
+    )?;
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    told.get("result")?.get("sent")?.as_array().cloned()
+}
+
+/// Whether this process may take a send or a yes: the second route, which
+/// has the voice judge and the echo hold; never the Live route.
+pub fn sends_here() -> bool {
+    judge().is_some()
+}
+
 /// [`linked_codes`]' list, from [`CONNECTED`]'s answer.
 fn codes_in(told: &Value) -> Option<Vec<String>> {
     if told.get("ok").and_then(Value::as_bool) != Some(true) {

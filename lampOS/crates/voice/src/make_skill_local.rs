@@ -123,7 +123,15 @@ fn system() -> String {
 /// [`system`], with a made skill's reads on or off.
 fn system_with(reads: bool) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
-    let services = services(reads);
+    let writes = made_skill::writes_on();
+    let services = services(reads, writes, &own_accounts());
+    // With a made skill's writes (#6066) a write to a linked service is
+    // told below; a text to a phone stays out of reach.
+    let cant_send = if writes {
+        "or send a message to a phone"
+    } else {
+        "send a message or write to a service"
+    };
     let triggers = made_skill::TRIGGER_MEANINGS;
     let gestures = made_skill::gesture_names();
     let (more, cant_yet) = (made_skill::MORE_STEPS, made_skill::CANT_YET);
@@ -145,7 +153,7 @@ fn system_with(reads: bool) -> String {
          faces): {triggers} A body step is one gesture, one of: {gestures}. Set none of \
          most_a_day, [quiet], [budget] or [rest] unless the request asks for more in its own \
          words: the lamp sets them. A skill can't yet \
-         hear what is said, know who someone is, send a message or write to a service: a \
+         hear what is said, know who someone is, {cant_send}: a \
          request that needs one, or anything else no step or trigger here does, is answered \
          with one line and no blocks: {cannot} then one short sentence said to the person, \
          beginning \"{cant_yet}\" and naming what in plain words (\"{cant_yet} sending a \
@@ -171,32 +179,124 @@ fn system_with(reads: bool) -> String {
 /// the owner to link a calendar already linked (the first builder on
 /// #5288). The cap (`made_skill::capped`) still holds every made skill to
 /// these whatever the model answers.
-fn services(reads: bool) -> String {
+fn services(reads: bool, writes: bool, own: &[(String, String)]) -> String {
     let cannot = made_skill::CANNOT;
     let ask_me = "You can ask me for it yourself any time.";
+    // A write on its own (#6066): its rules with the switch, else the
+    // lamp's "can't do that yet".
+    let write = if writes {
+        write_rules(own)
+    } else {
+        format!(
+            "A skill never sends or writes anything to a service by itself: a request for one \
+             that sends, mails, posts or adds anything on its own is answered with one line and \
+             no blocks: {cannot} {} {}.",
+            made_skill::CANT_YET,
+            made_skill::SENDS_ON_ITS_OWN
+        )
+    };
     if !reads {
+        let what = if writes { "read" } else { "use" };
         return format!(
-            "A skill can't use the person's mail, calendar or any other linked service yet, \
+            "A skill can't {what} the person's mail, calendar or any other linked service yet, \
              even one already linked: a request that needs one is answered with one line and \
-             no blocks: {cannot} Not possible yet: a skill can't use your mail, calendar or \
-             other services, even ones already linked. {ask_me} Never tell them to link one."
+             no blocks: {cannot} Not possible yet: a skill can't {what} your mail, calendar or \
+             other services, even ones already linked. {ask_me} Never tell them to link one.\n\
+             {write}"
         );
     }
     let steps = made_skill::read_steps().join("\n- ");
     let unreadable = made_skill::unreadable_names().join(", ");
+    let (only, asks_more) = if writes {
+        (
+            "never deletes or changes anything in a service, and writes only as below",
+            "A request to delete or change anything in a service",
+        )
+    } else {
+        (
+            "never sends, writes, posts, books, schedules, deletes or changes anything in a \
+             service",
+            "A request to send, write or change anything in a service",
+        )
+    };
     format!(
         "A skill may read at most one of the person's linked services, and only read it: it \
-         never sends, writes, posts, books, schedules, deletes or changes anything in a \
-         service. A request to be read one of these is a skill with [permissions] only \
+         {only}. A request to be read one of these is a skill with [permissions] only \
          speak = true, services = {{ CODE = \"read\" }} and its topics; its trigger's during \
          only for a time the request names; and exactly one [[do]] step, the one shown here \
          for that service, filled in from the request, and no light or head step. The services a skill can read, each as name (CODE): step:\n- {steps}\n\
-         A request to send, write or change anything in a service, to read two or more \
+         {asks_more}, to read two or more \
          services, or to read one not listed here ({unreadable}, or any other) is answered \
          with one line and no blocks: {cannot} then one short sentence saying what a skill \
          can do instead (read one linked service), ending \"{ask_me}\" Never tell them to \
-         link a service."
+         link a service.\n{write}"
     )
+}
+
+/// What the making model is told of a made skill's write (#6066, with
+/// [`made_skill::WRITES_ENVIRONMENT`] on): the kinds `lamp-services` sends,
+/// their keys, and the first builder's conditions: the words only the
+/// request's own, never a read's, the web's or memory's; the recipients
+/// only an address the request says or the person's own (`own`, each
+/// linked service's code and account); and the lamp says it back whole and
+/// waits for the person's yes. A request it can't make so is `cannot:`.
+fn write_rules(own: &[(String, String)]) -> String {
+    let cannot = made_skill::CANNOT;
+    let cant_yet = made_skill::CANT_YET;
+    let kinds: Vec<String> = lamp_services::skill_writes::KINDS
+        .iter()
+        .map(|(code, action, keys)| format!("{code} {action}: {}", keys.join(", ")))
+        .collect();
+    let mine: Vec<String> = own
+        .iter()
+        .filter(|(_, account)| account.contains('@'))
+        .map(|(code, account)| format!("{account} ({code})"))
+        .collect();
+    let mine = match mine.as_slice() {
+        [] => "none linked".to_owned(),
+        mine => mine.join(", "),
+    };
+    format!(
+        "A skill may also send or write to one linked service by itself, after the person \
+         says yes to it: a mail, a calendar event, an issue, a task or a comment. Such a skill \
+         has [permissions] services = {{ CODE = \"write\" }} and its trigger's topics, no \
+         speak, and exactly one [[do]] step: write = {{ service = \"CODE\", action = \
+         \"ACTION\", its keys }}, one of:\n- {}\n\
+         Every subject, text and title is the person's own words in the request, copied \
+         exactly (a quoted part as it is): never write, add, translate or fill in words of your \
+         own, and never take them from a read, the web or memory. Every to, cc and attendee is \
+         an email address the request says, or the person's own: {mine}. A repo, team, project \
+         or file is only one the request names. A request whose words to send, or whose \
+         recipient's address, it doesn't say (\"mail Mai that I left\") is answered with one \
+         line and no blocks: {cannot} {cant_yet} sending what you didn't say word for word, or \
+         to an address you didn't say; say the exact words and the address.",
+        kinds.join("\n- ")
+    )
+}
+
+/// The person's linked services' codes and accounts, for a write's own
+/// address (#6066): asked of `lamp-services` once a make begins, only with
+/// a made skill's writes on ([`own_accounts_now`]).
+static OWN: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
+
+fn own_accounts() -> Vec<(String, String)> {
+    OWN.lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
+}
+
+/// What is linked now, by code and account, asked of `lamp-services` with
+/// a made skill's writes on and kept for the making model's instructions;
+/// none with them off, or when it can't be told.
+fn own_accounts_now() -> Vec<(String, String)> {
+    let own = if made_skill::writes_on() {
+        crate::services::linked_accounts(std::path::Path::new(crate::services::FOLDER))
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    *OWN.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = own.clone();
+    own
 }
 
 /// The function the model is given with the switch: the lamp makes it
@@ -211,18 +311,32 @@ pub fn tool() -> lamp_gemini::Tool {
              few words that you'll make it now. The skill is made, checked, kept and put on the \
              lamp at once: then say exactly the line you are told, nothing more."
             .into(),
-        parameters: Some(json!({
-            "type": "object",
-            "properties": {
-                "request": {
-                    "type": "string",
-                    "description": "What the skill should do and when, in the person's own words, nothing else."
-                }
-            },
-            "required": ["request"]
-        })),
+        parameters: Some(parameters(made_skill::writes_on())),
         silent: false,
     }
+}
+
+/// The function's parameters: the request, and with a made skill's writes
+/// on (#6066) the yes to one that waits for it, `approve_id`, given alone.
+fn parameters(writes: bool) -> Value {
+    let mut parameters = json!({
+        "type": "object",
+        "properties": {
+            "request": {
+                "type": "string",
+                "description": "What the skill should do and when, in the person's own words, nothing else."
+            }
+        },
+        "required": ["request"]
+    });
+    if writes {
+        parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
+            "type": "string",
+            "description": "Only when a skill you just made waits for the person's yes and they then agree, in any words: its approve_id, given alone with no request."
+        });
+        parameters["required"] = json!([]);
+    }
+    parameters
 }
 
 /// Whether a failed answer is asked once more: the service not found or
@@ -336,13 +450,26 @@ pub fn make(
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     now_unix_ms: u64,
 ) -> Value {
-    make_with(request, keeping, chat, now_unix_ms, || {
+    make_in(0, request, keeping, chat, now_unix_ms)
+}
+
+/// [`make`] in the voice's request `made_in`: a write's yes comes in a
+/// later one (`crate::skill_write_yes`).
+pub fn make_in(
+    made_in: u64,
+    request: &str,
+    keeping: &Keeping,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    now_unix_ms: u64,
+) -> Value {
+    make_with(made_in, request, keeping, chat, now_unix_ms, || {
         crate::services::linked_codes(std::path::Path::new(crate::services::FOLDER))
     })
 }
 
-/// [`make`], what is linked given by `linked`.
+/// [`make_in`], what is linked given by `linked`.
 pub fn make_with(
+    made_in: u64,
     request: &str,
     keeping: &Keeping,
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
@@ -380,7 +507,45 @@ pub fn make_with(
         .map(|made| made_skill::put_on(keeping, made))
         .unwrap_or(Ok(()));
     MADE_LINE.with(|kept| kept.replace(Some(said_line(&made, &on))));
-    told(made, on, needs.as_deref())
+    let told = told(made.clone(), on.clone(), needs.as_deref());
+    // A skill that sends or writes, once on (its yes binds the installed
+    // package): its writes wait for the person's yes, in a later heard
+    // line (#6066, `crate::skill_write_yes`).
+    match (&made, &on) {
+        (Ok(made), Ok(())) => {
+            let writes = made_skill::writes_of(&keeping.directory, &made.sha256);
+            if writes.is_empty() {
+                return told;
+            }
+            let id = crate::skill_write_yes::wait_for_yes(
+                &made.name,
+                &writes,
+                made_in,
+                std::time::Instant::now(),
+            );
+            waits_for_yes(told, &id)
+        }
+        _ => told,
+    }
+}
+
+/// What the model is told of a made skill whose writes wait for the yes
+/// (#6066): its say-back said whole, every address and quoted word as
+/// written, then nothing asked to repeat; on an agreement in any words, a
+/// later call with `approve_id` alone; on a decline, a wait or a change,
+/// no call.
+fn waits_for_yes(mut told: Value, id: &str) -> Value {
+    told["writes_wait_for_yes"] = json!(true);
+    told[crate::skill_write_yes::APPROVE_ID] = json!(id);
+    let next = told["next"].as_str().unwrap_or_default().to_owned();
+    told["next"] = json!(format!(
+        "{next} Say every address and every quoted word exactly as written, and end as the \
+         line ends, asking nothing. Nothing is sent until they agree. If their next words \
+         agree, in any words, call make_skill again with only approve_id \"{id}\". If they \
+         decline, wait or change it, don't call it: nothing is sent, and a change is a new \
+         make_skill."
+    ));
+    told
 }
 
 std::thread_local! {
@@ -467,9 +632,14 @@ fn made_and_journaled(
 ) -> (Result<Made, Refused>, String) {
     let began = std::time::Instant::now();
     let chat = Arc::new(chat);
-    // The times of day the person's own words name: only a window within
-    // one runs at night without quiet hours (Thirteen's HOLD on #6103).
-    let asked = made_skill::asked_windows(request);
+    // The person's own words: the times of day they name, so only a window
+    // within one runs at night without quiet hours (Thirteen's HOLD on
+    // #6103); and a write's words and recipients (#6066), with what is
+    // linked now for their own address.
+    let asked = made_skill::Asked {
+        request,
+        own: own_accounts_now(),
+    };
     // Whether the last answer was the model's own `cannot:`: its reason is
     // never journaled ([`kept_line`]).
     let models_cannot = std::cell::Cell::new(false);
@@ -486,6 +656,7 @@ fn made_and_journaled(
                 ))
             }
             Ok(text) => made_skill::keep_asked(&text, false, from, keeping, &asked),
+
             Err(why) => {
                 eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
                 Err(Refused("the lamp's model didn't answer".into(), None))
@@ -623,7 +794,25 @@ fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Val
 pub const NOT_ASKED_ALOUD: &str =
     "a skill is made only when the person asks for one out loud, or with MAKE IT in the app";
 
-pub fn answer(call: &lamp_gemini::ToolCall, heard: bool) -> Value {
+pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value {
+    // The person's yes to a made skill's writes (#6066): the waiting
+    // skill's, in a later heard line, approved by the voice itself.
+    if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
+        return crate::skill_write_yes::approve(
+            id,
+            request,
+            heard,
+            crate::services::sends_here(),
+            std::time::Instant::now(),
+            |skill, writes| {
+                crate::services::skill_write_approve(
+                    std::path::Path::new(crate::services::FOLDER),
+                    skill,
+                    writes,
+                )
+            },
+        );
+    }
     if !heard {
         eprintln!(
             "lamp-voice: a skill wasn't made: no one asked for it aloud in this turn (#5985)"
@@ -637,7 +826,7 @@ pub fn answer(call: &lamp_gemini::ToolCall, heard: bool) -> Value {
         return crate::tools::unavailable();
     };
     let request_words = call.args["request"].as_str().unwrap_or_default();
-    make(request_words, &keeping, own_chat, now_unix_ms)
+    make_in(request, request_words, &keeping, own_chat, now_unix_ms)
 }
 
 #[cfg(test)]
@@ -659,7 +848,7 @@ pub(crate) mod tests {
             args: serde_json::json!({"request": "Glow green when I come back to my desk."}),
         };
         assert_eq!(
-            answer(&call, false),
+            answer(&call, 1, false),
             serde_json::json!({"error": NOT_ASKED_ALOUD})
         );
     }
@@ -1130,6 +1319,120 @@ light = { dim = 1 }
         assert_eq!(asked.join().unwrap()["install_made"], entry["sha256"]);
         assert_eq!(served.join().unwrap(), 1);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A made skill that mails mai when the person gets up (#6066).
+    const WRITE_TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+        [permissions]\ntopics = [\"room/stood_up\"]\nservices = { gmail = \"write\" }\n\
+        [trigger]\ntopic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n\
+        cooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[[do]]\n\
+        write = { service = \"gmail\", action = \"send_mail\", to = [\"mai@example.com\"], \
+        subject = \"Leaving\", text = \"I'm leaving now.\" }\n";
+    const WRITE_CARD: &str =
+        "---\nname: leaving-mail\ndescription: Mails Mai when I leave.\n---\n\n# Leaving mail\n";
+    const WRITE_REQUEST: &str = "make a skill that mails mai@example.com with the subject \
+                                 Leaving, saying I'm leaving now, when I get up from my desk";
+
+    fn write_answer(toml: &str) -> String {
+        format!("```skill.toml\n{toml}```\n\n```SKILL.md\n{WRITE_CARD}```\n")
+    }
+
+    /// Items 2, 4 and 5 (#6066): a write whose words aren't the request's
+    /// goes back for repair; the one kept is put on, said back whole with
+    /// its wait, and its writes wait for a yes in a later heard line, which
+    /// approves exactly its contents; the say-back's own words heard back
+    /// approve nothing.
+    #[test]
+    fn a_made_write_is_said_back_whole_and_waits_for_a_later_yes() {
+        made_skill::set_writes_here(Some(true));
+        let (root, keeping) = keeping("write");
+        let made_up = WRITE_TOML.replace("I'm leaving now.", "I'm off, see you tomorrow!");
+        let (url, served) = service(vec![
+            (200, write_answer(&made_up)),
+            (200, write_answer(WRITE_TOML)),
+        ]);
+        let asked = manage_helper(&keeping.manage);
+        let told = make_in(7, WRITE_REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap(), 2, "repaired once: {told}");
+        assert_eq!(told["made"], "leaving-mail", "{told}");
+        assert_eq!(told["writes_wait_for_yes"], true, "{told}");
+        let next = told["next"].as_str().unwrap();
+        for part in [
+            "mails mai@example.com from your Gmail, subject “Leaving”, saying “I'm leaving now.”",
+            made_skill::WAITS_FOR_YES.trim(),
+            "call make_skill again with only approve_id",
+            "don't call it: nothing is sent",
+        ] {
+            assert!(next.contains(part), "{part}: {next}");
+        }
+        assert!(!next.contains("it's on:"), "{next}");
+        asked.join().unwrap();
+        let id = told[crate::skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let now = std::time::Instant::now();
+        // The say-back's last words heard back, held as its echo in
+        // request 8: no yes in it.
+        crate::skill_write_yes::echo_held(8);
+        let never = |_: &str, _: &[Value]| -> Result<Value, String> { panic!("approved") };
+        assert!(
+            crate::skill_write_yes::approve(&id, 8, true, true, now, never)["error"].is_string()
+        );
+        // The wait was taken by that try: a new make waits again, and a yes
+        // in a later heard line approves its exact write.
+        let writes = made_skill::writes_of(
+            &keeping.directory,
+            made_skill::entries(&keeping.directory)[0]["sha256"]
+                .as_str()
+                .unwrap(),
+        );
+        assert_eq!(writes[0]["text"], "I'm leaving now.");
+        let id = crate::skill_write_yes::wait_for_yes("leaving-mail", &writes, 7, now);
+        let mut approved = None;
+        let told = crate::skill_write_yes::approve(&id, 9, true, true, now, |skill, writes| {
+            approved = Some((skill.to_owned(), writes.to_vec()));
+            Ok(json!({"approved": 1, "public": []}))
+        });
+        assert_eq!(told["approved"], true, "{told}");
+        assert_eq!(approved, Some(("leaving-mail".to_owned(), writes)));
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Item 1: with LAMP_SKILL_WRITES off the making model is told a skill
+    /// can't send or write on its own, said "I can't do that yet: sending
+    /// or writing on its own"; on, it is told the kinds and the request's
+    /// own words, and `make_skill` takes an `approve_id`.
+    #[test]
+    fn the_system_prompt_and_function_carry_a_write_only_with_its_switch() {
+        made_skill::set_writes_here(Some(false));
+        for reads in [true, false] {
+            let off = system_with(reads);
+            assert!(
+                off.contains("cannot: I can't do that yet: sending or writing on its own."),
+                "{off}"
+            );
+            assert!(!off.contains("services = { CODE = \"write\" }"));
+        }
+        assert!(parameters(false)["properties"].get("approve_id").is_none());
+        assert_eq!(parameters(false)["required"], json!(["request"]));
+        made_skill::set_writes_here(Some(true));
+        for reads in [true, false] {
+            let on = system_with(reads);
+            for rule in [
+                "services = { CODE = \"write\" }",
+                "gmail send_mail: to, cc, subject, text",
+                "the person's own words in the request, copied exactly",
+                "never take them from a read, the web or memory",
+                "an email address the request says, or the person's own",
+            ] {
+                assert!(on.contains(rule), "{rule}: {on}");
+            }
+            assert!(!on.contains("sending or writing on its own."), "{on}");
+        }
+        assert!(parameters(true)["properties"]["approve_id"].is_object());
+        made_skill::set_writes_here(None);
     }
 
     /// Kept, and the manage helper not there: it stays off, the model is
@@ -1798,7 +2101,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         // put on as before.
         let (root, keeping) = keeping("needs-link-unknown");
         let (url, served) = service(vec![(200, good())]);
-        let answer = make_with(REQUEST, &keeping, chat_at(url), NOW, || None);
+        let answer = make_with(0, REQUEST, &keeping, chat_at(url), NOW, || None);
         assert_eq!(answer["made"], "evening-dim", "{answer}");
         assert!(answer.get("needs_link").is_none(), "{answer}");
         assert_eq!(served.join().unwrap(), 1);
