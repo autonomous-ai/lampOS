@@ -713,12 +713,13 @@ impl<H: Http, M: Mail> Services<H, M> {
         .await
     }
 
-    /// A read's arguments, a Gmail read's service `gmail` whenever that
-    /// link is an app password: a read naming either Gmail name goes over
-    /// IMAP with it, never with a Google sign-in's token kept beside it
-    /// (`gmail-app`), as the owner asked on 10 Nov. Without an app
-    /// password, as asked.
-    fn read_args(&self, args: &Value) -> Value {
+    /// A call's arguments, a Gmail call's service `gmail` whenever that
+    /// link is an app password: a read or a write naming either Gmail name
+    /// goes over IMAP or SMTP with it, never with a Google sign-in's token
+    /// kept beside it (`gmail-app`), as the owner asked on 10 Nov. A write
+    /// is rewritten both when prepared and when sent, so the two agree.
+    /// Without an app password, as asked.
+    fn gmail_args(&self, args: &Value) -> Value {
         let mut args = args.clone();
         let gmail = args
             .get("service")
@@ -735,7 +736,7 @@ impl<H: Http, M: Mail> Services<H, M> {
     }
 
     async fn read(&self, args: &Value) -> Result<Value, String> {
-        let args = &self.read_args(args);
+        let args = &self.gmail_args(args);
         // A send-only link is answered so whether or not it is linked, and
         // so is `gmail` when the lamp's one Gmail link is send-only.
         let asked = args.get("service").and_then(Value::as_str);
@@ -800,6 +801,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         if !self.write_on {
             return Err("writing to services is off on this lamp".into());
         }
+        let args = &self.gmail_args(args);
         let Some(send_id) = args.get("send_id").and_then(Value::as_str) else {
             let (service, entry) = self.linked(args).await?;
             // Refused before it is prepared or held, and nothing is asked of
@@ -2296,6 +2298,8 @@ mod tests {
 
     /// With both Gmail links, each name reaches its own: the other is
     /// stood in only for a name with no link (the second read of #5279).
+    /// Both are sign-ins here: with no app password kept, a send uses
+    /// the sign-in's token as before.
     #[test]
     fn with_both_gmail_links_each_name_reaches_its_own() {
         let dir = tempfile::tempdir().unwrap();
@@ -2360,6 +2364,52 @@ mod tests {
             let answer = run(services.tool(&read_line(json!({"service":asked,"what":"recent"}))));
             assert_eq!(answer["ok"], true, "{asked}: {answer}");
             assert_eq!(answer["result"]["source"], "Gmail", "{asked}");
+        }
+        assert!(services.http.calls().is_empty(), "the token was sent");
+    }
+
+    /// With an app password and a Google sign-in both kept, a send naming
+    /// either Gmail name, prepared and confirmed by either, goes over SMTP
+    /// with the app password; the sign-in's token is never sent (the
+    /// owner's ask, 10 Nov).
+    #[test]
+    fn with_both_gmail_links_a_send_uses_the_app_password() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        let (answer, _) = run(services.admin(&set_line(
+            "gmail",
+            json!({"connector":"gmail","auth_type":"pat","api_key":"good pass word",
+                   "credentials":{"email":"me@home.test"},"scopes":["mail"]}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        let pairs = [
+            ("gmail", "gmail"),
+            ("gmail-app", "gmail-app"),
+            ("gmail-app", "gmail"),
+            ("gmail", "gmail-app"),
+        ];
+        for (sent_count, (prepared, confirmed)) in (1..).zip(pairs) {
+            let answer = run(services.tool(&mail_ask(prepared)));
+            assert_eq!(answer["ok"], true, "{prepared}: {answer}");
+            assert!(
+                answer["result"]["read_back"]
+                    .as_str()
+                    .unwrap()
+                    .contains("from me@home.test to mom@home.test"),
+                "{prepared}: {answer}"
+            );
+            let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+            let sent = run(services.tool(&mail_send(confirmed, &id)));
+            assert_eq!(
+                sent["result"],
+                json!({"sent":true,"service":"Gmail"}),
+                "{prepared} then {confirmed}: {sent}"
+            );
+            assert_eq!(services.mail.sent.lock().unwrap().len(), sent_count);
         }
         assert!(services.http.calls().is_empty(), "the token was sent");
     }

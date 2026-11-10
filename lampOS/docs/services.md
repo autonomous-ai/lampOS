@@ -432,17 +432,20 @@ account's identity and `gmail.send` only, no `gmail.readonly`.
   read list is empty, so no read route is ever called with its token.
 - **Writes:** `send_mail`, read back and sent as `gmail`'s, on a spoken
   "send": one `POST /gmail/v1/users/me/messages/send` from the account
-  itself, never SMTP. 401 or 403: "not sent: Google refused the Gmail
-  sign-in".
-- **With both linked**, a send may go through either; a read only through
-  `gmail`. The read function's description says `gmail-app: none, it only
-  sends: reads use gmail`. When `gmail` is an app password, every read
-  prefers it (`serve.rs`, `read_args`, the owner's ask of 10 Nov): a read
-  naming `gmail`, `gmail-app` or either one's name goes over IMAP with the
-  app password, and the sign-in's token is never sent for it. Only when no
-  app password is kept does a read use a Google sign-in's token (a `gmail`
-  link made with one); a read naming `gmail-app` then still reads nothing.
-  Writes are unchanged: each still goes through the link its name reaches.
+  itself, never SMTP; unless `gmail` is linked with an app password
+  (below). 401 or 403: "not sent: Google refused the Gmail sign-in".
+- **With both linked**, a read goes only through `gmail`. The read
+  function's description says `gmail-app: none, it only sends: reads use
+  gmail`. One rule holds for every Gmail read and write: an app password
+  first, the token only without one (`serve.rs`, `gmail_args`, the owner's
+  ask of 10 Nov). When `gmail` is an app password, a read or a send naming
+  `gmail`, `gmail-app` or either one's name goes over IMAP or SMTP with the
+  app password, and the sign-in's token is never sent for it. A send is
+  rewritten so both when it is prepared (its read back says "from" the
+  app password's address) and when it is confirmed, so the two agree,
+  whichever Gmail name each uses. Only when no app password is kept does a
+  Gmail call use a Google sign-in's token: a send then goes through the
+  link its name reaches, and a read naming `gmail-app` still reads nothing.
 - **Either name reaches it** (`serve.rs`, `linked_code`): a call naming
   `gmail` when only `gmail-app` is linked uses the `gmail-app` link, and one
   naming `gmail-app` when only `gmail` is linked uses `gmail`, which also
