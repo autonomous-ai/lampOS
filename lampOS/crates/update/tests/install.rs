@@ -2371,6 +2371,23 @@ fn the_product_reads_a_lone_known_face_and_a_carried_line_as_theirs() {
     }
 }
 
+/// A first word said as a sentence of its own, written as another word, is the
+/// name when lamp-name heard it near (#6078, its lamp check on lamp-52e6 on
+/// 10 Nov: first "Lamp, ..." lines taken 0/5 off, 3/5 on).
+#[test]
+fn the_product_takes_a_misheard_name_said_as_a_sentence() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_NAME_AS_A_SENTENCE=on"),
+        "the voice lacks LAMP_NAME_AS_A_SENTENCE=on"
+    );
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.

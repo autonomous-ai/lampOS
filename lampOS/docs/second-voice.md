@@ -1924,7 +1924,7 @@ order is kept. A written turn is the same from the chat on.
     `a_near_bar_says_hearings_under_the_bar_and_changes_nothing_else`.
 - **With `LAMP_NAME_AS_A_SENTENCE=on` beside `LAMP_NAME_NEAR=on`, a first
   word said as a sentence of its own, heard near, is the name** (off unless
-  set; #5277). On lamp-52e6 on 4 Nov (sw5008f, request 24, the product's
+  set, on in the product since 10 Nov, #6078; #5277). On lamp-52e6 on 4 Nov (sw5008f, request 24, the product's
   switches and no other) the owner's "Lamp. I'm going out later. Do I need
   an umbrella?", the relay's speech to text writing the name a sentence of
   its own 3 times of 3, went unanswered: lamp-name heard the name near at

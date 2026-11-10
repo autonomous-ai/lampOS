@@ -155,6 +155,11 @@ Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
+# A first word said as a sentence of its own, written as another word ("Link. What reminders do I have?"), is the
+# name when lamp-name heard it near by the line's start (#5277, #6078): on lamp-52e6 on 10 Nov (11450), the first
+# "Lamp, ..." line after a restart was taken 0/5 off and 3/5 on; of 10 lines without the name, 2/10 woke it off and
+# 1/10 on, each one lamp-name's own hearing at 0.9 or more, none the switch's.
+Environment=LAMP_NAME_AS_A_SENTENCE=on
 # A line opened by "Ma'am," or "Sir," said to a person is no call of the lamp's on a start hearing alone (#3945,
 # #5233): on lamp-c0a4 on 6 Nov (10441), a person's own "Ma'am, could you pass me the salt, please?", turned away,
 # was heard as the name at the line's start and held; every "Ma'am/Sir" line held, every "Lamp, …" answered.
