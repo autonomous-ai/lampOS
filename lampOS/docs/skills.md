@@ -2129,17 +2129,66 @@ gone ([switches.md](switches.md)). What happens:
    both, its first two skills were refused for a trigger field and a light
    step the check didn't know. Its answer must be exactly two fenced
    blocks, `skill.toml` and `SKILL.md`, at most 8 KiB each.
-4. **Held to what a made skill may use** (the coordinator's cap, 19 Oct):
-   - `kind` installable, with a version;
-   - `[permissions]` with only `light`, `body`, `speak`, and `topics`
-     among `voice/state`, `room/presence`, `humans/faces/tracked` and
-     `room/stood_up` (presence alone, `lamp_skills::PRESENCE_TOPICS`: a
-     made skill's trigger reads no field of the faces, so never who) and
-     `clock/local` (lamp-skills' own clock, `LOCAL_CLOCK_TOPIC`);
-   - no function for the model (`tool`);
-   - `[ask] policy` only `nudge`, never a hello, news or a reminder;
-   - messages, the look, known faces, actions and any other topic are
-     refused.
+4. **Held to what a made skill may use: the cap lifted** (#6066). The
+   cap came from #1685 (deehw, 20 Oct): voice only, at a time when a
+   computer's agent wrote the skill. It held a made skill to `light`,
+   `body` and a few presence topics, `[ask] policy` only `nudge`, and
+   refused speaking, messages, the look, known faces, actions and every
+   other topic. On #6066 it was lifted by the lead's principle, which the
+   first builder confirmed (19:44, 10 Nov): **a skill a person makes on
+   their own lamp may do whatever the lamp can do.** Sharing it to the
+   Store is where it is reviewed. So `made_skill::capped` now takes:
+   - `kind` installable, with a version, and no function for the model
+     (`tool`): it runs by itself;
+   - any `[permissions]` and `[ask]` that `lamp-skills`' own pack check
+     takes for an installable skill: `light`, `body`, `speak`, any
+     topic, `messages`, `camera` (and format 1's `look`), `known_faces`,
+     `who`, `actions`, `output_limits`, `services` reads (with
+     `LAMP_SKILL_READS=on`), and a policy of `nudge`, `hello`,
+     `reminder` or `news`. A core grant, a write to a service or a step
+     its runtime doesn't take is refused by that check, not by the cap.
+   - Only #6062's say stays this cap's (below).
+   **What stays**, and only this:
+   - **The lamp's hardware safety:** the body's bounds, heat and load
+     stops, a hand on the head, the volume ceiling. They apply to
+     everything on the lamp, below any skill.
+   - **Said back before it goes on** (`made_skill::plainly`): when it
+     runs and every step, and the outbound steps and the camera or
+     microphone named in the same sentence: "When someone pats its head,
+     it nods, using the camera.", "…, it nods, and it may send a message
+     to your phone.", "…, listening with the microphone." It checks that
+     the skill matches the ask; it isn't a permission gate.
+   - **The privacy rules:** a linked service's read stays the owner's
+     alone, behind its gate ([services.md](services.md)); a skill never
+     reads one person's memory to another; a send or write goes through
+     the send gate's read-back, never around it.
+   - **What the runtime can't do yet** is answered "I can't do that yet:"
+     and what, never refused by a rule, and never repaired away
+     (`made_skill::CANT_YET`; said as it is, without "I couldn't make
+     that:"). Today: a step that sends a message or writes to a service
+     ("sending a message or writing to a linked service"; no step sends
+     one: a text is a watch's, and lamp-skills takes a service as `"read"`
+     only), a write in `services` ("writing to a linked service"), a move
+     of its own ("a move of its own") or a sound other than the hum (a made
+     skill carries no file but its two), with reads off any service
+     ("reading your linked services"), and a trigger on what is heard, a
+     reminder coming due, the news of work, a touch, the mood, the parts'
+     health or a pause ("starting on words it hears", ...). Each is build
+     work. The making model is told the same, and answers such a request
+     `cannot: I can't do that yet: …`.
+   - **Said plainly** since #6066, beside the light, the gestures, a say,
+     the hum and a read: a light's `dim` or `out` (`over`), `until =
+     "ends"` ("while that lasts"), `relative`, a `pattern` (breathing,
+     a candle, pulsing) and `no_brighter`; a body's `look_at = "face"` and
+     the reading pose with `for`; `look = true` ("takes a look with the
+     camera") and `stand`, which lamp-skills' check takes only in a skill
+     a person asks for by its function, so it refuses them in a made one;
+     `[ask]`'s
+     hello, reminder, news and warning; and the triggers on a pat
+     (`controls/pet`), stuffy air (`air/state` `co2_ppm` above a level)
+     and what someone at the desk is doing (`room/activity`: head down,
+     at the desk, leaning in). The said-back line may be 240 characters
+     (200 before).
    - **It may speak** (#6055, the app owner, 10 Nov: "Say hello when I sit
      down at my desk", the app's own example, was refused or repaired into
      a light; #6062, its exact words). `speak = true` with one `[[do]]`
@@ -2215,15 +2264,21 @@ gone ([switches.md](switches.md)). What happens:
      refused as a say is, and it is paced as a say is (`made_skill::paced`:
      a cooldown of an hour or more, and on the lamp's resting only between
      07:00 and 22:00). Any
-     other cue, a path or file name, or a `sound` step at all is refused
-     ("it would play a sound the lamp doesn't have; the one sound a made
-     skill plays is its soft hum", `made_skill::SOUND_NOT_SHIPPED`): the
+     other cue, a path or file name, or a `sound` step at all is what the
+     lamp can't do yet ("I can't do that yet: a sound other than its soft
+     hum", `made_skill::SOUND_NOT_SHIPPED`, with no repair since #6066): the
      sounds are a fixed list by name (`made_skill::SOUNDS`), the model
      never supplies audio or a path, and nothing is packed beside
      `skill.toml`. Tests: `a_made_skill_may_play_the_lamps_soft_hum`,
      `a_sound_the_lamp_doesnt_ship_is_refused`, and in `tests/it/made.rs`
      the real `lamp-skills pack` keeping one.
-   Widening this is the lead's call. The one widening (proposal #5288's
+   - Tests for the lifted cap (#6066):
+     `a_made_skill_may_use_whatever_a_skill_can_declare`,
+     `every_kind_a_skill_can_declare_is_kept_and_said`,
+     and the
+     `voice/heard` trigger's "can't yet" in
+     `what_it_cant_say_is_refused_with_lines_for_a_repair`.
+   The read of a linked service (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
    `lamp-skills-manage@`, on in the product units): `services` naming one linked
    service with a fixed read as `"read"`, and `speak` for saying it. No
@@ -2251,8 +2306,11 @@ gone ([switches.md](switches.md)). What happens:
    skill can't use any linked service, and a request for one is answered
    `cannot: Not possible yet: a skill can't use your mail, calendar or other
    services, even ones already linked. You can ask me for it yourself any
-   time.` Either way the cap holds whatever is kept ([services.md](services.md),
-   "A made skill's read"). Kept, a skill whose step reads a service not
+   time.` Either way `lamp-skills`' check holds whatever is kept to reads
+   of a service with reads; a write in `services` is answered "I can't do
+   that yet: writing to a linked service", and with reads off any
+   `services` "I can't do that yet: reading your linked services"
+   ([services.md](services.md), "A made skill's read"). Kept, a skill whose step reads a service not
    linked now (`services_connected`, asked once, at most 500 ms) is still
    kept, and the make tells it: by voice, `needs_link` in the make's
    answer, and after the line that it's on the model is asked to tell the
