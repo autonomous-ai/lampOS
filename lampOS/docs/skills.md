@@ -2168,7 +2168,10 @@ gone ([switches.md](switches.md)). What happens:
      runs at 22:10; test `a_made_evening_dim_runs_at_ten_past_ten`); a
      wider one, such as all day, keeps it. The
      floors of #6062 and #6070 (`made_skill::say_paced`: a say's hour, a
-     face's minute away, a getting up's minute) apply too. Each manner is
+     face's minute away, a getting up's minute, stuffy air's hour) apply
+     too. A trigger on one person's face (a `name`, `known` or `who` key) is
+     "I can't do that yet: starting when it sees one particular person":
+     `lamp-skills`' trigger sees a face, never whose. Each manner is
      said back as set: "… It starts on its own, at most 3 times a day, one
      an hour with the lamp's other nudges, never from 22:00 to 08:00, and
      rests till morning if ignored twice." (`made_skill::manners_plainly`;

@@ -797,6 +797,13 @@ pub const LEAST_FACE_ABSENT_SECS: u64 = 60;
 /// shorter; one that speaks has [`LEAST_SAY_COOLDOWN_SECS`].
 pub const LEAST_STOOD_UP_COOLDOWN_SECS: u64 = 60;
 
+/// The least cooldown of a made skill on stuffy air (#6066): the CO2 level
+/// hovers about its line as a window opens and shuts, so a skill on it
+/// would run each crossing. [`paced`] sets it, `"1h"`, when it is missing or
+/// shorter, as for a say; the built-in stuffy air waits for the air to
+/// clear (its `rearm`), which a made skill doesn't write.
+pub const LEAST_AIR_COOLDOWN_SECS: u64 = 3_600;
+
 /// A trigger's cooldown in seconds, when it is one [`duration`].
 fn cooldown_secs(trigger: &toml::Table) -> Option<u64> {
     duration_secs(trigger, "cooldown")
@@ -1072,6 +1079,8 @@ fn say_paced(text: &str) -> String {
     let mut set: Vec<(&str, String)> = Vec::new();
     let least = if says {
         Some((LEAST_SAY_COOLDOWN_SECS, "1h"))
+    } else if topic == Some(AIR_TOPIC) {
+        Some((LEAST_AIR_COOLDOWN_SECS, "1h"))
     } else if topic == Some(STOOD_UP_TOPIC) {
         Some((LEAST_STOOD_UP_COOLDOWN_SECS, "1m"))
     } else {
@@ -1686,6 +1695,17 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
     {
         return Err(Unsaid::cant(what));
     }
+    // A face by whose it is: `lamp-skills`' trigger sees only that a face
+    // is in view (`lamp_msgs::Faces` carries no name), so starting on one
+    // person is what the lamp can't do yet (#6066), said so.
+    if let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table)
+        && trigger.get("topic").and_then(toml::Value::as_str) == Some(FACES_TOPIC)
+        && ["name", "known", "who", "person", "face", "names"]
+            .iter()
+            .any(|key| trigger.contains_key(*key))
+    {
+        return Err(Unsaid::cant(ONE_PERSON));
+    }
     // The trigger first, any part beside it named with it: a skill shaped
     // like a built-in one (a [[trigger]] on the faces, a [[while]]) is told
     // both in its one repair.
@@ -1861,6 +1881,10 @@ const ACTIVITY_TOPIC: &str = "room/activity";
 /// What the lamp can't start a made skill on yet, by a real topic of the
 /// lamp's that no saying here knows, in plain words: "starting on words it
 /// hears". Any other topic is none: a slip the repair fixes.
+/// What a made skill on one person's face can't do yet: the trigger sees
+/// a face, never whose.
+const ONE_PERSON: &str = "starting when it sees one particular person";
+
 fn topic_cant_yet(topic: &str) -> Option<&'static str> {
     Some(match topic {
         "voice/heard" | "name/heard" => "starting on words it hears",
@@ -5201,6 +5225,53 @@ light = { colour = "green", level = 3, for = "20s" }
         let (table, plain) = set("", "\n[quiet]\nfrom = \"03:00\"\nto = \"04:00\"\n");
         assert_eq!(table["quiet"]["from"].as_str(), Some("22:00"));
         assert!(plain.contains("never from 22:00 to 08:00"), "{plain}");
+    }
+
+    /// #6066: a made skill on stuffy air is kept with the nudges' manners
+    /// and an hour's cooldown at least, set not refused; one on a person's
+    /// face by whose it is is what the lamp can't do yet (the trigger sees
+    /// a face, never whose), said so with no repair.
+    #[test]
+    fn stuffy_air_is_paced_and_one_persons_face_is_cant_yet() {
+        let air = "topic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\nfor = \"10m\"\n";
+        for (cooldown, kept) in [
+            ("", "1h"),
+            ("cooldown = \"5m\"\n", "1h"),
+            ("cooldown = \"3h\"\n", "3h"),
+        ] {
+            let text = paced(&made_with(
+                &format!("{air}{cooldown}"),
+                "light = { colour = \"blue\", level = 2, for = \"6s\" }",
+            ));
+            let table: toml::Table = toml::from_str(&text).unwrap();
+            assert_eq!(
+                table["trigger"]["cooldown"].as_str(),
+                Some(kept),
+                "{cooldown}"
+            );
+            assert_eq!(table["budget"]["group"].as_str(), Some(MANNERS_GROUP));
+            capped_with(&text, false).unwrap();
+            let said = plainly_with(&text, false).unwrap();
+            assert!(
+                said.contains("It starts on its own, at most 3 times a day"),
+                "{said}"
+            );
+        }
+        for key in ["name = \"Mai\"", "known = \"Mai\"", "who = \"Mai\""] {
+            let text = paced(&made_with(
+                &format!("topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n{key}\n"),
+                "cue = \"hum\"",
+            ));
+            assert_eq!(
+                plainly_with(&text, false).unwrap_err(),
+                Refused(cant_yet(ONE_PERSON), None),
+                "{key}"
+            );
+        }
+        assert_eq!(
+            not_made_line(&cant_yet(ONE_PERSON)),
+            "I can't do that yet: starting when it sees one particular person."
+        );
     }
 
     /// Thirteen's P2 on #6103 and the coordinator's ruling: the night stays
