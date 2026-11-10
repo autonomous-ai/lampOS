@@ -1,3 +1,15 @@
+## 2026-11-10 — setup repair handed to Twelve; refresh receipt repair
+
+- PM assigned #5667 to Twelve after my carry claim. Confirmed Twelve as
+  the single owner in PR6757605539 and Queue6757605973; no competing PR.
+  Prepared the initial-status fix and six controls: before 9 pass / 4 fail,
+  after 13 pass / zero fail. Formatting and strict affected-package Clippy
+  pass; full Setup/Update and workspace build remain underway.
+- #5945 unchanged-head READ-OK restated after the train hold, 6757608664.
+- Integration advanced to 90d9948c4. Rebased #5935 locally; all nine
+  range-diff entries equal, new head 56f27e488. New-base gates and review
+  confirmation remain due; earlier exact-head evidence is not relabelled.
+
 ## 2026-11-10 — take stalled setup first-update repair
 
 - Took #5667 at 47017c360 after its initial-status P2 remained unanswered
