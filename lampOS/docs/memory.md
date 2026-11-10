@@ -1034,8 +1034,20 @@ note with preferences and kept facts first, in at most 600 bytes, then the
 rest as before under the same cap, from the same candidates
 ([the rule](memory-days.md#request-contract)). An older memory refuses it.
 With `"role":true` (the voice's `LAMP_MEMORY_ROLE`), `session_open` also
-answers the known person's role (`"role"`, a name or null); `role_set` and
-`role_end` keep and end it ([the rule](memory-days.md#request-contract)).
+answers the known person's role (`"role"`, a name or null); `role_set_session` and
+`role_end_session` keep and end it ([the rule](memory-days.md#request-contract)).
+
+Role writes use the adopted person's session and generation, checked by Memory
+in the same transaction as the mutation. An app forget invalidates that session,
+so a delayed set cannot restore its role and a delayed end cannot erase a fresh
+role. Voice never opens a new session to authorize an old role action. Updated
+Memory refuses legacy unfenced operations; updated Voice sends only the new
+operations, which older Memory rejects. An older Voice and older Memory pair
+still has the previous unfenced behavior.
+External forget notifications are polled every 500 ms off the turn path; the
+cached role can remain visible until the notification is handled. The storage
+fence does not promise an atomic cross-process speech cutoff.
+
 An older memory refuses them.
 `session_open` returns a frozen `snapshot`; default `conversation_end`
 returns bounded model `input`, without invoking a model. With `submit:true`,
@@ -2183,7 +2195,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   guests my sister is pregnant" included, sets no role and the model is told
   so. The same check is made on read: a stored role that is no short name
   (an older build's row, or one written around the voice) is never held or
-  told. The gate is `remember`'s: written (`role_set`, `role_end`)
+  told. The gate is `remember`'s: written (`role_set_session`, `role_end_session`)
   only in the scope of the line's own placed seen speaker, its lease
   current, never a held, carried or room line. Nor a line its person's only
   by their face alone in view with `LAMP_PERSON_SCOPE_ONE_FACE_READS`

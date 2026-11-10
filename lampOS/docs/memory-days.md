@@ -201,16 +201,36 @@ default, on in the product since the memory owner's call of 9 Nov; their
 design, 6 Nov), the answer also carries
 `"role"`: the name of the role that known person asked the lamp to play, or
 `null`. It is read with the open, never by a request of its own; the
-room's is always `null`. `role_set {person, name}` keeps it (`{ok:true}`),
+room's is always `null`. `role_set_session {person, session, generation, name}` keeps it (`{ok:true}`),
 one a person, a new one replacing theirs, at most 60 bytes (`ROLE_BYTES`),
 tidied (the voice sends only a short name: at most 4 words and 40 bytes,
 letters, spaces, hyphens and apostrophes, no word of a sentence or an
 instruction, so free text is never a role, and checks a stored role the
-same way when it reads it, never telling one that fails); `role_end {person}` removes it (`{ok:true,ended}`). Only a known
+same way when it reads it, never telling one that fails); `role_end_session {person, session, generation}` removes it (`{ok:true,ended}`). Only a known
 person (`p-` id) has one: the room, a rules scope or any other id is
 refused `bad_person`, and a name with no letter or digit `empty`. Kept in
 `roles(person PRIMARY KEY, name, at_unix_ms)`, created `IF NOT EXISTS`,
 `user_version` unchanged; it goes with `forget_all` and `forget_person`.
+Both writes require the exact adopted person snapshot's session and generation.
+Memory checks the existing session, its invalidation flag and both generations
+inside the mutation's transaction. Missing, closed or invalidated sessions fail
+with `stale_session`; no person or session is created by a role write. The old
+unfenced `role_set` and `role_end` operations now refuse. Older Memory rejects
+the new operation names, and Voice does not retry with the legacy operations.
+`forget_all` and `forget_person` advance the generation of targeted existing people even when
+there are no entries to erase. Closing and reopening a session name therefore
+cannot revive its pre-forget token. No person tombstones, database migration or
+extra Voice network request are added. Voice uses a fresh session prefix and
+monotonic counter. A caller must not reuse a closed session name as a new
+incarnation without a generation change: closing alone deletes the row, and
+reopening the same name otherwise represents the same token identity.
+
+An app forget invalidates storage immediately in its transaction. Voice's
+external-forget notification is checked every 500 ms off the turn path: its
+cached role may remain visible until that notification is handled. This is not
+an atomic cross-process speech cutoff; stale role writes are refused regardless
+of that notification delay.
+
 Without the field the answer is the one before it, byte for byte. An older
 memory refuses the field and answers `unknown_op` to the two new
 operations, so the voice sends them only with its switch on.
