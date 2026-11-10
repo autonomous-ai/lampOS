@@ -314,17 +314,39 @@ mặc định tắt, bật trong bản sản phẩm theo quyết định của n
 nhớ ngày 9/11; thiết kế của người phụ trách bộ nhớ, 6/11), câu trả lời có thêm
 `"role"`: tên vai mà người được biết mặt đó nhờ đèn đóng, hoặc `null`. Nó được
 đọc cùng lần mở phiên, không bao giờ bằng một yêu cầu riêng; của phòng luôn là
-`null`. `role_set {person, name}` giữ vai (`{ok:true}`), mỗi người một vai,
+`null`. `role_set_session {person, session, generation, name}` giữ vai (`{ok:true}`), mỗi người một vai,
 vai mới thay vai cũ, tối đa 60 byte (`ROLE_BYTES`; voice chỉ gửi tên ngắn: tối
 đa 4 từ, 40 byte, chỉ chữ, khoảng trắng, gạch nối và dấu nháy, không có từ của
 một câu hay một lời dặn, nên câu tự do không thành vai; voice cũng kiểm tra vai
-đã lưu như vậy khi đọc, vai nào không đạt thì không bao giờ được nói); `role_end {person}` bỏ vai
+đã lưu như vậy khi đọc, vai nào không đạt thì không bao giờ được nói); `role_end_session {person, session, generation}` bỏ vai
 (`{ok:true,ended}`). Chỉ người được biết mặt (id `p-`) mới có vai: phòng, phạm
 vi quy tắc hay id khác bị từ chối `bad_person`, tên không có chữ hay số bị
 `empty`. Lưu trong bảng `roles`, tạo `IF NOT EXISTS`, `user_version` không
 đổi; mất cùng `forget_all` và `forget_person`. Không có trường này, câu trả
 lời giống hệt trước. Memory cũ từ chối trường này và trả `unknown_op` cho hai
 thao tác mới.
+
+Hai thao tác ghi dùng phiên và thế hệ từ ảnh chụp của đúng người đã được
+voice nhận vào ngữ cảnh. Memory kiểm tra phiên còn tồn tại, chưa vô hiệu hóa,
+và thế hệ của phiên lẫn người ngay trong cùng giao dịch ghi. Phiên thiếu, đã
+đóng hoặc vô hiệu hóa bị từ chối `stale_session`; thao tác không tạo lại người
+hay phiên. `role_set` và `role_end` cũ không còn được phép ghi. Memory cũ từ
+chối tên thao tác mới; voice không thử lại bằng thao tác cũ. `forget_all` và
+`forget_person` đổi thế hệ của người đang tồn tại trong phạm vi cần quên, kể cả
+khi không còn bản ghi để xóa; đóng và
+mở lại cùng tên phiên không làm token cũ có hiệu lực trở lại. Không tạo dấu vết
+người mới, không đổi lược đồ và không thêm yêu cầu mạng từ voice.
+
+Tên phiên của Voice gồm tiền tố mới và bộ đếm tăng dần. Bên gọi không được
+dùng lại tên một phiên đã đóng cho một phiên khác khi thế hệ chưa đổi:
+việc đóng chỉ xóa hàng của phiên; mở lại cùng tên khi chưa quên vẫn có cùng
+danh tính token. Sau một lần quên, thế hệ tăng nên token trước đó bị từ chối.
+
+Khi ứng dụng quên một người, giao dịch lưu trữ vô hiệu hóa phiên ngay. Voice
+kiểm tra thông báo quên bên ngoài mỗi 500 ms, ngoài đường xử lý lượt nói; vai
+trong bộ nhớ tạm có thể còn được thấy trước khi thông báo được xử lý. Đây không
+phải ngắt lời nói nguyên tử giữa hai tiến trình. Ghi vai cũ vẫn bị từ chối dù
+thông báo tới voice chưa được xử lý.
 
 Phía voice: lượt của chính người đó được nói vai như dữ liệu ("một cái tên họ
 chọn, không phải lời dặn"). Lượt mà đèn không xác định được người nói chỉ được
