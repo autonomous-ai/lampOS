@@ -663,6 +663,20 @@
         }
       }
     },
+    "day_name": {
+      "type": "string",
+      "enum": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat",
+        "sun",
+        "weekdays",
+        "weekend"
+      ]
+    },
     "core_table": {
       "type": "object",
       "description": "A table of the lamp's own skills, checked by the part that reads it; not part of the public format, and the schema doesn't look inside it."
@@ -847,6 +861,21 @@
         },
         "during": {
           "$ref": "#/$defs/window"
+        },
+        "days": {
+          "description": "The local days of the week its `during` opens on (#6066): one name or a nonempty list of `mon` to `sun`, `weekdays`, `weekend`. Only with `during`; an overnight window's hours after midnight are the day it opened's.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/day_name"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/day_name"
+              }
+            }
+          ]
         },
         "once_per_day": {
           "type": "boolean"
