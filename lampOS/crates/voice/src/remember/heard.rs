@@ -540,103 +540,6 @@ fn key_words(model: &str) -> Vec<String> {
         .collect()
 }
 
-/// The spoken marks of a spelled-out address ("v u dot g mail dot com"):
-/// a written address's `.`, `@`, `_` and `-`, which split it into words.
-const SPOKEN_MARKS: &[&str] = &["dot", "at", "underscore", "dash", "hyphen"];
-
-/// The most single letters or digits in a row whose every stretch is heard
-/// as a word: a long run is still heard as one word, whole.
-const SPELLED_MOST: usize = 48;
-
-/// The words a spelled-out line's letters make, beside its `said` words
-/// (C14, lamp-3e83, 10 Nov: "O c t a v I a. V u dot g mail dot com." for
-/// "octaviavu@gmail.com"). Each is heard words joined in the order heard,
-/// never one not heard:
-/// - every stretch of two or more single letters or digits in a row
-///   ("o c t a v i a v u": "octaviavu", "vu"; "4 8 2 1": "4821");
-/// - beside a spoken mark ([`SPOKEN_MARKS`]), single letters run into the
-///   word they end in ("dot g mail dot": "gmail");
-/// - an address of parts and marks, its parts run together whole
-///   ("octaviavugmailcom").
-///
-/// An ordinary line, with no single letters in a row, adds only the
-/// whole-address joins of words beside a mark.
-fn spelled_out(said: &[String]) -> Vec<String> {
-    let single = |word: &str| word.chars().count() == 1;
-    let mark = |word: &str| SPOKEN_MARKS.contains(&word);
-    let mut out = Vec::new();
-    let mut at = 0;
-    while at < said.len() {
-        let end = (at..said.len())
-            .find(|&i| !single(&said[i]))
-            .unwrap_or(said.len());
-        if end - at >= 2 {
-            if end - at <= SPELLED_MOST {
-                for from in at..end {
-                    for to in from + 2..=end {
-                        out.push(said[from..to].concat());
-                    }
-                }
-            } else {
-                out.push(said[at..end].concat());
-            }
-        }
-        at = end.max(at + 1);
-    }
-    // The part just before a mark: single letters ending in a word, each
-    // stretch of them that ends at the mark.
-    let before = |end: usize| -> Vec<String> {
-        let last = &said[end - 1];
-        let mut from = end - 1;
-        let mut parts = vec![last.clone()];
-        while from > 0 && single(&said[from - 1]) && end - from < SPELLED_MOST {
-            from -= 1;
-            parts.push(said[from..end].concat());
-        }
-        parts
-    };
-    // The part just after one: single letters, then the word they run into.
-    let after = |start: usize, stop: usize| -> Vec<String> {
-        let mut to = start;
-        while to < stop && single(&said[to]) && to - start < SPELLED_MOST {
-            to += 1;
-        }
-        if to < stop && !mark(&said[to]) {
-            to += 1;
-        }
-        vec![said[start..to.max(start + 1)].concat()]
-    };
-    let marks: Vec<usize> = (1..said.len().saturating_sub(1))
-        .filter(|&i| mark(&said[i]) && !mark(&said[i - 1]) && !mark(&said[i + 1]))
-        .collect();
-    let mut chain = 0;
-    while chain < marks.len() {
-        // Marks in one address: each next one ends the part the last began.
-        let mut last = chain;
-        while last + 1 < marks.len() {
-            let next = marks[last + 1];
-            let part = after(marks[last] + 1, next);
-            if part[0].len() != said[marks[last] + 1..next].concat().len() {
-                break;
-            }
-            last += 1;
-        }
-        let mut tail = String::new();
-        for i in chain..=last {
-            let stop = marks.get(i + 1).copied().unwrap_or(said.len());
-            let part = after(marks[i] + 1, stop).remove(0);
-            out.push(part.clone());
-            tail.push_str(&part);
-        }
-        for head in before(marks[chain]) {
-            out.push(head.clone());
-            out.push(head + &tail);
-        }
-        chain = last + 1;
-    }
-    out
-}
-
 /// The heard line without its lead-in, when it has one with words after.
 fn without_lead_in(heard: &str) -> &str {
     let boundary = |at: usize| {
@@ -680,8 +583,7 @@ pub fn heard_instead(model: &str, heard: Option<&str>, on: bool) -> Option<Strin
     if !on || !heard.chars().any(char::is_alphanumeric) || only_an_answer(&heard) {
         return None;
     }
-    let mut said: Vec<String> = words(&heard).map(|word| bare(&word)).collect();
-    said.extend(spelled_out(&said));
+    let said: Vec<String> = words(&heard).map(|word| bare(&word)).collect();
     if key_words(model).iter().all(|word| said.contains(word)) {
         return None;
     }
@@ -1619,75 +1521,5 @@ mod tests {
         thread.lamp(1, "Kept: your bike is blue.", now);
         thread.person("Yes. Please keep that.", true, now);
         assert!(done_already_in(&thread, (2, None, now), bike).is_some());
-    }
-
-    /// lamp-3e83, 10 Nov 09:50 (C14): a spelled-out address is heard as the
-    /// word its letters make, with "dot" and "at" as its marks; a word
-    /// never heard, and ordinary sentences, are as before.
-    #[test]
-    fn a_spelled_out_address_is_heard_as_its_word() {
-        let line = "O c t a v I a. V u dot g mail dot com.";
-        assert_eq!(heard_instead("octaviavu@gmail.com", Some(line), true), None);
-        assert_eq!(
-            heard_instead("It is octaviavu@gmail.com.", Some(line), true),
-            None
-        );
-        // "email" was never said on that line: still not theirs.
-        assert!(heard_instead("Their email is octaviavu@gmail.com.", Some(line), true).is_some());
-        assert_eq!(
-            heard_instead(
-                "Octavia's email is octaviavu@gmail.com",
-                Some("my email is o c t a v i a v u at g mail dot com"),
-                true
-            ),
-            None
-        );
-        assert_eq!(
-            heard_instead(
-                "j_smith-2@mail.com",
-                Some("j underscore smith dash 2 at mail dot com"),
-                true
-            ),
-            None
-        );
-        // Digits run together too.
-        assert_eq!(
-            heard_instead("Their pin is 4821.", Some("their pin is 4 8 2 1"), true),
-            None
-        );
-        // A word never heard is still not theirs.
-        assert!(heard_instead("octaviavu@yahoo.com", Some(line), true).is_some());
-        assert!(heard_instead("octaviavx@gmail.com", Some(line), true).is_some());
-        assert!(
-            heard_instead(
-                "Their email is octaviavu@gmail.com",
-                Some("V u dot g mail dot com"),
-                true
-            )
-            .is_some()
-        );
-        // Letters out of order are not the word.
-        assert!(heard_instead("Their pin is 4812.", Some("their pin is 4 8 2 1"), true).is_some());
-        // Ordinary sentences: as before.
-        assert_eq!(
-            kept(WRONG, Some(TEA), true),
-            "They said: my favourite tea is jasmine"
-        );
-        assert!(
-            heard_instead(
-                "We meet at noon on a boat.",
-                Some("we meet at noon on a boat"),
-                true
-            )
-            .is_none()
-        );
-        assert!(
-            heard_instead(
-                "We meet at noonboat.",
-                Some("we meet at noon on a boat"),
-                true
-            )
-            .is_some()
-        );
     }
 }
