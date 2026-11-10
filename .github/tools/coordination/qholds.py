@@ -1,6 +1,6 @@
 # qholds.py [--writers FILE] HEAD QUEUE_JSONL (3 Nov 15:4x, out of train-bot.sh for the Reviewer-lead's read of #5068):
 # whether a HOLD posted on the Queue holds this PR. QUEUE_JSONL holds the comments of every Queue issue (lib.sh's
-# COORD_QUEUE_ISSUES: #4710, then #5385 from 5 Nov) as JSON lines {login, body, created_at}; stdin holds the PR's
+# COORD_QUEUE_ISSUES: #4710, then #5385 from 5 Nov, then #6059 from 10 Nov) as JSON lines {login, body, created_at}; stdin holds the PR's
 # comments the same way. Prints the created_at of the first Queue HOLD that stands, or nothing.
 # 3 Nov 09:4x: a Queue comment whose first line is `HOLD <sha>` holds the PR whose head starts with that sha, until the
 # same account posts a READ-OK on the PR, after it, saying the HOLD is lifted or cleared. Train 546 took #5013 on
