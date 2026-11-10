@@ -970,7 +970,8 @@ fn tool_checks() -> Vec<(&'static str, Vec<String>)> {
 }
 
 /// The namespace the wrapper makes, tried as `lampos` before anything is
-/// installed: a user and mount namespace with `lampos` as its root, then a
+/// installed: a user, mount and PID namespace with its own `/proc`, with
+/// `lampos` as its root (as [`WRAPPER_TEXT`] makes it), then a
 /// nested user namespace back to `lampos`'s own `uid` and `gid`, running
 /// `true`.
 pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
@@ -982,6 +983,9 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
         "/usr/bin/unshare",
         "--map-root-user",
         "--mount",
+        "--pid",
+        "--kill-child",
+        "--mount-proc",
         "--propagation",
         "private",
         "/usr/bin/unshare",
