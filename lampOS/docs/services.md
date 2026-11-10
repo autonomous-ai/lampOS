@@ -2099,6 +2099,66 @@ of the room for a calendar read (lamp-9adf, 4 Nov 21:45: "Let me look.",
 `service_read`, then "I see a laptop screen…" unasked). A skill's look in
 the same turn stands.
 
+## Service records (`LAMP_SERVICE_RECORDS`, off unless set)
+
+With `LAMP_SERVICE_RECORDS=on` (the second route only, with the Days
+memory; the connector records plan, PR 1a), every outcome of a
+`service_read` or `service_write` is written to the Days memory as one
+record, kept until it is forgotten (`crates/voice/src/service_records.rs`;
+the store's side in [memory-days](memory-days.md)):
+
+| Outcome | Record |
+|---|---|
+| The prepare answer (read-back given) | created `prepared`, with every field the write was asked with |
+| The send's answer | `done` with the service's id, `failed` with its error, `cancelled` when the services let it go |
+| No answer within 20 s (`DEADLINE`) | `failed`: not known whether it went, never `done` |
+| A gate refusal of a send (not heard, not the owner, another voice or face, not read back in full) | `refused`, with the gate's reason |
+| A waiting write dropped (another call, more lines since, the lamp answered another request, a new write, the lamp answered after the read-back with no send) | `cancelled`, with that reason |
+| Two minutes with no send | `timed_out` |
+| A call refused before anything was prepared | its own record, `refused` |
+| A read | `done` with the query and what came back, or `no_result` |
+
+- **What is kept.** The owner's own writes in full (recipients, copies,
+  subject, text; an event's title, times, attendees, notes, calendar). A
+  read keeps only its query and, of each item found (at most 10), its
+  title, sender, date, link and id, with an excerpt of at most 160 bytes
+  only when `mail::is_security_mail` and `mail::has_secret_shape` pass it.
+  Each field is held to the same rule: a title with a code's shape
+  (`mail::has_code_shape`: a code number or a mixed code such as "F7K2Q9"),
+  a sender whose display name has one (`mail::from_has_code_shape`, never
+  its bare address, so "bob42@x.com" is kept) and a sign-in, reset or token
+  link (`mail::is_secret_link`) are not kept, while a plain page or file
+  link is. An item the services left
+  out is counted, and nothing of it is kept.
+- **One source for sends (#5853).** The send receipts a cut-in turn reads
+  (`services::send_state`) are kept in the records' ledger
+  (`service_records::keep_send`): a send's answer sets its receipt and its
+  record under one lock, once; a receipt that went is never undone. The
+  send's own call is the only writer of its record, so a cut-in send is
+  never written twice, and never lost while the voice runs.
+- **Never slows the reply.** Changes go on a queue of at most 32, one a
+  record (the latest), written by a thread of its own; the memory down, the
+  change waits and is tried again (1 s, doubling to 30 s), said once in the
+  journal. One journal line per change: key, service, action and status,
+  never a word of what was asked or found. An older memory's `unknown_op`
+  lets the change go.
+- **Whose.** Saved under the owner's memory id; with no known owner,
+  nothing is saved. A refused call by someone else keeps its service,
+  action, status and reason only.
+- **Forget.** Forget everything takes the person's records, in the memory
+  and in the voice; a forget about a thing takes the records that name it.
+  Both reach the memory with `LAMP_SERVICE_RECORDS` on or off, so records
+  kept while it was on are never left behind.
+  On every forget the changes still waiting go: those of the person (or
+  that match the thing) leave the queue before the forget is sent, so a
+  writer in backoff never writes one after it, and the voice's copies go
+  whenever the memory answers ok, whether it removed any or not. The memory
+  refuses a change asked before the forget that reaches it after
+  (`forgotten`, in `memory-days.md`). Forgetting never undoes anything at
+  the service, and the answer says so.
+- **Off**, nothing is kept or written, and the receipts are kept exactly as
+  before.
+
 ## The voice is told what is linked (`LAMP_SERVICES_TOLD`, #5523, off unless set)
 
 A marketing tester linked a service in the app's Connectors on 6 Nov and
