@@ -1096,7 +1096,7 @@ def test_the_readme_reference_names_every_public_call_command_and_option():
 # the JS SDK's test has the same list).
 UNPLAYABLE = [
     ([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 200, "frames: a move this body cannot play: it lasts 600 ms, not 1500 to 10000"),
-    ([[0, 0, 0, 0, 0], [0, 0, 251, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 251 counts, farther than 250, this lamp's yaw reach (--reach)"),
+    ([[0, 0, 0, 0, 0], [0, 0, 1301, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 1301 counts, farther than 1300, this lamp's yaw reach (--reach)"),
     ([[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 1000, None),  # 2 s: one the body plays
     ([[0, 0, 0, 0, 0]] * 7 + [[0, 0, 0, 0, 300]] * 8 + [[0, 0, 0, 0, 0]], 100, "frames: a move this body cannot play: frame 7 asks joint 4 for 3000 counts a second, faster than 800"),
     ([[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 500, "frames: start and end at home, all five 0"),
@@ -1121,8 +1121,10 @@ def test_the_move_rules_are_the_bodys_and_lamp_controls_own():
         return [float(n.replace("_", "")) for n in re.findall(r"[0-9][0-9_]*(?:\.[0-9]+)?", text)]
 
     farthest = re.search(r"pub const FARTHEST: \[i16; 5\] = \[([^\]]*)\]", body).group(1)
+    ceiling = re.search(r"pub const CEILING: \[u16; 5\] = \[([^\]]*)\]", body).group(1)
     fastest = re.search(r"pub const FASTEST: \[f32; 5\] = \[([^\]]*)\]", body).group(1)
-    assert numbers(farthest) == list(moves.MOVE_FARTHEST)
+    assert numbers(farthest) == list(moves.SKILL_FARTHEST)
+    assert numbers(ceiling) == list(moves.MOVE_FARTHEST)
     assert numbers(fastest) == list(moves.MOVE_FASTEST)
     shortest = numbers(re.search(r"const SHORTEST_US: u64 = ([0-9_]+);", body).group(1))[0]
     longest = numbers(re.search(r"const LONGEST_US: u64 = ([0-9_]+);", body).group(1))[0]
@@ -1176,7 +1178,8 @@ def test_the_fake_refuses_a_move_the_body_would_drop_with_its_words_before_the_l
     assert move_refusal(500, [[0, 0, 0, 0, 0]]) == "frames: at least 2"
 
     async def go():
-        async with FakeLamp() as fake:
+        # An app-reach lamp takes a move up to the ceiling (the 1301 above is past it).
+        async with FakeLamp(app_reach=True) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 # Refused before the lease is asked for, as lamp-control's protocol.rs checks it.
@@ -1295,8 +1298,8 @@ def test_poses_a_move_cannot_make_are_refused_with_the_joint_before_sending(tmp_
         ([{"nose": 3}], "'nose' is not a joint"),
         ([{"pitch": True}], "pitch must be a number of degrees"),
         ([{"pitch": float("nan")}], "pitch must be a number of degrees"),
-        ([{"pitch": 40}], "pitch 40° is farther than a move may take it, 17.6° either way"),
-        ([{"yaw": -23}], "yaw -23° is farther than a move may take it, 22.0° either way"),
+        ([{"pitch": 130}], "pitch 130° is farther than a move may take it, 114.3° either way"),
+        ([{"yaw": -130}], "yaw -130° is farther than a move may take it, 114.3° either way"),
         ([{"shoulder": 30, "elbow": -30}] * 12, "longer than a move's 10000"),
     ):
         with pytest.raises(errors.BY_CODE["bad_request"], match=re.escape(words)):
@@ -1310,7 +1313,7 @@ def test_poses_a_move_cannot_make_are_refused_with_the_joint_before_sending(tmp_
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000):
                     with pytest.raises(LampError, match="farther than a move may take it") as raised:
-                        await lamp.move_poses([{"pitch": 40}])
+                        await lamp.move_poses([{"pitch": 130}])
                     assert raised.value.code == "bad_request"
                     assert fake.asked("move") == []
                     await lamp.move_poses([{"pitch": 10}, {"yaw": -8}], hold_ms=200)
@@ -3012,3 +3015,26 @@ def test_a_missing_camera_grant_says_the_app_does_not_grant_it_and_another_keeps
                 assert say.value.why == "not granted: speak"
 
     run(go())
+
+
+def test_the_fake_holds_a_move_to_the_caps_every_shipped_lamp_has_unless_told_it_has_app_reach(tmp_path):
+    """A program that passes its fake test with a sway the shipped lamps refuse
+    would fail on the lamp: the default fake takes a yaw of 250 counts at most."""
+    ramp = [0, 150, 300, 450, 600, 681]
+    sway = [[0, 0, n, 0, 0] for n in ramp + ramp[::-1]]
+
+    async def go(app_reach):
+        async with FakeLamp(app_reach=app_reach) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000):
+                    if app_reach:
+                        await lamp.move(sway, 200)
+                        return None
+                    with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                        await lamp.move(sway, 200)
+                    return raised.value.why
+
+    why = run(go(False))
+    assert why is not None and "joint 2 300 counts, farther than 250, this lamp's yaw reach (--reach)" in why
+    assert run(go(True)) is None

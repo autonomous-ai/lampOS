@@ -8,7 +8,13 @@ export const MOVE_LASTS_MS = [1500, 10000];
 // A computer's move: 2 frames at the least (lamp-control's protocol.rs
 // FRAMES_MIN); its most are the body's check's (10 s at a 40 ms step, 251).
 export const MOVE_FRAMES_MIN = 2;
-export const MOVE_FARTHEST = [200, 200, 250, 350, 350];
+// The most any lamp may take a joint either way (lamp_body::moves::CEILING: more than 90% of any lamp's
+// hardware range, so that this never refuses what a lamp's body would take); each lamp's own reach is the
+// body's (the door refuses a move past it, with the reach in its words).
+export const MOVE_FARTHEST = [1300, 1300, 1300, 1000, 1000];
+// What every shipped lamp takes of a move (lamp_body::moves::FARTHEST); a lamp
+// with LAMP_BODY_APP_REACH takes up to MOVE_FARTHEST.
+export const LAMP_FARTHEST = [200, 200, 250, 350, 350];
 export const MOVE_FASTEST = [900, 1300, 1000, 800, 800];
 
 // Rust's `{:.0}`, as the body prints a speed: a half rounds to the even neighbour.
@@ -21,7 +27,7 @@ function roundHalfEven(value) {
 
 // Why the body refuses a move of these steps and frames, in its words, at its
 // first problem; null for one it plays.
-export function moveWhy(stepMs, frames) {
+export function moveWhy(stepMs, frames, farthest = MOVE_FARTHEST) {
   if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms ${stepMs} is not from 40 to 1000`;
   const lasts = Math.max(frames.length - 1, 0) * stepMs;
   if (lasts < MOVE_LASTS_MS[0] || lasts > MOVE_LASTS_MS[1]) return `it lasts ${lasts} ms, not 1500 to 10000`;
@@ -31,7 +37,7 @@ export function moveWhy(stepMs, frames) {
   for (let at = 1; at < frames.length; at++) {
     for (let joint = 0; joint < 5; joint++) {
       const after = frames[at][joint];
-      if (Math.abs(after) > MOVE_FARTHEST[joint]) return `frame ${at} takes joint ${joint} ${after} counts, farther than ${MOVE_FARTHEST[joint]}${joint === 2 ? ", this lamp's yaw reach (--reach)" : ''}`;
+      if (Math.abs(after) > farthest[joint]) return `frame ${at} takes joint ${joint} ${after} counts, farther than ${farthest[joint]}${joint === 2 ? ", this lamp's yaw reach (--reach)" : ", this lamp's reach"}`;
       const speed = Math.abs(after - frames[at - 1][joint]) / step;
       if (speed > MOVE_FASTEST[joint] + 2 / step) {
         return `frame ${at} asks joint ${joint} for ${roundHalfEven(speed)} counts a second, faster than ${MOVE_FASTEST[joint]}`;

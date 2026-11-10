@@ -140,12 +140,12 @@
       "maximum": 180
     },
     "frame": {
-      "description": "One step of a move: head pitch, head roll, base yaw, shoulder, elbow, in counts from the pose (4,096 a turn), as moves/*.json.",
+      "description": "One step of a move: head pitch, head roll, base yaw, shoulder, elbow, in counts from the pose (4,096 a turn), as moves/*.json. At most 1,300 either way here (the ceiling any lamp could take); the body holds each joint to its own reach.",
       "type": "array",
       "items": {
         "type": "integer",
-        "minimum": -350,
-        "maximum": 350
+        "minimum": -1300,
+        "maximum": 1300
       },
       "minItems": 5,
       "maxItems": 5

@@ -1827,6 +1827,36 @@ report counts. It is held to what the generator promises the clips:
   reach is refused with it in the words (`farther than 250, this lamp's yaw
   reach (--reach)`). The built-in clips keep to 150 and are unchanged.
   A lamp started without `--reach` has a yaw reach of 40 (`Limits::FOLDED`) but its moves are admitted to 150, and only on such a lamp (`Limits::yaw_unset`) is the base held to no less than those 150 whatever is laid over the look (`gesture_yaw_reach`), so an accepted move of 150 is played whole, as before; a lamp started with a `--reach` keeps its yaw as configured, even under 150.
+  With `LAMP_BODY_APP_REACH=on` (the person, 14:04 on 10 Nov, for the dev lamps
+  75c9 and a63e until the hardware team signs the numbers) a move may instead
+  take each joint 90% of its hardware range from the pose, on each side
+  (`moves::Reach::of_hardware`, `body::app_reach_of`): the head's pitch, roll
+  and the base's yaw from the servos' own stored ranges, read at start (it
+  turns `LAMP_BODY_OWN_RANGES` on), the shoulder and the elbow from the arm's
+  window (the way between folded and stood up and `ARM_WINDOW_MARGIN` either
+  side). On 75c9 (yaw 820..3,268 from 2,015, roll 897..3,153 from 2,044, pitch
+  1,457..3,029 from 1,900) that is yaw 1,075 down and 1,127 up (-94 and +99
+  degrees), roll 1,032 and 998, pitch 398 up and 1,016 down. The head's pitch
+  floor then follows the servo's own lower limit less the margin (1,477 on
+  75c9), not the 1,670 tuned for lamp-4ace's head. The body judges the move
+  as it begins: one past that reach is dropped whole and said (`dropped: past
+  this lamp's reach`), never played cut short (with the switch on but the
+  servos' ranges unread, the reach is not known: a gesture past
+  `GESTURE_REACH` is dropped and said, `dropped: this lamp's reach is not
+  known`), and the door and the SDKs let a
+  move through up to the most any lamp may take (`moves::CEILING`). The
+  gesture's reach (`GESTURE_REACH`), the base's reach the look and a gesture
+  are held to together, the arm's ease reach and the head's roll in a
+  gesture (a lamp whose `--reach` roll is 1 does not tilt for a gesture, but
+  does for an app's move) follow it. A head or base joint whose servo stores the whole turn
+  (`0..=4095`, never calibrated) has no range to take 90% of: it keeps today's reach, and
+  its pitch floor is left alone. The head's pitch floor follows the servo's own limit
+  less a margin everywhere in the run, so with the switch on the lamp's own look and idle
+  may take the head that low too, not only an app's move. The lamp's own life (but for that
+  pitch floor), the anti-tip rule
+  (which refuses a shoulder alone past about 300 counts from the standing pose:
+  the arm's usable reach is the rule's, not 90%), the heat stop and every speed
+  and acceleration cap are as before.
 
 A file that breaks any of these, is not JSON of exactly these three fields
 or is longer than 256 KiB is refused, and its reason is said in the log.

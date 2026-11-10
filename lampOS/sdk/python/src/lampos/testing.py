@@ -46,7 +46,7 @@ from websockets.exceptions import ConnectionClosed
 
 from . import schema
 from .keys import HELLO, b64, pin_of, proof, unb64
-from .moves import move_refusal
+from .moves import MOVE_FARTHEST, SKILL_FARTHEST, move_refusal
 
 # The fake's camera picture: the smallest whole JPEG (start and end markers).
 FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
@@ -466,6 +466,7 @@ class FakeLamp:
         motion_done: bool = True,
         face_look: bool = True,
         face: dict[str, float] | None = None,
+        app_reach: bool = False,
     ):
         self.code = code
         # True says `motion_done` in hello's limits and ends a gesture or a
@@ -473,6 +474,10 @@ class FakeLamp:
         # (#4209); False answers them as a lamp-control from before it:
         # taken, and no `done` follows.
         self.motion_done = motion_done
+        # False holds a move to the caps every shipped lamp has (the yaw of
+        # --reach 250 at most); True is a lamp started with LAMP_BODY_APP_REACH,
+        # which takes a move to 90% of its hardware (the ceiling here).
+        self.app_reach = app_reach
         # Ops refused `refused` with this why, as a lamp that doesn't route
         # them yet does (LAMP_CONTROL_REFUSES); none by default.
         self.refuses = dict(refuses or {})
@@ -860,7 +865,9 @@ class FakeLamp:
                     and _whole(request.get("step_ms"))
                     and _frames(request.get("frames"))
                 ):
-                    refusal = move_refusal(request["step_ms"], request["frames"])
+                    refusal = move_refusal(
+                        request["step_ms"], request["frames"], MOVE_FARTHEST if self.app_reach else SKILL_FARTHEST
+                    )
                     if refusal is not None:
                         await self._refuse(ws, id_, "bad_request", refusal)
                         continue

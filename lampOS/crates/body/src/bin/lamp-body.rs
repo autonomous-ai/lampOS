@@ -1437,6 +1437,12 @@ impl Hush {
     }
 }
 
+/// `LAMP_BODY_APP_REACH=on` (`body::APP_REACH`).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn app_reach_on() -> bool {
+    lamp_body::moves::app_reach_from(std::env::var(lamp_body::moves::APP_REACH).ok().as_deref())
+}
+
 /// The base's yaw reach a move is held to: `--reach`'s last number, the
 /// lamp's own; a body started without `--reach` keeps to what it did before
 /// moves were held to the reach: 150 counts.
@@ -1448,11 +1454,14 @@ fn moves_yaw_reach(reach: Option<[u16; 4]>) -> u16 {
 /// The moves in `--moves`, read once at start. A refused move and a folder
 /// that cannot be read are said, and the body runs with what it has.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
-fn moves_of(folder: Option<&std::path::Path>, yaw_reach: u16) -> lamp_body::moves::Loaded {
+fn moves_of(
+    folder: Option<&std::path::Path>,
+    reach: &lamp_body::moves::Reach,
+) -> lamp_body::moves::Loaded {
     let Some(folder) = folder else {
         return lamp_body::moves::Loaded::default();
     };
-    match lamp_body::moves::load_within(folder, yaw_reach) {
+    match lamp_body::moves::load_reach(folder, reach) {
         Ok(loaded) => {
             for (path, why) in &loaded.refused {
                 eprintln!("lamp-body: move {} refused: {why}", path.display());
@@ -1696,8 +1705,16 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // Where the head looks as the body applies it, to place a face seen.
     let lease_looked = std::cell::Cell::new([0.0f32; 2]);
     let lease_posed = std::cell::Cell::new(None);
-    let moves_reach = moves_yaw_reach(arguments.reach);
-    let moves = moves_of(arguments.moves.as_deref(), moves_reach);
+    // What a move is held to as it is taken: the lamp's own yaw reach, or with
+    // `LAMP_BODY_APP_REACH` the most any lamp may be given (`Reach::ANY`),
+    // the body judging the move against the 90% of its own hardware as it
+    // begins (`body::app_reach_of`).
+    let moves_reach = if app_reach_on() {
+        lamp_body::moves::Reach::ANY
+    } else {
+        lamp_body::moves::Reach::today(moves_yaw_reach(arguments.reach))
+    };
+    let moves = moves_of(arguments.moves.as_deref(), &moves_reach);
     // `--hold-from` (#2668): a hand on the head from a test input, for
     // tests on a lamp only; what it says this step, for the journal.
     let mut hold = arguments
@@ -1776,7 +1793,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let woken = std::cell::Cell::new(false);
     let mut unknown_said = Hush::default();
     // A skill's move sent whole, played as a gesture (docs/body.md).
-    let mut moves_sent = lamp_body::moves::Sent::within_besides(moves_reach, &moves);
+    let mut moves_sent = lamp_body::moves::Sent::reach_besides(moves_reach, &moves);
     let mut datagram = vec![0u8; lamp_body::moves::MOST_DATAGRAM];
     // When a skill last said `reading` (`of_this_step`).
     let mut reading_at: Option<std::time::Instant> = None;
@@ -1947,8 +1964,14 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 .ok()
                 .as_deref(),
         ),
+        // The app's reach reads the servos' own ranges, so it turns them on.
         own_ranges: lamp_body::body::own_ranges_from(
             std::env::var(lamp_body::body::OWN_RANGES).ok().as_deref(),
+        ) || lamp_body::body::app_reach_from(
+            std::env::var(lamp_body::body::APP_REACH).ok().as_deref(),
+        ),
+        app_reach: lamp_body::body::app_reach_from(
+            std::env::var(lamp_body::body::APP_REACH).ok().as_deref(),
         ),
         strain_guard: lamp_body::body::strain_guard_from(
             std::env::var(lamp_body::body::STRAIN_GUARD).ok().as_deref(),
@@ -3365,9 +3388,13 @@ mod tests {
         ] {
             assert!(with(refused).is_err(), "{refused:?}");
         }
-        let unread = moves_of(Some(std::path::Path::new("/nonexistent/lamp-moves")), 250);
+        let today = lamp_body::moves::Reach::today(250);
+        let unread = moves_of(
+            Some(std::path::Path::new("/nonexistent/lamp-moves")),
+            &today,
+        );
         assert!(unread.moves.is_empty());
-        assert!(moves_of(None, 250).moves.is_empty());
+        assert!(moves_of(None, &today).moves.is_empty());
         // A move is held to the lamp's own yaw reach: `--reach`'s last number,
         // or the built-in clips' 150 without one.
         assert_eq!(moves_yaw_reach(Some([150, 15, 1, 250])), 250);

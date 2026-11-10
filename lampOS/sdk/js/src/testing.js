@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { WebSocketServer } from './ws.js';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
-import { MOVE_FRAMES_MIN, MOVE_STEP_MS, moveWhy } from './moves.js';
+import { LAMP_FARTHEST, MOVE_FARTHEST, MOVE_FRAMES_MIN, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -174,16 +174,16 @@ function clipLoudnessRefusal(data, read) {
 
 // A move's bounds and the body's check of it live in moves.js, which the
 // client uses too; they are exported from here as before.
-export { MOVE_FARTHEST, MOVE_FASTEST, MOVE_FRAMES_MIN, MOVE_LASTS_MS, MOVE_STEP_MS, moveWhy } from './moves.js';
+export { LAMP_FARTHEST, MOVE_FARTHEST, MOVE_FASTEST, MOVE_FRAMES_MIN, MOVE_LASTS_MS, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // lamp-control's refusal of a computer's `move` (protocol.rs), in its words, as
 // `bad_request`: its own shape first, then the body's check; null for one it takes.
-export function moveRefusal(stepMs, frames) {
+export function moveRefusal(stepMs, frames, farthest = MOVE_FARTHEST) {
   if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms: from ${MOVE_STEP_MS[0]} to ${MOVE_STEP_MS[1]}`;
   if (frames.length < MOVE_FRAMES_MIN) return `frames: at least ${MOVE_FRAMES_MIN}`;
   const home = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every((count) => count === 0);
   if (!home(frames[0]) || !home(frames.at(-1))) return 'frames: start and end at home, all five 0';
-  const why = moveWhy(stepMs, frames);
+  const why = moveWhy(stepMs, frames, farthest);
   return why === null ? null : `frames: a move this body cannot play: ${why}`;
 }
 
@@ -364,14 +364,14 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false } = {}) {
     // `followsHand: false` answers a look at `hand` as a lamp-control from
     // before #4183 does: taken, with no `follow`, and nothing follows it.
     // 'all': every grant the protocol names, as `lamp fake` pairs with. The default
     // stays narrow, as a real pairing the owner chose is.
     // A bare string would be split into letters: grants: 'hear' is a slip.
     if (typeof grants === 'string' && grants !== 'all') throw new TypeError(`grants is 'all' or an array of grant names, not '${grants}'`);
-    Object.assign(this, { code, grants: grants === 'all' ? [...schema.grants] : [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone, faceLook, face });
+    Object.assign(this, { code, grants: grants === 'all' ? [...schema.grants] : [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone, faceLook, face, appReach });
     this.asker = new Map();
     // The owner's language the lamp says in welcome and hello; null leaves it out, as a lamp from before it does.
     this.lamp = { id: lampId, name, v: schema.VERSION, ...(language === null ? {} : { language }) };
@@ -701,7 +701,7 @@ export class FakeLamp {
         if (!Array.isArray(request.frames) || !request.frames.every(whole)) {
           return this.refuse(ws, id, 'bad_request', 'frames: each frame is five whole counts');
         }
-        const refusal = moveRefusal(request.step_ms, request.frames);
+        const refusal = moveRefusal(request.step_ms, request.frames, this.appReach ? MOVE_FARTHEST : LAMP_FARTHEST);
         if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
       }
       // As lamp-control's protocol.rs for a light: its own limits, in its words.
