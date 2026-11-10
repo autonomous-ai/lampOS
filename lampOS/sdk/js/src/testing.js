@@ -18,7 +18,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer } from './ws.js';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
 import { MOVE_FRAMES_MIN, MOVE_STEP_MS, moveWhy } from './moves.js';

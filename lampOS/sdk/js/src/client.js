@@ -8,7 +8,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
-import WebSocket from 'ws';
+import { WebSocket } from './ws.js';
 import * as debug from './debug.js';
 import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
