@@ -1723,7 +1723,12 @@ What the body does with the request:
 - Its offsets are laid over whatever the mood and the eyes have the lamp
   doing, outside the filter that follows the mood, and leave the lamp where
   it was. They change by at most 24, 34, 26, 21 and 21 counts a step and
-  take no joint further than 220, 220, 170, 360 and 360 counts.
+  take no joint further than 220, 220, 250, 360 and 360 counts (the base's
+  250 is the lamp's own yaw reach at most: a move the check takes is played
+  whole; the base is never asked past home plus `--reach`'s yaw, or past where the look
+  alone has it, whatever is laid over the look: a sway over a turned look stops
+  at the reach, and the journal says `gesture's yaw cut to the reach`, once a
+  gesture; the way back toward home is never cut).
 - While one plays, and for half a second after, a joint of the head may be
   150 counts from its goal and read a load of 700, and the shoulder and
   elbow may be 260 from theirs. A quick move lags and reverses hard. If a
@@ -1813,9 +1818,15 @@ report counts. It is held to what the generator promises the clips:
   name order keeps it);
 - `step_ms` from 40 to 1000, and 1.5 to 10 s in all;
 - the first and the last frame nothing;
-- no joint farther than 200, 200, 150, 350 and 350 counts, nor asked to
-  go faster than 900, 1,300, 1,000, 800 and 800 counts a second (with a
-  count of rounding at each end of a step).
+- no joint farther than 200, 200, the lamp's own yaw reach (`--reach`'s
+  last figure, 250 counts, about 22 degrees, on lamp-75c9 and lamp-a63e; 150
+  without `--reach`; never past the 250 any lamp may be given), 350 and 350
+  counts, nor asked to go faster than 900, 1,300, 1,000, 800 and 800 counts a
+  second (with a count of rounding at each end of a step). A wider sway is
+  only slower: the speed and acceleration caps are the same. A move past the
+  reach is refused with it in the words (`farther than 250, this lamp's yaw
+  reach (--reach)`). The built-in clips keep to 150 and are unchanged.
+  A lamp started without `--reach` has a yaw reach of 40 (`Limits::FOLDED`) but its moves are admitted to 150, and only on such a lamp (`Limits::yaw_unset`) is the base held to no less than those 150 whatever is laid over the look (`gesture_yaw_reach`), so an accepted move of 150 is played whole, as before; a lamp started with a `--reach` keeps its yaw as configured, even under 150.
 
 A file that breaks any of these, is not JSON of exactly these three fields
 or is longer than 256 KiB is refused, and its reason is said in the log.

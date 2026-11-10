@@ -1355,14 +1355,22 @@ impl Hush {
     }
 }
 
+/// The base's yaw reach a move is held to: `--reach`'s last number, the
+/// lamp's own; a body started without `--reach` keeps to what it did before
+/// moves were held to the reach: 150 counts.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn moves_yaw_reach(reach: Option<[u16; 4]>) -> u16 {
+    reach.map_or(lamp_body::moves::YAW_REACH_DEFAULT, |reach| reach[3])
+}
+
 /// The moves in `--moves`, read once at start. A refused move and a folder
 /// that cannot be read are said, and the body runs with what it has.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
-fn moves_of(folder: Option<&std::path::Path>) -> lamp_body::moves::Loaded {
+fn moves_of(folder: Option<&std::path::Path>, yaw_reach: u16) -> lamp_body::moves::Loaded {
     let Some(folder) = folder else {
         return lamp_body::moves::Loaded::default();
     };
-    match lamp_body::moves::load(folder) {
+    match lamp_body::moves::load_within(folder, yaw_reach) {
         Ok(loaded) => {
             for (path, why) in &loaded.refused {
                 eprintln!("lamp-body: move {} refused: {why}", path.display());
@@ -1574,7 +1582,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let lease_seen = std::cell::Cell::new(None);
     let lease_aimed = std::cell::Cell::new(None);
     let lease_posed = std::cell::Cell::new(None);
-    let moves = moves_of(arguments.moves.as_deref());
+    let moves_reach = moves_yaw_reach(arguments.reach);
+    let moves = moves_of(arguments.moves.as_deref(), moves_reach);
     // `--hold-from` (#2668): a hand on the head from a test input, for
     // tests on a lamp only; what it says this step, for the journal.
     let mut hold = arguments
@@ -1653,7 +1662,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let woken = std::cell::Cell::new(false);
     let mut unknown_said = Hush::default();
     // A skill's move sent whole, played as a gesture (docs/body.md).
-    let mut moves_sent = lamp_body::moves::Sent::besides(&moves);
+    let mut moves_sent = lamp_body::moves::Sent::within_besides(moves_reach, &moves);
     let mut datagram = vec![0u8; lamp_body::moves::MOST_DATAGRAM];
     // When a skill last said `reading` (`of_this_step`).
     let mut reading_at: Option<std::time::Instant> = None;
@@ -1800,6 +1809,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     })?;
     // The head's tilt, for a lamp that has stood up.
     let limits = Limits {
+        yaw_unset: arguments.reach.is_none(),
         stand_roll: arguments.stand_roll.map_or(folded.stand_roll, f32::from),
         head_stall_load: arguments.head_stall_load.unwrap_or(limits.head_stall_load),
         force: arguments.force_limit,
@@ -3239,9 +3249,13 @@ mod tests {
         ] {
             assert!(with(refused).is_err(), "{refused:?}");
         }
-        let unread = moves_of(Some(std::path::Path::new("/nonexistent/lamp-moves")));
+        let unread = moves_of(Some(std::path::Path::new("/nonexistent/lamp-moves")), 250);
         assert!(unread.moves.is_empty());
-        assert!(moves_of(None).moves.is_empty());
+        assert!(moves_of(None, 250).moves.is_empty());
+        // A move is held to the lamp's own yaw reach: `--reach`'s last number,
+        // or the built-in clips' 150 without one.
+        assert_eq!(moves_yaw_reach(Some([150, 15, 1, 250])), 250);
+        assert_eq!(moves_yaw_reach(None), 150);
     }
 
     /// Turning to a call is on or off, and off unless given.
