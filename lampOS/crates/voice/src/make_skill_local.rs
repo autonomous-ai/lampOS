@@ -462,14 +462,32 @@ pub fn make_in(
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     now_unix_ms: u64,
 ) -> Value {
-    make_with(made_in, request, keeping, chat, now_unix_ms, || {
-        crate::services::linked_codes(std::path::Path::new(crate::services::FOLDER))
-    })
+    // The line heard for the make, as `forget` takes it (`tools`): a
+    // write is held to it. None heard is no words, so a write fails
+    // closed; `made_in` 0 is no request of the voice's.
+    let heard = (made_in != 0).then(|| {
+        crate::thread::THREAD
+            .lock()
+            .ok()
+            .and_then(|thread| thread.heard_for(made_in, std::time::Instant::now()))
+            .unwrap_or_default()
+    });
+    make_with(
+        made_in,
+        heard.as_deref(),
+        request,
+        keeping,
+        chat,
+        now_unix_ms,
+        || crate::services::linked_codes(std::path::Path::new(crate::services::FOLDER)),
+    )
 }
 
-/// [`make_in`], what is linked given by `linked`.
+/// [`make_in`], with the line `heard` for it (`None` for no request of the
+/// voice's) and what is linked given by `linked`.
 pub fn make_with(
     made_in: u64,
+    heard: Option<&str>,
     request: &str,
     keeping: &Keeping,
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
@@ -486,8 +504,9 @@ pub fn make_with(
             });
         }
     };
-    let made = make_kept(
+    let made = make_kept_heard(
         request,
+        heard,
         brief,
         keeping,
         chat,
@@ -517,13 +536,24 @@ pub fn make_with(
             if writes.is_empty() {
                 return told;
             }
+            // What must be heard whole before the yes: each write's plain
+            // words, as the say-back has them.
+            let say_back = writes
+                .iter()
+                .filter_map(made_skill::write_said)
+                .collect::<Vec<_>>()
+                .join(" ");
             let id = crate::skill_write_yes::wait_for_yes(
-                &made.name,
-                &writes,
+                crate::skill_write_yes::Asks {
+                    skill: made.name.clone(),
+                    sha256: made.sha256.clone(),
+                    writes,
+                    say_back,
+                },
                 made_in,
                 std::time::Instant::now(),
             );
-            waits_for_yes(told, &id)
+            waits_for_yes(told, &made_skill::on_line(made), &id)
         }
         _ => told,
     }
@@ -534,16 +564,14 @@ pub fn make_with(
 /// written, then nothing asked to repeat; on an agreement in any words, a
 /// later call with `approve_id` alone; on a decline, a wait or a change,
 /// no call.
-fn waits_for_yes(mut told: Value, id: &str) -> Value {
+fn waits_for_yes(mut told: Value, line: &str, id: &str) -> Value {
     told["writes_wait_for_yes"] = json!(true);
     told[crate::skill_write_yes::APPROVE_ID] = json!(id);
-    let next = told["next"].as_str().unwrap_or_default().to_owned();
     told["next"] = json!(format!(
-        "{next} Say every address and every quoted word exactly as written, and end as the \
-         line ends, asking nothing. Nothing is sent until they agree. If their next words \
-         agree, in any words, call make_skill again with only approve_id \"{id}\". If they \
-         decline, wait or change it, don't call it: nothing is sent, and a change is a new \
-         make_skill."
+        "{}{} {}",
+        made_skill::ALREADY_DONE,
+        crate::skill_write_yes::say_whole(line),
+        crate::skill_write_yes::then_wait(id)
     ));
     told
 }
@@ -617,7 +645,20 @@ pub fn make_kept(
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     from: &str,
 ) -> Result<Made, Refused> {
-    let (made, line) = made_and_journaled(request, brief, keeping, chat, from);
+    make_kept_heard(request, None, brief, keeping, chat, from)
+}
+
+/// [`make_kept`] by voice: a write held to `heard`, the line the person
+/// said, never to the model's `request` (App Only's P1 on #6142).
+fn make_kept_heard(
+    request: &str,
+    heard: Option<&str>,
+    brief: String,
+    keeping: &Keeping,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    from: &str,
+) -> Result<Made, Refused> {
+    let (made, line) = made_and_journaled(request, heard, brief, keeping, chat, from);
     eprintln!("{line}");
     made
 }
@@ -625,6 +666,7 @@ pub fn make_kept(
 /// [`make_kept`]'s make, and the journal's line for it ([`kept_line`]).
 fn made_and_journaled(
     request: &str,
+    heard: Option<&str>,
     brief: String,
     keeping: &Keeping,
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
@@ -639,6 +681,7 @@ fn made_and_journaled(
     let asked = made_skill::Asked {
         request,
         own: own_accounts_now(),
+        heard,
     };
     // Whether the last answer was the model's own `cannot:`: its reason is
     // never journaled ([`kept_line`]).
@@ -804,11 +847,10 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
             heard,
             crate::services::sends_here(),
             std::time::Instant::now(),
-            |skill, writes| {
+            |asks| {
                 crate::services::skill_write_approve(
                     std::path::Path::new(crate::services::FOLDER),
-                    skill,
-                    writes,
+                    asks,
                 )
             },
         );
@@ -1352,7 +1394,15 @@ light = { dim = 1 }
             (200, write_answer(WRITE_TOML)),
         ]);
         let asked = manage_helper(&keeping.manage);
-        let told = make_in(7, WRITE_REQUEST, &keeping, chat_at(url), NOW);
+        let told = make_with(
+            7,
+            Some(WRITE_REQUEST),
+            WRITE_REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
         assert_eq!(served.join().unwrap(), 2, "repaired once: {told}");
         assert_eq!(told["made"], "leaving-mail", "{told}");
         assert_eq!(told["writes_wait_for_yes"], true, "{told}");
@@ -1366,36 +1416,64 @@ light = { dim = 1 }
             assert!(next.contains(part), "{part}: {next}");
         }
         assert!(!next.contains("it's on:"), "{next}");
+        assert!(next.contains("word for word"), "{next}");
         asked.join().unwrap();
         let id = told[crate::skill_write_yes::APPROVE_ID]
             .as_str()
             .unwrap()
             .to_owned();
         let now = std::time::Instant::now();
-        // The say-back's last words heard back, held as its echo in
-        // request 8: no yes in it.
-        crate::skill_write_yes::echo_held(8);
-        let never = |_: &str, _: &[Value]| -> Result<Value, String> { panic!("approved") };
-        assert!(
-            crate::skill_write_yes::approve(&id, 8, true, true, now, never)["error"].is_string()
-        );
-        // The wait was taken by that try: a new make waits again, and a yes
-        // in a later heard line approves its exact write.
-        let writes = made_skill::writes_of(
-            &keeping.directory,
-            made_skill::entries(&keeping.directory)[0]["sha256"]
-                .as_str()
-                .unwrap(),
-        );
+        // A yes before the say-back was heard: not taken, said again.
+        let never =
+            |_: &crate::skill_write_yes::Asks| -> Result<Value, String> { panic!("approved") };
+        let early = crate::skill_write_yes::approve(&id, 8, true, true, now, never);
+        assert_eq!(early["error"], crate::skill_write_yes::NOT_SAID_WHOLE);
+        // The lamp says the line whole in the make's request; a yes in a
+        // later heard line approves its exact write and its package.
+        let line = next.split('"').nth(1).unwrap();
+        crate::skill_write_yes::lamp_said(7, line);
+        let sha256 = made_skill::entries(&keeping.directory)[0]["sha256"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let writes = made_skill::writes_of(&keeping.directory, &sha256);
         assert_eq!(writes[0]["text"], "I'm leaving now.");
-        let id = crate::skill_write_yes::wait_for_yes("leaving-mail", &writes, 7, now);
         let mut approved = None;
-        let told = crate::skill_write_yes::approve(&id, 9, true, true, now, |skill, writes| {
-            approved = Some((skill.to_owned(), writes.to_vec()));
+        let told = crate::skill_write_yes::approve(&id, 9, true, true, now, |asks| {
+            approved = Some(asks.clone());
             Ok(json!({"approved": 1, "public": []}))
         });
         assert_eq!(told["approved"], true, "{told}");
-        assert_eq!(approved, Some(("leaving-mail".to_owned(), writes)));
+        let approved = approved.unwrap();
+        assert_eq!(
+            (approved.skill.as_str(), &approved.writes, &approved.sha256),
+            ("leaving-mail", &writes, &sha256)
+        );
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// App Only's P1 on #6142: a write's address and words are held to the
+    /// line heard, never to the model's `request` argument, which may carry
+    /// what a read said: an address or a text only in it is refused.
+    #[test]
+    fn a_writes_words_only_in_the_models_request_are_refused() {
+        made_skill::set_writes_here(Some(true));
+        let (root, keeping) = keeping("write-heard");
+        let (url, served) = service(vec![(200, write_answer(WRITE_TOML)); 1 + MOST_REPAIRS]);
+        let told = make_with(
+            7,
+            Some("make a skill that mails that to them when I get up from my desk"),
+            WRITE_REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
+        assert!(told["error"].is_string(), "{told}");
+        assert!(told.get("writes_wait_for_yes").is_none(), "{told}");
+        assert!(made_skill::entries(&keeping.directory).is_empty());
         made_skill::set_writes_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -1587,6 +1665,7 @@ light = { dim = 1 }
         )]);
         let (made, line) = made_and_journaled(
             "glow when PRIVATE-DETAIL-7 calls",
+            None,
             made_skill::brief("glow when PRIVATE-DETAIL-7 calls").unwrap(),
             &keeping,
             chat_at(url),
@@ -2108,7 +2187,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         // put on as before.
         let (root, keeping) = keeping("needs-link-unknown");
         let (url, served) = service(vec![(200, good())]);
-        let answer = make_with(0, REQUEST, &keeping, chat_at(url), NOW, || None);
+        let answer = make_with(0, None, REQUEST, &keeping, chat_at(url), NOW, || None);
         assert_eq!(answer["made"], "evening-dim", "{answer}");
         assert!(answer.get("needs_link").is_none(), "{answer}");
         assert_eq!(served.join().unwrap(), 1);

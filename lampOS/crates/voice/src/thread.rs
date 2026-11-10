@@ -908,6 +908,9 @@ impl Thread {
         // A write waiting for its "send" hears what the lamp said of its
         // read-back, as said, and of any other request (`crate::services`).
         crate::services::lamp_said(request, words, now);
+        // A made skill's writes waiting for a yes hear its say-back so
+        // (`crate::skill_write_yes`).
+        crate::skill_write_yes::lamp_said(request, words);
         // The owner asked whether the lamp may learn their voice: the ask
         // said, and the line after it answered (`crate::owner_voice`).
         if crate::owner_voice::waits_for_answer() {
@@ -1159,6 +1162,7 @@ impl Thread {
         self.cut = Some(request);
         // A read-back cut is no read-back: its write is never sent.
         crate::services::lamp_cut(request);
+        crate::skill_write_yes::lamp_cut(request);
         if self.private.contains(&request) {
             return;
         }

@@ -806,7 +806,7 @@ fn a_made_evening_dim_runs_at_ten_past_ten() {
             &keeping,
             &Asked {
                 request,
-                own: Vec::new(),
+                ..Asked::default()
             },
         )
         .unwrap();
