@@ -1,3 +1,27 @@
+## 2026-11-10 — interrupted-question read complete; concrete lamp handoffs
+
+- READ-OK #6006 bb5b1a1df, comment 6761054151: fmt and strict Voice
+  all-target Clippy pass; two authored actual Engine tests pass in 0.02 s.
+  Two additional temporary Engine controls pass in 0.01 s: normal answer
+  stays intact, and four Stop/Never mind variants do not revive the cut
+  question. Patch/probe/log retained in /private/tmp/third-6006-*; removed
+  from checkout, status clean. Docs 192/1899/0. No full Voice suite,
+  default-on approval or played w3 result claimed by this code read.
+- #5975 second read reached one hour unanswered on current f75e3da94;
+  replacement requested from PM/Reviewer-lead in Queue 6761055346.
+  Second's existing READ-OK and all current gates remain green; draft/OFF.
+- Expanded the three own PR bodies (#5969, #5975, #5997) with concrete
+  assigned-holder lamp checks: actual scene preconditions, positive and
+  cancellation controls, exact available journal strings, current heads,
+  relevant constants, and measurement boundaries. Reminder's missing
+  joined-cut journal remains a nonblocking P3; no invented log proof.
+  Speech words arriving after completion remain an explicit limitation.
+  Music's dormant switch/absent recording cannot count as a positive.
+  These are written handoffs, not new device authorization or results.
+- #6008 author's normal reboot/mute lamp row was posted separately in
+  6760869039. It does not cover the demonstrated slow-mixer budget or
+  rounding findings, and does not lift Third's HOLD. No own device work.
+
 ## 2026-11-10 — hand docs read; volume restore needs two repairs
 
 - READ-OK #6003 9e8e18249, comment 6760785885: all five docs lines
