@@ -154,7 +154,9 @@ asyncio.run(main())
 - **Leases:** `async with lamp.lease("body"):` holds the body for looks,
   moves and joints, renewed for you, until the block ends or the lamp takes
   it back (a hand on its head, a conversation): `lease.state`,
-  `lease.lost_why`.
+  `lease.lost_why`. When the connection closes the lamp ends the lease and
+  says nothing: `lease.state` is `lost`, `lost_why` "the connection closed",
+  at once; take a new lease on the new connection.
 - **Following a hand:** `async with lamp.follow_hand() as following:` has
   the body follow the hand it sees, under a body lease of its own, waiting
   while the hand is gone, until the block ends, `lamp.stop()`, another
