@@ -1131,6 +1131,9 @@ pub struct Engine<P: Persistence> {
     /// a `prepare` it refuses is refused at once. Empty without the
     /// switch, and then nothing is refused from it.
     readiness: BTreeMap<String, crate::readiness::Computer>,
+    /// `LAMP_HERMES_ON_LAMP` (#5978): the lamp's own target may be used
+    /// ([`Engine::lamp_on`]).
+    lamp: bool,
     state: State,
     last_clock: Clock,
     failed: bool,
@@ -1148,6 +1151,40 @@ impl<P: Persistence> Engine<P> {
     /// (`serve --close-told`).
     pub fn close_told(&mut self, on: bool) {
         self.close_told = on;
+    }
+
+    /// `LAMP_HERMES_ON_LAMP` (#5978): with it, a `prepare` for a computer
+    /// goes to the lamp's own target ([`crate::runtime::LAMP_TARGET`],
+    /// Hermes) only when there is one and every computer target is known
+    /// offline, or there is none; one asking for the lamp by its alias goes
+    /// there. Computers come first: one not known offline is never passed
+    /// over. Off: as before.
+    pub fn lamp_on(&mut self, on: bool) {
+        self.lamp = on;
+    }
+
+    /// The target a `prepare` asking for `asked` goes to ([`Self::lamp_on`]).
+    fn target_for(&self, asked: &str) -> String {
+        let lamp = crate::runtime::LAMP_TARGET;
+        let there = self.lamp
+            && self
+                .targets
+                .get(lamp)
+                .is_some_and(|target| target.engine == EngineKind::Hermes);
+        let no_computer = self
+            .targets
+            .keys()
+            .filter(|alias| alias.as_str() != lamp)
+            .all(|alias| {
+                self.readiness
+                    .get(alias)
+                    .is_some_and(|known| known.offline())
+            });
+        if there && asked != lamp && no_computer {
+            lamp.to_owned()
+        } else {
+            asked.to_owned()
+        }
     }
 
     pub fn open(
@@ -1320,6 +1357,7 @@ impl<P: Persistence> Engine<P> {
             no_harness: false,
             names: BTreeMap::new(),
             readiness: BTreeMap::new(),
+            lamp: false,
         })
     }
 
@@ -1664,6 +1702,8 @@ impl<P: Persistence> Engine<P> {
                         "That preparation request ID was already used.",
                     ));
                 }
+                // No computer there but the lamp's own (#5978).
+                let target = &self.target_for(target);
                 let target_value = self
                     .targets
                     .get(target)
@@ -2655,12 +2695,17 @@ fn receipt_body(state: &State, request: &Request) -> Result<Value, Error> {
                 .iter()
                 .find(|t| t.prepare_request_id == guard.request_id)
                 .ok_or_else(storage)?;
-            if task.launch.prompt != *text || task.target_alias != *target {
+            // Prepared for the lamp's own target instead (#5978): said, so
+            // the voice says where it goes.
+            let lamp = task.target_alias == crate::runtime::LAMP_TARGET;
+            if task.launch.prompt != *text || (task.target_alias != *target && !lamp) {
                 return Err(storage());
             }
-            Ok(
-                json!({"id":task.id,"prepared_digest":task.prepared_digest,"label":task.launch.name,"expires_monotonic_ms":task.expires_monotonic_ms}),
-            )
+            let mut body = json!({"id":task.id,"prepared_digest":task.prepared_digest,"label":task.launch.name,"expires_monotonic_ms":task.expires_monotonic_ms});
+            if task.target_alias != *target {
+                body["target"] = task.target_alias.clone().into();
+            }
+            Ok(body)
         }
         Request::Confirm {
             id,
