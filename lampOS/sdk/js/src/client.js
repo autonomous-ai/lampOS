@@ -322,7 +322,15 @@ export class Lamp {
       for (const { reject } of [...this.waiting.values(), ...this.done.values()]) {
         reject(new LampError('the connection to the lamp closed', { code: 'closed' }));
       }
-      for (const lease of this.leases.values()) clearInterval(lease.timer);
+      // The lamp ends a computer's leases when its last connection closes
+      // and tells nobody: none of ours is held any more.
+      for (const lease of this.leases.values()) {
+        clearInterval(lease.timer);
+        if (lease.state === 'held' || lease.state === 'suspended') {
+          lease.state = 'lost';
+          lease.lostWhy = 'the connection closed';
+        }
+      }
     });
   }
 

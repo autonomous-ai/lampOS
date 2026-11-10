@@ -178,7 +178,10 @@ await lamp.closed();
   moment only: stay connected while it should show (`examples/ci-light.js`).
 - **Leases:** `await lamp.withLease(['body'], async (lease) => ...)` holds
   the body for looks, moves and joints, renewed for you, until the callback
-  ends or the lamp takes it back: `lease.state`, `lease.lostWhy`.
+  ends or the lamp takes it back: `lease.state`, `lease.lostWhy`. When the
+  connection closes the lamp ends the lease and says nothing: `lease.state` is
+  `lost`, `lostWhy` "the connection closed", at once; take a new lease on the
+  new connection.
 - **Following a hand:** `const following = await lamp.followHand().start()`
   (or `lamp.withHand(async (following) => ...)`) has the body follow the
   hand it sees, under a body lease of its own, waiting while the hand is

@@ -637,6 +637,11 @@ class Lamp:
             for future in [*self._waiting.values(), *self._done.values()]:
                 if not future.done():
                     future.set_exception(LampError("the connection to the lamp closed", code="closed"))
+            # The lamp ends a computer's leases when its last connection
+            # closes and tells nobody: none of ours is held any more.
+            for lease in self._leases.values():
+                if lease.state in ("held", "suspended"):
+                    lease.state, lease.lost_why = "lost", "the connection closed"
 
     def _event(self, event: dict) -> None:
         name = event["ev"]

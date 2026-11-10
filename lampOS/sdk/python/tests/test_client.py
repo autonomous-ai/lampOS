@@ -666,6 +666,27 @@ def test_a_lease_the_lamp_takes_back_is_lost_with_its_why(tmp_path):
     run(go())
 
 
+def test_a_lease_whose_connection_closed_is_lost_not_held(tmp_path):
+    """The lamp ends a computer's leases when its last connection closes and
+    tells nobody; `Lease.state` must not go on saying `held` (the lead's
+    4-lamp show, 10 Nov: held, then no_lease on the next look)."""
+
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                lease = lamp.lease("body", for_ms=60_000)
+                await lease.take()
+                assert lease.held
+                await fake.restart()
+                await asyncio.wait_for(lamp.wait_closed(), timeout=5)
+                assert lease.state == "lost"
+                assert lease.lost_why == "the connection closed"
+                assert not lease.held
+
+    run(go())
+
+
 def test_refusals_are_typed_and_say_when_to_try_again(tmp_path):
     async def go():
         async with FakeLamp(grants=("body",)) as fake:
