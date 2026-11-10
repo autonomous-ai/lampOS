@@ -147,3 +147,31 @@ two completed clean Third worktrees and unlocked old incremental caches,
 the same Clippy command passed (empty output, exit 0). No source changes
 were made between these lint attempts. Native tests are retained in
 [the music log](compound-music.txt) and [requested-audio log](compound-requested.txt).
+
+## Selector-head ARM and current-base attempts
+
+The watcher for [42761649338](https://github.com/autonomous-ai/lampOS/actions/runs/42761649338)
+stopped on GitHub REST quota exhaustion. The later retrieved actual result
+was failure: 1,856 passed / one failed, 113 skipped, stopping after 1,857
+of 15,012 selected tests (37.800 s). The inherited Control test
+`microphone::tests::never_while_someone_else_is_here` failed on
+`rig.ears.send(block(2)).unwrap()` with SendError. The music carry does not
+edit that source. The [failure excerpt](arm-42761649338-failure.txt) is
+retained and sent to the #5839 owner; no harmless-flake claim is made.
+
+All eight music commits rebased equal onto `c29008d21`, runtime head
+`02432e3a5`. The first current-base gate exited 101 during disk exhaustion,
+with an empty music log (so no detailed compiler/test diagnostic survived).
+A separate attempted evidence write failed explicitly with no space left.
+Eleven old, clean Third review worktrees were archived under Third refs and
+removed, restoring about 4 GiB; dirty and other-builder checkouts were
+untouched. Fresh current-base checks follow, not a relabeling of the failed
+invocation.
+
+Current-base retry completed successfully on runtime `02432e3a5`:
+formatting and strict Voice all-target Clippy passed (empty output, exit 0);
+[33 music tests](current-music.txt) passed in 0.73 s and
+[66 requested-audio tests / one ignored](current-requested.txt) passed in
+6.83 s. Current docs: 192 documents, 1900 links, zero broken. The added
+evidence commit changes no runtime or tests. Fresh CI and the required
+reads still qualify the resulting published head separately.

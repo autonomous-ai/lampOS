@@ -1,0 +1,27 @@
+Retained failure excerpt: https://github.com/autonomous-ai/lampOS/actions/runs/42761649338
+
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8792650Z         FAIL [   0.155s] ( 1854/15012) lamp-control microphone::tests::never_while_someone_else_is_here
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8793353Z   stdout ───
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8793463Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8793537Z     running 1 test
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8793983Z     test microphone::tests::never_while_someone_else_is_here ... FAILED
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8794254Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8794327Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8794433Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8794500Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8794730Z         microphone::tests::never_while_someone_else_is_here
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8794947Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8795240Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 175 filtered out; finished in 0.15s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8795594Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8795738Z   stderr ───
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8795842Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8796757Z     thread 'microphone::tests::never_while_someone_else_is_here' (20371) panicked at crates/control/src/microphone.rs:957:33:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8797381Z     called `Result::unwrap()` on an `Err` value: SendError { .. }
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8797817Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8798121Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.8798248Z   Cancelling due to test failure: 3 tests still running
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.9046453Z         PASS [   0.123s] ( 1855/15012) lamp-control parts::tests::a_computers_mute_is_one_held_connection_let_go_as_it_goes
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:19.9500375Z         PASS [   0.455s] ( 1856/15012) lamp-control microphone::tests::lost_counts_a_gap_and_the_blocks_a_full_connection_dropped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:20.1271550Z         PASS [   1.308s] ( 1857/15012) lamp-voice::it capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:20.1296994Z ────────────
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-11-10T05:36:20.1297353Z      Summary [  37.800s] 1857/15012 tests run: 1856 passed, 1 failed, 113 skipped
