@@ -8774,6 +8774,12 @@ enum AfterCut {
     Nothing,
     /// The line said again, and "no, not that" heard before its end.
     WordsWhileSaidAgain,
+    StaleWhileSaidAgain,
+    MalformedStateWhileSaidAgain,
+    ThinkingWhileSaidAgain,
+    SpeakingTimeoutWhileSaidAgain,
+    MalformedWordsWhileSaidAgain,
+    MalformedWordsAtResting,
 }
 
 impl ToolProgram {
@@ -8807,7 +8813,14 @@ impl ToolProgram {
                     self.voice_is(Listening);
                 }
             }
-            AfterCut::SaidAgain | AfterCut::WordsWhileSaidAgain => {
+            AfterCut::SaidAgain
+            | AfterCut::WordsWhileSaidAgain
+            | AfterCut::StaleWhileSaidAgain
+            | AfterCut::MalformedStateWhileSaidAgain
+            | AfterCut::ThinkingWhileSaidAgain
+            | AfterCut::SpeakingTimeoutWhileSaidAgain
+            | AfterCut::MalformedWordsWhileSaidAgain
+            | AfterCut::MalformedWordsAtResting => {
                 self.clock.skip(Duration::from_secs(2));
                 self.voice_is(Listening);
                 self.clock.skip(Duration::from_secs(2));
@@ -8820,8 +8833,49 @@ impl ToolProgram {
                 if how == AfterCut::WordsWhileSaidAgain {
                     self.heard_in("no, not that", Some(32));
                 }
-                self.clock.skip(Duration::from_millis(1_200));
-                self.voice_is(Resting);
+                match how {
+                    AfterCut::StaleWhileSaidAgain => {
+                        // said_lately uses real wall time, not this fixture's
+                        // clock: no heartbeat and no Resting for over 3 s.
+                        std::thread::sleep(Duration::from_millis(3_200));
+                    }
+                    AfterCut::MalformedStateWhileSaidAgain => {
+                        self.voice
+                            .publish_json(1, &serde_json::json!({"state": "unknown"}))
+                            .unwrap();
+                    }
+                    AfterCut::ThinkingWhileSaidAgain => {
+                        self.voice_is(lamp_msgs::Voice::Thinking);
+                        self.clock.skip(Duration::from_secs(5));
+                    }
+                    AfterCut::SpeakingTimeoutWhileSaidAgain => {
+                        // The retained Speaking heartbeat is still fresh in
+                        // real time; only the line's fake deadline passes.
+                        self.clock.skip(Duration::from_secs(181));
+                    }
+                    AfterCut::MalformedWordsWhileSaidAgain | AfterCut::MalformedWordsAtResting => {
+                        // Valid bus envelope, invalid Speech payload. This
+                        // is a parse failure, not a Subscriber I/O error.
+                        self.heard
+                            .lock()
+                            .unwrap()
+                            .as_mut()
+                            .unwrap()
+                            .publish_json(1, &serde_json::json!({"text": 17, "finished": true}))
+                            .unwrap();
+                        if how == AfterCut::MalformedWordsWhileSaidAgain {
+                            self.clock.skip(Duration::from_millis(100));
+                            std::thread::sleep(Duration::from_millis(100));
+                        }
+                        // In the boundary case there is no intentional wait
+                        // between malformed words and the terminal state.
+                        self.voice_is(Resting);
+                    }
+                    _ => {
+                        self.clock.skip(Duration::from_millis(1_200));
+                        self.voice_is(Resting);
+                    }
+                }
             }
         }
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -8893,6 +8947,124 @@ fn a_cut_that_never_settles_makes_nothing_after_it() {
 fn words_heard_after_the_line_is_said_again_still_cancel() {
     let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
     let (colours, done) = program.cut_after("light_show", AfterCut::WordsWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+/// Host-only cancellation timing; excludes setup and the heartbeat TTL.
+#[test]
+#[ignore = "manual host latency diagnostic"]
+fn resumed_say_unknown_state_first_and_repeated_cancellation_latency() {
+    use lamp_msgs::Voice::{Listening, Speaking};
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "latency").unwrap();
+    for label in ["first", "repeated"] {
+        program.heard_in("lamp, can you do it", Some(30));
+        program.voice_is(Listening);
+        assert_eq!(program.call("light_show", "{}")["ok"], true);
+        program.voice_is(Speaking);
+        program.clock.skip(Duration::from_millis(590));
+        program.voice_is(Listening);
+        program.heard_in("", Some(31));
+        program.clock.skip(Duration::from_secs(2));
+        program.voice_is(Listening);
+        program.clock.skip(Duration::from_secs(2));
+        program.voice_is(Speaking);
+        let began = Instant::now();
+        program
+            .voice
+            .publish_json(1, &serde_json::json!({"state": "unknown"}))
+            .unwrap();
+        let done = loop {
+            assert!(began.elapsed() < Duration::from_secs(2), "no cancellation");
+            if let Some(message) = events.recv(Duration::from_millis(20)).unwrap() {
+                let event: SkillEvent = message.parse().unwrap();
+                if event.stage == SkillStage::Done {
+                    break event;
+                }
+            }
+        };
+        let elapsed = began.elapsed();
+        eprintln!("resumed cancellation {label}: {} us", elapsed.as_micros());
+        assert!(
+            done.why.contains("nothing after it is made"),
+            "{}",
+            done.why
+        );
+        assert!(program.colours_within(0, Duration::ZERO).is_empty());
+        assert!(elapsed < Duration::from_millis(250), "{label}: {elapsed:?}");
+    }
+}
+
+#[test]
+fn a_resumed_say_with_a_stale_heartbeat_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::StaleWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_with_malformed_state_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::MalformedStateWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_still_thinking_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::ThinkingWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_still_speaking_at_timeout_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::SpeakingTimeoutWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_with_malformed_words_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::MalformedWordsWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_with_malformed_words_at_resting_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::MalformedWordsAtResting);
     assert!(colours.is_empty(), "{colours:?}; {}", done.why);
     assert!(
         done.why.contains("nothing after it is made"),
