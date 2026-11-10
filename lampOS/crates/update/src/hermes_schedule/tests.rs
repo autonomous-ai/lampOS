@@ -7,14 +7,15 @@ const HOUR: u64 = 60 * MIN;
 const NOON: u64 = 1_794_312_000_000;
 
 /// A moment that opens the night window: the third round, quiet, no walk,
-/// never tried, 02:00 local.
+/// tried once long ago (a lamp that never tried opens by day too), 02:00
+/// local.
 fn night() -> Moment {
     Moment {
         round: 3,
         quiet: Ok(()),
         walk_under_way: false,
         walk_ended_unix_ms: None,
-        tried_unix_ms: None,
+        tried_unix_ms: Some(NOON - 30 * HOUR),
         now_unix_ms: NOON,
         local_minute: Some(2 * 60),
     }
@@ -341,4 +342,46 @@ fn the_listener_has_a_name_the_bus_takes() {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'),
         "{name}"
     );
+}
+
+/// The day window (the first builder, 11 Nov 01:15 on #6059): a lamp that
+/// never tried, as one that just took the update, installs at its first
+/// quiet stretch by day, with or without a local time; still never in the
+/// first round, the walk or while someone speaks. Once it tried, by day is
+/// closed again and the night stands.
+#[test]
+fn a_lamp_that_never_tried_installs_at_its_first_quiet_stretch_by_day() {
+    let updated = Moment {
+        tried_unix_ms: None,
+        local_minute: Some(7 * 60 + 20),
+        ..night()
+    };
+    assert_eq!(window(&updated), Ok(Window::AfterUpdate));
+    assert_eq!(
+        window(&Moment {
+            local_minute: None,
+            ..updated.clone()
+        }),
+        Ok(Window::AfterUpdate)
+    );
+    for closed in [
+        Moment {
+            round: 1,
+            ..updated.clone()
+        },
+        Moment {
+            walk_under_way: true,
+            ..updated.clone()
+        },
+        Moment {
+            quiet: Err("the voice is speaking".into()),
+            ..updated.clone()
+        },
+        Moment {
+            tried_unix_ms: Some(NOON - HOUR),
+            ..updated.clone()
+        },
+    ] {
+        assert!(window(&closed).is_err(), "{closed:?}");
+    }
 }
