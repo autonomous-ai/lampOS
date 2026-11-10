@@ -4593,19 +4593,20 @@ impl Engine {
         self
     }
 
-    /// [`Self::reading_carried`] where no voice print is taken for every
-    /// rule (`hears` false, the product's `LAMP_SAME_VOICE_FOR=services`):
-    /// the switch still acts (the memory owner's call, 10 Nov, after lamp-3e83
-    /// held "It's correct." for a seen yes on a carried line). Another voice
-    /// is then told apart only by the rule's other signs and the faces, as
-    /// for a lone known face's read; said once at start. Before, it stayed
-    /// inactive (Jarvis's P2 on #5842).
+    /// [`Self::reading_carried`] only where another voice can be heard:
+    /// `hears`, the same-voice check runs for this route (its printer
+    /// started for every rule). Without it the tracker would never record a
+    /// voice, so "no other voice" would always hold (Jarvis's P2 on #5842,
+    /// as the Reviewer-lead's P2 on #4610 for
+    /// [`Self::carrying_past_silent_where_heard`]): a carried line stays as
+    /// before, said once at start with why.
     pub(crate) fn reading_carried_where_heard(mut self, hears: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         if shared.carried_memory && !hears {
             eprintln!(
-                "lamp-voice second: LAMP_CONVERSATION_CARRIED_MEMORY acts with no voice print for the rules: another voice is told apart only by the rule's other signs and the faces"
+                "lamp-voice second: LAMP_CONVERSATION_CARRIED_MEMORY is inactive: the same-voice check is not running here; a carried line stays held and the room's"
             );
+            shared.carried_memory = false;
         }
         self
     }
