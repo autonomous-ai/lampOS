@@ -2789,6 +2789,8 @@ EXAMPLE_RUNS = {
     "pomodoro.py": ([], None, (("light", {"colour": "warm", "level": 2}),)),
     "push_skill.py": (["../examples/hello-skill"], None, ("skill.push",)),
     # Pixel 0 white, a green pixel walking, the whole ring blue, given back.
+    # An arrival is counted in the day's note, quietly: no say, no light.
+    "visitors.py": ([], "arrived", (("notes.get", {}), ("notes.set", {"value": 1}))),
     "touch.py": ([], "tap", (("light", {"colour": "warm", "level": 3}),)),
     "ring_walk.py": (["50"], None, (
         ("light", {"pixels": lambda px: isinstance(px, list) and px[0] == "#ffffff" and set(px[1:]) == {"#000000"}}),
