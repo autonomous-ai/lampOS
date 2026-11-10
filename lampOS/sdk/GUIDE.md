@@ -400,7 +400,7 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
   `if event.get("score", 0) >= 0.99`.
 - `sound.heard`: `class` (`knock`, `music`, ...), `score`. Grant `sound`. In today's build,
   lamp run pending.
-- `touch`: `kind` (`tap`, `pet`, `hold`), `where`. No grant. Next build: a tap reaches a program from #5981 (merged in train 774; on 11091 it did not). Today `kind` is `tap` or `pet`; `hold` and `where` are not sent yet. Example: `examples/touch.py`.
+- `touch`: `kind` (`tap`, `pet`, `hold`), `where`. No grant. A tap reaches a program from build 11372 (#5981; on 11091 it did not; 8 of 8 taps on lamp-75c9, 10 Nov 14:18). `kind` is `tap` or `pet`; `hold` and `where` are not sent yet. Example: `examples/touch.py`.
 - `button`: `press` (`press`, `long_press`). No grant. In today's build, lamp run pending.
 - `time`: the client's own schedule. No grant. Planned: nothing sends it yet.
 - `lamp.changed`: `lamp_state` (`talking`, `paused`, `private`, `asleep`, `lease`). No grant.
@@ -685,8 +685,8 @@ the last frame of a 3 s stream; without the `camera` grant they print the refusa
 ### Touch and the button
 
 The head senses a `tap`, a `pet` and a `hold`; the button a `press` and a
-`long_press`. Both come as events with no grant (`touch`, `button`); they are in
-next build (a tap reaches a program from #5981, train 774; a run needs a hand on the lamp). Example: `examples/touch.py` answers a tap with a light and a pet with a feeling.
+`long_press`. Both come as events with no grant (`touch`, `button`); a tap reaches a
+program from build 11372 (#5981; shown on lamp-75c9, 10 Nov 14:18); a `pet` is not shown on a lamp yet. Example: `examples/touch.py` answers a tap with a light and a pet with a feeling.
 
 ```python
 await lamp.on("touch", lambda event: print(event["kind"], event.get("where")))
@@ -821,7 +821,8 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 | Leases, and the person coming first | works today (9 Nov 2026) | |
 | Turns: start a turn | works today (9 Nov 2026) | the lamp's own model answers the turn |
 | Turns: end a turn, the program's own mute | works today (9 Nov 2026) | on build 10824 a begun turn ended in 31 ms; the mute held in 62 ms and lifted in 8 ms, a second hold or lift answering `held` / `nothing_held`. Ending a turn that hasn't begun yet is refused `busy` on 10824; `stop()` drops a start still queued, not one whose prompt is being said. A fix is in review (#5870) |
-| Events: arrival, a tap, the rest | next build (a tap reaches a program only from #5981, train 774; arrival is in 11091's code, lamp run pending) | `touch` sends `kind` `tap` (two quick taps are one) or `pet`; `hold` and `where` are not sent yet. Examples: `examples/touch.py`, `touch.js`, `greet.py` |
+| A tap on the head (`touch`) | works today (10 Nov 2026, build 11372) | 8 of 8 taps reached a program on lamp-75c9, 10 Nov 14:18, on the fix as merged (#5981), which ships in 11372. `touch` sends `kind` `tap` (two quick taps are one) or `pet`; `hold` and `where` are not sent yet. Examples: `examples/touch.py`, `touch.js` |
+| Arrival (`person.arrived`, `person.left`) | lamp run pending | in the customer build's code (11091); no run showed it yet. Example: `examples/greet.py` |
 | `phrase.heard` | next build (delivered on a test lamp, 10 Nov 2026) | on the customer build a phrase is missed when the recognizer writes it joined ("Goodnight") or with an "s" on its last word ("lamps"); the next build matches both; matching is on the recognizer's words, so register short phrases and their variants |
 | Follow a hand | in development: the lamp doesn't track hands yet, and its body doesn't follow one yet | the door is in; nothing on the lamp publishes `humans/hands/tracked`, and lamp-body refuses a hold that says `follow` (the lease ends `released`) |
 | Camera snapshot and stream | works today (9 Nov 2026) | about 2 frames a second at about 320 px today |
