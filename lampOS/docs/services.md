@@ -180,7 +180,7 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
-  | `{"op":"skill_write_approve","skill":"<name>","writes":[...]}`, the app's yes to a made skill's writes (with `LAMP_SKILL_WRITES=on`; "A made skill's write", below) | `{"ok":true,"result":{"approved":N}}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...]}`, the app's yes to a made skill's writes (with `LAMP_SKILL_WRITES=on`; "A made skill's write", below) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
 
   A line with a field its op doesn't take, or a code the catalogue doesn't
   know, is refused without repeating it.
@@ -1780,6 +1780,27 @@ token. A new yes replaces the skill's approvals, and an empty list takes
 them away. A skill holds at most 4, and the lamp at most 50. The journal
 says only how many were approved.
 
+The yes is to the whole skill as it was put on, not to its write alone:
+each approval also keeps the SHA-256 of the skill's installed package,
+read by `lamp-services` from the skill's `.package.json` under
+`/var/lib/lampOS/skills` (root's, written by the installer;
+`skill_writes::installed_package`). The package holds the skill's trigger
+and manners with its write. A skill not on as a package (put in by hand, a
+developer's push) is never approved: "the skill is not on the lamp as a
+package". A skill updated (a changed trigger is a new package), removed,
+or replaced by another package of its name is waiting for a new yes, and
+its old approvals are dropped at its next run (App Only's P2-2 on #6123).
+
+**A GitHub repository anyone can see** is allowed (the owner on #6123),
+but the yes says so. At the yes, `lamp-services` reads the repository with
+the link's token (`GET /repos/<owner>/<name>`, on GitHub's read list) and
+keeps whether it is public; one it can't read counts as public. The yes's
+answer is `{"approved": N, "public": ["owner/name", ...]}`, the
+repositories anyone can see, for the voice to say "anyone can see it". A
+repository approved as private is read again at each send: made public
+since, or unreadable, the write waits for a new yes (`WAITING`), since the
+yes didn't cover public.
+
 **Who sends.** `lamp-skills` itself, as with a read: `lamp-services` takes
 `lamp-skills.service`'s cgroup on the tools socket when either
 `LAMP_SKILL_READS` or `LAMP_SKILL_WRITES` is on, and then only
@@ -1806,18 +1827,24 @@ and no text:
 4. The content is one of the kinds above, on a service with a write list
    in `catalog.rs`, never an MCP service.
 5. The service, by its exact code (no other Gmail link stands in), still
-   linked under the link approved. Unlinked, or linked again as another
-   account, is refused as `STOPPED` ("stopped: the Gmail link changed since
-   the owner's yes; nothing was sent"), and `lamp-skills` stops that
-   skill's writes until it restarts. The same account linked again still
-   goes. An expired link, or one whose scopes don't allow the write
-   (`writes::scope_missing`), is refused as for the voice.
+   linked under the link approved. Unlinking a service drops every
+   approval for it (App Only's P2-1 on #6123), so the same account linked
+   again is waiting for a new yes. Linked over as another account (a new
+   link without an unlink) is refused as `STOPPED` ("stopped: the Gmail
+   link changed since the owner's yes; nothing was sent"), and
+   `lamp-skills` stops that skill's writes until it restarts. An expired
+   link, or one whose scopes don't allow the write
+   (`writes::scope_missing`), is refused as for the voice. A GitHub
+   repository approved as private and public now waits, as above.
 6. **The bounds** (`skill_writes::Ledger`, `skill-writes.json` in the store
    folder): at most 3 sends a skill and 10 across every skill in any 24
    hours. Each send is counted before it goes, one at a time, so two at
    once never pass a bound together. A send that then fails still counts.
    The ledger keeps a skill's name and a time, nothing else, so a restart
-   doesn't forget the day's sends.
+   doesn't forget the day's sends. It fails closed: a ledger that can't
+   be read, or that holds a send after now (the clock went back, as at a
+   boot before the time is set), counts as full, and nothing goes until
+   the clock passes it again.
 
 The write is then sent as the voice's confirmed write is, through the same
 guard and write list, once.
@@ -1830,12 +1857,14 @@ outcome on its run: "sent to gmail", or the refusal.
 
 **The owner's sent-log** (`skill-writes-sent.json` in the store folder).
 It keeps the last 20 sends, each the skill's name, the service, the time
-and who it went to (`skill_writes::sent_to`): a mail's first address and
-how many more, an event's guests, an issue's repository or team. It holds
-no text, subject or title. The voice reads it with `skill_writes_sent`,
-its own call like the yes, as `{"sent": [{"skill", "service", "at",
-"to"}]}`, to tell the owner "I sent your arrival mail to boss@work.test
-at 18:02" the next time they are seen. That telling is not built yet.
+and who it went to (`skill_writes::sent_to`): a mail's first recipient
+and how many more, an event's guests, an issue's repository or team. A
+recipient is the local part of its address only (a write's addresses are
+plain, with no display name), never the whole address. It holds no text,
+subject or title. The voice reads it with `skill_writes_sent`, its own
+call like the yes, as `{"sent": [{"skill", "service", "at", "to"}]}`, to
+tell the owner "I sent your arrival mail to boss at 18:02" the next time
+they are seen. That telling is not built yet.
 
 **Not done yet:**
 

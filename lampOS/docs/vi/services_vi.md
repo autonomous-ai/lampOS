@@ -184,7 +184,7 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
-  | `{"op":"skill_write_approve","skill":"<name>","writes":[...]}`, lời đồng ý của ứng dụng cho các lần ghi của kỹ năng tự tạo (với `LAMP_SKILL_WRITES=on`; "Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) | `{"ok":true,"result":{"approved":N}}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...]}`, lời đồng ý của ứng dụng cho các lần ghi của kỹ năng tự tạo (với `LAMP_SKILL_WRITES=on`; "Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
 
   Một dòng có trường mà op của nó không nhận, hoặc một code mà danh mục không
   biết, bị từ chối mà không lặp lại nó.
@@ -1828,6 +1828,29 @@ lần đồng ý mới thay các phê duyệt của kỹ năng, và danh sách r
 Một kỹ năng giữ tối đa 4, cả đèn tối đa 50. Journal chỉ nói có bao nhiêu
 lần ghi được duyệt.
 
+Lời đồng ý là cho cả kỹ năng như khi nó được bật, không chỉ cho lần ghi:
+mỗi phê duyệt còn giữ SHA-256 của gói đã cài của kỹ năng, do
+`lamp-services` đọc từ `.package.json` của kỹ năng trong
+`/var/lib/lampOS/skills` (của root, do bộ cài ghi;
+`skill_writes::installed_package`). Gói chứa trigger và cách cư xử của kỹ
+năng cùng lần ghi của nó. Kỹ năng không được bật dưới dạng gói (đặt vào
+bằng tay, bản đẩy của nhà phát triển) không bao giờ được duyệt: "the skill
+is not on the lamp as a package". Kỹ năng được cập nhật (trigger đổi là một
+gói mới), bị gỡ, hoặc bị thay bằng một gói khác cùng tên thì chờ lời đồng
+ý mới, và các phê duyệt cũ bị xoá ở lần chạy kế tiếp (P2-2 của App Only
+trên #6123).
+
+**Repository GitHub ai cũng thấy được** được phép (chủ đèn trên #6123),
+nhưng lời đồng ý phải nói rõ. Lúc đồng ý, `lamp-services` đọc repository
+bằng token của liên kết (`GET /repos/<owner>/<name>`, có trong danh sách
+đọc của GitHub) và giữ việc nó có công khai không; repository không đọc
+được thì tính là công khai. Câu trả lời của lời đồng ý là
+`{"approved": N, "public": ["owner/name", ...]}`, các repository ai cũng
+thấy, để giọng nói nói "anyone can see it". Repository được duyệt là riêng
+tư thì được đọc lại ở mỗi lần gửi: nếu đã thành công khai, hoặc không đọc
+được, lần ghi chờ lời đồng ý mới (`WAITING`), vì lời đồng ý không bao gồm
+công khai.
+
 **Ai gửi.** Chính `lamp-skills`, như với việc đọc: `lamp-services` nhận
 cgroup của `lamp-skills.service` trên socket tools khi `LAMP_SKILL_READS`
 hoặc `LAMP_SKILL_WRITES` bật, và khi đó chỉ nhận `service_read` (khi đọc
@@ -1855,19 +1878,24 @@ người nhận hay nội dung:
 4. Nội dung thuộc một trong các loại ở trên, trên dịch vụ có danh sách ghi
    trong `catalog.rs`, không bao giờ là dịch vụ MCP.
 5. Dịch vụ, theo đúng mã của nó (không liên kết Gmail nào khác thay thế),
-   vẫn được liên kết dưới liên kết đã duyệt. Nếu bị huỷ liên kết, hoặc liên
-   kết lại bằng tài khoản khác, lần ghi bị từ chối dạng `STOPPED` ("stopped:
-   the Gmail link changed since the owner's yes; nothing was sent"), và
-   `lamp-skills` dừng các lần ghi của kỹ năng đó cho đến khi nó khởi động
-   lại. Cùng tài khoản liên kết lại thì vẫn gửi. Liên kết hết hạn, hoặc có
-   phạm vi không cho phép lần ghi (`writes::scope_missing`), bị từ chối như
-   với giọng nói.
+   vẫn được liên kết dưới liên kết đã duyệt. Huỷ liên kết một dịch vụ xoá
+   mọi phê duyệt cho nó (P2-1 của App Only trên #6123), nên cùng tài khoản
+   liên kết lại sẽ chờ lời đồng ý mới. Liên kết đè bằng tài khoản khác (liên
+   kết mới mà không huỷ) bị từ chối dạng `STOPPED` ("stopped: the Gmail link
+   changed since the owner's yes; nothing was sent"), và `lamp-skills` dừng
+   các lần ghi của kỹ năng đó cho đến khi nó khởi động lại. Liên kết hết
+   hạn, hoặc có phạm vi không cho phép lần ghi (`writes::scope_missing`), bị
+   từ chối như với giọng nói. Repository GitHub được duyệt là riêng tư mà
+   giờ công khai thì chờ, như ở trên.
 6. **Giới hạn** (`skill_writes::Ledger`, `skill-writes.json` trong thư mục
    kho): tối đa 3 lần gửi mỗi kỹ năng và 10 lần cho mọi kỹ năng trong bất
    kỳ 24 giờ nào. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
    lần cùng lúc không bao giờ cùng vượt giới hạn. Lần gửi thất bại sau đó
    vẫn được đếm. Sổ chỉ giữ tên kỹ năng và thời điểm, nên khởi động lại
-   không quên các lần gửi trong ngày.
+   không quên các lần gửi trong ngày. Nó đóng khi lỗi: sổ không đọc được,
+   hoặc có lần gửi sau thời điểm hiện tại (đồng hồ lùi lại, như khi khởi
+   động trước khi có giờ), được tính là đầy, và không gì được gửi cho đến
+   khi đồng hồ vượt qua nó.
 
 Sau đó lần ghi được gửi một lần, như lần ghi đã xác nhận của giọng nói,
 qua cùng bộ chặn và danh sách ghi.
@@ -1880,13 +1908,15 @@ có người nhận, chủ đề hay nội dung. `lamp-skills` ghi kết quả c
 
 **Nhật ký đã gửi cho chủ đèn** (`skill-writes-sent.json` trong thư mục
 kho). Nó giữ 20 lần gửi gần nhất, mỗi lần gồm tên kỹ năng, dịch vụ, thời
-điểm và gửi cho ai (`skill_writes::sent_to`): địa chỉ đầu tiên của thư và
-còn bao nhiêu người nữa, khách mời của sự kiện, repository hay team của
-issue. Nó không giữ nội dung, chủ đề hay tiêu đề. Giọng nói đọc nó bằng
+điểm và gửi cho ai (`skill_writes::sent_to`): người nhận đầu tiên của thư
+và còn bao nhiêu người nữa, khách mời của sự kiện, repository hay team của
+issue. Người nhận chỉ là phần trước `@` của địa chỉ (địa chỉ trong một lần
+ghi là địa chỉ thường, không có tên hiển thị), không bao giờ là cả địa chỉ.
+Nó không giữ nội dung, chủ đề hay tiêu đề. Giọng nói đọc nó bằng
 `skill_writes_sent`, lệnh gọi riêng của nó như lần đồng ý, dưới dạng
 `{"sent": [{"skill", "service", "at", "to"}]}`, để nói với chủ đèn "I sent
-your arrival mail to boss@work.test at 18:02" vào lần tới thấy họ. Phần nói
-đó chưa làm.
+your arrival mail to boss at 18:02" vào lần tới thấy họ. Phần nói đó chưa
+làm.
 
 **Chưa làm:**
 
