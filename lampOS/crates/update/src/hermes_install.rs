@@ -29,6 +29,21 @@
 //! and then drops back to the caller's own ids in a nested user namespace,
 //! where those mounts are locked. Hermes is given only lamp-cloud's local
 //! forwarder token ([`TOKEN`], as [`TOKEN_ENV`]), never the relay key.
+//!
+//! **The lamp's skills, behind their own switch** (#6128). With
+//! [`SKILLS_SWITCH`] (`LAMP_HERMES_SKILLS` in lamp-update's own unit, on
+//! by default on a product lamp, the product owner's decision: a person has
+//! no way to turn it on; `off` there turns it off) the namespace script is written as [`ns_text`]`(true)`,
+//! which also shows Hermes [`SKILLS_SOCKET`] (lamp-skills' `tools.json`
+//! and `call.sock`), read-only, so `lamp-tasks skill call NAME` reaches the
+//! lamp as the voice's model does: through lamp-skills, which applies its
+//! cooldowns, pause and policy, takes no requested-audio context from any
+//! peer but the voice, and refuses another peer's call while the lamp is
+//! private. Off, it is [`NS_TEXT`], and nothing under `/run` is shown. The
+//! switch is carried in the script's own text, written by root, never in
+//! anything `lampos` can change; a round that finds the other text asks the
+//! one-shot to write it again ([`present`]).
+//!
 //! Before anything is installed, the namespace is tried as `lampos`
 //! ([`userns_argv`]); a lamp where it does not work gets nothing,
 //! `no_userns`. No unit, no daemon,
@@ -91,6 +106,17 @@ pub const SWITCH: &str = "LAMP_HERMES_ON_LAMP";
 /// while someone speaks, stopped when the privacy reading is lost); `off`
 /// turns it off. Any other lamp with it unset is off.
 pub const PRODUCT_DEFAULT: bool = true;
+/// The skills switch (#6128), in lamp-update's own unit: `on` exactly
+/// shows Hermes [`SKILLS_SOCKET`] ([`ns_text`]); read as [`SWITCH`] is,
+/// with [`SKILLS_PRODUCT_DEFAULT`].
+pub const SKILLS_SWITCH: &str = "LAMP_HERMES_SKILLS";
+/// Whether a lamp installed as the product shows Hermes the skills' socket
+/// with [`SKILLS_SWITCH`] unset: on, the product owner's decision (11 Nov),
+/// as a person has no way to turn it on; lamp-skills' caller check (no
+/// requested-audio context or audio op from any peer but the voice, no
+/// other peer's call while the lamp is private) is what makes that safe.
+/// `off` turns it off; any other lamp with it unset is off.
+pub const SKILLS_PRODUCT_DEFAULT: bool = true;
 
 /// Where the install is, in lamp-update's records (0600), next to
 /// Harness's [`harness_install::RECORD`]. lamp-update's own: not said on
@@ -150,6 +176,12 @@ pub const TOKEN_ENV: &str = "LAMP_HERMES_TOKEN";
 pub const WORK: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks";
 /// The lamp's skills, which Hermes reads in place: shown read-only.
 pub const SKILLS: &str = "/var/lib/lampOS/skills";
+/// lamp-skills' tools folder (`tools.json` and `call.sock`), the voice's
+/// `LAMP_SKILLS_DIR`: with [`SKILLS_SWITCH`] on, the one folder under
+/// `/run` [`ns_text`] shows Hermes, read-only (a unix socket still
+/// connects on a read-only mount), when it is there. Off, it is hidden as
+/// every other lamp service's folder is.
+pub const SKILLS_SOCKET: &str = "/run/lampos-skills";
 /// All [`NS`] shows Hermes of what it lays [`OVERLAID`] over: its own
 /// folder, the work folder and the skills (read-only), plus the file
 /// `/etc/resolv.conf` resolves to when that is under `/run` (read-only,
@@ -239,7 +271,8 @@ exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --
 /// 5. [`HERMES`] run with `HOME` its own folder, as the caller's own ids,
 ///    in a nested user namespace, where none of these mounts can be undone.
 ///
-/// Any step failing ends it before Hermes runs.
+/// Any step failing ends it before Hermes runs. This is the text with
+/// [`SKILLS_SWITCH`] off; [`ns_text`] gives the one with it on.
 pub const NS_TEXT: &str = r#"#!/bin/sh
 # lampOS: Hermes on the lamp, inside the namespace /usr/local/bin/hermes makes (#5978; lampOS/docs/install.md,
 # "Hermes on the lamp"). Written by lamp-update. Root here only: it shows Hermes only its own folder, its work folder,
@@ -284,6 +317,55 @@ unset LAMP_NS_UID LAMP_NS_GID
 export HOME
 exec /usr/bin/unshare --user --map-user="$U" --map-group="$G" /var/lib/lampos-hermes/.local/bin/hermes "$@"
 "#;
+
+/// What [`ns_text`] changes in [`NS_TEXT`] with [`SKILLS_SWITCH`] on, each
+/// found exactly once (a test holds it): [`SKILLS_SOCKET`] staged with the
+/// rest before `/run` is hidden (skipped when the folder is not there),
+/// moved back and remounted read-only, and its staging folder removed.
+const SKILLS_EDITS: [(&str, &str); 6] = [
+    (
+        "# where these mounts are locked. Any step failing ends it before Hermes runs.\n",
+        "# where these mounts are locked. Any step failing ends it before Hermes runs.\n\
+         # LAMP_HERMES_SKILLS=on (#6128): it also shows lamp-skills' socket folder /run/lampos-skills, read-only, so Hermes\n\
+         # reaches the lamp only through lamp-skills, as the voice does.\n",
+    ),
+    (
+        "K=/var/lib/lampOS/skills S=/tmp/.lampos-ns\n",
+        "K=/var/lib/lampOS/skills C=/run/lampos-skills S=/tmp/.lampos-ns\n",
+    ),
+    (
+        "mkdir -m 0700 \"$S\" \"$S/h\" \"$S/w\" \"$S/k\" || fail \"no staging\"\n",
+        "mkdir -m 0700 \"$S\" \"$S/h\" \"$S/w\" \"$S/k\" \"$S/c\" || fail \"no staging\"\n",
+    ),
+    (
+        "if [ -d \"$K\" ]; then mount --bind \"$K\" \"$S/k\" || fail \"no $K\"; else K=; fi\n",
+        "if [ -d \"$K\" ]; then mount --bind \"$K\" \"$S/k\" || fail \"no $K\"; else K=; fi\n\
+         if [ -d \"$C\" ]; then mount --bind \"$C\" \"$S/c\" || fail \"no $C\"; else C=; fi\n",
+    ),
+    (
+        "if [ -n \"$K\" ]; then mkdir -p \"$K\" && mount --move \"$S/k\" \"$K\" && ro \"$K\" || fail \"$K not shown\"; fi\n",
+        "if [ -n \"$K\" ]; then mkdir -p \"$K\" && mount --move \"$S/k\" \"$K\" && ro \"$K\" || fail \"$K not shown\"; fi\n\
+         if [ -n \"$C\" ]; then mkdir -p \"$C\" && mount --move \"$S/c\" \"$C\" && ro \"$C\" || fail \"$C not shown\"; fi\n",
+    ),
+    (
+        "rmdir \"$S/h\" \"$S/w\" \"$S/k\" \"$S\" ||",
+        "rmdir \"$S/h\" \"$S/w\" \"$S/k\" \"$S/c\" \"$S\" ||",
+    ),
+];
+
+/// [`NS`]'s text for [`SKILLS_SWITCH`]: off, [`NS_TEXT`]; on, [`NS_TEXT`]
+/// with [`SKILLS_EDITS`], which also shows Hermes [`SKILLS_SOCKET`],
+/// read-only. The switch lives only in this text, which root writes and
+/// `lampos` cannot change: the script reads nothing to decide it.
+pub fn ns_text(skills: bool) -> String {
+    let mut text = NS_TEXT.to_owned();
+    if skills {
+        for (from, to) in SKILLS_EDITS {
+            text = text.replacen(from, to, 1);
+        }
+    }
+    text
+}
 
 /// Hermes's config set after its install, each with `hermes config set`
 /// as `lampos` (its own writer: it changes that key alone and keeps every
@@ -449,6 +531,10 @@ struct Ask {
     /// Take the entry points out (the switch off), not install.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     remove: bool,
+    /// [`SKILLS_SWITCH`] on: the namespace script written as
+    /// [`ns_text`]`(true)`. Absent (an older round's ask) is off.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    skills: bool,
 }
 
 /// The install as [`RECORD`] has it, when lamp-update could have written
@@ -505,30 +591,38 @@ fn holds(root: &Path, path: &str, text: &str) -> bool {
 
 /// Hermes there as this build puts it, under `root`: its command, its
 /// checkout at [`COMMIT`], and the wrapper and namespace script with this
-/// build's text. Any of them otherwise is Hermes missing, put there again.
-pub fn present(root: &Path) -> bool {
+/// build's text, the script's as [`ns_text`]`(skills)`. Any of them
+/// otherwise is Hermes missing, put there again: so turning
+/// [`SKILLS_SWITCH`] on or off has the script written again.
+pub fn present(root: &Path, skills: bool) -> bool {
     fs::metadata(on(root, HERMES)).is_ok()
         && head(root).as_deref() == Some(COMMIT)
         && holds(root, WRAPPER, WRAPPER_TEXT)
-        && holds(root, NS, NS_TEXT)
+        && holds(root, NS, &ns_text(skills))
 }
 
 /// When `serve` starts: off, an earlier record and ask are taken away; on
-/// with Hermes missing and no record, `absent`.
-pub fn at_start(root: &Path, records: &Path, switch: bool, now_unix_ms: u64) {
+/// with Hermes missing (with `skills`, [`SKILLS_SWITCH`]) and no record,
+/// `absent`.
+pub fn at_start(root: &Path, records: &Path, switch: bool, skills: bool, now_unix_ms: u64) {
     if !switch {
         for name in [RECORD, ASK] {
             let _ = fs::remove_file(records.join(name));
         }
         return;
     }
-    if !present(root) && record(records).is_none() {
+    if !present(root, skills) && record(records).is_none() {
         write(records, HermesInstall::new("absent", None, now_unix_ms));
     }
 }
 
-fn ask(records: &Path, remove: bool) -> io::Result<()> {
-    let text = serde_json::to_vec(&Ask { version: 1, remove }).map_err(io::Error::other)?;
+fn ask(records: &Path, remove: bool, skills: bool) -> io::Result<()> {
+    let text = serde_json::to_vec(&Ask {
+        version: 1,
+        remove,
+        skills,
+    })
+    .map_err(io::Error::other)?;
     write_whole(&records.join(ASK), &text, 0o600)
 }
 
@@ -542,18 +636,21 @@ fn ask(records: &Path, remove: bool) -> io::Result<()> {
 /// [`ASK`] is written; then with Harness there, `installing` is recorded
 /// and Harness's one-shot started without waiting (a unit not started is
 /// `not_started`), and with Harness missing nothing more: the one-shot
-/// Harness's round starts reads the ask after Harness. What was recorded
-/// is returned, none when nothing changed.
+/// Harness's round starts reads the ask after Harness. With `skills`
+/// ([`SKILLS_SWITCH`]), Hermes is there only with [`ns_text`]`(true)`, and
+/// the ask says so. What was recorded is returned, none when nothing
+/// changed.
 pub fn after_round(
     root: &Path,
     records: &Path,
+    skills: bool,
     systemd: &mut dyn Systemd,
     now_unix_ms: u64,
     window: Result<crate::hermes_schedule::Window, String>,
     say: &mut dyn FnMut(&str),
 ) -> Option<HermesInstall> {
     let before = record(records);
-    if present(root) {
+    if present(root, skills) {
         if before
             .as_ref()
             .is_some_and(|said| said.install == "installed")
@@ -590,7 +687,7 @@ pub fn after_round(
         }
     };
     say(&format!("Hermes may be installed now: {}", window.name()));
-    if let Err(error) = ask(records, false) {
+    if let Err(error) = ask(records, false, skills) {
         say(&format!(
             "Hermes is not installed: {ASK} not written: {error}"
         ));
@@ -739,7 +836,7 @@ pub fn after_round_off(
     if entry_points(root).next().is_none() {
         return false;
     }
-    let started = ask(records, true)
+    let started = ask(records, true, false)
         .map_err(|error| error.to_string())
         .and_then(|()| harness_install::start(root, systemd));
     match started {
@@ -842,7 +939,7 @@ fn install_with(
         let _ = fs::remove_file(records.join(RECORD));
         None
     } else {
-        let said = steps(root, records, run, now_unix_ms, say, kit);
+        let said = steps(root, records, run, now_unix_ms, say, kit, asked.skills);
         if said.install == "failed" {
             remove_entry_points(root, say);
         }
@@ -883,8 +980,9 @@ fn steps(
     now_unix_ms: &mut dyn FnMut() -> u64,
     say: &mut dyn FnMut(&str),
     kit: &Kit,
+    skills: bool,
 ) -> HermesInstall {
-    if present(root) && kit.commit == COMMIT {
+    if present(root, skills) && kit.commit == COMMIT {
         say(&format!(
             "Hermes {VERSION} is already at {HERMES}: nothing installed"
         ));
@@ -1044,7 +1142,7 @@ fn steps(
             );
         }
     }
-    if let Err(why) = write_entry_points(root) {
+    if let Err(why) = write_entry_points(root, skills) {
         return fail("entry", why, say);
     }
     remove_aside(root, say);
@@ -1057,8 +1155,13 @@ fn steps(
             say(&format!("lamp-tasks.service not started again: {why}"));
         }
     }
+    let shown = if skills {
+        "its own folder, its work folder, the skills and lamp-skills' socket"
+    } else {
+        "its own folder, its work folder and the skills"
+    };
     say(&format!(
-        "Hermes {VERSION} ({}) installed for {USER} at {HERMES}; Harness runs it through {WRAPPER}, in a namespace that shows it only its own folder, its work folder and the skills; no service, nothing at boot",
+        "Hermes {VERSION} ({}) installed for {USER} at {HERMES}; Harness runs it through {WRAPPER}, in a namespace that shows it only {shown}; no service, nothing at boot",
         kit.commit
     ));
     write(records, HermesInstall::installed(now_unix_ms()))
@@ -1216,11 +1319,12 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
     .collect()
 }
 
-/// The namespace script, then the wrapper: root's, 0755, each written
-/// whole beside and renamed in (never through a link), so `lampos` never
-/// finds a wrapper before what it runs.
-fn write_entry_points(root: &Path) -> Result<(), String> {
-    for (path, text) in [(NS, NS_TEXT), (WRAPPER, WRAPPER_TEXT)] {
+/// The namespace script ([`ns_text`]`(skills)`), then the wrapper: root's,
+/// 0755, each written whole beside and renamed in (never through a link),
+/// so `lampos` never finds a wrapper before what it runs.
+fn write_entry_points(root: &Path, skills: bool) -> Result<(), String> {
+    let ns = ns_text(skills);
+    for (path, text) in [(NS, ns.as_str()), (WRAPPER, WRAPPER_TEXT)] {
         let place = on(root, path);
         if let Some(folder) = place.parent()
             && !folder.is_dir()

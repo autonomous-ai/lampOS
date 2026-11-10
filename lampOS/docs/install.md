@@ -1631,8 +1631,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `ReadWritePaths=` under `/run` or `/var/lib` of the product units run
      as `lampos`, and the tmpfiles folders made `lampos`'s, and fails if
      any of them is not hidden, so a new service is hidden with no change.
-     Nothing under `/run` is shown to Hermes here: any reach of the lamp's
-     Hermes into the lamp's skills is #6128's, behind its own switch.
+     With `LAMP_HERMES_SKILLS` off nothing under `/run` is shown to Hermes;
+     with it on (the product's default), lamp-skills' socket folder alone
+     (next).
      Shown on lamp-c0a4 by hand (10 Nov, the earlier deny-list scripts):
      the key hidden; `umount` refused, nested too. As plain `lampos`, `ls
      /proc/<lamp-cloud pid>/root/run/credentials/lamp-cloud.service/`
@@ -1643,6 +1644,38 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      scripts are still to be shown there. The relay key never goes into
      Hermes's environment or its folder; only the forwarder's token does
      (Hermes keeps snapshots of its shell's environment under its home).
+   - **The lamp's skills, behind their own switch** (#6128;
+     `LAMP_HERMES_SKILLS` in `lamp-update.service`'s environment, read as
+     `LAMP_HERMES_ON_LAMP` is: set, on only when `on` exactly, so `off`
+     turns it off; unset, on on every product lamp, `SKILLS_PRODUCT_DEFAULT`
+     on, the product owner's decision (11 Nov), as a person has no way to
+     turn it on; off on any other lamp; no product unit names it). The
+     caller check below is what makes on by default safe.
+     On, the namespace script is written with four more steps
+     (`hermes_install::ns_text(true)`): lamp-skills' tools folder
+     `/run/lampos-skills` (`tools.json` and `call.sock`, the voice's
+     `LAMP_SKILLS_DIR`) staged on the new `/tmp` with the rest before
+     `/run` is hidden (skipped when the folder is not there), moved back
+     and remounted read-only (a unix socket still connects on a read-only
+     mount), and its staging folder removed; any of them failing ends it
+     before Hermes runs. Then `lamp-tasks skill call NAME '{…}'` reaches the
+     lamp as the voice's model does, through lamp-skills, which applies its
+     cooldowns, pause and policy, and which tells its caller apart
+     (`docs/skills.md`, "The call socket tells its caller apart"): only lamp-voice's process may give
+     a requested-audio context or authorize and finish requested audio,
+     and a call from any other peer is refused while the lamp is private.
+     Nothing else under `/run` is shown. The switch is carried in the
+     script's own text, which root writes and `lampos` cannot change; the
+     script reads no flag. A round passes it to the one-shot in its ask
+     (`"skills": true`; an ask without it is off), and the script with the
+     other text is Hermes not there as this build puts it, so turning the
+     switch on or off has the next reached round write the script again
+     (no installer runs; Hermes at the pin gets its config and both
+     scripts again). Tests: the script run by `sh` with the switch on and
+     off (each new step failing stops it; off, the folder there is never
+     named), `no_lampos_service_folder_is_visible_to_hermes` (off, no
+     folder under `/run` is named; on, exactly `/run/lampos-skills`), and
+     the switch turned on and off over an installed Hermes.
    - **User namespaces checked first:** before anything is made, `lampos`
      must be able to make that namespace: `runuser -u lampos --
      /usr/bin/unshare --map-root-user --mount --pid --kill-child
@@ -1793,7 +1826,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      yet, and moves it aside (or removes it) otherwise; a `/var/lib/lampos-hermes.old` set aside
      before the failure stays until a later install's new Hermes runs.
    - **The parts' units** (`deploy/product`): unchanged; none sets
-     `LAMP_HERMES_ON_LAMP` in this change: lamp-update installs the
+     `LAMP_HERMES_ON_LAMP` in this change, and none names
+     `LAMP_HERMES_SKILLS` (on by lamp-update's own default): lamp-update installs the
      product's Hermes by its own default (on since the product owner's
      decision, 10 Nov, with the window above), and
      `LAMP_HERMES_ON_LAMP=off` in its unit turns that off. lamp-cloud's

@@ -66,7 +66,8 @@ harness-install run by lamp-update-harness.service, which a `serve` round starts
         checked first), recorded for update/status; no Harness at boot, no daemon. Then
         Hermes after it (on by default on a product lamp, LAMP_HERMES_ON_LAMP=off
         turns it off), pinned, as lampos, only in its quiet window and watched by
-        serve while it runs (#5978).
+        serve while it runs (#5978); with LAMP_HERMES_SKILLS (on by default on a
+        product lamp), its namespace shows lamp-skills' socket (#6128).
 back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
         lamp-update.service's failure and its timer): when lamp-update switched to its own
         new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
@@ -895,25 +896,40 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // On by this build's default on a product lamp (PRODUCT_DEFAULT true, the product owner's
         // decision, 10 Nov, with the first builder's schedule: crate::hermes_schedule);
         // LAMP_HERMES_ON_LAMP=off turns it off, and another lamp needs `on`.
+        let product = acts && product::product_lamp(&config.root, &config.on(&config.units));
         let wanted = hermes::wanted(
             std::env::var(hermes::SWITCH).ok().as_deref(),
-            acts && product::product_lamp(&config.root, &config.on(&config.units)),
+            product,
             hermes::PRODUCT_DEFAULT,
+        );
+        // Its own switch (#6128), on by this build's default on a product lamp
+        // (SKILLS_PRODUCT_DEFAULT true): Hermes is shown lamp-skills' socket folder,
+        // read-only; LAMP_HERMES_SKILLS=off turns it off, and another lamp needs `on`.
+        let skills = hermes::wanted(
+            std::env::var(hermes::SKILLS_SWITCH).ok().as_deref(),
+            product,
+            hermes::SKILLS_PRODUCT_DEFAULT,
         );
         if acts && wanted && harness.is_none() {
             say("Hermes on the lamp: off, as Harness before the sign-in is off");
         }
         let on = acts && wanted && harness.is_some();
         if acts {
-            hermes::at_start(&config.root, &records, on, lamp_update::records::unix_ms());
+            hermes::at_start(
+                &config.root,
+                &records,
+                on,
+                skills,
+                lamp_update::records::unix_ms(),
+            );
         }
         // Off, a `serve` that acts still takes out what an earlier install
         // left for lampos to run (its wrapper and namespace script).
-        acts.then_some(on)
+        acts.then_some((on, skills))
     };
     // Hermes's schedule (#5978): the voice heard from the start, so a round
     // knows the quiet stretch, and each install watched while it runs.
-    let hermes_watch = (hermes == Some(true))
+    let hermes_watch = matches!(hermes, Some((true, _)))
         .then(|| lamp_update::hermes_schedule::Watcher::start(&bus_root, &records));
     let local_time = hermes_watch
         .as_ref()
@@ -975,7 +991,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 },
                 &mut say,
             );
-            if let Some(watch) = &hermes_watch {
+            if let (Some(watch), Some((true, skills))) = (&hermes_watch, hermes) {
                 use lamp_update::{hermes_install, hermes_schedule};
                 let now_unix_ms = lamp_update::records::unix_ms();
                 let window = hermes_schedule::window(&hermes_schedule::Moment {
@@ -994,6 +1010,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 hermes_install::after_round(
                     &config.root,
                     &records,
+                    skills,
                     &mut systemd,
                     now_unix_ms,
                     window,
@@ -1001,7 +1018,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 );
             }
         }
-        if hermes == Some(false)
+        if matches!(hermes, Some((false, _)))
             && !matches!(
                 outcome,
                 Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }

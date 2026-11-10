@@ -284,6 +284,7 @@ fn round(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesInstall> {
     after_round(
         lamp.root(),
         &lamp.records(),
+        false,
         systemd,
         at,
         Ok(crate::hermes_schedule::Window::Night),
@@ -296,9 +297,23 @@ fn closed_round(lamp: &Lamp, systemd: &mut Fake, at: u64, why: &str) -> Option<H
     after_round(
         lamp.root(),
         &lamp.records(),
+        false,
         systemd,
         at,
         Err(why.to_owned()),
+        &mut quiet(),
+    )
+}
+
+/// A round in an open window with the skills switch on (#6128).
+fn round_with_skills(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesInstall> {
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        true,
+        systemd,
+        at,
+        Ok(crate::hermes_schedule::Window::Night),
         &mut quiet(),
     )
 }
@@ -333,12 +348,12 @@ fn the_switch_is_on_by_default_on_a_product_lamp_only() {
     assert!(wanted(Some("on"), false, PRODUCT_DEFAULT));
     assert!(wanted(Some("on"), true, PRODUCT_DEFAULT));
     let lamp = Lamp::new();
-    at_start(lamp.root(), &lamp.records(), false, 1);
+    at_start(lamp.root(), &lamp.records(), false, false, 1);
     assert_eq!(fs::read_dir(lamp.records()).unwrap().count(), 0);
-    at_start(lamp.root(), &lamp.records(), true, 1);
+    at_start(lamp.root(), &lamp.records(), true, false, 1);
     assert_eq!(lamp.said().unwrap().install, "absent");
     lamp.ask();
-    at_start(lamp.root(), &lamp.records(), false, 2);
+    at_start(lamp.root(), &lamp.records(), false, false, 2);
     assert_eq!(lamp.said(), None);
     assert_eq!(lamp.asked(), None);
     // No ask, no Hermes: a one-shot run for Harness alone runs nothing of it.
@@ -383,7 +398,7 @@ fn on_with_harness_there_installs_the_pinned_hermes_as_lampos() {
     assert_eq!(said.commit.as_deref(), Some(COMMIT));
     assert_eq!(lamp.said(), Some(said));
     assert_eq!(lamp.asked(), None, "answered");
-    assert!(present(lamp.root()));
+    assert!(present(lamp.root(), false));
 
     let lines = runs.lines();
     let at = |wanted: &str| {
@@ -462,6 +477,7 @@ impl Ask {
         Self {
             version,
             remove: false,
+            skills: false,
         }
     }
 }
@@ -715,6 +731,7 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
         "/var/lib/lampos-cloud",
         "/run/lampos-bus",
         "/run/lampos-photos",
+        SKILLS_SOCKET,
     ] {
         assert!(folders.iter().any(|f| f == wanted), "{wanted} not read");
     }
@@ -737,6 +754,30 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
         );
     }
     assert!(!under(TOKEN, PLACE) && !under(TOKEN, WORK) && !under(TOKEN, SKILLS));
+    // The skills switch off (the default): the script names no folder
+    // under /run but resolv.conf's, so lamp-skills' is hidden as any is.
+    assert!(!NS_TEXT.contains(SKILLS_SOCKET));
+    // On (#6128): exactly one lamp service folder is shown, lamp-skills'
+    // tools folder, and nothing beside or above it under /run.
+    let on = ns_text(true);
+    let mut named: Vec<&String> = folders
+        .iter()
+        .filter(|folder| on.contains(&format!("={folder} ")))
+        .collect();
+    named.sort();
+    named.dedup();
+    assert_eq!(named, [SKILLS_SOCKET], "{named:?}");
+    for folder in &folders {
+        assert!(
+            folder == SKILLS_SOCKET || !under(folder, SKILLS_SOCKET),
+            "{folder} is under the skills' socket folder"
+        );
+        assert!(
+            !under(SKILLS_SOCKET, folder) || folder == SKILLS_SOCKET,
+            "{folder} is above the skills' socket folder"
+        );
+    }
+    assert!(under(SKILLS_SOCKET, "/run"));
 }
 
 /// The namespace script run under `sh` with every mount stubbed, on a
@@ -748,6 +789,24 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
 /// step failing ends it with Hermes not run.
 #[test]
 fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
+    stages_the_allowed_and_stops_at_any_failing_step(false);
+}
+
+/// [`SKILLS_SWITCH`] on (#6128): the same script, run the same way, also
+/// stages [`SKILLS_SOCKET`] before `/run` is hidden, moves it back and
+/// remounts it read-only with the flags it had, and removes its staging
+/// folder; each of those steps failing ends it before Hermes runs. Nothing
+/// else under `/run` but `resolv.conf` is put back. With no skills' socket
+/// folder (no lamp-skills), it is skipped and Hermes still runs.
+#[test]
+fn with_the_skills_switch_on_the_namespace_script_shows_the_skills_socket_read_only() {
+    stages_the_allowed_and_stops_at_any_failing_step(true);
+}
+
+/// [`ns_text`]`(skills)` run under `sh`, every mount stubbed, on a
+/// stand-in root that has [`SKILLS_SOCKET`] either way: off, nothing of
+/// it is touched.
+fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
     let folder = tempfile::tempdir().unwrap();
     let base = folder.path().to_string_lossy().into_owned();
     let at = |path: &str| format!("{base}/root{path}");
@@ -761,6 +820,7 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
         "/etc/lampOS",
         "/dev/shm",
         "/run/systemd/resolve",
+        SKILLS_SOCKET,
     ] {
         fs::create_dir_all(at(made)).unwrap();
     }
@@ -779,7 +839,7 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
     }
     // Each path the script names, moved under the stand-in root in one
     // pass (placeholders first, so no root is moved twice).
-    let mut text = NS_TEXT.to_owned();
+    let mut text = ns_text(skills);
     let moved = [
         "/var/tmp",
         "/var/lib",
@@ -836,56 +896,84 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
             .unwrap_or_else(|| panic!("no `{wanted}` in {lines:#?}"))
     };
     let stage = at("/tmp/.lampos-ns");
+    let socket = at(SKILLS_SOCKET);
+    // With the switch on, the skills' socket folder's own steps, in their
+    // place; off, none.
+    let when = |line: String| skills.then_some(line);
     let order = [
-        format!(
+        Some(format!(
             "mount -t tmpfs -o size=256m,mode=1777,nosuid,nodev none {}",
             at("/tmp")
-        ),
-        format!("mkdir -m 0700 {stage} {stage}/h {stage}/w {stage}/k"),
-        format!("mount --bind {} {stage}/h", at(PLACE)),
-        format!("mount --bind {} {stage}/w", at(WORK)),
-        format!("mount --bind {} {stage}/k", at(SKILLS)),
-        format!("mount --bind {resolv} {stage}/r"),
-        format!(
+        )),
+        Some(if skills {
+            format!("mkdir -m 0700 {stage} {stage}/h {stage}/w {stage}/k {stage}/c")
+        } else {
+            format!("mkdir -m 0700 {stage} {stage}/h {stage}/w {stage}/k")
+        }),
+        Some(format!("mount --bind {} {stage}/h", at(PLACE))),
+        Some(format!("mount --bind {} {stage}/w", at(WORK))),
+        Some(format!("mount --bind {} {stage}/k", at(SKILLS))),
+        when(format!("mount --bind {socket} {stage}/c")),
+        Some(format!("mount --bind {resolv} {stage}/r")),
+        Some(format!(
             "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
             at("/run")
-        ),
-        format!(
+        )),
+        Some(format!(
             "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
             at("/var/lib")
-        ),
-        format!(
+        )),
+        Some(format!(
             "mount -t tmpfs -o size=4k,mode=0555,nosuid,nodev,noexec none {}",
             at("/etc/lampOS")
-        ),
-        format!("mount --move {stage}/h {}", at(PLACE)),
-        format!("mount --move {stage}/w {}", at(WORK)),
-        format!("mount --move {stage}/k {}", at(SKILLS)),
-        format!(
+        )),
+        Some(format!("mount --move {stage}/h {}", at(PLACE))),
+        Some(format!("mount --move {stage}/w {}", at(WORK))),
+        Some(format!("mount --move {stage}/k {}", at(SKILLS))),
+        Some(format!(
             "mount -o remount,bind,ro,nosuid,nodev,relatime {}",
             at(SKILLS)
-        ),
-        format!("mount --move {stage}/r {resolv}"),
-        format!("mount -o remount,bind,ro,nosuid,nodev,relatime {resolv}"),
-        format!("rmdir {stage}/h {stage}/w {stage}/k {stage}"),
-        format!(
+        )),
+        when(format!("mount --move {stage}/c {socket}")),
+        when(format!(
+            "mount -o remount,bind,ro,nosuid,nodev,relatime {socket}"
+        )),
+        Some(format!("mount --move {stage}/r {resolv}")),
+        Some(format!(
+            "mount -o remount,bind,ro,nosuid,nodev,relatime {resolv}"
+        )),
+        Some(if skills {
+            format!("rmdir {stage}/h {stage}/w {stage}/k {stage}/c {stage}")
+        } else {
+            format!("rmdir {stage}/h {stage}/w {stage}/k {stage}")
+        }),
+        Some(format!(
             "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
             at("/run")
-        ),
-        format!(
+        )),
+        Some(format!(
             "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
             at("/var/lib")
-        ),
-        format!(
+        )),
+        Some(format!(
             "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
             at("/etc/lampOS")
-        ),
-        format!(
+        )),
+        Some(format!(
             "unshare --user --map-user=996 --map-group=994 {} chat -q a b",
             at(HERMES)
-        ),
+        )),
     ];
+    let order: Vec<String> = order.into_iter().flatten().collect();
     let places: Vec<usize> = order.iter().map(|line| find(line)).collect();
+    if !skills {
+        // Off: the skills' socket folder, there on this root, is never
+        // named, so it stays under the empty /run.
+        assert!(
+            !lines.iter().any(|line| line.contains(&socket)),
+            "{lines:#?}"
+        );
+    }
     assert!(places.windows(2).all(|two| two[0] < two[1]), "{lines:#?}");
     assert_eq!(*places.last().unwrap(), lines.len() - 1, "Hermes last");
     let shown: Vec<&str> = lines
@@ -896,6 +984,7 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
     let allowed: Vec<String> = ALLOWED
         .iter()
         .map(|path| at(path))
+        .chain(skills.then(|| socket.clone()))
         .chain([resolv.clone()])
         .collect();
     assert_eq!(
@@ -903,7 +992,13 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
         allowed.iter().map(String::as_str).collect::<Vec<_>>()
     );
     // Each step failing ends it before Hermes runs.
-    for fail_on in [
+    let socket_steps = [
+        format!("--bind {socket}"),
+        format!("mount --move {stage}/c"),
+        format!("findmnt -no VFS-OPTIONS -M {socket}"),
+        format!("remount,bind,ro,nosuid,nodev,relatime {socket}"),
+    ];
+    let steps = [
         format!("none {}", at("/tmp")),
         format!("none {}", at("/var/tmp")),
         "mkdir -m 0700".to_owned(),
@@ -924,14 +1019,54 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
         format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/run")),
         format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/var/lib")),
         format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/etc/lampOS")),
-    ] {
-        let (out, lines) = run(&fail_on);
+    ];
+    let socket_steps = if skills { &socket_steps[..] } else { &[] };
+    for fail_on in steps.iter().chain(socket_steps) {
+        let (out, lines) = run(fail_on);
         assert!(!out.status.success(), "{fail_on}: {lines:#?}");
         assert!(
             !lines.iter().any(|line| line.starts_with("unshare ")),
             "{fail_on}: Hermes ran"
         );
+        assert!(
+            lines.iter().any(|line| line.contains(fail_on.as_str())),
+            "{fail_on}: never reached"
+        );
     }
+    if !skills {
+        return;
+    }
+    // A lamp with no skills' socket folder (no lamp-skills): skipped, and
+    // Hermes still runs; nothing else under /run but resolv.conf is shown.
+    fs::remove_dir_all(&socket).unwrap();
+    let (out, lines) = run("");
+    assert!(out.status.success(), "{out:?}");
+    assert!(
+        !lines.iter().any(|line| line.contains(&socket)),
+        "{lines:#?}"
+    );
+    let shown: Vec<&str> = lines
+        .iter()
+        .filter_map(|line| line.strip_prefix("mount --move "))
+        .map(|line| line.rsplit(' ').next().unwrap())
+        .collect();
+    assert_eq!(
+        shown,
+        [at(PLACE), at(WORK), at(SKILLS), resolv.clone()]
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        lines.last().map(String::as_str),
+        Some(
+            format!(
+                "unshare --user --map-user=996 --map-group=994 {} chat -q a b",
+                at(HERMES)
+            )
+            .as_str()
+        )
+    );
 }
 
 /// Hermes's own update check, its plugins' and its language servers are
@@ -975,7 +1110,7 @@ fn no_user_namespace_is_no_userns_and_nothing_is_installed() {
 #[test]
 fn on_with_harness_missing_hermes_is_installed_right_after_harness() {
     let lamp = Lamp::new();
-    at_start(lamp.root(), &lamp.records(), true, 1);
+    at_start(lamp.root(), &lamp.records(), true, false, 1);
     let mut systemd = Fake::default();
     let harness_said = harness_install::after_round(
         lamp.root(),
@@ -1253,7 +1388,7 @@ fn another_hermes_is_moved_aside_then_removed_once_the_new_one_runs() {
     lamp.hermes_at(OTHER);
     fs::write(lamp.at(&format!("{HERMES_HOME}/config.yaml")), "old: 1\n").unwrap();
     fs::write(lamp.at(WRAPPER), "#!/bin/sh\nexec old\n").unwrap();
-    assert!(!present(lamp.root()));
+    assert!(!present(lamp.root(), false));
     lamp.ask();
     // First a failed try: the old one stays aside.
     let runs = Runs {
@@ -1278,7 +1413,7 @@ fn another_hermes_is_moved_aside_then_removed_once_the_new_one_runs() {
     assert_eq!(said.install, "installed", "{said:?}");
     assert!(!lamp.at(ASIDE).exists(), "removed once the new one runs");
     assert_eq!(head(lamp.root()).as_deref(), Some(COMMIT));
-    assert!(present(lamp.root()));
+    assert!(present(lamp.root(), false));
     let lines = runs.lines();
     let ran = lines
         .iter()
@@ -1312,7 +1447,7 @@ fn an_older_wrapper_over_the_pinned_hermes_is_written_anew_with_no_install() {
     let lamp = Lamp::new();
     lamp.hermes_there();
     fs::write(lamp.at(WRAPPER), "#!/bin/sh\nexec sudo old\n").unwrap();
-    assert!(!present(lamp.root()));
+    assert!(!present(lamp.root(), false));
     lamp.ask();
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
@@ -1321,7 +1456,7 @@ fn an_older_wrapper_over_the_pinned_hermes_is_written_anew_with_no_install() {
     assert!(runs.ran(&format!(
         "{AS_LAMPOS}{HERMES} config set updates.check false"
     )));
-    assert!(present(lamp.root()));
+    assert!(present(lamp.root(), false));
 }
 
 /// The switch off: a round that finds an entry point asks the one-shot to
@@ -1343,7 +1478,8 @@ fn the_switch_off_takes_the_wrapper_out() {
         lamp.asked(),
         Some(Ask {
             version: 1,
-            remove: true
+            remove: true,
+            skills: false,
         })
     );
     let runs = Runs::new(&lamp);
@@ -1406,7 +1542,7 @@ fn a_checkout_at_another_commit_is_version() {
         Some("version")
     );
     assert!(lamp.entry_points().is_empty());
-    assert!(!present(lamp.root()));
+    assert!(!present(lamp.root(), false));
     assert_eq!(round(&lamp, &mut Fake::default(), 6), None);
     assert_eq!(
         round(&lamp, &mut Fake::default(), 5 + 24 * HOUR_MS)
@@ -1552,6 +1688,151 @@ fn the_product_units_do_not_turn_the_lamps_hermes_on() {
         assert!(!text.lines().any(|line| line == switch), "{unit}");
     }
     assert!(!cloud.contains("lampos-hermes"));
+    // The skills switch (#6128): named by no product unit at all, so it is
+    // lamp-update's build default, on on a product lamp.
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if let Ok(text) = fs::read_to_string(&path) {
+            assert!(!text.contains(SKILLS_SWITCH), "{}", path.display());
+        }
+    }
+}
+
+/// The skills switch (#6128) is read as [`SWITCH`] is, on by default on
+/// every product lamp (the product owner's decision, 11 Nov: a person has
+/// no way to turn it on): unset is on on a product lamp, off on any other;
+/// set, only `on` is on, so `off` turns a product lamp off.
+#[test]
+fn the_skills_switch_is_on_by_default_on_every_lamp() {
+    const { assert!(SKILLS_PRODUCT_DEFAULT) };
+    assert_eq!(SKILLS_SWITCH, "LAMP_HERMES_SKILLS");
+    assert!(
+        wanted(None, true, SKILLS_PRODUCT_DEFAULT),
+        "a product lamp, unset"
+    );
+    assert!(
+        !wanted(None, false, SKILLS_PRODUCT_DEFAULT),
+        "another lamp, unset"
+    );
+    for product in [true, false] {
+        for value in ["off", "", "ON", "1", "yes"] {
+            assert!(!wanted(Some(value), product, SKILLS_PRODUCT_DEFAULT));
+        }
+        assert!(wanted(Some("on"), product, SKILLS_PRODUCT_DEFAULT));
+    }
+}
+
+/// [`ns_text`]: off, exactly [`NS_TEXT`]; on, each of [`SKILLS_EDITS`]
+/// found once in [`NS_TEXT`] and made, so the text names
+/// [`SKILLS_SOCKET`] and stages, moves back, remounts read-only and
+/// removes its staging folder; nothing else of the script changes.
+#[test]
+fn the_skills_text_is_the_namespace_script_with_only_the_skills_socket_added() {
+    assert_eq!(ns_text(false), NS_TEXT);
+    assert!(!NS_TEXT.contains(SKILLS_SOCKET));
+    assert!(!NS_TEXT.contains("$C"));
+    let on = ns_text(true);
+    for (from, to) in SKILLS_EDITS {
+        assert_eq!(NS_TEXT.matches(from).count(), 1, "{from}");
+        assert!(on.contains(to), "{to}");
+    }
+    assert!(on.contains(&format!("C={SKILLS_SOCKET} ")));
+    assert!(on.contains("mount --move \"$S/c\" \"$C\" && ro \"$C\""));
+    // Only lines added or widened: every line off is in the text on.
+    let lines_on: Vec<&str> = on.lines().collect();
+    for line in NS_TEXT.lines().filter(|line| {
+        !SKILLS_EDITS
+            .iter()
+            .any(|(from, _)| from.contains(line) || line.contains(from.trim_end()))
+    }) {
+        assert!(lines_on.contains(&line), "{line}");
+    }
+    // The skills' socket is moved back before /run is made read-only and
+    // before Hermes runs.
+    let shown = on.find("mount --move \"$S/c\"").unwrap();
+    let ro_run = on
+        .find("mount -o remount,bind,ro,nosuid,nodev,noexec /run")
+        .unwrap();
+    let hidden = on.find("none /run ||").unwrap();
+    let staged = on.find("mount --bind \"$C\" \"$S/c\"").unwrap();
+    assert!(staged < hidden && hidden < shown && shown < ro_run);
+    // The switch is in the text alone: the script reads no flag file, and
+    // nothing of the caller's environment but its ids.
+    assert_eq!(
+        on.matches("LAMP_").count(),
+        NS_TEXT.matches("LAMP_").count() + 1,
+        "only the comment names the switch"
+    );
+}
+
+/// Turning the skills switch on with Hermes there (written with it off):
+/// a round finds Hermes not there as this build puts it and asks the
+/// one-shot with `skills`; the one-shot runs no installer stage, writes
+/// the namespace script with the skills' socket, and Hermes is there.
+/// Turning it off again writes the script back without it.
+#[test]
+fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    lamp.hermes_there();
+    assert!(present(lamp.root(), false));
+    assert!(!present(lamp.root(), true));
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, 5).unwrap().install, "installed");
+    let said = round_with_skills(&lamp, &mut systemd, 10).unwrap();
+    assert_eq!(said.install, "installing");
+    assert_eq!(
+        lamp.asked(),
+        Some(Ask {
+            version: 1,
+            remove: false,
+            skills: true
+        })
+    );
+    let text = fs::read_to_string(lamp.records().join(ASK)).unwrap();
+    assert!(text.contains("\"skills\":true"), "{text}");
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
+    assert!(runs.stages().is_empty(), "no installer stage");
+    assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), ns_text(true));
+    assert_eq!(fs::read_to_string(lamp.at(WRAPPER)).unwrap(), WRAPPER_TEXT);
+    assert_eq!(mode(&lamp.at(NS)), 0o755);
+    assert!(present(lamp.root(), true) && !present(lamp.root(), false));
+    assert_eq!(
+        round_with_skills(&lamp, &mut systemd, 30),
+        None,
+        "nothing to do"
+    );
+
+    // Off again.
+    assert_eq!(
+        round(&lamp, &mut systemd, 40).unwrap().install,
+        "installing"
+    );
+    assert_eq!(lamp.asked(), Some(Ask::default_with(1)));
+    let text = fs::read_to_string(lamp.records().join(ASK)).unwrap();
+    assert!(!text.contains("skills"), "{text}");
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 50).unwrap().install, "installed");
+    assert!(runs.stages().is_empty());
+    assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), NS_TEXT);
+    assert!(present(lamp.root(), false));
+}
+
+/// An ask an older build wrote, with no `skills`, is read as off: the
+/// namespace script shows nothing under `/run`.
+#[test]
+fn an_ask_without_skills_is_off() {
+    let ask: Ask = serde_json::from_str("{\"version\":1}").unwrap();
+    assert_eq!(ask, Ask::default_with(1));
+    let lamp = Lamp::new();
+    lamp.hermes_there();
+    fs::write(lamp.at(NS), ns_text(true)).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
+    assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), NS_TEXT);
 }
 
 /// Under 1 GiB of memory available (`MemAvailable`; lamp-c0a4 had about
