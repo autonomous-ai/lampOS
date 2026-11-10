@@ -28,6 +28,10 @@ Environment=LAMP_BUS_ROOT=/run/lampos-bus
 # lamp's drop-in sets 0.0.0.0:80, so the page is http://lamp-xxxx.local/.
 #Environment=LAMP_PEEK_LISTEN=0.0.0.0:80
 #LoadCredential=peek-token:/etc/lampOS/peek/token
+# Monitor mode (LAMP_PEEK=monitor, #5883): its admin socket, where lamp-cloud asks for a
+# one-time code, /run/lampos-peek/admin.sock, this user and root only.
+RuntimeDirectory=lampos-peek
+RuntimeDirectoryMode=0700
 # Port 80 and nothing else: the one capability it is given.
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
