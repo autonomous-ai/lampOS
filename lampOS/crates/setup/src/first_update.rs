@@ -18,10 +18,11 @@
 //! [`MOST`] passing ends the wait, and the marker is written on whatever
 //! build the lamp has: a failed or slow update never strands setup.
 //!
-//! While setup waits, `/var/lib/lampos-setup/first-update` is there
-//! ([`WAITING`]), so the updater leaves setup's own unit alone as it does a
-//! completed setup's (`lamp_update::setup_lifecycle`): a restart would end
-//! the wait mid-round.
+//! While setup waits, and on until its marker is written,
+//! `/var/lib/lampos-setup/first-update` is there ([`WAITING`]), so the
+//! updater leaves setup's own unit alone as it does a completed setup's
+//! (`lamp_update::setup_lifecycle`): a restart would end the wait mid-round,
+//! or bring the hotspot back before the marker.
 use lamp_msgs::{UpdateCheck, UpdateResult, UpdateStatus};
 use std::{
     io,

@@ -573,17 +573,20 @@ marker (`crate::first_update`):
    updater below the build's `min_updater`) is followed by the new updater's
    own round. An unreachable round may have begun before the join, so it is
    asked once more after the least time between checks (60 s). Any other end,
-   an updater not heard in 20 s, or 10 minutes from the ask ends the wait.
+   an updater not heard in 20 s, or 10 minutes from the wait's start (setup's
+   first look at the updater's status, before the ask) ends the wait.
 4. `updating` goes back to false, the journal says
    `the first update ended (…) in N s; the marker follows`, and the marker is
    written as before: on stable's build after a switch, on the image's
    otherwise. No end of the wait fails setup.
 
-While it waits, `/var/lib/lampos-setup/first-update` is there, and the
-updater leaves `lamp-setup.service` alone as it leaves a completed setup's
-grace period (`setup_lifecycle`, the same unit and drop-in checks): a
-restart would cut the wait off and bring the hotspot back. The old process
-runs to its marker, and the next start removes a file a crash left.
+While it waits, and on until the marker is written,
+`/var/lib/lampos-setup/first-update` is there, and the updater leaves
+`lamp-setup.service` alone as it leaves a completed setup's grace period
+(`setup_lifecycle`, the same unit and drop-in checks): a restart would cut
+the wait off, or bring the hotspot back between the wait's end and the
+marker. The file goes once the marker is written, or once setup failed
+anyway, and the next start removes a file a crash left (#5965).
 
 An app that doesn't send `update_first` (every app before it, V1's page and
 this crate's own) gets setup as before: it gives up on a setup that takes

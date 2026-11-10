@@ -936,7 +936,10 @@ impl Files<'_> {
 
     /// The first update's wait (#5458), with the file the updater reads
     /// as setup waiting (`first_update::WAITING`, next to the marker) put
-    /// there first, so a round leaves this unit alone meanwhile.
+    /// there first, so a round leaves this unit alone meanwhile. It stays
+    /// after the wait, until [`Save::update_first_over`]: between the
+    /// wait's end and the marker a restart would still bring the hotspot
+    /// back (reviewer-two's HOLD on #5965).
     pub fn wait_first_update(
         &mut self,
         wait: impl FnOnce() -> crate::first_update::Ended,
@@ -946,9 +949,7 @@ impl Files<'_> {
         if let Err(error) = write_private(&waiting, b"") {
             return Ended::NotAsked(format!("{}: {error}", waiting.display()));
         }
-        let ended = wait();
-        let _ = fs::remove_file(&waiting);
-        ended
+        wait()
     }
 }
 
@@ -1040,6 +1041,9 @@ impl Save for Files<'_> {
                 eprintln!("lamp-setup: {line}");
             });
         }
+    }
+    fn update_first_over(&mut self) {
+        let _ = fs::remove_file(self.0.marker.with_file_name(crate::first_update::WAITING));
     }
     fn own_keys_on(&self) -> bool {
         crate::keys::on(std::env::var(crate::keys::ENVIRONMENT).ok().as_deref())
@@ -1244,6 +1248,12 @@ pub fn run(
             // first line is already at it (#5551).
             .map(|()| save.first_volume())
             .and_then(|()| save.marker());
+            // The first update's file stays until the marker is there, so
+            // no round restarts setup in between; after a failure too, so
+            // the next try's round is not held off (#5965).
+            if accepted.update_first {
+                save.update_first_over();
+            }
             if save.keeps_settings() {
                 let mut status = status.lock().unwrap();
                 status.share_reports = saved.is_ok() && reports_kept;
