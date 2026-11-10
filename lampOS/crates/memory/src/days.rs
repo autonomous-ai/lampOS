@@ -790,9 +790,12 @@ impl Days {
     /// Whether a correction of `old` in `text` would only say it again: `old`
     /// is a kept thing of this person's, active, not newer than `at`, that
     /// `shown` holds (each as [`Self::remember_replacing_on_by`] checks), and
-    /// its words are `text`'s (the same as `once` compares them,
-    /// [`same_text`]). Anything else is `false`, and the correction goes on
-    /// to be checked, and refused or kept, as before.
+    /// its words are `text`'s, the same as `once` compares them
+    /// ([`once_text`]: C81 on lamp-06c1, stock 11091, 10 Nov, "They said: my
+    /// gym locker code is 441." kept as heard, then "Gym locker code is 441."
+    /// replaced it as a new id and no time it was said again was kept).
+    /// Anything else is `false`, and the correction goes on to be checked,
+    /// and refused or kept, as before.
     pub fn restates(
         &self,
         person: &Person,
@@ -812,7 +815,7 @@ impl Days {
             && record.active
             && record.at_unix_ms <= at
             && !text.is_empty()
-            && same_text(&record.text) == same_text(&text))
+            && once_text(person, &record.text) == once_text(person, &text))
     }
 
     /// A remember's `from`, the person's own exchanges, and its text tidied.
@@ -854,25 +857,16 @@ impl Days {
     }
 
     /// The id of this person's active kept thing with `text`, the same by
-    /// [`same_text`], and in a person's own scope by [`own_text`] too.
+    /// [`once_text`].
     fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
-        let own = person.as_str() != Person::EVERYONE;
-        let fold = |text: &str| {
-            let same = same_text(text);
-            if own {
-                own_text(&same).to_owned()
-            } else {
-                same
-            }
-        };
-        let wanted = fold(text);
+        let wanted = once_text(person, text);
         let mut statement = self.db.prepare(
             "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id",
         )?;
         let mut rows = statement.query([person.as_str()])?;
         while let Some(row) = rows.next()? {
             let kept: String = row.get(1)?;
-            if fold(&kept) == wanted {
+            if once_text(person, &kept) == wanted {
                 return Ok(Some(row.get(0)?));
             }
         }
@@ -2805,11 +2799,27 @@ pub(crate) fn same_text(text: &str) -> String {
 /// there (C81, stock 10538 on lamp-06c1, 6 Nov: "The gym locker code is
 /// 441." kept, "My gym locker code is 441." said again and kept twice). In
 /// the room's, "my" is whoever said it, so it is never folded.
+/// A line the voice kept as heard leads with "They said: " (its
+/// `remember::heard::SAID`), which is folded first: "They said: my gym
+/// locker code is 441." is "Gym locker code is 441." (C81, stock 11091 on
+/// lamp-06c1, 10 Nov).
 fn own_text(same: &str) -> &str {
+    let same = same.strip_prefix("they said: ").unwrap_or(same);
     ["my ", "the "]
         .iter()
         .find_map(|lead| same.strip_prefix(lead))
         .unwrap_or(same)
+}
+
+/// The words `once` compares in `person`'s scope: [`same_text`], and in a
+/// person's own scope [`own_text`] too.
+fn once_text(person: &Person, text: &str) -> String {
+    let same = same_text(text);
+    if person.as_str() != Person::EVERYONE {
+        own_text(&same).to_owned()
+    } else {
+        same
+    }
 }
 
 fn is_punctuation(c: char) -> bool {

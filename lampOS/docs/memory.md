@@ -955,8 +955,10 @@ With `"once":true` (#2176, the voice's `LAMP_MEMORY_REMEMBER_ONCE`), a text
 the same person already keeps, active and the same words, ignoring case,
 spacing and a final punctuation mark (and, in a person's own scope, a leading
 "my" or "the": C81, stock 10538 on lamp-06c1, 6 Nov, "The gym locker code is
-441." kept and "My gym locker code is 441." kept again; never in the room's,
-where "my" is whoever said it, `days::own_text`), is answered
+441." kept and "My gym locker code is 441." kept again; and before it the
+"They said: " a line kept as heard leads with: C81, stock 11091, 10 Nov,
+"They said: my gym locker code is 441." is "Gym locker code is 441."; never
+in the room's, where "my" is whoever said it, `days::own_text`), is answered
 `{"ok":true,"id":24,"existing":true}` with that kept thing's id, and no
 entry is written; it gains this conversation's `source_ids`, so forgetting
 it with `LAMP_MEMORY_FORGET_ALL` removes both conversations' exchanges
@@ -2164,7 +2166,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   time called `remember` again with the same text (lamp-06c1, the second
   route, build 4142: kept ids 24 and 25). Now a text the person already
   keeps (the same words, ignoring case, spacing and a final punctuation
-  mark, and in their own scope a leading "my" or "the", C81) is that kept
+  mark, and in their own scope a leading "They said: ", "my" or "the", C81) is that kept
   thing, no entry is written, it gains this
   conversation's exchanges as sources (so forgetting it with
   `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told
@@ -2333,9 +2335,13 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     kept thing said again, answered `existing` as `once` answers it, with no
     new version (`Days::restates`; C81 on lamp-06c1, 5 Nov: "gym locker code
     441" said twice came back as `replaces` of itself and was kept as a new
-    id, never marked said again;
+    id, never marked said again; and stock 11091, 10 Nov: "They said: my gym
+    locker code is 441." kept as heard, then "Gym locker code is 441." named
+    it, was kept as a new id with no "last said", as `restates` compared the
+    words without the own scope's folding;
     `days_protocol::tests::a_correction_with_once_is_never_deduplicated_and_an_id_out_of_range_is_refused`,
-    `it::days::a_correction_in_the_very_words_it_replaces_is_said_again`).
+    `it::days::a_correction_in_the_very_words_it_replaces_is_said_again`,
+    `it::days::a_heard_keep_said_again_in_the_models_words_is_said_again`).
   - **The journal**, counts and yes/no only, never a word of the call,
     of what was heard or of what was kept:
     - One line per `remember` call, both routes:
