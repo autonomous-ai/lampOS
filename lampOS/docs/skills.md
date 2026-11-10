@@ -2073,7 +2073,11 @@ gone ([switches.md](switches.md)). What happens:
    own, declared once and routed to `Route::MakeLocal`, with a tasks part
    or without one; the tasks part never declares it, and a skill is never
    handed to a computer. There is no `put_on_made_skill` since #5977: a
-   made skill goes on as soon as it is kept (step 8).
+   made skill goes on as soon as it is kept (step 8). So it is made only
+   in a turn someone spoke (`heard`): in the lamp's own event turn, a
+   hand-over or on the model's own idea, `make_skill` makes and keeps
+   nothing and is told `make_skill_local::NOT_ASKED_ALOUD` (Thirteen's P2
+   on #5985).
    `make_skill` makes at once, with no read-back: the model says in a few
    words that it is making it, and the person waits. The switch is given to
    the second route's worker only (`process.rs`), which keeps the chat's

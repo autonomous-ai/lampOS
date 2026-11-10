@@ -22,7 +22,11 @@ sau:
    khai báo một lần và đi tới `Route::MakeLocal`, có hay không có phần
    tasks; phần tasks không bao giờ khai báo nó, và kỹ năng không bao giờ
    được giao cho máy tính. Không còn `put_on_made_skill` từ #5977: kỹ năng
-   đã tạo được bật ngay khi được giữ (bước 8).
+   đã tạo được bật ngay khi được giữ (bước 8). Vì vậy nó chỉ được tạo
+   trong một lượt có người nói (`heard`): trong lượt sự kiện của chính
+   đèn, một lần giao việc hay theo ý riêng của mô hình, `make_skill` không
+   tạo, không giữ gì và được báo `make_skill_local::NOT_ASKED_ALOUD` (P2
+   của Thirteen trên #5985).
    `make_skill` tạo ngay, không đọc lại: mô hình nói vài chữ rằng nó đang
    tạo, và người dùng chờ. Công tắc chỉ được đưa cho worker của tuyến thứ
    hai (`process.rs`), worker này giữ cấu hình chat như khi nó khởi động,
