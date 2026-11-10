@@ -616,6 +616,14 @@ pub const ANSWER_ASK_AGAIN_ENVIRONMENT: &str = "LAMP_ANSWER_ASK_AGAIN";
 /// call ([`ANSWER_ASK_AGAIN_ENVIRONMENT`]): once, never twice in a row.
 pub(crate) const ANSWER_AGAIN_LINE: &str = "Sorry, could you say that again?";
 
+/// Where the worker reads whether a person's words cut short by a line let
+/// out, and not joined to it, are answered in its place when that line's
+/// answer only declines ([`Engine::answering_cut_words_a_decline_leaves`]):
+/// `on`, and nothing else. On lamp-52e6 on 10 Nov 09:5x an 8-word ask cut
+/// by a 1-word line in a busy room with no face seen was let go, and the
+/// model's `not_for_me` on the one word left it unanswered (#5961).
+pub const CUT_ASK_ANSWERED_ENVIRONMENT: &str = "LAMP_CUT_ASK_ANSWERED";
+
 /// What a turn of short answers is said when its calls' own lines differ
 /// ("Brighter." with "Quieter."): one line, never two (#2877).
 pub(crate) const SHORT_DONE_TOGETHER: &str = "Done.";
@@ -1485,6 +1493,12 @@ struct Shared {
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
     answer_again: bool,
+    /// [`Engine::answering_cut_words_a_decline_leaves`] (#5961).
+    cut_ask_answered: bool,
+    /// The line let out whose cut words wait on its answer
+    /// (`LAMP_CUT_ASK_ANSWERED`): still set when [`answer`] returns, its
+    /// answer only declined, and they are answered in its place.
+    declined_in_place: Mutex<Option<u64>>,
     /// Whether a request was judged said by the person the lamp asked:
     /// their voice, or a face turned to the lamp
     /// ([`Engine::answering_the_asked_person`]).
@@ -4162,6 +4176,8 @@ impl Engine {
                 worded_claims: false,
                 no_words_again: false,
                 answer_again: false,
+                cut_ask_answered: false,
+                declined_in_place: Mutex::new(None),
                 asked_person: None,
                 written_wait: false,
                 second_try: None,
@@ -5367,6 +5383,21 @@ impl Engine {
     pub fn asking_again_for_answers(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.answer_again = on;
+        }
+        self
+    }
+
+    /// `LAMP_CUT_ASK_ANSWERED=on` ([`CUT_ASK_ANSWERED_ENVIRONMENT`], #5961):
+    /// words cut short by a line let out, not joined to it nor told first
+    /// in its answer, are kept while it is answered. If its answer only
+    /// declines (`not_for_me`, nothing said, run or done), they are answered
+    /// in its place, as a held line's are; otherwise they are let go, as
+    /// before. Never the lamp's name it was not shown said by, words after
+    /// a stop, or words said to a person (`LAMP_NAME_SAID_TO_A_PERSON`).
+    /// Before any turn only.
+    pub fn answering_cut_words_a_decline_leaves(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.cut_ask_answered = on;
         }
         self
     }
@@ -9323,8 +9354,10 @@ async fn spoken(
         .map(|carried| carried.earlier.clone())
         .unwrap_or_default();
     let cut_from = carried.as_ref().map(origins).unwrap_or_default();
+    let mut the_name_refused = false;
     let (text, carried, parts) = match carried {
         Some(carried) if name_refused(&shared, request, &carried) => {
+            the_name_refused = true;
             (text, Some(carried), vec![own])
         }
         Some(carried) => {
@@ -9347,9 +9380,19 @@ async fn spoken(
         }
         None => (text, None, vec![own]),
     };
-    // Words let go, or none carried: a send kept for them goes too (#5853).
+    // Words not joined, a person's ask, kept while this line is answered:
+    // answered in its place if its answer only declines
+    // (`LAMP_CUT_ASK_ANSWERED`, #5961). Never the name, nor words said to a
+    // person, as a held line's are not.
+    let keep_cut = shared.cut_ask_answered
+        && !the_name_refused
+        && carried.as_ref().is_some_and(|carried| {
+            cut_said_to_a_person(shared.cut_to_a_person, &carried.text(), &text).is_none()
+        });
+    // Words let go, or none carried: a send kept for them goes too (#5853);
+    // kept, only once they are let go.
     let joined_sent = !cut_from.is_empty() && carried.is_none();
-    if !joined_sent {
+    if !joined_sent && !keep_cut {
         drop_sent_write(&shared, None);
     }
     // Words cut short in their pause's grace and not joined to this line,
@@ -9600,11 +9643,24 @@ async fn spoken(
         // (30 Oct, #3997's cut-in proposal).
         .chain(cut_in)
         .collect();
-    if let Some(carried) = carried.filter(|_| !cut_told) {
+    let (kept_cut, let_go) = match carried.filter(|_| !cut_told) {
+        Some(carried) if keep_cut => (Some(carried), None),
+        carried => (None, carried),
+    };
+    if let Some(carried) = let_go {
         eprintln!(
             "lamp-voice second: request {}'s words, cut short, are let go: request {request} is answered",
             carried.request
         );
+    }
+    if let Some(kept) = &kept_cut {
+        eprintln!(
+            "lamp-voice second: request {}'s words, cut short, wait on request {request}'s answer: answered in its place if it only declines (LAMP_CUT_ASK_ANSWERED)",
+            kept.request
+        );
+        if let Ok(mut declined) = shared.declined_in_place.lock() {
+            *declined = Some(request);
+        }
     }
     let memory_write_owner = WriteOwner::default();
     put_in_flight(
@@ -9643,6 +9699,8 @@ async fn spoken(
     if let Some(heard) = &shared.words_heard {
         heard(request, &text);
     }
+    let lease = kept_cut.as_ref().and(scope.clone());
+    let kept_times = kept_cut.as_ref().map(|_| times.clone());
     answer(
         &shared,
         (request, scope),
@@ -9654,6 +9712,72 @@ async fn spoken(
         times,
         prepared,
         Some(memory_write_owner),
+    )
+    .await;
+    if let (Some(carried), Some(times)) = (kept_cut, kept_times) {
+        answered_if_declined(&shared, (request, lease), carried, times).await;
+    }
+}
+
+/// Words a line let out cut short and kept while it was answered
+/// (`LAMP_CUT_ASK_ANSWERED`, #5961): answered in `request`'s place when its
+/// answer only declined, as a held line's are (#1712); else let go, as
+/// before, with any send kept for them (#5853).
+async fn answered_if_declined(
+    shared: &Shared,
+    (request, lease): (u64, Option<crate::memory_scope::ScopeLease>),
+    carried: Carried,
+    times: Arc<Mutex<Times>>,
+) {
+    let declined = shared
+        .declined_in_place
+        .lock()
+        .ok()
+        .and_then(|mut declined| declined.take_if(|of| *of == request))
+        .is_some();
+    if !declined {
+        drop_sent_write(shared, None);
+        eprintln!(
+            "lamp-voice second: request {}'s words, cut short, are let go: request {request} is answered",
+            carried.request
+        );
+        return;
+    }
+    eprintln!(
+        "lamp-voice second: request {request} only declined, so request {}'s words, cut short by it, are answered in its place (LAMP_CUT_ASK_ANSWERED)",
+        carried.request
+    );
+    unsay_carried(shared, request, &carried);
+    let owner = carried.memory_write_owner.clone();
+    put_in_flight(
+        shared,
+        Carried {
+            request,
+            unchecked: Vec::new(),
+            ..carried.clone()
+        },
+    );
+    // Their go-ahead's write, as a held line's (#5853).
+    let sent_note = match sent_with_words(shared, &origins(&carried), request).await {
+        SentWith::Cut => return,
+        SentWith::Nothing => None,
+        SentWith::Told(note) => note,
+    };
+    let notes = told_earlier(shared, request, lease.as_ref(), &carried.earlier)
+        .into_iter()
+        .chain(sent_note.map(str::to_owned))
+        .collect();
+    answer(
+        shared,
+        (request, lease),
+        carried.text(),
+        Asker::Spoken,
+        None,
+        None,
+        notes,
+        times,
+        None,
+        Some(owner),
     )
     .await;
 }
@@ -16103,6 +16227,22 @@ async fn answer(
         request,
         ended.as_ref().ok().map(|(_, whole)| whole.as_str()),
     );
+    // Only declined, nothing said, run or done, with words it cut short
+    // waiting on it (`LAMP_CUT_ASK_ANSWERED`, #5961): the turn is not over,
+    // those words are answered in its place ([`answered_if_declined`]).
+    // Else they are let go there.
+    let in_its_place = matches!(ended, Err(Stop::Declined))
+        && !ran.load(Ordering::Relaxed)
+        && !answered.load(Ordering::Relaxed)
+        && !acted.load(Ordering::Relaxed);
+    if let Ok(mut declined) = shared.declined_in_place.lock()
+        && *declined == Some(request)
+    {
+        if in_its_place {
+            return;
+        }
+        *declined = None;
+    }
     // Only asking the person to wait ("One moment."), or ending with a
     // promise to check ("Let me look."), with nothing called:
     // the coordinator asks this route to go on, as it asks Gemini

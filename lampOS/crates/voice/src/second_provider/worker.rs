@@ -3746,6 +3746,19 @@ pub fn serve(
         );
     }
     engine = engine.asking_again_for_answers(answer_again);
+    // An ask cut short by a line let out whose answer only declines is
+    // answered in its place, never let go silently
+    // (`LAMP_CUT_ASK_ANSWERED=on`, #5961).
+    let cut_ask_answered = std::env::var(crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if cut_ask_answered {
+        eprintln!(
+            "lamp-voice second: words cut short by a line let out are answered in its place when its answer only declines (LAMP_CUT_ASK_ANSWERED)"
+        );
+    }
+    engine = engine.answering_cut_words_a_decline_leaves(cut_ask_answered);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)

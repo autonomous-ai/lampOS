@@ -1955,6 +1955,8 @@ fn second_route_worker_environment(
         crate::cut_in_wordless::RESUMES_ENVIRONMENT,
         // An empty answer to the lamp's own question asked again (Queue #4710).
         crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
+        // An ask cut by a line let out that only declines is answered (#5961).
+        crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         // A don't-know about the person recalls their kept things first (C57).
@@ -2203,6 +2205,7 @@ mod tests {
             crate::cut_in_wordless::ENVIRONMENT,
             crate::cut_in_wordless::RESUMES_ENVIRONMENT,
             crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
+            crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::dont_know::ENVIRONMENT,
             crate::remember::doubted::UNDOES_ENVIRONMENT,
@@ -3054,6 +3057,7 @@ mod tests {
                     || name == crate::cut_in_wordless::ENVIRONMENT
                     || name == crate::cut_in_wordless::RESUMES_ENVIRONMENT
                     || name == crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT
+                    || name == crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::dont_know::ENVIRONMENT
@@ -3207,6 +3211,7 @@ mod tests {
                     "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
                     "LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
                     "LAMP_CONVERSATION_SUMMARY=on",
+                    "LAMP_CUT_ASK_ANSWERED=on",
                     "LAMP_CUT_IN_WORDLESS_ASKS=on",
                     "LAMP_CUT_IN_WORDLESS_RESUMES=on",
                     "LAMP_DECLINE_SILENT=on",
