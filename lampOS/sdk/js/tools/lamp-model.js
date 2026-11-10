@@ -9,11 +9,19 @@
 // of its rotation that changes), its origin and rest rotation from its node.
 // What is not in the CAD is said as such: each joint's zero (the servo's
 // reading at the CAD's rest pose) and direction are "cad" until measured
-// on a lamp, and its reach is the product's (`lamp-body --reach`).
+// on a lamp (MEASURED below holds what has been), and its reach is the
+// product's (`lamp-body --reach`).
 import { readFileSync } from 'node:fs';
 
 // The body's servos in their bus order (lamp-body's `bus_out::JOINTS`), the
 // protocol's names for them, and each one's bone in lamp.glb.
+// Zero and direction measured from a lamp's own numbers. Shoulder and elbow:
+// sign -1 and the lamp-75c9's stand angle (stand counts less home counts, of
+// 4096 a turn: 2639 - 2076 and 2570 - 2045), so the CAD's upright pose is the
+// stood lamp and deg 0 the folded one. From the render of the CAD against the
+// body's numbers; not yet checked against a photo of the lamp.
+const MEASURED = { shoulder: { sign: -1, zero_deg: 49.5 }, elbow: { sign: -1, zero_deg: 46.1 } };
+
 const JOINTS = [
   { name: 'yaw', bus: 'base_yaw', servo: 1, bone: 'base_yaw', mesh: '1_base_yaw' },
   { name: 'shoulder', bus: 'shoulder', servo: 2, bone: 'base_pitch', mesh: '2_base_pitch' },
@@ -97,8 +105,8 @@ function model(path) {
       origin_m: (node.translation ?? [0, 0, 0]).map((v) => round(v, 4)),
       rest_quat: rest.map((v) => round(v, 4)),
       axis: axisOf(rest, keys),
-      sign: 1,
-      zero_deg: 0,
+      sign: MEASURED[joint.name]?.sign ?? 1,
+      zero_deg: MEASURED[joint.name]?.zero_deg ?? 0,
       reach_counts: reach ?? null,
       reach_deg: reach
         ? Object.fromEntries(Object.entries(reach).map(([way, counts]) => [way, round(counts * DEG_A_COUNT, 1)]))
@@ -125,7 +133,7 @@ function model(path) {
     frame: 'glTF: y up, metres; each joint turns its bone about axis, in the bone\'s own frame after rest_quat',
     measured: {
       origins: 'cad',
-      zero_and_sign: 'cad: zero_deg is the joint\'s deg (body.state, degrees from its home) at the CAD\'s rest pose, sign +1, until measured on a lamp',
+      zero_and_sign: 'shoulder and elbow: sign -1 and zero_deg at lamp-75c9\'s stand angle (stand 2639 / 2570 counts less home 2076 / 2045: 49.5 / 46.1 deg), so the CAD\'s upright pose is the stood lamp and deg 0 the folded one; from the render, not yet checked against a photo of the lamp; another lamp\'s own stand angle differs by a few degrees. The others: cad, zero_deg is the joint\'s deg (body.state, degrees from its home) at the CAD\'s rest pose, sign +1, until measured on a lamp',
       reach: 'product: lamp-body --reach around each lamp\'s home; a lamp\'s home is its own (/etc/lampOS/body/lamp.env)',
     },
     chain: order,
