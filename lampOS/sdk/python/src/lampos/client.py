@@ -1042,7 +1042,9 @@ class Lamp:
     async def upload_sound(self, name: str, wav: bytes | str | os.PathLike) -> dict:
         """Keep a clip on the lamp as `name`, over one of the same name, to
         play with `sound(name)`: a WAV of 16-bit mono PCM at 24 kHz, at most
-        30 s, within the voice's loudness cap. `wav` is its bytes or a path.
+        30 s, within the voice's loudness cap: no sample past -12 dBFS and no
+        10 ms past -30 dBFS RMS (so a steady tone peaks near -27 dBFS at most).
+        `wav` is its bytes or a path.
         Sent in parts, as the lamp takes them; the lamp checks it whole and
         refuses it with why. Returns the clip as kept: name, bytes, ms."""
         data = wav if isinstance(wav, bytes) else Path(wav).read_bytes()
