@@ -13033,7 +13033,7 @@ fn conversation_with_gate_inner(
                     model_refusing.holds(clock) || signed_out.holds(),
                 );
             }
-            let note = walk.tick(
+            let note = walk.tick_line(
                 clock,
                 clock.saturating_sub(last_turn_us),
                 can_speak,
