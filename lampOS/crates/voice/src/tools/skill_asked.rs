@@ -22,7 +22,11 @@
 //! you?" was the model's own words, and "where can I buy you?" said
 //! "autonomous.ai" without the page faq's `about` names. The topic is still
 //! the model's. A question with any other word ("who made you sad", "where
-//! can I buy milk") is the model's, as before.
+//! can I buy milk") is the model's, as before. The same questions asked in
+//! Vietnamese ("Ai làm ra bạn?", "Mua bạn ở đâu?", "Bạn giá bao nhiêu?")
+//! are forced too, with diacritics as speech-to-text writes them; "ai làm
+//! bạn buồn" (who made you sad) and "mua sữa ở đâu" (where to buy milk)
+//! are the model's.
 use crate::known_faces::lower_words;
 use crate::second_provider::net::{Force, Forced, Message};
 
@@ -85,6 +89,45 @@ const QUESTIONS: &[(&[&str], &str)] = &[
     (&["what", "is", "your", "price"], HELP),
     (&["what's", "your", "price"], HELP),
     (&["whats", "your", "price"], HELP),
+    // The same in Vietnamese: "ra" whole, since "ai làm bạn …" is "who
+    // makes you …" (sad, a friend); a longer question before its start.
+    (&["ai", "làm", "ra", "bạn"], HELP),
+    (&["ai", "tạo", "ra", "bạn"], HELP),
+    (&["ai", "đã", "làm", "ra", "bạn"], HELP),
+    (&["ai", "đã", "tạo", "ra", "bạn"], HELP),
+    (&["ai", "sản", "xuất", "ra", "bạn"], HELP),
+    (&["công", "ty", "nào", "làm", "ra", "bạn"], HELP),
+    (&["công", "ty", "nào", "tạo", "ra", "bạn"], HELP),
+    (&["công", "ty", "nào", "sản", "xuất", "ra", "bạn"], HELP),
+    (&["hãng", "nào", "làm", "ra", "bạn"], HELP),
+    (&["mua", "bạn", "ở", "đâu"], HELP),
+    (&["có", "thể", "mua", "bạn", "ở", "đâu"], HELP),
+    (&["tôi", "có", "thể", "mua", "bạn", "ở", "đâu"], HELP),
+    (&["mình", "có", "thể", "mua", "bạn", "ở", "đâu"], HELP),
+    (&["tôi", "mua", "bạn", "ở", "đâu"], HELP),
+    (&["mình", "mua", "bạn", "ở", "đâu"], HELP),
+    (&["bạn", "giá", "bao", "nhiêu", "tiền"], HELP),
+    (&["bạn", "giá", "bao", "nhiêu"], HELP),
+    (&["bạn", "bao", "nhiêu", "tiền"], HELP),
+    (&["giá", "của", "bạn", "là", "bao", "nhiêu"], HELP),
+    (&["giá", "bạn", "bao", "nhiêu"], HELP),
+];
+
+/// Words a Vietnamese question about the lamp may hold anywhere besides
+/// [`AROUND`]: a call ("ơi", "đèn ơi"), a greeting, a thanks, and the
+/// endings a plain question takes ("vậy", "thế", "ạ", "nhỉ"). Only for
+/// [`QUESTIONS`]: the scenes' and shows' asks are as before.
+const AROUND_VI: &[&[&str]] = &[
+    &["ơi"],
+    &["đèn"],
+    &["chào"],
+    &["xin", "chào"],
+    &["vậy"],
+    &["thế"],
+    &["ạ"],
+    &["nhỉ"],
+    &["cảm", "ơn"],
+    &["cám", "ơn"],
 ];
 
 /// Words the line may hold anywhere: a greeting, the lamp's name, a
@@ -162,22 +205,23 @@ fn phrase_at(words: &[String], at: usize, phrases: &[&[&str]]) -> Option<usize> 
 /// exactly one ask ([`ASKS`]), requests ([`REQUESTS`]) only before it, and
 /// no word but those [`AROUND`].
 pub fn asks_for(said: &str) -> Option<&'static str> {
-    plainly(said, ASKS, REQUESTS)
+    plainly(said, ASKS, REQUESTS, &[])
 }
 
 /// The help skill's function a line plainly asks a question about the lamp
 /// itself for, if any: the line holds exactly one whole question
-/// ([`QUESTIONS`]) and no word but those [`AROUND`].
+/// ([`QUESTIONS`]) and no word but those [`AROUND`] or [`AROUND_VI`].
 pub fn asks_about(said: &str) -> Option<&'static str> {
-    plainly(said, QUESTIONS, &[])
+    plainly(said, QUESTIONS, &[], AROUND_VI)
 }
 
 /// The function of the one entry of `table` that `said` holds, with
-/// `requests` only before it and no word but those [`AROUND`].
+/// `requests` only before it and no word but those [`AROUND`] or `also`.
 fn plainly(
     said: &str,
     table: &[(&[&str], &'static str)],
     requests: &[&[&str]],
+    also: &[&[&str]],
 ) -> Option<&'static str> {
     let words = lower_words(said);
     let mut asked = None;
@@ -192,12 +236,15 @@ fn plainly(
             }
             asked = Some(*name);
             at += ask.len();
-        } else if let Some(taken) = phrase_at(&words, at, AROUND).or_else(|| {
-            asked
-                .is_none()
-                .then(|| phrase_at(&words, at, requests))
-                .flatten()
-        }) {
+        } else if let Some(taken) = phrase_at(&words, at, AROUND)
+            .or_else(|| phrase_at(&words, at, also))
+            .or_else(|| {
+                asked
+                    .is_none()
+                    .then(|| phrase_at(&words, at, requests))
+                    .flatten()
+            })
+        {
             at += taken;
         } else {
             return None;
@@ -390,6 +437,57 @@ mod tests {
         }
     }
 
+    /// The same questions asked in Vietnamese (the testers' lines) ask the
+    /// help skill; one with any other word, or two, is the model's, and a
+    /// Vietnamese call or ending does not make a light ask.
+    #[test]
+    fn a_plain_question_about_the_lamp_in_vietnamese_asks_its_help() {
+        for said in [
+            "Ai làm ra bạn?",
+            "Ai tạo ra bạn?",
+            "Công ty nào làm ra bạn?",
+            "Mua bạn ở đâu?",
+            "Bạn giá bao nhiêu?",
+            "Lamp ơi, ai làm ra bạn vậy?",
+            "Đèn ơi, ai đã tạo ra bạn thế?",
+            "Ai sản xuất ra bạn?",
+            "Công ty nào sản xuất ra bạn?",
+            "Hãng nào làm ra bạn?",
+            "Tôi có thể mua bạn ở đâu?",
+            "Mình mua bạn ở đâu nhỉ?",
+            "Có thể mua bạn ở đâu ạ?",
+            "Bạn giá bao nhiêu tiền?",
+            "Bạn bao nhiêu tiền?",
+            "Giá của bạn là bao nhiêu?",
+            "Xin chào, giá bạn bao nhiêu? Cảm ơn.",
+            "AI LÀM RA BẠN",
+        ] {
+            assert_eq!(asks_about(said), Some(HELP), "{said}");
+            assert_eq!(asks_for(said), None, "{said}");
+        }
+        for said in [
+            "Ai làm bạn buồn?",
+            "Ai làm ra bạn buồn vậy?",
+            "Ai làm bạn với tôi?",
+            "Mua sữa ở đâu?",
+            "Bạn mua sữa ở đâu?",
+            "Bạn mua ở đâu?",
+            "Bạn có biết ai làm ra bạn không?",
+            "Ai làm ra bạn? Mua bạn ở đâu?",
+            "Ai làm ra bạn và mua bạn ở đâu?",
+            "Bạn giá bao nhiêu ở Việt Nam?",
+            "Bạn bao nhiêu tuổi?",
+            "Cái này giá bao nhiêu?",
+            "Ai làm ra cái này?",
+            "Mua bạn ở đâu rẻ nhất?",
+            "Đèn ơi.",
+            "Lamp ơi, movie light.",
+        ] {
+            assert_eq!(asks_about(said), None, "{said}");
+        }
+        assert_eq!(asks_for("Lamp ơi, movie light."), None);
+    }
+
     /// The help skill is forced through `use_skill`, pinned to `lamp_help`,
     /// only when offered; without `use_skill`, its own function.
     #[test]
@@ -420,6 +518,21 @@ mod tests {
         after.push(Message::tool("1", "{\"next\":\"Say it.\"}"));
         assert_eq!(wrapped(&after), None);
         assert_eq!(wrapped(&[Message::user("Where can I buy milk?")]), None);
+        for said in ["Ai làm ra bạn?", "Mua bạn ở đâu?", "Bạn giá bao nhiêu?"] {
+            let line = [Message::user(said)];
+            assert_eq!(
+                wrapped(&line),
+                Some(Forced {
+                    name: crate::use_skill::NAME,
+                    only: Some(("skill", HELP))
+                }),
+                "{said}"
+            );
+            let only_scenes: Offered = Arc::new(|skill| skill == SCENE);
+            assert_eq!(force(Some(only_scenes))(&line), None, "{said}");
+        }
+        assert_eq!(wrapped(&[Message::user("Mua sữa ở đâu?")]), None);
+        assert_eq!(wrapped(&[Message::user("Ai làm bạn buồn?")]), None);
     }
 
     /// Through `use_skill`, the skill is pinned only when it is offered;
