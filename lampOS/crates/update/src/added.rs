@@ -16,6 +16,12 @@ use std::{fs, path::Path};
 
 /// Where the units are, as the lamp names it.
 pub const UNITS: &str = "/etc/systemd/system";
+/// The lamp as one: the target its parts are enabled into.
+pub const LAMP: &str = "lampos.target";
+/// The linked services' part, started first of those a round added: the
+/// app shows an account linked as soon as setup has the link, and with
+/// this part not running the link goes nowhere.
+pub const SERVICES: &str = "lamp-services.service";
 
 /// The links that enable `name` as its `[Install]` asks: each
 /// `WantedBy=X` is `/etc/systemd/system/X.wants/<name>`, each `RequiredBy=X`
@@ -106,6 +112,56 @@ pub fn missing(root: &Path, text: &str) -> Vec<String> {
         }
     }
     missing
+}
+
+/// The units a kept switch added that it starts at once (docs/updates.md,
+/// "A part added over the air"), each `(name, text)` as written: a service
+/// that is a part of [`LAMP`], enabled into it (`enabled`: its link
+/// `lampos.target.wants/<name>` is there), no template and no one-shot.
+/// [`SERVICES`] first, then in the order given. A unit wanted by anything
+/// else (the waking face by `sysinit.target`, recovery and the Wi-Fi
+/// restore by `multi-user.target`), a socket, a timer and a timed service
+/// are left for the lamp's next start, as `install` leaves them.
+pub fn to_start(added: &[(String, String)], enabled: impl Fn(&str) -> bool) -> Vec<String> {
+    let mut picked: Vec<String> = added
+        .iter()
+        .filter(|(name, text)| {
+            name.ends_with(".service")
+                && !name.contains('@')
+                && !oneshot(text)
+                && wants(name, text)
+                    .is_ok_and(|links| links.iter().any(|link| target(link) == Some(LAMP)))
+                && enabled(name)
+        })
+        .map(|(name, _)| name.clone())
+        .collect();
+    if let Some(at) = picked.iter().position(|name| name == SERVICES) {
+        let services = picked.remove(at);
+        picked.insert(0, services);
+    }
+    picked
+}
+
+/// Whether a service's `[Service]` says `Type=oneshot` (its last `Type=`).
+fn oneshot(text: &str) -> bool {
+    let mut within = false;
+    let mut kind = "";
+    for line in text.lines().map(str::trim) {
+        if let Some(section) = line
+            .strip_prefix('[')
+            .and_then(|line| line.strip_suffix(']'))
+        {
+            within = section == "Service";
+            continue;
+        }
+        if within
+            && let Some((key, value)) = line.split_once('=')
+            && key.trim() == "Type"
+        {
+            kind = value.trim();
+        }
+    }
+    kind == "oneshot"
 }
 
 /// A unit's plain name: letters, digits and `-_.`, then a known suffix.

@@ -708,6 +708,12 @@ pub trait Save {
     /// just before the marker: best effort, it never fails setup. Nothing
     /// by default: only [`Files`] sets it, and [`NetworkOnly`] never does.
     fn first_volume(&mut self) {}
+    /// Just after the marker: the parts `lampos.target` wants and does not
+    /// run, started ([`crate::parts`]), so a part skipped at boot before the
+    /// marker was there does not wait for the next reboot. Best effort, it
+    /// never fails setup. Nothing by default: only [`Files`] starts them,
+    /// and [`NetworkOnly`] never does.
+    fn start_parts(&mut self) {}
     /// Whether a person's own keys are taken (#2094, `LAMP_OWN_KEYS=on`).
     /// Off by default: nothing is checked, kept or said.
     fn own_keys_on(&self) -> bool {
@@ -1011,6 +1017,13 @@ impl Save for Files<'_> {
             });
         }
     }
+    fn start_parts(&mut self) {
+        crate::parts::start(
+            crate::reset::query::read,
+            crate::reset::run_within,
+            |line| eprintln!("lamp-setup: {line}"),
+        );
+    }
     fn own_keys_on(&self) -> bool {
         crate::keys::on(std::env::var(crate::keys::ENVIRONMENT).ok().as_deref())
     }
@@ -1193,7 +1206,11 @@ pub fn run(
             // The volume before the marker, which starts the voice, so its
             // first line is already at it (#5551).
             .map(|()| save.first_volume())
-            .and_then(|()| save.marker());
+            .and_then(|()| save.marker())
+            // Just after the marker: what lampos.target wants and does not
+            // run, started, since the path's start of a target already
+            // active pulls nothing in again (crate::parts).
+            .map(|()| save.start_parts());
             if save.keeps_settings() {
                 let mut status = status.lock().unwrap();
                 status.share_reports = saved.is_ok() && reports_kept;

@@ -556,6 +556,9 @@ impl Save for Volumed {
     fn first_volume(&mut self) {
         self.0.calls.push("first_volume=".into());
     }
+    fn start_parts(&mut self) {
+        self.0.calls.push("start_parts=".into());
+    }
 }
 
 /// #5551: a new lamp's first volume is set once its settings are saved,
@@ -585,7 +588,8 @@ fn a_first_setup_sets_the_first_volume_just_before_the_marker_and_nothing_else_d
             "timezone=Asia/Ho_Chi_Minh",
             "credential=AIza-key_1",
             "first_volume=",
-            "marker="
+            "marker=",
+            "start_parts="
         ]
     );
 
@@ -626,6 +630,71 @@ fn a_first_setup_sets_the_first_volume_just_before_the_marker_and_nothing_else_d
         &mut Lamp::new(true),
         &mut lamp_setup::serve::NetworkOnly(&mut recovering),
         || Some("192.168.1.23".into()),
+    );
+    assert!(recovering.0.calls.is_empty(), "{:?}", recovering.0.calls);
+}
+
+/// The parts `lampos.target` wants and does not run are started just after
+/// the marker (`lamp_setup::parts`): a lamp whose target was
+/// already active when setup finished pulled nothing in again, and
+/// lamp-services, skipped at boot, stayed dead until a reboot. A marker that
+/// cannot be written, a failed join and recovery's network-only run start
+/// none.
+#[test]
+fn the_waiting_parts_start_just_after_the_marker_and_only_after_a_written_one() {
+    let status = || Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut done = Volumed::default();
+    run(
+        &status(),
+        &accepted(),
+        "VN",
+        &mut Lamp::new(true),
+        &mut done,
+        || None,
+    );
+    assert_eq!(
+        done.0.calls.last().map(String::as_str),
+        Some("start_parts=")
+    );
+    assert_eq!(done.0.calls[done.0.calls.len() - 2], "marker=");
+
+    let mut unmarked = Volumed(Saved {
+        fail_on: Some("marker"),
+        ..Saved::default()
+    });
+    run(
+        &status(),
+        &accepted(),
+        "VN",
+        &mut Lamp::new(true),
+        &mut unmarked,
+        || None,
+    );
+    assert!(
+        !unmarked.0.calls.iter().any(|call| call == "start_parts="),
+        "{:?}",
+        unmarked.0.calls
+    );
+
+    let mut refused = Volumed::default();
+    run(
+        &status(),
+        &accepted(),
+        "VN",
+        &mut Lamp::new(false),
+        &mut refused,
+        || None,
+    );
+    assert!(refused.0.calls.is_empty(), "{:?}", refused.0.calls);
+
+    let mut recovering = Volumed::default();
+    run(
+        &status(),
+        &accepted(),
+        "VN",
+        &mut Lamp::new(true),
+        &mut lamp_setup::serve::NetworkOnly(&mut recovering),
+        || None,
     );
     assert!(recovering.0.calls.is_empty(), "{:?}", recovering.0.calls);
 }
