@@ -1069,6 +1069,19 @@ impl OwnAsks {
         });
         answered
     }
+
+    /// Own asks for a test, and what each asked: its skill and priority,
+    /// the ask then dropped (its answer's sender with it).
+    #[cfg(test)]
+    pub(crate) fn for_test() -> (Self, impl Fn() -> Option<(String, u8)>) {
+        let (sent, taken) = mpsc::channel::<Asked>();
+        (Self(sent), move || {
+            taken
+                .recv_timeout(Duration::from_secs(5))
+                .ok()
+                .map(|asked| (asked.request.skill.clone(), asked.request.priority))
+        })
+    }
 }
 
 /// One waiting, in the order taken.

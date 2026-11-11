@@ -982,8 +982,9 @@ fn says_aloud(table: &toml::Table) -> bool {
 /// same text. Anything else, or a skill that can't be read, is given back
 /// as it came. Then every skill that starts itself is given the runtime's
 /// manners ([`mannered`], #6066 (a)): both the floors and the manners apply.
-/// First its trigger's own topic is put in its `[permissions] topics` when
-/// the model left it out ([`topic_granted`]).
+/// First the fields that can't apply are taken out ([`tidied`]), and its
+/// trigger's own topic is put in its `[permissions] topics` when the model
+/// left it out ([`topic_granted`]).
 pub fn paced(text: &str) -> String {
     paced_asked(text, &[])
 }
@@ -991,7 +992,221 @@ pub fn paced(text: &str) -> String {
 /// [`paced`], with the times the request named ([`asked_windows`]): a
 /// `during` within one runs as said, with no quiet hours.
 pub fn paced_asked(text: &str, asked: &[(u32, u32)]) -> String {
-    mannered_asked(&say_paced(&topic_granted(text)), asked)
+    mannered_asked(&say_paced(&topic_granted(&tidied(text))), asked)
+}
+
+/// A made skill's `skill.toml` with the fields that can't apply taken out,
+/// as the lamp's own model wrote them on lamp-74ff, 11 Nov 09:48-09:50
+/// ("nod when I stand up" failed all three repairs twice): a body step's
+/// `for` beside a `gesture` with no `mood` (a gesture plays once; only a
+/// mood is held, and `lamp-skills` refuses "a body mood goes with its for,
+/// and a for with a mood"); a `for` or `absent_for` on a `room/stood_up`
+/// trigger, one message a getting up that never lasts, which [`plainly`]
+/// can't say, and on any trigger one of nothing ("0s"), which
+/// `lamp-skills` reads as none and [`plainly`] can't say (lamp-9adf, 11
+/// Nov 10:01: "say hello when I come back to my desk" refused on
+/// "room/presence, its for"); and `speak = true` in `[permissions]` with
+/// no say step, no hum and no read, which [`capped`] refuses ("it asks for
+/// its voice but never says anything"). Each only removes: the skill keeps every step,
+/// trigger and grant it uses, and gains nothing. Each removal is a line or
+/// an entry of a one-line table taken out, taken only when the text then
+/// reads as the same skill without that one field; a skill written
+/// otherwise is given back as it came, for the check to say why. One
+/// journal line for each.
+pub fn tidied(text: &str) -> String {
+    let Ok(mut table) = toml::from_str::<toml::Table>(text) else {
+        return text.to_owned();
+    };
+    let mut text = text.to_owned();
+    fn tidy(
+        text: &mut String,
+        table: &mut toml::Table,
+        parent: &dyn Fn(&mut toml::Table) -> Option<&mut toml::Table>,
+        key: &str,
+        what: String,
+    ) {
+        if let Some((tidied, expected)) = field_taken_out(text, table, parent, key) {
+            eprintln!("lamp-voice: a made skill tidied: {what}");
+            *text = tidied;
+            *table = expected;
+        }
+    }
+    // (a) A gesture's `for`, with no mood to hold.
+    let steps = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .map_or(0, Vec::len);
+    for index in 0..steps {
+        let gesture_for = table["do"][index]
+            .get("body")
+            .and_then(toml::Value::as_table)
+            .is_some_and(|body| {
+                body.contains_key("gesture")
+                    && body.contains_key("for")
+                    && !body.contains_key("mood")
+            });
+        if gesture_for {
+            tidy(
+                &mut text,
+                &mut table,
+                &|table| {
+                    table
+                        .get_mut("do")?
+                        .as_array_mut()?
+                        .get_mut(index)?
+                        .get_mut("body")?
+                        .as_table_mut()
+                },
+                "for",
+                format!("[[do]] step {}, a body's for beside its gesture", index + 1),
+            );
+        }
+    }
+    // (b) A getting up's `for` and `absent_for`, and on any trigger a
+    // `for` or `absent_for` of nothing, which `lamp-skills` reads as none
+    // (its `optional`: no duration and "0s" are both 0).
+    for key in ["for", "absent_for"] {
+        let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table) else {
+            break;
+        };
+        let stood_up = trigger.get("topic").and_then(toml::Value::as_str) == Some(STOOD_UP_TOPIC);
+        let nothing = trigger
+            .get(key)
+            .and_then(toml::Value::as_str)
+            .and_then(whole_ms)
+            == Some(0);
+        if trigger.contains_key(key) && (stood_up || nothing) {
+            let topic = trigger
+                .get("topic")
+                .and_then(toml::Value::as_str)
+                .map_or("another", named)
+                .to_owned();
+            let why = if stood_up { "" } else { " of nothing" };
+            tidy(
+                &mut text,
+                &mut table,
+                &|table| table.get_mut("trigger")?.as_table_mut(),
+                key,
+                format!("trigger topic {topic}, its {key}{why}"),
+            );
+        }
+    }
+    // (c) Its voice asked with nothing to say: no say step, no sound and
+    // no read, as [`capped`] holds it.
+    let steps = || {
+        table
+            .get("do")
+            .and_then(toml::Value::as_array)
+            .into_iter()
+            .flatten()
+    };
+    let speaks = steps().any(|step| {
+        ["say", "cue", "sound"]
+            .iter()
+            .any(|key| step.get(key).is_some())
+    });
+    let permissions = table.get("permissions").and_then(toml::Value::as_table);
+    let reads = permissions
+        .and_then(|permissions| permissions.get("services"))
+        .and_then(toml::Value::as_table)
+        .is_some_and(|services| services.values().any(|how| how.as_str() == Some("read")));
+    let voice = permissions
+        .and_then(|permissions| permissions.get("speak"))
+        .and_then(toml::Value::as_bool)
+        == Some(true);
+    if voice && !speaks && !reads {
+        tidy(
+            &mut text,
+            &mut table,
+            &|table| table.get_mut("permissions")?.as_table_mut(),
+            "speak",
+            "[permissions] speak, with no say step, hum or read".to_owned(),
+        );
+    }
+    text
+}
+
+/// `text` with `parent`'s `key` taken out, and the table it then reads as,
+/// if one line or one entry of a one-line table taken out makes it read as
+/// `table` without that field and nothing else ([`tidied`]).
+fn field_taken_out(
+    text: &str,
+    table: &toml::Table,
+    parent: &dyn Fn(&mut toml::Table) -> Option<&mut toml::Table>,
+    key: &str,
+) -> Option<(String, toml::Table)> {
+    let mut expected = table.clone();
+    parent(&mut expected)?.remove(key)?;
+    let mut start = 0;
+    for line in text.split_inclusive('\n') {
+        for (from, to) in entries_of(line, key) {
+            let tidied = format!("{}{}", &text[..start + from], &text[start + to..]);
+            if toml::from_str::<toml::Table>(&tidied).is_ok_and(|read| read == expected) {
+                return Some((tidied, expected));
+            }
+        }
+        start += line.len();
+    }
+    None
+}
+
+/// Where in `line` each `key = value` entry is, as the span to take out to
+/// drop it: the whole line when the entry is the line, else the entry with
+/// one comma beside it, in a one-line table. Strings are skipped whole, and
+/// a value's own tables and lists with it; what this misreads, the read
+/// back in [`field_taken_out`] refuses.
+fn entries_of(line: &str, key: &str) -> Vec<(usize, usize)> {
+    let bytes = line.as_bytes();
+    let mut spans = Vec::new();
+    for (at, _) in line.match_indices(key) {
+        let before = line[..at].trim_end();
+        if !(before.is_empty() || before.ends_with('{') || before.ends_with(',')) {
+            continue;
+        }
+        let after = &line[at + key.len()..];
+        let Some(value) = after.trim_start().strip_prefix('=') else {
+            continue;
+        };
+        let value_at = line.len() - value.len();
+        let (mut depth, mut quote, mut escaped) = (0_i32, None::<u8>, false);
+        let mut end = line.len();
+        for (offset, &byte) in bytes[value_at..].iter().enumerate() {
+            if let Some(open) = quote {
+                if escaped {
+                    escaped = false;
+                } else if byte == b'\\' && open == b'"' {
+                    escaped = true;
+                } else if byte == open {
+                    quote = None;
+                }
+                continue;
+            }
+            match byte {
+                b'"' | b'\'' => quote = Some(byte),
+                b'{' | b'[' => depth += 1,
+                b'}' | b']' if depth > 0 => depth -= 1,
+                b',' | b'}' | b'#' | b'\n' | b'\r' if depth == 0 => {
+                    end = value_at + offset;
+                    break;
+                }
+                _ => {}
+            }
+        }
+        let rest = &line[end..];
+        if before.is_empty() && (rest.trim().is_empty() || rest.trim_start().starts_with('#')) {
+            // The entry is the line.
+            spans.push((0, line.len()));
+        } else if let Some(after_comma) = rest.strip_prefix(',') {
+            // Its comma after it, and the space before the next.
+            let next = after_comma.len() - after_comma.trim_start_matches([' ', '\t']).len();
+            spans.push((at, end + 1 + next));
+        } else if rest.starts_with('}') && before.ends_with(',') {
+            // The last entry: the comma before it.
+            let value_end = line[..end].trim_end().len();
+            spans.push((before.len() - 1, value_end));
+        }
+    }
+    spans
 }
 
 /// A made skill's `skill.toml` with its `[trigger]`'s topic in its
@@ -1966,8 +2181,8 @@ struct Unsaid {
     part: String,
     trigger: bool,
     /// How to write the part so it is said, told the repair after the part
-    /// whole, never cut with its keys ([`LIGHT_PART`]).
-    hint: &'static str,
+    /// whole, never cut with its keys ([`step_hint`]).
+    hint: String,
     /// What the lamp can't do yet, said as [`cant_yet`] and never repaired
     /// (#6066).
     cant: Option<String>,
@@ -1978,7 +2193,7 @@ impl Unsaid {
         Self {
             part: part.into(),
             trigger: false,
-            hint: "",
+            hint: String::new(),
             cant: None,
         }
     }
@@ -1987,7 +2202,7 @@ impl Unsaid {
         Self {
             part: part.into(),
             trigger: true,
-            hint: "",
+            hint: String::new(),
             cant: None,
         }
     }
@@ -1997,7 +2212,7 @@ impl Unsaid {
         Self {
             part: format!("can't yet: {}", named(&what)),
             trigger: false,
-            hint: "",
+            hint: String::new(),
             cant: Some(what),
         }
     }
@@ -2040,6 +2255,113 @@ const SOUND_PART: &str = ": its one sound is cue = \"hum\"";
 /// `until` failed all three repairs on the check's own words).
 const LIGHT_PART: &str = ": relative = { dimmer = 1 }, for = \"10m\" takes only for, at most \
                           10m; dim = 1 to 4 takes only until = \"ends\"";
+
+/// What a repair is told after a body step [`plainly`] couldn't say: each
+/// as `lamp-skills` takes it (lamp-74ff, 11 Nov 09:48: a nod written with a
+/// `for` failed all three repairs, twice, and `lamp-skills` refused it: "a
+/// body mood goes with its for, and a for with a mood").
+const BODY_PART: &str = ": body = { gesture = \"nod\" } takes no for; only mood = \"reading\" \
+                         takes for, at most 2m";
+
+/// What a repair is told after a step [`plainly`] couldn't say with more
+/// than one kind in it (lamp-9adf and lamp-74ff, 11 Nov 10:01: "say hello
+/// when I come back to my desk" written as one step with a gesture, a
+/// light and a say, told only how to write a say, never repaired).
+const ONE_KIND_PART: &str = ": one kind a [[do]] step: a light, a body and a say each a step \
+                             of its own";
+
+/// What a repair is told after a light step whose colour isn't one the
+/// light has (`lamp_msgs::Light::COLOURS`, the list `lamp-skills`' check
+/// holds it to).
+fn colour_part() -> String {
+    format!(
+        ": colour is one of {}",
+        lamp_msgs::Light::COLOURS.join(", ")
+    )
+}
+
+/// The most a step's hints come to ([`step_hint`]), so a repair's lines
+/// keep within [`MOST_REPAIR_BYTES`].
+const MOST_HINT_BYTES: usize = 200;
+
+/// How to write a `[[do]]` step [`plainly`] couldn't say, for the repair:
+/// each kind in it judged on its own ([`step_plainly`]), and a hint for
+/// each that fails, by what failed (a say's form, the hum, a dim, a colour
+/// not in the light's list, a body's gesture or mood), then, for a step
+/// with more than one kind, that each is a step of its own (lamp-9adf, 11
+/// Nov 10:01: a say beside a light of an unknown colour was told only the
+/// say's form, which was fine). One hint is said as it is; several after
+/// one colon, by semicolons, at most [`MOST_HINT_BYTES`].
+fn step_hint(step: &toml::Value) -> String {
+    let Some(step) = step.as_table() else {
+        return String::new();
+    };
+    let mut hints: Vec<String> = Vec::new();
+    for (key, value) in step {
+        let alone = toml::Value::Table(toml::Table::from_iter([(key.clone(), value.clone())]));
+        if step_plainly(&alone).is_some() {
+            continue;
+        }
+        let hint = match key.as_str() {
+            "say" => SAY_TEXT_PART.to_owned(),
+            "cue" | "sound" => SOUND_PART.to_owned(),
+            "body" => BODY_PART.to_owned(),
+            "light" => light_hint(value),
+            _ => String::new(),
+        };
+        if !hint.is_empty() && !hints.contains(&hint) {
+            hints.push(hint);
+        }
+    }
+    if step.len() > 1 {
+        hints.push(ONE_KIND_PART.to_owned());
+    }
+    let mut kept: Vec<&str> = Vec::new();
+    let mut bytes = 0;
+    for hint in &hints {
+        let hint = hint.strip_prefix(": ").unwrap_or(hint);
+        if bytes + hint.len() + 2 <= MOST_HINT_BYTES {
+            bytes += hint.len() + 2;
+            kept.push(hint);
+        }
+    }
+    if kept.is_empty() {
+        return String::new();
+    }
+    format!(": {}", kept.join("; "))
+}
+
+/// How to write a light step [`plainly`] couldn't say: a dim or a
+/// `relative` as `lamp_skills::light_call` takes it ([`LIGHT_PART`]), or
+/// a colour the light has ([`colour_part`]); else nothing more than its
+/// keys.
+fn light_hint(light: &toml::Value) -> String {
+    let Some(light) = light.as_table() else {
+        return String::new();
+    };
+    if light.contains_key("relative") || light.contains_key("dim") {
+        return LIGHT_PART.to_owned();
+    }
+    match light.get("colour").map(toml::Value::as_str) {
+        Some(Some(colour)) if lamp_msgs::Light::COLOURS.contains(&colour) => String::new(),
+        Some(_) => colour_part(),
+        None => String::new(),
+    }
+}
+
+/// Whether a repair's `lines` carry a step's hint for what `lamp-skills`'
+/// check would refuse alike: a dim or `relative`, a body or a colour, with
+/// any other hint of the same step beside it (a step of more than one
+/// kind, lamp-9adf, 11 Nov 10:01), so one repair is told all of it. Then
+/// they go to the repair before the check's own words ([`keep_asked`]). A
+/// step of more than one kind alone, which the check takes, still goes
+/// to the check first.
+fn hinted_first(lines: &str) -> bool {
+    [LIGHT_PART, BODY_PART]
+        .iter()
+        .any(|hint| lines.contains(hint.strip_prefix(": ").unwrap_or(hint)))
+        || lines.contains(colour_part().trim_start_matches(": "))
+}
 
 /// What a repair is told before the part [`plainly`] couldn't say.
 const UNSAID_PART: &str = "Can't be said plainly: ";
@@ -2122,29 +2444,9 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
             .cloned()
             .ok_or_else(|| Unsaid::of("no [[do]] step"))
     };
-    let unsaid_step = |index: usize, step: &toml::Value| {
-        let say = match (step.get("say"), step.get("cue").or(step.get("sound"))) {
-            (Some(_), _) => SAY_TEXT_PART,
-            (None, Some(_)) => SOUND_PART,
-            (None, None) => "",
-        };
-        // A step that is one dim or `relative` light, and so the light
-        // itself is what couldn't be said.
-        let light = step
-            .as_table()
-            .filter(|step| step.len() == 1)
-            .and_then(|step| step.get("light"))
-            .and_then(toml::Value::as_table);
-        let dims =
-            light.is_some_and(|light| light.contains_key("relative") || light.contains_key("dim"));
-        Unsaid {
-            hint: if dims { LIGHT_PART } else { "" },
-            ..Unsaid::of(format!(
-                "[[do]] step {}, {}{say}",
-                index + 1,
-                step_named(step)
-            ))
-        }
+    let unsaid_step = |index: usize, step: &toml::Value| Unsaid {
+        hint: step_hint(step),
+        ..Unsaid::of(format!("[[do]] step {}, {}", index + 1, step_named(step)))
     };
     let too_long = || Unsaid::of("what it does, too long for one breath");
     // A skill added from a file (`crate::upload_skill`): started by its
@@ -2556,7 +2858,12 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
     let text_of = |key: &str| trigger.get(key).and_then(|value| value.as_str());
     let its = |what: &str| format!("{named}, its {what}");
     let lasting = match trigger.get("for") {
-        Some(lasting) => Some(lasting.as_str().and_then(spell).ok_or_else(|| its("for"))?),
+        Some(lasting) => Some(
+            lasting
+                .as_str()
+                .and_then(spell)
+                .ok_or_else(|| its("for, like \"5m\": s, m or h, above 0"))?,
+        ),
         None => None,
     };
     // `when = "appears"`: once each time it comes to hold, as
@@ -2910,13 +3217,20 @@ pub const TRIGGER_MEANINGS: &str = concat!(
 /// a `relative` light as `lamp_skills::light_call` takes them (lamp-9adf,
 /// 11 Nov 05:34: "dim the light a step at ten" was written as a `relative`
 /// with `until`, and once with a `for` in words, and failed all three
-/// repairs).
+/// repairs); a gesture with no `for`, a getting up with no `for` or
+/// `absent_for`, and `speak` only with something said (lamp-74ff, 11 Nov
+/// 09:48: "nod when I stand up" written with all three failed every
+/// repair, twice; [`tidied`] takes them out too).
 pub const MORE_STEPS: &str = "A light step may also be { dim = 1 } (dim = 1 to 4, beside it \
      only until = \"ends\"), { out = true }, { relative = { dimmer = 1 }, for = \"10m\" } (a \
      step dimmer, or warmer = 1, for a while: beside it only for, at most 10m) or a colour \
      with pattern = { kind = \"breathe\" } (or candle, pulse). Every for is a whole number \
      and ms, s, m or h, like \"30s\" or \"10m\", never words. A body step may be \
-     look_at = \"face\", or mood = \"reading\" with for. [ask] policy is \"nudge\", or \"hello\", \"reminder\" or \"news\" as the \
+     { gesture = \"nod\" } with no for (a gesture plays once), look_at = \"face\", or \
+     mood = \"reading\" with for = \"1m\" (at most 2m): only a mood takes a for. A getting \
+     up (room/stood_up) takes no for or absent_for. speak = true only with a say or cue \
+     step, or a read. Each [[do]] step is one kind, a light, a body, a say or the hum, each a \
+     step of its own: saying hello is one say step. [ask] policy is \"nudge\", or \"hello\", \"reminder\" or \"news\" as the \
      request means it. Any [permissions] a skill may have are fine as its steps use them: the \
      lamp says each back to the person before it goes on.";
 
@@ -3340,12 +3654,21 @@ fn light_plainly(light: &toml::Table) -> Option<String> {
     if !only(&["colour", "level", "for", "pattern", "until", "no_brighter"]) {
         return None;
     }
+    // A colour the light has and a level 1 to 5, as
+    // `lamp_skills::light_call` takes them (lamp-9adf, 11 Nov 10:01: a
+    // colour not in its list said here and refused by the check).
     let mut said = match light.get("colour") {
-        Some(colour) => format!("glows {}", colour.as_str()?),
+        Some(colour) => {
+            let colour = colour.as_str()?;
+            lamp_msgs::Light::COLOURS.contains(&colour).then_some(())?;
+            format!("glows {colour}")
+        }
         None => "turns the light".to_owned(),
     };
     if let Some(level) = light.get("level") {
-        said.push_str(&format!(" at level {}", level.as_integer()?));
+        let level = level.as_integer()?;
+        (1..=5).contains(&level).then_some(())?;
+        said.push_str(&format!(" at level {level}"));
     }
     if let Some(lasting) = light.get("for") {
         said.push_str(&format!(" for {}", spell(lasting.as_str()?)?));
@@ -3472,16 +3795,26 @@ fn body_plainly(body: &toml::Table) -> Option<String> {
     if let Some(gesture) = body.get("gesture") {
         parts.push(gesture_said(gesture.as_str()?)?.to_owned());
     }
+    // As `lamp-skills` takes them: a mood with its for, more than 0 and at
+    // most 2m, and a for only with a mood (lamp-74ff, 11 Nov 09:48: a nod
+    // with a for, which it refuses).
     match (body.get("mood"), body.get("for")) {
         (None, None) => {}
-        (Some(mood), Some(lasting)) if mood.as_str() == Some("reading") => parts.push(format!(
-            "holds its reading pose for {}",
-            spell(lasting.as_str()?)?
-        )),
+        (Some(mood), Some(lasting)) if mood.as_str() == Some("reading") => {
+            let lasting = lasting.as_str()?;
+            if !(1..=MOOD_MOST_MS).contains(&whole_ms(lasting)?) {
+                return None;
+            }
+            parts.push(format!("holds its reading pose for {}", spell(lasting)?));
+        }
         _ => return None,
     }
     (!parts.is_empty()).then(|| parts.join(" and "))
 }
+
+/// The longest a mood is held: `lamp-skills`' "a mood's for is more than 0
+/// and at most 2m".
+const MOOD_MOST_MS: u64 = 2 * 60 * 1_000;
 
 /// Each gesture a made skill may name, one a step, as the person hears it:
 /// the body's clips that `lamp_skills::gesture_known` takes (all of
@@ -4091,11 +4424,11 @@ pub fn keep_asked(
     // goes to the repair first, not the check's own words (lamp-9adf, 11
     // Nov 05:34: three repairs told only "relative takes only for and a
     // breathe pattern" never wrote one the check took).
+    // A body step's alike (`BODY_PART`, lamp-74ff, 11 Nov 09:48), a
+    // colour's and a step with more than one kind (lamp-9adf, 11 Nov
+    // 10:01): [`hinted_first`].
     if let Err(refused) = &said
-        && refused
-            .1
-            .as_deref()
-            .is_some_and(|lines| lines.contains(LIGHT_PART))
+        && refused.1.as_deref().is_some_and(hinted_first)
     {
         return Err(refused.clone());
     }
@@ -6316,9 +6649,9 @@ light = { colour = "green", level = 3, for = "20s" }
             ),
             (
                 pet,
-                "light = { colour = \"amber\", level = 2, for = \"20s\", pattern = { kind = \
+                "light = { colour = \"orange\", level = 2, for = \"20s\", pattern = { kind = \
                  \"breathe\", period = \"6s\" } }",
-                "When someone pats its head, it glows amber at level 2 for 20 seconds, \
+                "When someone pats its head, it glows orange at level 2 for 20 seconds, \
                  breathing.",
             ),
             (
@@ -8503,5 +8836,266 @@ light = { colour = "green", level = 3, for = "20s" }
             topic_granted(&TOML.replace("[trigger]", "[when]")),
             TOML.replace("[trigger]", "[when]")
         );
+    }
+
+    /// lamp-74ff, 11 Nov 09:48-09:50: "nod when I stand up", made from the
+    /// app, failed all three repairs twice on a nod written with a `for`:
+    /// that `for` is taken out, in any form it is written as one line or
+    /// one entry, and a gesture beside a mood, which takes it, is not.
+    #[test]
+    fn a_made_gestures_for_is_tidied_and_a_moods_kept() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        let nod = made_with(stood, "body = { gesture = \"nod\" }");
+        for step in [
+            "body = { gesture = \"nod\", for = \"2s\" }",
+            "body = { for = \"2s\", gesture = \"nod\" }",
+            "body = {gesture=\"nod\",for=\"2s\"}",
+        ] {
+            let tidy = tidied(&made_with(stood, step));
+            assert_eq!(
+                toml::from_str::<toml::Table>(&tidy).unwrap(),
+                toml::from_str::<toml::Table>(&nod).unwrap(),
+                "{step}"
+            );
+            assert!(!tidy.contains("for ="), "{tidy}");
+        }
+        assert_eq!(
+            tidied(&made_with(
+                stood,
+                "body = { gesture = \"nod\", for = \"2s\" }"
+            )),
+            nod
+        );
+        // As a table of its own: its line.
+        assert_eq!(
+            tidied(&made_with(
+                stood,
+                "[do.body]\ngesture = \"nod\"\nfor = \"2s\""
+            )),
+            made_with(stood, "[do.body]\ngesture = \"nod\"")
+        );
+        // A mood takes its for, with a gesture or not: untouched.
+        for step in [
+            "body = { gesture = \"nod\", mood = \"reading\", for = \"1m\" }",
+            "body = { mood = \"reading\", for = \"1m\" }",
+            "body = { gesture = \"nod\" }",
+        ] {
+            let text = made_with(stood, step);
+            assert_eq!(tidied(&text), text, "{step}");
+        }
+        // Written dotted: as it came, for the check to say why.
+        let dotted = made_with(stood, "body.gesture = \"nod\"\nbody.for = \"2s\"");
+        assert_eq!(tidied(&dotted), dotted);
+        assert_eq!(tidied("not = toml = at all"), "not = toml = at all");
+        // Paced, so checked and said, it nods.
+        let paced_nod = paced(&made_with(
+            stood,
+            "body = { gesture = \"nod\", for = \"2s\" }",
+        ));
+        assert!(capped_with(&paced_nod, false).is_ok(), "{paced_nod}");
+        assert!(
+            plainly_with(&paced_nod, false)
+                .unwrap()
+                .starts_with("When someone sitting at the desk gets up, it nods"),
+            "{paced_nod}"
+        );
+    }
+
+    /// The same make's trigger: `room/stood_up` with a `for` or an
+    /// `absent_for`, which a getting up never lasts. Both are taken out;
+    /// a face's `absent_for`, which it counts, is not.
+    #[test]
+    fn a_made_getting_ups_for_and_absent_for_are_tidied() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        let step = "body = { gesture = \"nod\" }";
+        let nod = made_with(stood, step);
+        for held in [
+            "for = \"10s\"\n",
+            "absent_for = \"1m\"\n",
+            "for = \"10s\"\nabsent_for = \"1m\"\n",
+        ] {
+            let text = made_with(&format!("{stood}{held}"), step);
+            assert!(plainly_with(&text, false).is_err(), "{held}");
+            assert_eq!(tidied(&text), nod, "{held}");
+            assert!(plainly_with(&paced(&text), false).is_ok(), "{held}");
+        }
+        let face = made_with(
+            "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\nabsent_for = \"5m\"\n",
+            step,
+        );
+        assert_eq!(tidied(&face), face);
+    }
+
+    /// The same make's grant: `speak = true` with nothing said, which the
+    /// cap refuses ("it asks for its voice but never says anything"), is
+    /// taken out; beside a say, a hum or a read it is kept.
+    #[test]
+    fn a_made_skills_voice_asked_with_nothing_said_is_tidied() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        let speaking = |step: &str| {
+            made_with(stood, step).replace("body = true\n", "body = true\nspeak = true\n")
+        };
+        let nod = speaking("body = { gesture = \"nod\" }");
+        assert!(capped_with(&nod, false).is_err());
+        assert_eq!(
+            tidied(&nod),
+            made_with(stood, "body = { gesture = \"nod\" }")
+        );
+        assert!(capped_with(&paced(&nod), false).is_ok());
+        for step in [
+            "say = { text = \"Off you go.\" }",
+            "cue = \"hum\"",
+            "body = { gesture = \"nod\" }\n\n[[do]]\ncue = \"hum\"",
+        ] {
+            let text = speaking(step);
+            assert_eq!(tidied(&text), text, "{step}");
+        }
+        let reads = nod.replace(
+            "speak = true\n",
+            "speak = true\nservices = { gmail = \"read\" }\n",
+        );
+        assert_eq!(tidied(&reads), reads);
+        // All three at once, as lamp-74ff's model wrote them.
+        let all = speaking("body = { gesture = \"nod\", for = \"2s\" }")
+            .replace(stood, &format!("{stood}for = \"5s\"\n"));
+        assert_eq!(
+            tidied(&all),
+            made_with(stood, "body = { gesture = \"nod\" }")
+        );
+    }
+
+    /// A body step [`plainly`] can't say is refused with how to write one,
+    /// as `lamp-skills` takes it: a gesture with no for, a mood's for more
+    /// than 0 and at most 2m.
+    #[test]
+    fn a_body_step_is_said_only_as_lamp_skills_takes_it() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        for (step, keys) in [
+            ("body = { gesture = \"nod\", for = \"2s\" }", "for, gesture"),
+            ("body = { mood = \"reading\", for = \"3m\" }", "for, mood"),
+            ("body = { mood = \"reading\", for = \"0s\" }", "for, mood"),
+            ("body = { mood = \"reading\" }", "mood"),
+        ] {
+            let Err(Refused(why, Some(lines))) = plainly_with(&made_with(stood, step), false)
+            else {
+                panic!("{step}: said");
+            };
+            assert_eq!(why, UNSAID, "{step}");
+            assert_eq!(
+                lines,
+                format!("{UNSAID_PART}[[do]] step 1, body ({keys}){BODY_PART}. {PLAIN_ONLY}"),
+                "{step}"
+            );
+            assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+        }
+        assert!(
+            plainly_with(
+                &made_with(stood, "body = { mood = \"reading\", for = \"2m\" }"),
+                false
+            )
+            .is_ok()
+        );
+    }
+
+    /// lamp-9adf and lamp-74ff, 11 Nov 10:01: "say hello when I come back
+    /// to my desk" written as one step with a gesture, a light of a colour
+    /// the light hasn't and a fine say, the repair told only the say's form.
+    /// Each kind is judged on its own: the colour is named with the
+    /// light's list, the say isn't, and the step is told to be split.
+    #[test]
+    fn a_repair_is_told_the_part_of_a_step_that_failed() {
+        let back = "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                    when = \"appears\"\nabsent_for = \"5m\"\n";
+        let step = "body = { gesture = \"greeting\" }\nlight = { colour = \"gold\", level = 3, \
+                    for = \"20s\" }\nsay = { text = \"Welcome back!\" }";
+        let Err(Refused(why, Some(lines))) = plainly_with(&made_with(back, step), false) else {
+            panic!("said");
+        };
+        assert_eq!(why, UNSAID);
+        assert!(
+            lines.contains(
+                ": colour is one of yellow, red, green, blue, cyan, purple, orange, pink, white, \
+                 warm; one kind a [[do]] step"
+            ),
+            "{lines}"
+        );
+        assert!(!lines.contains(SAY_TEXT_PART), "{lines}");
+        assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+        assert!(hinted_first(&lines));
+        // Every kind fine, but together: told only to split them.
+        let together = step.replace("\"gold\"", "\"warm\"");
+        let Err(Refused(_, Some(lines))) = plainly_with(&made_with(back, &together), false) else {
+            panic!("said");
+        };
+        assert!(
+            lines.contains(&format!("say (text){ONE_KIND_PART}. ")),
+            "{lines}"
+        );
+        // One step a kind: said.
+        let apart = together
+            .replace("\nlight", "\n\n[[do]]\nlight")
+            .replace("\nsay", "\n\n[[do]]\nsay");
+        assert!(
+            plainly_with(&made_with(back, &apart), false).is_ok(),
+            "{apart}"
+        );
+        // A light alone of a colour it hasn't, or a level past 5: refused,
+        // the colour named.
+        for light in [
+            "light = { colour = \"gold\" }",
+            "light = { colour = \"warm\", level = 9 }",
+        ] {
+            let Err(Refused(_, Some(lines))) = plainly_with(&made_with(back, light), false) else {
+                panic!("{light}: said");
+            };
+            assert!(lines.contains("[[do]] step 1, light ("), "{lines}");
+        }
+        let Err(Refused(_, Some(lines))) =
+            plainly_with(&made_with(back, "light = { colour = \"gold\" }"), false)
+        else {
+            panic!("said");
+        };
+        assert!(
+            lines.contains(&format!("light (colour){}. ", colour_part())),
+            "{lines}"
+        );
+        // A bad say alone is still told the say's form.
+        let Err(Refused(_, Some(lines))) = plainly_with(&made_with(back, "say = \"hello\""), false)
+        else {
+            panic!("said");
+        };
+        assert!(lines.contains(&format!("say{SAY_TEXT_PART}. ")), "{lines}");
+    }
+
+    /// The same make's trigger, on the desk's presence: a `for` of nothing
+    /// is taken out, on any trigger, as `lamp-skills` reads it as none; a
+    /// `for` that holds is kept; one in words is refused with its form.
+    #[test]
+    fn a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept() {
+        let come = "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n";
+        let step = "body = { gesture = \"greeting\" }";
+        let plain = made_with(come, step);
+        for nothing in ["for = \"0s\"\n", "for = \"0m\"\n", "for = \"0ms\"\n"] {
+            let text = made_with(&format!("{come}{nothing}"), step);
+            assert!(plainly_with(&text, false).is_err(), "{nothing}");
+            assert_eq!(tidied(&text), plain, "{nothing}");
+        }
+        let face = "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n";
+        assert_eq!(
+            tidied(&made_with(&format!("{face}absent_for = \"0s\"\n"), step)),
+            made_with(face, step)
+        );
+        let held = made_with(&format!("{come}for = \"5s\"\n"), step);
+        assert_eq!(tidied(&held), held);
+        let words = made_with(&format!("{come}for = \"5 seconds\"\n"), step);
+        assert_eq!(tidied(&words), words);
+        let Err(Refused(_, Some(lines))) = plainly_with(&words, false) else {
+            panic!("said");
+        };
+        assert!(
+            lines.contains("room/presence, its for, like \"5m\": s, m or h, above 0"),
+            "{lines}"
+        );
+        assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
     }
 }
