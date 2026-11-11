@@ -224,10 +224,11 @@ attach to `lamp-cloud` or `lamp-voice` can make it ask.
 `.<code>.json.new`, synced, renamed over, the folder synced). A code is never
 a path: only a code in the catalogue names a file. The file is V1's
 `ConnectorCreds`: `connector`, `auth_type`, `access_token`, `refresh_token`,
-`token_type`, `expires_at` (0 for a credential that never expires), `api_key`,
+`token_type`, `expires_at` (0 for a credential that never ends by time), `api_key`,
 `scopes`, `user_email`, `client_id`, `credentials` (Gmail's `email`, a Page's
 `page_id`, an MCP service's `mcp_url` and `mcp_auth_header`), `refresh` and
-`obtained_at`. Its `Debug` shows `<hidden>` for each secret and only the names
+`obtained_at`, and the lamp's own `link_id` and `refused` (the service
+refused a link with no end by time: [Refresh](#refresh)). Its `Debug` shows `<hidden>` for each secret and only the names
 of `credentials`; no refusal names a value. A credential of over 8,192 bytes,
 or one with a control character (a line break that could split a header), is
 refused at `set`.
@@ -259,8 +260,8 @@ Wiped:
   services' tokens").
 
 `list` and `services_connected` give a service's code, its account and
-`expired` (expired with no refresh token, so it needs linking again), never
-a secret.
+`expired` (expired with no refresh token, or refused by its service, so it
+needs linking again), never a secret.
 
 ## The services
 
@@ -318,9 +319,12 @@ named it; both are known. Facebook is asked at Graph API `v19.0`, GitHub with
 `MQTTConnectorSetData`): `auth_type` is required, and an `access_token` or an
 `api_key`. The token is sent as `Authorization: Bearer`, but Figma's with
 `auth_type: "pat"` as `X-Figma-Token`. An OAuth link (`expires_in` or
-`expires_at`, absent: one hour from now) may carry a `refresh_token` and
-`refresh: true`; a static key (`pat`, or an `api_key` with no access token)
-with no time given never expires. Gmail's app password needs the account's
+`expires_at`) may carry a `refresh_token` and `refresh: true`. Given no time,
+one with both is given one hour from now, so it is renewed before then; one
+without them keeps no guessed end (`expires_at` 0) and is used until its
+service refuses it ([Refresh](#refresh)): a GitHub OAuth App's token or a
+Slack token without rotation never ends at the service. A static key (`pat`,
+or an `api_key` with no access token) with no time given never expires. Gmail's app password needs the account's
 email (a Google sign-in's is read from Gmail at `set` when the link has
 none; a `gmail-app` link's must be in it); a Facebook write needs `credentials.page_id` (reads fall back to
 `me`).
@@ -2006,8 +2010,34 @@ replaces the old); anything else leaves the link as it was. A link past its
 time is refused: "the link to <Service> has expired: link it again in the
 app". The journal says why a link was not renewed ("<code>'s link not
 renewed: …", with the backend's status, or "has expired and it has no
-refresh token" / "it is not marked to be renewed"), never a token or the
-answer.
+refresh token" / "it is not marked to be renewed" / "its service refused
+it"), never a token or the answer.
+
+An OAuth link given no time and no refresh token with `refresh: true` has no
+end by time (`expires_at` 0, `store::expires_at`): nothing could renew it, and
+a guessed hour only ended a token that still worked at its service (testers
+linked Slack and GitHub again every day). It is used until the service
+itself refuses it: a 401 to an HTTP call (GitHub's "Bad credentials" among
+them, but not a 401 whose body says the scopes are too few), or an MCP
+service's 401 or its words for a dead token (`invalid_auth`,
+`token_expired`, `token_revoked`, in a JSON-RPC error or a tool's error;
+`mcp::DEAD_TOKEN`). That call is answered as before ("<Service> refused the
+lamp's link: it may need linking again in the app"), and the link's file
+keeps `refused: true` (`serve::mark_refused`; the journal says "<code>
+refused its link: kept as expired until it is linked again"): `list` and
+`services_connected` show it `expired: true`, and the next call is told
+"the link to <Service> has expired: link it again in the app" without
+asking the service. A 403, a scope refusal or any other error marks
+nothing. Linking it again in the app writes a new entry, the mark gone. A
+link given its time, one renewed through the backend and a static key are
+as before: a refusal doesn't mark them.
+
+A service whose tokens are short-lived (Slack with token rotation, a GitHub
+App's user tokens, Notion's and other MCP servers' OAuth) stays linked only
+if the backend sends its `refresh_token` with `refresh: true` and its time,
+and `POST <base>/connector/refresh-token` accepts that connector's code:
+without them its token ends at the service, the service refuses it, and it
+is shown expired.
 
 ## The app's kinds
 

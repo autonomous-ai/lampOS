@@ -160,7 +160,9 @@ node examples/twin/try.js --lamp-sim ../../target/debug/lamp-sim     # prints th
 
 The lamp runs in a private folder (`~/.lampsim-try-PID`, 0700) and listens on 127.0.0.1 only; the page is the one
 thing on the network and answers only with the token in its URL. The camera and the microphone are off: the lamp
-has neither grant, so no picture of the room is ever on the page. The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
+has neither grant, so no picture of the room is ever on the page. `--camera` and `--microphone` turn them on for
+one run (the host's, opened only while the lamp's own mark shows): then the page can show the room, over plain
+HTTP, to anyone on your network who has the link. The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
 your own at the same lamp.
 
 Every button is one entry of the table in `examples/twin/controls.js` (a label, its fields, and the SDK call it makes, or the `lamp-sim` stimulus), and the page is drawn from that table: a new SDK feature is a new entry there, and `test/try.test.js` runs every entry with its defaults.
@@ -563,7 +565,7 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.stop()` | | none | no |
 | `lamp.startTurn(prompt, { wait })` | `prompt`: words said first, as `say`'s `text` (`undefined`: none). Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. Resolves `{"to": "voice"}`; with `wait`, its `done`: `finished` once the answer has sounded, else `dropped` with the voice's why (`dropped: nobody spoke`). Refused in quiet hours where the lamp sets them, as `say` | `speak` and `hear` | no |
 | `lamp.endTurn()` | Ends the turn this computer started, never another's: `{"turn": "ended", "started": <the turn.start's id>}`, and the start's `done` follows. With none, `busy` ("not this computer's turn") | `speak` | no |
-| `lamp.setListening(on)` | `false` holds this computer's mute: `{"mute": "held"}` (again: the same, nothing new). `true` lifts it: `{"mute": "lifted"}`, or `{"mute": "nothing_held"}`. The person wins: a hand on the head lifts it, said as a `done` `cut_short`, "a hand on the head", naming the `listen.set` that held it; and it ends when this computer's last connection closes or it is revoked. A `stop` doesn't lift it. Nothing the lamp hears reaches a computer either way | `hear` | no |
+| `lamp.setListening(on)` | `false` holds this computer's mute: `{"mute": "held"}` (again: the same, nothing new). `true` lifts it: `{"mute": "lifted"}`, or `{"mute": "nothing_held"}`. The person wins: a hand on the head lifts it, said as a `done` `cut_short`, "a hand on the head", naming the `listen.set` that held it; and it ends when this computer's last connection closes or it is revoked. A `stop` doesn't lift it. Nothing the lamp hears reaches a computer either way **Caution (11 Nov 2026):** on the earlier stable 11716 a mute held while the lamp was answering crashed the voice's second worker once, and the lamp stayed muted by its restart guard until a tap on the head; not reproduced on stable 11756 (idle and during an answer, 11 Nov 12:18 and 12:21; GUIDE.md, `set_listening`). On a lamp still on 11716 or older, do not hold a mute from a program someone depends on. | `hear` | no |
 | `lamp.request(op, fields)` | any op of the schema, checked against it first | the op's | |
 
 **A look's or a `joints`' `done` on a resting lamp:** a resting head or base

@@ -15,9 +15,14 @@ export function tokenOk(url, token) {
   return given.length === wanted.length && timingSafeEqual(given, wanted);
 }
 
-// The page's own origin only: http://localhost:PORT or http://127.0.0.1:PORT.
-export function originOk(origin, port, host) {
-  // `host`, only when the twin is on the LAN (--lan): the page's own origin is whatever address it was
-  // opened at, so an Origin equal to the Host the request came to is the page itself; any other website's is not.
-  return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}` || (Boolean(host) && origin === `http://${host}`);
+// The page's own origin only: http://localhost:PORT or http://127.0.0.1:PORT, and with --lan the one address the
+// twin printed (`lanHost`, "ADDRESS:PORT", fixed at start: never the request's own Host, which a page can choose).
+export function originOk(origin, port, lanHost) {
+  return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}` || (Boolean(lanHost) && origin === `http://${lanHost}`);
+}
+
+// Whether a request's Host header is one of the twin's own (the same three), so a page reached under another
+// name (DNS rebinding) is refused before the token is even looked at.
+export function hostOk(host, port, lanHost) {
+  return host === `localhost:${port}` || host === `127.0.0.1:${port}` || (Boolean(lanHost) && host === lanHost);
 }

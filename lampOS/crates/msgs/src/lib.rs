@@ -802,6 +802,75 @@ pub fn line_topics() -> Vec<(&'static str, Declaration)> {
     vec![(SaidLine::TOPIC, SaidLine::declaration())]
 }
 
+/// A hand in view (`humans/hands/tracked`, #4375's follow a hand): the
+/// palm's centre from the picture's left and top and its width, each a share
+/// of the picture's width or height, whether the hand is open, and how sure
+/// the tracker is. Never the picture or its keypoints. One a look while a
+/// hand is wanted and seen ([`HandsWanted`]); none while it isn't, and a
+/// hand not heard of for a second is gone (lamp-control, `watch::HAND_GONE`).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HandTrack {
+    pub x: f32,
+    pub y: f32,
+    pub size: f32,
+    pub open: bool,
+    pub confidence: f32,
+}
+
+impl HandTrack {
+    pub const TYPE: &str = "lamp_msgs/HandTrack";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "humans/hands/tracked";
+
+    /// One a look, no period promised: a hand seen, not a state kept.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    /// Every share is from 0 to 1.
+    pub fn check(&self) -> Result<(), Invalid> {
+        for (name, value) in [
+            ("x", self.x),
+            ("y", self.y),
+            ("size", self.size),
+            ("confidence", self.confidence),
+        ] {
+            if !(0.0..=1.0).contains(&value) {
+                return invalid(format!("hand {name} is {value}: from 0 to 1"));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Whether anyone wants a hand looked for (`humans/hands/wanted`): lamp-control
+/// says `true` while a computer's `look` at `hand` stands, `false` when it
+/// ends. The eyes look for a hand only while it is true, so with nobody
+/// wanting one nothing runs and nothing is published.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HandsWanted {
+    pub wanted: bool,
+}
+
+impl HandsWanted {
+    pub const TYPE: &str = "lamp_msgs/HandsWanted";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "humans/hands/wanted";
+
+    /// The newest says it: a latecomer reads whether one is wanted now.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+    }
+}
+
+/// The hand-follow's two topics, apart from the first topics.
+pub fn hand_topics() -> Vec<(&'static str, Declaration)> {
+    vec![
+        (HandTrack::TOPIC, HandTrack::declaration()),
+        (HandsWanted::TOPIC, HandsWanted::declaration()),
+    ]
+}
+
 /// The voice's turns' verdicts (#1155), apart from the first topics.
 pub fn turn_topics() -> Vec<(&'static str, Declaration)> {
     vec![(VoiceTurn::TOPIC, VoiceTurn::declaration())]
@@ -2118,6 +2187,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(online_topics())
         .chain(arrival_topics())
         .chain(turn_topics())
+        .chain(hand_topics())
         .chain(tone_topics())
         .chain(line_topics())
         .chain(skill_ask_topics())
@@ -2555,6 +2625,55 @@ mod tests {
         assert_eq!(
             declaration_of(SaidLine::TOPIC),
             Some(SaidLine::declaration())
+        );
+    }
+
+    /// A hand in view and whether one is wanted (`humans/hands/tracked`,
+    /// `humans/hands/wanted`): shares from 0 to 1, its own topics, known by
+    /// name; the JSON is what lamp-control's `Hand::of` reads.
+    #[test]
+    fn a_hand_in_view_and_whether_one_is_wanted() {
+        round_trip(
+            &HandTrack {
+                x: 0.5,
+                y: 0.25,
+                size: 0.125,
+                open: true,
+                confidence: 0.75,
+            },
+            "{\"x\":0.5,\"y\":0.25,\"size\":0.125,\"open\":true,\"confidence\":0.75}",
+        );
+        round_trip(&HandsWanted { wanted: true }, "{\"wanted\":true}");
+        let hand = |x, y, size, confidence| HandTrack {
+            x,
+            y,
+            size,
+            open: false,
+            confidence,
+        };
+        assert!(hand(0.0, 1.0, 0.5, 1.0).check().is_ok());
+        for bad in [
+            hand(-0.01, 0.5, 0.5, 0.5),
+            hand(0.5, 1.01, 0.5, 0.5),
+            hand(0.5, 0.5, f32::NAN, 0.5),
+            hand(0.5, 0.5, 0.5, 2.0),
+        ] {
+            assert!(bad.check().is_err(), "{bad:?}");
+        }
+        assert_eq!(HandTrack::declaration().kind, Kind::Event);
+        assert_eq!(HandsWanted::declaration().kind, Kind::Latest);
+        assert_eq!(
+            declaration_of(HandTrack::TOPIC),
+            Some(HandTrack::declaration())
+        );
+        assert_eq!(
+            declaration_of(HandsWanted::TOPIC),
+            Some(HandsWanted::declaration())
+        );
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| { *topic != HandTrack::TOPIC && *topic != HandsWanted::TOPIC })
         );
     }
 

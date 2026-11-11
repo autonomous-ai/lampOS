@@ -4,7 +4,7 @@
 // on it. The twin, the SDK and lamp-mcp then see a lamp like any other.
 //
 //   node examples/twin/virtual-lamp.js [--lamp-sim PATH] [--bin-dir DIR] [--dir DIR]
-//        [--port N] [--twin-port N] [--glb PATH] [--camera=always] [--microphone] [--no-open] [--browser] [--try]
+//        [--port N] [--twin-port N] [--glb PATH] [--camera|--camera=always] [--microphone] [--no-open] [--browser] [--try]
 //
 // --lamp-sim PATH   the lamp-sim binary (default: `lamp-sim` on the PATH)
 // --bin-dir DIR     where lamp-body and lamp-control are (default: beside lamp-sim)
@@ -13,7 +13,7 @@
 // --twin-port N     the twin's page (default 8737)
 // --glb PATH        the rigged CAD for the twin (default: the repository's, which needs `git lfs pull`)
 // --try             the try-it app (see try.js): the page on the LAN too, with a control panel, stimuli and
-//                   an event log; no camera or microphone grant
+//                   an event log; no camera or microphone unless --camera / --microphone is given
 // --browser         open the default browser's tab, not a window of its own (the default is a
 //                   chromeless Chrome/Chromium/Edge window, the browser's own tab when none is installed)
 // It pairs a fresh keyring under DIR/sdk each start (the lamp makes a new
@@ -29,14 +29,20 @@ import { Keyring, Lamp } from '../../src/index.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const GRANTS = 'body,light,speak,look,hear,sound,air,device,camera,microphone';
-// The try-it app's lamp has no camera or microphone grant: a picture of the room would sit on the LAN page.
+// The try-it app's lamp has no camera or microphone grant unless that is asked for (`--camera`, `--microphone`):
+// a picture of the room would sit on the LAN page.
 const TRY_GRANTS = 'body,light,speak,look,hear,sound,air,device';
+export function grantsFor(flags, tryApp) {
+  if (!tryApp) return GRANTS;
+  const camera = flags.some((f) => f === '--camera' || f.startsWith('--camera='));
+  return [TRY_GRANTS, ...(camera ? ['camera'] : []), ...(flags.includes('--microphone') ? ['microphone'] : [])].join(',');
+}
 
 export function parseArguments(args) {
   const out = { flags: [] };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--no-open' || arg === '--browser' || arg === '--try' || arg === '--microphone' || arg.startsWith('--camera=')) out.flags.push(arg);
+    if (arg === '--no-open' || arg === '--browser' || arg === '--try' || arg === '--microphone' || arg === '--camera' || arg.startsWith('--camera=')) out.flags.push(arg);
     else if (arg.startsWith('--') && args[i + 1] !== undefined) out[arg.slice(2)] = args[++i];
     else throw new Error(`unknown argument ${arg}`);
   }
@@ -142,7 +148,7 @@ export async function start(options, log = console.log) {
     ended.catch(() => {});
     await Promise.race([listening(port, 60_000), ended]);
     // lamp-control answers on its admin socket a moment after its door opens.
-    const given = pairingFrom(await outputOf(lampSim, ['code', dir, ...binDir, '--grants', tryApp ? TRY_GRANTS : GRANTS]));
+    const given = pairingFrom(await outputOf(lampSim, ['code', dir, ...binDir, '--grants', grantsFor(options.flags, tryApp)]));
     const home = join(dir, 'sdk');
     rmSync(home, { recursive: true, force: true });
     const pairing = await Lamp.pair(given.code, '127.0.0.1', { pin: given.pin, port, name: 'virtual lamp viewer', keyring: new Keyring(home) });

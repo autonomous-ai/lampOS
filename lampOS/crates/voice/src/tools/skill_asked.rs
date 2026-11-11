@@ -13,6 +13,16 @@
 //! there, or the skill's own function. The choice (which scene, which show)
 //! is still the model's. A line with any other word, a round after a call,
 //! and a skill not offered are asked as before. Off, nothing is forced.
+//!
+//! A line that is only a plain question about the lamp itself ("who made
+//! you?", "where can I buy you?", "how much do you cost?") calls the lamp's
+//! help skill (faq's `lamp_help`) the same way. On build 11756 on 11 Nov
+//! (#6216's row) both were answered with no call, though faq was offered
+//! through `use_skill` with a line naming those very questions: "who made
+//! you?" was the model's own words, and "where can I buy you?" said
+//! "autonomous.ai" without the page faq's `about` names. The topic is still
+//! the model's. A question with any other word ("who made you sad", "where
+//! can I buy milk") is the model's, as before.
 use crate::known_faces::lower_words;
 use crate::second_provider::net::{Force, Forced, Message};
 
@@ -28,6 +38,9 @@ pub fn on() -> bool {
 pub const SCENE: &str = "light_scene";
 /// Light show's function.
 pub const SHOW: &str = "light_show";
+/// The lamp's help skill's function (faq's `tool`): the name `use_skill`
+/// gives it, as it gives light-scenes' as `light_scene`.
+pub const HELP: &str = "lamp_help";
 
 /// The asks, as words in a row, and the skill's function each calls: the
 /// scenes' names before "light" (light-scenes' `one_of`, and "relaxing" as
@@ -43,6 +56,35 @@ const ASKS: &[(&[&str], &str)] = &[
     (&["night", "light"], SCENE),
     (&["light", "show"], SHOW),
     (&["party", "lights"], SHOW),
+];
+
+/// The plain questions about the lamp itself, each whole, and the help
+/// skill each calls: who made it, where it is sold, what it costs (faq's
+/// `about`, and its SKILL.md's "who made you?", "where can I buy you?").
+/// Only [`AROUND`] words may stand beside one, and no request: "do you know
+/// who made you" or "who made you sad" is the model's.
+// ponytail: questions named here, not read from the skill, as [`ASKS`].
+const QUESTIONS: &[(&[&str], &str)] = &[
+    (&["who", "made", "you"], HELP),
+    (&["who", "makes", "you"], HELP),
+    (&["who", "built", "you"], HELP),
+    (&["who", "created", "you"], HELP),
+    (&["what", "company", "made", "you"], HELP),
+    (&["which", "company", "made", "you"], HELP),
+    (&["where", "can", "i", "buy", "you"], HELP),
+    (&["where", "can", "i", "get", "you"], HELP),
+    (&["where", "do", "i", "buy", "you"], HELP),
+    (&["where", "can", "i", "buy", "one"], HELP),
+    (
+        &["where", "can", "i", "buy", "a", "lamp", "like", "you"],
+        HELP,
+    ),
+    (&["how", "much", "do", "you", "cost"], HELP),
+    (&["how", "much", "are", "you"], HELP),
+    (&["what", "do", "you", "cost"], HELP),
+    (&["what", "is", "your", "price"], HELP),
+    (&["what's", "your", "price"], HELP),
+    (&["whats", "your", "price"], HELP),
 ];
 
 /// Words the line may hold anywhere: a greeting, the lamp's name, a
@@ -120,11 +162,28 @@ fn phrase_at(words: &[String], at: usize, phrases: &[&[&str]]) -> Option<usize> 
 /// exactly one ask ([`ASKS`]), requests ([`REQUESTS`]) only before it, and
 /// no word but those [`AROUND`].
 pub fn asks_for(said: &str) -> Option<&'static str> {
+    plainly(said, ASKS, REQUESTS)
+}
+
+/// The help skill's function a line plainly asks a question about the lamp
+/// itself for, if any: the line holds exactly one whole question
+/// ([`QUESTIONS`]) and no word but those [`AROUND`].
+pub fn asks_about(said: &str) -> Option<&'static str> {
+    plainly(said, QUESTIONS, &[])
+}
+
+/// The function of the one entry of `table` that `said` holds, with
+/// `requests` only before it and no word but those [`AROUND`].
+fn plainly(
+    said: &str,
+    table: &[(&[&str], &'static str)],
+    requests: &[&[&str]],
+) -> Option<&'static str> {
     let words = lower_words(said);
     let mut asked = None;
     let mut at = 0;
     while at < words.len() {
-        let found = ASKS
+        let found = table
             .iter()
             .find(|(ask, _)| phrase_at(&words, at, &[ask]).is_some());
         if let Some((ask, name)) = found {
@@ -136,7 +195,7 @@ pub fn asks_for(said: &str) -> Option<&'static str> {
         } else if let Some(taken) = phrase_at(&words, at, AROUND).or_else(|| {
             asked
                 .is_none()
-                .then(|| phrase_at(&words, at, REQUESTS))
+                .then(|| phrase_at(&words, at, requests))
                 .flatten()
         }) {
             at += taken;
@@ -152,16 +211,18 @@ pub type Offered = std::sync::Arc<dyn Fn(&str) -> bool + Send + Sync>;
 
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
-/// a person's line that plainly asks for a scene or a show must call its
-/// skill. `offered` says, at each request, whether `use_skill` offers a
-/// skill: then `use_skill` is forced with its `skill` pinned to it, and
-/// nothing when it is not offered (a skill turned off is never forced);
-/// without `use_skill` (`None`), the skill's own function, which the chat
-/// forces only when it is declared.
+/// a person's line that plainly asks for a scene or a show, or plainly
+/// asks a question about the lamp itself, must call its skill. `offered`
+/// says, at each request, whether `use_skill` offers a skill: then
+/// `use_skill` is forced with its `skill` pinned to it, and nothing when it
+/// is not offered (a skill turned off is never forced); without `use_skill`
+/// (`None`), the skill's own function, which the chat forces only when it
+/// is declared.
 pub fn force(offered: Option<Offered>) -> Force {
     std::sync::Arc::new(move |messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
-        let skill = asks_for(last.words()?)?;
+        let said = last.words()?;
+        let skill = asks_for(said).or_else(|| asks_about(said))?;
         match &offered {
             Some(offered) => offered(skill).then_some(Forced {
                 name: crate::use_skill::NAME,
@@ -274,6 +335,91 @@ mod tests {
         ] {
             assert_eq!(asks_for(said), None, "{said}");
         }
+    }
+
+    /// Each plain question about the lamp itself (build 11756, 11 Nov:
+    /// "who made you?" and "where can I buy you?" called nothing) asks the
+    /// help skill; a light ask never does.
+    #[test]
+    fn a_plain_question_about_the_lamp_asks_its_help() {
+        for said in [
+            "Hey Lamp, who made you?",
+            "Who makes you?",
+            "Lamp, who built you?",
+            "Who created you, lamp?",
+            "What company made you?",
+            "Which company made you?",
+            "Hey Lamp, where can I buy you?",
+            "Where can I get you?",
+            "Where do I buy you?",
+            "Where can I buy one, please?",
+            "Where can I buy a lamp like you?",
+            "How much do you cost?",
+            "Lamp, how much are you?",
+            "What do you cost?",
+            "What is your price?",
+            "What's your price?",
+            "What\u{2019}s your price?",
+            "Whats your price",
+            "Okay lamp, who made you? Thanks.",
+        ] {
+            assert_eq!(asks_about(said), Some(HELP), "{said}");
+            assert_eq!(asks_for(said), None, "{said}");
+        }
+        for said in [
+            "Where can I buy milk?",
+            "Who made you cry?",
+            "Do you know who made you sad?",
+            "Who made you sad?",
+            "Can you tell me who made you?",
+            "Who made you, and where can I buy you?",
+            "Where can I buy a lamp?",
+            "How much do you cost in Vietnam?",
+            "Who made this?",
+            "Lamp, movie light.",
+            "Lamp.",
+            "",
+        ] {
+            assert_eq!(asks_about(said), None, "{said}");
+        }
+        for (said, name) in [
+            ("Lamp, movie light.", SCENE),
+            ("Lamp, show me a light show.", SHOW),
+        ] {
+            assert_eq!(asks_for(said), Some(name), "{said}");
+        }
+    }
+
+    /// The help skill is forced through `use_skill`, pinned to `lamp_help`,
+    /// only when offered; without `use_skill`, its own function.
+    #[test]
+    fn a_plain_question_about_the_lamp_forces_its_help_only_when_offered() {
+        let who = [Message::user("Hey Lamp, who made you?")];
+        let buy = [Message::user("Hey Lamp, where can I buy you?")];
+        let every: Offered = Arc::new(|_| true);
+        let wrapped = force(Some(every));
+        for line in [&who, &buy] {
+            assert_eq!(
+                wrapped(line),
+                Some(Forced {
+                    name: crate::use_skill::NAME,
+                    only: Some(("skill", HELP))
+                })
+            );
+        }
+        let only_scenes: Offered = Arc::new(|skill| skill == SCENE);
+        assert_eq!(force(Some(only_scenes))(&who), None, "faq not offered");
+        assert_eq!(
+            force(None)(&buy),
+            Some(Forced {
+                name: HELP,
+                only: None
+            })
+        );
+        let mut after = who.to_vec();
+        after.push(Message::tool("1", "{\"next\":\"Say it.\"}"));
+        assert_eq!(wrapped(&after), None);
+        assert_eq!(wrapped(&[Message::user("Where can I buy milk?")]), None);
     }
 
     /// Through `use_skill`, the skill is pinned only when it is offered;

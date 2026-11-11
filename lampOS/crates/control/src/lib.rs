@@ -19,6 +19,7 @@ pub mod body_state;
 pub mod camera;
 pub mod cert;
 pub mod feelings;
+pub mod hands;
 pub mod journal;
 pub mod lease;
 pub mod microphone;
