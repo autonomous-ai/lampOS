@@ -10267,8 +10267,15 @@ impl DaysClient {
         lease: Option<&crate::memory_scope::ScopeLease>,
         named: bool,
     ) -> (Value, bool) {
-        let records = self.forget_records_about(about, person, until);
-        let contacts = self.forget_contacts_about(about, person, until);
+        // Records and contacts are kept under the services' owner id
+        // (`services::owner_of`), which in the private room is the first
+        // owner id, not always the scope's person: forgotten under the same
+        // id, or a forget removes none (the switch-on row on lamp-06c1,
+        // 11 Nov).
+        let owner = crate::services::owner_of(lease);
+        let theirs = owner.as_deref().or(person);
+        let records = self.forget_records_about(about, theirs, until);
+        let contacts = self.forget_contacts_about(about, theirs, until);
         let told = self.forget_kept_about(about, person, until, lease, named);
         contacts_forgotten(records_forgotten(told, records), contacts)
     }
@@ -17853,6 +17860,61 @@ mod tests {
         served.join().unwrap();
         // The removed count is the memory's answer to the records forget.
         assert_eq!(told["records"], 1, "{told}");
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// The switch-on row on lamp-06c1 (11 Nov): in the private room the
+    /// records and contacts are kept under the services' owner id
+    /// (`services::owner_of`), the first owner id, while the forget's scope
+    /// is the speaker's own memory id. The forget about removes them under
+    /// the owner id the saves used, not the scope's.
+    #[test]
+    fn a_forget_about_in_the_private_room_removes_the_records_and_contacts_kept_under_the_owner_id()
+    {
+        const SPEAKER: &str = "p-0123456789abcdef";
+        crate::person::set_private_room_for_test(Some(true));
+        crate::known_faces::owner_for_test(Some(Some("Owner".to_owned())));
+        let owner = crate::services::owner_of(None).expect("the private room's owner");
+        assert!(lamp_msgs::known::is_person_id(&owner), "{owner}");
+        assert_ne!(owner, SPEAKER);
+        crate::service_records::on_for_test(true);
+        crate::service_contacts::on_for_test(true);
+        crate::service_records::forgot(None);
+        let (socket, served) = memory("records-forget-owner-id", 3, |request| match request["op"]
+            .as_str()
+        {
+            Some("service_records_forget") | Some("service_contacts_forget") => {
+                json!({"ok":true,"removed":1})
+            }
+            Some("forget_mark") => json!({"ok":true}),
+            Some("kept") => json!({"ok":true,"entries":[]}),
+            _ => json!({"ok":false}),
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about":"party"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(SPEAKER),
+        );
+        assert!(answered, "{told}");
+        let read = served.join().unwrap();
+        for op in ["service_records_forget", "service_contacts_forget"] {
+            let sent = read
+                .iter()
+                .find(|request| request["op"] == op)
+                .unwrap_or_else(|| panic!("no {op}: {read:?}"));
+            assert_eq!(sent["person"], owner.as_str(), "{op} under the owner id");
+        }
+        assert_eq!(told["records"], 1, "{told}");
+        assert_eq!(told["contacts"], 1, "{told}");
+        crate::service_records::on_for_test(false);
+        crate::service_contacts::on_for_test(false);
+        crate::known_faces::owner_for_test(None);
+        crate::person::set_private_room_for_test(None);
         drop(client);
         let _ = std::fs::remove_file(&socket);
     }
