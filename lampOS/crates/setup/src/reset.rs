@@ -435,14 +435,22 @@ pub struct AgentFolder {
 /// the person's, so it is removed. Not plan paths: a plan empties a path
 /// and keeps it, and a plan of 64 paths at most has no room for each.
 /// Kept, and why:
-/// - Hermes's home: `.hermes` (below), `.local` (the `hermes` command and
-///   its Python), `.cache` and `.npm` (download caches), the shell's
-///   `.bashrc` and `.profile`;
+/// - Hermes's home (its `HOME`, where its terminal tool runs): `.hermes`
+///   (below), `.local` (below), and the shell's `.bashrc` and `.profile`,
+///   written again as exactly what the installer writes there
+///   ([`HERMES_SHELL_TEXT`]), so a person's `export TOKEN=…` a tool added
+///   goes (the Reviewer-lead's P2); `.cache` and `.npm` are emptied and
+///   kept. Everything else goes;
+/// - `.local`: `bin` (the `hermes` command `hermes_install::present` reads,
+///   and the commands the installer publishes beside it) and `share/uv`'s
+///   `python` (the uv-managed Python the installer's `bootstrap_python`
+///   puts there, with `HOME` set to Hermes's); a `pip --user` install
+///   (`lib`), a `uv tool` install (`share/uv/tools`) and anything else go;
 /// - `HERMES_HOME`: the checkout `hermes-agent`, `tools` (uv, ffmpeg),
 ///   `installs`, the public model lists' caches, and `config.yaml`, cut
 ///   to lamp-update's install-time settings (no update check, no language
-///   servers: `hermes_install::CONFIG`) and Harness's `hooks:` block
-///   ([`cut_hermes_config`]): a person's `mcp_servers`, skill folders,
+///   servers: `hermes_install::CONFIG`) and Harness's own `hooks:` items
+///   ([`cut_hermes_config`]): a person's hooks, `mcp_servers`, skill folders,
 ///   personality and the rest go; lamp-tasks merges the lamp's provider
 ///   back in at its next start. Its key file `.env` is removed, and
 ///   written again by lamp-tasks with the forwarder's new token;
@@ -461,10 +469,25 @@ pub struct AgentFolder {
 /// Beside them, the Hermes a pin change moved aside
 /// (`hermes_install::ASIDE`, kept until a new Hermes runs) is removed
 /// whole: it holds the old Hermes's sessions, memories and keys.
-pub const AGENT_FOLDERS: [AgentFolder; 4] = [
+pub const AGENT_FOLDERS: [AgentFolder; 7] = [
     AgentFolder {
         folder: "/var/lib/lampos-hermes",
-        keep: &[".hermes", ".local", ".cache", ".npm", ".bashrc", ".profile"],
+        keep: &[".hermes", ".local", ".bashrc", ".profile"],
+        empty: &[".cache", ".npm"],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.local",
+        keep: &["bin", "share"],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.local/share",
+        keep: &["uv"],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.local/share/uv",
+        keep: &["python"],
         empty: &[],
     },
     AgentFolder {
@@ -588,8 +611,21 @@ pub fn forget_agents(root: &Path) -> io::Result<usize> {
         "openclaw.json",
         cut_openclaw_config,
     )?);
+    for shell in [".bashrc", ".profile"] {
+        removed += usize::from(cut_kept(
+            root,
+            lamp_update::hermes_install::PLACE,
+            shell,
+            |_| Some(HERMES_SHELL_TEXT.as_bytes().to_vec()),
+        )?);
+    }
     Ok(removed)
 }
+
+/// What the Hermes installer writes in Hermes's `.bashrc` and `.profile`
+/// (`append_shell_path` with `SHELL_PATH_LINE`, `SHELL=/bin/sh`), and all
+/// a reset leaves there: `.local/bin` on `PATH`.
+pub const HERMES_SHELL_TEXT: &str = "\n# Hermes Agent command\ncase \":$PATH:\" in *\":$HOME/.local/bin:\"*) ;; *) export PATH=\"$HOME/.local/bin:$PATH\" ;; esac\n";
 
 /// OpenClaw's state folder (`lamp_update::openclaw_install::STATE`).
 const OPENCLAW_STATE: &str = "/var/lib/lampos-openclaw/state";
@@ -710,7 +746,8 @@ fn cut_kept(
 
 /// Hermes's `config.yaml` cut to what the lamp wrote (#6343): the keys of
 /// `lamp_update::hermes_install::CONFIG`, written again with their values,
-/// and Harness's top-level `hooks:` block as it was. Everything else, a
+/// and Harness's own entries of the top-level `hooks:` block
+/// ([`harness_hooks`]). Everything else, a
 /// person's `mcp_servers`, `skills.external_dirs`, personality and the
 /// rest, goes; lamp-tasks merges the lamp's provider back in at its next
 /// start. The workspace has no YAML crate, so it is read line by line, as
@@ -768,21 +805,93 @@ pub fn cut_hermes_config(text: &[u8]) -> Option<Vec<u8>> {
             }
         }
     }
-    if let Some(mut lines) = hooks {
-        while lines.len() > 1
-            && lines.last().is_some_and(|line| {
-                let trimmed = line.trim();
-                trimmed.is_empty() || trimmed.starts_with('#')
-            })
-        {
-            lines.pop();
+    if let Some(lines) = hooks {
+        out.push_str(&harness_hooks(&lines));
+    }
+    Some(out.into_bytes())
+}
+
+/// The `hooks:` block's lines cut to Harness's own entries (the
+/// Reviewer-lead's P3): under each event, only the list items whose
+/// `command` starts with `harness hook `; an event left with none, and the
+/// block left with no event, go. A person's hook, whose command can carry
+/// a token, goes, as does anything not in the block style Harness writes
+/// (an inline value, a comment, a nested mapping outside an item).
+fn harness_hooks(lines: &[&str]) -> String {
+    let Some((first, body)) = lines.split_first() else {
+        return String::new();
+    };
+    let inline = first
+        .split_once(':')
+        .map(|(_, rest)| rest.trim())
+        .unwrap_or("");
+    if !(inline.is_empty() || inline.starts_with('#')) {
+        return String::new();
+    }
+    let content = |line: &&&str| {
+        let trimmed = line.trim();
+        !trimmed.is_empty() && !trimmed.starts_with('#')
+    };
+    let is_item = |line: &str| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with("- ") || trimmed == "-"
+    };
+    let indent = |line: &str| line.len() - line.trim_start_matches(' ').len();
+    let body: Vec<&str> = body.iter().filter(content).copied().collect();
+    let Some(events_at) = body
+        .iter()
+        .filter(|line| !is_item(line))
+        .map(|line| indent(line))
+        .min()
+    else {
+        return String::new();
+    };
+    // (event line, whether it stands alone, its items' lines)
+    let mut events: Vec<(&str, bool, Vec<Vec<&str>>)> = Vec::new();
+    for line in body {
+        if !is_item(line) && indent(line) == events_at {
+            let alone = line
+                .split_once(':')
+                .is_some_and(|(_, rest)| rest.trim().is_empty());
+            events.push((line, alone, Vec::new()));
+        } else if let Some((_, _, items)) = events.last_mut() {
+            if is_item(line) {
+                items.push(vec![line]);
+            } else if let Some(item) = items.last_mut() {
+                item.push(line);
+            } else {
+                // A mapping under the event, not a list: not Harness's.
+                events.last_mut().unwrap().1 = false;
+            }
         }
-        for line in lines {
+    }
+    let harness = |item: &Vec<&str>| {
+        item.iter().any(|line| {
+            let line = line.trim_start();
+            let line = line.strip_prefix('-').unwrap_or(line).trim_start();
+            line.strip_prefix("command:").is_some_and(|value| {
+                let value = value.trim().trim_matches(['"', '\'']);
+                value.starts_with("harness hook ")
+            })
+        })
+    };
+    let mut out = String::new();
+    for (event, alone, items) in events {
+        let kept: Vec<&Vec<&str>> = items.iter().filter(|item| harness(item)).collect();
+        if !alone || kept.is_empty() {
+            continue;
+        }
+        out.push_str(event);
+        out.push('\n');
+        for line in kept.into_iter().flatten() {
             out.push_str(line);
             out.push('\n');
         }
     }
-    Some(out.into_bytes())
+    if out.is_empty() {
+        return out;
+    }
+    format!("{first}\n{out}")
 }
 
 /// The key of a top-level `key:` or `key: value` line, quotes allowed;
