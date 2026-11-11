@@ -3616,18 +3616,25 @@ A skill made here, by voice or in the app, is the person's own, so with
 adjustments: `[rest]` stays, and a send, the camera and the microphone are
 always named exactly). Off unless
 set, and in no product unit. `lamp-voice` reads it (and gives the exact `on`
-to its `provider` and `second` workers, which make the skill),
-`lamp-skills`' manage helper reads it through `made_skill::capped` as it
-puts a made skill on, and `lamp-services` reads it for the sends. Only a
-skill made here (`made_skill::keep_asked`) loosens: one added from a file,
-written in the app, from the Store or installed keeps today's checks.
+to its `provider` and `second` workers, which make the skill), and
+`lamp-skills`' manage helper reads it through `made_skill::capped` as
+it puts a made skill on. Set it alike in `lamp-voice` and in the
+`lamp-skills` units (`lamp-skills-manage@` among them): with it on in the
+voice alone, a made say with a cooldown under an hour is refused at
+install. Only a skill made here (`made_skill::keep_asked`) loosens: one
+added from a file, written in the app, from the Store or installed keeps
+today's checks.
 
 1. **Fix, don't refuse** (`made_skill::loosened`). When `lamp-skills pack`
    refuses a made skill, before any repair, the parts that may go are
    tried out of it, one at a time, each checked by the real `lamp-skills
-   pack` (a key of a step's kind, a kind of a step with more than one, a
-   key of the trigger but its topic, then a whole `[[do]]` step; never its
-   last step, a read or a write). Those the check's own words name go
+   pack` (a key of a step's kind, a kind of a step with more than one,
+   then a whole `[[do]]` step; never its last step, a read or a write).
+   Never a key of the trigger: a trigger the check refuses stays refused.
+   Never a key inside a step that sends or writes or uses the camera or
+   the microphone (`made_skill::named_exactly`), and never a guard alone
+   (`GUARD_KEYS`: `on`, `if_choice`, `after` and the trigger's keys); such
+   a step may still go whole. Those the check's own words name go
    first; one the check then passes is taken, and one it names whose
    taking changes the refusal is taken and the next refusal followed. Each
    left out is journaled by its keys (`a made skill loosened: left out
@@ -3638,8 +3645,9 @@ written in the app, from the Store or installed keeps today's checks.
 2. **No limits the person didn't ask for** (`made_skill::mannered_with`).
    No `most_a_day` or shared `[budget]` is added, and any the model wrote
    alone is taken out, unless the request asks for limits in its own words
-   (`made_skill::limits_asked`: "at most", "times a day", "once a day",
-   "per hour", "no more than", ...); then they are set as before. Its
+   (`made_skill::limits_asked`, English words only: "at most", "times a
+   day", "once a day", "per hour", "no more than", ...); then they are set
+   as before. Its
    `[rest] after_ignored = 2` stays: a skill ignored twice rests till
    morning. `[quiet]` 22:00-08:00 is kept only for a skill with a say or
    its hum, and only as before (not for a time the person asked for). The
@@ -3664,14 +3672,15 @@ written in the app, from the Store or installed keeps today's checks.
    What the lamp can't do yet and a read are still refused or said whole.
 
 Unchanged with it on: a write's read-back and the spoken yes on its
-content's SHA-256; the 10 sends a day across all skills (`lamp-services`
-drops only the per-skill 3, `skill_writes::Ledger`); the privacy refusals;
-#6071's code grants and yes.
+content's SHA-256; the sends, at most 3 a skill and 10 across all skills
+a day (`lamp-services`, which doesn't read the switch); the privacy
+refusals; #6071's code grants and yes.
 
-Tests: `made_skill::tests::loosened_*` (the four, on and off),
-`skill_writes::tests::loose_a_skill_sends_past_three_but_every_skill_stays_at_ten`,
-and with the real `lamp-skills` `made::loosened_a_key_the_check_refuses_is_left_out_and_told`
-and `made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`.
+Tests: `made_skill::tests::loosened_*` (the four, on and off, and
+`loosened_never_takes_a_triggers_key_or_a_camera_steps_key_alone`), and
+with the real `lamp-skills` `made::loosened_a_key_the_check_refuses_is_left_out_and_told`,
+`made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`
+and `made::loosened_a_trigger_the_check_refuses_is_never_loosened`.
 
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
