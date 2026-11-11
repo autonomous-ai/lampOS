@@ -13,7 +13,9 @@
 //! switch (`LAMP_SERVICES_WRITE=on`) and two phases: a full read-back first,
 //! then the one send it names. Off unless `LAMP_SERVICES=on` (or `--enable`).
 //! With `LAMP_SKILL_WRITES=on` too, `lamp-skills.service` may make a made
-//! skill's one fixed write, approved at install ([`skill_writes`]).
+//! skill's one fixed write, approved at install ([`skill_writes`]). With
+//! `LAMP_SKILL_TASKS=on`, `lamp-control.service` may read, or prepare a
+//! write, for a skill's run under its grants (#6432).
 pub mod catalog;
 pub mod mail;
 pub mod mcp;
@@ -37,6 +39,12 @@ pub const WRITE_ENVIRONMENT: &str = "LAMP_SERVICES_WRITE";
 /// `lamp-skills.service` may call the tools' socket too, for `service_read`
 /// alone.
 pub const SKILL_READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
+/// The switch for a skill's run on the lamp's Hermes (#6432), read by this
+/// program, lamp-control and lamp-tasks: off unless `on`. On,
+/// `lamp-control.service` may call the tools' socket too, for a run's
+/// `service_read` and a `service_write` that is only prepared and held for
+/// the person's spoken yes ([`serve::Services::run_tool`]).
+pub const SKILL_TASKS_ENVIRONMENT: &str = "LAMP_SKILL_TASKS";
 /// The switch for changing and cancelling a Google Calendar event by its
 /// id (`update_event`, `delete_event`), read by this program: off unless
 /// `on`, and only with [`WRITE_ENVIRONMENT`] on too.

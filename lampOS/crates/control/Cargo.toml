@@ -55,6 +55,9 @@ tokio-tungstenite = { version = "=0.30.0", default-features = false, features = 
 lamp-skills = { path = "../skills" }
 # `sounds`' checks held to the voice's own (`lamp_voice::say::decode_clip`).
 lamp-voice = { path = "../voice" }
+# The services' grants (`protocol::SERVICE_CODES`) held to lamp-services'
+# catalog, so a new service can't be missed (#6432).
+lamp-services = { path = "../services" }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [lints]

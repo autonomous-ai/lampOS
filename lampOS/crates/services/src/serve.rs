@@ -45,6 +45,22 @@ pub const TOOLS_ASKER_CGROUP: &str = "/lampos.slice/lampos-voice.slice/lamp-voic
 /// `LAMP_SKILL_READS=on`, a second caller of the tools' socket, for a made
 /// skill's read alone ([`Services::skill_tool`], #5288).
 pub const SKILLS_ASKER_CGROUP: &str = "/lampos.slice/lampos-parts.slice/lamp-skills.service";
+/// Where it puts `lamp-control.service` (`Slice=lampos-parts.slice`): with
+/// `LAMP_SKILL_TASKS=on`, a third caller of the tools' socket, for a skill
+/// run's read or a write it prepares, under the grants lamp-control holds it
+/// to ([`Services::run_tool`], #6432).
+pub const CONTROL_ASKER_CGROUP: &str = "/lampos.slice/lampos-parts.slice/lamp-control.service";
+/// What a skill run's call to anything but a read or a write is told.
+pub const RUN_READS_AND_WRITES_ONLY: &str =
+    "a skill's run may only read a linked service or prepare a write to it";
+/// What a skill run's write that names a send is told: only the person's
+/// spoken yes sends it, through the voice.
+pub const RUN_PREPARES_ONLY: &str = "a skill's run only prepares a write: the lamp reads it back and the person's spoken yes sends it";
+/// What a skill run's write is told while another write waits for its yes.
+pub const RUN_WRITE_WAITS: &str =
+    "another write waits for the person's yes: nothing was prepared, try again later";
+/// What a skill run's prepared write tells it: nothing went.
+pub const RUN_HELD: &str = "Nothing is sent. The lamp reads it back to the person and sends it only if they say yes; say nothing of it as sent.";
 /// What a skill's call to anything but a read is told.
 pub const SKILL_READS_ONLY: &str = "a skill may only read a linked service";
 /// What a skill's call to anything but a read or its approved write is
@@ -239,6 +255,13 @@ pub struct Services<H, M> {
     pub signed_out: AtomicBool,
     /// Held while a skill's write is counted against the bounds.
     skill_send: Mutex<()>,
+    /// `LAMP_SKILL_TASKS=on`: `lamp-control` may call the tools' socket for
+    /// a skill's run ([`Services::run_tool`]).
+    pub skill_tasks: bool,
+    /// The write a skill's run prepared, by its `send_id`, and the skill:
+    /// its send, whoever confirms it, counts against the skills' bounds
+    /// ([`skill_writes::Ledger`]).
+    run_held: Mutex<Option<(String, String)>>,
     /// `LAMP_CALENDAR_EDITS=on`: a Google Calendar event may be changed or
     /// cancelled by its id, read back and sent as any write.
     pub calendar_edits: bool,
@@ -347,6 +370,8 @@ impl<H: Http, M: Mail> Services<H, M> {
             not_approved: AtomicUsize::new(0),
             signed_out: AtomicBool::new(false),
             skill_send: Mutex::new(()),
+            skill_tasks: false,
+            run_held: Mutex::new(None),
             calendar_edits: false,
             draft_edits: false,
             desk: Desk::default(),
@@ -399,6 +424,107 @@ impl<H: Http, M: Mail> Services<H, M> {
         door == Door::Tools
             && (self.skill_reads || self.skill_writes)
             && from_asker(cgroup, SKILLS_ASKER_CGROUP)
+    }
+
+    /// With `LAMP_SKILL_TASKS` as `on` gives it.
+    pub fn with_skill_tasks(mut self, on: bool) -> Self {
+        self.skill_tasks = on;
+        self
+    }
+
+    /// Whether a peer in `cgroup` is `lamp-control` on the tools' door with
+    /// `LAMP_SKILL_TASKS=on`: then [`Self::run_tool`] answers it.
+    pub fn run_caller(&self, door: Door, cgroup: &str) -> bool {
+        door == Door::Tools && self.skill_tasks && from_asker(cgroup, CONTROL_ASKER_CGROUP)
+    }
+
+    /// A skill run's call, sent on by lamp-control (#6432), which has held
+    /// it to the run's one-run token and its grants (`<service>-read`,
+    /// `<service>-write`): `{"op":"call","name","args","skill"}`.
+    /// `service_read` is answered as a made skill's read is quoted (a
+    /// security mail left out); `service_write` only prepares the write,
+    /// read back and held [`writes::HOLD`] as every write, and gives the run
+    /// its read-back with no `send_id`: only the person's spoken yes,
+    /// through the voice, sends it, and the send counts against the skills'
+    /// bounds. The service is named by its exact code, never by a name.
+    /// Anything else is refused and nothing is called.
+    pub async fn run_tool(&self, line: &str) -> Value {
+        let refused = |why: &str| json!({"ok": false, "error": why});
+        let line = line.trim_end_matches(['\r', '\n']);
+        let (name, args) = match parse_tool(line) {
+            Ok(call) => call,
+            Err(why) => return refused(&why),
+        };
+        if name != tools::READ && name != tools::WRITE {
+            return refused(RUN_READS_AND_WRITES_ONLY);
+        }
+        let skill = serde_json::from_str::<Value>(line)
+            .ok()
+            .and_then(|call| call.get("skill").and_then(Value::as_str).map(str::to_owned))
+            .filter(|skill| skill_writes::skill_name_ok(skill));
+        let Some(skill) = skill else {
+            return refused("the call names no skill");
+        };
+        let asked = args
+            .get("service")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if catalog::service(asked).is_none() {
+            return refused(&cant_link(Some(asked)));
+        }
+        let answer = match name.as_str() {
+            tools::READ => self.read(&args, Asker::Skill).await,
+            tools::WRITE if args.get("send_id").is_some() || args.get("said").is_some() => {
+                Err(RUN_PREPARES_ONLY.into())
+            }
+            tools::WRITE if self.desk.waiting_at(Instant::now()) => Err(RUN_WRITE_WAITS.into()),
+            tools::WRITE => match self.write(&args).await {
+                Ok(mut held) => {
+                    if let Some(send_id) = held
+                        .as_object_mut()
+                        .and_then(|held| held.remove("send_id"))
+                        .and_then(|id| id.as_str().map(str::to_owned))
+                    {
+                        *self
+                            .run_held
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
+                            Some((send_id, skill.clone()));
+                        eprintln!(
+                            "lamp-services: a skill's run prepared a write to {asked}, held for a spoken yes"
+                        );
+                    }
+                    held["held"] = json!(true);
+                    held["next"] = json!(RUN_HELD);
+                    Ok(held)
+                }
+                Err(why) => Err(why),
+            },
+            _ => Err(RUN_READS_AND_WRITES_ONLY.into()),
+        };
+        let answer = match answer {
+            Ok(result) => json!({"ok": true, "result": result}),
+            Err(why) => json!({"ok": false, "error": why}),
+        };
+        if answer.to_string().len() < ANSWER_MOST {
+            answer
+        } else {
+            refused("the answer was too long to give")
+        }
+    }
+
+    /// The skill whose run prepared the write `send_id` names, taken: its
+    /// send counts against that skill's bounds.
+    fn run_skill_of(&self, send_id: &str) -> Option<String> {
+        let mut held = self
+            .run_held
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if held.as_ref().is_some_and(|(id, _)| id == send_id) {
+            held.take().map(|(_, skill)| skill)
+        } else {
+            None
+        }
     }
 
     /// With `LAMP_CALENDAR_EDITS` as `on` gives it.
@@ -1573,6 +1699,8 @@ impl<H: Http, M: Mail> Services<H, M> {
         // Taken whatever follows: a write is sent once, and anything but
         // "send" cancels it.
         let pending = self.desk.take(send_id, Instant::now());
+        // A skill run's write (#6432), taken with it.
+        let run_skill = self.run_skill_of(send_id);
         if args.get("said").and_then(Value::as_str).map(str::trim) != Some("send") {
             return Ok(json!({"sent": false, "cancelled": true}));
         }
@@ -1612,6 +1740,22 @@ impl<H: Http, M: Mail> Services<H, M> {
         // (Reviewer-three's P1 on #5825).
         if writes::link_of(&entry) != pending.link {
             return Err(LINK_CHANGED.into());
+        }
+        // A skill run's write counts against the skills' bounds, as a made
+        // skill's fixed write does: taken before it is sent, under the same
+        // lock, a send that then fails still counted.
+        if let Some(skill) = &run_skill {
+            let taken = {
+                let _one = self
+                    .skill_send
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                skill_writes::Ledger::new(&self.store.0).take(skill, crate::now_secs())
+            };
+            if let Err(why) = taken {
+                eprintln!("lamp-services: a skill run's write refused: {why}");
+                return Err(format!("not sent: {why}"));
+            }
         }
         let answer = self.send(service, &entry, pending).await?;
         if answer["sent"] == true {
@@ -1981,7 +2125,9 @@ fn answer_one<H: Http, M: Mail>(
     let cgroup = peer_cgroup(stream).unwrap_or_default();
     let asker = from_asker(&cgroup, door.asker());
     let skill = !asker && services.skill_caller(door, &cgroup);
-    if !asker && !skill {
+    // A skill's run (#6432): `lamp-control`, only with LAMP_SKILL_TASKS=on.
+    let run = !asker && !skill && services.run_caller(door, &cgroup);
+    if !asker && !skill && !run {
         return writeln!(&*stream, "{}", door.refusal());
     }
     let mut line = String::new();
@@ -1997,6 +2143,7 @@ fn answer_one<H: Http, M: Mail>(
             answer
         }
         Door::Tools if skill => runtime.block_on(services.skill_tool(&line)),
+        Door::Tools if run => runtime.block_on(services.run_tool(&line)),
         Door::Tools => runtime.block_on(services.tool(&line)),
     };
     writeln!(&*stream, "{answer}")
@@ -2239,6 +2386,150 @@ mod tests {
         let services = services(dir.path(), "[]", true);
         assert!(!services.skill_reads);
         assert!(services.with_skill_reads(true).skill_reads);
+    }
+
+    /// #6432: lamp-control is a caller only with LAMP_SKILL_TASKS=on, on
+    /// the tools' door, by its own cgroup.
+    #[test]
+    fn lamp_control_calls_only_with_the_switch_on() {
+        let dir = tempfile::tempdir().unwrap();
+        let control = "0::/lampos.slice/lampos-parts.slice/lamp-control.service\n";
+        let off = services(dir.path(), "[]", true);
+        assert!(!off.run_caller(Door::Tools, control));
+        let on = services(dir.path(), "[]", true).with_skill_tasks(true);
+        assert!(on.run_caller(Door::Tools, control));
+        assert!(!on.run_caller(Door::Admin, control));
+        for other in [
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-control.service-evil\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-tasks.service\n",
+        ] {
+            assert!(!on.run_caller(Door::Tools, other), "{other}");
+        }
+        // Nor does it make lamp-control a made skill's caller.
+        assert!(!on.with_skill_reads(true).skill_caller(Door::Tools, control));
+    }
+
+    fn run_line(name: &str, args: Value) -> String {
+        json!({"op":"call","name":name,"args":args,"skill":"mail-count"}).to_string()
+    }
+
+    /// #6432: a skill's run reads as a made skill's read is quoted (a
+    /// security mail left out), the service named by its code; the list of
+    /// what is linked, a send, a name for a code or no skill is refused, and
+    /// nothing is called.
+    #[test]
+    fn a_skill_run_reads_by_its_grant() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "[]", true).with_skill_tasks(true);
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        let read = run(services.run_tool(&run_line(
+            tools::READ,
+            json!({"service":"gmail","what":"recent"}),
+        )));
+        let text = read.to_string();
+        assert_eq!(read["ok"], true, "{text}");
+        assert!(text.contains("Dinner") && text.contains("a security mail, left out"));
+        assert!(!text.contains("551234") && !text.contains("goodpassword"));
+        for (line, why) in [
+            (
+                run_line(tools::CONNECTED, json!({})),
+                RUN_READS_AND_WRITES_ONLY.to_owned(),
+            ),
+            (
+                run_line(tools::READ, json!({"service":"Gmail","what":"recent"})),
+                cant_link(Some("Gmail")),
+            ),
+            (
+                json!({"op":"call","name":"service_read","args":{"service":"gmail","what":"recent"}})
+                    .to_string(),
+                "the call names no skill".to_owned(),
+            ),
+            (
+                run_line(
+                    skill_writes::FUNCTION,
+                    json!({"service":"gmail","skill":"mail-count"}),
+                ),
+                RUN_READS_AND_WRITES_ONLY.to_owned(),
+            ),
+        ] {
+            assert_eq!(
+                run(services.run_tool(&line)),
+                json!({"ok": false, "error": why}),
+                "{line}"
+            );
+        }
+        assert!(services.mail.sent.lock().unwrap().is_empty());
+    }
+
+    /// #6432: a skill run's write is only prepared, read back and held as
+    /// every write, with no send_id for the run; it never sends one itself.
+    /// Sent on the yes's send, it counts against the skills' bounds.
+    #[test]
+    fn a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "[]", true).with_skill_tasks(true);
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        let draft = json!({"service":"gmail","action":"send_mail","to":["mom@home.test"],
+            "subject":"Dinner","text":"Home by 7"});
+        // A send named by the run: refused, nothing prepared.
+        let mut sending = draft.clone();
+        sending["send_id"] = json!("x");
+        sending["said"] = json!("send");
+        assert_eq!(
+            run(services.run_tool(&run_line(tools::WRITE, sending)))["error"],
+            RUN_PREPARES_ONLY
+        );
+        assert!(!services.desk.waiting());
+        let held = run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
+        assert_eq!(held["ok"], true, "{held}");
+        assert!(
+            held["result"]["read_back"]
+                .as_str()
+                .unwrap()
+                .contains("Home by 7")
+        );
+        assert_eq!(held["result"]["sent"], false);
+        assert_eq!(held["result"]["held"], true);
+        assert!(held["result"].get("send_id").is_none(), "{held}");
+        assert!(services.desk.waiting());
+        assert!(services.mail.sent.lock().unwrap().is_empty());
+        // A second while it waits: refused, the first kept.
+        assert_eq!(
+            run(services.run_tool(&run_line(tools::WRITE, draft.clone())))["error"],
+            RUN_WRITE_WAITS
+        );
+        // The yes's send (the voice's, by the tools' socket): sent once, and
+        // counted for the skill.
+        let id = services.run_held.lock().unwrap().clone().unwrap();
+        assert_eq!(id.1, "mail-count");
+        let send = |id: &str| {
+            json!({"op":"call","name":"service_write","args":{"service":"gmail","send_id":id,"said":"send"}})
+                .to_string()
+        };
+        assert_eq!(run(services.tool(&send(&id.0)))["result"]["sent"], true);
+        assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
+        // The skill's day's sends used up: the next is not sent.
+        let ledger = skill_writes::Ledger::new(&services.store.0);
+        ledger.take("mail-count", crate::now_secs()).unwrap();
+        ledger.take("mail-count", crate::now_secs()).unwrap();
+        run(services.run_tool(&run_line(tools::WRITE, draft)));
+        let id = services.run_held.lock().unwrap().clone().unwrap();
+        let refused = run(services.tool(&send(&id.0)));
+        assert!(
+            refused["error"]
+                .as_str()
+                .unwrap()
+                .contains("at most 3 times a day"),
+            "{refused}"
+        );
+        assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
     }
 
     /// #5288: a skill reads as the voice does, quoted and with security

@@ -74,9 +74,125 @@ pub enum Part {
     Voice,
 }
 
-/// What the owner granted a paired client, as the app shows it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+/// The linked services a skill's run may be granted, by the code the person
+/// sees (`lamp_services::catalog::SERVICES`, the second code of a service
+/// folded to its first, [`SERVICE_CODES_FOLDED`]): their grants are
+/// `<code>-read` and `<code>-write` (#6432). One list, which lamp-tasks'
+/// grant check follows; a test holds it to lamp-services' catalog.
+pub const SERVICE_CODES: [&str; 14] = [
+    "gmail",
+    "google_calendar",
+    "google_drive",
+    "figma",
+    "github",
+    "linear",
+    "asana",
+    "ahrefs",
+    "facebook",
+    "slack",
+    "mondaydotcom",
+    "hubspot",
+    "amplitude",
+    "notion",
+];
+
+/// A service's second catalog code, and the code its grant names: a Gmail
+/// link by app password is `gmail-app`, and is granted as `gmail`.
+pub const SERVICE_CODES_FOLDED: [(&str, &str); 2] =
+    [("gmail-app", "gmail"), ("figma-api", "figma")];
+
+/// The code a service's grant names, for catalog code `code`; `None` for a
+/// service the lamp has no grant for.
+pub fn service_grant_code(code: &str) -> Option<&'static str> {
+    let code = SERVICE_CODES_FOLDED
+        .iter()
+        .find_map(|(other, folded)| (*other == code).then_some(*folded))
+        .unwrap_or(code);
+    SERVICE_CODES.iter().copied().find(|known| *known == code)
+}
+
+/// What a service grant lets a skill's run do: read, or prepare a write
+/// that the person's spoken yes sends, never the run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Access {
+    Read,
+    Write,
+}
+
+/// One linked service's grant, `<code>-read` or `<code>-write`: a skill
+/// run's alone, never a paired computer's or the local agent's (#6432).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ServiceGrant {
+    /// One of [`SERVICE_CODES`].
+    pub code: &'static str,
+    pub access: Access,
+}
+
+impl ServiceGrant {
+    /// The grant for catalog code `code` (folded) and `access`.
+    pub fn of(code: &str, access: Access) -> Option<Self> {
+        service_grant_code(code).map(|code| Self { code, access })
+    }
+
+    /// Its wire name, `<code>-read` or `<code>-write`.
+    pub fn wire(self) -> String {
+        match self.access {
+            Access::Read => format!("{}-read", self.code),
+            Access::Write => format!("{}-write", self.code),
+        }
+    }
+
+    /// The grant a wire name names, if it is one: the code exactly as
+    /// [`SERVICE_CODES`] lists it, never a second code.
+    pub fn from_wire(name: &str) -> Option<Self> {
+        let (code, access) = if let Some(code) = name.strip_suffix("-read") {
+            (code, Access::Read)
+        } else {
+            (name.strip_suffix("-write")?, Access::Write)
+        };
+        let code = SERVICE_CODES.iter().copied().find(|known| *known == code)?;
+        Some(Self { code, access })
+    }
+}
+
+/// The plain grants' wire names, in [`Grant::ALL`]'s order.
+const PLAIN_WIRE: [&str; 13] = [
+    "body",
+    "light",
+    "speak",
+    "look",
+    "hear",
+    "sound",
+    "skills",
+    "air",
+    "device",
+    "camera",
+    "microphone",
+    "notes",
+    "speech",
+];
+
+impl Serialize for Grant {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.wire())
+    }
+}
+
+impl<'de> Deserialize<'de> for Grant {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let name = String::deserialize(deserializer)?;
+        Grant::from_wire(&name).ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "unknown grant `{name}`, expected one of {}, or <service>-read or <service>-write",
+                PLAIN_WIRE.join(", ")
+            ))
+        })
+    }
+}
+
+/// What the owner granted a paired client, as the app shows it; and, for a
+/// skill's run alone, a linked service ([`Grant::Service`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Grant {
     /// Gestures, its own moves, looking, joints under a lease, feelings.
     Body,
@@ -116,9 +232,41 @@ pub enum Grant {
     /// what it reads to the person, never what a person says to it
     /// (docs/control.md, "What the lamp says").
     Speech,
+    /// One linked service, read or a write prepared, through lamp-services
+    /// (`service.read`, `service.write`): only in a skill run's token, from
+    /// the owner's yes, used only with `LAMP_SKILL_TASKS=on`
+    /// (docs/control.md, "A skill run's linked services"). Never in
+    /// [`Grant::ALL`].
+    Service(ServiceGrant),
 }
 
 impl Grant {
+    /// Its wire name: `body` … `speech`, or `<code>-read` / `<code>-write`.
+    pub fn wire(self) -> String {
+        match self {
+            Self::Service(service) => service.wire(),
+            plain => Self::ALL
+                .iter()
+                .position(|grant| *grant == plain)
+                .map(|at| PLAIN_WIRE[at].to_owned())
+                .unwrap_or_default(),
+        }
+    }
+
+    /// The grant a wire name names, if this build knows it.
+    pub fn from_wire(name: &str) -> Option<Self> {
+        PLAIN_WIRE
+            .iter()
+            .position(|plain| *plain == name)
+            .map(|at| Self::ALL[at])
+            .or_else(|| ServiceGrant::from_wire(name).map(Self::Service))
+    }
+
+    /// A linked service's grant: a skill run's alone.
+    pub fn is_service(self) -> bool {
+        matches!(self, Self::Service(_))
+    }
+
     /// Every grant this build knows, in the pairing screen's order.
     pub const ALL: [Grant; 13] = [
         Self::Body,
@@ -170,6 +318,16 @@ impl Grant {
             }
             Self::Notes => {
                 "can keep small notes of its own on the lamp, which stay until it is let go"
+            }
+            Self::Service(ServiceGrant {
+                access: Access::Read,
+                ..
+            }) => "can read one of your linked services, for one run of a skill",
+            Self::Service(ServiceGrant {
+                access: Access::Write,
+                ..
+            }) => {
+                "can prepare a write to one of your linked services, for one run of a skill: the lamp reads it back and sends it only on your spoken yes"
             }
             Self::Speech => {
                 "can read everything the lamp says out loud, which can be personal: it includes what it repeats back to you and what it reads to you from your mail and calendar, never what you say to it; every computer you give this to reads the same lines; what it has sent can't be taken back, and the computer may pass it on"
@@ -567,7 +725,31 @@ pub enum Op {
     /// (`microphone.ended`, with why).
     #[serde(rename = "microphone.stream")]
     MicrophoneStream { on: bool },
+    /// A skill's run only: one read of a linked service through
+    /// lamp-services' `service_read`, its `args` as that function takes
+    /// them, `service` beside them (docs/control.md, "A skill run's linked
+    /// services"). Needs `<service>-read`.
+    #[serde(rename = "service.read")]
+    ServiceRead {
+        service: String,
+        #[serde(default)]
+        args: Map<String, Value>,
+    },
+    /// A skill's run only: one write to a linked service, **prepared** by
+    /// lamp-services' `service_write` and held for the person's spoken yes,
+    /// never sent by the run (no `send_id`, no `said`). Needs
+    /// `<service>-write`.
+    #[serde(rename = "service.write")]
+    ServiceWrite {
+        service: String,
+        #[serde(default)]
+        args: Map<String, Value>,
+    },
 }
+
+/// What a skill run's `service.write` that tries to send is told: the
+/// person's spoken yes sends a write, never the run.
+pub const RUN_PREPARES_ONLY: &str = "a skill's run only prepares a write: the lamp reads it back and the person's spoken yes sends it, so send_id and said are not taken here";
 
 impl Op {
     /// The grants it needs (all of them).
@@ -619,6 +801,15 @@ impl Op {
             | Self::NotesGet { .. }
             | Self::NotesDelete { .. }
             | Self::NotesList { .. } => vec![Grant::Notes],
+            // `check` has refused a service with no grant before this.
+            Self::ServiceRead { service, .. } => ServiceGrant::of(service, Access::Read)
+                .map(Grant::Service)
+                .into_iter()
+                .collect(),
+            Self::ServiceWrite { service, .. } => ServiceGrant::of(service, Access::Write)
+                .map(Grant::Service)
+                .into_iter()
+                .collect(),
         };
         needs.sort();
         needs.dedup();
@@ -967,6 +1158,27 @@ impl Op {
                 }
                 if to.is_some_and(|to| to > 100) {
                     return Err("to: from 0 to 100".to_owned());
+                }
+            }
+            Self::ServiceRead { service, args } | Self::ServiceWrite { service, args } => {
+                if service_grant_code(service).is_none() {
+                    return Err(format!(
+                        "service: one of the lamp's services, {}, or {}",
+                        SERVICE_CODES.join(", "),
+                        SERVICE_CODES_FOLDED
+                            .iter()
+                            .map(|(other, _)| *other)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                }
+                if args.contains_key("service") {
+                    return Err("args: the service is named beside them, not in them".to_owned());
+                }
+                if matches!(self, Self::ServiceWrite { .. })
+                    && (args.contains_key("send_id") || args.contains_key("said"))
+                {
+                    return Err(RUN_PREPARES_ONLY.to_owned());
                 }
             }
         }
@@ -1655,6 +1867,105 @@ mod tests {
             Some(1)
         );
         assert_eq!(why(r#"{"id":1,"op":"microphone.stream"}"#).0, Some(1));
+    }
+
+    /// #6432: a service's grants are `<code>-read` and `<code>-write`, for
+    /// the codes lamp-services' catalog has, each pair of codes for one
+    /// service folded to one; every name passes lamp-tasks' check (`a-z`,
+    /// `0-9`, `-`, `_`, at most 64).
+    #[test]
+    fn service_grants_are_the_catalogs_codes_read_and_write() {
+        let mut folded: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        for service in lamp_services::catalog::SERVICES {
+            folded.insert(
+                service_grant_code(service.code)
+                    .unwrap_or_else(|| panic!("{} has no grant", service.code)),
+            );
+        }
+        assert_eq!(
+            folded,
+            SERVICE_CODES.iter().copied().collect(),
+            "every listed code is the catalog's"
+        );
+        for (other, code) in SERVICE_CODES_FOLDED {
+            assert!(lamp_services::catalog::service(other).is_some(), "{other}");
+            assert!(SERVICE_CODES.contains(&code) && !SERVICE_CODES.contains(&other));
+        }
+        for code in SERVICE_CODES {
+            for access in [Access::Read, Access::Write] {
+                let grant = Grant::Service(ServiceGrant::of(code, access).unwrap());
+                let name = json!(grant).as_str().unwrap().to_owned();
+                assert!(
+                    name.len() <= 64
+                        && name.bytes().all(|b| b.is_ascii_lowercase()
+                            || b.is_ascii_digit()
+                            || matches!(b, b'-' | b'_')),
+                    "{name}"
+                );
+                assert_eq!(serde_json::from_value::<Grant>(json!(name)).unwrap(), grant);
+                assert!(!Grant::ALL.contains(&grant));
+            }
+        }
+        assert_eq!(json!(Grant::Light), json!("light"));
+        assert_eq!(
+            json!(Grant::Service(
+                ServiceGrant::of("gmail-app", Access::Read).unwrap()
+            )),
+            json!("gmail-read")
+        );
+        assert_eq!(
+            json!(Grant::Service(
+                ServiceGrant::of("google_calendar", Access::Write).unwrap()
+            )),
+            json!("google_calendar-write")
+        );
+        // A second code, an unknown one or another spelling is no grant.
+        for name in [
+            "gmail-app-read",
+            "calendar-write",
+            "gmail-send",
+            "gmail",
+            "Gmail-read",
+            "gmail:read",
+        ] {
+            assert!(
+                serde_json::from_value::<Grant>(json!(name)).is_err(),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_service_call_names_a_known_service_and_a_write_never_sends() {
+        let checked = |frame: &str| parse(frame).map(|request| request.op);
+        let op =
+            checked(r#"{"id":1,"op":"service.read","service":"gmail","args":{"what":"search"}}"#)
+                .unwrap();
+        assert_eq!(
+            op.needs(),
+            [Grant::Service(ServiceGrant {
+                code: "gmail",
+                access: Access::Read
+            })]
+        );
+        let op = checked(r#"{"id":1,"op":"service.write","service":"figma-api"}"#).unwrap();
+        assert_eq!(
+            op.needs(),
+            [Grant::Service(ServiceGrant {
+                code: "figma",
+                access: Access::Write
+            })]
+        );
+        for frame in [
+            r#"{"id":1,"op":"service.read","service":"calendar","args":{}}"#,
+            r#"{"id":1,"op":"service.read","service":"gmail","args":{"service":"github"}}"#,
+            r#"{"id":1,"op":"service.read","service":"gmail","args":[]}"#,
+            r#"{"id":1,"op":"service.read","args":{}}"#,
+            r#"{"id":1,"op":"service.write","service":"gmail","args":{"send_id":"x"}}"#,
+            r#"{"id":1,"op":"service.write","service":"gmail","args":{"said":"send"}}"#,
+        ] {
+            assert!(checked(frame).is_err(), "{frame}");
+        }
     }
 
     #[test]

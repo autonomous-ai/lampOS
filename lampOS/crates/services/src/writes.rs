@@ -1359,6 +1359,15 @@ impl Desk {
         }
     }
 
+    /// Whether a write is waiting at `now`, still within [`HOLD`].
+    pub fn waiting_at(&self, now: Instant) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .as_ref()
+            .is_some_and(|held| now.saturating_duration_since(held.made) <= HOLD)
+    }
+
     /// Whether a write is waiting.
     pub fn waiting(&self) -> bool {
         self.0
