@@ -1338,8 +1338,8 @@ pub fn read_in_full(alone: bool, likeness: Option<f32>, seen_owner: bool) -> boo
 /// Whether a heard line (`heard`: someone spoke it) is the owner's own,
 /// seen: in the private room (`private_room`) any heard line; outside it,
 /// the owner (`owner`, [`owner_of`]) seen saying it (`seen`, the eyes'
-/// [`seen_saying_owner`]). What a read in full is held to, and a made
-/// skill's read-back said whole ([`owner_hears`]).
+/// [`seen_saying_owner`]). The first of what a read in full is held to
+/// ([`said_whole`]).
 pub(crate) fn owner_seen_saying(
     heard: bool,
     private_room: bool,
@@ -1353,54 +1353,99 @@ pub(crate) fn owner_seen_saying(
     }
 }
 
-/// Whether what only the owner may hear is said to the line `request`
-/// (`heard`, its memory scope `lease`): the private room, or the owner
-/// seen saying it, as a read in full is held ([`owner_seen_saying`]).
-/// A made skill's read-back is said whole only then
-/// (`make_skill_local::read_back`; App Only's P2 on #6230).
+/// Whether what only the owner may hear is said whole to a line: in the
+/// private room (`private_room`) always; outside it, [`read_in_full`]: the
+/// owner seen saying it (`seen_owner`, [`owner_seen_saying`]), the one
+/// face in view (`alone`, [`owner_alone`]), and the line's voice as like
+/// as `same_voice::SERVICES_SAME_FROM`, 0.55, or more (`likeness`,
+/// [`owner_likeness`]: none on the Live route, which has no judge). Asked
+/// in that order, each only when the one before holds. The one rule of a
+/// services read in full ([`run`]) and a made skill's read-back said whole
+/// ([`owner_hears`]), so the two can't drift apart.
+pub(crate) fn said_whole(
+    private_room: bool,
+    seen_owner: bool,
+    alone: impl FnOnce() -> bool,
+    likeness: impl FnOnce() -> Option<f32>,
+) -> bool {
+    if private_room {
+        return true;
+    }
+    if !seen_owner || !alone() {
+        return false;
+    }
+    read_in_full(true, likeness(), true)
+}
+
+/// How like the owner (`owner`, [`owner_of`]) the line `request` sounds,
+/// by the second route's `judge` (none, the Live route: unknown), asked as
+/// [`owner_ask`] and waited for up to [`PRINT_WAIT`] ([`judged`]).
+fn owner_likeness(judge: Option<&VoiceJudge>, request: u64, owner: Option<&str>) -> Option<f32> {
+    judged(judge?, owner_ask(request, owner))
+}
+
+/// What the line `request` is held to for the owner (`owner`): the
+/// owner's enrolled print when they have one
+/// (`LAMP_SAME_VOICE_FOR=services`, `crate::owner_voice`;
+/// [`VoiceAsk::Owner`]), else the conversation's voice
+/// ([`VoiceAsk::Conversation`]).
+fn owner_ask(request: u64, owner: Option<&str>) -> VoiceAsk {
+    if owner.is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some()) {
+        VoiceAsk::Owner(request)
+    } else {
+        VoiceAsk::Conversation(request)
+    }
+}
+
+/// Whether what only the owner may hear is said whole to the line
+/// `request` (`heard`, its memory scope `lease`): in the private room
+/// always; outside it, the owner seen saying it, the one face in view, and
+/// in their voice on the judge route, as a read in full is held
+/// ([`said_whole`]). A made skill's read-back is said whole only then
+/// (`make_skill_local::read_back`; App Only's P2s on #6230 and #6250).
 pub(crate) fn owner_hears(
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> bool {
     let private_room = crate::person::private_room();
-    private_room
-        || owner_seen_saying(heard, private_room, owner_of(lease).as_deref(), |owner| {
-            seen_saying_owner(request, owner).0
-        })
+    if private_room {
+        return true;
+    }
+    let owner = owner_of(lease);
+    let seen_owner = owner_seen_saying(heard, private_room, owner.as_deref(), |owner| {
+        seen_saying_owner(request, owner).0
+    });
+    said_whole(private_room, seen_owner, owner_alone, || {
+        owner_likeness(judge().as_ref(), request, owner.as_deref())
+    })
 }
 
 /// Whether the owner's service records are told in full
-/// (`service_records::told`), as a read is said in full: in the private
-/// room, or [`read_in_full`]'s three checks. `likeness` is asked only for
-/// the owner seen saying the line alone in view.
+/// (`service_records::told`): as a read is said in full, the one rule
+/// [`said_whole`]: in the private room always; outside it, the owner seen
+/// saying the line (`seen_owner`), the one face in view (`alone`), and
+/// `likeness`, asked only for the owner seen saying the line alone in view.
 pub(crate) fn told_in_full(
     private_room: bool,
     alone: bool,
     seen_owner: bool,
     likeness: impl FnOnce() -> Option<f32>,
 ) -> bool {
-    private_room || (alone && seen_owner && read_in_full(alone, likeness(), seen_owner))
+    said_whole(private_room, seen_owner, || alone, likeness)
 }
 
 /// [`told_in_full`] for the line `request` of the owner `owner` (memory
 /// id): the read's checks, its voice asked once of the second route's
-/// judge (the owner's enrolled print when they have one, else the
-/// conversation's voice) and never waited for, so a print not made yet
-/// tells the brief form; no judge, brief.
+/// judge ([`owner_ask`]: the owner's enrolled print when they have one,
+/// else the conversation's voice) and never waited for, so a print not
+/// made yet tells the brief form; no judge, brief.
 pub(crate) fn records_in_full(request: u64, owner: &str) -> bool {
     told_in_full(
         crate::person::private_room(),
         owner_alone(),
         seen_saying_owner(request, owner).0,
-        || {
-            let ask = if crate::owner_voice::enrolled(owner).is_some() {
-                VoiceAsk::Owner(request)
-            } else {
-                VoiceAsk::Conversation(request)
-            };
-            judge().and_then(|judge| judge(ask))
-        },
+        || judge().and_then(|judge| judge(owner_ask(request, Some(owner)))),
     )
 }
 
@@ -1602,15 +1647,10 @@ pub fn run(
     }
     // A send, with the model's id.
     let send_id = given_send_id(call).is_some();
-    // With the owner's enrolled print (`LAMP_SAME_VOICE_FOR=services`,
-    // `crate::owner_voice`), a read in full is held to it; without one, to
-    // the conversation's voice. A send is held to no voice, whoever agrees
-    // sends what waits (the owner, 10 Nov), but in a line begun in the echo
-    // tail of the lamp's words with any of them: there to the asker's.
-    let enrolled = private_room
-        || owner
-            .as_deref()
-            .is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some());
+    // A read in full is held to the owner's voice ([`owner_likeness`]). A
+    // send is held to no voice, whoever agrees sends what waits (the owner,
+    // 10 Nov), but in a line begun in the echo tail of the lamp's words
+    // with any of them: there to the asker's.
     let seen_owner = owner_seen_saying(heard, private_room, owner.as_deref(), |owner| {
         seen_saying_owner(request, owner).0
     });
@@ -1745,8 +1785,8 @@ pub fn run(
                 .unwrap_or_default();
             crate::service_contacts::plan(owner.as_deref(), &call.args, &filled, &lines, &mut told);
         }
-        let owner = owner.as_deref().unwrap_or_default();
         kept::pending(|pending| {
+            let owner = owner.as_deref().unwrap_or_default();
             self::answered(pending, &call, request, &mut told, Instant::now(), owner);
         });
         if send_id {
@@ -1769,23 +1809,11 @@ pub fn run(
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
                 thread.private_for(request);
             }
-            // In full only to the owner alone in view, in the
-            // conversation's voice; on the Live route, never.
-            let alone = owner_alone();
-            let likeness = judge
-                .as_ref()
-                .filter(|_| alone && !private_room)
-                .and_then(|judge| {
-                    judged(
-                        judge,
-                        if enrolled {
-                            VoiceAsk::Owner(request)
-                        } else {
-                            VoiceAsk::Conversation(request)
-                        },
-                    )
-                });
-            if !private_room && !read_in_full(alone, likeness, seen_owner) {
+            // In full only to the owner seen, alone in view, in their
+            // voice; on the Live route, never ([`said_whole`]).
+            if !said_whole(private_room, seen_owner, owner_alone, || {
+                owner_likeness(judge.as_ref(), request, owner.as_deref())
+            }) {
                 brief(&mut told);
             }
         }
@@ -3138,6 +3166,23 @@ mod tests {
             ("an off-camera voice", true, Some(0.9), false),
         ] {
             assert!(!read_in_full(alone, likeness, seen_owner), "{why}");
+        }
+    }
+
+    /// App Only's P2 on #6250: the one rule of a read in full and a made
+    /// skill's read-back said whole. In the private room always, nothing
+    /// asked; outside it, the owner seen, alone in view and in their voice
+    /// at 0.55 or more, each asked only when the one before holds.
+    #[test]
+    fn said_whole_is_a_read_in_full_and_always_in_the_private_room() {
+        let unasked = || -> bool { panic!("alone asked") };
+        assert!(said_whole(true, false, unasked, || panic!("voice asked")));
+        assert!(said_whole(false, true, || true, || Some(0.6)));
+        assert!(said_whole(false, true, || true, || Some(0.55)));
+        assert!(!said_whole(false, false, unasked, || panic!("voice asked")));
+        assert!(!said_whole(false, true, || false, || panic!("voice asked")));
+        for (why, likeness) in [("under the bar", Some(0.54)), ("no print, or Live", None)] {
+            assert!(!said_whole(false, true, || true, || likeness), "{why}");
         }
     }
 
