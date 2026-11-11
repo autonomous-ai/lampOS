@@ -1,0 +1,11 @@
+# Radio continue: the ring's sign tells the radio app to pick the story up.
+needs = ["light"]
+kind = "installable"
+version = "1.0.4"
+tool = "continue_story"
+
+[permissions]
+light = true
+
+[[do]]
+light = { colour = "yellow", level = 1, for = "12s" }

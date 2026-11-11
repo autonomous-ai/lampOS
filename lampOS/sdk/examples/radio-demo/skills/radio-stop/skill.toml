@@ -1,0 +1,11 @@
+# Radio stop: the ring's sign tells the radio app to stop the story.
+needs = ["light"]
+kind = "installable"
+version = "1.0.3"
+tool = "stop_story"
+
+[permissions]
+light = true
+
+[[do]]
+light = { colour = "blue", level = 1, for = "12s" }

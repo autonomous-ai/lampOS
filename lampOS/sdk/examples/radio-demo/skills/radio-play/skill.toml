@@ -1,0 +1,31 @@
+# Radio play: a person asks for a story; the ring shows a short sign the
+# radio app (lamp-call-app/radio.py serve) reads, and it plays the episode.
+needs = ["light"]
+kind = "installable"
+version = "1.0.5"
+tool = "play_story"
+
+[choice]
+name = "genre"
+about = "The kind of story they asked for: horror (scary, ghosts, kinh dị), romance (love, tình cảm), fantasy (dragons, magic), or any when they gave none."
+one_of = ["horror", "romance", "fantasy", "any"]
+default = "any"
+
+[permissions]
+light = true
+
+[[do]]
+if_choice = ["horror"]
+light = { colour = "purple", level = 1, for = "12s" }
+
+[[do]]
+if_choice = ["romance"]
+light = { colour = "pink", level = 1, for = "12s" }
+
+[[do]]
+if_choice = ["fantasy"]
+light = { colour = "cyan", level = 1, for = "12s" }
+
+[[do]]
+if_choice = ["any"]
+light = { colour = "green", level = 1, for = "12s" }
