@@ -1942,3 +1942,11 @@ test("FakeLamp({ grants: 'all' }) takes every grant the protocol names; the defa
   } finally { await wide.stop(); }
   for (const slip of ['hear', 'All', '']) assert.throws(() => new FakeLamp({ grants: slip }), TypeError);
 });
+
+test('a missing camera or microphone grant says the app does not grant it; another grant keeps its short words', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp) => {
+    await assert.rejects(lamp.cameraSnapshot(), (error) => error instanceof byCode.no_grant
+      && error.why === 'not granted: camera (the app does not grant it yet: only a pairing code made on the lamp itself carries it)');
+    await assert.rejects(lamp.say('x'), (error) => error instanceof byCode.no_grant && error.why === 'not granted: speak');
+  });
+});

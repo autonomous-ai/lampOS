@@ -642,7 +642,7 @@ folded, may wait up to that long for its first motion to begin.
 |---|---|
 | `unpaired` | no pairing, a revoked one, or a bad signature |
 | `no_hello` | an op before `hello` on this connection |
-| `no_grant` | the client lacks the grant; `why` names it |
+| `no_grant` | the client lacks the grant; `why` names it, and for `camera` and `microphone` adds "(the app does not grant it yet: only a pairing code made on the lamp itself carries it)" (`session::not_granted`) |
 | `no_lease`, `lease_lost` | the action needs a lease the client doesn't hold |
 | `busy` | another client holds the part, or this one by another lease; a `turn.end` with no turn of this computer's, "not this computer's turn" |
 | `refused` | the body's own check, with its why: "centre of gravity 27 mm > 22 mm", "pitch past its window"; the voice's, for `turn.end` and `listen.set`, and "the voice here doesn't take turns from a computer" or "…doesn't take a computer's mute" from a voice older than them |

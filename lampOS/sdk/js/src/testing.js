@@ -345,6 +345,12 @@ function certificate() {
 export const AIR = Object.freeze({ pm1_0: 2.1, pm2_5: 5.3, pm4_0: 6.8, pm10: 7.9, co2_ppm: 620, humidity: 45, temperature: 27.4, feel: 'fresh', known: true });
 export const DEVICE = Object.freeze({ cpu_load: 0.25, memory_used: 0.4, disk_free: 0.6, uptime_s: 3600, temperature_c: Object.freeze({ cpu_thermal: 55 }), known: true });
 
+// What the lamp says for a missing grant (lamp-control's `not_granted`): for `camera` and `microphone` it says the way out.
+const notGranted = (missing) => {
+  const said = `not granted: ${missing.join(', ')}`;
+  return missing.some((g) => g === 'camera' || g === 'microphone') ? `${said} (the app does not grant it yet: only a pairing code made on the lamp itself carries it)` : said;
+};
+
 export class FakeLamp {
   static async start(options = {}) {
     const fake = new FakeLamp(options);
@@ -886,7 +892,7 @@ export class FakeLamp {
   op(ws, client, request) {
     const { op, id } = request;
     const missing = this.needs(op, request).filter((g) => !this.clients.get(client).grants.includes(g));
-    if (missing.length) return this.refuse(ws, id, 'no_grant', `needs ${missing[0]}`);
+    if (missing.length) return this.refuse(ws, id, 'no_grant', notGranted(missing));
     const queued = this.refusals.get(op);
     if (queued?.length) {
       const { code, why, retryMs } = queued.shift();
