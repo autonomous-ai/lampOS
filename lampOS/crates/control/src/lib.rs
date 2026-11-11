@@ -15,11 +15,15 @@
 
 pub mod body_info;
 pub mod body_lease;
+pub mod body_state;
 pub mod camera;
 pub mod cert;
 pub mod feelings;
 pub mod journal;
 pub mod lease;
+pub mod microphone;
+pub mod motion_done;
+pub mod notes;
 pub mod pairing;
 pub mod parts;
 pub mod protocol;

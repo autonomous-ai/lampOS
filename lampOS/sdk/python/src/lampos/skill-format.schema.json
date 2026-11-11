@@ -73,6 +73,11 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,47}$"
     },
+    "knowledge": {
+      "description": "A file of the skill's folder told to the tool's call after its note, the section its choice names (#5790).",
+      "type": "string",
+      "pattern": "^[a-z0-9-]+\\.md$"
+    },
     "choice": {
       "type": "object",
       "additionalProperties": false,
@@ -658,6 +663,20 @@
         }
       }
     },
+    "day_name": {
+      "type": "string",
+      "enum": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat",
+        "sun",
+        "weekdays",
+        "weekend"
+      ]
+    },
     "core_table": {
       "type": "object",
       "description": "A table of the lamp's own skills, checked by the part that reads it; not part of the public format, and the schema doesn't look inside it."
@@ -843,6 +862,21 @@
         "during": {
           "$ref": "#/$defs/window"
         },
+        "days": {
+          "description": "The local days of the week its `during` opens on (#6066): one name or a nonempty list of `mon` to `sun`, `weekdays`, `weekend`. Only with `during`; an overnight window's hours after midnight are the day it opened's.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/day_name"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/day_name"
+              }
+            }
+          ]
+        },
         "once_per_day": {
           "type": "boolean"
         },
@@ -969,10 +1003,9 @@
           "type": "string",
           "pattern": "^[a-z0-9_]{1,64}$"
         },
-        "stands_in_for": {
-          "description": "Another skill, by name, whose due nudge this `follows` word stands in for (#5620): while the word is still to come that skill's chance waits, and its cooldown begins with the word. Only with `follows`, never the skill's own name.",
-          "type": "string",
-          "pattern": "^[a-z0-9-]{1,64}$"
+        "stands_in_for_group": {
+          "description": "This `follows` word stands in for the nudges of its skill's own `[budget]` group (#5620): while the word is still to come their due chances wait, and their cooldowns begin with the word; never a `warning`. Once a window closes without the word, the group is not held again until it runs. Only with `follows`, in a skill with a `[budget]` group.",
+          "type": "boolean"
         }
       }
     },

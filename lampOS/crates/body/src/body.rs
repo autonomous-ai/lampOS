@@ -37,7 +37,7 @@ use crate::{
     gesture::{Gestures, Mood, Pose},
     idle,
     inspection::{Interest, PortIo, Runtime},
-    lease,
+    lease::{self, REST_SLACK},
     protocol::{ReadOnlyRequest, ReadWindow, StatusFlags, StatusParser},
     units::ENCODER_MAX,
 };
@@ -71,7 +71,6 @@ const EASE_STEPS: u16 = 100;
 /// this many steps, a minute.
 const EASES_ALLOWED: usize = 3;
 const EASE_MEMORY_STEPS: u64 = 3_000;
-const REST_SLACK: u16 = 24;
 /// At rest on its goal: within `REST_SLACK` of it. The same slack attests a
 /// fold for unplugging: lamp-52e6's elbow rests 13 counts past its folded
 /// goal (2082 against 2069) every time it folds (#1699 trial, 2026-10-20).
@@ -290,7 +289,14 @@ const GESTURE_WAIT: Duration = Duration::from_secs(3);
 /// a clip is followed exactly and one that is dropped goes back no faster.
 const GESTURE_STEP: [f32; 5] = [24.0, 34.0, 26.0, 21.0, 21.0];
 /// The farthest a gesture takes each of those from where the lamp has it.
-const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 170.0, 360.0, 360.0];
+/// At least what a move may ask (`moves::FARTHEST`: 200, 200, the lamp's own
+/// yaw reach up to 250, 350, 350), so that a move the check takes is played
+/// whole, never cut here (banana's P2 on ten/move-reach). The base's yaw is
+/// laid over the pose, and the sum is held to home plus `Limits::yaw` (or to
+/// where the look alone already has the base, if farther): a sway alone goes
+/// 250 either way of home, and over a turned look it stops at the reach and
+/// says so in the journal, never past it.
+const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 250.0, 360.0, 360.0];
 /// The farthest a holder's pose (`Asked::pose`) takes the head's roll from
 /// the pose; the arm goes anywhere inside its window instead (the pose's
 /// own clamp), and pitch and yaw stay with the holder's look.
@@ -676,6 +682,12 @@ pub struct Asked {
     /// not from the pose (`{"look":{…,"from":"home"}}`, a computer's
     /// `joints`): the pose's offset is taken off ([`aim_from_home`]).
     pub aim_from_home: bool,
+    /// The gesture asked replaces the one playing (`"replace": true` on the
+    /// mood socket, sent by `lamp-control` for a paired computer): asked at
+    /// `skill`, it ends one of `skill` or lower at once and eases out of it,
+    /// and is refused with [`crate::moves::PERSON_USING`] over anything
+    /// higher. Without it, a gesture asked over one playing is as before.
+    pub replace: bool,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -715,6 +727,7 @@ impl Asked {
         night: false,
         night_woke: false,
         aim_from_home: false,
+        replace: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -743,6 +756,7 @@ impl Asked {
         night: false,
         night_woke: false,
         aim_from_home: false,
+        replace: false,
     };
 }
 
@@ -1053,6 +1067,10 @@ pub struct Limits {
     /// limits are not read, as before.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub own_ranges: bool,
+    /// The lamp was started without `--reach`: its `yaw` is `Limits::FOLDED`'s, not a choice, and
+    /// a move on it is admitted to `moves::YAW_REACH_DEFAULT` (`gesture_yaw_reach`).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub yaw_unset: bool,
     /// `LAMP_BODY_STRAIN_GUARD=on` (#4390, #4501), with its bounds; `None`
     /// is the body as before.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1189,6 +1207,7 @@ impl Limits {
         arbitration: false,
         gesture_pause: false,
         own_ranges: false,
+        yaw_unset: false,
         strain_guard: None,
     };
 }
@@ -1222,6 +1241,10 @@ pub struct Glimpse {
     pub step: u64,
     pub mood: Mood,
     pub goals: [u16; 3],
+    /// Where the pose wants each joint this step, before it is eased there
+    /// or a rest writes its goal where it stopped: what a holder's look is
+    /// judged against (lamp-75c9, 7 Nov: a resting head stopped 17 short).
+    pub wanted: [u16; 3],
     pub positions: [u16; 3],
     pub loads: [u16; 3],
     /// What each of the three joints' temperature register reads.
@@ -1288,6 +1311,9 @@ pub struct Glimpse {
     /// shifts at rest or its glance for a call. One refused by V1's
     /// anti-tip rule is `dropped: it would tip`, and said by [`Tipping`] too.
     pub gesture_fates: Fates,
+    /// A gesture playing ended on this step for one a `replace` asked: the
+    /// one ended and the one that takes its place, for the journal.
+    pub handed_over: Option<(&'static str, &'static str)>,
     /// Why a face the eyes report is not looked at now, for a body with
     /// eyes: paused, folded, or neither listening nor speaking. `None`
     /// while one would be.
@@ -1840,6 +1866,20 @@ const TEMPERATURE_SETTLE_SKIPS: u8 = 5;
 const SETTLES_KEPT: usize = 16;
 /// Reads of a first read that found a joint hot, before it is acted on.
 const FIRST_HEAT_REREADS: usize = 3;
+
+/// The base's reach a gesture laid over the pose is held to, either side of
+/// home: the lamp's own (`--reach`'s yaw), as configured, even a small one;
+/// only a lamp started without `--reach` (`Limits::yaw_unset`), whose yaw is
+/// `Limits::FOLDED`'s 40, keeps the 150 counts a move is admitted to there
+/// (Third's P2 on #6002: an accepted move of 150 was played cut to 40; Second's:
+/// a configured yaw of 100 must not be raised to 150).
+fn gesture_yaw_reach(limits: &Limits) -> f32 {
+    if limits.yaw_unset {
+        limits.yaw.max(f32::from(crate::moves::YAW_REACH_DEFAULT))
+    } else {
+        limits.yaw
+    }
+}
 
 /// The window each arm goal must be inside, shoulder then elbow, for a body
 /// given a pose to stand in: its way between folded and stood up, and
@@ -3122,6 +3162,7 @@ fn glimpse_of(template: Glimpse, step: u64, now: &[Sample; 5], goals: [u16; 3]) 
         face: None,
         gesture: None,
         gesture_fates: Fates::default(),
+        handed_over: None,
         ..template
     }
 }
@@ -3997,6 +4038,7 @@ pub(crate) fn run_looking(
         night: false,
         night_woke: false,
         aim_from_home: false,
+        replace: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5189,7 +5231,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // one it opened: a pause gives that one back, so the lamp folds.
     let mut pending_window: Option<(Option<Duration>, Option<Duration>)> = None;
     let mut gesture_fates = Fates::default();
+    let mut handed_over = None;
     let mut gesture_now = [0.0f32; 5];
+    // The base's yaw was cut to its reach under a gesture, said once a gesture.
+    let mut yaw_cut_said = false;
     let mut gesture_cooling = 0u16;
     // Steps are being cut short by the anti-tip rule.
     let mut tipping = false;
@@ -5425,6 +5470,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.steps
             );
         }
+        // Only lamp-control's asks (a paired computer's) replace what
+        // plays; any other asker's mark is taken as absent.
+        asked_now.replace &=
+            asked_source.is_some_and(|source| crate::moves::from_control(source.as_str()));
         // A hand from the test input (`--hold-from`) holds through anything
         // that replaces what is asked, as a real hand would.
         let test_held = asked_now.held_by_test;
@@ -5996,20 +6045,39 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 Some(("dropped: it let go and lies where it slumped", None))
             } else if in_hand_now {
                 Some((
-                    if limits.arbitration {
+                    if asked_now.replace {
+                        crate::moves::PERSON_USING
+                    } else if limits.arbitration {
                         "dropped: held by a hand"
                     } else {
                         "dropped: a hand holds it"
                     },
                     None,
                 ))
+            } else if asked_now.replace && (talking || paused.is_some()) {
+                // The person always first: a paired computer's motion never
+                // starts while someone is talking with the lamp (listening,
+                // thinking or speaking), nor over a gesture paused for that
+                // talk, whatever is playing (the Reviewer-lead's P2 on #4618).
+                Some((crate::moves::PERSON_USING, None))
             } else if standing.is_none() {
                 Some(("dropped: it does not stand this run", None))
             } else if !(playing.is_none() || idling) {
                 let by = playing
                     .filter(|(clip, _)| from_outside(clip))
                     .map_or((Priority::Conversation, None), |_| playing_by);
-                if !limits.arbitration {
+                // A replace (a paired computer's, through lamp-control)
+                // ends one of `skill` or lower, with or without
+                // arbitration; over the conversation or the person it is
+                // refused, the person always first.
+                if asked_now.replace && by.0 <= Priority::Skill && asked_by >= by.0 {
+                    None
+                } else if asked_now.replace
+                    && by.0 > Priority::Skill
+                    && !(limits.arbitration && asked_by > by.0)
+                {
+                    Some((crate::moves::PERSON_USING, by.1))
+                } else if !limits.arbitration {
                     Some(("dropped: another gesture plays", None))
                 } else if asked_by > by.0 {
                     None
@@ -6022,7 +6090,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 } else {
                     (Priority::Conversation, None)
                 };
-                (asked_by < by.0).then(|| (crate::moves::busy(by.0), by.1))
+                (asked_by < by.0).then(|| {
+                    if asked_now.replace && by.0 > Priority::Skill {
+                        (crate::moves::PERSON_USING, by.1)
+                    } else {
+                        (crate::moves::busy(by.0), by.1)
+                    }
+                })
             } else {
                 None
             };
@@ -6043,9 +6117,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         by: asked_source,
                     };
                     if let Some((old, _)) = playing.filter(|(old, _)| !idle::is_move(old)) {
+                        if asked_now.replace {
+                            handed_over = Some((old.name, clip.name));
+                        }
                         if from_outside(old) {
                             gesture_fates.push_told(
-                                (old.name, crate::moves::ended(asked_by)),
+                                (
+                                    old.name,
+                                    if asked_now.replace {
+                                        crate::moves::REPLACED
+                                    } else {
+                                        crate::moves::ended(asked_by)
+                                    },
+                                ),
                                 Told {
                                     source: playing_by.1,
                                     ..ender
@@ -6266,6 +6350,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         gesture_moved = std::array::from_fn(|index| gesture_now[index] - before[index]);
         let gesturing = playing.is_some() || gesture_now != [0.0; 5];
+        yaw_cut_said &= gesturing;
         yielding &= gesturing;
         // A glance is a quick move of the head, and is judged as a gesture
         // is: a head that lags or strains lets the move go, not the run.
@@ -6525,11 +6610,20 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         });
         // What is wanted of each joint with the move laid over, while one
         // plays: a stall in a move is held against this (`Stall::with_move`).
+        let yaw_home = home_now[2];
+        let yaw_reach = gesture_yaw_reach(&limits);
         let moving_of = |wanted_of: &[f32; 3], index: usize| {
             gesturing.then(|| {
-                (wanted_of[index] + over_of[index])
-                    .round()
-                    .clamp(0.0, 4_095.0) as u16
+                let mut sum = wanted_of[index] + over_of[index];
+                // The base is asked no farther than its reach (below), so a
+                // stall is judged against that, not the move's whole offset.
+                if index == 2 {
+                    sum = sum.clamp(
+                        (yaw_home - yaw_reach).min(wanted_of[2]),
+                        (yaw_home + yaw_reach).max(wanted_of[2]),
+                    );
+                }
+                sum.round().clamp(0.0, 4_095.0) as u16
             })
         };
         for (index, offset) in offsets.into_iter().enumerate() {
@@ -6553,7 +6647,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             if relaxed {
                 continue;
             }
-            let wanted = match glance_from {
+            // A glance does not turn the base, but a move from a computer does: while one plays the
+            // base is asked as if no glance were under way. Run 5 on lamp-75c9 (10 Nov): every move
+            // after the first was taken, the gesture layer wanted 683 counts of yaw, and the base's
+            // goal stayed where the look had it; with this, run 6 played them (to 88.9 degrees).
+            let glancing = glance_from.filter(|_| !(index == 2 && gesturing));
+            let wanted = match glancing {
                 // The base is not turned for a glance.
                 Some(_) if index == 2 => continue,
                 // From where it rested, by no more than the joint's own reach
@@ -6631,7 +6730,33 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             } else {
                 commanded[index]
             };
-            goals[index] = (led + over).round().clamp(least, 4_095.0) as u16;
+            let mut sum = led + over;
+            if index == 2 && over != 0.0 {
+                // Whatever is laid over the look, the base is asked no
+                // farther from home than its reach, or than the look alone
+                // already has it (the Reviewer-lead's P2 on ten/move-reach:
+                // a look at 22 degrees and a sway of 22 more would go to 44,
+                // past the reach and toward the cables). The way back
+                // toward home is never cut.
+                let (low_goal, high_goal) = (
+                    (home_now[2] - gesture_yaw_reach(&limits)).min(led),
+                    (home_now[2] + gesture_yaw_reach(&limits)).max(led),
+                );
+                let cut = sum.clamp(low_goal, high_goal);
+                if (cut - sum).abs() >= 1.0 && !yaw_cut_said {
+                    yaw_cut_said = true;
+                    eprintln!(
+                        "lamp-body: step {} gesture's yaw cut to the reach: a look at {:.0} and the move's {:.0} would go {:.0} from home, the reach is {:.0}",
+                        report.steps,
+                        led - home_now[2],
+                        over,
+                        sum - home_now[2],
+                        gesture_yaw_reach(&limits)
+                    );
+                }
+                sum = cut;
+            }
+            goals[index] = sum.round().clamp(least, 4_095.0) as u16;
             if index == 0 && leads != leading {
                 leading = leads;
                 let why = match (leads, below, lead) {
@@ -7047,6 +7172,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             step: report.steps,
             mood,
             goals: written,
+            wanted: wanted_of.map(|wanted| wanted.round().clamp(0.0, 4_095.0) as u16),
             positions: COMMANDED.map(|joint| samples[joint.index()].position),
             loads: COMMANDED.map(|joint| samples[joint.index()].load),
             temperatures: COMMANDED.map(|joint| samples[joint.index()].temperature),
@@ -7107,6 +7233,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 || test_held,
             tipping: report.tipping,
             gesture_fates: std::mem::take(&mut gesture_fates),
+            handed_over: handed_over.take(),
             looks_dropped,
             toward_refused,
             bad_reads: bus.bad_reads,

@@ -176,6 +176,8 @@ Environment=LAMP_ENDPOINT_UNFINISHED_BELOW=0.5
 Environment=LAMP_ENDPOINT_UNSURE_MS=1200
 Environment=LAMP_SECOND_UNFINISHED_WAIT=on
 Environment=LAMP_JOIN_CUT_WORDS=on
+# An ask cut short by a line let out that the model only declines is answered in its place (#5961).
+Environment=LAMP_CUT_ASK_ANSWERED=on
 Environment=LAMP_REPLY_END_REACH=on
 # Its own voice heard back, a cut-in told as one, words said once, and a reply that is not for it.
 Environment=LAMP_SECOND_OWN_ECHO=on
@@ -277,6 +279,9 @@ Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
 Environment=LAMP_LIGHT_REQUESTS=on
+# Bedtime and Morning's night caps (#5753, #1732): the ring keeps under Actions' output caps, light 24 from 21:00
+# to 06:00; all night under the caps on lamp-06c1 through restarts and silence (#2804, 22-23 Oct).
+Environment=LAMP_OUTPUT_CAPS=on
 Environment=LAMP_QUIET_PACE=on
 # A silent service costs no connection and no line waiting on it: the provider file's unset
 # waits become assume_over, 8 s with no output = unanswered, 12 s for a first output (#705).
@@ -293,6 +298,10 @@ Environment=LAMP_RING_ASLEEP=on
 # legacy_head, as install's head_touch_comes_whole_and_never_beside_the_old_engines_head holds. Merged only after
 # a person's try on lamp-52e6: a tap, a hold, and sleep and wake (#1798).
 Environment=LAMP_HEAD_TOUCH=on
+# A hand's 3 s hold says "Going to sleep. Tap my head to wake me." in the owner's language before the mute (#3748,
+# #6028): the speech cache's kept line at the hold's 2 s mark, the breath in the quiet hours (22:00 to 07:00) or
+# while the line is not kept yet. The mute comes once the cue has played, at most 6 s after the hold.
+Environment=LAMP_SLEEP_LINE=on
 Environment=LAMP_RESTORED_MUTE=on
 # The privacy slide is the lamp's sleep and wake (migrate-P4, #5182): closing it lays the lamp down, and open for 1 s
 # it wakes as at a tap, with no touch; a POWER mute stays. The lead's yes on 6 Nov, after lamp-e82d's row at 10441.
@@ -398,6 +407,10 @@ Environment=LAMP_SKILL_READS=on
 Environment=LAMP_SCHEDULE_SPEAK=skill
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
 Environment=LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/schedule-delivery
+# A delivery ledger fenced ahead of its store (a store put back to an older revision) is re-fenced once at the
+# voice's start, so new timers ring; while it still refuses every item, a timer is not set and the model is told
+# so, never "Timer set." (#5560): on lamp-52e6 on 8 Nov (10749), off said "Timer set." and never rang, on rang.
+Environment=LAMP_LEDGER_REFENCE=on
 Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
 Environment=LAMP_MEMORY_DAYS=on
 # Nothing about a person kept while nobody is known (the lead's decision 1, 23 Oct; docs/memory.md): a
@@ -410,6 +423,12 @@ Environment=LAMP_MEMORY_KEEP_ASKED=on
 # And a line that plainly asks for a timer or a reminder calls the function that sets it (lamp-4ace, 25 Oct:
 # "remind me in three minutes to call my sister" got "Three minutes, call your sister." and no call).
 Environment=LAMP_SCHEDULE_ASKED=on
+# And a line that is only a plain question about the person's reminders calls list_reminders (lamp-52e6, 9 Nov:
+# "what reminders do I have?" was answered in words with no call in 2 of 8 asks).
+Environment=LAMP_REMINDERS_ASKED=on
+# And a line that is only a plain ask for a light scene or a light show calls its skill (lamp-52e6, 9 Nov: "movie
+# light" and "show me a light show" were answered in words and no call, and the light never changed).
+Environment=LAMP_SKILL_ASKED=on
 # A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.
@@ -427,6 +446,13 @@ Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
 # 0, and their own reminder left out of the list). Memory's reads stay the room's. Known risk, accepted by the
 # memory owner on 4 Nov: a voice not seen saying it, with the person's face alone in view, hears their reminders.
 Environment=LAMP_ONE_FACE_REMINDERS=on
+# And such a line is told and read as theirs, not only kept (the memory owner's call, 6 Nov on #5385; switched on by
+# their call on 10 Nov, after lamp-3e83 answered a lone known face at the desk from the room's memory, "nothing from
+# before is kept", while their own held the answer): recall, hits, their note and thread, and its exchange journalled
+# in their record. Forgets, rule and correction calls still need their face seen speaking. Known risk, accepted by the
+# memory owner: a guest off camera, the person's face silent and alone in view and no other voice heard, is told the
+# person's recall, and the guest's words are filed as theirs.
+Environment=LAMP_PERSON_SCOPE_ONE_FACE_READS=on
 # And such a line's reply is told the person's name, only their name, when no face was seen speaking it, their own
 # known face was the one face in view through it (the mouth not read), it was not carried and no other voice was heard
 # (lamp-06c1 on 5 Nov, request 6: the test face alone in 11 of 11 looks, read still in 6, and "what's my name?" got
@@ -449,6 +475,10 @@ Environment=LAMP_CONVERSATION_CARRIES=on
 # it. Still no recall, note or hits on it, no forget and no yes, never another person's scope, and a line held only by
 # a face's gap holds nothing.
 Environment=LAMP_CONVERSATION_CARRIED_SAVES=on
+# And a carried line recalls and keeps as its person's, never forgets (#5842; the memory owner's call, switched on 10 Nov,
+# when lamp-3e83's carried "It's correct." was refused as unseen). Needs lamp-same-voice where the voice expects it;
+# without it the switch is said at start and does nothing.
+Environment=LAMP_CONVERSATION_CARRIED_MEMORY=on
 # And a silent face doesn't count (#4339, lamp-3e83 on 30 Oct: the known face in all 30 looks of a line, none with it
 # alone, so 4 lines carried while one conversation split in two): with no other face seen speaking a line and no other
 # voice in the conversation (the rule's sign of another person, kept for the cut words' join), other faces in view
@@ -547,15 +577,42 @@ Environment=LAMP_MEMORY_REPLACES=on
 # "Forget what I said about my bicycle" forgets just those things (#2176): on lamp-06c1 on 4 Nov (build 10012) both
 # bicycle things were forgotten by forget's about, and the coffee one was still found.
 Environment=LAMP_MEMORY_FORGET_ABOUT=on
+# A bare "forget that" right after the same person's keep forgets that keep, by its id in their scope, and past a
+# minute asks which (C88, #5022). The memory owner's call on 5 Nov, after lamp-06c1 answered "Lamp, forget that." 56 s
+# after Olivia's umbrella was kept in words, nothing forgotten, on two days running. Needs LAMP_MEMORY_DAYS above.
+Environment=LAMP_MEMORY_FORGET_JUST_KEPT=on
 # Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
 # alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
 Environment=LAMP_MEMORY_RECALL_V2=on
+# A keep the round right after it doubts is taken back and held for the person's yes (C37, docs/memory.md): the
+# memory owner's call A on 11 Nov, after lamp-06c1 kept "renunctinus" twice on 10 Nov and then asked "is that
+# ranunculus?". A round asking whether a kept word was another keeps the asked word on their yes. Needs
+# LAMP_MEMORY_FORGET_ALL and LAMP_EYES_SPEAKING, both on here.
+Environment=LAMP_MEMORY_DOUBT_UNDOES=on
 # Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md). The session note keeps the
 # person's tastes and kept facts first (PROFILE): the memory owner's call on 5 Nov, off for the candidate on 6 Nov
 # (#5464), back on after its played check passed on lamp-06c1 with ElevenLabs voices on 6 Nov (PASS bd98421414,
-# #5331). It needs a lamp-memory from the same build, which a product install ships. LAMP_MEMORY_NEWER_FIRST and
-# LAMP_MEMORY_STRENGTH stay off until a played check reaches their own fields (earlier:true, strength:"maybe").
+# #5331). A maybe or a plan comes back marked as one (STRENGTH), back on after its played check on lamp-06c1 on
+# 6 Nov showed kept entry 579 with strength:"maybe" and the answer that read it (#5503,
+# https://github.com/autonomous-ai/lampOS/pull/5503#issuecomment-6678298333). Each needs a lamp-memory from the
+# same build, which a product install ships. LAMP_MEMORY_NEWER_FIRST stays off: with REPLACES and KEEP_QUIETLY on,
+# a played correction is either replaced or kept alone, so its earlier:true is not reachable as played.
+Environment=LAMP_MEMORY_STRENGTH=on
 Environment=LAMP_MEMORY_PROFILE=on
+# The nightly pass (extraction plan C, step B; docs/memory.md, "The nightly pass"): 03:00 to 06:00 local, after
+# 20 min quiet with the privacy slide open, each known person's day before is sent through the relay's model once
+# more and Days keeps the episodes, facts, profile lines, ahead items, patterns and feelings that pass its checks, one
+# by one. Nothing is said or shown; the journal has counts only. The memory owner's call on 5 Nov, with patterns and
+# feelings; its quotes are kept, by the owner's decision on 4 Nov. Needs lamp-memory's nightly ops (--memory-days).
+Environment=LAMP_MEMORY_NIGHTLY=on
+Environment=LAMP_MEMORY_NIGHTLY_PATTERNS=on
+Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on
+# A role a seen person gives the lamp ("you are Harry Potter") lasts with them until they end it (the memory owner's
+# design of 6 Nov, #5545; switched on by their call on 9 Nov). Only a short name is kept, per known face, read once with
+# their session's open; a turn not placed as theirs is told only the role names of the known faces in view, never
+# whose. Private-room mode above does not hold names back; outside that mode a held-back name suppresses this note.
+# Second route and Days only; needs same-build lamp-memory (role_set_session, role_end_session), which a product install ships.
+Environment=LAMP_MEMORY_ROLE=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present

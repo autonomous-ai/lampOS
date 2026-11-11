@@ -26,19 +26,21 @@ use futures_util::{SinkExt as _, StreamExt as _};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::{TcpListener, UnixListener};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::cert::Identity;
+use crate::parts::Media;
 use crate::protocol::{EventKind, Grant, Op};
 use crate::session::{Door, Parts, event_of};
 use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
 pub const FRAME_MAX: usize = 64 * 1024;
-/// Camera frames queued for one connection at most; past that one is dropped.
+/// Binary frames (camera frames, microphone blocks) queued for one
+/// connection at most; past that one is dropped.
 pub const FRAMES_QUEUED: usize = 4;
 /// How long a new connection has to say `hello` (or `pair`).
 pub const HELLO_WITHIN: Duration = Duration::from_secs(30);
@@ -150,14 +152,19 @@ pub const LEASE_TICK: Duration = Duration::from_millis(250);
 struct Open {
     client: Option<String>,
     outbox: mpsc::UnboundedSender<Value>,
-    /// Its camera frames, binary, [`FRAMES_QUEUED`] at most: past that a
-    /// frame is dropped, never queued, so a slow link never grows memory.
-    frames: mpsc::Sender<Vec<u8>>,
+    /// Its binary frames, camera pictures and microphone blocks, each with
+    /// its kind, [`FRAMES_QUEUED`] at most: past that a frame is dropped,
+    /// never queued, so a slow link never grows memory.
+    frames: mpsc::Sender<(Media, Option<u64>, Vec<u8>)>,
     /// What it subscribed to, and its phrases, as its session says.
     events: BTreeSet<EventKind>,
     phrases: Vec<String>,
     /// Its client's grants, read at its hello.
     grants: BTreeSet<Grant>,
+    /// Its newest `body.state` not yet sent, apart from the outbox: a
+    /// newer one takes its place, so a stalled computer holds one, never a
+    /// queue of 12.5 a second (the Reviewer-lead's P2 on #4564).
+    body_state: watch::Sender<Option<Value>>,
 }
 
 /// What every connection shares.
@@ -365,45 +372,56 @@ impl Shared {
         })
     }
 
-    /// Sends `event` to every connection of `client`.
-    /// Sends a binary camera frame to every connection of `client` on the
-    /// lamp's own network: dropped for one whose queue is full.
-    fn send_binary_to(&self, client: &str, frame: &[u8]) {
+    /// Sends a binary frame of `media` to every connection of `client` that
+    /// holds its grant: dropped for one whose queue is full, never waited
+    /// for. Whether every one, and at least one, took it.
+    fn send_binary_to(&self, client: &str, media: Media, turn: Option<u64>, frame: &[u8]) -> bool {
+        let mut taken = None;
         for open in self.open.lock().expect("open").values() {
-            if open.client.as_deref() == Some(client)
-                && open.grants.contains(&crate::protocol::Grant::Camera)
-            {
-                let _ = open.frames.try_send(frame.to_vec());
+            if open.client.as_deref() == Some(client) && open.grants.contains(&media.grant()) {
+                let took = open.frames.try_send((media, turn, frame.to_vec())).is_ok();
+                taken = Some(taken.unwrap_or(true) && took);
             }
         }
+        taken.unwrap_or(false)
     }
 
-    /// Binary camera frames for a client (`crate::camera`'s fast stream).
+    /// Binary frames for a client (`crate::camera`'s fast stream,
+    /// `crate::microphone`'s blocks).
     pub fn binary(self: &Arc<Self>) -> crate::parts::Binary {
         let shared = Arc::downgrade(self);
-        Arc::new(move |client: &str, frame: &[u8]| {
-            if let Some(shared) = shared.upgrade() {
-                shared.send_binary_to(client, frame);
-            }
-        })
+        Arc::new(
+            move |client: &str, media: Media, turn: Option<u64>, frame: &[u8]| {
+                shared
+                    .upgrade()
+                    .is_some_and(|shared| shared.send_binary_to(client, media, turn, frame))
+            },
+        )
     }
 
-    fn send_to(&self, client: &str, event: Value) {
-        for open in self.open.lock().expect("open").values() {
-            if open.client.as_deref() == Some(client) {
+    fn send_to(&self, client: &str, mut event: Value) {
+        // An action's end for one connection (`motion_done`'s
+        // [`crate::motion_done::CONNECTION`]): to that connection alone,
+        // the tag taken off, so another program of the same computer, with
+        // its own request numbers, never takes it as its own.
+        let only = event
+            .as_object_mut()
+            .and_then(|fields| fields.remove(crate::motion_done::CONNECTION))
+            .and_then(|connection| connection.as_u64());
+        for (id, open) in self.open.lock().expect("open").iter() {
+            if open.client.as_deref() == Some(client) && only.is_none_or(|only| only == *id) {
                 let _ = open.outbox.send(event.clone());
             }
         }
         // A stream's end is in the journal with its why, as its start was
-        // (Thirteen's P3 on #4521).
-        if event["ev"] == "camera.ended" {
+        // (Thirteen's P3 on #4521): the camera's and the microphone's.
+        if let Some(ev @ ("camera.ended" | "microphone.ended")) = event["ev"].as_str() {
             let why = event["why"].as_str().unwrap_or("ended");
             let now = self.now_us();
-            self.door.lock().expect("door").journal_event(
-                client,
-                &format!("camera.ended ({why})"),
-                now,
-            );
+            self.door
+                .lock()
+                .expect("door")
+                .journal_event(client, &format!("{ev} ({why})"), now);
         }
     }
 
@@ -464,18 +482,31 @@ impl Shared {
                         let granted = kind
                             .needs()
                             .is_none_or(|grant| open.grants.contains(&grant));
-                        if let Some(client) = &open.client
-                            && granted
-                            && open.events.contains(&kind)
-                            && open.outbox.send(event.clone()).is_ok()
+                        if open.client.is_none() || !granted || !open.events.contains(&kind) {
+                            continue;
+                        }
+                        if kind == EventKind::BodyState {
+                            open.body_state.send_replace(Some(event.clone()));
+                        } else if open.outbox.send(event.clone()).is_ok()
+                            && let Some(client) = &open.client
                         {
                             sent.push(client.clone());
                         }
                     }
+                    // `body.state` is never journaled: at 12.5 a second it
+                    // would spend each computer's lines a second on itself
+                    // and leave its commands out (the Reviewer-lead's P2 on
+                    // #4564).
                     self.journal_events(&sent, &event["ev"], now);
                 }
                 Out::Heard(text) => {
                     let mut heard = Vec::new();
+                    // Counted, never the words (ten's phrase.heard finding on
+                    // lamp-75c9, 9 Nov): how many computers listen for phrases
+                    // and with how many phrases between them, and how many
+                    // phrases were told in this line.
+                    let mut listening = 0usize;
+                    let mut phrases = 0usize;
                     for open in self.open.lock().expect("open").values() {
                         if open.client.is_none()
                             || !open.grants.contains(&Grant::Hear)
@@ -483,6 +514,8 @@ impl Shared {
                         {
                             continue;
                         }
+                        listening += 1;
+                        phrases += open.phrases.len();
                         for phrase in phrases_in(&text, &open.phrases) {
                             if open.outbox.send(serde_json::json!({"ev": "phrase.heard", "at": at, "phrase": phrase})).is_ok()
                                 && let Some(client) = &open.client
@@ -491,8 +524,39 @@ impl Shared {
                             }
                         }
                     }
+                    eprintln!(
+                        "lamp-control: a finished line heard ({} words): {listening} listening for {phrases} phrases, {} told",
+                        crate::protocol::phrase_words(&text).len(),
+                        heard.len()
+                    );
                     // The kind alone: never the phrase, nor what was said.
                     self.journal_events(&heard, &serde_json::json!("phrase.heard"), now);
+                }
+                Out::Said { fields, to } => {
+                    let mut event = fields;
+                    event["ev"] = serde_json::json!("lamp.said");
+                    event["at"] = Value::String(at.clone());
+                    let mut sent = Vec::new();
+                    for open in self.open.lock().expect("open").values() {
+                        let Some(client) = &open.client else {
+                            continue;
+                        };
+                        let mine = match &to {
+                            crate::watch::SaidTo::Everyone => true,
+                            crate::watch::SaidTo::Client(id) => id == client,
+                        };
+                        if !mine
+                            || !open.grants.contains(&Grant::Speech)
+                            || !open.events.contains(&EventKind::LampSaid)
+                        {
+                            continue;
+                        }
+                        if open.outbox.send(event.clone()).is_ok() {
+                            sent.push(client.clone());
+                        }
+                    }
+                    // The kind alone: never what was said.
+                    self.journal_events(&sent, &event["ev"], now);
                 }
                 Out::Suspend(part, why) => {
                     let changes = self
@@ -883,10 +947,17 @@ async fn connection<S>(
 {
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
-    let (frames, mut framed) = mpsc::channel::<Vec<u8>>(FRAMES_QUEUED);
+    let (frames, mut framed) = mpsc::channel::<(Media, Option<u64>, Vec<u8>)>(FRAMES_QUEUED);
+    // The writer's own way back into its queue: an end drains only its own
+    // kind and puts the others back.
+    let requeue = frames.clone();
+    let (body_state, mut newest_body) = watch::channel::<Option<Value>>(None);
+    // Until its sender goes with the connection's entry.
+    let mut body_open = true;
     // Weak, so a revoke that drops the connection's outbox still closes it.
     let answers = outbox.downgrade();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
+    session.set_connection(id);
     if remote {
         session.set_remote();
     }
@@ -899,6 +970,7 @@ async fn connection<S>(
             events: BTreeSet::new(),
             phrases: Vec::new(),
             grants: BTreeSet::new(),
+            body_state,
         },
     );
     let (quiet, hello) = {
@@ -955,6 +1027,11 @@ async fn connection<S>(
                         if let Some(entry) = shared.open.lock().expect("open").get_mut(&id) {
                             entry.client = Some(client.to_owned());
                             entry.events = session.events().clone();
+                            // An unsubscribe drops a state still held, so
+                            // none goes after it (El's P3 on #4564).
+                            if !entry.events.contains(&EventKind::BodyState) {
+                                entry.body_state.send_replace(None);
+                            }
                             entry.phrases = session.phrases().to_vec();
                             entry.grants = grants;
                         }
@@ -979,17 +1056,19 @@ async fn connection<S>(
                     }
                 }
                 frame = framed.recv() => {
-                    let Some(frame) = frame else { continue };
+                    let Some((media, turn, frame)) = frame else { continue };
                     // Never beyond the lamp's own network (control.md, "The
-                    // camera").
+                    // camera", "The microphone").
                     if remote {
                         continue;
                     }
-                    // Only while its stream still runs: a frame queued
-                    // before an `off`, a `stop`, a re-pairing or an end
-                    // never goes (Thirteen's P3 on #4521).
+                    // Only while its own stream still runs: a picture or a
+                    // block queued before an `off`, a `stop`, a re-pairing
+                    // or an end never goes (Thirteen's P3 on #4521), and a
+                    // block of an ended stream never goes through the stream
+                    // that replaced it (Second's P1 on #5839).
                     let streaming = session.client().is_some_and(|client| {
-                        shared.parts.lock().expect("parts").camera_streaming(client)
+                        shared.parts.lock().expect("parts").streaming(client, media, turn)
                     });
                     if !streaming {
                         continue;
@@ -1010,11 +1089,70 @@ async fn connection<S>(
                     {
                         continue;
                     }
-                    // Ended: the frames still queued for it never go
-                    // (Thirteen's P3 on #4521).
-                    if event["ev"] == "camera.ended" {
-                        while framed.try_recv().is_ok() {}
+                    // Ended: the pictures or blocks still queued for it never
+                    // go (Thirteen's P3 on #4521); the other kind's stay.
+                    let ended = match event["ev"].as_str() {
+                        Some("camera.ended") => Some(Media::Camera),
+                        Some("microphone.ended") => Some(Media::Microphone),
+                        _ => None,
+                    };
+                    let mut event = event;
+                    if let Some(ended) = ended {
+                        // An older stream's end, late after a newer stream of
+                        // this computer started, is not the newer one's: it
+                        // neither empties its queue nor reaches the computer
+                        // (Second's P2 on #5839). Its turn is the door's own,
+                        // taken off before it goes.
+                        let turn = event
+                            .as_object_mut()
+                            .and_then(|fields| fields.remove(crate::camera::TURN_FIELD))
+                            .and_then(|turn| turn.as_u64());
+                        let newest = session.client().and_then(|client| {
+                            shared.parts.lock().expect("parts").newest_turn(client, ended)
+                        });
+                        if crate::camera::older_end(turn, newest) {
+                            continue;
+                        }
+                        let others: Vec<(Media, Option<u64>, Vec<u8>)> = std::iter::from_fn(|| framed.try_recv().ok())
+                            .filter(|(media, _, _)| *media != ended)
+                            .collect();
+                        for other in others {
+                            let _ = requeue.try_send(other);
+                        }
                     }
+                    // A picture goes only while the stream that made it runs,
+                    // never through one started after it (banana, 9 Nov), and
+                    // its turn is the door's own, taken off before it goes.
+                    if event["ev"] == "camera.frame" {
+                        let turn = event
+                            .as_object_mut()
+                            .and_then(|fields| fields.remove(crate::camera::TURN_FIELD))
+                            .and_then(|turn| turn.as_u64());
+                        let streaming = turn.is_some_and(|turn| {
+                            session.client().is_some_and(|client| {
+                                shared
+                                    .parts
+                                    .lock()
+                                    .expect("parts")
+                                    .streaming(client, Media::Camera, Some(turn))
+                            })
+                        });
+                        if !streaming {
+                            continue;
+                        }
+                    }
+                    if socket.send(Message::text(event.to_string())).await.is_err() {
+                        break;
+                    }
+                }
+                changed = newest_body.changed(), if body_open => {
+                    if changed.is_err() {
+                        body_open = false;
+                        continue;
+                    }
+                    let Some(event) = newest_body.borrow_and_update().clone() else {
+                        continue;
+                    };
                     if socket.send(Message::text(event.to_string())).await.is_err() {
                         break;
                     }
@@ -1245,12 +1383,13 @@ fn wall_ms() -> u64 {
 
 /// The bus topics the door reads, each subscribed on its own thread, every
 /// message handed to `watch` and what it means delivered.
-pub const TOPICS: [&str; 21] = [
+pub const TOPICS: [&str; 24] = [
     "humans/faces/tracked",
     "humans/hands/tracked",
     "room/stood_up",
     "name/heard",
     "voice/heard",
+    "voice/line",
     "ears/classes",
     "controls/gesture",
     "body/hand",
@@ -1262,11 +1401,13 @@ pub const TOPICS: [&str; 21] = [
     "light/drawn",
     "mood/state",
     "controls/touch",
+    "controls/pet",
     "air/state",
     "board/state",
     "speaker/volume",
     "body/limits",
     "body/joint_states",
+    "diagnostics",
 ];
 
 /// Subscribes to [`TOPICS`] on the bus at `bus`, and hands every message to
@@ -1283,6 +1424,10 @@ pub fn watch_bus(
         let sent = sent.clone();
         let clock = shared.clone();
         std::thread::spawn(move || {
+            // A payload that can't be read is passed over, said once per
+            // topic so a lamp shows why its events stopped (ten's
+            // phrase.heard finding on lamp-75c9, 9 Nov).
+            let mut unread_said = false;
             // What `watch` last read from this topic, and when: a state
             // message that says the same is passed over here, not handed on
             // (lamp-75c9's idle CPU was `voice/privacy`'s hundred a second),
@@ -1291,8 +1436,17 @@ pub fn watch_bus(
             loop {
                 match subscriber.recv(Duration::from_secs(1)) {
                     Ok(Some(message)) => {
-                        let Ok(payload) = message.json() else {
-                            continue;
+                        let payload = match message.json() {
+                            Ok(payload) => payload,
+                            Err(error) => {
+                                if !unread_said {
+                                    unread_said = true;
+                                    eprintln!(
+                                        "lamp-control: {topic}: a message not read, passed over: {error}"
+                                    );
+                                }
+                                continue;
+                            }
                         };
                         // When it came, not when the runtime gets to it: a
                         // runtime held up (a slow save) mustn't make a lease
@@ -1364,6 +1518,119 @@ pub fn rfc3339_utc(at: std::time::SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A door whose journal lines go to the list it gives back, and one
+    /// connection on it, hello'd as `c_1` with the body grant, subscribed
+    /// to `body.state` and `touch`, that never reads what is sent it.
+    #[allow(clippy::type_complexity)]
+    fn stalled() -> (
+        Arc<Shared>,
+        Arc<Mutex<Vec<String>>>,
+        mpsc::UnboundedReceiver<Value>,
+        watch::Receiver<Option<Value>>,
+    ) {
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let into = lines.clone();
+        let door = Door::new(
+            "lamp-test",
+            "Lamp",
+            [0; 32],
+            crate::pairing::Clients::default(),
+            None,
+        )
+        .with_journal(crate::journal::Journal::to(move |line| {
+            into.lock().unwrap().push(line.to_owned());
+        }));
+        let shared = Shared::new(door, Box::new(crate::session::Unrouted), String::new());
+        let (outbox, inbox) = mpsc::unbounded_channel();
+        let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+        let (body_state, newest) = watch::channel(None);
+        shared.open.lock().unwrap().insert(
+            1,
+            Open {
+                client: Some("c_1".to_owned()),
+                outbox,
+                frames,
+                events: [EventKind::BodyState, EventKind::Touch].into(),
+                phrases: Vec::new(),
+                grants: [Grant::Body].into(),
+                body_state,
+            },
+        );
+        (shared, lines, inbox, newest)
+    }
+
+    fn body_state(yaw: f64) -> Out {
+        Out::Event(
+            EventKind::BodyState,
+            json!({"joints": {"yaw": {"deg": yaw}}, "lamp": {}}),
+        )
+    }
+
+    /// The Reviewer-lead's P2 on #4564: a stalled computer holds the newest
+    /// `body.state` only, however many the body sent, and none in its
+    /// outbox.
+    #[test]
+    fn a_stalled_computer_holds_one_body_state_the_newest() {
+        let (shared, _, mut inbox, newest) = stalled();
+        for at in 0..200 {
+            shared.deliver(vec![body_state(f64::from(at))]);
+        }
+        assert!(inbox.try_recv().is_err(), "nothing queued in the outbox");
+        let held = newest.borrow().clone().expect("one held");
+        assert_eq!(held["ev"], "body.state");
+        assert_eq!(held["joints"]["yaw"]["deg"], 199.0);
+        // Other events still queue as they did.
+        shared.deliver(vec![Out::Event(EventKind::Touch, json!({"kind": "tap"}))]);
+        assert_eq!(inbox.try_recv().unwrap()["ev"], "touch");
+    }
+
+    /// El's P3 on #4564: `body.state` needs the `body` grant, and a
+    /// connection without it is held none.
+    #[test]
+    fn body_state_goes_only_with_the_body_grant() {
+        assert_eq!(EventKind::BodyState.needs(), Some(Grant::Body));
+        let (shared, _, _inbox, newest) = stalled();
+        shared
+            .open
+            .lock()
+            .unwrap()
+            .get_mut(&1)
+            .unwrap()
+            .grants
+            .clear();
+        shared.deliver(vec![body_state(1.0)]);
+        assert!(newest.borrow().is_none(), "none held without the grant");
+        shared.open.lock().unwrap().get_mut(&1).unwrap().grants = [Grant::Body].into();
+        shared.deliver(vec![body_state(2.0)]);
+        assert_eq!(
+            newest.borrow().clone().expect("held")["joints"]["yaw"]["deg"],
+            2.0
+        );
+    }
+
+    /// The Reviewer-lead's P2 on #4564: `body.state` writes no journal line,
+    /// so a computer's lines a second are all left for the rest.
+    #[test]
+    fn body_state_spends_none_of_the_journals_lines() {
+        let (shared, lines, _inbox, _newest) = stalled();
+        for at in 0..50 {
+            shared.deliver(vec![body_state(f64::from(at))]);
+        }
+        for _ in 0..crate::journal::MOST_A_SECOND {
+            shared.deliver(vec![Out::Event(EventKind::Touch, json!({"kind": "tap"}))]);
+        }
+        let lines = lines.lock().unwrap();
+        assert!(
+            !lines.iter().any(|line| line.contains("body.state")),
+            "{lines:?}"
+        );
+        let touches = lines
+            .iter()
+            .filter(|line| line.ends_with("event touch sent"))
+            .count();
+        assert_eq!(touches as u32, crate::journal::MOST_A_SECOND, "{lines:?}");
+    }
 
     #[test]
     fn only_the_lamps_own_network_may_connect() {

@@ -176,6 +176,9 @@ pub enum Outcome {
     NotQuiet(String),
     /// Switched, and every part well.
     Switched(u64),
+    /// Switched and kept, every part well but one held still as it was
+    /// before the switch (#6113): not this build's doing, so not put back.
+    Held { sequence: u64, why: String },
     /// The parts run build `sequence`, and `update/current` now names its
     /// lamp-update (`to`) instead of `from`: started in this program's
     /// place, it must confirm itself (crate::own).
@@ -244,7 +247,9 @@ impl Outcome {
     /// The build this outcome is about, where it names one.
     pub fn sequence(&self) -> Option<u64> {
         match self {
-            Self::UpToDate(sequence) | Self::Switched(sequence) => Some(*sequence),
+            Self::UpToDate(sequence) | Self::Switched(sequence) | Self::Held { sequence, .. } => {
+                Some(*sequence)
+            }
             Self::SelfSwitched { sequence, .. }
             | Self::Climbs { sequence, .. }
             | Self::RolledBack { sequence, .. } => Some(*sequence),
@@ -262,6 +267,7 @@ impl Outcome {
             Self::Would(_) => "would",
             Self::NotQuiet(_) => "not-quiet",
             Self::Switched(_) => "switched",
+            Self::Held { .. } => "held",
             Self::SelfSwitched { .. } | Self::Climbs { .. } => "self-switched",
             Self::RolledBack { .. } => "rolled-back",
             Self::Failed(_) => "failed",
@@ -287,6 +293,9 @@ impl std::fmt::Display for Outcome {
             Self::NotQuiet(why) => write!(f, "not switched: {why}"),
             Self::Switched(sequence) => {
                 write!(f, "switched to build {sequence}; every part is well")
+            }
+            Self::Held { sequence, why } => {
+                write!(f, "switched to build {sequence} and kept; held: {why}")
             }
             Self::SelfSwitched { sequence, from, to } => write!(
                 f,
@@ -366,6 +375,8 @@ struct Change {
     /// The new folder is to be made, with these files.
     make: Option<Vec<Want>>,
     was_active: bool,
+    /// Held still before the switch (judge::UnitState::held, #6113).
+    was_held: bool,
     /// A part started through its `current` link: the link, and the build
     /// it names before and after. Its unit is written only if it changes.
     link: Option<Link>,
@@ -522,7 +533,9 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         outcome = climbed;
     }
     if config.self_switch
-        && let Outcome::Switched(sequence) | Outcome::UpToDate(sequence) = outcome
+        && let Outcome::Switched(sequence)
+        | Outcome::Held { sequence, .. }
+        | Outcome::UpToDate(sequence) = outcome
         && let Some(switched) = run.own(sequence)
     {
         outcome = switched;
@@ -808,9 +821,9 @@ impl Run<'_, '_> {
         match self.world.systemd.states(&units) {
             Ok(states) => {
                 for change in &mut changes {
-                    change.was_active = states
-                        .iter()
-                        .any(|state| state.unit == change.unit && state.running());
+                    let state = states.iter().find(|state| state.unit == change.unit);
+                    change.was_active = state.is_some_and(UnitState::running);
+                    change.was_held = state.is_some_and(|state| state.held().is_some());
                 }
             }
             Err(why) => return Outcome::Failed(format!("systemd cannot be asked: {why}")),
@@ -1043,7 +1056,50 @@ impl Run<'_, '_> {
         self.fetching = to_fetch(self.config, &changes, &self.placings);
         self.room(&changes)?;
         let placing = self.product_skills(state, &manifest, &installed, &carried)?;
+        self.retained_units(&manifest, &installed, &companions, &carried, &changes);
         Ok((manifest, changes, placing))
+    }
+
+    /// Say which unit text a new product round deliberately keeps (#5061).
+    /// Reuse the verified candidate texts and plan; no fetch or systemd call.
+    /// The updater's unit is absent from product manifests, so its line says
+    /// only the policy, never that it differs from the candidate build.
+    fn retained_units(
+        &mut self,
+        manifest: &Manifest,
+        installed: &[Installed],
+        companions: &BTreeMap<String, String>,
+        carried: &BTreeMap<String, String>,
+        changes: &[Change],
+    ) {
+        if !manifest
+            .units
+            .iter()
+            .any(|unit| unit.lamp == manifest::PRODUCT_LAMP)
+        {
+            return;
+        }
+        let own = self.config.on(&self.config.units).join(OWN_UNIT);
+        if fs::symlink_metadata(own).is_ok_and(|metadata| metadata.file_type().is_file()) {
+            self.say(&format!(
+                "{OWN_UNIT} is not carried by rounds; its installed unit is kept"
+            ));
+        }
+        for (name, after) in carried {
+            if changes.iter().any(|change| &change.unit == name) {
+                continue;
+            }
+            let before = installed
+                .iter()
+                .find(|part| &part.unit == name)
+                .map(|part| &part.text)
+                .or_else(|| companions.get(name));
+            if before.is_some_and(|before| before != after && unit::same(before, after)) {
+                self.say(&format!(
+                    "{name} is kept: only comments, blank lines or trailing whitespace differ"
+                ));
+            }
+        }
     }
 
     /// The build's product skills (#2014's P2), fetched and checked, and
@@ -2384,7 +2440,10 @@ impl Run<'_, '_> {
                 text: change.before.clone(),
                 was_active: change.was_active,
                 restarted: false,
-                before: Before::of(&change.part, health.as_ref()),
+                before: Before {
+                    held: change.was_held,
+                    ..Before::of(&change.part, health.as_ref())
+                },
                 link: change.link.as_ref().map(|link| LinkBack {
                     path: link.path.clone(),
                     build: link.old.clone(),
@@ -2594,7 +2653,9 @@ impl Run<'_, '_> {
             );
         }
         (self.world.phase)("watching");
-        if let Err((unit, why, judged)) = self.watch(&mut watches) {
+        let watched = self.watch(&mut watches);
+        let held = watches.iter().find_map(|watch| watch.held.clone());
+        if let Err((unit, why, judged)) = watched {
             let told = if judged {
                 self.told(&unit)
             } else {
@@ -2628,7 +2689,16 @@ impl Run<'_, '_> {
         }
         self.start_recover_if_on();
         self.prune(state);
-        Outcome::Switched(build.sequence)
+        match held {
+            Some(why) => {
+                self.say(&format!("build {} kept; held: {why}", build.sequence));
+                Outcome::Held {
+                    sequence: build.sequence,
+                    why,
+                }
+            }
+            None => Outcome::Switched(build.sequence),
+        }
     }
 
     /// Recovery, enabled and with its switch on through its drop-ins, is
@@ -3532,7 +3602,8 @@ fn list_sha256(wants: &[Want]) -> String {
 
 /// What goes into a part's new folder: what is beside its binary now,
 /// each from the build if the build carries it, else from the old folder;
-/// and the binary. A folder that is not there is installed afresh (V1's
+/// the tools install puts beside it that the build carries; and the
+/// binary. A folder that is not there is installed afresh (V1's
 /// lesson: a missing installation is a reinstall, not an error).
 fn wants_of(
     config: &Config,
@@ -3543,6 +3614,18 @@ fn wants_of(
     let old_folder = program.folder();
     let mut names = BTreeSet::from([program.binary.clone()]);
     names.extend(models.keys().map(|name| (*name).to_owned()));
+    // The tools install puts beside this binary, when the build carries
+    // them: a folder made before one shipped gets it at the next round, not
+    // only at an install (lamp-same-voice on lamp-06c1, 10 Nov).
+    names.extend(
+        crate::install::BESIDE
+            .iter()
+            .chain(crate::install::BESIDE_IF_CARRIED)
+            .filter(|(owner, _)| *owner == program.binary)
+            .flat_map(|(_, tools)| tools.iter())
+            .filter(|tool| files.contains_key(**tool))
+            .map(|tool| (*tool).to_owned()),
+    );
     if let Ok(entries) = fs::read_dir(config.on(&old_folder)) {
         for entry in entries {
             let entry = entry.map_err(|error| format!("{old_folder}: {error}"))?;
@@ -3706,6 +3789,7 @@ fn plan(
             new_folder,
             make,
             was_active: false,
+            was_held: false,
             link,
             kind: None,
             added: None,
@@ -3731,6 +3815,7 @@ fn plan(
             new_folder: folder,
             make: None,
             was_active: false,
+            was_held: false,
             link: None,
             kind: companion::kind(name),
             added: None,
@@ -3880,6 +3965,7 @@ fn add_units(
             new_folder: folder,
             make,
             was_active: false,
+            was_held: false,
             link: None,
             kind: None,
             added: Some(Adding { wants, link }),
@@ -3936,6 +4022,7 @@ fn add_units(
             new_folder: folder,
             make: None,
             was_active: false,
+            was_held: false,
             link: None,
             kind: companion::kind(name),
             added: Some(Adding {
@@ -4095,4 +4182,91 @@ fn conditions(text: &str) -> Vec<&str> {
         .map(str::trim)
         .filter(|line| line.starts_with("Condition"))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(root: &Path) -> Config {
+        Config {
+            root: root.to_owned(),
+            units: "/etc/systemd/system/".into(),
+            records: "/var/lib/lampos-update/".into(),
+            channel: "lamp-voice".into(),
+            channel_url: "https://channel.test/".into(),
+            key: [0; 32],
+            lamp: "lamp-06c1".into(),
+            apply: false,
+            quiet_wait: Duration::ZERO,
+            watch: Duration::ZERO,
+            keep_free: 0,
+            self_switch: false,
+            running: None,
+            updater: manifest::UPDATER,
+            models: false,
+            models_file: false,
+            settings: false,
+            product_settings: false,
+            image: false,
+            writer_from: None,
+        }
+    }
+
+    fn file(name: &str) -> manifest::File {
+        manifest::File {
+            name: name.into(),
+            sha256: manifest::sha256_hex(name.as_bytes()),
+            size: 1,
+        }
+    }
+
+    /// A lamp whose voice folder was made before the voice's same-voice
+    /// check shipped took every round after it with only what was already
+    /// beside the voice, so the check never arrived (lamp-06c1 on build
+    /// 11091, 10 Nov): a round puts a tool the build carries beside its part,
+    /// as install does.
+    #[test]
+    fn a_round_puts_a_carried_tool_beside_its_part() {
+        let folder = tempfile::tempdir().unwrap();
+        let build = "a".repeat(64);
+        let old = folder.path().join(format!("opt/lampOS/voice/{build}"));
+        fs::create_dir_all(&old).unwrap();
+        fs::write(old.join("lamp-voice"), "voice 1").unwrap();
+        fs::write(old.join("lamp-turn-end"), "turn-end 1").unwrap();
+        let carried = [
+            file("lamp-voice"),
+            file("lamp-turn-end"),
+            file("lamp-same-voice"),
+            file("lamp-body-measure"),
+        ];
+        let files: BTreeMap<&str, &manifest::File> = carried
+            .iter()
+            .map(|file| (file.name.as_str(), file))
+            .collect();
+        let program = Program {
+            builds: "/opt/lampOS/voice/".into(),
+            build,
+            binary: "lamp-voice".into(),
+            linked: true,
+        };
+        let wants = wants_of(&config(folder.path()), &files, &BTreeMap::new(), &program).unwrap();
+        let names: Vec<&str> = wants.iter().map(|want| want.name.as_str()).collect();
+        assert_eq!(names, ["lamp-same-voice", "lamp-turn-end", "lamp-voice"]);
+        assert!(
+            wants
+                .iter()
+                .all(|want| matches!(&want.source, Source::Build(_)))
+        );
+
+        // A build without it still makes the folder, without it.
+        let older: BTreeMap<&str, &manifest::File> = files
+            .iter()
+            .filter(|(name, _)| **name != "lamp-same-voice")
+            .map(|(name, file)| (*name, *file))
+            .collect();
+        let wants = wants_of(&config(folder.path()), &older, &BTreeMap::new(), &program).unwrap();
+        let names: Vec<&str> = wants.iter().map(|want| want.name.as_str()).collect();
+        assert_eq!(names, ["lamp-turn-end", "lamp-voice"]);
+    }
 }

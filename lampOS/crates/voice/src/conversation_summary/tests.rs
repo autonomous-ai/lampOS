@@ -693,6 +693,49 @@ fn a_held_exchange_never_reaches_the_summary_or_the_talk_note() {
     );
 }
 
+/// Reviewer-two's HOLD on #5968 at `8c1cbd4268`: with the running summary
+/// off, memory's forget from the app still drops the write waiting for its
+/// send, through the worker's own reader (`memory_forgot_waiting`); a rules
+/// scope's forget, or another part's, leaves it.
+#[test]
+fn a_forget_from_the_app_drops_the_waiting_write_with_the_summary_off() {
+    let root = std::path::PathBuf::from(format!("/tmp/lvs-forgot-w-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+    let publisher = |source| {
+        bus.publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            source,
+        )
+        .unwrap()
+    };
+    let (mut memory, mut eyes) = (publisher("memory"), publisher("eyes"));
+    let told = |person: Option<&str>| lamp_msgs::MemoryForgot {
+        person: person.map(str::to_owned),
+    };
+    let waiting = || crate::services::Pending {
+        service: "gmail".to_owned(),
+        ..crate::services::Pending::new("id", 0, Instant::now(), "Send a mail.", "ann")
+    };
+    crate::services::pending_for_test(Some(waiting()));
+    eyes.publish_json(1, &told(None)).unwrap();
+    memory.publish_json(1, &told(Some("r-house"))).unwrap();
+    assert_eq!(memory_forgot_waiting(&mut forgot, 1_000_000), 0);
+    assert!(
+        crate::services::pending_for_test_is_some(),
+        "not the conversation's"
+    );
+    memory
+        .publish_json(2, &told(Some(&crate::remember::person_id("Tom"))))
+        .unwrap();
+    assert_eq!(memory_forgot_waiting(&mut forgot, 2_000_000), 1);
+    assert!(!crate::services::pending_for_test_is_some(), "dropped");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 /// The reviewer-lead's P2 on #4479: memory's forget from the app
 /// (`memory/forgot`) reaches the conversation as a voice-tool forget does:
 /// a person's, the room's ("everyone") or every person's drops the thread,
@@ -741,6 +784,10 @@ fn a_forget_from_the_app_drops_the_notes_and_any_in_the_making() {
         Some(&tom),
         now,
     );
+    // Their role (`LAMP_MEMORY_ROLE`), and another person's beside it.
+    let mai = crate::remember::person_id("Mai");
+    crate::remember::role::hold(&tom, Some("Harry Potter".into()));
+    crate::remember::role::hold(&mai, Some("Ron".into()));
     // Someone else's forget is not memory's: nothing goes.
     eyes.publish_json(1, &told(Some(&tom))).unwrap();
     assert_eq!(
@@ -748,6 +795,10 @@ fn a_forget_from_the_app_drops_the_notes_and_any_in_the_making() {
         0
     );
     assert!(told_from(summaries, Some(&tom), now, 64 * 1024).contains("Lima"));
+    assert_eq!(
+        crate::remember::role::cached(&tom).as_deref(),
+        Some("Harry Potter")
+    );
     // The app forgets Tom: the thread and the note go.
     memory.publish_json(2, &told(Some(&tom))).unwrap();
     assert_eq!(
@@ -762,6 +813,9 @@ fn a_forget_from_the_app_drops_the_notes_and_any_in_the_making() {
             .recall_for(Some(&tom), now, usize::MAX),
         None
     );
+    // The voice's held role went with it, and only Tom's.
+    assert_eq!(crate::remember::role::cached(&tom), None);
+    assert_eq!(crate::remember::role::cached(&mai).as_deref(), Some("Ron"));
     // A forget of everything while a note is being made: it is never kept.
     let (memory, forgot) = (Mutex::new(memory), Mutex::new(forgot));
     let forgetting = |input: &str| {
@@ -781,6 +835,8 @@ fn a_forget_from_the_app_drops_the_notes_and_any_in_the_making() {
         now,
     );
     assert_eq!(told_from(summaries, Some(&tom), now, 64 * 1024), "");
+    // Everyone's forget clears every held role.
+    assert_eq!(crate::remember::role::cached(&mai), None);
     let _ = std::fs::remove_dir_all(root);
 }
 

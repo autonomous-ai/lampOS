@@ -1580,6 +1580,39 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// The nightly pass is on in the product, with patterns and feelings (the
+/// memory owner's call on 5 Nov): it needs the memory's socket, Days and
+/// the second route's relay, which the unit sets too, and lamp-memory's
+/// nightly ops, which `--memory-days` brings.
+#[test]
+fn the_product_sorts_a_day_into_memory_overnight() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let service = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_NIGHTLY=on",
+        "Environment=LAMP_MEMORY_NIGHTLY_PATTERNS=on",
+        "Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+        "Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+    let memory = section(unit("lamp-memory.service"), "Service");
+    assert!(
+        memory
+            .iter()
+            .any(|line| line.starts_with("ExecStart=") && line.contains(" --memory-days")),
+        "the memory runs without --memory-days"
+    );
+}
+
 /// What a caller said before their face was known becomes theirs once it is
 /// (`LAMP_MEMORY_FOLLOWS_FACE`, #2176): the memory owner's call on 4 Nov. It
 /// moves nothing without the Days memory, the second route and the eyes'
@@ -1654,13 +1687,14 @@ fn the_product_recalls_before_a_dont_know() {
     );
 }
 
-/// A keep the round right after it doubts is not taken back in the product
-/// (`LAMP_MEMORY_DOUBT_UNDOES`, C37): off again on 5 Nov at the PM's call
-/// (#5454), since ordinary keep closings ("If it changes, just say it
-/// again.") still read as doubt and would forget a right keep. It goes back
-/// on in its own PR once the matcher passes the readers' lines.
+/// A keep the round right after it doubts is taken back in the product
+/// and held for the person's yes (`LAMP_MEMORY_DOUBT_UNDOES`, C37): the
+/// memory owner's call A on 11 Nov, after lamp-06c1 kept "renunctinus"
+/// twice on 10 Nov and then asked "is that ranunculus?". Off on 5 Nov at
+/// the PM's call (#5454) until the matcher stopped reading keep closings
+/// as doubt.
 #[test]
-fn the_product_does_not_take_back_a_doubted_keep() {
+fn the_product_takes_back_a_doubted_keep() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
@@ -1668,10 +1702,25 @@ fn the_product_does_not_take_back_a_doubted_keep() {
         .1;
     let service = section(voice, "Service");
     assert!(
-        !service
-            .iter()
-            .any(|line| line.contains("LAMP_MEMORY_DOUBT_UNDOES")),
-        "the voice sets LAMP_MEMORY_DOUBT_UNDOES"
+        service.contains(&"Environment=LAMP_MEMORY_DOUBT_UNDOES=on"),
+        "the voice lacks LAMP_MEMORY_DOUBT_UNDOES"
+    );
+}
+
+/// "Forget that" right after a keep forgets that keep in the product
+/// (C88, #5022): the memory owner's call on 5 Nov, after lamp-06c1 answered
+/// a bare "forget that" after the umbrella keep in words two days running.
+#[test]
+fn the_product_forgets_what_was_just_kept() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_MEMORY_FORGET_JUST_KEPT=on"),
+        "the voice lacks LAMP_MEMORY_FORGET_JUST_KEPT"
     );
 }
 
@@ -1807,7 +1856,7 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
     }
 }
 
-/// A skill added from a file in the app, on a spoken yes (#5080): the
+/// A skill added from a file in the app, on at once (#5080, #5977): the
 /// switch is on in both parts that read it, `lamp-cloud` (the kind, with
 /// the skills page) and `lamp-voice` (the app-make socket, with the maker
 /// and the say service), once each.
@@ -2303,15 +2352,16 @@ fn the_product_sleeps_and_wakes_with_the_privacy_slide() {
     }
 }
 
-/// Tastes first in the session note (`LAMP_MEMORY_PROFILE`), one of Tiers'
-/// ideas in Days, is on in the product (the memory owner's call on 5 Nov, off
-/// for the candidate on 6 Nov, #5464, and back on after its played check
-/// passed on lamp-06c1 on 6 Nov, #5331). A newer correction first
-/// (`LAMP_MEMORY_NEWER_FIRST`) and a maybe or a plan marked
-/// (`LAMP_MEMORY_STRENGTH`) stay off until a played check reaches their own
-/// fields. Each sends its field only with Days on.
+/// Tastes first in the session note (`LAMP_MEMORY_PROFILE`) and a maybe or a
+/// plan marked (`LAMP_MEMORY_STRENGTH`), two of Tiers' ideas in Days, are on
+/// in the product (the memory owner's call on 5 Nov, off for the candidate on
+/// 6 Nov, #5464, and back on after their played checks on lamp-06c1 on 6 Nov,
+/// #5331 and #5503). A newer correction first (`LAMP_MEMORY_NEWER_FIRST`)
+/// stays off: with REPLACES and KEEP_QUIETLY on, a played correction is
+/// replaced or kept alone, so it is not reachable as played. Each sends its
+/// field only with Days on.
 #[test]
-fn the_product_keeps_tastes_first_and_leaves_newer_first_and_strength_off() {
+fn the_product_keeps_tastes_first_marks_maybes_and_leaves_newer_first_off() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
@@ -2319,15 +2369,104 @@ fn the_product_keeps_tastes_first_and_leaves_newer_first_and_strength_off() {
         .1;
     let service = section(voice, "Service");
     for line in [
+        "Environment=LAMP_MEMORY_STRENGTH=on",
         "Environment=LAMP_MEMORY_PROFILE=on",
         "Environment=LAMP_MEMORY_DAYS=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
-    for switch in ["LAMP_MEMORY_NEWER_FIRST", "LAMP_MEMORY_STRENGTH"] {
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.contains("LAMP_MEMORY_NEWER_FIRST")),
+        "the voice sets LAMP_MEMORY_NEWER_FIRST"
+    );
+}
+
+/// A role a seen person gives the lamp lasts with them until they end it
+/// (`LAMP_MEMORY_ROLE`, #5545): a short name kept per known face, read once
+/// with their session's open, and never told as whose on a turn not placed
+/// as theirs. The memory owner's call, 9 Nov. It acts only with Days memory
+/// on the second route, both set beside it.
+#[test]
+fn the_product_keeps_a_role_a_seen_person_gives() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_ROLE=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// A delivery ledger fenced ahead of its store is re-fenced at the voice's
+/// start in the product (#5560, its played row on lamp-52e6 on 8 Nov), so a
+/// lamp whose store was put back rings its new timers again.
+#[test]
+fn the_product_refences_a_ledger_ahead_of_its_store() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_LEDGER_REFENCE=on"),
+        "the voice lacks LAMP_LEDGER_REFENCE=on"
+    );
+}
+
+/// A lone known face's line is told and read as theirs, and a carried line
+/// recalls and keeps as its person's, never forgets (the memory owner's call,
+/// switched on 10 Nov after lamp-3e83 answered its known person from the
+/// room's memory).
+#[test]
+fn the_product_reads_a_lone_known_face_and_a_carried_line_as_theirs() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for switch in [
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE_READS=on",
+        "Environment=LAMP_CONVERSATION_CARRIED_MEMORY=on",
+    ] {
+        assert!(service.contains(&switch), "the voice lacks {switch}");
+    }
+}
+
+/// Bedtime and Morning comes on in the product with its night caps (#5753):
+/// the skill installed enabled, and the output caps on in each part that
+/// keeps them, Actions (the store and the mixer), Skills (its `[limits]`)
+/// and the voice (the ring), so the light and volume stay under the night's
+/// ceilings from 21:00 to 06:00 (#2804's nights on lamp-06c1, 22-23 Oct).
+#[test]
+fn the_product_runs_bedtime_and_morning_with_its_night_caps() {
+    let mut lamp = Lamp::new(197, &[]);
+    lamp.install().unwrap();
+    let bedtime = lamp_skills::load(&lamp.on("/var/lib/lampOS/skills/bedtime-morning")).unwrap();
+    assert!(bedtime.enabled, "Bedtime and Morning is installed off");
+    assert!(bedtime.permissions.output_limits);
+    for name in [
+        "lamp-actions.service",
+        "lamp-skills.service",
+        "lamp-voice.service",
+    ] {
+        let unit = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
         assert!(
-            !service.iter().any(|line| line.contains(switch)),
-            "the voice sets {switch}"
+            section(unit, "Service").contains(&"Environment=LAMP_OUTPUT_CAPS=on"),
+            "{name} lacks LAMP_OUTPUT_CAPS=on"
         );
     }
 }
@@ -2365,7 +2504,9 @@ fn the_product_sees_who_speaks() {
 /// #4710: the memory owner's yes (4 Nov), after Sixth's lamp-52e6 check,
 /// to leaving the head's own moves out of the speaking read (#4558). The
 /// known hold (#4493) is on since #5522: a miss no longer empties the known
-/// file with the face still in view. The re-found face (#4486) stays off.
+/// file with the face still in view. The re-found face (#4486) is on beside
+/// it (C65, the memory owner's call): a face back on a new id is recognised
+/// at once, and the followed id (#4885) is said for the second voice.
 #[test]
 fn the_product_reads_speaking_on_steady_looks() {
     let (_, eyes) = install::PRODUCT
@@ -2376,15 +2517,10 @@ fn the_product_reads_speaking_on_steady_looks() {
     for on in [
         "Environment=LAMP_EYES_SPEAKING_STEADY=on",
         "Environment=LAMP_FACE_KNOWN_HOLD=on",
+        "Environment=LAMP_FACE_REFOUND=on",
     ] {
         assert!(service.contains(&on), "lamp-eyes.service lacks {on}");
     }
-    assert!(
-        !service
-            .iter()
-            .any(|line| line.starts_with("Environment=LAMP_FACE_REFOUND=")),
-        "lamp-eyes.service sets LAMP_FACE_REFOUND"
-    );
 }
 
 /// #2176 row 3: a rename keeps the person's memory, so the eyes and the
@@ -2944,8 +3080,8 @@ fn an_install_puts_a_core_skills_changed_file_back_and_says_so() {
 }
 
 /// The first builder on #2585 (22:24): a disabled core skill turned on
-/// stays on through an install. Bedtime and Morning ships off; turned on by
-/// hand, the next install keeps it on and records it in lamp-skills' state
+/// stays on through an install. Comfort break ships off by its own file
+/// (Bedtime and Morning did before #5753); turned on by hand, the next install keeps it on and records it in lamp-skills' state
 /// folder, so an install with its file gone writes it turned on again.
 #[test]
 fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
@@ -2953,7 +3089,7 @@ fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
     lamp.install().unwrap();
     let state_dir = lamp.on("/var/lib/lampos-skills-state");
     fs::create_dir_all(&state_dir).unwrap();
-    let folder = lamp.on("/var/lib/lampOS/skills/bedtime-morning");
+    let folder = lamp.on("/var/lib/lampOS/skills/comfort-break");
     let toml = folder.join("skill.toml");
     let shipped = fs::read_to_string(&toml).unwrap();
     assert!(!lamp_skills::load(&folder).unwrap().enabled);
@@ -2963,7 +3099,7 @@ fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
     assert!(lamp_skills::load(&folder).unwrap().enabled);
     assert_eq!(
         fs::read_to_string(state_dir.join("on")).unwrap(),
-        "bedtime-morning\n"
+        "comfort-break\n"
     );
     // The choice is the record's, not only the file's.
     fs::remove_file(&toml).unwrap();
@@ -2972,7 +3108,7 @@ fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
 }
 
 #[test]
-fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
+fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     let mut lamp = Lamp::new(195, &[]);
     lamp.install().unwrap();
     let root = lamp.on("/var/lib/lampOS/skills");
@@ -2987,12 +3123,14 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     // Comfort break, off by its own file and on by its [present] with the
     // product units' LAMP_NUDGES_PRESENT=on (#5207).
     // Sit back since its played check with a person (#5208, 4 Nov).
-    assert_eq!(installed.len(), 30);
+    // The FAQ, How to use the lamp, since #5790.
+    // Bedtime and Morning since its nights on lamp-06c1 (#5753).
+    assert_eq!(installed.len(), 31);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
         .unwrap();
-    assert!(!bedtime.enabled);
+    assert!(bedtime.enabled);
     assert!(bedtime.tool.is_none());
     assert_eq!(bedtime.kind, lamp_skills::SkillKind::Core);
     assert_eq!(bedtime.version.as_deref(), Some("1.0.0"));
@@ -3012,13 +3150,15 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The twenty-one live skills (with music sway and
+    // contribute functions. The twenty-three live skills (with Bedtime and
+    // Morning, which declares none, since #5753) (with music sway and
     // watch you leave since #2834, Head pat and its wiggle, which declare
     // none, and Sit back, which shares wellbeing_nudges) offer Dance,
-    // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
-    // wellbeing nudges' one wellbeing_nudges (since 25 Oct), and Pose's set_pose (#4135).
+    // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, the
+    // wellbeing nudges' one wellbeing_nudges (since 25 Oct), Pose's set_pose (#4135),
+    // and the FAQ's lamp_help (#5790).
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 30);
+    assert_eq!(inventory.len(), 31);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -3026,25 +3166,26 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .find(|line| line.split_whitespace().next() == Some("bedtime-morning"))
         .unwrap();
     assert_eq!(
-        row.split_whitespace().take(4).collect::<Vec<_>>(),
-        ["bedtime-morning", "core", "1.0.0", "disabled;"]
+        row.split_whitespace().take(3).collect::<Vec<_>>(),
+        ["bedtime-morning", "core", "1.0.0"]
     );
+    assert!(!row.contains("disabled;"), "{row}");
     assert!(
         listed
             .lines()
             .last()
             .unwrap()
             .starts_with(
-                "The skills here give the model 4 functions (dance, prepare_to_unplug, set_pose, wellbeing_nudges)."
+                "The skills here give the model 5 functions (dance, lamp_help, prepare_to_unplug, set_pose, wellbeing_nudges)."
             ),
         "{listed}"
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 21);
-    assert!(live.iter().all(|skill| skill.name != bedtime.name));
+    assert_eq!(live.len(), 23);
+    assert!(live.iter().any(|skill| skill.name == bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
-    // function, its tool or not: the 4 above are all a session is told.
+    // function, its tool or not: the 5 above are all a session is told.
     for (name, _) in install::PRODUCT_SKILLS_OFF {
         let skill = installed.iter().find(|skill| skill.name == *name).unwrap();
         assert!(!skill.enabled, "{name}");
@@ -3060,13 +3201,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         lamp_skills::tools_file(&installed),
         lamp_skills::tools_file(&live)
     );
-    // Even a caller that passes the disabled file directly cannot subscribe
-    // its triggers or advertise it beside the product's live tools.
-    assert!(
-        lamp_skills::Engine::new(vec![bedtime.clone()], true)
-            .topics()
-            .is_empty()
-    );
+    // Live, it adds no function of its own.
     assert_eq!(
         lamp_skills::tools_file(std::slice::from_ref(bedtime)),
         serde_json::json!({"tools":[]})
@@ -3074,7 +3209,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
 }
 
 #[test]
-fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
+fn product_routine_state_is_private_persistent_and_its_switches_owned() {
     let mut lamp = Lamp::new(196, &[]);
     lamp.install().unwrap();
     for (unit, directory, variable, flag, path) in [
@@ -3122,13 +3257,14 @@ fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
         assert!(Path::new(path).starts_with(format!("/var/lib/{directory}")));
     }
     // Night sleep is a skill (#940): Skills' routines and Expression's rest
-    // requests are on, each in its own unit only; the caps stay off.
+    // requests are on, each in its own unit only; Bedtime and Morning's
+    // night caps are on in Actions, Skills and the voice (#5753).
     for (unit, text) in install::PRODUCT {
         for line in section(text, "Service") {
             for (switch, owner) in [
                 ("LAMP_SKILL_ROUTINES", "lamp-skills.service"),
                 ("LAMP_REST_REQUESTS", "lamp-expression.service"),
-                ("LAMP_OUTPUT_CAPS", ""),
+                ("LAMP_OUTPUT_CAPS", "lamp-actions.service"),
             ] {
                 assert_eq!(
                     line == format!("Environment={switch}=on"),
@@ -3136,7 +3272,9 @@ fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
                     "{unit}: {line}"
                 );
                 if line.contains(&format!("{switch}=on")) {
-                    assert_eq!(*unit, owner, "{line}");
+                    let caps = switch == "LAMP_OUTPUT_CAPS"
+                        && ["lamp-skills.service", "lamp-voice.service"].contains(unit);
+                    assert!(*unit == owner || caps, "{line}");
                 }
             }
         }
@@ -7029,6 +7167,41 @@ fn a_build_without_the_same_voice_check_still_installs() {
         said[0].contains("build 188 carries no lamp-same-voice"),
         "{said:?}"
     );
+}
+
+/// Who was here reaches a lamp by the Store, not the product's install
+/// (#5751, the first builder's ruling of 9 Nov): the product already runs
+/// what it reads, the room's presence and one function for every skill, and
+/// keeps it to times only, with no "someone the lamp knows" and no names.
+#[test]
+fn the_product_runs_who_was_heres_reads_with_times_only() {
+    let unit = |name: &str| {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
+        section(text, "Service")
+    };
+    assert!(
+        unit("lamp-eyes.service").contains(&"Environment=LAMP_PRESENCE=on"),
+        "the eyes lack LAMP_PRESENCE=on"
+    );
+    assert!(
+        unit("lamp-voice.service").contains(&"Environment=LAMP_USE_SKILL=on"),
+        "the voice lacks LAMP_USE_SKILL=on"
+    );
+    for line in unit("lamp-skills.service") {
+        for closed in ["LAMP_WHO_WAS_HERE_KNOWN=", "LAMP_WHO_WAS_HERE_NAMES="] {
+            assert!(!line.contains(&format!("Environment={closed}")), "{line}");
+        }
+    }
+    let why = install::NOT_PRODUCT_SKILLS
+        .iter()
+        .find(|(name, _)| *name == "who-was-here")
+        .unwrap()
+        .1;
+    assert!(why.contains("the Store"), "who-was-here's reason: {why}");
 }
 
 /// Guard mode, an installable skill from the Store (#5752, #1685): the

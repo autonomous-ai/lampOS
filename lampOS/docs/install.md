@@ -221,8 +221,8 @@ owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`),
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
-equal, Laugh glance parked out of both): twenty-nine folders are installed,
-twenty enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+equal, Laugh glance parked out of both): thirty-one folders are installed,
+twenty-three enabled (Bedtime and Morning since #5753; Comfort break is off by its own file, the seven of `PRODUCT_SKILLS_OFF` by install), one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is on: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's
@@ -235,8 +235,9 @@ Not feeling well (#1681) came with the product after its lamp check, row 8
 on lamp-52e6 with the lead (20 Oct 11:35): one slow droop for a failed
 part, and the light back after; it adds no function. Prepare-to-unplug is
 enabled but stays hidden and inactive unless `LAMP_UNPLUG=on`.
-Bedtime and Morning is included with `enabled = false`, awaiting its lamp
-comparison (#1672); it adds no active trigger or advertised tool. Watches
+Bedtime and Morning is included enabled since #5753, after its nights on
+lamp-06c1 (#2803, #2804), with `LAMP_OUTPUT_CAPS=on` in the Actions, Skills
+and voice units for its night ceilings; it adds no advertised tool. Watches
 you leave and Music sway (#1669) are on in the product since #2834, with
 the eyes' `LAMP_ACTIVITY=place` for Watches you leave: the sitter followed
 by place only, never by a face print. With `room/activity` said, Stretch
@@ -289,10 +290,11 @@ would take a Live session past its 32, and its marks, called only after its look
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
-product lamp has 40 functions of its own: the voice's own 21 (with
-`LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them),
-the actions part's 17, Dance's and Pose's `set_pose`, which comes with the
-product since #4135 (`PRODUCT_FUNCTIONS` in
+product lamp has 42 functions of its own: the voice's own 24 (with
+`LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them,
+and `LAMP_MEMORY_ROLE=on`'s `set_role` and `end_role` since 9 Nov), the
+actions part's 17 and `use_skill`, reaching Dance's `dance` and Pose's
+`set_pose`, which comes with the product since #4135 (`PRODUCT_FUNCTIONS` in
 `crates/update/tests/functions.rs`, which fails if one is left out or the
 count changes). On the product's route a chat request takes 48
 (`second_provider::MAX_TOOLS`), and each offers every one, with the
@@ -350,8 +352,8 @@ not the runtime journals. The paths do not enable a feature.
 `LAMP_SKILL_ROUTINES` (Skills) and `LAMP_REST_REQUESTS` (Expression) are on
 in the product units for Night sleep (#940): its rest leased to Expression
 and its claim on the night, with Expression's built-in sleep as the
-fallback for one release; `LAMP_OUTPUT_CAPS` remains unset, and Bedtime
-and Morning remains disabled. Actions
+fallback for one release; `LAMP_OUTPUT_CAPS=on` in the same units since
+#5753, for Bedtime and Morning's night caps. Actions
 requires its caps directory only when `LAMP_OUTPUT_CAPS=on`.
 The paths come as `Environment=` lines, not as the binaries' `--daily-state`
 and `--caps-dir` options, so an older Actions or Skills from the channel
@@ -571,6 +573,17 @@ link, keeps the old build in its journal and `previous/`, and puts the link
 back to go back; a part that names its build in its unit (lamp-4ace,
 lamp-52e6) is switched as before, both in one round
 ([updates.md](updates.md), "One round").
+
+An install writes every product unit byte for byte; a round deliberately
+keeps some installed text (#5061). While planning a new product build, it
+names `lamp-update.service` as not carried by rounds: its product manifest
+has no candidate text for that unit, so this is a policy notice, not a claim
+that the file is stale. It also names a carried unit whose text differs only
+in comments, blank lines or trailing whitespace when the plan leaves that
+unit alone. These notices contain no unit contents, require no extra fetch
+or systemd call, and do not repeat on polls of an already installed build.
+`lamp-update check-units` remains the way to compare all installed unit text
+with a specified product build.
 
 ## Two ways in
 
@@ -1190,14 +1203,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      and every later one, with or without a lampOS update due. Only while
      nothing is at `/usr/local/bin/harness`, its link followed: a link whose
      target is gone counts as missing and is put there again; one already
-     there is recorded `installed` and nothing runs.
+     there is recorded `installed` and nothing runs, unless it is older than
+     the build's pin ("A newer pin moves an older Harness", below).
    - **How:** a round's own sandbox can't write `/usr/local/bin` or
      Harness's home, so, as with the settings writer, the round writes the
      fixed one-shot `lamp-update-harness.service` in `/etc/systemd/system`,
      checks what systemd loaded is that file alone, and starts it with
      `--no-block`. Neither the round nor the onboarding waits for Harness's
-     download. The unit (`ProtectSystem=full`, `ReadWritePaths=/usr/local/bin`,
-     `TimeoutStartSec=1500`, never enabled) runs `lamp-update
+     download. The unit (`ProtectSystem=full`, `ReadWritePaths=/usr/local/bin
+     -/usr/local/lib/lampos` and `TimeoutStartSec=3600` since #5978, which
+     runs Hermes after Harness, never enabled) runs `lamp-update
      harness-install`: `harness-on`'s install steps above, then `harness
      version` and `systemctl restart lamp-tasks.service`. One install at a
      time (`harness.lock` in the records).
@@ -1220,9 +1235,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never rewrites `lamp-update.service`, so a pin or switch written there
      would reach only a lamp installed after it. Instead the pinned Harness
      manifest itself is compiled into lamp-update (`product::MANIFEST`, from
-     `deploy/harness/cli-0.5.39.metadata.json`, a byte-for-byte copy of
+     `deploy/harness/cli-0.6.2.metadata.json`, a byte-for-byte copy of
      Harness's CDN manifest `https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json`
-     when it named 0.5.39). The signed manifest names lamp-update by its
+     when it named 0.6.2; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
      SHA-256, so the build's Ed25519 signature covers the pin (#3693's
      decision (a): a sha256 pin in our signed manifest is enough, as Harness
      signs nothing). Nothing is fetched or hosted for it: the one-shot checks
@@ -1237,7 +1252,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never reads it again from its server.
      After the install, `harness
      version` is compared with the manifest's `cli.version` and journaled:
-     `Harness 0.5.39 is the pinned version`, or `Harness says version …, not
+     `Harness 0.6.2 is the pinned version`, or `Harness says version …, not
      the pinned …`. Another version, or none, is recorded `failed` with
      `version`, not `installed`, so the app can tell it apart. Harness is
      still there and lamp-tasks is still started again. While Harness is
@@ -1296,7 +1311,89 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        `deploy/harness/`, and updates `product.rs`'s `include_bytes!` paths
        and constants: `MANIFEST_SHA256`, `VERSION`, `INSTALLER_SHA256` and
        each `MANIFESTS` entry's `sha256`. Tests hold every constant to its
-       file.
+       file. CI opens that PR by itself (#5957 part 1,
+       `.github/workflows/lampos-harness-pin.yml`): once a day (01:00 UTC,
+       or by hand) it reads `product::ORIGIN`, and when its `cli.version` is
+       a newer plain version than `product::VERSION` it copies the six
+       files, checks every linux-arm64 file they name against its SHA-256
+       (and size), updates `product.rs` and this section's version and date,
+       runs `cargo test -p lamp-update --lib harness_install`, and installs
+       that pin in an ARM64 container from the copies on `127.0.0.1`
+       (`harness version` says the new version, `harness --help` runs). It
+       then opens one PR onto lamp-voice with the workflow's own token, and
+       closes an older pin PR it opened. It never merges: a reader reads it,
+       a push starts its own CI (a PR opened by that token starts none), and
+       it merges only after its row "Each Harness pin move" in
+       `lamp-runs.md` passes (#5957 (b)).
+     - **A newer pin moves an older Harness** (#5957; no switch of its own,
+       it follows `LAMP_HARNESS_AT_ONBOARDING` and the build's default).
+       After a reached round, Harness there and recorded `installed` with a
+       `version` older than the pin's `cli.version` is installed again by
+       the same one-shot, the same loopback files and the same hold, as
+       `lampos`, with Harness's home (and so its sign-in) kept. Versions are
+       compared as dotted numbers (`0.5.100` is newer than `0.5.39`); a
+       version missing or not plain digits and dots is left alone, and an
+       equal or newer one too. With the build's own pin the round compares
+       the versions itself. An env pin's version is known only once fetched,
+       so the round asks the one-shot when that pin differs from the one in
+       `harness-ask.json`, and the one-shot installs only if the fetched
+       `cli.version` is newer, else records `installed` as it was.
+       - **Not while Harness is in use:** a round waits, saying one line
+         (`Harness X is older than the pinned Y: moved at a later round,
+         …`), never an error, while `tasks/status`'s kept value lists a
+         task in `tasks` or `unread` (one that can't be read counts as in
+         use), or a Harness `login` (a sign-in by code), `new` or `reply`
+         (a hand-over or follow-up being sent) is among the lamp's
+         processes (`harness_install/busy.rs`; options before the verb,
+         as in `harness --json login`, are passed over). lamp-tasks' store is
+         private and never opened. The next idle round moves it.
+       - **The ask:** `harness-ask.json` gains `upgrade_from` (the
+         recorded version), so the one-shot moves the Harness that is there
+         instead of saying "already at …, nothing installed". The record
+         is `installing` with `from_version` and the words "Updating
+         Harness on the lamp.". An ask or record without the new fields
+         reads as before.
+       - **The move:** the one-shot reads `harness version` again (none:
+         left alone, `installed`). That version, not the record's (Harness
+         may have moved itself), is the `from_version` of the `installing`
+         record and of any `failed` `upgrade`. It checks the pinned files as
+         for a first install, then looks again whether Harness is in use: if
+         it is, it records `installed` at that version and a later round
+         moves it. Then it stops `lamp-tasks.service` and runs `harness
+         stop` (lamp-tasks starts the new daemon when it starts again).
+         Either stop failing, or `id -u` failing first, is "not now" in the
+         same way, with `systemctl start lamp-tasks.service` (a running one
+         is left as it is). A bus that can't be opened counts as in use. Then it keeps the Harness that is there: as
+         `lampos`, the folder of the `cli.js` its launcher runs, the
+         launcher, `~/.harness/runtime/current-{node,tmux,grid}` and the
+         `~/.local/bin/tmux` link are copied to
+         `~/.harness/lampos-upgrade-from`. Runtimes sit in folders named by
+         their version that the installer never removes, so these are what
+         the older Harness needs. The CLI folder is checked by its real path
+         (`pwd -P`, so `/./` or `//` change nothing): Harness's home,
+         `.harness`, `.local`, `.local/bin`, the kept copy, or a folder
+         above one of them is refused, here and again before a put-back, so
+         neither can remove the sign-in. A kept copy already there (a
+         put-back that failed) is the only good one: it is never removed,
+         and the move is refused (`upgrade`, nothing stopped or installed,
+         journaled `a kept copy waits at …`) until it is cleared by hand;
+         this is looked at before anything is stopped. The new copy is made at `<kept>.new` and
+         renamed only once whole. Then the installer runs.
+       - **Put back on failure:** the installer failing, or `harness
+         version` not the pinned one after it, puts the kept copy back (as
+         `lampos`) and records `failed` with `upgrade` and `from_version`,
+         "Harness couldn't be updated, so the lamp keeps the version it
+         had."; it is journaled whether `harness version` says the older
+         one again, and the kept copy is removed only when it does. A copy
+         not kept installs nothing (also `upgrade`). Either
+         way the launcher is pinned again (with the hold on) and lamp-tasks
+         started again. A failed move is tried again by a round with
+         another pin at once, or with the same pin after 24 h
+         (`UPGRADE_RETRY_AFTER`). If the copy cannot be put back and
+         Harness is then missing, the next round installs it as on a lamp
+         without it.
+       - **Shown in tests, and on lamp-c0a4 on 10 Nov** (the move to a newer pin, signed in and
+         handing work over after: 0.5.62 to 0.5.95, and 0.5.95 to 0.6.2 with #5978's row).
      - **Held there:** Harness's own self-update is held by lamp-tasks'
        `LAMP_HARNESS_HOLD_UPDATES` (tasks.md, "Harness held at its pinned
        version"). A Team account ignores it. With that switch on in
@@ -1311,13 +1408,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        hundred bytes; not read past the cap, one line said; #5647).
    - **Said to the app:** `harness-install.json` in the records,
      `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
-     "error"?, "message"}` (`lamp_msgs::HarnessInstall`), on
+     "error"?, "from_version"?, "message"}` (`lamp_msgs::HarnessInstall`), on
      `update/status` as `harness` and in lamp-cloud's `update.status`
      (`docs/cloud.md`). `install` is `absent` (switch on, not tried yet),
      `installing`, `installed` or `failed`; `error` a fixed code
      (`pin_unreadable`, `pin_fetch`, `pin_mismatch`, `timeout`,
-     `installer`, `no_user`, `not_started`, `serve`, `version`); `message`
-     fixed words for
+     `installer`, `no_user`, `not_started`, `serve`, `version`,
+     `upgrade`); `from_version` only with an `installing` that moves an
+     older Harness, or a `failed` `upgrade` (#5957), absent otherwise;
+     `message` fixed words for
      them; `revision` one more at each change. Said within 2 s of a
      change, with the switch on. Switch off, `serve` removes the record, so
      no `harness`, and the status thread wakes once a minute, as before.
@@ -1328,12 +1427,391 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      more after it (`RETRY_AFTER`), so a broken installer isn't run after
      every round; an `update.check` within those 30 min starts no install.
      `serve` and the rest are tried at the next round. `version` is not
-     held either, but nothing is tried while Harness is there.
+     held either, but nothing is tried while Harness is there. `upgrade`
+     waits 24 h for the same pin, none for another.
    - **Shown only in tests** (`harness_install::tests`, the status and
      `app_contract` tests). Not run on a lamp: the one-shot's sandbox with
      the real installer, and a first onboarding with the switch on.
      `lamp-update.service` is never switched by a round, so the switch
      reaches a lamp by a drop-in or a new image.
+
+   **Hermes on the lamp** (#5978;
+   `crates/update/src/hermes_install.rs`; `LAMP_HERMES_ON_LAMP` in
+   `lamp-update.service`'s environment: set, on only when `on` exactly, so
+   any other value is off and `off` turns a product lamp off; unset, on on
+   a lamp installed as the product, the build's default `PRODUCT_DEFAULT`
+   being on (the product owner's decision, 10 Nov, which the first builder
+   allows with the schedule below: it installs only in a quiet window,
+   gives way while someone speaks and stops if the privacy reading is
+   lost), and off on any other lamp; no product unit sets it). Hermes (NousResearch
+   hermes-agent) is a coding agent Harness already knows as an engine.
+   Harness finds an engine only by `command -v` in its user's login shell,
+   so a `hermes` on `lampos`'s login `PATH` is all it needs: the wrapper
+   `/usr/local/bin/hermes`. Nothing is done by hand on the lamp: a fresh
+   install, an update from an older build and a try after a failure all
+   take the same steps.
+   - **Rides on Harness's install:** read only by a `serve` that acts with
+     Harness before the sign-in on too. With that off, Hermes is off as
+     well, journaled `Hermes on the lamp: off, as Harness before the
+     sign-in is off`.
+   - **When:** after each reached round, right after Harness's own step,
+     while Hermes is not there as this build puts it: `hermes` in its
+     folder, its checkout at the pinned commit (read from the checkout's
+     `.git/HEAD`), and the wrapper and the namespace script holding this
+     build's text. One of them missing or different is Hermes missing. The
+     round writes `hermes-ask.json` in the records. With Harness there, it
+     records `installing` and starts `lamp-update-harness.service` itself,
+     without waiting. With Harness missing it starts nothing: the one-shot
+     Harness's step started installs Hermes right after Harness, in the
+     same run, and the record stays `absent` until then. Only in its
+     window, below; outside it the round writes no ask, takes back an
+     install ask an earlier round left (an ask to remove is kept), and
+     journals `Hermes 0.22.2 is not set up yet: it waits, <why>`.
+   - **The window** (`crates/update/src/hermes_schedule.rs`, the first
+     builder's rules for the default-on, 10 Nov). Measured on a 4 GB lamp
+     with an SD card, the install (about 2.4 GB of writes, 7 to 12 min)
+     slipped lamp-controls' 50 ms privacy reading and kept the voice's
+     microphones closed. A round starts it (or asks Harness's one-shot for
+     it) only when all of these hold:
+     - not the first round after lamp-update started (a boot, an update's
+       restart, its own switch);
+     - the setup walk not under way (the voice's onboarding file, as the
+       round's own walk hold reads it, `crates/update/src/walk.rs`);
+     - a quiet stretch: the voice seen resting on the bus and nobody heard
+       or answered for 10 min (`QUIET_STRETCH`), by the round's own quiet
+       gate (`voice/state`, `voice/heard`, `voice/said`, `voice/mute`,
+       `voice/privacy`, `crates/update/src/quiet.rs`), heard by a thread
+       of `serve` that listens from its start (subscribed as
+       `update_hermes`), so a stretch needs 10 min of listening;
+     - and either right after the setup walk ended: the walk's
+       `done_at_unix_ms` in the voice's onboarding file
+       (`/var/lib/lampOS/voice/onboarding/progress.json`, or the file the
+       voice unit's `LAMP_ONBOARDING_FILE` names), within 6 h
+       (`AFTER_WALK_LASTS`), for the first try since (a try recorded
+       `installing` or `failed` after it waits for the night); or, by
+       day, the first quiet stretch of a lamp that never tried (no
+       `installing` or `failed` record: one that just took the update with
+       Hermes on, so it is usable the same day; the first builder's day
+       window, 11 Nov on #6059), and a try after it waits for the night; or
+       the quiet hour at night, 01:00 up to 05:00 local
+       (`NIGHT_FROM_MINUTE`, `NIGHT_TO_MINUTE`), in the lamp's zone
+       (`/etc/localtime`, which setup points at the phone's zone, read by
+       `lamp-local-time` as the other parts read it). A wall clock before
+       2026 is not set: no local time, so only the walk's window.
+     Harness's own install is not held by it. lamp-update's sandbox reads
+     all of these: `ProtectSystem=strict` keeps `/var/lib` and `/etc`
+     readable, and `/run/lampos-bus` is among its `ReadWritePaths`.
+   - **Gives way while it runs** (the same thread, every 100 ms, while the
+     record says `installing` and systemd says the one-shot is
+     `activating`):
+     - the voice not quiet (someone heard or answered, the voice not
+       resting, or not seen): the unit's own `cgroup.freeze` (systemd 252 refuses `systemctl freeze` for a oneshot still activating, "Unit has a pending job")
+       journaled `Hermes's
+       install is frozen while the voice is not quiet: <why>`; thawed with
+       `cgroup.freeze` back to 0 once the quiet stretch (10 min) is back. Frozen
+       30 min in all (`MOST_FROZEN`), over one freeze or several, it is
+       stopped as `interrupted`, so with the install's own 7 to 12 min it
+       ends inside the unit's hour (`TimeoutStartSec` counts on while
+       frozen). A freeze or thaw systemd refuses stops it too, so the
+       one-shot is never left frozen; and a `serve` that starts thaws it
+       first, in case one ended mid-freeze;
+     - the privacy reading lost: once a fresh lease with the slide read
+       (or a lamp with no slide) was seen on `voice/privacy`, its newest
+       lease older than 250 ms (`LOST_AFTER`, its life being 50 ms), one
+       that no longer reads the slide, or one from another of the voice's
+       boots (it ended and started again): the one-shot is thawed and
+       stopped at once (`systemctl stop`), and the record written `failed`
+       with `privacy_lost`. A lamp whose voice never said a reading is not
+       judged by it. Looked at every 100 ms, a lapse shorter than that
+       between two looks can be missed; a restart of the voice by an
+       update round during the install stops it too.
+     A stopped install's ask is taken away with it (the one-shot is killed
+     before it could); what it left in `/var/lib/lampos-hermes` is taken up
+     by the next try, as a cut-off try's is, and the entry points are
+     written only as an install ends.
+   - **The one-shot:** `lamp-update harness-install` runs Harness's install
+     when Harness is missing (started for Hermes alone, Harness's record is
+     left as it is), then Hermes's when the ask is there, whatever
+     Harness's install did. The unit's result is Harness's alone: a Hermes
+     failure is journaled and recorded, never the unit's, and never stops
+     Harness or the round. The ask is removed once answered. One Hermes
+     install at a time (`hermes.lock`).
+   - **As `lampos`, Harness's own user,** so Harness's hooks in Hermes's
+     `config.yaml` and its reading of Hermes's sessions work. No other
+     user, no group, no sudo. Hermes's folder is `/var/lib/lampos-hermes`,
+     made `lampos:lampos` 0700 by `install -d` before the installer runs;
+     Hermes's own home (`HERMES_HOME`) is `/var/lib/lampos-hermes/.hermes`,
+     the folder lamp-tasks and Harness's hold file name. Every step of the
+     installer runs as `runuser -u lampos -- env HOME=/var/lib/lampos-hermes
+     HERMES_HOME=/var/lib/lampos-hermes/.hermes PATH=/usr/bin:/bin
+     SHELL=/bin/sh`, so every file it writes, `config.yaml` among them, is
+     `lampos`'s. Its checkout (`.hermes/hermes-agent`), its `uv`, its
+     Python and its dependencies are all under the folder. The lamp has no
+     Python: the installer's `venv` stage fetches its own pinned `uv`
+     (checked by its SHA-256 in the checkout's `pm/lock.json`) and a
+     uv-managed Python, and its package manager installs the dependencies
+     from the checkout's hash-locked `uv.lock`. `hermes` is published at
+     `/var/lib/lampos-hermes/.local/bin/hermes`, on no `PATH`. No unit, no
+     service, no gateway, nothing at boot: Harness starts `hermes` in a
+     pane only when a task is sent to it.
+   - **In a namespace that shows Hermes only its own folders.** Hermes
+     runs shell commands the model chooses. As plain `lampos` they could
+     reach every lamp service run as `lampos`: lamp-cloud's relay key (its
+     systemd credential under `/run/credentials`, and lamp-cloud's state
+     folder), the eyes' `/run/lampos-eyes/permit.sock` (it turns the
+     camera on) and `/var/lib/lampos-eyes/people.json` (the face prints),
+     the body's motors under `/run/lampos-body`, the person's asks in
+     `/var/lib/lampos-tasks/store`, and, through `lampos`'s groups
+     (`video`, `audio`, `dialout`, `i2c`), the camera, mic and serial
+     ports themselves. So Hermes is never run but through two root-owned
+     scripts, 0755, each written whole beside and renamed in, never
+     through a link:
+     - the wrapper `/usr/local/bin/hermes` reads lamp-cloud's local
+       forwarder token, `/var/lib/lampos-cloud/hermes-token` (lamp-cloud
+       makes it, 0600, with `LAMP_HERMES_ON_LAMP=on` in its unit). Missing
+       or empty, it says so and ends with 1, running nothing. Else it
+       exports `LAMP_HERMES_TOKEN` (the variable Hermes's `providers.lamp`
+       reads its key from, as lamp-tasks writes it) and `HERMES_HOME`, and
+       runs `unshare --map-root-user --mount --pid --kill-child
+       --mount-proc --propagation private /usr/local/lib/lampos/hermes-ns`:
+       a PID namespace of its own with its own `/proc`, the wrapper its
+       parent (`--kill-child` forks, and killing the wrapper kills Hermes).
+       Hermes shares `lampos`'s uid with lamp-cloud, so with the lamp's
+       `/proc` it could open lamp-cloud's `/proc/<pid>/root` (lamp-cloud's
+       own mount view, the credentials there), `environ` and `fd`; in its
+       own PID namespace Hermes sees only its own processes, and no lamp
+       process is there to open;
+     - the namespace script `/usr/local/lib/lampos/hermes-ns` refuses to
+       run in the lamp's own user namespace (its `uid_map` the whole
+       range). Then, by an allow-list (`ALLOWED`), as root of that first
+       namespace:
+       1. an empty writable tmpfs of Hermes's own on `/tmp` (256 MB),
+          `/var/tmp` and `/dev/shm` (64 MB each), which are shared on the
+          lamp;
+       2. what stays visible staged on that new `/tmp`: Hermes's folder
+          `/var/lib/lampos-hermes`, its work folder
+          `/var/lib/lampos-tasks/harnesses/lamp-tasks` and the skills
+          `/var/lib/lampOS/skills` bound there (the last two only when
+          there), and the file `/etc/resolv.conf` resolves to when it is
+          under `/run` (such as `/run/systemd/resolve/stub-resolv.conf`),
+          so names still resolve for the web and the forwarder stays on
+          TCP `127.0.0.1:7741`. The work folder is Harness's project
+          `~/harnesses/lamp-tasks` in its home, not only its `lamp`
+          subfolder (where lamp-tasks puts `AGENTS.md` and Harness starts
+          Hermes), as Harness names the project and may start a task in
+          another folder of it; nothing else of lamp-tasks' state folder
+          (its `store`, Harness's own files) is shown;
+       3. an empty tmpfs over `/run`, `/var/lib` and `/etc/lampOS` (when
+          there), the mount points made in it and the staged mounts moved
+          back; the skills and `resolv.conf` remounted read-only (with the
+          flags they had, as a user namespace may only add flags); then
+          the three overlays remounted read-only;
+       4. `/dev/null` bound over every character device matching
+          `/dev/video*`, `/dev/media*`, `/dev/v4l-subdev*`, `/dev/snd/*`,
+          `/dev/ttyACM*`, `/dev/ttyUSB*`, `/dev/ttyS*`, `/dev/ttyAMA*`,
+          `/dev/i2c-*`, `/dev/spidev*`, `/dev/gpiochip*`, `/dev/hidraw*`,
+          `/dev/fb*` and `/dev/dri/*` (a missing one is fine): under
+          `--map-root-user` `setgroups` is denied, so `lampos`'s groups
+          can't be dropped, and the devices are hidden instead;
+       5. back into the folder it was started in through the new mounts
+          (the old one would reach the hidden folders by `..`); a folder
+          not shown ends it;
+       6. `HOME` set to `/var/lib/lampos-hermes` and `unshare --user
+          --map-user=<caller's uid> --map-group=<caller's gid>
+          /var/lib/lampos-hermes/.local/bin/hermes`.
+       In that nested user namespace the mounts are locked: Hermes cannot
+       take them off. Any step failing ends it before Hermes runs.
+     So Hermes sees its own folder, its work folder and the skills
+     (read-only), `resolv.conf`, its own `/tmp` and `/proc`, and the
+     lamp's programs (`/usr`, `/opt/lampOS`); no lamp service's `/run` or
+     `/var/lib` folder (no socket, no state, no credential), no
+     `/etc/lampOS`, no camera, mic, serial, I2C, SPI or GPIO device and no
+     lamp process. A test (`no_lampos_service_folder_is_visible_to_hermes`)
+     reads every `RuntimeDirectory=`, `StateDirectory=` and
+     `ReadWritePaths=` under `/run` or `/var/lib` of the product units run
+     as `lampos`, and the tmpfiles folders made `lampos`'s, and fails if
+     any of them is not hidden, so a new service is hidden with no change.
+     Nothing under `/run` is shown to Hermes here: any reach of the lamp's
+     Hermes into the lamp's skills is #6128's, behind its own switch.
+     Shown on lamp-c0a4 by hand (10 Nov, the earlier deny-list scripts):
+     the key hidden; `umount` refused, nested too. As plain `lampos`, `ls
+     /proc/<lamp-cloud pid>/root/run/credentials/lamp-cloud.service/`
+     lists `account build key`; inside the wrapper's namespaces without
+     the PID namespace it is `Permission denied`, but `/proc/<pid>/fd` is
+     still listable; with `--pid --fork --mount-proc` the lamp-cloud pid
+     does not exist there and only 3 processes are visible. The allow-list
+     scripts are still to be shown there. The relay key never goes into
+     Hermes's environment or its folder; only the forwarder's token does
+     (Hermes keeps snapshots of its shell's environment under its home).
+   - **User namespaces checked first:** before anything is made, `lampos`
+     must be able to make that namespace: `runuser -u lampos --
+     /usr/bin/unshare --map-root-user --mount --pid --kill-child
+     --mount-proc --propagation private /usr/bin/unshare --user --map-user=<uid> --map-group=<gid> true`. It
+     failing is `no_userns`, said with the reason, and nothing is
+     installed: Hermes never runs where it could read the key. lamp-c0a4
+     had kernel 5.15, `user.max_user_namespaces` 15294 and
+     `/usr/bin/unshare`.
+   - **Hermes's own update and lingering turned off:** after the install,
+     as `lampos`, `hermes config set` (Hermes's own writer, which changes
+     that key alone and keeps every other line, Harness's `hooks:` block
+     among them) sets `updates.check false` (no update check of its own,
+     so nothing offers a Hermes past the pin; Hermes applies no update
+     unless `hermes update` is run by hand), `plugins.auto_update_check_hours
+     0`, `lsp.enabled false` (no language servers, which Hermes otherwise
+     starts after an edit and keeps 600 s idle) and
+     `terminal.oneshot_completion_wait_seconds 0` (a `chat -q` run ends
+     with its turn, not up to 600 s later). Its messaging gateway is never
+     installed or started: the installer's `gateway` stage is not run, and
+     nothing runs `hermes gateway`. One not set is `config`. Then
+     `hermes --version` is run as `lampos`, and its first line journaled;
+     failing, `installer`.
+   - **Another Hermes moved aside:** a Hermes in `/var/lib/lampos-hermes`
+     that is not this build's (its checkout at another commit or on a
+     branch, a `hermes` with no checkout at a commit, or the folder
+     another user's) is moved whole to `/var/lib/lampos-hermes.old` before
+     the install, after the free-space check, and removed once the new
+     Hermes has run. A failed install keeps it there; a later try that
+     finds another one in the folder with one aside already removes that
+     one instead. A link at the folder is removed, never followed. A
+     checkout at the pinned commit left by a try that was cut off is kept:
+     the installer repairs it in place.
+   - **Then, in this order:** the namespace script, then the wrapper (so
+     `lampos` never finds a wrapper before what it runs); any not written,
+     or no `/usr/local/lib/lampos` folder, is `entry`. Then the old Hermes
+     removed, and, after an install that ran the installer,
+     `systemctl try-restart lamp-tasks.service`: lamp-tasks merges Hermes's
+     settings at its start (the forwarder as its provider, the lamp's
+     skills), and is started only if it was running. Hermes there at the
+     pin with an older build's wrapper gets its config and both scripts
+     again, with no installer and no restart.
+   - **The one-shot's sandbox:** `ReadWritePaths=/usr/local/bin
+     -/usr/local/lib/lampos` (since #5978; `-`, so a lamp without that
+     folder still installs Harness), `ProtectSystem=full` (so `/var` is
+     writable for Hermes's folder), `TimeoutStartSec=3600`, for Harness's
+     install as well. `/etc` is not writable. It runs at `Nice=10`,
+     `IOSchedulingClass=idle` and `CPUWeight=20`, as lamp-update does, and
+     is capped: `CPUQuota=100%`, writes 8 MB/s and 200 IOPS, reads 16 MB/s
+     and 400 IOPS on `/var/lib`'s card, and `MemoryHigh=600M`: past it
+     the kernel reclaims the one-shot's own memory and throttles it, never
+     kills it (no `MemoryMax`). At `CPUQuota=150%` and `MemoryHigh=1200M`
+     the `products` stage took `MemAvailable` down to about 786 MB on
+     lamp-c0a4 and the voice lost its privacy reading (2 of 2 runs); at
+     100% and 600M it stayed above 1.4 GB, the privacy reading held, and
+     the whole install took 20 min (`products` 531 s) on 11 Nov. On lamp-c0a4 on 10 Nov a Hermes
+     install at the default priority stalled lamp-controls' loop 93 ms past
+     the privacy reading's 50 ms, and the voice kept the microphones closed
+     until it was restarted. The lower priority alone did not stop it: the
+     card's scheduler is `none`, so the idle I/O class has no effect, and the
+     install's 2.4 GB of writes (the Python packages above all) took the card.
+   - **Taken out:** a failed install takes the wrapper and the namespace
+     script out, the wrapper first, so `lampos` finds no `hermes`. With the
+     switch off, a reached round that finds either writes the ask with
+     `"remove": true` and starts the one-shot, which takes them out with
+     the record and runs nothing else. Hermes's folder stays.
+   - **Pinned:** the installer of hermes-agent's tag `v0.22.2`
+     (`scripts/install.sh` at the pinned commit) is compiled in, a
+     byte-for-byte copy at `deploy/hermes/install-v0.22.2-f4cdb0e2.sh`,
+     with its SHA-256 (`INSTALLER_SHA256`, `f4cdb0e2…`). It is checked
+     before anything runs, written as `hermes-install.sh` in a new folder
+     under the one-shot's private `/tmp` (root's, folder 0755, file 0644),
+     checked again, run with `bash`, and removed after; other bytes are
+     `pin_mismatch` and nothing runs. The commit is the tag `v0.22.2`,
+     `d923a5eb487a17c0a68801bba9ef0f56c81040a8` on `main` (`COMMIT`),
+     passed as the installer's own pin, `--branch main --commit <COMMIT>`:
+     the installer checks the commit is on `main`, checks it out detached,
+     and looks up no release. After it, the checkout's commit is read;
+     another is `failed` with `version`. Why 0.22.2: Harness takes no
+     session id of Hermes 0.22.3 or later until openharness main's fix is
+     in a Harness release. A new Hermes is a PR that copies the installer
+     again and updates `COMMIT`, `VERSION` and `INSTALLER_SHA256`; a test
+     holds them to the file. Harness's Hermes binding needs Harness 0.5.98
+     or later; this build's Harness pin is still 0.5.39
+     (`harness_install::product::VERSION`), so the pin must move in the
+     same release (#5957).
+   - **The stages:** `prerequisites repository venv python-deps config
+     products`, each run alone (`--stage`) with `--non-interactive
+     --skip-browser --skip-computer-use`, each stage's time journaled.
+     Version 1's list (`runtimes/hermes/install.sh` in the autonomous
+     repo) skipped `node-deps`, which hung on ARM; this installer has no
+     such stage: its `products` stage publishes the command, and Node's
+     tools come through its package manager only as a build asks for them.
+     `setup` and `gateway` need a person and are not run; `complete` writes
+     only a marker. Each stage has the installer's 15-min bound
+     and the 30 min it may be kept frozen while someone speaks
+     (`HERMES_STAGE_WITHIN`, 45 min: a stage's clock goes on while frozen,
+     and on c0a4 a products stage frozen 21 min was taken for timed out
+     the moment it thawed); the unit's is an hour for Harness and Hermes
+     together.
+   - **Memory first:** before anything is moved or made, and before the
+     disk is looked at, `MemAvailable` in `/proc/meminfo` must be at least
+     1 GiB (`NEEDS_AVAILABLE_KB`, 1,048,576 kB); less, or it not read (no
+     file, no such line, not a number in kB), is `no_memory` and nothing
+     is changed. The floor is from lamp-c0a4 on 10 Nov, which had about
+     2.1 GB available at rest with the voice running; the install's own
+     peak is still to be measured. pip's `python-deps` stage is the heavy
+     one.
+   - **Free space next:** before anything is moved or made, `df -Pk
+     /var/lib` must show at least 4 GiB available (`NEEDS_FREE_KB`); less,
+     or `df` not read, is `no_space` and nothing is changed. Hermes v0.22.2
+     took 3.0 GB on lamp-c0a4. The check reads the file system's free
+     space alone: a partial `/var/lib/lampos-hermes` or a
+     `/var/lib/lampos-hermes.old` left by a failed try is not counted as
+     room the install gets back, so their space is taken off the 4 GiB
+     like any other file's. Neither check runs when Hermes is already
+     there at the pin in a `lampos` folder (the try only repairs the
+     entry points and config then).
+   - **Disk on a 16 GB card:** the lampOS image plus Harness and Hermes
+     use about 7.0 GB (Hermes's folder about 2.4 GB of it), leaving
+     roughly 7–8 GB free. Measured on lamp-c0a4 (10 Nov): 13.1 GB used on
+     its 58 GB card, of which 6.1 GB were test copies, so about 7.0 GB
+     for the product.
+   - **What the lamp must have:** `git`, `curl` and `bash`, looked for as
+     `lampos` with the install's `PATH`, and `/usr/bin/unshare`, before the
+     installer runs (`no_tools` otherwise). Nothing is added to the system
+     for them.
+   - **The record:** `hermes-install.json` in the records, next to
+     Harness's, `{"install", "revision", "at_unix_ms", "version"?,
+     "commit"?, "error"?}`, lamp-update's own (not on `update/status`
+     yet). `install` is `absent`, `installing`, `installed` or `failed`;
+     `error` one of `pin_mismatch`, `no_user`, `no_space`, `no_memory`,
+     `no_tools`,
+     `no_userns`, `serve` (one of lamp-update's own steps: the installer's
+     file, moving the old Hermes aside, making the folder), `timeout`,
+     `installer`, `version`, `config`, `entry`, `not_started`,
+     `privacy_lost` and `interrupted` (stopped by the watch above); `version`
+     and `commit` with `installed`. Switch off, `serve` removes the record
+     and the ask at its start; the entry points go as above.
+   - **Tried again** by the first reached round 24 h after a failure
+     (`RETRY_AFTER`), or after `installing` for over 70 min; `serve`,
+     `not_started`, `privacy_lost` and `interrupted` at the next round
+     whose window is open (`RETRY_IN_NEXT_WINDOW`): a failure after the
+     walk's window is tried in the quiet hour at night. Every retry waits
+     for its window. A failed install takes out the
+     wrapper and the namespace script, but keeps its partial
+     `/var/lib/lampos-hermes` (up to about 2.4 GB) until that retry 24 h
+     later, which continues it when its checkout is at the pin or not made
+     yet, and moves it aside (or removes it) otherwise; a `/var/lib/lampos-hermes.old` set aside
+     before the failure stays until a later install's new Hermes runs.
+   - **The parts' units** (`deploy/product`): unchanged; none sets
+     `LAMP_HERMES_ON_LAMP` in this change: lamp-update installs the
+     product's Hermes by its own default (on since the product owner's
+     decision, 10 Nov, with the window above), and
+     `LAMP_HERMES_ON_LAMP=off` in its unit turns that off. lamp-cloud's
+     forwarder (`LAMP_HERMES_ON_LAMP=on` in `lamp-cloud.service`, which
+     writes only its own state folder, so it needs no other path and no
+     group) and lamp-tasks' side (`lamp-tasks.service`) are turned on by
+     the units' own change. lamp-tasks' `--engines-from-machines` (without
+     it the lamp's own Hermes is never looked for, and the lamp is no
+     target) and `--reply-named`, `LAMP_TASKS_REPLY_NAMED` (lamp-voice) and
+     `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) come with the routing that
+     reads them (#6094).
+   - **Shown only in tests** (`hermes_install::tests`,
+     `hermes_schedule::tests`, the wrapper and the namespace script run by
+     `sh` there too). Not run on a lamp yet: the whole install by
+     lamp-update, its window, a freeze and thaw, and a stop on a lost
+     privacy reading. Measured by hand on lamp-c0a4 (10 Nov,
+     the same installer as `lampos`, the same six stages): 557 s in all,
+     +3.0 GB, inside each stage's 15-min bound and the unit's hour.
 
    **Undone by `lamp-update harness-off`** (as root, #811; the first
    builder's yes on #705, 18 Oct): with that record, as `lampos` with the
@@ -1473,7 +1951,7 @@ It writes each skill of `install::PRODUCT_SKILLS` at REV into
 `tests/` and hidden files, 0644 in 0755 folders, and the skills of
 `install::PRODUCT_SKILLS_OFF` with `install::OFF_LINE` above their
 `skill.toml`. A skill the build ships off (that line, or its own
-`enabled = false`, as Bedtime and Morning) that the lamp has turned on
+`enabled = false`, as Comfort break) that the lamp has turned on
 stays on, as a round keeps it (`product_skills::keep_turned_on`): when the
 lamp's `skill.toml` turns it on, or lamp-skills' `on` (in its
 `--state-dir`) names it and the lamp's file is missing or still the
@@ -1902,12 +2380,13 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   `LAMP_SKILLS_ASK=skip` until the Policy's gate (#939). Only in tests: no
   lamp has run the product unit with them yet, and Reminders and Task news
   have not run as skills on any lamp.
-- Bedtime and Morning (#1672): an installed skill that is disabled.
-  Host installation tests check that nineteen skills are active, the new
-  skill is absent from the live catalog, and the Skills and Actions units
-  declare their private durable paths without enabling any new switch.
-  The directories' creation by systemd and the routine's behavior on a lamp
-  still need the comparison recorded in [bedtime-morning.md](bedtime-morning.md).
+- Bedtime and Morning (#1672): an installed skill, enabled since #5753.
+  Host installation tests check that it is live with no function of its
+  own, that the Skills and Actions units declare their private durable
+  paths, and that `LAMP_OUTPUT_CAPS=on` is in the Actions, Skills and voice
+  units (`the_product_runs_bedtime_and_morning_with_its_night_caps`). Its
+  nights on lamp-06c1 are #2803 and #2804; a played row on the product
+  build is still owed (#5753).
 
 ## Prepare-to-unplug core skill (#1674)
 

@@ -4,7 +4,10 @@
 #   [Service]
 #   Environment=LAMP_CONTROL=on
 # as a drop-in and restarts it. Off, `serve` says so and exits 0 with nothing listening.
-# No --manage-socket: skill push comes on in its own pull request, after this one. The body's
+# Skill push on (--manage-socket, docs/control.md "Skills pushed from a computer"): a paired computer
+# with the `skills` grant pushes, lists and removes its own skills through root's manage helper
+# (lamp-skills-manage.socket), which reads the push from --state-dir's push/ and installs it into
+# /var/lib/lampOS/skills-dev for lamp-skills. The body's
 # lease socket is opened by the product lamp-body unit (#4568); until it is there, lamp-control
 # retries it and `look` is refused as the body not reachable.
 [Unit]
@@ -12,7 +15,7 @@ Description=lampOS control (lamp-control)
 PartOf=lampos.target
 # Not before setup has finished (#806). The target's own condition holds back none of its parts.
 ConditionPathExists=/var/lib/lampos-setup/done
-After=local-fs.target network-online.target lamp-voice.service lamp-body.service lamp-actions.service
+After=local-fs.target network-online.target lamp-voice.service lamp-body.service lamp-actions.service lamp-skills-manage.socket
 StartLimitIntervalSec=600
 StartLimitBurst=5
 
@@ -23,9 +26,9 @@ Group=lampos
 Slice=lampos-parts.slice
 Nice=10
 # Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
-# the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`)
-# and the ring's light requests on the bus.
-ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --lease-socket /run/lampos-body/lease.sock --say-socket /run/lampos-say/say.sock --actions-socket /run/lampos-actions/call.sock --bus-root /run/lampos-bus
+# the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`),
+# root's skills manage helper (skill push) and the ring's light requests on the bus.
+ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --lease-socket /run/lampos-body/lease.sock --say-socket /run/lampos-say/say.sock --actions-socket /run/lampos-actions/call.sock --manage-socket /run/lampos-skills-manage/manage.sock --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

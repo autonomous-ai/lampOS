@@ -151,8 +151,9 @@ Keys of a trigger:
 - Timing: `for` (the test holds this long), `absent_for`, `gap`,
   `cooldown`, `wait` (at most 1 h), `rise = { by, within }`,
   `rearm` (`"leaves"`, `"ends"`, or `{ above | below, for }`).
-- `during` (a window), `once_per_day` (with a `name` and `during`),
-  `unless_heard`.
+- `during` (a window), `days` (with `during`: `["mon", "fri"]`,
+  `"weekdays"` or `"weekend"`, the days the window opens on),
+  `once_per_day` (with a `name` and `during`), `unless_heard`.
 - `yields_to = { skill, trigger }`: it gives way to another skill's
   trigger.
 - `sooner = { topic, field, above, for }`: a shorter `for` while that
@@ -162,6 +163,11 @@ Keys of a trigger:
 - `instead_of = "NAME"`: with `once_per_day`, this trigger's run takes the
   chance of a later trigger of the skill on the same topic, whose cooldown
   begins then: one run, not two (#5207, Welcome back's day's first hello).
+- `stands_in_for_group = true`: with `follows`, in a skill with a
+  `[budget]` group, this word stands in for the group's other nudges: while
+  it is still to come their due chances wait (never a `warning`), and their
+  cooldowns begin with the word. A window that closes without the word
+  holds nothing again until it runs (#5620, Quiet focus).
 
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on

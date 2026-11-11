@@ -958,8 +958,9 @@ fn owner<C: Clock>(
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
-    // Dropped before `waits` and the engine: every `watch` child is killed
-    // and reaped when the owner ends, however it ends.
+    // Declared before `waits`, so dropped after it, but still before the
+    // engine: every `watch` child is killed and reaped when the owner ends,
+    // however it ends.
     let mut follows = Follows::new(watch_lane);
     let mut waits = Waits::new(lane);
     // Progress lives here, beside the engine, and only in memory: what an
@@ -2825,7 +2826,8 @@ fn publish<T: serde::Serialize>(out: &mut Publisher, value: &T, errors: &mut u64
 
 /// How the production adapter calls Harness: `serve`'s switches for it
 /// (`--harness-as-person`, `--folder-missing`, `--engines-ready`,
-/// `--route`, `--absolute-folder`), each [`CliConfig`]'s field of that
+/// `--route`, `--reply-named`, `--absolute-folder`), each [`CliConfig`]'s
+/// field of that
 /// name, and `--new-folder`, which keeps the folders seen in
 /// [`NEW_FOLDER_FILE`] of the tasks folder.
 #[derive(Clone, Copy, Debug, Default)]
@@ -2834,6 +2836,7 @@ pub struct HarnessSwitches {
     pub folder_missing: bool,
     pub engines_ready: bool,
     pub route: bool,
+    pub reply_named: bool,
     pub absolute_folder: bool,
     pub new_folder: bool,
 }
@@ -2855,6 +2858,7 @@ impl HarnessSwitches {
         cli.folder_missing = self.folder_missing;
         cli.engines_ready = self.engines_ready;
         cli.route = self.route;
+        cli.reply_named = self.reply_named;
         cli.absolute_folder = self.absolute_folder;
         cli.new_folder = (self.new_folder || from_machines).then(|| dir.join(NEW_FOLDER_FILE));
         cli.new_folder_only = (!self.new_folder && from_machines).then(|| MACHINES_PROJECT.into());

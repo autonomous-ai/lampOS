@@ -1,0 +1,5 @@
+# lamp-06c1, read at rest with torque off by lamp-body-measure --seated, 2026-11-09T02:00Z.
+# At rest: yaw 2034, shoulder 2050, elbow 2059, roll 2057, pitch 1772; the pitch servo's limits 1451-3067.
+# The servos' own limits: yaw 0-4095, shoulder 0-4095, elbow 0-4095, roll 0-4095, pitch 1451-3067.
+# SEATED: the first stand is not confirmed by a person yet, so no stand and no folded arm; torque is taken on the head and base only. home: found at rest. pitch-window: the default, checked. gaze: NOT measured.
+BODY_POSES="--home 1772,2057,2034 --pitch-window 1740,2030 --torque on"

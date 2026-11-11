@@ -179,6 +179,14 @@ pub struct Launch {
     pub name: String,
     pub prompt: String,
     pub target: Target,
+    /// The session the person named for this work, its name as they said it
+    /// ("docs", "docs update"), #5535: with `serve --reply-named` the words go into that
+    /// session on the target's computer, never a new one
+    /// ([`Cli::reply_named`]). Absent when none was named, and then the
+    /// launch, its digest and the stored task are as before; a stored task
+    /// that has one needs schema 5.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -188,10 +196,15 @@ pub enum LaunchOutcome {
         agent_id: String,
     },
     /// The task's words were typed into a session the person already had,
-    /// which Harness's router chose (`serve --route`): its agent is that
-    /// session, which the lamp never closes.
+    /// which Harness's router chose (`serve --route`) or the person named
+    /// (`serve --reply-named`): its agent is that session, which the lamp
+    /// never closes.
     Joined {
         agent_id: String,
+        /// Which of the person's sessions it is, as they would know it, for
+        /// one they named ([`Cli::reply_named`]); none for the router's.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session: Option<JoinedSession>,
     },
     Pending {
         creation_id: String,
@@ -202,6 +215,20 @@ pub enum LaunchOutcome {
     Uncertain {
         code: String,
     },
+}
+
+/// The person's own session a named hand-over was typed into, as they
+/// would know it: its name, or its folder's last part when it has none,
+/// never a lamp-made `lamp-<hex>` one, and the first thing it was asked, cut
+/// at a word. Kept on the task so the voice says which session took the
+/// work and a wrong join is heard at once (the Reviewer-lead's P2 on #5784
+/// at 71bf964baa). At least one is there.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct JoinedSession {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<String>,
 }
 
 /// How closing one harness this lamp started went (#1390).
@@ -363,6 +390,9 @@ pub const ENGINES_KEPT: Duration = Duration::from_secs(300);
 /// answers in 0.4 to 0.7 s and is bounded at 8 s; from a lamp, the read of
 /// that computer's sessions and the typing in come on top.
 pub const ROUTE_TIMEOUT: Duration = Duration::from_secs(20);
+/// The longest session words a launch may carry (#5535): a name or a few
+/// words said for one, never a task.
+pub const MOST_SESSION_BYTES: usize = 128;
 /// How often a Devin just started is looked at until it is idle, for its
 /// first message ([`Cli::first_message`]).
 const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
@@ -483,6 +513,13 @@ impl Launch {
         {
             return Err("invalid_prompt".into());
         }
+        if let Some(session) = &self.session
+            && (session.trim().is_empty()
+                || session.len() > MOST_SESSION_BYTES
+                || session.chars().any(char::is_control))
+        {
+            return Err("invalid_session".into());
+        }
         Ok(())
     }
 }
@@ -522,6 +559,12 @@ pub struct CliConfig {
     /// [`Cli::route_first`]). Off unless set (`serve --route`): `new`, as
     /// before.
     pub route: bool,
+    /// A task whose launch names a session (#5535) is typed into that
+    /// session on the target's computer with `harness reply`, found among
+    /// that computer's sessions by name or folder ([`Cli::reply_named`]);
+    /// it is never started new. Off unless set (`serve --reply-named`): a
+    /// launch that names a session is not sent (`reply_named_off`).
+    pub reply_named: bool,
     /// A `~/…` target folder is sent as the absolute folder on that
     /// computer once its home is known, learned from the folder an earlier
     /// `new` there reports it started in ([`Cli::folder_of`], P4 step 1).
@@ -614,6 +657,7 @@ impl CliConfig {
             folder_missing: false,
             engines_ready: false,
             route: false,
+            reply_named: false,
             absolute_folder: false,
             new_folder: None,
             new_folder_only: None,
@@ -812,6 +856,10 @@ impl Cli {
         if let Err(code) = launch.validate() {
             return not_sent(&code);
         }
+        // A session named with the switch off: never a new one in its place.
+        if launch.session.is_some() && !self.config.reply_named {
+            return not_sent("reply_named_off");
+        }
         let Ok(_guard) = self.operation.try_lock() else {
             return not_sent("busy");
         };
@@ -840,6 +888,11 @@ impl Cli {
         }
         if let Err(code) = machines(&preflight.stdout, &launch.target.machine_id) {
             return not_sent(code);
+        }
+        // The session the person named is already there: its engine is not
+        // asked about, nothing is routed, and nothing is started.
+        if let Some(session) = &launch.session {
+            return self.reply_named(launch, session, seen);
         }
         if self.config.engines_ready
             && let Some(code) = self.engine_refusal(&launch.target, seen)
@@ -1039,7 +1092,10 @@ impl Cli {
                     "tasks: {}: routed to a session already there, in {ms} ms",
                     launch.name
                 );
-                Some(LaunchOutcome::Joined { agent_id })
+                Some(LaunchOutcome::Joined {
+                    agent_id,
+                    session: None,
+                })
             }
             Routed::Busy => {
                 eprintln!(
@@ -1058,6 +1114,102 @@ impl Cli {
                 None
             }
             Routed::Unsure => uncertain("route_uncertain"),
+        }
+    }
+
+    /// #5535, `serve --reply-named`: the session the person named, found
+    /// among the target computer's sessions (`harness ps --all`, the ones
+    /// stopped this week too) by its name or its folder's, and the words
+    /// typed into it with `harness reply`, as the person would type them
+    /// (behind their own `programs-reply` switch). Taken, it is the task's
+    /// agent (`joined`), which the lamp never closes. Nothing else is ever
+    /// started in its place, so each other end is not sent, with why:
+    /// `session_not_found`, `session_ambiguous` (more than one live one
+    /// fits, or, by its work, a live one and a stopped one), `session_stopped` (only a stopped one fits), `session_busy`
+    /// (working, or asking the person something), the reply's refusal
+    /// (`reply_off`, `reply_not_idle`, `reply_not_running`, `reply_failed`),
+    /// or `sessions_…` when the list can't be read. A reply that started and
+    /// gave no answer, or one Harness took whose answer can't be read or
+    /// names another session, may have typed, so it is uncertain
+    /// (`reply_uncertain`), never sent again.
+    fn reply_named(&self, launch: &Launch, session: &str, seen: &mut Seen) -> LaunchOutcome {
+        let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
+        let began = Instant::now();
+        let listed = self.run(
+            &[
+                "ps".into(),
+                "--machine".into(),
+                launch.target.machine_id.clone().into(),
+                "--all".into(),
+                "--json".into(),
+            ],
+            // The launch's own bound, not the 10 s read bound: on
+            // lamp-c0a4 on 9 Nov, `ps --all` of the person's Mac took 4.5 to
+            // 10 s, and two hand-overs a person had said yes to twice ran
+            // out at 10 s (`sessions_timeout`). The reply below gets what is
+            // left of the same bound.
+            self.config.launch_timeout,
+        );
+        seen.took(&listed);
+        let (agent_id, joined) = match listed {
+            Ok(reply) if reply.success => match named_session(&reply.stdout, session) {
+                Named::Idle(agent_id, joined) => (agent_id, joined),
+                Named::Refused(code) => {
+                    eprintln!(
+                        "tasks: {}: the named session: {code}, not sent",
+                        launch.name
+                    );
+                    return not_sent(code);
+                }
+            },
+            Ok(_) => return not_sent("sessions_failed"),
+            Err(error) if error.code == "cancelled" => return not_sent("cancelled"),
+            Err(error) => return not_sent(&format!("sessions_{}", error.code)),
+        };
+        let left = self.config.launch_timeout.saturating_sub(began.elapsed());
+        // A list that took nearly the whole bound leaves the reply no time
+        // to answer, and a reply cut short may have typed: under
+        // `REPLY_FLOOR` left, nothing is typed (the Reviewer-lead's P3 on
+        // #5784 at 71bf964baa).
+        if left < REPLY_FLOOR {
+            return not_sent("sessions_timeout");
+        }
+        let reply = self.run(
+            &[
+                "reply".into(),
+                "--machine".into(),
+                launch.target.machine_id.clone().into(),
+                agent_id.clone().into(),
+                "--json".into(),
+                "--".into(),
+                launch.prompt.clone().into(),
+            ],
+            left,
+        );
+        seen.took(&reply);
+        let ms = began.elapsed().as_millis();
+        match reply {
+            Ok(reply) if reply.success && replied(&reply.stdout, &agent_id) => {
+                eprintln!(
+                    "tasks: {}: typed into the named session, in {ms} ms",
+                    launch.name
+                );
+                LaunchOutcome::Joined {
+                    agent_id,
+                    session: joined,
+                }
+            }
+            // Taken by Harness, and an answer that can't say for this
+            // session: the words may be there, so never asked again (the
+            // Reviewer-lead's P3 on #5779).
+            Ok(reply) if reply.success => uncertain("reply_uncertain"),
+            // Refused, or its machine did not take the words: nothing typed.
+            Ok(reply) => not_sent(reply_refusal(&reply.stdout)),
+            Err(error) if error.code == "cancelled" => uncertain("cancelled"),
+            // Started, and stopped before it answered: it may have typed.
+            Err(error) if error.spawned => uncertain("reply_uncertain"),
+            Err(error) => not_sent(&format!("reply_{}", error.code)),
         }
     }
 
@@ -3137,6 +3289,248 @@ fn route_answer(bytes: &[u8]) -> Routed {
         },
         _ => Routed::Unsure,
     }
+}
+
+/// What `harness ps --all --json` says of the session the person named.
+#[derive(Debug, PartialEq, Eq)]
+enum Named {
+    /// One live session fits and it is idle: its id, and how the person
+    /// would know it.
+    Idle(String, Option<JoinedSession>),
+    /// Why nothing is typed.
+    Refused(&'static str),
+}
+
+/// A name or folder as the person might say it: lowercase letters and
+/// digits only, in any script, so "Docs-Update", "docs update" and
+/// "docs_update" are one.
+fn session_words(text: &str) -> String {
+    words_of(text).concat()
+}
+
+/// The words of a name, folder or what was said: runs of letters and
+/// digits, lowercased.
+fn words_of(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// The session the person named among a computer's (#5535): a row fits
+/// when its name or its folder's last part is the words said, or, when no
+/// row is that, when each word said begins one of its words, in order
+/// ("docs" fits "Docs-Update"; "api" never fits "rapid-prototype": the
+/// Reviewer-lead's P2 on #5779), or, when none is, by what it worked on
+/// ([`by_its_work`]). Of those that fit, one live session is
+/// the one; a stopped one is said to be stopped; more than one live is
+/// asked about, never guessed.
+fn named_session(bytes: &[u8], session: &str) -> Named {
+    let Ok(answer) = serde_json::from_slice::<Value>(bytes) else {
+        return Named::Refused("sessions_failed");
+    };
+    let Some(rows) = answer["harnesses"].as_array() else {
+        return Named::Refused("sessions_failed");
+    };
+    let said = session_words(session);
+    if said.is_empty() {
+        return Named::Refused("session_not_found");
+    }
+    let said_words = words_of(session);
+    let parts = |row: &Value| -> [String; 2] {
+        let folder = row["folder"]
+            .as_str()
+            .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
+            .unwrap_or_default();
+        [
+            row["name"].as_str().unwrap_or_default().to_owned(),
+            folder.to_owned(),
+        ]
+    };
+    let names = |row: &Value| parts(row).map(|part| session_words(&part));
+    // Each word said begins a word of the name, in order.
+    let begins = |part: &str| {
+        let mut words = words_of(part).into_iter();
+        said_words
+            .iter()
+            .all(|said| words.any(|word| word.starts_with(said.as_str())))
+    };
+    let exact: Vec<&Value> = rows
+        .iter()
+        .filter(|row| names(row).contains(&said))
+        .collect();
+    let fits: Vec<&Value> = if exact.is_empty() && said.chars().count() >= 3 {
+        rows.iter()
+            .filter(|row| parts(row).iter().any(|part| begins(part)))
+            .collect()
+    } else {
+        exact
+    };
+    // No name or folder is it: what the person said is what the session
+    // worked on ("the book program one"), found in what it was asked and
+    // what it says it did (the owner, 9 Nov: a person remembers the work,
+    // never a session's name or id).
+    let by_work = fits.is_empty();
+    let fits = if by_work {
+        by_its_work(rows, &said_words)
+    } else {
+        fits
+    };
+    let gone = |row: &&Value| {
+        matches!(
+            row["state"].as_str(),
+            Some("stopped" | "failed" | "offline")
+        )
+    };
+    let live: Vec<&Value> = fits.iter().copied().filter(|row| !gone(row)).collect();
+    // Found by its work, a live session and a stopped one that both hold
+    // the words are not told apart: the one meant may be the stopped one,
+    // so neither is typed into (the Reviewer-lead's P2 on #5784 at
+    // 71bf964baa).
+    if by_work && !live.is_empty() && live.len() < fits.len() {
+        return Named::Refused("session_ambiguous");
+    }
+    match live.as_slice() {
+        [] if fits.is_empty() => Named::Refused("session_not_found"),
+        [] => Named::Refused("session_stopped"),
+        [row] => match (row["id"].as_str(), row["state"].as_str()) {
+            (Some(id), Some("idle")) if agent_id(id) => {
+                Named::Idle(id.to_owned(), joined_session(row))
+            }
+            (Some(id), _) if agent_id(id) => Named::Refused("session_busy"),
+            _ => Named::Refused("sessions_failed"),
+        },
+        _ => Named::Refused("session_ambiguous"),
+    }
+}
+
+/// The most characters of a joined session's first ask kept on its task
+/// ([`JoinedSession`]): enough to know the work by, never the whole of it.
+const MOST_JOINED_ASK_CHARS: usize = 80;
+
+/// Whether a session's name is one the lamp made (`lamp-` and hex, as
+/// `engine::task_label` makes them): it names no work the person knows.
+fn lamp_made(name: &str) -> bool {
+    name.strip_prefix("lamp-")
+        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_hexdigit()))
+}
+
+/// How the person would know a `harness ps` row ([`JoinedSession`]): its
+/// name, or, with none, its folder's last part, never a lamp-made one; a
+/// lamp-made session's folder is the lamp's target folder, the same for
+/// every task it hands over, so it tells nothing apart. And the first thing
+/// it was asked, on one line, cut at a word to [`MOST_JOINED_ASK_CHARS`]
+/// with "…". None when it has neither.
+fn joined_session(row: &Value) -> Option<JoinedSession> {
+    let flat = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let name = flat(row["name"].as_str().unwrap_or_default());
+    let name = if name.is_empty() {
+        row["folder"]
+            .as_str()
+            .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
+            .map(flat)
+            .unwrap_or_default()
+    } else {
+        name
+    };
+    let name = (!name.is_empty() && !lamp_made(&name)).then_some(name);
+    let ask = row["asks"]
+        .as_array()
+        .and_then(|asks| asks.first())
+        .and_then(Value::as_str)
+        .map(flat)
+        .filter(|ask| !ask.is_empty())
+        .map(|ask| cut_at_word(&ask, MOST_JOINED_ASK_CHARS));
+    (name.is_some() || ask.is_some()).then_some(JoinedSession { name, ask })
+}
+
+/// `text` whole when it is at most `most` characters, else cut at the last
+/// space that leaves room for "…" (at a character when it has none), and
+/// "…": at most `most` characters either way.
+fn cut_at_word(text: &str, most: usize) -> String {
+    if text.chars().count() <= most {
+        return text.to_owned();
+    }
+    // `most` characters: a space at the last of them still leaves room.
+    let kept: String = text.chars().take(most).collect();
+    let cut = match kept.rfind(' ').filter(|at| *at > 0) {
+        Some(at) => kept[..at].to_owned(),
+        None => kept.chars().take(most.saturating_sub(1)).collect(),
+    };
+    format!("{}…", cut.trim_end())
+}
+
+/// Words that say which session, not what it did: "the one from before",
+/// "my earlier session", "that thing you did".
+const NOT_THE_WORK: [&str; 40] = [
+    "a", "an", "the", "one", "ones", "session", "sessions", "my", "your", "our", "that", "this",
+    "which", "where", "who", "in", "on", "of", "for", "to", "with", "about", "from", "earlier",
+    "before", "last", "previous", "other", "did", "do", "made", "was", "is", "it", "you", "we",
+    "i", "thing", "work", "and",
+];
+
+/// Endings a word of a session's work may add to a word said, or the
+/// other way round: "book" is "books", "fix" is "fixed", "test" is
+/// "tests" but never "testament", "note" never "notebook" (the
+/// Reviewer-lead's P2 on #5784 at de9bebdb41). A word said under
+/// [`SHORTEST_STEM`] letters takes no ending.
+const ENDINGS: [&str; 6] = ["s", "es", "ed", "ing", "er", "ers"];
+
+/// The least time a named session's `harness reply` is given after its
+/// list ([`Cli::reply_named`]): less than this left of the launch bound is
+/// `sessions_timeout`, nothing typed.
+const REPLY_FLOOR: Duration = Duration::from_secs(1);
+
+/// The fewest letters a word needs before an ending may follow it: "us"
+/// is never "user", nor "it" "items" (Reviewer-three's P2 on #5784 at
+/// 71bf964baa); two letters are an acronym or a stop word, held only as
+/// they are.
+const SHORTEST_STEM: usize = 3;
+
+/// Whether a word said stands for a word of a session's work: the same
+/// word, or the same word with one of [`ENDINGS`].
+fn same_word(said: &str, word: &str) -> bool {
+    let (short, long) = if said.len() <= word.len() {
+        (said, word)
+    } else {
+        (word, said)
+    };
+    short == long
+        || short.len() >= SHORTEST_STEM
+            && long
+                .strip_prefix(short)
+                .is_some_and(|ending| ENDINGS.contains(&ending))
+}
+
+/// The session whose work is what the person said (#5535): each row's
+/// `asks` and `about` against the words said that name work
+/// ([`NOT_THE_WORK`] left out). Its name and folder are not read here: a
+/// name is matched only as [`named_session`] matches it, word starts in
+/// order, so "client api" never finds "Fix the API client". A row fits
+/// only when it holds every one of those words ([`same_word`]): "the
+/// payroll dashboard one" never finds a weather dashboard on "dashboard"
+/// alone (Reviewer-three's P2 on #5784 at 3d90e56736). Every fitting row
+/// is given back, live or stopped: [`named_session`] says a stopped one is
+/// stopped, and more than one fitting, a live one beside a stopped one
+/// too, is asked about, never guessed.
+fn by_its_work<'a>(rows: &'a [Value], said_words: &[String]) -> Vec<&'a Value> {
+    let work: Vec<&str> = said_words
+        .iter()
+        .map(String::as_str)
+        .filter(|word| !NOT_THE_WORK.contains(word))
+        .collect();
+    if work.is_empty() {
+        return Vec::new();
+    }
+    let holds_all = |row: &Value| -> bool {
+        let mut text: Vec<String> = words_of(row["about"].as_str().unwrap_or_default());
+        for ask in row["asks"].as_array().into_iter().flatten() {
+            text.extend(words_of(ask.as_str().unwrap_or_default()));
+        }
+        work.iter()
+            .all(|said| text.iter().any(|word| same_word(said, word)))
+    };
+    rows.iter().filter(|row| holds_all(row)).collect()
 }
 
 /// Whether `harness reply --json` took the words for `agent_id`: queued in

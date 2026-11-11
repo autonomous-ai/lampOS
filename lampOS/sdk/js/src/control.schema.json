@@ -22,12 +22,12 @@
       "maximum": 9007199254740991
     },
     "time": {
-      "description": "The lamp's local time with its offset (RFC 3339).",
+      "description": "A time in UTC, RFC 3339 with `Z` (`2026-10-27T08:40:01Z`), as lamp-control writes it; a client turns it into local time itself.",
       "type": "string",
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound, never while the lamp is private (not routed yet).",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
       "enum": [
         "body",
         "light",
@@ -39,7 +39,9 @@
         "air",
         "device",
         "camera",
-        "microphone"
+        "microphone",
+        "notes",
+        "speech"
       ]
     },
     "part": {
@@ -64,8 +66,10 @@
         "button",
         "time",
         "lamp.changed",
+        "body.state",
         "air.changed",
-        "volume.changed"
+        "volume.changed",
+        "lamp.said"
       ]
     },
     "state_name": {
@@ -209,6 +213,18 @@
           "$ref": "#/$defs/sound.remove"
         },
         {
+          "$ref": "#/$defs/notes.set"
+        },
+        {
+          "$ref": "#/$defs/notes.get"
+        },
+        {
+          "$ref": "#/$defs/notes.delete"
+        },
+        {
+          "$ref": "#/$defs/notes.list"
+        },
+        {
           "$ref": "#/$defs/volume"
         },
         {
@@ -237,6 +253,9 @@
         },
         {
           "$ref": "#/$defs/listen.set"
+        },
+        {
+          "$ref": "#/$defs/microphone.stream"
         }
       ]
     },
@@ -973,6 +992,97 @@
       ],
       "additionalProperties": false
     },
+    "notes_key": {
+      "description": "A note's key: 1 to 64 bytes of letters, digits and . _ : -.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,64}$"
+    },
+    "notes.set": {
+      "description": "Keeps a note of this computer's own under a key, over one of the same key: the reply's key and bytes (the value serialized). The value is any JSON, at most 16384 bytes serialized; a computer keeps at most 256 keys and 262144 bytes of keys and values in all (hello's limits.notes). Needs the notes grant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.set"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        },
+        "value": {}
+      },
+      "required": [
+        "id",
+        "op",
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "notes.get": {
+      "description": "One of this computer's own notes: the reply's key, found and, when found, value. A key not kept is found false, not an error.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.get"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "notes.delete": {
+      "description": "One of this computer's own notes dropped: the reply's key and deleted (false when it was not kept).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.delete"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "notes.list": {
+      "description": "This computer's own keys that start with prefix (all when it is left out), sorted: the reply's keys (each key and the bytes of its value), count (those listed), total (all it keeps), bytes (all its keys and values take), keys_max and bytes_max.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.list"
+        },
+        "prefix": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{0,64}$"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
     "clip": {
       "description": "A clip of this computer's own, as sound.upload and sound.list say it.",
       "type": "object",
@@ -1171,7 +1281,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; turn.end carries turn and started; listen.set carries mute.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
           "type": "object",
           "properties": {
             "re": {
@@ -1287,25 +1397,25 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 1 µm, µg/m³, to a tenth."
+                      "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm2_5": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+                      "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm4_0": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 4 µm, µg/m³, to a tenth."
+                      "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm10": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 10 µm, µg/m³, to a tenth."
+                      "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "co2_ppm": {
                       "type": "integer",
@@ -1386,6 +1496,28 @@
                     "known"
                   ],
                   "additionalProperties": false
+                },
+                "volume": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "description": "get's volume (the speak grant): the level speaker/volume last said, as volume.changed tells it; null until lamp-actions has said it.",
+                  "properties": {
+                    "level": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "0 to 100 of what the lamp allows."
+                    },
+                    "muted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "body": {
+                  "$ref": "#/$defs/body"
                 }
               },
               "additionalProperties": false
@@ -1452,6 +1584,46 @@
             "removed": {
               "type": "string"
             },
+            "key": {
+              "type": "string"
+            },
+            "found": {
+              "type": "boolean"
+            },
+            "value": {},
+            "deleted": {
+              "type": "boolean"
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "bytes": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "key",
+                  "bytes"
+                ]
+              }
+            },
+            "count": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "keys_max": {
+              "type": "integer"
+            },
+            "bytes_max": {
+              "type": "integer"
+            },
             "turn": {
               "const": "ended"
             },
@@ -1465,6 +1637,29 @@
                 "lifted",
                 "nothing_held"
               ]
+            },
+            "sample_rate": {
+              "description": "microphone.stream: samples a second, 16000.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "channels": {
+              "description": "microphone.stream: channels interleaved in a block, 1.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "format": {
+              "description": "microphone.stream: how a sample is written: s16le, signed 16 bits, low byte first.",
+              "const": "s16le"
+            },
+            "block_ms": {
+              "description": "microphone.stream: how long one block is, 20 ms.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "source": {
+              "description": "microphone.stream: which of the lamp's microphones: mic1, the room microphone the ears read.",
+              "const": "mic1"
             }
           },
           "required": [
@@ -1757,6 +1952,72 @@
             "store_max_bytes"
           ]
         },
+        "notes": {
+          "description": "A computer's own notes (notes.set): a key's and a value's largest, how many keys and bytes each computer keeps, and the rates of writes (set, delete) and reads (get, list).",
+          "type": "object",
+          "properties": {
+            "key_max_bytes": {
+              "type": "integer"
+            },
+            "value_max_bytes": {
+              "type": "integer"
+            },
+            "keys_max": {
+              "type": "integer"
+            },
+            "bytes_max": {
+              "type": "integer"
+            },
+            "writes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "most": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "within_ms": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "most",
+                  "within_ms"
+                ]
+              }
+            },
+            "reads": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "most": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "within_ms": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "most",
+                  "within_ms"
+                ]
+              }
+            }
+          },
+          "required": [
+            "key_max_bytes",
+            "value_max_bytes",
+            "keys_max",
+            "bytes_max",
+            "writes",
+            "reads"
+          ]
+        },
         "push": {
           "type": "array",
           "items": {
@@ -1796,6 +2057,10 @@
               "within_ms"
             ]
           }
+        },
+        "motion_done": {
+          "const": true,
+          "description": "Present when a `gesture`, `move` or feeling's move ends with a `done` once the body says what became of it (#4209): `finished` at its end, `dropped` (never began: the person using the lamp, a move it can't play, nothing begun within 10 s) or `cut_short` (ended as it played: replaced by a newer motion, or for the person), each with the body's `why`. Without it, a lamp-control from before reads no word from the body, and an SDK's wait for them ends at the answer."
         },
         "ring": {
           "type": "object",
@@ -1876,14 +2141,16 @@
                 "lease",
                 "done",
                 "camera.frame",
-                "camera.ended"
+                "camera.ended",
+                "microphone.audio",
+                "microphone.ended"
               ]
             }
           ]
         },
         "at": {
           "$ref": "#/$defs/time",
-          "description": "The lamp's local time, on the events about the room. welcome, lease and done may not carry it."
+          "description": "When it happened, in UTC (`…Z`), on the events about the room. welcome, lease and done may not carry it."
         }
       },
       "required": [
@@ -2046,6 +2313,25 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "name.heard"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "How sure the lamp's listener was that it heard its name, to a hundredth. A sound like the name can reach the lamp's own bar, so a program that acts on its own may want a higher one."
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "touch"
               }
             }
@@ -2181,6 +2467,64 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "body.state"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "joints": {
+                "type": "object",
+                "description": "Each joint the body read, named as the joints op names them.",
+                "properties": {
+                  "pitch": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "roll": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "yaw": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "shoulder": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "elbow": {
+                    "$ref": "#/$defs/body_joint"
+                  }
+                }
+              },
+              "lamp": {
+                "type": "object",
+                "description": "The lamp's own state beside the joints: the light it shows now, whether it talks, whether it is private.",
+                "properties": {
+                  "light": {
+                    "type": "object"
+                  },
+                  "talking": {
+                    "type": "boolean"
+                  },
+                  "private": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "light",
+                  "talking",
+                  "private"
+                ]
+              }
+            },
+            "required": [
+              "joints",
+              "lamp"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "lease"
               }
             }
@@ -2270,31 +2614,31 @@
             }
           },
           "then": {
-            "description": "The air sensor's reading (air/state, the air grant): the first one, then one where a value moved by its step (particles 5 µg/m³, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C), came or went, or feel changed; at most once every 5 s, the newest held back until then.",
+            "description": "The air sensor's reading (air/state, the air grant): the first one, then one where a value moved by its step (particles 5 \u00b5g/m\u00b3, carbon dioxide 50 ppm, humidity 3, temperature 0.5 \u00b0C), came or went, or feel changed; at most once every 5 s, the newest held back until then.",
             "properties": {
               "pm1_0": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 1 µm, µg/m³, to a tenth."
+                "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm2_5": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+                "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm4_0": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 4 µm, µg/m³, to a tenth."
+                "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm10": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 10 µm, µg/m³, to a tenth."
+                "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "co2_ppm": {
                 "type": "integer",
@@ -2356,6 +2700,47 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "lamp.said"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "What the lamp said out loud, as written (for a reply, what the model wrote; see cut)."
+              },
+              "by": {
+                "enum": [
+                  "lamp",
+                  "computer"
+                ],
+                "description": "Who had it said: the lamp itself, or a computer's own say (back to that computer alone)."
+              },
+              "source": {
+                "enum": [
+                  "reply",
+                  "exact",
+                  "cached"
+                ],
+                "description": "A reply of the lamp's model, a computer's word-for-word say, or one of the lamp's fixed phrases."
+              },
+              "cut": {
+                "const": true,
+                "description": "Present only when the line was cut short (talked over, stopped): text may not have been said in full."
+              }
+            },
+            "required": [
+              "text",
+              "by",
+              "source"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "camera.frame"
               }
             }
@@ -2410,6 +2795,74 @@
               "why"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "microphone.audio"
+              }
+            }
+          },
+          "then": {
+            "description": "One block of a microphone.stream, the header of its binary WebSocket message (the sound itself follows the header, never in JSON).",
+            "properties": {
+              "sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The block's count since the ears started; a step of more than one is sound that was lost."
+              },
+              "lost": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Blocks lost since the last one this stream sent: gaps in sequence, and blocks the connection had no room for."
+              },
+              "sample_rate": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "channels": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "format": {
+                "const": "s16le"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The sound's size in bytes: 640 for a 20 ms block."
+              }
+            },
+            "required": [
+              "sequence",
+              "lost",
+              "sample_rate",
+              "channels",
+              "format",
+              "bytes"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "microphone.ended"
+              }
+            }
+          },
+          "then": {
+            "description": "The microphone.stream ended by itself: the lamp turned private, someone else came into view (more than one person), or no sound came for 2 s (the lamp's microphone isn't shared here).",
+            "properties": {
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "why"
+            ]
+          }
         }
       ]
     },
@@ -2421,25 +2874,25 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 1 µm, µg/m³, to a tenth."
+          "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm2_5": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+          "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm4_0": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 4 µm, µg/m³, to a tenth."
+          "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm10": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 10 µm, µg/m³, to a tenth."
+          "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "co2_ppm": {
           "type": "integer",
@@ -2503,6 +2956,155 @@
             "type": "number"
           },
           "description": "Each temperature the board reports, by its sensor's name, in degrees Celsius."
+        }
+      },
+      "additionalProperties": false
+    },
+    "body": {
+      "description": "get's body (the body grant): what the body may do and where each joint is, from body/limits and body/joint_states, with known: true; or known: false and why, while the body has said no limits in the last 15 s. Nothing here can be raised.",
+      "type": "object",
+      "properties": {
+        "known": {
+          "type": "boolean",
+          "description": "Whether the body has said its limits in the last 15 s; false, and then only why."
+        },
+        "why": {
+          "type": "string",
+          "description": "Why it isn't known."
+        },
+        "joints": {
+          "description": "By the names joints takes; a joint the body didn't name is left out.",
+          "type": "object",
+          "properties": {
+            "yaw": {
+              "$ref": "#/$defs/get_body_joint"
+            },
+            "pitch": {
+              "$ref": "#/$defs/get_body_joint"
+            },
+            "roll": {
+              "$ref": "#/$defs/get_body_joint"
+            },
+            "shoulder": {
+              "$ref": "#/$defs/get_body_joint"
+            },
+            "elbow": {
+              "$ref": "#/$defs/get_body_joint"
+            }
+          },
+          "additionalProperties": false
+        },
+        "stands": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether this lamp may stand; with false, the arm has no poses."
+        },
+        "speed_deg_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "The head's and base's speed cap, degrees a second."
+        },
+        "acceleration_deg_s2": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "The head's and base's acceleration cap, degrees a second squared."
+        },
+        "load_limit": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "The force cap as a share; null where each servo keeps its own."
+        },
+        "heat_stop_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Where a joint stops for heat, degrees Celsius."
+        },
+        "counts_per_turn": {
+          "type": "number",
+          "description": "4,096."
+        }
+      },
+      "required": [
+        "known"
+      ],
+      "additionalProperties": false
+    },
+    "get_body_joint": {
+      "description": "One joint of get's body: where it is and its bounds, in counts (4,096 a turn) and in degrees from its home (body_info::from_home). A number is null when not known.",
+      "type": "object",
+      "properties": {
+        "counts": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Where it is now, of 4,096 a turn; null with no position in the last 15 s."
+        },
+        "deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Degrees from its home, to a tenth; null with no position in the last 15 s."
+        },
+        "min_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Its lowest bound in degrees from home. The head's and base's are a folded lamp's: don't clamp a target to them."
+        },
+        "max_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Its highest bound in degrees from home. The head's and base's are a folded lamp's: don't clamp a target to them."
+        },
+        "min_counts": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Its lowest bound, counts."
+        },
+        "max_counts": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Its highest bound, counts."
+        },
+        "home_counts": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Its home, counts: the found home for the head and base, the folded pose for the arm."
+        },
+        "folded_counts": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "The arm's folded pose, counts; null for the head and base."
+        },
+        "stand_counts": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "The arm's stand pose, counts; null for the head and base."
         }
       },
       "additionalProperties": false
@@ -2599,6 +3201,78 @@
             "1280x720"
           ],
           "description": "The fast stream's size, where the eyes serve every frame: the camera's own 25 fps MJPEG modes. 640x480 if not given."
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "on"
+      ],
+      "additionalProperties": false
+    },
+    "body_joint": {
+      "description": "One joint in a body.state: where it is, from the body's own read.",
+      "type": "object",
+      "properties": {
+        "deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -360,
+          "maximum": 360,
+          "description": "Where it is, in degrees from its home, to a tenth, as get('body') counts them: from the found home for the head and base and the folded pose for the arm; yaw, shoulder, elbow and roll positive with more counts, pitch positive looking up. null until the body has said its limits."
+        },
+        "counts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4095,
+          "description": "Where it is, in the servo's own encoder counts: 4,096 a turn, 2,048 its middle."
+        },
+        "goal_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -360,
+          "maximum": 360,
+          "description": "Where it was last asked to be, in the same degrees as deg."
+        },
+        "load": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "How hard it works: the share of its servo's full strength, without a direction."
+        },
+        "moving": {
+          "type": "boolean",
+          "description": "Turning at 5 degrees a second or more."
+        },
+        "temp_c": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Its servo's temperature, from the body's once-a-second report; absent until the first."
+        }
+      },
+      "required": [
+        "deg",
+        "counts",
+        "moving"
+      ]
+    },
+    "microphone.stream": {
+      "description": "The microphone's sound, each 20 ms block the ears share on mic1/audio (mono, 16 kHz, S16LE), as a binary WebSocket message: the header's length (4 bytes, big-endian), the header (JSON: ev microphone.audio, sequence, lost, sample_rate, channels, format, bytes), then the samples, 640 bytes. Until on is false, stop, the connection closes, or a microphone.ended event (the lamp turned private, someone else came into view, or no block came for 2 s: the ears share their sound only with LAMP_BUS_AUDIO=on). On again while one runs replaces it. Needs the microphone grant, the lamp's own network and the owner's switch (lamp-control --microphone on, LAMP_CONTROL_MICROPHONE=on; off unless given: refused, the microphone stream is off on this lamp). Refused while the lamp is private, while more than one person is in view (refused: someone else is here; the door can't tell the owner from anyone else), and where the ring can't show its mark; either of the first two also ends a running stream with microphone.ended.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "microphone.stream"
+        },
+        "on": {
+          "type": "boolean"
         }
       },
       "required": [

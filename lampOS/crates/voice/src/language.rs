@@ -191,6 +191,15 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     (
+        lamp_msgs::RESET_STARTING,
+        [
+            "Bắt đầu khôi phục cài đặt gốc.",
+            "初期化を始めます。",
+            "开始恢复出厂设置。",
+            "공장 초기화를 시작합니다.",
+        ],
+    ),
+    (
         PROVIDER_UNAVAILABLE,
         [
             "Xin lỗi, giờ mình không kết nối được internet. Mình sẽ quay lại sớm thôi.",
@@ -403,6 +412,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わかった。",
             "好的，明白了。",
             "알겠어요.",
+        ],
+    ),
+    // What the second route says at once for a plain keep
+    // (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59), from its clip rendered ahead.
+    (
+        crate::keep_at_once::KEPT,
+        [
+            "Được, mình sẽ nhớ điều đó.",
+            "わかった、覚えておくね。",
+            "好的，我会记住的。",
+            "알겠어요, 기억해 둘게요.",
         ],
     ),
     // The first stand's ask and its "here I go", sent to the say service as
@@ -786,7 +806,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 26);
+        assert_eq!(FIXED_LINES.len(), 28);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
@@ -807,6 +827,12 @@ mod tests {
             }
             assert_eq!(language.fixed("Hello."), None);
         }
+        // The reset's line (#5929), warmed in English and the owner's language.
+        assert_eq!(
+            Language::Vietnamese.fixed(lamp_msgs::RESET_STARTING),
+            Some("Bắt đầu khôi phục cài đặt gốc.")
+        );
+        assert!(crate::say::tts_cache::WARM.contains(&lamp_msgs::RESET_STARTING));
         assert_eq!(Language::Vietnamese.woken_by_name(), "Dạ?");
         // A say of "Yes?" is no wake's line: it stays as it was asked.
         assert_eq!(Language::Vietnamese.fixed(WOKEN_BY_NAME_LINE), None);

@@ -1,0 +1,8 @@
+# 19:00, 90 minutes at the desk alone: one read of tomorrow at 2 minutes, never again.
+clock = "19:00"
+
+[[expect]]
+at = "2m"
+within = "1m"
+call = "read"
+args = { service = "google_calendar", what = "events", day = "tomorrow" }

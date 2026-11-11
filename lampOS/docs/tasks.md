@@ -122,6 +122,122 @@ when it is idle as `harness reply` does (openharness#2157, the person's
 - **Not yet shown:** any run with a real `harness route`, which
   harness-reviewer is building (29 Oct).
 
+`--reply-named` (off unless set; #5535, the owner, 9 Nov) hands the work
+to a session the person names ("go into the docs session and also do
+this"), never a new one. The tasks request `prepare` takes an optional
+`session`, the session as the person said it (its name, or what it worked on), and it goes into the launch, so the
+yes is to that session (`Launch::session`, absent when none was named;
+a store holding such a task is schema 5). After the yes and the machines
+preflight, `Cli::reply_named` lists that computer's sessions with `harness
+ps --machine <id> --all --json`, the ones stopped this week too, within
+the launch's bound (60 s), not the 10 s read bound: on lamp-c0a4 on 9 Nov
+that list of the person's Mac took 4.5 to 10 s, and two hand-overs said
+yes to twice ended `sessions_timeout` at 10 s. A row fits when its name or its folder's last part is
+the words said, compared on letters and digits only ("Docs-Update",
+"docs update"); when no row is that, a row where each word said begins
+one of the name's or folder's words, in order (three letters or more in
+all: "docs" fits "Docs-Update", "api" never fits "rapid-prototype", the
+Reviewer-lead's P2 on #5779). When neither fits, the session is found by
+what it worked on (the owner, 9 Nov: a person remembers the work, never a
+session's name, which for one the lamp started is `lamp-<hex>`, or its
+id): the words said, less the ones that only say which one ("the", "one",
+"session", "earlier", "that", … `NOT_THE_WORK`), against each row's
+`asks` and `about` (never its name or folder, which only the rule above
+reads, so "client api" never finds "Fix the API client"). A word said is
+held when a row's word is the same, or the same with one of the endings
+s, es, ed, ing, er or ers (`ENDINGS`: "book" for "books.py", "test" for
+"tests", never "testament" or "notebook", the Reviewer-lead's P2 on #5784
+at de9bebdb41). A word of one or two letters takes no ending, so "the US
+tax session" never finds "Update user tax settings" (`SHORTEST_STEM`,
+Reviewer-three's P2 on #5784 at 71bf964baa). A row fits only when it holds every one of those words,
+so "the payroll dashboard one" never finds a weather dashboard on
+"dashboard" alone (Reviewer-three's P2 on #5784 at 3d90e56736). So "the
+book program one" finds the session whose `about` is "I wrote books.py, a
+short command-line program for keeping a reading list". Two that fit are
+`session_ambiguous`, a live one beside a stopped one too, since the one
+meant may be the stopped one (the Reviewer-lead's P2 on #5784 at
+71bf964baa). Harness fills `asks` (the last two
+prompts) and `about` (the last recaps) only for a live session with a
+finished turn, within 3 s, for the first 40 rows; a stopped row, or one
+with no turn ended yet, is found by its name or folder alone. A session
+the lamp started keeps the `lamp-<hex>` it was given with `--name`, which
+Harness never replaces with the agent's title. `harness route` was tried for this
+and not used: on lamp-c0a4 on 9 Nov it took 6.6–18.6 s a call and called
+"add a search feature to the reading list book program" new work. The words are typed in with `harness reply
+--machine <id> <agent> --json -- <task>`, which Harness takes for a live,
+idle session behind the person's `programs-reply` switch. Nothing is
+routed, the engine is not asked about (`--engines-ready`, a known
+refusal), and nothing is started new in any case:
+- **One live session fits and takes it:** the task's agent, `joined`, as a
+  routed one: watched, told, and never closed by the lamp. How the person
+  knows that session is kept on the task (`dispatch.joined`, listed): its
+  `name`, or its folder's last part when it has none, never a lamp-made
+  `lamp-<hex>` one, and its first `ask`, on one line, cut at a word to 80
+  characters. Task news says it at once, so a wrong join is heard (the
+  Reviewer-lead's P2 on #5784 at 71bf964baa). A routed join keeps none.
+- **Not sent, with why:** `session_not_found`; `session_ambiguous` (two or
+  more live ones fit, or, found by its work, a live one and a stopped one;
+  never guessed); `session_stopped` (only a stopped
+  one fits); `session_busy` (working, asking the person something, or
+  still starting); the reply's refusal (`reply_off`, `reply_not_idle`,
+  `reply_not_running`, `reply_failed`); `sessions_failed` or
+  `sessions_<code>` when the list can't be read, `sessions_timeout` too
+  when it leaves the reply under 1 s of the launch bound (`REPLY_FLOOR`).
+- **Uncertain:** a reply that started and gave no answer, or one Harness
+  took (exit 0) whose answer can't be read or names another session
+  (`reply_uncertain`): the words may be there, so never sent again.
+- **Switch off:** a launch that names a session is `not_sent` with
+  `reply_named_off` before anything runs; with no session named, the
+  hand-over is as before either way. Session words that are blank, over
+  128 bytes or hold a control character are refused (`bad_session` at
+  `prepare`, `invalid_session` at launch).
+- **Tests:** `tests/harness.rs`
+  `with_reply_named_a_named_session_is_typed_into_and_never_started_new`,
+  `with_reply_named_a_session_is_found_by_what_it_worked_on`,
+  `with_reply_named_the_joined_session_is_kept_by_its_name_and_first_ask`;
+  `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`,
+  `engine::tests::a_joined_sessions_name_and_first_ask_are_kept_and_listed`.
+- **The voice's side** (off unless `LAMP_TASKS_REPLY_NAMED=on`, the
+  provider worker's `--tasks-reply-named`, last of the tasks flags; it
+  needs only the tasks part): `start_agent_task` takes an optional
+  `session`, described as "Only if the person means earlier work, not a
+  new session: how they said it, its name or what it worked on ("the book
+  program one"). Never guessed." It is trimmed and sent as `prepare`'s
+  `session`; blank is none, and words over 128 bytes or with a control
+  character prepare nothing and the model is told to ask which session.
+  The answer's `where`, which the read-back says, is "<who>, in the
+  session "…" on <computer>, not a new one", and its `next` is
+  `session_next`, never only "Shall I start it?": say who will do it and
+  where, as `where` says it, and ask whether to start it there, so the
+  person hears the session before their yes (the Reviewer-lead's P2 on
+  #5784 at de9bebdb41). The session is kept with the
+  task waiting for its yes. With `LAMP_TASKS_ONE_YES`, a yes in the turn
+  that prepared it never starts a task for a named session, whatever the
+  read-back said: which session a line said can't be told from its words
+  ("docs" inside "the docs archive session" is not the "docs" session,
+  and Harness may hold both), so it always waits for a second yes, to the
+  read-back of `start_agent_task`'s answer, whose `where` says the session
+  as prepared (the Reviewer-lead's P2 on #5784, Reviewer-three's P2); a session of only filler words ("the
+  that") prepares nothing and the model is told to ask; with `LAMP_TASKS_CORRECT`, an ask that
+  changes only the session is a correction and replaces the one waiting. A
+  session named for Devin's cloud is refused before anything is asked of
+  the tasks part. Without the switch the parameter isn't offered, and one
+  the model sends anyway is dropped. Task news tells
+  `session_busy` (and `reply_not_idle`) with the `failed_busy` words, as a
+  busy routed pick; the other codes above are told as a plain failure.
+  Work said yes to that joined a session is told once, at once, within
+  10 minutes of the hand-over on this boot (`<store>:<task>:joined`, beside
+  its later finish): with the `joined` words, naming the session by its
+  name, or with `joined_asked`, by what it was first asked, and that the
+  person can say if it's the wrong one. A new session, or the router's
+  pick, is not told so.
+  Tests: `agent_tasks::tests::a_named_session_is_sent_with_the_task_only_with_the_switch`,
+  `agent_tasks::tests::the_reply_named_switch_is_on_only_with_the_tasks_part_and_adds_session`,
+  `agent_tasks::tests::a_task_for_a_named_session_never_starts_on_one_yes`,
+  `agent_tasks::tests::another_session_is_a_correction_and_devins_cloud_takes_none`,
+  `task_news::tests::a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure`,
+  `task_news::tests::work_that_joined_an_earlier_session_names_that_session_once`.
+
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads
 how each task handed over is going with one `harness ps` a machine and puts
 it on the bus as `tasks/status`, without the agent's words: ["Progress on
@@ -2391,6 +2507,128 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
     the declined task's note still stood beside them;
   - "yes, and also …" isn't shown cleanly yet.
 
+### One yes for a read-back said in words (#5169, off unless `LAMP_TASKS_ONE_YES=on`)
+
+On lamp-c0a4 on 4 November the product voice often said the task back in
+words ("Claude Code will write … Shall I start it?") without calling
+`start_agent_task`. Then the person's yes either prepared the task and
+confirmed it in the same turn, which `may_confirm` refuses (the request that
+prepares can't confirm), or confirmed with nothing prepared. Both times the
+lamp asked again, so the hand-over needed two yeses. With
+`LAMP_TASKS_ONE_YES=on` (the provider worker's `--tasks-one-yes`, last of the
+tasks flags; it needs only the tasks part):
+
+- `start_agent_task`'s description, with the lead-in or without it, asks for
+  the call first: "Call it first: say the task back only from its answer, in
+  one short sentence, and ask whether to start it." With the staff, it says
+  ", with who will do it," as before. Every description still fits in 1,024
+  bytes, with the switch on too (`every_description_fits_the_service_whatever_the_switches`).
+- `start_agent_task`'s `task` parameter reads "The work, in the person's
+  own words. A short ask is enough: the agent works out the details." in
+  place of "… complete enough to do without asking." (folded in from #5119).
+  With the old words the model asked what a short ask should have instead
+  of calling: on lamp-c0a4 on 3 November, "ask Claude Code to build a
+  website that promotes tourism in Vietnam" called it 1 time in 3, and the
+  same ask with its sections named was called at once. The 4 November count
+  (`docs/verification/p2-handover-wording-lamp-c0a4-20261104/`) found the
+  words alone changed little (0 of 9 before, 1 of 9 after), so they sit
+  under this switch beside the call-first read-back. The read-back still
+  guards a short ask: nothing starts before the yes
+  (`a_short_ask_is_enough_only_with_the_one_yes_switch`).
+- `confirm_agent_task` with nothing prepared answers "Nothing is prepared
+  yet: call start_agent_task now with the task you said back, then call
+  confirm_agent_task again." Without the switch it answers "There is no task
+  waiting to be started." as before.
+- A yes in the request that prepared the task may start it
+  (`agent_tasks::yes_in_the_same_turn`) only when all of these hold. If any
+  fails, `may_confirm`'s refusal stands:
+  - the request was heard, not typed in the app or written by the lamp;
+  - the task was prepared in this very request, within `CONFIRM_WITHIN`
+    (120 s);
+  - the person's words in it (`thread::heard_for`) are a plain yes: at most
+    six words, only yes, yeah, yep, yup, sure, ok, okay, "go ahead", "do
+    it" and "please do", with "please", "lamp" and "hey" beside them, and
+    no question mark. "Yes and also make it longer" is not a yes. "Okay."
+    and "ok ok" count as a yes too: each is only yes words;
+  - the lamp's line just before it (`thread::answered_last_but_cut`) was
+    said within `CONFIRM_WITHIN`, ends with a question, names who the task
+    was prepared for (the name, or a form the voice hears for it), and
+    holds every one of the task's content words, none missing. Content
+    words are lower case, with common short words ("did" and "does" among
+    them) left out, and for a question task they come from its question
+    alone. A task word counts as read back only when a spoken word of
+    the read-back has the same stem (a plural or verb "s", "es", "ing" or
+    "ed" and a final "e" set aside, so "files" matches "file" and "fixing"
+    matches "fix"), and each spoken word stands for one task word at most:
+    "Test the tests" read back as "Claude Code will test it" is refused.
+    No near form counts: "remote" never stands for "remove", "kill" for
+    "killall", "wrote" for "write" or "reverse" for "revert". A stem this
+    leaves apart costs a second yes, never work started unheard. A
+    read-back that drops any word never starts the task: for "Delete all
+    the files in my Downloads folder and empty the trash", "Claude Code
+    will delete the files in your Downloads folder. Shall I start it?"
+    misses "all", "empty" and "trash"; "Reboot" read back as "Claude Code
+    will do it", "delete Downloads" as "Claude Code will delete that",
+    "Force push to main" without "force", and "Empty the trash and delete
+    Downloads" without "trash" or without "downloads" are all refused
+    (the Reviewer-lead's P2s on #5609). Before, half the content words,
+    then all but one, and then near forms were enough, and the unheard
+    part started. The words of the name and the closing question never
+    stand for a task word: the first of the name's forms in the line
+    (those the name check uses) is left out of it, and so is the line's
+    last sentence when it ends with "?". In the task a form is left out
+    only where it addresses the agent, right after "ask", "have", "tell",
+    "get" or "let", so "Uninstall the codecs" read back as "Codex will
+    uninstall it" is refused and "Codex will uninstall the codecs" is not
+    (the Reviewer-lead's P3 on #5785's READ-OK). "Delete the code" read back as "Claude
+    Code will delete it. Shall I start it?" (the name's "Code") and "Start
+    the server" read back as "Claude Code will stark the server. Shall I
+    start it?" (the question's "start") are refused. A task that names the
+    agent, "Ask Claude Code to fix the tests", needs "ask", "fix" and
+    "tests" said back beside the name ("I'll ask Claude Code to fix the
+    tests. Shall I start it?"). A read-back that is one question alone
+    ("Shall Claude Code start the server?") says nothing back and costs a
+    second yes (the Reviewer-lead's P3 on #5609's READ-OK);
+  - that line was not cut. It is marked cut on its own exchange, so a yes
+    in any later request reads it as cut too: kept as heard after a cut
+    (`thread::heard_only`, the second route with `LAMP_SAID_AS_HEARD=on`),
+    or the line after it began over the lamp's voice, came first after a
+    Stop, or cut its answer (`over_the_lamps_voice`, `after_stop` or
+    `heard_of_cut` on that line's Start, marked by
+    `thread::began_over_the_lamps_voice` from both routes' provider
+    workers, `mark_cut_read_back`; on the Live route the three flags are
+    read from the Start itself, `start_cuts_read_back`, so the test drives
+    the same reading as the call site). On the Live route the lamp's line is
+    never cut down to what was heard, so without this a yes said over a
+    read-back cut off, or after a Stop by hand or head with
+    `LAMP_SAID_AS_HEARD` off, was checked against the whole line, its
+    question included (the Reviewer-lead's P3s on #5609).
+- When those hold as `start_agent_task` prepares the task, its `next` says
+  "The person has already said yes to this task as you said it back: call
+  confirm_agent_task now, and do not ask again." The confirm checks the rule
+  again on its own.
+- A task started this way is journalled as `lamp-voice: tasks: request N:
+  task <id> started on a yes in the turn that prepared it, after its
+  read-back in words`, with no task words or paths.
+
+The guard that a yes must come after a read-back stays. This rule only
+recognizes a read-back said in words, before the call. Without the switch
+every description, answer and line is byte-for-byte as before
+(`the_one_yes_switch_changes_only_the_read_back_and_task_words`). Tests:
+`a_yes_in_the_turn_that_prepared_counts_only_after_its_read_back_in_words`,
+`one_yes_starts_only_a_task_read_back_whole`,
+`one_yes_never_counts_over_a_cut_read_back`,
+`one_yes_needs_every_task_word_read_back`,
+`one_yes_matches_task_words_by_stem_one_for_one`,
+`one_yes_reads_back_past_the_name_and_the_closing_question`,
+`a_start_over_the_lamps_voice_or_after_a_stop_marks_the_read_back_cut`
+(in both `provider_worker` and `second_provider`),
+`thread::tests::answered_last_but_cut_says_a_read_back_was_cut`,
+`a_confirm_with_nothing_prepared_says_to_prepare_it_with_the_switch`,
+`the_one_yes_switch_is_on_only_with_the_tasks_part`. Not yet played: a
+count of 10 spoken hand-overs with a real yes on each side of the switch,
+counting those that needed only one yes (#5169).
+
 ### A lead-in before a call (#799, `LAMP_TOOL_LEAD_IN=on`, on in the product)
 
 A turn in which the model calls `start_agent_task` or `confirm_agent_task`
@@ -2580,8 +2818,9 @@ switch both are as before. Test:
 
 `check_agent_task` tells only the newest work handed over. With
 `LAMP_TASKS_NOW=on` and the tasks part (`LAMP_TASKS_DIR`), the voice's
-`--tasks-now`, taken last, after `--tasks-questions` and
-`--tasks-sign-in-app`, the model also has `tasks_now`. It answers "how's it
+`--tasks-now`, taken after `--tasks-questions` and
+`--tasks-sign-in-app`, before `--tasks-one-yes`, the model also has
+`tasks_now`. It answers "how's it
 going?", "is it done?", "what is Claude doing?" and "did the poem one
 finish?" for any recent piece of work.
 
@@ -2863,7 +3102,8 @@ A skill is made by the lamp's own model, never handed to a computer's agent
 [skills.md](skills.md#made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
 The tasks part declares no `make_skill` or `put_on_made_skill`, and the
 worker's `--tasks-make-skill` flag is gone: `LAMP_MAKE_SKILL=on` alone gives
-the voice its own two functions, with a tasks part or without one, and an
+the voice its own function, `make_skill` (`put_on_made_skill` is gone since
+#5977: a made skill goes on as soon as it is kept), with a tasks part or without one, and an
 app's typed skill (`LAMP_APP_MAKE_SKILL`) is made the same way, never handed
 over. The made skills' news words (`made`, `not_kept`) and their repair through
 a task are gone with it. A task whose words are a skill's brief, handed over

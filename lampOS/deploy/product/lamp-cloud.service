@@ -83,6 +83,9 @@ Environment=LAMP_APP_RESTART=on
 # (/run/lampos-tasks/app.sock, its --app-socket); the code and the email go to the backend over HTTPS only,
 # never on the broker. The same switch as lamp-voice.service's, with LAMP_TASKS_SIGN_IN there.
 Environment=LAMP_TASKS_SIGN_IN_APP=on
+# The app told once that setup is done (#5812, onboarding.done; system.info's onboarding_done_supported),
+# its acked date kept in the state folder below: on, the lead's call (9 Nov).
+Environment=LAMP_APP_ONBOARDING_DONE=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

@@ -421,6 +421,27 @@ fn a_comment_only_product_unit_is_an_intended_noop() {
     assert_eq!(lamp.read("/etc/systemd/system/lamp-eyes.service"), before);
     assert_eq!(lamp.state()["installed"]["sequence"], 2);
     assert!(lamp.calls().is_empty());
+    assert!(lamp.said.iter().any(|line| line
+        == "lamp-eyes.service is kept: only comments, blank lines or trailing whitespace differ"));
+}
+
+#[test]
+fn comment_differences_written_with_a_new_binary_are_not_reported_as_retained() {
+    let mut lamp = settings_lamp(false, true);
+    let candidate = format!("{}# carrier comment with a binary change\n", eyes_unit());
+    carried(&mut lamp, &candidate, "eyes 2", None, Vec::new());
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(
+        lamp.read("/etc/systemd/system/lamp-eyes.service"),
+        candidate
+    );
+    assert_eq!(lamp.calls(), ["reload", "restart lamp-eyes.service"]);
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.starts_with("lamp-eyes.service is kept:"))
+    );
 }
 
 // The shared fake starts text binaries, not an argument parser. Only this

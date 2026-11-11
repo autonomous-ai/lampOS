@@ -3059,6 +3059,48 @@ fn gesture_run(
     seconds: u64,
     prepare: impl FnOnce(&mut Lamp),
 ) -> (BodyReport, Lamp, Vec<Step>) {
+    gesture_run_over(clip, ask_at, seconds, prepare, None)
+}
+
+/// [`gesture_run`], with a holder's look (`Asked::aim`, as `{"look":…}` on
+/// the lamp's lease socket) at `yaw` counts from the pose's own direction from the
+/// given moment on: the lamp is turned that far, as a look at a person turns
+/// it, when the gesture is asked.
+fn gesture_run_over(
+    clip: &'static Clip,
+    ask_at: Duration,
+    seconds: u64,
+    prepare: impl FnOnce(&mut Lamp),
+    looking: Option<(Duration, f32)>,
+) -> (BodyReport, Lamp, Vec<Step>) {
+    gesture_run_yaw(clip, ask_at, seconds, prepare, looking, None)
+}
+
+/// [`gesture_run_over`], the base's yaw reach set to `yaw` counts when given: 40, what a lamp
+/// started without `--reach` has (`Limits::FOLDED.yaw`).
+fn gesture_run_yaw(
+    clip: &'static Clip,
+    ask_at: Duration,
+    seconds: u64,
+    prepare: impl FnOnce(&mut Lamp),
+    looking: Option<(Duration, f32)>,
+    yaw: Option<f32>,
+) -> (BodyReport, Lamp, Vec<Step>) {
+    gesture_run_glancing(clip, ask_at, seconds, prepare, looking, yaw, false)
+}
+
+/// [`gesture_run_yaw`], and when `glancing`, on a lamp at rest (mood Resting) with `--rest-glance` whose
+/// Expression asks a small head glance without a break from 6 s on (the lamp has stood by then): the
+/// glance that begins takes the head out of rest (`glance_from`) and keeps it out, as on lamp-75c9.
+fn gesture_run_glancing(
+    clip: &'static Clip,
+    ask_at: Duration,
+    seconds: u64,
+    prepare: impl FnOnce(&mut Lamp),
+    looking: Option<(Duration, f32)>,
+    yaw: Option<f32>,
+    glancing: bool,
+) -> (BodyReport, Lamp, Vec<Step>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
@@ -3069,8 +3111,16 @@ fn gesture_run(
         servo_speed: 1_000,
         servo_acceleration: 60,
     })
+    .map(|limits| Limits {
+        yaw: yaw.unwrap_or(limits.yaw),
+        // 40 is `Limits::FOLDED`'s: the lamp started without `--reach`.
+        yaw_unset: yaw == Some(Limits::FOLDED.yaw),
+        rest_glance: glancing,
+        ..limits
+    })
     .unwrap();
     let time = clock.time.clone();
+    let expression_at = clock.time.clone();
     let seen_at = clock.time.clone();
     let mut asked_once = false;
     let mut seen = Vec::new();
@@ -3081,7 +3131,16 @@ fn gesture_run(
         Some(HOME),
         Some(standing(100, 60)),
         None,
-        || Some((Mood::Speaking, 60)),
+        || {
+            Some((
+                if glancing {
+                    Mood::Resting
+                } else {
+                    Mood::Speaking
+                },
+                60,
+            ))
+        },
         move || {
             let due = !asked_once && time.get() >= ask_at;
             asked_once |= due;
@@ -3089,7 +3148,8 @@ fn gesture_run(
                 toward: None,
                 seen: None,
                 gesture: due.then_some(clip),
-                expression: None,
+                expression: (glancing && expression_at.get() >= Duration::from_secs(6))
+                    .then_some([-30.0, 0.0, 0.0]),
                 called: false,
                 still: false,
                 paused: false,
@@ -3097,8 +3157,8 @@ fn gesture_run(
                 pose: None,
                 unplug: false,
                 held_by_test: false,
-                held: false,
-                aim: None,
+                held: looking.is_some_and(|(from, _)| time.get() >= from),
+                aim: looking.map(|(_, yaw)| [yaw, 0.0]),
                 limp: false,
                 unseat: false,
                 night: false,
@@ -3106,6 +3166,7 @@ fn gesture_run(
                 aim_from_home: false,
                 asleep: false,
                 woken: false,
+                replace: false,
             }
         },
         |glimpse| {
@@ -3118,6 +3179,55 @@ fn gesture_run(
         },
     );
     (report, lamp, seen)
+}
+
+/// Lead, 17:03 on 10 Nov, from run 6 on lamp-75c9: a computer's move over a lamp at rest was taken and its
+/// base offset dropped whenever a rest glance (Expression asking the head) was under way: "the base is not
+/// turned for a glance" skipped the base's whole goal, the move's yaw with it. A move turns the base.
+/// NOTE: this harness cannot hold a glance open through a move (the head's glance ends before the move
+/// plays), so the test passes without the fix too; the lamp's trace (run 6) is the proof, this one holds
+/// the behaviour.
+#[test]
+fn a_move_turns_the_base_while_a_rest_glance_is_under_way() {
+    static SWAY: Clip = Clip {
+        name: "sway",
+        step_ms: 500,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 0, 60, 0, 0],
+            [0, 0, 120, 0, 0],
+            [0, 0, 120, 0, 0],
+            [0, 0, 60, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    // Asked in the middle of an odd second, a glance under way.
+    let (report, _, seen) = gesture_run_glancing(
+        &SWAY,
+        Duration::from_millis(9_300),
+        16,
+        |_| {},
+        None,
+        None,
+        true,
+    );
+    assert_eq!(report.gestures_dropped, 0, "{report:?}");
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_millis(9_300))
+        .unwrap()
+        .2[2];
+    let most = seen
+        .iter()
+        .filter(|step| step.1 == Some("sway"))
+        .map(|step| step.2[2])
+        .max()
+        .unwrap_or(0);
+    assert!(
+        most >= rested + 100,
+        "the base's goal went {} counts from {rested}, the move asked 120",
+        most.saturating_sub(rested)
+    );
 }
 
 /// A lamp that stands at once and is in one mood throughout, asked by
@@ -3187,6 +3297,7 @@ fn expression_run_with(
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |glimpse| seen.push((seen_at.get(), glimpse.goals)),
     );
@@ -3358,6 +3469,7 @@ fn speaking_run_with(
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
     );
@@ -4072,6 +4184,7 @@ fn rest_glances_watched(
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |glimpse| {
             let at = seen_at.get();
@@ -4307,6 +4420,226 @@ fn a_head_dipped_before_its_rest_has_lasted_is_led_back_up() {
     );
 }
 
+/// A move that sways the base 250 counts either way (the lamp's own yaw
+/// reach, 22 degrees) and back in 2 s, 500 counts a second at most.
+static SWAY_250: Clip = Clip {
+    name: "sway",
+    step_ms: 250,
+    frames: &[
+        [0, 0, 0, 0, 0],
+        [0, 0, 125, 0, 0],
+        [0, 0, 250, 0, 0],
+        [0, 0, 125, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, -125, 0, 0],
+        [0, 0, -250, 0, 0],
+        [0, 0, -125, 0, 0],
+        [0, 0, 0, 0, 0],
+    ],
+};
+
+/// The person, 12:36 on 10 Nov: the move check takes a base yaw up to the
+/// lamp's own reach (250 counts), so the engine must play one that far, not
+/// cut it to the 170 `GESTURE_REACH` held before (banana's P2 on
+/// ten/move-reach): a standing lamp's base goes 250 either way of where it
+/// was, and is back to it.
+#[test]
+fn a_sway_of_the_lamps_whole_yaw_reach_is_played_and_not_cut_short() {
+    let (report, _, seen) = gesture_run(&SWAY_250, Duration::from_secs(8), 16, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(
+        (report.gestures, report.gestures_dropped),
+        (1, 0),
+        "{report:?}"
+    );
+    let before = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[2];
+    let during: Vec<u16> = seen
+        .iter()
+        .filter(|step| step.1 == Some("sway"))
+        .map(|step| step.2[2])
+        .collect();
+    let (high, low) = (*during.iter().max().unwrap(), *during.iter().min().unwrap());
+    assert!(
+        high >= before + 248 && low + 248 <= before,
+        "swayed {low} to {high} from {before}, not 250 either way"
+    );
+    // And no farther: the move asked 250, the body adds no more.
+    assert!(
+        high <= before + 252 && low + 252 >= before,
+        "{low} {high} {before}"
+    );
+    let after = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(13))
+        .unwrap()
+        .2[2];
+    assert!(
+        after.abs_diff(before) <= 4,
+        "back at {after}, rested at {before}"
+    );
+}
+
+/// The base is never asked past its reach whatever is laid over what (the
+/// Reviewer-lead's P2 on ten/move-reach): a look that has the lamp turned,
+/// 170 counts (15 degrees) or the whole 250, and a sway of 250 laid over it
+/// sum to more than the reach, and the goal stops at the reach: 250 counts
+/// (22 degrees) from where the lamp rests, held there until the sway is
+/// back inside it, and the journal says it was cut. The way back toward
+/// home is never cut.
+#[test]
+fn a_sway_over_a_turned_look_goes_only_to_the_yaw_reach() {
+    for look in [170.0f32, 250.0] {
+        let (report, _, seen) = gesture_run_over(
+            &SWAY_250,
+            Duration::from_secs(10),
+            18,
+            |_| {},
+            Some((Duration::from_secs(6), look)),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert_eq!(
+            (report.gestures, report.gestures_dropped),
+            (1, 0),
+            "{report:?}"
+        );
+        let rest = seen
+            .iter()
+            .rfind(|step| step.0 < Duration::from_secs(6))
+            .unwrap()
+            .2[2];
+        let turned = seen
+            .iter()
+            .rfind(|step| step.0 < Duration::from_secs(10))
+            .unwrap()
+            .2[2];
+        assert!(
+            turned >= rest + (look as u16) - 10,
+            "look {look}: rest {rest} turned {turned}"
+        );
+        let during: Vec<u16> = seen
+            .iter()
+            .filter(|step| step.1 == Some("sway"))
+            .map(|step| step.2[2])
+            .collect();
+        let (high, low) = (*during.iter().max().unwrap(), *during.iter().min().unwrap());
+        assert!(
+            high <= rest + 252,
+            "look {look}: rest {rest}, the sway went to {high}, past the reach"
+        );
+        assert!(
+            high >= rest + 245,
+            "look {look}: held at the reach, not short: {high}"
+        );
+        // Toward home it goes the whole way: the look less the sway.
+        assert!(
+            low + 245 <= turned,
+            "look {look}: turned {turned}, sway low {low}: cut on the way back"
+        );
+    }
+}
+
+/// Third's P2 on #6002 (14:09): a lamp started without `--reach` has a yaw reach of 40 (`Limits::FOLDED`)
+/// and its moves are admitted to 150 counts (`YAW_REACH_DEFAULT`); the sum clamp must not cut such a move to
+/// the 40: an accepted move of 150 is played whole, as it was before the clamp.
+#[test]
+fn a_lamp_without_a_reach_plays_an_accepted_150_count_sway_whole() {
+    static SWAY_150: Clip = Clip {
+        name: "sway",
+        step_ms: 1_000,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 0, -75, 0, 0],
+            [0, 0, -150, 0, 0],
+            [0, 0, -75, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 75, 0, 0],
+            [0, 0, 150, 0, 0],
+            [0, 0, 75, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    let (report, _, seen) = gesture_run_yaw(
+        &SWAY_150,
+        Duration::from_secs(8),
+        18,
+        |_| {},
+        None,
+        Some(40.0),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(
+        (report.gestures, report.gestures_dropped),
+        (1, 0),
+        "{report:?}"
+    );
+    let rested = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(8))
+        .unwrap()
+        .2[2];
+    let during: Vec<u16> = seen
+        .iter()
+        .filter(|step| step.1 == Some("sway"))
+        .map(|step| step.2[2])
+        .collect();
+    let (high, low) = (*during.iter().max().unwrap(), *during.iter().min().unwrap());
+    assert!(
+        high >= rested + 148 && low + 148 <= rested,
+        "swayed {low} to {high} from {rested}, cut short of 150 either way"
+    );
+}
+
+/// Second's P2 on #6002 (14:41): a lamp configured with a yaw reach under 150 keeps it. With a look
+/// 100 counts out and an accepted sway of 100 more, the base is asked no farther than 100 from home,
+/// not the 150 a lamp started without `--reach` is given (the no-argument and 250 controls are above).
+#[test]
+fn a_configured_yaw_reach_of_100_is_kept_under_a_look_and_a_sway() {
+    static SWAY_100: Clip = Clip {
+        name: "sway",
+        step_ms: 1_000,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 0, -50, 0, 0],
+            [0, 0, -100, 0, 0],
+            [0, 0, -50, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 50, 0, 0],
+            [0, 0, 100, 0, 0],
+            [0, 0, 50, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    let (report, _, seen) = gesture_run_yaw(
+        &SWAY_100,
+        Duration::from_secs(10),
+        18,
+        |_| {},
+        Some((Duration::from_secs(6), 100.0)),
+        Some(100.0),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let rest = seen
+        .iter()
+        .rfind(|step| step.0 < Duration::from_secs(6))
+        .unwrap()
+        .2[2];
+    let high = seen
+        .iter()
+        .filter(|step| step.1 == Some("sway"))
+        .map(|step| step.2[2])
+        .max()
+        .unwrap();
+    assert!(
+        high <= rest + 102,
+        "rest {rest}: the base went to {high}, past the configured 100"
+    );
+    assert!(high >= rest + 95, "held at the reach, not short: {high}");
+}
+
 #[test]
 fn a_standing_lamp_nods_and_is_left_exactly_where_it_was() {
     // Standing takes a little over four seconds; the nod is asked at eight.
@@ -4497,6 +4830,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |glimpse| steps.push((glimpse.goals, glimpse.arm_goals, glimpse.stand)),
     );
@@ -4569,6 +4903,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             aim_from_home: false,
             asleep: false,
             woken: false,
+            replace: false,
         },
         |_| {},
     );
@@ -4659,6 +4994,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 aim_from_home: false,
                 asleep: false,
                 woken: false,
+                replace: false,
             }
         },
         |glimpse| {
@@ -5088,6 +5424,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     aim_from_home: false,
                     asleep: false,
                     woken: false,
+                    replace: false,
                 }
             },
             |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -5173,6 +5510,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 aim_from_home: false,
                 asleep: false,
                 woken: false,
+                replace: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -5263,6 +5601,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 night: false,
                 night_woke: false,
                 aim_from_home: false,
+                replace: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -8107,6 +8446,7 @@ fn called_run(
                 aim_from_home: false,
                 asleep: false,
                 woken: false,
+                replace: false,
             }
         },
         |glimpse| {
@@ -16627,4 +16967,476 @@ fn a_standing_lamp_held_looks_from_home_where_it_was_asked() {
     let (above, aimed) = run(200.0);
     assert!((at_pose - above - 100).abs() <= 3, "{at_pose} {above}");
     assert!((aimed[1] + 200.0).abs() < 1.0, "{aimed:?}");
+}
+
+/// An ask, and the source of a `"replace": true` when it says one (a
+/// paired computer's is `control:<client>`, through lamp-control).
+type ReplaceAsk = (Duration, &'static Clip, Priority, Option<&'static str>);
+
+/// Fates said, as `(name, why)`.
+type Fated = Vec<(&'static str, &'static str)>;
+
+/// As [`arbitrated_run`], each ask with its replace mark, and the
+/// hand-overs the glimpses said.
+fn replace_run(
+    arbitration: bool,
+    asks: Vec<ReplaceAsk>,
+    seconds: u64,
+) -> (BodyReport, Fated, Vec<Step>, Fated) {
+    replace_run_in(arbitration, false, |_| Mood::Reading, asks, seconds)
+}
+
+/// As [`replace_run`], with the lamp's mood at each moment and the gesture
+/// pause (#2602) on or off.
+fn replace_run_in(
+    arbitration: bool,
+    gesture_pause: bool,
+    mood_at: fn(Duration) -> Mood,
+    asks: Vec<ReplaceAsk>,
+    seconds: u64,
+) -> (BodyReport, Fated, Vec<Step>, Fated) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        arbitration,
+        gesture_pause,
+        ..gesture_limits()
+    };
+    let time = clock.time.clone();
+    let mood_time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut asks = VecDeque::from(asks);
+    let (mut fates, mut seen, mut handed) = (Vec::new(), Vec::new(), Vec::new());
+    let report = run_told(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        move || Some((mood_at(mood_time.get()), 60)),
+        move || match asks.front() {
+            Some((at, clip, by, replace)) if time.get() >= *at => {
+                let asked = Asked {
+                    gesture: Some(*clip),
+                    replace: replace.is_some(),
+                    ..Asked::default()
+                };
+                let told = (asked, *by, replace.and_then(Source::new));
+                asks.pop_front();
+                told
+            }
+            _ => (Asked::default(), Priority::Conversation, None),
+        },
+        |glimpse| {
+            fates.extend(glimpse.gesture_fates);
+            handed.extend(glimpse.handed_over);
+            seen.push((
+                seen_at.get(),
+                glimpse.gesture,
+                glimpse.goals,
+                glimpse.arm_goals,
+            ));
+        },
+    );
+    (report, fates, seen, handed)
+}
+
+/// A paired computer's new motion (`replace`, at `skill`) asked while a
+/// skill's stretch plays at its widest ends it at once, with or without
+/// arbitration: the stretch eases out from where it is under the gesture's
+/// step, never a jump, and the nod plays after. The hand-over is said once.
+#[test]
+fn a_replace_ends_a_skill_motion_playing_and_the_hand_over_is_rate_limited() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        let asks = vec![
+            (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+            (
+                ms(11_200),
+                &crate::clips::NOD,
+                Priority::Skill,
+                Some("control:c_1"),
+            ),
+        ];
+        let (report, fates, seen, handed) = replace_run(arbitration, asks, 16);
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert_eq!(report.gestures, 2, "{arbitration}");
+        assert_eq!(
+            fates,
+            [
+                ("stretching", "taken: it plays"),
+                ("stretching", crate::moves::REPLACED),
+                ("nod", "taken: it plays"),
+            ],
+            "{arbitration}"
+        );
+        assert_eq!(handed, [("stretching", "nod")]);
+        let ended = seen.iter().position(|step| step.0 >= ms(11_200)).unwrap();
+        let nod = seen.iter().position(|step| step.1 == Some("nod")).unwrap();
+        assert!(nod > ended, "{ended} {nod}");
+        assert!(seen[ended..nod].iter().all(|step| step.1.is_none()));
+        // Each step from before the hand-over to well into the nod: the
+        // head's roll and the base's turn carry the gesture alone and move
+        // no more than its step; the arm (the gesture under the speaking
+        // lean, which eases a count or two a step) two counts over it.
+        for pair in seen[ended - 1..nod + 25].windows(2) {
+            let (before, after) = (&pair[0], &pair[1]);
+            for joint in [1, 2] {
+                let by = f32::from(after.2[joint].abs_diff(before.2[joint]));
+                assert!(
+                    by <= GESTURE_STEP[joint].ceil() + 1.0,
+                    "{arbitration} {joint} {pair:?}"
+                );
+            }
+            assert!(after.2[0].abs_diff(before.2[0]) <= 50, "{pair:?}");
+            for joint in 0..2 {
+                let by = f32::from(after.3[joint].abs_diff(before.3[joint]));
+                assert!(
+                    by <= GESTURE_STEP[3 + joint].ceil() + 2.0,
+                    "{arbitration} arm {joint} {pair:?}"
+                );
+            }
+        }
+    }
+}
+
+/// A replace never ends the conversation's or the person's motion: it is
+/// refused with why "the person is using the lamp", with or without
+/// arbitration, and what plays plays on.
+#[test]
+fn a_replace_over_the_conversation_or_the_person_is_refused() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        for holder in [Priority::Conversation, Priority::Safety, Priority::Person] {
+            let asks = vec![
+                (ms(8_000), &crate::clips::STRETCHING, holder, None),
+                (
+                    ms(10_000),
+                    &crate::clips::NOD,
+                    Priority::Skill,
+                    Some("control:c_1"),
+                ),
+            ];
+            let (report, fates, _, handed) = replace_run(arbitration, asks, 12);
+            assert_eq!(report.gestures, 1, "{arbitration} {holder:?}");
+            assert_eq!(
+                fates,
+                [
+                    ("stretching", "taken: it plays"),
+                    ("nod", crate::moves::PERSON_USING),
+                ],
+                "{arbitration} {holder:?}"
+            );
+            assert!(handed.is_empty());
+        }
+    }
+    assert_eq!(
+        crate::moves::PERSON_USING,
+        "dropped: the person is using the lamp"
+    );
+}
+
+/// The person always first (the Reviewer-lead's P2 on #4618): while
+/// someone talks with the lamp, a paired computer's motion is refused with
+/// why "the person is using the lamp", with or without arbitration, even
+/// over a skill's gesture and even with nothing playing.
+#[test]
+fn a_replace_while_the_person_talks_with_the_lamp_is_refused() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
+            let talk: fn(Duration) -> Mood = match mood {
+                Mood::Listening => |_| Mood::Listening,
+                Mood::Thinking => |_| Mood::Thinking,
+                _ => |_| Mood::Speaking,
+            };
+            // Over a skill's gesture playing.
+            let asks = vec![
+                (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+                (
+                    ms(10_000),
+                    &crate::clips::NOD,
+                    Priority::Skill,
+                    Some("control:c_1"),
+                ),
+            ];
+            let (_, fates, seen, handed) = replace_run_in(arbitration, false, talk, asks, 12);
+            assert!(
+                fates.contains(&("nod", crate::moves::PERSON_USING)),
+                "{arbitration} {mood:?} {fates:?}"
+            );
+            assert!(handed.is_empty(), "{arbitration} {mood:?}");
+            assert!(seen.iter().all(|step| step.1 != Some("nod")));
+            // With nothing playing.
+            let asks = vec![(
+                ms(8_000),
+                &crate::clips::NOD,
+                Priority::Skill,
+                Some("control:c_1"),
+            )];
+            let (report, fates, ..) = replace_run_in(arbitration, false, talk, asks, 10);
+            assert_eq!(report.gestures, 0, "{arbitration} {mood:?}");
+            assert_eq!(fates, [("nod", crate::moves::PERSON_USING)]);
+        }
+    }
+}
+
+/// With the gesture pause on (#2602), a skill's gesture paused because the
+/// person is speaking to the lamp is not ended by a paired computer's
+/// motion: the replace is refused, and nothing new plays over the person.
+#[test]
+fn a_replace_over_a_gesture_paused_for_talk_is_refused() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        let asks = vec![
+            (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+            (
+                ms(10_500),
+                &crate::clips::NOD,
+                Priority::Skill,
+                Some("control:c_1"),
+            ),
+        ];
+        let listening_from_ten: fn(Duration) -> Mood = |at| {
+            if at >= Duration::from_secs(10) && at < Duration::from_secs(11) {
+                Mood::Listening
+            } else {
+                Mood::Resting
+            }
+        };
+        let (_, fates, seen, handed) =
+            replace_run_in(arbitration, true, listening_from_ten, asks, 14);
+        assert!(
+            fates.contains(&("nod", crate::moves::PERSON_USING)),
+            "{arbitration} {fates:?}"
+        );
+        assert!(!fates.contains(&("stretching", crate::moves::REPLACED)));
+        assert!(handed.is_empty());
+        assert!(seen.iter().all(|step| step.1 != Some("nod")));
+    }
+}
+
+/// Without the replace mark, a gesture asked over one playing is as before:
+/// dropped without arbitration, and as busy under it at the same priority.
+#[test]
+fn without_replace_a_gesture_asked_over_one_playing_is_dropped_as_before() {
+    let ms = Duration::from_millis;
+    for (arbitration, why) in [
+        (false, "dropped: another gesture plays"),
+        (true, "dropped: busy, skill"),
+    ] {
+        let asks = vec![
+            (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+            (ms(10_000), &crate::clips::NOD, Priority::Skill, None),
+        ];
+        let (report, fates, _, handed) = replace_run(arbitration, asks, 12);
+        assert_eq!(report.gestures, 1);
+        assert_eq!(fates, [("stretching", "taken: it plays"), ("nod", why)]);
+        assert!(handed.is_empty());
+    }
+}
+
+/// A replace whose new frames would tip, laid over the pose the lamp is in
+/// when it begins, ends what played and is then refused whole by V1's
+/// anti-tip rule, as any gesture is.
+#[test]
+fn a_replace_that_would_tip_from_the_pose_it_begins_in_is_refused() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+        (
+            ms(10_000),
+            &PAST_THE_LINE,
+            Priority::Skill,
+            Some("control:c_1"),
+        ),
+    ];
+    let (report, fates, seen, _) = replace_run(true, asks, 14);
+    assert_eq!(report.tipping.refused, 1, "{:?}", report.tipping);
+    assert_eq!(report.tipping.last_refused.unwrap().0, "past_the_line");
+    assert_eq!(
+        fates,
+        [
+            ("stretching", "taken: it plays"),
+            ("stretching", crate::moves::REPLACED),
+            ("past_the_line", "dropped: it would tip"),
+        ]
+    );
+    assert!(seen.iter().all(|step| step.1 != Some("past_the_line")));
+}
+
+/// Only lamp-control's replace is honoured, with or without arbitration:
+/// one from `control:<client>` (or as `--caller-caps` names it,
+/// `lamp-control/control:<client>`) ends a skill's motion; the same mark
+/// from a skill or another part is taken as absent, dropped as today.
+#[test]
+fn only_lamp_controls_replace_interrupts_and_any_other_askers_is_as_before() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        for source in ["control:c_1", "lamp-control/control:c_1"] {
+            let asks = vec![
+                (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+                (
+                    ms(10_000),
+                    &crate::clips::NOD,
+                    Priority::Skill,
+                    Some(source),
+                ),
+            ];
+            let (report, fates, _, handed) = replace_run(arbitration, asks, 14);
+            assert_eq!(report.gestures, 2, "{arbitration} {source}");
+            assert!(
+                fates.contains(&("stretching", crate::moves::REPLACED)),
+                "{arbitration} {source} {fates:?}"
+            );
+            assert_eq!(handed, [("stretching", "nod")]);
+        }
+        let why = if arbitration {
+            "dropped: busy, skill"
+        } else {
+            "dropped: another gesture plays"
+        };
+        for source in ["skill:foo", "voice", "unknown/control:c_1"] {
+            let asks = vec![
+                (ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None),
+                (
+                    ms(10_000),
+                    &crate::clips::NOD,
+                    Priority::Skill,
+                    Some(source),
+                ),
+            ];
+            let (report, fates, _, handed) = replace_run(arbitration, asks, 12);
+            assert_eq!(report.gestures, 1, "{arbitration} {source}");
+            assert_eq!(
+                fates,
+                [("stretching", "taken: it plays"), ("nod", why)],
+                "{arbitration} {source}"
+            );
+            assert!(handed.is_empty());
+        }
+    }
+}
+
+/// A computer's look from home at 5 up and 5 right on a resting folded lamp,
+/// held, with one servo stopping `short` counts short of any goal: what the
+/// look is answered, and when.
+fn a_held_look_at_rest_with(short: (usize, f32)) -> Vec<(Duration, String)> {
+    use crate::lease::{Looking, Reach};
+    let (mut lamp, mut clock) = folded(Duration::from_secs(20));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.short = Some(short);
+    let limits = Limits {
+        rest_glance: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 300,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let reach = Reach {
+        yaw: 480.0,
+        up: 150.0,
+        down: 15.0,
+    };
+    let start = std::time::Instant::now();
+    let looking = Rc::new(std::cell::RefCell::new(Looking::default()));
+    let said: Rc<std::cell::RefCell<Vec<(Duration, String)>>> = Default::default();
+    let (asking, stepping, kept) = (looking.clone(), looking.clone(), said.clone());
+    let (time, seen_at) = (clock.time.clone(), clock.time.clone());
+    let mut asked = false;
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let at = time.get();
+            let mut looking = asking.borrow_mut();
+            if !asked && at >= LOOK_ASKED_AT {
+                asked = true;
+                let line = br#"{"look":{"yaw":5,"pitch":5,"from":"home"}}"#;
+                assert_eq!(looking.ask(line, true, reach, start + at), None);
+            }
+            // Held, lamp-body passes nothing of Expression's.
+            Asked {
+                held: true,
+                aim: looking.aim(),
+                aim_from_home: looking.from_home(),
+                ..Asked::default()
+            }
+        },
+        move |glimpse| {
+            let at = seen_at.get();
+            let mut looking = stepping.borrow_mut();
+            looking.applied(glimpse.look_aimed);
+            // As lamp-body does: the goals the pose wants, and where the
+            // joints read.
+            if let Some(line) = looking.step(
+                Ok(()),
+                Some((glimpse.wanted, glimpse.positions)),
+                start + at,
+            ) {
+                kept.borrow_mut().push((at, line));
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    said.take()
+}
+
+const LOOK_ASKED_AT: Duration = Duration::from_secs(8);
+
+/// The one answer of [`a_held_look_at_rest_with`]: there, `clamped`, inside
+/// two seconds, at these angles to a tenth of a degree or two.
+fn answered_there_clamped_at(said: &[(Duration, String)], yaw: f64, pitch: f64) {
+    assert_eq!(said.len(), 1, "{said:?}");
+    let (at, line) = &said[0];
+    let value: serde_json::Value = serde_json::from_str(line).unwrap();
+    assert_eq!(value["look"], "there", "at {at:?}: {line}");
+    assert_eq!(value["clamped"], true, "{line}");
+    assert!(
+        *at < LOOK_ASKED_AT + Duration::from_secs(2),
+        "answered at {at:?}"
+    );
+    assert!(
+        (value["yaw"].as_f64().unwrap() - yaw).abs() <= 0.2,
+        "{line}"
+    );
+    assert!(
+        (value["pitch"].as_f64().unwrap() - pitch).abs() <= 0.2,
+        "{line}"
+    );
+}
+
+/// The local leader's check of #4580 on lamp-75c9 (stable 10579, 7 Nov, run
+/// twice, lamp-body restarted between): a computer's look from home on a
+/// resting lamp, no hand on it, ended `cut_short` ("not there in time:
+/// something holds the head") after 5 s. The head's pitch stopped 17 counts
+/// short of its goal (step 1501: goal 1743, position 1760, load 80), inside
+/// the slack a rest is let stop in but past the look's 6 counts. A look that
+/// has stopped moving that near is answered there, from where the head
+/// stopped, and said `clamped`; in the simulator, where a rest wrote the
+/// pitch's goal where it stopped, it had been said there at 5.0, unclamped.
+#[test]
+fn a_look_held_on_a_resting_lamp_whose_head_stops_short_is_answered_where_it_stopped() {
+    // 17 counts, 1.5 degrees, short of 5 up.
+    answered_there_clamped_at(&a_held_look_at_rest_with((PITCH, 17.0)), 5.0, 3.5);
+}
+
+/// The same with the base: on lamp-75c9 a look 57 counts right left the
+/// base 41 over, its goal written where it stopped, and said nothing of it
+/// (`clamped:false`). Stopped 16 short, it is said there where it stopped.
+#[test]
+fn a_look_held_on_a_resting_lamp_whose_base_stops_short_is_answered_where_it_stopped() {
+    // 16 counts, 1.4 degrees, short of 5 right.
+    answered_there_clamped_at(&a_held_look_at_rest_with((YAW, 16.0)), 3.6, 5.0);
 }

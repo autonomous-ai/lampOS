@@ -722,9 +722,10 @@ impl Thread {
             self.heard_done = false;
         }
         // A new line begins: a write waiting for its "send" counts it
-        // (`crate::services`), so only the very next line can send it.
+        // (`crate::services`), so only the very next line can send it. The
+        // person's words come with no request: never taken off as an echo.
         if self.heard.trim().is_empty() && text.chars().any(char::is_alphanumeric) {
-            crate::services::line_began(now);
+            crate::services::line_began(None, now);
         }
         add(&mut self.heard, text, PERSON_BYTES);
         // Scrubbed joined too: a code or an account split across pieces is
@@ -732,6 +733,22 @@ impl Thread {
         self.heard = crate::sign_in::scrub_piece(&self.heard);
         self.heard_at = Some(now);
         self.heard_done = finished;
+    }
+
+    /// The line of `request`'s words are told (`second_provider`, before
+    /// they go out as the person's): a write waiting for its "send" counts
+    /// it with its request, the only kind of line it takes off when held as
+    /// the lamp's echo ([`Self::own_echo_held`]).
+    pub fn line_heard(&mut self, request: u64, now: Instant) {
+        crate::services::line_began(Some(request), now);
+    }
+
+    /// The line of `request` was held as the lamp's own words heard back
+    /// (`second_provider`, `own_echo`): a write waiting for its "send" does
+    /// not count it as the person's (`crate::services`), if it counted it
+    /// with its request ([`Self::line_heard`]).
+    pub fn own_echo_held(&mut self, request: u64) {
+        crate::services::own_echo_held(request);
     }
 
     /// The words heard in the line `request` answers, as far as the thread
@@ -891,6 +908,9 @@ impl Thread {
         // A write waiting for its "send" hears what the lamp said of its
         // read-back, as said, and of any other request (`crate::services`).
         crate::services::lamp_said(request, words, now);
+        // A made skill's writes waiting for a yes hear its say-back so
+        // (`crate::skill_write_yes`).
+        crate::skill_write_yes::lamp_said(request, words);
         // The owner asked whether the lamp may learn their voice: the ask
         // said, and the line after it answered (`crate::owner_voice`).
         if crate::owner_voice::waits_for_answer() {
@@ -1142,6 +1162,7 @@ impl Thread {
         self.cut = Some(request);
         // A read-back cut is no read-back: its write is never sent.
         crate::services::lamp_cut(request);
+        crate::skill_write_yes::lamp_cut(request);
         if self.private.contains(&request) {
             return;
         }
@@ -1173,6 +1194,9 @@ impl Thread {
     /// said about it is not to be told to the next session.
     pub fn forget(&mut self) {
         crate::conversation_summary::forget_all();
+        // The write waiting for its send goes with what was said of it
+        // (Thirteen's P2 on #5968).
+        crate::services::forget_waiting();
         self.exchanges.clear();
         self.lines.clear();
         self.calling.clear();
@@ -1384,6 +1408,41 @@ impl Thread {
     /// was, so the words and their age come from one exchange (the
     /// Reviewer-lead's P3 on #4880).
     pub fn answered_last_but(&self, request: u64, now: Instant) -> Option<(String, Duration)> {
+        self.answered_last_but_cut(request, now)
+            .map(|(lamp, ago, _)| (lamp, ago))
+    }
+
+    /// The line `request` began over the lamp's audible answer, cut it, or
+    /// came first after a Stop (`over_the_lamps_voice`, `heard_of_cut` or
+    /// `after_stop` on its Start, either route's provider worker): the
+    /// lamp's line before it, the newest with the lamp's words but
+    /// `request`'s, was not heard whole, and is marked cut itself, so a yes
+    /// in any later request reads it as cut too
+    /// ([`Self::answered_last_but_cut`], the Reviewer-lead's P3s on #5609).
+    /// On the Live route the lamp's words are never cut down to what was
+    /// heard ([`Self::heard_only`]), so this is all it is told. The words
+    /// stay as they are.
+    pub fn began_over_the_lamps_voice(&mut self, request: u64) {
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+        {
+            exchange.cut = true;
+        }
+    }
+
+    /// [`Self::answered_last_but`], and whether that line was cut: kept as
+    /// heard after a cut ([`Self::heard_only`]), or a line began over it
+    /// ([`Self::began_over_the_lamps_voice`]). A yes to it is no
+    /// yes to all of it (`crate::agent_tasks`, #5169).
+    pub fn answered_last_but_cut(
+        &self,
+        request: u64,
+        now: Instant,
+    ) -> Option<(String, Duration, bool)> {
         let exchange = self
             .exchanges
             .iter()
@@ -1395,7 +1454,11 @@ impl Thread {
         } else {
             format!("{} {}", exchange.lamp, exchange.tail)
         };
-        Some((lamp, now.saturating_duration_since(exchange.at)))
+        Some((
+            lamp,
+            now.saturating_duration_since(exchange.at),
+            exchange.cut,
+        ))
     }
 
     /// The request of the newest exchange with the lamp's words, `request`'s
@@ -1517,13 +1580,27 @@ impl Thread {
     /// `exchanges` before it, oldest first, each with what the lamp said
     /// back. A note the lamp was given in writing is not anyone's words.
     pub fn names_window(&self, exchanges: usize) -> crate::known_faces::Said {
-        let spoken: Vec<&Exchange> = self
-            .exchanges
-            .iter()
-            .filter(|exchange| exchange.written.is_none())
-            .collect();
+        // The face question the walk hands out in writing
+        // (`onboarding::skill::FACE_ASK`, #5931) is the lamp's own words
+        // after the line before it: kept as that exchange's, so its yes runs
+        // the setup save (`yes_save`) and the read-back stays in the window
+        // (the Reviewer-lead's HOLD on #6013). Any other written note is
+        // not anyone's words, and is left out.
+        let mut spoken: Vec<(String, String)> = Vec::new();
+        for exchange in &self.exchanges {
+            if exchange.written.is_none() {
+                spoken.push((exchange.person.clone(), exchange.lamp.clone()));
+            } else if crate::known_faces::asks_for_the_face(&exchange.lamp)
+                && let Some((_, lamp)) = spoken.last_mut()
+            {
+                if !lamp.trim().is_empty() {
+                    lamp.push(' ');
+                }
+                lamp.push_str(exchange.lamp.trim());
+            }
+        }
         let (this, earlier) = match spoken.split_last() {
-            Some((last, rest)) if self.heard.trim().is_empty() => (last.person.clone(), rest),
+            Some((last, rest)) if self.heard.trim().is_empty() => (last.0.clone(), rest),
             _ => (self.heard.clone(), &spoken[..]),
         };
         // An exchange where neither they nor the lamp said a word is
@@ -1533,18 +1610,16 @@ impl Thread {
         // builder's P3) or the wordless cut-in's own question, "did anyone
         // say something?", whose yes answers it and never the read-back
         // before it (the Reviewer-lead's P2).
-        let earlier: Vec<&&Exchange> = earlier
+        let earlier: Vec<&(String, String)> = earlier
             .iter()
-            .filter(|exchange| {
-                !(exchange.person.trim().is_empty() && exchange.lamp.trim().is_empty())
-            })
+            .filter(|(person, lamp)| !(person.trim().is_empty() && lamp.trim().is_empty()))
             .collect();
         let from = earlier.len().saturating_sub(exchanges);
         crate::known_faces::Said {
             this,
             before: earlier[from..]
                 .iter()
-                .map(|exchange| (exchange.person.clone(), exchange.lamp.clone()))
+                .map(|&exchange| exchange.clone())
                 .collect(),
         }
     }
@@ -3712,6 +3787,53 @@ mod tests {
         assert_eq!(said.before[1].1, "Walter, did I get that right?");
     }
 
+    /// The Reviewer-lead's HOLD on #6013: the walk's face question goes out
+    /// as a written note, and a window that dropped it never let its yes run
+    /// the setup save. It stays the lamp's words after the line before it,
+    /// with the read-back still in the window; a no to it saves nothing.
+    #[test]
+    fn the_walks_written_face_question_is_in_the_names_window() {
+        let now = Instant::now();
+        let asked = |answer: &str| {
+            let mut thread = Thread::new();
+            thread.person("My name is Walter.", true, now);
+            thread.lamp(1, "Walter, did I get that right?", now);
+            thread.person("Yes. That's my name.", true, now);
+            thread.lamp(2, "Yes, that's your name settled, then.", now);
+            thread.written(3, crate::onboarding::skill::FACE_ASK);
+            thread.lamp(3, "May I remember your face, so I know you next time?", now);
+            thread.person(answer, true, now);
+            thread.names_window(crate::known_faces::SAID_EXCHANGES)
+        };
+        let said = asked("Yes.");
+        assert_eq!(said.before.len(), 2, "{:?}", said.before);
+        assert_eq!(said.before[0].1, "Walter, did I get that right?");
+        assert_eq!(
+            crate::known_faces::face_agreed_name(&said).as_deref(),
+            Some("Walter"),
+            "{said:?}"
+        );
+        assert_eq!(crate::known_faces::face_agreed_name(&asked("No.")), None);
+        // Any other written note is still no one's words.
+        let mut thread = Thread::new();
+        thread.person("My name is Walter.", true, now);
+        thread.lamp(1, "Walter, did I get that right?", now);
+        thread.written(
+            2,
+            "(Say only this, nothing before or after it: \"Step three: pet the top of my head.\")",
+        );
+        thread.lamp(2, "Step three: pet the top of my head.", now);
+        thread.person("Yes.", true, now);
+        let said = thread.names_window(crate::known_faces::SAID_EXCHANGES);
+        assert_eq!(
+            said.before,
+            [(
+                "My name is Walter.".to_owned(),
+                "Walter, did I get that right?".to_owned()
+            )]
+        );
+    }
+
     /// `LAMP_LIVE_SCOPED_SESSION`: a line admitted for someone known makes
     /// the session theirs before the count catches up, refuses only another
     /// known person's session, and stops counting two minutes on or once
@@ -4619,6 +4741,41 @@ mod tests {
         assert!(lamp.contains("Shall I put it on the lamp?"), "{lamp}");
         assert_eq!(ago, Duration::from_secs(5));
         assert!(Thread::new().answered_last_but(1, now).is_none());
+    }
+
+    /// The Reviewer-lead's P3 on #5609: a read-back cut as heard, or one a
+    /// line began over, says it was cut; one heard whole does not.
+    #[test]
+    fn answered_last_but_cut_says_a_read_back_was_cut() {
+        let ask = "Claude Code will write a poem. Shall I start it?";
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("Ask Claude Code for a poem", true, now);
+        thread.lamp(1, ask, now);
+        thread.person("Yes.", true, now);
+        assert!(!thread.answered_last_but_cut(2, now).unwrap().2);
+        // A line that began over the lamp's voice marks the line before it.
+        thread.began_over_the_lamps_voice(2);
+        let (lamp, _, cut) = thread.answered_last_but_cut(2, now).unwrap();
+        assert!(cut && lamp.contains("Shall I start it?"), "{lamp}");
+        // The line that began over it got no spoken answer, and the yes
+        // came as the next request: still cut (the Reviewer-lead's second
+        // P3 on #5609).
+        let mut thread = Thread::new();
+        thread.person("Ask Claude Code for a poem", true, now);
+        thread.lamp(1, ask, now);
+        thread.began_over_the_lamps_voice(2);
+        thread.person("Wait, I mean", true, now);
+        thread.person("Yes.", true, now);
+        let (lamp, _, cut) = thread.answered_last_but_cut(3, now).unwrap();
+        assert!(cut && lamp.contains("Shall I start it?"), "{lamp}");
+        // Kept as heard after a cut (the second route).
+        let mut thread = Thread::new();
+        thread.person("Ask Claude Code for a poem", true, now);
+        thread.lamp(1, ask, now);
+        thread.heard_only(1, "Claude Code will write");
+        thread.person("Yes.", true, now);
+        assert!(thread.answered_last_but_cut(2, now).unwrap().2);
     }
 
     /// `LAMP_KEEP_QUIETLY`: the lamp's words of the conversation going on,

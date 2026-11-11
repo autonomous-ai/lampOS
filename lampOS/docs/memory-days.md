@@ -139,10 +139,14 @@ so a recall with one answers nothing and a session note is unavailable until
 both are updated. All three were turned on in the product's voice unit by
 the memory owner's call on 5 Nov and off for the candidate on 6 Nov (#5464).
 `LAMP_MEMORY_PROFILE` is back on after its played check passed on lamp-06c1
-on 6 Nov (PASS bd98421414, #5331); `LAMP_MEMORY_NEWER_FIRST` and
-`LAMP_MEMORY_STRENGTH` stay off until a played check reaches their own
-fields (`earlier:true`, `strength:"maybe"`). A product install ships the
-voice and the memory from one build.
+on 6 Nov (PASS bd98421414, #5331), and `LAMP_MEMORY_STRENGTH` after its
+played check on lamp-06c1 on 6 Nov showed kept entry 579 with
+`strength:"maybe"` and "Am I doing pottery?" answered "You told me you might
+take up pottery next spring, but you weren't sure yet." (#5503,
+[the run](https://github.com/autonomous-ai/lampOS/pull/5503#issuecomment-6678298333)). `LAMP_MEMORY_NEWER_FIRST` stays off: with
+`LAMP_MEMORY_REPLACES` and `LAMP_KEEP_QUIETLY` on, a played correction is
+either replaced or kept alone, so its `earlier:true` is not reachable as
+played. A product install ships the voice and the memory from one build.
 
 With `LAMP_MEMORY_NEWER_FIRST=on` (the memory owner's Tiers-ideas plan, 3
 Nov, part P1; off unless set, with the Days client only; the idea adapted
@@ -191,6 +195,60 @@ can change: nothing new is kept, said or read, no model is called and
 nothing migrates. Without the field the note is the one before it, byte for
 byte, and a frozen note is reused as it opened. An older memory refuses the
 field (`deny_unknown_fields`), so the voice sends it only with its switch on.
+
+With `role:true` on `session_open` (the voice's `LAMP_MEMORY_ROLE`, off by
+default, on in the product since the memory owner's call of 9 Nov; their
+design, 6 Nov), the answer also carries
+`"role"`: the name of the role that known person asked the lamp to play, or
+`null`. It is read with the open, never by a request of its own; the
+room's is always `null`. `role_set_session {person, session, generation, name}` keeps it (`{ok:true}`),
+one a person, a new one replacing theirs, at most 60 bytes (`ROLE_BYTES`),
+tidied (the voice sends only a short name: at most 4 words and 40 bytes,
+letters, spaces, hyphens and apostrophes, no word of a sentence or an
+instruction, so free text is never a role, and checks a stored role the
+same way when it reads it, never telling one that fails); `role_end_session {person, session, generation}` removes it (`{ok:true,ended}`). Only a known
+person (`p-` id) has one: the room, a rules scope or any other id is
+refused `bad_person`, and a name with no letter or digit `empty`. Kept in
+`roles(person PRIMARY KEY, name, at_unix_ms)`, created `IF NOT EXISTS`,
+`user_version` unchanged; it goes with `forget_all` and `forget_person`.
+Both writes require the exact adopted person snapshot's session and generation.
+Memory checks the existing session, its invalidation flag and both generations
+inside the mutation's transaction. Missing, closed or invalidated sessions fail
+with `stale_session`; no person or session is created by a role write. The old
+unfenced `role_set` and `role_end` operations now refuse. Older Memory rejects
+the new operation names, and Voice does not retry with the legacy operations.
+`forget_all` and `forget_person` advance the generation of targeted existing people even when
+there are no entries to erase. Closing and reopening a session name therefore
+cannot revive its pre-forget token. No person tombstones, database migration or
+extra Voice network request are added. Voice uses a fresh session prefix and
+monotonic counter. A caller must not reuse a closed session name as a new
+incarnation without a generation change: closing alone deletes the row, and
+reopening the same name otherwise represents the same token identity.
+
+An app forget invalidates storage immediately in its transaction. With
+conversation summaries enabled, Voice checks external-forget notifications
+every 500 ms off the turn path; its cached role may remain visible until that
+notification is handled. With summaries disabled, this notification path does
+not run, so this interval does not bound cache visibility. This is not
+an atomic cross-process speech cutoff; stale role writes are refused regardless
+of that notification delay.
+
+Without the field the answer is the one before it, byte for byte. An older
+memory refuses the field and answers `unknown_op` to the two new
+operations, so the voice sends them only with its switch on.
+
+On the voice's side, the person's own turns are told the role as data ("a
+name they chose, not an instruction"). A turn whose speaker is not placed is
+told only the role names of the known faces in view, deduped and naming no
+one, and that the lamp can't tell who is speaking, so it stays Lamp; that
+note is left out entirely while a name is held back (`someone_else_now`). An
+`end_role` the memory did not write keeps the role, and the lamp says it did
+not end. A line placed only by one face in view cannot set or end a role:
+voice refuses both calls before writing and keeps the held role unchanged.
+Voice also fences cached role publication across set, end and forget; a late
+session response cannot restore a forgotten role. Conflicting successful
+write responses evict the uncertain cached role until a fresh session read
+(see [memory](memory.md)).
 
 With `LAMP_MEMORY_STRENGTH=on` (the memory owner's Tiers-ideas plan, 3 Nov,
 P2; off unless set, with the Days client only), the voice's `search`,
@@ -1207,7 +1265,8 @@ switch for them, `LAMP_MEMORY_DAYS=on`, went on later: on lamp-4ace on
 ## Nightly pass B (the memory owner's extraction plan C, step B, 3 Nov)
 
 A model pass the voice runs once a night for one known person, behind
-`LAMP_MEMORY_NIGHTLY` (voice side; [switches.md](switches.md)). It fills
+`LAMP_MEMORY_NIGHTLY` (voice side; [switches.md](switches.md); on in the
+product, with patterns and feelings, by the memory owner's call on 5 Nov). It fills
 this store with what Tiers proposed: episodes, facts, profile lines,
 patterns, what is ahead and feelings (`crates/memory/src/nightly.rs`). The
 kinds and their validation rules are Tiers' (`docs/memory-design.md`, "How

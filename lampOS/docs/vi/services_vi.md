@@ -22,8 +22,13 @@ lúc 14:11 ngày 3 Nov 2026):
   được mở ở chế độ chỉ-đọc.
 - **Ghi chỉ khi trực tiếp**, sau công tắc riêng: do chủ đèn yêu cầu tại đèn,
   được đọc lại đầy đủ (nơi nó đến, mọi người nhận, ai có thể thấy, toàn bộ
-  nội dung) và chỉ gửi khi người đó nói "send" ngay ở câu kế tiếp của họ; bất
-  cứ điều gì khác sẽ huỷ nó.
+  nội dung), rồi đèn nói "Say 'yes, send it' to send it." ("Nói 'gửi đi' để
+  gửi nhé."); mô hình quyết định câu trả lời là xác nhận hay huỷ, bằng bất kỳ
+  lời nào (chủ đèn, 10/11), và gửi bằng `send_id` của lần ghi trong vòng hai
+  phút, dù ai nói; không danh sách từ nào trong đèn quyết định việc đó. Chỉ
+  một câu trả lời bắt đầu trong 1,5 s đuôi tiếng vọng của lời đèn, có chung
+  bất kỳ từ nào với lời đó, mới phải là giọng của người đã yêu cầu, nên chính
+  lời của đèn vọng lại không bao giờ gửi được.
 - **Các hàng rào**: chỉ câu nói được nghe của chính chủ đèn mới chạm đến một
   dịch vụ ("Ai dùng được chúng", bên dưới); token chỉ đi đến các host của
   chính dịch vụ của nó, qua HTTPS, không theo chuyển hướng; các lượt chạy
@@ -32,12 +37,30 @@ lúc 14:11 ngày 3 Nov 2026):
   bạn ở một mình với đèn ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới); lời từ một thư,
   một trang hay một giọng khác không bao giờ trở thành một lần ghi hay bất kỳ
   hành động nào khác; mã dùng một lần và nội dung bảo mật không bao giờ được
-  nói ra, chuyển tiếp hay lưu giữ, dù từ dịch vụ nào; những gì một dịch vụ
+  nói ra, chuyển tiếp hay lưu giữ, dù từ dịch vụ nào (lần đọc Gmail của
+  chính bạn nói một thư bảo mật với đường dẫn và mã của nó được che); những gì một dịch vụ
   trả về là dữ liệu trích dẫn, không bao giờ là chỉ dẫn, và không gì của nó
   được giữ trong luồng hội thoại; gỡ một dịch vụ, khôi phục cài đặt gốc và
   đăng xuất đều xoá token của nó.
 
 ## Ai dùng được chúng
+
+**Trong sản phẩm hôm nay, bất kỳ ai nói với đèn** (`LAMP_PRIVATE_ROOM=on`,
+quyết định của chủ đèn ngày 6/11). Đèn là một căn phòng riêng giữa nó và chủ
+của nó, nên ai nói cũng là chủ đèn, và không có kiểm tra quyền sở hữu nào
+chạy: việc nhận ra ai đang nói chưa đủ tin cậy, và đèn đã từ chối chính chủ
+của nó. Một câu vẫn phải được nói ra (`NOT_HEARD`), và một lần ghi vẫn được
+đọc lại, và chỉ gửi bằng lệnh gọi của mô hình có `send_id` sau một câu trả lời
+nói ra (chủ đèn, 10/11: mô hình quyết định xác nhận hay huỷ; đèn chỉ kiểm tra
+send_id, một yêu cầu sau, hai phút và phần đọc lại không bị cắt). Lệnh ghi vẫn chỉ ở trên tuyến thứ hai.
+
+**Cái giá đã chấp nhận (chủ đèn, 6/11):** không hề cần khuôn mặt nào, kể cả
+khi không có ai trong tầm nhìn. Nên một TV, một cuộc gọi video hay một bản ghi
+âm nói "read my mail" có thể khiến thư được đọc to đầy đủ. Chủ đèn chọn điều
+này thay vì bất kỳ luật cần-thấy-mặt nào, để đèn không từ chối.
+
+Các luật dưới đây là những gì áp dụng khi tắt công tắc; chúng ở lại trong mã
+cho một tính năng sau này.
 
 Chỉ chủ của đèn: người có khuôn mặt quen được giữ dưới tên gõ lúc setup
 (`LAMP_PERSON_NAME`) hoặc dưới tên mà `who_you_are` lưu cùng khuôn mặt của họ
@@ -116,8 +139,10 @@ dịch vụ.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
+| `LAMP_CALENDAR_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_event` và `delete_event` của `service_write` trả lời "changing or cancelling a calendar event is off on this lamp" trước khi bất cứ gì được đọc, giữ hay gửi, và `tools.json` chỉ liệt kê `create_event` cho Google Calendar ("Đổi hoặc huỷ một sự kiện lịch", bên dưới) |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
-| `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
+| `LAMP_SKILL_WRITES=on` (#6066; tắt trong mọi unit sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
+| `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -159,7 +184,7 @@ kế tiếp, và khi đó giọng nói không khai báo hàm nào của dịch v
 
 | Phần | Chạy dưới quyền | Việc nó làm ở đây |
 |---|---|---|
-| `lamp-services` (`crates/services`, package và binary `lamp-services`) | root không có capability nào (`CapabilityBoundingSet=`), `Group=lampos`, `lamp-services.service`, được phép dùng mạng, hệ thống chỉ-đọc trừ hai thư mục của nó, kernel, đồng hồ, hostname và control group được bảo vệ, không namespace, realtime, set-id hay bộ nhớ vừa ghi vừa chạy, system call giới hạn ở `@system-service` trừ `@privileged` và `@resources` | Giữ các token; thực hiện mọi lệnh gọi đến một dịch vụ; giữ một lần ghi đã chuẩn bị chờ "send" của nó |
+| `lamp-services` (`crates/services`, package và binary `lamp-services`) | root không có capability nào (`CapabilityBoundingSet=`), `Group=lampos`, `lamp-services.service`, được phép dùng mạng, hệ thống chỉ-đọc trừ hai thư mục của nó, kernel, đồng hồ, hostname và control group được bảo vệ, không namespace, realtime, set-id hay bộ nhớ vừa ghi vừa chạy, system call giới hạn ở `@system-service` trừ `@privileged` và `@resources` (trả lại `setrlimit` và `prlimit64`, cho giới hạn bộ nhớ của bộ đọc PDF) | Giữ các token; thực hiện mọi lệnh gọi đến một dịch vụ; giữ một lần ghi đã chuẩn bị chờ "send" của nó |
 | `lamp-cloud` (`crates/cloud/src/services.rs`) | `lampos` | Nhận các kind của ứng dụng, lấy dữ liệu của một liên kết từ backend và chuyển tiếp; xoá khi đăng xuất |
 | `lamp-voice` (`crates/voice/src/services.rs`) | root | Khai báo ba hàm cho mô hình và giữ cổng gửi |
 
@@ -182,6 +207,7 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...],"sha256"?}`, lời đồng ý của ứng dụng cho các lần ghi của kỹ năng tự tạo (với `LAMP_SKILL_WRITES=on`; `sha256`, không bắt buộc, là package được nói lại, bị từ chối nếu không phải package đang cài; "Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
 
   Một dòng có trường mà op của nó không nhận, hoặc một code mà danh mục không
   biết, bị từ chối mà không lặp lại nó.
@@ -201,7 +227,10 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   `LAMP_SKILL_READS=on`, một tiến trình tại
   `/lampos.slice/lampos-parts.slice/lamp-skills.service` cũng được gọi, nhưng
   chỉ `service_read`: mọi tên khác nhận "a skill may only read a linked
-  service" (`serve::Services::skill_tool`).
+  service" (`serve::Services::skill_tool`). Với `LAMP_SKILL_WRITES=on` nó
+  còn được gọi `skill_write`, lần ghi của kỹ năng tự tạo mà chủ đèn đã đồng
+  ý, và chỉ giọng nói được gọi `skill_write_approve` và `skill_writes_sent`
+  ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới).
 
 Mỗi cửa trả lời tối đa 8 kết nối cùng lúc ("busy" khi vượt quá), và một peer
 có 5 s để gửi dòng của nó và nhận câu trả lời. Unit là một service thường,
@@ -271,10 +300,10 @@ backend của đèn, không bao giờ đến Google).
 
 | Code | Tên | Host | Đọc (`what`) | Ghi (`action`) |
 |---|---|---|---|---|
-| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
+| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `drafts {count}` (chỉ mật khẩu ứng dụng), `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}`, `save_draft {to, cc, subject, text}` (chỉ mật khẩu ứng dụng) |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | không có: nó chỉ gửi | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
-| `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | không có |
+| `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | `create_doc {title, text}`, `create_sheet {title, rows}`, `create_file {title, text}`: một tệp mới trong My Drive |
 | `figma`, `figma-api` | Figma | `api.figma.com` | `me`, `file {id}`, `comments {id}` | `comment {id, text}` |
 | `github` | GitHub | `api.github.com` | `query {graphql, variables}`, `notifications`, `issues {repo}`, `pulls {repo}`, `repos` | `create_issue {repo, title, text}`, `comment {repo, number, text}` |
 | `linear` | Linear | `api.linear.app` | `query {graphql, variables}`, `my_issues` | `create_issue {team_id, title, text}` |
@@ -335,7 +364,8 @@ for your account"), nên nó liên kết bằng đăng nhập, như Google Calen
 thông tin xác thực chỉ đi đến các host của riêng nó: mật khẩu ứng dụng không
 bao giờ đến `gmail.googleapis.com`, nơi từ chối nó, và token của đăng nhập
 không bao giờ đến IMAP hay SMTP. Cả hai loại giữ mọi luật dưới đây: cùng câu
-trả lời `service_read` và giới hạn, thư bảo mật bị bỏ ra, chỉ ghi khi có câu
+trả lời `service_read` và giới hạn, thư bảo mật được che trong lần đọc của
+chính bạn và bị bỏ ra khỏi lần đọc của một kỹ năng tự tạo, chỉ ghi khi có câu
 "send" nói ra cùng `LAMP_SERVICES_WRITE`, chỉ câu nghe được của chủ, không
 giữ gì.
 
@@ -349,18 +379,62 @@ giữ gì.
 - **Ở `set`:** một lệnh IMAP `LOGIN` được thử trước. Bị từ chối: `failure` với
   "Gmail refused the app password"; không kết nối được: "Gmail couldn't be
   reached"; dù trường hợp nào cũng không gì được lưu.
-- **Đọc:** IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `EXAMINE INBOX`
-  (hộp thư mở ở chế độ chỉ-đọc), `UID SEARCH` (các từ của `search` là cú pháp
+- **Đọc:** IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `EXAMINE` một
+  hộp thư (mở ở chế độ chỉ-đọc), `UID SEARCH` (các từ của `search` là cú pháp
   riêng của Gmail, `X-GM-RAW`), `UID FETCH` lấy From, Subject, Date và phần
-  đầu nội dung bằng `BODY.PEEK` (không gì bị đánh dấu đã đọc), `LOGOUT`. Một
-  danh sách tối đa 10 thư, mỗi thư 300 ký tự; `message {id}` (UID mà một danh
-  sách đưa ra) đến 3,000. Nội dung lấy từ phần văn bản thuần trước, nếu không
+  đầu nội dung bằng `BODY.PEEK` (không gì bị đánh dấu đã đọc), `LOGOUT`.
+  `recent` đọc hộp thư đến (`EXAMINE INBOX`). `search` đọc All Mail, như
+  tìm kiếm riêng của Gmail, nên một thư đã lưu trữ hoặc gắn nhãn nằm ngoài
+  hộp thư đến cũng được tìm thấy (Spam và Trash không nằm trong All Mail):
+  trước tiên một lệnh `LIST "" "*"` tìm hộp thư được đánh dấu `\All` (RFC
+  6154), dù tên của nó theo ngôn ngữ của tài khoản là gì (`[Gmail]/All
+  Mail`, `[Gmail]/Tất cả thư`), và gửi lại tên đúng như máy chủ đã viết
+  (modified UTF-7); khi không hộp thư nào được đánh dấu (All Mail bị ẩn khỏi
+  IMAP trong cài đặt của Gmail) thì tìm kiếm đọc hộp thư đến. Một UID chỉ chỉ
+  một thư trong hộp thư của nó, nên id của một thư từ All Mail mang theo điều
+  đó: `all41` là UID 41 trong All Mail, `41` trơn là UID 41 trong hộp thư
+  đến. `message {id}` mở lại đúng hộp thư mà id nêu (với `all…`, lại `LIST`;
+  nếu All Mail đã không còn, không gì được đọc). `drafts {count}` đọc Drafts
+  (yêu cầu của chủ đèn ngày 10/11: "read my drafts"): `LIST` tìm hộp thư được
+  đánh dấu `\Drafts`, dù tên nó là gì (`[Gmail]/Drafts`,
+  `[Gmail]/Th&AbA- nh&AOE-p` cho "Thư nháp"), nếu không thì `[Gmail]/Drafts`,
+  rồi `EXAMINE` và `UID SEARCH ALL`, mới nhất trước; id của chúng là
+  `draft12` (UID 12 trong Drafts), mà `message {id}` đọc lại trong Drafts.
+  Mỗi lần fetch đều xin cả To, nhưng chỉ một bản nháp giữ nó (`"to"` trong
+  mục của nó: gửi cho ai là điều bản nháp nói về); To của một thư nhận được
+  bị bỏ, và một lần đọc rút gọn còn ai và về việc gì thì bỏ nó ra. Một danh sách tối đa 10 thư,
+  mỗi thư 300 ký tự; `message {id}` (id mà một danh sách đưa ra) đến 3,000.
+  Nội dung lấy từ phần văn bản thuần trước, nếu không
   thì từ HTML đã bỏ thẻ; quoted-printable, base64 và các từ RFC 2047 được giải
   mã. 5 s để kết nối, 20 s cho toàn bộ trao đổi.
 - **Ghi:** SMTP qua TLS đến `smtp.gmail.com:465`: `EHLO`, `AUTH PLAIN` (nếu
   không thì `LOGIN`), `MAIL`, `RCPT` cho mỗi người nhận, `DATA`, `QUIT`. Một
   thư văn bản thuần bằng UTF-8, thân thư ở dạng base64, gửi từ chính tài
   khoản đó.
+- **Nháp** (`save_draft`, yêu cầu của chủ đèn ngày 10/11): một thư soạn bằng
+  giọng nói được lưu vào Drafts của Gmail, không bao giờ được gửi. Nó được
+  kiểm tra như `send_mail` (cùng `to`, `cc`, `subject`, `text`, tối đa 20
+  người nhận) và được đọc lại là "Save a draft to <to>[, with a copy to
+  <cc>], in the Gmail Drafts of <account>. Subject: "<subject>". It says:
+  "<text>". Nothing is sent." Với cùng câu xác nhận nói ra như một lần gửi
+  (ở dưới), IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `LIST "" "*"`
+  tìm hộp thư được đánh dấu `\Drafts` (nếu không thì `[Gmail]/Drafts`), một
+  `APPEND <Drafts> (\Draft \Seen) {n}` với thư là literal của nó (cùng thư
+  mà SMTP gửi: From là tài khoản, To, Cc, Subject là một từ RFC 2047 khi
+  không phải ASCII, Date, Message-ID, văn bản thuần UTF-8, thân thư dạng
+  base64), `LOGOUT`. Các phản hồi không gắn tag trước dấu `+` của `APPEND`
+  ("* OK Still connected") được nhận, tối đa 100 (RFC 3501 2.2.1); một `* BYE`
+  hay một NO có tag ở đó thì không lưu gì. OK có tag của `APPEND` là lần
+  lưu, được trả lời ngay: toàn bộ lần lưu đến nó, kể cả kết nối và TLS, có
+  một ngân sách 15 s (`mail::DRAFT_WITHIN`, nằm trong 20 s
+  `services::DEADLINE` của giọng nói ít nhất 3 s, nên một bản nháp đã lưu
+  không bao giờ bị báo là không dùng được), và `LOGOUT` chạy sau câu trả
+  lời, riêng, tối đa 2 s, câu trả lời của nó hay không có gì cũng không bao
+  giờ làm chậm hay huỷ lần lưu (RFC 3501 6.3.11). Không nói SMTP và không mở hộp thư nào. Câu trả lời là
+  `{"sent": false, "saved": true, "service": "Gmail"}`; một `APPEND` bị từ
+  chối là "not saved: Gmail couldn't be reached". `next` của bước chuẩn bị
+  nói "Nothing is saved yet. Read read_back to the person in full; save the
+  draft only if they agree, in any words."
 - Mật khẩu chỉ nằm trong các dòng `LOGIN` và `AUTH`. Một lỗi được nói bằng
   một trong hai câu ở trên, không bao giờ kèm điều máy chủ đã nói.
 
@@ -378,9 +452,13 @@ giữ gì.
   reached"; dù trường hợp nào cũng không gì được lưu. Khi thành công,
   `scopes` trong câu trả lời là của liên kết, như backend đã đưa.
 - **Đọc** (`users.messages.list` và `users.messages.get`, mỗi cái nằm trong
-  danh sách đọc): `recent` và `search` liệt kê hộp thư đến
-  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`, `search`
-  thêm `q=<words>`, cú pháp tìm kiếm riêng của Gmail), rồi lấy từng thư với
+  danh sách đọc): `recent` liệt kê hộp thư đến
+  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`), còn
+  `search` tìm trong mọi thư, như tìm kiếm riêng của Gmail
+  (`/gmail/v1/users/me/messages?maxResults=<count>&q=<words>`, không nhãn,
+  nên một thư đã lưu trữ hoặc gắn nhãn nằm ngoài hộp thư đến cũng được tìm
+  thấy; Spam và Trash vẫn bị loại, `includeSpamTrash` để mặc định là false),
+  rồi lấy từng thư với
   `format=metadata` (From, Subject, Date) và đoạn xem trước ngắn của Gmail
   (các thực thể HTML được đọc), 300 ký tự của nó. `message {id}` (id riêng
   của Gmail mà một danh sách đưa ra: chữ và số, tối đa 64) lấy thư với
@@ -394,17 +472,31 @@ giữ gì.
   hỏi theo id vẫn là "Gmail has no such item". Một danh sách tối đa 10 thư,
   mới nhất trước; không gì bị đánh
   dấu đã đọc (một lần lấy không đổi nhãn nào). Mỗi lệnh gọi là một lần đọc
-  web (5 s để kết nối, 15 s mỗi lệnh), 20 s cho cả lần đọc; các token cũng
-  được xoá khỏi nội dung đã giải mã.
+  web (5 s để kết nối, 15 s mỗi lệnh), 20 s cho cả lần đọc. Các token cũng
+  được xoá khỏi mọi trường đã giải mã (`serve::scrub_mail`): người gửi, tiêu
+  đề, ngày, nội dung, và tên, kiểu, nội dung của mỗi tệp đính kèm, ở một
+  danh sách, lần đọc một thư và lần đọc một tệp đính kèm; qua IMAP mật khẩu
+  ứng dụng cũng vậy, như đã nhập và khi bỏ dấu cách. Một bí mật được mã hoá
+  trong một header hay một tên tệp RFC 2047 chỉ được giải mã sau lần xoá trên
+  câu trả lời thô, nên nó được xoá lại ở đó.
 - **Ghi:** khi có câu "send" nói ra, một `POST
   /gmail/v1/users/me/messages/send` (`users.messages.send`, route duy nhất
   trong danh sách ghi của nó) với `{"raw": <base64url>}`: cùng thư văn bản
-  thuần mà SMTP gửi, từ chính tài khoản đó.
+  thuần mà SMTP gửi, từ chính tài khoản đó. Không có nháp và không đọc nháp:
+  một `save_draft` bị từ chối trước khi bất cứ gì được giữ hay gọi, với
+  `writes::NO_DRAFTS`, "this Gmail link can't save drafts: only one linked
+  with an app password can. Say "I can't save a draft yet. I can read it
+  back and send it when you say 'send it'."", và `drafts` với "this Gmail
+  link reads no drafts: only one linked with an app password does" (liên
+  kết không có `gmail.compose`).
 - **Scope** nó cần từ Google: `gmail.readonly` cho profile, danh sách (có
   `q`) và từng lần lấy, và `gmail.send` cho một lần gửi (`gmail.modify` hoặc
   `https://mail.google.com/` bao cả hai). IMAP không được dùng vì nó chỉ nhận
-  `https://mail.google.com/`. Một token thiếu scope mà lệnh gọi cần nhận 403:
-  "Gmail refused the lamp's link: it may need linking again in the app".
+  `https://mail.google.com/`. Một lần gửi mà các scope được liệt kê của liên
+  kết không cho phép bị từ chối trước khi đọc lại, và một lần gửi Google từ
+  chối vì scope cũng được nói như vậy ("Scope một lần ghi cần", trong phần
+  Ghi). Một lần đọc thiếu scope nó cần nhận 403: "Gmail refused the lamp's
+  link: it may need linking again in the app".
 - **Làm mới:** qua backend, như mọi liên kết OAuth ([Làm mới](#làm-mới)).
 
 **Một đăng nhập Google chỉ-gửi (`gmail-app`):** đăng nhập Google cho Gmail
@@ -425,15 +517,28 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
 - **Đọc:** không có. Một `service_read` của `gmail-app`, đã liên kết hay
   chưa, đều trả lời "This Gmail link, made with Google sign-in, can only send
   mail. To read mail, link Gmail with an app password in the app: Skills,
-  then Connectors." Danh sách đọc của nó rỗng, nên không route đọc nào được
-  gọi với token của nó.
+  then Connectors.", trừ khi `gmail` được liên kết bằng mật khẩu ứng dụng
+  (xem dưới). Danh sách đọc của nó rỗng, nên không route đọc nào được gọi
+  với token của nó.
 - **Ghi:** `send_mail`, được đọc lại và gửi như của `gmail`, khi có câu
   "send" nói ra: một `POST /gmail/v1/users/me/messages/send` từ chính tài
-  khoản đó, không bao giờ qua SMTP. 401 hoặc 403: "not sent: Google refused
-  the Gmail sign-in".
-- **Khi cả hai được liên kết**, một lần gửi có thể đi qua một trong hai; một
-  lần đọc chỉ qua `gmail`. Mô tả của hàm đọc ghi `gmail-app: none, it only
-  sends: reads use gmail`.
+  khoản đó, không bao giờ qua SMTP; trừ khi `gmail` được liên kết bằng mật
+  khẩu ứng dụng (xem dưới). Một `save_draft` bị
+  từ chối với `writes::NO_DRAFTS`, như `gmail` của một đăng nhập Google. 401 hoặc 403: "not sent: Google refused the
+  Gmail sign-in".
+- **Khi cả hai được liên kết**, một lần đọc chỉ qua `gmail`. Mô tả của hàm
+  đọc ghi `gmail-app: none, it only sends: reads use gmail`. Một quy tắc áp
+  dụng cho mọi lần đọc và ghi Gmail: mật khẩu ứng dụng trước, token chỉ khi
+  không có nó (`serve.rs`, `gmail_args`, yêu cầu của chủ đèn ngày 10/11).
+  Khi `gmail` là mật khẩu ứng dụng, một lần đọc hay gửi gọi tên `gmail`,
+  `gmail-app` hay tên của một trong hai đều đi qua IMAP hoặc SMTP bằng mật
+  khẩu ứng dụng, và token của đăng nhập không bao giờ được gửi cho nó. Một
+  lần gửi được viết lại như thế cả khi được chuẩn bị (phần đọc lại ghi
+  "from" địa chỉ của mật khẩu ứng dụng) lẫn khi được xác nhận, nên hai bước
+  khớp nhau, dù mỗi bước dùng tên Gmail nào. Chỉ khi không có mật khẩu ứng
+  dụng nào được giữ thì một lệnh gọi Gmail mới dùng token của đăng nhập
+  Google: khi ấy lần gửi đi qua liên kết mà tên của nó dẫn đến, và một lần
+  đọc gọi tên `gmail-app` vẫn không đọc gì.
 - **Tên nào cũng đến được nó** (`serve.rs`, `linked_code`): một lệnh gọi tên
   `gmail` khi chỉ `gmail-app` được liên kết thì dùng liên kết `gmail-app`, và
   một lệnh gọi tên `gmail-app` khi chỉ `gmail` được liên kết thì dùng
@@ -449,6 +554,164 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
   ghi vẫn giữ nguyên.
 - **Làm mới:** qua backend dưới mã riêng của nó (`connector: "gmail-app"`),
   như của Google Calendar.
+
+**Tệp đính kèm của một thư** (`crates/services/src/mail/attachments.rs`),
+với cả hai loại liên kết `gmail`:
+
+- **Được nêu tên:** `message {id}` còn đưa ra `attachments`, tối đa 10
+  (`mail::ATTACHMENTS_MOST`): `name`, `type` và `size` của mỗi tệp ("24
+  bytes", "51 KB", "1.2 MB"), và một `note` bên cạnh tệp mà đèn không đọc
+  (`mail::note`): "can't read this kind yet" (`mail::CANT_READ`) cho một
+  loại, "this PDF is too large to read here (over 2 MB)" cho một PDF quá
+  2 MB theo kích thước thư đưa. Bản xem trước của một danh sách không nêu
+  tệp nào. Một tệp đính kèm không bao giờ bị
+  coi là nội dung riêng của thư: một phần mà danh sách tính là tệp
+  (`Content-Disposition: attachment`, hoặc có tên trong `filename` của
+  disposition hay `name` của kiểu, `inline` hay không;
+  `attachments::is_file`) bị bỏ qua ở đó. Qua IMAP chúng đến từ cùng lệnh UID FETCH,
+  kèm `BODYSTRUCTURE`; qua API từ các phần có `filename` trong câu trả lời
+  `format=full`.
+- **Đọc:** `attachment {id, name | index}` đọc nội dung chữ của một tệp
+  đính kèm: theo tên như `message` đã liệt kê (không phân biệt hoa thường,
+  hoặc một phần của tên chỉ khớp đúng một tệp), theo vị trí tính từ 1, hoặc,
+  khi không có cả hai, tệp đính kèm duy nhất của thư. Câu trả lời là `id`,
+  `from`, `subject` và `date` của thư cùng `attachment: {name, type, size,
+  text}`, không kèm nội dung riêng của thư, được trích dẫn như mọi lần đọc.
+  Nội dung tối đa 3,000 ký tự (`TEXT_MOST`) trước khi câu trả lời trích dẫn
+  tự cắt.
+- **Các loại được đọc:** `text/plain`, `text/csv`,
+  `text/tab-separated-values`, `text/markdown` và `text/html` (bỏ thẻ như
+  với nội dung thư); một phần kiểu `application/octet-stream` theo đuôi tệp
+  (`.txt`, `.csv`, `.tsv`, `.md`, `.log`, `.htm`, `.html`); và PDF
+  (`application/pdf`, hoặc đuôi `.pdf`), ở dưới. Mọi loại khác (tệp Office,
+  tệp nén) bị từ chối trước khi lấy: "the lamp can't read this kind yet: it
+  reads text, CSV, HTML and PDF attachments", bằng chữ cố định, không bao
+  giờ nhắc lại kiểu tệp người gửi khai. Không
+  có bộ trích Office nào trong các phụ thuộc của đèn. Một ảnh hay một chương
+  trình không bao giờ được đọc, dù nó khai kiểu gì (`image/*`, hoặc đuôi như
+  `.png`, `.exe`, `.sh`, `.js`, `.apk` ở bất kỳ tên nào của nó, đọc trọn):
+  điều này được kiểm tra trước tiên (`attachments::never`), nên `run.exe`
+  hay `photo.png` khai kiểu `application/pdf` không phải PDF và bị từ chối,
+  còn `notes.pdf` vẫn được đọc.
+- **Tên:** hiển thị tối đa 120 ký tự, nhưng mỗi tên mà phần đó được đặt
+  (`filename` của disposition, `name` của kiểu, từ RFC 2047, `filename*`
+  của RFC 2231 và các mảnh nối tiếp `filename*0*`, `filename*1*` hoặc
+  `filename*0`, được nối lại, tối đa 32 mảnh) được giữ trọn đến 1,024 ký tự
+  (`attachments::NAME_CHECK_MOST`) chỉ cho phép kiểm tra bảo mật, không bao
+  giờ được trả về. Một tên dài hơn thế, hoặc gửi thành mảnh mà thiếu một
+  mảnh hay quá 32 mảnh, không bao giờ được lấy: "can't check this file's
+  name, so it isn't read" (`attachments::NAME_UNCHECKED`), cũng là `note`
+  của nó trong danh sách. Một giá trị trong ngoặc kép được đọc cùng các ký
+  tự thoát, dấu `;` bên trong ngoặc là của chính nó
+  (`filename="notes; verification code.txt"` là trọn tên đó); một header có
+  ngoặc kép bị bỏ ngỏ, hoặc có chữ sau ngoặc đóng, cũng để tên ở trạng thái
+  chưa kiểm tra như vậy (`attachments::header_params`). Một tên RFC 2231,
+  và từng từ RFC 2047 trong một tên, chỉ được đọc ở UTF-8 (gồm cả US-ASCII) hoặc Latin-1, và chỉ khi đọc
+  trọn: ở bảng mã khác (`run.exe` bằng UTF-16 sẽ thành `r u n . e x e`),
+  với byte không thuộc bảng mã của nó, hoặc khi một tên bất kỳ có ký tự
+  NUL hay ký tự không giải mã được, tên đó cũng ở trạng thái chưa kiểm tra
+  (`attachments::name_in`); một tên có từ RFC 2047 ở bảng mã khác
+  (`run.exe` bằng UTF-7 đọc ra thành ASCII thường) hoặc bị hỏng cũng vậy,
+  kể cả phần dữ liệu: một dấu `=` trong Q không có hai chữ số hex theo sau,
+  hay chữ B không phải các nhóm bốn ký tự đủ và có đệm (`cnVuLmV4ZQ` không
+  đệm sẽ đọc thành `run.ex`) (`mail::decode_words_with`). Một giá trị
+  header chỉ được giải mã tới 16 KiB đầu (`mail::DECODE_MOST`), mỗi từ chỉ
+  được tìm trong 512 byte kể từ `=?` của nó, nên thời gian tăng tuyến tính
+  theo độ dài; một tên dài hơn thì ở trạng thái chưa kiểm tra.
+- **PDF** (`crates/services/src/mail/pdf.rs`): nội dung chữ của nó, đọc bằng
+  `pdf-extract` 0.12.1 trên `lopdf` 0.42 (cả hai MIT, thuần Rust, từ
+  crates.io, ghim trong `Cargo.lock`; lopdf không có tính năng mặc định).
+  Các giới hạn, đều trước hoặc quanh lúc phân tích:
+  - tối đa 2 MB (`pdf::PDF_MOST`): một PDF quá 2 MB theo kích thước thư đưa
+    bị từ chối trước khi lấy, và một PDF lớn hơn sau khi giải mã bị từ chối
+    trước khi phân tích, "this PDF is too large to read here (over 2 MB)";
+  - một PDF được mã hoá (`/Encrypt`) không được phân tích: "can't read this
+    PDF";
+  - việc phân tích không bao giờ chạy trong dịch vụ: chính binary của nó
+    được chạy lại thành một tiến trình con, `lamp-services --pdf-text`
+    (`/proc/self/exe`, vẫn là bản đang chạy sau một lần cập nhật), PDF vào
+    đầu vào chuẩn và nội dung ra đầu ra chuẩn, đầu ra lỗi bỏ đi (thông điệp
+    panic có thể trích tệp), panic hook im lặng và việc phân tích nằm trong
+    `catch_unwind`. Nó bị giết (SIGKILL) 2 s sau khi bắt đầu
+    (`pdf::PARSE_WITHIN`), và mỗi lúc chỉ phân tích một PDF, lượt của PDF
+    khác cũng chỉ được chờ tối đa 2 s. Một panic, tràn ngăn xếp (một form tự
+    vẽ chính nó), một vòng lặp hay một lần giết chỉ kết thúc tiến trình con,
+    không bao giờ là dịch vụ; khi đó lần đọc là "can't read this PDF";
+  - bộ nhớ, **giới hạn thật**: trên Linux, không gian địa chỉ và vùng dữ
+    liệu của tiến trình con (`RLIMIT_AS`, `RLIMIT_DATA`, cả soft lẫn hard)
+    là 128 MiB (`pdf::CHILD_MEMORY_MOST`), đặt trong tiến trình con đã fork
+    trước khi nó chạy binary (`pre_exec`, các lệnh `prlimit64`,
+    `pdf::limited`) và đặt lại bởi chính tiến trình con ngay đầu tiên
+    (`pdf::cap_memory`). Một tiến trình con không đặt được giới hạn thì
+    không bao giờ được chạy, hoặc thoát trước khi đọc gì. Một lần cấp phát
+    vượt giới hạn thất bại trong tiến trình con, nó abort: "can't read this
+    PDF", không bao giờ là lỗi của dịch vụ. Bộ lọc của unit trả lại
+    `setrlimit prlimit64` từ `~@resources` cho việc này
+    (`SystemCallFilter=setrlimit prlimit64`); không có capability nào thì
+    một giới hạn chỉ có thể bị hạ xuống. Trên máy Mac của nhà phát triển
+    không có giới hạn này;
+  - các lần từ chối sớm trước khi phân tích, trong tiến trình con, không cái
+    nào là giới hạn thật: tên trong PDF được đọc như `lopdf` đọc
+    (`/Fil#74er` là `/Filter`), rồi PDF là "can't read this PDF" khi có một
+    bộ lọc mà phép đếm dưới đây không giới hạn được (`LZWDecode`,
+    `ASCII85Decode`), khi có một mảng `/Filter` nhiều hơn một bộ lọc (mỗi
+    tầng giải nén đầu ra của tầng trước), hoặc khi `/Columns` quá 4,096,
+    `/Colors` quá 32 hay `/BitsPerComponent` quá 32 (`pdf::COLUMNS_MOST`,
+    `COLORS_MOST`, `BITS_MOST`: một predictor cấp phát hai hàng theo các số
+    đó trước khi có dữ liệu). Một predictor trong các giới hạn đó vẫn được
+    đọc, như của một cross-reference stream (`/Predictor 12 /Columns 5`).
+    Sau đó mỗi stream được giải nén một lần như `lopdf` sẽ làm (zlib, nếu
+    không thì raw deflate) với tổng cộng dồn, khoảng trắng hay tab giữa từ
+    khoá `stream` và cuối dòng được tính như `lopdf` tính, và quá 16 MB tổng
+    (`pdf::INFLATED_MOST`) thì PDF không được đọc;
+  - nội dung ra: tối đa 3,000 ký tự (việc dàn trang dừng khi quá gấp đôi số
+    đó, các trang sau của một PDF dài không bao giờ được dàn); một PDF không
+    có chữ (bản scan) là "can't read this PDF".
+
+  Một PDF đã lấy mà không đọc được nêu trong `attachments` của câu trả lời
+  kèm `note`, không bao giờ được đọc. Đo trên một laptop (aarch64-darwin,
+  release): một PDF một trang đọc qua tiến trình con trong khoảng 15 ms, lần
+  đầu và lần lặp; một tiến trình con không bao giờ kết thúc bị giết ở 2.0 s.
+  Thời gian trên đèn chưa được đo. Kích thước binary: `lamp-services` release
+  tăng từ 1.35 MB lên 2.95 MB trên máy đó (1.14 MB lên 2.56 MB khi strip),
+  khoảng 1.5 MB là của `lopdf`, mà phần giải mã của nó không bỏ được bằng
+  feature; `pdf-extract` thêm khoảng 60 KB.
+- **Qua IMAP:** cùng lần đăng nhập, `EXAMINE` chỉ-đọc hộp thư mà id chỉ tới
+  và UID FETCH như `message` (`all41` là All Mail, tìm lại bằng `LIST`; `41`
+  trơn là hộp thư đến; id All Mail khi All Mail đã không còn thì không gì
+  được đọc; id nào khác bị từ chối trước khi kết nối), rồi
+  `UID FETCH <uid> (UID BODY.PEEK[<section>]<0.1048576>)`: chỉ phần đó, tối
+  đa 1 MB (`net::BODY_MOST`), không đánh dấu đã đọc; giải mã base64 hoặc
+  quoted-printable, đọc theo charset của nó. Phần của một PDF được lấy trọn,
+  tối đa 2,900,000 byte (`mail::PDF_FETCH`: 2 MB ở base64 kèm ngắt dòng),
+  giới hạn literal chỉ được nâng cho riêng lần lấy đó.
+- **Qua API:** thư với `format=full`, rồi `GET
+  /gmail/v1/users/me/messages/<id>/attachments/<attachmentId>`
+  (`users.messages.attachments.get`, nằm trong danh sách đọc của Gmail, với
+  `gmail.readonly`); một phần có dữ liệu ngay trong thư không cần lần gọi
+  thứ hai. Câu trả lời được đọc đến giới hạn 1 MB (của một PDF đến
+  `mail::PDF_FETCH`, chỉ riêng lần gọi đó, `net::Call::most`); câu trả lời
+  bị cắt ở đó được đọc từ đầu dữ liệu của nó. Các token được xoá khỏi nội
+  dung và khỏi tên và kiểu của mọi tệp đính kèm (`serve::scrub_mail`). Một thư
+  mà câu trả lời `format=full` bị cắt thì không đọc tệp đính kèm nào ("this
+  mail is too long to read its attachments here").
+- **Bảo mật:** tệp đính kèm của một thư bảo mật không bao giờ được lấy, và
+  thư bị bỏ ra nguyên vẹn như mọi thư bảo mật. Một phép kiểm tra
+  (`mail::is_security_item`) đọc người gửi, tiêu đề và nội dung cùng các tên
+  trọn vẹn (đến 1,024 ký tự, không phải 120 ký tự hiển thị) và kiểu của mọi
+  tệp đính kèm, trước khi chọn hay lấy bất kỳ phần nào qua IMAP hoặc API:
+  một thư mà chỉ riêng tên tệp đã đánh dấu (`verification code.txt`, hoặc
+  121 chữ `a` rồi ` verification code.txt`, hoặc tên đó gửi thành các mảnh
+  RFC 2231) không có byte nào của tệp bị lấy. Cùng phép kiểm tra chạy lại
+  trên những gì được trả về, gồm cả nội dung tệp đính kèm, nên một mã trong
+  tệp đính kèm cũng làm thư bị bỏ ra. Những gì tệp đính kèm nói là dữ liệu trích dẫn,
+  không bao giờ là chỉ dẫn.
+- **Từ chối,** bằng lời không chứa gì của thư: "this mail has no
+  attachments", "this mail has N attachments: give the name or index of
+  one", "this mail has no one attachment by that name: read the mail with
+  message to see their names", "this mail has N attachments: index is 1 to
+  N", "this PDF is too large to read here (over 2 MB)", "the lamp can't
+  check this file's name, so it isn't read".
 
 ## Dịch vụ MCP
 
@@ -530,8 +793,18 @@ giờ (`Z` hoặc độ lệch như `+07:00`: Calendar từ chối thời điể
 bị từ chối trước khi đọc lại, `reads::calendar_time`). Một yêu cầu
 chỉ qua HTTPS, đến các host của chính dịch vụ, không theo chuyển hướng, 5 s để
 kết nối, tổng cộng 15 s, và đọc tối đa 1 MiB câu trả lời. Một mã lỗi được nói
-rõ ràng: 401 hoặc 403 "<Service> refused the lamp's link: it may need linking
-again in the app", 404 "has no such item", 429 "is busy: try again in a
+rõ ràng: 401 "<Service> refused the lamp's link: it may need linking
+again in the app" (401 hoặc 403 của một lần ghi nói scope của nó không đủ thì
+được nói cách làm: "Scope một lần ghi cần", trong phần Ghi); 403 theo lý do mà lỗi của Google nêu (`serve::forbidden`,
+`error.errors[].reason`, `error.details[].reason` hoặc `error.status`, chỉ so
+tên, không truyền đi gì của câu trả lời): `storageQuotaExceeded` (hoặc
+`teamDriveFileLimitExceeded`) "<Service> is full: the account has no
+storage left for a new file", `userRateLimitExceeded`, `rateLimitExceeded`,
+`dailyLimitExceeded`, `quotaExceeded`, `RATE_LIMIT_EXCEEDED` hoặc
+`RESOURCE_EXHAUSTED` "is busy: try again in a while", `domainPolicy`
+"<Service>'s account doesn't allow this: its organisation's policy
+refuses it", mọi lý do khác (scope hay đăng nhập bị từ chối, không có lý do)
+là câu liên kết lại như 401; 404 "has no such item", 429 "is busy: try again in a
 while", còn lại "answered with an error". Token và refresh token được xoá khỏi
 mọi câu trả lời (mọi cách viết, thuần hay mã hoá URL).
 
@@ -551,7 +824,10 @@ code in it."
 ## Thư bảo mật và mã
 
 Mã dùng một lần và nội dung bảo mật không bao giờ được nói ra, chuyển tiếp hay
-lưu giữ (`mail::is_security_mail`), dù từ dịch vụ nào. Một đoạn văn bản là
+lưu giữ (`mail::is_security_mail`), dù từ dịch vụ nào; trong lần đọc Gmail
+của chính bạn, một thư bảo mật được đọc với đường dẫn và mã của nó được che
+thay vào đó ("Một thư bảo mật trong lần đọc Gmail của chính bạn", bên dưới).
+Một đoạn văn bản là
 nội dung bảo mật khi nó chứa một trong các cụm từ (`verification code`,
 `verify your`, `one-time`, `passcode`, `security code`, `sign-in code`,
 `2-step`, `two-factor`, `password reset`, `reset your password`, `new
@@ -618,7 +894,120 @@ mật, đã bỏ ra) trong Gmail, "a security message, left out" (một tin bả
 của mọi hàm là không bao giờ đọc ra một mã dùng một lần, một mã xác minh hay
 một đường dẫn đặt lại mật khẩu.
 
-## Ghi: đọc lại, rồi một câu "send" nói ra
+### Một thư bảo mật trong lần đọc Gmail của chính bạn
+
+Bộ lọc thiên về che giấu, nên thư thật của bạn bị nó giấu đi. Trong lần đọc
+Gmail của chính bạn (lời gọi của giọng nói; qua REST API hay IMAP đều vậy),
+một thư bảo mật không còn bị bỏ ra (`reads::owner_mails_quoted`). Trong
+`search` và `recent` nó được liệt kê như mọi thư khác, ngày giữ nguyên. Chủ
+đề và tên trong From được nói với mọi đường dẫn và mọi dạng mã được che
+(`mail::masked_subject`, `mail::masked_from`), vì một chủ đề không bao giờ
+được đọc trọn để có ngữ cảnh: "G-482913 is your Google verification code"
+được nói "G-a code is your Google verification code", và "Code 4821
+<no-reply@…>" thành "Code a code <no-reply@…>"; địa chỉ được giữ. Nội dung của nó, bản xem trước của danh sách hay toàn bộ nội
+dung mà `message` đọc, được nói với mọi đường dẫn và mã được che
+(`mail::masked`), đọc ở dạng tổ hợp (NFC):
+
+- Mọi đường dẫn được nói là "a link" (một đường dẫn): một từ chứa `http://`,
+  `https://` hay `www.`, từ đó đến hết từ, hay một đường dẫn trần mang
+  `token=` hoặc một tên máy và một path ("example.com/reset"), dấu đóng
+  ngoặc hay dấu chấm sau nó được giữ.
+- Một mã được nói là "a code" (một mã): một số mã hay một mã chữ và số
+  (các dạng của bộ lọc, bên trên) trong vòng 200 byte quanh một từ chỉ mã
+  (`code`, `mã`, `token`, `pin`, `verification`, `otp`, `2fa`, `mfa` của bộ
+  lọc, các từ đăng nhập, và `password`, `passcode`, `one-time`, `one time`,
+  `2-step`, `two-step`, `two-factor`, `steam guard`, `mật khẩu`); một số mã
+  không phải năm, giá, số thập phân, giờ hay số có nhãn, hoặc một từ chữ và
+  số đổi giữa chữ và số hai lần, cạnh `enter`, `confirm`, `verify` và các từ
+  kia (trong vòng 80 byte, cùng mệnh đề). Không cần từ chỉ mã: một mã dự
+  phòng hay mã khôi phục (8 đến 12 chữ cái và chữ số ASCII có một chữ số,
+  hoặc các nhóm 3 đến 6 tách bằng `-` có một chữ số, tổng 8 trở lên,
+  "4f9k-2m7q"; một số gồm 2 nhóm trở lên, mỗi nhóm 3 đến 6 chữ số, tổng 8
+  đến 12, "1234 5678"); một mật khẩu ứng dụng (bốn từ bốn chữ cái tách bằng
+  một dấu cách, đứng riêng một dòng, sau dấu hai chấm, hoặc trong vòng 200
+  byte quanh `password` hay `mật khẩu`); một số 6 đến 8 chữ số, không phải
+  ngày, đứng riêng một dòng.
+- Đóng khi lỗi (fail closed): một nội dung không được đọc trọn (bản xem
+  trước của danh sách; một nội dung bị cắt ở mức trần, kết thúc bằng "…",
+  như lần fetch IMAP giờ cũng đánh dấu một phần thân nó cắt; một nội dung
+  được báo "(the rest of this mail is too long to read here)"), hay một
+  thư mà From hoặc chủ đề có một từ chỉ mã, có mọi đường dẫn và mọi dạng
+  mã được che: mọi số mã và mã chữ và số, ở bất kỳ đâu.
+- Chủ đề và tên trong From luôn được che theo cách chặt, như trên.
+- Thứ mà một từ chỉ mã gọi tên là một mã, dù nó có dạng gì: token sau ":",
+  "=", " is " hay " là " của từ đó trên cùng dòng, trong vòng 80 byte ("Your
+  code is XKCDQZ.", "password: Tr0ub4dor&3", "Mã của bạn là K7Q2"), cho đến
+  khoảng trắng, được nói là "a code". Chữ số của mọi hệ chữ đều được tính là
+  chữ số ("４８２９１３", "٤٨٢٩١٣").
+- Một mã chỉ gồm chữ (`mail::letter_spans`): một từ 4 đến 8 chữ cái và
+  chữ số ASCII có một chữ cái, toàn chữ hoa hoặc có một chữ số ("XKCDQZ",
+  "F7K2Q"; không bao giờ là chữ thường hay một từ viết hoa chữ đầu như
+  "Chrome"), hoặc 4 chữ hoa hay chữ số đơn trở lên tách bằng một dấu cách
+  ("K Q Z W X T"), không phải chính một từ chỉ mã hay cụm từ bảo mật, được
+  nói là "a code" khi nó ở trong vòng 80 byte quanh một từ chỉ mã (`code`,
+  `mã`, `token`, `pin`, `verification`, `otp`, `2fa`, `mfa`, và `password`
+  đến `mật khẩu` ở trên) cùng mệnh đề, có hay không có dấu phân cách ("Use
+  code ABCDEF to sign in", "Your code (XKCDQZ) expires", "Your code —
+  XKCDQZ", "Mã ABCDEF"; trên một dòng toàn chữ hoa thì chỉ từ ngay sau từ
+  chỉ mã, "YOUR LOGIN CODE a code"); đứng riêng một dòng trong nội dung;
+  hoặc ở bất kỳ đâu trong một chủ đề có chữ thường ("Your login code a
+  code"). Tên trong From chỉ che mã ở gần một từ chỉ mã ("HSBC Alerts"
+  được giữ).
+- Một từ chỉ mã mà dòng của nó kết thúc ở chính nó hay ở dấu phân cách
+  (":", "=", "is") gọi tên token của dòng không rỗng kế tiếp, trong vòng
+  200 byte: một token đứng riêng trên dòng đó sau một dấu phân cách (mọi
+  dạng), một mã chữ, hoặc các ký tự đơn tách bằng dấu cách ("Enter this
+  code in the app:\n\nK Q Z W X T").
+- Một mật khẩu sau `password`, `passcode` hay `mật khẩu` và một dấu cách
+  được che trọn, cho đến khoảng trắng, khi nó có một chữ số, một ký hiệu
+  hay một chữ hoa sau ký tự đầu ("Temporary password Summer!2026" được nói
+  "Temporary password a code"; "Your password was changed" được giữ).
+- Trong nội dung hay chủ đề (không phải tên trong From), một từ 4 đến 8
+  chữ cái ASCII, hoa hay thường, cũng được nói là "a code" khi nó là từ
+  ngay sau một từ chỉ mã, giữa chỉ có dấu cách hay một ký hiệu ("Use code
+  xkcdqz to sign in", "Your login code xkcdqz"), hoặc đứng riêng một dòng
+  trong vòng 200 byte sau dòng của một từ chỉ mã ("Enter this code in the
+  app\n\nxkcdqz"). Một từ thường ở đó cũng có thể bị che, vì che thừa thì
+  an toàn hơn, trừ các từ hay theo sau một từ chỉ mã
+  (`mail::AFTER_CODE_WORDS`: is, was, will, expires, expired, has, below,
+  above, to, for, from, and, or, with, sent, that, this, reset, change,
+  changed, thanks): "Your code expires in 10 minutes. Do not share this
+  code with anyone." được giữ.
+- Mã như vậy có thể chia nhóm: 2 đến 4 nhóm, mỗi nhóm 3 đến 8 chữ cái, nối
+  bằng một "-" hay một " ", tối đa 16 chữ cái, được nói là một "a code"
+  ("Use code abcd-efgh" được nói "Use code a code"); một từ trong danh sách
+  trên kết thúc dãy. Dấu phẩy sau từ chỉ mã tách mã ra như ":": một mã chữ
+  hoa hay có chữ số sau nó ("Your code, XKCDQZ, expires"), hoặc một dãy chữ
+  thường kết thúc bằng dấu phẩy, dấu chấm hay cuối dòng ("Your code,
+  xkcdqz, expires"); "If you did not ask for this code, ignore this email."
+  được giữ.
+- Cả khi không có từ chỉ mã: một số có 4 đến 8 chữ số không phải ngày, năm,
+  giá, số thập phân, giờ hay số có nhãn, ở bất kỳ đâu ("Type 48291 on the
+  next screen", cả "1600 Main St", vì che thừa thì an toàn hơn); một khoá,
+  bất kể từ nào ở gần, mỗi khoá là một dãy chữ cái, chữ số ASCII, `-` và
+  `_`, nên khoá dính vào "…" của chỗ cắt, dấu ngoặc kép hay dấu chấm của bất
+  kỳ hệ chữ nào vẫn là một khoá (12 chữ cái và chữ số trở lên có cả chữ số
+  lẫn chữ cái, hoặc chữ hoa và chữ thường trộn lẫn, "AbCdEfGh12345678XyZq",
+  hoặc chữ thường với chưa tới ba nguyên âm trên mười chữ,
+  "kqzvwxhtrplmnbgf"; 3 nhóm trở lên gồm 3 đến 6 chữ hoa hoặc chữ số ngăn
+  bởi `-`, "QWER-TYUI-ASDF-ZXCV").
+- Một đường dẫn còn là mọi từ có scheme ("acme://auth/…"), và một host trần
+  (một tên và một tên miền cấp cao gồm chữ cái hoặc `xn--`, hoặc một địa chỉ
+  IPv4) rồi đến đường dẫn, query hay fragment ("acme.test?k=…",
+  "10.1.2.3/reset/…"). Một đường dẫn kết thúc dòng của nó và tiếp tục một
+  mình ở dòng sau thì dòng đó cũng được nói là "a link", và mỗi dòng như
+  thế sau nó cũng vậy, cho đến một từ thường ("Thanks") hay một dòng kết
+  thúc bằng dấu chấm.
+- Việc che luôn có giới hạn: chỉ đọc tối đa 512 byte của chủ đề hay From
+  (`mail::HEAD_MOST`) và 16 KiB của nội dung (`mail::MASK_MOST`); phần dài
+  hơn bị cắt ở đó ("…", và nội dung đó được đọc theo cách chặt); các lần
+  quét mã chỉ có giới hạn nhờ các mức trần này.
+
+Lần đọc của một kỹ năng tự tạo (`lamp-skills`, "Một kỹ năng tự tạo đọc dịch
+vụ", bên dưới) giữ luật bên trên: một thư bảo mật vẫn là "a security mail,
+left out". Mọi dịch vụ khác cũng vậy.
+
+## Ghi: đọc lại, rồi một lời đồng ý nói ra
 
 Tắt trừ khi `LAMP_SERVICES_WRITE=on`. Hai pha (`writes.rs`):
 
@@ -632,35 +1021,256 @@ Tắt trừ khi `LAMP_SERVICES_WRITE=on`. Hai pha (`writes.rs`):
    on Facebook can see it."; một sự kiện lịch có người tham dự thì "each gets
    an invitation by email". `send_id` là 16 byte ngẫu nhiên dạng hex.
 2. **Cùng `send_id` đó với `"said":"send"`** gửi đúng lần ghi đó, một lần:
-   `{"sent": true, "service"}`. Lần ghi đang chờ bị lấy đi dù điều gì xảy ra
+   `{"sent": true, "service"}` (một tệp Drive mới thì có thêm `"made":
+   {"name", "link"}`, xem dưới). Lần ghi đang chờ bị lấy đi dù điều gì xảy ra
    tiếp: `said` khác "send" thì trả lời `{"sent": false, "cancelled":
    true}`; một id sai, đã dùng hoặc quá hạn thì "nothing is waiting to be
    sent: it was cancelled, already sent or over two minutes old"; một id của
-   dịch vụ khác thì bị từ chối. Journal chỉ ghi "a confirmed write to <code>
-   was sent".
+   dịch vụ khác thì bị từ chối. Một lần ghi gắn với tài khoản đã liên kết
+   lúc nó được chuẩn bị (`Pending::account`, `Entry::account`): nếu từ đó
+   liên kết bị thay bằng liên kết của tài khoản khác, không gì đi cả, "not
+   sent: the <Service> link changed; nothing was sent" ("not saved: the
+   Gmail link changed; nothing was saved" với một bản nháp); cùng tài khoản
+   được liên kết lại thì vẫn đi (Reviewer-two trên #5982), trừ khi chính
+   liên kết của nó đã đổi (xem dưới). Journal chỉ ghi
+   "a confirmed write to <code> was sent".
 
 Mỗi lúc chỉ một lần ghi chờ (lần mới thay lần cũ), trong 120 s. Giới hạn: một
 văn bản tối đa 3,000 ký tự (giữ dấu xuống dòng), một tiêu đề thư hay tiêu đề
 là một dòng tối đa 200, tối đa 20 người nhận hoặc người tham dự, mỗi người là
-một `local@domain.tld` thuần. Google Drive và Ahrefs không có ghi ("the lamp
-only reads …").
+một `local@domain.tld` thuần. Ahrefs không có ghi ("the lamp only reads …").
+
+**Toàn bộ phần đọc lại cũng có giới hạn** (`writes::READ_BACK_JSON_MOST`,
+3,584 byte dạng JSON đã đặt trong ngoặc và escape, cho mọi lần ghi, cả tool
+MCP): cùng `send_id`, `sent` của lần chuẩn bị và lời của giọng nói bảo nói
+nó, những gì model nhận vẫn nằm trong câu trả lời tool 4,096 byte của nó.
+Một lần ghi trong mọi giới hạn trên nhưng phần đọc lại dài hơn (50 hàng 10 ô
+trống, mỗi ô nói "blank"; một văn bản toàn dấu ngoặc kép hay chữ ngoài bảng
+Latin, tốn nhiều byte hơn) bị từ chối trước khi giữ gì:
+`writes::READ_BACK_TOO_LONG`, "that is too long to read back in one go, so
+nothing was prepared: ask for a shorter text or a smaller sheet, or make it
+in parts".
+
+**Một lần gửi chỉ đi với đúng liên kết đã được đọc lại** (P1 của
+Reviewer-three trên #5825): lần chuẩn bị giữ `writes::link_of` của mục đã
+liên kết (một hash của mã, loại, client, tài khoản, phần thêm, khoá tĩnh và
+refresh token, hoặc access token khi không có), và lần gửi so nó với chính
+mục sắp dùng, sau phép gắn tài khoản ở trên. Một lệnh `set` cho tài khoản
+khác xen giữa (Drive B thay Drive A, một Gmail khác) bị phép gắn đó từ chối
+("not sent: the <Service> link changed; nothing was sent"); cùng tài khoản
+được liên kết lại với một refresh token khác cũng không gửi gì: `{"ok":
+false, "error": "nothing was sent: the service was linked again since the
+read-back, so ask for it again"}` (`serve::LINK_CHANGED`). Dù cách nào lần
+ghi cũng bị bỏ. Cùng tài khoản được đặt lại hay
+làm mới (access token mới, cùng refresh token) vẫn gửi; một refresh token
+được xoay vòng được coi là liên kết khác, chỉ làm huỷ.
+
+**Google Drive tạo một tệp mới** (#5385, first builder đồng ý ngày 9/11):
+`create_doc {title, text}` một Google Doc, `create_sheet {title, rows}` một
+Google Sheet, `create_file {title, text}` một tệp văn bản thuần (tên được
+thêm `.txt` trừ khi đã kết thúc như vậy). Mỗi lần là một tệp mới trong My
+Drive, bằng một lệnh gọi, lệnh duy nhất trong danh sách ghi của Drive: `POST
+https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink`
+(`writes::DRIVE_UPLOAD`; danh sách là đường dẫn `/upload/drive/v3/files`),
+một thân `multipart/related` với boundary ngẫu nhiên `lamp-<hex>`: metadata
+`{"mimeType", "name"}` (`application/vnd.google-apps.document`,
+`application/vnd.google-apps.spreadsheet` hoặc `text/plain`; không có thư mục
+cha), rồi nội dung dạng `text/plain` (Doc, tệp văn bản) hoặc `text/csv`
+(Sheet), mà Drive chuyển đổi. Không gì sửa, sao chép, di chuyển, chia sẻ, xoá
+hay ghi đè một tệp: các lệnh đó không nằm trong danh sách nào, và một action
+khác ba action trên bị từ chối kèm danh sách của Drive. Phần đọc lại nói loại,
+tên và toàn bộ nội dung, ví dụ "Make a new Google Doc named "Trip plan" in
+your Google Drive, saying: "Day 1: Hue.". Only you can see it, unless your
+Drive shares new files."; một sheet nói từng hàng, các ô cách nhau bằng
+"; then " (`writes::CELL_BREAK`, để một ô có dấu phẩy vẫn được nghe là một
+ô), ô trống là "blank": "Make a new Google Sheet named "Groceries" in your
+Google Drive, with 2 rows. Row 1: Item; then Note; then Count. Row 2: Milk;
+then 2%, cold; then 2. …", và một sheet không có hàng "…, empty.".
+Tiêu đề là một dòng tối đa 200 ký tự và văn bản tối đa 3,000, như của thư;
+một sheet tối đa 50 hàng 10 ô, tổng cộng 3,000 ký tự, mỗi ô là văn bản, số,
+true hoặc false (rows là danh sách các danh sách, hoặc danh sách đó dạng văn
+bản JSON), và không ô nào là công thức: ô bắt đầu bằng `=`, `+`, `-` hoặc `@`
+(sau khi cắt khoảng trắng), mà việc nhập CSV có thể tính, bị từ chối, nhưng
+một số có dấu thuần như `-5`, `+3.2` hay `-1.5e-7` (`digits[.digits]
+[e[+|-]digits]` sau dấu, không gì khác) được giữ, vì sheet chỉ đọc nó là một
+số. CSV
+đặt trong ngoặc kép một ô có dấu phẩy, dấu ngoặc kép hoặc xuống dòng và nhân
+đôi dấu ngoặc kép của nó. Chỉ tạo khi có câu "send" nói ra, như mọi lần ghi:
+câu trả lời là `{"sent": true, "service": "Google Drive", "made": {"name",
+"link"}}`, link chỉ khi là của chính Google (`https://docs.google.com/…` hoặc
+`https://drive.google.com/…`, `writes::made`), ngược lại thì bỏ đi. Một lần
+tải lên thất bại là `{"ok": false, "error": "not made: …"}`, không có `made`,
+lý do theo các mã 403 ở trên (liên kết lại, Drive đầy, Drive bận). Cùng cổng
+như thư: chỉ chủ đèn, được thấy đang nói, trên route thứ hai, không bao giờ từ
+một kỹ năng tự tạo (chỉ `service_read`), một lần chạy theo lịch, một trang hay
+một thư.
+
+**Scope của Drive:** liên kết Drive của sản phẩm (đăng nhập Google qua
+backend) giữ `https://www.googleapis.com/auth/drive.file`, `openid`,
+`userinfo.email` và `userinfo.profile`, không bao giờ `drive.readonly`
+(Backend2, 16:06 ngày 9/11). Nên đèn tạo tệp dưới liên kết `drive.file` đó,
+và chỉ thấy, đọc và tìm được các tệp nó đã tạo hoặc chủ đèn đã chọn cho nó,
+không phải phần còn lại của Drive. Một lần ghi chỉ được chuẩn bị khi `scopes`
+của liên kết có `https://www.googleapis.com/auth/drive` hoặc
+`https://www.googleapis.com/auth/drive.file` (`writes::drive_may_write`, mỗi
+scope được so nguyên vẹn); nếu không, và khi liên kết không ghi scope nào
+(đặt trước khi scope được lưu, hoặc đặt tay), lệnh gọi đầu tiên bị từ chối
+trước mọi phần đọc lại, không giữ hay gọi gì: `writes::DRIVE_NO_WRITE_SCOPE`,
+"This Google Drive link can't make files. To let the lamp make one, link
+Google Drive again in the app: Skills, then Connectors." Không có scope thì
+bị từ chối vì liên kết đó có thể chỉ đọc, và người dùng sẽ đọc cả tệp chỉ để
+nghe một lỗi; liên kết lại qua app sẽ ghi các scope.
+
+**Hết thời gian sau khi Drive đã lưu:** lần tải lên có 15 s, trong 20 s của
+giọng nói. Nếu Drive đã tạo tệp nhưng câu trả lời đến quá muộn, đèn nói tệp
+chưa được tạo, và hỏi lại sẽ tạo tệp thứ hai cùng tên: người dùng có thể xoá
+tệp thừa trong Drive.
+
+**Scope một lần ghi cần** (`writes::SCOPES`). Kiểm tra này chỉ áp dụng cho
+một liên kết OAuth có ghi lại scope: một lần đăng nhập (có access token,
+`auth_type` không phải `pat`) mà `scopes` có ít nhất một mục không trống.
+Một `service_write` như vậy không có `send_id` được kiểm tra với chúng trước
+khi bất cứ gì được chuẩn bị hay giữ, và trước khi hỏi dịch vụ bất cứ gì. Một
+trong các URL scope đầy đủ sau cho phép lần ghi (tài liệu của chính các dịch
+vụ: `users.messages.send`, `events.insert`), `https://www.googleapis.com/auth/`
+được viết là `…/` ở đây:
+
+| Dịch vụ | Action | Bất kỳ scope nào trong |
+|---|---|---|
+| `gmail`, `gmail-app` | `send_mail` | `…/gmail.send`, `…/gmail.compose`, `…/gmail.modify`, `https://mail.google.com/` |
+| `google_calendar` | `create_event`, `update_event`, `delete_event` | `…/calendar`, `…/calendar.events`, `…/calendar.events.owned` |
+
+`writes::scope_allows` tách mỗi mục `scopes` theo khoảng trắng (một danh sách
+giữ thành một chuỗi cách nhau bởi dấu cách được đọc như nhau) và khớp mỗi
+scope như một URL đầy đủ, chính xác: một tên trần như `gmail.send` không cho
+phép gì, như phần tạo tệp của Google Drive (#5825) từ chối một `drive.file`
+trần; kiểm tra đó sẽ gọi cùng hàm này khi #5825 vào. Chỉ liên kết của Google
+ghi scope theo dạng này, nên không dịch vụ nào khác có trong bảng.
+Không có scope nào trong số đó thì lệnh gọi thất bại với "<Service> is linked
+without permission to <what>: link it again in the app (Skills, then
+Connectors) and allow it." (`serve::NO_PERMISSION`, sau dấu hai chấm),
+`<what>` là "send mail", "add calendar events", "change calendar events"
+hoặc "delete calendar events": không gì được giữ, không
+gì được gọi. Một mật khẩu ứng dụng, một khoá cá nhân (`pat`) hoặc một liên kết
+không ghi lại scope thì không bị kiểm tra, như trước.
+
+Ở lần "send", một 401 hoặc 403 mà nội dung nói scope của token không đủ, theo
+cách Google nói (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` hoặc
+`insufficientPermissions`, `writes::scope_refused`), được nói cùng những lời
+đó sau "not sent: " (với một dịch vụ không có trong bảng, `<what>` là "make
+this change"). Mọi 401 hoặc 403 khác giữ lời của nó.
+
+### Đổi hoặc huỷ một sự kiện lịch (`LAMP_CALENDAR_EDITS`)
+
+Tắt trừ khi `LAMP_CALENDAR_EDITS=on` và `LAMP_SERVICES_WRITE=on` trong
+`lamp-services` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn). Khi bật,
+các action của Google Calendar trong `tools.json` thêm `update_event
+{event_id, title, start, end, text, calendar}` và `delete_event {event_id,
+calendar}` (`writes::CALENDAR_EDITS`), và `service_write` nhận một
+`event_id`: id mà một lần đọc lịch hoặc một lần tạo đưa ra (một
+`create_event` đã xác nhận giờ trả lời `{"sent": true, "service",
+"event_id"}`). Mô tả của hàm ghi liệt kê Google Calendar là `create_event,
+update_event, delete_event: see event_id` (`writes::CALENDAR_ACTIONS_SHORT`),
+và mô tả riêng của `event_id` nêu cả ba cùng các trường của chúng: mô tả hàm
+ghi không còn chỗ cho chúng trong 1.024 byte mà liên kết của nó nhận.
+
+- **Scope.** `events.patch` và `events.delete` của Google nhận cùng các scope
+  như `events.insert`, nên liên kết Calendar của ứng dụng, giữ
+  `calendar.events`, cho phép cả hai mà không cần đồng ý lại (bảng trên). Một
+  liên kết không có scope nào trong đó bị từ chối trước khi hỏi Google bất cứ
+  gì, như một lần tạo.
+- **Đọc lại từ sự kiện như nó đang là.** Không có `send_id`, đèn trước hết
+  đọc đúng sự kiện đó (`GET /calendar/v3/calendars/<calendar>/events/<id>`,
+  trong danh sách đọc của Calendar), rồi đọc lại tiêu đề và giờ hiện tại, điều
+  gì thay đổi và ai được báo: "Change the event "Hamburger party" on your
+  Google Calendar (primary), now from … to …: move it to … to …. Its guests,
+  …, are told by email. Seen by whoever your calendar is shared with." hoặc
+  "Delete the event "Hamburger party", now from … to …, from your Google
+  Calendar (primary). … The lamp can't bring it back." Chữ của chính sự kiện
+  là dữ liệu của dịch vụ, giữ thành một dòng tối đa 200 ký tự.
+- **Rồi gửi như mọi lần ghi**: giữ 120 s, gửi một lần khi `"said":"send"`,
+  qua cùng cổng của giọng nói ("Ghi", ở trên): chỉ chuẩn bị khi thấy chủ đèn
+  nói, và gửi khi người đó đồng ý bằng bất kỳ lời nào, trong một yêu cầu sau
+  lời đọc lại, lời đọc lại đó không bị cắt hay bị nói đè; một câu phủ định, một
+  lời huỷ hay một câu hỏi không gửi gì. Lần gửi là một `PATCH
+  …/events/<id>?sendUpdates=all` chỉ mang những gì thay đổi (`summary`,
+  `start` và `end` cùng nhau, `description`), hoặc một `DELETE
+  …/events/<id>?sendUpdates=all` không có nội dung; cả hai đều có trong danh
+  sách ghi của Calendar (`catalog.rs`) và không gì khác.
+- **Giới hạn.** `event_id` và `calendar` là id trong đường dẫn (không `/`,
+  `\`, `?`, `#`, tối đa 256 byte); một lần dời giờ đưa cả start và end, mỗi
+  cái có độ lệch UTC của chính đèn; một `update_event` cần ít nhất một thay
+  đổi.
+- **Đã mất trong Google.** Khi sự kiện đã bị xoá, hoặc bị đổi như vậy, ngay
+  trong Google, lần đọc hoặc lần gửi của nó nhận 404 hoặc 410, hoặc sự kiện
+  đọc ra `"status":"cancelled"`. Mỗi trường hợp trả lời `writes::EVENT_GONE`:
+  "That event is no longer on the Google Calendar: it was deleted or changed
+  there, and nothing was changed. Say it's no longer there, and offer to
+  create it again with create_event." (sau "not sent: " ở một lần gửi). Không
+  gì được giữ.
+
+Mô hình được nói về `service_write`, trước tiên trong mô tả của nó
+(`WRITE_RULE`, rồi đến luật mà mọi hàm dịch vụ đều có, ở dưới):
+"Only when the person asks you, now, to send or post something; an ask to
+draft, write or reply to a mail or message is one, never a remember. A mail
+draft: gmail's action save_draft; if refused, say what the call said. Call it
+first without send_id: it sends nothing and gives a read_back. Say it in full,
+word for word, then "Say 'yes, send it' to send it." (Vietnamese "Nói 'gửi đi'
+để gửi nhé."; a draft: "save it"). If they agree, in any words, call it again
+with its send_id; if they cancel or wait, don't send and say it's cancelled.
+Never say a read-back no call gave in this turn. Never say you can't use their
+services: refuse only for a reason a call gave."
+
+Một yêu cầu soạn nháp thư là một lệnh ghi: từ yêu cầu của chủ đèn ngày 10/11,
+khi Gmail được liên kết bằng mật khẩu ứng dụng, nó là `save_draft`, được chuẩn
+bị và đọc lại như mọi lệnh ghi và được lưu vào Drafts của Gmail khi người đó
+đồng ý, bằng bất kỳ lời nào (ở trên, "Nháp"), không bao giờ được gửi. Một
+liên kết Gmail bằng đăng nhập Google (`gmail-app`, hay `gmail` tạo bằng nó)
+không có `gmail.compose` và không lưu nháp: `save_draft` của nó bị từ chối
+với lý do của chính lệnh gọi, mang câu cần nói, "I can't save a draft yet. I
+can read it back and send it when you say 'send it'." Sau mọi phần đọc lại
+đèn hỏi ngắn (chủ đèn, 10/11), "Say 'yes, send it' to send it." (với một bản
+nháp: "save it"), và mô hình xét mọi câu trả lời. Nó không bao giờ là một `remember`: trên
+lamp-3e83 ngày 10 tháng 11, mô hình gọi `remember` ba lần cho một bản nháp
+trước khi ghi, và bản nháp kết thúc bằng "shall I send it?". Trên lamp-29e7
+ngày 9 tháng 11, "Draft a new email for me" bị từ chối mà không có lệnh gọi nào
+("I cannot touch your mail") và, khi được hỏi tại sao, "Because I'm a lamp.";
+luật không nói gì về nháp, cũng không nói lý do của một lời từ chối đến từ
+đâu. Toàn bộ luật cùng luật chung là 997 trong 1,024 byte của mô tả, chừa 26
+byte cho lời riêng của `lamp-services` cho hàm ghi: chỉ những câu trọn vẹn,
+nên danh sách "action, by service: …" của nó được nói trên tham số `action`.
 
 ### Cổng gửi của giọng nói
 
 `crates/voice/src/services.rs` giữ các luật riêng của nó, bất kể
-`lamp-services` hay mô hình nói gì (`gate`, `answered`, `says_send`,
-`read_back_said`):
+`lamp-services` hay mô hình nói gì (`gate`, `answered`). **Chủ đèn, 10/11:
+người nói đã xác nhận hay huỷ là do mô hình xét ("quăng cho deepseek hết đi,
+đừng if else"), cho mọi connector.** Không còn danh sách từ, phép thử đồng ý
+hay so khớp câu huỷ trơn nào trong đèn quyết định việc đó (`agrees_to_send`,
+`says_send`, `AGREE_WORDS`, `SEND_WORDS`, `PLAIN_WORDS`, `NOT_WORDS`,
+`says_cancel`, `CANCEL_WORDS`, `cancel_waiting` và câu "Okay, cancelled."
+của chính đèn đã bị bỏ). Đèn chỉ kiểm tra cấu trúc: đúng `send_id` của lần
+ghi, một yêu cầu sau yêu cầu đọc lại, tối đa hai phút, và phần đọc lại không
+bị cắt hay bị nói đè. Chỉ còn một phép kiểm tra giọng, cho một câu bắt đầu
+trong đuôi tiếng vọng của lời đèn và có chung bất kỳ từ nào với lời đó (phương
+án 1 của Thirteen trên #6009, bên dưới): ở đó phải là giọng của người đã yêu
+cầu; ở mọi chỗ khác, ai nói cũng được.
 
-- **Chỉ câu nói được nghe của chủ đèn** mới chạm đến một dịch vụ, dù đọc hay
-  ghi ("Ai dùng được chúng", ở trên); mọi trường hợp khác là `OWNER_ONLY`
-  hoặc `NOT_HEARD`, và mọi lần ghi đang chờ bị quên.
-- **Chỉ ghi trên tuyến thứ hai.** Tuyến Live không có dấu giọng, nên không
-  biết giọng ai nói "send": ở đó một `service_write`, có hay không có
-  `send_id`, được báo `NO_SEND_HERE`, "Not done: on this voice I don't send
-  or post to linked services. Say so in a few words; they can ask again on
-  the lamp's other voice.", và không gì được chuẩn bị hay gửi. Một tuyến là
-  tuyến thứ hai khi worker của nó đã đưa phép kiểm tra cùng giọng cho các
-  dịch vụ (`services::judging_voices`); tiến trình Live không bao giờ làm vậy.
+- **Chỉ một câu được nghe** mới chạm đến một dịch vụ, dù đọc hay ghi; mọi
+  trường hợp khác là `NOT_HEARD`, và mọi lần ghi đang chờ bị quên. **Chỉ câu
+  của chủ đèn** mới đọc hay chuẩn bị một lần ghi ("Ai dùng được chúng", ở
+  trên): mọi câu khác là `OWNER_ONLY`, và mọi lần ghi đang chờ bị quên. Ngoại
+  lệ duy nhất là lần gửi của một lần ghi đã đang chờ: lệnh gọi của mô hình có
+  `send_id` gửi nó dù ai trả lời (cả một người khác đã biết, hay một câu không
+  thuộc khuôn mặt đã biết nào), trừ một câu bắt đầu trong đuôi tiếng vọng của
+  đèn có lời của nó, câu đó phải là giọng của người đã yêu cầu (bên dưới).
+- **Chỉ ghi trên tuyến thứ hai.** Ở đó một `service_write`, có hay không có
+  `send_id`, được chuyển cho các luật dưới đây; trên tuyến Live nó được báo
+  `NO_SEND_HERE`, "Not done: on this voice I don't send or post to linked
+  services. Say so in a few words; they can ask again on the lamp's other
+  voice.", và không gì được chuẩn bị hay gửi. Một tuyến là tuyến thứ hai khi
+  worker của nó đã đưa phép kiểm tra cùng giọng cho các dịch vụ
+  (`services::judging_voices`); tiến trình Live không bao giờ làm vậy.
 - **Chỉ chuẩn bị khi thấy chủ đèn nói.** Một `service_write` không có
   `send_id` mà câu của nó không được thấy khuôn mặt chủ đèn nói ("Ai dùng được
   chúng", ở trên) được báo `NOT_SEEN_SAYING`, "Not done: I write for the
@@ -670,126 +1280,227 @@ only reads …").
   hiện, và không được đưa vào tham số của hàm.
 - **Chuẩn bị:** một `service_write` không có `send_id` được chuyển tiếp, mọi
   lần ghi đang chờ bị quên trước. Khi câu trả lời có `read_back` và `send_id`,
-  id đó được giữ cùng với yêu cầu mà nó đến, phần đọc lại, và chủ đèn đã yêu
-  cầu, và mô hình được báo "Nothing is sent yet. Say read_back in full, word
-  for word, leaving nothing out, then ask them to say "go ahead and send it"
-  (in Vietnamese "ừ, gửi đi giúp tôi") to send it. Send only if their next
-  words are that."; một id không có phần đọc lại bị bỏ và không
-  bao giờ được gửi.
+  id đó được giữ cùng với yêu cầu mà nó đến, dịch vụ, phần đọc lại, và chủ
+  đèn đã yêu cầu, và mô hình được báo "Nothing is sent yet. Say read_back in
+  full, word for word, leaving nothing out, then say "Say 'yes, send it' to
+  send it." (in Vietnamese "Nói 'gửi đi' để gửi nhé."). If they agree, in any
+  words, call service_write again with its send_id. If they cancel, decline,
+  wait or change it, don't send: say it's cancelled, or prepare the changed
+  one anew."; một id không có
+  phần đọc lại bị bỏ và không bao giờ được gửi. Một lệnh ghi được chuẩn bị
+  với `action` `save_draft` được giữ là một bản nháp (`Pending::draft`), và
+  mô hình được báo thay vào đó `SAVE_READ_BACK_NEXT`, "Nothing is saved yet,
+  and nothing is ever sent. Say read_back in full, word for word, leaving
+  nothing out, then say "Say 'yes, save it' to save it as a draft." (in
+  Vietnamese "Nói 'lưu đi' để lưu nháp nhé."). If they agree, in any words,
+  call service_write again with its send_id. If they cancel, decline, wait or
+  change it, don't save: say it's cancelled, or prepare the changed one
+  anew."
 - **Những gì đèn đã nói về nó:** mọi lời đèn nói trong yêu cầu đó sau khi lần
   ghi được chuẩn bị được giữ cùng nó, đúng như đã nói, trên cả hai tuyến
-  (`thread::Thread::lamp_for` → `services::lamp_said`).
-- **Một câu "send" thuần là của lệnh ghi đang chờ.** Lịch sử của một lượt
-  sau giữ tên của một lần gọi, không bao giờ giữ câu trả lời của nó, nên mô
-  hình không thể biết `send_id`. Một `service_write` trong một request sau mà
-  câu nói là một câu gửi thuần (`says_send`) được coi là của lệnh ghi đang
-  chờ, bất kể nó đưa id nào hay không đưa: đối số của nó chỉ còn
-  `{"service": <dịch vụ lệnh ghi được chuẩn bị cho>, "send_id": <id của nó>}`,
-  nên đúng những gì đã được đọc lại được gửi, đến dịch vụ đó, theo mọi luật
-  dưới đây. Giọng của nó được xét như mọi lần gửi (`is_send`, cùng phép thử
-  cổng dùng): trên lamp-9adf ngày 4/11 một lần gửi không có id được nhận
-  nhưng không bao giờ được xét giọng, và bị từ chối như một giọng không nghe
-  được. `service_write` của bất kỳ câu nào khác là một lệnh ghi mới, như
-  trước.
-- **Gửi:** một `service_write` có `send_id` được chuyển tiếp, với
-  `"said":"send"` được thêm vào, chỉ khi tất cả đều đúng: đó là id được giữ;
-  nó đến trong một yêu cầu sau yêu cầu đã đọc lại nó; lượt của đèn ngay trước
-  lượt này là lượt của phần đọc lại đó, và từ đó đèn không nói trong yêu cầu
-  nào khác; câu của người đó là câu đầu tiên được bắt đầu kể từ khi lần ghi
-  được chuẩn bị; đó là cùng chủ đèn đã yêu cầu; tối đa 2 phút kể từ khi chuẩn
-  bị và 30 s (`SEND_WITHIN`, `send_by`) kể từ khi đèn nói lời cuối của nó, hoặc
-  kể từ khi phần đọc lại có thể đã phát xong với 600 ms mỗi từ, nếu muộn hơn
-  (sau khi đèn hỏi lại, chỉ tính từ lần hỏi đó); và lời của người đó trong lượt này là một câu gửi thuần. Nếu không, mô hình được báo
-  `CANCELLED`, "Not sent, and cancelled: I send only on a plain "send" said
-  to me right after I read the message back. Say it was not sent." Journal
-  ghi tên từng điều kiện không đạt ("a send cancelled: …"), và mỗi lần từ
-  chối ghi kèm lời đã báo.
+  (`thread::Thread::lamp_for` → `services::lamp_said`), để tính giờ một câu
+  bắt đầu đè lên nó (bên dưới).
+- **Lần gửi là lệnh gọi của mô hình có `send_id`.** Ghi chú chờ của mỗi lượt
+  sau đưa cho mô hình `send_id` của lần ghi (ở dưới), vì lịch sử giữ tên một
+  lệnh gọi, không bao giờ giữ câu trả lời của nó. Một `service_write` không
+  có `send_id` là một lần ghi mới, như trước.
+- **Gửi:** một `service_write` có `send_id` được chuyển tiếp dưới dạng
+  `{"service": <dịch vụ mà lần ghi đã được chuẩn bị>, "send_id": <id của
+  nó>, "said": "send"}`, nên đúng những gì đã đọc lại được gửi, đến dịch vụ
+  đó, chỉ khi tất cả đều đúng: đó là id được giữ; nó đến trong một yêu cầu
+  sau yêu cầu đã đọc lại; lần ghi có dịch vụ của nó; và tối đa 2 phút
+  (`PENDING_FOR`) kể từ khi chuẩn bị. Lời của câu nói không bị kiểm tra:
+  "Yes.", "ok send", "sure", "gửi đi" hay "send it to Bob" là do mô hình xét.
+  Không quan trọng đó có phải câu ngay sau không (một câu đèn chưa trả lời
+  có thể đến ở giữa), lời của đèn có chứa nguyên văn phần đọc lại không (`read_back_said`
+  giờ chỉ là phép kiểm tra của câu hỏi giọng chủ đèn), hay ai nói, trừ trong
+  đuôi tiếng vọng của đèn (bên dưới). Nếu không,
+  mô hình được báo `CANCELLED`, "Not sent, and cancelled: a send needs the
+  waiting write's own send_id, in a later turn than its read-back, within two
+  minutes. Say it was not sent." Nhật ký ghi tên từng điều kiện không đạt ("a
+  send cancelled: …": send_id khác, không phải yêu cầu sau yêu cầu đọc lại,
+  không có dịch vụ, chuẩn bị quá lâu rồi), và mỗi lời từ chối kèm lời nó đưa.
+- **Một phần đọc lại bị cắt vẫn không gửi gì.** Phần đọc lại không được bị
+  một câu nói hay một lệnh Stop cắt ngang (`Thread::heard_only` →
+  `services::lamp_cut`), và câu của người đó không được bắt đầu trước khi
+  phần đọc lại có thể được nói trọn (400 ms mỗi từ, nhịp của chính đèn, tính
+  từ từ đầu tiên của nó) hay trước khi bất kỳ phần nào của nó được nói, cũng
+  không được đè lên giọng của đèn. Trên tuyến thứ hai câu được tính giờ từ lúc
+  nó bắt đầu (`Began` của `Heeding::hear`, trước khi lời của nó đến →
+  `services::voice_began`), khi có luật (`--attention`); không có thì từ lúc
+  những lời đầu của nó đến. Nếu không, mô hình được báo `NOT_READ_BACK`, "Not
+  sent, and cancelled: the read-back was cut off before they agreed. Say it
+  was not sent, and that they can ask again." Một lần gửi bị từ chối làm quên
+  id trong mọi trường hợp.
+- **Trong đuôi tiếng vọng của đèn, phải là giọng người đã yêu cầu** (phương
+  án 1 của Thirteen trên #6009). Một lần gửi trong một câu bắt đầu đè lên
+  giọng đèn hoặc trong vòng 1,5 s (`own_echo::TAIL_US`) sau khi lời mới nhất
+  của đèn lẽ ra đã phát hết, và có chung ít nhất một từ với lời đó
+  (`own_echo::in_tail_with_its_words`, được xét trên tuyến thứ hai khi lời của
+  câu đến, dù `LAMP_SECOND_OWN_ECHO` bật hay không, và được giữ cùng lần ghi
+  đang chờ: `services::line_in_echo_tail`, `Pending.echo_tail`,
+  `Turn.in_echo_tail`), có thể là chính lời của đèn vọng lại, dù ngắn đến đâu:
+  "Yes." hay "Send it." quá ngắn để `own_echo` giữ lại (`HELD_LEAST`, 3). Lần
+  gửi đó chỉ đi khi giọng của câu là giọng người đã yêu cầu: `Turn.alike`, so
+  với bản in giọng đã đăng ký của người đó (`VoiceAsk::Owner`) hoặc nếu không
+  thì với câu đã chuẩn bị lần ghi (`VoiceAsk::Alike`), từ
+  `same_voice::SERVICES_SAME_FROM` (0,55) trở lên, chờ bản in tối đa 800 ms,
+  và không thấy khuôn mặt nào khác nói câu đó (`Turn.other_seen`). Một giọng
+  khác đã biết hay một khuôn mặt khác thì huỷ nó, `OTHER_VOICE`: "Not sent,
+  and cancelled: I send only when the voice saying "send" is the one that
+  asked for it. Say it was not sent." Khi chưa có bản in (câu quá ngắn), lần
+  ghi chờ thêm một lần thử, chỉ một lần: mô hình được báo `NO_PRINT_YET`,
+  "Not sent yet: I couldn't hear whose voice that was.", kèm `SAY_IT_LONGER`
+  là điều cần nói tiếp (nhờ họ nói "go ahead and send it", và chỉ gửi lại nếu
+  họ đồng ý); lời đèn hỏi lại không tính là một yêu cầu khác
+  (`Pending.asked_again`), và một lần gửi thứ hai vẫn không có bản in là
+  `OTHER_VOICE`. Trong phòng riêng, giọng được coi là của người đã yêu cầu
+  (`alike` 1,0, không hỏi giọng hay khuôn mặt nào), như chủ đèn đã chấp nhận
+  ngày 6/11. Một câu bắt đầu sau đuôi, hoặc không có từ nào của đèn, không gắn
+  với giọng nào: ai nói cũng đồng ý được, và không chờ bản in nào. Nhật ký ghi
+  "a send begun in the lamp's echo tail; its voice beside request N's: cosine
+  0.62" (hoặc "no print"), chỉ một điểm số.
 - **Một câu gửi khi không có lệnh ghi nào đang chờ** (chưa chuẩn bị, hoặc
   đã gửi hay đã huỷ) không gửi gì, và mô hình được báo `NOTHING_WAITING`,
   "Not sent: no write waits for a send. None was prepared, or it was already
   sent or cancelled. If they still want it, call service_write now without
   send_id, say its read_back in full, and ask them again.", để người đó nghe
-  một phần đọc lại thật rồi nói "send" lần nữa. Journal ghi "a send with no
-  write waiting". Trên lamp-9adf ngày 4/11 mô hình hai lần tự nói một phần
-  đọc lại mà không gọi hàm, và câu "send" sau đó không thấy gì; luật riêng
-  của hàm giờ nói không bao giờ được nói một phần đọc lại mà không lệnh gọi
-  nào trong cùng lượt đưa ra.
-- **Điểm giọng của câu gửi được ghi vào journal**: "a send's voice beside
-  request N's: cosine 0.64" (hoặc "no print"), chỉ là điểm, không bao giờ là
-  dấu giọng.
-- **Phần đọc lại phải được nghe trọn.** Lời của đèn phải chứa mọi từ của
-  `read_back` theo đúng thứ tự (chữ cái và chữ số, viết thường, "at" và "dot"
-  của một địa chỉ nói hay viết đều như nhau; thêm lời xung quanh, như "Shall
-  I send it?", không sao), để người nhận, nơi đến và toàn bộ nội dung đã được
-  nói. Phần đọc lại không được bị một câu nói hay một lệnh Stop cắt ngang
-  (`Thread::heard_only` → `services::lamp_cut`), và câu của người đó không
-  được bắt đầu trước khi phần đọc lại có thể được nói trọn (400 ms mỗi từ,
-  nhịp của chính đèn, tính từ từ đầu tiên của nó) hay trước khi bất kỳ phần
-  nào của nó được nói, cũng không được đè lên giọng của đèn. Trên tuyến thứ
-  hai câu được tính giờ từ lúc nó bắt đầu (`Began` của `Heeding::hear`, trước
-  khi lời của nó đến → `services::voice_began`), khi có luật (`--attention`);
-  không có thì từ lúc những lời đầu của nó đến. Nếu không, mô hình được báo `NOT_READ_BACK`, "Not
-  sent, and cancelled: the message was not read back in full before the
-  "send". Say it was not sent, and that they can ask again." Một lần gửi bị
-  từ chối làm quên id trong mọi trường hợp.
-- **Giọng nói "send" là giọng đã yêu cầu.** Dấu giọng của câu gửi và của câu
-  chuẩn bị được so (`same_voice::Voices::alike`). Một giọng khác đã biết (có
-  cả hai dấu giọng, giống nhau dưới `same_voice::SERVICES_SAME_FROM`, 0.55, thấp hơn `SAME_FROM` 0.70 của cuộc trò chuyện vì hầu hết chủ đèn ở một mình với đèn) hoặc một
-  khuôn mặt khác được thấy nói câu gửi sẽ huỷ nó: mô hình được báo
-  `OTHER_VOICE`, "Not sent, and cancelled: I send only when the voice saying
-  "send" is the one that asked for it. Say it was not sent." Dấu giọng chỉ
-  được làm từ một câu có từ 1.5 s lời nói trở lên bắt đầu khi đèn im lặng
-  (`same_voice::LEAST_SAMPLES`), nên một câu "send" trơn thường không có: khi
-  đó lần ghi được giữ (2 phút của nó vẫn chạy, còn 30 s được tính lại từ
-  lúc đèn hỏi lại, vì cùng câu "send" đầu tiên việc này đã quá 30 s kể từ lúc
-  đọc lại trên lamp-9adf) và mô hình được báo
-  `NO_PRINT_YET`, "Not sent yet: I couldn't hear whose voice that was.", với
-  bước tiếp theo "Ask them, in the conversation's language, to say "go ahead
-  and send it" (in Vietnamese "ừ, gửi đi giúp tôi"), and nothing else. …".
-  Lời của đèn trong yêu cầu đó không tính là của yêu cầu khác, và câu tiếp
-  theo của người đó có thể gửi, theo mọi luật ở trên với yêu cầu đó là lượt
-  của đèn ngay trước. Một câu thứ hai không có dấu giọng huỷ nó như
-  `OTHER_VOICE`.
-- **Dấu giọng đăng ký của chủ đèn, khi có** (chỉ với
-  `LAMP_SAME_VOICE_FOR=services`, [same-voice.md](../same-voice.md), "The
-  owner's voice print"): dấu giọng của câu gửi được so với dấu giọng của chủ
-  đèn, lấy trung bình từ nhiều câu của họ, thay cho dấu giọng của câu chuẩn
-  bị (`VoiceAsk::Owner`, `services::send_likeness`), với cùng `SERVICES_SAME_FROM`;
-  nhật ký chỉ ghi cosine ("owner print: the send's cosine 0.82"). Mọi kiểm
-  tra khác ở trên giữ nguyên. Không có dấu giọng thì như trên. Sau một lần
-  gửi của chủ đèn chưa có dấu giọng, đã gửi hoặc bị từ chối là
-  `OTHER_VOICE`, và khuôn mặt họ được thấy nói câu đó, mô hình được báo một
-  lần, dưới `then`: "Then ask, in the conversation's language, exactly: "May
-  I learn your voice, so I only send mail when it's you?" (in Vietnamese
-  "Cho tôi học giọng của bạn nhé, để tôi chỉ gửi thư khi đúng là bạn?"). …".
-  Không hỏi lúc chuẩn bị: phần đọc lại và câu "send" của nó là các lượt
-  ngay sau đó.
-- **Mọi lượt sau đó đều làm quên nó:** một câu thứ hai do bất kỳ ai bắt đầu,
-  đèn nói trong một yêu cầu khác thứ hai, hoặc một lệnh gọi dịch vụ không có
-  `send_id` trong một yêu cầu khác sẽ bỏ lần ghi đang chờ.
+  một phần đọc lại thật rồi đồng ý lần nữa. Journal ghi "a send with no write
+  waiting". Trên lamp-9adf ngày 4/11 mô hình hai lần tự nói một phần đọc lại
+  mà không gọi hàm, và câu "send" sau đó không thấy gì; luật riêng của hàm
+  giờ nói không bao giờ được nói một phần đọc lại mà không lệnh gọi nào trong
+  cùng lượt đưa ra.
+- **Mọi câu trả lời được nghe là câu trả lời** (`answer_awaited`). Khi một
+  lệnh ghi đang chờ (chuẩn bị chưa tới 2 phút, phần đọc lại không bị cắt,
+  câu ngay sau nó), một câu có chữ được tính là trả lời đèn, dù nói gì, bất
+  kể câu cuối của phần đọc lại ra sao. Vì vậy một câu "Yes.", "Send." hay
+  "Cancel." trơn không bị giữ là một âm ngắn hay lời lẻ của phòng, kể cả khi
+  không có ai trong khung hình, và đến được mô hình. Điều này chỉ áp dụng cho
+  một câu được biết là bắt đầu tách khỏi lời của đèn; câu bắt đầu đè lên
+  giọng của đèn, trong vòng 1.5 s (`own_echo::TAIL_US`) sau khi lời của đèn
+  kết thúc, hoặc khi không có hook nghe để biết lúc nó bắt đầu, được xét như
+  mọi câu khác.
+- **Không lời nhắc, không câu huỷ của đèn.** Lời nhắc riêng của đèn "Say
+  'send it' to send it." (`SAY_SEND_IT`, `nudge_waiting`; với một bản nháp
+  "Say 'save it' to save the draft.", `SAY_SAVE_IT`) và câu riêng
+  "Okay, cancelled. Nothing was sent." (`CANCELLED_SAID`, #5958) đã bị bỏ:
+  một câu "go ahead" hay "cancel that" là lượt của mô hình, được nói lệnh ghi
+  đang chờ (ở dưới). Nó gửi bằng `send_id`, hoặc nói đã huỷ và không gửi;
+  lần ghi đang chờ khi đó hết hạn sau 2 phút hoặc bị bỏ bởi lệnh gọi khác kế
+  tiếp, và `lamp-services` để bản riêng của nó hết hạn sau 2 phút. Một lần
+  quên (của luồng, bằng giọng; `memory/forgot` của bộ nhớ cho bất kỳ ai, dù
+  bản tóm tắt đang chạy bật hay tắt: tắt thì là bộ đọc riêng của worker,
+  `memory_forgot_waiting`) hoặc một thay đổi quyền riêng tư của camera hay
+  micro bỏ lần ghi đang chờ (`forget_waiting`). Một ghi chú lần ghi đang chờ
+  lấy trước đó được bỏ ở mỗi lần chat mà engine hỏi, ở bất kỳ vòng hay lần
+  thử nào (`LettingGo`, `waiting_note_stands`, so văn bản của ghi chú với
+  lần ghi còn đang chờ).
+- **Mỗi lượt sau được nói lệnh ghi đang chờ** (#5962). Lịch sử giữ tên một
+  lệnh gọi, không bao giờ giữ câu trả lời của nó, và phía đèn chỉ giữ 400 byte
+  đầu, nên đuôi của một phần đọc lại dài bị mất và mô hình hỏi lại những gì
+  nó đã được nói. Khi một lệnh ghi đang chờ (tối đa 2 phút), mỗi lượt sau của
+  người đã yêu cầu (trong phòng riêng là bất kỳ ai nói) mang nó trong ghi chú,
+  chỉ trong bộ nhớ, cùng lệnh ghi (`services::waiting_note`): dịch vụ của nó,
+  `send_id` của nó và toàn bộ phần đọc lại (tối đa 1,500 byte), với một bản
+  nháp rằng đó là "a Gmail draft, saved, never sent", rằng nếu họ
+  đồng ý, bằng bất kỳ lời nào, thì mô hình gọi `service_write` với `send_id`
+  đó, rằng nếu họ huỷ, từ chối hay bảo chờ thì nó không gửi và nói đã huỷ, và
+  rằng một thay đổi là một `service_write` mới với toàn bộ thư đã đổi, không
+  bao giờ hỏi lại điều nó đã giữ. Kết quả đọc vẫn riêng tư như trước.
+- **Mọi lệnh gọi khác làm quên nó:** một lệnh gọi dịch vụ không có `send_id`
+  trong một yêu cầu khác, hoặc đèn nói trong một yêu cầu khác thứ hai, sẽ bỏ
+  lần ghi đang chờ. Nhật ký ghi lý do: "a waiting write dropped: another call
+  (prepared in request N)", "… dropped: the lamp answered another request".
+- **Câu trả lời cho phần đọc lại là cơ hội duy nhất** (P2 của Thirteen trên
+  #6009). Khi đèn đã trả lời yêu cầu ngay sau phần đọc lại (`Pending.other`)
+  mà không có lần gửi nào trong đó, mọi yêu cầu sau bỏ lần ghi trước lệnh gọi
+  hay ghi chú của nó (`answered_without_send`, nhật ký "a waiting write
+  dropped: the lamp answered request N after its read-back with no send"):
+  mô hình đã coi câu trả lời là huỷ ("Cancel that." → "Okay, cancelled."),
+  chờ, hay điều khác ("What time is it?" → "It's three."). Một câu "Yes,
+  send it." sau đó gặp `NOTHING_WAITING`, không lượt sau nào được nói về lần
+  ghi, và mô hình chuẩn bị lại. Lần gửi của chính yêu cầu đó, sau những lời
+  như "Sure, sending it now.", vẫn đi.
+- **Tiếng vọng của chính đèn không phải câu của người nói** (#5846). Một câu
+  mà tuyến thứ hai giữ lại là lời của chính đèn vọng lại (`own_echo`,
+  `Echo::Held`) được báo qua thread (`Thread::own_echo_held` →
+  `services::own_echo_held`, nhật ký "the lamp's echo, not counted toward the
+  waiting write"): `Pending.echoes` đếm nó, và một câu trả lời được chờ kiểm
+  tra số câu của người nói, nên thread nghe về lúc câu bắt đầu hay về tiếng vọng
+  trước cũng không sao. Mỗi câu được đếm hai lần: bởi thread, không có
+  request (`Thread::person` → `line_began(None)`, `lines`), và trên tuyến
+  thứ hai với request của nó khi lời của nó được báo (`Thread::line_heard` →
+  `line_began(Some(request))`, `heard`, giữ 8 id mới nhất). Số câu của người
+  nói là số đếm lớn hơn trừ số tiếng vọng, và một tiếng vọng chỉ được trừ cho
+  một request đã được đếm kèm id, và chỉ một lần: dấu đi cùng id trong 8 id
+  mới nhất, nên tiếng vọng lặp lại không bao giờ được trừ lần nữa, và một câu
+  thread chưa từng đếm (một mảnh nối vào câu đang nói, hoặc không có chữ cái
+  hay chữ số) không trừ câu nào của người nói. Một lần cắt chỉ do lúc bắt đầu
+  của tiếng vọng gây ra (bắt đầu đè lên giọng của đèn, `voice_began` cho yêu
+  cầu đó, `Pending.cut_by`) được gỡ cùng nó; lần cắt do câu trả lời của đèn
+  bị dừng, do một câu khác, hay do cách tính giờ của thread (`began_in`) thì
+  giữ nguyên, và từ chối lần gửi là `NOT_READ_BACK`. Trên lamp-29e7 ngày 9/11,
+  chính câu "go ahead and send it" của phần đọc lại vọng lại được tính là câu
+  đầu tiên, và chủ đèn phải nói "send" năm lần.
+- **Chính lời của phần đọc lại vọng lại không bao giờ đồng ý thay người
+  nói** (P1 của App Only và Thirteen trên #6009). Phần đọc lại của một lệnh
+  ghi đang chờ được `own_echo` xét như mọi câu của đèn: trong 1,5 s đuôi của
+  nó, "Yes, send it." do phòng vọng lại bị giữ, và "Um, yes, send it." (một
+  từ đệm của ASR) bị bỏ đoạn lời của đèn, nên mô hình chỉ nhận "Um," và
+  không bao giờ nhận lời đồng ý của đèn. Một tiếng vọng ngắn hơn, "Yes." hay
+  "Send it.", không bị giữ (`own_echo` giữ một câu có từ 3 từ của đèn trở
+  lên, `HELD_LEAST`, và bỏ các đoạn từ 2 từ trở lên, `STRIP_RUN`) và đến mô
+  hình nguyên vẹn; điều giữ đèn không gửi theo nó là phép kiểm tra giọng của
+  lần gửi trong đuôi ("Trong đuôi tiếng vọng của đèn, phải là giọng người đã
+  yêu cầu", ở trên): giọng của chính đèn không phải giọng người đã yêu cầu,
+  và hai lần không có bản in thì huỷ. Người nói đúng từng chữ ngay khi đèn
+  vừa dứt bị giữ một lần và nói lại (lamp-3e83, 10/11); người thêm một từ
+  ("Okay, yes, send it.") đến mô hình là "Okay,", và lần gửi khi đó đi nếu là
+  giọng người đã yêu cầu; người bắt đầu sau đuôi đến mô hình như đã nói, và
+  lần gửi đi dù ai nói.
 - **Sau một lần gửi** mô hình được báo một câu cố định: "Say only that it was
-  sent, in the conversation's language." khi dịch vụ trả lời `sent: true`,
-  nếu không thì "Say only that it was not sent, in the conversation's
-  language." (nói bằng ngôn ngữ của cuộc trò chuyện).
-- **Một câu gửi thuần** (`says_send`): các từ viết thường, mọi thứ trừ chữ
-  cái, chữ số và `'` thành dấu cách, các từ đệm `yes`, `yeah`, `yep`, `ok`,
-  `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `hey`, `hi`, `hello`,
-  `oh`, `vâng`, `dạ`, `ừ`, `có` được bỏ ở cả hai đầu, và phần còn lại đúng là một trong `send`, `send it`,
-  `send that`, `send the message`, `send the email`, `go ahead and send it`,
-  `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
-  `gửi đi giúp tôi`, `gui di giup toi`: câu nào cũng có "send", "gửi", "gởi"
-  hoặc "gui". Vì vậy "Yes, send it.", "Vâng, gửi đi" và "Ừ, gửi đi giúp tôi"
-  thì gửi, "Hey Lamp, yes, send it." cũng vậy; "do it", "don't send it",
-  "send it to Bo instead", "đừng gửi" và "no" thì không.
-- **Một câu gửi thuần được nghe là câu trả lời** (`send_awaited`). Khi một lệnh
-  ghi đang chờ, một câu gửi thuần được tính là trả lời đèn, bất kể câu cuối
-  của phần đọc lại ra sao. Vì vậy nó không bị giữ lại như một âm thanh ngắn hay
-  vài từ lẻ của căn phòng, kể cả khi không có ai trong tầm nhìn. Điều này chỉ áp
-  dụng cho câu được biết là bắt đầu tách khỏi lời của đèn. Câu bắt đầu đè lên
-  giọng của đèn, trong vòng 1,5 s (`own_echo::TAIL_US`) sau khi lời của đèn kết
-  thúc, hoặc khi không có hook nghe nào cho biết nó bắt đầu lúc nào, có thể là
-  chính "send it" của đèn vọng lại, mà `own_echo` không giữ khi dưới 3 từ. Câu
-  như vậy được xét như mọi câu khác, và `gate` vẫn xét lần gửi đó.
+  sent, in the conversation's language." khi dịch vụ trả lời `sent: true`;
+  "Say only that the file was made in their Google Drive, with its name from
+  made, in the conversation's language. Never read out its link."
+  (`MADE_NEXT`) khi nó cũng trả `made`; "Say only that it was saved as a
+  draft in their Gmail Drafts, not sent, in the conversation's language."
+  (`SAVED_NEXT`) khi nó trả lời `saved: true`, nên đèn nói "Saved as a
+  draft.", không bao giờ nói "sent"; "Say only that the draft was not saved,
+  in the conversation's language." (`NOT_SAVED_NEXT`) với một lỗi bắt đầu
+  bằng "not saved"; "Say that it was not sent or made, and why, in a few
+  words from error, in the conversation's language." (`NOT_SENT_WHY_NEXT`)
+  khi dịch vụ đưa lý do riêng khác của nó (`error`: liên kết Drive cần làm
+  lại, Drive đầy), để người dùng biết phải làm gì; nếu không thì "Say only
+  that it was not sent, in the conversation's language." (nói bằng ngôn ngữ
+  của cuộc trò chuyện). Một bản nháp đã lưu là một lệnh ghi đã xong như một
+  lần đã gửi (`services::went`): biên nhận của nó không bao giờ bị huỷ hay
+  bị bỏ trước, và ghi chú của một lượt bị cắt nói lời đồng ý "already sent
+  the write they asked for (or, for a draft, saved it)". Chủ đèn
+  không còn được hỏi, sau một lần gửi, đèn có được học giọng của họ không
+  (`owner_voice::ask_after_send` không còn được gọi): một lần gửi sau đuôi
+  tiếng vọng của đèn không gắn với giọng nào.
+- **Một lần gửi bị cắt khi còn đang chờ không bao giờ được trả lời như thể
+  chưa làm gì** (#5853, lamp-9adf, 9/11). Trên tuyến thứ hai, lệnh gọi của
+  một lần gửi vẫn chạy đến khi có câu trả lời dù một câu mới hơn cắt lượt,
+  và câu trả lời lại những lời đó được đưa lệnh gọi của lần gửi cùng chỗ
+  dịch vụ đã làm tới với chính lần thử đó (`send_state`, giữ trong `run`
+  trước mọi hàng rào của tuyến theo mã lần thử của tuyến thứ hai, được thêm
+  vào tham số của mỗi lần gửi là `lamp_send_attempt` và được `run` bỏ ra
+  trước khi cổng hay `lamp-services` thấy: đã hỏi khi qua cổng, rồi câu trả
+  lời của dịch vụ hay lời từ chối của cổng. Biên nhận của mỗi lần thử là của
+  riêng nó, nên một lần thử bị từ chối không bao giờ nhận thành công của lần
+  khác, và một lần gửi chậm của yêu cầu cũ xong muộn hơn không bao giờ ghi
+  đè lên của yêu cầu mới hơn; giữ 512 (`RECEIPTS_KEPT`), lời từ chối bị bỏ
+  trước), được báo là lần ghi đã gửi trừ khi bị từ chối, và không chạy
+  `service_write` nào trong lượt đó
+  ([second-voice.md](../second-voice.md), các vòng được mang theo của
+  `LAMP_JOIN_CUT_WORDS`).
+
+Nháp: một bản nháp Gmail (`save_draft`, ở trên) được lưu theo cùng cách: lệnh
+gọi của mô hình với `send_id` của nó mang lời đồng ý, bằng bất kỳ lời nào.
+Không có danh sách từ nào được kiểm tra cho nó (`says_save`, `SAVE_WORDS` đã
+bị bỏ cùng `says_send`), và nó được lưu, không bao giờ được gửi, dù lời nào
+đã đồng ý.
 
 ### Sau một lần đọc
 
@@ -816,23 +1527,39 @@ dịch vụ được giữ chờ quyết định của Policy như các lệnh c
 `LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). Khi `LAMP_SKILL_READS`
 tắt (mặc định; sản phẩm bật nó), kỹ năng tự tạo không chạm đến dịch vụ nào cả: một bước của kỹ năng tự tạo nêu một hàm dịch vụ
 không bao giờ được nói thẳng ra, và một hàm riêng cùng tên của kỹ năng tự tạo
-bị từ chối (`made_skill::plainly`, `made_skill::capped`). Một yêu cầu tạo
-kỹ năng có nêu bất kỳ dịch vụ liên kết nào (thư và lịch: "mail", "email",
-"e-mail", "gmail", "inbox", "calendar"; tên riêng của dịch vụ, là một từ
-nguyên vẹn: Notion, Figma, GitHub, Asana, Ahrefs, Facebook, Slack, HubSpot,
-Amplitude, "gdrive"; và "google drive", "linear app", "monday com" dưới dạng
-cụm từ, vì "drive", "linear" và "monday" cũng là từ thường) không bao giờ được
-giao cho mô hình: `made_skill::brief` trả lời bằng `NOT_A_SERVICE`, "Not
-possible yet: a skill can't use your mail, calendar or other services, even
-ones already linked. You can ask me for it yourself any time.", là lời nói với
-người dùng, vì app hiện đúng nguyên văn. Nó không nêu chỗ liên kết dịch vụ: trên lamp-9adf
-ngày 4/11 mô hình bảo chủ liên kết một lịch đã được liên kết (#5288, nơi các
-skill đọc dịch vụ được lên kế hoạch). Khi bật, xem
+bị từ chối (`made_skill::plainly`, `made_skill::capped`). Không danh sách từ nào trong `lamp-voice` quyết định một yêu cầu tạo kỹ năng
+có nêu dịch vụ liên kết hay không (chủ đèn, 10/11: "quăng cho deepseek hết
+đi, đừng if else"): system prompt của mô hình tạo kỹ năng
+(`make_skill_local::services`) nói một kỹ năng chưa dùng được thư, lịch hay
+bất kỳ dịch vụ liên kết nào khác của người dùng, kể cả dịch vụ đã liên kết, và
+một yêu cầu cần đến dịch vụ được trả lời `cannot: Not possible yet: a skill
+can't use your mail, calendar or other services, even ones already linked.
+You can ask me for it yourself any time.`, nói và hiển thị đúng nguyên văn cho
+người dùng. Nó không nêu chỗ liên kết dịch vụ: trên lamp-9adf ngày 4/11 mô
+hình bảo chủ liên kết một lịch đã được liên kết (#5288, nơi các skill đọc dịch
+vụ được lên kế hoạch). Dù mô hình trả lời gì, cap vẫn từ chối `services` của
+kỹ năng tự tạo. Khi bật, xem
 phần "Một kỹ năng tự tạo đọc dịch vụ".
 
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
 to this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
+
+`service` của một lệnh gọi đến một dịch vụ theo đúng mã của nó (mỗi mã Gmail
+đến liên kết Gmail mà đèn có, như trước), nếu không thì theo một mã hoặc tên
+trong catalogue như mô hình có thể nói: không phân biệt hoa thường, khoảng
+trắng và `-` được đọc là `_` ("Google Drive", "GMAIL", "google calendar",
+"GitHub"); với hai dịch vụ cùng một tên (của Figma), là dịch vụ đã liên kết
+(`serve::named`). Lệnh gọi đó khi ấy nhận câu trả lời của dịch vụ đó, hoặc lời
+`NOT_LINKED` của nó.
+
+Một lệnh gọi nêu một dịch vụ mà đèn không có connector (không mã hay tên nào
+trong catalogue khớp) thất bại với "The lamp can't link <name> yet. The services it can
+link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, sau câu
+đầu). `<name>` là tên lệnh gọi đưa ra, chỉ được nói khi nó tối đa 40 ký tự,
+toàn chữ cái, chữ số, khoảng trắng, `-` hoặc `_`; mọi tên khác, hoặc không có
+tên, được nói là "that service". Mô tả của `services_connected` nêu các dịch
+vụ đèn liên kết được ("Ba hàm của giọng nói").
 
 ## Một kỹ năng tự tạo đọc dịch vụ (đề xuất #5288, `LAMP_SKILL_READS`, bật trong sản phẩm)
 
@@ -849,12 +1576,15 @@ kết của chủ đèn, bất kỳ dịch vụ nào có thứ để đọc, khi
 `lamp-services` (`/run/lampos-services/tools/call.sock`, hoặc
 `LAMP_SKILLS_SERVICES_SOCKET`): `lamp-services` nhận ra nó qua cgroup và chỉ
 nhận `service_read` từ nó ("Ba phần và các socket của chúng", bên trên). Những
-gì dịch vụ trả về không đến mô hình nào: `lamp-skills` nói nó như văn bản
+gì dịch vụ trả về không đến mô hình ngôn ngữ nào: `lamp-skills` nói nó như văn bản
 chính xác qua socket say của giọng nói (không bao giờ là một lượt của mô hình,
 chờ khi có người đang nói với đèn, bị từ chối khi đèn tạm dừng hay tắt tiếng),
 nên nó vẫn là dữ liệu trích dẫn và không gì hành động theo nó được, đúng như
 `AFTER_READ` đòi hỏi. Cổng gửi của giọng nói không nằm trên đường này; cổng
-của kỹ năng bên dưới thay cho nó.
+của kỹ năng bên dưới thay cho nó. Nhà cung cấp tổng hợp giọng nói được cấu hình
+vẫn có thể nhận đúng văn bản được nói, gồm tiêu đề sự kiện, người gửi và
+chủ đề thư, để tạo âm thanh; lời nói cố định không có nghĩa là việc tổng hợp
+giọng nói chỉ diễn ra trên đèn.
 
 **Dịch vụ nào.** Mọi dịch vụ trong catalogue có một việc đọc dạng cố định,
 và không dịch vụ nào chỉ gửi (`lamp_services::spoken::not_readable`):
@@ -867,7 +1597,7 @@ dịch vụ nào trong số đó được kỹ năng tự tạo đọc ("... whi
 can't read yet"), cho đến khi mỗi dịch vụ có một việc đọc cố định. Dịch vụ có được liên kết hay không là câu trả lời của
 chính `lamp-services` lúc chạy (`NOT_LINKED`), ghi vào journal là "not read:
 ...". Một lần đọc trả về toàn văn của một mục không bao giờ là của kỹ năng
-(`spoken::WHOLE_TEXTS`): `message` của `gmail`, `text` của `google_drive`,
+(`spoken::WHOLE_TEXTS`): `message` và `attachment` của `gmail`, `text` của `google_drive`,
 và `comments` của `figma` và `figma-api`. Một việc đọc
 dạng tự do cũng không, vì người hỏi viết hình dạng của nó và nó có thể đặt
 bất kỳ văn bản nào vào chỗ của tiêu đề (`spoken::FREE_FORM`, P2 của Thirteen
@@ -901,8 +1631,12 @@ do. Các khoá khác là của chính `service_read` cho một việc đọc c�
 `project` và `workspace` (mỗi khoá 1 đến 1.000 byte); không bao giờ `from`
 hay `to`, cũng không bao giờ `graphql`, `variables`, `path`, `params`,
 `tool` hay `arguments` của một việc đọc dạng tự do.
-`query` là từ để tìm (`fullText contains` của Drive), không bao giờ là một
-thứ tự: Drive liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
+`query` là từ để tìm, mỗi từ trong tên tệp hoặc nội dung của nó (`name
+contains` hoặc `fullText contains` của Drive; `_`, `-` và `.` trong tên tách
+từ), và kết quả theo độ liên quan, vì Drive từ chối một thứ tự đi cùng
+`fullText` (HTTP 400; lamp-3e83, 9/11: một tệp được hỏi bằng tên không bao
+giờ tìm thấy). Nó không bao giờ là một thứ tự: không có `query` thì Drive
+liệt kê tệp mới nhất trước (`orderBy = modifiedTime desc`) và
 thư cũng mới nhất trước, nên một lần đọc những tệp mới nhất thì bỏ `query`;
 một thứ tự hay chỉ "mới nhất" ("order by modifiedTime desc", "newest") bị
 từ chối (`service_read::ordering`, sau khi một kỹ năng được tạo trên một
@@ -942,9 +1676,24 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 | Không nghe giọng nào trong một phút qua | Mỗi dòng trên `voice/heard`, được một luồng riêng của `lamp-skills` đánh dấu khi đến (topic này là event: bus không giữ bản mới nhất, nên trước bản sửa này dòng này chưa từng giữ lại lần đọc nào; lamp-9adf, 5/11) | "a voice heard" |
 
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
-rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>"). Mỗi kỹ năng đọc một lần
+rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>").
+Khung giờ của trigger quy định khi nào lượt đọc đến hạn, không phải giờ
+buộc phải ngừng nói. Lượt đọc đang chờ có thể nói sau khung giờ đó, trong
+cùng một giờ chờ tính từ lúc đến hạn, nếu cổng vẫn mở; giờ yên lặng và các
+kiểm tra trước mỗi dòng vẫn áp dụng.
+
+**Mỗi lần chỉ một lượt đọc** (`service_read::Turns`, #5618): một lượt đọc chỉ
+bắt đầu khi giữ được lượt duy nhất của đèn, và giữ nó từ lúc cổng mở tới dòng
+cuối. Lượt này rảnh khi không có lượt đọc nào của kỹ năng khác đang giữ và đã
+qua một phút (`AFTER_ANOTHER`) kể từ khi lượt trước kết thúc; trước đó cổng
+được tính là đóng ("another read under way"). Sau đó lượt đọc vẫn cần cổng
+của chính nó liên tục 5 s, và thời gian chờ vẫn tính trong cùng 60 phút kể từ
+khi đến hạn, nên một lượt đọc xếp hàng sau lượt khác sẽ bỏ qua ngày đó khi hết
+giờ ("skipped: another read under way"), không bao giờ bắt đầu một giờ mới.
+Nếu không có quy tắc này, hai lượt đọc của hai kỹ năng cùng chờ ở cổng (Morning
+agenda và Morning mail khi có khách) sẽ nói xen kẽ từng dòng của nhau. Mỗi kỹ năng đọc một lần
 mỗi ngày địa phương (giữ trong bộ nhớ của `lamp-skills`, nên khởi động lại thì
-quên). Trong lúc lượt chạy chờ cổng, và sau khi đến hạn cho tới nửa đêm địa
+quên và có thể cho phép đọc lại trong ngày đó). Trong lúc lượt chạy chờ cổng, và sau khi đến hạn cho tới nửa đêm địa
 phương, trigger của kỹ năng không được ghi là triggered hay hỏi Policy mỗi
 lần nó giữ: cơ hội bị bỏ với một dòng journal mỗi lần giữ, `<skill> not run:
 its read is still under way` hoặc `... its read came due once today already`
@@ -996,47 +1745,27 @@ once", "not told: <kết quả của cổng>" hoặc "not told (<lý do>)". Tắ
 `on` cho các worker của hai route, `provider` và `second`, nơi `make_skill`
 soạn và kiểm tra skill: môi trường của chúng vốn bị xoá sạch, và thiếu nó thì
 công tắc ở đó là tắt trên lamp-9adf ngày 4/11),
-`made_skill::brief` cho qua một yêu cầu nêu đúng một dịch vụ liên kết có việc
-đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
-những yêu cầu còn lại được báo đúng giới hạn của chúng, bằng lời nói với người
-dùng (bảng của tester, 6/11: "a skill is limited with no reason"), không bao giờ
-là `NOT_A_SERVICE`, vì câu đó nói không skill nào dùng được dịch vụ, điều sai
-khi công tắc bật: một lần ghi là `NOT_A_WRITE` ("Not possible yet: a skill can
-read one linked service, but it can't send, write or change anything there."),
-hai dịch vụ là `ONE_SERVICE` ("... can read only one linked service, not two or
-more."), và một dịch vụ không có gì cho kỹ năng tự tạo đọc, như Notion, là
-`NOT_READABLE` ("... can read one linked service, but not that one."). Câu nào
-cũng kết thúc bằng "You can ask me for it yourself any time." Việc xin chính skill
-không phải là ghi: các từ trước "skill" chỉ để xin nó ("create me a new skill
-that ...", "add a skill to ...") được bỏ ra trước. "Schedule", "post" và "book"
-đứng sau "my", "the", "tomorrow's", "latest", "last" hay "newest" là thứ được
-đọc, dù sau đó là gì ("read me my schedule on my calendar"), trừ khi "say" hay
-"saying" theo sau mà không có lời xin đọc nào ("latest post: say hi on
-Facebook"). Đứng sau "tomorrow", "today", "day", "calendar", "facebook" hay
-"page" thì chúng chỉ là thứ được đọc khi đứng sau một từ xin đọc ("read",
-"tell", "what", "show", "check": "read me my Facebook post about the sale"),
-hoặc ở cuối yêu cầu hay trước "from" hoặc "of" ("my latest Facebook post"),
-còn lại là động từ ("tomorrow book the room", "my calendar book the room",
-"tomorrow book for me a table"; các P3 của El trên #5690 và các P2 trên #5696).
-Ở đó, "a", "an", "me", "it", "the" hay "my" ngay sau chúng biến chúng thành
-động từ, kể cả khi đã có lời xin đọc trước đó, nếu giữa lời xin đọc đó và chúng
-có "and", "then" hay "also" ("check my calendar and tomorrow schedule a
-meeting"); nếu không có, nó chỉ ra thứ nào được đọc ("read me my Facebook post
-a week ago"; HOLD của first builder trên #5719). Chữ "s" của "let's" không phải "'s" ("let's post a photo on
-Facebook"; các P3 của first builder trên #5696).
-Với "say" hay "saying", một từ xin đọc ở bất kỳ đâu trong yêu cầu giữ nó là
-việc đọc ("the last post saying we are open, read it to me"); không có từ nào
-thì đó là một bài cần đăng. Luật này bắt đầu từ lamp-9adf lúc 23:51 ngày 4/11, khi
-"create a skill that reads my calendar" bị từ chối. "Put" chỉ là ghi khi có một
-dịch vụ được nêu sau nó, hoặc "in", "on", "into" hay "to" "my drive" ("put the
-count on the light" là việc của chính lamp). Một
-lần ghi đứng sau chúng vẫn tính. Bước của lịch được cho
-trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư (`recent`)
-và của Drive (`files`, mới nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
-toàn văn và dạng tự do (`spoken::whats`) và mô hình chọn một. Thời điểm trong
-ngày là của yêu cầu: brief chỉ đưa `during` của trigger làm ví dụ, "a time of
-day as its during = { from = \"08:00\", to = \"08:30\" }" (P3 của Thirteen
-trên #5303), như brief đèn-và-đầu. Kỹ năng tự tạo bị giữ ở
+mọi yêu cầu tạo kỹ năng đều được soạn brief, và mô hình tạo kỹ năng tự phán
+đoán theo các luật mà system prompt của nó nói bằng lời dễ hiểu
+(`make_skill_local::services`; chủ đèn, 10/11: quyết định giao cho mô hình,
+không phải danh sách từ trong Rust, thứ mà trước đó phân loại việc ghi, hai
+dịch vụ và dịch vụ không đọc được theo các từ như "send", "post", "book" hay
+"schedule"). Một kỹ năng đọc tối đa một dịch vụ liên kết và chỉ đọc nó, không
+bao giờ gửi, ghi, đăng, đặt chỗ, lên lịch, xoá hay thay đổi gì ở đó. Mỗi dịch
+vụ mà kỹ năng đọc được được liệt kê cùng bước duy nhất của nó
+(`made_skill::read_steps`, từ catalogue của crate này và
+`spoken::not_readable`): bước của lịch được cho trọn (hôm nay, hoặc ngày mai
+khi yêu cầu hỏi ngày mai), bước của thư (`recent`) và của Drive (`files`, mới
+nhất trước, `query` chỉ là từ để tìm) cũng vậy; với dịch vụ khác, các việc đọc
+của nó được liệt kê trừ việc đọc toàn văn và dạng tự do (`spoken::whats`) để
+mô hình chọn một. Một yêu cầu gửi, ghi hay thay đổi bất cứ gì trong một dịch
+vụ, đọc hai dịch vụ trở lên, hay đọc một dịch vụ không có trong danh sách (được
+nêu tên trong prompt, `made_skill::unreadable_names`: Notion, Slack, Ahrefs,
+...) được trả lời `cannot:` với một câu ngắn nói kỹ năng làm được gì thay vào
+đó, kết thúc bằng "You can ask me for it yourself any time." (bảng của tester,
+6/11: "a skill is limited with no reason"), báo cho người dùng đúng như mô hình
+nói. Thời điểm trong ngày là của yêu cầu: prompt chỉ cho việc đọc
+`during` khi yêu cầu nêu giờ. Kỹ năng tự tạo bị giữ ở
 `services = { <service> = "read" }` (`made_skill::capped`: mọi mục services
 khác bị từ chối, "it asks to use linked services other than by reading one
 that has something to read, which a made skill can't"), và câu "có" nói ra
@@ -1049,7 +1778,7 @@ việc đọc dịch vụ không liệt kê) làm kỹ năng bị từ chối. P
 <service>".
 
 **Chưa liên kết lúc tạo** (`made_skill::needs_link`, không có công tắc: nó
-chỉ thêm một trường và một câu). Khi một kỹ năng tự tạo có đọc một dịch vụ
+chỉ thêm một trường và một lời dặn cho mô hình). Khi một kỹ năng tự tạo có đọc một dịch vụ
 đã được giữ, `lamp-voice` hỏi `lamp-services` `services_connected` trên
 socket tools (`services::linked_codes`, tối đa 500 ms; kỹ năng không đọc gì
 thì không hỏi gì). Mỗi code Gmail được tính là đã liên kết cho code kia,
@@ -1058,9 +1787,11 @@ Nếu dịch vụ nó đọc không có trong danh sách, kỹ năng vẫn đư�
 hỏi như trước, và:
 
 - tạo bằng giọng nói, câu trả lời của việc tạo có `needs_link`
-  (`[{"code", "name"}]`), và đèn nói một câu trước lời hỏi: "Gmail isn't
-  linked yet: link it in the app, under Skills, then Connectors, and the
-  skill will start then.";
+  (`[{"code", "name"}]`), và sau câu báo đã bật, mô hình được dặn nói với
+  người dùng, bằng lời của nó và bằng ngôn ngữ của cuộc trò chuyện, rằng kỹ
+  năng sẽ chạy khi Gmail được liên kết trong ứng dụng, ở Skills, rồi
+  Connectors (`made_skill::needs_link_ask`; chủ đèn, 10/11, "đồng bộ luôn":
+  không bao giờ là một câu tiếng Anh cố định nói nguyên văn);
 - tạo từ ứng dụng, lời yêu cầu giữ nó, và `skills.made` báo nó là
   `needs_link: [{"code": "gmail", "name": "Gmail"}]`, `[]` khi không thiếu
   gì.
@@ -1068,6 +1799,225 @@ hỏi như trước, và:
 Khi `lamp-services` không trả lời được (không có socket, không trả lời kịp,
 bị từ chối), `needs_link` bị bỏ ra và không nói gì; việc tạo không bao giờ
 hỏng vì nó.
+
+## Một kỹ năng tự tạo ghi vào dịch vụ (#6066, `LAMP_SKILL_WRITES`, tắt)
+
+Chủ đèn đã bỏ quy tắc (b) của #6066 vào ngày 10/11: một kỹ năng tự tạo tự
+khởi động có thể gửi một thư, thêm một sự kiện lịch, hoặc mở một issue, một
+task hay một bình luận trên một dịch vụ đã liên kết, dù lúc đó không ai yêu
+cầu. Nửa runtime là `lamp_services::skill_writes` và
+`lamp_skills::service_write`; việc tạo, câu nói lại, lời đồng ý và "I sent
+…" của giọng nói ở bên dưới ("Phía giọng nói"); unit sản phẩm làm sau. Mọi
+thứ đều tắt trừ khi `LAMP_SKILL_WRITES=on` (đúng `on`) có trong môi trường
+của `lamp-services`, `lamp-skills` và `lamp-skills-manage@`, nơi nạp kỹ
+năng khi cài nó, và của `lamp-voice`, nơi chuyển nó cho cả hai route. Mọi
+unit sản phẩm để nó tắt.
+
+**Bước.** Trong `skill.toml` ([skills.md](../skills.md)):
+
+```toml
+[permissions]
+services = { gmail = "write" }
+
+[[do]]
+write = { service = "gmail", action = "send_mail", to = ["boss@work.test"], subject = "In", text = "I'm at my desk." }
+```
+
+Mọi trường đều cố định trong tệp. Không gì được điền lúc chạy, nên kỹ năng
+không thể đưa những gì nó đọc, nghe hay được bảo vào một lần ghi. Một bước
+chỉ nhận đúng các khoá của hành động đó (`skill_writes::KINDS`):
+
+| Dịch vụ | Hành động | Khoá |
+|---|---|---|
+| `gmail`, `gmail-app` | `send_mail` | `to`, `cc`, `subject`, `text` |
+| `google_calendar` | `create_event` | `title`, `start`, `end`, `calendar`, `attendees`, `text` |
+| `github` | `create_issue`, `comment` | `repo`, `title`, `text`; `repo`, `number`, `text` |
+| `linear` | `create_issue` | `team_id`, `title`, `text` |
+| `asana` | `create_task` | `project` hoặc `workspace`, `title`, `text` |
+| `figma`, `figma-api` | `comment` | `id`, `text` |
+
+Kỹ năng không đăng bài công khai (`page_post` của Facebook), không lưu bản
+nháp và không gọi tool MCP, vì hình dạng của lệnh gọi MCP là do bên gọi tự
+đặt. Mỗi trường được kiểm tra khi nạp, bằng đúng phép kiểm tra mà lần ghi
+của giọng nói có (`writes::prepare` trên một liên kết thay thế): một địa
+chỉ thường, tiêu đề hay chủ đề một dòng tối đa 200 ký tự, nội dung tối đa
+3.000 ký tự, giờ lịch có độ lệch múi giờ. `send_id` và `said` không phải
+khoá của bước. Lần ghi là bước duy nhất của kỹ năng, đứng một mình, trong
+kỹ năng do trigger khởi động, không có `each` và không có tool. Nó cần
+`[permissions] services = { <code> = "write" }`, và quyền `"write"` chỉ
+được nhận khi công tắc bật và với dịch vụ có trong bảng. Khi công tắc tắt
+trong `lamp-skills`, kỹ năng như vậy không được nạp.
+
+**Cài đặt không duyệt gì cả.** Việc bật một kỹ năng tự tạo, bằng
+`install_made` hay cách nào khác, không ghi lại sự đồng ý nào. Cho đến khi
+chủ đèn đồng ý, mỗi lần chạy bị từ chối với "not sent: waiting for the
+owner's yes".
+
+**Sự đồng ý của chủ đèn** (`skill_write_approve`). Nó đến từ đường đồng ý
+của giọng nói hoặc từ ứng dụng, không bao giờ từ `lamp-skills`. Trên socket
+tools chỉ cgroup của `lamp-voice.service` tới được nó. Nó không có trong
+`tools.json` và không nằm trong ba hàm giọng nói đưa cho mô hình
+(`services::NAMES`), nên mô hình không bao giờ gọi được nó. Trên socket
+admin, nó là op `{"op": "skill_write_approve", "skill", "writes"}` của
+`lamp-cloud`, cho ứng dụng. Không kiểm tra ai đã đồng ý (chủ đèn, 10/11:
+không kiểm tra khuôn mặt, dấu giọng hay chủ đèn; ở phòng riêng, ai đang ở
+bên đèn là chủ của nó). Dòng của giọng nói là
+`{"skill": "<name>", "writes": [<content>, ...]}`, mỗi nội dung là đúng
+các trường của bước cùng `service` và `action`. Mỗi nội dung được kiểm tra
+như lúc nạp, và dịch vụ của nó phải đang được liên kết. `lamp-services` giữ
+trong thư mục kho của chính nó
+(`/var/lib/lampos-services/skill-writes-approved.json`, của root, 0600
+trong thư mục 0700, nơi `lamp-skills` không tới được) SHA-256 của mỗi nội
+dung, tính trên một dòng JSON có khoá được sắp xếp
+(`skill_writes::canonical`, cùng các byte ở cả hai phía), tên kỹ năng, dịch
+vụ, và liên kết mà nó được duyệt dưới đó (`skill_writes::link_of`). Liên
+kết đó là tài khoản mà liên kết ghi, hoặc, khi nó không ghi tài khoản nào,
+id riêng của liên kết, 16 byte ngẫu nhiên được cấp khi ứng dụng liên kết và
+được giữ qua lần làm mới (`Entry::link_id`). Nó không bao giờ là token. Một
+lần đồng ý mới thay các phê duyệt của kỹ năng, và danh sách rỗng xoá chúng.
+Một kỹ năng giữ tối đa 4, cả đèn tối đa 50. Journal chỉ nói có bao nhiêu
+lần ghi được duyệt.
+
+Lời đồng ý là cho cả kỹ năng như khi nó được bật, không chỉ cho lần ghi:
+mỗi phê duyệt còn giữ SHA-256 của gói đã cài của kỹ năng, do
+`lamp-services` đọc từ `.package.json` của kỹ năng trong
+`/var/lib/lampOS/skills` (của root, do bộ cài ghi;
+`skill_writes::installed_package`). Gói chứa trigger và cách cư xử của kỹ
+năng cùng lần ghi của nó. Kỹ năng không được bật dưới dạng gói (đặt vào
+bằng tay, bản đẩy của nhà phát triển) không bao giờ được duyệt: "the skill
+is not on the lamp as a package". Kỹ năng được cập nhật (trigger đổi là một
+gói mới), bị gỡ, hoặc bị thay bằng một gói khác cùng tên thì chờ lời đồng
+ý mới, và các phê duyệt cũ bị xoá ở lần chạy kế tiếp (P2-2 của App Only
+trên #6123).
+
+**Repository GitHub ai cũng thấy được** được phép (chủ đèn trên #6123),
+nhưng lời đồng ý phải nói rõ. Lúc đồng ý, `lamp-services` đọc repository
+bằng token của liên kết (`GET /repos/<owner>/<name>`, có trong danh sách
+đọc của GitHub) và giữ việc nó có công khai không; repository không đọc
+được thì tính là công khai. Câu trả lời của lời đồng ý là
+`{"approved": N, "public": ["owner/name", ...]}`, các repository ai cũng
+thấy, để giọng nói nói "anyone can see it". Repository được duyệt là riêng
+tư thì được đọc lại ở mỗi lần gửi: nếu đã thành công khai, hoặc không đọc
+được, lần ghi chờ lời đồng ý mới (`WAITING`), vì lời đồng ý không bao gồm
+công khai.
+
+**Ai gửi.** Chính `lamp-skills`, như với việc đọc: `lamp-services` nhận
+cgroup của `lamp-skills.service` trên socket tools khi `LAMP_SKILL_READS`
+hoặc `LAMP_SKILL_WRITES` bật, và khi đó chỉ nhận `service_read` (khi đọc
+bật) hoặc `skill_write` (khi ghi bật). Tên khác nhận "a skill may only read
+a linked service or make its approved write". Mọi cgroup khác
+(`lamp-skills-manage@`, `lamp-cloud`, một shell đăng nhập) bị từ chối ở cửa
+(`Services::skill_caller`). Dòng của lần chạy là
+`{"op":"call","name":"skill_write","args":{"skill","write"}}`.
+
+**Những gì `lamp-services` kiểm tra,** theo thứ tự. Lời từ chối không nêu
+người nhận hay nội dung:
+
+1. `LAMP_SKILL_WRITES=on` và `LAMP_SERVICES_WRITE=on`.
+2. Không bị đăng xuất: sau một lần xoá (đăng xuất, huỷ ghép đôi hay đặt
+   lại), không lần ghi nào của kỹ năng được gửi cho đến khi một dịch vụ được
+   liên kết lại, kể cả khi việc xoá thất bại. Điều này được giữ trong bộ
+   nhớ. Khởi động lại sẽ xoá nó, vì lần xoá đã không để lại liên kết nào.
+   Lần xoá cũng xoá các phê duyệt, sổ giới hạn và nhật ký đã gửi, nên chủ
+   đèn phải đồng ý lại.
+3. Hash của nội dung đã được duyệt cho kỹ năng đó. Nếu kỹ năng chưa có phê
+   duyệt nào, câu trả lời là `WAITING`. Một nội dung không thuộc các nội
+   dung đã duyệt (nội dung đổi một ký tự, người nhận khác) bị từ chối, "not
+   sent: this write is not the one the owner said yes to", và journal chỉ
+   nói đã có bao nhiêu lần bị từ chối kể từ khi khởi động.
+4. Nội dung thuộc một trong các loại ở trên, trên dịch vụ có danh sách ghi
+   trong `catalog.rs`, không bao giờ là dịch vụ MCP.
+5. Dịch vụ, theo đúng mã của nó (không liên kết Gmail nào khác thay thế),
+   vẫn được liên kết dưới liên kết đã duyệt. Huỷ liên kết một dịch vụ xoá
+   mọi phê duyệt cho nó (P2-1 của App Only trên #6123), nên cùng tài khoản
+   liên kết lại sẽ chờ lời đồng ý mới. Liên kết đè bằng tài khoản khác (liên
+   kết mới mà không huỷ) bị từ chối dạng `STOPPED` ("stopped: the Gmail link
+   changed since the owner's yes; nothing was sent"), và `lamp-skills` dừng
+   các lần ghi của kỹ năng đó cho đến khi nó khởi động lại. Liên kết hết
+   hạn, hoặc có phạm vi không cho phép lần ghi (`writes::scope_missing`), bị
+   từ chối như với giọng nói. Repository GitHub được duyệt là riêng tư mà
+   giờ công khai thì chờ, như ở trên.
+6. **Giới hạn** (`skill_writes::Ledger`, `skill-writes.json` trong thư mục
+   kho): tối đa 3 lần gửi mỗi kỹ năng và 10 lần cho mọi kỹ năng trong bất
+   kỳ 24 giờ nào. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
+   lần cùng lúc không bao giờ cùng vượt giới hạn. Lần gửi thất bại sau đó
+   vẫn được đếm. Sổ chỉ giữ tên kỹ năng và thời điểm, nên khởi động lại
+   không quên các lần gửi trong ngày. Nó đóng khi lỗi: sổ không đọc được,
+   hoặc có lần gửi sau thời điểm hiện tại (đồng hồ lùi lại, như khi khởi
+   động trước khi có giờ), được tính là đầy, và không gì được gửi cho đến
+   khi đồng hồ vượt qua nó.
+
+Sau đó lần ghi được gửi một lần, như lần ghi đã xác nhận của giọng nói,
+qua cùng bộ chặn và danh sách ghi.
+
+**Journal** chỉ giữ số đếm và kết quả. "a skill's write to gmail was sent
+(2 of 3 for it today, 5 of 10 for every skill)", "a skill's write refused:
+not the approved content (3 since start)", hoặc lời từ chối. Không bao giờ
+có người nhận, chủ đề hay nội dung. `lamp-skills` ghi kết quả của lần chạy:
+"sent to gmail", hoặc lời từ chối.
+
+**Nhật ký đã gửi cho chủ đèn** (`skill-writes-sent.json` trong thư mục
+kho). Nó giữ 20 lần gửi gần nhất, mỗi lần gồm tên kỹ năng, dịch vụ, thời
+điểm và gửi cho ai (`skill_writes::sent_to`): người nhận đầu tiên của thư
+và còn bao nhiêu người nữa, khách mời của sự kiện, repository hay team của
+issue. Người nhận chỉ là phần trước `@` của địa chỉ (địa chỉ trong một lần
+ghi là địa chỉ thường, không có tên hiển thị), không bao giờ là cả địa chỉ.
+Nó không giữ nội dung, chủ đề hay tiêu đề. Giọng nói đọc nó bằng
+`skill_writes_sent`, lệnh gọi riêng của nó như lần đồng ý, dưới dạng
+`{"sent": [{"skill", "service", "at", "to"}]}`, để nói với chủ đèn "I sent
+your arrival mail to boss at 18:02" vào lần tới thấy họ, như bên dưới.
+
+**Phía giọng nói** ([skills_vi.md](skills_vi.md), "Made by voice", cho
+toàn bộ):
+
+- **Chỉ tạo từ lời của yêu cầu.** Kỹ năng tự tạo chỉ mang một bước `write`
+  khi bật công tắc; khi tắt là "I can't do that yet: sending or writing on
+  its own". Chủ đề, nội dung và tiêu đề của nó là lời của chính yêu cầu
+  của người dùng (bỏ qua chữ hoa, khoảng trắng, dấu câu và dấu ngoặc kép),
+  không bao giờ từ một lần đọc, web hay bộ nhớ; người nhận là địa chỉ của
+  chính tài khoản đã liên kết (account trong `services_connected`,
+  `services::linked_accounts`) hoặc một địa chỉ yêu cầu nói ra, viết hay
+  đọc; repository, team, project hay tệp là cái yêu cầu nêu. Mọi thứ khác
+  quay lại mô hình tạo kỹ năng để sửa (`made_skill::write_from_request`).
+- **Nói lại trọn vẹn**, mọi người nhận và toàn bộ nội dung trích nguyên,
+  với lần ghi GitHub thì repository của nó và "anyone who can see that
+  repo can see it" (để lời đồng ý bao gồm cả repo công khai), khi nào và
+  bao lâu một lần, kết thúc bằng "It waits for you to agree
+  before it sends anything." (`made_skill::WAITS_FOR_YES`): không có từ để
+  lặp lại, không có "yes".
+- **Lời đồng ý.** Khi kỹ năng đã bật, nội dung chính xác các lần ghi của
+  nó chờ trong bộ nhớ của giọng nói 120 s (`crate::skill_write_yes`). Một
+  lời đồng ý bằng bất kỳ lời nào, do mô hình phán đoán, là một lệnh gọi
+  `make_skill` chỉ với `approve_id` nó được đưa, trong một yêu cầu nghe
+  được sau đó trên route thứ hai, khi lời của chính đèn trong một câu trả
+  lời, như đã phát và không bị cắt, đã có trọn câu nói lại của mỗi lần ghi
+  (nếu không thì nói lại và tiếp tục chờ). Khi đó chính giọng nói gọi
+  `skill_write_approve` (`services::skill_write_approve`), với `sha256`
+  của package đã được nói lại: `lamp-services` từ chối "the skill on the
+  lamp is not the one said back" khi một package khác đang được cài. Các
+  repository
+  `public` trong câu trả lời được nói là "anyone can see" những gì nó
+  đăng. Trong lúc chờ lời đồng ý, một dòng chỉ gồm lời của chính đèn, bắt
+  đầu khi đèn đang nói hoặc trong 1,5 s đuôi tiếng vọng, bị giữ cả trong
+  phòng riêng (`own_echo::yes_echo`), và việc đồng ý trong yêu cầu của nó
+  bị từ chối. Từ chối, chờ hay thay đổi thì không đồng ý gì. Không kiểm tra
+  ai nói đồng ý.
+- **"I sent …"** (`crate::skill_writes_told`). Route thứ hai hỏi
+  `skill_writes_sent` ngoài đường đi của dòng, tối đa 5 s một lần, khi có
+  một dòng nghe được. Dòng nghe được tiếp theo được báo mỗi lần gửi kể từ
+  lần báo cuối, một lần: "I sent your 'leaving mail' mail to mai at
+  18:02." Mốc đã báo là `writes-told.json` trong thư mục kỹ năng tự tạo
+  của giọng nói.
+
+**Chưa làm:**
+
+- Lời đồng ý từ ứng dụng: `lamp-cloud` chưa có kind cho
+  `skill_write_approve`, và danh sách của ứng dụng chỉ hiện `uses.sends_to`
+  ("sends to …") của kỹ năng tự tạo khi ứng dụng làm (chữ của nó nằm trong
+  ứng dụng).
+- Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
+  bạ, nên mô hình tạo kỹ năng xin địa chỉ.
+- Một unit sản phẩm đặt `LAMP_SKILL_WRITES=on`.
 
 ## Làm mới
 
@@ -1132,7 +2082,13 @@ mục kỹ năng), được định tuyến đến `call.sock` của nó và kh�
 không bao giờ lấy từ thư mục của executive hay của một kỹ năng.
 
 - **`services_connected {}`**: `{"connected": [{"service", "name",
-  "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`.
+  "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`. Mô tả của nó nêu
+  mỗi dịch vụ đèn liên kết được, theo tên trong catalogue, mỗi tên một lần
+  ("The lamp can link only: Gmail, Gmail with Google sign-in, Google
+  Calendar, …, Notion."), và bảo mô hình: "If the person names a service not
+  among them, say the lamp can't link it yet, and never give another
+  reason." Nó tối đa 600 byte, để quy tắc riêng của giọng nói vừa trước nó
+  trong 1,024 byte mà liên kết nhà cung cấp nhận.
 - **`service_read {service, what, …}`**: `what` và các đối số của nó như
   trong bảng ở trên; câu trả lời được trích dẫn, rút gọn còn ai gửi và về
   việc gì khi chủ đèn có thể không ở một mình. Một lần đọc đầy đủ còn cần câu
@@ -1236,6 +2192,12 @@ không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
   sau đó để lại tên cũ cho đến lần khởi động lại, và điều đó đóng an toàn:
   tệp known của mắt không còn hiện tên đó, nên việc đọc dừng ở "not the
   owner". Việc ghi từ một kỹ năng tự tạo chưa được xây.
+- **Tạo tệp Drive mới đã xây, chưa chạy trên đèn** (#5385): tệp được tạo
+  dưới liên kết `drive.file` của sản phẩm (một liên kết không có scope tạo
+  tệp, hoặc không ghi scope nào, được bảo liên kết lại trước mọi phần đọc
+  lại); việc tải lên một sheet trống và việc Drive chuyển đổi từng phần là
+  như Google mô tả, chưa được thấy; sau khi gửi đèn nói tên tệp mới, không
+  bao giờ đọc to link, mà câu trả lời mang theo.
 - **Đọc dịch vụ theo lịch** (một bản tóm tắt thư buổi sáng) được bỏ ra cho
   đến khi có thiết kế riêng: một yêu cầu không được nghe trực tiếp không chạm
   đến dịch vụ nào.
@@ -1256,7 +2218,7 @@ không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
   trên; một liên kết trên host khác bị từ chối.
 - `lamp-services.service` đã được cài nhưng tắt trên mọi đèn, và chưa phần
   nào ở đây chạy trên một đèn: các kiểm tra cgroup dưới socket
-  thật, các trao đổi IMAP và SMTP với Gmail, REST API của Gmail với một đăng
+  thật, các trao đổi IMAP và SMTP với Gmail (trong đó có `APPEND` của một bản nháp), REST API của Gmail với một đăng
   nhập Google (và các scope mà đăng nhập Gmail của backend yêu cầu),
   `get-message` và làm mới của backend, và API riêng của từng dịch vụ.
 
@@ -1267,21 +2229,60 @@ code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật
 `Debug` hay một lời từ chối; một token chỉ qua https đến các host của chính nó
 (không port, user, fragment hay host giả mạo), đọc chỉ trong danh sách cho
 phép, ghi chỉ trong danh sách ghi; mọi mutation GraphQL bị từ chối; IMAP của
-Gmail chỉ-đọc (`EXAMINE`, `BODY.PEEK`) và SMTP một thư sau `AUTH`; `set`
+Gmail chỉ-đọc (`EXAMINE`, `BODY.PEEK`), tìm kiếm của nó trong All Mail (tìm
+theo dấu `\All` dưới một tên theo ngôn ngữ, nếu không thì hộp thư đến),
+`recent` trong hộp thư đến và `message` trong hộp thư mà id của nó nêu,
+`drafts` trong Drafts (tìm theo dấu `\Drafts` dưới một tên theo ngôn ngữ)
+cùng người nhận của từng bản và một id đọc lại được nó, một `APPEND` duy
+nhất của bản nháp với cả thư là literal được đánh dấu `(\Draft \Seen)` vào
+Drafts (nếu không thì `[Gmail]/Drafts`), không SMTP và không mở hộp thư nào,
+một `APPEND` bị từ chối được nói là không kết nối được, các phản hồi không
+gắn tag trước dấu `+` của nó được nhận và một `* BYE` ở đó không lưu gì, một
+`LOGOUT` bị giữ sau OK của nó vẫn để bản nháp đã lưu và không bao giờ bị
+chờ, một bản nháp được xác nhận gần cuối ngân sách của nó được trả lời đã
+lưu trước khi giọng nói thôi chờ, một lần ghi chuẩn bị
+với một tài khoản không bao giờ đi với tài khoản liên kết sau, `save_draft` được
+đọc lại là một bản nháp, kiểm tra như một lần gửi, lưu một lần khi được xác
+nhận mà không gửi gì và trả lời `saved`, và bị từ chối với liên kết đăng nhập
+Google mà không giữ gì, và SMTP một thư sau `AUTH`; `set`
 không giữ gì khi đăng nhập Gmail bị từ chối; một đăng nhập Google của Gmail
 được kiểm tra ở `set` bằng profile của nó (bị từ chối, không kết nối được,
-tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, metadata
+tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, một tìm
+kiếm trong mọi thư và thư đã lưu trữ của nó được đọc theo id, metadata
 của từng thư, một thư trọn vẹn từ phần văn bản thuần, token của nó bị xoá,
-thư bảo mật bị bỏ ra, một id không phải của Gmail không bao giờ được gửi),
+thư bảo mật được liệt kê và đọc có che, một id không phải của Gmail không bao giờ được gửi),
 được gia hạn qua backend, được gửi qua API chỉ khi có câu "send" nói ra, và
 mật khẩu ứng dụng không bao giờ được gửi đến API; một liên kết `gmail-app`
 được giữ chỉ dựa vào các trường của nó (không có tài khoản: bị từ chối,
 không gọi Google), mọi lần đọc nó được trả lời là chỉ-gửi (đã liên kết hay
 chưa, không gọi gì), lần gửi của nó chỉ qua API, một token bị từ chối được
 nói là "Google refused the Gmail sign-in", và việc gia hạn dưới mã riêng
-của nó; thư bảo mật được phát hiện và bỏ
-trọn; câu trả lời được trích dẫn và dưới mức trần của giọng nói; một lần ghi
-bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; luật
+của nó; thư bảo mật được liệt kê và đọc với mỗi đường dẫn nói là "a link"
+và mỗi mã là "a code" (một đường dẫn đặt lại, mã dự phòng, một dòng 6 chữ
+số trần, một nội dung bị cắt có mọi dạng mã được che, một nội dung IMAP bị
+cắt ở lần fetch được báo là bị cắt) và vẫn bị bỏ trọn với một kỹ năng tự
+tạo; câu trả lời được trích dẫn và dưới mức trần của giọng nói; một lần ghi
+bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; một
+Google Doc, Sheet hay tệp văn bản Drive mới được đọc lại trọn (loại, tên, mọi
+chữ hay ô), thân multipart của nó (boundary, cả hai kiểu, CSV đặt trong ngoặc
+kép dấu phẩy, dấu ngoặc kép và xuống dòng), giới hạn của nó (tiêu đề, văn
+bản, 50 hàng 10 ô, không ô nào bắt đầu bằng `=`, `+`, `-` hay `@` trừ một số
+có dấu thuần), một liên kết không có `drive` hay `drive.file` (hoặc không có
+scope) bị từ chối trước mọi phần đọc lại, mọi action Drive khác bị từ chối, danh
+sách ghi chỉ nhận `POST /upload/drive/v3/files`, tạo một lần khi gửi với kiểu
+multipart và trả lời bằng tên và chỉ link của chính Google, một lần tải lên bị
+từ chối là `ok:false` không có `made` kèm lý do 403 (đầy, bận, liên kết), một phần đọc lại quá 3,584 byte JSON bị từ chối (50 hàng 10 ô trống), không gửi với một liên kết được đặt thay kể từ lần đọc lại (Drive hay thư), không
+bao giờ từ một kỹ năng tự tạo (và trong `-p lamp-voice`, mọi action ghi của
+`tools.json` đến được model trong giới hạn của liên kết, một lần gửi thất bại
+được bảo nói lý do, một tệp đã tạo nói tên của nó); một lần gửi hay một sự kiện mà scope được liệt kê của liên kết không cho phép bị
+từ chối bằng lời rõ ràng, không gì được giữ hay gọi, một lần được cho phép
+được đọc lại, một lần gửi Google từ chối vì scope được nói cùng lời đó và mọi
+403 khác giữ lời riêng, một liên kết không liệt kê scope (mật khẩu ứng dụng,
+khoá cá nhân) không bị kiểm tra, một scope chỉ cho phép khi là URL đầy đủ
+(một chuỗi cách nhau bởi dấu cách được đọc như danh sách, một `gmail.send`
+trần bị từ chối), một dịch vụ được nói theo tên ("Google Drive", "GMAIL")
+đến được nó, và một dịch vụ đèn không liên kết được thì
+được nói như vậy, một tên độc hại được nói là "that service"; luật
 đọc/ghi MCP, host được ghim của nó, một liên kết trên host khác không bao giờ
 được gọi, một tool ghi được đọc lại trọn và gọi một lần khi gửi; yêu cầu làm
 mới giống V1; người hỏi được nhận biết qua cgroup của họ. `-p lamp-cloud`
@@ -1304,19 +2305,25 @@ trong một nhóm và qua ba mục, không bao giờ hai thư riêng biệt hay 
 kiện lịch; các mục không có khoá nhóm của một câu trả lời được đọc như một
 (P2 của Reviewer-lead trên #5070); "at 1430" được giữ như một giờ. `-p lamp-voice` (`services`,
 `tools`, `thread`, `made_skill`): công tắc cho ra cờ và thư mục, ba hàm được
-khai báo và định tuyến chỉ khi có công tắc và thư mục, luật đứng đầu, một câu
-gửi thuần và không gì khác ("do it" thì không bao giờ; "gởi", "gui di", "ừ,
-gửi đi giúp tôi" thì có), một lần gửi ở một giọng khác đã biết hay được thấy
-từ một khuôn mặt khác bị huỷ, một lần gửi không có dấu giọng giữ lần ghi và
-hỏi lại một lần (câu dài hơn thì gửi, câu thứ hai không có dấu giọng thì huỷ),
+khai báo và định tuyến chỉ khi có công tắc và thư mục, luật đứng đầu, chỉ
+đúng `send_id` của lần ghi đang chờ mới gửi nó, dù lời là gì (mô hình quyết
+định, chủ đèn, 10/11), một id bịa ra thì huỷ và một lệnh gọi không có id thì
+chuẩn bị lại, mọi câu ngay sau phần đọc lại được chờ là câu trả lời của nó,
+lần gửi của một người khác đã biết hay một người nói khác gửi lần ghi đang
+chờ, đèn nói "Say 'yes, send it' to send it." và ghi chú chờ đưa send_id,
+một câu "Yes, send it." sau phần đọc lại đó không bao giờ bị giữ là tiếng vọng
+của đèn (lamp-3e83), một lần gửi sau một câu khác mà đèn chưa trả lời hay sau một phần đọc lại không
+được nói trọn vẫn gửi, câu trả lời cho phần đọc lại không có lần gửi ("Okay,
+cancelled.", "It's three.") kết thúc lần ghi nên một lần gửi sau đó không thấy
+gì, còn lần gửi của chính câu trả lời đó vẫn đi,
 một lần ghi chỉ được chuẩn bị khi thấy chủ đèn nói (một giọng ngoài khung hình
 bị từ chối), tuyến Live không bao giờ chuẩn bị hay gửi, một lần đọc đầy đủ chỉ
 khi một mình, được thấy nói và ở giọng của cuộc trò chuyện (một giọng ngoài
 khung hình thì ngắn gọn), một câu bắt đầu đè lên phần đọc lại đánh dấu nó bị
 cắt, một lần gửi bị từ
-chối và quên trừ khi mọi luật đều đúng, một lần gửi sau phần đọc lại không
-được nói trọn hay bị nói đè thì bị từ chối, mọi câu hay lượt sau đó làm quên
-lần ghi, chỉ câu nói được nghe của chủ đèn chạm đến một dịch vụ (khách, cả
+chối và quên trừ khi mọi luật đều đúng (cùng lượt, quá hai phút, send_id
+khác), một lần gửi nói đè lên phần đọc lại thì bị từ chối, một lệnh
+gọi khác hay đèn trả lời hai lần làm quên lần ghi, chỉ câu nói được nghe của chủ đèn chạm đến một dịch vụ (khách, cả
 phòng, một câu bị giữ hay thu hẹp, không có phạm vi và một lượt chạy theo
 lịch đều bị từ chối, cả đọc lẫn ghi), không gì khác chạy sau một lần đọc
 trong cùng yêu cầu, một lần đọc rút gọn còn ai gửi và về việc gì khi có thể có
@@ -1340,7 +2347,9 @@ Linear) và không cho `gmail-app`, toàn văn hay việc đọc dạng tự do 
 `get`, `call`, hay các khoá của chúng), schema và
 bộ nạp khớp nhau; một lần đọc Drive được nói theo tên; cổng chờ 5 s liên tục,
 bỏ qua sau 60 phút, dừng trước một lời, dừng với "I'll tell you the rest
-later." khi có người đến, và các dòng được nói. `-p lamp-update` (unit được
+later." khi có người đến, và các dòng được nói; mỗi lần một lượt đọc (hai
+lượt cùng đến hạn được nói lần lượt, cách nhau một phút; một lượt xếp hàng sau
+lượt khác bỏ qua khi hết giờ của chính nó). `-p lamp-update` (unit được
 cài với `LAMP_SERVICES=on` trong đó, như trong `lamp-cloud.service` và
 `lamp-voice.service`, `LAMP_SERVICES_WRITE=on` chỉ trong
 `lamp-services.service`, `LAMP_SAME_VOICE_FOR=services` cạnh mô hình được ghim

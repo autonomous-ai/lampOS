@@ -23,7 +23,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `lane.sh PR...` | Prints the lane each PR goes to, as the bot decides it. Read-only but for local fetches. |
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
 | `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
-| `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
+| `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
 | `gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON PRIVATE_NAMES` | The generator `build-rows-pr.sh` calls. |
 
@@ -102,7 +102,7 @@ echo $! > "$S/train-bot.pid"
 Stop: `kill "$(cat "$S/train-bot.pid")"` (it stops both lanes). Restart: stop, check no train is open, start.
 
 The bot stops by itself (exit 2) when two crate trains in a row time out, or a crate run fails with no failing test named.
-It says so on the Queue (#5385, the last issue in lib.sh's `COORD_QUEUE_ISSUES`).
+It says so on the Queue (#6059, the last issue in lib.sh's `COORD_QUEUE_ISSUES`).
 If the Queue refuses the post (an issue takes at most 2,500 comments), the bot logs it instead.
 The no-crates lane stops alone (the file `train-bot.stop-nc` in the state folder) when two of its trains in a row time out or GitHub refuses its merge; delete the file, or restart the bot, to start it again.
 
@@ -119,6 +119,8 @@ The train merges as it is, by rebase and pinned to its head, after the same prec
 
 The crates' tests read files in `lampOS/deploy`, `lampOS/skills`, `lampOS/etc` and those docs, so a gain there rebuilds.
 Anything else rebuilds as before, and so does any error (fail closed).
+
+A train GitHub already shows as merged is never rebuilt, whatever `merge-when-green.sh` answered: train 761 (#5904) merged and was answered as behind, so its PRs were left open. The bot then closes the carried PRs as after any merge.
 
 Replay a case without changing anything:
 
@@ -169,7 +171,7 @@ in time order with the comments (its submit time), so a later HOLD beats an earl
 A review's state (APPROVED, CHANGES_REQUESTED, ...) is never a read. A review with an empty body, not yet submitted, or dismissed counts for nothing.
 
 **Fetches fail closed.** If a PR's head, comments, reviews or body can't be fetched, that PR is not eligible.
-If any Queue issue (#4710 or #5385) can't be fetched, no PR is eligible that round.
+If any Queue issue (#4710, #5385 or #6059) can't be fetched, no PR is eligible that round.
 `still-eligible.sh` rechecks the markers, the Queue HOLDs and TWO READS just before a train merges.
 
 **Markers.**
@@ -203,7 +205,7 @@ If any Queue issue (#4710 or #5385) can't be fetched, no PR is eligible that rou
   or `<login>/unsigned-review#<submitted_at>` for an unsigned HOLD posted as a review.
   Post the reader's closing comment on the PR when you add the row.
 
-**Queue HOLDs.** A Queue comment of the last 3 days, on #4710 or on #5385 (lib.sh's `COORD_QUEUE_ISSUES`, the one place the Queue's issue numbers live; #4710 hit GitHub's 2,500-comment limit on 5 Nov), whose first line is `HOLD <sha>` holds the PR whose head starts with that sha.
+**Queue HOLDs.** A Queue comment of the last 3 days, on #4710, #5385 or #6059 (lib.sh's `COORD_QUEUE_ISSUES`, the one place the Queue's issue numbers live; #4710 hit GitHub's 2,500-comment limit on 5 Nov and #5385 on 10 Nov), whose first line is `HOLD <sha>` holds the PR whose head starts with that sha.
 **When the Queue fills** (2,500 comments): open the next Queue issue and append its number to `COORD_QUEUE_ISSUES` in `lib.sh`, last.
 Keep the older ones while their last 3 days of HOLDs matter; the bot posts on the last one.
 It stands until the same login posts a later READ-OK marker on the PR whose first 400 characters say the HOLD is lifted or cleared

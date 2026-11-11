@@ -17,13 +17,14 @@ name: lampOS on ARM64
 # of test time on 2026-10-15; nextest group `realtime` in
 # lampOS/.config/nextest.toml) runs only in the full run: every night, started
 # from main by .github/workflows/lampos-nightly.yml as a manual run of this
-# workflow on lamp-voice with `full`. A failed full run opens an issue. See
+# workflow on lamp-voice with `full`. It builds cold, with no cache (below).
+# A failed full run opens an issue. See
 # lampOS/docs/realtime-tests.md.
 #
 #            | runners | profile   | tests at once | realtime | crates tested
 # pull req.  | 1       | `pr`      | one per core  | skipped  | its own, their users, three readers (below)
 # lamp-voice | 1       | `pr`      | one per core  | skipped  | all (binaries for updates.md; on the Studio when route says so)
-# full       | 4       | `default` | one           | run      | all
+# full       | 4       | `default` | one           | run      | all (cold: no cache)
 #
 # A pull request tests only the crates its diff changes, every crate that
 # depends on them, and lamp-cloud, lamp-voice-eval and lamp-update, whose
@@ -43,10 +44,13 @@ name: lampOS on ARM64
 # the crates built from them, not all of lampOS on every checkout (#1806; the
 # first builder's ask of 21 Oct 2026 for runs of about ten minutes, against 11
 # to 28 and 19 at the median: 3.9 to 4.4 minutes in the probe runs there).
-# Publication-eligible pushes are the exception: they restore neither target
-# nor source times, and record fresh checkout times in an empty target before
-# building. Their signed binaries do not depend on cache freshness. PRs and
-# publication-disabled runs keep the ordinary cached path below.
+# lamp-voice's publication build takes this cached path too: a cold one held
+# every promote about 35 minutes, against about 13 cached (the owner's yes on
+# #6021, 10 Nov 2026). The full run is the exception and the check on it: it
+# restores neither target nor source times, and records fresh checkout times
+# in an empty target before building. If the cold full run fails where
+# lamp-voice's cached build of the same commit passed, publication goes back
+# to cold until it is explained (the first builder's condition on #6021).
 #
 # The cache is lamp-voice's newest build: each of lamp-voice's own runs saves
 # it under a key with its commit, even when a test failed, and pull requests
@@ -138,9 +142,9 @@ jobs:
   # trusted slot (org runner group lampos-studio, label studio-trusted: one
   # 20-vCPU VM, fresh for each job, no cache, only lamp-voice) or
   # GitHub-hosted, as before. lamp-voice's push is the publication build,
-  # about 25 minutes here; signing and publishing stay on GitHub-hosted, so the
-  # key never reaches the Studio. GitHub-hosted is the default and every doubt
-  # falls back to it (.github/scripts/lampos-route.py): the switch
+  # cold here, cached on GitHub-hosted (#6021); signing and publishing stay on
+  # GitHub-hosted, so the key never reaches the Studio. GitHub-hosted is the
+  # default and every doubt falls back to it (.github/scripts/lampos-route.py): the switch
   # vars.LAMPOS_STUDIO not on (canary: runs by hand on lamp-voice only), the
   # Studio's heartbeat (vars.LAMPOS_STUDIO_BEAT, written every 30 s by the
   # Studio host) older than two minutes, a Studio job stuck, the queue there
@@ -233,12 +237,10 @@ jobs:
         run: cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
       - name: restore the cache
         id: cache
-        # Match publish's eligibility exactly, so signing candidates build cold.
-        # Not on the Studio: it builds lamp-voice cold, and the cache job below
-        # renews this one for pull requests.
-        if: >-
-          ${{ runner.environment == 'github-hosted' && !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
-          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on') }}
+        # Not for the full run, which builds cold (see the top). Not on the
+        # Studio: it builds lamp-voice cold, and the cache job below renews
+        # this one for pull requests.
+        if: ${{ runner.environment == 'github-hosted' && !inputs.full }}
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -250,19 +252,15 @@ jobs:
             lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
             lampos-arm64-u2204-
       - name: unchanged source files get the cached build's times back
-        if: >-
-          ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
-          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on') }}
+        if: ${{ !inputs.full }}
         run: python3 -I .github/scripts/lampos-source-times.py
-      - name: record fresh source times for a cold publication build
-        if: >-
-          github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
-          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on'
+      - name: record fresh source times for the cold full run
+        if: ${{ inputs.full }}
         # With no target/record, this only records checkout times for the cache
         # saved after the run. Any unexpected pre-existing target fails closed.
         run: |
           if [ -e lampOS/target ] || [ -L lampOS/target ]; then
-            echo 'cold publication build requires an absent lampOS/target' >&2
+            echo 'the cold full run requires an absent lampOS/target' >&2
             exit 1
           fi
           python3 -I .github/scripts/lampos-source-times.py
@@ -358,7 +356,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             lampOS/target
-          # A cold publication build skipped restore, so it has no cache outputs.
+          # The cold full run skipped restore, so it has no cache outputs.
           key: ${{ steps.cache.outputs.cache-primary-key || format('lampos-arm64-u2204-{0}-{1}', hashFiles('lampOS/Cargo.lock'), github.sha) }}
 
   # Pull requests restore lamp-voice's newest build (see the top), which
@@ -555,6 +553,9 @@ jobs:
         ${{ github.sha }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
         Pull requests and merges skip the realtime group (lampOS/docs/realtime-tests.md),
         so the change that broke it may have passed its own run.
+        The full run builds cold and lamp-voice's publication build uses the cache (#6021):
+        if a test fails here that passed in lamp-voice's run of the same commit, publication
+        goes back to cold until it is explained.
     steps:
       - run: |
           n=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number -q '.[0].number')

@@ -96,7 +96,21 @@ nên không xóa gì. Một câu đọc ra không nêu tên nhưng các
 từ khác có thể nêu một thứ («Quên nó đi, ý tôi là địa chỉ») không bao giờ
 xóa thứ được giữ gần nhất theo phỏng đoán: không xóa gì, và đèn hỏi lại một
 lần là thứ nào. Chỉ câu không nêu tên rõ ràng («quên cái đó đi») mới xóa thứ
-được giữ gần nhất.
+được giữ gần nhất, và chỉ khi lần giữ hoặc lần nhắc lại cuối cùng của phiên
+này, trong phạm vi của họ, vừa cho ra một thứ trong vòng `HELD_FORGET_FOR`,
+hoặc đèn vừa hỏi họ một câu hỏi tiếp theo; nếu không (phiên mới, đã quá một
+phút) thì không xóa gì, không bao giờ đoán là thứ được giữ mới nhất (C35).
+Khi phiên đã cho thấy từ một thứ trở lên, mô hình hỏi là thứ nào, và nhật ký
+ghi `lamp-voice provider: a bare forget is not run: nothing was given just
+before and N shown could be meant, asked which`. Khi chưa cho thấy gì, mô
+hình hỏi họ muốn quên gì, và nhật ký ghi `lamp-voice provider: a bare forget
+is not run: nothing was given just before and nothing was shown, asked
+what`. Với
+`LAMP_MEMORY_FORGET_ABOUT`, `about` của mô hình chỉ chạy đúng như gọi khi
+không nghe được gì hoặc các từ của nó có trong phần yêu cầu quên của câu;
+một `about` chưa từng được nói bị bỏ và lệnh quên được xem là không nêu tên
+(lamp-06c1, 9/11, bản 10824: «Lamp, forget that.» đi kèm một `about` 2 từ,
+chạy đúng như gọi và xóa chiếc khăn mà không hỏi là thứ nào).
 
 ## Nhật ký dừng sau một lệnh quên, rồi chạy lại
 
@@ -117,9 +131,13 @@ một câu mà chính người đó đã giữ, còn hiệu lực và cùng ch�
 hoa thường, khoảng trắng và dấu câu cuối; trong phạm vi riêng của một người,
 cả chữ «my» hay «the» ở đầu: C81, bản 10538 trên lamp-06c1, 6/11, «The gym
 locker code is 441.» đã giữ và «My gym locker code is 441.» bị giữ lần nữa;
-không bao giờ trong phạm vi căn phòng, nơi «my» là của bất kỳ ai nói,
+và trước đó cả «They said: » mà một câu giữ theo lời nghe được mở đầu: C81,
+bản 11091, 10/11, «They said: my gym locker code is 441.» là «Gym locker code
+is 441.»; không bao giờ trong phạm vi căn phòng, nơi «my» là của bất kỳ ai nói,
 `days::own_text`), là chính điều đã giữ đó, không ghi
-thêm dòng nào. Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
+thêm dòng nào. Một lời sửa có `once` mà nêu đúng điều đã giữ bằng cùng chữ như
+vậy (`Days::restates`) cũng là điều đó được nói lại: không có bản mới, và nó
+mang thời điểm được nói lại («last said»). Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
 điều đã quên hay đã bị thay, không tính là cùng một điều. Unit sản phẩm bật công
 tắc này từ 28/10: trên lamp-06c1, khi không có nó, một câu nói lại đã được giữ
 lần thứ hai (lượt chạy của Friday, #3504). Vẫn còn nợ một lần kiểm tra trên
@@ -289,6 +307,62 @@ thứ tự: không giữ, nói hay đọc thêm gì, không gọi mô hình, kh�
 liệu. Không có trường này, ghi chú giống hệt trước, từng byte. Memory cũ từ
 chối trường này (`deny_unknown_fields`).
 
+## Vai được giao (`role`, `LAMP_MEMORY_ROLE`)
+
+Với `role:true` trong `session_open` (công tắc `LAMP_MEMORY_ROLE` của voice,
+mặc định tắt, bật trong bản sản phẩm theo quyết định của người phụ trách bộ
+nhớ ngày 9/11; thiết kế của người phụ trách bộ nhớ, 6/11), câu trả lời có thêm
+`"role"`: tên vai mà người được biết mặt đó nhờ đèn đóng, hoặc `null`. Nó được
+đọc cùng lần mở phiên, không bao giờ bằng một yêu cầu riêng; của phòng luôn là
+`null`. `role_set_session {person, session, generation, name}` giữ vai (`{ok:true}`), mỗi người một vai,
+vai mới thay vai cũ, tối đa 60 byte (`ROLE_BYTES`; voice chỉ gửi tên ngắn: tối
+đa 4 từ, 40 byte, chỉ chữ, khoảng trắng, gạch nối và dấu nháy, không có từ của
+một câu hay một lời dặn, nên câu tự do không thành vai; voice cũng kiểm tra vai
+đã lưu như vậy khi đọc, vai nào không đạt thì không bao giờ được nói); `role_end_session {person, session, generation}` bỏ vai
+(`{ok:true,ended}`). Chỉ người được biết mặt (id `p-`) mới có vai: phòng, phạm
+vi quy tắc hay id khác bị từ chối `bad_person`, tên không có chữ hay số bị
+`empty`. Lưu trong bảng `roles`, tạo `IF NOT EXISTS`, `user_version` không
+đổi; mất cùng `forget_all` và `forget_person`. Không có trường này, câu trả
+lời giống hệt trước. Memory cũ từ chối trường này và trả `unknown_op` cho hai
+thao tác mới.
+
+Hai thao tác ghi dùng phiên và thế hệ từ ảnh chụp của đúng người đã được
+voice nhận vào ngữ cảnh. Memory kiểm tra phiên còn tồn tại, chưa vô hiệu hóa,
+và thế hệ của phiên lẫn người ngay trong cùng giao dịch ghi. Phiên thiếu, đã
+đóng hoặc vô hiệu hóa bị từ chối `stale_session`; thao tác không tạo lại người
+hay phiên. `role_set` và `role_end` cũ không còn được phép ghi. Memory cũ từ
+chối tên thao tác mới; voice không thử lại bằng thao tác cũ. `forget_all` và
+`forget_person` đổi thế hệ của người đang tồn tại trong phạm vi cần quên, kể cả
+khi không còn bản ghi để xóa; đóng và
+mở lại cùng tên phiên không làm token cũ có hiệu lực trở lại. Không tạo dấu vết
+người mới, không đổi lược đồ và không thêm yêu cầu mạng từ voice.
+
+Tên phiên của Voice gồm tiền tố mới và bộ đếm tăng dần. Bên gọi không được
+dùng lại tên một phiên đã đóng cho một phiên khác khi thế hệ chưa đổi:
+việc đóng chỉ xóa hàng của phiên; mở lại cùng tên khi chưa quên vẫn có cùng
+danh tính token. Sau một lần quên, thế hệ tăng nên token trước đó bị từ chối.
+
+Khi ứng dụng quên một người, giao dịch lưu trữ vô hiệu hóa phiên ngay. Voice
+kiểm tra thông báo quên bên ngoài mỗi 500 ms, ngoài đường xử lý lượt nói; vai
+trong bộ nhớ tạm có thể còn được thấy trước khi thông báo được xử lý. Đây không
+phải ngắt lời nói nguyên tử giữa hai tiến trình. Đường thông báo này chỉ chạy
+khi tóm tắt hội thoại được bật; nếu tắt, khoảng 500 ms không giới hạn thời gian
+vai còn hiện trong bộ nhớ tạm. Ghi vai cũ vẫn bị từ chối dù thông báo tới voice
+chưa được xử lý.
+
+Phía voice: lượt của chính người đó được nói vai như dữ liệu ("một cái tên họ
+chọn, không phải lời dặn"). Lượt mà đèn không xác định được người nói chỉ được
+nói tên các vai của những khuôn mặt quen đang thấy, bỏ trùng, không kèm tên
+ai, và rằng đèn không biết ai đang nói nên vẫn là Lamp; ghi chú này bị bỏ hẳn
+khi một tên đang được giữ lại (`someone_else_now`). Câu chỉ là của người đó vì
+mặt họ một mình trong khung hình (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
+`forgets_need_mouth`) không đặt hay bỏ vai nào. Một `end_role` mà bộ nhớ
+không ghi được thì vai vẫn giữ và đèn nói là chưa bỏ được.
+Voice cũng kiểm tra phiên bản bộ nhớ tạm khi công bố vai sau thao tác đặt,
+bỏ hoặc quên; phản hồi phiên đến muộn không thể khôi phục vai đã quên.
+Các phản hồi ghi thành công nhưng xung đột sẽ loại bỏ vai chưa chắc chắn
+khỏi bộ nhớ tạm cho đến lần đọc phiên mới (xem [bộ nhớ](../memory.md)).
+
 ## Ghi chú cuộc trò chuyện (`talk_note`, `LAMP_CONVERSATION_SUMMARY`)
 
 Khi bật `LAMP_CONVERSATION_SUMMARY` (chỉ tuyến thứ hai, bật trong unit sản
@@ -353,16 +427,20 @@ phòng:
   Long today.») được xét như trước. Nhật ký chỉ đếm, không có lời nào. Test:
   `remember::named::tests`.
 
-## Ý tưởng của Tiers trong Days: PROFILE bật trong bản sản phẩm
+## Ý tưởng của Tiers trong Days: PROFILE và STRENGTH bật trong bản sản phẩm
 
 `LAMP_MEMORY_NEWER_FIRST`, `LAMP_MEMORY_STRENGTH` và `LAMP_MEMORY_PROFILE`
 (kế hoạch ý tưởng Tiers của người phụ trách trí nhớ, 3/11; mỗi công tắc chỉ
 nhận `on`, chỉ với Days) được bật trong unit voice của bản sản phẩm từ 5/11
 theo quyết định của người phụ trách trí nhớ, và tắt cho bản ứng viên ngày 6/11
 (#5464). `LAMP_MEMORY_PROFILE` bật lại sau khi bài kiểm tra phát thử của nó đạt
-trên lamp-06c1 ngày 6/11 (PASS bd98421414, #5331); `LAMP_MEMORY_NEWER_FIRST`
-và `LAMP_MEMORY_STRENGTH` vẫn tắt cho đến khi một bài phát thử chạm tới chính
-trường của chúng (`earlier:true`, `strength:"maybe"`). Khi bật, một lời
+trên lamp-06c1 ngày 6/11 (PASS bd98421414, #5331), và `LAMP_MEMORY_STRENGTH`
+bật lại sau khi bài phát thử trên lamp-06c1 ngày 6/11 cho thấy mục đã giữ 579
+mang `strength:"maybe"` và câu trả lời đọc nó cho "Am I doing pottery?" (#5503,
+[lần chạy](https://github.com/autonomous-ai/lampOS/pull/5503#issuecomment-6678298333)). `LAMP_MEMORY_NEWER_FIRST` vẫn tắt:
+khi `LAMP_MEMORY_REPLACES` và `LAMP_KEEP_QUIETLY` bật, một lời sửa nói khi
+phát thử hoặc thay thế câu cũ, hoặc được giữ một mình, nên `earlier:true` không
+đạt tới được khi phát thử. Khi bật, một lời
 sửa nói trong lúc trò chuyện
 ("thật ra bây giờ là trà xanh") được trả về trước câu cũ mà nó sửa, và câu cũ
 mang `earlier`; một điều nói như "có lẽ" hay một dự định được đánh dấu
@@ -609,6 +687,17 @@ tính và bị bỏ, không mã, không vị trí, chỉ khi bật công tắc h
 như trước. Các ngưỡng 0,6 và 0,70 lấy từ bản ghi trên lamp-06c1 (3/11); một người thật đứng
 sau chủ đèn 1 m vẫn chưa được thử.
 
+**Một khuôn mặt quay đi rồi quay lại vẫn là của họ** (`LAMP_FACE_REFOUND=on`
+cùng `LAMP_FACE_KNOWN_HOLD=on`, cả hai bật trong mắt của bản sản phẩm, khuôn mặt
+tìm lại từ quyết định của người phụ trách bộ nhớ, C65; [eyes.md](../eyes.md), "The
+followed id"): một khuôn mặt quay lại với mã tạm mới được nhận ra ngay lần nhìn
+đầu, không phải tới 2 giây sau, và mắt nói nó nối tiếp mã đã mất nào, nên một câu
+nói qua lúc quay đầu là của một khuôn mặt ([second-voice.md](../second-voice.md)).
+Tên họ chỉ chuyển sang mã mới khi một dấu mặt được đọc là của họ (ít nhất 0,363 so
+với dấu mặt mắt đã đọc của họ); trước dấu mặt đó, câu chờ tối đa 1 giây sau khi
+kết thúc, rồi thuộc về cả phòng. Người khác ngồi vào chỗ họ không bao giờ nhận bộ
+nhớ của họ chỉ nhờ mối nối.
+
 Với `LAMP_PERSON_SCOPE_ONE_FACE=on` (bật trong bản sản phẩm; mục 1 của nhóm
 thử nghiệm ra mắt trên #3997): trên lamp-220c ngày 30/10, mặt chủ đèn có trong
 17 lần nhìn của một câu nhưng không lần nào đọc là đang nói, nên với
@@ -734,6 +823,9 @@ lời yêu cầu của nó không tính là yêu cầu ngay trước (`forget_as
 (`replaces`, `remember::corrects`) bị từ chối như lệnh quên, và khi không có
 id thì bộ so khớp lời sửa bị bỏ qua, nên điều mới được giữ như thường và không
 gì bị thay; `keep_rule`, `list_rules` và `forget_rule` bị từ chối;
+`set_role` và `end_role` cũng bị từ chối, cả trong
+`remember::role_for_guarded` (lần đọc riêng tư trên #5385), nên một vị khách
+ngoài khung hình không bỏ hay thay được vai của người chủ;
 `cancel_reminder` và `snooze_reminder` bị từ chối trừ khi
 `LAMP_ONE_FACE_REMINDERS` bật (điều chấp nhận ngày 4/11); và câu ấy không có
 chủ dịch vụ (`services::owner_of`), nên không `service_read` nào chạy cho nó,
@@ -933,6 +1025,14 @@ Dòng hồ sơ vào dải sở
 thích của ghi chú phiên (P3, #5043); các loại khác không bao giờ vào ghi chú
 phiên. Không có gì được nói ra hay hiển thị.
 
+`LAMP_MEMORY_NIGHTLY`, cùng `LAMP_MEMORY_NIGHTLY_PATTERNS` và
+`LAMP_MEMORY_NIGHTLY_FEELINGS`, bật trong unit voice của bản sản phẩm từ 5/11,
+theo quyết định của người phụ trách trí nhớ: từ 03:00 đến 06:00 giờ địa
+phương, sau 20 phút yên lặng và khi công tắc riêng tư mở, ngày hôm trước của
+mỗi người đã biết được gửi qua relay tới mô hình một lần nữa, và Days giữ
+những gì qua được kiểm tra, từng mục một. Không nói hay hiện gì; nhật ký chỉ
+có số đếm.
+
 ## Đầu dò của bộ đo (#4748)
 
 Bộ đo bộ nhớ (`docs/memory-bench.md`) chạy một tháng qua chính client Days của
@@ -1074,3 +1174,86 @@ lamp.
 Ý tưởng quan sát có liên kết nguồn, chép đúng lời của người nói, là sự thật
 kèm trích dẫn nguyên văn của thiết kế Tiers
 ([memory-tiers.md](../memory-tiers.md)), ở đây không dùng mô hình.
+
+## Lời đã thấy nói, trả lời thay cho một câu không có lời, vẫn là của người nói (`LAMP_HELD_WORDS_SEEN`)
+
+Trên lamp-06c1 (chạy lại 10/11, bản 11091, S1), câu «Lamp. Actually, my
+bike is blue now.» (yêu cầu 83) được thấy chính khuôn mặt cô ấy nói, nhưng
+một câu không có lời (84) cắt ngang trước khi trả lời, và 84 rồi 85 trả lời
+lời đó thay cho 83. 84 và 85 là câu được mang theo (không khuôn mặt nào được
+thấy nói một câu không có lời), nên câu trả lời không có ghi chú bộ nhớ,
+không đọc bộ nhớ, và việc giữ phải chờ một lời «có»: lamp nói không biết gì
+về màu xe đạp, và màu xanh không được giữ. Khi bật `LAMP_HELD_WORDS_SEEN`
+(mặc định tắt cho đến khi kiểm tra trên lamp), mỗi câu được thấy chính khuôn
+mặt người đó nói được đánh dấu (`memory_scope::mark_seen_line`; thu hẹp về
+phòng thì xóa dấu). Một câu không có lời của riêng nó, trả lời thay cho lời
+mà mọi phần đều được thấy cùng một khuôn mặt nói, và chính nó được mang theo
+trọn vẹn cho cuộc nói chuyện của người đó, sẽ trả lời trong phạm vi của
+người đó, không bị giữ (`ScopeLease::answer_words_seen`): đọc bộ nhớ, giữ
+ngay, sửa hoặc quên đều chạy, như ở câu gốc. Chi tiết ở
+[memory.md](../memory.md).
+
+## Không bao giờ nói đã quên khi chưa quên (C88, B-G23)
+
+Trên lamp-06c1 (10/11, bản 11091, yêu cầu 30), câu «Lamp, forget that.» khi
+khuôn mặt đứng yên được trả lời «I've forgotten the thing about your
+umbrella.» nhưng không có lệnh gọi nào (`calls=none`): `forget` vẫn được đưa
+cho mô hình, mô hình không gọi, và chiếc ô vẫn còn trong bộ nhớ. Với
+`LAMP_ACTION_CLAIM_CHECKED` (bật trong sản phẩm), trên một câu nói yêu cầu
+quên, câu trả lời mà câu đầu tiên nói đã quên điều gì đó
+(`action_claim::forget_claim`) chỉ được nói khi trong lượt đó có một lệnh
+quên thật sự xóa được (`forgotten`, `everything` hoặc khuôn mặt đã quên là
+true, `action_claim::forgot_in`), hoặc bên cạnh lệnh quên khuôn mặt hay quy
+tắc đã xóa được (`forget_my_face` trả `ok` và không có `error`, `forget_rule`
+trả `forgotten: true`). Lệnh quên bị từ chối (kể cả trên câu chỉ có một khuôn
+mặt), lệnh quên khuôn mặt trả `NOT_SEEN` hay `NOT_THEIRS`, hoặc lệnh quên quy
+tắc không xóa được gì, đều không xóa gì.
+Nếu không, mô hình được báo `action_claim::FORGET_NOTE` và hỏi lại một lần;
+lần thứ hai vẫn nói đã quên thì lamp nói «Sorry, I didn't do that. Could you
+ask me again?» (bằng ngôn ngữ của chủ). Lời nói đã quên đi cùng lệnh gọi
+quên (bộ nhớ, khuôn mặt hay quy tắc) trong cùng một vòng thì không được nói,
+nhưng cũng không đặt lời nhắc nào: vòng sau nói theo đúng kết quả của lệnh
+quên. Chi tiết ở
+[memory.md](../memory.md).
+
+## Không nói «đã giữ» khi lệnh giữ sau một lời «có» không giữ gì
+
+Khi chạy lại trên lamp-06c1 (10/11, bản 11211), câu «Yes. Please keep that.»
+được thấy nói nhưng không có lời đề nghị giữ nào đang chờ. Mô hình gọi
+`remember`, lệnh này không giữ gì và báo cho mô hình biết
+(`heard::YES_ALONE`, «Never say it was kept.»), nhưng vòng 2 vẫn nói
+«Kept—the office plant gets watered on Mondays.» (S4, yêu cầu 54: một điều
+của phòng từ mười phút trước) và «Fifty-three, kept as your lucky number.»
+(S14, yêu cầu 103). Bộ kiểm tra lời tự nhận đã giữ không nhận ra hai dạng
+này. Giờ «Kept» (hoặc «I've kept») trước dấu gạch ngang là một lời tự nhận
+chắc chắn trên mọi câu; trên câu chỉ là một lời «có», «kept», «saved» hoặc
+«remembered» ở đúng dạng một lời tự nhận cũng vậy: sau «I», «I've» hoặc
+«I have», sau một dấu câu và trước «as your», hoặc trước «that»/«it» «for you»
+(`remember::kept_in_a_claims_shape`). «kept» chỉ là một từ thường giữa câu
+thì không tính, dù trước nó là dấu gì (HOLD của Third trên #5994: «Your
+plant, kept outdoors, needs watering.», «kept under the mat», «kept
+refrigerated» được nói nguyên văn), cũng như một trạng thái được giữ
+(«I've kept it dim.»); nhưng một từ trạng thái nằm trong mệnh đề về một
+người là của điều được giữ, nên «I've kept that you like bright light.» vẫn
+là lời tự nhận (P3 của Fourth trên #5994). Lời tự nhận đó không được nói:
+mô hình được hỏi lại một lần, lần thứ hai thì lamp nói «I didn't keep that.
+Tell me again and I'll remember it.». Chi tiết ở
+[second-voice.md](../second-voice.md).
+
+## Lời bị cắt giữ phạm vi mà câu của nó đã định (lamp-0c4e, 10/11)
+
+Trên lamp-0c4e, một câu hỏi được mang theo (yêu cầu 238, về trà nhài) đã
+được đọc là của người đó, với 3 kết quả bộ nhớ, rồi bị một câu không có lời
+(239) cắt ngang trước khi câu trả lời được phát; 239 trả lời lời của 238
+thay cho nó. Quy tắc giọng nói không bao giờ xét một câu không có lời, nên
+`LAMP_CONVERSATION_CARRIED_MEMORY` thu hẹp 239 về phòng, và lamp nói «không
+có gì trong bộ nhớ». Nay mỗi câu đã được định là của một người, sau mọi
+kiểm tra giọng của chính nó, được đánh dấu là của ai và theo cách nào
+(`memory_scope::mark_said_line`; thu hẹp về phòng thì xóa dấu). Một câu được
+mang theo, không có lời, mà lý do thu hẹp duy nhất là quy tắc chưa nghe nó
+(của công tắc này hoặc của `LAMP_CONVERSATION_CARRIES_PAST_SILENT`), sẽ chờ
+lời nó trả lời thay: nếu mọi phần của lời đó đã được định là của đúng người
+mà câu này được mang theo cho (`second_provider::said_saying`), nó giữ phạm
+vi của người đó; nếu không, nó là của phòng như trước. Câu có lời mà không
+quy tắc nào xét vẫn là của phòng, và một giọng khác xuất hiện vẫn thu hẹp về
+phòng. Chi tiết ở [memory.md](../memory.md).

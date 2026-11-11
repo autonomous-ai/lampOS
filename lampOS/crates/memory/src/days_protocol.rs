@@ -139,6 +139,34 @@ enum Extra {
         /// search's entries do ([`labelled_note`]). Absent, as before.
         #[serde(default)]
         strength: bool,
+        /// The voice's `LAMP_MEMORY_ROLE` (the memory owner's design, 6
+        /// Nov): the answer also says the person's role, `"role"`, a name
+        /// or null (`Days::role`), so it is read with the note it opens, never
+        /// on its own. The room's is always null. Absent, as before.
+        #[serde(default)]
+        role: bool,
+    },
+    /// Legacy unfenced role set, retained only for an explicit refusal.
+    RoleSet {
+        #[serde(default)]
+        person: Who,
+        name: String,
+    },
+    /// Legacy unfenced role end, retained only for an explicit refusal.
+    RoleEnd {
+        #[serde(default)]
+        person: Who,
+    },
+    RoleSetSession {
+        person: Who,
+        session: String,
+        generation: u64,
+        name: String,
+    },
+    RoleEndSession {
+        person: Who,
+        session: String,
+        generation: u64,
     },
     SessionClose {
         #[serde(default)]
@@ -816,15 +844,51 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             max_bytes,
             profile,
             strength,
+            role,
         } => {
             let cap = max_bytes.unwrap_or(1200).min(1200) as usize;
-            let snapshot = store.session_open_with(&one(person)?, &session, cap, profile)?;
-            if strength {
+            let person = one(person)?;
+            let snapshot = store.session_open_with(&person, &session, cap, profile)?;
+            let mut answer = if strength {
                 let snapshot = serde_json::to_value(&snapshot).expect("a note is JSON values only");
                 json!({"ok":true,"snapshot":labelled_note(snapshot, cap)})
             } else {
                 json!({"ok":true,"snapshot":snapshot})
+            };
+            if role {
+                answer["role"] = json!(store.role(&person)?);
             }
+            answer
+        }
+        Extra::RoleSet { person, name } => {
+            let _ = (person, name);
+            return Err(Error::new(
+                "stale_session",
+                "role writes require an admitted session",
+            ));
+        }
+        Extra::RoleEnd { person } => {
+            let _ = person;
+            return Err(Error::new(
+                "stale_session",
+                "role writes require an admitted session",
+            ));
+        }
+        Extra::RoleSetSession {
+            person,
+            session,
+            generation,
+            name,
+        } => {
+            store.role_set_session(&one(person)?, &session, generation, &name)?;
+            json!({"ok":true})
+        }
+        Extra::RoleEndSession {
+            person,
+            session,
+            generation,
+        } => {
+            json!({"ok":true,"ended":store.role_end_session(&one(person)?, &session, generation)?})
         }
         Extra::SessionClose { person, session } => {
             store.session_close(&one(person)?, &session)?;
@@ -1004,6 +1068,10 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "nightly_prepare",
             "nightly_apply",
             "forget_mark",
+            "role_set",
+            "role_end",
+            "role_set_session",
+            "role_end_session",
         ];
         const OLD: &[&str] = &[
             "append",
@@ -1144,6 +1212,203 @@ mod tests {
     }
 
     const NOW_MS: u64 = NOW;
+
+    /// `LAMP_MEMORY_ROLE` (the memory owner's design, 6 Nov): a known
+    /// person's role is kept across a reopen of the store, read with their
+    /// `session_open` only when it asks for `role`, replaced by a new one,
+    /// ended by `role_end_session` and by `forget_all`, and never the room's or a
+    /// rules scope's. Without `role` a session open answers as before.
+    #[test]
+    fn a_role_is_kept_until_ended_and_read_only_with_the_session_open() {
+        let (scratch, mut store) = Scratch::new("role");
+        let olivia = "p-0123456789abcdef";
+        let tom = "p-fedcba9876543210";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let open = |store: &mut Days, person: &str, session: &str, role: bool| -> Value {
+            let mut request =
+                json!({"op":"session_open","person":person,"session":session,"max_bytes":1200});
+            if role {
+                request["role"] = json!(true);
+            }
+            send(store, request)
+        };
+        let first = open(&mut store, olivia, "s1", true);
+        assert_eq!(first["role"], Value::Null);
+        let og = first["snapshot"]["generation"].clone();
+        let tg = open(&mut store, tom, "s1", true)["snapshot"]["generation"].clone();
+        let set = send(
+            &mut store,
+            json!({"op":"role_set_session","person":olivia,"session":"s1","generation":og,"name":"Harry Potter"}),
+        );
+        assert_eq!(set, json!({"ok":true}));
+        let set = send(
+            &mut store,
+            json!({"op":"role_set_session","person":tom,"session":"s1","generation":tg,"name":"Ron"}),
+        );
+        assert_eq!(set, json!({"ok":true}));
+        // Off: the open is as before, with no role in it.
+        let plain = open(&mut store, olivia, "s2", false);
+        assert_eq!(plain["ok"], true, "{plain}");
+        assert!(plain.get("role").is_none(), "{plain}");
+        // Kept across a restart of the memory, each person's own.
+        drop(store);
+        let mut store = scratch.open();
+        assert_eq!(open(&mut store, olivia, "s3", true)["role"], "Harry Potter");
+        assert_eq!(open(&mut store, tom, "s3", true)["role"], "Ron");
+        assert_eq!(
+            send(
+                &mut store,
+                json!({"op":"session_open","session":"s3","max_bytes":1200,"role":true})
+            )["role"],
+            Value::Null
+        );
+        // A new one replaces theirs.
+        send(
+            &mut store,
+            json!({"op":"role_set_session","person":olivia,"session":"s1","generation":og,"name":"Hermione"}),
+        );
+        assert_eq!(open(&mut store, olivia, "s4", true)["role"], "Hermione");
+        // Ended: gone, and a second end says none was there.
+        let ended = send(
+            &mut store,
+            json!({"op":"role_end_session","person":olivia,"session":"s1","generation":og}),
+        );
+        assert_eq!(ended, json!({"ok":true,"ended":true}));
+        assert_eq!(open(&mut store, olivia, "s5", true)["role"], Value::Null);
+        let ended = send(
+            &mut store,
+            json!({"op":"role_end_session","person":olivia,"session":"s1","generation":og}),
+        );
+        assert_eq!(ended, json!({"ok":true,"ended":false}));
+        // Forget everything takes it too.
+        send(&mut store, json!({"op":"forget_all","person":tom}));
+        assert_eq!(open(&mut store, tom, "s6", true)["role"], Value::Null);
+        // Never the room's, a rules scope's, nor an empty name.
+        for person in [None, Some("r-0123456789abcdef")] {
+            let mut request = json!({"op":"role_set_session","person":null,"session":"s1","generation":0,"name":"Harry"});
+            if let Some(person) = person {
+                request["person"] = json!(person);
+            }
+            let refused = send(&mut store, request);
+            assert_eq!(refused["error"], "bad_person", "{refused}");
+        }
+        let refused = send(
+            &mut store,
+            json!({"op":"role_set_session","person":olivia,"session":"s1","generation":og,"name":" .. "}),
+        );
+        assert_eq!(refused["error"], "empty", "{refused}");
+    }
+
+    #[test]
+    fn forgetting_an_empty_person_fences_a_reopened_session_name() {
+        let (_scratch, mut store) = Scratch::new("role-empty-forget");
+        let person = Person::new("p-0123456789abcdef").unwrap();
+        let old = store.session_open(&person, "reused", 1200).unwrap();
+        store.forget_person(&person).unwrap();
+        store.session_close(&person, "reused").unwrap();
+        let new = store.session_open(&person, "reused", 1200).unwrap();
+        assert_eq!(new.generation, old.generation + 1);
+        assert!(
+            store
+                .role_set_session(&person, "reused", old.generation, "Stale")
+                .is_err()
+        );
+        assert_eq!(store.role(&person).unwrap(), None);
+        store
+            .role_set_session(&person, "reused", new.generation, "Fresh")
+            .unwrap();
+        assert_eq!(store.role(&person).unwrap().as_deref(), Some("Fresh"));
+    }
+
+    #[test]
+    fn role_sessions_refuse_deleted_closed_wrong_and_legacy_writes() {
+        let (_scratch, mut store) = Scratch::new("role-session-fence");
+        let p = "p-0123456789abcdef";
+        let other = "p-fedcba9876543210";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let open = |store: &mut Days, session: &str| -> Value {
+            send(
+                store,
+                json!({"op":"session_open","person":p,"session":session}),
+            )["snapshot"]["generation"]
+                .clone()
+        };
+        for (index, forget) in ["forget_person", "forget_all", "all"]
+            .into_iter()
+            .enumerate()
+        {
+            let session = format!("old-{index}");
+            let generation = open(&mut store, &session);
+            let set = json!({"op":"role_set_session","person":p,"session":session,"generation":generation,"name":"Harry"});
+            assert_eq!(send(&mut store, set.clone())["ok"], true);
+            let deletion = if forget == "all" {
+                json!({"op":"forget_all","person":null})
+            } else {
+                json!({"op":forget,"person":p})
+            };
+            assert_eq!(send(&mut store, deletion)["ok"], true);
+            let stale = send(&mut store, set);
+            assert_ne!(stale["ok"], true, "{forget}: {stale}");
+            let fresh = format!("fresh-{index}");
+            let current = open(&mut store, &fresh);
+            assert_eq!(
+                send(
+                    &mut store,
+                    json!({"op":"session_open","person":p,"session":fresh,"role":true})
+                )["role"],
+                Value::Null
+            );
+            assert_eq!(
+                send(
+                    &mut store,
+                    json!({"op":"role_set_session","person":p,"session":fresh,"generation":current,"name":"Sherlock"})
+                )["ok"],
+                true
+            );
+            assert_ne!(
+                send(
+                    &mut store,
+                    json!({"op":"role_end_session","person":p,"session":session,"generation":generation})
+                )["ok"],
+                true
+            );
+            assert_eq!(
+                send(
+                    &mut store,
+                    json!({"op":"session_open","person":p,"session":fresh,"role":true})
+                )["role"],
+                "Sherlock"
+            );
+        }
+        let generation = open(&mut store, "closing");
+        for request in [
+            json!({"op":"role_set_session","person":other,"session":"closing","generation":generation,"name":"Harry"}),
+            json!({"op":"role_set_session","person":p,"session":"closing","generation":u64::MAX,"name":"Harry"}),
+            json!({"op":"role_set_session","person":p,"session":"missing","generation":generation,"name":"Harry"}),
+            json!({"op":"role_set","person":p,"name":"Harry"}),
+            json!({"op":"role_end","person":p}),
+        ] {
+            assert_ne!(send(&mut store, request)["ok"], true);
+        }
+        assert_eq!(
+            send(
+                &mut store,
+                json!({"op":"session_close","person":p,"session":"closing"})
+            )["ok"],
+            true
+        );
+        assert_ne!(
+            send(
+                &mut store,
+                json!({"op":"role_set_session","person":p,"session":"closing","generation":generation,"name":"Harry"})
+            )["ok"],
+            true
+        );
+    }
 
     #[test]
     fn search_returns_the_day_attached_to_a_dated_fact() {

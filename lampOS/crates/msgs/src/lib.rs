@@ -133,6 +133,12 @@ pub mod consent;
 /// The ring's unplug light is soft green.
 pub const GOING_TO_SLEEP: &str = "Going to sleep now. Unplug me when my light turns green.";
 
+/// The factory reset's line (#5929, V1's "Factory reset starting"): said by
+/// `lamp-setup reset-now` when the reset button is let go after its 5 s,
+/// before the reset stops the voice, played from the voice's speech cache,
+/// which is keyed by these exact words.
+pub const RESET_STARTING: &str = "Factory reset starting.";
+
 /// The sleep line (#3748, `docs/controls.md`): said by a hand's hold on the
 /// head with `LAMP_SLEEP_LINE=on`, played from the voice's speech cache
 /// (rendered at start in the product voice), and by the `go_to_sleep`
@@ -731,6 +737,69 @@ impl VoiceRemarked {
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
     }
+}
+
+/// Who had the lamp say a line (`voice/line`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineBy {
+    /// The lamp's own words: its answers, its fixed phrases.
+    Lamp,
+    /// A paired computer's `say`, word for word.
+    Computer,
+    /// A skill's `say`.
+    Skill,
+}
+
+/// Where a line's words came from (`voice/line`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineSource {
+    /// The model's answer: the provider's transcript of it.
+    Reply,
+    /// Words as sent, rendered straight through the speech service.
+    Exact,
+    /// A fixed line played from the speech cache.
+    Cached,
+    /// A line recorded at build time.
+    Recording,
+}
+
+/// A line the lamp says (`voice/line`, #4209): once, when it begins to play
+/// (a reply: when it has played to its end or been cut). The lamp's own words, or the
+/// words a computer or a skill had it say, never a person's.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SaidLine {
+    pub text: String,
+    pub by: LineBy,
+    pub source: LineSource,
+    /// The computer's name (its pairing's) or the skill's, when `by` says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
+    /// The request this answers, as `voice/said` numbers it, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<u64>,
+    /// A reply that was cut short (talked over, stopped, or the voice
+    /// went on): `text` is what the model wrote, which the lamp may not
+    /// have said in full. Absent when the line played to its end.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cut: bool,
+}
+
+impl SaidLine {
+    pub const TYPE: &str = "lamp_msgs/SaidLine";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/line";
+
+    /// One a line, as it begins: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+/// The lamp's lines (`voice/line`), apart from the first topics.
+pub fn line_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(SaidLine::TOPIC, SaidLine::declaration())]
 }
 
 /// The voice's turns' verdicts (#1155), apart from the first topics.
@@ -1353,7 +1422,11 @@ pub struct UpdateRound {
 /// never free text. `revision` goes up by one at each change of this
 /// object and never on a read. `version` is `harness version`'s `a.b.c`,
 /// with `installed` only; `pinned` says whether the install went through
-/// the pinned manifest.
+/// the pinned manifest. `from_version` (#5957) is the older Harness a
+/// newer pin is moving the lamp from: with `installing` while it moves
+/// (its message then says Harness is being updated), and with `failed` and
+/// `upgrade` when the move failed and that version was put back. Absent
+/// otherwise, and in a record written before it, which reads as before.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HarnessInstall {
     pub install: String,
@@ -1365,6 +1438,8 @@ pub struct HarnessInstall {
     pub pinned: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_version: Option<String>,
     pub message: String,
 }
 
@@ -1377,8 +1452,9 @@ impl HarnessInstall {
     /// Harness's installer failed or left no `harness`, no `lampos` user,
     /// the one-shot unit not started, the pinned files not handed to the
     /// installer (no listener on 127.0.0.1, or no file for its script),
-    /// a pinned install's `harness version` not the pinned one.
-    pub const ERRORS: [&str; 9] = [
+    /// a pinned install's `harness version` not the pinned one, a move to
+    /// a newer pinned Harness that failed, the older one put back (#5957).
+    pub const ERRORS: [&str; 10] = [
         "pin_unreadable",
         "pin_fetch",
         "pin_mismatch",
@@ -1388,11 +1464,19 @@ impl HarnessInstall {
         "not_started",
         "serve",
         "version",
+        "upgrade",
     ];
 
     /// The words the app shows for `install` and `error`, as they are.
     pub fn message_for(install: &str, error: Option<&str>) -> &'static str {
+        Self::message_of(install, error, false)
+    }
+
+    /// [`Self::message_for`], and for an `installing` that moves an older
+    /// Harness to a newer pin (`from_version` set, #5957) its own words.
+    pub fn message_of(install: &str, error: Option<&str>, upgrading: bool) -> &'static str {
         match (install, error) {
+            ("installing", _) if upgrading => "Updating Harness on the lamp.",
             ("absent", _) => "Harness will be installed once the lamp is online.",
             ("installing", _) => "Installing Harness on the lamp.",
             ("installed", _) => "Harness is installed. Sign in to hand tasks over.",
@@ -1405,6 +1489,9 @@ impl HarnessInstall {
             (_, Some("timeout")) => "Installing Harness took too long. Try again.",
             (_, Some("version")) => {
                 "Harness was installed, but not at the version this lamp expects."
+            }
+            (_, Some("upgrade")) => {
+                "Harness couldn't be updated, so the lamp keeps the version it had."
             }
             _ => "Harness couldn't be installed on the lamp. Try again.",
         }
@@ -1419,28 +1506,63 @@ impl HarnessInstall {
             version: None,
             pinned: None,
             error: error.map(str::to_owned),
+            from_version: None,
             message: Self::message_for(install, error).to_owned(),
+        }
+    }
+
+    /// `installing`, moving the Harness at `from_version` to a newer pin
+    /// (#5957), pinned, at revision 0.
+    pub fn upgrading(from_version: &str, at_unix_ms: u64) -> Self {
+        Self {
+            pinned: Some(true),
+            from_version: Some(from_version.to_owned()),
+            message: Self::message_of("installing", None, true).to_owned(),
+            ..Self::new("installing", None, at_unix_ms)
+        }
+    }
+
+    /// `failed` with `upgrade`: the move from `from_version` failed, and
+    /// that version was put back (#5957), pinned, at revision 0.
+    pub fn upgrade_failed(from_version: &str, at_unix_ms: u64) -> Self {
+        Self {
+            pinned: Some(true),
+            from_version: Some(from_version.to_owned()),
+            ..Self::new("failed", Some("upgrade"), at_unix_ms)
         }
     }
 
     /// Whether every field is one lamp-update could have said: a known
     /// `install`, an `error` only with `failed` (and always with it) and
     /// from the list, the message for them, a version only with
-    /// `installed` and only digits and dots.
+    /// `installed` and only digits and dots, a `from_version` only with
+    /// `installing` or a `failed` `upgrade` (#5957), digits and dots too.
     pub fn check(&self) -> bool {
+        let plain = |version: &str| {
+            !version.is_empty()
+                && version.len() <= 32
+                && version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+        };
         Self::INSTALL.contains(&self.install.as_str())
             && match &self.error {
                 None => self.install != "failed",
                 Some(error) => self.install == "failed" && Self::ERRORS.contains(&error.as_str()),
             }
-            && self.message == Self::message_for(&self.install, self.error.as_deref())
+            && self.message
+                == Self::message_of(
+                    &self.install,
+                    self.error.as_deref(),
+                    self.from_version.is_some(),
+                )
             && match &self.version {
                 None => true,
+                Some(version) => self.install == "installed" && plain(version),
+            }
+            && match &self.from_version {
+                None => true,
                 Some(version) => {
-                    self.install == "installed"
-                        && !version.is_empty()
-                        && version.len() <= 32
-                        && version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+                    (self.install == "installing" || self.error.as_deref() == Some("upgrade"))
+                        && plain(version)
                 }
             }
     }
@@ -1997,6 +2119,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(arrival_topics())
         .chain(turn_topics())
         .chain(tone_topics())
+        .chain(line_topics())
         .chain(skill_ask_topics())
         .chain(addon_topics())
         .chain(privacy_topics())
@@ -2354,6 +2477,84 @@ mod tests {
         assert_eq!(
             declaration_of(VoiceTurn::TOPIC),
             Some(VoiceTurn::declaration())
+        );
+    }
+
+    /// A line the lamp says (`voice/line`, #4209): its words, who had it say
+    /// them, and where they came from. The lamp's own words only: never a
+    /// person's. Its own topic, known by name.
+    #[test]
+    fn a_line_the_lamp_says_names_who_had_it_say_them() {
+        round_trip(
+            &SaidLine {
+                text: "Good morning.".into(),
+                by: LineBy::Lamp,
+                source: LineSource::Reply,
+                app: None,
+                request: Some(7),
+                cut: false,
+            },
+            "{\"text\":\"Good morning.\",\"by\":\"lamp\",\"source\":\"reply\",\"request\":7}",
+        );
+        round_trip(
+            &SaidLine {
+                text: "It is a long".into(),
+                by: LineBy::Lamp,
+                source: LineSource::Reply,
+                app: None,
+                request: Some(8),
+                cut: true,
+            },
+            "{\"text\":\"It is a long\",\"by\":\"lamp\",\"source\":\"reply\",\"request\":8,\"cut\":true}",
+        );
+        round_trip(
+            &SaidLine {
+                text: "Build passed.".into(),
+                by: LineBy::Computer,
+                source: LineSource::Exact,
+                app: Some("desk-wave".into()),
+                request: None,
+                cut: false,
+            },
+            "{\"text\":\"Build passed.\",\"by\":\"computer\",\"source\":\"exact\",\"app\":\"desk-wave\"}",
+        );
+        for (source, word) in [
+            (LineSource::Reply, "reply"),
+            (LineSource::Exact, "exact"),
+            (LineSource::Cached, "cached"),
+            (LineSource::Recording, "recording"),
+        ] {
+            round_trip(
+                &SaidLine {
+                    text: "x".into(),
+                    by: LineBy::Skill,
+                    source,
+                    app: Some("reminder".into()),
+                    request: None,
+                    cut: false,
+                },
+                &format!(
+                    "{{\"text\":\"x\",\"by\":\"skill\",\"source\":\"{word}\",\"app\":\"reminder\"}}"
+                ),
+            );
+        }
+        assert!(
+            serde_json::from_str::<SaidLine>(
+                "{\"text\":\"x\",\"by\":\"person\",\"source\":\"reply\"}"
+            )
+            .is_err(),
+            "a person is never who had the lamp say a line"
+        );
+        assert_eq!(SaidLine::declaration().kind, Kind::Event);
+        assert_eq!(line_topics(), [(SaidLine::TOPIC, SaidLine::declaration())]);
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| *topic != SaidLine::TOPIC)
+        );
+        assert_eq!(
+            declaration_of(SaidLine::TOPIC),
+            Some(SaidLine::declaration())
         );
     }
 
@@ -3387,6 +3588,65 @@ mod tests {
             HarnessInstall {
                 version: Some("1.2.3 /x".into()),
                 ..installed.clone()
+            },
+        ] {
+            assert!(!bad.check(), "{bad:?}");
+        }
+    }
+
+    /// #5957: a move to a newer pin says `from_version` with `installing`
+    /// (its own words) and with a `failed` `upgrade`; nowhere else. A record
+    /// written before the field reads as before.
+    #[test]
+    fn a_harness_upgrade_says_from_version_only_where_it_belongs() {
+        let moving = HarnessInstall {
+            revision: 5,
+            ..HarnessInstall::upgrading("0.5.39", 9)
+        };
+        assert!(moving.check());
+        round_trip(
+            &moving,
+            r#"{"install":"installing","revision":5,"at_unix_ms":9,"pinned":true,"from_version":"0.5.39","message":"Updating Harness on the lamp."}"#,
+        );
+        let failed = HarnessInstall::upgrade_failed("0.5.39", 9);
+        assert!(failed.check());
+        assert_eq!(
+            failed.message,
+            "Harness couldn't be updated, so the lamp keeps the version it had."
+        );
+        let old: HarnessInstall = serde_json::from_str(
+            r#"{"install":"installed","revision":3,"at_unix_ms":7,"version":"0.5.39","pinned":true,"message":"Harness is installed. Sign in to hand tasks over."}"#,
+        )
+        .unwrap();
+        assert!(old.check());
+        assert_eq!(old.from_version, None);
+        assert!(
+            !serde_json::to_string(&old)
+                .unwrap()
+                .contains("from_version")
+        );
+        for bad in [
+            HarnessInstall {
+                from_version: Some("0.5.39".into()),
+                ..old.clone()
+            },
+            HarnessInstall {
+                from_version: Some("0.5.39".into()),
+                ..HarnessInstall::new("failed", Some("installer"), 1)
+            },
+            HarnessInstall {
+                from_version: Some("0.5 /x".into()),
+                ..moving.clone()
+            },
+            // The upgrade's words without its `from_version`, and the
+            // plain words with it.
+            HarnessInstall {
+                from_version: None,
+                ..moving.clone()
+            },
+            HarnessInstall {
+                from_version: Some("0.5.39".into()),
+                ..HarnessInstall::new("installing", None, 1)
             },
         ] {
             assert!(!bad.check(), "{bad:?}");

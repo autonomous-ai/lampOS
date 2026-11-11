@@ -296,6 +296,24 @@ and none of the skills' own (`crate::use_skill`):
   - **As a skill's call in every other way:** it waits for the Policy's hold,
     it never runs on a reply, its answer may ask for a look, and the request
     counts as one in which the lamp acted.
+- **A plain ask that must call its skill** (`LAMP_SKILL_ASKED=on`, the
+  second route, on in the product unit; #5744, #5745): a line that is only
+  "movie light", "reading light", "night light", "light show", "party
+  lights" and the like, beside a greeting, the lamp's name, "wait",
+  "please" or a request said before it ("show me a", "can you", "I'd
+  like a"; `tools::skill_asked::asks_for`), has its first
+  chat round sent with `tool_choice` naming `use_skill` and its `skill`
+  told only `light_scene` or `light_show`, when `use_skill` offers that
+  skill now; the scene or the show is still the model's. A preference or
+  a question ("I like movie light", "do you like movie light?") is the
+  model's: "I", "like", "do" and "you" alone are no request. Any other word,
+  two asks, a skill not offered and a round after a call are asked as
+  before. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
+  lines naming those asks, and "Lamp, movie light." (2 of 2) and "Lamp,
+  show me a light show." (3 of 3) were answered in words with no call;
+  "reading light" and "light my book" did call. Host tests:
+  `a_plain_ask_for_a_scene_or_a_show_is_told_apart`,
+  `a_plain_ask_forces_its_skill_only_when_offered`.
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
@@ -330,6 +348,23 @@ now, including "remind me in two minutes", with the person's label and whole
 seconds. `set_reminder` is reserved for a requested clock time; a relative
 duration must not be rounded into its minute-only `HH:MM` field. See the
 [relative-time examples and lamp check](schedule.md#relative-time-follow-up-on-the-lamp).
+
+A plain question about the person's reminders must read them
+(`LAMP_REMINDERS_ASKED=on`, the second route, on in the product unit): a
+line that is only "what reminders do I have", "do I have any reminders",
+"what are my reminders", "list my reminders" and the like, beside a
+greeting, the lamp's name, "please", "can you", "tell me" or a day
+(`tools::reminders_asked::asks_for_reminders`), has its first chat round
+sent with `tool_choice` naming `list_reminders`, when it is declared. Any
+other word (a set, a cancel, a delete, a move, a timer, "do you like
+reminders?"), `list_reminders` not declared and a round after a call are
+asked as before. On lamp-52e6 on 9 Nov (build 10972) "Lamp, what reminders
+do I have?" was answered in words with no call in 2 of 8 asks, memory
+telling nothing; the journal tagged those lines with
+`attention::about_its_work`, which takes any line with "reminder" in it and
+so is too wide to force a call on. Host tests:
+`a_plain_question_about_reminders_is_told_apart`,
+`a_plain_question_forces_list_reminders_only_when_offered`.
 
 Actions validates arguments before IPC, owns Schedule's CAS guards, and calls
 the socket selected by `LAMP_SCHEDULE_SOCKET` (enabled default
@@ -447,10 +482,12 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 40 of the lamp's own
+unit sets it: a product lamp's chat request offers 42 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 21 with these two among them, the actions part's 17, Dance's
-`dance` and Pose's `set_pose` (#4135). At the bound a core skill's function is never the one cut (the
+voice's own 24 with these two among them (and `set_role` and `end_role`
+since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov), the actions part's
+17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
+(#4135, #2826). At the bound a core skill's function is never the one cut (the
 owner's rule, on #2614; [install.md](install.md)), and on the chat route
 neither is `reports_stop` nor any of the actions part's (the first builder,
 on #2644): the cut takes the second route's fetch, then its time

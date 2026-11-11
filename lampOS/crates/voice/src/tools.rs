@@ -47,6 +47,12 @@ mod schedule_integration_tests;
 #[path = "tools/schedule_asked.rs"]
 pub mod schedule_asked;
 
+#[path = "tools/reminders_asked.rs"]
+pub mod reminders_asked;
+
+#[path = "tools/skill_asked.rs"]
+pub mod skill_asked;
+
 #[path = "tools/schedule_whose.rs"]
 pub mod schedule_whose;
 
@@ -853,11 +859,11 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if let Some(place) = &settings.tasks {
         tools.extend(crate::agent_tasks::tools(place));
     }
-    // A skill made by the lamp's own model: its two functions are the
-    // voice's own, with or without the tasks part.
+    // A skill made by the lamp's own model: its function is the voice's
+    // own, with or without the tasks part. It goes on as soon as it is
+    // kept, so there is no function to put it on (the owner, 10 Nov).
     if settings.make_skill {
         tools.push(crate::make_skill_local::tool());
-        tools.push(crate::made_skill::put_on_tool());
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
@@ -1148,8 +1154,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
                 .flatten(),
         );
     }
-    if settings.make_skill && (name == crate::made_skill::MAKE || name == crate::made_skill::PUT_ON)
-    {
+    if settings.make_skill && name == crate::made_skill::MAKE {
         return Route::MakeLocal;
     }
     if crate::agent_tasks::is_tool(name) {
@@ -1847,7 +1852,13 @@ fn run_call_with_scope(
                         // nothing saw the mouth say it (the memory owner,
                         // 16:49 on #5385). Read after the late look, which
                         // may take the line by the rule as it ends.
-                        if model.name == crate::remember::FORGET && lease.forgets_need_mouth() {
+                        // The one exception: the second route taking back
+                        // this request's own new keep on its own doubt
+                        // (`LAMP_MEMORY_DOUBT_UNDOES`, C37).
+                        if model.name == crate::remember::FORGET
+                            && lease.forgets_need_mouth()
+                            && !lease.undoes_own_keep(&call.args)
+                        {
                             eprintln!(
                                 "lamp-voice: request {request}: a forget on a line whose keep is the one known face's is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
                             );
@@ -3035,6 +3046,8 @@ mod tests {
                 correct: false,
                 questions: false,
                 now: false,
+                one_yes: false,
+                reply_named: false,
                 sign_in: false,
                 sign_in_app: false,
             }),
@@ -3353,6 +3366,8 @@ mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -4419,6 +4434,8 @@ mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };

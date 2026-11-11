@@ -8,13 +8,15 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
-import WebSocket from 'ws';
+import { WebSocket } from './ws.js';
 import * as debug from './debug.js';
 import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
+import { POSES_STEP_MS, posesToFrames } from './moves.js';
 
-/** A fast stream's binary `camera.frame`: its header, with the JPEG as `data`. */
+/** A binary frame, a fast stream's `camera.frame` or a microphone stream's
+ * `microphone.audio`: its header, with the JPEG or the samples as `data`. */
 export function binaryFrame(message) {
   const length = message.readUInt32BE(0);
   const frame = JSON.parse(message.subarray(4, 4 + length).toString());
@@ -22,13 +24,23 @@ export function binaryFrame(message) {
   return frame;
 }
 
-// Events that come with a request, never subscribed to: a camera stream's.
+// Events that come with a request, never subscribed to: a camera stream's,
+// and a microphone stream's.
 const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
+const MICROPHONE_EVENTS = ['microphone.audio', 'microphone.ended'];
+
+// `keepConnected`'s pauses before connecting again, in seconds: the first after
+// a closed connection, then longer while the lamp can't be reached (a restart
+// takes a few seconds; an update about a minute).
+export const RECONNECT_PAUSES = Object.freeze([1, 2, 5, 10]);
 
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
 // (docs/control.md): a wait for them ends at that answer. `say` and
 // `turn.start` answer `{"to":"voice"}` and their `done` does follow.
-export const ENDS_AT_REPLY = new Set(['gesture', 'move']);
+// Ended at their answer by a lamp-control that doesn't say `motion_done` in
+// hello's limits (from before #4209): it hands them to the body and says
+// nothing back.
+export const ENDS_AT_REPLY = new Set(['gesture', 'move', 'express']);
 // A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 // The SDK's check is a pre-check: it may let through what the lamp refuses,
 // never the other way.
@@ -111,6 +123,27 @@ function hex(colour) {
 // MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 export const SAY_MAX_BYTES = 900;
 
+// The refusal for a name that is no event, with the event the name was meant
+// for when it is a lease's or a look's end (`lease.ended` is `lease`, state
+// `lost`); `lease` and `done` come with no subscription.
+function noEvent(name, on = false) {
+  if (name === 'lease' || name === 'done') {
+    return new LampError(`no event '${name}' to subscribe to: it comes without subscribing, hear it with lamp.on('${name}', handler)`, { code: 'bad_request' });
+  }
+  let hint;
+  if (name.startsWith('lease')) {
+    hint = "a lease's changes come as the event 'lease' (state held, suspended or lost, and why): lamp.on('lease', handler)";
+  } else if (name.startsWith('done')) {
+    hint = "the end of a look or a move comes as the event 'done': lamp.on('done', handler)";
+  } else {
+    // With `on`: what it takes: the schema's, the streams' and the two that come unasked.
+    hint = on
+      ? `one of ${[...new Set([...schema.events, ...CAMERA_EVENTS, ...MICROPHONE_EVENTS])].sort().join(', ')}, or 'lease' or 'done'`
+      : `one of ${[...schema.events].sort().join(', ')}`;
+  }
+  return new LampError(`no event '${name}': ${hint}`, { code: 'bad_request' });
+}
+
 function check(op, fields) {
   if (!schema.ops.includes(op)) throw new LampError(`no op ${op} in v${schema.VERSION}`, { code: 'bad_request' });
   if (op === 'say' && typeof fields.text === 'string') {
@@ -134,7 +167,7 @@ function check(op, fields) {
     }
   }
   for (const event of fields.events ?? []) {
-    if (!schema.events.includes(event)) throw new LampError(`no event ${event}`, { code: 'bad_request' });
+    if (!schema.events.includes(event)) throw noEvent(event);
   }
   // A lease's parts; a `sound.upload`'s or `skill.push`'s `parts` is a count.
   for (const part of op === 'lease.take' ? fields.parts ?? [] : []) {
@@ -289,8 +322,9 @@ export class Lamp {
     ws.removeAllListeners('message');
     for (const frame of frames.splice(0)) this.frame(frame);
     ws.on('message', (data, isBinary) => {
-      // A fast camera frame: the header's length, the header, then the JPEG,
-      // given as `data` (a Buffer).
+      // A fast camera frame or a microphone block: the header's length, the
+      // header, then the JPEG or the samples, given as `data` (a Buffer).
+      // Never logged.
       if (isBinary) return this.frame(binaryFrame(data));
       const frame = JSON.parse(data.toString());
       debug.frame('<-', frame);
@@ -312,7 +346,15 @@ export class Lamp {
       for (const { reject } of [...this.waiting.values(), ...this.done.values()]) {
         reject(new LampError('the connection to the lamp closed', { code: 'closed' }));
       }
-      for (const lease of this.leases.values()) clearInterval(lease.timer);
+      // The lamp ends a computer's leases when its last connection closes
+      // and tells nobody: none of ours is held any more.
+      for (const lease of this.leases.values()) {
+        clearInterval(lease.timer);
+        if (lease.state === 'held' || lease.state === 'suspended') {
+          lease.state = 'lost';
+          lease.lostWhy = 'the connection closed';
+        }
+      }
     });
   }
 
@@ -362,6 +404,65 @@ export class Lamp {
     return new Lamp(ws, welcome, reply, frames);
   }
 
+  /**
+   * Run a long-running program across the lamp's restarts (every update
+   * restarts it, and the connection closes). Connects, runs
+   * `await setup(lamp)` (subscribe, ask for leases, as after `connect`), and
+   * waits until the connection ends; then connects again and runs `setup`
+   * again on the new connection, after a pause that grows along `pauses`
+   * (seconds) while the lamp can't be reached and starts over once it can.
+   *
+   * Never resolves by itself: pass `signal` (an AbortSignal) to stop it.
+   * Rejects at once with what connecting again can't mend: no pairing
+   * (`NotPaired`), another lamp at the address (`WrongLamp`), a refusal of
+   * the hello (`unpaired`, revoked), and anything `setup` throws, a refused
+   * subscription it awaited (`no_grant`) included.
+   */
+  static async keepConnected(setup, { lamp, host, keyring, pauses = RECONNECT_PAUSES, signal } = {}) {
+    // An abort already fired doesn't fire again for a listener added later,
+    // so each step checks `signal.aborted` first (Second's P2 on #5833).
+    const pause = (seconds) => new Promise((resolve) => {
+      if (signal?.aborted) { resolve(); return; }
+      const timer = setTimeout(done, seconds * 1000);
+      function done() { clearTimeout(timer); signal?.removeEventListener('abort', done); resolve(); }
+      signal?.addEventListener('abort', done, { once: true });
+    });
+    let failures = 0;
+    while (!signal?.aborted) {
+      let connection;
+      try {
+        connection = await Lamp.connect(lamp, { host, keyring });
+      } catch (error) {
+        // `closed`: the lamp went while saying hello, as a restart does.
+        if (error instanceof LampError && error.code !== 'closed') throw error;
+        const wait = pauses[Math.min(failures, pauses.length - 1)];
+        if (debug.on()) process.stderr.write(`lampos .. not reached (${error.code ?? error.name}), again in ${wait} s\n`);
+        failures += 1;
+        await pause(wait);
+        continue;
+      }
+      failures = 0;
+      if (signal?.aborted) {
+        // Aborted while it connected: closed again, setup never run.
+        await connection.close().catch(() => {});
+        break;
+      }
+      const stop = () => connection.close();
+      signal?.addEventListener('abort', stop, { once: true });
+      try {
+        await setup(connection);
+        await connection.closed();
+      } catch (error) {
+        // The lamp went in the middle of setup: connect again.
+        if (!(error instanceof LampError) || error.code !== 'closed') throw error;
+      } finally {
+        signal?.removeEventListener('abort', stop);
+        await connection.close().catch(() => {});
+      }
+      if (!signal?.aborted) await pause(pauses[0]);
+    }
+  }
+
   async close() {
     for (const lease of [...this.leases.values()]) await lease.release();
     this.ws.close();
@@ -400,27 +501,40 @@ export class Lamp {
 
   // An action: its reply when taken, or with `wait` its `done` event; for the
   // actions no `done` follows yet (`ENDS_AT_REPLY`), the reply.
-  act(op, fields, wait = false) {
+  // `onTaken` runs once the lamp has taken the action, before any wait for its
+  // `done`, and never for a refusal: what the lamp ends on taking it ends here
+  // then, even if the wait is abandoned (Reviewer-two's P2 on #5837).
+  act(op, fields, wait = false, onTaken = undefined) {
     const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
     // Checked before an id is taken, so an action refused here has no id,
     // and every id is this call's own.
     try { check(op, clean); } catch (error) { return Promise.reject(error); }
     const id = this.nextId++;
-    // Handed to the body, which says nothing back, `gesture` and `move` get
-    // no `done` (docs/control.md): their wait ends at the answer, so none is
-    // kept for them.
-    const done = wait && !ENDS_AT_REPLY.has(op)
+    // A lamp that says `motion_done` ends `gesture`, `move` and an express's
+    // move with a `done` once the body says what became of them; on one that
+    // doesn't, their wait ends at the answer, so none is kept for them.
+    const atReply = ENDS_AT_REPLY.has(op) && !this.limits?.motion_done;
+    const done = wait && !atReply
       ? new Promise((resolve, reject) => this.done.set(id, { resolve, reject }))
       : null;
     // A close rejects every `done`; when it comes before the reply, `taken`
     // carries the rejection to the caller and this one has no listener, which
     // Node would end the program for.
     done?.catch(() => {});
-    const taken = this.send(id, op, clean);
+    const sent = this.send(id, op, clean);
+    const taken = onTaken ? sent.then((reply) => { onTaken(); return reply; }) : sent;
     if (!done) return taken;
     // A refused action takes its `done` back, so nothing is left to reject,
     // unheard, when the connection closes.
-    return taken.then(() => done, (error) => { this.done.delete(id); throw error; });
+    // An express too slight to move (`"move": null`) sends the body nothing,
+    // so no `done` follows: its wait ends at the answer.
+    return taken.then(
+      (reply) => {
+        if (op === 'express' && reply.move == null) { this.done.delete(id); return reply; }
+        return done;
+      },
+      (error) => { this.done.delete(id); throw error; },
+    );
   }
 
   frame(frame) {
@@ -436,18 +550,32 @@ export class Lamp {
       if (done) { this.done.delete(frame.re); done.resolve(frame); }
     }
     for (const handler of this.handlers.get(frame.ev) ?? []) {
-      Promise.resolve().then(() => handler(frame)).catch((error) => this.ws.emit('handlerError', error));
+      Promise.resolve().then(() => handler(frame)).catch((error) => {
+        // Said, not swallowed: a handler that throws (a refused `light` inside `person.arrived`, say) must not vanish
+        // silently. Listen for 'handlerError' on `lamp.ws` to take it over.
+        if (this.ws.listenerCount('handlerError') > 0) this.ws.emit('handlerError', error);
+        else console.error(`lampos: your handler for ${frame.ev} threw: ${error?.stack ?? error}`);
+      });
     }
   }
 
   // Call `handler(event)` for each `event` the lamp says; subscribes at once.
   on(event, handler, { phrases } = {}) {
-    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)) {
-      throw new LampError(`no event ${event}`, { code: 'bad_request' });
+    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)
+      && !MICROPHONE_EVENTS.includes(event)) {
+      throw noEvent(event, true);
     }
     const short = shortPhrase(phrases);
     if (short) throw short;
-    this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
+    // A handler given `phrases` hears only those; with none it hears every `phrase.heard`. The lamp is asked for
+    // all the connection's phrases once, so the filter is here.
+    let registered = handler;
+    if (phrases?.length && event === 'phrase.heard') {
+      const own = new Set(phrases.map((p) => p.toLowerCase()));
+      registered = (frame) => (typeof frame.phrase === 'string' && !own.has(frame.phrase.toLowerCase()) ? undefined : handler(frame));
+      registered.original = handler;
+    }
+    this.handlers.set(event, [...(this.handlers.get(event) ?? []), registered]);
     if (phrases) this.phrases = [...new Set([...this.phrases, ...phrases])].sort();
     if (!schema.events.includes(event)) return Promise.resolve();
     // A refused subscription takes its handler back off, so a later `on()`
@@ -456,7 +584,7 @@ export class Lamp {
       // Only the copy this call added: the same function may be there
       // already for a granted subscription.
       const left = [...(this.handlers.get(event) ?? [])];
-      const at = left.lastIndexOf(handler);
+      const at = left.lastIndexOf(registered);
       if (at >= 0) left.splice(at, 1);
       if (left.length) this.handlers.set(event, left);
       else this.handlers.delete(event);
@@ -467,7 +595,7 @@ export class Lamp {
   // Stop calling `handler` for `event`; with none left for an event the lamp
   // says, unsubscribe from it.
   off(event, handler) {
-    const left = (this.handlers.get(event) ?? []).filter((h) => h !== handler);
+    const left = (this.handlers.get(event) ?? []).filter((h) => h !== handler && h.original !== handler);
     if (left.length) {
       this.handlers.set(event, left);
       return Promise.resolve();
@@ -516,14 +644,20 @@ export class Lamp {
     try { return await body(lease); } finally { await lease.release(); }
   }
 
-  express(feeling, strength) { return this.act('express', { feeling, strength }); }
+  express(feeling, strength, { wait = false } = {}) { return this.act('express', { feeling, strength }, wait); }
   gesture(name, { wait = false } = {}) { return this.act('gesture', { name }, wait); }
-  // Taken, another look ends a following (lamp-control's own rule).
-  async look(at) {
-    const reply = await this.act('look', { at });
-    this.following?.end('cut_short', 'another look');
-    return reply;
+  // Turn the head (`at`, or `{ yaw, pitch }` in degrees). Its answer when the
+  // door takes it; with `wait`, the body's `done` instead: `finished` with
+  // where the head got to, or `dropped` with why ('the body is not held' while
+  // a conversation suspends your lease). A look at 'hand' has no `done`
+  // (followHand). Taken, another look ends a following (lamp-control's rule).
+  async look(at, { wait = false } = {}) {
+    if (wait && at === 'hand') throw new LampError('a look at hand is followed until it ends, with no done: use followHand', { code: 'bad_request' });
+    // Taken, another look ends a following (lamp-control's own rule), at
+    // once, not after its `done`.
+    return this.act('look', { at }, wait, () => this.#anotherLook());
   }
+  #anotherLook() { this.following?.end('cut_short', 'another look'); }
   // `const following = await lamp.followHand().start()` ... `await
   // following.stop()`, or `await lamp.withHand(async (following) => ...)`:
   // the head turns after the hand the lamp sees. Listen with
@@ -534,9 +668,37 @@ export class Lamp {
     try { return await body(following); } finally { await following.stop(); }
   }
   move(frames, stepMs, { wait = false } = {}) { return this.act('move', { step_ms: stepMs, frames }, wait); }
+  // A move through `poses`, each the degrees of the joints it turns from the
+  // standing pose ({ pitch: 10, yaw: -8 }), eased there and back
+  // (`posesToFrames`). A LampError (code 'bad_request'), before sending, for poses a move can't make.
+  movePoses(poses, { holdMs = 400, wait = false } = {}) {
+    let frames;
+    try { frames = posesToFrames(poses, { stepMs: POSES_STEP_MS, holdMs }); } catch (error) { return Promise.reject(error); }
+    return this.move(frames, POSES_STEP_MS, { wait });
+  }
   play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
-  joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
+  // Aim the joints named, in degrees, under `lease`. Its answer when the door
+  // takes it; with `wait`, the body's `done`, as look's.
+  // lamp-control sends yaw and pitch as the holder's look, so taking it ends a
+  // following too (parts.rs `joints`).
+  joints(lease, withinMs, targets, { wait = false } = {}) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }, wait, () => this.#anotherLook()); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
+  // Keep a light on past the 30 s a single ask lasts: asks it now and again at half of the lamp's hold limit
+  // (`limits.hold_max_ms`) until `stop()`. `ask` is one of light()'s argument lists: `holdLight('warm', 3, 'breathe')`.
+  // A later ask that the lamp refuses ends the holding and is passed to `onError` (else logged), as a lease's loss.
+  async holdLight(colour, level, pattern, { onError } = {}) {
+    const holdMs = this.limits.hold_max_ms ?? 30_000;
+    const every = Math.max(1000, holdMs / 2);
+    const ask = () => this.light(colour, level, holdMs, pattern);
+    await ask();
+    let timer = setInterval(() => {
+      ask().catch((error) => {
+        clearInterval(timer);
+        if (onError) onError(error); else console.error(`lampos: holdLight ended: ${error?.message ?? error}`);
+      });
+    }, every);
+    return { stop: () => clearInterval(timer) };
+  }
   // How many pixels the ring has, from hello's limits (undefined from a lamp before pixel lights).
   get ringPixels() { return this.limits.ring?.pixels; }
   // Light the ring pixel by pixel for `forMs` (30 s at most): one colour per pixel, from pixel 0 around the ring,
@@ -555,9 +717,18 @@ export class Lamp {
     try { colour = hex(rgb); } catch (error) { return Promise.reject(error); }
     return this.act('light', { rgb: colour, brightness, fade_ms: fadeMs, for_ms: forMs });
   }
+  // Put the lamp's light out for `forMs` (30 s at most), as a black ring: there is no level 0 for `light`, and a ring
+  // of black pixels is how a program turns the light off. The lamp's own light comes back when it lapses or at
+  // `stop()`; ask again before it lapses to keep it out. Needs a lamp with a pixel ring (`ringPixels`).
+  lightOff({ forMs = 30_000 } = {}) {
+    if (this.ringPixels === undefined) {
+      return Promise.reject(new LampError('light_off needs a lamp with a pixel ring: this one has none', { code: 'bad_request' }));
+    }
+    return this.ring(Array(this.ringPixels).fill('#000000'), { forMs });
+  }
   // Say `text` in the lamp's voice, exactly as written, once the person isn't talking; `{ rephrase: true }` lets the
   // lamp's model say it in its own words instead, as before.
-  say(text, { rephrase } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }); }
+  say(text, { rephrase, wait = false } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }, wait); }
   // The speaker's volume, the person's own: one of `to` (0-100), `step` ('up' or 'down'), or `mute` (true or
   // false). Resolves to the level it left, `{ level, muted }`.
   async volume({ to, step, mute } = {}) {
@@ -587,10 +758,25 @@ export class Lamp {
     if (size !== undefined) fields.size = size;
     return this.request('camera.stream', fields);
   }
+
+  // The microphone (the `microphone` grant): the ears' own sound, never while
+  // the lamp is private, only on the lamp's own network.
+
+  /** The room's sound as `microphone.audio` events (`lamp.on('microphone.audio', ...)`),
+   * one each 20 ms block: mono, 16 kHz, signed 16-bit little-endian samples as
+   * `data` (a Buffer, 640 bytes a block), with `sequence` and `lost` (blocks
+   * lost since the last one sent). Until `microphoneStream(false)`, `stop`, or
+   * a `microphone.ended` event: the lamp turned private, someone else came
+   * into view, the room went unseen, the ring didn't show its mark, or no sound came for 2 s (the
+   * lamp doesn't share its microphone, `LAMP_BUS_AUDIO`). */
+  microphoneStream(on = true) {
+    return this.request('microphone.stream', { on });
+  }
   // `hum`, the lamp's own, or one of this computer's clips by name (`uploadSound`), once the person isn't talking.
   sound(name) { return this.act('sound', { name }); }
   // Keep a clip on the lamp as `name`, over one of the same name, to play with `sound(name)`: a WAV of 16-bit mono PCM
-  // at 24 kHz, at most 30 s, within the voice's loudness cap. `wav` is its bytes (a Buffer or Uint8Array) or a path.
+  // at 24 kHz, at most 30 s, within the voice's loudness cap: no sample past -12 dBFS and no 10 ms past -30 dBFS RMS (so a
+  // steady tone peaks near -27 dBFS at most). `wav` is its bytes (a Buffer or Uint8Array) or a path.
   // Sent in parts, as the lamp takes them; the lamp checks it whole and refuses it with why. Resolves to the clip as
   // kept: name, bytes, ms.
   async uploadSound(name, wav) {
@@ -612,6 +798,36 @@ export class Lamp {
   async sounds() { return (await this.request('sound.list', {})).sounds ?? []; }
   // Delete one of this computer's clips from the lamp.
   removeSound(name) { return this.request('sound.remove', { name }); }
+  // Notes (the `notes` grant, docs/control.md "Notes"): this computer's own small key/value memory on the lamp. It
+  // outlives the program and the lamp's restart, belongs to this computer alone, and goes when the owner lets it go.
+  // `lamp.notes.get/set/delete/list` are the same as `notesGet/notesSet/notesDelete/notesList`.
+  get notes() {
+    return {
+      get: (key, fallback) => this.notesGet(key, fallback),
+      set: (key, value) => this.notesSet(key, value),
+      delete: (key) => this.notesDelete(key),
+      list: (prefix) => this.notesList(prefix),
+    };
+  }
+  // Keep `value` (any JSON, at most 16384 bytes serialized) under `key` (up to 64 of letters, digits and `. _ : -`):
+  // `{ key, bytes }`. A computer keeps 256 keys and 256 KiB at most (`lamp.limits.notes`).
+  async notesSet(key, value) {
+    const reply = await this.request('notes.set', { key, value });
+    return { key: reply.key, bytes: reply.bytes };
+  }
+  // The value under `key`, or `fallback` (undefined) when none is kept; a stored null comes back as null.
+  async notesGet(key, fallback = undefined) {
+    const reply = await this.request('notes.get', { key });
+    return reply.found ? reply.value : fallback;
+  }
+  // Drop `key`; whether it was kept.
+  async notesDelete(key) { return Boolean((await this.request('notes.delete', { key })).deleted); }
+  // This computer's keys that start with `prefix`, sorted: `keys` (each `{ key, bytes }`), `count`, `total`, `bytes`,
+  // `keys_max` and `bytes_max`.
+  async notesList(prefix = '') {
+    const { re: _re, ok: _ok, ...rest } = await this.request('notes.list', prefix ? { prefix } : {});
+    return rest;
+  }
   // Turns and listening (docs/control.md): the person wins over each.
   // Opens a conversation turn, as a tap on the head does: the person's next
   // line is answered as spoken to the lamp; with `prompt`, the lamp says it

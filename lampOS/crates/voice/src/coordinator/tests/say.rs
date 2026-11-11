@@ -325,7 +325,11 @@ fn the_setup_intro_is_kept_as_said_only_when_its_committed_turn_was_heard_whole(
                 walk.tick(at, at, true, false, Some(face), true)
             })
             .expect("the intro");
-        assert_eq!(note, crate::onboarding::SIT_NOTE);
+        // The opener: the intro, then step one's ask.
+        assert!(
+            note.contains("Step one: sit where you usually sit, and look at me."),
+            "{note}"
+        );
         let mut test = Test::writing(&note);
         let bound = {
             let owner = test.reply.as_ref().unwrap().owner;
@@ -790,6 +794,7 @@ fn take_sound(
         &mut false,
         PlayoutStart::default(),
         trace,
+        None,
         |_| Ok(()),
     )
     .unwrap()
@@ -1093,6 +1098,7 @@ fn take_exact(
         reply,
         PlayoutStart::default(),
         trace,
+        None,
         |_| Ok(()),
     )
     .unwrap()
@@ -1448,6 +1454,22 @@ fn a_request_begun_in_the_walk_is_marked_before_any_of_its_sound() {
     // Off without the switch, and with no walk known.
     assert!(!sleep_not_now(false, None, None));
     assert!(!sleep_not_now(true, None, None));
+}
+
+/// #5931: the second route's worker, another process, is told the walk's
+/// state with each turn while it is under way (a worker started since
+/// learns it), once as it ends or a conversation begins, and never more
+/// outside it.
+#[test]
+fn the_worker_is_told_the_walk_with_each_turn_while_it_is_under_way() {
+    assert!(walk_to_tell(None, (1, false)));
+    assert!(!walk_to_tell(Some((1, false)), (2, false)));
+    assert!(walk_to_tell(None, (1, true)));
+    assert!(!walk_to_tell(Some((1, true)), (1, true)));
+    assert!(walk_to_tell(Some((1, true)), (2, true)));
+    assert!(walk_to_tell(Some((2, true)), (2, false)));
+    assert!(walk_to_tell(Some((2, true)), (3, false)));
+    assert!(!walk_to_tell(Some((3, false)), (4, false)));
 }
 
 /// "Lamp, go to sleep" (#3748, the reviewer-lead's P2 on #3835): its sleep

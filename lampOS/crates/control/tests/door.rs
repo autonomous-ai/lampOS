@@ -35,6 +35,16 @@ async fn lamp_built(
     parts: Box<dyn session::Parts + Send>,
     build: impl FnOnce(session::Door, &std::path::Path) -> session::Door,
 ) -> Lamp {
+    lamp_made(name, move |_| parts, build).await
+}
+
+/// A lamp whose parts are made with the server's own events, so what they
+/// tell later (a motion's `done`) reaches the computer.
+async fn lamp_made(
+    name: &str,
+    parts: impl FnOnce(lamp_control::parts::Events) -> Box<dyn session::Parts + Send>,
+    build: impl FnOnce(session::Door, &std::path::Path) -> session::Door,
+) -> Lamp {
     let dir = std::env::temp_dir().join(format!("lamp-control-door-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -47,7 +57,7 @@ async fn lamp_built(
         Some(dir.join("clients.json")),
     );
     let door = build(door, &dir);
-    let shared = server::Shared::new(door, parts, identity.pin.clone());
+    let shared = server::Shared::new_with(door, identity.pin.clone(), parts);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let admin = dir.join("admin.sock");
@@ -105,6 +115,20 @@ async fn connect(lamp: &Lamp, path: &str) -> Result<Socket, tokio_tungstenite::t
 async fn next(socket: &mut Socket) -> Value {
     loop {
         let message = tokio::time::timeout(Duration::from_secs(5), socket.next())
+            .await
+            .expect("a frame in time");
+        match message {
+            Some(Ok(Message::Text(text))) => return serde_json::from_str(&text).unwrap(),
+            Some(Ok(Message::Ping(_) | Message::Pong(_))) => continue,
+            other => panic!("{other:?}"),
+        }
+    }
+}
+
+/// The next frame, waiting up to `within`.
+async fn next_within(socket: &mut Socket, within: Duration) -> Value {
+    loop {
+        let message = tokio::time::timeout(within, socket.next())
             .await
             .expect("a frame in time");
         match message {
@@ -270,6 +294,11 @@ async fn another_path_or_an_oversized_frame_is_refused() {
 
 /// A computer paired with `grants` and said hello, as the SDK would.
 async fn paired(lamp: &Lamp, grants: Value, seed: u8) -> Socket {
+    paired_hello(lamp, grants, seed).await.0
+}
+
+/// As [`paired`], with hello's answer.
+async fn paired_hello(lamp: &Lamp, grants: Value, seed: u8) -> (Socket, Value) {
     let keys = Ed25519KeyPair::from_seed_unchecked(&[seed; 32]).unwrap();
     let key: [u8; 32] = keys.public_key().as_ref().try_into().unwrap();
     let issued = admin(lamp, json!({"code": {"grants": grants}})).await;
@@ -291,7 +320,7 @@ async fn paired(lamp: &Lamp, grants: Value, seed: u8) -> Socket {
     )
     .await;
     assert_eq!(hello["ok"], true, "{hello}");
-    socket
+    (socket, hello)
 }
 
 /// The Reviewer-lead's P2 on #3778: silent TCP peers that never send a TLS
@@ -548,11 +577,118 @@ async fn the_bus_reaches_a_subscriber_as_events_phrases_only_and_lease_signals()
         next(&mut socket).await,
         json!({"ev": "lease", "lease": "l_1", "state": "suspended", "why": "conversation"})
     );
+    // Its own take meanwhile is told whose lease holds the part, not
+    // "another computer" (lamp run, 10 Nov 16:20).
+    let again = send(
+        &mut socket,
+        json!({"id": 5, "op": "lease.take", "parts": ["light"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(again["error"]["code"], "busy", "{again}");
+    assert_eq!(
+        again["error"]["why"],
+        "your lease on the light is suspended while someone talks to the lamp: it is yours again when they stop",
+        "{again}"
+    );
     lamp.shared.deliver(vec![Out::Resume]);
     assert_eq!(
         next(&mut socket).await,
         json!({"ev": "lease", "lease": "l_1", "state": "held"})
     );
+}
+
+/// What the lamp says goes to a computer only with the `speech` grant it
+/// asked for, a line meant for one computer goes to that computer alone, and
+/// the journal keeps the kind, never the words.
+#[tokio::test]
+async fn what_the_lamp_says_reaches_only_a_computer_holding_speech() {
+    use lamp_control::watch::{Out, SaidTo};
+    let lamp = lamp("said").await;
+    // Without the grant the subscription itself is refused.
+    let mut plain = paired(&lamp, json!(["look"]), 7).await;
+    let refused = send(
+        &mut plain,
+        json!({"id": 3, "op": "subscribe", "events": ["lamp.said"]}),
+    )
+    .await;
+    assert_eq!(refused["error"]["code"], "no_grant", "{refused}");
+    lamp.shared.move_clock_on(Duration::from_millis(1_100));
+    let mut reader = paired(&lamp, json!(["speech"]), 8).await;
+    let subscribed = send(
+        &mut reader,
+        json!({"id": 3, "op": "subscribe", "events": ["lamp.said"]}),
+    )
+    .await;
+    assert_eq!(subscribed["ok"], true, "{subscribed}");
+    let fields = json!({"text": "Going to sleep now.", "by": "lamp", "source": "cached"});
+    lamp.shared.deliver(vec![Out::Said {
+        fields: fields.clone(),
+        to: SaidTo::Everyone,
+    }]);
+    let said = next(&mut reader).await;
+    assert_eq!(said["ev"], "lamp.said");
+    assert_eq!(said["text"], "Going to sleep now.");
+    assert_eq!(
+        (said["by"].as_str(), said["source"].as_str()),
+        (Some("lamp"), Some("cached"))
+    );
+    assert!(said["at"].as_str().unwrap().ends_with('Z'), "{said}");
+    // A line meant for another computer is not this one's.
+    lamp.shared.deliver(vec![Out::Said {
+        fields: json!({"text": "Not yours.", "by": "computer", "source": "exact"}),
+        to: SaidTo::Client("c_other".into()),
+    }]);
+    // Its own is.
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    let own = listed["clients"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "test laptop")
+        .map(|c| c["id"].as_str().unwrap().to_owned())
+        .unwrap_or_else(|| listed["clients"][1]["id"].as_str().unwrap().to_owned());
+    lamp.shared.deliver(vec![Out::Said {
+        fields: json!({"text": "Build passed.", "by": "computer", "source": "exact"}),
+        to: SaidTo::Client(own),
+    }]);
+    let mine = next(&mut reader).await;
+    assert_eq!(mine["text"], "Build passed.", "{mine}");
+}
+
+/// A look under a body lease that a conversation suspended is refused as
+/// the suspension it is, not as "take a lease on the body first": the SDK's
+/// `Lease.state` still read `held` for the moment before its event came
+/// (the lead's 4-lamp show, 10 Nov 16:50: no_lease on about 1 turn in 6).
+#[tokio::test]
+async fn an_op_under_a_suspended_body_lease_says_suspended_not_no_lease() {
+    use lamp_control::protocol::LeaseWhy;
+    use lamp_control::watch::Out;
+    let lamp = lamp("suspended-look").await;
+    let mut socket = paired(&lamp, json!(["body", "look"]), 5).await;
+    let take = send(
+        &mut socket,
+        json!({"id": 3, "op": "lease.take", "parts": ["body"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(take["lease"], "l_1", "{take}");
+    lamp.shared
+        .deliver(vec![Out::Suspend(None, LeaseWhy::Conversation)]);
+    assert_eq!(
+        next(&mut socket).await,
+        json!({"ev": "lease", "lease": "l_1", "state": "suspended", "why": "conversation"})
+    );
+    let look = send(&mut socket, json!({"id": 4, "op": "look", "at": "ahead"})).await;
+    assert_eq!(look["error"]["code"], "busy", "{look}");
+    assert_eq!(
+        look["error"]["why"],
+        "your lease on the body is suspended while someone talks to the lamp: it is yours again when they stop",
+        "{look}"
+    );
+    // Never taken at all: still no_lease.
+    lamp.shared.move_clock_on(Duration::from_millis(1_100));
+    let mut other = paired(&lamp, json!(["body", "look"]), 6).await;
+    let none = send(&mut other, json!({"id": 3, "op": "look", "at": "ahead"})).await;
+    assert_eq!(none["error"]["code"], "no_lease", "{none}");
 }
 
 /// Part 6: while a computer holds `body`, the door holds the body's own
@@ -859,6 +995,72 @@ async fn a_hand_on_the_bus_is_told_and_a_look_at_it_has_the_body_follow() {
     let stopped = send(&mut socket, json!({"id": 6, "op": "stop"})).await;
     assert_eq!(stopped["ok"], true, "{stopped}");
     assert_eq!(line(&mut lines).await, r#"{"hold":{"for_ms":30000}}"#);
+}
+
+/// `get` `body` follows the body as it moves (the local leader's run on
+/// lamp-75c9, 4 Nov): `body/joint_states` as lamp-body publishes it, 12.5 a
+/// second with its declaration and a second's lifespan, each new position
+/// shown within a few of them, never held at an old one.
+#[tokio::test]
+async fn get_body_follows_the_joint_states_on_the_bus() {
+    let watch = Arc::new(std::sync::Mutex::new(lamp_control::watch::Watch::new()));
+    let events: lamp_control::parts::Events = Arc::new(|_: &str, _: Value| {});
+    let parts = lamp_control::parts::Lamp::new(None, None, None, "boot".into(), events)
+        .watching(watch.clone());
+    let lamp = lamp_with("joints", Box::new(parts)).await;
+    let bus = lamp_bus::Bus::new(lamp.dir.join("bus")).unwrap();
+    server::watch_bus(&bus, watch, lamp.shared.clone()).unwrap();
+    let mut limits = bus
+        .publisher_declared(
+            lamp_msgs::BodyLimits::TOPIC,
+            &lamp_msgs::BodyLimits::declaration(),
+            "body",
+        )
+        .unwrap();
+    let mut states = bus
+        .publisher_declared(
+            lamp_msgs::JointState::TOPIC,
+            &lamp_msgs::JointState::declaration(),
+            "body",
+        )
+        .unwrap();
+    states.expires_after(Some(Duration::from_secs(1)));
+    let limit = json!({"joints": [{"name": "base_yaw", "min": 1975, "max": 2055, "home": 2012}],
+                       "speed": 50.0, "acceleration": 400.0, "force": 600, "heat_stop": 62, "stands": true});
+    let radians = |counts: f64| (counts - 2_048.0) * std::f64::consts::TAU / 4_096.0;
+    let mut socket = paired(&lamp, json!(["body"]), 15).await;
+    let yaw = |body: &Value| body["state"]["body"]["joints"]["yaw"]["counts"].as_f64();
+    let started = std::time::Instant::now();
+    let mut at_us = 1;
+    for counts in [1_999.0, 2_021.0, 2_007.0, 1_998.0, 2_030.0] {
+        // 20 steps (1.6 s) at each position, as a body holding there says.
+        let mut seen = None;
+        for step in 0..20 {
+            if step % 10 == 0 {
+                limits.publish_json(at_us, &limit).unwrap();
+            }
+            let state = json!({"name": ["base_yaw"], "position": [radians(counts)],
+                               "velocity": [], "effort": [], "commanded": [radians(counts)]});
+            states.publish_json(at_us, &state).unwrap();
+            at_us += 80_000;
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            let body = send(
+                &mut socket,
+                json!({"id": at_us, "op": "get", "state": ["body"]}),
+            )
+            .await;
+            seen = yaw(&body);
+            if step == 5 {
+                assert_eq!(
+                    seen,
+                    Some(counts),
+                    "at {counts} for 6 steps, {:?} in: {body}",
+                    started.elapsed()
+                );
+            }
+        }
+        assert_eq!(seen, Some(counts));
+    }
 }
 
 /// The local leader's P3: A follows the hand, A's lease ends, B takes the
@@ -1590,6 +1792,180 @@ async fn skill_push_is_off_without_the_helper() {
     );
 }
 
+/// #4209: a computer's motion is told back. On a bus in a folder, with the
+/// body's mood socket: hello says `motion_done`; a gesture the body begins
+/// and ends is `finished`, at its `over`; a move the body drops is
+/// `dropped` with the body's why; one the body never begins is `dropped`
+/// after 10 s. A lamp that can't read the body's word says nothing of it.
+#[tokio::test]
+async fn a_motion_is_told_finished_or_dropped_as_the_body_says() {
+    let dir = std::env::temp_dir().join(format!("lamp-control-motion-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let mood = dir.join("mood.sock");
+    let body = std::os::unix::net::UnixDatagram::bind(&mood).unwrap();
+    let bus = lamp_bus::Bus::new(dir.join("bus")).unwrap();
+    let gestures = bus.subscribe("body/gesture", "control").unwrap();
+    let mut said = bus
+        .publisher("body/gesture", lamp_bus::Kind::Event, "body")
+        .unwrap();
+    let told = lamp_made(
+        "motion-done",
+        move |events| {
+            Box::new(
+                lamp_control::parts::Lamp::new(Some(mood), None, None, "boot".into(), events)
+                    .telling_motions(gestures),
+            )
+        },
+        // As the product: rates off (lamp-control's default).
+        |door, _| door.with_rates_off(),
+    )
+    .await;
+    let (mut socket, hello) = paired_hello(&told, json!(["body"]), 41).await;
+    assert_eq!(hello["limits"]["motion_done"], true, "{hello}");
+    let mut buffer = [0u8; 4096];
+    let nod = send(
+        &mut socket,
+        json!({"id": 5, "op": "gesture", "name": "nod"}),
+    )
+    .await;
+    assert_eq!(nod["to"], "body", "{nod}");
+    let length = body.recv(&mut buffer).unwrap();
+    let asked: Value = serde_json::from_slice(&buffer[..length]).unwrap();
+    assert_eq!(asked["gesture"], "nod");
+    said.publish_json(1, &json!({"name": "nod", "state": "began"}))
+        .unwrap();
+    said.publish_json(2, &json!({"name": "nod", "state": "over"}))
+        .unwrap();
+    let done = next(&mut socket).await;
+    assert_eq!(done, json!({"ev": "done", "re": 5, "how": "finished"}));
+    let take = send(
+        &mut socket,
+        json!({"id": 10, "op": "lease.take", "parts": ["body"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(take["ok"], true, "{take}");
+    let frames = json!([
+        [0, 0, 0, 0, 0],
+        [0, 0, 40, 0, 0],
+        [0, 0, 40, 0, 0],
+        [0, 0, 0, 0, 0]
+    ]);
+    let moved = send(
+        &mut socket,
+        json!({"id": 6, "op": "move", "step_ms": 500, "frames": frames}),
+    )
+    .await;
+    assert_eq!(moved["to"], "body", "{moved}");
+    let drop = json!({"name": "control", "state": "dropped",
+        "why": "dropped: the person is using the lamp"});
+    said.publish_json(3, &drop).unwrap();
+    let done = next(&mut socket).await;
+    assert_eq!(
+        done,
+        json!({"ev": "done", "re": 6, "how": "dropped",
+            "why": "dropped: the person is using the lamp"})
+    );
+    let shy = send(
+        &mut socket,
+        json!({"id": 7, "op": "gesture", "name": "shy"}),
+    )
+    .await;
+    assert_eq!(shy["to"], "body", "{shy}");
+    let done = tokio::time::timeout(Duration::from_secs(13), async {
+        loop {
+            let frame = next_within(&mut socket, Duration::from_secs(13)).await;
+            if frame["ev"] == "done" {
+                return frame;
+            }
+        }
+    })
+    .await
+    .expect("a done for the gesture never begun");
+    assert_eq!(
+        done,
+        json!({"ev": "done", "re": 7, "how": "dropped",
+            "why": "the body did not begin it within 10 s"})
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    let plain = lamp("motion-done-none").await;
+    let (_, hello) = paired_hello(&plain, json!(["body"]), 42).await;
+    assert!(hello["limits"].get("motion_done").is_none(), "{hello}");
+}
+
+/// Another connection of an already paired computer (`seed`'s key): its
+/// own welcome, signed as that computer.
+async fn hello_again(lamp: &Lamp, seed: u8) -> Socket {
+    let keys = Ed25519KeyPair::from_seed_unchecked(&[seed; 32]).unwrap();
+    let key: [u8; 32] = keys.public_key().as_ref().try_into().unwrap();
+    let client = pairing::client_id(&key);
+    let mut socket = connect(lamp, "/v1").await.unwrap();
+    let welcome = next(&mut socket).await;
+    let nonce: [u8; 32] = pairing::bytes_of(welcome["nonce"].as_str().unwrap()).unwrap();
+    let sig = keys.sign(&[pairing::HELLO_CONTEXT, &nonce].concat());
+    let hello = send(
+        &mut socket,
+        json!({"id": 1, "op": "hello", "client": client, "sig": STANDARD.encode(sig)}),
+    )
+    .await;
+    assert_eq!(hello["ok"], true, "{hello}");
+    socket
+}
+
+/// Second's P2 on #5835: two programs of one paired computer, each on its
+/// own connection with its own request numbers, both ask request 5: A a
+/// nod, B a headshake. The body begins and ends the nod alone: A is told
+/// its `done`, and B, whose headshake hasn't played, is told nothing.
+#[tokio::test]
+async fn a_motions_done_goes_to_the_connection_that_asked_it_alone() {
+    let dir = std::env::temp_dir().join(format!("lamp-control-motion2-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let mood = dir.join("mood.sock");
+    let body = std::os::unix::net::UnixDatagram::bind(&mood).unwrap();
+    let bus = lamp_bus::Bus::new(dir.join("bus")).unwrap();
+    let gestures = bus.subscribe("body/gesture", "control").unwrap();
+    let mut said = bus
+        .publisher("body/gesture", lamp_bus::Kind::Event, "body")
+        .unwrap();
+    let told = lamp_made(
+        "motion-two",
+        move |events| {
+            Box::new(
+                lamp_control::parts::Lamp::new(Some(mood), None, None, "boot".into(), events)
+                    .telling_motions(gestures),
+            )
+        },
+        |door, _| door.with_rates_off(),
+    )
+    .await;
+    let mut a = paired(&told, json!(["body"]), 45).await;
+    let mut b = hello_again(&told, 45).await;
+    let nod = send(&mut a, json!({"id": 5, "op": "gesture", "name": "nod"})).await;
+    assert_eq!(nod["to"], "body", "{nod}");
+    let shake = send(
+        &mut b,
+        json!({"id": 5, "op": "gesture", "name": "headshake"}),
+    )
+    .await;
+    assert_eq!(shake["to"], "body", "{shake}");
+    let mut buffer = [0u8; 4096];
+    for _ in 0..2 {
+        body.recv(&mut buffer).unwrap();
+    }
+    said.publish_json(1, &json!({"name": "nod", "state": "began"}))
+        .unwrap();
+    said.publish_json(2, &json!({"name": "nod", "state": "over"}))
+        .unwrap();
+    assert_eq!(
+        next(&mut a).await,
+        json!({"ev": "done", "re": 5, "how": "finished"})
+    );
+    let nothing = tokio::time::timeout(Duration::from_millis(500), b.next()).await;
+    assert!(nothing.is_err(), "B was told: {nothing:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// docs/control.md, "Turns and listening", end to end: `listen.set false`
 /// is answered on its own connection once the voice has taken the mute, and
 /// the say socket connection holding it closes when the computer's last
@@ -1809,5 +2185,41 @@ async fn the_owner_takes_the_lamp_back_and_the_computers_stay_paired() {
     assert_eq!(
         admin(&lamp, json!({"take_back": true, "client": 7})).await,
         json!({"error": "client: a computer's id"})
+    );
+}
+
+/// ten's 75c9 case (9 Nov, stable 10824): a computer paired with `hear`,
+/// subscribed to `phrase.heard` alone with one phrase, hears it when the
+/// voice publishes `voice/heard` as it does on a lamp: a declared
+/// `lamp_msgs/Speech`, finished, with its `request`, through the real bus
+/// and `watch_bus`, not handed to `deliver` directly.
+#[tokio::test]
+async fn a_phrase_heard_on_the_bus_reaches_its_subscriber() {
+    let lamp = lamp("phrase-bus").await;
+    let bus = lamp_bus::Bus::new(lamp.dir.join("bus")).unwrap();
+    let watch = Arc::new(std::sync::Mutex::new(lamp_control::watch::Watch::new()));
+    server::watch_bus(&bus, watch, lamp.shared.clone()).unwrap();
+    let mut socket = paired(&lamp, json!(["body", "light", "look", "hear"]), 43).await;
+    let subscribed = send(
+        &mut socket,
+        json!({"id": 3, "op": "subscribe", "events": ["phrase.heard"], "phrases": ["good night lamp"]}),
+    )
+    .await;
+    assert_eq!(subscribed["ok"], true, "{subscribed}");
+    let mut heard = bus
+        .publisher_declared("voice/heard", &lamp_msgs::Speech::declaration(), "voice")
+        .unwrap();
+    let line = lamp_msgs::Speech {
+        text: "Lamp. Good night lamp.".into(),
+        finished: true,
+        locale: None,
+        request: Some(148),
+    };
+    heard.publish_json(1, &line).unwrap();
+    let told = next(&mut socket).await;
+    assert_eq!(
+        (&told["ev"], &told["phrase"]),
+        (&json!("phrase.heard"), &json!("good night lamp")),
+        "{told}"
     );
 }

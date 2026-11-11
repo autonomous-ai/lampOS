@@ -1143,6 +1143,16 @@ it a call changes nothing the body writes (test
   seen before or during it ends it, and the gaze has them. It takes the place
   of a shift at rest, never of another gesture.
 - It never searches: one glance, then it lets it go.
+- With `LAMP_NAME_WORDLESS_BAR=on` in its environment (#5385), only a
+  hearing at 0.99 or more is a call (`name_in::bar_from`). The body cannot
+  know whether words follow a hearing (the voice knows about 1.7 s later),
+  and on lamp-75c9 a hearing at 0.941 in the body's own move's sound, with
+  no words, turned and glanced. A real call under 0.99 still gets the
+  voice's own listening, which lifts the head from early in the line
+  (0.45 s into it on lamp-52e6, before the name is heard), so the first
+  thing seen is not later; only the glance with nobody in view, and the
+  two seconds a call adds while the voice rests, are left out. Off, as
+  before. Test: `with_the_wordless_bar_only_a_sure_hearing_is_a_call`.
 
 On lamp-52e6 on 2026-10-14, with calls published by hand and nobody in view
 ([verification](verification/look-at-name-lamp-52e6-20261014/)): standing,
@@ -1658,7 +1668,12 @@ What the body does with the request:
   overload or a hand and lies where it slumped (until a mood or somebody
   in front of it stands it up), and one that may not stand. A gesture
   asked while another plays is dropped too, or, under `--arbitration on`,
-  weighed by who asks ("Who may ask over whom" below). Paused after a gesture was
+  weighed by who asks ("Who may ask over whom" below). The one exception is
+  lamp-control's `replace` (a paired computer's motion, docs/control.md): it
+  ends a skill's or idle gesture playing, eased out, and plays after it, but
+  never while someone is talking with the lamp (listening, thinking or
+  speaking) or over a gesture paused for that talk, when it is dropped as
+  `dropped: the person is using the lamp`. Paused after a gesture was
   taken, the awake window it opened is given back, so the lamp folds as a
   paused body does: before it began, the gesture is dropped (`dropped:
   paused`); once it plays, it ends first and the lamp folds after it.
@@ -1708,7 +1723,12 @@ What the body does with the request:
 - Its offsets are laid over whatever the mood and the eyes have the lamp
   doing, outside the filter that follows the mood, and leave the lamp where
   it was. They change by at most 24, 34, 26, 21 and 21 counts a step and
-  take no joint further than 220, 220, 170, 360 and 360 counts.
+  take no joint further than 220, 220, 250, 360 and 360 counts (the base's
+  250 is the lamp's own yaw reach at most: a move the check takes is played
+  whole; the base is never asked past home plus `--reach`'s yaw, or past where the look
+  alone has it, whatever is laid over the look: a sway over a turned look stops
+  at the reach, and the journal says `gesture's yaw cut to the reach`, once a
+  gesture; the way back toward home is never cut).
 - While one plays, and for half a second after, a joint of the head may be
   150 counts from its goal and read a load of 700, and the shoulder and
   elbow may be 260 from theirs. A quick move lags and reverses hard. If a
@@ -1798,9 +1818,15 @@ report counts. It is held to what the generator promises the clips:
   name order keeps it);
 - `step_ms` from 40 to 1000, and 1.5 to 10 s in all;
 - the first and the last frame nothing;
-- no joint farther than 200, 200, 150, 350 and 350 counts, nor asked to
-  go faster than 900, 1,300, 1,000, 800 and 800 counts a second (with a
-  count of rounding at each end of a step).
+- no joint farther than 200, 200, the lamp's own yaw reach (`--reach`'s
+  last figure, 250 counts, about 22 degrees, on lamp-75c9 and lamp-a63e; 150
+  without `--reach`; never past the 250 any lamp may be given), 350 and 350
+  counts, nor asked to go faster than 900, 1,300, 1,000, 800 and 800 counts a
+  second (with a count of rounding at each end of a step). A wider sway is
+  only slower: the speed and acceleration caps are the same. A move past the
+  reach is refused with it in the words (`farther than 250, this lamp's yaw
+  reach (--reach)`). The built-in clips keep to 150 and are unchanged.
+  A lamp started without `--reach` has a yaw reach of 40 (`Limits::FOLDED`) but its moves are admitted to 150, and only on such a lamp (`Limits::yaw_unset`) is the base held to no less than those 150 whatever is laid over the look (`gesture_yaw_reach`), so an accepted move of 150 is played whole, as before; a lamp started with a `--reach` keeps its yaw as configured, even under 150.
 
 A file that breaks any of these, is not JSON of exactly these three fields
 or is longer than 256 KiB is refused, and its reason is said in the log.
@@ -1960,16 +1986,23 @@ The lamp programming protocol's server, `lamp-control`, keeps its own
 leases, clients and the 10-minute cap. The body knows one holder only.
 With `--lease-socket PATH` the body listens there for one stream at a time,
 and lets one in only if the kernel names it `lamp-control.service` run as
-`lampos`, or root (`lamp_ipc::caller`). A second, or anyone else, is
-answered `refused` with why and closed. Lines of JSON each way
+`lampos`, or root (`lamp_ipc::caller`); with `--lease-holder-uid N` (the
+virtual lamp's, where nothing runs under systemd; no product unit passes it),
+also any caller running as uid N, whatever its unit. The flag depends on the
+kernel naming the peer (Linux peer credentials): it cannot make an unidentified
+caller one, and it does not bypass the socket's filesystem permissions. "For
+the virtual lamp only" is a deployment rule (no product unit passes it), not
+something the body checks. A second, or anyone else, is answered `refused`
+with why and closed. Lines of JSON each way
 (`lamp_body::lease`):
 
 | Asked | Answered |
 |-------|----------|
-| `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held"}`, or `suspended` or `lost` as below |
+| `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held","tags":true}`, or `suspended` (also with `"tags":true`) or `lost` as below. `tags`: this body takes a `tag` on look and pose lines |
 | `{"let_go":true}` | `{"lease":"free"}` |
 | `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive, from the pose's own direction, as the gaze's look), `{"look":{"yaw":Y,"pitch":P,"from":"home"}}` (from where the head and base were found at start, as a computer's `joints` and `get` `body`: the body takes its pose's offset off, `body::aim_from_home`, and says `there` in the same frame), or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
 | `{"pose":{"roll":R,"shoulder":S,"elbow":E}}` (degrees, one at least; as `get('body')` counts them), while held | once, later: `{"pose":"there","roll":…,"shoulder":…,"elbow":…,"clamped":…}`, or `{"pose":"cut_short","why":…}`; at once while not held, while the body takes no pose, or for another pose: `{"pose":"refused","why":…}` |
+| A look or pose line with `"tag":N` (N an unsigned 64-bit integer, lamp-control's; any other `tag`, such as a string, a negative or a fraction, refuses the line, and that refusal carries no tag) | every answer to that line carries the same `"tag":N`: its `there`, `cut_short` or `refused`, and the `cut_short` of a line a newer one replaced carries the replaced line's own `tag`. A line refused at once can overtake one still owed, so a holder pairs answers by `tag`, not by order. A line without `tag` is answered as before, with none |
 | `{"limp":true}` or `{"limp":false}`, while held | at once: `{"limp":"on"}` or `{"limp":"off"}`; `{"limp":"refused","why":…}` while not held; and unasked, once, `{"limp":"off","why":…}` when the hold ends |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
 
@@ -1981,9 +2014,15 @@ cut to `--reach`'s yaw (or `--gaze-reach`'s, if larger) and to `--reach`'s up
 and down, and said `clamped` when cut. The body eases the head there as the
 gaze's own look, in the gaze's place, and keeps it there while held: nothing
 of the head rests, relaxes or sleeps meanwhile, and every pose's bounds still
-hold. It is `there` once the head and base are within 6 counts (`THERE_WITHIN`)
-of goals that have not moved for 10 steps (`THERE_STEPS`, 0.2 s). A look not
-there in 5 s (`LONGEST_LOOK`, something holds the head), another look, a
+hold. It is judged against where the pose wants each joint (`Glimpse::wanted`),
+not the eased goal or one a rest wrote where a joint stopped: `there` once the
+head and base are within 6 counts (`THERE_WITHIN`) and have not moved for 10
+steps (`THERE_STEPS`, 0.2 s); `there` too, from where they stopped and
+`clamped` past half a degree, once stopped within `REST_SLACK` (24 counts) and
+still for 50 steps (`REST_STOPPED_STEPS`, 1 s), as a resting head stops short
+against its weight (lamp-75c9 on 7 Nov: 17 counts at load 80, cut short after
+5 s before this). A look not there in 5 s (`LONGEST_LOOK`; said with how many
+counts short when past the slack), another look, a
 conversation or the lease's end cuts it short. A conversation keeps the aim for
 when the lease is held again; any other end drops it, and the head goes back
 to the pose's own direction. The head is woken to move only when the look
@@ -1996,8 +2035,8 @@ Tests: `a_held_lamp_looks_where_its_holder_asks_and_comes_back_when_let_go`,
 `the_lease_door_aims_its_holders_look_and_says_when_it_is_there`.
 
 **A holder's pose** (`lease::Posing`, the protocol's `joints` past yaw and
-pitch; no lamp-control code sends it yet, so `joints` still refuses roll,
-shoulder and elbow until that routing lands): the head's roll from the found home and the shoulder and the elbow
+pitch; lamp-control sends a `joints`' roll, shoulder and elbow as it,
+docs/control.md): the head's roll from the found home and the shoulder and the elbow
 from the folded arm, in degrees, each rising with counts, as `get('body')`
 says them. A joint not named keeps where it is. The body takes it only while
 held and standing still at its full height (a lamp given `--stand`) with no
@@ -2027,7 +2066,13 @@ stopped (its position still within a count) within 50 counts of it
 88 and 152). One stopped farther short is held by something: the pose stays
 owed and is cut short in time. `there` says the degrees the positions
 reached, sag and all, and `clamped` when the window or the reach cut the
-goal by more than half a degree. A pose not there in 6 s (`LONGEST_POSE`) is
+goal by more than half a degree, or when a joint stopped more than 2 degrees
+(`POSE_SHORT_WITHIN`) short of what was asked, measured from where it reached, for the joints the line named
+(an arm joint not named is not judged: a standing arm sags on its own weight; a
+roll whose goal still moves is not settled)
+(lamp-75c9: an elbow asked 43.0 degrees stood at 39.5 and was said unclamped
+before: a `there` that says reached while short is a silent failure).
+`a_pose_that_stopped_short_of_what_was_asked_says_clamped`. A pose not there in 6 s (`LONGEST_POSE`) is
 cut short, "something holds the arm". A conversation keeps it for when the lease is
 held again; any other end lets it go, back to the stand. Tests:
 `a_held_standing_lamp_takes_its_holders_pose_inside_the_arms_window`,
@@ -2216,9 +2261,10 @@ four rows, "Without it" is what `off` leaves.
 | `--gaze-reach Y,P` | the farthest the gaze takes yaw and pitch; the yaw may be wider than `--reach`'s | 250,120 | 500, 200 |
 | `--look-at-name on` (default) | the lamp's name heard on the bus taken as being spoken to for two seconds, and with nobody in view one small glance once it stands (see "Turning to a call") | a call is not taken | on or off |
 | `--idle on` (default) | a standing lamp at rest shifts a little now and then | off | on or off |
-| `--arbitration on` | a gesture or a move may say who asks (`source`, `priority`), and one asked higher ends the one playing (see "Who may ask over whom") | as before: `source` and `priority` are ignored, and a gesture asked while another plays is dropped | on or off |
+| `--arbitration on` | a gesture or a move may say who asks (`source`, `priority`), and one asked higher ends the one playing (see "Who may ask over whom") | as before: `source` and `priority` are ignored, and a gesture asked while another plays is dropped, except lamp-control's `replace`, which ends one at `skill` or lower (see "Gestures") | on or off |
 | `--caller-caps on` | who asks is the kernel's word: a gesture or a move is held to its unit's most, and the gaze socket takes sights from the eyes, skills or root only (see "Who asks, from the kernel") | as before: any process in group `lampos` may ask at any priority and send a sight | on or off |
 | `--lease-socket ABSOLUTE_PATH` | lamp-control may hold the body for up to 30 s at a time, renewed, while the lamp's own life stands back (see "Held by lamp-control") | no lease: nobody can ask the lamp's own life to stand back | a short absolute path |
+| `--lease-holder-uid N` | with `--lease-socket`: a caller running as user id N (above 0) may hold the body too, whatever its unit; for the virtual lamp only | only `lamp-control.service` as `lampos`, or root | a user id above 0, given once, and only with `--lease-socket` |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
 | `--head-stall-load LOAD` | the head pitch's stall bound, this lamp's own (see "Giving way to a hand": a head that holds more than 100 to stand) | 100 | 100 to 230 |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
@@ -2514,7 +2560,7 @@ before.
 | `body/joint_states` | `lamp_msgs/JointState` | every fourth step: 12.5 a second | Where each joint is, how fast it is turning, how hard its servo is working, and where it was last asked to be |
 | `diagnostics` | `lamp_msgs/Diagnostic` | once a second, and once more when it stops; let go for its pose, once per change and the same again every 2 s | How the body is, under the name `body` |
 | `body/hand` | `lamp_msgs/Hand` | with every step passed on | Whether a hand pushes it (below, "A hand on the bus") |
-| `body/gesture` | `lamp_msgs/BodyGesture` | an event, each time, whatever the step | What became of a gesture: `{"name", "state"}`, `began` when the body begins it, `over` when it ends (played out, let go as it played, replaced by another, whose `began` follows its `over`, or ended by the run stopping: a goal refused, a surprise, asked to), `dropped` when one asked is dropped before it began (paused, a hand, held by a hand or busy under arbitration, another playing or asked after it, slumped, stale, refused whole by the anti-tip rule as `dropped: it would tip`) or one playing is ended for a higher ask (`ended: by WHO`, #1239), which no `over` follows. A gesture still waiting to begin when the run stops is not in the body's last step, so nothing is said of it. Several in one step are each said. Said where the journal says `gesture NAME`, `gesture over` and `gesture NAME dropped: ...` (one `GestureSaid` reads both), so the two never differ, but for the journal saying a repeated drop once in five seconds. Read-only: it asks nothing and changes no motion. A gesture let go as it played (a joint could not keep up) began, so it says `over`, not `dropped`, though its journal line says `dropped: a joint could not keep up with it`. One the publishing thread has no room for is let go and counted apart from the steps (`gestures_let_go`); lamp-body's last line says both counts. Under `--arbitration on` (#940), a `dropped` also says whose it was, why and who holds the body, so the asker that lost is told: `source`, the name its datagram gave (kept only up to 64 printable bytes, inline, so the motor loop never allocates; a longer one is not kept); `why`, the journal's own reason (`dropped: busy, skill`, `ended: by conversation`); and `by`, the holder's name, only when a skill or the conversation that named itself holds the body, never for a hand, a pause or a lamp that doesn't stand. The body carries each name with its priority (`playing_by`, `pending_by`), and who wins, and every goal it writes, is as without them. Of two asks read in the same step, the one dropped as it is read (`kept_of`) is told on `body/gesture` too, with its asker and the one that keeps the body as `by` (the reviewer on #1473: two skills asking at once). Each is left out when not known, and with the switch off the message is byte for byte `{"name", "state"}` |
+| `body/gesture` | `lamp_msgs/BodyGesture` | an event, each time, whatever the step | What became of a gesture: `{"name", "state"}`, `began` when the body begins it, `over` when it ends (played out, let go as it played, replaced by another, whose `began` follows its `over`, or ended by the run stopping: a goal refused, a surprise, asked to), `dropped` when one asked is dropped before it began (paused, a hand, held by a hand or busy under arbitration, another playing or asked after it, slumped, stale, refused whole by the anti-tip rule as `dropped: it would tip`) or one playing is ended for a higher ask (`ended: by WHO`, #1239) or by lamp-control's `replace` (`ended: replaced by a newer motion`), which no `over` follows. A gesture still waiting to begin when the run stops is not in the body's last step, so nothing is said of it. Several in one step are each said. Said where the journal says `gesture NAME`, `gesture over` and `gesture NAME dropped: ...` (one `GestureSaid` reads both), so the two never differ, but for the journal saying a repeated drop once in five seconds. Read-only: it asks nothing and changes no motion. A gesture let go as it played (a joint could not keep up) began, so it says `over`, not `dropped`, though its journal line says `dropped: a joint could not keep up with it`. One the publishing thread has no room for is let go and counted apart from the steps (`gestures_let_go`); lamp-body's last line says both counts. Under `--arbitration on` (#940), a `dropped` also says whose it was, why and who holds the body, so the asker that lost is told: `source`, the name its datagram gave (kept only up to 64 printable bytes, inline, so the motor loop never allocates; a longer one is not kept); `why`, the journal's own reason (`dropped: busy, skill`, `ended: by conversation`); and `by`, the holder's name, only when a skill or the conversation that named itself holds the body, never for a hand, a pause or a lamp that doesn't stand. The body carries each name with its priority (`playing_by`, `pending_by`), and who wins, and every goal it writes, is as without them. Of two asks read in the same step, the one dropped as it is read (`kept_of`) is told on `body/gesture` too, with its asker and the one that keeps the body as `by` (the reviewer on #1473: two skills asking at once). Each is left out when not known, and with the switch off the message is byte for byte `{"name", "state"}` |
 
 The joints are `base_yaw`, `shoulder`, `elbow`, `head_roll`, `head_pitch`,
 in the order of their servos' numbers, 1 to 5.

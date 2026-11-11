@@ -12,6 +12,8 @@
 //! Reads go through an allow-list per service; writes are behind their own
 //! switch (`LAMP_SERVICES_WRITE=on`) and two phases: a full read-back first,
 //! then the one send it names. Off unless `LAMP_SERVICES=on` (or `--enable`).
+//! With `LAMP_SKILL_WRITES=on` too, `lamp-skills.service` may make a made
+//! skill's one fixed write, approved at install ([`skill_writes`]).
 pub mod catalog;
 pub mod mail;
 pub mod mcp;
@@ -19,6 +21,7 @@ pub mod net;
 pub mod reads;
 pub mod refresh;
 pub mod serve;
+pub mod skill_writes;
 pub mod spoken;
 pub mod store;
 pub mod tools;
@@ -34,6 +37,10 @@ pub const WRITE_ENVIRONMENT: &str = "LAMP_SERVICES_WRITE";
 /// `lamp-skills.service` may call the tools' socket too, for `service_read`
 /// alone.
 pub const SKILL_READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
+/// The switch for changing and cancelling a Google Calendar event by its
+/// id (`update_event`, `delete_event`), read by this program: off unless
+/// `on`, and only with [`WRITE_ENVIRONMENT`] on too.
+pub const CALENDAR_EDITS_ENVIRONMENT: &str = "LAMP_CALENDAR_EDITS";
 
 /// Whether a switch is on, as `var` gives it.
 pub fn on(var: Option<&str>) -> bool {

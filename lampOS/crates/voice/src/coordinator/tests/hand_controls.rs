@@ -3640,6 +3640,47 @@ fn with_the_sleep_line_missing_the_breath_plays_and_the_sleep_waits_for_it() {
     );
 }
 
+/// #6028: in the quiet hours a hand's hold plays the breath, never the
+/// kept sleep line, and still sleeps once the breath has played.
+#[test]
+fn with_the_sleep_line_in_the_quiet_hours_the_breath_plays_not_the_line() {
+    let line = sleep_line(2);
+    TEST_QUIET_HOURS.with(|quiet| quiet.set(true));
+    let (ran, holds_at) = held_run_with(2_150_000, 9_000_000, 1_500_000, Some(Some(line)));
+    TEST_QUIET_HOURS.with(|quiet| quiet.set(false));
+    let admitted = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "input_admitted")
+        .expect("its own turn");
+    assert_eq!(admitted["admission_basis"], "head_sleep_breath");
+    let breath = crate::head_cue::breath(crate::head_cue::DBFS);
+    assert_eq!(played(&ran), breath, "the breath, not the line");
+    assert!(slept_owed(&ran) > holds_at, "it still sleeps");
+}
+
+/// #6028: a short touch, let go at 1.5 s (a pet's or a tap's length), is no
+/// sleep: with the line kept, nothing is said and nothing sleeps.
+#[test]
+fn with_the_sleep_line_a_short_touch_says_nothing_and_stays_awake() {
+    let line = sleep_line(2);
+    let (ran, _) = held_run_with(1_000_000, 1_500_000, 3_000_000, Some(Some(line)));
+    assert!(
+        ran.trace
+            .iter()
+            .all(|row| row["kind"] != "head_sleep_breath"
+                && row["admission_basis"] != "head_sleep_line"),
+        "no cue for a short touch"
+    );
+    assert!(played(&ran).is_empty(), "nothing said");
+    assert!(
+        ran.trace
+            .iter()
+            .all(|row| row["kind"] != "hand_control_cancel" || row["reason"] != "head_sleep"),
+        "no sleep"
+    );
+}
+
 /// #3748: a line still sounding 6 s after the Hold no longer holds the
 /// sleep back: it comes at the cap.
 #[test]
@@ -3683,6 +3724,7 @@ fn walk_for_the_next_loop(ended: &[&str]) -> PathBuf {
                 framing: None,
                 offered_at_unix_s: None,
                 later_offers: 0,
+                ended_at_unix_ms: None,
             },
         );
     }

@@ -23,6 +23,7 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         || crate::tools::SCHEDULE_NAMES.contains(&name)
         || crate::agent_tasks::is_tool(name)
         || crate::known_faces::is_tool(name)
+        || crate::rules::is_tool(name)
         || matches!(
             name,
             "light_on"
@@ -109,6 +110,54 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
             outcome.insert("reminders_result".into(), json!(state));
         }
     }
+    if name == crate::known_faces::FORGET {
+        if let Some(forgotten) = result["ok"].as_bool() {
+            outcome.insert("face_forgotten".into(), json!(forgotten));
+            incomplete |= !forgotten;
+        }
+        if let Some(note) = result.get("note") {
+            let key = if note == crate::known_faces::FORGOTTEN_SOME_KEPT_APART {
+                "old_face_records_kept_apart"
+            } else {
+                "face_cleanup_uncertain"
+            };
+            outcome.insert(key.into(), json!(true));
+            incomplete = true;
+        }
+        if let Some(memory) = result.get("memory") {
+            let state =
+                if memory == "forgotten too" || memory == crate::remember::FACE_MEMORY_PARTIAL {
+                    "forgotten"
+                } else {
+                    "uncertain"
+                };
+            incomplete |= state != "forgotten";
+            outcome.insert("primary_memory_result".into(), json!(state));
+        }
+        // This inner path never performs the outer setup-name, place,
+        // voice-print, journal and reminder cleanup. Retain a partial flag,
+        // but never let face success claim aggregate deletion.
+        if outcome.get("everything") == Some(&json!(true)) {
+            outcome.remove("everything");
+        }
+    }
+    if crate::remember::is_forget(name) {
+        for field in [
+            "room_memory_result",
+            "sound_consent_result",
+            "face_expression_consent_result",
+        ] {
+            if let Some(value) = result.get(field) {
+                let state = match value.as_str() {
+                    Some("cleared") => "cleared",
+                    Some("kept") => "kept",
+                    _ => "uncertain",
+                };
+                incomplete |= state != "cleared";
+                outcome.insert(field.into(), json!(state));
+            }
+        }
+    }
     // A reminders failure does not downgrade the producer's everything=true.
     // Do not carry that overbroad claim past an explicit failed/uncertain step.
     if incomplete && outcome.get("everything") == Some(&json!(true)) {
@@ -123,10 +172,18 @@ pub(super) fn context(
     calls: &[Value],
     left: usize,
 ) -> Vec<Message> {
+    let kind = if calls
+        .last()
+        .is_some_and(|call| call["tool"] == crate::known_faces::FORGET)
+    {
+        "face"
+    } else {
+        "memory"
+    };
     vec![
         Message::system(instruction),
         Message::system(format!(
-            "A memory forget call has run in this turn. The earlier conversation, recalled memory, pictures and tool payloads have been discarded. Answer only the person's current words and these content-free call outcomes: {}. Do not repeat any of these calls or reconstruct what was forgotten. Only confirm deletion when the outcome confirms it; an error or missing confirmation means the result is uncertain, not success. forgotten reports memory items only; false means none were removed. face_forgotten is independent and true confirms the face was forgotten. setup_name_result, place_result and reminders_result report those steps: forgotten/cancelled confirms that step, kept means it could not be cleared, uncertain means it was not confirmed. A missing step is unreported, never a confirmation. everything=false, all=false, some_subjects_not_found or some_items_left means do not claim complete deletion; distinguish a known kept part from an uncertain outcome. scope=room means only what this room remembers, never a person's private memory. Say briefly if a face, old face records, setup name, place or reminders could not be cleared. {left} later calls from the old round were not run; if the current words still ask for other work, plan it afresh without the discarded context. Never invent a fact or a reason that the status does not give.",
+            "A {kind} forget call has run in this turn. The earlier conversation, recalled memory, pictures and tool payloads have been discarded. Answer only the person's current words and these content-free call outcomes: {}. Do not repeat any of these calls or reconstruct what was forgotten. Only confirm deletion when the outcome confirms it; an error or missing confirmation means the result is uncertain, not success. forgotten reports memory items only; false means none were removed. face_forgotten is independent and true confirms the face was forgotten, not that memory or every related record was removed. primary_memory_result=forgotten confirms primary memory only; uncertain means it could not be confirmed. old_face_records_kept_apart means old face records remain, and face_cleanup_uncertain means another face cleanup warning could not be interpreted. Neither is complete deletion. setup_name_result, place_result and reminders_result report those steps: forgotten/cancelled confirms that step, kept means it could not be cleared, uncertain means it was not confirmed. room_memory_result, sound_consent_result and face_expression_consent_result report cleanup of the room lines and the two household consents: cleared confirms that step, kept means it was refused, uncertain means completion was not confirmed. A missing step is unreported, never a confirmation. everything=false, all=false, some_subjects_not_found or some_items_left means do not claim complete deletion; distinguish a known kept part from an uncertain outcome. scope=room means only what this room remembers, never a person's private memory. Say briefly if a face, old face records, setup name, place, reminders, room lines or household consents could not be cleared. {left} later calls from the old round were not run; if the current words still ask for other work, plan it afresh without the discarded context. Never invent a fact or a reason that the status does not give.",
             serde_json::to_string(calls).expect("JSON values serialize"),
         )),
         question.clone(),
@@ -136,6 +193,91 @@ pub(super) fn context(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Thirteen's P2-1 on #5942: a rule's and a face's forget keep their
+    /// built-in names and outcomes, which alone back a forget said done
+    /// (`action_claim::forgot_in`).
+    #[test]
+    fn a_rule_or_face_forget_keeps_its_name_and_outcome() {
+        let kept = status(
+            crate::rules::FORGET_RULE,
+            &json!({"forgotten": true, "note": "Stop following it from now on."}),
+        );
+        assert_eq!(
+            kept,
+            json!({"tool": crate::rules::FORGET_RULE, "outcome": {"forgotten": true}})
+        );
+        let kept = status(
+            crate::known_faces::FORGET,
+            &json!({"error": crate::known_faces::NOT_THEIRS}),
+        );
+        assert_eq!(
+            kept,
+            json!({"tool": crate::known_faces::FORGET, "outcome": {"error": true}})
+        );
+    }
+
+    #[test]
+    fn cleanup_outcome_status_timing() {
+        let result = json!({"forgotten":true,"everything":false,
+            "room_memory_result":"uncertain", "sound_consent_result":"uncertain",
+            "face_expression_consent_result":"cleared"});
+        let mut samples = Vec::new();
+        for _ in 0..1001 {
+            let start = std::time::Instant::now();
+            let kept = status("forget_everything", &result);
+            samples.push(start.elapsed().as_nanos());
+            assert_eq!(kept["outcome"]["everything"], false);
+        }
+        let first = samples.remove(0);
+        samples.sort_unstable();
+        eprintln!(
+            "forget_cleanup_status_timing {}",
+            json!({
+                "boundary":"status entry to sanitized outcome; three cleanup fields",
+                "first_ns":first,"repeated_count":1000,
+                "p50_ns":samples[499],"p95_ns":samples[949],"max_ns":samples[999],
+                "target_ns":1_000_000,
+                "limits":"host debug build; deletion, IPC, process startup, model and lamp excluded"
+            })
+        );
+    }
+
+    #[test]
+    fn cleanup_outcomes_keep_only_fixed_states_and_never_upgrade_partial_results() {
+        for field in [
+            "room_memory_result",
+            "sound_consent_result",
+            "face_expression_consent_result",
+        ] {
+            for (value, expected) in [
+                (json!("cleared"), "cleared"),
+                (json!("kept"), "kept"),
+                (json!("uncertain"), "uncertain"),
+                (json!("private canary"), "uncertain"),
+                (json!({"path":"private canary"}), "uncertain"),
+                (Value::Null, "uncertain"),
+            ] {
+                let mut result = json!({"forgotten":true,"everything":true});
+                result[field] = value;
+                let kept = status("forget_everything", &result);
+                assert_eq!(kept["outcome"][field], expected);
+                assert_eq!(kept["outcome"]["everything"], expected == "cleared");
+                assert!(!kept.to_string().contains("private canary"));
+                result["everything"] = json!(false);
+                assert_eq!(
+                    status("forget_everything", &result)["outcome"]["everything"],
+                    false
+                );
+                assert!(
+                    status("forget_everything", &json!({}))["outcome"]
+                        .get(field)
+                        .is_none()
+                );
+                assert!(status("recall", &result)["outcome"].get(field).is_none());
+            }
+        }
+    }
 
     #[test]
     fn deletion_step_warnings_survive_without_their_payloads() {
@@ -275,5 +417,109 @@ mod tests {
             )["outcome"],
             json!({"forgotten": false, "face_forgotten": true})
         );
+    }
+}
+
+#[cfg(test)]
+mod face_context_tests {
+    use super::*;
+
+    /// Fresh-process host bookkeeping only; excludes tool execution and model I/O.
+    #[test]
+    #[ignore = "manual face context reset latency measurement"]
+    fn face_forget_context_reset_timing() {
+        let result = json!({"ok": true, "everything": false,
+            "memory": crate::remember::FACE_MEMORY_PARTIAL,
+            "room_memory_result": "kept", "sound_consent_result": "uncertain",
+            "face_expression_consent_result": "cleared"});
+        let question = Message::user("Forget my face.");
+        let mut samples = Vec::new();
+        for _ in 0..101 {
+            let began = std::time::Instant::now();
+            let outcome = status(crate::known_faces::FORGET, &result);
+            let fresh =
+                std::hint::black_box(context("Static instructions", &question, &[outcome], 1));
+            samples.push(began.elapsed().as_nanos());
+            assert_eq!(fresh.len(), 3);
+        }
+        let first = samples.remove(0);
+        samples.sort_unstable();
+        println!(
+            "face_forget_context_timing {}",
+            json!({
+                "boundary": "receipt sanitizer entry to fresh context vector",
+                "first_ns": first, "repeated_p95_ns": samples[94],
+                "repeated_max_ns": samples[99], "repeated_count": 100,
+                "target_ns": 1_000_000,
+            })
+        );
+    }
+
+    #[test]
+    fn face_forget_context_receipts_preserve_steps_without_private_payloads() {
+        let partial_memory = "Their face and primary memory are forgotten, but not all related cleanup was confirmed. Tell them which fixed cleanup outcomes are kept or uncertain; do not say everything was forgotten.";
+        let result = json!({
+            "ok": true,
+            "everything": false,
+            "memory": partial_memory,
+            "note": crate::known_faces::FORGOTTEN_SOME_KEPT_APART,
+            "room_memory_result": "kept",
+            "sound_consent_result": "uncertain",
+            "face_expression_consent_result": "cleared",
+            "name": "private result canary",
+            "private": "private result canary",
+        });
+        let kept = status(crate::known_faces::FORGET, &result);
+        assert_eq!(kept["outcome"]["face_forgotten"], true);
+        assert_eq!(kept["outcome"]["primary_memory_result"], "forgotten");
+        assert_eq!(kept["outcome"]["old_face_records_kept_apart"], true);
+        assert_eq!(kept["outcome"]["everything"], false);
+        for field in [
+            "room_memory_result",
+            "sound_consent_result",
+            "face_expression_consent_result",
+        ] {
+            assert_eq!(kept["outcome"][field], result[field]);
+        }
+        assert!(!kept.to_string().contains("private result canary"));
+        assert!(kept["outcome"].get("memory").is_none());
+        assert!(kept["outcome"].get("note").is_none());
+    }
+
+    #[test]
+    fn face_forget_context_receipts_do_not_invent_memory_or_complete_deletion() {
+        let absent = status(
+            crate::known_faces::FORGET,
+            &json!({"ok": true, "everything": true}),
+        );
+        assert_eq!(absent["outcome"]["face_forgotten"], true);
+        assert!(absent["outcome"].get("primary_memory_result").is_none());
+        assert_ne!(absent["outcome"]["everything"], true);
+        let refused = status(crate::known_faces::FORGET, &json!({"ok": false}));
+        assert_eq!(refused["outcome"]["face_forgotten"], false);
+        let missing = status(crate::known_faces::FORGET, &json!({}));
+        assert!(missing["outcome"].get("face_forgotten").is_none());
+        for value in [
+            json!("private result canary"),
+            json!({"name": "private result canary"}),
+            Value::Null,
+            json!(crate::remember::FACE_MEMORY_KEPT),
+        ] {
+            let kept = status(
+                crate::known_faces::FORGET,
+                &json!({"ok": true, "memory": value, "note": "private result canary", "sound_consent_result": "private result canary"}),
+            );
+            assert_eq!(kept["outcome"]["primary_memory_result"], "uncertain");
+            assert_eq!(kept["outcome"]["sound_consent_result"], "uncertain");
+            assert_eq!(kept["outcome"]["face_cleanup_uncertain"], true);
+            assert_ne!(kept["outcome"]["everything"], true);
+            assert!(!kept.to_string().contains("private result canary"));
+        }
+        let complete = status(
+            crate::known_faces::FORGET,
+            &json!({"ok": true, "memory": "forgotten too"}),
+        );
+        assert_eq!(complete["outcome"]["primary_memory_result"], "forgotten");
+        assert!(complete["outcome"].get("everything").is_none());
     }
 }

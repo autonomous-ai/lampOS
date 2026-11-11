@@ -39,10 +39,7 @@ pub fn under_way(config: &Config) -> bool {
     if !setup_lifecycle::done(&config.root) {
         return false;
     }
-    let voice = fs::read_to_string(config.on(&config.units).join(VOICE_UNIT)).unwrap_or_default();
-    let walks = unit::environment(&voice, "LAMP_ONBOARDING").as_deref() == Some("on");
-    let progress =
-        unit::environment(&voice, "LAMP_ONBOARDING_FILE").unwrap_or_else(|| PROGRESS.to_owned());
+    let (walks, progress) = file(config);
     let bytes = match fs::read(config.on(&progress)) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return walks,
@@ -57,6 +54,33 @@ pub fn under_way(config: &Config) -> bool {
     lamp_msgs::ONBOARDING_STEPS
         .iter()
         .any(|step| !steps.contains_key(*step))
+}
+
+/// Whether the installed voice unit walks (`LAMP_ONBOARDING=on`), and
+/// the onboarding file it names.
+fn file(config: &Config) -> (bool, String) {
+    let voice = fs::read_to_string(config.on(&config.units).join(VOICE_UNIT)).unwrap_or_default();
+    let walks = unit::environment(&voice, "LAMP_ONBOARDING").as_deref() == Some("on");
+    let progress =
+        unit::environment(&voice, "LAMP_ONBOARDING_FILE").unwrap_or_else(|| PROGRESS.to_owned());
+    (walks, progress)
+}
+
+/// When the setup walk ended (#5978, the Hermes install's window): the
+/// voice's onboarding file's `done_at_unix_ms`, which the walk sets once,
+/// as it first hands out its done line, and keeps through a redo. None
+/// while a walk is under way, before it ended, for a walk ended before it
+/// was dated, or a file that can't be read.
+pub fn ended_at_unix_ms(config: &Config) -> Option<u64> {
+    if under_way(config) {
+        return None;
+    }
+    let (_, progress) = file(config);
+    let bytes = fs::read(config.on(&progress)).ok()?;
+    serde_json::from_slice::<serde_json::Value>(&bytes)
+        .ok()?
+        .get("done_at_unix_ms")?
+        .as_u64()
 }
 
 /// What the switch's quiet wait gives up with when a walk begins while it

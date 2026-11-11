@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use crate::journal::{self, Journal};
 use crate::lease::{Change, Leases, Refusal};
 use crate::pairing::{self, Clients, Codes, PairRefused};
+use crate::parts::Media;
 use crate::protocol::{
     self, Error, ErrorCode, EventKind, Grant, LeaseWhy, Op, Part, StateKind, VERSION,
 };
@@ -35,13 +36,21 @@ pub trait Parts {
     fn state(&self, kind: StateKind) -> Value;
     /// Ends everything `client` asked for that is still going.
     fn stop(&mut self, client: &str, now_us: u64);
-    /// Ends `client`'s camera stream, and nothing else of it: its pairing
-    /// no longer grants the camera (Thirteen's P2 on #4521).
-    fn camera_end(&mut self, _client: &str) {}
-    /// Whether `client` has a camera stream running now: a frame already
-    /// queued for it goes only then (Thirteen's P3 on #4521).
-    fn camera_streaming(&self, _client: &str) -> bool {
+    /// Ends `client`'s camera or microphone stream, and nothing else of
+    /// it: its pairing no longer grants that one (Thirteen's P2 on #4521).
+    fn media_end(&mut self, _client: &str, _media: Media) {}
+    /// Whether `client`'s camera or microphone stream that made a frame
+    /// still runs: a picture or a block already queued for it goes only then
+    /// (Thirteen's P3 on #4521). With a `turn`, only that very stream: a
+    /// newer one never carries an ended one's blocks (Second's P1 on #5839).
+    fn streaming(&self, _client: &str, _media: Media, _turn: Option<u64>) -> bool {
         false
+    }
+    /// The turn of `client`'s newest camera or microphone stream, running or
+    /// ended by itself, until its `off`: the writer tells an older stream's
+    /// late end from that stream's own (`crate::camera::older_end`).
+    fn newest_turn(&self, _client: &str, _media: Media) -> Option<u64> {
+        None
     }
     /// Does `op` for `client`, as [`Parts::act`], where the reply may wait
     /// on the part: a `turn.end` or a `listen.set` the voice answers. What
@@ -55,6 +64,15 @@ pub trait Parts {
     fn gone(&mut self, client: &str, now_us: u64) {
         self.stop(client, now_us);
     }
+    /// Whether a `gesture`, `move` or feeling's move gets a `done` once
+    /// the body says what became of it (#4209), told in hello's `limits`
+    /// as `motion_done`.
+    fn motion_done(&self) -> bool {
+        false
+    }
+    /// The connection the next `act` or `reply` is for, told just before
+    /// it: a part that tells an action's end later sends it there alone.
+    fn asking(&mut self, _connection: Option<u64>) {}
 }
 
 /// A part's answer: now, or what to run off the door's lock for it.
@@ -147,6 +165,10 @@ pub struct Session {
     /// From beyond the lamp's own network (`--remote on`): never the camera
     /// or the microphone.
     remote: bool,
+    /// The server's number for this connection, so an action's later word
+    /// (a motion's `done`) goes to this connection alone, never another of
+    /// the same computer's (Second's P2 on #5835).
+    connection: Option<u64>,
 }
 
 /// What a computer beyond the lamp's own network is told when it asks for
@@ -155,6 +177,15 @@ pub const LOCAL_ONLY: &str = "local network only: the camera and the microphone 
 
 impl Session {
     /// This connection comes from beyond the lamp's own network.
+    /// The server's number for this connection.
+    pub fn set_connection(&mut self, connection: u64) {
+        self.connection = Some(connection);
+    }
+
+    pub fn connection(&self) -> Option<u64> {
+        self.connection
+    }
+
     pub fn set_remote(&mut self) {
         self.remote = true;
     }
@@ -206,9 +237,9 @@ pub struct Door {
     codes: Codes,
     /// The grants the owner chose with the code out.
     code_grants: BTreeSet<Grant>,
-    /// A computer re-paired without the camera: its stream is ended once
-    /// the pairing is answered.
-    camera_dropped: Option<String>,
+    /// A computer re-paired without the camera or the microphone: that
+    /// stream is ended once the pairing is answered.
+    media_dropped: Vec<(String, Media)>,
     clients: Clients,
     clients_path: Option<PathBuf>,
     leases: Leases,
@@ -234,6 +265,8 @@ pub struct Door {
     /// The computers' own clips (`crate::sounds`): none, and `sound` plays
     /// the hum only.
     sounds: Option<crate::sounds::Sounds>,
+    /// The computers' own notes, kept under the state folder's `notes`.
+    notes: Option<crate::notes::Notes>,
     /// Each computer's pairing generation, raised at its every pair,
     /// re-pair and revoke from one counter, so an install asked under one
     /// pairing knows when it's no longer the same (the same key gets the
@@ -328,7 +361,7 @@ impl Door {
             lamp: json!({"id": id, "name": name, "v": VERSION}),
             codes: Codes::new(),
             code_grants: BTreeSet::new(),
-            camera_dropped: None,
+            media_dropped: Vec::new(),
             clients,
             clients_path,
             leases: Leases::new(),
@@ -342,6 +375,7 @@ impl Door {
             push_folder: None,
             pushes: Pushes::default(),
             sounds: None,
+            notes: None,
             revs: BTreeMap::new(),
             last_rev: 0,
             asking: BTreeSet::new(),
@@ -428,6 +462,13 @@ impl Door {
         self
     }
 
+    /// The computers' own notes kept under `folder` (the state folder's
+    /// `notes`).
+    pub fn with_notes_folder(mut self, folder: PathBuf) -> Self {
+        self.notes = Some(crate::notes::Notes::new(folder));
+        self
+    }
+
     /// The computers' own clips kept under `folder` (the state folder's
     /// `sounds`, which the voice plays from).
     pub fn with_sound_folder(mut self, folder: PathBuf) -> Self {
@@ -497,6 +538,7 @@ impl Door {
             events: BTreeSet::new(),
             phrases: Vec::new(),
             remote: false,
+            connection: None,
         };
         use base64::Engine as _;
         let welcome = json!({
@@ -555,6 +597,9 @@ impl Door {
             self.tell_helper_off(client);
             if let Some(sounds) = &mut self.sounds {
                 sounds.forget(client);
+            }
+            if let Some(notes) = &mut self.notes {
+                notes.forget(client);
             }
         }
         // To the file: now, or with the next save that succeeds (a retry,
@@ -692,12 +737,14 @@ impl Door {
         match &op {
             Op::Pair { name, key, proof } => {
                 let outcome = self.pair(session, re, name, key, proof, now_us, wall_s);
-                if let Some(client) = self.camera_dropped.take() {
-                    parts.camera_end(&client);
+                for (client, media) in std::mem::take(&mut self.media_dropped) {
+                    parts.media_end(&client, media);
                 }
                 return outcome;
             }
-            Op::Hello { client, sig } => return self.hello(session, re, client, sig),
+            Op::Hello { client, sig } => {
+                return self.hello(session, re, client, sig, parts.motion_done());
+            }
             _ => {}
         }
         let Some(client) = session.client.clone() else {
@@ -783,6 +830,10 @@ impl Door {
             } => {
                 return match self.leases.take(&client, wanted, *for_ms, now_us) {
                     Ok(held) => ok(re, json!({"lease": held.lease, "for_ms": for_ms})),
+                    Err(Refusal::Busy { part, holder }) if holder == client => {
+                        let suspended = self.leases.has_suspended(&client, part, now_us);
+                        reply_refused(Some(re), own_busy(part, suspended))
+                    }
                     Err(refusal) => refused_by_lease(re, refusal),
                 };
             }
@@ -858,6 +909,65 @@ impl Door {
                         ask: Some(Ask {
                             rev: self.rev_of(&client),
                             ..Ask::install(re, &client, &sha256)
+                        }),
+                        ..Outcome::default()
+                    },
+                    Err(error) => reply_refused(Some(re), error),
+                };
+            }
+            Op::NotesSet { .. }
+            | Op::NotesGet { .. }
+            | Op::NotesDelete { .. }
+            | Op::NotesList { .. }
+                if self.notes.is_none() =>
+            {
+                return refuse(ErrorCode::Refused, NOTES_OFF.to_owned());
+            }
+            Op::NotesSet { .. }
+            | Op::NotesGet { .. }
+            | Op::NotesDelete { .. }
+            | Op::NotesList { .. } => {
+                // Each is a read or a write of the lamp's disk: held to its
+                // rate, and counted once the notes took it.
+                let class = Class::of(&op).expect("a notes op has a rate");
+                if let Err(retry_ms) = self.rates.check(&client, class, now_us) {
+                    let mut error = Error::new(ErrorCode::Rate, class.says());
+                    error.retry_ms = Some(retry_ms);
+                    return reply_refused(Some(re), error);
+                }
+                let notes = self.notes.as_ref().expect("notes on");
+                // A write is kept off the door's lock (two fsyncs took 11 to
+                // 15 ms on lamp-75c9, 10 Nov), its answer coming when it is;
+                // a read is from memory.
+                let answered = match &op {
+                    Op::NotesSet { key, value } => notes.set(&client, key, value),
+                    Op::NotesDelete { key } => notes.delete(&client, key),
+                    Op::NotesGet { key } => notes.get(&client, key).map(|found| {
+                        crate::notes::Step::Now(match found {
+                            Some(value) => json!({"key": key, "found": true, "value": value}),
+                            None => json!({"key": key, "found": false}),
+                        })
+                    }),
+                    Op::NotesList { prefix } => {
+                        notes.list(&client, prefix).map(crate::notes::Step::Now)
+                    }
+                    _ => unreachable!("a notes op"),
+                };
+                // A write counts whether or not it took: a failed write
+                // still cost the disk a try (nine's P3 on banana/store).
+                // A busy refusal cost the disk nothing: not counted.
+                let busy = matches!(&answered, Err(error) if error.code == ErrorCode::Busy);
+                if answered.is_ok() || (class == Class::NotesWrite && !busy) {
+                    self.rates.count(&client, class, now_us);
+                }
+                return match answered {
+                    Ok(crate::notes::Step::Now(with)) => ok(re, with),
+                    Ok(crate::notes::Step::Later(run)) => Outcome {
+                        later: Some(Later {
+                            re,
+                            client,
+                            op: journal::op_name(&op),
+                            run,
                         }),
                         ..Outcome::default()
                     },
@@ -947,6 +1057,13 @@ impl Door {
         } else if op.needs_lease() == Some(Part::Body)
             && !self.leases.holds(&client, Part::Body, now_us)
         {
+            // A lease a conversation suspended is still this client's: say
+            // so, so a program waits for the `held` event instead of taking
+            // a second lease (the lead's 4-lamp show, 10 Nov: `no_lease` on
+            // about 1 turn in 6 while `Lease.state` still read held).
+            if self.leases.has_suspended(&client, Part::Body, now_us) {
+                return reply_refused(Some(re), own_busy(Part::Body, true));
+            }
             return refuse(
                 ErrorCode::NoLease,
                 "take a lease on the body first".to_owned(),
@@ -983,6 +1100,7 @@ impl Door {
             error.retry_ms = Some(retry_ms);
             return reply_refused(Some(re), error);
         }
+        parts.asking(session.connection);
         match parts.reply(&client, re, &op, now_us) {
             Ok(reply) => {
                 // Counted only once the part took it.
@@ -1083,19 +1201,28 @@ impl Door {
         {
             self.tell_helper_grants(&id, &grants);
         }
-        // Re-paired without the camera: a stream it had going ends now,
-        // not when it next asks (Thirteen's P2 on #4521).
-        if before
-            .as_ref()
-            .is_some_and(|before| before.grants.contains(&Grant::Camera))
-            && !grants.contains(&Grant::Camera)
-        {
-            self.camera_dropped = Some(id.clone());
+        // Re-paired without the camera or the microphone: a stream it had
+        // going ends now, not when it next asks (Thirteen's P2 on #4521).
+        for media in [Media::Camera, Media::Microphone] {
+            if before
+                .as_ref()
+                .is_some_and(|before| before.grants.contains(&media.grant()))
+                && !grants.contains(&media.grant())
+            {
+                self.media_dropped.push((id.clone(), media));
+            }
         }
         ok(re, json!({"client": id, "grants": grants}))
     }
 
-    fn hello(&mut self, session: &mut Session, re: u64, client: &str, sig: &str) -> Outcome {
+    fn hello(
+        &mut self,
+        session: &mut Session,
+        re: u64,
+        client: &str,
+        sig: &str,
+        motion_done: bool,
+    ) -> Outcome {
         // One hello a connection, so its count of open connections stays
         // right (the Reviewer-lead's P3: a second id kept the first's
         // leases open after it closed).
@@ -1119,15 +1246,21 @@ impl Door {
         let grants = paired.grants.clone();
         *self.open.entry(client.to_owned()).or_default() += 1;
         session.client = Some(client.to_owned());
+        let mut limits = limits(
+            self.quiet.as_ref().and_then(|quiet| quiet.window),
+            self.rates.lifted(),
+        );
+        // A gesture's, a move's and a feeling's move's `done` (#4209): told
+        // so an SDK waits for it only where it comes.
+        if motion_done {
+            limits["motion_done"] = json!(true);
+        }
         ok(
             re,
             json!({
                 "lamp": self.lamp,
                 "grants": grants,
-                "limits": limits(
-                    self.quiet.as_ref().and_then(|quiet| quiet.window),
-                    self.rates.lifted()
-                ),
+                "limits": limits,
             }),
         )
     }
@@ -1141,6 +1274,9 @@ impl Door {
         Ok(())
     }
 }
+
+/// Why a notes op is refused on a lamp that keeps no computer's notes.
+pub const NOTES_OFF: &str = "this lamp keeps no computer's notes";
 
 /// Why a clip op is refused on a lamp that keeps no clips.
 pub const SOUNDS_OFF: &str = "this lamp keeps no computer's clips";
@@ -1170,6 +1306,7 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
             "lease_max_ms": protocol::LEASE_MAX_MS,
             "say_max_bytes": protocol::SAY_MAX_BYTES,
             "sounds": sounds_limits(),
+            "notes": notes_limits(),
             "quiet_hours": quiet_hours_of(quiet),
             "ring": ring_limits(),
         });
@@ -1188,8 +1325,30 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
         "lease_max_ms": protocol::LEASE_MAX_MS,
         "say_max_bytes": protocol::SAY_MAX_BYTES,
         "sounds": sounds_limits(),
+        "notes": notes_limits(),
         "quiet_hours": quiet_hours_of(quiet),
         "ring": ring_limits(),
+    })
+}
+
+/// A computer's notes, as hello tells them (`crate::notes`): what a key and
+/// a value may be, how much each computer keeps, and the rates of writes and
+/// reads.
+fn notes_limits() -> Value {
+    let class = |class: Class| -> Value {
+        class
+            .windows()
+            .iter()
+            .map(|(most, within)| json!({"most": most, "within_ms": within / 1_000}))
+            .collect()
+    };
+    json!({
+        "key_max_bytes": crate::notes::KEY_MOST_BYTES,
+        "value_max_bytes": crate::notes::VALUE_MOST_BYTES,
+        "keys_max": crate::notes::KEYS_MOST,
+        "bytes_max": crate::notes::TOTAL_MOST_BYTES,
+        "writes": class(Class::NotesWrite),
+        "reads": class(Class::NotesRead),
     })
 }
 
@@ -1303,6 +1462,24 @@ fn reply_refused(re: Option<u64>, error: Error) -> Outcome {
     }
 }
 
+/// A take refused because this computer holds the part itself: by a lease
+/// a conversation suspended (it comes back when they stop), or by one it
+/// still has, not "another computer" (the lead's lamp run, 10 Nov).
+fn own_busy(part: Part, suspended: bool) -> Error {
+    let part = json!(part);
+    let part = part.as_str().unwrap_or_default();
+    Error::new(
+        ErrorCode::Busy,
+        if suspended {
+            format!(
+                "your lease on the {part} is suspended while someone talks to the lamp: it is yours again when they stop"
+            )
+        } else {
+            format!("you already hold the {part}: use the lease you have")
+        },
+    )
+}
+
 fn refused_by_lease(re: u64, refusal: Refusal) -> Outcome {
     let error = match refusal {
         Refusal::Busy { part, .. } => Error::new(
@@ -1331,6 +1508,20 @@ fn refused_by_lease(re: u64, refusal: Refusal) -> Outcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A computer refused its own body take says whose lease holds it
+    /// (the lead's lamp run, 10 Nov: "another computer" for its own).
+    #[test]
+    fn a_take_refused_by_its_own_lease_does_not_blame_another_computer() {
+        assert_eq!(
+            own_busy(Part::Body, true).why,
+            "your lease on the body is suspended while someone talks to the lamp: it is yours again when they stop"
+        );
+        assert_eq!(
+            own_busy(Part::Body, false).why,
+            "you already hold the body: use the lease you have"
+        );
+    }
     use base64::Engine as _;
     use base64::engine::general_purpose::STANDARD;
     use ring::signature::{Ed25519KeyPair, KeyPair as _};
@@ -1342,7 +1533,7 @@ mod tests {
     struct Fake {
         did: Vec<String>,
         stopped: Vec<String>,
-        cameras_ended: Vec<String>,
+        media_ended: Vec<(String, Media)>,
         refuse_with: Option<Error>,
     }
 
@@ -1363,8 +1554,8 @@ mod tests {
         fn stop(&mut self, client: &str, _: u64) {
             self.stopped.push(client.to_owned());
         }
-        fn camera_end(&mut self, client: &str) {
-            self.cameras_ended.push(client.to_owned());
+        fn media_end(&mut self, client: &str, media: Media) {
+            self.media_ended.push((client.to_owned(), media));
         }
     }
 
@@ -1453,15 +1644,47 @@ mod tests {
         };
         pair_again(&mut door, &mut fake, &[Grant::Light, Grant::Camera], 5 * S);
         assert!(
-            fake.cameras_ended.is_empty(),
+            fake.media_ended.is_empty(),
             "the camera kept, the stream goes on"
         );
         pair_again(&mut door, &mut fake, &[Grant::Light], 10 * S);
-        assert_eq!(fake.cameras_ended, [id]);
+        assert_eq!(fake.media_ended, [(id, Media::Camera)]);
         assert!(
             fake.stopped.is_empty(),
             "only the camera, not its light or leases"
         );
+    }
+
+    /// As the camera's: a computer re-paired without the microphone has its
+    /// stream ended at once; one re-paired without both has both ended.
+    #[test]
+    fn a_re_pairing_that_drops_the_microphone_ends_its_stream_at_once() {
+        let computer = Computer::new(42);
+        let all = [Grant::Light, Grant::Camera, Grant::Microphone];
+        let (mut door, _, mut fake) = paired(&computer, &all);
+        let id = pairing::client_id(&computer.key());
+        let pair_again = |door: &mut Door, fake: &mut Fake, grants: &[Grant], at: u64| {
+            let code = door.issue_code(grants.iter().copied().collect(), at);
+            let (mut session, welcome) = door.open();
+            let outcome = door.handle(
+                &mut session,
+                &computer.pair_frame(&code, &welcome),
+                fake,
+                at,
+                1,
+            );
+            assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+        };
+        pair_again(&mut door, &mut fake, &[Grant::Light, Grant::Camera], 5 * S);
+        assert_eq!(fake.media_ended, [(id.clone(), Media::Microphone)]);
+        pair_again(&mut door, &mut fake, &all, 10 * S);
+        assert_eq!(fake.media_ended.len(), 1, "granted again, nothing ends");
+        pair_again(&mut door, &mut fake, &[Grant::Light], 15 * S);
+        assert_eq!(
+            fake.media_ended[1..],
+            [(id.clone(), Media::Camera), (id, Media::Microphone)]
+        );
+        assert!(fake.stopped.is_empty(), "only the streams, not its light");
     }
 
     /// docs/control.md, "The journal": one line a command, naming the
@@ -2265,6 +2488,57 @@ mod tests {
     }
 
     #[test]
+    fn a_microphone_stream_is_journaled_on_and_off_and_never_given_beyond_the_lamps_network() {
+        let computer = Computer::new(1);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Microphone]);
+        let lines = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let into = lines.clone();
+        let mut door = door.with_journal(Journal::to(move |line| {
+            into.lock().unwrap().push(line.to_owned())
+        }));
+        for (n, frame) in [
+            r#"{"id":3,"op":"microphone.stream","on":true}"#,
+            r#"{"id":4,"op":"microphone.stream","on":false}"#,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let near = door.handle(&mut session, frame, &mut fake, 2 * S + n as u64 * S, 1);
+            assert_eq!(code_of(&near), None, "{near:?}");
+        }
+        let client = pairing::client_id(&computer.key());
+        door.journal_event(&client, "microphone.ended", 4 * S);
+        let lines = lines.lock().unwrap().clone();
+        let who = format!("{client} (a name the door doesn't write)");
+        assert!(
+            lines[0].starts_with(&format!(
+                "lamp-control: {who}: microphone.stream (on): ok, to the ears, by mic1/audio, "
+            )),
+            "{lines:?}"
+        );
+        assert!(
+            lines[1].starts_with(&format!(
+                "lamp-control: {who}: microphone.stream (off): ok, to the ears, by mic1/audio, "
+            )),
+            "{lines:?}"
+        );
+        assert_eq!(
+            lines[2],
+            format!("lamp-control: {who}: event microphone.ended sent")
+        );
+        session.set_remote();
+        let far = door.handle(
+            &mut session,
+            r#"{"id":5,"op":"microphone.stream","on":true}"#,
+            &mut fake,
+            5 * S,
+            1,
+        );
+        assert_eq!(code_of(&far), Some("refused"));
+        assert_eq!(reply(&far)["error"]["why"], LOCAL_ONLY);
+    }
+
+    #[test]
     fn a_computer_beyond_the_lamps_own_network_never_gets_the_camera_whatever_it_was_granted() {
         let computer = Computer::new(1);
         let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Light, Grant::Camera]);
@@ -2613,6 +2887,176 @@ mod tests {
         assert!(folder.join(&id).join("chime.wav").is_file());
         assert!(door.revoke(&id, 3 * S).was);
         assert!(!folder.join(&id).exists());
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// A computer's own notes at the door (docs/control.md, "Notes"): the
+    /// notes grant, set, read, listed and deleted as its own, refused on a
+    /// lamp keeping none, a bad key refused, and deleted with its revoke.
+    #[test]
+    fn notes_are_set_read_listed_deleted_and_deleted_with_a_revoke() {
+        let folder =
+            std::env::temp_dir().join(format!("lamp-control-door-notes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        let set = r#"{"id":2,"op":"notes.set","key":"mood","value":{"calm":true}}"#;
+
+        // No notes grant: refused, for each op.
+        let computer = Computer::new(1);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak]);
+        let mut door = door.with_notes_folder(folder.clone());
+        for frame in [
+            set,
+            r#"{"id":2,"op":"notes.get","key":"mood"}"#,
+            r#"{"id":2,"op":"notes.delete","key":"mood"}"#,
+            r#"{"id":2,"op":"notes.list"}"#,
+        ] {
+            let outcome = door.handle(&mut session, frame, &mut fake, 2 * S, 1);
+            assert_eq!(code_of(&outcome), Some("no_grant"), "{frame}");
+        }
+
+        // A lamp keeping none: refused with why.
+        let computer = Computer::new(2);
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Notes]);
+        let outcome = door.handle(&mut session, set, &mut fake, 2 * S, 1);
+        assert_eq!(reply(&outcome)["error"]["why"], NOTES_OFF);
+
+        let computer = Computer::new(3);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Notes]);
+        let id = pairing::client_id(&computer.key());
+        let mut door = door.with_notes_folder(folder.clone());
+        // A write's answer comes when its disk write has run, off the door's
+        // lock: run it here.
+        let mut ask = |door: &mut Door, frame: &str| {
+            let mut outcome = door.handle(&mut session, frame, &mut fake, 2 * S, 1);
+            match outcome.later.take() {
+                Some(later) => later.reply(),
+                None => reply(&outcome).clone(),
+            }
+        };
+        let kept = ask(&mut door, set);
+        assert_eq!(kept["key"], "mood");
+        assert_eq!(kept["bytes"], 13);
+        assert!(folder.join(format!("{id}.json")).is_file());
+        let read = ask(&mut door, r#"{"id":3,"op":"notes.get","key":"mood"}"#);
+        assert_eq!(
+            (read["found"].clone(), read["value"].clone()),
+            (json!(true), json!({"calm": true}))
+        );
+        let missing = ask(&mut door, r#"{"id":3,"op":"notes.get","key":"nope"}"#);
+        assert_eq!(missing["found"], false);
+        assert!(missing.get("value").is_none(), "{missing}");
+        ask(
+            &mut door,
+            r#"{"id":4,"op":"notes.set","key":"mode","value":1}"#,
+        );
+        let listed = ask(&mut door, r#"{"id":5,"op":"notes.list","prefix":"mo"}"#);
+        assert_eq!(
+            listed["keys"],
+            json!([{"key": "mode", "bytes": 1}, {"key": "mood", "bytes": 13}])
+        );
+        let all = ask(&mut door, r#"{"id":5,"op":"notes.list"}"#);
+        assert_eq!(all["count"], 2);
+        assert_eq!(all["keys_max"], 256);
+        // A bad key or a missing value is a bad request, nothing kept.
+        for frame in [
+            r#"{"id":6,"op":"notes.set","key":"a b","value":1}"#,
+            r#"{"id":6,"op":"notes.set","key":"","value":1}"#,
+            r#"{"id":6,"op":"notes.set","key":"k"}"#,
+            r#"{"id":6,"op":"notes.get","key":"../x"}"#,
+            r#"{"id":6,"op":"notes.list","prefix":"a/b"}"#,
+        ] {
+            assert_eq!(
+                ask(&mut door, frame)["error"]["code"],
+                "bad_request",
+                "{frame}"
+            );
+        }
+        let deleted = ask(&mut door, r#"{"id":7,"op":"notes.delete","key":"mode"}"#);
+        assert_eq!(deleted["deleted"], true);
+        let again = ask(&mut door, r#"{"id":7,"op":"notes.delete","key":"mode"}"#);
+        assert_eq!(again["deleted"], false);
+
+        // The computer revoked: its notes go with it.
+        assert!(door.revoke(&id, 3 * S).was);
+        assert!(!folder.join(format!("{id}.json")).exists());
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// nine's P3 on banana/store: a write the notes refused still cost the
+    /// disk a try, so it counts in the rate; the 31st write in a minute is
+    /// `rate` whether or not the earlier ones took.
+    #[test]
+    fn a_refused_notes_write_still_counts_in_the_rate() {
+        let folder = std::env::temp_dir().join(format!(
+            "lamp-control-door-notes-rate-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&folder);
+        let computer = Computer::new(1);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Notes]);
+        let mut door = door.with_notes_folder(folder.clone());
+        let too_big = format!(
+            r#"{{"id":2,"op":"notes.set","key":"k","value":"{}"}}"#,
+            "x".repeat(16_400)
+        );
+        for n in 0..30 {
+            let outcome = door.handle(&mut session, &too_big, &mut fake, 2 * S + n, 1);
+            assert_eq!(code_of(&outcome), Some("bad_request"), "{n}");
+        }
+        let outcome = door.handle(&mut session, &too_big, &mut fake, 2 * S + 40, 1);
+        assert_eq!(code_of(&outcome), Some("rate"));
+        // A read has its own, untouched window.
+        let outcome = door.handle(
+            &mut session,
+            r#"{"id":3,"op":"notes.get","key":"k"}"#,
+            &mut fake,
+            2 * S + 50,
+            1,
+        );
+        assert_eq!(reply(&outcome)["found"], false);
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// eighth's P3 on banana/store: a write refused as busy (the last one
+    /// is still being kept) costs the disk nothing, so it is not in the rate.
+    #[test]
+    fn a_busy_notes_write_does_not_count_in_the_rate() {
+        let folder = std::env::temp_dir().join(format!(
+            "lamp-control-door-notes-busy-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&folder);
+        let computer = Computer::new(1);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Notes]);
+        let mut door = door.with_notes_folder(folder.clone());
+        let mut first = door.handle(
+            &mut session,
+            r#"{"id":2,"op":"notes.set","key":"k","value":1}"#,
+            &mut fake,
+            2 * S,
+            1,
+        );
+        let kept = first.later.take().expect("a write is kept later");
+        for n in 0..40 {
+            let outcome = door.handle(
+                &mut session,
+                r#"{"id":3,"op":"notes.set","key":"j","value":1}"#,
+                &mut fake,
+                2 * S + n,
+                1,
+            );
+            assert_eq!(code_of(&outcome), Some("busy"), "{n}");
+        }
+        assert_eq!(kept.reply()["key"], "k");
+        // Forty busy tries later this computer is not rate-limited.
+        let mut next = door.handle(
+            &mut session,
+            r#"{"id":4,"op":"notes.set","key":"j","value":1}"#,
+            &mut fake,
+            2 * S + 100,
+            1,
+        );
+        assert_eq!(next.later.take().expect("kept").reply()["key"], "j");
         let _ = std::fs::remove_dir_all(&folder);
     }
 

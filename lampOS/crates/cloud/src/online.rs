@@ -248,6 +248,8 @@ struct Handed {
     uploads_lost: Vec<crate::settings::Outcome>,
     /// Those the broker acknowledged, for `Uploads::acked`.
     uploads_acked: Vec<crate::settings::Outcome>,
+    /// The `onboarding.done` date the broker acknowledged (#5812).
+    onboarding_done_acked: Option<u64>,
     /// Journal lines, one per step of a change's result (Mobile on #1959,
     /// 21:0x): handed, sent as a packet, acked or lost. Never its data.
     journal: Vec<String>,
@@ -269,6 +271,9 @@ enum Tagged {
     /// A skill added from a file's result (`crate::upload`), said again if
     /// it is lost before its ack: the backend deletes the file on it.
     Upload(crate::settings::Outcome),
+    /// The app told the walk's end, at this date (`crate::onboarding_done`),
+    /// sent again if it is lost before its ack.
+    OnboardingDone(u64),
 }
 
 impl Handed {
@@ -355,6 +360,10 @@ impl Handed {
                 self.uploads_acked.push(outcome);
                 None
             }
+            Some(Tagged::OnboardingDone(at)) => {
+                self.onboarding_done_acked = Some(at);
+                None
+            }
             _ => None,
         }
     }
@@ -434,8 +443,18 @@ fn dropped(
     lamp: &mut impl Lamp,
     changes: &Option<Arc<crate::settings::Changes>>,
     reports: &Option<Arc<crate::reports::Shared>>,
+    onboarding_done: &mut Option<crate::onboarding_done::Done>,
+    onboarding_step: &mut Option<crate::onboarding_step::Steps>,
 ) {
     let again = handed.lost();
+    // Whatever was not acked went with the connection: the walk's end too.
+    if let Some(done) = onboarding_done {
+        done.lost();
+    }
+    // Looked at again with the walk's end on the next connection (#5979).
+    if let Some(steps) = onboarding_step {
+        steps.lost();
+    }
     let services = std::mem::take(&mut handed.services_lost);
     if let Some(shared) = lamp.services() {
         shared.owe(services);
@@ -557,6 +576,15 @@ async fn session(
     let mut harness_sign_in = lamp
         .harness_sign_in()
         .map(crate::harness_sign_in::Follow::new);
+    // The walk's end told to the app once (#5812), with its switch.
+    let mut onboarding_done = lamp
+        .onboarding_done()
+        .map(crate::onboarding_done::Done::new);
+    // Each walk step's end told to the app once (#5979), with the same
+    // switch, its file beside the done one.
+    let mut onboarding_step = lamp
+        .onboarding_done()
+        .map(crate::onboarding_step::Steps::new);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // What was last said, so a state is said once.
     let mut said = String::new();
@@ -597,7 +625,7 @@ async fn session(
                             break None;
                         }
                     }
-                    _ = tick.tick(), if skill_lines || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() => {
+                    _ = tick.tick(), if skill_lines || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() => {
                         let me = identity.borrow().clone();
                         // Only while connected: the app asks `state` on its
                         // screen's open for what it missed.
@@ -609,6 +637,40 @@ async fn session(
                                 .data(&now(), crate::harness_sign_in::PUSHED, &Ok(Some(view)))
                                 .to_string();
                             handed.publish(&client, account.fd_channel.as_str(), pushed, None);
+                        }
+                        // Each walk step's end (#5979): only while connected,
+                        // best effort, tried once and never waiting on an
+                        // ack. Before the walk's end, on the same look (one
+                        // `looked`, both lost with the connection), so the
+                        // last step's event goes ahead of `onboarding.done`;
+                        // neither waits on the other.
+                        let looked = std::time::Instant::now();
+                        if connected
+                            && let Some(steps) = onboarding_step.as_mut()
+                            && let Some((walk_id, ended)) = steps.due(looked, crate::chat::now_ms(), || lamp.onboarding_steps())
+                        {
+                            for ended in ended {
+                                let event = me
+                                    .data(&now(), crate::onboarding_step::KIND, &Ok(Some(crate::onboarding_step::data(walk_id, &ended))))
+                                    .to_string();
+                                let took = handed.publish(&client, account.fd_channel.as_str(), event, None);
+                                say.line(&steps.tried(&ended, took));
+                            }
+                        }
+                        // The walk's end (#5812): only while connected, and
+                        // kept until the broker's ack.
+                        if connected
+                            && let Some(done) = onboarding_done.as_mut()
+                            && let Some(at) = done.due(looked, || lamp.onboarding())
+                        {
+                            let event = me
+                                .data(&now(), crate::onboarding_done::KIND, &Ok(Some(crate::onboarding_done::data(at))))
+                                .to_string();
+                            let tag = Tagged::OnboardingDone(at);
+                            if handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
+                                done.handed(at);
+                                say.line(&format!("{}: handed to the client, at {at}", crate::onboarding_done::KIND));
+                            }
                         }
                         if texting {
                             for data in lamp.chat_events(crate::chat::now_ms()) {
@@ -697,7 +759,14 @@ async fn session(
             say.line(&line);
         }
         let Some(polled) = polled else {
-            dropped(&mut handed, lamp, &changes, &reports);
+            dropped(
+                &mut handed,
+                lamp,
+                &changes,
+                &reports,
+                &mut onboarding_done,
+                &mut onboarding_step,
+            );
             connected = false;
             for line in std::mem::take(&mut handed.journal) {
                 say.line(&line);
@@ -768,6 +837,11 @@ async fn session(
                         changes.acked(&outcome);
                     }
                 }
+                if let Some(at) = handed.onboarding_done_acked.take()
+                    && let Some(done) = onboarding_done.as_mut()
+                {
+                    say.line(&done.acked(at));
+                }
                 // A skill from a file's result acked: no longer in flight.
                 for outcome in std::mem::take(&mut handed.uploads_acked) {
                     if let Some(uploads) = lamp.upload() {
@@ -786,7 +860,14 @@ async fn session(
             Ok(_) => {}
             Err(error) => {
                 connected = false;
-                dropped(&mut handed, lamp, &changes, &reports);
+                dropped(
+                    &mut handed,
+                    lamp,
+                    &changes,
+                    &reports,
+                    &mut onboarding_done,
+                    &mut onboarding_step,
+                );
                 for line in std::mem::take(&mut handed.journal) {
                     say.line(&line);
                 }
@@ -909,6 +990,9 @@ mod tests {
         /// publish after it in its queue meanwhile (#2562, the reviewer's
         /// correction read on #2769).
         HoldsFirstAck,
+        /// Takes every connection, but closes the first on its first
+        /// `onboarding.done`, unacknowledged (#5812).
+        DropsDoneUnacked,
     }
 
     /// How long [`Broker::HoldsFirstAck`] holds the first PUBACK back.
@@ -1079,6 +1163,9 @@ mod tests {
                         }
                         Packet::Publish(publish) => {
                             let payload = String::from_utf8_lossy(&publish.payload).into_owned();
+                            let unacked = behaves == Broker::DropsDoneUnacked
+                                && connections == 1
+                                && payload.contains("\"kind\":\"onboarding.done\"");
                             if behaves == Broker::StaleFirstLateAck
                                 && payload.contains("\"kind\":\"wifi.joined\"")
                             {
@@ -1088,6 +1175,9 @@ mod tests {
                                 String::from_utf8_lossy(&publish.topic).into_owned(),
                                 payload,
                             ));
+                            if unacked {
+                                break 'connection;
+                            }
                             if behaves == Broker::HoldsFirstAck && replies == 0 {
                                 tokio::time::sleep(HELD_ACK).await;
                             }
@@ -2611,5 +2701,232 @@ mod tests {
             .filter(|s| matches!(s, Seen::Subscribe(_)))
             .count();
         assert!(connects >= 2 && subscribes >= 2, "{seen:?}");
+    }
+
+    /// The walk's end the tests' lamp knows (#5812).
+    const DONE_AT: u64 = 1_762_675_200_000;
+
+    /// A lamp that knows the walk's end `at`, with the switch on (its file
+    /// in `dir`) or off.
+    fn lamp_done(at: Option<u64>, dir: Option<&std::path::Path>) -> Fake {
+        Fake {
+            onboarding: at,
+            onboarding_done: dir.map(|dir| dir.join(crate::onboarding_done::FILE)),
+            ..Fake::default()
+        }
+    }
+
+    /// The `onboarding.done` replies the broker saw, on `fd_channel`.
+    fn dones(seen: &[Seen]) -> Vec<serde_json::Value> {
+        publishes(seen)
+            .into_iter()
+            .filter(|(topic, reply)| topic == "fd/d-42" && reply["kind"] == "onboarding.done")
+            .map(|(_, reply)| reply)
+            .collect()
+    }
+
+    fn acked(lines: &[String]) -> bool {
+        lines
+            .iter()
+            .any(|line| line.starts_with("onboarding.done: acked by the broker"))
+    }
+
+    /// #5812: the walk's end goes to the app exactly once, as an unasked
+    /// `data` reply with `at` only; once acked it is kept in the state
+    /// file, and a restart sends nothing more.
+    #[tokio::test]
+    async fn the_walks_end_is_told_once_and_kept_after_the_ack() {
+        let dir = tempfile::tempdir().unwrap();
+        let start = std::time::Instant::now();
+        let (seen, lines) = lines_against(
+            Broker::Takes,
+            lamp_done(Some(DONE_AT), Some(dir.path())),
+            |lines| acked(lines) && start.elapsed() >= Duration::from_millis(2500),
+        )
+        .await;
+        let told = dones(&seen);
+        assert_eq!(told.len(), 1, "{told:?} {lines:?}");
+        assert_eq!(
+            (&told[0]["type"], &told[0]["status"], &told[0]["data"]),
+            (
+                &serde_json::json!("data"),
+                &serde_json::json!("success"),
+                &serde_json::json!({"at": DONE_AT})
+            )
+        );
+        let file = dir.path().join(crate::onboarding_done::FILE);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), DONE_AT.to_string());
+        // lamp-cloud restarts: acked already, so nothing more is sent.
+        let start = std::time::Instant::now();
+        let (seen, _) = lines_against(
+            Broker::Takes,
+            lamp_done(Some(DONE_AT), Some(dir.path())),
+            |_| start.elapsed() >= Duration::from_millis(1500),
+        )
+        .await;
+        assert!(dones(&seen).is_empty(), "{seen:?}");
+    }
+
+    /// #5812: one the connection took before its ack is sent again on the
+    /// next connection, the same `at`, and kept once that one is acked.
+    #[tokio::test]
+    async fn the_walks_end_lost_before_its_ack_is_told_again_on_the_next_connection() {
+        let dir = tempfile::tempdir().unwrap();
+        let (seen, lines) = lines_against(
+            Broker::DropsDoneUnacked,
+            lamp_done(Some(DONE_AT), Some(dir.path())),
+            acked,
+        )
+        .await;
+        let told = dones(&seen);
+        // The client may also send its own copy again: two at least.
+        assert!(told.len() >= 2, "{told:?} {lines:?}");
+        assert!(
+            told.iter()
+                .all(|reply| reply["data"] == serde_json::json!({"at": DONE_AT}))
+        );
+        let connects = seen
+            .iter()
+            .filter(|seen| matches!(seen, Seen::Connect { .. }))
+            .count();
+        assert_eq!(connects, 2, "{seen:?}");
+        let file = dir.path().join(crate::onboarding_done::FILE);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), DONE_AT.to_string());
+    }
+
+    /// #5812: no date (a walk not ended, or set up before it was dated)
+    /// sends nothing, nor does a date with the switch off.
+    #[tokio::test]
+    async fn without_a_date_or_the_switch_the_walks_end_is_not_told() {
+        let dir = tempfile::tempdir().unwrap();
+        for lamp in [
+            lamp_done(None, Some(dir.path())),
+            lamp_done(Some(DONE_AT), None),
+        ] {
+            let start = std::time::Instant::now();
+            let (seen, lines) = lines_against(Broker::Takes, lamp, |_| {
+                start.elapsed() >= Duration::from_millis(1500)
+            })
+            .await;
+            assert!(
+                seen.iter().any(|seen| matches!(seen, Seen::Publish(..))),
+                "{seen:?}"
+            );
+            assert!(dones(&seen).is_empty(), "{seen:?}");
+            assert!(
+                !lines.iter().any(|line| line.starts_with("onboarding.done")),
+                "{lines:?}"
+            );
+        }
+        assert!(!dir.path().join(crate::onboarding_done::FILE).exists());
+    }
+
+    /// A lamp whose walk `WALK` ended two steps just before `now` (Unix
+    /// ms), its end known, with the switch on (its files in `dir`) or off
+    /// (#5979).
+    fn lamp_steps(now: u64, dir: Option<&std::path::Path>) -> Fake {
+        let ended = |step: &str, outcome: &str, at| lamp_msgs::OnboardingStepEnded {
+            step: step.into(),
+            outcome: outcome.into(),
+            at,
+        };
+        Fake {
+            onboarding_steps: Some((
+                WALK,
+                vec![
+                    ended("where_you_sit", "done", now - 2_000),
+                    ended("touch", "not_available", now - 1_000),
+                ],
+            )),
+            ..lamp_done(Some(DONE_AT), dir)
+        }
+    }
+
+    /// The walk's id the tests' lamp knows (#5979).
+    const WALK: u64 = 1_762_675_100_000;
+
+    /// The `onboarding.step` replies the broker saw, on `fd_channel`.
+    fn steps_told(seen: &[Seen]) -> Vec<serde_json::Value> {
+        publishes(seen)
+            .into_iter()
+            .filter(|(topic, reply)| topic == "fd/d-42" && reply["kind"] == "onboarding.step")
+            .map(|(_, reply)| reply)
+            .collect()
+    }
+
+    /// #5979: each ended step goes to the app once, in the order it ended,
+    /// as an unasked `data` reply holding its step, outcome, end and walk
+    /// only; `onboarding.done` goes as before and is acked; a restart sends
+    /// no step again.
+    #[tokio::test]
+    async fn each_walk_step_is_told_once_beside_the_walks_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let now = crate::chat::now_ms();
+        let start = std::time::Instant::now();
+        let (seen, lines) =
+            lines_against(Broker::Takes, lamp_steps(now, Some(dir.path())), |lines| {
+                acked(lines) && start.elapsed() >= Duration::from_millis(2500)
+            })
+            .await;
+        let told = steps_told(&seen);
+        let named: Vec<_> = told.iter().map(|reply| &reply["data"]["step"]).collect();
+        assert_eq!(named, ["where_you_sit", "touch"], "{told:?} {lines:?}");
+        for reply in &told {
+            assert_eq!(
+                (&reply["type"], &reply["status"], &reply["data"]["walk_id"]),
+                (
+                    &serde_json::json!("data"),
+                    &serde_json::json!("success"),
+                    &serde_json::json!(WALK)
+                )
+            );
+            let mut keys: Vec<_> = reply["data"].as_object().unwrap().keys().collect();
+            keys.sort();
+            assert_eq!(keys, ["at", "outcome", "step", "walk_id"]);
+        }
+        assert_eq!(told[1]["data"]["outcome"], "not_available");
+        assert_eq!(dones(&seen).len(), 1, "{seen:?}");
+        // The heartbeat has the last step ended and the walk's end dated:
+        // the steps go first, then `onboarding.done` (#5979's done-when).
+        let kinds: Vec<_> = publishes(&seen)
+            .into_iter()
+            .filter(|(_, reply)| {
+                reply["kind"] == "onboarding.step" || reply["kind"] == "onboarding.done"
+            })
+            .map(|(_, reply)| reply["kind"].as_str().unwrap_or_default().to_owned())
+            .collect();
+        assert_eq!(
+            kinds,
+            ["onboarding.step", "onboarding.step", "onboarding.done"],
+            "{seen:?}"
+        );
+        // lamp-cloud restarts: its steps sent already, nothing more.
+        let start = std::time::Instant::now();
+        let (seen, _) = lines_against(Broker::Takes, lamp_steps(now, Some(dir.path())), |_| {
+            start.elapsed() >= Duration::from_millis(1500)
+        })
+        .await;
+        assert!(steps_told(&seen).is_empty(), "{seen:?}");
+    }
+
+    /// #5979: with the switch off, no step is told, nor is any file kept.
+    #[tokio::test]
+    async fn without_the_switch_no_walk_step_is_told() {
+        let start = std::time::Instant::now();
+        let (seen, lines) = lines_against(
+            Broker::Takes,
+            lamp_steps(crate::chat::now_ms(), None),
+            |_| start.elapsed() >= Duration::from_millis(1500),
+        )
+        .await;
+        assert!(
+            seen.iter().any(|seen| matches!(seen, Seen::Publish(..))),
+            "{seen:?}"
+        );
+        assert!(steps_told(&seen).is_empty(), "{seen:?}");
+        assert!(
+            !lines.iter().any(|line| line.starts_with("onboarding.step")),
+            "{lines:?}"
+        );
     }
 }

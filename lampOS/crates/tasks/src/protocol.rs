@@ -48,6 +48,11 @@ pub enum Request {
         guard: Guard,
         text: String,
         target: String,
+        /// The session the person named for the work, in their words
+        /// (#5535): typed into that one with `serve --reply-named`, never a
+        /// new one ([`crate::harness::Launch::session`]). Absent, as before.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session: Option<String>,
     },
     Confirm {
         guard: Guard,

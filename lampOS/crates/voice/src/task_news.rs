@@ -1403,6 +1403,37 @@ fn read_once_with(
             let Some(id) = item["id"].as_u64() else {
                 continue;
             };
+            // Work the person said yes to that went into one of their
+            // earlier sessions (lamp-tasks' `serve --reply-named`, #5535):
+            // which one is told at once, so a wrong one is heard (the
+            // Reviewer-lead's P2 on #5784 at 71bf964baa). Its finish is
+            // news of its own, below.
+            if let Some(session) = joined_hand_over(item, now) {
+                let key = format!("{store}:{id}:joined");
+                let until = if retelling.contains(&key) {
+                    let ended = item["dispatch"]["finished"]["monotonic_ms"]
+                        .as_u64()
+                        .unwrap_or_default();
+                    retell_until(now.ms.saturating_sub(ended)).map(Some)
+                } else {
+                    Some(None)
+                };
+                if let Some(until) = until
+                    && !told.contains(&key)
+                    && !offered.contains(&key)
+                    && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
+                    && let Some(note) = note_joined(&words, &task, session)
+                {
+                    news.push(News {
+                        key,
+                        note,
+                        until,
+                        progress: None,
+                        finished: None,
+                        also: Vec::new(),
+                    });
+                }
+            }
             // Work the person said yes to that never reached its agent is
             // news too: the lamp said it was handing it over.
             if let Some(failed) = failed_hand_over(item, now) {
@@ -1574,6 +1605,53 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
         .then_some(unsure)
 }
 
+/// The earlier session of the person's that a task they said yes to went
+/// into within the last [`JUST_MS`] of this boot, as lamp-tasks keeps it
+/// (`dispatch.joined`: its `name`, its first `ask`); none for a new
+/// session, or one the router chose, which keep none.
+fn joined_hand_over<'a>(item: &'a Value, now: &BootClock) -> Option<&'a Value> {
+    let dispatch = &item["dispatch"];
+    if dispatch["state"].as_str()? != "accepted"
+        || dispatch["confirmed"].is_null()
+        || !dispatch["joined"].is_object()
+    {
+        return None;
+    }
+    let finished = &dispatch["finished"];
+    (finished["boot_id"].as_str() == Some(now.boot_id.as_str())
+        && now.ms.saturating_sub(finished["monotonic_ms"].as_u64()?) <= JUST_MS)
+        .then_some(&dispatch["joined"])
+}
+
+/// The most of a joined session's name or first ask quoted in its note:
+/// lamp-tasks keeps 80 characters of an ask.
+const MOST_SESSION_CHARS: usize = 80;
+
+/// Which earlier session a task went into ([`joined_hand_over`]), fitted
+/// to one written turn: by its name, or, with none, by what it was first
+/// asked; none with neither.
+fn note_joined(words: &NewsWords, task: &Value, session: &Value) -> Option<String> {
+    let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
+    let who = who(task);
+    let said = |key: &str| {
+        session[key]
+            .as_str()
+            .map(|text| quoted(text, MOST_SESSION_CHARS).0)
+            .filter(|text| !text.is_empty())
+    };
+    let (line, slot, value) = match (said("name"), said("ask")) {
+        (Some(name), _) => (&words.joined, "session", name),
+        (None, Some(ask)) => (&words.joined_asked, "earlier", ask),
+        (None, None) => return None,
+    };
+    fitted(&asked, "", false, |asked, _, _| {
+        unprompted(&fill(
+            line,
+            &[("asked", asked), ("who", who), (slot, value.as_str())],
+        ))
+    })
+}
+
 /// A hand-over that did not reach its agent, fitted to one written turn
 /// like other news ([`fitted`]): the task's words are cut first
 /// (reviewer-two's P2 on #2875). A missing folder's note with a computer
@@ -1599,7 +1677,9 @@ fn note_failed(
         Some("folder_missing") => Some(&words.failed_folder),
         Some("engine_signed_out") => Some(&words.failed_signed_out),
         Some("engine_no_prompt") => Some(&words.failed_no_prompt),
-        Some("agent_busy") => Some(&words.failed_busy),
+        // A session the person named that is busy (#5535, `serve
+        // --reply-named`) is told as a busy routed one.
+        Some("agent_busy" | "session_busy" | "reply_not_idle") => Some(&words.failed_busy),
         _ => None,
     };
     if let Some(line) = refused
@@ -3164,6 +3244,134 @@ mod tests {
             note_failed(&own(), &task("claude", json!([])), true, FOLDER),
             note_failed(&own(), &task("claude", json!([])), true, None)
         );
+    }
+
+    /// `serve --reply-named` (#5535): a session the person named that is
+    /// busy is told as a busy one, as the router's pick is; the other ends
+    /// of a named session are told as a plain failure.
+    #[test]
+    fn a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure() {
+        let busy = note_failed(
+            &own(),
+            &task("claude", json!([])),
+            false,
+            Some("agent_busy"),
+        );
+        assert!(
+            busy.as_deref().is_some_and(|told| told.contains("is busy")),
+            "{busy:?}"
+        );
+        for code in ["session_busy", "reply_not_idle"] {
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), false, Some(code)),
+                busy,
+                "{code}"
+            );
+        }
+        let plain = note_failed(&own(), &task("claude", json!([])), false, None);
+        for code in [
+            "session_not_found",
+            "session_ambiguous",
+            "session_stopped",
+            "reply_off",
+            "reply_named_off",
+        ] {
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), false, Some(code)),
+                plain,
+                "{code}"
+            );
+        }
+    }
+
+    /// `serve --reply-named` (#5535), the Reviewer-lead's P2 on #5784 at
+    /// 71bf964baa: work said yes to that went into one of the person's
+    /// earlier sessions is told at once, naming that session by its name,
+    /// or else by what it was first asked, so a wrong one is heard: once,
+    /// beside its later finish, never for a new session, one not said yes
+    /// to, or one from long ago.
+    #[test]
+    fn work_that_joined_an_earlier_session_names_that_session_once() {
+        let root = std::env::temp_dir().join(format!("task-news-joined-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let joined = |id: u64, joined: Value, confirmed: bool, ms: u64| {
+            json!({"id":id,"observations": if id == 1 { 1 } else { 0 },"dispatch":{"state":"accepted",
+                "confirmed": if confirmed { json!({"boot_id":"boot-a"}) } else { Value::Null },
+                "finished":{"boot_id":"boot-a","monotonic_ms":ms},"joined":joined}})
+        };
+        let items = json!([
+            joined(
+                1,
+                json!({"name":"Docs-Update","ask":"Update the setup page"}),
+                true,
+                NOW - 5_000
+            ),
+            joined(
+                2,
+                json!({"ask":"Write a short book program."}),
+                true,
+                NOW - 5_000
+            ),
+            // A new session the lamp started: no `joined`.
+            joined(3, Value::Null, true, NOW - 5_000),
+            joined(4, json!({"name":"Docs-Update"}), false, NOW - 5_000),
+            joined(5, json!({"name":"Docs-Update"}), true, NOW - JUST_MS - 1),
+        ]);
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let answer = match (asked["op"].as_str().unwrap(), asked["id"].as_u64()) {
+                    ("list", _) => json!({"ok":true,"store_id":"s1","items":items}),
+                    ("get_task", Some(1)) => {
+                        task("claude", json!([seen(1, "idle", "boot-a", NOW - 1_000)]))
+                    }
+                    ("get_task", Some(_)) => task("claude", json!([])),
+                    ("get_observation", Some(1)) => {
+                        json!({"ok":true,"data":{"state":"idle","answer":"Lumi, Sunny and Archie.","truncated":false}})
+                    }
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let news = read_once(&socket, &now(), &BTreeSet::new(), &BTreeSet::new());
+        let keys: Vec<&str> = news.iter().map(|news| news.key.as_str()).collect();
+        assert_eq!(keys, ["s1:1:joined", "s1:1:1", "s1:2:joined"]);
+        let named = &news[0].note;
+        assert!(
+            named.starts_with("(Nobody has spoken. ")
+                && named.contains("\"Docs-Update\"")
+                && !named.contains("Update the setup page")
+                && named.contains("wrong one")
+                && named.contains("Claude Code"),
+            "{named}"
+        );
+        let asked = &news[2].note;
+        assert!(
+            asked.contains("asked to \"Write a short book program.\"")
+                && asked.contains("wrong one")
+                && !asked.contains("Docs-Update"),
+            "{asked}"
+        );
+        for note in [named, asked] {
+            assert!(!note.contains("lamp-") && !note.contains('/'), "{note}");
+        }
+        // Told once: offered or told, not again; the finish is its own.
+        let offered: BTreeSet<String> = keys.iter().map(|key| (*key).to_owned()).collect();
+        assert!(read_once(&socket, &now(), &BTreeSet::new(), &offered).is_empty());
+        let told = BTreeSet::from(["s1:1:joined".to_owned(), "s1:2:joined".to_owned()]);
+        let keys: Vec<String> = read_once(&socket, &now(), &told, &BTreeSet::new())
+            .into_iter()
+            .map(|news| news.key)
+            .collect();
+        assert_eq!(keys, ["s1:1:1"]);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// `serve --engines-ready` (openharness#1788): a hand-over refused as

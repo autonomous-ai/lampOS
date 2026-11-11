@@ -78,6 +78,25 @@ fn turn_with(
         // A set refused by a ledger that can't ring it (#5560).
         let answer = if args["cannot_ring"] == true {
             json!({"error": crate::reminders::CANNOT_RING})
+        } else if name == crate::remember::FORGET {
+            // A forget the memory refused (a one-face line's), or one that
+            // removed something.
+            if args["refused"] == true {
+                json!({"forgotten": false, "note": "Nothing was forgotten."})
+            } else {
+                json!({"forgotten": true})
+            }
+        } else if name == crate::known_faces::FORGET && args["refused"] == true {
+            // A face forget refused for someone not in view.
+            json!({"error": crate::known_faces::NOT_THEIRS})
+        } else if name == crate::rules::FORGET_RULE {
+            // A rule forget that removed nothing asks which one; one that
+            // removed something says so.
+            if args["refused"] == true {
+                json!({"rules": [], "note": "They have not asked you for anything like that."})
+            } else {
+                json!({"forgotten": true, "note": "Stop following it from now on."})
+            }
         } else {
             told(&name)
         };
@@ -229,6 +248,33 @@ fn a_timer_claimed_after_a_set_the_ledger_refused_is_never_said() {
     };
     assert_eq!(ran(true), ran(false));
     assert_eq!(ran(true).said, said(&["Timer set."]));
+}
+
+/// Reviewer-three's after-merge P2 on #5326: a forget discards the later
+/// calls of its batch, so a `set_timer` planned beside it never ran and is
+/// no call of its kind. "Timer set." in the clean round after it is held as
+/// a claim with no call, never said as it came.
+#[test]
+fn a_timer_the_forget_discarded_never_backs_a_claim() {
+    let went = claimed(
+        true,
+        "Forget that, then set a timer for one minute.",
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("erase", crate::remember::FORGET, json!({})),
+                call("stale", "set_timer", json!({"seconds": 60})),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![saying("Timer set."), saying("Timer set.")],
+    );
+    assert_eq!(went.ran, [crate::remember::FORGET], "{went:?}");
+    assert!(
+        went.said.iter().all(|said| !said.contains("Timer set")),
+        "{went:?}"
+    );
+    assert!(told_claim(&went), "{went:?}");
+    assert_eq!(went.asked, 3, "{went:?}");
 }
 
 /// lamp-52e6, the earlier run: "Louder." and "Brighter." with no call. The
@@ -923,4 +969,299 @@ fn a_kept_lights_claim_is_held_beside_any_call() {
         }
     }
     assert!(said_anyway.is_empty(), "said: {said_anyway:?}");
+}
+
+/// One spoken turn begun with the lamp's name to a face turned to the
+/// lamp (`answering_named_to_a_face`), so a `not_for_me` is not taken and
+/// the model is asked once more, every call of that round answered and
+/// none run. Reviewer-three's harness on #5215 (merged 66bc7d93b7).
+fn named_turn(
+    on: bool,
+    worded_on: bool,
+    product: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new(std::iter::once(first).chain(later).collect()),
+        ..Script::default()
+    });
+    let ran: Calls = Arc::default();
+    let seen = ran.clone();
+    let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
+        let answer = told(&name);
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async move { answer })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .answering_short(product)
+    .saying_at_once(product)
+    .checking_action_claims(on)
+    .checking_worded_claims(worded_on)
+    .answering_named_to_a_face(Arc::new(|_| true));
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn(&mut engine).await
+        });
+    let asked = script.asked.lock().unwrap();
+    let notes = asked
+        .iter()
+        .flatten()
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .filter(|content| content.starts_with("(For you to know"))
+        .map(str::to_owned)
+        .collect();
+    Went {
+        said: labels
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect(),
+        asked: asked.len(),
+        ran: ran
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(name, ..)| name.clone())
+            .collect(),
+        notes,
+    }
+}
+
+/// A round of `not_for_me` and `set_timer`, not taken because the lamp was
+/// named to a face: neither runs, so the timer is no evidence for "Timer
+/// set." in the next round, which is held as with no call (Reviewer-three's
+/// after-merge P2 on #5215).
+#[test]
+fn a_declined_rounds_calls_are_no_evidence_for_a_claim() {
+    let first = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("decline", NOT_FOR_ME, json!({})),
+                call("timer", "set_timer", json!({"seconds": 60})),
+            ])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for worded in [false, true] {
+        let went = named_turn(
+            true,
+            worded,
+            true,
+            "Lamp, set a timer to one minute.",
+            first(),
+            vec![saying("Timer set."), saying("I did not set it.")],
+        );
+        assert!(went.ran.is_empty(), "the declined round ran: {went:?}");
+        assert!(
+            !went.said.iter().any(|line| line == "said:Timer set."),
+            "a call not run stood behind the claim (worded {worded}): {went:?}"
+        );
+        assert!(told_claim(&went), "{went:?}");
+    }
+}
+
+/// The control: a declined round of `not_for_me` alone, then "Timer set.",
+/// is held and asked again.
+#[test]
+fn a_declined_not_for_me_alone_still_holds_the_claim() {
+    let went = named_turn(
+        true,
+        false,
+        true,
+        "Lamp, set a timer to one minute.",
+        calling(NOT_FOR_ME),
+        vec![saying("Timer set."), saying("I did not set it.")],
+    );
+    assert!(went.ran.is_empty());
+    assert!(!went.said.iter().any(|line| line == "said:Timer set."));
+    assert!(told_claim(&went));
+}
+
+/// C88, B-G23: lamp-06c1 (10 Nov, build 11091, request 30), "Lamp, forget
+/// that." with the face still was answered "I've forgotten the thing about
+/// your umbrella." with `calls=none`, and the umbrella stayed kept. With the
+/// switch the forget said done is held, the model is told so and asked
+/// again; said again with no forget, it is the line that it wasn't done.
+/// Without the switch it is said as it came, as on the lamp.
+#[test]
+fn a_forget_said_done_with_no_forget_is_never_said() {
+    let heard = "Lamp, forget that.";
+    let claim = "I've forgotten the thing about your umbrella.";
+    let went = claimed(true, heard, saying(claim), vec![saying(claim)]);
+    assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));
+    assert_eq!((went.asked, went.ran.len()), (2, 0), "{went:?}");
+    assert!(
+        went.notes
+            .iter()
+            .any(|note| note == crate::action_claim::FORGET_NOTE),
+        "{:?}",
+        went.notes
+    );
+    // Off: said as it came, nothing forgotten.
+    let went = claimed(false, heard, saying(claim), vec![saying(claim)]);
+    assert_eq!(went.said, said(&[claim]));
+    assert_eq!((went.asked, went.ran.len()), (1, 0));
+}
+
+/// Asked again, the model calls `forget`. One the memory refused (a
+/// one-face line's) removed nothing: a forget said done after it is still
+/// held, and what its answer told them to say goes on. One that removed
+/// something lets its line stand, as without the switch.
+#[test]
+fn a_forget_said_done_stands_only_beside_a_forget_that_removed_something() {
+    let heard = "Lamp, forget that.";
+    let forget = |refused: bool| {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                crate::remember::FORGET,
+                json!({"refused": refused}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let honest = "I'll forget that when I can see you say it.";
+    let went = claimed(
+        true,
+        heard,
+        saying("I've forgotten it."),
+        vec![forget(true), saying(honest)],
+    );
+    assert_eq!(went.said, said(&[honest]), "{went:?}");
+    assert_eq!(went.ran, [crate::remember::FORGET]);
+    // Refused, then said done anyway: never said.
+    let went = claimed(
+        true,
+        heard,
+        forget(true),
+        vec![saying("Okay, forgotten."), saying("I forgot it.")],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    // Removed: the line stands, byte for byte as without the switch.
+    let ran = |on| claimed(on, heard, forget(false), vec![saying("I've forgotten it.")]);
+    assert_eq!(ran(true), ran(false));
+    assert_eq!(ran(true).said, said(&["I've forgotten it."]));
+}
+
+/// Only a line that asks to forget judges a forget said done: "I forgot,
+/// sorry." answering a question goes on as without the switch.
+#[test]
+fn a_forget_said_on_a_line_not_asking_to_forget_is_untouched() {
+    let went = |on| {
+        claimed(
+            on,
+            "What did I tell you yesterday?",
+            saying("I forgot, sorry."),
+            vec![],
+        )
+    };
+    assert_eq!(went(true), went(false));
+    assert_eq!(went(true).said, said(&["I forgot, sorry."]));
+}
+
+/// Thirteen's P2-1 on #5942: a face's or a rule's forget backs a forget said
+/// done only when it removed something. One refused (`NOT_THEIRS`), or a
+/// rule forget that removed nothing, leaves "I've forgotten it." held and,
+/// said again, the line that it wasn't done; one that removed something
+/// lets the line stand, byte for byte as without the switch.
+#[test]
+fn a_face_or_rule_forget_backs_a_forget_said_done_only_by_its_outcome() {
+    let forget = |name: &str, refused: bool| {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                name,
+                json!({"refused": refused}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for (heard, name) in [
+        ("Lamp, forget my face.", crate::known_faces::FORGET),
+        (
+            "Lamp, forget the rule about the light.",
+            crate::rules::FORGET_RULE,
+        ),
+    ] {
+        let went = claimed(
+            true,
+            heard,
+            forget(name, true),
+            vec![saying("I've forgotten it."), saying("Okay, forgotten.")],
+        );
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{name}: {went:?}"
+        );
+        assert_eq!(went.ran, [name]);
+        assert!(
+            went.notes
+                .iter()
+                .any(|note| note == crate::action_claim::FORGET_NOTE),
+            "{name}: {:?}",
+            went.notes
+        );
+        let ran = |on| {
+            claimed(
+                on,
+                heard,
+                forget(name, false),
+                vec![saying("I've forgotten it.")],
+            )
+        };
+        assert_eq!(ran(true), ran(false), "{name}");
+        assert_eq!(ran(true).said, said(&["I've forgotten it."]), "{name}");
+    }
+}
+
+/// Thirteen's P2-2 on #5942: words that say a forget done, and a forget
+/// called, in one round. The words are not said, as they ran ahead of the
+/// call, but the next round is told no `FORGET_NOTE`: it speaks from the
+/// forget's own answer, and its line is said.
+#[test]
+fn words_and_a_forget_in_one_round_bring_no_false_note() {
+    let heard = "Lamp, forget that.";
+    let both = |name: &str| {
+        vec![
+            text("Okay, I've forgotten that."),
+            Ok(ChatEvent::ToolCalls(vec![call("c0", name, json!({}))])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    for name in [
+        crate::remember::FORGET,
+        crate::known_faces::FORGET,
+        crate::rules::FORGET_RULE,
+    ] {
+        let went = claimed(true, heard, both(name), vec![saying("I've forgotten it.")]);
+        assert!(
+            !went
+                .notes
+                .iter()
+                .any(|note| note == crate::action_claim::FORGET_NOTE),
+            "{name}: {:?}",
+            went.notes
+        );
+        assert_eq!(went.ran, [name], "{name}");
+        assert_eq!(went.said, said(&["I've forgotten it."]), "{name}: {went:?}");
+    }
 }

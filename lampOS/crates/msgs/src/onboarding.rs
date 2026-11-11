@@ -43,6 +43,34 @@ pub struct OnboardingPending {
     /// leads by talk. Absent from an older voice: false.
     #[serde(default)]
     pub walk: bool,
+    /// When the setup walk handed out its done line, in Unix ms, as committed
+    /// in its progress file: kept through a redo, gone after a factory reset,
+    /// and absent for a walk set up before it was dated or not yet ended.
+    /// lamp-cloud tells the app once from it (`onboarding.done`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_at_unix_ms: Option<u64>,
+    /// This walk's id (#5979): when it began, in Unix ms, as committed in
+    /// its progress file. A redo of the whole walk makes a new one; a redo
+    /// of one step keeps it. Absent from an older voice, and for a walk
+    /// begun before it was dated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub walk_id: Option<u64>,
+    /// The walk's steps that ended this walk, of `where_you_sit`,
+    /// `who_you_are`, `touch` and `how_you_sound` only, in the order they
+    /// ended. lamp-cloud tells the app each once (`onboarding.step`).
+    /// Empty from an older voice.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps_ended: Vec<OnboardingStepEnded>,
+}
+
+/// One walk step's end (#5979): its name, its outcome as the walk keeps it
+/// (`done`, `skipped`, `failed` or `not_available`) and when, in Unix ms.
+/// No names, no words.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnboardingStepEnded {
+    pub step: String,
+    pub outcome: String,
+    pub at: u64,
 }
 
 impl OnboardingPending {
@@ -143,5 +171,58 @@ mod tests {
         let giving: OnboardingPending =
             serde_json::from_str(&text.replace("privacy", "giving_way")).unwrap();
         assert_eq!(giving.invitations[0].step, OnboardingStep::GivingWay);
+    }
+
+    /// The walk's end date round-trips, is left out while unknown, and an
+    /// older voice's heartbeat without it reads as unknown.
+    #[test]
+    fn done_date_round_trips_and_is_absent_from_older_json() {
+        let pending = OnboardingPending {
+            done_at_unix_ms: Some(1_762_675_200_000),
+            ..OnboardingPending::default()
+        };
+        let text = serde_json::to_string(&pending).unwrap();
+        assert!(text.contains("\"done_at_unix_ms\":1762675200000"));
+        assert_eq!(
+            serde_json::from_str::<OnboardingPending>(&text).unwrap(),
+            pending
+        );
+        let unknown = serde_json::to_string(&OnboardingPending::default()).unwrap();
+        assert!(!unknown.contains("done_at_unix_ms"));
+        let old: OnboardingPending =
+            serde_json::from_str(r#"{"invitations":[],"walk":true}"#).unwrap();
+        assert_eq!(old.done_at_unix_ms, None);
+    }
+
+    /// The walk's id and its ended steps round-trip, are left out while
+    /// there are none, and an older voice's heartbeat reads as neither.
+    #[test]
+    fn walk_id_and_ended_steps_round_trip_and_are_absent_from_older_json() {
+        let pending = OnboardingPending {
+            walk_id: Some(1_762_675_100_000),
+            steps_ended: vec![OnboardingStepEnded {
+                step: "where_you_sit".into(),
+                outcome: "done".into(),
+                at: 1_762_675_160_000,
+            }],
+            ..OnboardingPending::default()
+        };
+        let text = serde_json::to_string(&pending).unwrap();
+        assert!(text.contains(r#""walk_id":1762675100000"#), "{text}");
+        assert!(
+            text.contains(
+                r#""steps_ended":[{"step":"where_you_sit","outcome":"done","at":1762675160000}]"#
+            ),
+            "{text}"
+        );
+        assert_eq!(
+            serde_json::from_str::<OnboardingPending>(&text).unwrap(),
+            pending
+        );
+        let none = serde_json::to_string(&OnboardingPending::default()).unwrap();
+        assert!(!none.contains("walk_id") && !none.contains("steps_ended"));
+        let old: OnboardingPending =
+            serde_json::from_str(r#"{"invitations":[],"walk":true}"#).unwrap();
+        assert_eq!((old.walk_id, old.steps_ended.len()), (None, 0));
     }
 }

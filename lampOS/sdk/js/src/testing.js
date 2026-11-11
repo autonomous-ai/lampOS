@@ -18,9 +18,10 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer } from './ws.js';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
+import { MOVE_FRAMES_MIN, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -29,23 +30,50 @@ const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 // The fake's camera picture: the smallest whole JPEG (start and end markers).
 export const FAKE_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 
+// The fake's microphone, as the ears share it on mic1/audio: a 20 ms block of
+// 320 samples, mono, 16 kHz, S16LE.
+export const AUDIO_RATE = 16_000;
+export const AUDIO_BLOCK = 320;
+export const AUDIO_EVERY_MS = 20;
+// Why lamp-control refuses or ends a microphone stream with more than one
+// person in view (microphone.rs `SOMEONE_ELSE`).
+export const SOMEONE_ELSE = 'someone else is here';
+
+// Block `sequence` of a quiet tone, as signed 16-bit little-endian samples:
+// 640 bytes, continuous from one block to the next.
+export function toneBlock(sequence, hz = 440, level = 1000) {
+  const samples = Buffer.alloc(AUDIO_BLOCK * 2);
+  const start = sequence * AUDIO_BLOCK;
+  for (let n = 0; n < AUDIO_BLOCK; n += 1) {
+    samples.writeInt16LE(Math.trunc(level * Math.sin((2 * Math.PI * hz * (start + n)) / AUDIO_RATE)), n * 2);
+  }
+  return samples;
+}
+
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
 
-// `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
+// `look`'s targets lamp-control doesn't route, in parts.rs's words: `name`
+// (the lamp has no sound direction). A lamp-control before the face look
+// (stable 11091 and older) refuses `face` too: `faceLook: false`.
 export const LOOK_WAITS = {
-  face: 'not in this release: look at a face or a name',
-  name: 'not in this release: look at a face or a name',
+  name: "not in this release: look at who said the lamp's name (the lamp has no sound direction)",
 };
+export const LOOK_FACE_OLD = 'not in this release: look at a face or a name';
+// What the body says when it has no face to turn to.
+export const NO_FACE_IN_VIEW = 'no face in view';
 
 // What lamp-control refuses today, in its own words (crates/control/src/
 // parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
 // lamp does now. `lamp fake` does.
+// lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
+export const JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now";
+// And for a `joints` leaving out yaw or pitch while the body hasn't said where it is.
+export const JOINTS_UNKNOWN = 'name both yaw and pitch while the body has not said where it is in the last 15 s (get body)';
 export const LAMP_CONTROL_REFUSES = Object.freeze({
-  // No product unit passes --lease-socket yet (docs/control.md).
-  look: "the body's lease socket is not on here",
-  joints: "not routed yet: waits for a goal stream on the body's lease socket",
   play: 'not routed yet: waits for client packages',
 });
+// `look` and `joints` are not in it: the product lamp-body opens its lease socket (stable 10824 and later), so a
+// lamp takes a look, and `joints` at yaw and pitch, refusing roll, shoulder and elbow with JOINTS_WAIT (above).
 // A light's pattern, as lamp-control checks it before the ring (lamp_msgs'
 // LightPattern::check, with the breath's low at 1): the least level each is
 // seen at, and the words it refuses with.
@@ -76,6 +104,14 @@ export const LIMITS = Object.freeze({
     clips_max: 64,
     store_max_bytes: 20_000_000,
   },
+  notes: {
+    key_max_bytes: 64,
+    value_max_bytes: 16_384,
+    keys_max: 256,
+    bytes_max: 262_144,
+    writes: [{ most: 30, within_ms: 60_000 }],
+    reads: [{ most: 120, within_ms: 60_000 }],
+  },
   ring: { pixels: 32 },
   quiet_hours: 'off',
 });
@@ -93,60 +129,52 @@ function wavFrames(data) {
     const id = data.toString('ascii', at, at + 4);
     const size = data.readUInt32LE(at + 4);
     if (id === 'fmt ') format = { channels: data.readUInt16LE(at + 10), rate: data.readUInt32LE(at + 12), bits: data.readUInt16LE(at + 22) };
-    if (id === 'data') return format ? { format, frames: Math.floor(Math.min(size, data.length - at - 8) / 2) } : undefined;
+    // The frames the header says, as hound's `duration` does; `cutShort` when the file holds fewer bytes.
+    if (id === 'data') return format ? { format, frames: Math.floor(size / 2), at: at + 8, cutShort: data.length - at - 8 < size } : undefined;
     at += 8 + size + (size % 2);
   }
   return undefined;
 }
 
+// Why lamp-control would refuse this clip, in sounds.rs `check_clip`'s words and order: its format, its length,
+// a file shorter than its header says, then its loudness; undefined for one it keeps.
 function clipRefusal(data) {
   const read = wavFrames(data);
   if (read === undefined) return 'not a WAV file';
   if (read.format.channels !== 1 || read.format.bits !== 16 || read.format.rate !== 24_000) return 'not 16-bit mono PCM at 24000 Hz';
   if (read.frames < 1 || read.frames > 24_000 * 30) return 'not 1 to 720000 frames (30 s at most)';
+  // Fewer bytes than the header's frames (an odd or an even count short): hound's samples end early.
+  if (read.cutShort) return 'a WAV file cut short';
+  return clipLoudnessRefusal(data, read);
+}
+
+// The voice's loudness cap on a clip, as lamp-control's sounds.rs `check_clip`
+// holds it at upload: no sample past CLIP_PEAK_DBFS, and no 10 ms window
+// (CLIP_WINDOW frames, the last one shorter) louder than CLIP_LOUDEST_DBFS RMS.
+export const CLIP_PEAK_DBFS = -12;
+export const CLIP_LOUDEST_DBFS = -30;
+export const CLIP_WINDOW = 240;
+
+function clipLoudnessRefusal(data, read) {
+  const full = 32_767;
+  const sample = (i) => data.readInt16LE(read.at + 2 * i);
+  let peak = 0;
+  for (let i = 0; i < read.frames; i += 1) peak = Math.max(peak, Math.abs(sample(i)));
+  if (peak > full * 10 ** (CLIP_PEAK_DBFS / 20)) return `a peak past ${CLIP_PEAK_DBFS} dBFS`;
+  let loudest = 0;
+  for (let at = 0; at < read.frames; at += CLIP_WINDOW) {
+    const end = Math.min(at + CLIP_WINDOW, read.frames);
+    let power = 0;
+    for (let i = at; i < end; i += 1) power += sample(i) ** 2;
+    loudest = Math.max(loudest, Math.sqrt(power / (end - at)));
+  }
+  if (loudest > full * 10 ** (CLIP_LOUDEST_DBFS / 20)) return `louder than ${CLIP_LOUDEST_DBFS} dBFS RMS over 10 ms`;
   return undefined;
 }
 
-// A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs): head
-// pitch, head roll, base yaw, shoulder, elbow, in counts from rest and counts a
-// second. The Python SDK's skillcheck has the same.
-export const MOVE_STEP_MS = [40, 1000];
-export const MOVE_LASTS_MS = [1500, 10000];
-// A computer's move: 2 frames at the least (lamp-control's protocol.rs
-// FRAMES_MIN); its most are the body's check's (10 s at a 40 ms step, 251).
-export const MOVE_FRAMES_MIN = 2;
-export const MOVE_FARTHEST = [200, 200, 150, 350, 350];
-export const MOVE_FASTEST = [900, 1300, 1000, 800, 800];
-
-// Rust's `{:.0}`, as the body prints a speed: a half rounds to the even neighbour.
-function roundHalfEven(value) {
-  const floor = Math.floor(value);
-  const part = value - floor;
-  if (part !== 0.5) return Math.round(value);
-  return floor % 2 === 0 ? floor : floor + 1;
-}
-
-// Why the body refuses a move of these steps and frames, in its words, at its
-// first problem; null for one it plays.
-export function moveWhy(stepMs, frames) {
-  if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms ${stepMs} is not from 40 to 1000`;
-  const lasts = Math.max(frames.length - 1, 0) * stepMs;
-  if (lasts < MOVE_LASTS_MS[0] || lasts > MOVE_LASTS_MS[1]) return `it lasts ${lasts} ms, not 1500 to 10000`;
-  const rest = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every((count) => count === 0);
-  if (!frames.length || !rest(frames[0]) || !rest(frames.at(-1))) return 'it does not begin and end at nothing';
-  const step = stepMs / 1000;
-  for (let at = 1; at < frames.length; at++) {
-    for (let joint = 0; joint < 5; joint++) {
-      const after = frames[at][joint];
-      if (Math.abs(after) > MOVE_FARTHEST[joint]) return `frame ${at} takes joint ${joint} ${after} counts, farther than ${MOVE_FARTHEST[joint]}`;
-      const speed = Math.abs(after - frames[at - 1][joint]) / step;
-      if (speed > MOVE_FASTEST[joint] + 2 / step) {
-        return `frame ${at} asks joint ${joint} for ${roundHalfEven(speed)} counts a second, faster than ${MOVE_FASTEST[joint]}`;
-      }
-    }
-  }
-  return null;
-}
+// A move's bounds and the body's check of it live in moves.js, which the
+// client uses too; they are exported from here as before.
+export { MOVE_FARTHEST, MOVE_FASTEST, MOVE_FRAMES_MIN, MOVE_LASTS_MS, MOVE_STEP_MS, moveWhy } from './moves.js';
 
 // lamp-control's refusal of a computer's `move` (protocol.rs), in its words, as
 // `bad_request`: its own shape first, then the body's check; null for one it takes.
@@ -157,6 +185,46 @@ export function moveRefusal(stepMs, frames) {
   if (!home(frames[0]) || !home(frames.at(-1))) return 'frames: start and end at home, all five 0';
   const why = moveWhy(stepMs, frames);
   return why === null ? null : `frames: a move this body cannot play: ${why}`;
+}
+
+// lamp-control's `light` limits (protocol.rs, msgs' arbitration.rs): a ring
+// light's fade, how long it is held, the ring's pixels, the colour levels.
+export const LIGHT_FADE_MS = Object.freeze([1_000, 60_000]);
+export const LIGHT_FOR_MS = Object.freeze([1, 30_000]);
+export const LIGHT_LEVELS = Object.freeze([1, 5]);
+export const RING_PIXELS = 32;
+const hexRgb = (text) => typeof text === 'string' && /^#[0-9a-fA-F]{6}$/.test(text);
+
+// lamp-control's refusal of a computer's `light` (protocol.rs), in its words, as
+// `bad_request`, in its order; null for one it takes. Only for a light it parses
+// (whole numbers where it wants them): anything else is the schema's to refuse.
+export function lightRefusal(request) {
+  for (const field of ['level', 'brightness', 'fade_ms', 'for_ms']) {
+    const value = request[field];
+    if (value !== undefined && value !== null && !Number.isInteger(value)) return null;
+  }
+  const given = (value) => value !== undefined && value !== null;
+  const { colour, rgb, pixels } = request;
+  if ([colour, rgb, pixels].filter(given).length !== 1) return 'one of colour, rgb or pixels';
+  if (given(colour)) {
+    if (!schema.colours.includes(colour)) return `colour: one of ${schema.colours.join(', ')}`;
+    const level = request.level;
+    if (!given(level) || level < LIGHT_LEVELS[0] || level > LIGHT_LEVELS[1]) return `level: from ${LIGHT_LEVELS[0]} to ${LIGHT_LEVELS[1]}, with colour`;
+    if (given(request.brightness)) return 'brightness goes with rgb or pixels; colour has level';
+  } else {
+    if (given(request.level) || given(request.pattern)) return 'level and pattern go with colour';
+    if (given(request.brightness) && (request.brightness < 0 || request.brightness > 100)) return 'brightness: from 0 to 100';
+  }
+  if (given(rgb) && !hexRgb(rgb)) return 'rgb: #rrggbb';
+  if (given(pixels)) {
+    if (!Array.isArray(pixels) || pixels.length !== RING_PIXELS) return `pixels: ${RING_PIXELS} of them, one per pixel of the ring`;
+    if (!pixels.every(hexRgb)) return 'pixels: each #rrggbb';
+  }
+  const fade = request.fade_ms;
+  if (given(fade) && (fade < LIGHT_FADE_MS[0] || fade > LIGHT_FADE_MS[1])) return `fade_ms: from ${LIGHT_FADE_MS[0]} to ${LIGHT_FADE_MS[1]}`;
+  const forMs = request.for_ms;
+  if (given(forMs) && (forMs < LIGHT_FOR_MS[0] || forMs > LIGHT_FOR_MS[1])) return `for_ms: from ${LIGHT_FOR_MS[0]} to ${LIGHT_FOR_MS[1]}`;
+  return null;
 }
 
 // How a synthetic hand moves (`handTrack`): across the picture and back
@@ -284,13 +352,20 @@ export class FakeLamp {
     return fake;
   }
 
-  // `autoDone: false` leaves a play's or say's `done` to the test.
+  // `autoDone: false` leaves a play's, say's, gesture's or move's `done` to
+  // the test. `motionDone: false` answers a gesture or a move as a
+  // lamp-control from before #4209: no `motion_done` in hello's limits, and
+  // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null } = {}) {
     // `followsHand: false` answers a look at `hand` as a lamp-control from
     // before #4183 does: taken, with no `follow`, and nothing follows it.
-    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand });
+    // 'all': every grant the protocol names, as `lamp fake` pairs with. The default
+    // stays narrow, as a real pairing the owner chose is.
+    // A bare string would be split into letters: grants: 'hear' is a slip.
+    if (typeof grants === 'string' && grants !== 'all') throw new TypeError(`grants is 'all' or an array of grant names, not '${grants}'`);
+    Object.assign(this, { code, grants: grants === 'all' ? [...schema.grants] : [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone, faceLook, face });
     this.asker = new Map();
     this.lamp = { id: lampId, name, v: schema.VERSION };
     this.clients = new Map();
@@ -303,6 +378,9 @@ export class FakeLamp {
     // its loudness check.
     this.clips = new Map();
     this.uploads = new Map();
+    // Each computer's notes (`notes.set`) as lamp-control's notes.rs keeps them: its keys and values, held to the same
+    // caps, and gone with a `revoke`.
+    this.notes = new Map();
     // Pushed skills by name, and the one push in flight on the lamp.
     this.pushed = new Map();
     this.pushing = null;
@@ -326,6 +404,9 @@ export class FakeLamp {
     this.pulsesDropped = [];
     this.pulsed = new Map();
     this.clock = () => Date.now();
+    // The picture `camera.snapshot` and a stream's frames carry: the smallest whole JPEG
+    // unless a test sets a real one (`fake.picture = buffer`).
+    this.picture = FAKE_JPEG;
     // Each connection whose head follows the hand (`look` at `hand`) and its
     // lease, until its stop, another look, or the lease ends; and the last
     // hand said.
@@ -338,6 +419,10 @@ export class FakeLamp {
     this.turns = new Map();
     this.mutes = new Map();
     this.clientOf = new Map();
+    // Each connection's microphone stream (`microphone.stream`), and the
+    // made-up ears' next block's `sequence`.
+    this.listening = new Map();
+    this.audioSequence = 0;
   }
 
   async listen() {
@@ -353,11 +438,44 @@ export class FakeLamp {
     this.port = this.https.address().port;
   }
 
+  // A `Lamp` paired with this fake and connected, for a test of your own
+  // program: no code, pin or keyring to set up. Its keyring is a folder of its
+  // own (removed by `stop()`, your LAMPOS_HOME untouched), and `stop()` closes it.
+  // Call it again for a second computer.
+  //
+  //   const fake = await FakeLamp.start();
+  //   const lamp = await fake.connect();
+  //   await lamp.say('hello');
+  //   assert.deepEqual(fake.asked('say'), [{ text: 'hello' }]);
+  async connect({ name } = {}) {
+    name ??= `test app ${(this.connected?.length ?? 0) + 1}`; // each computer has its own name
+    const { Lamp } = await import('./client.js');
+    const { Keyring } = await import('./keys.js');
+    const folder = mkdtempSync(join(tmpdir(), 'lampos-fake-'));
+    (this.folders ??= []).push(folder);
+    const keyring = new Keyring(folder);
+    await Lamp.pair(this.code, this.host, { pin: this.pin, port: this.port, name, keyring });
+    const lamp = await Lamp.connect(undefined, { keyring });
+    (this.connected ??= []).push(lamp);
+    return lamp;
+  }
+
   async stop() {
-    for (const ws of this.wss.clients) ws.terminate();
-    await new Promise((resolve) => this.wss.close(resolve));
-    this.https.closeAllConnections();
-    await new Promise((resolve) => this.https.close(resolve));
+    // A test may have dropped or closed it already (a lease held on a dead
+    // socket): that must not mask the test's own result.
+    try {
+      for (const lamp of this.connected ?? []) await lamp.close().catch(() => {});
+      this.connected = [];
+      for (const ws of [...this.listening.keys()]) this.stopListening(ws);
+      for (const ws of this.wss.clients) ws.terminate();
+      await new Promise((resolve) => this.wss.close(resolve));
+      this.https.closeAllConnections();
+      await new Promise((resolve) => this.https.close(resolve));
+    } finally {
+      // The folders go even if closing the server threw.
+      for (const folder of this.folders ?? []) rmSync(folder, { recursive: true, force: true });
+      this.folders = [];
+    }
   }
 
   // The fields of every `op` request taken, oldest first.
@@ -379,6 +497,13 @@ export class FakeLamp {
   emit(event, fields = {}) {
     const frame = JSON.stringify({ ev: event, at: now(), ...fields });
     for (const ws of this.wss.clients) if (this.subscribed.get(ws)?.has(event)) ws.send(frame);
+  }
+
+  // The lamp restarts, as on every update: each connection closes (1012,
+  // "service restart"), and pairings stay. A program connects again
+  // (`Lamp.keepConnected`).
+  restart() {
+    for (const ws of this.wss.clients) ws.close(1012, 'the lamp restarts');
   }
 
   // The ring shows a computer's light while it lasts.
@@ -433,6 +558,61 @@ export class FakeLamp {
     for (const held of [...this.following.keys()]) if (ws === undefined || held === ws) this.following.delete(held);
   }
 
+  // The made-up ears skip `blocks` blocks, as sound lost on the way: the next
+  // block's `sequence` jumps, and each stream says it in `lost`.
+  loseAudio(blocks) { this.audioSequence += blocks; }
+
+  // The privacy switch: on, every microphone stream ends at once with
+  // `microphone.ended`, as lamp-control's do, and a new one is refused.
+  setPrivate(isPrivate = true) {
+    this.state.lamp.private = isPrivate;
+    if (isPrivate) this.endListening('the lamp is private');
+  }
+
+  // How many people are in view (`presence`'s `count`): above one, every
+  // microphone stream ends at once with `microphone.ended` ("someone else is
+  // here"), and a new one is refused, as lamp-control does, since it can't
+  // tell the owner from anyone else.
+  setInView(count) {
+    this.state.presence.count = count;
+    if (count > 1) this.endListening(SOMEONE_ELSE);
+  }
+
+  endListening(why) {
+    for (const ws of [...this.listening.keys()]) {
+      this.stopListening(ws);
+      ws.send(JSON.stringify({ ev: 'microphone.ended', why }));
+    }
+  }
+
+  stopListening(ws) {
+    clearInterval(this.listening.get(ws));
+    this.listening.delete(ws);
+  }
+
+  // One block every 20 ms of a quiet 440 Hz tone, as binary frames: the
+  // header's length, the header, then the samples.
+  listenFor(ws) {
+    let last = null;
+    const block = () => {
+      const sequence = this.audioSequence;
+      this.audioSequence += 1;
+      const lost = last === null ? 0 : Math.max(sequence - last - 1, 0);
+      last = sequence;
+      const samples = toneBlock(sequence);
+      const header = Buffer.from(JSON.stringify({
+        ev: 'microphone.audio', sequence, lost, sample_rate: AUDIO_RATE, channels: 1, format: 's16le', bytes: samples.length,
+      }));
+      const length = Buffer.alloc(4);
+      length.writeUInt32BE(header.length);
+      ws.send(Buffer.concat([length, header, samples]));
+    };
+    block();
+    const timer = setInterval(block, AUDIO_EVERY_MS);
+    timer.unref();
+    this.listening.set(ws, timer);
+  }
+
   unfollow(lease) {
     for (const [held, following] of [...this.following]) if (following.lease === lease) this.following.delete(held);
   }
@@ -442,11 +622,29 @@ export class FakeLamp {
     const held = this.leases.get(lease);
     if (!held) return;
     if (state === 'lost') this.leases.delete(lease);
+    // A suspended lease still stands, but the body is not held: a look or
+    // `joints` under it is taken by the door and dropped by the body.
+    else held.state = state;
     held.ws.send(JSON.stringify({ ev: 'lease', lease, state, ...(why ? { why } : {}) }));
     if (state === 'lost') this.unfollow(lease);
   }
 
   loseLease(lease, why = 'hand') { this.leaseEvent(lease, 'lost', why); }
+
+  // A look the door takes ({ to: 'body' }), and the body's answer as its
+  // `done`: there, or, while the computer's body lease is suspended (a
+  // conversation), dropped as the body says it (body_lease.rs `done_of`).
+  lookDone(ws, id, yaw, pitch, drop) {
+    this.ok(ws, id, { to: 'body' });
+    if (!this.autoDone) return undefined;
+    const suspended = [...this.leases.values()].some((h) => h.ws === ws && h.parts.includes('body') && h.state === 'suspended');
+    ws.send(JSON.stringify(suspended
+      ? { ev: 'done', re: id, how: 'dropped', why: 'the body is not held' }
+      : drop
+        ? { ev: 'done', re: id, how: 'dropped', why: drop }
+        : { ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
+    return undefined;
+  }
 
   // End the action whose request id was `re`, to the client that asked.
   done(re, how = 'finished', why) {
@@ -476,6 +674,7 @@ export class FakeLamp {
       const gone = this.clientOf.get(ws);
       this.clientOf.delete(ws);
       if (gone && ![...this.clientOf.values()].includes(gone)) this.mutes.delete(gone);
+      this.stopListening(ws);
       for (const [lease, held] of this.leases) if (held.ws === ws) this.leases.delete(lease);
     });
     ws.on('message', (data) => {
@@ -496,6 +695,11 @@ export class FakeLamp {
           return this.refuse(ws, id, 'bad_request', 'frames: each frame is five whole counts');
         }
         const refusal = moveRefusal(request.step_ms, request.frames);
+        if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
+      }
+      // As lamp-control's protocol.rs for a light: its own limits, in its words.
+      if (request.op === 'light') {
+        const refusal = lightRefusal(request);
         if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
       }
       if (request.op === 'pair') return this.pair(ws, request, nonce);
@@ -571,7 +775,8 @@ export class FakeLamp {
       ws.close();
       return null;
     }
-    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits: LIMITS });
+    const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
+    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits });
     return request.client;
   }
 
@@ -581,7 +786,7 @@ export class FakeLamp {
     hand: 'look',
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound',
     'air.changed': 'air',
-    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak',
+    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak', 'lamp.said': 'speech',
   };
   static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'speak', body: 'body' };
 
@@ -593,13 +798,54 @@ export class FakeLamp {
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
     const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end', 'volume'];
     if (op.startsWith('skill.')) return ['skills'];
+    if (op.startsWith('notes.')) return ['notes'];
     if (speak.includes(op)) return ['speak'];
     // A turn speaks and hears what is said to the lamp.
     return {
       express: ['body', 'light'], light: ['light'],
       'camera.snapshot': ['camera'], 'camera.stream': ['camera'],
+      'microphone.stream': ['microphone'],
       'turn.start': ['speak', 'hear'], 'listen.set': ['hear'],
     }[op] ?? [];
+  }
+
+  // The owner lets `client` go, as lamp-control's revoke: its key, its clips and its notes are gone.
+  revoke(client) {
+    this.clients.delete(client);
+    this.clips.delete(client);
+    this.notes.delete(client);
+  }
+
+  // One `notes.*` op, as lamp-control's notes.rs answers it: this computer's own keys only, the value at most 16384
+  // bytes serialized, 256 keys and 262144 bytes of keys and values in all.
+  notesOp(ws, client, request) {
+    const { id, op } = request;
+    const room = this.notes.get(client) ?? new Map();
+    // As notes.rs: a key is 1 to 64 bytes of letters, digits and `. _ : -`; a prefix up to 64 of them.
+    const bad = op === 'notes.list' ? !/^[A-Za-z0-9._:-]{0,64}$/.test(request.prefix ?? '') : !/^[A-Za-z0-9._:-]{1,64}$/.test(request.key);
+    if (bad) return this.refuse(ws, id, 'bad_request', `${op === 'notes.list' ? 'prefix' : 'key'}: up to 64 bytes of letters, digits and . _ : -`);
+    const size = (value) => Buffer.byteLength(JSON.stringify(value));
+    const held = (keys) => [...keys].reduce((sum, [k, v]) => sum + Buffer.byteLength(k) + size(v), 0);
+    if (op === 'notes.set') {
+      const bytes = size(request.value);
+      if (bytes > 16_384) return this.refuse(ws, id, 'bad_request', `value: ${bytes} bytes, over the 16384 one note may take`);
+      const after = new Map(room).set(request.key, request.value);
+      if (after.size > 256 || held(after) > 262_144) {
+        return this.refuse(ws, id, 'refused', `this computer's notes are full: it keeps 256 keys at most and 262144 bytes in all (now ${room.size} keys, ${held(room)} bytes)`);
+      }
+      this.notes.set(client, after);
+      return this.ok(ws, id, { key: request.key, bytes });
+    }
+    if (op === 'notes.get') {
+      return room.has(request.key)
+        ? this.ok(ws, id, { key: request.key, found: true, value: room.get(request.key) })
+        : this.ok(ws, id, { key: request.key, found: false });
+    }
+    if (op === 'notes.delete') return this.ok(ws, id, { key: request.key, deleted: room.delete(request.key) });
+    const prefix = request.prefix ?? '';
+    const keys = [...room].filter(([k]) => k.startsWith(prefix)).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, value]) => ({ key, bytes: size(value) }));
+    return this.ok(ws, id, { keys, count: keys.length, total: room.size, bytes: held(room), keys_max: 256, bytes_max: 262_144 });
   }
 
   clipsOf(client) {
@@ -715,7 +961,7 @@ export class FakeLamp {
       }
       case 'camera.snapshot':
         // A picture with no camera behind it: the smallest whole JPEG.
-        return this.ok(ws, id, { jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0 });
+        return this.ok(ws, id, { jpeg: this.picture.toString('base64'), bytes: this.picture.length, age_ms: 0 });
       case 'camera.stream':
         // As lamp-control's check: 1 to 30 a second.
         if (request.fps !== undefined && !(Number.isInteger(request.fps) && request.fps >= 1 && request.fps <= 30)) {
@@ -723,30 +969,49 @@ export class FakeLamp {
         }
         if (!request.on) return this.ok(ws, id, { stream: 'off' });
         this.ok(ws, id, { stream: 'on', fps: request.fps ?? 2, fps_now: null });
-        ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0, fps_now: null }));
+        ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: this.picture.toString('base64'), bytes: this.picture.length, age_ms: 0, fps_now: null }));
+        return undefined;
+      case 'microphone.stream':
+        // As lamp-control's microphone.rs: on again replaces it, off ends it
+        // with no event, and none while the lamp is private.
+        this.stopListening(ws);
+        if (!request.on) return this.ok(ws, id, { stream: 'off' });
+        if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'the lamp is private');
+        if (this.state.presence.count > 1) return this.refuse(ws, id, 'refused', SOMEONE_ELSE);
+        this.ok(ws, id, { stream: 'on', sample_rate: AUDIO_RATE, channels: 1, format: 's16le', block_ms: AUDIO_EVERY_MS, source: 'mic1' });
+        this.listenFor(ws);
         return undefined;
       case 'stop':
-        // The holder's stop ends its following, as any of its actions.
+        // The holder's stop ends its following, as any of its actions, and
+        // its microphone stream, with no event.
         this.stopFollowing(ws);
+        this.stopListening(ws);
         return this.ok(ws, id);
       case 'express': {
         // As lamp-control's feelings.rs: the feelings skill's three, its
-        // move to the body (smaller below strength 0.5) and its light; no
-        // `done` follows. The fake always shows the light.
+        // move to the body (smaller below strength 0.5) and its light; with
+        // motionDone its move's `done` follows (none when no move was sent).
+        // The fake always shows the light.
         const name = FEELING_MOVES[request.feeling];
         if (!name) return this.refuse(ws, id, 'bad_request', 'feeling: one of glad, lively, low');
         const rounded = Math.round(Math.min(Math.max((request.strength ?? 0.5) / 0.5, 0), 1) * 4);
         // `low` goes no smaller than three quarters (feelings.rs `least_step`).
         const step = rounded === 0 ? 0 : Math.max(rounded, request.feeling === 'low' ? 3 : 1);
         const move = step === 0 ? null : step === 4 ? name : `${name}-${step * 25}`;
-        return this.ok(ws, id, { to: 'body', move, light: true });
+        this.ok(ws, id, { to: 'body', move, light: true });
+        if (move !== null && this.motionDone && this.autoDone) this.done(id);
+        return undefined;
       }
       case 'look': {
-        // As lamp-control with --lease-socket (parts.rs `look`): `face` and
-        // `name` aren't routed; `hand` is followed until a stop, another look
-        // or the lease ends, so no `done` follows it; the body takes the rest,
-        // and its `done` says where the head got to.
+        // As lamp-control with --lease-socket (parts.rs `look`): `name` isn't
+        // routed (nor `face`, with `faceLook: false`, a lamp-control before
+        // it); `hand` is followed until a stop, another look or the lease
+        // ends, so no `done` follows it; the body takes the rest, and its
+        // `done` says where the head got to. A `face` is one turn toward
+        // `this.face` ({ yaw, pitch }: where the face is from the head, in
+        // degrees), or dropped, "no face in view", when none is set.
         if (typeof request.at === 'string' && LOOK_WAITS[request.at]) return this.refuse(ws, id, 'refused', LOOK_WAITS[request.at]);
+        if (request.at === 'face' && !this.faceLook) return this.refuse(ws, id, 'refused', LOOK_FACE_OLD);
         // Another look ends a following.
         this.stopFollowing(ws);
         if (request.at === 'hand') {
@@ -757,18 +1022,38 @@ export class FakeLamp {
           this.following.set(ws, { lease });
           return this.ok(ws, id, { to: 'body', follow: 'hand' });
         }
-        this.ok(ws, id, { to: 'body' });
-        if (this.autoDone) {
-          const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
-          ws.send(JSON.stringify({ ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
+        if (request.at === 'face') {
+          this.stopFollowing(ws);
+          if (!this.face) return this.lookDone(ws, id, 0, 0, NO_FACE_IN_VIEW);
+          return this.lookDone(ws, id, this.face.yaw, this.face.pitch);
         }
-        return undefined;
+        const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
+        return this.lookDone(ws, id, yaw, pitch);
+      }
+      case 'joints': {
+        // As lamp-control (parts.rs `joints`): roll, shoulder and elbow wait
+        // for the body's goal stream; yaw and pitch go to the body as the
+        // holder's look, a joint not named staying where `get` `body` says it
+        // is, so its `done` follows as a look's does, and taking it ends a
+        // hand-follow as any look does.
+        const { targets } = request;
+        if (['roll', 'shoulder', 'elbow'].some((joint) => joint in targets)) return this.refuse(ws, id, 'refused', JOINTS_WAIT);
+        const now = this.state.body.joints;
+        const yaw = targets.yaw ?? now.yaw.deg;
+        const pitch = targets.pitch ?? now.pitch.deg;
+        // The door's words when the body hasn't said where it is.
+        if (yaw === null || yaw === undefined || pitch === null || pitch === undefined) return this.refuse(ws, id, 'refused', JOINTS_UNKNOWN);
+        this.stopFollowing(ws);
+        return this.lookDone(ws, id, yaw, pitch);
       }
       case 'gesture':
       case 'move':
-        // As lamp-control routes them: the body takes them, and no `done`
-        // follows.
-        return this.ok(ws, id, { to: 'body' });
+        // As lamp-control routes them: the body takes them; with motionDone
+        // a `done` follows once the body says it ended (`finished`, or
+        // `dropped`/`cut_short` with the body's why).
+        this.ok(ws, id, { to: 'body' });
+        if (this.motionDone && this.autoDone) this.done(id);
+        return undefined;
       case 'skill.push':
         return this.push(ws, client, id, request);
       case 'skill.list':
@@ -779,6 +1064,11 @@ export class FakeLamp {
         this.pushed.delete(request.name);
         return this.ok(ws, id);
       }
+      case 'notes.set':
+      case 'notes.get':
+      case 'notes.delete':
+      case 'notes.list':
+        return this.notesOp(ws, client, request);
       case 'sound.upload':
         return this.upload(ws, client, request);
       case 'sound.list':

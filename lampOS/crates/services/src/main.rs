@@ -3,10 +3,15 @@
 //! the voice's tools folder (`<run>/tools/`, lamp-voice only). Off unless
 //! `LAMP_SERVICES=on` (a drop-in on its unit, as in lamp-cloud's and the
 //! voice's) or `--enable`: off, it opens no socket and exits at once, so its
-//! unit stays inactive.
+//! unit stays inactive. `lamp-services --pdf-text` is the service's own
+//! child for one PDF's text (`mail::pdf`), never started by hand.
 use lamp_services::{
-    ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT, mail::Gmail, net::Https, on,
-    refresh::Backend, serve, store, tools,
+    CALENDAR_EDITS_ENVIRONMENT, ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT,
+    mail::{self, Gmail},
+    net::Https,
+    on,
+    refresh::Backend,
+    serve, skill_writes, store, tools,
 };
 use std::{
     fs, io,
@@ -37,6 +42,11 @@ fn bind(path: &Path) -> io::Result<UnixListener> {
 }
 
 fn main() -> ExitCode {
+    // A PDF attachment's parse, in a child of the service (`mail::pdf`):
+    // nothing else of the service is started.
+    if std::env::args().nth(1).as_deref() == Some(mail::pdf::CHILD_ARG) {
+        return mail::pdf::child();
+    }
     let mut enable = on(std::env::var(ENVIRONMENT).ok().as_deref());
     let mut store = PathBuf::from(store::DIR);
     let mut run = PathBuf::from("/run/lampos-services");
@@ -83,9 +93,21 @@ fn main() -> ExitCode {
     if skill_reads {
         say("a made skill's reads on: lamp-skills may read, never write");
     }
+    // A made skill's approved write (#6066): lamp-skills may send it.
+    let skill_writes = on(std::env::var(skill_writes::ENVIRONMENT).ok().as_deref());
+    if skill_writes {
+        say("a made skill's writes on: lamp-skills may send each write the owner said yes to");
+    }
+    // Changing and cancelling a calendar event by its id, a write too.
+    let calendar_edits = write_on && on(std::env::var(CALENDAR_EDITS_ENVIRONMENT).ok().as_deref());
+    if calendar_edits {
+        say("calendar edits on: an event changed or cancelled only on a spoken send");
+    }
     let services = Arc::new(
         serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
-            .with_skill_reads(skill_reads),
+            .with_skill_reads(skill_reads)
+            .with_skill_writes(skill_writes)
+            .with_calendar_edits(calendar_edits),
     );
     let tools_dir = run.join("tools");
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
@@ -93,7 +115,7 @@ fn main() -> ExitCode {
         fs::set_permissions(&tools_dir, fs::Permissions::from_mode(0o755))?;
         let admin = bind(&run.join("admin.sock"))?;
         let calls = bind(&tools_dir.join(tools::CALL_SOCKET))?;
-        tools::write(&tools_dir)?;
+        tools::write_for(&tools_dir, calendar_edits)?;
         Ok((admin, calls))
     })();
     let (admin, calls) = match opened {

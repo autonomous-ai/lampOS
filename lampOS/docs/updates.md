@@ -106,7 +106,7 @@ by default**: the helper requires repository variable
 **`LAMPOS_UPDATE_PUBLISH` to be exactly lowercase `on`**. Only a push to
 `autonomous-ai/lampOS`'s `lamp-voice` can publish; pull requests and manual
 runs cannot. [Actions string comparisons ignore case](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#operators),
-so `ON` can enter the cold-build and protected publication job paths, but
+so `ON` can enter the protected publication job path, but
 the helper rejects it before executing an artifact binary.
 
 **Where the artifact is built.** With repository variable `LAMPOS_STUDIO` set
@@ -116,7 +116,7 @@ job and deleted after it, with no cache mounted, that takes only `lamp-voice`.
 `.github/scripts/lampos-route.py` chooses, and falls back to GitHub-hosted on
 any doubt and on every re-run: any attempt after the first runs the `arm64`
 job on GitHub-hosted, whether it is "Re-run all jobs" or "Re-run failed
-jobs" (which reuses `route`'s first answer). The build is cold either way. `publish` and
+jobs" (which reuses `route`'s first answer). The Studio builds cold; GitHub-hosted uses the cache (below). `publish` and
 `promote-stable` always run on GitHub-hosted, so the signing key never
 reaches the Studio. The key staying away does not keep the Studio out of the
 release's trust: `publish` signs the bytes the Studio built, and its SHA-256
@@ -270,18 +270,24 @@ These tests do not establish a real stable promotion or lamp acceptance.
   `lampos-arm64-<github.sha>` from the same run. No artifact from another
   run, branch, pull request or manual input is accepted. The manifest's
   commit is that SHA and its sequence is `github.run_number`.
-- A run eligible to publish under that exact event/ref/repository/variable
-  gate builds cold: it skips cache restore and the step that restores
-  cached source times. A separate step first refuses an existing
-  `lampOS/target`, including a dangling symlink, then runs the unchanged
-  source-times helper against the absent target. This only records fresh
-  checkout times for the cache saved afterward; it cannot reuse a cached
-  binary or timestamp record. The save keeps the upstream commit-keyed
-  policy, with the same explicit key when restore produced no output.
-  Pull requests, manual runs and publication-disabled pushes keep their
-  existing cached behavior. This cold build is the reviewable default for
-  signing candidates, not an activation or an owner configuration change;
-  its extra compilation time belongs in the publication cadence decision.
+- A run eligible to publish builds on GitHub-hosted from the cache, like a
+  pull request: it restores lamp-voice's newest build and gives unchanged
+  source files their cached times back, so cargo rebuilds only the crates
+  that changed (the owner's yes on
+  [#6021](https://github.com/autonomous-ai/lampOS/issues/6021), 10 Nov 2026;
+  a cold build held every promote about 35 minutes, against about 13
+  cached). Only lamp-voice's own runs save that cache; pull requests restore
+  it and never save it.
+- The nightly full run is the check on that cache: it builds cold. It skips
+  cache restore and the step that restores cached source times. A separate
+  step first refuses an existing `lampOS/target`, including a dangling
+  symlink, then runs the unchanged source-times helper against the absent
+  target. This only records fresh checkout times for the cache saved
+  afterward; it cannot reuse a cached binary or timestamp record. The save
+  keeps the commit-keyed policy, with the same explicit key when restore
+  produced no output. If the cold full run fails where lamp-voice's cached
+  build of the same commit passed, publication goes back to cold until the
+  difference is explained; the full run's failure issue says so.
 - Artifact packaging uses the current workspace's `cargo metadata` and
   successful build's JSON `compiler-artifact` records, never a glob over
   the restored target cache. Every current `lamp-*` binary target and both
@@ -653,6 +659,16 @@ each under the quiet rule. A round
    "the channel cannot be reached", not a round held for good (#830). One
    lookup runs at a time: while one that ran over has not ended, a round
    starts none and says "an earlier name lookup has not ended".
+   **A busy channel is asked again.** Every file a round reads, the
+   manifest and each part's files alike, is asked for again after 2, 5 and
+   10 s when the channel answered 5xx or gave no answer and nothing of the
+   file had come yet, each wait only if it ends within the file's own
+   900 s (`fetch::AGAIN_AFTER`, `again_while_busy`). On 9 Nov from 12:30
+   GitHub's release downloads answered 504 to about six tries in ten, and
+   since a round needs every file, lamp-74ff refused five rounds in a row,
+   each on another file (the lead's proposal on #1711). A missing file
+   (404), any other answer, or a file cut short half way refuses as before:
+   its bytes are already written, and its SHA-256 check throws them away.
 3. **The build.** The envelope's key fingerprint must be the lamp's and
    its signature must match the manifest's bytes. Then, before anything
    else of the manifest is read, its `min_updater`: one above this
@@ -930,6 +946,16 @@ each under the quiet rule. A round
    every later build. `lamp-setup.service` keeps its own rules
    (`setup_lifecycle`): a completed setup restarted and skipped by its marker
    is still not well.
+   A part **held** (#6113): lamp-body after a failed unplug fold stays up
+   and still, ready to systemd, its `StatusText` `held, nothing moves: <why>`
+   (#5777, [unplug.md](unplug.md)), so systemd alone would call it well. The
+   round reads `StatusText` before the switch and at the watch's end
+   (`judge::UnitState::held`). Held before and after: not this build's doing,
+   and a put-back fixes nothing, so the build is **kept**, its own health not
+   asked, and the round ends `held` (`build N kept; held: …` in the journal).
+   Held only after the switch: not well, put back as any part is
+   (`… held, nothing moves: …, and was not before the switch`). A body that
+   says no status (a build before #5777) is judged as before.
 10. **Back.** A part not well: the journal's validated old startup order is
     used without rereading the installed dependency graph. Later changes or
     read failures in that graph cannot veto the saved restart order. Every
@@ -1163,6 +1189,17 @@ already in a home. A test pins the product unit's sandbox to 7071's and
 each folder a round writes itself to inside it (`own_unit_line_tests` in
 `main.rs`, #4540).
 
+When planning a newer product build, the round names an installed regular
+`lamp-update.service` as "not carried by rounds; its installed unit is kept"
+(#5061). This reports the policy only: the product manifest omits that unit,
+so no candidate-byte comparison is claimed. It also names any carried unit
+with different text that the plan leaves unchanged because only comments,
+blank lines or trailing whitespace differ. A unit written along with a
+binary or setting change is not reported as retained. Both notices use the
+already loaded unit texts and plan, plus one local metadata check for the
+updater's unit: no new network or systemd calls, no unit contents in the
+journal, and no repetition when the installed build is already up to date.
+
 ### Its records
 
 In `/var/lib/lampos-update/` (`records.rs`), each written whole:
@@ -1254,6 +1291,7 @@ only a self-switch or a climb goes to the journal's form, before its `exec`.
 | `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, its updater put back before, or its updater not this channel's (each ends `…; waiting for a newer updater`); or the build carries none (`…; it carries no lamp-update, so waiting for a build that does`) |
 | `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, or `another lamp-update is at work` |
 | `switched to build N; every part is well` | `switched` | the parts switched and the watch passed |
+| `switched to build N and kept; held: <unit> held, nothing moves: <why>` | `held` | the parts switched and the watch passed, one unit held as it was before the switch (#6113, step 9): the build is kept, the hold needs a person (unplug.md); the cloud alert tells it as `done` |
 | `build N runs; lamp-update switches from its build A to B, which must confirm itself` | `self-switched` | a new updater, after the parts switched and their watch passed (or with none to change). That round writes this end instead of `switched to build N; every part is well`. It does so whenever the build carries a lamp-update other than the running one, as 8999 → 9063 did (lamp-9adf, 30 Oct): lamp-update's own code was unchanged, but it embeds the product's units, and `lamp-voice.service` changed. Builds are reproducible, so between builds whose lamp-update is the same (9101 to 9118) the end is `switched …`. A promote spans many builds, so it mostly ends this way: 9 of the 10 stable promotes since 8327 changed lamp-update, and 8545 kept 8525's |
 | `build N needs updater M; lamp-update switches from its build A to B, which the build carries, and takes nothing else of it until that one has confirmed itself` | `self-switched` | a **climb**: only the updater the build carries is taken |
 | `build N put back: …; the previous build is well`, or `…; the previous build is not well either: …` | `rolled-back` | the parts were put back (the watch, or a start that failed). The second ending, the old build failing its own check too, is the one to post at once; grep `build N put back:` for both |
@@ -1295,12 +1333,15 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `the settings writer refreshed has proved itself (its back ended well): the copy before is removed` | a refreshed writer's first `back` ended well |
 | `the settings writer refreshed is put back (its back failed): the copy before is the writer again` | a refreshed writer's first `back` failed |
 | `the settings writer refreshed is put back (its first apply failed): the copy before is the writer again, and this lamp-update may be asked to be it again` | a refreshed writer's first `apply` failed: the build is refused, the writer is not (#5539) |
+| `lamp-update: <why>; asking again in N s` | the channel answered 5xx or gave no answer before any of a file came: it is asked for again after 2, 5 and then 10 s, within the file's own time; the round goes on if a later try brings it |
 | `the settings writer could not be put back or proved (…): …` | either of those two asked of the unit, and it failed |
 | `the settings writer's back failed in a run that began before it was refreshed: the next back judges it` | the failed `back` may be the copy before's, so nothing is put back for it |
 | **The journal** (`acting`, at the round's start) | |
 | `the journal could not be read (…): kept as …, and the units are taken as they are` | a `journal.json` it can't parse is set aside, and the round goes on (#1505) |
 | `putting build N back: the switch was cut short (lamp-update stopped, or the lamp lost power)` | a journal left by a switch that didn't finish: that build is put back |
 | **What the build brings** | |
+| `lamp-update.service is not carried by rounds; its installed unit is kept` | a new product build is planned and the installed updater unit is a regular file; policy only, since the manifest has no candidate text for it |
+| `… is kept: only comments, blank lines or trailing whitespace differ` | a carried unit has such text differences and the plan leaves it unchanged; never for a unit being rewritten with a binary or setting change |
 | `installed … beside …` | each new folder, a self-switch's or a climb's updater too |
 | `fetched … into …` | a model the build pins, fetched into the model store |
 | `kept …: it is not the pinned model` | a model file at a path of its own that isn't the pinned one: the lamp's, kept |
@@ -1326,6 +1367,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
 | `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
+| `build N kept; held: <unit> held, nothing moves: …` | the watch passed with a unit held as before the switch (#6113, step 9): the round ends `held` |
 | **Putting a build back** | |
 | `putting build N back: …` | before a `put back` end, with why |
 | `the settings need no putting back: lamp-update-apply.service wrote nothing for build N` | the build's settings were never written, so none are put back |
@@ -2748,9 +2790,18 @@ own choice, the queue and the exit note a crash came from, and the login a
 ping rotated, `rotated.json`); the controls (`controls.json`, the product's
 pins file, read with `--touch`, and the pins file prepare gives a lamp moved
 from V1, read without it); the skills turned off (`off`, read by lamp-skills at
-a start and by lamp-cloud for the app); and lamp-records (a voice session
-folder, taken as a session with nothing refused). The other parts follow, by
-harm.
+a start and by lamp-cloud for the app); lamp-records (a voice session
+folder, taken as a session with nothing refused); and the body (#5759): the
+lamp's own poses, `/etc/lampOS/body/lamp.env`, in each shape its writers give
+and as lamp-06c1 and lamp-fc4b hold it, started from the product unit and read
+by the let-go, the generic package's seated `measured.env` started from its
+own unit, and the first stand's record, read so a lamp that stood never asks
+again. Not kept, and why: setup's reset plan is a build's own setting, and
+install keeps every SHA-256 it has had (`install::RESET_PLAN`);
+lamp-policy's `--log-dir` is written and never read back; the output caps
+are off in the product (`LAMP_OUTPUT_CAPS`), so no lamp holds them yet,
+and their fixture is owed before that switch goes on. The other parts follow,
+by harm.
 
 **Published Controls single-implementation replay check** (#2809): the
 Controls `release_pair` target selects pinned 6408/6498
@@ -3220,11 +3271,32 @@ unset too: the build's `PRODUCT_DEFAULT`, on, #5229) and nothing at
 (`harness_install::TEXT`) beside the writer's, checks systemd's view of it
 the same way (`writer_unit::loaded_as`), and starts it with `--no-block`:
 the round never waits for Harness's download. Its sandbox differs:
-`ProtectSystem=full` with `/usr/local/bin` writable, since Harness's home
-may not exist yet under `/var/lib`; network on; 1500 s. It runs
-`lamp-update harness-install`. `check-units` compares it with its own text
+`ProtectSystem=full` with `/usr/local/bin` writable, and since #5978
+`/usr/local/lib/lampos` when it is there (Hermes's wrapper and its
+namespace script), since Harness's home may not exist yet under
+`/var/lib`; network on; 3600 s since #5978 (1500 before). It runs
+`lamp-update harness-install`, which also installs the pinned Hermes
+after Harness, as `lampos`, unless `LAMP_HERMES_ON_LAMP=off` in
+lamp-update's own unit (on by default on a product lamp: its
+`PRODUCT_DEFAULT` is on, the product owner's decision, 10 Nov; another
+lamp needs `on`; install.md, "Hermes on the lamp"); a round with that
+switch on and Harness already
+there starts the same unit for Hermes. Hermes's install starts only in
+its window (`hermes_schedule::window`): not in the first round after
+lamp-update starts, not while the setup walk is under way, only after
+10 min with the voice resting and nobody heard, and then right after the
+walk ended, by day for a lamp that never tried (one that just took the
+update), or 01:00 to 05:00 local. While it runs, a thread of `serve`
+freezes the unit (its own `cgroup.freeze`; `systemctl freeze` is refused for a oneshot still activating) as soon as the voice is not quiet,
+thaws it after 10 quiet min, stops it after 30 min frozen in all
+(`interrupted`) and stops it at once when the voice's privacy lease is
+lost (`privacy_lost`); both are tried in the next open window. The unit
+has `MemoryHigh=600M` and `CPUQuota=100%` too, so the voice keeps its privacy reading through the `products` stage (lamp-c0a4, 11 Nov: above 1.4 GB available all through). `check-units` compares it with its own text
 as "the updater's", and a round never takes it for a part's unit. Its
 record, `harness-install.json`, is said on `update/status` as `harness`.
+The same unit moves a Harness older than the build's pin to it, when
+Harness is not in use, and puts the older one back if the move fails
+(#5957; `docs/install.md`, "A newer pin moves an older Harness").
 
 ### A fixed copy, checked (#3689)
 

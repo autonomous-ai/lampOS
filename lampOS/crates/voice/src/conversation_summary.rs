@@ -380,8 +380,12 @@ pub fn memory_forgot_from(
     summaries: &Mutex<Summaries>,
     thread: &Mutex<crate::thread::Thread>,
 ) -> usize {
-    let forgets = forgot
-        .forgotten(now_us)
+    let forgotten = forgot.forgotten(now_us);
+    // A role went with its person's everything (`LAMP_MEMORY_ROLE`).
+    for person in &forgotten {
+        crate::remember::role::forgot(person.as_deref());
+    }
+    let forgets = forgotten
         .iter()
         .filter(|person| memory_forgot_talk(person.as_deref()))
         .count();
@@ -404,6 +408,25 @@ pub fn memory_forgot_from(
 /// [`memory_forgot_from`] on this process's thread and notes.
 pub fn memory_forgot(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> usize {
     memory_forgot_from(forgot, now_us, &SUMMARIES, &crate::thread::THREAD)
+}
+
+/// Memory's forgets since the last look, with the running summary off
+/// ([`on`]): no thread or note is touched here, as before, but any that
+/// reaches the conversation ([`memory_forgot_talk`]) still drops the write
+/// waiting for its send, and with it what the next turn would be told of
+/// it (`crate::services::forget_waiting`; Reviewer-two's HOLD on #5968 at
+/// `8c1cbd4268`: the forget reached the write only through the summary's
+/// reader). How many there were.
+pub fn memory_forgot_waiting(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> usize {
+    let forgets = forgot
+        .forgotten(now_us)
+        .iter()
+        .filter(|person| memory_forgot_talk(person.as_deref()))
+        .count();
+    if forgets > 0 {
+        crate::services::forget_waiting();
+    }
+    forgets
 }
 
 /// The scope's note, while it is under [`crate::thread::REMEMBERED_FOR`]

@@ -10,7 +10,7 @@ first: it says exactly what was wrong.
 | `no_grant` | Ask the owner to tick this grant for this computer in the app, then connect again: grants are read at hello. |
 | `no_lease` | Hold a `body` lease first (Python `lamp.lease("body")`, JS `lamp.withLease(['body'], ...)`); `joints` names it. |
 | `lease_lost` | The lamp took the body back; `why` says why (a conversation, a hand, private, a stop). Let it be, and take a new lease later. |
-| `busy` | A motion still plays (a gesture, move or feeling's move, whoever asked): wait `retry_ms` and send it again. Without `retry_ms`, someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first. |
+| `busy` | Someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first. |
 | `refused` | The part's own check said no, in its words in `why` (out of reach, under a pattern's least level, not routed on this lamp yet). Change the request: the same one is refused again. |
 | `quiet_hours` | It's the lamp's quiet hours (`limits.quiet_hours`, off unless this lamp sets them): `say`, `sound` and `turn.start` wait until they end. A light is still fine. |
 | `private` | The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false. |
@@ -19,6 +19,12 @@ first: it says exactly what was wrong.
 | `rate` | Too many of one kind too fast: wait `retry_ms` and send it again. With the rates off (the default), only refused actions and phrase changes are bounded. |
 | `bad_request` | The request doesn't fit the protocol; `why` names the field. Check it against the schema (control.schema.json). |
 | `off` | Developer access is off on this lamp: the owner turns it on in the app. |
+
+On stable 10824 and older, `busy` with `retry_ms` also means a motion still
+plays (the last gesture, move or feeling's move lamp-control sent, from any computer; the lamp's own motions don't count): wait `retry_ms` and
+send it again. Without `retry_ms`, it is a held part, as in the table. On a
+customer lamp, `refused` "skill push is not on this lamp" means skill push
+isn't there yet ([gotchas.md](gotchas.md)): don't retry.
 
 Not from the lamp, but from the SDK: `not_paired` (no pairing here: run `lamp pair`),
 `wrong_lamp` (the certificate isn't the pinned one: pair again), `closed`

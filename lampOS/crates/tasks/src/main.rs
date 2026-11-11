@@ -65,6 +65,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut folder_missing = false;
     let mut new_folder = false;
     let mut route = false;
+    let mut reply_named = false;
     let mut engines_ready = false;
     let mut absolute_folder = false;
     let mut from_machines = None;
@@ -87,6 +88,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--sign-in-by-code" => sign_in_by_code = true,
             "--folder-missing" => folder_missing = true,
             "--route" => route = true,
+            "--reply-named" => reply_named = true,
             "--new-folder" => new_folder = true,
             "--engines-ready" => engines_ready = true,
             "--absolute-folder" => absolute_folder = true,
@@ -223,6 +225,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             folder_missing,
             engines_ready,
             route,
+            reply_named,
             absolute_folder,
             new_folder,
         },

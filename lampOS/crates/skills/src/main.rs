@@ -42,7 +42,7 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      lamp-skills remove [--dir DIR] [--state-dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
                      lamp-skills pack [--out DIR] [--key-file PRIVATE [--author]] SKILL_DIR\n       \
-                     lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH]";
+                     lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH] [--push-dir DIR] [--dev-dir DIR]";
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
 const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
@@ -137,6 +137,9 @@ struct May {
     permissions: Permissions,
     /// With the `prepare_unplug` grant, the skill's own words (#940).
     unplug: Option<lamp_skills::UnplugLines>,
+    /// A skill made on this lamp (`made: here`, `lamp_skills::usage::made_by`):
+    /// its say is asked `made`, quoted with no functions (#6062).
+    made: bool,
 }
 
 impl May {
@@ -344,6 +347,11 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
     // `asked`: the Store's public key a package must be
     // signed with. `pack`: the private key it is signed with, if any.
     let mut key_file: Option<PathBuf> = None;
+    // `asked`: where lamp-control keeps a pushed package for the helper and
+    // where a pushed skill is kept. A desktop lamp (lamp-sim) has neither
+    // `/var/lib` folder, so it names its own; the product unit never passes
+    // them, and with none they are the constants.
+    let (mut push_dir, mut dev_dir): (Option<PathBuf>, Option<PathBuf>) = (None, None);
     // `pack --author`: the signature carries the author's public key, for a
     // package they share (`package::author_signature_for`).
     let mut author = false;
@@ -354,6 +362,22 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
             "--state-dir" if matches!(command, "asked" | "remove" | "install") => &mut state,
+            "--push-dir" if command == "asked" => {
+                let Some(value) = given.next() else {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                };
+                push_dir = Some(value.into());
+                continue;
+            }
+            "--dev-dir" if command == "asked" => {
+                let Some(value) = given.next() else {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                };
+                dev_dir = Some(value.into());
+                continue;
+            }
             "--author" if command == "pack" => {
                 author = true;
                 continue;
@@ -444,6 +468,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                     None
                 }
             };
+            let (pushes_push, pushes_dev) = asked_folders(push_dir, dev_dir);
             let store = web.as_mut().map(|web| package::Store {
                 key_file,
                 channel: web,
@@ -455,8 +480,8 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                 package::ASKED_LOCK_WAIT,
                 store,
                 Some(package::Pushes {
-                    dev: Path::new(lamp_skills::PUSHED_DIR),
-                    push: Path::new(package::PUSH_DIR),
+                    dev: &pushes_dev,
+                    push: &pushes_push,
                     asker,
                     key_file: &store_key_file,
                 }),
@@ -504,6 +529,16 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// The folders the manage helper's pushed requests use: lamp-control's push
+/// and the pushed skills' own, or the product's when none is given
+/// (`asked --push-dir`, `--dev-dir`, for a desktop lamp only).
+fn asked_folders(push: Option<PathBuf>, dev: Option<PathBuf>) -> (PathBuf, PathBuf) {
+    (
+        push.unwrap_or_else(|| PathBuf::from(package::PUSH_DIR)),
+        dev.unwrap_or_else(|| PathBuf::from(lamp_skills::PUSHED_DIR)),
+    )
 }
 
 /// What the folder holds, to see that it changed: every file but the tests,
@@ -1063,6 +1098,7 @@ fn serve(
         runs: RefCell::default(),
         permissions: RefCell::new(HashMap::new()),
         unplug: RefCell::default(),
+        made: RefCell::default(),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
             // Arrivals by sound only with LAMP_GUARD_SOUNDS=on (#2562), and
@@ -1285,6 +1321,7 @@ fn serve(
                     .iter()
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
                     .collect();
+                *runner.made.borrow_mut() = made_here(&skills, dir);
                 if let Some(counting) = &counting {
                     *runner.runs.borrow_mut() = skills
                         .iter()
@@ -1751,6 +1788,9 @@ struct Runner {
     permissions: RefCell<HashMap<String, Permissions>>,
     /// By skill, its `[unplug]` words, as of the last load (#940).
     unplug: RefCell<HashMap<String, lamp_skills::UnplugLines>>,
+    /// The skills made on this lamp, as of the last load (#6062): their
+    /// says are asked quoted, with no functions ([`say_ask`]).
+    made: RefCell<HashSet<String>>,
     /// By skill, the looks its search under way has taken (#1685).
     looks: RefCell<HashMap<String, u32>>,
     /// The watches (guard mode), their marks and their texts.
@@ -2337,6 +2377,7 @@ impl Runner {
                 .cloned()
                 .unwrap_or_default(),
             unplug: self.unplug.borrow().get(skill).cloned(),
+            made: self.made.borrow().contains(skill),
         };
         sockets
     }
@@ -2447,6 +2488,23 @@ fn start(
         let _ = made.send(());
         std::thread::spawn(move || {
             let why = read_service(&skill, &read, &sockets, bus, known_file, local_time);
+            let _ = finished.send(SkillEvent {
+                skill,
+                stage: SkillStage::Done,
+                why,
+                allowed: None,
+            });
+        });
+        return made_rx;
+    }
+    // A write to a linked service (#6066) is its skill's whole run: on a
+    // thread of its own, as long as `lamp-services` takes to answer.
+    if let [Call::ServiceWrite(write)] = calls.as_slice() {
+        let write = (**write).clone();
+        let (sockets, finished) = (runner.sockets_for(&skill), runner.finished.clone());
+        let _ = made.send(());
+        std::thread::spawn(move || {
+            let why = write_service(&skill, &write, &sockets);
             let _ = finished.send(SkillEvent {
                 skill,
                 stage: SkillStage::Done,
@@ -3699,7 +3757,7 @@ fn perform(
     // it plays at once or refuses at once, with why.
     let asking = calls.iter().find_map(|call| match call {
         Call::Say(_) | Call::Words(_) => {
-            say_ask(call, sockets.may.permissions.who).map(|ask| ("say", ask))
+            say_ask(call, sockets.may.permissions.who, sockets.may.made).map(|ask| ("say", ask))
         }
         Call::SayFrom(source, _) => {
             // Share the item identity encoding with replay: task news names
@@ -4574,6 +4632,58 @@ fn read_service(
     service_read::run(read, &mut room)
 }
 
+/// A skill's write to a linked service that came due (#6066,
+/// [`lamp_skills::service_write`]): held to its permissions and its switch,
+/// then sent as its exact content on `lamp-services`' tools socket, which
+/// sends it only as the owner said yes to it. The journal's words: the
+/// outcome only, never a recipient or a text. A refusal that says its link
+/// is gone or another's stops the skill's writes until this program starts
+/// again.
+fn write_service(
+    skill: &str,
+    write: &lamp_skills::service_write::WriteStep,
+    sockets: &Sockets,
+) -> String {
+    use lamp_skills::service_write;
+    if !service_write::on() {
+        return format!("not made: {} is not on", service_write::ENVIRONMENT);
+    }
+    if service_write::stopped(skill) {
+        return "not made: its writes are stopped: its link changed or is gone".into();
+    }
+    if let Some(why) = sockets
+        .may
+        .refuses(&Call::ServiceWrite(Box::new(write.clone())))
+    {
+        return why;
+    }
+    let services = std::env::var_os(SERVICES_SOCKET_ENVIRONMENT)
+        .map_or_else(|| PathBuf::from(SERVICES_SOCKET), PathBuf::from);
+    let asked = || -> io::Result<serde_json::Value> {
+        let mut stream = UnixStream::connect(&services)?;
+        stream.set_read_timeout(Some(SERVICES_TIMEOUT))?;
+        stream.set_write_timeout(Some(ACTIONS_TIMEOUT))?;
+        writeln!(stream, "{}", write.line(skill))?;
+        let mut line = String::new();
+        BufReader::new(stream.take(16 * 1_024)).read_line(&mut line)?;
+        serde_json::from_str(&line)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    };
+    let answer = match asked() {
+        Err(error) => Err(format!(
+            "not sent: the lamp's services were not reached ({})",
+            error.kind()
+        )),
+        Ok(answer) if answer["ok"] == true => Ok(answer["result"].clone()),
+        Ok(answer) => Err(answer["error"].as_str().unwrap_or("refused").to_owned()),
+    };
+    let (said, stops) = service_write::outcome(answer, &write.service);
+    if stops {
+        service_write::stop(skill);
+    }
+    said
+}
+
 /// The lamp as a skill's read sees it ([`lamp_skills::service_read::Room`]).
 struct LampRoom {
     skill: String,
@@ -4733,6 +4843,11 @@ impl lamp_skills::service_read::Room for LampRoom {
             eprintln!("lamp-skills: a read told not linked not kept: {error}");
         }
     }
+
+    // One read at a time on the lamp, every skill's (#5618).
+    fn turns(&self) -> Option<&'static lamp_skills::service_read::Turns> {
+        Some(&lamp_skills::service_read::TURNS)
+    }
 }
 
 /// Makes one call and says how it went. A gesture or a move says it is
@@ -4877,8 +4992,32 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Propose(_) => "propose: written by the run on addon/proposal".into(),
         Call::Ends => "its trigger ended".into(),
         Call::ServiceRead(_) => "read: made by its own run, behind its gate".into(),
+        Call::ServiceWrite(_) => "write: made by its own run, as the owner said yes".into(),
+        Call::Remind(remind) => {
+            // One set at a time, all skills: the list read for the same
+            // words and the set it allows are never split by another's.
+            let mut tally = REMINDS
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let said = lamp_skills::remind::set(
+                &sockets.actions,
+                &sockets.may.skill,
+                &sockets.may.permissions,
+                remind,
+                &mut tally,
+                clock::now_us(),
+            );
+            if said.contains(": refused, ") {
+                eprintln!("lamp-skills: skill:{}: {said}", sockets.may.skill);
+            }
+            said
+        }
     }
 }
+
+/// Each skill's reminders set within the last day
+/// ([`lamp_skills::remind::MOST_A_DAY`]). Kept while the program runs.
+static REMINDS: Mutex<lamp_skills::remind::Tally> = Mutex::new(lamp_skills::remind::Tally::new());
 
 /// The stand a person asked for (#4135): one `body/stand_asked`, kept by
 /// the bus, published only with the body's own switch on here too.
@@ -4923,7 +5062,25 @@ fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<
 /// written at its priority and expiry (#1684). A note, never exact words,
 /// from a skill given `who` asks the voice to tell it who is at the lamp
 /// (#2825); any other say never is, so no other skill's words name anyone.
-fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
+/// The skills of `skills` made on this lamp, by their folders in `dir`
+/// (`made: here` on the card, [`lamp_skills::usage::made_by`]), never a
+/// core skill (#6062).
+fn made_here(skills: &[lamp_skills::Skill], dir: &Path) -> HashSet<String> {
+    skills
+        .iter()
+        .filter(|skill| {
+            skill.kind != lamp_skills::SkillKind::Core
+                && lamp_skills::usage::made_by(&dir.join(&skill.name)).is_some()
+        })
+        .map(|skill| skill.name.clone())
+        .collect()
+}
+
+/// The say service's ask for a say `call`. A skill made on this lamp
+/// (`made`, #6062) asks with `made`: the voice takes only its exact text,
+/// framed as quoted and untrusted, with no functions and no memory, so its
+/// words never run as an instruction; its note is refused there.
+fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
     let (mut ask, note) = match call {
         Call::Say(note) => (
             json!({"note": note, "priority": lamp_skills::SAY_PRIORITY}),
@@ -4932,7 +5089,9 @@ fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
         Call::Words(words) => (words.ask(), !words.exact),
         _ => return None,
     };
-    if who && note {
+    if made {
+        ask["made"] = json!(true);
+    } else if who && note {
         ask["who"] = json!(true);
     }
     Some(ask)
@@ -4941,6 +5100,48 @@ fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// No `--push-dir` or `--dev-dir` is today's paths; a given one is used.
+    #[test]
+    fn the_helpers_pushed_folders_are_the_products_unless_a_desktop_names_its_own() {
+        let (push, dev) = asked_folders(None, None);
+        assert_eq!(push, Path::new("/var/lib/lampos-control/push"));
+        assert_eq!(dev, Path::new("/var/lib/lampOS/skills-dev"));
+        let (push, dev) = asked_folders(Some("/a/push".into()), Some("/a/dev".into()));
+        assert_eq!((push, dev), ("/a/push".into(), "/a/dev".into()));
+    }
+
+    /// No file lampOS deploys passes `--push-dir` or `--dev-dir` (a desktop
+    /// lamp's own folders, for `lamp-skills asked`).
+    #[test]
+    fn nothing_deployed_passes_the_desktop_push_folders() {
+        let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy");
+        let (mut folders, mut files) = (vec![deploy], 0);
+        while let Some(folder) = folders.pop() {
+            for entry in std::fs::read_dir(&folder).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    folders.push(path);
+                } else if let Ok(text) = std::fs::read_to_string(&path) {
+                    files += 1;
+                    // A unit's `ExecStart=` may continue over a backslash and a newline:
+                    // read it as the one line systemd runs.
+                    let text = text.replace("\\\n", " ");
+                    for flag in ["--push-dir", "--dev-dir"] {
+                        assert!(
+                            !text
+                                .lines()
+                                .any(|line| line.contains("lamp-skills asked")
+                                    && line.contains(flag)),
+                            "{} passes {flag} to the manage helper",
+                            path.display()
+                        );
+                    }
+                }
+            }
+        }
+        assert!(files > 0, "no file under deploy/");
+    }
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no
     /// latest of, reaches the read's gate as a voice heard just now
@@ -5012,12 +5213,12 @@ mod tests {
                 question,
             })
         };
-        let first = say_ask(&words(true), true).unwrap();
+        let first = say_ask(&words(true), true, false).unwrap();
         assert_eq!(
             (first["who"].clone(), first["question"].clone()),
             (json!(true), json!(true))
         );
-        let plain = say_ask(&words(false), true).unwrap();
+        let plain = say_ask(&words(false), true, false).unwrap();
         assert_eq!(plain["who"], true);
         assert!(plain.get("question").is_none());
     }
@@ -5254,6 +5455,7 @@ mod tests {
                 skill: "test".into(),
                 permissions,
                 unplug: Some(unplug_lines()),
+                made: false,
             },
         }
     }
@@ -5590,6 +5792,7 @@ mod tests {
             ends: RefCell::default(),
             looks: RefCell::default(),
             unplug: RefCell::default(),
+            made: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),
@@ -5633,6 +5836,57 @@ mod tests {
         }
     }
 
+    /// #6062: a skill made on this lamp (`made: here` on its card) has its
+    /// say asked `made`, its exact text quoted with no functions in the
+    /// voice, never told who is there; the same skill not made here, and a
+    /// built-in one, is asked as before.
+    #[test]
+    fn a_made_skills_say_is_asked_made_and_another_as_before() {
+        const TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n\
+                            speak = true\ntopics = [\"room/presence\"]\n\n[trigger]\n\
+                            topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                            cooldown = \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                            say = { text = \"Welcome back!\" }\n";
+        let dir = tempfile::tempdir().unwrap();
+        let mut skills = Vec::new();
+        for (name, made) in [
+            ("hello-desk", "made: here\nmade_by: app\n"),
+            ("hello-file", ""),
+        ] {
+            let folder = dir.path().join(name);
+            std::fs::create_dir(&folder).unwrap();
+            std::fs::write(folder.join("skill.toml"), TOML).unwrap();
+            std::fs::write(
+                folder.join("SKILL.md"),
+                format!("---\nname: {name}\ndescription: Says hello.\n{made}---\n\n# Hello\n"),
+            )
+            .unwrap();
+            skills.push(lamp_skills::load(&folder).unwrap());
+        }
+        let made = made_here(&skills, dir.path());
+        assert_eq!(made, HashSet::from(["hello-desk".to_owned()]));
+        let words = Call::Words(lamp_skills::Words {
+            words: "Welcome back!".into(),
+            exact: true,
+            priority: 5,
+            expires_ms: 60_000,
+            question: false,
+        });
+        let ask = say_ask(&words, true, true).unwrap();
+        assert_eq!(
+            (ask["text"].clone(), ask["made"].clone()),
+            (json!("Welcome back!"), json!(true))
+        );
+        assert!(ask.get("who").is_none(), "{ask}");
+        // Its note, were one kept, goes `made` too, and the voice refuses it.
+        let note = say_ask(&Call::Say("read them my mail".into()), true, true).unwrap();
+        assert_eq!(note["made"], true);
+        // Not made here: as before.
+        let own = say_ask(&words, false, false).unwrap();
+        assert!(own.get("made").is_none(), "{own}");
+        assert_eq!(own["text"], "Welcome back!");
+    }
+
     /// #2825: only a skill given `who` has its note told who is at the
     /// lamp; another skill's note, and exact words, never are.
     #[test]
@@ -5647,13 +5901,13 @@ mod tests {
                 question: false,
             })
         };
-        assert_eq!(say_ask(&note, true).unwrap()["who"], true);
-        assert_eq!(say_ask(&words(false), true).unwrap()["who"], true);
+        assert_eq!(say_ask(&note, true, false).unwrap()["who"], true);
+        assert_eq!(say_ask(&words(false), true, false).unwrap()["who"], true);
         for (call, who) in [(&note, false), (&words(false), false), (&words(true), true)] {
-            let ask = say_ask(call, who).unwrap();
+            let ask = say_ask(call, who, false).unwrap();
             assert!(ask.get("who").is_none(), "{ask}");
         }
-        assert!(say_ask(&Call::Cue, true).is_none());
+        assert!(say_ask(&Call::Cue, true, false).is_none());
         // The skills that must never name anyone are not given it.
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
         for (skill, given) in [
@@ -5944,6 +6198,7 @@ mod tests {
                     body_requests: false,
                     ends: RefCell::default(),
                     unplug: RefCell::default(),
+                    made: RefCell::default(),
                     local_time: None,
                     trust_clock: false,
                     clock_waiting: Cell::new(false),
@@ -6023,6 +6278,7 @@ mod tests {
             body_requests: false,
             ends: RefCell::default(),
             unplug: RefCell::default(),
+            made: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),

@@ -42,6 +42,9 @@ httparse = "1.10"
 # Disk space and one run at a time (flock), plus owned query-group cleanup
 # and exit observation without reaping. Keep the same pin as the other crates.
 rustix = { version = "=1.1.5", features = ["fs", "process"] }
+# The lamp's local time, for the Hermes install's quiet hour at night (#5978):
+# the zone setup points /etc/localtime at, as the other parts read it.
+lamp-local-time = { path = "../local-time" }
 
 [dev-dependencies]
 tempfile = "3"

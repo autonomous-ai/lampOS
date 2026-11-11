@@ -25,8 +25,14 @@ cập cho nhà phát triển trong ứng dụng.
 
 - **Sự kiện:** `person.arrived`, `person.left`, `person.stood_up`,
   `person.facing`, `phrase.heard` (chỉ cụm từ đã đăng ký khớp, **không bao
-  giờ** là lời đã nói), `name.heard`, `sound.heard`, `touch`, `button`,
+  giờ** là lời đã nói; so với chữ của bộ nhận dạng: chữ thường, bỏ dấu nháy,
+  từ viết liền hay tách đều khớp ("goodnight" / "good night"), và từ cuối
+  nghe được có thể thêm một "s" ("lamps" khớp "lamp"); lamp-control chỉ ghi
+  số đếm vào nhật ký, không ghi lời), `name.heard`, `sound.heard`, `touch`, `button`,
   `time`, `lamp.changed`.
+- **`touch`:** một cú chạm đầu (`tap`, nhả nhanh) từ `controls/touch` và một
+  cú vuốt đầu (`pet`, mỗi lần chạm một sự kiện, từ `controls/pet`) đến chương
+  trình của bạn; loại `hold` chưa được tạo ra.
 - **Hành động:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. `look`, `move`, `play` và `joints` cần một
   lease.

@@ -146,8 +146,8 @@ pub const PRODUCT: &[(&str, &str)] = &[
     ),
     // The skills' manage helper (#1722, #2414): root's, started by its
     // socket for each connection, so the socket is enabled and the template
-    // never is. lamp-cloud's skills.remove and a made skill's spoken yes
-    // (#1685) ask it.
+    // never is. lamp-cloud's skills.remove and a made skill going on once
+    // kept (#1685, #5977) ask it.
     (
         "lamp-skills-manage.socket",
         include_str!("../../../deploy/product/lamp-skills-manage.socket"),
@@ -305,9 +305,9 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Twenty-one keep their
-/// folders' own default: twenty enabled, Bedtime and Morning disabled by its
-/// own `enabled = false` until its lamp comparison (#1672), and Comfort break
+/// `tests/install.rs` holds the two lists equal). Twenty-four keep their
+/// folders' own default: twenty-three enabled (Bedtime and Morning since #5753,
+/// with `LAMP_OUTPUT_CAPS=on` in the product units), and Comfort break
 /// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
 /// the product's skills units set (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
@@ -366,6 +366,10 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // yes after the lamp check on lamp-06c1 (29 Oct).
     "head-pat",
     "head-pat-wiggle",
+    // How to use the lamp (#5790): asked "how do I...", "what can you do",
+    // it answers from its own product knowledge (`knowledge.md`), reached
+    // through `use_skill`; it only tells, and changes nothing.
+    "faq",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
     "light-out",
     "light-scenes",
@@ -481,6 +485,24 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill, not yet tried on a lamp (#3504): V1's meal reminder, which its \
          owner chooses; a played check on a lamp comes first",
     ),
+    // Installable reads of a linked service (V1's Store skills ported,
+    // #5385, 6 Nov): each owner chooses them from the Skills Store, and a
+    // read needs that owner's own linked account.
+    (
+        "morning-agenda",
+        "an installable skill from the Skills Store: today's Google Calendar read once a morning, \
+         which needs its owner's calendar linked",
+    ),
+    (
+        "morning-mail",
+        "an installable skill from the Skills Store: the newest mail's senders and subjects read \
+         once a morning, which needs its owner's Gmail linked",
+    ),
+    (
+        "tomorrows-plan",
+        "an installable skill from the Skills Store: tomorrow's Google Calendar read once an \
+         evening, which needs its owner's calendar linked",
+    ),
     (
         "quiet-focus",
         "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
@@ -488,9 +510,9 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     ),
     (
         "who-was-here",
-        "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
-         eyes say only with `LAMP_PRESENCE=on`, and its function would put a product session past \
-         its 32 without `LAMP_USE_SKILL=on`",
+        "an installable skill, offered by the Store (#5751, the first builder's ruling of 9 Nov): \
+         installing it is the owner's yes to being told who was at the lamp; the product runs what \
+         it reads (`LAMP_PRESENCE=on`, `LAMP_USE_SKILL=on`), times only",
     ),
 ];
 
@@ -602,6 +624,9 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("light-scenes", "SKILL.md"),
     skill_file_off!("point-light"),
     skill_file!("point-light", "SKILL.md"),
+    skill_file!("faq", "skill.toml"),
+    skill_file!("faq", "SKILL.md"),
+    skill_file!("faq", "knowledge.md"),
     skill_file_off!("light-show"),
     skill_file!("light-show", "SKILL.md"),
     skill_file!("light-show", "shows/calm.toml"),
@@ -902,7 +927,7 @@ const HARNESS_DONE: &str = "harness-at-boot";
 /// Binaries a build carries that live in another part's folder: the voice
 /// starts its turn-end worker from its own (docs/endpoint-detection.md). A
 /// build without one is refused whole.
-const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
+pub(crate) const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 
 /// Tools put beside a part when the build carries them, and left out, said
 /// once, when it does not: the factory's steps run the body's from the
@@ -911,7 +936,8 @@ const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 /// does (the reviewer on #2249). The voice starts its same-voice check
 /// from its own folder, and only when `LAMP_SAME_VOICE_MODEL` is set
 /// (docs/same-voice.md); a build from before it shipped must still install.
-const BESIDE_IF_CARRIED: &[(&str, &[&str])] = &[
+/// A round puts them beside too when the build carries them (crate::round).
+pub(crate) const BESIDE_IF_CARRIED: &[(&str, &[&str])] = &[
     ("lamp-body", &["lamp-body-measure", "lamp-body-mood"]),
     ("lamp-voice", &["lamp-same-voice"]),
 ];
@@ -1169,22 +1195,49 @@ pub const VERSION_WITHIN: Duration = Duration::from_secs(30);
 /// be slow.
 pub const INSTALLER_WITHIN: Duration = Duration::from_secs(15 * 60);
 
+/// The longest one stage of Hermes's installer may take (#5978): the
+/// installer's own [`INSTALLER_WITHIN`] and the most the one-shot may be
+/// kept frozen while someone speaks
+/// ([`crate::hermes_schedule::MOST_FROZEN`]), as the clock goes on while it
+/// is frozen. On c0a4 (11 Nov) a products stage frozen 21 min was taken for
+/// timed out the moment it thawed.
+pub const HERMES_STAGE_WITHIN: Duration =
+    Duration::from_secs(INSTALLER_WITHIN.as_secs() + crate::hermes_schedule::MOST_FROZEN.as_secs());
+
 /// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
-/// which fetches, gets [`INSTALLER_WITHIN`].
+/// which fetches, gets [`INSTALLER_WITHIN`], and a stage of Hermes's,
+/// which may be frozen too, [`HERMES_STAGE_WITHIN`].
 pub fn output_of(argv: &[String]) -> Result<String, String> {
-    output_of_within(
-        argv,
-        if runs_installer(argv) {
-            INSTALLER_WITHIN
-        } else {
-            RESTART_WITHIN
-        },
-    )
+    output_of_within(argv, bound_of(argv))
+}
+
+/// How long [`output_of`] waits for `argv`.
+pub fn bound_of(argv: &[String]) -> Duration {
+    if runs_hermes_stage(argv) {
+        HERMES_STAGE_WITHIN
+    } else if runs_installer(argv) {
+        INSTALLER_WITHIN
+    } else {
+        RESTART_WITHIN
+    }
+}
+
+/// Whether `argv` runs one stage of Hermes's checked installer, `bash
+/// <dir>/`[`crate::hermes_install::INSTALLER_FILE`] `--stage …`.
+pub fn runs_hermes_stage(argv: &[String]) -> bool {
+    let hermes = format!("/{}", crate::hermes_install::INSTALLER_FILE);
+    argv.windows(2)
+        .any(|pair| pair[0] == "bash" && pair[1].ends_with(&hermes))
 }
 
 /// Whether `argv` runs Harness's installer: the CDN's piped to `sh`, or a
-/// pinned install's checked copy, `sh <dir>/`[`PINNED_INSTALLER`].
+/// pinned install's checked copy, `sh <dir>/`[`PINNED_INSTALLER`]; or one
+/// stage of Hermes's checked copy, `bash <dir>/`
+/// [`crate::hermes_install::INSTALLER_FILE`] `--stage …` (#5978).
 pub fn runs_installer(argv: &[String]) -> bool {
+    if runs_hermes_stage(argv) {
+        return true;
+    }
     match argv {
         [.., sh, file] if sh == "sh" && file.ends_with(&format!("/{PINNED_INSTALLER}")) => true,
         [.., last] => last.contains(HARNESS_INSTALLER),
@@ -3264,6 +3317,46 @@ mod tests {
             !enabled().iter().any(|name| name.contains('@')),
             "{:?}",
             enabled()
+        );
+    }
+
+    /// Nine's wall (a) on #3504: skill push is on in the product. The
+    /// developers' door passes `--manage-socket` at the very socket the
+    /// skills' manage helper listens on, and is ordered after it, so a
+    /// paired computer's `skill.push` reaches the helper on every lamp.
+    #[test]
+    fn the_door_passes_the_skills_manage_socket_it_listens_on() {
+        let unit = |wanted: &str| {
+            PRODUCT
+                .iter()
+                .find(|(name, _)| *name == wanted)
+                .map(|(_, text)| *text)
+                .unwrap_or_else(|| panic!("{wanted} is not installed"))
+        };
+        let listen = unit("lamp-skills-manage.socket")
+            .lines()
+            .find_map(|line| line.strip_prefix("ListenStream="))
+            .expect("the manage socket's ListenStream");
+        let control = unit("lamp-control.service");
+        let exec = control
+            .lines()
+            .find(|line| line.starts_with("ExecStart="))
+            .expect("lamp-control's ExecStart");
+        let words: Vec<&str> = exec.split_whitespace().collect();
+        let manage = words
+            .windows(2)
+            .find(|pair| pair[0] == "--manage-socket")
+            .map(|pair| pair[1]);
+        assert_eq!(manage, Some(listen), "{exec}");
+        let after = control
+            .lines()
+            .find(|line| line.starts_with("After="))
+            .expect("lamp-control's After");
+        assert!(
+            after
+                .split_whitespace()
+                .any(|unit| unit.ends_with("lamp-skills-manage.socket")),
+            "{after}"
         );
     }
 

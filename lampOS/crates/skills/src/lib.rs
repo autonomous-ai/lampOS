@@ -23,12 +23,15 @@ pub mod addon;
 pub mod clock;
 pub mod daily;
 pub mod glow;
+pub mod knowledge;
 pub mod known;
 pub mod limits;
 pub mod package;
+pub mod remind;
 pub mod requested_audio;
 pub mod routine;
 pub mod service_read;
+pub mod service_write;
 pub mod unplug;
 pub mod usage;
 pub mod visits;
@@ -223,6 +226,9 @@ struct SkillFile {
     ask: Option<AskFile>,
     /// A function the model may call, which runs the steps.
     tool: Option<String>,
+    /// A file of the skill's folder whose section the choice names is told
+    /// to the tool's call after its note (#5790, [`knowledge`]).
+    knowledge: Option<String>,
     /// The tool's one argument the model picks from named values.
     choice: Option<ChoiceFile>,
     /// The tool's one argument that is yes or no.
@@ -443,6 +449,15 @@ struct QuietFile {
     to: String,
 }
 
+/// A trigger's `days` (#6066): a list of day names, or one name alone
+/// (`days = "weekdays"`).
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum DaysFile {
+    One(String),
+    List(Vec<String>),
+}
+
 /// A trigger's `rearm`: a word, or a line its field must stay past for a
 /// while.
 #[derive(Deserialize)]
@@ -611,6 +626,8 @@ struct TriggerFile {
     present: Option<bool>,
     /// Local hours in which this trigger can hold.
     during: Option<QuietFile>,
+    /// The local days of the week its `during` opens on (#6066).
+    days: Option<DaysFile>,
     /// Consume at most one chance per local window, durably before acting.
     #[serde(default)]
     once_per_day: bool,
@@ -640,9 +657,10 @@ struct TriggerFile {
     /// A daily trigger whose run stands in for another of the skill's
     /// triggers, named, at the same moment (#5207: the day's first hello).
     instead_of: Option<String>,
-    /// A `follows` word that stands in for another skill's nudge (#5620):
-    /// while it is still to come, that skill's due chance waits for it.
-    stands_in_for: Option<String>,
+    /// A `follows` word that stands in for the nudges of its skill's own
+    /// `[budget]` group (#5620): while it is still to come, their due
+    /// chances wait for it.
+    stands_in_for_group: Option<bool>,
 }
 
 /// `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`.
@@ -755,6 +773,12 @@ struct StepFile {
     /// A read of one of the owner's linked services, said to them alone
     /// ([`service_read`], #5288).
     read: Option<service_read::ReadFile>,
+    /// A fixed write to one of the owner's linked services, sent only as
+    /// the owner said yes to it ([`service_write`], #6066).
+    write: Option<service_write::WriteFile>,
+    /// A timer or reminder set in the schedule, its words the skill's own
+    /// ([`remind`], #6066).
+    remind: Option<remind::RemindFile>,
 }
 
 /// `propose = { ... }`: what an add-on suggests, as its folder writes it.
@@ -1240,8 +1264,8 @@ pub struct Permissions {
     #[serde(default)]
     pub topics: Vec<String>,
     /// The actions part's functions it may call by name, beyond the
-    /// light's own, which `light` gives. No step names one yet: this is
-    /// the list such a step will be held to.
+    /// light's own, which `light` gives: a `remind` step's `set_reminder`
+    /// or `set_timer` ([`remind`], #6066).
     #[serde(default)]
     pub actions: Vec<String>,
     /// It may speak: a note or the voice's own words (`say`), or a sound.
@@ -1306,9 +1330,11 @@ pub struct Permissions {
     /// copy of the skill without the declaration gets nothing of it.
     #[serde(default)]
     pub core: Vec<String>,
-    /// The owner's linked services it may use, each with how: `"read"`,
-    /// the only value (#5288; writes are not ruled yet). A `read` step
-    /// reads only a service listed here ([`service_read`]).
+    /// The owner's linked services it may use, each with how: `"read"`
+    /// (#5288), or `"write"` with `LAMP_SKILL_WRITES=on` (#6066). A `read`
+    /// step reads only a service listed here as a read ([`service_read`]),
+    /// a `write` step writes only to one listed as a write
+    /// ([`service_write`]).
     #[serde(default)]
     pub services: BTreeMap<String, String>,
 }
@@ -1375,6 +1401,19 @@ impl Permissions {
             | Call::RequestedAudio(_) => ("speak", self.speak),
             Call::Look => ("camera", self.sees_picture()),
             Call::Text(_) => ("messages", self.messages),
+            // A write needs its service listed as a write, and the switch.
+            Call::ServiceWrite(write) => {
+                if self.services.get(&write.service).map(String::as_str) != Some("write") {
+                    return Some(format!(
+                        "write to {0} needs services = {{ {0} = \"write\" }} in [permissions], which it does not give",
+                        write.service
+                    ));
+                }
+                if !service_write::on() {
+                    return Some(service_write::OFF.into());
+                }
+                return None;
+            }
             // A read is said aloud: it needs its service listed as a read,
             // and the voice.
             Call::ServiceRead(read) => {
@@ -1394,6 +1433,8 @@ impl Permissions {
                     )
                 });
             }
+            // Its function, which [permissions] actions must list.
+            Call::Remind(remind) => return self.refuses_action(remind.action()),
             Call::PrepareUnplug => unreachable!("handled above"),
             Call::AfterSay | Call::Ends => return None,
         };
@@ -1534,17 +1575,34 @@ impl Permissions {
 
     /// Each list's entries well formed, once each.
     fn check(&self) -> Result<(), String> {
-        // A service a skill may read, and only read (#5288).
+        // A service a skill may read (#5288), or with the switch write to
+        // (#6066).
         for (service, how) in &self.services {
-            if let Some(why) = lamp_services::spoken::not_readable(service) {
-                return Err(format!(
-                    "[permissions] services: {why}, so a skill can't read it"
-                ));
-            }
-            if how != "read" {
-                return Err(format!(
-                    "[permissions] services: {service} = {how:?}: only \"read\"; a skill never writes to a service"
-                ));
+            match how.as_str() {
+                "read" => {
+                    if let Some(why) = lamp_services::spoken::not_readable(service) {
+                        return Err(format!(
+                            "[permissions] services: {why}, so a skill can't read it"
+                        ));
+                    }
+                }
+                "write" if !service_write::on() => {
+                    return Err(format!(
+                        "[permissions] services: {service} = \"write\": a skill's writes are off on this lamp ({} is not on)",
+                        service_write::ENVIRONMENT
+                    ));
+                }
+                "write" if !lamp_services::skill_writes::writable(service) => {
+                    return Err(format!(
+                        "[permissions] services: {service} = \"write\": a skill can't write to {service}"
+                    ));
+                }
+                "write" => {}
+                _ => {
+                    return Err(format!(
+                        "[permissions] services: {service} = {how:?}: only \"read\" or \"write\""
+                    ));
+                }
             }
         }
         for (what, list, ok) in [
@@ -1681,6 +1739,7 @@ fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
         (file.again.is_some(), "[again]"),
         (file.still.is_some(), "still"),
         (file.history.is_some(), "[history]"),
+        (file.knowledge.is_some(), "knowledge"),
         (file.search.is_some(), "[search]"),
         (file.stop.is_some(), "[stop]"),
         (file.watch.is_some(), "[watch]"),
@@ -1816,6 +1875,9 @@ pub struct Skill {
     /// With `[history]`: how far back a call is told who was at the lamp
     /// (#1685), and in what words (#940).
     pub history: Option<visits::History>,
+    /// With `knowledge`: the product knowledge a call is told, the section
+    /// its choice names (#5790, [`knowledge`]).
+    pub knowledge: Option<knowledge::Knowledge>,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
     /// The most runs it starts itself a local day.
@@ -2215,7 +2277,18 @@ fn out_of_window(trigger: &Trigger, moment: Option<&daily::Moment>) -> Option<St
             window.opens(),
             window.closes()
         )),
-        Some(_) => None,
+        // The day its window opened is the one its `days` names (#6066):
+        // an overnight window's hours after midnight are the evening's.
+        Some(moment) => {
+            let days = trigger.days.as_ref()?;
+            let opened = window.occurrence_day(moment.day, moment.minute)?;
+            (!days.contains(opened)).then(|| {
+                format!(
+                    "not one of its days: its window opened on {}",
+                    daily::Weekdays::name(opened)
+                )
+            })
+        }
     }
 }
 
@@ -2301,6 +2374,10 @@ pub struct Trigger {
     /// talk ends. 0: a chance held back is spent.
     pub wait_us: u64,
     pub during: Option<daily::Window>,
+    /// The local days of the week `during` opens on (#6066); None, every
+    /// day. An overnight window's hours after midnight are the day it
+    /// opened's.
+    pub days: Option<daily::Weekdays>,
     pub once_per_day: bool,
     /// No chance once something was heard since `during` opened today; a
     /// daily trigger's day is spent then, said once.
@@ -2319,10 +2396,11 @@ pub struct Trigger {
     /// Another trigger of the skill, by name, whose chance this one's run
     /// takes (#5207, `instead_of`): that trigger's cooldown begins with it.
     pub instead_of: Option<String>,
-    /// Another skill, by name, whose due chance waits while this `follows`
-    /// word is still to come, and whose cooldown begins with the word
-    /// (#5620, `stands_in_for`).
-    pub stands_in_for: Option<String>,
+    /// The skills of this skill's own `[budget]` group (never a warning,
+    /// never one that itself stands in) whose due chances wait while this
+    /// `follows` word is still to come, and whose cooldowns begin with the
+    /// word (#5620, `stands_in_for_group`).
+    pub stands_in_for_group: bool,
 }
 
 /// A trigger's `sooner` (#3709): while `test` holds on `topic`'s newest
@@ -2522,6 +2600,13 @@ pub enum Call {
     /// A read of one of the owner's linked services, said to them alone
     /// behind its gate ([`service_read`], #5288). Its skill's only step.
     ServiceRead(Box<service_read::ReadStep>),
+    /// A fixed write to one of the owner's linked services, sent as the
+    /// owner said yes to it ([`service_write`], #6066). Its skill's only
+    /// step.
+    ServiceWrite(Box<service_write::WriteStep>),
+    /// A timer or reminder set in the schedule through the actions part's
+    /// `set_timer` or `set_reminder` ([`remind`], #6066).
+    Remind(remind::Remind),
 }
 
 /// A say written as a table: `{ text = "..." }` or `{ note = "..." }`, with
@@ -2759,6 +2844,8 @@ impl Call {
             }
             Self::Ends => ("ends", json!({})),
             Self::ServiceRead(read) => ("read", read.named()),
+            Self::ServiceWrite(write) => ("write", write.named()),
+            Self::Remind(remind) => ("remind", remind.named()),
         }
     }
 }
@@ -2952,6 +3039,14 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         .map(|window| daily::Window::parse(&window.from, &window.to))
         .transpose()
         .map_err(|error| format!("during: {error}"))?;
+    let days = match file.days {
+        None => None,
+        Some(_) if during.is_none() => {
+            return Err("days goes with during: the days its window opens on".into());
+        }
+        Some(DaysFile::One(name)) => Some(daily::Weekdays::parse(&[name])?),
+        Some(DaysFile::List(names)) => Some(daily::Weekdays::parse(&names)?),
+    };
     if file.once_per_day && (during.is_none() || file.name.is_none() || file.each.is_some()) {
         return Err("once_per_day needs a named trigger with during, and no each".into());
     }
@@ -3032,20 +3127,12 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             Some(other)
         }
     };
-    // A word that stands in for another skill's nudge (#5620): a `follows`
+    // A word that stands in for its group's nudges (#5620): a `follows`
     // word only, so what it waits on is bounded by its `within`.
-    let stands_in_for = match file.stands_in_for {
-        None => None,
-        Some(_) if follows.is_none() => {
-            return Err("stands_in_for goes with follows".into());
-        }
-        Some(other) => {
-            if !plain_name(&other) || other.contains('_') {
-                return Err(format!("stands_in_for {other:?} is not a skill's name"));
-            }
-            Some(other)
-        }
-    };
+    let stands_in_for_group = file.stands_in_for_group.unwrap_or(false);
+    if stands_in_for_group && follows.is_none() {
+        return Err("stands_in_for_group goes with follows".into());
+    }
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -3189,13 +3276,14 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         wait_us,
         rise,
         during,
+        days,
         once_per_day: file.once_per_day,
         unless_heard: file.unless_heard,
         yields_to,
         sooner,
         follows,
         instead_of,
-        stands_in_for,
+        stands_in_for_group,
     })
 }
 
@@ -3910,14 +3998,9 @@ fn manifest(
             ));
         }
     }
-    if let Some(other) = triggers
-        .iter()
-        .find_map(|trigger| trigger.stands_in_for.as_ref())
-        .filter(|other| **other == name)
-    {
-        return Err(format!(
-            "stands_in_for {other:?} is this skill: it names another"
-        ));
+    // The group it stands in for is its own (#5620, the PM's call (a)).
+    if budget.is_none() && triggers.iter().any(|trigger| trigger.stands_in_for_group) {
+        return Err("stands_in_for_group needs the skill's own [budget] group".into());
     }
     // Before the trigger it stands in for, so at one message it is judged
     // first, and on the same topic, so they hold at one message.
@@ -3945,9 +4028,14 @@ fn manifest(
     // A read of a linked service (#5288) is its skill's whole run: its one
     // step, alone in it, started by a trigger and never by the model, and
     // said by this program behind its gate ([`service_read`]).
-    if file.steps.iter().any(|step| step.read.is_some()) {
+    let writes = file.steps.iter().any(|step| step.write.is_some());
+    if writes && !service_write::on() {
+        return Err(service_write::OFF.into());
+    }
+    if writes || file.steps.iter().any(|step| step.read.is_some()) {
         let alone = |step: &StepFile| {
-            step.body.is_none()
+            (step.read.is_none() || step.write.is_none())
+                && step.body.is_none()
                 && step.light.is_none()
                 && step.say.is_none()
                 && step.sound.is_none()
@@ -3958,6 +4046,7 @@ fn manifest(
                 && step.show.is_none()
                 && step.stand.is_none()
                 && step.propose.is_none()
+                && step.remind.is_none()
                 && step.on.is_none()
                 && step.after.is_none()
                 && step.if_choice.is_none()
@@ -3967,15 +4056,20 @@ fn manifest(
             || triggers.is_empty()
             || triggers.iter().any(|trigger| trigger.each.is_some())
         {
-            return Err(
-                "read is its skill's only step, alone in it, in a skill a trigger starts (no each) and with no tool"
-                    .into(),
-            );
+            return Err(format!(
+                "{} is its skill's only step, alone in it, in a skill a trigger starts (no each) and with no tool",
+                if writes { "write" } else { "read" }
+            ));
         }
     }
     for step in file.steps {
         if let Some(read) = step.read {
             steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
+            ons.resize(steps.len(), None);
+            continue;
+        }
+        if let Some(write) = step.write {
+            steps.push(Step::Call(Call::ServiceWrite(Box::new(write.step()?))));
             ons.resize(steps.len(), None);
             continue;
         }
@@ -3990,9 +4084,10 @@ fn manifest(
             && step.show.is_none()
             && step.stand.is_none()
             && step.propose.is_none()
+            && step.remind.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose or read"
+                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose, remind or read"
                     .into(),
             );
         }
@@ -4034,6 +4129,7 @@ fn manifest(
                     || step.rest.is_some()
                     || step.requested_audio.is_some()
                     || step.look.is_some()
+                    || step.remind.is_some()
                 {
                     return Err(
                         "a step for some choices only makes body, light, show or stand".into(),
@@ -4315,6 +4411,17 @@ fn manifest(
             }
             steps.push(Step::Call(Call::RequestedAudio(asset)));
         }
+        if let Some(remind) = step.remind {
+            // A person who asks for a reminder asks the voice, which sets it
+            // and says its time back: a skill's is set by its trigger.
+            if file.tool.is_some() {
+                return Err(
+                    "remind, in a skill with a tool: a person asks the voice for a reminder, which sets it and says its time back; a skill's remind is set when its trigger starts it"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Remind(remind.step()?)));
+        }
         ons.resize(steps.len(), on);
     }
     let steps: Vec<(Option<Only>, Step)> = ons.into_iter().zip(steps).collect();
@@ -4553,6 +4660,60 @@ fn manifest(
             })
         }
     };
+    // Product knowledge (#5790, the core FAQ): a person asks, so a tool
+    // alone starts it; its choice names the section told, with a default
+    // for a call that names none; its one say is the note the section
+    // follows, the same for every call.
+    let knowledge = match &file.knowledge {
+        None => None,
+        Some(name) => {
+            if file.tool.is_none() || !triggers.is_empty() {
+                return Err(
+                    "knowledge is told to a tool's call: in a skill started by its tool alone"
+                        .into(),
+                );
+            }
+            let Some(choice) = file
+                .choice
+                .as_ref()
+                .filter(|choice| choice.default.is_some())
+            else {
+                return Err(
+                    "knowledge goes with a [choice] with a default: its words name the sections"
+                        .into(),
+                );
+            };
+            // A tool's say is a note (a say table is refused with a tool).
+            let notes: Vec<(bool, &str)> = steps
+                .iter()
+                .filter_map(|(only, step)| match step {
+                    Step::Call(Call::Say(note)) => Some((only.is_none(), note.as_str())),
+                    _ => None,
+                })
+                .collect();
+            let [(true, note)] = notes.as_slice() else {
+                return Err("knowledge goes with one say, a note, in every call".into());
+            };
+            // Nothing in it is anyone's, and the answer is bounded here,
+            // at load, whole: a `[history]` record told beside it is about
+            // people and grows with the visits, so the two together could
+            // pass what the link carries (Reviewer-three on #5822).
+            if history.is_some() {
+                return Err(
+                    "knowledge is the same words for everyone: not with [history], which is told who was here"
+                        .into(),
+                );
+            }
+            let looks = steps
+                .iter()
+                .any(|(_, step)| *step == Step::Call(Call::Look));
+            let loaded = knowledge::read(dir, name, &choice.one_of)?;
+            if let Some(why) = loaded.too_long(note, looks) {
+                return Err(why);
+            }
+            Some(loaded)
+        }
+    };
     // The words the voice says for a `say = { from = ... }` are the skill
     // whose say it is (#940): checked here as the voice checks them, and
     // only in a skill with that say.
@@ -4634,6 +4795,7 @@ fn manifest(
         still,
         search,
         history,
+        knowledge,
         quiet,
         most_a_day: file.most_a_day,
         active,
@@ -5141,30 +5303,24 @@ pub const PUSHED_TOPICS: [&str; 6] = [
     "controls/touch",
 ];
 
-/// Why `skill`'s `stands_in_for` word may not hold `held`'s chance (#5620,
-/// the reviewer's P1 on #5704); `None` if it may. Only a skill of its own
-/// `[budget]` group, never a `warning`, and never from a pushed skill: so a
-/// word that never comes holds back no smoke warning, reminder or nudge of
-/// another group. Checked at load ([`load_each_with`]) and again each time
-/// a chance is judged ([`Engine`]'s `stood_in_by`), since skills come and go
-/// in any order.
-fn stands_in_refuses(skill: &Skill, held: &Skill) -> Option<String> {
+/// Whether `skill`'s `stands_in_for_group` word may hold `held`'s chance
+/// (#5620, the PM's call (a), the reviewer's P1 on #5704): only another
+/// skill of its own `[budget]` group, never a `warning`, never one that
+/// itself stands in for the group, and never from a pushed skill. So a word
+/// that never comes holds back no smoke warning, reminder or nudge of
+/// another group. Judged each time a chance is ([`Engine`]'s
+/// `stood_in_by`), since skills come and go in any order.
+fn stands_in_holds(skill: &Skill, held: &Skill) -> bool {
     let group = |skill: &Skill| skill.budget.as_ref().map(|(group, _)| group.clone());
-    if held.policy == "warning" {
-        Some(format!(
-            "stands_in_for {:?} is a warning: a warning never waits for another's word",
-            held.name
-        ))
-    } else if group(skill).is_none() || group(skill) != group(held) {
-        Some(format!(
-            "stands_in_for {:?} is not in its own [budget] group",
-            held.name
-        ))
-    } else if skill.pushed_by.is_some() {
-        Some("a pushed skill may not use stands_in_for".into())
-    } else {
-        None
-    }
+    skill.name != held.name
+        && held.policy != "warning"
+        && group(skill).is_some()
+        && group(skill) == group(held)
+        && skill.pushed_by.is_none()
+        && !held
+            .triggers
+            .iter()
+            .any(|trigger| trigger.stands_in_for_group)
 }
 
 /// Why a pushed skill may not run, held to the protocol's grants
@@ -5199,10 +5355,11 @@ pub fn pushed_refuses(skill: &Skill) -> Option<String> {
     if skill
         .triggers
         .iter()
-        .any(|trigger| trigger.stands_in_for.is_some())
+        .any(|trigger| trigger.stands_in_for_group)
     {
         return Some(
-            "a pushed skill may not use stands_in_for: it never holds a lamp skill's chance".into(),
+            "a pushed skill may not use stands_in_for_group: it never holds a lamp skill's chance"
+                .into(),
         );
     }
     if let Some(topic) = permissions
@@ -5347,27 +5504,6 @@ pub fn load_each_with(
             };
             loaded.push((folder, skill));
         }
-    }
-    // A `stands_in_for` naming a skill loaded here (#5704's P1): only one of
-    // its own `[budget]` group, never a warning ([`stands_in_refuses`]).
-    // One naming a skill not here loads; held to the same each time a
-    // chance is judged, should that skill come later.
-    let refused: Vec<(usize, String)> = loaded
-        .iter()
-        .enumerate()
-        .filter_map(|(at, (_, result))| {
-            let skill = result.as_ref().ok()?;
-            skill.triggers.iter().find_map(|trigger| {
-                let other = trigger.stands_in_for.as_ref()?;
-                let held = loaded.iter().find_map(|(_, result)| {
-                    result.as_ref().ok().filter(|held| &held.name == other)
-                })?;
-                stands_in_refuses(skill, held).map(|why| (at, why))
-            })
-        })
-        .collect();
-    for (at, why) in refused {
-        loaded[at].1 = Err(why);
     }
     // Each tool's name, and the skill that has it.
     // With, for a `[stop]` function, the `[budget]` group of its skill: a
@@ -5534,7 +5670,7 @@ struct Watch {
     changes: Changes,
     /// With `yields_to`: when this time it holds first waited, and said so.
     yielded_us: Option<u64>,
-    /// Another skill's `stands_in_for` word is still to come (#5620): when
+    /// A `stands_in_for_group` word of its group is still to come (#5620): when
     /// this chance first waited for it, and said so.
     stood_in_us: Option<u64>,
     /// Each gate a due chance was said dropped by ([`dropped`], #2602): the
@@ -5691,6 +5827,13 @@ pub struct Engine {
     /// By group, each member waiting for its hour: since when, and when it
     /// was last held back for it.
     budget_waits: HashMap<String, HashMap<String, (u64, u64)>>,
+    /// By a skill with a `stands_in_for_group` word (#5620): how many
+    /// windows for the word opened since it last ran, 2 once one closed
+    /// without it (the trigger it `follows` ran again, or the word's chance
+    /// was let go past its `wait`). From 2 its group is not held again
+    /// until the word runs (the reviewer's bound on #5704): a word that
+    /// never comes holds the group for one window at most.
+    word_windows: HashMap<String, u8>,
     /// When each member of a group last started or was asked: of the
     /// skills sharing a `[stop]`, the latest is what a call without `all`
     /// stops.
@@ -5930,6 +6073,7 @@ impl Engine {
             day_runs: HashMap::new(),
             group_runs: HashMap::new(),
             budget_waits: HashMap::new(),
+            word_windows: HashMap::new(),
             group_ran: HashMap::new(),
             unsaid_from: HashMap::new(),
             nudges: HashMap::new(),
@@ -5980,13 +6124,15 @@ impl Engine {
         self.rested_day = day;
     }
 
-    /// The loaded skill whose `stands_in_for` word for `name` is still to
-    /// come (#5620): the trigger it `follows` ran within its `within`, the
-    /// word has not run since, and nothing it can see would drop the word
-    /// (off, snoozed, its day's most run, resting). Only a skill of `name`'s
-    /// own `[budget]` group, never for a warning, never a pushed one
-    /// ([`stands_in_refuses`]). None on a lamp without such a skill, so
-    /// there nothing changes.
+    /// The loaded skill whose `stands_in_for_group` word, standing in for
+    /// `name`'s group, is still to come (#5620): the trigger it `follows`
+    /// ran within its `within`, the word has not run since, no window for it
+    /// closed without it since it last ran ([`Engine`]'s `word_windows`),
+    /// and nothing it can see would drop the word (off, snoozed, its day's
+    /// most run, resting). Only for another skill of its own `[budget]`
+    /// group, never for a warning, never from a pushed one
+    /// ([`stands_in_holds`]). None on a lamp without such a skill, so there
+    /// nothing changes.
     fn stood_in_by(&self, name: &str, now_us: u64) -> Option<&str> {
         let ran = |skill: &str, index: usize| {
             self.watches
@@ -5996,8 +6142,11 @@ impl Engine {
         let day = day_of(self.clock, now_us);
         let held = self.skills.iter().find(|skill| skill.name == name)?;
         self.skills.iter().find_map(|skill| {
-            if skill.name == name
-                || stands_in_refuses(skill, held).is_some()
+            if !stands_in_holds(skill, held)
+                || self
+                    .word_windows
+                    .get(&skill.name)
+                    .is_some_and(|windows| *windows >= 2)
                 || self.off.contains(&skill.name)
                 || self
                     .snoozed
@@ -6021,7 +6170,7 @@ impl Engine {
                 .enumerate()
                 .find_map(|(index, trigger)| {
                     let (other, within_us) = trigger.follows.as_ref()?;
-                    if trigger.stands_in_for.as_deref() != Some(name) {
+                    if !trigger.stands_in_for_group {
                         return None;
                     }
                     let at = skill
@@ -6047,19 +6196,21 @@ impl Engine {
         let Some(skill) = self.skills.iter().find(|skill| &skill.name == name) else {
             return Yield::No;
         };
-        let Some((index, window)) = skill
+        let Some((index, window, days)) = skill
             .triggers
             .iter()
             .enumerate()
             .find(|(_, other)| other.name.as_ref() == Some(trigger) && other.once_per_day)
-            .and_then(|(index, other)| Some((index, other.during.as_ref()?)))
+            .and_then(|(index, other)| Some((index, other.during.as_ref()?, other.days)))
         else {
             return Yield::No;
         };
+        // Not one of its days (#6066), its greeting does not come today.
         let Some(day) = window
             .contains(moment.minute)
             .then(|| window.occurrence_day(moment.day, moment.minute))
             .flatten()
+            .filter(|day| days.is_none_or(|days| days.contains(*day)))
         else {
             return Yield::No;
         };
@@ -6593,6 +6744,42 @@ impl Engine {
             .collect()
     }
 
+    /// A `knowledge` skill's calls (#5790): its note followed by the section
+    /// the call's choice names (or its default), and whether each skill
+    /// that section names is on this lamp now: installed and enabled, and
+    /// not turned off or snoozed. One installed disabled is not among
+    /// the engine's skills, so it is told as not on this lamp.
+    fn told_knowledge(
+        &self,
+        skill: &Skill,
+        calls: Vec<Call>,
+        args: &Value,
+        now_us: u64,
+    ) -> Vec<Call> {
+        let (Some(knowledge), Some(choice)) = (&skill.knowledge, &skill.choice) else {
+            return calls;
+        };
+        let topic = args[&choice.name]
+            .as_str()
+            .or(choice.default.as_deref())
+            .unwrap_or_default();
+        let Some(section) = knowledge.section(topic) else {
+            return calls;
+        };
+        let here = |name: &str| match self.skills.iter().find(|other| other.name == name) {
+            None => knowledge::Here::Missing,
+            Some(_) if self.stopped(name, now_us) => knowledge::Here::Off,
+            Some(_) => knowledge::Here::On,
+        };
+        calls
+            .into_iter()
+            .map(|call| match call {
+                Call::Say(note) => Call::Say(knowledge::told(&note, section, here)),
+                other => other,
+            })
+            .collect()
+    }
+
     fn local_minute(&self, now_us: u64) -> Option<u16> {
         let (offset, at_us, unix_ms) = self.clock?;
         let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
@@ -7018,10 +7205,7 @@ impl Engine {
             if trigger.once_per_day && self.daily_faulted {
                 return false;
             }
-            if trigger.during.as_ref().is_some_and(|window| {
-                self.local_moment(now_us)
-                    .is_none_or(|moment| !window.contains(moment.minute))
-            }) {
+            if out_of_window(trigger, self.local_moment(now_us).as_ref()).is_some() {
                 return false;
             }
             rose(index, trigger)
@@ -7205,7 +7389,7 @@ impl Engine {
         }
         self.invalidate_changes(now_us);
         let mut runs = Vec::new();
-        let mut stood_in_for: Vec<(String, String)> = Vec::new();
+        let mut stood_in_for: Vec<String> = Vec::new();
         let minute = self.local_minute(now_us);
         let moment = self.local_moment(now_us);
         // What a run held until its trigger stops holding is given back
@@ -7708,7 +7892,12 @@ impl Engine {
                 // Quiet focus for Rest your eyes): while it is still to
                 // come, the chance is kept, as the quiet hours keep one,
                 // said once; when it runs, this cooldown begins with it.
-                if let Some(by) = stood_in {
+                // Only once this skill's `[[while]]` holds (#5704's P3): a
+                // chance its own conditions hold back would not have spoken
+                // anyway, so it goes on as without the key.
+                if let Some(by) = stood_in
+                    && Self::conditions_hold(&self.latest, &self.holding, skill, now_us)
+                {
                     if trigger.when != When::Appears {
                         watch.spent = false;
                         watch.disarmed = false;
@@ -7872,6 +8061,11 @@ impl Engine {
                         // drop says it too, with the condition that held it
                         // (#2861); a daily one's line is as it was. Without a
                         // `wait` a chance held back is spent, as before.
+                        // A word let go past its wait missed its window: its
+                        // group is not held again until it runs (#5620).
+                        if trigger.stands_in_for_group {
+                            self.word_windows.insert(skill.name.clone(), 2);
+                        }
                         let mut why = format!(
                             "{} chance dropped: it held, but the skill's conditions did not hold within its wait of {} s; it comes again only once the trigger ends and holds again",
                             trigger.name.as_deref().unwrap_or("trigger"),
@@ -8100,8 +8294,24 @@ impl Engine {
                     watch.ran_us = Some(now_us);
                     watch.said.clear();
                     instead = trigger.instead_of.as_ref();
-                    if let Some(other) = &trigger.stands_in_for {
-                        stood_in_for.push((skill.name.clone(), other.clone()));
+                    // Its own run is its own: no word's hand-over after it.
+                    watch.stood_in_us = None;
+                    if trigger.stands_in_for_group {
+                        stood_in_for.push(skill.name.clone());
+                        self.word_windows.remove(&skill.name);
+                    } else if trigger.name.as_ref().is_some_and(|name| {
+                        skill.triggers.iter().any(|word| {
+                            word.stands_in_for_group
+                                && word
+                                    .follows
+                                    .as_ref()
+                                    .is_some_and(|(other, _)| other == name)
+                        })
+                    }) {
+                        // A window for the word opens; a second since it
+                        // last ran means the first closed without it.
+                        let windows = self.word_windows.entry(skill.name.clone()).or_insert(0);
+                        *windows = windows.saturating_add(1).min(2);
                     }
                     // Counted as the cooldown is: when the run is started,
                     // or asked of the Policy (#1685).
@@ -8171,41 +8381,44 @@ impl Engine {
             item_runs.sort_by(|(a, _), (b, _)| item_order(a).cmp(&item_order(b)));
             runs.extend(item_runs.into_iter().map(|(_, run)| run));
         }
-        // A word that stood in for another skill's waiting nudge (#5620):
-        // that nudge's chance was this word's, so its cooldown begins now.
-        for (by, other) in stood_in_for {
-            let Some(triggers) = self
-                .skills
-                .iter()
-                .find(|skill| skill.name == other)
-                .map(|skill| skill.triggers.len())
-            else {
+        // A word that stood in for its group's waiting nudges (#5620): each
+        // nudge's chance was this word's, so its cooldown begins now.
+        for by in stood_in_for {
+            let Some(word) = self.skills.iter().find(|skill| skill.name == by) else {
                 continue;
             };
-            let mut waited = false;
-            for index in 0..triggers {
-                if let Some(watch) = self.watches.get_mut(&(other.clone(), index))
-                    && watch.stood_in_us.take().is_some()
-                {
-                    watch.ran_us = Some(now_us);
-                    waited = true;
+            let held: Vec<(String, usize)> = self
+                .skills
+                .iter()
+                .filter(|held| stands_in_holds(word, held))
+                .map(|held| (held.name.clone(), held.triggers.len()))
+                .collect();
+            for (other, triggers) in held {
+                let mut waited = false;
+                for index in 0..triggers {
+                    if let Some(watch) = self.watches.get_mut(&(other.clone(), index))
+                        && watch.stood_in_us.take().is_some()
+                    {
+                        watch.ran_us = Some(now_us);
+                        waited = true;
+                    }
                 }
-            }
-            if waited {
-                runs.push(Run {
-                    generation: None,
-                    skill: other.clone(),
-                    events: vec![event(
-                        &other,
-                        SkillStage::Answered,
-                        format!("done: {by}'s word stood in for it"),
-                        Some(false),
-                    )],
-                    calls: Vec::new(),
-                    ask: None,
-                    queue: false,
-                    from: None,
-                });
+                if waited {
+                    runs.push(Run {
+                        generation: None,
+                        skill: other.clone(),
+                        events: vec![event(
+                            &other,
+                            SkillStage::Answered,
+                            format!("done: {by}'s word stood in for it"),
+                            Some(false),
+                        )],
+                        calls: Vec::new(),
+                        ask: None,
+                        queue: false,
+                        from: None,
+                    });
+                }
             }
         }
         runs
@@ -8301,9 +8514,14 @@ impl Engine {
                 format!("the model called {name} with {args}"),
                 None,
             )],
-            calls: self.told_history(
+            calls: self.told_knowledge(
                 skill,
-                calls(&self.latest, &self.picked, skill, None, now_us, args, None),
+                self.told_history(
+                    skill,
+                    calls(&self.latest, &self.picked, skill, None, now_us, args, None),
+                    now_us,
+                ),
+                args,
                 now_us,
             ),
             ask: None,
@@ -9640,5 +9858,110 @@ mod tests {
         let why = package::install(&other, None, &folder).unwrap_err();
         assert!(why.contains(service_read::QUERY_NOT_AN_ORDER), "{why}");
         assert!(!other.join(name).exists());
+    }
+
+    /// A skill folder `name` in `dir` with `toml` as its skill.toml.
+    fn write_skill(dir: &std::path::Path, name: &str, toml: &str) -> std::path::PathBuf {
+        let folder = dir.join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Mails my boss when I arrive.\n---\n"),
+        )
+        .unwrap();
+        std::fs::write(folder.join("skill.toml"), toml).unwrap();
+        folder
+    }
+
+    const ARRIVAL_WRITE: &str = "version = \"1.0.0\"\n[trigger]\ntopic = \"room/presence\"\n\
+        field = \"present\"\nequals = true\n[ask]\npolicy = \"nudge\"\n[permissions]\n\
+        topics = [\"room/presence\"]\nservices = { gmail = \"write\" }\n[[do]]\n\
+        write = { service = \"gmail\", action = \"send_mail\", to = [\"boss@work.test\"], \
+        subject = \"In\", text = \"I'm at my desk.\" }\n";
+
+    /// #6066: a write step loads only with `LAMP_SKILL_WRITES` on and its
+    /// service listed as a write, every field fixed and checked as it loads,
+    /// alone in its skill; its content is what lamp-services hashes.
+    #[test]
+    fn a_write_step_loads_only_with_its_switch_and_permission() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = write_skill(dir.path(), "arrive-mail", ARRIVAL_WRITE);
+        service_write::set_on_here(Some(false));
+        let off = load(&folder).unwrap_err();
+        assert!(off.contains("LAMP_SKILL_WRITES"), "{off}");
+        service_write::set_on_here(Some(true));
+        let skill = load(&folder).unwrap();
+        let [(_, Step::Call(Call::ServiceWrite(write)))] = skill.steps.as_slice() else {
+            panic!("{:?}", skill.steps);
+        };
+        assert_eq!(
+            write.content(),
+            &json!({"service":"gmail","action":"send_mail","to":["boss@work.test"],"subject":"In","text":"I'm at my desk."})
+        );
+        assert_eq!(
+            skill
+                .permissions
+                .refuses(&Call::ServiceWrite(write.clone())),
+            None
+        );
+        let refused = |name: &str, toml: String, why: &str| {
+            let folder = write_skill(dir.path(), name, &toml);
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        };
+        // Its permission a read, or none.
+        refused(
+            "as-read",
+            ARRIVAL_WRITE.replace("gmail = \"write\"", "gmail = \"read\""),
+            "needs services = { gmail = \"write\" }",
+        );
+        refused(
+            "no-permission",
+            ARRIVAL_WRITE.replace("services = { gmail = \"write\" }\n", ""),
+            "needs services = { gmail = \"write\" }",
+        );
+        // A service no skill writes to.
+        refused(
+            "drive-write",
+            ARRIVAL_WRITE.replace(
+                "gmail = \"write\"",
+                "gmail = \"write\", google_drive = \"write\"",
+            ),
+            "a skill can't write to google_drive",
+        );
+        // A field filled at run time, a field it doesn't take, a bad one.
+        refused(
+            "filled",
+            ARRIVAL_WRITE.replace("text = \"I'm at my desk.\"", "text = { from = \"voice\" }"),
+            "skill.toml",
+        );
+        refused(
+            "send-id",
+            ARRIVAL_WRITE.replace(" }\n", ", send_id = \"x\" }\n"),
+            "unknown field",
+        );
+        refused(
+            "bad-address",
+            ARRIVAL_WRITE.replace("boss@work.test", "my boss"),
+            "not an email address",
+        );
+        // Not alone: with another step, or started by a tool.
+        refused(
+            "with-light",
+            format!("{ARRIVAL_WRITE}[[do]]\nlight = \"warm\"\n"),
+            "write is its skill's only step",
+        );
+        service_write::set_on_here(Some(false));
+        // Its permission listed with the switch off.
+        assert!(
+            Permissions {
+                services: [("gmail".to_owned(), "write".to_owned())].into(),
+                ..Permissions::default()
+            }
+            .check()
+            .unwrap_err()
+            .contains("LAMP_SKILL_WRITES")
+        );
+        service_write::set_on_here(None);
     }
 }

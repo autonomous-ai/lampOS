@@ -40,12 +40,16 @@ Environment=LAMP_MEMORY_STABLE_ID=on
 Environment=LAMP_PRESENCE=on
 Environment=LAMP_PRESENCE_VOICE=addressed
 # The head's own moves left out of the speaking read, and a meshed face read from 16 px (#4558): the
-# memory owner's yes (#4710, 4 Nov), after Sixth's lamp-52e6 check. LAMP_FACE_REFOUND stays off.
+# memory owner's yes (#4710, 4 Nov), after Sixth's lamp-52e6 check.
 Environment=LAMP_EYES_SPEAKING_STEADY=on
 # The one known held through a missed check for 4 s (#4493, both arms passed on lamp-52e6, 30 Oct): without it
 # each miss removed the known file with their face still in view, the voice went cold and named nobody, and
 # their line went to the room (#5522: lamp-29e7, 122 cold lines in 1.5 days).
 Environment=LAMP_FACE_KNOWN_HOLD=on
+# A face turned away and back, on a new passing id, recognised at its first look, not up to 2 s later (#4486), and
+# with the hold above a new id beside the held one's said on humans/faces/tracked as following it (#4885, #5081):
+# the memory owner's call (C65). The name moves to the new id only by a print read as theirs (who::Held::printed).
+Environment=LAMP_FACE_REFOUND=on
 # How the near face seems, on humans/seems for Mood's LAMP_MOOD_SEEMS (#1671, #2799): Google's
 # Blendshape V2 from Face Mesh V2's points, both placed by install (models.json). FER+ (`--seems`)
 # never runs here: its training pictures are for research only. Nothing is read without the

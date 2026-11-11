@@ -232,6 +232,16 @@ pub struct NewsWords {
     /// without it says the built-in words.
     #[serde(default = "failed_busy")]
     pub failed_busy: String,
+    /// A hand-over that went into an earlier session of the person's, by
+    /// its name (lamp-tasks' `serve --reply-named`, #5535): `{asked}`,
+    /// `{who}` and `{session}`, so a wrong one is heard at once. A skill
+    /// without it says the built-in words.
+    #[serde(default = "joined")]
+    pub joined: String,
+    /// ...or, with no name of its own, by what it was first asked:
+    /// `{asked}`, `{who}` and `{earlier}`.
+    #[serde(default = "joined_asked")]
+    pub joined_asked: String,
     /// A question task answered (`agent_tasks::QUESTION`), with its answer
     /// whole: the slots of [`Self::done`], `{asked}` the person's question.
     /// A skill without it says the built-in words, so one written before it
@@ -289,6 +299,16 @@ fn failed_busy() -> String {
     "The work the person asked you to hand over, \"{asked}\", did not reach {who}: {who} on {computer} is busy with something else right now, so it was not given to it. Tell them that in one plain, light sentence, with no technical words, and to ask you again once it is done.".into()
 }
 
+/// [`NewsWords::joined`]'s words, built in.
+fn joined() -> String {
+    "The work the person asked you to hand over, \"{asked}\", went to {who} in their earlier session \"{session}\", not a new one. Tell them that in one short, plain sentence, naming that session, with no technical words, and that they can tell you if it's the wrong one.".into()
+}
+
+/// [`NewsWords::joined_asked`]'s words, built in.
+fn joined_asked() -> String {
+    "The work the person asked you to hand over, \"{asked}\", went to {who} in their earlier session, the one that was asked to \"{earlier}\", not a new one. Tell them that in one short, plain sentence, saying which session by what it was asked, in your own words, with no technical words, and that they can tell you if it's the wrong one.".into()
+}
+
 /// [`NewsWords::answered`]'s words, built in.
 fn answered() -> String {
     ANSWERED.into()
@@ -333,6 +353,8 @@ impl NewsWords {
             failed_signed_out: failed_signed_out(),
             failed_no_prompt: failed_no_prompt(),
             failed_busy: failed_busy(),
+            joined: joined(),
+            joined_asked: joined_asked(),
             answered: answered(),
             answered_cut: answered_cut(),
             together: "News from {how_many} pieces of work you handed over for the person. {each} Tell them now, together, in one turn: one plain spoken sentence for each, starting with something like \"Oh, {first} just finished…\" (\"earlier\" for one a while ago), each with the gist of its result. No code, lists, file paths or links.{goes_on} No question.".into(),
@@ -414,6 +436,12 @@ impl NewsWords {
                     "failed_busy",
                     &self.failed_busy,
                     &["asked", "computer", "who", "who"],
+                ),
+                ("joined", &self.joined, &["asked", "session", "who"]),
+                (
+                    "joined_asked",
+                    &self.joined_asked,
+                    &["asked", "earlier", "who"],
                 ),
                 (
                     "together",

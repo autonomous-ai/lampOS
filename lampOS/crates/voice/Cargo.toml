@@ -21,8 +21,8 @@ lamp-gemini = { path = "../gemini" }
 lamp-turn-end-wire = { path = "../turn-end-wire" }
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
-# A made skill's read (#5288): the services it may read and its spoken yes,
-# from lamp-services' own catalogue (`lamp_services::spoken`).
+# A made skill's read (#5288): the services it may read and how it is
+# said, from lamp-services' own catalogue (`lamp_services::spoken`).
 lamp-services = { path = "../services" }
 # This home's near-call bar, measured by onboarding (#1803).
 lamp-near-call = { path = "../near-call" }

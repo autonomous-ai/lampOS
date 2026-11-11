@@ -790,9 +790,12 @@ impl Days {
     /// Whether a correction of `old` in `text` would only say it again: `old`
     /// is a kept thing of this person's, active, not newer than `at`, that
     /// `shown` holds (each as [`Self::remember_replacing_on_by`] checks), and
-    /// its words are `text`'s (the same as `once` compares them,
-    /// [`same_text`]). Anything else is `false`, and the correction goes on
-    /// to be checked, and refused or kept, as before.
+    /// its words are `text`'s, the same as `once` compares them
+    /// ([`once_text`]: C81 on lamp-06c1, stock 11091, 10 Nov, "They said: my
+    /// gym locker code is 441." kept as heard, then "Gym locker code is 441."
+    /// replaced it as a new id and no time it was said again was kept).
+    /// Anything else is `false`, and the correction goes on to be checked,
+    /// and refused or kept, as before.
     pub fn restates(
         &self,
         person: &Person,
@@ -812,7 +815,7 @@ impl Days {
             && record.active
             && record.at_unix_ms <= at
             && !text.is_empty()
-            && same_text(&record.text) == same_text(&text))
+            && once_text(person, &record.text) == once_text(person, &text))
     }
 
     /// A remember's `from`, the person's own exchanges, and its text tidied.
@@ -854,25 +857,16 @@ impl Days {
     }
 
     /// The id of this person's active kept thing with `text`, the same by
-    /// [`same_text`], and in a person's own scope by [`own_text`] too.
+    /// [`once_text`].
     fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
-        let own = person.as_str() != Person::EVERYONE;
-        let fold = |text: &str| {
-            let same = same_text(text);
-            if own {
-                own_text(&same).to_owned()
-            } else {
-                same
-            }
-        };
-        let wanted = fold(text);
+        let wanted = once_text(person, text);
         let mut statement = self.db.prepare(
             "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id",
         )?;
         let mut rows = statement.query([person.as_str()])?;
         while let Some(row) = rows.next()? {
             let kept: String = row.get(1)?;
-            if fold(&kept) == wanted {
+            if once_text(person, &kept) == wanted {
                 return Ok(Some(row.get(0)?));
             }
         }
@@ -1527,6 +1521,56 @@ impl Days {
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// A role write belongs to the exact session that admitted it. Check
+    /// under the write transaction, so a forget cannot slip between the
+    /// check and the mutation. Missing and invalidated sessions fail closed.
+    pub fn role_set_session(
+        &mut self,
+        person: &Person,
+        session: &str,
+        generation: u64,
+        name: &str,
+    ) -> Result<()> {
+        known_only(person)?;
+        identifier(session)?;
+        let name = store::tidy(name, ROLE_BYTES);
+        if !name.chars().any(char::is_alphanumeric) {
+            return Err(Error::new("empty", "there is no name for the role"));
+        }
+        let tx = self.db.transaction()?;
+        role_session(&tx, person, session, generation)?;
+        tx.execute("INSERT INTO roles(person,name,at_unix_ms) VALUES(?1,?2,?3) ON CONFLICT(person) DO UPDATE SET name=excluded.name,at_unix_ms=excluded.at_unix_ms", params![person.as_str(), name, self.now])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn role_end_session(
+        &mut self,
+        person: &Person,
+        session: &str,
+        generation: u64,
+    ) -> Result<bool> {
+        known_only(person)?;
+        identifier(session)?;
+        let tx = self.db.transaction()?;
+        role_session(&tx, person, session, generation)?;
+        let ended = tx.execute("DELETE FROM roles WHERE person=?1", [person.as_str()])? > 0;
+        tx.commit()?;
+        Ok(ended)
+    }
+
+    /// `person`'s role, if they set one and have not ended it.
+    pub fn role(&self, person: &Person) -> Result<Option<String>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT name FROM roles WHERE person=?1",
+                [person.as_str()],
+                |r| r.get(0),
+            )
+            .optional()?)
     }
 
     pub fn session_open(
@@ -2763,11 +2807,27 @@ pub(crate) fn same_text(text: &str) -> String {
 /// there (C81, stock 10538 on lamp-06c1, 6 Nov: "The gym locker code is
 /// 441." kept, "My gym locker code is 441." said again and kept twice). In
 /// the room's, "my" is whoever said it, so it is never folded.
+/// A line the voice kept as heard leads with "They said: " (its
+/// `remember::heard::SAID`), which is folded first: "They said: my gym
+/// locker code is 441." is "Gym locker code is 441." (C81, stock 11091 on
+/// lamp-06c1, 10 Nov).
 fn own_text(same: &str) -> &str {
+    let same = same.strip_prefix("they said: ").unwrap_or(same);
     ["my ", "the "]
         .iter()
         .find_map(|lead| same.strip_prefix(lead))
         .unwrap_or(same)
+}
+
+/// The words `once` compares in `person`'s scope: [`same_text`], and in a
+/// person's own scope [`own_text`] too.
+fn once_text(person: &Person, text: &str) -> String {
+    let same = same_text(text);
+    if person.as_str() != Person::EVERYONE {
+        own_text(&same).to_owned()
+    } else {
+        same
+    }
 }
 
 fn is_punctuation(c: char) -> bool {
@@ -2921,6 +2981,21 @@ fn legacy_files(dir: &Path) -> Result<Vec<PathBuf>> {
     files.sort();
     Ok(files)
 }
+/// The longest role name kept: a name, never a person's whole words.
+pub const ROLE_BYTES: usize = 60;
+
+/// Only a known person (`p-` ids) has a role.
+fn known_only(person: &Person) -> Result<()> {
+    if lamp_msgs::known::is_person_id(person.as_str()) {
+        Ok(())
+    } else {
+        Err(Error::new(
+            "bad_person",
+            "only a known person can have a role",
+        ))
+    }
+}
+
 pub(crate) fn ensure_person(db: &Connection, person: &Person) -> Result<()> {
     db.execute(
         "INSERT OR IGNORE INTO people(person) VALUES(?)",
@@ -3346,6 +3421,22 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
     }
     Ok(())
 }
+/// Indexed session/person lookup; it never creates a person or a session.
+fn role_session(tx: &Transaction<'_>, person: &Person, session: &str, expected: u64) -> Result<()> {
+    let valid: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sessions s JOIN people p ON p.person=s.person WHERE s.person=?1 AND s.session=?2 AND s.invalidated=0 AND s.generation=?3 AND p.generation=?3)",
+        params![person.as_str(), session, expected], |row| row.get(0),
+    )?;
+    if valid {
+        Ok(())
+    } else {
+        Err(Error::new(
+            "stale_session",
+            "the role's session is no longer current",
+        ))
+    }
+}
+
 /// Every entry of `person`, or of every person for `None`, erased in the
 /// caller's transaction, with their session notes, jobs and skipped count.
 fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
@@ -3367,6 +3458,12 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         room_from_citing(tx, person)?;
         talk_with_doomed(tx)?;
     }
+    // erase advances people with doomed entries. Advance empty people too:
+    // closing/reopening the same session name cannot revive a pre-forget token.
+    tx.execute(
+        "UPDATE people SET generation=generation+1 WHERE (?1 IS NULL OR person=?1) AND NOT EXISTS(SELECT 1 FROM entries e JOIN doomed d ON d.rid=e.rid WHERE e.person=people.person)",
+        [person.map(Person::as_str)],
+    )?;
     let count = erase(tx)?;
     // Empty people also have job and snapshot metadata, but keep the high
     // water mark so a stale external reference can never name a new entry.
@@ -3379,6 +3476,11 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         [person.map(Person::as_str)],
     )?;
     crate::nightly::empty(tx, person)?;
+    // A role they asked the lamp to play goes with everything else of theirs.
+    tx.execute(
+        "DELETE FROM roles WHERE ?1 IS NULL OR person=?1",
+        [person.map(Person::as_str)],
+    )?;
     tx.execute(
         "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],

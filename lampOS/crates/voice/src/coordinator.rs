@@ -2284,6 +2284,25 @@ fn may_hear(allowed: bool, slide: Option<crate::privacy::PrivacyState>) -> bool 
     allowed && slide != Some(crate::privacy::PrivacyState::Muted)
 }
 
+/// Whether a hand's hold falls in the lamp's quiet hours now
+/// (`lamp_local_time::quiet_hours`, 22:00 to 07:00 local, the one definition
+/// skills keep too), where it plays the breath, not the sleep line (#6028).
+/// A local time it cannot read is not quiet: the line is said.
+fn sleep_line_quiet_hours() -> bool {
+    #[cfg(test)]
+    {
+        TEST_QUIET_HOURS.with(std::cell::Cell::get)
+    }
+    #[cfg(not(test))]
+    {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        crate::local_time::system()
+            .is_some_and(|zone| lamp_local_time::quiet_hours(zone.minute_of_day(now_ms)))
+    }
+}
+
 /// The person's light a hand's sleep keeps on, from the bus if there is
 /// one (#1362): none means the asleep face. Read on Linux, where the ring is.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
@@ -4287,6 +4306,7 @@ fn flush_provider_input_with(
             | ProviderInput::StepCall { request, .. }
             | ProviderInput::Onboarding { request, .. }
             | ProviderInput::TurnOpened { request, .. }
+            | ProviderInput::WalkUnderWay { request, .. }
             | ProviderInput::WokenByName { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
@@ -5658,6 +5678,9 @@ thread_local! {
     /// `TEST_TASK_NEWS`.
     static TEST_SPEECH_CACHE: std::cell::RefCell<Option<std::sync::Arc<crate::say::tts_cache::TtsCache>>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's quiet hours for the hold's sleep line (#6028), in
+    /// place of the lamp's local time.
+    static TEST_QUIET_HOURS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
@@ -6535,6 +6558,9 @@ fn conversation_with_gate_inner(
     // What the person is saying, until its last piece, for the onboarding
     // steps that end on a heard answer (#1722 row 10). Memory only.
     let mut onboarding_heard = String::new();
+    // The lamp's words of its current line, for the walk's face question
+    // (`Onboarding::lamp_words`): they come in pieces too.
+    let mut onboarding_said = String::new();
     // The answer whose words are arriving, and whether any of them has been
     // a word yet.
     let mut answer_words: Option<(u64, bool)> = None;
@@ -6736,6 +6762,9 @@ fn conversation_with_gate_inner(
     // The last turn told the provider it began while onboarding was under
     // way, so a `go_to_sleep` it calls is answered not now.
     let mut onboarding_marked: Option<u64> = None;
+    // The walk's state as last told the provider worker, and the turn it
+    // was told with ([`walk_to_tell`], #5931).
+    let mut walk_told: Option<(u64, bool)> = None;
     // A turn held as unclear in a conversation, and when (#926): asked again
     // with a written turn once it is over.
     let mut asking = AskAgainState::default();
@@ -7711,12 +7740,18 @@ fn conversation_with_gate_inner(
         // person to hold the head. Told before each poll; kept while the
         // walk hasn't read its progress yet, and between conversations,
         // where there is no walk to ask.
+        let under_way = onboarding
+            .as_ref()
+            .map_or(Some(false), crate::onboarding::Onboarding::under_way);
         if let Some(controls) = controls.as_mut()
-            && let Some(under_way) = onboarding
-                .as_ref()
-                .map_or(Some(false), crate::onboarding::Onboarding::under_way)
+            && let Some(under_way) = under_way
         {
             controls.set_onboarding(under_way);
+        }
+        // The model's replies drop the walk's step words while it is under
+        // way (#5809, [`crate::onboarding::model_words`]).
+        if let Some(under_way) = under_way {
+            crate::onboarding::set_under_way(under_way);
         }
         let walk_under_way = controls.as_ref().is_some_and(HandControls::onboarding);
         // Every turn in hand while the walk is under way, whichever way it
@@ -9013,6 +9048,14 @@ fn conversation_with_gate_inner(
                         && let Some(walk) = onboarding.as_mut()
                     {
                         walk.lamp_said(monotonic_us());
+                        // ponytail: past 4 KiB a line is not read, as heard.
+                        if onboarding_said.len() + text.len() <= 4_096 {
+                            onboarding_said.push_str(&text);
+                        }
+                        walk.lamp_words(&onboarding_said);
+                        if finished {
+                            onboarding_said.clear();
+                        }
                     }
                     // What the lamp says is its own, not a stop said over it
                     // (#828, `heard-always`), stamped with when it will be
@@ -10693,6 +10736,13 @@ fn conversation_with_gate_inner(
                     if not_now {
                         onboarding_marked = reply.as_ref().map(|current| current.owner.turn());
                     }
+                    tell_walk(
+                        &mut provider_queue,
+                        &mut walk_told,
+                        reply.as_ref(),
+                        snapshot.microphone_generation(),
+                        onboarding.is_some(),
+                    );
                     // A line begun in a computer's turn is a call, as a tap
                     // is: told to the worker's rule right after its Start.
                     if let Some(current) = reply.as_ref() {
@@ -10942,6 +10992,13 @@ fn conversation_with_gate_inner(
                                     onboarding_marked =
                                         reply.as_ref().map(|current| current.owner.turn());
                                 }
+                                tell_walk(
+                                    &mut provider_queue,
+                                    &mut walk_told,
+                                    reply.as_ref(),
+                                    snapshot.microphone_generation(),
+                                    onboarding.is_some(),
+                                );
                                 if took_over {
                                     took_over_turn =
                                         reply.as_ref().map(|current| current.owner.turn());
@@ -11698,6 +11755,9 @@ fn conversation_with_gate_inner(
             let played_whole = matches!(current.cloud.outcome, Some(RequestOutcome::Complete))
                 && current.delivery_outcome() == "audio_written_unscored"
                 && !sound_finished;
+            if let Some(bus) = bus_out.as_mut() {
+                bus.reply_ended(turn, !played_whole, monotonic_us());
+            }
             holding_answer.settled(turn, played_whole, monotonic_us());
             if let Some((kind, why)) = look_note.settled(turn, played_whole, monotonic_us()) {
                 record(
@@ -11830,6 +11890,7 @@ fn conversation_with_gate_inner(
             clock,
         );
         if let Some(bus) = bus_out.as_mut() {
+            bus.settle(reply.is_some(), monotonic_us());
             tell_voice_of_turn(
                 bus,
                 snapshot,
@@ -11922,7 +11983,11 @@ fn conversation_with_gate_inner(
                     // "Where you sit": between turns the lamp looks at the
                     // person, its gaze turning the head to them, before it
                     // asks to be moved (#1722 row 10, rule 8).
-                    None if onboarding.as_ref().is_some_and(|walk| walk.looking()) => {
+                    // A walk not yet begun rises and looks too (#5931).
+                    None if onboarding
+                        .as_ref()
+                        .is_some_and(|walk| walk.looking() || walk.rising(clock)) =>
+                    {
                         Some(RingPhase::Listening)
                     }
                     Some(RingPhase::Speaking) if attending => Some(RingPhase::Listening),
@@ -12643,12 +12708,13 @@ fn conversation_with_gate_inner(
                 snapshot = now_state;
                 last_publish = monotonic_us();
             }
-            // An add-on's quoted line is the second route's alone: there its
-            // turn is asked with no functions (#2530 part 2). The Live
+            // An add-on's quoted line, and a made skill's words (#6062), are
+            // the second route's alone: there the turn is asked with no
+            // functions (#2530 part 2). The Live
             // session's functions are declared once, so it never takes one.
             if let Some(why) = quoted_refused(quoted, &rig.provider.role) {
                 eprintln!(
-                    "lamp-voice: the add-on {}'s say is refused: {why}",
+                    "lamp-voice: the skill {}'s quoted say is refused: {why}",
                     ticket.skill()
                 );
                 ticket.answer(crate::say::Outcome::Refused(why.into()));
@@ -12914,6 +12980,7 @@ fn conversation_with_gate_inner(
                 reply,
                 rig.playout_start_now(),
                 trace,
+                bus_out.as_mut(),
                 |state| rig.publish(state),
             )? {
                 snapshot = now_state;
@@ -12931,6 +12998,7 @@ fn conversation_with_gate_inner(
                 &mut submission_draining,
                 rig.playout_start_now(),
                 trace,
+                bus_out.as_mut(),
                 |state| rig.publish(state),
             )? {
                 snapshot = now_state;
@@ -12987,7 +13055,7 @@ fn conversation_with_gate_inner(
                     model_refusing.holds(clock) || signed_out.holds(),
                 );
             }
-            let note = walk.tick(
+            let note = walk.tick_line(
                 clock,
                 clock.saturating_sub(last_turn_us),
                 can_speak,
@@ -13187,11 +13255,19 @@ fn conversation_with_gate_inner(
                     "boundary":"this decision, at Controls' hand time on the head; the first sample is head_sleep_breath_first_write"}),
             )?;
             if decided.is_ok() {
-                // The recorded line in the breath's place (#3748).
+                // The recorded line in the breath's place (#3748), but not in
+                // the quiet hours, where the breath and the asleep face alone
+                // show it (#6028).
+                let quiet = sleep_line_cache.is_some() && sleep_line_quiet_hours();
                 let sleep_line = sleep_line_cache
                     .as_ref()
+                    .filter(|_| !quiet)
                     .and_then(|cache| cache.sleep_line());
-                if sleep_line_cache.is_some() && sleep_line.is_none() {
+                if quiet {
+                    eprintln!(
+                        "lamp-voice: a hand's hold in the quiet hours: the breath plays, not the sleep line"
+                    );
+                } else if sleep_line_cache.is_some() && sleep_line.is_none() {
                     eprintln!(
                         "lamp-voice: the sleep line is not in the speech cache yet: a hand's hold plays the breath"
                     );
@@ -14391,6 +14467,7 @@ fn play_exact_line(
     reply: &mut Option<Reply>,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
+    bus: Option<&mut crate::bus_out::BusOut>,
     publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Option<Snapshot>> {
     if !says.exact_waiting(at_us) {
@@ -14431,10 +14508,26 @@ fn play_exact_line(
         publish,
     )?;
     ticket.begun(monotonic_us());
+    tell_line(bus, &ticket);
     if let Some(current) = reply.as_mut() {
         current.say = Some(ticket);
     }
     Ok(Some(snapshot))
+}
+
+/// The line a ticket plays, on `voice/line` as it begins (#4209): an exact
+/// line's words and who had them said, or a cached phrase. A clip or a
+/// sound has none.
+fn tell_line(bus: Option<&mut crate::bus_out::BusOut>, ticket: &crate::say::Ticket) {
+    if let (Some(bus), Some(line)) = (bus, ticket.spoken_line()) {
+        bus.line_played(
+            &line.text,
+            line.by,
+            line.source,
+            line.app.as_deref(),
+            monotonic_us(),
+        );
+    }
 }
 
 /// A skill's sound asked for, if one waits: played now as a turn of the
@@ -14455,6 +14548,7 @@ fn play_skill_sound(
     submission_draining: &mut bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
+    bus: Option<&mut crate::bus_out::BusOut>,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Option<Snapshot>> {
     let Some((samples, ticket)) = says.take_sound(at_us) else {
@@ -14499,6 +14593,7 @@ fn play_skill_sound(
     )?;
     says.sound_played(at_us);
     ticket.begun(monotonic_us());
+    tell_line(bus, &ticket);
     if let Some(current) = reply.as_mut() {
         current.say = Some(ticket);
     }
@@ -16349,6 +16444,47 @@ fn after_start(
     marks
 }
 
+/// Whether the provider worker is told the walk's state `now` (its turn in
+/// hand, under way or not), having been told `told` last: each turn while
+/// the walk is under way, so a worker started since learns it, and once
+/// when it is not, at the conversation's first turn (a worker may outlive
+/// one) or as the walk ends. Outside the walk nothing more is sent.
+fn walk_to_tell(told: Option<(u64, bool)>, now: (u64, bool)) -> bool {
+    told != Some(now) && (now.1 || told.map(|(_, on)| on) != Some(false))
+}
+
+/// The walk's state, told right after a person's line's Start (#5931): the
+/// model's replies drop its step words ([`crate::onboarding::model_words`])
+/// in the second route's worker, another process, which never reads the
+/// coordinator's. A line's Start is where a mark may go: a lamp's own turn
+/// is its start and end at once and takes none, and is answered as the
+/// worker was told last.
+fn tell_walk(
+    queue: &mut VecDeque<ProviderInput>,
+    told: &mut Option<(u64, bool)>,
+    reply: Option<&Reply>,
+    privacy_generation: u64,
+    walk: bool,
+) {
+    // A lamp with no walk at all (no onboarding) has nothing to tell.
+    if !walk {
+        return;
+    }
+    // A local-only turn (#830) sends nothing.
+    let Some(current) = reply.filter(|current| current.local_only.is_none()) else {
+        return;
+    };
+    let now = (current.owner.turn(), crate::onboarding::under_way_now());
+    if walk_to_tell(*told, now) {
+        *told = Some(now);
+        queue.push_back(ProviderInput::WalkUnderWay {
+            request: now.0,
+            privacy_generation,
+            on: now.1,
+        });
+    }
+}
+
 /// Whether a request begun now is in the walk for `go_to_sleep`
 /// (`LAMP_SLEEP_ASKED=on`, #3748): the hand controls' own onboarding bit,
 /// or the walk under way.
@@ -16709,7 +16845,7 @@ fn take_interrupted_reminder(reply: &mut Option<Reply>) -> Option<crate::reminde
         return None;
     }
     let mut receipt = current.reminder.take()?;
-    // Cut after most of it played: heard, so completed, not said again
+    // One reminder cut after most of it played: completed, not said again
     // (06c1, 5 Nov 17:04).
     if let Some(cut) = current.mostly_heard_at_cut()
         && receipt.heard_before_the_cut(cut.playback_sequence, current.handed)

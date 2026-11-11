@@ -106,6 +106,9 @@ impl Message {
     }
 }
 
+/// The most tool calls one streamed reply may carry.
+pub const MOST_CALLS: usize = 64;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolCall {
     pub id: String,
@@ -956,7 +959,7 @@ impl Deltas {
             {
                 index = self.calls.len();
             }
-            if index >= 64 {
+            if index >= MOST_CALLS {
                 return Err(Error::Protocol("tool call index"));
             }
             if self.calls.len() <= index {

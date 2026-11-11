@@ -222,6 +222,10 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::SoundUpload { .. } => "sound.upload",
         Op::SoundList {} => "sound.list",
         Op::SoundRemove { .. } => "sound.remove",
+        Op::NotesSet { .. } => "notes.set",
+        Op::NotesGet { .. } => "notes.get",
+        Op::NotesDelete { .. } => "notes.delete",
+        Op::NotesList { .. } => "notes.list",
         Op::TurnStart { .. } => "turn.start",
         Op::TurnEnd {} => "turn.end",
         Op::ListenSet { .. } => "listen.set",
@@ -232,6 +236,7 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::CameraSnapshot {} => "camera.snapshot",
         Op::CameraStream { .. } => "camera.stream",
         Op::Volume { .. } => "volume",
+        Op::MicrophoneStream { .. } => "microphone.stream",
     }
 }
 
@@ -257,6 +262,7 @@ pub fn went(op: &Op) -> &'static str {
         Op::SkillPush { .. } | Op::SkillList {} | Op::SkillRemove { .. } => "the skill helper",
         Op::CameraSnapshot {} => "the eyes' newest frame, by sight.jpg",
         Op::CameraStream { .. } => "the eyes, by sight.jpg or their frames socket",
+        Op::MicrophoneStream { .. } => "the ears, by mic1/audio",
         _ => "the door",
     }
 }
@@ -349,6 +355,8 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
             format!("{}, for_ms {for_ms}", list(parts.iter().map(named)))
         }
         Op::LeaseRenew { for_ms, .. } => format!("for_ms {for_ms}"),
+        // Its start and its stop told apart; never the sound.
+        Op::MicrophoneStream { on } => (if *on { "on" } else { "off" }).to_owned(),
         _ => return String::new(),
     };
     format!(" ({inside})")

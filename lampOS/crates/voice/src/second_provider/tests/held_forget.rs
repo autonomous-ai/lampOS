@@ -12,6 +12,12 @@ use crate::memory_scope::FaceCache;
 enum Lamp {
     Says(&'static str),
     Calls(&'static str, &'static str),
+    CallsWithStale(&'static str, &'static str),
+    /// A `remember` of this text, then a line.
+    Keeps(&'static str, &'static str),
+    /// A `remember` of this text with a line in the same round, then the
+    /// line again.
+    KeepsAsking(&'static str, &'static str),
 }
 
 impl Lamp {
@@ -19,7 +25,8 @@ impl Lamp {
     fn name(&self) -> &'static str {
         match self {
             Lamp::Says(_) => "",
-            Lamp::Calls(name, _) => name,
+            Lamp::Calls(name, _) | Lamp::CallsWithStale(name, _) => name,
+            Lamp::Keeps(..) | Lamp::KeepsAsking(..) => crate::remember::REMEMBER,
         }
     }
 }
@@ -47,6 +54,9 @@ struct Ran {
     marked: Vec<(String, bool)>,
     /// Every call run, by name and arguments, in order.
     calls: Vec<(String, Value)>,
+    /// For each `remember` run, the words its scope was marked as a yes to
+    /// a held keep about ([`crate::memory_scope::ScopeLease::released_keep`]).
+    released: Vec<Option<String>>,
 }
 
 async fn run(turns: &[Turn]) -> Ran {
@@ -119,15 +129,30 @@ async fn run_full(
     for (who, _, lamp, _) in turns {
         match lamp {
             Lamp::Says(line) => chats.push_back(vec![text(line), Ok(ChatEvent::Done)]),
-            Lamp::Calls(name, line) => {
+            Lamp::Keeps(kept, line) => {
+                let calls = vec![call("c1", crate::remember::REMEMBER, json!({"text": kept}))];
+                chats.push_back(vec![Ok(ChatEvent::ToolCalls(calls)), Ok(ChatEvent::Done)]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+            }
+            Lamp::KeepsAsking(kept, line) => {
+                let calls = vec![call("c1", crate::remember::REMEMBER, json!({"text": kept}))];
                 chats.push_back(vec![
-                    Ok(ChatEvent::ToolCalls(vec![call(
-                        "c1",
-                        name,
-                        json!({"name": who}),
-                    )])),
+                    text(line),
+                    Ok(ChatEvent::ToolCalls(calls)),
                     Ok(ChatEvent::Done),
                 ]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+            }
+            Lamp::Calls(name, line) | Lamp::CallsWithStale(name, line) => {
+                let mut calls = vec![call("c1", name, json!({"name": who}))];
+                if matches!(lamp, Lamp::CallsWithStale(_, _)) {
+                    calls.push(call(
+                        "stale",
+                        "set_timer",
+                        json!({"label": "old private context"}),
+                    ));
+                }
+                chats.push_back(vec![Ok(ChatEvent::ToolCalls(calls)), Ok(ChatEvent::Done)]);
                 chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
             }
         }
@@ -149,7 +174,15 @@ async fn run_full(
     let lines_seen = lines.clone();
     let marked = Arc::new(Mutex::new(Vec::new()));
     let marks = marked.clone();
+    let released = Arc::new(Mutex::new(Vec::new()));
+    let releases = released.clone();
     let runner: ScopedToolRunner = Arc::new(move |request, heard, name, args, scope| {
+        if name == crate::remember::REMEMBER {
+            releases
+                .lock()
+                .unwrap()
+                .push(scope.released_keep().map(str::to_owned));
+        }
         if crate::remember::is_forget(&name) {
             marks
                 .lock()
@@ -294,12 +327,14 @@ async fn run_full(
     let asked = script.asked.lock().unwrap().clone();
     let lines = lines.lock().unwrap().clone();
     let marked = marked.lock().unwrap().clone();
+    let released = released.lock().unwrap().clone();
     Ran {
         forgets,
         asked,
         lines,
         marked,
         calls,
+        released,
     }
 }
 
@@ -991,9 +1026,20 @@ async fn a_forget_they_asked_for_just_before_runs_on_the_call() {
     ])
     .await;
     assert_eq!(ran.forgets, [(FACE.to_owned(), json!({"name": "A"}))]);
-    // Run, never held: the model was given the forget's own result.
-    let told = ran.asked[2].last().cloned().unwrap();
-    assert_eq!(told, Message::tool("c1", json!({"ok": true}).to_string()));
+    // Run, never held: its fixed outcome survives in the fresh request.
+    let next = &ran.asked[2];
+    assert_eq!(next.last(), Some(&Message::user("Yes.")));
+    let encoded = serde_json::to_value(next).unwrap();
+    let receipt = json!({"tool": FACE, "outcome": {"ok": true, "face_forgotten": true}});
+    assert!(
+        encoded[1]["content"]
+            .as_str()
+            .unwrap()
+            .contains(&receipt.to_string())
+    );
+    let clean = serde_json::to_string(next).unwrap();
+    assert!(!clean.contains("old private context"));
+    assert!(!clean.contains("tool_call_id"));
 
     let asked = (
         "A",
@@ -1453,6 +1499,61 @@ async fn a_held_memory_forgets_uncertain_result_cannot_copy_old_context() {
     assert_eq!(yes.last(), Some(&Message::user("Yes.")));
 }
 
+#[tokio::test]
+async fn a_face_forgets_partial_cleanup_reaches_the_next_model_request() {
+    let result = crate::remember::face_and_memory(
+        json!({"ok": true}),
+        &json!({
+            "forgotten": true,
+            "everything": false,
+            "room_memory_result": "kept",
+            "sound_consent_result": "uncertain",
+            "face_expression_consent_result": "cleared",
+            "private": "internal-memory canary",
+        }),
+    );
+    let ran = run_seen_from_result(
+        &[(
+            "A",
+            "Forget my face.",
+            Lamp::Calls(FACE, "I could not confirm all related cleanup."),
+            0,
+        )],
+        None,
+        5_803_001,
+        result,
+    )
+    .await;
+    assert_eq!(ran.calls, [(FACE.to_owned(), json!({"name": "A"}))]);
+    assert_eq!(ran.asked.len(), 2);
+    let next = &ran.asked[1];
+    assert_eq!(next.last(), Some(&Message::user("Forget my face.")));
+    let clean = serde_json::to_string(next).unwrap();
+    for canary in [
+        "internal-memory canary",
+        "old private context",
+        "tool_call_id",
+    ] {
+        assert!(!clean.contains(canary), "{clean}");
+    }
+    let receipt = json!({"tool": FACE, "outcome": {
+        "ok": true,
+        "face_forgotten": true,
+        "primary_memory_result": "forgotten",
+        "everything": false,
+        "room_memory_result": "kept",
+        "sound_consent_result": "uncertain",
+        "face_expression_consent_result": "cleared",
+    }});
+    let encoded = serde_json::to_value(next).unwrap();
+    assert!(
+        encoded[1]["content"]
+            .as_str()
+            .unwrap()
+            .contains(&receipt.to_string())
+    );
+}
+
 /// C37 (lamp-06c1, 5 Nov): round 1 was a bare `remember`, and round 2 said
 /// "Was that 'rhinodulus' right? I want to be sure", the word already
 /// kept. With `LAMP_MEMORY_DOUBT_UNDOES` that keep is forgotten by its id
@@ -1590,6 +1691,133 @@ async fn a_keep_the_next_round_doubts_is_taken_back_until_their_yes() {
     }
 }
 
+/// C37, the memory owner's call A (11 Nov). On lamp-06c1 on 10 Nov, twice,
+/// "ranunculus" was heard as "renunctinus", kept in round 1, and round 2
+/// asked "Kept as you said it … is that ranunculus?". That keep is taken
+/// back at once, nothing of the misheard word stays kept, and their yes
+/// keeps the word asked. A no keeps nothing; a reply asking nothing, or a
+/// keep someone else made, is never taken back.
+#[tokio::test]
+async fn a_keep_its_next_round_offers_another_word_for_waits_for_their_yes_to_that_word() {
+    const REMEMBER: &str = crate::remember::REMEMBER;
+    const FORGET: &str = crate::remember::FORGET;
+    const MISHEARD: &str = "Their favorite flower is a renunctinus.";
+    const SAID: &str = "Remember that my favorite flower is a renunctinus.";
+    let asks = Lamp::Keeps(MISHEARD, "Kept as you said it \u{2026} is that ranunculus?");
+    let a: Sight = (&["A"], true);
+    let b: Sight = (&["B"], true);
+    let keep = |text: &str| (REMEMBER.to_owned(), json!({ "text": text }));
+    let undo = (FORGET.to_owned(), json!({"source_id": 391}));
+    let kept_misheard = vec![keep(MISHEARD)];
+    let undone = vec![keep(MISHEARD), undo.clone()];
+    let kept_asked = vec![
+        keep(MISHEARD),
+        undo,
+        keep("Their favorite flower is a ranunculus."),
+    ];
+    /// The turns, their eyes, the calls run, and the case.
+    type Case<'a> = (&'a [Turn], &'a [Sight], &'a [(String, Value)], &'a str);
+    let cases: &[Case] = &[
+        (
+            &[("A", SAID, asks, 0)],
+            &[a],
+            &undone,
+            "the 06c1 sequence: renunctinus is not left kept",
+        ),
+        (
+            &[("A", SAID, asks, 0), ("A", "Yes.", Lamp::Says("Kept."), 5)],
+            &[a, a],
+            &kept_asked,
+            "their yes keeps ranunculus",
+        ),
+        (
+            &[
+                ("A", SAID, asks, 0),
+                ("A", "No.", Lamp::Says("Okay, how is it said?"), 5),
+            ],
+            &[a, a],
+            &undone,
+            "their no keeps nothing",
+        ),
+        (
+            &[
+                (
+                    "A",
+                    SAID,
+                    Lamp::Keeps(MISHEARD, "Kept: your favorite flower is a renunctinus."),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[a, a],
+            &kept_misheard,
+            "no confirm question: nothing undone",
+        ),
+        (
+            &[
+                ("B", SAID, Lamp::Keeps(MISHEARD, "Kept."), 0),
+                (
+                    "A",
+                    "What's my favorite flower?",
+                    Lamp::Says("Is that ranunculus?"),
+                    5,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[b, a, a],
+            &kept_misheard,
+            "another person's keep is never undone",
+        ),
+    ];
+    for (at, (turns, sight, calls, case)) in cases.iter().enumerate() {
+        let ran = run_full(
+            turns,
+            Some(sight),
+            9501 + 10 * at as u64,
+            (false, true),
+            json!({"ok": true}),
+        )
+        .await;
+        assert_eq!(ran.calls, *calls, "{case}");
+        // Their yes is a yes to the lamp's question about those words, so
+        // the memory's route keeps them for a line that is only "Yes."
+        // (`remember::heard::yes_alone`, `LAMP_MEMORY_KEEP_HEARD`).
+        if *calls == kept_asked {
+            assert_eq!(
+                ran.released,
+                [
+                    None,
+                    Some("Their favorite flower is a ranunculus.".to_owned())
+                ],
+                "{case}"
+            );
+        }
+    }
+}
+
+/// The same question beside the keep, in its own round: the keep is not
+/// run (#3504 finding N5), so nothing misheard is kept.
+#[tokio::test]
+async fn a_keep_beside_a_question_offering_another_word_is_not_run() {
+    let ran = run_full(
+        &[(
+            "A",
+            "Remember that my favorite flower is a renunctinus.",
+            Lamp::KeepsAsking(
+                "Their favorite flower is a renunctinus.",
+                "Is that ranunculus?",
+            ),
+            0,
+        )],
+        Some(&[(&["A"], true)]),
+        9601,
+        (false, true),
+        json!({"ok": true}),
+    )
+    .await;
+    assert_eq!(ran.calls, []);
+}
+
 /// Without the eyes' sight no yes could keep it again, so nothing is taken
 /// back.
 #[tokio::test]
@@ -1614,4 +1842,246 @@ async fn a_doubted_keep_stays_without_the_eyes() {
         ran.calls,
         [(crate::remember::REMEMBER.to_owned(), json!({"name": "A"}))]
     );
+}
+
+/// An admitted face forget may also empty personal memory. Neither its
+/// next request nor later calls planned from the old context may reuse it.
+#[tokio::test]
+async fn face_forget_context_ordinary_discards_the_entire_next_request_and_batch() {
+    for result in [
+        json!({"ok": true, "memory": "forgotten too"}),
+        json!({"ok": true, "everything": false, "memory": "private result canary"}),
+        json!({"ok": false, "error": "private result canary"}),
+    ] {
+        let ran = run_seen_from_result(
+            &[(
+                "A",
+                "Forget my face, then set a timer.",
+                Lamp::CallsWithStale(FACE, "I will report only the confirmed outcome."),
+                0,
+            )],
+            None,
+            5_851_001,
+            result,
+        )
+        .await;
+        assert_eq!(ran.asked.len(), 2);
+        assert!(
+            serde_json::to_string(&ran.asked[0])
+                .unwrap()
+                .contains("old private context")
+        );
+        let clean = serde_json::to_string(&ran.asked[1]).unwrap();
+        assert!(!clean.contains("old private context"), "{clean}");
+        assert!(!clean.contains("private result canary"), "{clean}");
+        assert!(!clean.contains("tool_call_id"), "{clean}");
+        assert!(clean.contains("1 later calls"), "{clean}");
+        assert_eq!(ran.calls, [(FACE.to_owned(), json!({"name": "A"}))]);
+        assert_eq!(
+            ran.asked[1].last(),
+            Some(&Message::user("Forget my face, then set a timer."))
+        );
+    }
+}
+
+/// The same boundary applies before round one when a held face forget is
+/// admitted by the person's yes, including a missing or partial receipt.
+#[tokio::test]
+async fn face_forget_context_held_yes_discards_the_entire_next_request() {
+    for result in [
+        json!({"ok": true, "memory": "forgotten too"}),
+        json!({"ok": true, "everything": false, "memory": "private result canary"}),
+        json!({"error": "private result canary"}),
+    ] {
+        let ran = run_seen_from_result(
+            &[
+                ("A", "What do you know about me?", ASKS, 0),
+                (
+                    "A",
+                    "Yes.",
+                    Lamp::Says("I will report only the confirmed outcome."),
+                    5,
+                ),
+            ],
+            None,
+            5_851_101,
+            result,
+        )
+        .await;
+        assert_eq!(ran.calls, [(FACE.to_owned(), json!({"name": "A"}))]);
+        let clean = serde_json::to_string(ran.asked.last().unwrap()).unwrap();
+        assert!(!clean.contains("old private context"), "{clean}");
+        assert!(!clean.contains("private result canary"), "{clean}");
+        assert_eq!(
+            ran.asked.last().unwrap().last(),
+            Some(&Message::user("Yes."))
+        );
+    }
+}
+
+/// Cutting an admitted forget while its runner waits must not carry an
+/// earlier recall round into the empty line's resumed model request.
+async fn cut_during_forget_discards_recalled_round(name: &'static str, held: bool) {
+    let question = if held {
+        "What do you know about me?"
+    } else if name == FACE {
+        "Forget my face."
+    } else {
+        "Forget my favorite color."
+    };
+    let mut heard = vec![Ok(question.to_owned())];
+    if held {
+        heard.push(Ok("Yes.".to_owned()));
+    }
+    heard.push(Ok(String::new()));
+    let mut chats = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "private-recall-call-canary",
+                crate::remember::RECALL,
+                json!({"query": "favorite color"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "forget-call",
+                name,
+                json!({"name": "A", "text": "favorite color"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+    ];
+    if held {
+        chats.push(vec![text("Shall I forget your face?"), Ok(ChatEvent::Done)]);
+    }
+    chats.push(vec![
+        text("I will report only what is confirmed."),
+        Ok(ChatEvent::Done),
+    ]);
+    let script = Arc::new(Script {
+        heard: Mutex::new(heard.into()),
+        chats: Mutex::new(chats.into()),
+        ..Script::default()
+    });
+    let (begun, waiting) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, called, _| {
+        let begun = begun.clone();
+        Box::pin(async move {
+            if called == name {
+                begun.send(()).unwrap();
+                std::future::pending::<()>().await;
+            }
+            json!({"memories": ["private-recall-result-canary"]})
+        })
+    });
+    let scoped_runner = runner.clone();
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    if held {
+        // A confirmation belongs to a known person's session; an
+        // anonymous yes is correctly refused before the runner.
+        let path = std::env::temp_dir().join(format!(
+            "cut-held-forget-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&path, "A").unwrap();
+        let cache = Arc::new(FaceCache::default());
+        engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([43; 16]).unwrap(),
+            cache.clone(),
+            Arc::new(move |request, heard, name, args, _| {
+                scoped_runner(request, heard, name, args)
+            }),
+            None,
+        );
+        engine.memory_camera(true, 1);
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+    let request = 5_878_100;
+    engine.submit(start(request));
+    engine.submit(audio(request, 1));
+    engine.submit(end(request));
+    let forgetting = if held {
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the face-forget question finishes");
+            if matches!(event, ProviderOutput::TurnComplete { request: done, .. } if done == request)
+            {
+                break;
+            }
+        }
+        engine.submit(start(request + 1));
+        engine.submit(audio(request + 1, 1));
+        engine.submit(end(request + 1));
+        request + 1
+    } else {
+        request
+    };
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if waiting.try_recv().is_ok() {
+                break;
+            }
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+    })
+    .await
+    .expect("the admitted forget reaches its blocked runner");
+    {
+        let asked = script.asked.lock().unwrap();
+        assert!(
+            serde_json::to_string(&*asked)
+                .unwrap()
+                .contains("private-recall-result-canary")
+        );
+    }
+    let resumed = forgetting + 1;
+    engine.submit(start(resumed));
+    engine.retire_through(forgetting);
+    engine.submit(audio(resumed, 1));
+    engine.submit(end(resumed));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the empty line's resumed turn finishes");
+        if matches!(event, ProviderOutput::TurnComplete { request: done, .. } if done == resumed) {
+            break;
+        }
+    }
+    let asked = script.asked.lock().unwrap();
+    assert!(asked.len() >= if held { 4 } else { 3 });
+    let next = serde_json::to_string(asked.last().unwrap()).unwrap();
+    for canary in ["private-recall-call-canary", "private-recall-result-canary"] {
+        assert!(
+            !next.contains(canary),
+            "{canary} survived cut during {name}: {next}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn cut_during_face_forget_drops_prior_recall_from_resumed_request() {
+    cut_during_forget_discards_recalled_round(FACE, false).await;
+}
+
+#[tokio::test]
+async fn cut_during_held_face_forget_drops_prior_recall_from_resumed_request() {
+    cut_during_forget_discards_recalled_round(FACE, true).await;
+}
+
+#[tokio::test]
+async fn cut_during_plain_forget_drops_prior_recall_from_resumed_request() {
+    cut_during_forget_discards_recalled_round(crate::remember::FORGET, false).await;
 }

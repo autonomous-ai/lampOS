@@ -277,6 +277,7 @@ From #2208, the bench run on build 3309. Third asks for `head_move` here. The re
 
 ## Not placed
 
+- Each Harness pin move (#5957 (b)), a standing row for every PR from `lampos-harness-pin.yml`: on lamp-52e6 or lamp-c0a4, booked with its owner, the lamp on the old pin and signed in takes the PR's build in one update round. PASS for each of: Harness reinstalled as `lampos` and recorded `installed` with the new version, the sign-in still holds (no new sign-in asked), and one hand-over and one follow-up go through. The PR merges only after this passes, and reaches stable only on a promote after that. Not placed on one lamp because it comes back with each Harness release.
 - `LAMP_SECOND_SPEECH_SOCKET` (#2135): through the relay the socket closes before any audio. It waits for the relay's `/ws/` to carry `stream-input`, not for a lamp.
 - `LAMP_LIVE_SCOPED_SESSION` (#1675), `LAMP_REMARKS` (#705), `LAMP_TRANSCRIPTION_LANGUAGE` (#926) and `LAMP_PROVIDER_WRITES` (#705): the Live route only. Lamps run the second route since 19 Oct.
 - `LAMP_SECOND_GEMINI_BASE_URL` (#1712): its check is recorded (19 Oct, 12 of 12 through the relay) and it's proposed unset. Gemini speech isn't the lamps' voice, so nothing is left to run.

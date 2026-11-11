@@ -9,7 +9,7 @@
 //! The lamp holds it to a made skill's own rules, and more:
 //! - **Never as the Store's.** It is marked `made: here` and
 //!   [`made_skill::ADDED_FROM_FILE`], and said as "added from a file, not
-//!   from the Skills Store" ([`ask_line`]).
+//!   from the Skills Store" ([`on_line`]).
 //! - **A name the lamp holds is refused, never replaced**: a skill on the
 //!   lamp by that name (core, from the Store, pushed or made), or one kept
 //!   here, made or added ([`taken`]). The manage helper holds it again at
@@ -24,10 +24,12 @@
 //! - **The same checks as a made skill**: [`made_skill::plainly`] says what
 //!   it does, `lamp-skills pack` checks it, and it is kept beside the made
 //!   skills, at most five made or added ([`made_skill::keep_added`]).
-//! - **On only at a spoken yes**: the lamp says it through the say
-//!   service's own asks, ending in [`made_skill::ASK_TO_PUT_ON`], and only
-//!   a plain spoken yes right after puts it on, as a skill typed in the
-//!   app ([`crate::app_make`]). Nothing from the app puts it on.
+//! - **On at once, with no spoken yes** (#5977; the owner, 10 Nov: a made skill
+//!   goes on with no spoken yes; the app's ask is the ask): once kept it
+//!   is put on through [`made_skill::put_on`] and the manage helper, held
+//!   again to the added cap there, as a skill typed in the app
+//!   ([`crate::app_make`]), and the lamp says [`on_line`], or
+//!   [`not_on_line`] with why it isn't on.
 //!
 //! The files' words are never in the journal.
 use crate::made_skill::{self, Files, Keeping, Made, Refused};
@@ -49,8 +51,8 @@ pub const PUSHED_FOLDER: &str = "/var/lib/lampOS/skills-dev";
 pub const MOST_NOTE_BYTES: usize = crate::say::MOST_WORDS_BYTES;
 /// What a refusal says with the switch off.
 pub const OFF: &str = "not on this lamp: a skill added from a file";
-/// What a refusal says without the say service, so nothing could be asked
-/// aloud.
+/// What a refusal says without the say service, so nothing could be said
+/// aloud of it.
 pub const NO_ASK: &str = "the lamp can't ask about it aloud now";
 
 /// Whether the switch is on in this process's environment.
@@ -196,26 +198,32 @@ pub fn take(
     made_skill::keep_added(&files, &format!("{FROM}{at_unix_ms}"), keeping)
 }
 
-/// What the lamp says aloud of a skill added from a file: that it was
-/// added from a file and not from the Store, what it does
-/// ([`made_skill::plainly`]'s words), and exactly
-/// [`made_skill::ASK_TO_PUT_ON`], last.
-pub fn ask_line(made: &Made) -> String {
-    format!(
-        "A skill called {} was added in the app from a file, not from the Skills Store. {} {}",
-        made.name.replace('-', " "),
-        made.description.trim(),
-        made_skill::ASK_TO_PUT_ON
-    )
+/// What the lamp says aloud once a skill added from a file is on: its
+/// name, that it was added from a file and not from the Skills Store, and
+/// that it's on, then what it does and uses, as a
+/// made skill's line says (Thirteen's P3 on #5985: no yes is asked).
+pub fn on_line(made: &Made) -> String {
+    let made_line = made_skill::on_line(made);
+    let said = made_skill::spoken_name(&made.name);
+    let rest = made_line
+        .strip_prefix(&format!("I made {said}, and it's on"))
+        .unwrap_or(".");
+    format!("I added {said} from a file, not from the Skills Store, and it's on{rest}")
+}
+
+/// What the lamp says aloud when a skill added from a file couldn't be put
+/// on: why, in the plain words [`made_skill::put_on`] gives.
+pub fn not_on_line(why: &str) -> String {
+    format!("I added a skill from a file but couldn't put it on: {why}.")
 }
 
 /// What became of the skill added from a file `sha256`, kept in
-/// `directory`: `kept` (not yet asked about aloud), `asked` (a spoken yes
-/// would put it on now), `on`, `left_off` (asked, and no longer the offer a
-/// yes would put on) or `none` (not kept, or not one added from a file).
+/// `directory`: `kept` (kept, and being put on), `on`, `left_off` (kept
+/// and not put on: its `not_on` says why; or asked about before 10 Nov and
+/// never said yes to) or `none` (not kept, or not one added from a file).
 /// `lamp-cloud` asks it until the skill is on or left off, so the backend
 /// is told only then (`skills.upload.<upload_id>`'s second reply).
-pub fn state(directory: &Path, sha256: &str, now_unix_ms: u64) -> &'static str {
+pub fn state(directory: &Path, sha256: &str) -> &'static str {
     let entries = made_skill::entries(directory);
     let Some(entry) = entries
         .iter()
@@ -226,20 +234,17 @@ pub fn state(directory: &Path, sha256: &str, now_unix_ms: u64) -> &'static str {
     if entry["on"] == true {
         return "on";
     }
-    if entry["offered_at_unix_ms"].as_u64().is_none() {
-        return "kept";
+    if entry.get("not_on").is_some() || entry["offered_at_unix_ms"].as_u64().is_some() {
+        return "left_off";
     }
-    match made_skill::waiting(directory, now_unix_ms) {
-        Some((_, waiting)) if waiting == sha256 => "asked",
-        _ => "left_off",
-    }
+    "kept"
 }
 
 /// One line on the app-make socket, if it is an upload's (`upload`) or
 /// asks what became of one (`{"added": {"sha256"}}`, [`state`]): the answer, and
-/// once kept, the skill to ask about (its ask line and SHA-256). `on` is
-/// the switch; `can_ask`, whether the say service is there to ask aloud.
-/// None for a line that is not an upload's.
+/// once kept, the skill to put on at once. `on` is the switch; `can_ask`,
+/// whether the say service is there to say it aloud. None for a line that
+/// is not an upload's.
 pub fn line(
     asked: &Value,
     on: bool,
@@ -247,17 +252,14 @@ pub fn line(
     place: &Place,
     keeping: &Keeping,
     now_unix_ms: u64,
-) -> Option<(Value, Option<(String, String)>)> {
+) -> Option<(Value, Option<Made>)> {
     let asked = asked.as_object().filter(|asked| asked.len() == 1)?;
     if let Some(added) = asked.get("added") {
         if !on {
             return Some((json!({"refused": OFF}), None));
         }
         let sha256 = added["sha256"].as_str().unwrap_or_default();
-        return Some((
-            json!({"state": state(&keeping.directory, sha256, now_unix_ms)}),
-            None,
-        ));
+        return Some((json!({"state": state(&keeping.directory, sha256)}), None));
     }
     let upload = asked.get("upload")?;
     if !on {
@@ -277,8 +279,7 @@ pub fn line(
     Some(
         match take(place, keeping, skill_toml, skill_md, now_unix_ms) {
             Ok(made) => {
-                eprintln!("lamp-voice: a skill added from a file: kept; its ask goes to be said");
-                let ask = (ask_line(&made), made.sha256.clone());
+                eprintln!("lamp-voice: a skill added from a file: kept; put on now");
                 (
                     json!({"kept": {
                         "name": made.name,
@@ -287,7 +288,7 @@ pub fn line(
                         "sha256": made.sha256,
                         "uses": {"light": made.uses.light, "body": made.uses.body, "topics": made.uses.topics},
                     }}),
-                    Some(ask),
+                    Some(made),
                 )
             }
             Err(Refused(why, _)) => {
@@ -342,9 +343,11 @@ mod tests {
         let entry = &made_skill::entries(&keeping.directory)[0];
         assert_eq!(entry["added"], "file");
         assert_eq!(entry["from"], format!("upload:{NOW}"));
-        let line = ask_line(&made);
-        assert!(line.contains("not from the Skills Store"), "{line}");
-        assert!(line.ends_with(made_skill::ASK_TO_PUT_ON), "{line}");
+        let line = on_line(&made);
+        assert_eq!(
+            line,
+            "I added tea tip from a file, not from the Skills Store, and it's on: only when you ask for it, it answers in its own words, as its file tells it, and never on its own."
+        );
         // Its words are the lamp's plain ones, never the file's.
         assert!(!line.contains("SECRET-WORDS"), "{line}");
         let _ = std::fs::remove_dir_all(&root);
@@ -387,13 +390,12 @@ mod tests {
         assert!(refused(triggered).contains("starts on its own"));
         let no_tool = "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nlight = true\n\
                        [[do]]\nlight = { colour = \"cyan\" }\n";
-        assert!(refused(no_tool).contains("no function"));
+        assert!(refused(no_tool).contains("no tool"));
         let wider = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
                      [permissions]\nlight = true\nmessages = true\n[[do]]\nlight = { colour = \"cyan\" }\n";
-        assert!(refused(wider).contains("more than the light"));
-        let reads = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
-                     [permissions]\ntopics = [\"voice/heard\"]\n[[do]]\nlight = { colour = \"cyan\" }\n";
-        assert!(refused(reads).contains("read more"));
+        // A skill added from a file keeps the cap from before #6066 (App
+        // Only's P2 on #6103): the lift is for a skill made on the lamp.
+        assert!(refused(wider).contains("more than the light and the head"));
         assert!(made_skill::entries(&keeping.directory).is_empty());
         // Within the cap, asked for only: kept, its light said plainly.
         let good = "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"glow_back\"\n\
@@ -427,41 +429,33 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Nothing puts it on before the spoken yes: kept, nothing waits for a
-    /// yes until its ask is said whole; a yes before that, or one not
-    /// heard, puts nothing on.
+    /// Kept, it goes on at once with no yes (the owner, 10 Nov): the
+    /// manage helper is asked for its SHA-256, and it reads `on`. With no
+    /// helper it stays off, reads `left_off`, and why is said.
     #[test]
-    fn it_is_never_on_before_the_spoken_yes() {
-        let (root, keeping) = keeping("upload-yes");
+    fn it_goes_on_at_once_with_no_yes_or_stays_off_with_why() {
+        use crate::make_skill_local::tests::manage_helper;
+        let (root, keeping) = keeping("upload-on");
         let made = take(&place(&root), &keeping, None, CARD, NOW).unwrap();
         let directory = &keeping.directory;
-        let socket = Path::new("/nowhere/manage.sock");
-        assert_eq!(made_skill::waiting(directory, NOW + 1_000), None);
-        let told = made_skill::put_on(directory, socket, Some("Yes."), NOW + 1_000);
-        assert!(told["error"].is_string(), "{told}");
-        assert!(made_skill::entries(directory)[0]["on"] != true);
-        // Said whole: it waits for the yes, and only a heard one goes on.
-        crate::app_make::ask_answered(
-            directory,
-            &made.sha256,
-            &crate::say::Answer::Done(crate::say::Outcome::Spoken),
-            NOW + 2_000,
-        )
-        .unwrap();
+        assert_eq!(state(directory, &made.sha256), "kept");
+        let why = made_skill::put_on(&keeping, &made).unwrap_err();
+        assert_eq!(state(directory, &made.sha256), "left_off");
         assert_eq!(
-            made_skill::waiting(directory, NOW + 3_000).map(|(_, sha)| sha),
-            Some(made.sha256.clone())
+            not_on_line(&why),
+            "I added a skill from a file but couldn't put it on: the lamp's skills couldn't be \
+             reached."
         );
-        let told = made_skill::put_on(directory, socket, None, NOW + 3_000);
-        assert!(
-            told["error"].as_str().unwrap().contains("out loud"),
-            "{told}"
-        );
+        let asked = manage_helper(&keeping.manage);
+        made_skill::put_on(&keeping, &made).unwrap();
+        assert_eq!(asked.join().unwrap()["install_made"], made.sha256.as_str());
+        assert_eq!(state(directory, &made.sha256), "on");
         let _ = std::fs::remove_dir_all(&root);
     }
 
     /// The socket's line: refused with the switch off or no say service;
-    /// kept with its ask to say; anything not an upload's is not taken here.
+    /// kept, given back to be put on; anything not an upload's is not taken
+    /// here.
     #[test]
     fn the_sockets_upload_line_is_switched_and_answered() {
         let (root, keeping) = keeping("upload-line");
@@ -475,18 +469,18 @@ mod tests {
         let (told, ask) = line(&asked, true, true, &place, &keeping, NOW).unwrap();
         assert_eq!(told["kept"]["name"], "tea-tip", "{told}");
         assert!(!told.to_string().contains("SECRET-WORDS"), "{told}");
-        let (said, sha) = ask.unwrap();
-        assert!(said.ends_with(made_skill::ASK_TO_PUT_ON));
+        let made = ask.unwrap();
+        let sha = made.sha256.clone();
         assert_eq!(told["kept"]["sha256"], sha);
         assert!(line(&json!({"made": {}}), true, true, &place, &keeping, NOW).is_none());
         // What became of it, as lamp-cloud asks until it is on or left off.
         let added = json!({"added": {"sha256": sha.clone()}});
         let state_of = |now| line(&added, true, true, &place, &keeping, now).unwrap().0;
         assert_eq!(state_of(NOW), json!({"state": "kept"}));
-        made_skill::offered(&keeping.directory, &sha, NOW + 1_000).unwrap();
-        assert_eq!(state_of(NOW + 2_000), json!({"state": "asked"}));
-        let past = NOW + 2_000 + made_skill::PUT_ON_WITHIN.as_millis() as u64;
-        assert_eq!(state_of(past), json!({"state": "left_off"}));
+        let asked = crate::make_skill_local::tests::manage_helper(&keeping.manage);
+        made_skill::put_on(&keeping, &made).unwrap();
+        asked.join().unwrap();
+        assert_eq!(state_of(NOW + 2_000), json!({"state": "on"}));
         let missing = json!({"added": {"sha256": "0".repeat(64)}});
         assert_eq!(
             line(&missing, true, true, &place, &keeping, NOW).unwrap().0,

@@ -39,8 +39,13 @@ pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
 pub const RENDER_WITHIN: Duration = Duration::from_secs(5);
 /// Rendered at start, after the speech service is configured, until each is
 /// kept: the safe shutdown's line, one source with the shutdown, then the
-/// hold's sleep line (#3748), read by the coordinator with [`TtsCache::kept`].
-pub const WARM: &[&str] = &[lamp_msgs::GOING_TO_SLEEP, lamp_msgs::SLEEP_LINE];
+/// hold's sleep line (#3748), read by the coordinator with [`TtsCache::kept`],
+/// then the factory reset's line (#5929), said as the reset button is let go.
+pub const WARM: &[&str] = &[
+    lamp_msgs::GOING_TO_SLEEP,
+    lamp_msgs::SLEEP_LINE,
+    lamp_msgs::RESET_STARTING,
+];
 /// How soon an unrendered warm line is first tried again (offline at
 /// start); each later try waits twice as long, up to [`WARM_EVERY_MOST`].
 const WARM_EVERY: Duration = Duration::from_secs(60);
@@ -488,19 +493,26 @@ mod tests {
 
     #[test]
     fn warm_renders_the_shutdown_line_and_the_sleep_line_once() {
-        assert_eq!(WARM, [lamp_msgs::GOING_TO_SLEEP, lamp_msgs::SLEEP_LINE]);
+        assert_eq!(
+            WARM,
+            [
+                lamp_msgs::GOING_TO_SLEEP,
+                lamp_msgs::SLEEP_LINE,
+                lamp_msgs::RESET_STARTING
+            ]
+        );
         let dir = scratch("warm");
         let (cache, calls) = counted(&dir, "Rachel");
         assert_eq!(cache.kept(lamp_msgs::SLEEP_LINE), None);
         cache.warm(WARM).unwrap();
         cache.warm(WARM).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
         assert!(cache.path(lamp_msgs::GOING_TO_SLEEP).is_file());
         assert_eq!(
             cache.kept(lamp_msgs::SLEEP_LINE),
             Some(vec![lamp_msgs::SLEEP_LINE.len() as i16; 2_400])
         );
-        assert_eq!(calls.load(Ordering::SeqCst), 2, "kept never renders");
+        assert_eq!(calls.load(Ordering::SeqCst), 3, "kept never renders");
     }
 
     /// #4473 (c): English warms exactly [`WARM`] and has no line of the
@@ -524,8 +536,8 @@ mod tests {
             let (cache, calls) = counted(&dir, "Rachel");
             let cache = cache.speaking(Some(language));
             let lines = cache.warm_lines();
-            assert_eq!(lines.len(), 26 + WARM.len(), "{language:?}");
-            assert_eq!(&lines[26..], WARM);
+            assert_eq!(lines.len(), 28 + WARM.len(), "{language:?}");
+            assert_eq!(&lines[28..], WARM);
             let words = language.fixed(lamp_msgs::SLEEP_LINE).unwrap();
             assert_eq!(lines[1], words);
             assert_ne!(cache.key(words), cache.key(lamp_msgs::SLEEP_LINE));
@@ -561,7 +573,7 @@ mod tests {
         let (off, _) = counted(&dir, "Rachel");
         let off = off.speaking(Some(Language::Vietnamese));
         assert!(!off.warm_lines().contains(&"Dạ?"));
-        assert_eq!(off.warm_lines().len(), 26 + WARM.len());
+        assert_eq!(off.warm_lines().len(), 28 + WARM.len());
         let (vietnamese, calls) = counted(&dir, "Rachel");
         let vietnamese = vietnamese
             .speaking(Some(Language::Vietnamese))

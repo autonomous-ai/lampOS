@@ -5,7 +5,8 @@ the core skill [Night sleep](alive.md#night-sleep-is-a-skill), on in every
 product lamp, and the first face of the morning wakes it as Expression's
 reflex. Bedtime and Morning dropped its own `rest` and `wake` steps and its
 bedtime trigger: it keeps the evening glow, the morning hum and the night's
-ceilings, installed and off, a person's add-on. Its morning hum no longer
+ceilings, installed and on in the product since 9 Nov (#5753), with
+`LAMP_OUTPUT_CAPS=on` in the product's Actions, Skills and voice units. Its morning hum no longer
 waits for a night it rested or for a wake it owns, and it plays no stretch
 of its own. What this page says below of its bedtime rest, settling again
 after a night sound and the morning's owned wake describes the routine
@@ -15,16 +16,16 @@ a lamp that never slept is closed: with no fresh claim on the night,
 Expression sleeps by its own schedule (the fallback, for one release).
 
 The product installer includes the [core skill](../skills/bedtime-morning/skill.toml)
-at `/var/lib/lampOS/skills/bedtime-morning/`, disabled with `enabled = false`.
-Turning it on means editing that installed `skill.toml` to `enabled = true`.
-It stays on through the next install or update round: the round keeps it in
-`/var/lib/lampos-skills-state/on` and writes the build's file turned on
-([skills.md](skills.md), #2585). A multi-night lamp run survives an
-overnight round.
+at `/var/lib/lampOS/skills/bedtime-morning/`, enabled with `enabled = true`
+since #5753, after its nights on lamp-06c1 (#2803, #2804). Before that it
+shipped `enabled = false`, turned on by editing the installed `skill.toml`.
+A person who turns it off (the app's `skills.off`, or `[stop]`) keeps it
+off through an install or update round (`/var/lib/lampos-skills-state/off`,
+[skills.md](skills.md), #2585).
 It copies every file of each product skill's folder but its `tests/`
 (`install::PRODUCT_SKILLS`). Those in `install::PRODUCT_SKILLS_OFF` are
-installed disabled by install itself, and Bedtime and Morning by its own
-`enabled = false`; the rest are installed enabled (Not feeling well came with
+installed disabled by install itself; the rest, Bedtime and Morning among
+them, are installed enabled (Not feeling well came with
 the product after its lamp check, #1681). Desk tutor, Desk tutor marks and the
 other installable skills remain outside the product install
 (`install::NOT_PRODUCT_SKILLS`); [skills.md](skills.md), "Core and
@@ -65,9 +66,10 @@ declarations use mode 0700 and the service user `lampos`. Systemd creates
 these durable directories when the services start. The paths do not enable
 the new features. Since #940 the product units turn on
 `LAMP_SKILL_ROUTINES` and `LAMP_REST_REQUESTS` for Night sleep, with
-Expression's built-in sleep as the fallback for one release;
-`LAMP_OUTPUT_CAPS` stays unset, so this skill's ceilings stay off, and its
-manifest stays disabled with no active trigger or advertised tool.
+Expression's built-in sleep as the fallback for one release. Since #5753
+they also turn on `LAMP_OUTPUT_CAPS` in Actions, Skills and the voice, and
+the manifest is enabled: the evening glow, the morning hum and the night's
+ceilings run on a product lamp. It still advertises no tool.
 
 Skills chooses when a routine is eligible. Expression owns its rest pose
 and transitions; Body retains the existing fold, pause, range and motor
@@ -504,10 +506,13 @@ active restrictions combine by minimum with the product ceiling. Volume
 entry lowers an already louder mixer, preserves a quieter choice, and
 never unmutes. All volume setters, including the app slider and unmute,
 honor the effective ceiling. Any remembered pre-mute level is clamped too.
-Relaxing or removing a restriction never writes back an old setting. If
-entry reduced the mixer volume, that reduction remains after release until
-a later explicit volume action changes it; release does not restore a saved
-user preference.
+Relaxing a restriction never writes back an old setting. Removing the last
+one (the night cap's lift at 06:00, by removal or expiry) gives the Speaker
+back the level the cap lowered at entry, but only while the mixer still
+reads what the cap wrote: any volume change in the night, the app slider,
+up, down, mute or unmute, stands, and a muted Speaker stays muted (#5753).
+That level is kept in Actions' memory only, so an Actions restart during
+the night leaves the lowered level in place after the lift.
 
 Actions stores at most eight stable source identities, including their
 terminal records, in a bounded 16 KiB state. A cap contains `source`,
@@ -640,7 +645,8 @@ Before enabling the core skill, record a lamp comparison covering:
   ring startup darkness, and measured request-to-mixer, optical, motion and
   acoustic response.
 
-Keep the skill disabled until those observations establish acceptable
-behavior. No device access, acoustic measurement, optical measurement,
+The skill was kept disabled until those observations; #2803 and #2804
+(lamp-06c1, 22-23 Oct) recorded the full night and the five cap cases, and
+it ships on since #5753. A reboot with an unknown clock was not run. No device access, acoustic measurement, optical measurement,
 physical-motion result or complete installed-system result is established
 by the host tests.

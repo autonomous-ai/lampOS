@@ -751,6 +751,37 @@ mod tests {
         values.iter().map(OsString::from).collect()
     }
 
+    /// #5759: the let-go reads `--home` and `--folded-arm` from every kept
+    /// `lamp.env` and `measured.env` (tests/fixtures/stores), so a later build still judges a
+    /// shipped lamp down before the power goes.
+    #[test]
+    fn let_go_reads_every_kept_lamp_env() {
+        let folder = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/stores");
+        let mut read = 0;
+        for entry in std::fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            if !(name.starts_with("lamp-env-") || name.starts_with("measured-env-")) {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            // Written out by hand, so a reader that changes what a kept
+            // number means fails.
+            let pinned = match name.as_str() {
+                "lamp-env-06c1-by-hand-2026-10-16" => ([1772, 2057, 2034], Some([2050, 2059])),
+                "lamp-env-fc4b-factory-2026-10-30" => ([1817, 2085, 2028], Some([2048, 1946])),
+                "lamp-env-standing-2026-11-09" | "lamp-env-stood-swept-2026-11-09" => {
+                    ([1772, 2057, 2034], Some([2050, 2059]))
+                }
+                "measured-env-seated-2026-11-09" => ([1772, 2057, 2034], None),
+                _ => panic!("{name}: a kept poses file with no numbers pinned here"),
+            };
+            assert_eq!(let_go_poses(&text), Ok(pinned), "{name}");
+            read += 1;
+        }
+        assert!(read >= 5, "{read}");
+    }
+
     #[test]
     fn let_go_reads_home_and_the_folded_arm_from_lamp_env() {
         let standing = "# read\nBODY_POSES=\"--home 1916,2049,2041 --folded-arm 2046,2046 --stand 1772,2049,2041,2633,2603 --pitch-window 1740,2030 --torque on\"\n";

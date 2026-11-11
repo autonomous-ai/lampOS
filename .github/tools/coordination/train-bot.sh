@@ -72,7 +72,7 @@ eligible() {
     # 4 Nov: with its reviews' bodies (#5212 part 1).
     coord_pr_comments $p $cf || { once comments$p "#$p left out: its comments can't be fetched"; continue; }
     fine head$p; fine comments$p
-    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710, and from 5 Nov #5385: lib.sh's COORD_QUEUE_ISSUES) whose first
+    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710, from 5 Nov #5385, from 10 Nov #6059: lib.sh's COORD_QUEUE_ISSUES) whose first
     # line is `HOLD <sha>` holds the PR whose head starts with that sha, until the same account posts a READ-OK on the
     # PR, after it, saying the HOLD is lifted or cleared (qholds.py, with markers.py's marker and lifting words). Train
     # 546 took #5013 on Fourteen's READ-OK while Seventh's "HOLD a13408fb8d…: lamp check pending" stood only on the Queue.
@@ -275,6 +275,11 @@ run_train() {
   # --no-crates too, so a crate train's merge under it rebuilds it only on an overlap.
   local flags=(--behind-unrelated); [[ $lane == nc ]] && flags+=--no-crates
   $TOOLS_DIR/merge-when-green.sh $tp $flags --precheck $carried >> $LOG 2>&1; rc=$?
+  # 10 Nov 00:1x (train 761): GitHub merged the train, yet its merge was answered as behind lamp-voice (rc 3), so the
+  # bot rebuilt it, could not close it, and left its PRs open. A train GitHub says is merged goes on as merged.
+  if [[ $rc != 0 && $(gh pr view $tp -R $REPO --json state --jq .state 2>/dev/null) == MERGED ]]; then
+    say "train $tn (#$tp) answered $rc but merged: going on as merged"; rc=0
+  fi
   if [[ $rc == 6 ]]; then
     # A carried PR was held while the train ran: it sits out, the rest go again on the same head at once.
     gh pr close $tp -R $REPO -c "Train bot: closed before merging, a carried PR was held while it ran (see the log line); the rest go again." >/dev/null

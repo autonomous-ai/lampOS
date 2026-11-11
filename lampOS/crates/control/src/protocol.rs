@@ -108,6 +108,14 @@ pub enum Grant {
     /// The microphone's sound as it is heard, never while the lamp is
     /// private.
     Microphone,
+    /// Its own small notes kept on the lamp (`notes.set`, `notes.get`,
+    /// `notes.delete`, `notes.list`): only its own, gone with its revoke
+    /// (docs/control.md, "Notes").
+    Notes,
+    /// Every line the lamp says out loud, as `lamp.said`: its own words and
+    /// what it reads to the person, never what a person says to it
+    /// (docs/control.md, "What the lamp says").
+    Speech,
 }
 
 impl Grant {
@@ -131,6 +139,12 @@ impl Grant {
             Self::Camera => "can see what the lamp's camera sees, never while it is private",
             Self::Microphone => {
                 "can hear what the lamp's microphone hears, never while it is private"
+            }
+            Self::Notes => {
+                "can keep small notes of its own on the lamp, which stay until it is let go"
+            }
+            Self::Speech => {
+                "can read everything the lamp says out loud, which can be personal: it includes what it repeats back to you and what it reads to you from your mail and calendar, never what you say to it; every computer you give this to reads the same lines; what it has sent can't be taken back, and the computer may pass it on"
             }
         }
     }
@@ -171,6 +185,12 @@ pub enum EventKind {
     /// The speaker's volume changed, whoever changed it: `level`, `muted`.
     #[serde(rename = "volume.changed")]
     VolumeChanged,
+    /// Where each joint is, up to 25 a second, and the lamp's own state.
+    #[serde(rename = "body.state")]
+    BodyState,
+    /// A line the lamp said out loud: `text`, `by`, `source`, `cut`.
+    #[serde(rename = "lamp.said")]
+    LampSaid,
 }
 
 impl EventKind {
@@ -186,6 +206,8 @@ impl EventKind {
             Self::SoundHeard => Some(Grant::Sound),
             Self::AirChanged => Some(Grant::Air),
             Self::VolumeChanged => Some(Grant::Speak),
+            Self::BodyState => Some(Grant::Body),
+            Self::LampSaid => Some(Grant::Speech),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
         }
     }
@@ -419,6 +441,21 @@ pub enum Op {
     /// One of the computer's own clips, deleted.
     #[serde(rename = "sound.remove")]
     SoundRemove { name: String },
+    /// A note of the client's own kept under a key: any JSON, small.
+    #[serde(rename = "notes.set")]
+    NotesSet { key: String, value: Value },
+    /// One of the client's own notes.
+    #[serde(rename = "notes.get")]
+    NotesGet { key: String },
+    /// One of the client's own notes dropped.
+    #[serde(rename = "notes.delete")]
+    NotesDelete { key: String },
+    /// The client's own keys, those that start with `prefix`.
+    #[serde(rename = "notes.list")]
+    NotesList {
+        #[serde(default)]
+        prefix: String,
+    },
     /// Opens a conversation turn as a tap on the head does: the person's
     /// next line is answered as spoken to the lamp. With `prompt`, the lamp
     /// says it first (docs/control.md, "Turns and listening").
@@ -481,6 +518,12 @@ pub enum Op {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         size: Option<String>,
     },
+    /// The microphone's sound as binary `microphone.audio` frames, each
+    /// 20 ms block the ears share, until `on: false`, `stop`, the client
+    /// goes, the lamp turns private or no block comes for 2 s
+    /// (`microphone.ended`, with why).
+    #[serde(rename = "microphone.stream")]
+    MicrophoneStream { on: bool },
 }
 
 impl Op {
@@ -528,6 +571,11 @@ impl Op {
                 vec![Grant::Skills]
             }
             Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
+            Self::MicrophoneStream { .. } => vec![Grant::Microphone],
+            Self::NotesSet { .. }
+            | Self::NotesGet { .. }
+            | Self::NotesDelete { .. }
+            | Self::NotesList { .. } => vec![Grant::Notes],
         };
         needs.sort();
         needs.dedup();
@@ -856,7 +904,12 @@ impl Op {
             | Self::Stop {}
             | Self::SkillList {}
             | Self::SoundList {}
-            | Self::CameraSnapshot {} => {}
+            | Self::CameraSnapshot {}
+            | Self::MicrophoneStream { .. }
+            | Self::NotesSet { .. }
+            | Self::NotesGet { .. }
+            | Self::NotesDelete { .. }
+            | Self::NotesList { .. } => {}
             Self::Volume { to, step, mute } => {
                 let asked = usize::from(to.is_some())
                     + usize::from(step.is_some())
@@ -1232,7 +1285,7 @@ mod tests {
             words.contains("a move this body cannot play: it lasts 600 ms, not 1500 to 10000"),
             "{words}"
         );
-        assert!(why(r#"{"id":5,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,151,0,0],[0,0,0,0,0]]}"#).1.contains("farther than 150"));
+        assert!(why(r#"{"id":5,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,251,0,0],[0,0,0,0,0]]}"#).1.contains("farther than 250"));
         assert!(
             why(r#"{"id":6,"op":"move","step_ms":20,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#)
                 .1
@@ -1369,7 +1422,7 @@ mod tests {
             // (lamp_body::moves::check; Ten's finding on #3997).
             r#"{"id":1,"op":"move","step_ms":200,"frames":[[0,0,0,0,0],[20,0,0,0,0],[20,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":20,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
-            r#"{"id":1,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,151,0,0],[0,0,0,0,0]]}"#.to_owned(),
+            r#"{"id":1,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,251,0,0],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":100,"frames":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[10,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
@@ -1437,6 +1490,8 @@ mod tests {
             Grant::Device,
             Grant::Camera,
             Grant::Microphone,
+            Grant::Notes,
+            Grant::Speech,
         ]
         .into_iter()
         .map(|grant| (json!(grant), grant.shown()))
@@ -1473,6 +1528,14 @@ mod tests {
                     json!("microphone"),
                     "can hear what the lamp's microphone hears, never while it is private"
                 ),
+                (
+                    json!("notes"),
+                    "can keep small notes of its own on the lamp, which stay until it is let go"
+                ),
+                (
+                    json!("speech"),
+                    "can read everything the lamp says out loud, which can be personal: it includes what it repeats back to you and what it reads to you from your mail and calendar, never what you say to it; every computer you give this to reads the same lines; what it has sent can't be taken back, and the computer may pass it on"
+                ),
             ]
         );
     }
@@ -1487,6 +1550,21 @@ mod tests {
             let frame = format!(r#"{{"id":1,"op":"camera.stream","on":true,"fps":{fps}}}"#);
             assert_eq!(why(&frame).1, "fps: 1 to 30", "{fps}");
         }
+    }
+
+    #[test]
+    fn a_microphone_stream_is_on_or_off_under_the_microphone_grant() {
+        for on in [true, false] {
+            let frame = format!(r#"{{"id":1,"op":"microphone.stream","on":{on}}}"#);
+            assert_eq!(op(&frame).check(), Ok(()), "{on}");
+            assert_eq!(op(&frame).needs(), [Grant::Microphone]);
+        }
+        // Nothing else: no rate, no size.
+        assert_eq!(
+            why(r#"{"id":1,"op":"microphone.stream","on":true,"fps":5}"#).0,
+            Some(1)
+        );
+        assert_eq!(why(r#"{"id":1,"op":"microphone.stream"}"#).0, Some(1));
     }
 
     #[test]
@@ -1511,6 +1589,16 @@ mod tests {
         );
         assert_eq!(needs(r#"{"id":1,"op":"look","at":"ahead"}"#), [Grant::Body]);
         assert_eq!(needs(r#"{"id":1,"op":"say","text":"Hi."}"#), [Grant::Speak]);
+        for frame in [
+            r#"{"id":1,"op":"notes.set","key":"k","value":{"a":[1]}}"#,
+            r#"{"id":1,"op":"notes.get","key":"k"}"#,
+            r#"{"id":1,"op":"notes.delete","key":"k"}"#,
+            r#"{"id":1,"op":"notes.list"}"#,
+            r#"{"id":1,"op":"notes.list","prefix":"a."}"#,
+        ] {
+            assert_eq!(needs(frame), [Grant::Notes], "{frame}");
+            assert_eq!(op(frame).needs_lease(), None, "{frame}");
+        }
         assert_eq!(
             needs(
                 r#"{"id":1,"op":"subscribe","events":["person.arrived","sound.heard","touch","phrase.heard"],"phrases":["lights please"]}"#
@@ -1660,5 +1748,8 @@ mod tests {
         assert_eq!(op.needs(), vec![Grant::Speak]);
         assert_eq!(StateKind::Volume.needs(), Some(Grant::Speak));
         assert_eq!(EventKind::VolumeChanged.needs(), Some(Grant::Speak));
+        // Every line the lamp says needs its own grant, not `speak`: what a
+        // computer has the lamp say is not the same as reading all it says.
+        assert_eq!(EventKind::LampSaid.needs(), Some(Grant::Speech));
     }
 }

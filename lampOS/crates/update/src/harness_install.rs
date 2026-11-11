@@ -42,6 +42,14 @@
 //! `pinned: false`, except on a lamp installed as the product, which takes
 //! the pin compiled into this build, covered by its signature, and never
 //! installs unpinned ([`product`], #5229).
+//!
+//! **A newer pin moves an older Harness (#5957):** Harness there, recorded
+//! `installed` at a version older than the pin's `cli.version`, is
+//! installed again by the same one-shot, the same loopback kit and the
+//! same hold, with Harness's home (its sign-in) kept, but only while
+//! Harness is not in use ([`busy`]): a later round moves it otherwise. The
+//! Harness that was there is kept first ([`KEPT`]) and put back when the
+//! new one fails, recorded `failed` with `upgrade` and `from_version`.
 use crate::{
     install::{self, HARNESS, HARNESS_HOME, Runner, USER},
     records::write_whole,
@@ -80,6 +88,12 @@ pub const STUCK_AFTER: Duration = Duration::from_secs(30 * 60);
 /// round (#5241's reader); the rest, `serve` among them, are tried at the
 /// next round.
 pub const RETRY_AFTER: Duration = STUCK_AFTER;
+/// A failed move to a newer pin (`upgrade`, #5957) is tried again with the
+/// same pin only by a round this long after it; another pin at once.
+pub const UPGRADE_RETRY_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
+/// Where a move keeps the Harness that was there, under Harness's home
+/// (#5957), until it is installed or put back.
+pub const KEPT: &str = ".harness/lampos-upgrade-from";
 /// The largest pinned manifest fetched.
 const MANIFEST_MOST_BYTES: &str = "1048576";
 
@@ -88,13 +102,24 @@ pub const UNIT: &str = "lamp-update-harness.service";
 /// The unit. Not `ProtectSystem=strict`: Harness's home
 /// (`/var/lib/lampos-tasks`) may not be there yet, and is made under
 /// `/var/lib`. `/etc` and `/usr` stay read-only but for `/usr/local/bin`,
-/// where [`install::HARNESS`] is linked. Its bound is past the installer's
-/// own ([`install::INSTALLER_WITHIN`]) and the steps around it.
+/// where [`install::HARNESS`] is linked and Hermes's wrapper is written,
+/// and `/usr/local/lib/lampos`, where Hermes's namespace script is
+/// (#5978, [`crate::hermes_install`]; `-`: a lamp without that folder
+/// still installs Harness). Its bound is past Harness's installer
+/// ([`install::INSTALLER_WITHIN`]) and the steps around it, with Hermes
+/// after it: an hour. `MemoryHigh=600M` and `CPUQuota=100%` (#5978): past
+/// the memory cap the kernel reclaims the one-shot's own memory and
+/// throttles it, never kills it. At 1200M and 150% the `products` stage took
+/// `MemAvailable` down to about 786 MB on lamp-c0a4 and the voice lost its
+/// privacy reading twice; at 600M and 100% it stayed above 1.4 GB and the
+/// privacy reading held through the whole install.
 pub const TEXT: &str = "\
 # lamp-update-harness: puts Harness on the lamp before its sign-in, with Harness's own installer, installed only
 # (lampOS/docs/install.md, \"Harness before the sign-in\", #5197). Written and started by a round of lamp-update
 # with LAMP_HARNESS_AT_ONBOARDING=on, whose own sandbox cannot write /usr/local/bin or Harness's home; never
-# enabled. Outside lampos.target, as lamp-update is.
+# enabled. Outside lampos.target, as lamp-update is. With Hermes on (LAMP_HERMES_ON_LAMP) it puts the pinned Hermes there
+# after Harness, as lampos, with its wrapper in /usr/local/bin and its namespace script in /usr/local/lib/lampos
+# (lampOS/docs/install.md, \"Hermes on the lamp\", #5978).
 [Unit]
 Description=lampOS updates, Harness put on the lamp (lamp-update-harness)
 After=network-online.target
@@ -106,10 +131,19 @@ Group=root
 ExecStart=/opt/lampOS/update/current/lamp-update harness-install
 StandardInput=null
 SyslogIdentifier=lamp-update-harness
-TimeoutStartSec=1500
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=20
+CPUQuota=100%
+IOWriteBandwidthMax=/var/lib 8M
+IOReadBandwidthMax=/var/lib 16M
+IOWriteIOPSMax=/var/lib 200
+IOReadIOPSMax=/var/lib 400
+MemoryHigh=600M
 NoNewPrivileges=yes
 ProtectSystem=full
-ReadWritePaths=/usr/local/bin
+ReadWritePaths=/usr/local/bin -/usr/local/lib/lampos
 ProtectHome=yes
 PrivateTmp=yes
 ";
@@ -156,11 +190,54 @@ pub fn pin_from(url: Option<&str>, sha256: Option<&str>) -> Result<Option<Pin>, 
     }
 }
 
-/// What the round hands the one-shot in [`ASK`].
+/// What the round hands the one-shot in [`ASK`]. `upgrade_from` (#5957):
+/// Harness is there at this older version, and is to be moved to the pin,
+/// not left as "already at"; absent in an ask written before it.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Ask {
     version: u32,
     pin: Option<Pin>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    upgrade_from: Option<String>,
+}
+
+/// The ask [`ASK`] holds, when readable.
+fn asked(records: &Path) -> Option<Ask> {
+    fs::read(records.join(ASK))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Ask>(&bytes).ok())
+        .filter(|ask| ask.version == 1)
+}
+
+/// Whether `have` is older than `want`, both dotted numbers compared part
+/// by part (`0.5.100` is newer than `0.5.39`, a missing part is 0); none
+/// when either is not plain digits and dots (#5957: never compared as
+/// strings, and an unreadable version is never older).
+pub fn older(have: &str, want: &str) -> Option<bool> {
+    fn parts(version: &str) -> Option<Vec<u64>> {
+        if version.is_empty() || version.len() > 32 {
+            return None;
+        }
+        version
+            .split('.')
+            .map(|part| {
+                (!part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+                    .then(|| part.parse::<u64>().ok())
+                    .flatten()
+            })
+            .collect()
+    }
+    let (have, want) = (parts(have)?, parts(want)?);
+    let at = |list: &[u64], i: usize| list.get(i).copied().unwrap_or(0);
+    let longest = have.len().max(want.len());
+    for i in 0..longest {
+        match at(&have, i).cmp(&at(&want, i)) {
+            std::cmp::Ordering::Less => return Some(true),
+            std::cmp::Ordering::Greater => return Some(false),
+            std::cmp::Ordering::Equal => {}
+        }
+    }
+    Some(false)
 }
 
 /// The install as [`RECORD`] has it, when it is one lamp-update could have
@@ -198,7 +275,7 @@ fn failed(at_unix_ms: u64, pinned: Option<bool>, error: &str) -> HarnessInstall 
 /// Harness at [`HARNESS`], its link followed: a link whose target is gone
 /// is missing, so a round puts Harness there again (#5241's reader). An
 /// absolute target is read under `root`, as the lamp's own `/` is.
-fn present(root: &Path) -> bool {
+pub fn present(root: &Path) -> bool {
     let place = root.join(HARNESS.trim_start_matches('/'));
     match fs::read_link(&place) {
         Ok(target) if target.is_absolute() => {
@@ -224,13 +301,8 @@ pub fn at_start(root: &Path, records: &Path, switch: bool, now_unix_ms: u64) {
     }
 }
 
-/// After a round that reached the channel, with the switch on: Harness
-/// already there is recorded `installed` (put there before, or by hand),
-/// unless a pinned install recorded it `version`, and nothing runs; missing, with no try under way, `installing` is
-/// recorded, the pin handed over in [`ASK`], and [`UNIT`] written and
-/// started without waiting. A pin set wrongly, or a unit that cannot be
-/// started, is recorded `failed`. What was recorded is returned, none when
-/// nothing changed.
+/// [`after_round_when`], Harness's use read from the lamp's processes
+/// under `root` only, no bus.
 pub fn after_round(
     root: &Path,
     records: &Path,
@@ -239,12 +311,65 @@ pub fn after_round(
     now_unix_ms: u64,
     say: &mut dyn FnMut(&str),
 ) -> Option<HarnessInstall> {
+    after_round_when(
+        root,
+        records,
+        pin,
+        systemd,
+        now_unix_ms,
+        &mut || busy::in_use(root, None),
+        say,
+    )
+}
+
+/// After a round that reached the channel, with the switch on: Harness
+/// already there is recorded `installed` (put there before, or by hand),
+/// unless a pinned install recorded it `version`, and nothing runs; missing, with no try under way, `installing` is
+/// recorded, the pin handed over in [`ASK`], and [`UNIT`] written and
+/// started without waiting. A pin set wrongly, or a unit that cannot be
+/// started, is recorded `failed`. Harness there at a version older than
+/// the pin (#5957, [`upgrade_due`]) is moved by the same one-shot, unless
+/// `in_use` says why not now: then one line is said and a later round
+/// moves it. What was recorded is returned, none when nothing changed.
+pub fn after_round_when(
+    root: &Path,
+    records: &Path,
+    pin: &Result<Option<Pin>, String>,
+    systemd: &mut dyn Systemd,
+    now_unix_ms: u64,
+    in_use: &mut dyn FnMut() -> Option<&'static str>,
+    say: &mut dyn FnMut(&str),
+) -> Option<HarnessInstall> {
     let before = record(records);
     if present(root) {
+        if let (Some(said), Ok(Some(pin))) = (&before, pin)
+            && let Some((from, want)) = upgrade_due(said, pin, records, now_unix_ms)
+        {
+            if let Some(why) = in_use() {
+                say(&format!(
+                    "Harness {from} is to be moved to the pinned {want}: at a later round, {why}"
+                ));
+                return None;
+            }
+            return Some(ask_upgrade(
+                root,
+                records,
+                pin,
+                &from,
+                systemd,
+                now_unix_ms,
+                say,
+            ));
+        }
         // A pinned install that left another version stays `version`
-        // while Harness is there: it is not the pinned one.
+        // while Harness is there: it is not the pinned one. A move under
+        // way, or one that failed and put the older one back, stays too.
         if before.as_ref().is_some_and(|said| {
-            said.install == "installed" || said.error.as_deref() == Some("version")
+            said.install == "installed"
+                || matches!(said.error.as_deref(), Some("version" | "upgrade"))
+                || (said.install == "installing"
+                    && said.from_version.is_some()
+                    && now_unix_ms.saturating_sub(said.at_unix_ms) < STUCK_AFTER.as_millis() as u64)
         }) {
             return None;
         }
@@ -273,7 +398,11 @@ pub fn after_round(
         }
     };
     let pinned = Some(pin.is_some());
-    let ask = Ask { version: 1, pin };
+    let ask = Ask {
+        version: 1,
+        pin,
+        upgrade_from: None,
+    };
     let asked = serde_json::to_vec(&ask)
         .map_err(|error| error.to_string())
         .and_then(|text| {
@@ -310,10 +439,96 @@ pub fn after_round(
     }
 }
 
+/// Whether Harness, there as `said` records it, is to be moved to `pin`
+/// (#5957): the version it is at and the pinned one (`newer` when only the
+/// one-shot can know, an env pin's version being read once fetched).
+///
+/// - `installed` with a `version`; an `installing` move past
+///   [`STUCK_AFTER`], from its `from_version`; a `failed` `upgrade`, from
+///   its `from_version`, with another pin than [`ASK`]'s, or the same one
+///   [`UPGRADE_RETRY_AFTER`] after it.
+/// - The build's own pin: that version older than its `cli.version`
+///   ([`older`]); an equal, newer or unreadable one is left.
+/// - An env pin: a pin other than the one [`ASK`] handed over last; the
+///   one-shot then compares the fetched `cli.version`.
+fn upgrade_due(
+    said: &HarnessInstall,
+    pin: &Pin,
+    records: &Path,
+    now_unix_ms: u64,
+) -> Option<(String, String)> {
+    let since = now_unix_ms.saturating_sub(said.at_unix_ms);
+    let last_pin = asked(records).and_then(|ask| ask.pin);
+    let from = match (said.install.as_str(), said.error.as_deref()) {
+        ("installed", _) => said.version.clone()?,
+        ("installing", _) if since >= STUCK_AFTER.as_millis() as u64 => {
+            said.from_version.clone()?
+        }
+        ("failed", Some("upgrade"))
+            if last_pin.as_ref() != Some(pin)
+                || since >= UPGRADE_RETRY_AFTER.as_millis() as u64 =>
+        {
+            said.from_version.clone()?
+        }
+        _ => return None,
+    };
+    if pin.built_in {
+        let want = product::version_of(product::MANIFEST)?;
+        return older(&from, &want)?.then_some((from, want));
+    }
+    // Plain digits and dots, as the one-shot will compare it. A move tried
+    // before (stuck or failed, held above) is asked again with the same pin.
+    older(&from, "0")?;
+    (said.install != "installed" || last_pin.as_ref() != Some(pin))
+        .then(|| (from, "version, read once fetched".to_owned()))
+}
+
+/// The move asked (#5957): [`ASK`] with `upgrade_from`, `installing` with
+/// `from_version`, and [`UNIT`] started without waiting. A unit not
+/// started is a `failed` `upgrade`, Harness left as it is.
+fn ask_upgrade(
+    root: &Path,
+    records: &Path,
+    pin: &Pin,
+    from: &str,
+    systemd: &mut dyn Systemd,
+    now_unix_ms: u64,
+    say: &mut dyn FnMut(&str),
+) -> HarnessInstall {
+    let ask = Ask {
+        version: 1,
+        pin: Some(pin.clone()),
+        upgrade_from: Some(from.to_owned()),
+    };
+    let started = serde_json::to_vec(&ask)
+        .map_err(|error| error.to_string())
+        .and_then(|text| {
+            write_whole(&records.join(ASK), &text, 0o600).map_err(|error| error.to_string())
+        })
+        .and_then(|()| {
+            write(records, HarnessInstall::upgrading(from, now_unix_ms));
+            start(root, systemd)
+        });
+    match started {
+        Ok(()) => {
+            say(&format!(
+                "Harness {from} is to be moved to the pin: {UNIT} started to move it (pinned)"
+            ));
+            record(records).unwrap_or_else(|| HarnessInstall::upgrading(from, now_unix_ms))
+        }
+        Err(why) => {
+            say(&format!(
+                "Harness {from} is not moved: {UNIT} not started: {why}"
+            ));
+            write(records, HarnessInstall::upgrade_failed(from, now_unix_ms))
+        }
+    }
+}
+
 /// [`TEXT`] written at [`UNIT`] unless it is there, systemd reloaded if
 /// it was, what systemd loaded checked to be it, and the unit started
 /// without waiting for its end.
-fn start(root: &Path, systemd: &mut dyn Systemd) -> Result<(), String> {
+pub(crate) fn start(root: &Path, systemd: &mut dyn Systemd) -> Result<(), String> {
     if crate::writer_unit::write_unit(root, UNIT, TEXT)? {
         systemd.reload()?;
     }
@@ -355,6 +570,9 @@ struct Kit {
     installer_sha256: &'static str,
     manifests: [product::Manifest; 4],
     bind: fn() -> io::Result<TcpListener>,
+    /// Why Harness is in use now, looked at again just before a move
+    /// stops it (#5957): [`busy::in_use_here`].
+    in_use: fn(&Path) -> Option<&'static str>,
 }
 
 impl Kit {
@@ -363,6 +581,7 @@ impl Kit {
         installer_sha256: product::INSTALLER_SHA256,
         manifests: product::MANIFESTS,
         bind: serve::loopback,
+        in_use: busy::in_use_here,
     };
 
     /// Each file's bytes against its sha256, before anything runs: other
@@ -506,6 +725,21 @@ fn install_with(
     let _lock = lock(records)?;
     let before = record(records);
     if present(root) {
+        // A move to a newer pin, asked by the round (#5957).
+        if let Some(ask) = asked(records)
+            && let (Some(from), Some(pin)) = (&ask.upgrade_from, &ask.pin)
+        {
+            return Ok(upgrade(
+                root,
+                records,
+                run,
+                now_unix_ms,
+                say,
+                kit,
+                pin,
+                from,
+            ));
+        }
         let mut said = state("installed", now_unix_ms());
         said.version = version(run);
         said.pinned = before.and_then(|before| before.pinned);
@@ -515,11 +749,7 @@ fn install_with(
         ));
         return Ok(said);
     }
-    let ask = fs::read(records.join(ASK))
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Ask>(&bytes).ok())
-        .filter(|ask| ask.version == 1);
-    let Some(ask) = ask else {
+    let Some(ask) = asked(records) else {
         say(&format!(
             "{ASK} is missing or unreadable: nothing installed"
         ));
@@ -608,6 +838,290 @@ fn install_with(
         say(&format!("lamp-tasks.service not started again: {why}"));
     }
     Ok(said)
+}
+
+/// The Harness there kept at [`KEPT`], as `lampos` with Harness's home
+/// (#5957): the folder of the `cli.js` its launcher runs (wherever this
+/// Harness's installer put it), the launcher, the runtime's `current-*`
+/// files and the `tmux` link. The runtimes themselves sit in folders named
+/// by their version, which the installer never removes. Run as `lampos`,
+/// so nothing in a folder `lampos` owns is written as root. A `cli.js`
+/// folder that is, by its real path (`pwd -P`, so `/./` and `//` change
+/// nothing), Harness's home, `.harness`, `.local`, `.local/bin`, the kept
+/// copy, or a folder above one of them, is refused, so neither script can
+/// remove the sign-in. A kept copy already there (a put-back that failed)
+/// is the only good one: KEEP refuses it, and makes its own copy at
+/// `<kept>.new`, renamed only once whole.
+const KEEP: &str = r#"set -eu
+k="$HOME/.harness/lampos-upgrade-from"
+l="$HOME/.local/bin/harness"
+H=$(cd "$HOME" && pwd -P) || exit 1
+if [ -e "$k" ] || [ -L "$k" ]; then echo "a kept copy is already at $k: it is the only good one" >&2; exit 1; fi
+cli=$(grep -o "$HOME/[^'\" ]*/cli\.js" "$l" | head -n 1)
+[ -n "$cli" ] || exit 1
+d=$(cd "$(dirname "$cli")" && pwd -P) || exit 1
+for p in "$H" "$H/.harness" "$H/.local" "$H/.local/bin" "$H/.harness/lampos-upgrade-from"; do
+  case "$p/" in "$d"/*) exit 1 ;; esac
+done
+case "$d" in "$H/.harness/lampos-upgrade-from"/* | "$H/.harness/lampos-upgrade-from.new"*) exit 1 ;; "$H"/*) ;; *) exit 1 ;; esac
+n="$k.new"
+rm -rf "$n"
+mkdir -p "$n/runtime"
+cp -a "$d" "$n/cli"
+printf '%s\n' "$d" > "$n/cli-dir"
+cp -a "$l" "$n/harness"
+for f in current-node current-tmux current-grid; do
+  if [ -e "$HOME/.harness/runtime/$f" ]; then cp -a "$HOME/.harness/runtime/$f" "$n/runtime/$f"; fi
+done
+if [ -L "$HOME/.local/bin/tmux" ]; then cp -P "$HOME/.local/bin/tmux" "$n/tmux"; fi
+mv "$n" "$k"
+"#;
+/// What [`KEEP`] kept, put back in place, as `lampos`. The folder it names
+/// is checked again, by its real path, before anything is removed.
+const PUT_BACK: &str = r#"set -eu
+k="$HOME/.harness/lampos-upgrade-from"
+H=$(cd "$HOME" && pwd -P) || exit 1
+[ -d "$k/cli" ] || exit 1
+[ -f "$k/harness" ] || exit 1
+d=$(cat "$k/cli-dir")
+b=$(basename "$d")
+case "$b" in . | .. | "") exit 1 ;; esac
+d="$(cd "$(dirname "$d")" && pwd -P)/$b" || exit 1
+for p in "$H" "$H/.harness" "$H/.local" "$H/.local/bin" "$H/.harness/lampos-upgrade-from"; do
+  case "$p/" in "$d"/*) exit 1 ;; esac
+done
+case "$d" in "$H/.harness/lampos-upgrade-from"/* | "$H/.harness/lampos-upgrade-from.new"*) exit 1 ;; "$H"/*) ;; *) exit 1 ;; esac
+rm -rf "$d"
+mkdir -p "$HOME/.local/bin" "$HOME/.harness/runtime"
+cp -a "$k/cli" "$d"
+cp -a "$k/harness" "$HOME/.local/bin/.harness.lampos-back"
+mv -f "$HOME/.local/bin/.harness.lampos-back" "$HOME/.local/bin/harness"
+for f in current-node current-tmux current-grid; do
+  if [ -e "$k/runtime/$f" ]; then cp -a "$k/runtime/$f" "$HOME/.harness/runtime/$f"; fi
+done
+if [ -L "$k/tmux" ]; then ln -sfn "$(readlink "$k/tmux")" "$HOME/.local/bin/tmux"; fi
+"#;
+/// [`KEPT`] taken away once the move is done or put back.
+const LET_GO: &str = r#"rm -rf "$HOME/.harness/lampos-upgrade-from""#;
+
+/// `script` run by `sh` as `lampos`, with Harness's home as its `HOME`.
+fn as_harness_user(script: &str) -> Vec<String> {
+    vec![
+        "runuser".to_owned(),
+        "-u".to_owned(),
+        USER.to_owned(),
+        "--".to_owned(),
+        "env".to_owned(),
+        format!("HOME={HARNESS_HOME}"),
+        "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
+        "sh".to_owned(),
+        "-c".to_owned(),
+        script.to_owned(),
+    ]
+}
+
+/// The one-shot's move of the Harness there, at `from` as the round read
+/// it, to `pin` (#5957). `harness version` read again: none, or not older
+/// than the pin's `cli.version`, is left as it is and recorded `installed`.
+/// Else the pinned files checked as for a first install, Harness's use
+/// looked at again (in use: `installed` as it was, moved at a later
+/// round), lamp-tasks and then Harness's daemon stopped (either not
+/// stopped: the same, lamp-tasks started again; lamp-tasks starts the new
+/// daemon when it starts again), the Harness
+/// there kept ([`KEEP`]), the installer run, and `harness version`
+/// compared with the pin. A failed installer or another version puts the
+/// kept one back ([`PUT_BACK`]) and records `failed` with `upgrade` and
+/// `from_version`; so does a pin not checked or a copy not kept, with
+/// nothing installed. Either way the launcher is pinned again (with the
+/// hold on) and lamp-tasks started again.
+#[allow(clippy::too_many_arguments)]
+fn upgrade(
+    root: &Path,
+    records: &Path,
+    run: &mut Runner,
+    now_unix_ms: &mut dyn FnMut() -> u64,
+    say: &mut dyn FnMut(&str),
+    kit: &Kit,
+    pin: &Pin,
+    asked_from: &str,
+) -> HarnessInstall {
+    let Some(from) = version(run) else {
+        say(&format!(
+            "Harness at {HARNESS} says no version (asked to move it from {asked_from}): left as it is"
+        ));
+        return write(
+            records,
+            HarnessInstall {
+                pinned: Some(true),
+                ..state("installed", now_unix_ms())
+            },
+        );
+    };
+    // The version Harness says now, not the round's record (a lamp row on
+    // #5957: recorded 0.5.39, Harness itself had moved to 0.5.62): the
+    // `installing` record and any `failed` `upgrade` name it.
+    if from != asked_from {
+        say(&format!(
+            "Harness says version {from}, not the recorded {asked_from}: moved from {from}"
+        ));
+        write(records, HarnessInstall::upgrading(&from, now_unix_ms()));
+    }
+    let left = |now: u64| HarnessInstall {
+        version: Some(from.clone()),
+        pinned: Some(true),
+        ..state("installed", now)
+    };
+    let manifest = match pinned_bytes(pin, run, say) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            say(&format!(
+                "Harness {from} is not moved: the pin was not checked; it is kept as it is"
+            ));
+            return write(
+                records,
+                HarnessInstall::upgrade_failed(&from, now_unix_ms()),
+            );
+        }
+    };
+    let Some(want) = product::version_of(&manifest) else {
+        say(&format!(
+            "the pinned manifest names no plain version: Harness {from} is kept as it is"
+        ));
+        return write(records, left(now_unix_ms()));
+    };
+    if older(&from, &want) != Some(true) {
+        say(&format!(
+            "Harness {from} is not older than the pinned {want}: nothing installed"
+        ));
+        return write(records, left(now_unix_ms()));
+    }
+    let handed = match hand(manifest, kit, say) {
+        Ok(handed) => handed,
+        Err(_) => {
+            say(&format!(
+                "Harness {from} is not moved: the pinned files were not handed over; it is kept as it is"
+            ));
+            return write(
+                records,
+                HarnessInstall::upgrade_failed(&from, now_unix_ms()),
+            );
+        }
+    };
+    // Harness in use again just before it is stopped (#5957's pre-review):
+    // the round's look may be minutes old. lamp-tasks is stopped after
+    // this look, not before it, since stopping it would end a hand-over
+    // it is sending.
+    // A kept copy already there (a put-back that failed) is the only good
+    // one: looked at before anything is stopped, and nothing is moved
+    // until it is cleared by hand.
+    let kept = root.join(HARNESS_HOME.trim_start_matches('/')).join(KEPT);
+    if fs::symlink_metadata(&kept).is_ok() {
+        drop(handed);
+        say(&format!(
+            "a kept copy waits at {HARNESS_HOME}/{KEPT}; Harness is not moved until it is cleared"
+        ));
+        return write(
+            records,
+            HarnessInstall::upgrade_failed(&from, now_unix_ms()),
+        );
+    }
+    if let Some(why) = (kit.in_use)(root) {
+        drop(handed);
+        say(&format!(
+            "Harness {from} is to be moved to the pinned {want}: at a later round, {why}"
+        ));
+        return write(records, left(now_unix_ms()));
+    }
+    let stopped = install::uid_of(run, USER).and_then(|uid| {
+        run(&["systemctl", "stop", "lamp-tasks.service"].map(str::to_owned))?;
+        run(&install::harness_argv(USER, HARNESS_HOME, &uid, &["stop"]))
+    });
+    if let Err(why) = stopped {
+        drop(handed);
+        say(&format!(
+            "Harness {from} is to be moved to the pinned {want}: at a later round, Harness was not stopped ({why})"
+        ));
+        // `start`, not `restart`: lamp-tasks may never have been stopped
+        // (`id -u` failing first), and a running one is left as it is.
+        if let Err(why) = run(&["systemctl", "start", "lamp-tasks.service"].map(str::to_owned)) {
+            say(&format!("lamp-tasks.service not started again: {why}"));
+        }
+        return write(records, left(now_unix_ms()));
+    }
+    say(&format!("Harness {from} is moved to the pinned {want}"));
+    // A copy not kept is not let go: one already there (a put-back that
+    // failed) is the only good one, and KEEP makes a new one beside it
+    // (`.new`), renamed only once whole.
+    let said = if let Err(why) = run(&as_harness_user(KEEP)) {
+        drop(handed);
+        say(&format!(
+            "Harness {from} is not moved: it could not be kept to put back ({why}); nothing installed"
+        ));
+        HarnessInstall::upgrade_failed(&from, now_unix_ms())
+    } else {
+        let installer = handed.installer.path().to_string_lossy().into_owned();
+        let pinned_run = install::Pinned {
+            installer: &installer,
+            urls: &handed.urls,
+        };
+        let installed = install::harness_on_pinned_with(run, USER, HARNESS_HOME, Some(&pinned_run));
+        drop(handed);
+        let have = version(run);
+        match installed {
+            Ok(()) if have.as_deref() == Some(want.as_str()) => {
+                say(&format!("Harness moved from {from} to the pinned {want}"));
+                let _ = run(&as_harness_user(LET_GO));
+                HarnessInstall {
+                    version: have,
+                    pinned: Some(true),
+                    ..state("installed", now_unix_ms())
+                }
+            }
+            installed => {
+                match installed {
+                    Err(why) => say(&format!("Harness {want} not installed: {why}")),
+                    Ok(()) => say(&format!(
+                        "Harness says version {} after the move, not the pinned {want}",
+                        have.as_deref().unwrap_or("none")
+                    )),
+                }
+                put_back(run, &from, say);
+                HarnessInstall::upgrade_failed(&from, now_unix_ms())
+            }
+        }
+    };
+    let said = write(records, said);
+    launcher::after_install(root, run, say);
+    if let Err(why) = run(&["systemctl", "restart", "lamp-tasks.service"].map(str::to_owned)) {
+        say(&format!("lamp-tasks.service not started again: {why}"));
+    }
+    said
+}
+
+/// The kept Harness put back (#5957), its version said; [`KEPT`] taken
+/// away only once `harness version` says `from` again.
+fn put_back(run: &mut Runner, from: &str, say: &mut dyn FnMut(&str)) {
+    let back = run(&as_harness_user(PUT_BACK));
+    let ln = run(&[
+        "ln".to_owned(),
+        "-sfn".to_owned(),
+        format!("{HARNESS_HOME}/.local/bin/harness"),
+        HARNESS.to_owned(),
+    ]);
+    let now = version(run);
+    match (back, ln, now.as_deref() == Some(from)) {
+        (Ok(_), Ok(_), true) => {
+            say(&format!("Harness {from} put back"));
+            let _ = run(&as_harness_user(LET_GO));
+        }
+        (back, ln, _) => say(&format!(
+            "Harness {from} not put back: Harness says version {} ({}); the kept copy stays at {HARNESS_HOME}/{KEPT}",
+            now.as_deref().unwrap_or("none"),
+            back.err()
+                .or(ln.err())
+                .unwrap_or_else(|| "another version".to_owned())
+        )),
+    }
 }
 
 /// The pinned manifest's bytes, checked by its sha256: this build's own
@@ -705,6 +1219,7 @@ fn lock(records: &Path) -> Result<fs::File, String> {
     Ok(file)
 }
 
+pub mod busy;
 pub mod launcher;
 pub mod product;
 mod serve;

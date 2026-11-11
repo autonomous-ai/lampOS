@@ -10,13 +10,10 @@ import { FakeLamp, LAMP_CONTROL_REFUSES, handTrack } from './testing.js';
 const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
 
 // `everything`: answer every op; by default it refuses what lamp-control
-// doesn't route yet, as a lamp does. `hands`: a hand waves for 3 s after each
-// arrival, and looks are answered, as on a lamp with the body's lease socket
-// (examples/follow-hand.js).
+// doesn't route yet, as a lamp does (`play`; `joints` past yaw and pitch).
+// `hands`: a hand waves for 3 s after each arrival (examples/follow-hand.js).
 export async function fake({ every = 10, cycles, everything = false, hands = false } = {}) {
   const refuses = everything ? {} : { ...LAMP_CONTROL_REFUSES };
-  // A lamp with the body's lease socket, which a look at the hand needs.
-  if (hands) delete refuses.look;
   const lamp = await FakeLamp.start({ grants: schema.grants, name: 'Fake lamp (lamp fake)', refuses });
   try {
     const keyring = new Keyring();

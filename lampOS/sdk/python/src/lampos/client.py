@@ -16,10 +16,12 @@ import base64
 import hashlib
 import inspect
 import json
+import logging
 import os
 import re
 import socket
 import ssl
+import sys
 import unicodedata
 import warnings
 from collections import defaultdict
@@ -27,11 +29,12 @@ from pathlib import Path
 from typing import Any, Callable
 
 from websockets.asyncio.client import ClientConnection, connect as ws_connect
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from . import debug, errors, schema
 from .errors import BY_CODE, LampError, NotPaired, WrongLamp, from_reply
 from .keys import Keyring, Pairing, b64, is_pin, pin_of, proof, unb64
+from .moves import POSES_STEP_MS, poses_to_frames
 
 Handler = Callable[[dict], Any]
 
@@ -41,11 +44,37 @@ KEEPALIVE_S = 20.0
 # The actions lamp-control answers `{"to":"body"}` with no `done` after
 # (docs/control.md): a wait for them ends at that answer. `say` and
 # `turn.start` answer `{"to":"voice"}` and their `done` does follow.
-ENDS_AT_REPLY = frozenset({"gesture", "move"})
+# Ended at their answer by a lamp-control that doesn't say `motion_done` in
+# hello's limits (from before #4209): it hands them to the body and says
+# nothing back.
+ENDS_AT_REPLY = frozenset({"gesture", "move", "express"})
 # A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 # The SDK's check is a pre-check: it may let through what the lamp refuses,
 # never the other way.
 PHRASE_MIN_LETTERS = 8
+
+
+class _OnPhrases:
+    """A `phrase.heard` handler given `phrases=`: called only for those phrases, not for every phrase another
+    handler of the same connection listens for (the lamp is asked for all of them, once). Phrases compare
+    lowercased, as lamp-control lowercases them (`str::to_lowercase`, `protocol::phrase_words`) and as the JS SDK does
+    (`toLowerCase`), never case-folded: the same rule everywhere, so a handler never misses a phrase the lamp said. It compares equal to
+    the handler it wraps, so `off()` and a refused subscription take it back off by the handler itself."""
+
+    def __init__(self, handler: Handler, phrases: list[str]) -> None:
+        self.handler = handler
+        self.phrases = {phrase.lower() for phrase in phrases}
+
+    def __call__(self, event: dict) -> Any:
+        said = event.get("phrase")
+        if isinstance(said, str) and said.lower() not in self.phrases:
+            return None
+        return self.handler(event)
+
+    def __eq__(self, other: object) -> bool:
+        return other is self or other == self.handler
+
+    __hash__ = None  # type: ignore[assignment]
 
 
 def _short_phrase(phrases: list[str] | None) -> None:
@@ -144,15 +173,44 @@ def _check(op: str, fields: dict) -> None:
             raise LampError(f"{field} {value!r}: one of {', '.join(names)}", code="bad_request")
     for value in fields.get("events", ()):
         if value not in schema.events():
-            raise LampError(f"no event {value!r}", code="bad_request")
+            raise _no_event(value)
     # A lease's parts; a `sound.upload`'s or `skill.push`'s `parts` is a count.
     for value in fields.get("parts", ()) if op == "lease.take" else ():
         if value not in schema.parts():
             raise LampError(f"no part {value!r}", code="bad_request")
 
 
+def _no_event(name: str, *, on: bool = False) -> LampError:
+    """The refusal for a name that is no event, with the event the name was
+    meant for when it is a lease's or a look's end (`lease.ended` is `lease`,
+    state `lost`)."""
+    if name in ("lease", "done"):
+        # Known to `on`, but sent to you with no subscription.
+        return LampError(
+            f"no event {name!r} to subscribe to: it comes without subscribing, "
+            f"hear it with lamp.on({name!r}, handler)",
+            code="bad_request",
+        )
+    if name.startswith("lease"):
+        hint = (
+            "a lease's changes come as the event 'lease' (state held, suspended or lost, "
+            "and why): lamp.on('lease', handler)"
+        )
+    elif name.startswith("done"):
+        hint = "the end of a look or a move comes as the event 'done': lamp.on('done', handler)"
+    else:
+        if on:
+            # What `on` takes: the schema's, the streams' and the two that come unasked.
+            names = sorted({*schema.events(), *CAMERA_EVENTS, *MICROPHONE_EVENTS})
+            hint = f"one of {', '.join(names)}, or 'lease' or 'done'"
+        else:
+            hint = f"one of {', '.join(sorted(schema.events()))}"
+    return LampError(f"no event {name!r}: {hint}", code="bad_request")
+
+
 def binary_frame(message: bytes) -> dict:
-    """A fast stream's binary `camera.frame`: its header, with the JPEG as
+    """A binary frame, a fast stream's `camera.frame` or a microphone
+    stream's `microphone.audio`: its header, with the JPEG or the samples as
     `data` (bytes)."""
     length = int.from_bytes(message[:4], "big")
     frame = json.loads(message[4 : 4 + length])
@@ -160,8 +218,24 @@ def binary_frame(message: bytes) -> dict:
     return frame
 
 
-# Events that come with a request, never subscribed to: a camera stream's.
+# Events that come with a request, never subscribed to: a camera stream's,
+# and a microphone stream's.
 CAMERA_EVENTS = ("camera.frame", "camera.ended")
+MICROPHONE_EVENTS = ("microphone.audio", "microphone.ended")
+
+# `keep_connected`'s pauses before connecting again, in seconds: the first
+# after a closed connection, then longer while the lamp can't be reached (a
+# restart takes a few seconds; an update about a minute).
+RECONNECT_PAUSES = (1.0, 2.0, 5.0, 10.0)
+
+_log = logging.getLogger("lampos")
+
+
+def _said(task: "asyncio.Future", name: str) -> None:
+    """Says an async handler's exception: nobody else awaits it."""
+    if not task.cancelled() and task.exception() is not None:
+        _log.error("your handler for %s raised", name, exc_info=task.exception())
+
 
 class Subscription:
     """What `Lamp.on` returns: an awaitable, not a future. Awaited, it raises
@@ -336,6 +410,49 @@ class Following:
         await self.stop()
 
 
+class Notes:
+    """This computer's notes on the lamp: `await lamp.notes.set("mood",
+    {"calm": True})`, `get`, `delete`, `list` (see `Lamp.notes_set`)."""
+
+    def __init__(self, lamp: "Lamp") -> None:
+        self._lamp = lamp
+
+    async def set(self, key: str, value: Any) -> dict:
+        return await self._lamp.notes_set(key, value)
+
+    async def get(self, key: str, default: Any = None) -> Any:
+        return await self._lamp.notes_get(key, default)
+
+    async def delete(self, key: str) -> bool:
+        return await self._lamp.notes_delete(key)
+
+    async def list(self, prefix: str = "") -> dict:
+        return await self._lamp.notes_list(prefix)
+
+
+class LightHold:
+    """A light kept on by `Lamp.hold_light`: asked again every half of the hold
+    limit until `stop()` or a refusal."""
+
+    def __init__(self, lamp: "Lamp", colour: str, level: int, pattern: str | None, hold_ms: int, on_error: Callable | None):
+        self._task = asyncio.create_task(self._keep(lamp, colour, level, pattern, hold_ms, on_error))
+
+    async def _keep(self, lamp, colour, level, pattern, hold_ms, on_error) -> None:
+        while True:
+            await asyncio.sleep(max(1.0, hold_ms / 2000))
+            try:
+                await lamp.light(colour, level, hold_ms, pattern)
+            except LampError as error:
+                if on_error is not None:
+                    on_error(error)
+                else:
+                    warnings.warn(f"lampos: hold_light ended: {error}")
+                return
+
+    def stop(self) -> None:
+        self._task.cancel()
+
+
 class Lamp:
     """A connection to one paired lamp."""
 
@@ -449,6 +566,62 @@ class Lamp:
             raise from_reply(reply.get("error", {}))
         return cls(ws, welcome, reply)
 
+    @classmethod
+    async def keep_connected(
+        cls,
+        setup: Callable[["Lamp"], Any],
+        lamp: str | None = None,
+        *,
+        host: str | None = None,
+        keyring: Keyring | None = None,
+        pauses: tuple[float, ...] = RECONNECT_PAUSES,
+    ) -> None:
+        """Run a long-running program across the lamp's restarts (every update
+        restarts it, and the connection closes). Connects, runs
+        `await setup(lamp)` (subscribe, ask for leases, as after `connect`),
+        and waits until the connection ends; then connects again and runs
+        `setup` again on the new connection, after a pause that grows along
+        `pauses` while the lamp can't be reached and starts over once it can.
+
+        Never returns by itself: cancel it to stop. Raises at once what
+        connecting again can't mend: no pairing (`NotPaired`), another lamp
+        at the address (`WrongLamp`), a refusal of the hello (`unpaired`,
+        revoked), and anything `setup` raises or a subscription's refusal
+        (`no_grant`) that nobody awaited."""
+        failures = 0
+        while True:
+            unreachable: BaseException | None = None
+            try:
+                connection = await cls.connect(lamp, host=host, keyring=keyring)
+            except LampError as error:
+                # `closed`: the lamp went while saying hello, as a restart does.
+                if error.code != "closed":
+                    raise
+                unreachable = error
+            except (OSError, asyncio.TimeoutError, WebSocketException, EOFError) as error:
+                unreachable = error
+            if unreachable is not None:
+                wait = pauses[min(failures, len(pauses) - 1)]
+                if debug.on():
+                    print(f"lampos .. not reached ({type(unreachable).__name__}), again in {wait:g} s", file=sys.stderr, flush=True)
+                failures += 1
+                await asyncio.sleep(wait)
+                continue
+            failures = 0
+            try:
+                result = setup(connection)
+                if inspect.isawaitable(result):
+                    await result
+                await connection.wait_closed()
+            except LampError as error:
+                # The lamp went in the middle of setup: connect again.
+                if error.code != "closed":
+                    raise
+            finally:
+                # Quiet when the lamp has gone already: its leases went with it.
+                await connection.close()
+            await asyncio.sleep(pauses[0])
+
     async def __aenter__(self) -> "Lamp":
         return self
 
@@ -516,15 +689,20 @@ class Lamp:
             raise from_reply(reply.get("error", {}))
         return reply
 
-    async def _act(self, op: str, wait: bool, **fields: Any) -> dict:
+    async def _act(self, op: str, wait: bool, *, taken: Callable[[], None] | None = None, **fields: Any) -> dict:
         """An action: its reply when taken, or with `wait` its `done` event;
         for the actions no `done` follows yet (`ENDS_AT_REPLY`), the reply.
+        `taken` runs once the lamp has taken it, before any wait for its
+        `done`, and never for a refusal: what the lamp ends on taking it ends
+        here then, even if the wait is cancelled (Reviewer-two's P2 on #5837).
         `request` takes the next id before it first yields, so this is it."""
         id_ = self._next_id
-        # Handed to the body, which says nothing back, `gesture` and `move`
-        # get no `done` (docs/control.md): their wait ends at the answer, so
-        # none is kept for them.
-        done = asyncio.get_running_loop().create_future() if wait and op not in ENDS_AT_REPLY else None
+        # A lamp that says `motion_done` ends `gesture`, `move` and an
+        # express's move with a `done` once the body says what became of
+        # them; on one that doesn't, their wait ends at the answer, so none
+        # is kept for them.
+        at_reply = op in ENDS_AT_REPLY and not self.limits.get("motion_done")
+        done = asyncio.get_running_loop().create_future() if wait and not at_reply else None
         if done is not None:
             self._done[id_] = done
         try:
@@ -533,6 +711,13 @@ class Lamp:
             if done is not None:
                 self._done.pop(id_, None)
             raise
+        if taken is not None:
+            taken()
+        # An express too slight to move (`"move": null`) sends the body
+        # nothing, so no `done` follows: its wait ends at the answer.
+        if done is not None and op == "express" and reply.get("move") is None:
+            self._done.pop(id_, None)
+            return reply
         return reply if done is None else await done
 
     # The reader.
@@ -549,8 +734,9 @@ class Lamp:
         try:
             async for text in self._ws:
                 if isinstance(text, bytes):
-                    # A fast camera frame: the header's length, the header,
-                    # then the JPEG, given as `data` (bytes).
+                    # A fast camera frame or a microphone block: the
+                    # header's length, the header, then the JPEG or the
+                    # samples, given as `data` (bytes). Never logged.
                     self._event(binary_frame(text))
                     continue
                 frame = json.loads(text)
@@ -565,6 +751,11 @@ class Lamp:
             for future in [*self._waiting.values(), *self._done.values()]:
                 if not future.done():
                     future.set_exception(LampError("the connection to the lamp closed", code="closed"))
+            # The lamp ends a computer's leases when its last connection
+            # closes and tells nobody: none of ours is held any more.
+            for lease in self._leases.values():
+                if lease.state in ("held", "suspended"):
+                    lease.state, lease.lost_why = "lost", "the connection closed"
 
     def _event(self, event: dict) -> None:
         name = event["ev"]
@@ -577,11 +768,18 @@ class Lamp:
             if future and not future.done():
                 future.set_result(event)
         for handler in self._handlers.get(name, []):
-            result = handler(event)
+            # A handler that raises must neither end the connection (this runs in the reader) nor vanish:
+            # it is said, with its traceback, on the `lampos` logger (stderr by default).
+            try:
+                result = handler(event)
+            except Exception:
+                _log.exception("your handler for %s raised", name)
+                continue
             if inspect.isawaitable(result):
                 task = asyncio.ensure_future(result)
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
+                task.add_done_callback(lambda done, name=name: _said(done, name))
 
     # Events and state.
 
@@ -591,10 +789,11 @@ class Lamp:
         `await lamp.on(...)` raises the lamp's refusal (`NoGrantError` without
         the event's grant). Not awaited, a refusal is raised by
         `wait_closed` instead, never lost."""
-        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS):
-            raise LampError(f"no event {event!r}", code="bad_request")
+        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS):
+            raise _no_event(event, on=True)
         _short_phrase(phrases)
-        self._handlers[event].append(handler)
+        # A handler given `phrases` hears only those; with none it hears every `phrase.heard`.
+        self._handlers[event].append(_OnPhrases(handler, phrases) if phrases and event == "phrase.heard" else handler)
         if phrases:
             self._phrases = sorted(set(self._phrases) | set(phrases))
         if event not in schema.events():
@@ -694,19 +893,30 @@ class Lamp:
 
     # Actions.
 
-    async def express(self, feeling: str, strength: float | None = None) -> dict:
-        return await self._act("express", False, feeling=feeling, strength=strength)
+    async def express(self, feeling: str, strength: float | None = None, *, wait: bool = False) -> dict:
+        return await self._act("express", wait, feeling=feeling, strength=strength)
 
     async def gesture(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("gesture", wait, name=name)
 
-    async def look(self, at: str | None = None, *, yaw: float | None = None, pitch: float | None = None) -> dict:
+    async def look(
+        self, at: str | None = None, *, yaw: float | None = None, pitch: float | None = None, wait: bool = False
+    ) -> dict:
+        """Turn the head (`at`, or `yaw`/`pitch` in degrees). Its answer when
+        the door takes it; with `wait`, the body's `done` instead: `finished`
+        with where the head got to, or `dropped` with why (`the body is not
+        held` while a conversation suspends your lease). A look at `hand` has
+        no `done` (`follow_hand`)."""
+        if wait and at == "hand":
+            raise BY_CODE["bad_request"]("a look at hand is followed until it ends, with no done: use follow_hand")
         target: Any = at if at is not None else {"yaw": yaw or 0.0, "pitch": pitch or 0.0}
-        reply = await self._act("look", False, at=target)
-        # Taken, another look ends a following (lamp-control's own rule).
+        # Taken, another look ends a following (lamp-control's own rule), at
+        # once, not after its `done`.
+        return await self._act("look", wait, taken=self._another_look, at=target)
+
+    def _another_look(self) -> None:
         if self._following is not None:
             self._following.end("cut_short", "another look")
-        return reply
 
     def follow_hand(self, *, for_ms: int = 10_000, why: str | None = None) -> Following:
         """`async with lamp.follow_hand() as following:` turns the head after
@@ -720,15 +930,36 @@ class Lamp:
     async def move(self, frames: list[list[int]], step_ms: int, *, wait: bool = False) -> dict:
         return await self._act("move", wait, step_ms=step_ms, frames=frames)
 
+    async def move_poses(self, poses: list[dict], *, hold_ms: int = 400, wait: bool = False) -> dict:
+        """A move through `poses`, each the degrees of the joints it turns
+        from the standing pose (`{"pitch": 10, "yaw": -8}`), eased there and
+        back (`moves.poses_to_frames`). LampError `bad_request`, before sending, for poses
+        a move can't make."""
+        frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)
+        return await self.move(frames, POSES_STEP_MS, wait=wait)
+
     async def play(self, name: str, *, wait: bool = False) -> dict:
         return await self._act("play", wait, name=name)
 
-    async def joints(self, lease: Lease, within_ms: int, **targets: float) -> dict:
-        return await self._act("joints", False, lease=lease.id, targets=targets, within_ms=within_ms)
+    async def joints(self, lease: Lease, within_ms: int, *, wait: bool = False, **targets: float) -> dict:
+        """Aim the joints named, in degrees, under `lease`. Its answer when the
+        door takes it; with `wait`, the body's `done`, as `look`'s."""
+        # lamp-control sends yaw and pitch as the holder's look, so taking it
+        # ends a following too (parts.rs `joints`).
+        return await self._act("joints", wait, taken=self._another_look, lease=lease.id, targets=targets, within_ms=within_ms)
 
     async def light(self, colour: str, level: int, for_ms: int, pattern: str | None = None) -> dict:
         return await self._act("light", False, colour=colour, level=level, pattern=pattern, for_ms=for_ms)
 
+
+    async def hold_light(self, colour: str, level: int, pattern: str | None = None, *, on_error: Callable | None = None) -> "LightHold":
+        """Keeps a light on past the 30 s one ask lasts: asks it now and again
+        at half of the lamp's hold limit (`limits["hold_max_ms"]`) until
+        `stop()`. A later ask the lamp refuses ends the holding; the error goes
+        to `on_error` (else a warning)."""
+        hold_ms = int(self.limits.get("hold_max_ms", 30_000))
+        await self.light(colour, level, hold_ms, pattern)
+        return LightHold(self, colour, level, pattern, hold_ms, on_error)
     @property
     def ring_pixels(self) -> int | None:
         """How many pixels the ring has, from hello's limits (none from a lamp
@@ -761,11 +992,23 @@ class Lamp:
         `(r, g, b)`, for `for_ms`, at `brightness` 0-100."""
         return await self._act("light", False, rgb=_hex(rgb), brightness=brightness, fade_ms=fade_ms, for_ms=for_ms)
 
-    async def say(self, text: str, *, rephrase: bool = False) -> dict:
+    async def light_off(self, *, for_ms: int = 30_000) -> dict:
+        """Put the lamp's light out for `for_ms` (30 s at most), as a black
+        ring: there is no level 0 for `light`, and a ring of black pixels is
+        how a program turns the light off. The lamp's own light comes back
+        when it lapses or at `stop()`; ask again before it lapses to keep it
+        out. Needs a lamp with a pixel ring (`ring_pixels`)."""
+        count = self.ring_pixels
+        if count is None:
+            raise LampError("light_off needs a lamp with a pixel ring: this one has none", code="bad_request")
+        return await self.ring(["#000000"] * count, for_ms=for_ms)
+
+    async def say(self, text: str, *, rephrase: bool = False, wait: bool = False) -> dict:
         """Say `text` in the lamp's voice, exactly as written, once the person
         isn't talking. `rephrase=True` lets the lamp's model say it in its own
-        words instead, as before."""
-        return await self._act("say", False, text=text, rephrase=True if rephrase else None)
+        words instead, as before. `wait=True` returns its `done` once it has
+        been said (`finished`), or `dropped`/`cut_short` with the voice's why."""
+        return await self._act("say", wait, text=text, rephrase=True if rephrase else None)
 
     # The camera (the `camera` grant): the eyes' own newest picture, never
     # while the lamp is private.
@@ -801,6 +1044,20 @@ class Lamp:
         reply = await self._act("volume", False, **given)
         return {"level": reply["level"], "muted": reply["muted"]}
 
+    # The microphone (the `microphone` grant): the ears' own sound, never
+    # while the lamp is private, only on the lamp's own network.
+
+    async def microphone_stream(self, on: bool = True) -> dict:
+        """The room's sound as `microphone.audio` events
+        (`lamp.on("microphone.audio", ...)`), one each 20 ms block: mono,
+        16 kHz, signed 16-bit little-endian samples as `data` (bytes, 640 a
+        block), with `sequence` and `lost` (blocks lost since the last one
+        sent). Until `microphone_stream(False)`, `stop`, or a
+        `microphone.ended` event: the lamp turned private, someone else came
+        into view, the room went unseen, the ring didn't show its mark, or no sound came for 2 s
+        (the lamp doesn't share its microphone, `LAMP_BUS_AUDIO`)."""
+        return await self.request("microphone.stream", on=on)
+
     async def sound(self, name: str) -> dict:
         """Play `hum`, the lamp's own, or one of this computer's clips by
         name (`upload_sound`), once the person isn't talking."""
@@ -809,7 +1066,9 @@ class Lamp:
     async def upload_sound(self, name: str, wav: bytes | str | os.PathLike) -> dict:
         """Keep a clip on the lamp as `name`, over one of the same name, to
         play with `sound(name)`: a WAV of 16-bit mono PCM at 24 kHz, at most
-        30 s, within the voice's loudness cap. `wav` is its bytes or a path.
+        30 s, within the voice's loudness cap: no sample past -12 dBFS and no
+        10 ms past -30 dBFS RMS (so a steady tone peaks near -27 dBFS at most).
+        `wav` is its bytes or a path.
         Sent in parts, as the lamp takes them; the lamp checks it whole and
         refuses it with why. Returns the clip as kept: name, bytes, ms."""
         data = wav if isinstance(wav, bytes) else Path(wav).read_bytes()
@@ -837,6 +1096,40 @@ class Lamp:
     async def remove_sound(self, name: str) -> dict:
         """Delete one of this computer's clips from the lamp."""
         return await self.request("sound.remove", name=name)
+
+    # Notes (the `notes` grant, docs/control.md "Notes"): this computer's own
+    # small key/value memory on the lamp. It outlives the program and the
+    # lamp's restart, belongs to this computer alone, and goes when the owner
+    # lets it go.
+
+    @property
+    def notes(self) -> "Notes":
+        """`lamp.notes.get/set/delete/list`: this computer's own notes."""
+        return Notes(self)
+
+    async def notes_set(self, key: str, value: Any) -> dict:
+        """Keep `value` (any JSON, at most 16384 bytes serialized) under
+        `key` (up to 64 of letters, digits and `. _ : -`): `{"key", "bytes"}`.
+        A computer keeps 256 keys and 256 KiB at most (`limits["notes"]`)."""
+        reply = await self.request("notes.set", key=key, value=value)
+        return {"key": reply["key"], "bytes": reply["bytes"]}
+
+    async def notes_get(self, key: str, default: Any = None) -> Any:
+        """The value under `key`, or `default` when none is kept (a stored
+        `None` is returned as `None`)."""
+        reply = await self.request("notes.get", key=key)
+        return reply["value"] if reply.get("found") else default
+
+    async def notes_delete(self, key: str) -> bool:
+        """Drop `key`; whether it was kept."""
+        return bool((await self.request("notes.delete", key=key)).get("deleted"))
+
+    async def notes_list(self, prefix: str = "") -> dict:
+        """This computer's keys that start with `prefix`, sorted:
+        `keys` (each `{"key", "bytes"}`), `count`, `total`, `bytes`,
+        `keys_max` and `bytes_max`."""
+        reply = await self.request("notes.list", prefix=prefix) if prefix else await self.request("notes.list")
+        return {k: v for k, v in reply.items() if k not in ("re", "ok")}
 
     # Turns and listening (docs/control.md): the person wins over each.
 

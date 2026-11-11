@@ -309,9 +309,135 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
     );
 }
 
+/// #5929: a reset a person asked for says `reset::RESET_STARTING` first,
+/// with nothing of the reset done yet (no journal, the marker there, no
+/// command run), within `reset::SAY_WITHIN`; then the reset runs as before.
+#[test]
+fn a_reset_asked_by_a_hold_is_said_before_anything_is_done() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake::default();
+    let calls = Rc::clone(&fake.calls);
+    let mut said = Vec::new();
+    let steps = reset::said_then_reset(
+        &plan,
+        &mut fake,
+        |line, within| {
+            assert!(!plan.journal.exists());
+            assert!(plan.marker.exists());
+            assert!(calls.borrow().is_empty());
+            said.push((line.to_owned(), within));
+            Ok(())
+        },
+        |_| {},
+    )
+    .unwrap();
+    assert_eq!(
+        said,
+        [(reset::RESET_STARTING.to_owned(), reset::SAY_WITHIN)]
+    );
+    assert_eq!(reset::RESET_STARTING, "Factory reset starting.");
+    assert!(reset::SAY_WITHIN <= Duration::from_secs(6));
+    assert_eq!(
+        &steps[..3],
+        [Step::Journal, Step::MarkerRemoved, Step::Stopped]
+    );
+    wiped(&root);
+}
+
+/// #5929: a line not said (no voice, muted, not in time) never holds the
+/// reset back: it runs all the same, and the journal says why.
+#[test]
+fn a_reset_line_not_said_still_resets() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut lines = Vec::new();
+    let steps = reset::said_then_reset(
+        &plan,
+        &mut Fake::default(),
+        |_, _| Err("the voice's say service is not there".into()),
+        |line| lines.push(line.to_owned()),
+    )
+    .unwrap();
+    assert!(steps.contains(&Step::Stopped));
+    wiped(&root);
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("not said") && line.contains("not there")),
+        "{lines:?}"
+    );
+}
+
+/// #5929, Reviewer-two's P2 on #5941: with the real say helper, a voice
+/// that never takes its connections (its queue full) holds no part of the
+/// reset past `reset::SAY_WITHIN`: the line is not said and the reset runs.
+#[test]
+fn a_voice_that_never_answers_does_not_hold_the_reset() {
+    use rustix::net::{AddressFamily, SocketAddrUnix, SocketType};
+    let root = Root::new();
+    let plan = lamp(&root);
+    let socket = root.0.join("say.sock");
+    let address = SocketAddrUnix::new(&socket).unwrap();
+    let listener = rustix::net::socket(AddressFamily::UNIX, SocketType::STREAM, None).unwrap();
+    rustix::net::bind(&listener, &address).unwrap();
+    rustix::net::listen(&listener, 0).unwrap();
+    // Fill the queue, never accepted: a blocking connect now waits on Linux.
+    let mut queued = Vec::new();
+    for _ in 0..8 {
+        let one = std::os::unix::net::UnixStream::from(
+            rustix::net::socket(AddressFamily::UNIX, SocketType::STREAM, None).unwrap(),
+        );
+        one.set_nonblocking(true).unwrap();
+        if rustix::net::connect(&one, &address).is_err() {
+            break;
+        }
+        queued.push(one);
+    }
+    let mut lines = Vec::new();
+    let started = Instant::now();
+    let steps = reset::said_then_reset(
+        &plan,
+        &mut Fake::default(),
+        |line, within| lamp_setup::shutdown::say_through(&socket, line, within),
+        |line| lines.push(line.to_owned()),
+    )
+    .unwrap();
+    assert!(started.elapsed() <= reset::SAY_WITHIN + Duration::from_secs(1));
+    assert!(steps.contains(&Step::Stopped));
+    wiped(&root);
+    assert!(
+        lines.iter().any(|line| line.contains("not said")),
+        "{lines:?}"
+    );
+}
+
+/// #5929: a reset carried on from its journal (a power cut after the hold)
+/// says nothing: the person's hold was a boot ago.
+#[test]
+fn a_reset_carried_on_from_its_journal_says_nothing() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    fs::write(&plan.journal, b"{}").unwrap();
+    let mut asked = false;
+    reset::said_then_reset(
+        &plan,
+        &mut Fake::default(),
+        |_, _| {
+            asked = true;
+            Ok(())
+        },
+        |_| {},
+    )
+    .unwrap();
+    assert!(!asked);
+}
+
 /// #5358, Twelve's P2 on #5365: a reset that ends in a reboot wipes the kept
 /// journal and leaves the keep its mark with this boot's id, so the reboot's
 /// shutdown keeps nothing of the old owner's boot (`lamp-journal-keep`).
+/// Linux provides the boot id through procfs; the Mac has no such source.
+#[cfg(target_os = "linux")]
 #[test]
 fn a_reset_marks_this_boot_so_its_shutdown_keeps_no_journal() {
     let root = Root::new();
@@ -2386,6 +2512,29 @@ fn a_reset_in_place_stops_lamp_peek_and_leaves_it_off_for_setup() {
     assert!(
         start.iter().any(|unit| unit == "lamp-setup.service"),
         "{start:?}"
+    );
+}
+
+/// Relative selection used the current directory while no-follow deletion
+/// began at `/` (#4839's P3). Refuse before even looking for a package mark,
+/// including a nonexistent relative folder that used to return success.
+#[test]
+fn installed_skill_removal_refuses_relative_folders_before_reading_them() {
+    for folder in [
+        "",
+        ".",
+        "skills",
+        "../skills",
+        "no-such-relative-skills-folder",
+    ] {
+        let error = reset::remove_installed_skills(Path::new(folder)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{folder:?}");
+    }
+    let root = Root::new();
+    assert!(
+        reset::remove_installed_skills(&root.path("missing-skills"))
+            .unwrap()
+            .is_empty()
     );
 }
 

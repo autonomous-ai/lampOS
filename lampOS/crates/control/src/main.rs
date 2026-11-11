@@ -5,6 +5,8 @@
 //!                    [--mood-socket PATH] [--say-socket PATH] [--actions-socket PATH]
 //!                    [--bus-root DIR] [--boot-id ID]
 //!                    [--sight-file PATH|off] [--frames-socket PATH|off] [--remote on|off]
+//!                    [--camera-opens-on-demand]
+//!                    [--microphone on|off]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
 //! lamp-control clients [--admin-socket PATH]
@@ -22,7 +24,11 @@
 //! is refused with a why. The `camera` grant's pictures are the eyes' newest
 //! frame in `--sight-file` (`/run/lampos-eyes/sight.jpg`, the eyes' own; `off`
 //! for none), read only with `--bus-root`, which says when the lamp is
-//! private (docs/control.md, "The camera"). Connections come only from the
+//! private (docs/control.md, "The camera"). The `microphone` grant's sound is
+//! the ears' `mic1/audio` on that bus, which they publish only with
+//! `LAMP_BUS_AUDIO=on`, and only with `--microphone on` (or
+//! `LAMP_CONTROL_MICROPHONE=on`; off unless given) (docs/control.md, "The
+//! microphone"). Connections come only from the
 //! lamp's own network unless `--remote on` (or `LAMP_CONTROL_REMOTE=on`)
 //! lets any address in, a VPN's 100.64/10 included; never to the camera or
 //! the microphone, which stay on the lamp's own network (docs/control.md,
@@ -45,6 +51,8 @@ const SIGHT: &str = "/run/lampos-eyes/sight.jpg";
 const FRAMES: &str = "/run/lampos-eyes/frames.sock";
 /// `--remote on` from the environment, when the flag isn't given.
 const REMOTE_ENVIRONMENT: &str = "LAMP_CONTROL_REMOTE";
+/// The owner's switch for `microphone.stream`, off unless `on`.
+const MICROPHONE_ENVIRONMENT: &str = "LAMP_CONTROL_MICROPHONE";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -193,6 +201,8 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     if say.is_some() {
         door = door.with_sound_folder(clips.clone());
     }
+    // A computer's own notes: always kept, in the state folder's `notes`.
+    door = door.with_notes_folder(state.join(lamp_control::notes::NOTES_FOLDER));
     let actions = option(arguments, "--actions-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
         Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),
@@ -223,50 +233,57 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         None => Some(PathBuf::from(SIGHT)),
     }
     .filter(|_| bus.is_some());
-    // The camera is never seen without the ring's mark (`light/mark`): no
-    // mark on the bus, no camera.
-    let mark = match (&sight, &bus) {
-        (Some(_), Some(bus)) => match bus.publisher_declared(
+    // The camera and the microphone are never seen or heard without the
+    // ring's mark (`light/mark`): no mark on the bus, neither.
+    let ring_mark = match &bus {
+        Some(bus) => match bus.publisher_declared(
             lamp_msgs::RingMark::TOPIC,
             &lamp_msgs::RingMark::declaration(),
             "control",
         ) {
-            Ok(publisher) => {
-                let publisher = Mutex::new(publisher);
-                Some(lamp_control::camera::mark_on(
-                    clock_id.clone(),
-                    move |mark| {
-                        if let Ok(mut publisher) = publisher.lock()
-                            && let Err(error) =
-                                publisher.publish_json(lamp_ipc::monotonic_us(), mark)
-                        {
-                            eprintln!("lamp-control: the ring's mark was not asked: {error}");
-                        }
-                    },
-                ))
-            }
+            Ok(publisher) => Some(Arc::new(Mutex::new(publisher))),
             Err(error) => {
-                eprintln!("lamp-control: no camera, since the ring's mark can't be asked: {error}");
+                eprintln!(
+                    "lamp-control: no camera or microphone, since the ring's mark can't be asked: {error}"
+                );
                 None
             }
         },
-        _ => None,
+        None => None,
+    };
+    let marked = |kind: lamp_msgs::MarkKind| {
+        ring_mark.clone().map(|publisher| {
+            lamp_control::camera::mark_on(clock_id.clone(), kind, move |mark| {
+                if let Ok(mut publisher) = publisher.lock()
+                    && let Err(error) = publisher.publish_json(lamp_ipc::monotonic_us(), mark)
+                {
+                    eprintln!("lamp-control: the ring's mark was not asked: {error}");
+                }
+            })
+        })
     };
     // The ring's word that it drew each computer's mark
-    // (`light/mark_drawn`): no word, no picture (Thirteen's P2 on #4521).
-    let mark = match (mark, &bus) {
-        (Some(mark), Some(bus)) => match drawn_on(bus, clock_id.clone()) {
-            Ok(drawn) => Some((mark, drawn)),
+    // (`light/mark_drawn`): no word, no picture and no sound (Thirteen's P2
+    // on #4521).
+    let drawn = match &bus {
+        Some(bus) if ring_mark.is_some() => match drawn_on(bus, clock_id.clone()) {
+            Ok(drawn) => Some(drawn),
             Err(error) => {
                 eprintln!(
-                    "lamp-control: no camera, since the ring's word on its mark can't be read: {error}"
+                    "lamp-control: no camera or microphone, since the ring's word on its mark can't be read: {error}"
                 );
                 None
             }
         },
         _ => None,
     };
-    let sight = sight.zip(mark);
+    let sight = sight.zip(marked(lamp_msgs::MarkKind::Camera).zip(drawn.clone()));
+    // The microphone: the ears' `mic1/audio`, subscribed only while a
+    // stream is on; shared only where they publish it (`LAMP_BUS_AUDIO=on`).
+    let hearing = bus
+        .clone()
+        .zip(marked(lamp_msgs::MarkKind::Microphone).zip(drawn))
+        .map(|(bus, marking)| (lamp_control::microphone::on_bus(bus), marking));
     // The fast stream from the eyes' frames socket, when they serve one; its
     // frames go out once the server below has a way to send them.
     let frames = match option(arguments, "--frames-socket").as_deref() {
@@ -283,17 +300,62 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let (looks, looked) = tokio::sync::mpsc::unbounded_channel();
     let follow = lamp_control::body_lease::Follower::default();
     let on_lease = lease_socket.is_some().then(|| (looks, follow.clone()));
+    let sink_for_ears = sink.clone();
+    // The microphone stream is off unless the owner switches it on: no unit
+    // sets it (docs/control.md, "The microphone").
+    let microphone = match option(arguments, "--microphone")
+        .or_else(|| std::env::var(MICROPHONE_ENVIRONMENT).ok())
+        .as_deref()
+    {
+        None | Some("off") => false,
+        Some("on") => true,
+        Some(_) => return Err("--microphone is on or off".to_owned()),
+    };
+    eprintln!(
+        "lamp-control: {}",
+        if microphone {
+            "the microphone stream is on (--microphone on), where the ears share their sound"
+        } else {
+            "the microphone stream is off (--microphone)"
+        }
+    );
+    // The body's word on each motion (`body/gesture`), for a gesture's,
+    // move's and feeling's move's `done` (#4209); without it they end at
+    // their answer, as hello's limits then say.
+    let gestures = match (&bus, &body) {
+        (Some(bus), Some(_)) => match bus.subscribe(lamp_msgs::BodyGesture::TOPIC, "control") {
+            Ok(subscriber) => Some(subscriber),
+            Err(error) => {
+                eprintln!(
+                    "lamp-control: no motion done, since body/gesture can't be read: {error}"
+                );
+                None
+            }
+        },
+        _ => None,
+    };
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
-        let mut lamp = parts::Lamp::new(body, light, say, clock_id, events)
+        let lamp = parts::Lamp::new(body, light, say, clock_id, events)
             .watching(watching)
             .with_clips(clips);
+        let mut lamp = match hearing {
+            Some((listen, marking)) => lamp.hearing(listen, marking, sink_for_ears, microphone),
+            None => lamp,
+        };
+        if let Some(gestures) = gestures {
+            lamp = lamp.telling_motions(gestures);
+        }
         if let Some(actions) = actions {
             lamp = lamp.volume_through(actions);
         }
+        let on_demand = arguments.iter().any(|a| a == "--camera-opens-on-demand");
         let lamp = match sight {
             Some((sight, mark)) => match frames {
-                Some(frames) => lamp.seeing(sight, mark).fast_frames(frames, sink_for_lamp),
-                None => lamp.seeing(sight, mark),
+                Some(frames) => lamp
+                    .seeing(sight, mark)
+                    .camera_on_demand(on_demand)
+                    .fast_frames(frames, sink_for_lamp),
+                None => lamp.seeing(sight, mark).camera_on_demand(on_demand),
             },
             None => lamp,
         };

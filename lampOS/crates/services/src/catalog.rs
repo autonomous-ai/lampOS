@@ -9,6 +9,7 @@ pub enum Method {
     Get,
     Post,
     Patch,
+    Delete,
 }
 
 impl Method {
@@ -17,6 +18,7 @@ impl Method {
             Self::Get => "GET",
             Self::Post => "POST",
             Self::Patch => "PATCH",
+            Self::Delete => "DELETE",
         }
     }
 }
@@ -46,7 +48,7 @@ pub struct Service {
     pub mcp: Option<&'static str>,
 }
 
-use Method::{Get, Post};
+use Method::{Delete, Get, Patch, Post};
 
 /// Figma's reads, under either of its codes.
 const FIGMA_READS: &[(Method, &str)] = &[
@@ -77,6 +79,8 @@ pub const SERVICES: &[Service] = &[
             (Get, "/gmail/v1/users/me/profile"),
             (Get, "/gmail/v1/users/me/messages"),
             (Get, "/gmail/v1/users/me/messages/*"),
+            // One attachment's data (`users.messages.attachments.get`).
+            (Get, "/gmail/v1/users/me/messages/*/attachments/*"),
         ],
         writes: &[(Post, "/gmail/v1/users/me/messages/send")],
         mcp: None,
@@ -106,7 +110,13 @@ pub const SERVICES: &[Service] = &[
             (Get, "/calendar/v3/calendars/*/events"),
             (Get, "/calendar/v3/calendars/*/events/*"),
         ],
-        writes: &[(Post, "/calendar/v3/calendars/*/events")],
+        // Changing and cancelling one event by its id with
+        // `LAMP_CALENDAR_EDITS` (`writes::prepare_edit`).
+        writes: &[
+            (Post, "/calendar/v3/calendars/*/events"),
+            (Patch, "/calendar/v3/calendars/*/events/*"),
+            (Delete, "/calendar/v3/calendars/*/events/*"),
+        ],
         mcp: None,
     },
     Service {
@@ -121,7 +131,9 @@ pub const SERVICES: &[Service] = &[
             (Get, "/drive/v3/files/*"),
             (Get, "/drive/v3/files/*/export"),
         ],
-        writes: &[],
+        // One new file in My Drive, uploaded whole (`writes::DRIVE_UPLOAD`):
+        // never an update, a copy, a share or a delete.
+        writes: &[(Post, "/upload/drive/v3/files")],
         mcp: None,
     },
     Service {
@@ -579,6 +591,22 @@ mod tests {
         ));
         assert!(!ok("gmail", Post, "/gmail/v1/users/me/messages/send"));
         assert!(!ok("gmail", Get, "/gmail/v1/users/me/settings/filters"));
+        // An attachment's data; never deeper, never a write.
+        assert!(ok(
+            "gmail",
+            Get,
+            "/gmail/v1/users/me/messages/18c2/attachments/ANGj-x_1"
+        ));
+        assert!(!ok(
+            "gmail",
+            Get,
+            "/gmail/v1/users/me/messages/18c2/attachments/a/b"
+        ));
+        assert!(!ok(
+            "gmail",
+            Post,
+            "/gmail/v1/users/me/messages/18c2/attachments/a"
+        ));
         assert!(write_allowed(
             "gmail",
             Post,
@@ -610,6 +638,32 @@ mod tests {
         ));
         assert!(!write_allowed("github", Post, "/user/repos"));
         assert!(!write_allowed("google_drive", Post, "/drive/v3/files"));
+        // Drive's one write is a new file's upload: never an update, a
+        // copy, a permission (a share), a delete or anything under it.
+        assert!(write_allowed(
+            "google_drive",
+            Post,
+            "/upload/drive/v3/files"
+        ));
+        for (method, path) in [
+            (Method::Patch, "/upload/drive/v3/files/abc"),
+            (Post, "/upload/drive/v3/files/abc"),
+            (Method::Patch, "/drive/v3/files/abc"),
+            (Post, "/drive/v3/files/abc/copy"),
+            (Post, "/drive/v3/files/abc/permissions"),
+            (Post, "/drive/v3/files/abc/comments"),
+            (Post, "/upload/drive/v2/files"),
+            (Post, "/upload/drive/v3/files/../files"),
+            (Get, "/upload/drive/v3/files"),
+        ] {
+            assert!(!write_allowed("google_drive", method, path), "{path}");
+        }
+        assert!(!ok("google_drive", Post, "/upload/drive/v3/files"));
+        assert!(!write_allowed(
+            "google_calendar",
+            Post,
+            "/upload/drive/v3/files"
+        ));
     }
 
     #[test]

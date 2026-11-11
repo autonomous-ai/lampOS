@@ -145,6 +145,24 @@ pub const NAMED_ONLY_FLAG: &str = "--tasks-named-only";
 /// `on` only.
 pub const CORRECT_ENVIRONMENT: &str = "LAMP_TASKS_CORRECT";
 pub const CORRECT_FLAG: &str = "--tasks-correct";
+/// Where it reads whether a spoken hand-over needs only one yes
+/// ([`Place::one_yes`], #5169): `start_agent_task` is called before the
+/// read-back, confirming with nothing prepared says to prepare it first,
+/// and a plain yes heard after a read-back said only in words may start
+/// the task prepared in its own turn. `on` only.
+pub const ONE_YES_ENVIRONMENT: &str = "LAMP_TASKS_ONE_YES";
+pub const ONE_YES_FLAG: &str = "--tasks-one-yes";
+/// Where it reads whether the person may name one of their sessions for
+/// the work ([`Place::reply_named`], #5535): [`START`] takes a `session`,
+/// sent to the tasks part with the task, which types it into that session
+/// (`lamp-tasks serve --reply-named`). `on` only.
+pub const REPLY_NAMED_ENVIRONMENT: &str = "LAMP_TASKS_REPLY_NAMED";
+pub const REPLY_NAMED_FLAG: &str = "--tasks-reply-named";
+/// The longest session words sent, as the tasks part takes them
+/// (`lamp_tasks::harness::MOST_SESSION_BYTES`).
+const MOST_SESSION_BYTES: usize = 128;
+/// [`START`]'s `session` parameter with [`REPLY_NAMED_FLAG`].
+const SESSION: &str = "Only if the person means earlier work, not a new session: how they said it, its name or what it worked on (\"the book program one\"). Never guessed.";
 /// Where the second route reads whether a line whose own words ask one of
 /// the staff by name to do something ("ask Claude Code to …") has its
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
@@ -247,6 +265,10 @@ struct Pending {
     /// Prepared with [`CORRECT_FLAG`]: its note says a corrected ask
     /// replaces it.
     correct: bool,
+    /// The session the person named for it ([`REPLY_NAMED_FLAG`], #5535):
+    /// a read-back must say it too ([`reads_back`]), and another session is
+    /// a correction.
+    session: Option<String>,
 }
 
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
@@ -591,8 +613,18 @@ fn named_not_set_up(who: &str) -> Value {
 /// come. Kept short: with work asked of the staff ([`ASKED_FLAG`]) and
 /// three of them, the description has 165 bytes left for it of the 1,024
 /// the service takes.
-fn read_back(lead_in: bool, with_who: &str) -> String {
-    if lead_in {
+///
+/// With [`ONE_YES_FLAG`] (#5169), lead-in or not, the call comes first and
+/// the read-back only from its answer: on lamp-c0a4 on 4 Nov the model
+/// often said the task back in words without calling, so the person's yes
+/// had nothing to start and was asked for twice.
+fn read_back(lead_in: bool, with_who: &str, one_yes: bool) -> String {
+    if one_yes {
+        format!(
+            "Call it first: say the task back only from its answer, in one short \
+             sentence{with_who}, and ask whether to start it."
+        )
+    } else if lead_in {
         format!(
             "Say the task back in one short sentence{with_who} as a statement, then call it \
              at once; ask whether to start it only after it answers."
@@ -605,6 +637,16 @@ fn read_back(lead_in: bool, with_who: &str) -> String {
     }
 }
 
+/// `start_agent_task`'s `task` parameter, as it always was.
+const TASK_COMPLETE: &str =
+    "The work, in the person's own words, complete enough to do without asking.";
+
+/// `start_agent_task`'s `task` parameter with [`ONE_YES_FLAG`] (#5169, from
+/// #5119): "complete enough to do without asking" let the model ask what a
+/// short ask should have instead of calling. The read-back still guards it.
+const TASK_SHORT: &str =
+    "The work, in the person's own words. A short ask is enough: the agent works out the details.";
+
 fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
     let choosing = choosing(place, staff);
     // Who does it when nobody is named; without the switch, as always.
@@ -613,9 +655,11 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
     } else {
         CLAUDE_CODE
     };
+    // With LAMP_TASKS_ONE_YES (#5169, folding in #5119), a short ask is
+    // enough, so the model calls rather than asking what the work should have.
     let task = json!({
         "type": "string",
-        "description": "The work, in the person's own words, complete enough to do without asking."
+        "description": if place.one_yes { TASK_SHORT } else { TASK_COMPLETE }
     });
     let (start_description, start_parameters) = if choosing {
         let all = names(staff, "and");
@@ -641,7 +685,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      ask in a few words what it should work on, and call this with their answer.",
                     computer(place),
                     asked_of(&all, &examples(staff), place.staff_note, computer(place)),
-                    read_back(place.lead_in, ", with who will do it,")
+                    read_back(place.lead_in, ", with who will do it,", place.one_yes)
                 )
             } else {
                 format!(
@@ -651,7 +695,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      You can do this: if they ask you to start one of them, open a session or \
                      give it something, without saying what it should do, never say you cannot; \
                      ask in a few words what it should work on, and call this with their answer.",
-                    read_back(place.lead_in, ", with who will do it,")
+                    read_back(place.lead_in, ", with who will do it,", place.one_yes)
                 )
             },
             json!({
@@ -694,7 +738,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                         place.staff_note,
                         computer(place)
                     ),
-                    read_back(place.lead_in, "")
+                    read_back(place.lead_in, "", place.one_yes)
                 )
             } else {
                 format!(
@@ -704,7 +748,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      You can do this: if they ask you to start {default}, open a session or \
                      give it something, without saying what it should do, never say you cannot; \
                      ask in a few words what it should work on, and call this with their answer.",
-                    read_back(place.lead_in, "")
+                    read_back(place.lead_in, "", place.one_yes)
                 )
             },
             json!({
@@ -714,6 +758,16 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
             }),
         )
     };
+    // With the switch (#5535), the session the person named, if any.
+    let mut start_parameters = start_parameters;
+    if place.reply_named
+        && let Some(properties) = start_parameters["properties"].as_object_mut()
+    {
+        properties.insert(
+            "session".into(),
+            json!({"type": "string", "description": SESSION}),
+        );
+    }
     let mut tools = vec![
         Tool {
             name: START.into(),
@@ -1553,6 +1607,11 @@ pub struct Place {
     /// The model may ask what every recent piece of work is doing
     /// ([`NOW_FLAG`], [`NOW`], #4342).
     pub now: bool,
+    /// A spoken hand-over needs one yes ([`ONE_YES_FLAG`], #5169).
+    pub one_yes: bool,
+    /// The person may name one of their sessions for the work
+    /// ([`REPLY_NAMED_FLAG`], #5535).
+    pub reply_named: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -1595,7 +1654,25 @@ pub fn arguments_from_environment() -> Vec<String> {
     if now(&arguments, std::env::var(NOW_ENVIRONMENT).ok().as_deref()) {
         arguments.push(NOW_FLAG.to_owned());
     }
+    if one_yes(
+        &arguments,
+        std::env::var(ONE_YES_ENVIRONMENT).ok().as_deref(),
+    ) {
+        arguments.push(ONE_YES_FLAG.to_owned());
+    }
+    if reply_named(
+        &arguments,
+        std::env::var(REPLY_NAMED_ENVIRONMENT).ok().as_deref(),
+    ) {
+        arguments.push(REPLY_NAMED_FLAG.to_owned());
+    }
     arguments
+}
+
+/// Whether [`REPLY_NAMED_FLAG`] goes after `arguments`: `on`, and only with
+/// the tasks part; it needs no other switch.
+fn reply_named(arguments: &[String], value: Option<&str>) -> bool {
+    value == Some("on") && !arguments.is_empty()
 }
 
 /// Whether [`SIGN_IN_APP_FLAG`] goes after `arguments`: `on`, and only
@@ -1607,6 +1684,12 @@ pub(crate) fn sign_in_app(arguments: &[String], value: Option<&str>) -> bool {
 /// Whether [`NOW_FLAG`] goes after `arguments`: `on`, and only with the
 /// tasks part; it needs no other switch.
 fn now(arguments: &[String], value: Option<&str>) -> bool {
+    value == Some("on") && !arguments.is_empty()
+}
+
+/// Whether [`ONE_YES_FLAG`] goes after `arguments`: `on`, and only with the
+/// tasks part; it needs no other switch.
+fn one_yes(arguments: &[String], value: Option<&str>) -> bool {
     value == Some("on") && !arguments.is_empty()
 }
 
@@ -1686,7 +1769,7 @@ fn alias(text: &str) -> bool {
 /// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-machine-names]
 /// [--tasks-needs PATH] [--tasks-sign-in] [--tasks-named-only]
 /// [--tasks-correct] [--tasks-questions] [--tasks-sign-in-app]
-/// [--tasks-now]` off the flags.
+/// [--tasks-now] [--tasks-one-yes]` off the flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
         return Ok((None, flags));
@@ -1767,6 +1850,14 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == NOW_FLAG => (true, rest),
         _ => (false, rest),
     };
+    let (one_yes, rest) = match rest {
+        [flag, rest @ ..] if flag == ONE_YES_FLAG => (true, rest),
+        _ => (false, rest),
+    };
+    let (reply_named, rest) = match rest {
+        [flag, rest @ ..] if flag == REPLY_NAMED_FLAG => (true, rest),
+        _ => (false, rest),
+    };
     Ok((
         Some(Place {
             directory: PathBuf::from(directory),
@@ -1784,6 +1875,8 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             sign_in_app,
             questions,
             now,
+            one_yes,
+            reply_named,
         }),
         rest,
     ))
@@ -1798,6 +1891,309 @@ fn may_confirm(pending: &Pending, request: u64, heard: bool, now: Instant) -> bo
     (heard || crate::messages::same_chat(pending.request, request))
         && request > pending.request
         && now.duration_since(pending.at) <= CONFIRM_WITHIN
+}
+
+/// What `confirm_agent_task` answers with nothing prepared, with
+/// [`ONE_YES_FLAG`] (#5169): the model read the task back in words without
+/// calling `start_agent_task`, so it prepares it now and confirms again.
+const NOTHING_PREPARED: &str = "Nothing is prepared yet: call start_agent_task now with the task you said back, then call confirm_agent_task again.";
+
+/// What `start_agent_task`'s answer says, with [`ONE_YES_FLAG`], when the
+/// person's yes to a read-back said only in words is the line that prepared
+/// it ([`yes_in_the_same_turn`]): start it now, never ask again.
+const ALREADY_YES: &str = "The person has already said yes to this task as you said it back: call confirm_agent_task now, and do not ask again.";
+
+/// Whether, with [`ONE_YES_FLAG`] (#5169), a yes in the very request that
+/// prepared `pending` may start it. The model said the task back in words
+/// without calling `start_agent_task`, and called it only on the person's
+/// yes. Every one of these must hold, or [`may_confirm`]'s refusal stands:
+///
+/// - the request was heard, not typed or written by the lamp;
+/// - it is the request that prepared the task, still within
+///   [`CONFIRM_WITHIN`];
+/// - the person's words in it are a plain yes ([`plain_yes`]);
+/// - the lamp's line just before it (`read_back`, with how long ago it was
+///   said and whether it was cut) is within [`CONFIRM_WITHIN`], was not cut
+///   (the Reviewer-lead's P3 on #5609), ends with a question, names who the
+///   task was prepared for, and holds every one of the task's content
+///   words, each by a spoken word of the same stem ([`reads_back`]);
+/// - no session was named for it ([`REPLY_NAMED_FLAG`], #5535). Which
+///   session a read-back said can't be told from its words: "docs" said
+///   inside "the docs archive session" is not the "docs" session, and
+///   Harness may hold both. A task for a named session always waits for a
+///   second yes, to the read-back `start_agent_task` gives, whose `where`
+///   says the session as prepared (Reviewer-three's P2 on #5784).
+///
+/// The guard that a yes comes only after a read-back stays: this rule only
+/// recognizes a read-back said in words, before the call.
+fn yes_in_the_same_turn(
+    pending: &Pending,
+    request: u64,
+    heard: bool,
+    words: Option<&str>,
+    read_back: Option<(&str, Duration, bool)>,
+    now: Instant,
+) -> bool {
+    heard
+        && !crate::messages::is_text(request)
+        && request == pending.request
+        && pending.session.is_none()
+        && now.duration_since(pending.at) <= CONFIRM_WITHIN
+        && words.is_some_and(plain_yes)
+        && read_back.is_some_and(|(line, ago, cut)| {
+            ago <= CONFIRM_WITHIN && !cut && asks(line) && reads_back(line, pending)
+        })
+}
+
+/// [`yes_in_the_same_turn`] with the person's words and the lamp's line
+/// before them as this process's thread has them. Read only when the cheap
+/// parts already hold.
+fn yes_in_the_same_turn_now(pending: &Pending, request: u64, heard: bool) -> bool {
+    if !heard || request != pending.request {
+        return false;
+    }
+    let now = Instant::now();
+    let Ok(thread) = crate::thread::THREAD.lock() else {
+        return false;
+    };
+    let words = thread.heard_for(request, now);
+    let read_back = thread.answered_last_but_cut(request, now);
+    drop(thread);
+    yes_in_the_same_turn(
+        pending,
+        request,
+        heard,
+        words.as_deref(),
+        read_back
+            .as_ref()
+            .map(|(line, ago, cut)| (line.as_str(), *ago, *cut)),
+        now,
+    )
+}
+
+/// Lower-case words of letters and digits; an apostrophe stays inside one.
+fn plain_words(text: &str) -> Vec<String> {
+    text.split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '’'))
+        .map(|word| {
+            word.trim_matches(|c: char| c == '\'' || c == '’')
+                .to_lowercase()
+        })
+        .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// Whether `words` are a plain yes and nothing else: "Yes.", "Yeah, go
+/// ahead.", "Okay lamp, please do.", "Hey Lamp, yes please." Any other
+/// word ("yes and also make it longer", "yes, but to Codex"), a question
+/// ("Yes?") or more than six words is not. Kept small on purpose: a line this misreads costs a second
+/// yes, one it takes wrongly would start work on the person's computer.
+fn plain_yes(words: &str) -> bool {
+    const YES: [&str; 7] = ["yes", "yeah", "yep", "yup", "sure", "ok", "okay"];
+    const PHRASES: [[&str; 2]; 3] = [["go", "ahead"], ["do", "it"], ["please", "do"]];
+    const BESIDE: [&str; 3] = ["please", "lamp", "hey"];
+    if words.trim_end().ends_with('?') {
+        return false;
+    }
+    let words = plain_words(words);
+    if words.is_empty() || words.len() > 6 {
+        return false;
+    }
+    let mut yes = false;
+    let mut at = 0;
+    while at < words.len() {
+        if let Some(phrase) = PHRASES
+            .iter()
+            .find(|phrase| words[at..].starts_with(&phrase.map(str::to_owned)))
+        {
+            yes = true;
+            at += phrase.len();
+        } else if YES.contains(&words[at].as_str()) {
+            yes = true;
+            at += 1;
+        } else if BESIDE.contains(&words[at].as_str()) {
+            at += 1;
+        } else {
+            return false;
+        }
+    }
+    yes
+}
+
+/// Whether the lamp's `line` ends with a question.
+fn asks(line: &str) -> bool {
+    line.trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '”' | '\'' | '’' | ')'))
+        .ends_with('?')
+}
+
+/// Words that say nothing of the work itself, left out of a task's content
+/// words ([`reads_back`]).
+const NOT_CONTENT: [&str; 48] = [
+    "a", "an", "the", "to", "of", "for", "on", "in", "at", "and", "or", "with", "about", "by",
+    "from", "into", "as", "is", "it", "its", "it's", "this", "that", "these", "those", "my", "me",
+    "i", "your", "you", "our", "we", "please", "can", "could", "would", "will", "shall", "be",
+    "some", "any", "then", "there", "here", "so", "do", "did", "does",
+];
+
+/// The task's own words: its question alone for a question task.
+fn content_words(text: &str) -> Vec<String> {
+    let text = question_of(text).unwrap_or(text);
+    let mut words: Vec<String> = Vec::new();
+    for word in plain_words(text) {
+        if !NOT_CONTENT.contains(&word.as_str()) && !words.contains(&word) {
+            words.push(word);
+        }
+    }
+    words
+}
+
+/// A word without a plural's or a verb's ending ("files", "boxes",
+/// "fixing", "failed") and then a final "e", so "files" and "file", or
+/// "changed" and "change", are one word. Each cut leaves at least three
+/// letters. Kept simple: a word this leaves apart from the task's is not
+/// read back ([`stands_for`]), which costs a second yes, never work
+/// started unheard.
+fn stem(word: &str) -> &str {
+    let mut word = word;
+    for ending in ["ing", "ed", "es", "s"] {
+        if let Some(rest) = word.strip_suffix(ending).filter(|rest| rest.len() > 2) {
+            word = rest;
+            break;
+        }
+    }
+    word.strip_suffix('e')
+        .filter(|rest| rest.len() > 2)
+        .unwrap_or(word)
+}
+
+/// Whether `said` stands for the task's word `word`: the same stem
+/// ([`stem`]), and nothing else. No near form: a prefix or one letter apart
+/// let another word stand in, "remote" for "remove" or "kill" for
+/// "killall" (the Reviewer-lead's third P2 on #5609).
+fn stands_for(said: &str, word: &str) -> bool {
+    stem(said) == stem(word)
+}
+
+/// The forms of the name the task was prepared for, each as its plain
+/// words: the name and the forms the voice hears for it, the same ones the
+/// `named` check of [`reads_back`] looks for.
+fn name_forms(pending: &Pending) -> Vec<Vec<String>> {
+    let mut forms: Vec<Vec<String>> = std::iter::once(pending.who)
+        .chain(
+            KINDS
+                .iter()
+                .filter(|kind| kind.name == pending.who)
+                .flat_map(|kind| kind.heard.iter().copied()),
+        )
+        .map(plain_words)
+        .filter(|form| !form.is_empty())
+        .collect();
+    // The longest first, so "claude code" goes whole before any shorter
+    // form could take part of it.
+    forms.sort_by_key(|form| std::cmp::Reverse(form.len()));
+    forms
+}
+
+/// `words` with the first run of words that is one of `forms` left out:
+/// the name the read-back gives who will do it. A later form is a word of
+/// the read-back's own ("Codex will uninstall the codecs" says "codecs"
+/// back, the Reviewer-lead's P3 on #5785's READ-OK).
+fn without_first_form(words: Vec<String>, forms: &[Vec<String>]) -> Vec<String> {
+    for at in 0..words.len() {
+        if let Some(form) = forms.iter().find(|form| words[at..].starts_with(form)) {
+            let mut kept = words;
+            kept.drain(at..at + form.len());
+            return kept;
+        }
+    }
+    words
+}
+
+/// The words that address one of the staff in a task ("ask Codex to …",
+/// "have Claude Code …"): only a form right after one of them is the
+/// agent's name in the task's own words.
+const ADDRESSING: [&str; 5] = ["ask", "have", "tell", "get", "let"];
+
+/// The task's `words` with each form of the name left out only where it
+/// addresses the agent, right after one of [`ADDRESSING`]: "uninstall the
+/// codecs" keeps "codecs", which the read-back must then say (the
+/// Reviewer-lead's P3 on #5785's READ-OK: stripping it everywhere let
+/// "Codex will uninstall it" start that task on one yes).
+fn without_address(words: Vec<String>, forms: &[Vec<String>]) -> Vec<String> {
+    let mut kept: Vec<String> = Vec::with_capacity(words.len());
+    let mut at = 0;
+    while at < words.len() {
+        let addressed = kept
+            .last()
+            .is_some_and(|before| ADDRESSING.contains(&before.as_str()));
+        if addressed && let Some(form) = forms.iter().find(|form| words[at..].starts_with(form)) {
+            at += form.len();
+        } else {
+            kept.push(words[at].clone());
+            at += 1;
+        }
+    }
+    kept
+}
+
+/// `line` without its closing question: the last sentence, when it ends
+/// with '?', from just after the '.', '!' or '?' before it. A line that is
+/// one question alone leaves nothing.
+fn before_the_question(line: &str) -> &str {
+    let end = line
+        .trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '”' | '\'' | '’' | ')'));
+    let Some(body) = end.strip_suffix('?') else {
+        return line;
+    };
+    body.rfind(['.', '!', '?']).map_or("", |at| &body[..=at])
+}
+
+/// Whether the lamp's `line` says `pending` back: it names who the task was
+/// prepared for (the name, or a form the voice hears for it, spaces aside)
+/// and holds every one of the task's content words, each by a spoken word
+/// of its own with the same stem ([`stands_for`]): one spoken word stands
+/// for one task word at most. The words of the name and the closing
+/// question ("Shall I start it?") never stand for a task word: "Code" in
+/// "Claude Code" is not the "code" of "Delete the code", and the question's
+/// "start" is not the "start" of "Start the server" (the Reviewer-lead's
+/// P3 on #5609's READ-OK). In the task's words the name is left out only
+/// where it addresses the agent ([`without_address`]), so "Ask Claude Code
+/// to fix the tests" needs "ask", "fix" and "tests" read back beside the
+/// name, which `named` already holds, and "uninstall the codecs" still
+/// needs "codecs" said back. A read-back that
+/// is one question alone ("Shall Claude Code fix the tests?") reads back
+/// nothing, which costs a second yes. Only the one-yes rule
+/// ([`yes_in_the_same_turn`]) reads it.
+fn reads_back(line: &str, pending: &Pending) -> bool {
+    let words = plain_words(line);
+    let joined: String = words.concat();
+    let named = std::iter::once(pending.who.to_lowercase())
+        .chain(
+            KINDS
+                .iter()
+                .filter(|kind| kind.name == pending.who)
+                .flat_map(|kind| kind.heard.iter().map(|form| (*form).to_owned())),
+        )
+        .any(|name| {
+            let name: String = name.split_whitespace().collect();
+            !name.is_empty() && joined.contains(&name)
+        });
+    let forms = name_forms(pending);
+    let said = without_first_form(plain_words(before_the_question(line)), &forms);
+    let task_words = without_address(
+        plain_words(question_of(&pending.text).unwrap_or(&pending.text)),
+        &forms,
+    );
+    let task = content_words(&task_words.join(" "));
+    let mut unused: Vec<&str> = said.iter().map(String::as_str).collect();
+    named
+        && !task.is_empty()
+        && task.iter().all(|word| {
+            unused
+                .iter()
+                .position(|said| stands_for(said, word))
+                .map(|at| unused.swap_remove(at))
+                .is_some()
+        })
 }
 
 /// The note a request is given beside its words on a route that keeps only
@@ -1834,10 +2230,28 @@ const NOT_A_YES: &str = " The same ask again, in the same words or others, is no
 /// What `next` begins with when a corrected ask replaced the one waiting.
 const REPLACED_NEXT: &str = "This one replaces the earlier task, which you will not start now.";
 
-/// [`prepared_next`], with [`CORRECT_FLAG`]'s sentence, and begun with
-/// [`REPLACED_NEXT`] when this task replaced one waiting.
-fn next_for(place: &Place, choosing: bool, who: &str, replaced: bool) -> String {
-    let next = prepared_next(place.lead_in, choosing, who);
+/// What `next` says, in place of [`prepared_next`], for a task that goes
+/// into a session the person named (#5535): the person hears where it goes
+/// before their yes, even when the model said the task back already and
+/// would otherwise ask only "Shall I start it?" (the Reviewer-lead's P2 on
+/// #5784 at de9bebdb41). A yes said before this call is not taken for it
+/// ([`yes_in_the_same_turn`]), so a yes without the session said is never
+/// asked again with nothing new.
+fn session_next(who: &str) -> String {
+    format!(
+        "This goes into one of the person's earlier sessions, not a new one, and their yes is still needed for that. In one short sentence say {who} will do it and where, as `where` says it, {NAMES_BACK}, and ask whether to start it there. Start it only if the person says yes."
+    )
+}
+
+/// [`prepared_next`] ([`session_next`] for a task into a named session),
+/// with [`CORRECT_FLAG`]'s sentence, and begun with [`REPLACED_NEXT`] when
+/// this task replaced one waiting.
+fn next_for(place: &Place, choosing: bool, who: &str, replaced: bool, session: bool) -> String {
+    let next = if session {
+        session_next(who)
+    } else {
+        prepared_next(place.lead_in, choosing, who)
+    };
     if !place.correct {
         return next;
     }
@@ -1958,6 +2372,17 @@ fn unreached(place: &Place) -> Value {
     }
 }
 
+/// The tasks part's `prepare` request: with a session only when the
+/// person named one ([`REPLY_NAMED_FLAG`], #5535), so without it the
+/// request is as it always was.
+fn preparation(guard: Value, task: &str, target: &str, session: Option<&str>) -> Value {
+    let mut request = json!({"op":"prepare","guard":guard,"text":task,"target":target});
+    if let Some(session) = session {
+        request["session"] = json!(session);
+    }
+    request
+}
+
 /// [`run`] with the staff as known.
 fn run_for(
     place: &Place,
@@ -2000,6 +2425,30 @@ fn run_for(
                     true,
                 );
             }
+            // The session the person named (#5535): only with the switch,
+            // and refused, not cut, when it can't be a session's name.
+            let session = if place.reply_named {
+                call.args
+                    .get("session")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|session| !session.is_empty())
+            } else {
+                None
+            };
+            // A session of no words that name anything ("the one") can't be
+            // said back or told apart: asked about, never sent (the
+            // Reviewer-lead's P3 on #5784's READ-OK).
+            if session.is_some_and(|session| {
+                session.len() > MOST_SESSION_BYTES
+                    || session.chars().any(char::is_control)
+                    || content_words(session).is_empty()
+            }) {
+                return (
+                    json!({"error": "That is not a session's name: ask which session they mean, in a few words."}),
+                    true,
+                );
+            }
             // Who is settled before the tasks part is asked anything.
             let member = match chosen(place, staff, &call.args) {
                 Ok(member) => member,
@@ -2008,6 +2457,15 @@ fn run_for(
             let (target, who) = member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
                 (member.alias.as_str(), member.kind.name)
             });
+            // Devin's cloud has no sessions of the person's to name (the
+            // Reviewer-lead's P3 on #5784): refused, never sent.
+            if session.is_some() && member.is_some_and(|member| member.kind.engine == "devin-cloud")
+            {
+                return (
+                    json!({"error": "Devin works in its own cloud, with no session of theirs to name: hand it over without one, or to another agent."}),
+                    true,
+                );
+            }
             let recorded;
             let task = if place.questions && is_question(task) {
                 recorded = format!("{task} {PAST_WORK}");
@@ -2037,7 +2495,7 @@ fn run_for(
             };
             let mut prepared = ask_until_sure(
                 &place.directory.join("request.sock"),
-                &json!({"op":"prepare","guard":guard,"text":task,"target":target}),
+                &preparation(guard, task, target, session),
                 left,
             );
             // The target the work was prepared for, for the read-back.
@@ -2058,7 +2516,7 @@ fn run_for(
                         };
                         prepared = ask_until_sure(
                             &place.directory.join("request.sock"),
-                            &json!({"op":"prepare","guard":again,"text":task,"target":other}),
+                            &preparation(again, task, &other, session),
                             left,
                         );
                         sent_to = other;
@@ -2089,7 +2547,9 @@ fn run_for(
                             .filter(|waiting| {
                                 place.correct
                                     && waiting.id != id
-                                    && (waiting.text != task || waiting.who != who)
+                                    && (waiting.text != task
+                                        || waiting.who != who
+                                        || waiting.session.as_deref() != session)
                                     && may_confirm(waiting, request, heard, Instant::now())
                             })
                             .map(|waiting| waiting.id);
@@ -2101,6 +2561,7 @@ fn run_for(
                             who,
                             text: task.to_owned(),
                             correct: place.correct,
+                            session: session.map(str::to_owned),
                         });
                     }
                     if let Some(old) = replaced {
@@ -2122,10 +2583,32 @@ fn run_for(
                     });
                     let place_said = if cloud {
                         format!("{who}, in Devin's cloud")
+                    } else if let Some(session) = session {
+                        // The read-back says who, and where it goes (#5535).
+                        format!(
+                            "{who}, in the session \"{session}\" on {}, not a new one",
+                            where_done(place, &sent_to)
+                        )
                     } else {
                         format!("{who} on {}", where_done(place, &sent_to))
                     };
-                    let next = next_for(place, choosing(place, staff), who, replaced.is_some());
+                    let mut next = next_for(
+                        place,
+                        choosing(place, staff),
+                        who,
+                        replaced.is_some(),
+                        session.is_some() && !cloud,
+                    );
+                    // With the switch, the person's yes to a read-back said in
+                    // words may be this very line: then the task is started
+                    // now, not asked about again (#5169).
+                    if place.one_yes
+                        && let Some(waiting) = PENDING.lock().ok().and_then(|p| p.clone())
+                        && waiting.id == id
+                        && yes_in_the_same_turn_now(&waiting, request, heard)
+                    {
+                        next = ALREADY_YES.to_owned();
+                    }
                     (
                         json!({
                             "prepared": true,
@@ -2177,12 +2660,19 @@ fn run_for(
         CONFIRM => {
             let pending = PENDING.lock().ok().and_then(|pending| pending.clone());
             let Some(pending) = pending else {
-                return (
-                    json!({"error": "There is no task waiting to be started."}),
-                    true,
-                );
+                let told = if place.one_yes {
+                    NOTHING_PREPARED
+                } else {
+                    "There is no task waiting to be started."
+                };
+                return (json!({"error": told}), true);
             };
-            if !may_confirm(&pending, request, heard, Instant::now()) {
+            // With the switch, a plain yes to a read-back said in words may
+            // start the task prepared in its own request (#5169).
+            let same_turn = place.one_yes
+                && !may_confirm(&pending, request, heard, Instant::now())
+                && yes_in_the_same_turn_now(&pending, request, heard);
+            if !same_turn && !may_confirm(&pending, request, heard, Instant::now()) {
                 return (
                     json!({"error": "Not started: the person has not said yes to it since you asked. Ask again if they still want it."}),
                     true,
@@ -2213,6 +2703,12 @@ fn run_for(
                 Some(answer) if answer.get("ok") == Some(&json!(true)) => {
                     if let Ok(mut waiting) = PENDING.lock() {
                         *waiting = None;
+                    }
+                    if same_turn {
+                        eprintln!(
+                            "lamp-voice: tasks: request {request}: task {} started on a yes in the turn that prepared it, after its read-back in words",
+                            pending.id
+                        );
                     }
                     // Asked for by text: its news goes back by text, and
                     // only such work's (`task_news::ForTexts`, #1673).
@@ -2756,6 +3252,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -2812,6 +3310,7 @@ pub(crate) mod tests {
             who: CLAUDE_CODE,
             text: String::new(),
             correct: false,
+            session: None,
         };
         assert!(may_confirm(&pending, 6, true, at + Duration::from_secs(10)));
         // In the request that prepared it: the model asking itself.
@@ -2848,6 +3347,7 @@ pub(crate) mod tests {
             who: CLAUDE_CODE,
             text: String::new(),
             correct: false,
+            session: None,
         };
         assert!(may_confirm(
             &pending,
@@ -2867,6 +3367,911 @@ pub(crate) mod tests {
             false,
             at + CONFIRM_WITHIN + Duration::from_secs(1)
         ));
+    }
+
+    /// #5169: the task as the model prepared it on its yes turn, after a
+    /// read-back said only in words.
+    fn moon(at: Instant) -> Pending {
+        Pending {
+            id: 4,
+            digest: "d".into(),
+            request: 9,
+            at,
+            who: CLAUDE_CODE,
+            text: "Write a two-line poem about the moon".into(),
+            correct: false,
+            session: None,
+        }
+    }
+
+    /// The Reviewer-lead's P2 on #5784: with a session named, a read-back
+    /// that never said it is no read-back, so a yes to it doesn't start the
+    /// task, and the work never goes into a session the lamp didn't say.
+    /// Reviewer-three's P2 on #5784: a task for a named session never
+    /// starts on a yes in the turn that prepared it, whatever the read-back
+    /// said, so a yes to "the docs archive session" can't send the work to
+    /// the "docs" session. The same line and yes start it with no session.
+    #[test]
+    fn a_task_for_a_named_session_never_starts_on_one_yes() {
+        let at = Instant::now();
+        let now = at + Duration::from_secs(1);
+        let yes = |pending: &Pending, line: &str| {
+            yes_in_the_same_turn(
+                pending,
+                9,
+                true,
+                Some("Yes."),
+                Some((line, Duration::from_secs(8), false)),
+                now,
+            )
+        };
+        assert!(yes(&moon(at), MOON_BACK));
+        for (prepared, spoken) in [
+            ("files", "file"),
+            ("red blue", "blue red"),
+            ("docs", "docs archive"),
+            ("api", "the api"),
+            ("docs update", "docs update"),
+            ("readme", "readme"),
+        ] {
+            let pending = Pending {
+                session: Some(prepared.into()),
+                ..moon(at)
+            };
+            let line = format!(
+                "Claude Code will write a two-line poem about the moon in the {spoken} session on your office computer. Shall I start it?"
+            );
+            assert!(reads_back(&line, &pending), "{prepared}/{spoken}");
+            assert!(!yes(&pending, &line), "{prepared}/{spoken}");
+            assert!(!yes(&pending, MOON_BACK), "{prepared}");
+        }
+    }
+
+    const MOON_BACK: &str = "Claude Code will write a two-line poem about the moon on your office computer. Shall I start it?";
+
+    /// #5169, with `LAMP_TASKS_ONE_YES`: a plain spoken yes to a read-back
+    /// said in words starts the task prepared in its own request, and only
+    /// that; everything else keeps `may_confirm`'s refusal.
+    #[test]
+    fn a_yes_in_the_turn_that_prepared_counts_only_after_its_read_back_in_words() {
+        let at = Instant::now();
+        let pending = moon(at);
+        let now = at + Duration::from_secs(1);
+        let back = |line: &'static str, ago: u64| Some((line, Duration::from_secs(ago), false));
+        // `may_confirm` alone refuses it, as ever.
+        assert!(!may_confirm(&pending, 9, true, now));
+        for yes in [
+            "Yes.",
+            "Yeah, go ahead.",
+            "Okay lamp, please do.",
+            "Sure, do it.",
+            "yep please",
+            "Hey Lamp, yes please.",
+        ] {
+            assert!(
+                yes_in_the_same_turn(&pending, 9, true, Some(yes), back(MOON_BACK, 8), now),
+                "{yes}"
+            );
+        }
+        // A question task's read-back matches its question alone.
+        let question = Pending {
+            text: format!("{QUESTION} what did you change in the parser yesterday? {PAST_WORK}"),
+            ..moon(at)
+        };
+        assert!(yes_in_the_same_turn(
+            &question,
+            9,
+            true,
+            Some("Yes"),
+            back(
+                "I'll ask Claude Code what it changed in the parser yesterday. Shall I?",
+                8
+            ),
+            now
+        ));
+        // Typed or written by the lamp: never.
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            false,
+            Some("Yes."),
+            back(MOON_BACK, 8),
+            now
+        ));
+        let mut chats = crate::messages::Chats::default();
+        let typed = chats.next_request("s1");
+        let typed_pending = Pending {
+            request: typed,
+            ..moon(at)
+        };
+        assert!(!yes_in_the_same_turn(
+            &typed_pending,
+            typed,
+            true,
+            Some("Yes."),
+            back(MOON_BACK, 8),
+            now
+        ));
+        // Not a plain yes.
+        for not in [
+            "yes and also make it longer",
+            "Yes, but ask Codex.",
+            "Yes?",
+            "no",
+            "write a poem about the moon",
+            "",
+        ] {
+            assert!(
+                !yes_in_the_same_turn(&pending, 9, true, Some(not), back(MOON_BACK, 8), now),
+                "{not}"
+            );
+        }
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            None,
+            back(MOON_BACK, 8),
+            now
+        ));
+        // The read-back names another agent.
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(
+                "Codex will write a two-line poem about the moon on your office computer. Shall I start it?",
+                8
+            ),
+            now
+        ));
+        // A read-back of other work.
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(
+                "Claude Code will fix the failing login test in the web app. Shall I start it?",
+                8
+            ),
+            now
+        ));
+        // No question at its end.
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(
+                "Claude Code will write a two-line poem about the moon on your office computer.",
+                8
+            ),
+            now
+        ));
+        // No line before it.
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            None,
+            now
+        ));
+        // The read-back too old, or the task.
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(MOON_BACK, CONFIRM_WITHIN.as_secs() + 1),
+            now
+        ));
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(MOON_BACK, 8),
+            at + CONFIRM_WITHIN + Duration::from_secs(1)
+        ));
+        // Another request than the one that prepared it: `may_confirm`'s.
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            10,
+            true,
+            Some("Yes."),
+            back(MOON_BACK, 8),
+            now
+        ));
+    }
+
+    /// The Reviewer-lead's P2 on #5609: with one yes, a read-back that drops
+    /// a clause of the task never starts it, so no work starts unheard; one
+    /// that says every content word back does.
+    #[test]
+    fn one_yes_starts_only_a_task_read_back_whole() {
+        let at = Instant::now();
+        let pending = Pending {
+            text: "Delete all the files in my Downloads folder and empty the trash".into(),
+            ..moon(at)
+        };
+        let now = at + Duration::from_secs(1);
+        let back = |line: &'static str| Some((line, Duration::from_secs(8), false));
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back("Claude Code will delete the files in your Downloads folder. Shall I start it?"),
+            now
+        ));
+        assert!(yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(
+                "Claude Code will delete all the files in your Downloads folder and empty the trash. Shall I start it?"
+            ),
+            now
+        ));
+        // A plural, an -ing or an -ed said back for the task's own word.
+        let fixing = Pending {
+            text: "Fix the failing login test".into(),
+            ..moon(at)
+        };
+        assert!(yes_in_the_same_turn(
+            &fixing,
+            9,
+            true,
+            Some("Yes."),
+            back("Claude Code will be fixing the failed login tests. Shall I start it?"),
+            now
+        ));
+    }
+
+    /// The Reviewer-lead's second P2 on #5609: no task word may go missing,
+    /// whatever the task's length.
+    #[test]
+    fn one_yes_needs_every_task_word_read_back() {
+        let at = Instant::now();
+        let now = at + Duration::from_secs(1);
+        let task = |text: &str| Pending {
+            text: text.into(),
+            ..moon(at)
+        };
+        for (text, line) in [
+            ("Reboot", "Claude Code will do it. Shall I start it?"),
+            (
+                "delete Downloads",
+                "Claude Code will delete that. Shall I start it?",
+            ),
+            (
+                "Force push to main",
+                "Claude Code will push to main. Shall I start it?",
+            ),
+            (
+                "Empty the trash and delete Downloads",
+                "Claude Code will empty the trash and delete. Shall I start it?",
+            ),
+            (
+                "Empty the trash and delete Downloads",
+                "Claude Code will empty and delete your Downloads. Shall I start it?",
+            ),
+        ] {
+            assert!(!reads_back(line, &task(text)), "{text} / {line}");
+            assert!(
+                !yes_in_the_same_turn(
+                    &task(text),
+                    9,
+                    true,
+                    Some("Yes."),
+                    Some((line, Duration::from_secs(8), false)),
+                    now
+                ),
+                "{text} / {line}"
+            );
+        }
+        for (text, line) in [
+            ("Reboot", "Claude Code will reboot it. Shall I start it?"),
+            (
+                "Empty the trash and delete Downloads",
+                "Claude Code will empty the trash and delete your Downloads. Shall I start it?",
+            ),
+        ] {
+            assert!(reads_back(line, &task(text)), "{text} / {line}");
+        }
+    }
+
+    /// The Reviewer-lead's third P2 on #5609: a task word is read back only
+    /// by a spoken word of the same stem, never a near one, and each spoken
+    /// word stands for one task word at most.
+    #[test]
+    fn one_yes_matches_task_words_by_stem_one_for_one() {
+        let task = |text: &str| Pending {
+            text: text.into(),
+            ..moon(Instant::now())
+        };
+        for (text, line) in [
+            (
+                "Remove the remote origin",
+                "Claude Code will show the remote origin. Shall I start it?",
+            ),
+            (
+                "killall node",
+                "Claude Code will kill node. Shall I start it?",
+            ),
+            (
+                "Write a note about the release",
+                "Claude Code wrote a note about the release. Shall I start it?",
+            ),
+            (
+                "Revert the last commit",
+                "Claude Code will reverse the last commit. Shall I start it?",
+            ),
+            // One spoken "test" for the task's "test" and "tests".
+            (
+                "Test the tests",
+                "Claude Code will test it. Shall I start it?",
+            ),
+        ] {
+            assert!(!reads_back(line, &task(text)), "{text} / {line}");
+        }
+        for (text, line) in [
+            (
+                "Remove the remote origin",
+                "Claude Code will remove the remote origin. Shall I start it?",
+            ),
+            (
+                "Test the tests",
+                "Claude Code will test the tests. Shall I start it?",
+            ),
+        ] {
+            assert!(reads_back(line, &task(text)), "{text} / {line}");
+        }
+    }
+
+    /// The Reviewer-lead's P3 on #5609's READ-OK: the agent's name and the
+    /// closing question never stand for a task word. A task that names the
+    /// agent needs its other words read back, the name aside.
+    #[test]
+    fn one_yes_reads_back_past_the_name_and_the_closing_question() {
+        let at = Instant::now();
+        let now = at + Duration::from_secs(1);
+        let task = |text: &str| Pending {
+            text: text.into(),
+            ..moon(at)
+        };
+        for (text, line) in [
+            // "Code" in the name is not the task's "code".
+            (
+                "Delete the code",
+                "Claude Code will delete it. Shall I start it?",
+            ),
+            // The question's "start" is not the task's "start".
+            (
+                "Start the server",
+                "Claude Code will stark the server. Shall I start it?",
+            ),
+            // A read-back that is one question alone says nothing back.
+            ("Start the server", "Shall Claude Code start the server?"),
+            (
+                "Ask Claude Code to fix the tests",
+                "Claude Code will fix them. Shall I start it?",
+            ),
+        ] {
+            assert!(!reads_back(line, &task(text)), "{text} / {line}");
+            assert!(
+                !yes_in_the_same_turn(
+                    &task(text),
+                    9,
+                    true,
+                    Some("Yes."),
+                    Some((line, Duration::from_secs(8), false)),
+                    now
+                ),
+                "{text} / {line}"
+            );
+        }
+        for (text, line) in [
+            (
+                "Delete the code",
+                "Claude Code will delete the code. Shall I start it?",
+            ),
+            (
+                "Start the server",
+                "Claude Code will start the server. Shall I start it?",
+            ),
+            (
+                "Ask Claude Code to fix the tests",
+                "I'll ask Claude Code to fix the tests. Shall I start it?",
+            ),
+            (
+                "Ask Claude Code to fix the tests",
+                "Okay! I'll ask Claude Code to fix the tests. Want me to go ahead?",
+            ),
+        ] {
+            assert!(reads_back(line, &task(text)), "{text} / {line}");
+            assert!(
+                yes_in_the_same_turn(
+                    &task(text),
+                    9,
+                    true,
+                    Some("Yes."),
+                    Some((line, Duration::from_secs(8), false)),
+                    now
+                ),
+                "{text} / {line}"
+            );
+        }
+        // The Reviewer-lead's P3 on #5785's READ-OK: a form of the name
+        // that is the task's own word, not who it is asked of, still has to
+        // be said back. Only "ask Codex to …" addresses Codex.
+        let codex = |text: &str| Pending {
+            text: text.into(),
+            who: "Codex",
+            ..moon(at)
+        };
+        for (text, line, said) in [
+            (
+                "Uninstall the codecs",
+                "Codex will uninstall it. Shall I start it?",
+                false,
+            ),
+            (
+                "Uninstall the codecs",
+                "Codex will uninstall the codecs. Shall I start it?",
+                true,
+            ),
+            (
+                "Ask Codex to uninstall the codecs",
+                "I'll ask Codex to uninstall it. Shall I?",
+                false,
+            ),
+            (
+                "Ask Codex to uninstall the codecs",
+                "I'll ask Codex to uninstall the codecs. Shall I?",
+                true,
+            ),
+        ] {
+            assert_eq!(reads_back(line, &codex(text)), said, "{text} / {line}");
+        }
+    }
+
+    /// The Reviewer-lead's P3 on #5609: a yes said over the read-back, or
+    /// after one cut as heard, never starts the task, though the whole line
+    /// would read it back.
+    #[test]
+    fn one_yes_never_counts_over_a_cut_read_back() {
+        let at = Instant::now();
+        let pending = moon(at);
+        let now = at + Duration::from_secs(1);
+        let back = |cut| Some((MOON_BACK, Duration::from_secs(8), cut));
+        assert!(yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(false),
+            now
+        ));
+        assert!(!yes_in_the_same_turn(
+            &pending,
+            9,
+            true,
+            Some("Yes."),
+            back(true),
+            now
+        ));
+    }
+
+    /// #5169: a place with the tasks part, unread, and `one_yes` as given.
+    fn one_yes_place(directory: &Path, one_yes: bool) -> Place {
+        Place {
+            one_yes,
+            ..place(directory, false)
+        }
+    }
+
+    /// #5169: confirming with nothing prepared says, with the switch, to
+    /// prepare the task said back and confirm again; without it, as ever.
+    #[test]
+    fn a_confirm_with_nothing_prepared_says_to_prepare_it_with_the_switch() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let call = ToolCall {
+            id: "c".into(),
+            name: CONFIRM.into(),
+            args: json!({}),
+        };
+        let directory = Path::new("/nonexistent/tasks-5169");
+        let told = |one_yes: bool| {
+            run_for(
+                &one_yes_place(directory, one_yes),
+                &[],
+                &call,
+                3,
+                true,
+                Duration::from_millis(200),
+            )
+        };
+        assert_eq!(
+            told(false),
+            (
+                json!({"error": "There is no task waiting to be started."}),
+                true
+            )
+        );
+        let (on, answered) = told(true);
+        assert!(answered);
+        assert_eq!(on["error"], NOTHING_PREPARED);
+        assert!(NOTHING_PREPARED.contains(START) && NOTHING_PREPARED.contains(CONFIRM));
+    }
+
+    /// #5169: without `LAMP_TASKS_ONE_YES` every description is as before;
+    /// with it, only the read-back sentence of `start_agent_task` changes,
+    /// to call first and say the task back from the answer.
+    #[test]
+    fn the_one_yes_switch_changes_only_the_read_back_and_task_words() {
+        let old_lead_in = |with_who: &str| {
+            format!(
+                "Say the task back in one short sentence{with_who} as a statement, then call it at once; ask whether to start it only after it answers."
+            )
+        };
+        let old_plain = |with_who: &str| {
+            format!(
+                "Nothing starts yet: then say the task back in one short sentence{with_who} and ask whether to start it."
+            )
+        };
+        for with_who in ["", ", with who will do it,"] {
+            assert_eq!(read_back(true, with_who, false), old_lead_in(with_who));
+            assert_eq!(read_back(false, with_who, false), old_plain(with_who));
+            for lead_in in [false, true] {
+                let new = read_back(lead_in, with_who, true);
+                assert!(new.starts_with("Call it first"), "{new}");
+                assert!(new.contains("only from its answer"), "{new}");
+            }
+        }
+        for staff in [Vec::new(), two()] {
+            for (asked, lead_in) in [(false, false), (false, true), (true, false), (true, true)] {
+                let mut off = place(Path::new("/run/t"), !staff.is_empty());
+                off.asked = asked;
+                off.lead_in = lead_in;
+                let on = Place {
+                    one_yes: true,
+                    ..off.clone()
+                };
+                let with_who = if staff.is_empty() {
+                    ""
+                } else {
+                    ", with who will do it,"
+                };
+                let old = if lead_in {
+                    old_lead_in(with_who)
+                } else {
+                    old_plain(with_who)
+                };
+                let new = read_back(lead_in, with_who, true);
+                let (off, on) = (super::declared(&off, &staff), super::declared(&on, &staff));
+                assert_eq!(off.len(), on.len());
+                for (off, on) in off.iter().zip(&on) {
+                    assert_eq!(off.name, on.name);
+                    if off.name == START {
+                        // Only the task's words differ in the parameters (#5119).
+                        let words = |tool: &Tool| {
+                            tool.parameters.as_ref().unwrap()["properties"]["task"]["description"]
+                                .clone()
+                        };
+                        assert_eq!(words(off), TASK_COMPLETE);
+                        assert_eq!(words(on), TASK_SHORT);
+                        let mut back = on.parameters.clone().unwrap();
+                        back["properties"]["task"]["description"] = json!(TASK_COMPLETE);
+                        assert_eq!(Some(back), off.parameters);
+                    } else {
+                        assert_eq!(off.parameters, on.parameters);
+                    }
+                    if off.name == START {
+                        assert!(off.description.contains(&old), "{}", off.description);
+                        assert!(!off.description.contains(&new));
+                        assert_eq!(on.description.replace(&new, &old), off.description);
+                    } else {
+                        assert_eq!(off.description, on.description, "{}", off.name);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_short_ask_is_enough_only_with_the_one_yes_switch() {
+        // #5119: the old words had the model ask what "build a website about
+        // Vietnam tourism" should have instead of calling start_agent_task.
+        for staff in [Vec::new(), two()] {
+            let off = place(Path::new("/run/t"), !staff.is_empty());
+            let on = Place {
+                one_yes: true,
+                ..off.clone()
+            };
+            let task = |place: &Place| {
+                let tools = super::declared(place, &staff);
+                let start = tools.iter().find(|tool| tool.name == START).unwrap();
+                start.parameters.as_ref().unwrap()["properties"]["task"]["description"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            };
+            assert_eq!(
+                task(&off),
+                "The work, in the person's own words, complete enough to do without asking."
+            );
+            assert_eq!(
+                task(&on),
+                "The work, in the person's own words. A short ask is enough: the agent works out the details."
+            );
+        }
+    }
+
+    #[test]
+    fn the_one_yes_switch_is_on_only_with_the_tasks_part() {
+        let tasks = vec![FLAG.to_owned(), "/run/t".to_owned()];
+        assert!(one_yes(&tasks, Some("on")));
+        assert!(!one_yes(&tasks, Some("1")));
+        assert!(!one_yes(&tasks, None));
+        assert!(!one_yes(&[], Some("on")));
+        let flags: Vec<String> = [FLAG, "/run/t", CORRECT_FLAG, ONE_YES_FLAG, "--next"]
+            .map(str::to_owned)
+            .to_vec();
+        let (place, rest) = take(&flags).unwrap();
+        let place = place.unwrap();
+        assert!(place.one_yes && place.correct);
+        assert_eq!(rest, ["--next".to_owned()]);
+        let flags: Vec<String> = [FLAG, "/run/t"].map(str::to_owned).to_vec();
+        assert!(!take(&flags).unwrap().0.unwrap().one_yes);
+    }
+
+    /// #5535: `LAMP_TASKS_REPLY_NAMED=on` with the tasks part gives
+    /// [`REPLY_NAMED_FLAG`], taken after the other switches; only then does
+    /// [`START`] take a `session`.
+    #[test]
+    fn the_reply_named_switch_is_on_only_with_the_tasks_part_and_adds_session() {
+        let tasks = vec![FLAG.to_owned(), "/run/t".to_owned()];
+        assert!(reply_named(&tasks, Some("on")));
+        assert!(!reply_named(&tasks, Some("1")));
+        assert!(!reply_named(&tasks, None));
+        assert!(!reply_named(&[], Some("on")));
+        let flags: Vec<String> = [FLAG, "/run/t", ONE_YES_FLAG, REPLY_NAMED_FLAG, "--next"]
+            .map(str::to_owned)
+            .to_vec();
+        let (place, rest) = take(&flags).unwrap();
+        let place = place.unwrap();
+        assert!(place.reply_named && place.one_yes);
+        assert_eq!(rest, ["--next".to_owned()]);
+        let off = take(&[FLAG.to_owned(), "/run/t".to_owned()])
+            .unwrap()
+            .0
+            .unwrap();
+        assert!(!off.reply_named);
+        let session = |place: &Place| {
+            let tools = declared(place, &[]);
+            let start = tools.iter().find(|tool| tool.name == START).unwrap();
+            start.parameters.as_ref().unwrap()["properties"]
+                .get("session")
+                .cloned()
+        };
+        assert_eq!(session(&off), None);
+        assert_eq!(session(&place).unwrap()["description"], SESSION);
+        assert_eq!(session(&place).unwrap()["type"], "string");
+        assert!(SESSION.len() < 200);
+    }
+
+    /// The Reviewer-lead's P3s on #5784: with the switch, a corrected ask
+    /// that changes only the session replaces the one waiting, and a
+    /// session named for Devin's cloud is refused before anything is asked
+    /// of the tasks part.
+    #[test]
+    fn another_session_is_a_correction_and_devins_cloud_takes_none() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-session-fix-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"a","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":8,"prepared_digest":"b","revision":2}),
+                ),
+                ("request.sock", json!({"ok":true,"revision":3})),
+            ],
+        );
+        let mut on = place(&directory, false);
+        on.reply_named = true;
+        on.correct = true;
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args,
+        };
+        let task = "Add a line to the readme";
+        let (told, _) = run(
+            &on,
+            &call(json!({"task":task,"session":"docs"})),
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert!(
+            told["where"]
+                .as_str()
+                .unwrap()
+                .starts_with("Claude Code, in the session \"docs\" on "),
+            "{told}"
+        );
+        // The Reviewer-lead's P2 on #5784 at de9bebdb41: never only "Shall
+        // I start it?" for a named session; the session is said first.
+        assert_eq!(
+            told["next"],
+            json!(format!("{} {CORRECTED_NEXT}", session_next("Claude Code"))),
+            "{told}"
+        );
+        assert!(!told["next"].as_str().unwrap().contains("Shall I start it?"));
+        let (told, _) = run(
+            &on,
+            &call(json!({"task":task,"session":"site"})),
+            4,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert_eq!(
+            told["next"],
+            json!(format!(
+                "{REPLACED_NEXT} {} {CORRECTED_NEXT}",
+                session_next("Claude Code")
+            )),
+            "{told}"
+        );
+        let pending = PENDING.lock().unwrap().clone().unwrap();
+        assert_eq!((pending.id, pending.session.as_deref()), (8, Some("site")));
+        let ops: Vec<String> = std::iter::from_fn(|| seen.recv_timeout(PEER_WAIT).ok())
+            .map(|op| op["op"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ops, ["status", "prepare", "status", "prepare", "cancel"]);
+        *PENDING.lock().unwrap() = None;
+        // Devin's cloud: refused, nothing asked of the part.
+        let cloud = [Member {
+            alias: "cloud".into(),
+            kind: KINDS
+                .iter()
+                .find(|kind| kind.engine == "devin-cloud")
+                .unwrap(),
+        }];
+        let mut cloudy = place(&directory, true);
+        cloudy.reply_named = true;
+        cloudy.target = "cloud".into();
+        let (told, answered) = run_for(
+            &cloudy,
+            &cloud,
+            &call(json!({"task":task,"session":"docs"})),
+            5,
+            true,
+            PEER_WAIT,
+        );
+        assert!(answered && told.get("error").is_some(), "{told}");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #5535: with the switch, a session the person named goes to the tasks
+    /// part with the task, and the read-back says it goes into that
+    /// session, not a new one. Without the switch, or with none named, the
+    /// request is as it always was; words that can't be a session's name
+    /// prepare nothing.
+    #[test]
+    fn a_named_session_is_sent_with_the_task_only_with_the_switch() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-session-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let prepared = |id: u64| json!({"ok":true,"id":id,"prepared_digest":"abc","revision":1});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                ("request.sock", prepared(7)),
+                ("request.sock", status(1)),
+                ("request.sock", prepared(8)),
+                ("request.sock", status(2)),
+                ("request.sock", prepared(9)),
+            ],
+        );
+        let mut on = place(&directory, false);
+        on.reply_named = true;
+        let off = place(&directory, false);
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args,
+        };
+        let (told, answered) = run(
+            &on,
+            &call(json!({"task":"Add a line to the readme","session":"  docs update "})),
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert!(answered && told["prepared"] == json!(true), "{told}");
+        assert!(
+            told["where"]
+                .as_str()
+                .unwrap()
+                .starts_with("Claude Code, in the session \"docs update\" on "),
+            "{told}"
+        );
+        assert!(told["where"].as_str().unwrap().ends_with(", not a new one"));
+        assert_eq!(seen.recv().unwrap()["op"], "status");
+        let prepare = seen.recv().unwrap();
+        assert_eq!(prepare["op"], "prepare");
+        assert_eq!(prepare["session"], "docs update");
+        // Off: the session is not sent, and the read-back is as before.
+        let (told, _) = run(
+            &off,
+            &call(json!({"task":"Add a line to the readme","session":"docs update"})),
+            4,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert!(!told["where"].as_str().unwrap().contains("session"));
+        assert_eq!(seen.recv().unwrap()["op"], "status");
+        assert!(seen.recv().unwrap().get("session").is_none());
+        // On, with none named or only spaces: as before.
+        let (told, _) = run(
+            &on,
+            &call(json!({"task":"Add a line to the readme","session":"  "})),
+            5,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert_eq!(seen.recv().unwrap()["op"], "status");
+        assert!(seen.recv().unwrap().get("session").is_none());
+        // Words that can't be a session's name: nothing asked of the part.
+        for words in [
+            "docs\nrm".to_owned(),
+            "x".repeat(129),
+            "the that".to_owned(),
+        ] {
+            let (told, answered) = run(
+                &on,
+                &call(json!({"task":"Add a line to the readme","session":words})),
+                6,
+                true,
+                PEER_WAIT,
+            );
+            assert!(answered && told.get("error").is_some(), "{told}");
+        }
+        assert!(seen.try_recv().is_err());
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
@@ -2990,6 +4395,8 @@ pub(crate) mod tests {
                 correct: false,
                 questions: false,
                 now: false,
+                one_yes: false,
+                reply_named: false,
                 sign_in: false,
                 sign_in_app: false,
             })
@@ -3402,6 +4809,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -3656,6 +5065,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -3740,6 +5151,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -3832,6 +5245,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -3889,6 +5304,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -3948,6 +5365,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -4053,6 +5472,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         }
@@ -4457,6 +5878,8 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         }
@@ -5477,15 +6900,21 @@ pub(crate) mod tests {
                 switched.staff_note = noted;
                 switched.accounts = accounts && asked;
                 switched.named_only = named_only;
-                for (correct, now) in [(false, false), (false, true), (true, false), (true, true)] {
+                for ((correct, now), one_yes) in
+                    [(false, false), (false, true), (true, false), (true, true)]
+                        .into_iter()
+                        .flat_map(|switches| [(switches, false), (switches, true)])
+                {
                     switched.correct = correct;
                     // `LAMP_TASKS_NOW` (#4342): its own description, and
                     // check_agent_task's with what it says of it.
                     switched.now = now;
+                    // `LAMP_TASKS_ONE_YES`'s read-back sentence (#5169).
+                    switched.one_yes = one_yes;
                     for tool in super::declared(&switched, &staff) {
                         if tool.validate().is_err() {
                             refused.push(format!(
-                                "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}, correct {correct}, now {now}: {} bytes",
+                                "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}, correct {correct}, now {now}, one yes {one_yes}: {} bytes",
                                 tool.name,
                                 staff.len(),
                                 tool.description.len()
@@ -5599,11 +7028,11 @@ pub(crate) mod tests {
             );
             for choosing in [false, true] {
                 assert!(
-                    next_for(&on, choosing, "Codex", false).ends_with(
+                    next_for(&on, choosing, "Codex", false, false).ends_with(
                         "Only their yes starts it: the same ask again, in the same words or others, is not a yes."
                     )
                 );
-                assert!(!next_for(&off, choosing, "Codex", false).contains("not a yes"));
+                assert!(!next_for(&off, choosing, "Codex", false, false).contains("not a yes"));
             }
         }
         // A task prepared, then the same ask in other words: the note
@@ -5618,6 +7047,7 @@ pub(crate) mod tests {
                 who: CLAUDE_CODE,
                 text: "Summarise the readme in three short lines".into(),
                 correct,
+                session: None,
             });
             let note = pending_note(2, at).unwrap();
             assert_eq!(note.contains("that is not a yes"), correct, "{note}");
@@ -6027,6 +7457,8 @@ pub(crate) mod tests {
                 correct: false,
                 questions: false,
                 now: false,
+                one_yes: false,
+                reply_named: false,
                 sign_in: false,
                 sign_in_app: false,
             })
@@ -6578,6 +8010,8 @@ pub(crate) mod tests {
             correct,
             questions: false,
             now: false,
+            one_yes: false,
+            reply_named: false,
             sign_in: false,
             sign_in_app: false,
         }
@@ -6883,6 +8317,7 @@ pub(crate) mod tests {
             who: CLAUDE_CODE,
             text: String::new(),
             correct,
+            session: None,
         };
         *PENDING.lock().unwrap() = Some(waiting(false));
         assert_eq!(
@@ -6911,16 +8346,16 @@ pub(crate) mod tests {
                 off.lead_in = lead_in;
                 let before = prepared_next(lead_in, choosing, "Codex");
                 for replaced in [false, true] {
-                    assert_eq!(next_for(&off, choosing, "Codex", replaced), before);
+                    assert_eq!(next_for(&off, choosing, "Codex", replaced, false), before);
                 }
                 let mut on = off.clone();
                 on.correct = true;
                 assert_eq!(
-                    next_for(&on, choosing, "Codex", false),
+                    next_for(&on, choosing, "Codex", false, false),
                     format!("{before} {CORRECTED_NEXT}")
                 );
                 assert_eq!(
-                    next_for(&on, choosing, "Codex", true),
+                    next_for(&on, choosing, "Codex", true, false),
                     format!("{REPLACED_NEXT} {before} {CORRECTED_NEXT}")
                 );
             }

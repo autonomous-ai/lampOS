@@ -601,11 +601,13 @@ mod tests {
         watcher.onboarding(&OnboardingPending {
             invitations: vec![invitation],
             walk: true,
+            ..Default::default()
         });
         assert!(watcher.situation(0).onboarding);
         watcher.onboarding(&OnboardingPending {
             invitations: Vec::new(),
             walk: false,
+            ..Default::default()
         });
         assert!(!watcher.situation(0).onboarding);
     }

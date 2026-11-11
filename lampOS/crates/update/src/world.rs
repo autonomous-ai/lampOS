@@ -6,8 +6,8 @@ use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{Health, MicrophonePrivacy, Speech, VoiceMute, VoiceState};
 use std::{
     collections::BTreeMap,
-    io,
-    path::Path,
+    fs, io,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -64,6 +64,18 @@ pub trait Systemd {
     /// Harness's download. A systemd that cannot refuses.
     fn start_harness_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot start the Harness unit".to_owned())
+    }
+    /// [`crate::harness_install::UNIT`]'s cgroup frozen, and only its
+    /// (#5978), while the voice is not quiet during Hermes's install: by
+    /// its `cgroup.freeze`, as systemd refuses `systemctl freeze` for a
+    /// oneshot still activating. A systemd that cannot refuses.
+    fn freeze_harness_unit(&mut self) -> Result<(), String> {
+        Err("this systemd cannot freeze the Harness unit".to_owned())
+    }
+    /// [`crate::harness_install::UNIT`]'s cgroup thawed, and only its; no
+    /// cgroup (the unit not running) is nothing to thaw.
+    fn thaw_harness_unit(&mut self) -> Result<(), String> {
+        Err("this systemd cannot thaw the Harness unit".to_owned())
     }
     /// When [`crate::writer_swap::BACK_UNIT`]'s program last began, in Unix
     /// milliseconds to the second below (`ExecMainStartTimestamp`): none
@@ -123,7 +135,7 @@ impl Systemd for Systemctl {
             Command::new("systemctl")
                 .args([
                     "show",
-                    "--property=Id,ActiveState,SubState,MainPID,NRestarts,Result,ConditionResult",
+                    "--property=Id,ActiveState,SubState,MainPID,NRestarts,Result,ConditionResult,StatusText",
                     "--",
                 ])
                 .args(units),
@@ -219,6 +231,14 @@ impl Systemd for Systemctl {
             &["start", "--no-block", crate::harness_install::UNIT],
             JOURNAL_WITHIN,
         )
+    }
+
+    fn freeze_harness_unit(&mut self) -> Result<(), String> {
+        harness_cgroup_freeze(true)
+    }
+
+    fn thaw_harness_unit(&mut self) -> Result<(), String> {
+        harness_cgroup_freeze(false)
     }
 
     fn start_writer_unit(&mut self) -> Result<(), String> {
@@ -478,6 +498,41 @@ fn not_loaded(why: &str) -> bool {
 /// `TimeoutStartSec=120`.
 const WRITER_WITHIN: Duration = Duration::from_secs(150);
 
+/// The cgroup v2 root, where a unit's `ControlGroup` path begins.
+const CGROUP_ROOT: &str = "/sys/fs/cgroup";
+
+/// Freezes (or thaws) the Harness one-shot's cgroup by its own
+/// `cgroup.freeze` (#5978). `systemctl freeze` would be the plain way, but
+/// systemd (252 on the lamp) refuses it for a oneshot still activating, as
+/// the install is all its life: "Unit has a pending job" (c0a4, 11 Nov). The
+/// kernel's freezer has no such rule, and systemd keeps the unit as it is.
+/// No cgroup (the unit not running): nothing to thaw, and a freeze refused.
+fn harness_cgroup_freeze(frozen: bool) -> Result<(), String> {
+    let unit = crate::harness_install::UNIT;
+    let group = show_within(
+        Command::new("systemctl").args(["show", "--property=ControlGroup", "--value", "--", unit]),
+        JOURNAL_WITHIN,
+    )?;
+    let group = group.trim();
+    match cgroup_freeze_file(group) {
+        Some(file) => fs::write(&file, if frozen { "1" } else { "0" })
+            .map_err(|error| format!("{}: {error}", file.display())),
+        None if frozen => Err(format!("{unit} has no cgroup to freeze ({group:?})")),
+        None => Ok(()),
+    }
+}
+
+/// `cgroup.freeze` of a unit's `ControlGroup`, for a path systemd gives:
+/// absolute, below the root, with no `.` or `..` part.
+fn cgroup_freeze_file(group: &str) -> Option<PathBuf> {
+    let below = group.strip_prefix('/')?;
+    let parts_fit = !below.is_empty()
+        && below
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..");
+    parts_fit.then(|| Path::new(CGROUP_ROOT).join(below).join("cgroup.freeze"))
+}
+
 fn run(words: &[&str], within: Duration) -> Result<(), String> {
     let mut child = Command::new("systemctl")
         .args(words)
@@ -535,6 +590,7 @@ pub fn parse_show(text: &str) -> Vec<UnitState> {
                 "NRestarts" => unit.restarts = value.parse().unwrap_or(0),
                 "Result" => unit.result = value.to_owned(),
                 "ConditionResult" => unit.condition = value.to_owned(),
+                "StatusText" => unit.status = value.to_owned(),
                 _ => {}
             }
         }
@@ -562,6 +618,12 @@ impl BusEars {
     /// that cannot be used is said once, and then nothing is heard: the
     /// voice can then not be judged quiet.
     pub fn new(root: &Path, say: &mut dyn FnMut(&str)) -> Self {
+        Self::named(root, NAME, say)
+    }
+
+    /// [`BusEars::new`], subscribed under `name`: the Hermes install's
+    /// watch listens beside the rounds' own ears (#5978).
+    pub fn named(root: &Path, name: &str, say: &mut dyn FnMut(&str)) -> Self {
         let bus = match Bus::new(root) {
             Ok(bus) => bus,
             Err(error) => {
@@ -578,7 +640,7 @@ impl BusEars {
             }
         };
         let mut subscribe =
-            |topic: &str, type_name: &str| match bus.subscribe_typed(topic, NAME, type_name) {
+            |topic: &str, type_name: &str| match bus.subscribe_typed(topic, name, type_name) {
                 Ok(subscriber) => Some(subscriber),
                 Err(error) => {
                     say(&format!("{topic} cannot be subscribed to: {error}"));
@@ -614,6 +676,34 @@ impl BusEars {
         Some(Heard::Slide {
             closed: lease.physical_muted == Some(true),
         })
+    }
+}
+
+impl BusEars {
+    /// The voice's newest privacy lease for the Hermes install's watch
+    /// (#5978): fresh within [`crate::hermes_schedule::LOST_AFTER`] and
+    /// valid, with its boot and what it reads of the slide; else gone.
+    pub fn lease(&self) -> crate::hermes_schedule::Lease {
+        use crate::hermes_schedule::{LOST_AFTER, Lease};
+        let Some(Ok(Some(message))) = self
+            .bus
+            .as_ref()
+            .map(|bus| bus.latest(MicrophonePrivacy::TOPIC))
+        else {
+            return Lease::Gone;
+        };
+        let age = unix_ms().saturating_sub(message.header.at_unix_ms);
+        if age > LOST_AFTER.as_millis() as u64 {
+            return Lease::Gone;
+        }
+        match message.parse::<MicrophonePrivacy>() {
+            Ok(lease) if lease.check().is_ok() => Lease::Fresh {
+                boot: format!("{}/{}", lease.session_id, lease.controller_boot),
+                physical: lease.physical_muted,
+                no_slide: lease.no_slide,
+            },
+            _ => Lease::Gone,
+        }
     }
 }
 
@@ -730,6 +820,30 @@ impl Clock for Monotonic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// c0a4, 11 Nov: systemd 252 refused `systemctl freeze` for the
+    /// activating one-shot ("Unit has a pending job"), so the install was
+    /// stopped at the first ask instead of held. The freeze goes to the
+    /// unit's own `cgroup.freeze`, and only for a path systemd could give.
+    #[test]
+    fn the_harness_unit_is_frozen_by_its_own_cgroup_freeze_file() {
+        assert_eq!(
+            cgroup_freeze_file("/system.slice/lamp-update-harness.service"),
+            Some(PathBuf::from(
+                "/sys/fs/cgroup/system.slice/lamp-update-harness.service/cgroup.freeze"
+            ))
+        );
+        for refused in [
+            "",
+            "/",
+            "system.slice/lamp-update-harness.service",
+            "/system.slice/../x",
+            "/system.slice/./x",
+            "/system.slice//x",
+        ] {
+            assert_eq!(cgroup_freeze_file(refused), None, "{refused:?}");
+        }
+    }
 
     #[test]
     fn a_stop_of_a_unit_systemd_never_loaded_is_known_by_its_status_or_its_words() {
@@ -972,7 +1086,7 @@ mod tests {
 
     #[test]
     fn systemctl_show_is_read_unit_by_unit() {
-        let text = "Id=lamp-voice.service\nActiveState=active\nSubState=running\nMainPID=812\nNRestarts=2\n\nId=lamp-body.service\nActiveState=activating\nSubState=auto-restart\nMainPID=0\nNRestarts=1\n";
+        let text = "Id=lamp-voice.service\nActiveState=active\nSubState=running\nMainPID=812\nNRestarts=2\n\nId=lamp-body.service\nActiveState=activating\nSubState=auto-restart\nMainPID=0\nNRestarts=1\nStatusText=held, nothing moves: a fold failed\n";
         let units = parse_show(text);
         assert_eq!(units.len(), 2);
         assert_eq!(units[0].unit, "lamp-voice.service");
@@ -980,6 +1094,8 @@ mod tests {
         assert!(units[0].running());
         assert_eq!(units[1].sub, "auto-restart");
         assert!(!units[1].running());
+        assert_eq!(units[0].held(), None);
+        assert_eq!(units[1].held(), Some("a fold failed"));
     }
 
     #[test]

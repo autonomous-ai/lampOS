@@ -159,6 +159,35 @@ fn follows_up_from(began_us: Option<u64>) -> bool {
         )
 }
 
+/// A line begun over the lamp's audible answer, after a Stop, or cutting
+/// it (`over_the_lamps_voice`, `after_stop` or `heard_of_cut` on its Start,
+/// as told here): the lamp's line before it was not heard whole, and is
+/// marked cut, so a one-yes read-back is never taken from it, in this
+/// request or a later one (the Reviewer-lead's P3s on #5609). With
+/// `LAMP_SAID_AS_HEARD` off, a Stop by hand or head is all this route is
+/// told of a cut.
+fn mark_cut_read_back(thread: &mut crate::thread::Thread, request: u64, cuts: bool) {
+    if cuts {
+        thread.began_over_the_lamps_voice(request);
+    }
+}
+
+/// Whether `command` is a Start that cuts the lamp's line before it
+/// ([`mark_cut_read_back`]): over the lamp's voice, after a Stop, or
+/// cutting a reply. Read from the Start itself, so the Live route's call
+/// site passes no flag of its own that a test would not see.
+fn start_cuts_read_back(command: &ProviderInput) -> bool {
+    matches!(
+        command,
+        ProviderInput::Start {
+            over_the_lamps_voice,
+            after_stop,
+            heard_of_cut,
+            ..
+        } if *over_the_lamps_voice || *after_stop || heard_of_cut.is_some()
+    )
+}
+
 /// With [`name_or_follow_up`], two faces or more in the eyes' newest fresh
 /// look (`eyes`) are two people at the lamp, and the room is busy at once
 /// ([`crate::room_told::RoomTold::two_people`]); said when it turns so, for
@@ -869,6 +898,16 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// Whether the walk is under way (`onboarding::set_under_way`), told
+    /// the worker with each turn in hand while it is, and once as it ends:
+    /// the second route's replies drop the walk's step words in its own
+    /// process, which never reads the coordinator's (#5931). The Live
+    /// worker takes nothing from it.
+    WalkUnderWay {
+        request: u64,
+        privacy_generation: u64,
+        on: bool,
+    },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.
     Written {
@@ -927,6 +966,7 @@ impl ProviderInput {
             | Self::StepCall { request, .. }
             | Self::Onboarding { request, .. }
             | Self::TurnOpened { request, .. }
+            | Self::WalkUnderWay { request, .. }
             | Self::WokenByName { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
@@ -965,6 +1005,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::TurnOpened {
+                privacy_generation, ..
+            }
+            | Self::WalkUnderWay {
                 privacy_generation, ..
             }
             | Self::WokenByName {
@@ -6283,6 +6326,7 @@ impl InputHandoff {
         if state.owner().map(|owner| owner.turn()) != Some(request.get()) {
             return Err(io::Error::other("provider input has no matching current owner").into());
         }
+        let cuts_read_back = start_cuts_read_back(&command);
         match command {
             ProviderInput::Reminder {
                 session,
@@ -6387,6 +6431,9 @@ impl InputHandoff {
                 }
                 if let Err(refusal) = input.start(expected, request) {
                     return self.refused_start(request, refusal);
+                }
+                if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                    mark_cut_read_back(&mut thread, request.get(), cuts_read_back);
                 }
                 if continues {
                     self.continued = Some(request.get());
@@ -6527,6 +6574,8 @@ impl InputHandoff {
             ProviderInput::PauseJoin { .. } => {}
             // The second route's (`LAMP_STOP_WORDS_COMMIT_WAITS`).
             ProviderInput::StopWords { .. } => {}
+            // The second route's (#5931).
+            ProviderInput::WalkUnderWay { .. } => {}
             // Onboarding's sentence (#1803): from now its words and the
             // answer to it are kept out of the thread.
             ProviderInput::CountOnly { .. } => {
@@ -8404,6 +8453,54 @@ pub(crate) mod tests {
                 ..
             }
         ));
+    }
+
+    /// The Reviewer-lead's P3s on #5609: a Start over the lamp's voice, after
+    /// a Stop, or cutting a reply marks the read-back before it cut, and a
+    /// yes in a later request reads it so; a plain Start marks nothing. The
+    /// flags are read from the Start itself, as the Live route's call site
+    /// reads them ([`start_cuts_read_back`]), so a flag dropped there fails
+    /// here (the Reviewer-lead's P3 on #5609's READ-OK).
+    #[test]
+    fn a_start_over_the_lamps_voice_or_after_a_stop_marks_the_read_back_cut() {
+        let ask = "Claude Code will write a poem. Shall I start it?";
+        let now = Instant::now();
+        // Over the lamp's voice, after a Stop (a Stop by hand or head with
+        // `LAMP_SAID_AS_HEARD` off tells this route nothing else), cutting
+        // a reply, or none of these.
+        for (over, after_stop, heard_of_cut, cut) in [
+            (false, false, false, false),
+            (true, false, false, true),
+            (false, true, false, true),
+            (false, false, true, true),
+        ] {
+            let mut thread = crate::thread::Thread::new();
+            thread.person("Ask Claude Code for a poem", true, now);
+            thread.lamp(1, ask, now);
+            let start = ProviderInput::Start {
+                request: 2,
+                session: 7,
+                privacy_generation: 2,
+                continues: false,
+                continues_cut_off: false,
+                over_the_lamp: over,
+                after_stop,
+                follows_on: false,
+                over_the_lamps_voice: over,
+                heard_of_cut: heard_of_cut.then_some(crate::said_as_heard::HeardOfCut {
+                    request: 1,
+                    samples: 36_000,
+                }),
+                soft_lead_us: 0,
+            };
+            mark_cut_read_back(&mut thread, 2, start_cuts_read_back(&start));
+            thread.person("Yes.", true, now);
+            assert_eq!(
+                thread.answered_last_but_cut(3, now).unwrap().2,
+                cut,
+                "over {over}, after a Stop {after_stop}, cutting {heard_of_cut}"
+            );
+        }
     }
 
     /// `LAMP_SAID_AS_HEARD`: a Start that cut a reply says how much of it
@@ -11143,6 +11240,8 @@ pub(crate) mod tests {
                 correct: false,
                 questions: false,
                 now: false,
+                one_yes: false,
+                reply_named: false,
                 sign_in: false,
                 sign_in_app: false,
             }),
@@ -11293,6 +11392,8 @@ pub(crate) mod tests {
                 correct: false,
                 questions: false,
                 now: false,
+                one_yes: false,
+                reply_named: false,
                 sign_in: false,
                 sign_in_app: false,
             }),

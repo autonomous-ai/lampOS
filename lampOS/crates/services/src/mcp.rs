@@ -468,6 +468,7 @@ impl<'a, H: Http> Client<'a, H> {
                 url: endpoint.url.clone(),
                 headers,
                 body: Some(message.to_string().into_bytes()),
+                most: crate::net::BODY_MOST,
             })
             .await?;
         let name = endpoint.name;

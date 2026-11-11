@@ -15,6 +15,8 @@ pub mod harness_sign_in;
 pub mod lamp;
 pub mod light;
 pub mod make_skill;
+pub mod onboarding_done;
+pub mod onboarding_step;
 pub mod online;
 pub mod photos;
 pub mod ping;

@@ -666,10 +666,16 @@ prints the Policy's `like_asker` never reads (below), so no lamp says it.
 
 ## For the services only (`LAMP_SAME_VOICE_FOR=services`, 4 November)
 
-The linked services judge two lines by their prints ([services.md](services.md)):
-a write's "send" must be in the voice that asked (`VoiceAsk::Alike`, at
-`SERVICES_SAME_FROM`, 0.55, or over), and a read is said in full only for a line in the
-conversation's voice (`VoiceAsk::Conversation`). Both need the model, and
+The linked services judge a line by its print ([services.md](services.md)):
+a read is said in full only for a line in the conversation's voice
+(`VoiceAsk::Conversation`, at `SERVICES_SAME_FROM`, 0.55, or over). A
+write's send is held to no voice since the owner's call of 10 Nov (natural
+confirmations, no read-back or asker condition: whoever agrees sends it),
+but in a line begun in the lamp's 1.5 s echo tail with any of its words
+(#6009, `services::Turn::in_echo_tail`): that one must be in the asker's
+voice (`VoiceAsk::Alike` against the line that prepared the write, or
+`VoiceAsk::Owner` with the owner's enrolled print, at 0.55 or over), so the
+lamp's own short "Yes." or "Send it." heard back never sends. It needs the model, and
 until now the model came with every conversation rule that reads a print.
 `LAMP_SAME_VOICE_FOR=services`, beside `LAMP_SAME_VOICE_MODEL`, makes the
 prints for the services alone:
@@ -721,8 +727,7 @@ prints for the services alone:
   conversation's voice.
 - **Any other value** (`Services`, `everything`, empty) fails closed, said
   once in the journal: the coordinator passes no model, so no print is made
-  for anything, as without one; a send is refused for a voice not heard and
-  a read is brief (the reader's P3 on #5293: it had been every use, the
+  for anything, as without one; a read is brief (the reader's P3 on #5293: it had been every use, the
   widest). The journal holds counts and cosines only, never a print.
 
 Shown in tests only (`the_services_alone_start_the_same_voice_for_themselves`,
@@ -736,7 +741,7 @@ product's `lamp-voice.service` sets it, beside `LAMP_SAME_VOICE_MODEL` at
 CAM++'s pinned path, since 4 November, with `LAMP_SERVICES_WRITE=on` in
 `lamp-services.service` ([services.md](services.md)); a lamp whose voice
 folder lacks the model or `lamp-same-voice` has the check off after its
-three starts (`MOST_UNREADY`), and every send stays refused.
+three starts (`MOST_UNREADY`), and no read is said in full.
 
 ## The owner's voice print (`LAMP_SAME_VOICE_FOR=services`, 4 November)
 
@@ -748,6 +753,13 @@ and hold a send to that print (`crates/voice/src/owner_voice.rs`). Nothing
 of it runs without `LAMP_SAME_VOICE_FOR=services` and the services on (the
 second route calls `owner_voice::enable` where it starts the services'
 prints).
+
+**Since the owner's call of 10 Nov** (natural confirmations, no read-back or
+asker condition) a send is held to no voice, but in a line begun in the
+lamp's echo tail with any of its words (#6009), and `services::run` no
+longer asks after a send (`owner_voice::ask_after_send` is no longer
+called): a print already kept is still used for a read in full and for such
+a send, and the rules below are otherwise as they were.
 
 - **Asked once, of the setup owner alone.** After a `service_write` send by
   the owner (`person::owner_ids`, as the send gate's owner), sent or
@@ -812,12 +824,14 @@ prints).
   the room's forget leaves it. A sign-out wipes it too, with the services'
   tokens: the voice reads `account/state` every 5 s and removes it once a
   spell (`owner_voice::watch_sign_outs`).
-- **Used:** a send is held to it (`VoiceAsk::Owner`, at
-  `SERVICES_SAME_FROM`, 0.55) in place of the preparing line's print, and a read in full is too in place
-  of the conversation's voice ([services.md](services.md)); with none,
-  both are as before.
+- **Used:** a read in full is held to it (`VoiceAsk::Owner`, at
+  `SERVICES_SAME_FROM`, 0.55) in place of the conversation's voice
+  ([services.md](services.md)); with none, as before. A send was held to it
+  too until the owner's call of 10 Nov; since then only a send in a line
+  begun in the lamp's echo tail with any of its words (#6009).
 - **The services' bar, 0.55** (`same_voice::SERVICES_SAME_FROM`): the
-  send gate and a read in full pass at 0.55 or over, looser than the
+  read in full passes (and so does a send in the lamp's echo tail; every
+  send did until the owner's call of 10 Nov) at 0.55 or over, looser than the
   conversation's `SAME_FROM`, 0.70, which every conversation rule keeps.
   Most owners are alone with the lamp, so a lower bar keeps the owner from
   being refused while still turning away a clearly different voice: CAM++
@@ -911,9 +925,9 @@ and passes `--same-voice-confirms BAR` after the model's path):
   which has no confirm, starts no check at all with the switch on.
 - **The services' voice checks fail closed.** `services::judging_voices`
   reads the same voices (`kept_voices()`), so under `confirming_only` its
-  `VoiceAsk::Alike`, `VoiceAsk::Conversation` and `VoiceAsk::Owner` all
+  `VoiceAsk::Conversation` and `VoiceAsk::Owner` both
   return None: with `--same-voice-for-services` and a service linked, a
-  send has no voice cosine and is refused, a read is never in full, and
+  read is never in full, and
   `owner_voice::offer` learns nothing. That is no worse than without the
   model, but turning the switch on removes those positive checks.
 

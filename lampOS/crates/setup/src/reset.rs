@@ -339,6 +339,9 @@ const SKILL_PENDING: &str = ".reset-skill-pending";
 /// and retired folders are selected by their
 /// reserved names, even before a package mark was written. A link is passed
 /// over and a missing folder removes nothing. Returns removed folders in order.
+/// `folder` must be absolute: selection and no-follow deletion use the same
+/// root, never the caller's current directory. Relative paths are refused
+/// with [`io::ErrorKind::InvalidInput`] before reading any directory.
 pub fn remove_installed_skills(folder: &Path) -> io::Result<Vec<PathBuf>> {
     remove_installed_skills_with(folder, &mut || Ok(()))
 }
@@ -349,6 +352,12 @@ fn remove_installed_skills_with(
     folder: &Path,
     after_remove: &mut impl FnMut() -> io::Result<()>,
 ) -> io::Result<Vec<PathBuf>> {
+    if !folder.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the reset's skills folder must be absolute",
+        ));
+    }
     let entries = match fs::read_dir(folder) {
         Ok(entries) => entries,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -869,6 +878,36 @@ fn forget_this_boot(folder: &Path) {
             "lamp-setup: reset: the kept journal's boot mark could not be written ({error}); this boot's shutdown may keep it"
         );
     }
+}
+
+/// What the lamp says as a reset a person asked for begins (#5929, V1's
+/// "Factory reset starting"), in the owner's language from the voice's
+/// speech cache.
+pub use lamp_msgs::RESET_STARTING;
+
+/// The longest a reset waits for [`RESET_STARTING`] to be played whole: a
+/// cached line plays in under 2 s; a voice that is not there, refuses (the
+/// privacy switch, a pause) or has not said it by then never holds the reset.
+pub const SAY_WITHIN: std::time::Duration = std::time::Duration::from_secs(6);
+
+/// The reset a person asked for (`reset-now`): [`RESET_STARTING`] said
+/// first, through `say` within [`SAY_WITHIN`], while every part still runs
+/// and before anything of the reset is done, then [`reset`]. A reset already
+/// journalled (carried on after a power cut) says nothing. Said or not, the
+/// reset goes on; `log` says which.
+pub fn said_then_reset(
+    plan: &Plan,
+    effects: &mut impl Effects,
+    say: impl FnOnce(&str, std::time::Duration) -> Result<(), String>,
+    mut log: impl FnMut(&str),
+) -> io::Result<Vec<Step>> {
+    if !plan.journal.exists() {
+        match say(RESET_STARTING, SAY_WITHIN) {
+            Ok(()) => log(&format!("said: {RESET_STARTING}")),
+            Err(why) => log(&format!("not said ({why}); resetting all the same")),
+        }
+    }
+    reset(plan, effects)
 }
 
 /// Begin a reset: journal, remove the marker, stop the lamp, wipe, then start

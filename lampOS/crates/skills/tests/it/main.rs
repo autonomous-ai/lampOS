@@ -3,12 +3,14 @@
 mod addon;
 mod call_wait;
 mod daily_engine;
+mod faq;
 mod format;
 mod journal_output;
 mod made;
 mod night_sleep;
 mod package;
 mod pushed;
+mod remind;
 mod routine_service;
 mod shared;
 mod skills;

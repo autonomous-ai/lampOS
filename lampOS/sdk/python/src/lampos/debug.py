@@ -19,7 +19,9 @@ import sys
 from typing import Any
 
 # Fields replaced wherever they appear in a frame.
-SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp"})
+# A note's key and value and a list's prefix are the program's own: `key` was
+# secret already (the pairing key), and `value` and `prefix` join it.
+SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix"})
 # Fields given only as a summary: a said text or a turn's prompt, a pushed
 # skill part's bytes, a camera picture.
 SUMMARISED = frozenset({"text", "prompt", "data", "jpeg"})
@@ -39,6 +41,13 @@ SHOWN = frozenset({
     "pm2_5", "pm4_0", "temperature", "temperature_c", "uptime_s",
     # A camera picture's size, age and a stream's rate (never the picture).
     "age_ms", "bytes", "fast", "fps", "fps_now", "stream",
+    # A computer's own notes (`notes.*`) and hello's limits for them: whether a
+    # key was found or deleted, how many it keeps and the bounds; a key, a
+    # value and a prefix are secret above, never shown.
+    "notes", "found", "deleted", "keys", "count", "total", "keys_max", "bytes_max", "key_max_bytes", "value_max_bytes",
+    "writes", "reads",
+    # `lamp.said`: who had the line said and whether it was cut (its `text` is summarised above).
+    "by", "cut",
     # A computer's own clips (`sound.upload`, `sound.list`, `sound.remove`)
     # and hello's limits for them: names, sizes and lengths, never the bytes; a
     # pushed skill's whole hash and each part's number (`skill.push`).
@@ -46,12 +55,20 @@ SHOWN = frozenset({
     "clip_max_bytes", "part_max_chars", "parts_max", "clips_max", "store_max_bytes",
     # `light`'s own colours (the ring, pixel by pixel) and hello's ring.
     "brightness", "fade_ms", "pixels", "rgb", "ring",
-    # The `volume` op and `volume.changed`.
-    "muted", "step",
+    # The `volume` op, its `get` state and `volume.changed`.
+    "muted", "step", "volume",
+    # `get` `body`: the body's bounds and where each joint is, its numbers, never who.
+    "acceleration_deg_s2", "body", "counts", "counts_per_turn", "deg", "folded_counts", "heat_stop_c", "home_counts",
+    "load_limit", "max_counts", "max_deg", "min_counts", "min_deg", "speed_deg_s", "stand_counts", "stands",
+    # Each joint of a `body.state` beyond `get` `body`'s.
+    "goal_deg", "load", "moving", "temp_c",
+    # A microphone stream's shape and a block's count (never the sound, which
+    # comes binary and is never logged).
+    "block_ms", "channels", "format", "lost", "sample_rate", "sequence", "source",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how", "lease_max_ms", "say_max_bytes",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
-    "mood", "most", "motion", "mute", "name", "near", "ok", "on", "op", "open", "parts", "pattern", "paused", "phrase",
+    "mood", "most", "motion", "motion_done", "mute", "name", "near", "ok", "on", "op", "open", "parts", "pattern", "paused", "phrase",
     "phrases", "pitch", "presence", "press", "private", "push", "quiet_hours", "re", "refused",
     "retry_ms", "roll", "say", "say_max_chars", "score", "seen", "shoulder", "shows", "side", "size", "skill", "skills",
     "started", "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "to", "turn", "until", "v", "where",

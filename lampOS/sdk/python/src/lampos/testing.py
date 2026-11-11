@@ -15,8 +15,10 @@ request it took. It moves nothing, so it never stands in for a lamp check.
 
 from __future__ import annotations
 
+import array
 import asyncio
 import base64
+import contextlib
 import datetime
 import hashlib
 import io
@@ -25,7 +27,9 @@ import json
 import math
 import os
 import random
+import shutil
 import ssl
+import sys
 import tempfile
 import time
 import wave
@@ -38,6 +42,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, generate_private_key
 from cryptography.x509.oid import NameOID
 from websockets.asyncio.server import ServerConnection, serve
+from websockets.exceptions import ConnectionClosed
 
 from . import schema
 from .keys import HELLO, b64, pin_of, proof, unb64
@@ -45,6 +50,25 @@ from .moves import move_refusal
 
 # The fake's camera picture: the smallest whole JPEG (start and end markers).
 FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
+
+# The fake's microphone, as the ears share it on mic1/audio: a 20 ms block of
+# 320 samples, mono, 16 kHz, S16LE.
+AUDIO_RATE = 16_000
+AUDIO_BLOCK = 320
+AUDIO_EVERY_S = 0.02
+# Why lamp-control refuses or ends a microphone stream with more than one
+# person in view (microphone.rs `SOMEONE_ELSE`).
+SOMEONE_ELSE = "someone else is here"
+
+
+def tone_block(sequence: int, hz: float = 440.0, level: int = 1000) -> bytes:
+    """Block `sequence` of a quiet tone, as signed 16-bit little-endian
+    samples: 640 bytes, continuous from one block to the next."""
+    start = sequence * AUDIO_BLOCK
+    return b"".join(
+        int(level * math.sin(2 * math.pi * hz * (start + n) / AUDIO_RATE)).to_bytes(2, "little", signed=True)
+        for n in range(AUDIO_BLOCK)
+    )
 
 try:
     import jsonschema
@@ -73,21 +97,30 @@ def _certificate() -> tuple[bytes, bytes]:
     return cert.public_bytes(serialization.Encoding.PEM), pem_key
 
 
-# `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
+# `look`'s targets lamp-control doesn't route, in parts.rs's words: `name`
+# (the lamp has no sound direction). A lamp-control before the face look
+# (stable 11091 and older) refuses `face` too: `face_look=False`.
 LOOK_WAITS = {
-    "face": "not in this release: look at a face or a name",
-    "name": "not in this release: look at a face or a name",
+    "name": "not in this release: look at who said the lamp's name (the lamp has no sound direction)",
 }
+LOOK_FACE_OLD = "not in this release: look at a face or a name"
+# What the body says when it has no face to turn to.
+NO_FACE_IN_VIEW = "no face in view"
 
 # What lamp-control refuses today, in its own words (crates/control/src/
 # parts.rs, `waits_for`): pass it as `refuses=` for a fake that answers as a
 # lamp does now. `lamp fake` does.
+# lamp-control's words for `joints` naming roll, shoulder or elbow (parts.rs).
+JOINTS_WAIT = "not routed yet: waits for the body's goal stream for roll, shoulder and elbow; yaw and pitch go now"
+# And for a `joints` leaving out yaw or pitch while the body hasn't said where it is.
+JOINTS_UNKNOWN = "name both yaw and pitch while the body has not said where it is in the last 15 s (get body)"
 LAMP_CONTROL_REFUSES = {
-    # No product unit passes --lease-socket yet (docs/control.md).
-    "look": "the body's lease socket is not on here",
-    "joints": "not routed yet: waits for a goal stream on the body's lease socket",
     "play": "not routed yet: waits for client packages",
 }
+
+# `look` and `joints` are not in it: the product lamp-body opens its lease
+# socket (stable 10824 and later), so a lamp takes a look, and `joints` at yaw
+# and pitch, refusing roll, shoulder and elbow with JOINTS_WAIT (above).
 
 
 # `express`'s feelings and their moves, as lamp-control's feelings.rs.
@@ -140,6 +173,14 @@ LIMITS = {
         "clips_max": 64,
         "store_max_bytes": 20_000_000,
     },
+    "notes": {
+        "key_max_bytes": 64,
+        "value_max_bytes": 16_384,
+        "keys_max": 256,
+        "bytes_max": 262_144,
+        "writes": [{"most": 30, "within_ms": 60_000}],
+        "reads": [{"most": 120, "within_ms": 60_000}],
+    },
     "ring": {"pixels": 32},
     "quiet_hours": "off",
 }
@@ -161,7 +202,9 @@ def _frames_of(data: bytes) -> int | None:
 
 
 def _clip_refusal(data: bytes) -> str | None:
-    """Why lamp-control would refuse this clip, its format and length only."""
+    """Why lamp-control would refuse this clip, in sounds.rs `check_clip`'s
+    words and order: its format, its length, a file shorter than its header
+    says, then its loudness; None for one it keeps."""
     try:
         with wave.open(io.BytesIO(data)):
             pass
@@ -172,6 +215,39 @@ def _clip_refusal(data: bytes) -> str | None:
         return "not 16-bit mono PCM at 24000 Hz"
     if not 1 <= frames <= 24_000 * 30:
         return "not 1 to 720000 frames (30 s at most)"
+    with wave.open(io.BytesIO(data)) as read:
+        pcm = read.readframes(frames)
+    # Fewer bytes than the header's frames (an odd or an even count short):
+    # hound's samples end early.
+    if len(pcm) != 2 * frames:
+        return "a WAV file cut short"
+    return _clip_loudness_refusal(pcm)
+
+
+# The voice's loudness cap on a clip, as lamp-control's sounds.rs `check_clip`
+# holds it at upload: no sample past CLIP_PEAK_DBFS, and no 10 ms window
+# (CLIP_WINDOW frames, the last one shorter) louder than CLIP_LOUDEST_DBFS RMS.
+CLIP_PEAK_DBFS = -12.0
+CLIP_LOUDEST_DBFS = -30.0
+CLIP_WINDOW = 240
+
+
+def _clip_loudness_refusal(pcm: bytes) -> str | None:
+    samples = array.array("h", pcm)
+    if sys.byteorder == "big":
+        samples.byteswap()
+    full = 32_767.0
+    if max((abs(sample) for sample in samples), default=0) > full * 10 ** (CLIP_PEAK_DBFS / 20):
+        return f"a peak past {CLIP_PEAK_DBFS:g} dBFS"
+    loudest = max(
+        (
+            math.sqrt(sum(sample * sample for sample in samples[at : at + CLIP_WINDOW]) / len(samples[at : at + CLIP_WINDOW]))
+            for at in range(0, len(samples), CLIP_WINDOW)
+        ),
+        default=0.0,
+    )
+    if loudest > full * 10 ** (CLIP_LOUDEST_DBFS / 20):
+        return f"louder than {CLIP_LOUDEST_DBFS:g} dBFS RMS over 10 ms"
     return None
 
 
@@ -279,6 +355,65 @@ def hand_events(track: list[dict]) -> list[tuple[int, dict]]:
     return events
 
 
+# lamp-control's `light` limits (protocol.rs, msgs' arbitration.rs): a ring
+# light's fade, how long it is held, the ring's pixels, the colour levels.
+LIGHT_FADE_MS = (1_000, 60_000)
+LIGHT_FOR_MS = (1, 30_000)
+LIGHT_LEVELS = (1, 5)
+RING_PIXELS = 32
+
+
+def _hex_rgb(text: Any) -> bool:
+    return (
+        isinstance(text, str)
+        and len(text) == 7
+        and text[0] == "#"
+        and all(c in "0123456789abcdefABCDEF" for c in text[1:])
+    )
+
+
+def light_refusal(request: dict) -> str | None:
+    """lamp-control's refusal of a computer's `light` (protocol.rs), in its
+    words, as `bad_request`, in its order; None for one it takes. Only for a
+    light it parses (whole numbers where it wants them): anything else is the
+    schema's to refuse."""
+    for field in ("level", "brightness", "fade_ms", "for_ms"):
+        value = request.get(field)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+            return None
+    colour, rgb, pixels = request.get("colour"), request.get("rgb"), request.get("pixels")
+    if sum(given is not None for given in (colour, rgb, pixels)) != 1:
+        return "one of colour, rgb or pixels"
+    if colour is not None:
+        if colour not in schema.colours():
+            return f"colour: one of {', '.join(schema.colours())}"
+        level = request.get("level")
+        if level is None or not LIGHT_LEVELS[0] <= level <= LIGHT_LEVELS[1]:
+            return f"level: from {LIGHT_LEVELS[0]} to {LIGHT_LEVELS[1]}, with colour"
+        if request.get("brightness") is not None:
+            return "brightness goes with rgb or pixels; colour has level"
+    else:
+        if request.get("level") is not None or request.get("pattern") is not None:
+            return "level and pattern go with colour"
+        brightness = request.get("brightness")
+        if brightness is not None and not 0 <= brightness <= 100:
+            return "brightness: from 0 to 100"
+    if rgb is not None and not _hex_rgb(rgb):
+        return "rgb: #rrggbb"
+    if pixels is not None:
+        if not isinstance(pixels, list) or len(pixels) != RING_PIXELS:
+            return f"pixels: {RING_PIXELS} of them, one per pixel of the ring"
+        if not all(_hex_rgb(pixel) for pixel in pixels):
+            return "pixels: each #rrggbb"
+    fade = request.get("fade_ms")
+    if fade is not None and not LIGHT_FADE_MS[0] <= fade <= LIGHT_FADE_MS[1]:
+        return f"fade_ms: from {LIGHT_FADE_MS[0]} to {LIGHT_FADE_MS[1]}"
+    for_ms = request.get("for_ms")
+    if for_ms is not None and not LIGHT_FOR_MS[0] <= for_ms <= LIGHT_FOR_MS[1]:
+        return f"for_ms: from {LIGHT_FOR_MS[0]} to {LIGHT_FOR_MS[1]}"
+    return None
+
+
 def _whole(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -312,25 +447,44 @@ class FakeLamp:
         self,
         *,
         code: str = "12345678",
-        grants: tuple[str, ...] = ("body", "light", "speak"),
+        grants: tuple[str, ...] | str = ("body", "light", "speak"),
         lamp_id: str = "lamp-fake",
         name: str = "Fake lamp",
         auto_done: bool = True,
         refuses: dict[str, str] | None = None,
         follows_hand: bool = True,
+        motion_done: bool = True,
+        face_look: bool = True,
+        face: dict[str, float] | None = None,
     ):
         self.code = code
+        # True says `motion_done` in hello's limits and ends a gesture or a
+        # move with a `done`, as lamp-control reading the body's word does
+        # (#4209); False answers them as a lamp-control from before it:
+        # taken, and no `done` follows.
+        self.motion_done = motion_done
         # Ops refused `refused` with this why, as a lamp that doesn't route
         # them yet does (LAMP_CONTROL_REFUSES); none by default.
         self.refuses = dict(refuses or {})
         # False answers a look at `hand` as a lamp-control from before #4183
         # does: taken, with no `follow`, and nothing follows it.
         self.follows_hand = follows_hand
-        # gesture, move and play end with `done` at once; False leaves it to
-        # the test (`done`).
+        # False answers a look at `face` as a lamp-control before it does
+        # (refused, LOOK_FACE_OLD). `face` is where a face is from the head,
+        # `{"yaw": .., "pitch": ..}` in degrees: a look at it is one turn
+        # there; none, and the look is dropped, "no face in view".
+        self.face_look = face_look
+        self.face = face
+        # gesture, move (with motion_done) and play end with `done` at once;
+        # False leaves it to the test (`done`).
         self.auto_done = auto_done
         self._asker: dict[int, ServerConnection] = {}
-        self.grants = list(grants)
+        # "all": every grant the protocol names, as `lamp fake` pairs with. The
+        # default stays narrow, as a real pairing the owner chose is.
+        if isinstance(grants, str) and grants != "all":
+            # A bare string would be split into letters: grants="hear" is a slip.
+            raise ValueError(f'grants is "all" or a list of grant names, not {grants!r}')
+        self.grants = list(schema.grants()) if grants == "all" else list(grants)
         self.lamp = {"id": lamp_id, "name": name, "v": schema.VERSION}
         self.host = "127.0.0.1"
         self.port = 0
@@ -347,6 +501,10 @@ class FakeLamp:
         # flight: as lamp-control's sounds.rs, without its loudness check.
         self.clips: dict[str, dict[str, bytes]] = defaultdict(dict)
         self._uploads: dict[str, dict] = {}
+        # Each computer's notes (`notes.set`), as lamp-control's notes.rs keeps
+        # them: its keys and values, held to the same caps, and gone with a
+        # `revoke`.
+        self.notes: dict[str, dict[str, Any]] = {}
         # The newest light a computer asked for, and until when (the fake's
         # `clock`): what the ring shows while it lasts (`light_state`).
         self.shown: tuple[dict, float] | None = None
@@ -356,6 +514,9 @@ class FakeLamp:
         self.pulses_dropped: list[tuple[str, dict]] = []
         self._pulsed: dict[str, float] = {}
         self.clock = time.monotonic
+        # The picture `camera.snapshot` and a stream's frames carry: the
+        # smallest whole JPEG unless a test sets a real one (`fake.picture = jpeg`).
+        self.picture: bytes = FAKE_JPEG
         # Pushed skills by name, and the one push in flight on the lamp.
         self.pushed: dict[str, dict] = {}
         self._pushing: dict | None = None
@@ -390,8 +551,14 @@ class FakeLamp:
         self.mutes: dict[str, tuple[ServerConnection, int]] = {}
         self._client_of: dict[int, str] = {}
         self._connections: set[ServerConnection] = set()
+        # Each connection's microphone stream (`microphone.stream`), and the
+        # made-up ears' next block's `sequence`.
+        self.listening: dict[int, asyncio.Task] = {}
+        self.audio_sequence = 0
         self._next_lease = 1
         self._server = None
+        self._connected: list = []
+        self._folders: list[str] = []
         self._validator = (
             jsonschema.Draft202012Validator({**schema.schema(), "oneOf": [{"$ref": "#/$defs/request"}]})
             if jsonschema
@@ -415,8 +582,40 @@ class FakeLamp:
         return self
 
     async def __aexit__(self, *_exc) -> None:
+        for lamp in self._connected:
+            # A test may have dropped or closed it already (a lease held on a dead
+            # socket): that must not mask the test's own result.
+            with contextlib.suppress(Exception):
+                await lamp.close()
+        self._connected.clear()
         self._server.close()
         await self._server.wait_closed()
+        for folder in self._folders:
+            shutil.rmtree(folder, ignore_errors=True)
+        self._folders.clear()
+
+    async def connect(self, *, name: str | None = None) -> Any:
+        """A `Lamp` paired with this fake and connected, for a test of your own
+        program: no code, pin or keyring to set up. Its keyring is a folder of its
+        own (removed on exit, your `LAMPOS_HOME` untouched), and it is closed when
+        the fake is. Call it again for a second computer.
+
+            async with FakeLamp() as fake:
+                lamp = await fake.connect()
+                await lamp.say("hello")
+                assert fake.asked("say") == [{"text": "hello"}]
+        """
+        from .client import Lamp
+        from .keys import Keyring
+
+        name = name or f"test app {len(self._connected) + 1}"  # each computer has its own name
+        folder = tempfile.mkdtemp(prefix="lampos-fake-")
+        self._folders.append(folder)
+        ring = Keyring(folder)
+        await Lamp.pair(self.code, self.host, pin=self.pin, port=self.port, name=name, keyring=ring)
+        lamp = await Lamp.connect(keyring=ring)
+        self._connected.append(lamp)
+        return lamp
 
     # What a test asks of it.
 
@@ -504,6 +703,60 @@ class FakeLamp:
             if held == lease:
                 del self.following[key]
 
+    def lose_audio(self, blocks: int) -> None:
+        """The made-up ears skip `blocks` blocks, as sound lost on the way:
+        the next block's `sequence` jumps, and each stream says it in `lost`."""
+        self.audio_sequence += blocks
+
+    async def set_private(self, private: bool = True) -> None:
+        """The privacy switch: on, every microphone stream ends at once with
+        `microphone.ended`, as lamp-control's do, and a new one is refused."""
+        self.state["lamp"]["private"] = private
+        if private:
+            await self._end_listening("the lamp is private")
+
+    async def set_in_view(self, count: int) -> None:
+        """How many people are in view (`presence`'s `count`): above one,
+        every microphone stream ends at once with `microphone.ended`
+        ("someone else is here"), and a new one is refused, as lamp-control
+        does, since it can't tell the owner from anyone else."""
+        self.state["presence"]["count"] = count
+        if count > 1:
+            await self._end_listening(SOMEONE_ELSE)
+
+    async def _end_listening(self, why: str) -> None:
+        for key, task in list(self.listening.items()):
+            self.listening.pop(key, None)
+            task.cancel()
+            ws = next((ws for ws in self._connections if id(ws) == key), None)
+            if ws is not None:
+                await ws.send(json.dumps({"ev": "microphone.ended", "why": why}))
+
+    def _stop_listening(self, ws: ServerConnection) -> None:
+        task = self.listening.pop(id(ws), None)
+        if task is not None:
+            task.cancel()
+
+    async def _listen(self, ws: ServerConnection) -> None:
+        """One block every 20 ms of a quiet 440 Hz tone, as binary frames:
+        the header's length, the header, then the samples."""
+        last: int | None = None
+        while True:
+            sequence = self.audio_sequence
+            self.audio_sequence += 1
+            lost = 0 if last is None else max(sequence - last - 1, 0)
+            last = sequence
+            samples = tone_block(sequence)
+            header = json.dumps({
+                "ev": "microphone.audio", "sequence": sequence, "lost": lost, "sample_rate": AUDIO_RATE,
+                "channels": 1, "format": "s16le", "bytes": len(samples),
+            }).encode()
+            try:
+                await ws.send(len(header).to_bytes(4, "big") + header + samples)
+            except ConnectionClosed:
+                return
+            await asyncio.sleep(AUDIO_EVERY_S)
+
     async def lease_event(self, lease: str, state: str, why: str | None = None) -> None:
         """Tell a lease's holder its lease is `held`, `suspended` or `lost`
         (and, lost, end it here), as the lamp would."""
@@ -512,6 +765,10 @@ class FakeLamp:
             return
         if state == "lost":
             self.leases.pop(lease)
+        else:
+            # A suspended lease still stands, but the body is not held: a look
+            # or `joints` under it is taken by the door and dropped by the body.
+            holder["state"] = state
         event: dict[str, Any] = {"ev": "lease", "lease": lease, "state": state}
         if why is not None:
             event["why"] = why
@@ -529,12 +786,34 @@ class FakeLamp:
         self.turns = {client: started for client, started in self.turns.items() if started != re}
         await self._send_done(re, {"how": how} if why is None else {"how": how, "why": why})
 
+    async def restart(self) -> None:
+        """The lamp restarts, as on every update: each connection closes
+        (1012, "service restart"), and pairings stay. A program connects
+        again (`Lamp.keep_connected`)."""
+        for ws in list(self._connections):
+            await ws.close(1012, "the lamp restarts")
+
     async def hand_on_head(self) -> None:
         """A hand on the head lifts every computer's mute, as the voice does:
         each is told with a `done` `cut_short` on the listen.set that held it."""
         mutes, self.mutes = self.mutes, {}
         for ws, re in mutes.values():
             await ws.send(json.dumps({"ev": "done", "re": re, "how": "cut_short", "why": "a hand on the head"}))
+
+    async def _look_done(self, ws: ServerConnection, id_: int, yaw: float, pitch: float, drop: str | None = None) -> None:
+        """A look the door takes (`{"to": "body"}`), and the body's answer as
+        its `done`: there, or, while the computer's body lease is suspended (a
+        conversation), dropped as the body says it (body_lease.rs `done_of`)."""
+        await self._ok(ws, id_, to="body")
+        if not self.auto_done:
+            return
+        suspended = any(h["ws"] is ws and "body" in h["parts"] and h.get("state") == "suspended" for h in self.leases.values())
+        if suspended:
+            await self._send_done(id_, {"how": "dropped", "why": "the body is not held"})
+        elif drop is not None:
+            await self._send_done(id_, {"how": "dropped", "why": drop})
+        else:
+            await self._send_done(id_, {"how": "finished", "yaw": yaw, "pitch": pitch, "clamped": False})
 
     async def _send_done(self, re: int, fields: dict[str, Any]) -> None:
         ws = self._asker.get(re)
@@ -571,6 +850,13 @@ class FakeLamp:
                     if refusal is not None:
                         await self._refuse(ws, id_, "bad_request", refusal)
                         continue
+                # As lamp-control's protocol.rs for a light: its own limits, in its
+                # words, whether or not jsonschema is installed here.
+                if request.get("op") == "light" and id_ is not None:
+                    refusal = light_refusal(request)
+                    if refusal is not None:
+                        await self._refuse(ws, id_, "bad_request", refusal)
+                        continue
                 if self._validator is not None:
                     errors = list(self._validator.iter_errors(request))
                     if errors:
@@ -603,6 +889,7 @@ class FakeLamp:
             gone = self._client_of.pop(id(ws), None)
             if gone is not None and gone not in self._client_of.values():
                 self.mutes.pop(gone, None)
+            self._stop_listening(ws)
             for lease in [l for l, held in self.leases.items() if held["ws"] is ws]:
                 self.leases.pop(lease)
 
@@ -634,7 +921,8 @@ class FakeLamp:
             await self._refuse(ws, request["id"], "unpaired", "not paired, or a bad signature")
             await ws.close()
             return None
-        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=LIMITS)
+        limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
+        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=limits)
         return request["client"]
 
     # The grant each event and state needs, as lamp-control's own (#3736).
@@ -644,6 +932,7 @@ class FakeLamp:
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
         "air.changed": "air",
         "volume.changed": "speak",
+        "lamp.said": "speech",
     }
     STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "speak", "body": "body"}
 
@@ -668,6 +957,10 @@ class FakeLamp:
             "sound.upload": ["speak"],
             "sound.list": ["speak"],
             "sound.remove": ["speak"],
+            "notes.set": ["notes"],
+            "notes.get": ["notes"],
+            "notes.delete": ["notes"],
+            "notes.list": ["notes"],
             "skill.push": ["skills"],
             "skill.list": ["skills"],
             "skill.remove": ["skills"],
@@ -676,7 +969,60 @@ class FakeLamp:
             "turn.end": ["speak"],
             "listen.set": ["hear"],
             "volume": ["speak"],
+            "microphone.stream": ["microphone"],
         }.get(op, [])
+
+    def revoke(self, client: str) -> None:
+        """The owner lets `client` go, as lamp-control's revoke: its key, its
+        clips and its notes are gone."""
+        self.clients.pop(client, None)
+        self.clips.pop(client, None)
+        self.notes.pop(client, None)
+
+    async def _notes(self, ws, client: str, request: dict) -> None:
+        """One `notes.*` op, as lamp-control's notes.rs answers it: this
+        computer's own keys only, the value at most 16384 bytes serialized, 256
+        keys and 262144 bytes of keys and values in all."""
+        id_, op = request["id"], request["op"]
+        room = self.notes.get(client, {})
+
+        def size(value: Any) -> int:
+            return len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode())
+
+        def held(keys: dict) -> int:
+            return sum(len(k.encode()) + size(v) for k, v in keys.items())
+
+        if op == "notes.set":
+            key, value = request["key"], request["value"]
+            bytes_ = size(value)
+            if bytes_ > 16_384:
+                await self._refuse(ws, id_, "bad_request", f"value: {bytes_} bytes, over the 16384 one note may take")
+                return
+            after = {**room, key: value}
+            if len(after) > 256 or held(after) > 262_144:
+                await self._refuse(
+                    ws, id_, "refused",
+                    f"this computer's notes are full: it keeps 256 keys at most and 262144 bytes in all (now {len(room)} keys, {held(room)} bytes)",
+                )
+                return
+            self.notes[client] = after
+            await self._ok(ws, id_, key=key, bytes=bytes_)
+        elif op == "notes.get":
+            if request["key"] in room:
+                await self._ok(ws, id_, key=request["key"], found=True, value=room[request["key"]])
+            else:
+                await self._ok(ws, id_, key=request["key"], found=False)
+        elif op == "notes.delete":
+            deleted = request["key"] in room
+            if deleted:
+                del room[request["key"]]
+            await self._ok(ws, id_, key=request["key"], deleted=deleted)
+        else:
+            prefix = request.get("prefix", "")
+            keys = [{"key": k, "bytes": size(v)} for k, v in sorted(room.items()) if k.startswith(prefix)]
+            await self._ok(
+                ws, id_, keys=keys, count=len(keys), total=len(room), bytes=held(room), keys_max=256, bytes_max=262_144
+            )
 
     async def _upload(self, ws, client: str, request: dict) -> None:
         """One `sound.upload` part, as lamp-control's sounds.rs gathers it:
@@ -820,13 +1166,18 @@ class FakeLamp:
             await self._ok(ws, id_)
             self._unfollow(request["lease"])
         elif op == "stop":
-            # The holder's stop ends its following, as any of its actions.
+            # The holder's stop ends its following, as any of its actions,
+            # and its microphone stream, with no event.
             self.stop_following(ws)
+            self._stop_listening(ws)
             await self._ok(ws, id_)
         elif op in ("gesture", "move"):
-            # As lamp-control routes them: the body takes them, and no
-            # `done` follows.
+            # As lamp-control routes them: the body takes them; with
+            # motion_done a `done` follows once the body says it ended
+            # (`finished`, or `dropped`/`cut_short` with the body's why).
             await self._ok(ws, id_, to="body")
+            if self.motion_done and self.auto_done:
+                await self.done(id_)
         elif op == "light" and ("pixels" in request or "rgb" in request):
             # A computer's own colours (the ring, pixel by pixel), as
             # lamp-control's parts.rs: to the ring, each pixel at the brightness.
@@ -859,19 +1210,28 @@ class FakeLamp:
             await self._ok(ws, id_, to="ring")
         elif op == "express":
             # As lamp-control's feelings.rs: the feelings skill's three, its
-            # move to the body (smaller below strength 0.5) and its light; no
-            # `done` follows. The fake always shows the light.
+            # move to the body (smaller below strength 0.5) and its light; with
+            # motion_done its move's `done` follows (none when no move was
+            # sent). The fake always shows the light.
             if request["feeling"] not in FEELING_MOVES:
                 await self._refuse(ws, id_, "bad_request", "feeling: one of glad, lively, low")
                 return
-            await self._ok(ws, id_, to="body", move=_feeling_move(request), light=True)
+            move = _feeling_move(request)
+            await self._ok(ws, id_, to="body", move=move, light=True)
+            if move is not None and self.motion_done and self.auto_done:
+                await self.done(id_)
         elif op == "look":
-            # As lamp-control with --lease-socket (parts.rs `look`): `face`
-            # and `name` aren't routed; `hand` is followed until a stop,
-            # another look or the lease ends, so no `done` follows it; the
-            # body takes the rest, and its `done` says where the head got to.
+            # As lamp-control with --lease-socket (parts.rs `look`): `name`
+            # isn't routed (nor `face`, with `face_look=False`); `hand` is
+            # followed until a stop, another look or the lease ends, so no
+            # `done` follows it; the body takes the rest, and its `done` says
+            # where the head got to. A `face` is one turn toward `self.face`,
+            # or dropped, "no face in view", when none is set.
             if isinstance(request["at"], str) and request["at"] in LOOK_WAITS:
                 await self._refuse(ws, id_, "refused", LOOK_WAITS[request["at"]])
+                return
+            if request["at"] == "face" and not self.face_look:
+                await self._refuse(ws, id_, "refused", LOOK_FACE_OLD)
                 return
             # Another look ends a following. At `hand`, the body follows the
             # hand, waiting while it's gone; `follows_hand=False` is a
@@ -886,10 +1246,34 @@ class FakeLamp:
                 self.following[id(ws)] = (ws, lease)
                 await self._ok(ws, id_, to="body", follow="hand")
                 return
-            await self._ok(ws, id_, to="body")
-            if self.auto_done:
-                at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
-                await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
+            if request["at"] == "face":
+                if self.face is None:
+                    await self._look_done(ws, id_, 0.0, 0.0, drop=NO_FACE_IN_VIEW)
+                else:
+                    await self._look_done(ws, id_, self.face["yaw"], self.face["pitch"])
+                return
+            at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
+            await self._look_done(ws, id_, at["yaw"], at["pitch"])
+        elif op == "joints":
+            # As lamp-control (parts.rs `joints`): roll, shoulder and elbow
+            # wait for the body's goal stream; yaw and pitch go to the body as
+            # the holder's look, a joint not named staying where `get` `body`
+            # says it is, so its `done` follows as a look's does, and taking it
+            # ends a hand-follow as any look does.
+            targets = request["targets"]
+            if any(joint in targets for joint in ("roll", "shoulder", "elbow")):
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", JOINTS_WAIT)
+                return
+            now = self.state["body"]["joints"]
+            yaw, pitch = targets.get("yaw", now["yaw"]["deg"]), targets.get("pitch", now["pitch"]["deg"])
+            if yaw is None or pitch is None:
+                # The door's words when the body hasn't said where it is.
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", JOINTS_UNKNOWN)
+                return
+            self.stop_following(ws)
+            await self._look_done(ws, id_, yaw, pitch)
         elif op == "volume":
             # As lamp-control through lamp-actions' app calls: a level, the
             # voice's 20-point step within its floor of 10 and ceiling of 100,
@@ -921,6 +1305,8 @@ class FakeLamp:
                 return
             del self.pushed[request["name"]]
             await self._ok(ws, id_)
+        elif op.startswith("notes."):
+            await self._notes(ws, client, request)
         elif op == "sound.upload":
             await self._upload(ws, client, request)
         elif op == "sound.list":
@@ -944,12 +1330,12 @@ class FakeLamp:
                 await self.done(id_)
         elif op == "camera.snapshot":
             # A picture with no camera behind it: the smallest whole JPEG.
-            await self._ok(ws, id_, jpeg=base64.b64encode(FAKE_JPEG).decode(), bytes=len(FAKE_JPEG), age_ms=0)
+            await self._ok(ws, id_, jpeg=base64.b64encode(self.picture).decode(), bytes=len(self.picture), age_ms=0)
         elif op == "camera.stream":
             if request["on"]:
                 fps = request.get("fps", 2)
                 await self._ok(ws, id_, stream="on", fps=fps, fps_now=None)
-                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(FAKE_JPEG).decode(), "bytes": len(FAKE_JPEG), "age_ms": 0, "fps_now": None}
+                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(self.picture).decode(), "bytes": len(self.picture), "age_ms": 0, "fps_now": None}
                 await ws.send(json.dumps(frame))
             else:
                 await self._ok(ws, id_, stream="off")
@@ -976,6 +1362,22 @@ class FakeLamp:
                 await self._ok(ws, id_, mute="held")
             else:
                 await self._ok(ws, id_, mute="lifted" if self.mutes.pop(client, None) else "nothing_held")
+        elif op == "microphone.stream":
+            # As lamp-control's microphone.rs: on again replaces it, off ends
+            # it with no event, and none while the lamp is private.
+            self._stop_listening(ws)
+            if not request["on"]:
+                await self._ok(ws, id_, stream="off")
+            elif self.state["lamp"]["private"]:
+                await self._refuse(ws, id_, "private", "the lamp is private")
+            elif self.state["presence"]["count"] > 1:
+                await self._refuse(ws, id_, "refused", SOMEONE_ELSE)
+            else:
+                await self._ok(
+                    ws, id_, stream="on", sample_rate=AUDIO_RATE, channels=1, format="s16le",
+                    block_ms=int(AUDIO_EVERY_S * 1000), source="mic1",
+                )
+                self.listening[id(ws)] = asyncio.ensure_future(self._listen(ws))
         else:
             await self._ok(ws, id_)
             if op == "play" and self.auto_done:

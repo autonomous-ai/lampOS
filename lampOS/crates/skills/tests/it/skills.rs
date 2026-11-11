@@ -482,7 +482,8 @@ fn head_pats_response_is_chosen_in_its_file() {
 /// The owner, 19 Oct: core skills are always on the lamp, as a phone's own
 /// apps; the rest are installed. Desk tutor and its marks wait for the full
 /// look in the product. The four wellbeing nudges are core since 25 Oct
-/// (the owner: "do all of them"), and Sit back since #5208. Every one says its version.
+/// (the owner: "do all of them"), Sit back since #5208, and the FAQ since
+/// #5790. Every one says its version.
 #[test]
 fn every_skill_folder_says_its_kind_and_version() {
     let skills: Vec<_> = lamp_skills::load_each(&skills_root())
@@ -503,6 +504,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "comfort-break",
             "dance",
             "dusty-air",
+            "faq",
             "feelings",
             "head-pat",
             "head-pat-wiggle",
@@ -540,7 +542,10 @@ fn every_skill_folder_says_its_kind_and_version() {
             "guard-mode",
             "look-for-things",
             "meal-check",
+            "morning-agenda",
+            "morning-mail",
             "quiet-focus",
+            "tomorrows-plan",
             "who-was-here"
         ]
     );
@@ -560,16 +565,17 @@ fn every_skill_folder_says_its_kind_and_version() {
             .filter(|skill| !skill.enabled)
             .map(|skill| skill.name.as_str())
             .collect::<Vec<_>>(),
-        ["bedtime-morning", "comfort-break"],
-        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207)"
+        ["comfort-break"],
+        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753"
     );
 }
 
 #[test]
 fn disabled_skills_enter_neither_tools_nor_body_metadata() {
     let dir = tempfile::tempdir().unwrap();
-    let bedtime = load(&skills_root().join("bedtime-morning")).unwrap();
-    assert!(!bedtime.enabled);
+    // Comfort break, disabled by its own file (on only by its `[present]`).
+    let core = load(&skills_root().join("comfort-break")).unwrap();
+    assert!(!core.enabled);
     let disabled = load(&skill_with(
         dir.path(),
         "disabled-body",
@@ -590,7 +596,7 @@ fn disabled_skills_enter_neither_tools_nor_body_metadata() {
     .unwrap();
     // Passing the full inventory directly must not advertise disabled
     // tools or include their body grant in the text-origin restriction.
-    let mut inventory = vec![bedtime, disabled];
+    let mut inventory = vec![core, disabled];
     assert_eq!(tools_file(&inventory), serde_json::json!({"tools":[]}));
     inventory.push(quiet);
     assert_eq!(
@@ -869,7 +875,8 @@ fn a_read_step_reads_only_what_its_permissions_list() {
             "speak = true\nservices = { google_calendar = \"write\" }\n",
             "",
             CALENDAR,
-            "only \"read\"; a skill never writes to a service",
+            // A write is #6066's, and only with its switch on.
+            "a skill's writes are off on this lamp (LAMP_SKILL_WRITES is not on)",
         ),
         (
             "send-only",
@@ -2389,6 +2396,37 @@ fn a_sound_is_asked_of_the_voice_and_its_refusal_is_said_in_the_event() {
         "sound: refused (the lamp is speaking)"
     );
     assert_eq!(refused.lights.len(), 0, "nothing made with a sound refused");
+}
+
+/// A skill's reminder (#6066): its run asks the actions part for what is set
+/// before it sets anything, and with a list it can't read sets nothing.
+const REMINDS: &str = r#"
+[trigger]
+topic = "humans/faces/tracked"
+when = "appears"
+[ask]
+policy = "hello"
+[[do]]
+remind = { at = "22:00", words = "Time to drink some water." }
+[permissions]
+topics = ["humans/faces/tracked"]
+actions = ["set_reminder"]
+"#;
+
+#[test]
+fn a_remind_step_is_made_through_the_actions_part() {
+    let seen = the_program_with(REMINDS, true, &[], 3, 1, 4);
+    assert_eq!(stages(&seen.events).last(), Some(&SkillStage::Done));
+    let done = &seen.events[3].why;
+    assert!(
+        done.contains("remind at 22:00: not set, what is set could not be read"),
+        "{done}"
+    );
+    assert_eq!(seen.lights.len(), 1, "{:?}", seen.lights);
+    let asked: serde_json::Value = serde_json::from_str(&seen.lights[0]).unwrap();
+    assert_eq!(asked["name"], "list_reminders");
+    assert!(asked.get("caller").is_none());
+    assert!(seen.asked.is_none(), "a remind says nothing itself");
 }
 
 #[test]

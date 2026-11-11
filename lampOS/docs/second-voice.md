@@ -224,7 +224,7 @@ each line plays exactly as before.
 |---|---|---|---|
 | The shutdown's | `lamp_msgs::GOING_TO_SLEEP` | speech cache, warmed at start | cached `text` played in the owner's words (`Recordings::cached`) |
 | A wake by name's line, in the "hm?"'s place (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2) | `language::WOKEN_BY_NAME_LINE` ("Yes?") | speech cache, warmed at start only with the switch, else the "hm?" | the owner's when kept, else the "hm?", never the English (`TtsCache::wake_line`) |
-| A hand's hold's sleep line | `lamp_msgs::SLEEP_LINE` | speech cache, warmed at start (`LAMP_SLEEP_LINE`) | the owner's when kept, else the English kept line, else the breath |
+| A hand's hold's sleep line | `lamp_msgs::SLEEP_LINE` | speech cache, warmed at start (`LAMP_SLEEP_LINE`) | the owner's when kept, else the English kept line, else the breath; the breath in the quiet hours (#6028) |
 | `go_to_sleep`'s line | `lamp_msgs::SLEEP_LINE` | the model told to say the words; with `LAMP_SLEEP_LINE=on` and the line kept, the hold's cached line in its place | the model told the owner's words (`sleep_asked::told`); the cached line as a hold's, when kept |
 | Offline, service down, back online | `language::PROVIDER_UNAVAILABLE`, `VOICE_SERVICE_UNREACHABLE`, `BACK_ONLINE` | the notices release's English file | the cache's line when kept (`FailureNotices::owners_line`), the English file otherwise |
 | A failed turn | `language::TURN_LOST` ("Sorry, I couldn't answer that. Could you ask me again?", #4883) | the notices release's file (none in the product: the sigh) | the cache's line when kept (`FailureNotices::owners_line`), the release's file or the sigh otherwise |
@@ -238,6 +238,7 @@ each line plays exactly as before.
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
+| The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
@@ -949,6 +950,104 @@ order is kept. A written turn is the same from the chat on.
   words after the marker are preserved. The local processing target is
   under 1 ms; the prompt's effect on the model and acoustic latency still
   need a lamp replay.
+- **With `LAMP_KEEP_ANSWERS_AT_ONCE=on` a plain keep is answered at once,
+  with no second chat round** (C59; off unless set, in no unit). On
+  lamp-06c1 on 5 Nov (the batch-100 runs) 70 keep turns took 3804 ms at
+  the median from the words heard to the answer's first audio, against
+  1746 ms for 268 turns with no call: the memory answered in 39 ms, but
+  round 1 streams only the `remember` call and the first words come from
+  round 2, about 1.4 s later (`Engine::keeping_at_once`,
+  `crate::keep_at_once`):
+  - **Only a line that only asks to keep something**
+    (`keep_at_once::only_keeps`): a plain ask to keep
+    (`remember::asked::asks_to_keep`, "Remember that…", "Don't forget
+    that…"), with nothing else but thanks, a greeting or the name; no
+    question mark, and no question word or shape anywhere in it
+    (`keep_at_once::asks_a_question`, Thirteen's P3 on #5565, as speech
+    to text often drops the "?": "what", "where", "when", "who", "why",
+    "how", "which"; "do you", "is it", "can you"; Vietnamese "gì", "đâu",
+    "nào", "sao", "ai", "mấy", "bao giờ", or a "không" or "chưa" ending a
+    sentence), so "… in the drawer where are they" and "… how about you"
+    go to round 2; no second clause after the keep, whatever its words:
+    past a comma, colon or spaced dash, anything but thanks, a greeting or
+    the name goes to round 2 ("…, and I'd love a joke", "…, so what's the
+    weather like"); and no "and", "also", "then", "plus", "but", "so" or
+    "or" that starts another ask or a new clause ("… and let me know the
+    weather"). "Remember that I like tea and coffee" is still a plain
+    keep (the Reviewer-lead's P2 on #5594). A spoken
+    turn only. The ask to keep is recognised by its English words only
+    (`remember::asked::asks_to_keep`): a keep asked in another language
+    ("Nhớ giúp mình…") goes to round 2 as without the switch, even with
+    that language chosen; recognising it there is a follow-up.
+  - **Round 1 called `remember` alone, with no words of its own,** and as
+    its first calls, no held forget run before them.
+  - **What the calls kept covers the whole line** (`keep_at_once::covers`,
+    the Reviewer-lead's 09:56 P2 on #5594, for a further ask with no comma,
+    which speech to text often drops): every content word of the heard
+    line past its lead-in ("remember", "don't forget", "keep in mind",
+    "make a note", "note", "nhớ") must be among the words of the calls'
+    `text`s. Both sides are folded as the memory's search folds them
+    (`remember::about_fold`: NFC, lower case, `đ` as `d`, no accents),
+    split at anything not a letter or digit, a contraction's tail (`'s`,
+    `'m`, `'d`, `'ll`, `'ve`, `'re`) and a plural's `s` taken off
+    (`remember::plural_off`). A word that says "not" ("not", "never",
+    "no", "don't", "can't", "cannot", "không", "chưa", "đừng"…) is its stem
+    and "not", so "I don't like tea" kept "Likes tea." goes to round 2 and
+    kept "Doesn't like tea." stays fast; one letter alone is a word, so
+    "blood type O" kept "type A" goes to round 2 (Thirteen's P3 on #5565).
+    Not content: the memory's common words (`remember::SEARCH_COMMON`,
+    "my", "is", "and"…) but its question words, ask verbs ("tell", "can",
+    "will"…) and "not", which are; "I", "a", thanks, a greeting or the
+    name, "user", "person", "also", "too". So a keep told in the third person
+    stays fast ("Remember that I like tea" kept "The user likes tea.",
+    "… I take my coffee black" kept "Takes coffee black."), as do "tea and
+    coffee" and "my kids are Ann and Bob"; "… and explain gravity to me",
+    "… and recommend a book", "… and wish me luck", "… then explain
+    gravity", "… and also a joke" and "… and a joke would be nice" leave
+    a word the call did not keep and go to round 2, with no list of asks.
+    A paraphrase with another word ("favourite" kept "favorite") goes to
+    round 2 too: it costs the round, never an answer. The clause and
+    joining-word rules above stay as a further guard, for a further ask
+    the model folded into the kept text.
+  - **Every keep came back kept plainly** (`keep_at_once::kept_plainly`):
+    `"remembered": true` with nothing for the model to say (no `note`, no
+    `held`, no `replaced` or `not_replaced`, no `error`; `kept_for` only
+    when the line did not ask for everyone or the room). A correction that
+    `replaced` an older one goes to round 2, which says what changed. The
+    lamp then says "Okay, I'll remember that." (`keep_at_once::KEPT`), and
+    the turn ends. The journal says `N keep(s) kept plainly for a line that
+    only asks to keep; "…" said at once, and no round 2 is asked
+    (LAMP_KEEP_ANSWERS_AT_ONCE)`.
+  - **In the owner's language** the line is its row in
+    `language::FIXED_LINES` (Vietnamese "Được, mình sẽ nhớ điều đó."),
+    rendered ahead as the worker starts and at each line's start, as the
+    wordless cut-in lines are (`Engine::render_fixed_answers`,
+    `FixedClips`), and played from that clip as the turn's piece
+    (`Queue::push_clip`; journal `… said at once from its clip rendered
+    ahead`). Until the clip is kept (the voice slow or failed at start),
+    the turn asks round 2 as without the switch (journal `the keep's line
+    is not rendered ahead in the owner's language yet; round 2 answers`).
+    In English nothing is rendered ahead: the line goes to the voice as the
+    turn's piece, as before.
+  - **Anything else goes on exactly as without the switch.** A keep that
+    failed, kept nothing, was refused, held for a yes, doubted, or told
+    with a note ("Already kept") goes to round 2, which is told what the
+    memory answered and says it (journal: `a keep was not kept plainly;
+    round 2 says what happened`); so a failed keep is never said kept.
+    Another call beside it, the model's own words, or more asked go on as
+    before. The privacy gates (the speaker seen, the scope, a gap's hold,
+    a carried line's keep held for a yes) all run before the call is
+    answered, unchanged.
+  - **Timing replay** (`tests::keep_at_once::the_timing_replay_…`, the
+    test clock, the 5 Nov medians as fake latencies: round 1's first event
+    1656 ms for a keep and 1250 ms for a plain answer, round 2's 1338 ms,
+    the memory 39 ms, the voice's first audio 462 and 404 ms; from the
+    words' end to the engine's first audio, the stretch before the chat
+    begins not modelled): a plain answer 1654 ms, a keep 3495 ms off and
+    2157 ms on. That saves 1338 ms, the whole second round; what is left
+    over a plain answer, +503 ms, is round 1's later first event (a call
+    starts about 406 ms later than words), the memory and the voice. Not
+    yet measured on a lamp.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
@@ -2087,7 +2186,12 @@ order is kept. A written turn is the same from the chat on.
     `spoken_stop::JUST_AFTER` (3 s) of its end, is answered
     `spoken_stop::LINE` (`LAMP_SPOKEN_STOP_ENDS`); a cut-in that ended the
     answer and came back with no words, in a quiet room, is answered
-    `cut_in_wordless::LINE` (`LAMP_CUT_IN_WORDLESS_ASKS`). A cut-in whose
+    `cut_in_wordless::LINE` (`LAMP_CUT_IN_WORDLESS_ASKS`), except while a
+    skill an earlier line asked for by voice is still being made or its
+    line is still to be said, for at most `make_skill_local::MAKE_WITHIN`
+    (2 minutes) after its call (`Shared::quiet_for_a_make`, lamp-9adf, 11
+    Nov; skills.md, "A cut while it is made"): then the lamp stays quiet,
+    with `LAMP_CUT_IN_WORDLESS_RESUMES` too. A cut-in whose
     final words came back empty but had words on the way is taken as that
     stop when they are one, and otherwise is neither (#4938). Neither is asked
     of the model; both are rendered ahead (`FixedClips`) and played at once
@@ -2160,6 +2264,23 @@ order is kept. A written turn is the same from the chat on.
     lamp said" (or "… in a busy room; the model is not told …"), "only
     the lamp's name was said, and the model is told so", and "… no words
     of it came back: asked as the name".
+  - With `LAMP_NAME_WORDLESS_BAR=on` (#5385), that line with no words is
+    asked as the name only when lamp-name heard the name in it at 0.99 or
+    more (`second_provider::wordless_call`: its own `name/heard`
+    subscriber, read all the time by a reader thread of its own, so lines
+    with words, which never ask, do not leave its queue to fill and drop
+    the next hearing; the last 32 kept for 30 s; the best hearing that
+    began from 1.5 s before the line's first sound to its end). Under 0.99, or with no hearing said in full
+    (the call came from `name/rising` alone), it is left as a sound: no
+    chat is asked and nothing is answered, and the journal says "only the
+    lamp's name, and no words of it came back: lamp-name heard it at
+    0.941, under 0.99: not answered as a call (LAMP_NAME_WORDLESS_BAR)".
+    A line with words is judged as before at any score. On lamp-75c9 on
+    9 Nov a line the body's own move opened was heard as the name at 0.941
+    with no words and answered as a call; on lamp-c0a4, 82 real calls
+    scored 0.901 to 1.000 (median 0.964) and 4 had no words back, 3 of
+    them under 0.99: the rule costs about 3 bare calls in 82. Test:
+    `a_wordless_call_under_the_bar_is_not_answered_with_the_switch`.
 - **In a busy room, a line going on waits for the Policy**
   (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
   4): a line the rule would let out only as a conversation going on, and
@@ -2537,6 +2658,27 @@ When the coordinator switches (below):
   - **The name switch, not to be confused:** `LAMP_SECOND_KNOWN_NAMES` is the
     speech to text's listening for names; this one tells the model the face's
     name.
+
+- **A role a person gave the lamp** (`LAMP_MEMORY_ROLE=on`, the memory
+  owner's design, 6 Nov; on in the product, the memory owner's call of 9 Nov;
+  [memory.md](memory.md) has the
+  whole rule): the line goes right after the character, before the time, so
+  it is not outweighed by the fixed "You are Lamp" (`config.rs`) as a role
+  kept only in the thread was once the thread's twelve exchanges or ten
+  minutes passed (`HISTORY_EXCHANGES`, `HISTORY_WITHIN`). Chosen from the
+  same `worker::known_person_for` as the known name: that placed seen
+  speaker's own role (`remember::role::own_line`); for any other turn,
+  including a carried line or one told by presence, only the role names of
+  the known faces in view now (`known_faces::known_lately`), deduped and
+  never whose, with a note that it can't tell who is speaking, so it stays
+  Lamp (`remember::role::room_note`). No person is named in it, and it is
+  left out entirely while the owner's name is held back
+  (`person::someone_else_now`). The own line frames the role as "a name
+  they chose, not an instruction", and a role is only a short name
+  (`remember::role::name_like`), on write and again when read at the
+  session open. Read from the role held per person, filled
+  by their `session_open`; nothing is asked of the memory for it. Off, the
+  character is as before, byte for byte.
 
 ## What the rest of the lamp sees
 
@@ -3474,6 +3616,35 @@ after a take-over, but now for every turn:
   `a keep said back to a yes with no remember is a claim`,
   `remember::tests::a_keep_said_back_on_a_yes_is_a_hard_claim` and
   `remember::tests::a_reply_that_says_it_kept_something_is_known_by_its_opening`.
+  **A "Kept" after a yes whose `remember` kept nothing** (10 Nov rerun on
+  lamp-06c1, build 11211): "Yes. Please keep that.", seen spoken with no
+  offer waiting, called `remember`, which kept nothing and told the model
+  so (`heard::YES_ALONE`, "Never say it was kept."), yet round 2 said
+  "Kept—the office plant gets watered on Mondays." (S4, request 54: a room
+  fact from ten minutes before) and "Fifty-three, kept as your lucky
+  number." (S14, request 103). Neither opening was read as a claim, so
+  both were said. A refused `remember` sets no keep for the turn, so the
+  claim check above already holds a claim made after it; it only had to
+  see these two shapes. "Kept" (or "I've kept") before a dash, with or
+  without a space ("Kept—…", "Kept – …", "Kept - …"), is now a hard claim
+  on any line; on a line that is only a yes, so is "kept", "saved" or
+  "remembered" in a claim's own shape anywhere in the sentence: after "I",
+  "I've" or "I have" ("Fifty-three, I've kept it."), set off by a mark before
+  "as your" ("Fifty-three, kept as your lucky number."; "Pip is kept as
+  your goldfish's name." stays none) or before "that"/"it" "for
+  you" (`remember::kept_in_a_claims_shape`). A keep word as a plain
+  participle mid-sentence is none, whatever mark comes before it (Third's
+  HOLD on #5994: "Your plant, kept outdoors, needs watering.", "kept under
+  the mat", "kept refrigerated" are said as they came), nor a word joined
+  by a hyphen ("well-kept", "kept-up"), a state kept ("The light, kept on
+  since noon, …", "I've kept it dim."; a state word inside a clause about a
+  person is the fact's, so "I've kept that you like bright light." is a
+  claim, Fourth's P3 on #5994) or a reminder or setting saved. The
+  model's word choice is the cause, and the tool result told it the truth:
+  the gate is in code, not in the prompt. Tests:
+  `a_kept_said_after_a_yes_whose_remember_kept_nothing_is_never_said`,
+  `a_kept_as_a_plain_word_after_a_yes_is_said` and
+  `remember::tests::a_kept_before_a_dash_or_opening_a_clause_is_a_hard_claim`.
   **A face said saved counts the same** (`LAMP_MEMORY_KEEP_ASKED=on`, its
   switch; #5141 row 8). On lamp-0c4e on 3 Nov the model said "hold still
   while I take your face in" with no `remember_my_face` call, and no face
@@ -3538,7 +3709,11 @@ after a take-over, but now for every turn:
   set." beside `set_timer`, `set_reminder`, `repeat_reminder` or
   `snooze_reminder`, and "I'll remind you at …" beside those or
   `list_reminders`, which it also answers, each made in any round of the turn (beside calls of another kind, which run, the next round is told only the claimed kind wasn't done and the others mustn't be called again, `action_claim::beside_calls_note`) (a cut answer's carried
-  rounds too). Each round's opening is held only while its words could
+  rounds too), never a round declined with `not_for_me` and asked once more
+  because the lamp was named to a face: that round's calls run none, so
+  none of them backs a claim (Reviewer-three's after-merge P2 on #5215:
+  `[not_for_me, set_timer]`, then "Timer set." said with nothing set). Each
+  round's opening is held only while its words could
   still begin a claim; at the first that fits none, or a claim whose call
   an earlier round made, it goes on as before. A claim with no call yet is
   held to the round's end: beside a call of its kind it is said; beside
@@ -3989,7 +4164,21 @@ after a take-over, but now for every turn:
   or the rule), its turn answers the words cut short in its place, within
   30 s (`CARRY_WITHIN`): `request M is held, so request N's words, cut
   short by it, are answered in its place`. If it is let out, it is answered
-  itself and they are let go. With `LAMP_NAME_SAID_TO_A_PERSON=on` they are
+  itself and they are let go. With `LAMP_CUT_ASK_ANSWERED=on` (#5961), words
+  a line let out cut short and did not join or tell first wait on its answer
+  (`request N's words, cut short, wait on request M's answer: answered in
+  its place if it only declines`): if that answer only declines
+  (`not_for_me`, nothing said, run or done), the turn is not ended and they
+  are answered in its place, as a held line's are (`request M only
+  declined, so request N's words, cut short by it, are answered in its
+  place (LAMP_CUT_ASK_ANSWERED)`); any other answer lets them go, as
+  before. Never the lamp's name it was not shown said by, nor words said
+  to a person. On lamp-52e6 on 10 Nov at 09:5x (core w3) an 8-word ask was
+  cut 0.9 s after it ended by a 1-word line, in a busy room with no face
+  seen, so not joined; the model declined the one word and the ask was
+  never answered. Tests: `an ask cut by a line that only declines is
+  answered in its place` and `an ask cut by a line that calls a tool is
+  let go`. With `LAMP_NAME_SAID_TO_A_PERSON=on` they are
   let go, not answered in a held line's place, when they open with a word
   said to a person ("Ma'am, could …") or the held line does ("Sir, what time
   is this?") and they don't call the lamp; their unplayed answers leave the
@@ -4001,7 +4190,50 @@ after a take-over, but now for every turn:
   of the cut answer's finished rounds`. A round still waiting on a call is
   not carried. Words joined with new ones start again (#5026, lamp-0529,
   3 Nov: a search, a page and a second search were lost to a 0-word line,
-  and the answer came from the model's memory). Words answered again may
+  and the answer came from the model's memory). A connected service's send
+  (`service_write` with its `send_id`, `services::may_send`) is the one call
+  carried even while it is still awaited (#5853, lamp-9adf, 9 Nov: the
+  person's "go ahead and send it" was sent to Google Drive 0.9 s after a
+  wordless line cut the turn, and the held line answering it, given no trace
+  of the send, prepared a new write and read it back). The send runs on a
+  task of its own (`sending`), so it reaches its answer after the cut, and
+  is kept with that answer (`SentWrite`, by the send's own request and its
+  own attempt id (`send_attempt`), every try of one batch up to its bound
+  (`net::MOST_CALLS`, 64), refused tries let go first and never one that
+  went or may have gone, the newest 8 requests' (`SENDS_KEPT`); every try is
+  carried with its own result, and the note follows the one that went) until
+  its round is carried, a turn given it ends (`sent_given_over`), or its
+  words are let go. The line answering those words again, held or joined
+  with new ones, finds it by any of the words' requests (`origins`), so
+  through any number of cuts: it waits for the answer with the words in
+  flight as its own, so a newer line cutting it meanwhile carries them and
+  finds the send in turn, at most `services::DEADLINE` (20 s) from when
+  the send began, and goes on from the send's call and result (once, even
+  if a line before it already carried them), with the note "their
+  go-ahead already sent the write they asked for (or, for a draft, saved
+  it) … do not call
+  service_write again for it" (`SENT_WRITE_NOTE`); the journal says
+  `request M: request N's K send tr(y|ies) began before a newer line cut its
+  answer; the sent one and each try's own result go with its words` (the
+  tail names what was told instead when no try is known sent: "a send whose
+  result is not known", "a send not known to have gone", or "their results,
+  none sent,"). The cut turn's own answer is
+  fenced to "not running" once its lease is stale, so where the services
+  got to with that very try (`services::send_state`, by its attempt id) is
+  told instead: their answer, or the gate's refusal, never another try's.
+  Past the gate with no answer, the note says it was sent and its result
+  is not known (`SENT_UNKNOWN_NOTE`); no answer within the bound and
+  nothing at the services, that whether it went is not known
+  (`SEND_NOT_KNOWN_NOTE`, its `service_write` told `SEND_NOT_KNOWN`);
+  never that nothing was sent. After a forget boundary, `Asked` also stays
+  uncertain and uses `SEND_NOT_KNOWN_NOTE` and `SEND_NOT_KNOWN`.
+  In that line's turn a `service_write` is not run: a confirmed send gets
+  `ALREADY_SENT`, asking only for confirmation that it was sent, without
+  reconstructing what was done. Before a forget boundary, `Asked` also
+  gets `ALREADY_SENT`. No new read-back follows; the mark ends with the
+  turn. A send refused by the
+  gate, or answered "not running" before the services had it, goes with its
+  result only, never told as sent. Words answered again may
   still be searched again, but are written once (`WriteOwner`; lamp-06c1, 26 Oct,
   build 6963: one "remember my favourite planet is Saturn" was kept three
   times, by two empty held lines answering it again): the first request to
@@ -4261,31 +4493,82 @@ after a take-over, but now for every turn:
       of the thread the next turn is given, since it may name what went
       ([memory.md](memory.md), "A forget's answer stays out of the thread").
     - **The active turn forgets its copied context too.** Once an admitted
-      `forget` or `forget_everything` call returns, including an uncertain
-      failure, the next round starts with the configured character and
+      `forget`, `forget_everything` or `forget_my_face` call returns, including
+      an uncertain failure, the next round starts with the configured character and
       language, the current text-only question, and content-free names and
       outcomes of calls already run. It carries no earlier exchanges,
       memory notes, injected personal names, tool arguments or results,
       reasoning, per-turn notes, or picture. A confirmed held forget before
-      round 1 uses the same boundary. Locally held or refused calls do not
-      clear the context. Custom character-file text remains configuration.
+      round 1 uses the same boundary. Admission advances the shared context
+      epoch and clears all retained earlier tool rounds, before awaiting
+      either the held or ordinary forget call, alongside the pending
+      rename. This clears the installed rounds and prevents stale copied
+      rounds from being installed later. Cutting or dropping the turn
+      during that await cannot leave those rounds for the next turn.
+      Earlier `SentWrite` records retain request, attempt, timing and
+      outcome accounting, but the epoch immediately invalidates publication
+      of their display calls and results. Bounded raw receipt payloads may
+      remain in memory until registration, completion or recovery scrubs
+      them, or eviction drops them; immediate RAM zeroization is not promised.
+      Handles cloned before the await, late registration or completion,
+      and `services::send_state` fallback cannot restore raw call IDs,
+      arguments or results. Final reconstruction and publication share
+      admission's synchronization boundary. No new I/O or task is added,
+      and receipt waits remain outside the publication lock. Recovery can
+      hold that lock while taking a receipt-content lock, so admission is
+      not guaranteed to be independent of contention. Ordinary batches preserve their
+      producer context epoch when publishing finished rounds and registering
+      send receipts, including the requested-audio runner path. An old
+      batch that starts a send or finishes its round after admission cannot
+      regain permission to display its old content. A late genuine success may
+      update the fixed sent status; `Asked` and unknown outcomes remain
+      uncertain, and confirmed refusals remain refusals. Duplicate-send
+      guards survive without asking the model to reconstruct forgotten
+      details. The after-return reset still rebuilds the current
+      turn's local messages with fixed outcomes. Calls held or refused
+      before admission do not clear the context. Custom character-file
+      text remains configuration. This adds no deletion call, provider or
+      audio cancellation, or switch, and makes no device-verification claim.
       Calls left in that model batch are not run: their arguments came from
       the old context. The next round may plan the remaining work afresh,
       and is told not to repeat calls already run. Partial deletion and
       uncertain outcomes are not described as complete. Setup-name, place
       and reminder deletion results retain only fixed success, kept or
-      uncertain states; an unreported step is never assumed successful.
-      A failed or uncertain step downgrades an `everything=true` claim,
-      including reminder cancellation failures whose producer leaves it true.
+      uncertain states. The same sanitizer carries `room_memory_result`,
+      `sound_consent_result` and `face_expression_consent_result` only as
+      `cleared`, `kept` or `uncertain`; any other value becomes `uncertain`,
+      with no raw payload copied. An absent field stays unreported and is
+      never assumed successful.
+      For room cleanup, the producer reports `cleared` only for a
+      `forget_said` reply with `ok: true` and a nonnegative integer
+      `removed` count, including zero; `ok: false` with `unknown_op` means
+      `kept`, and other replies or a lost reply mean `uncertain`. Each
+      consent-file removal reports `cleared` on success or `NotFound`,
+      otherwise `uncertain`. A non-cleared room or consent outcome sets
+      `everything: false`, and later successful steps cannot restore true.
+      The sanitizer also downgrades an `everything=true` claim for any
+      failed or uncertain step, including reminder cancellation failures
+      whose producer leaves it true. These result fields add no calls,
+      retries or deadlines and do not change the deletion's privacy scope.
       The reset also clears the prior acting answer’s silence-marker state,
       so the fresh round does not inherit its unspoken-reply protocol.
       Earlier memory-keep evidence and its claim-correction allowance reset
       too: a fresh offer to remember stays audible, and an unsupported new
       keep claim is checked again. Completed non-memory calls retain their
       existing confirmation allowance.
-      This reset does not read the memory service or add a chat round;
-      normal context is composed again on the next turn. Face-only forgets retain their
-      existing path. Tests are in `second_provider/tests/after_forget.rs`
+      The reset itself adds no memory-service read. Dropped work may need
+      fresh planning within the existing round limit; normal context is
+      composed again on the next turn. After `forget_my_face`, the sanitized
+      receipt reports `face_forgotten` independently from
+      `primary_memory_result` (`forgotten` or `uncertain`). An absent memory
+      receipt stays unreported. `old_face_records_kept_apart` preserves the
+      fixed old-record warning; an unknown note becomes
+      `face_cleanup_uncertain`. The three fixed cleanup states survive, but
+      this inner path never introduces `everything: true` because it does
+      not perform the outer setup-name, place, voice-print, journal or
+      reminder cleanup ([memory.md](memory.md)). The same-turn reset also
+      discards a pending rename note already composed before the face call.
+      Tests are in `second_provider/tests/after_forget.rs`
       and `held_forget.rs`, with the prior acting-answer case in
       `short_done.rs`; a lamp replay is still needed. This boundary
       clears model context, not speech already queued: a pre-forget piece,
@@ -4867,8 +5150,14 @@ after a take-over, but now for every turn:
   (`person::someone_else_now`): another voice in the conversation (the
   rule's own `another_person`, told through `Heeding::telling_another_voice`),
   more than one face in view, one face the eyes don't know as the owner, or
-  the eyes knowing someone else. No face in view, the owner looking away, is
-  no sign. For the reply only: the line's scope, memory and every keep,
+  the eyes knowing someone else. No face in view, or no look, is nobody
+  known at the lamp and holds the name back too, unless the eyes knew the
+  owner's face lately (8 s, `known_faces::known_lately`: the owner just
+  looking away) or the line is carried as theirs (B5186, 10 Nov: with
+  nobody in view an off-camera "what's my name?" was told the owner's typed
+  name). The private room (`LAMP_PRIVATE_ROOM`) changes none of it. The
+  journal says why the owner was named and where the name came from
+  (typed at setup, or kept with their face), never the name. For the reply only: the line's scope, memory and every keep,
   recall and forget stay as the rule below decides. On lamp-29e7 (8250) the
   owner alone at the lamp right after setup asked "what's my name?" and was
   not answered: the camera read their mouth speaking on 2 of 18 lines, so no
@@ -5026,8 +5315,11 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `request N: seen speaking it: 2 faces (ids F, K): told and kept as the
   room's`, so with two faces in view the journal says which one a line
   went to (#3699). A face the eyes say `follows` a lost passing id (their
-  `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on`, #4885, eyes.md "The
-  followed id") is that face, but only on the eyes' word as of the line's
+  `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on`, both on in the
+  product's eyes since C65, #4885, eyes.md "The followed id") is that face (and a line ending while the eyes mark their
+  hold unsure, `LAMP_FACE_KNOWN_UNSURE=on`, waits up to 1 s for a print:
+  then the known file as it stands, or the room's at the bound, #5738,
+  eyes.md "Unsure until a print"), but only on the eyes' word as of the line's
   end: each link said in their looks up to it, kept as a chain (longer
   than the eyes, which drop a link 1.5 s after the old id was lost: the
   voice keeps it for the 30 s of looks it keeps unless a look cuts it), so a face re-found twice in a line (`f15` to `f16` to `f17`,
@@ -5064,14 +5356,19 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   such a line no face was seen speaking stays the conversation's, not the
   room's, when all of these hold: the newest exchange before it is theirs
   and began within 45 s (`Thread::going_on_with`; a room's exchange whose
-  line `named_alone` named for their face, never the one-face count alone,
-  with the one-face rule's voice tracker there and no other voice known for
-  it, opens their conversation for a **keep only**,
+  line `named_alone` named for their face, or the one-face count
+  (`LAMP_SECOND_NAME_ONE_FACE`) with their mouth read speaking in at least
+  one look (`SpeakingFaces::read_speaking_in`; never a face read only still
+  or unread), with the one-face rule's voice tracker there and no other
+  voice known for it, opens their conversation for a **keep only**,
   `ScopeLease::named_for_conversation`, `Thread::lamp_for_named`,
   `Thread::going_on_how`; any later narrow, or another voice heard as the
   line is judged, takes it back: lamp-06c1, 5 Nov, S4, where the owner-only
   name rule kept a non-owner's opening line as the room's and her car line
-  just after found no conversation of hers; Thirteen's P1 on #5448),
+  just after found no conversation of hers; Thirteen's P1 on #5448; and
+  lamp-06c1, 6 Nov, stock 10538, S4 request 291, her face alone in 9 of 9
+  looks, read speaking in 1 and still in 7, so never `named_alone`, and her
+  car line 292 was not carried),
   the eyes' looks fell in
   it and none tracked a face but theirs (`SpeakingFaces::no_other_face_in_view`;
   no look, a stalled eye or a covered camera, is not), their face was in
@@ -5110,7 +5407,8 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   least half its looks), while their known face was the only face in view
   through it with at least one look of it read speaking and fewer than half
   read still. A nod or a smile fits; so does a partner off camera talking
-  while they listen. So a conversation opened only by such a line
+  while they listen. The one-face count with one look read speaking is
+  weaker still (any share read still). So a conversation opened only by such a line
   (`ScopeLease::carry_keep_only`, Heron's P2 on #5448) carries a later
   unseen line's **keep alone**, held for their own seen yes and written in
   their scope on it, with `LAMP_CONVERSATION_CARRIED_SAVES`: the line is
@@ -5172,7 +5470,7 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   it, with the person's face alone in view, hears their reminders and may
   cancel or snooze them ([schedule.md](schedule.md), [switches.md](switches.md)).
 - **A one-face line is read as its person's; its forgets need the mouth**
-  (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, off everywhere, #5522; with
+  (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, on in the product since 10 Nov, #5522; with
   `LAMP_PERSON_SCOPE_ONE_FACE` acted on, `Engine::reading_by_one_face`). A
   line the one-face rule takes is not narrowed at admission
   (`ScopeLease::read_by_one_face`): its chat is told their context, recall
@@ -5183,7 +5481,9 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   (`one_face_refused`, before any hold) and by the memory route
   (`ScopeLease::forgets_need_mouth`, after the late look), and
   `forget_asker` gives such a line no asker. So are a correction
-  (`remember` with `replaces`), `keep_rule`, `list_rules`, and
+  (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
+  `end_role` (the privacy read on #5385, also in
+  `remember::role_for_guarded`), and
   `cancel_reminder` / `snooze_reminder` unless `LAMP_ONE_FACE_REMINDERS` is
   on, and the line has no services owner outside the private room
   (`services::owner_of`). The memory owner, 16:49 on

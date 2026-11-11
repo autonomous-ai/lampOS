@@ -1,7 +1,8 @@
-# Authored defaults, off until the first lamp comparison (#1672). The lamp's
-# sleep and its wake are Night sleep's and Expression's (#940): this keeps
-# the evening glow, the morning hum and the night's ceilings.
-enabled = false
+# On in the product since 9 Nov (#5753), after its nights on lamp-06c1
+# (#2803, #2804). The lamp's sleep and its wake are Night sleep's and
+# Expression's (#940): this keeps the evening glow, the morning hum and the
+# night's ceilings, which act only with LAMP_OUTPUT_CAPS=on.
+enabled = true
 needs = ["eyes", "voice", "light"]
 kind = "core"
 version = "1.0.0"

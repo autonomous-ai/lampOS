@@ -870,6 +870,40 @@ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_afte
     );
 }
 
+/// The second route says a request's confirmation with its call ("Sure,
+/// playing something calm now." and `use_skill`), and with
+/// `LAMP_SECOND_SAID_ONCE` says nothing after the call's result. A short
+/// confirmation can retire before the offer reaches the coordinator: on
+/// lamp-52e6 (10883, #5764) the skill was triggered and nothing played, and
+/// nothing said why. A retirement before the offer is still the turn's
+/// confirmation, so the recording follows it.
+#[test]
+fn a_confirmation_retired_before_its_offer_still_starts_the_recording() {
+    let _clock = fixture_clock();
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let original_owner = test.reply.as_ref().unwrap().owner;
+    let confirmation = test.generation();
+    test.accept(&confirmation, 240);
+    let retired = test.retire(&confirmation);
+    let offer = test.load(1);
+    test.provider_complete();
+    assert!(
+        test.prepare(),
+        "the retired confirmation before the offer starts the recording"
+    );
+    let first = test.dispatch().unwrap();
+    assert_eq!(first.permit.owner(), original_owner);
+    assert_eq!(first.samples, [100; 240]);
+    assert!(test.accept(&first, 240) >= retired);
+    let final_chunk = test.dispatch().unwrap();
+    test.accept(&final_chunk, 240);
+    test.retire(&final_chunk);
+    test.complete_media();
+    assert!(test.reply.as_ref().unwrap().settled(&test.pending));
+    test.skills
+        .finished(&offer, RequestedAudioOutcome::Completed);
+}
+
 #[test]
 fn news_in_a_music_confirmation_is_heard_once_after_both_parts_retire() {
     let _clock = fixture_clock();

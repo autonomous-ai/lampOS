@@ -1,13 +1,15 @@
 //! Independent pre-move prompt bytes for unchanged semantic tests and parity.
-pub const SIT_NOTE: &str = "(Say only this, nothing before or after it: \"Let's get set up first! It'll only take a few minutes. Please follow my instructions step-by-step, and once we're done, you can ask me anything. Sit where you usually sit and look at me. I'll tell you when I see you.\")";
-pub const SIT_OFFER: &str = "(Say only this, nothing before or after it: \"Sit where you usually sit and look at me. I'll tell you when I see you.\")";
-pub const SIT_VISIT_OFFER: &str = "(Say only this, nothing before or after it: \"One more thing: sit where you usually sit and look at me. I'll tell you when I see you.\")";
-pub const SIT_NO_FACE: &str = "(Say only this, nothing before or after it: \"I can't see your face yet. Sit where you usually sit, and look at me.\")";
+pub const SIT_NOTE: &str =
+    "(Say only this, nothing before or after it: \"Sit where you usually sit, and look at me.\")";
+pub const SIT_OFFER: &str =
+    "(Say only this, nothing before or after it: \"Sit where you usually sit, and look at me.\")";
+pub const SIT_VISIT_OFFER: &str = "(Say only this, nothing before or after it: \"One more thing: sit where you usually sit, and look at me.\")";
+pub const SIT_NO_FACE: &str = "(Say only this, nothing before or after it: \"I can't see you yet. Look at me for a moment.\")";
 pub const SIT_CLOSER: &str = "(Say only this, nothing before or after it: \"You're a little far. Move me closer to you, or stay as you are.\")";
 pub const SIT_TURN: &str = "(Say only this, nothing before or after it: \"I can see you at the edge of my view. Turn my head toward you until I'm facing you, or stay as you are.\")";
 pub const SIT_DONE: &str =
-    "(Say only this, nothing before or after it: \"Got it, I can see you well there.\")";
-pub const SIT_FAILED: &str = "(Say only this, nothing before or after it: \"I still can't see you well there. That's fine, you can turn me toward your seat later.\")";
+    "(Say only this, nothing before or after it: \"There you are. I can see you.\")";
+pub const SIT_FAILED: &str = "(Say only this, nothing before or after it: \"No problem. You can turn me toward you any time.\")";
 pub const WHO_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, say their name back as one clear yes-or-no question on its own, their name and then did I get that right, never their name alone, with nothing else in that line, and wait for their answer. Ask to spell it only if it's wrong or missed, once; then say the name it spells, as a word. Only after a clear yes to their name, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time?\", and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")";
 pub const WHO_NUDGE: &str = "(If you said their name back or asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)";
 pub const PREFERENCES_NUDGE: &str = "(They have answered. Call setup_step with step \"preferences\" now, before you say anything else.)";
@@ -15,24 +17,27 @@ pub const WHO_AGAIN: &str =
     "(That was not their name. Ask exactly this: \"Sorry, what should I call you?\")";
 pub const ROOM_SOUNDS_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"May I notice music and laughter in the room? Nothing is recorded. Just say yes or no.\" If you can't tell their answer, ask exactly this once: \"Sorry, was that a yes or a no?\" Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Then say only: \"Got it, I'll notice music and laughter.\" after a yes, or \"Okay, I won't.\" otherwise.)";
 pub const FACE_EXPRESSIONS_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"May I notice when people look happy or upset, so I can answer more warmly? A yes covers everyone at this lamp. I never say it aloud and keep no pictures. Just say yes or no.\" If they answer with a plain yes or no, say nothing and call nothing: the lamp answers it itself. If you can't tell their answer, ask exactly this once: \"Sorry, was that a yes or a no?\" For any other answer, call setup_step with step \"face_expressions\": done only after a clear yes, skipped if they say no or are unsure. Then say only: \"Got it, I'll notice how people look.\" after a yes, or \"Okay, I won't.\" otherwise.)";
-pub const TOUCH_NOTE: &str = "(Say only this, nothing before or after it: \"OK, next step. Tap the top of my head once, then let go.\")";
-pub const TOUCH_OFFER: &str = "(Say only this, nothing before or after it: \"One more thing: tap the top of my head once, then let go.\")";
-pub const TOUCH_REMIND: &str = "(Say only this, nothing before or after it: \"I didn't feel that. Touch the very top of my head with your fingertip, once.\")";
+pub const TOUCH_NOTE: &str =
+    "(Say only this, nothing before or after it: \"Pet the top of my head.\")";
+pub const TOUCH_OFFER: &str =
+    "(Say only this, nothing before or after it: \"Pet the top of my head.\")";
+pub const TOUCH_REMIND: &str =
+    "(Say only this, nothing before or after it: \"Gently, on top of my head.\")";
 pub const TOUCH_DONE: &str =
-    "(Say only this, nothing before or after it: \"Got it, I felt that.\")";
-pub const TOUCH_FAILED: &str = "(Say only this, nothing before or after it: \"I didn't feel a tap this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
+    "(Say only this, nothing before or after it: \"Mmm, that feels nice.\")";
+pub const TOUCH_FAILED: &str =
+    "(Say only this, nothing before or after it: \"That's okay. You can pet my head any time.\")";
 pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"Are there hours when I should keep quiet? For example, 'after ten at night', or 'no'.\" Keep each answer as a rule if you can, and answer each in at most five words, never with a question, even when a rule can't be kept. Never ask whether you may say hello and never close the setup yourself: that question and the last line come on their own. As soon as you have heard their answer about saying hello, call setup_step with step \"preferences\" before you say anything else.)";
 pub const PRIVACY_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones.\")";
 pub const PRIVACY_DONE_CAMERA: &str = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones and my camera.\")";
 pub const PRIVACY_FAILED: &str = "(Say only this, nothing before or after it: \"The switch check didn't finish. You can try it again later by redoing the setup. Just ask me to redo the setup.\")";
-pub const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat, the way you'd get my attention. I'll ask until I've heard you three times.\")";
+pub const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"When you want me, start with 'Hey Lamp'. When I stop talking, give it a try.\")";
 pub const NEAR_AGAIN: &str =
     "(Say only this, nothing before or after it: \"Got it. Say 'Hey Lamp' once more.\")";
-pub const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' again, from your seat.\")";
-pub const NEAR_DONE: &str =
-    "(Say only this, nothing before or after it: \"Got it, that's three.\")";
-pub const NEAR_FAILED: &str = "(Say only this, nothing before or after it: \"I couldn't learn how you call me this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
+pub const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Try once more when I stop talking.\")";
+pub const NEAR_DONE: &str = "(Say only this, nothing before or after it: \"That's me! Say 'Hey Lamp' whenever you need me.\")";
+pub const NEAR_FAILED: &str = "(Say only this, nothing before or after it: \"No worries. Just say 'Hey Lamp' whenever you need me.\")";
 pub const SENTENCE_FIRST: &str = "(Say only this, nothing before or after it: \"Now say any sentence to me, the way you'd talk to me.\")";
 pub const SENTENCE_LOUDER: &str = "(Say only this, nothing before or after it: \"Say another sentence from your seat, a little louder.\")";
 pub const SENTENCE_CLOSER: &str = "(Say only this, nothing before or after it: \"Come a little closer and say another sentence.\")";

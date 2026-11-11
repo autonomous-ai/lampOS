@@ -323,6 +323,173 @@ pub fn doubts_what_was_heard(said: &str) -> bool {
         || doubts_around(&said)
 }
 
+/// What opens a question that offers the word in place of a kept one,
+/// lower case: "is that ranunculus?" (lamp-06c1, 10 Nov, C37: "renunctinus"
+/// was kept, then "Kept as you said it … is that ranunculus?").
+const OFFERS: &[&str] = &[
+    "is that",
+    "is it",
+    "was it",
+    "did you mean",
+    "do you mean",
+    "did you say",
+];
+
+/// The longest offer, in bytes, from its opening words to its '?'.
+const OFFER_MOST: usize = 40;
+
+/// Words an offer may hold that never stand for a kept word: "Is that
+/// everything?", "Is it right?".
+const NOT_OFFERED: &[&str] = &[
+    "everything",
+    "anything",
+    "something",
+    "right",
+    "correct",
+    "okay",
+    "alright",
+    "true",
+    "fine",
+    "good",
+    "enough",
+    "all",
+    "still",
+    "really",
+    "what",
+    "that",
+    "this",
+    "your",
+    "their",
+    "with",
+];
+
+/// The edit distance between `a` and `b`, by characters.
+fn distance(a: &[char], b: &[char]) -> usize {
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, x) in a.iter().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, y) in b.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = (above + 1)
+                .min(row[j] + 1)
+                .min(diagonal + usize::from(x != y));
+            diagonal = above;
+        }
+    }
+    row[b.len()]
+}
+
+/// Whether `asked` sounds like a mishearing of `kept`, both lower case:
+/// not the same word, the same first letter, and at most half the longer
+/// one's letters changed ("renunctinus" and "ranunculus").
+fn misheard_as(kept: &str, asked: &str) -> bool {
+    let (kept, asked): (Vec<char>, Vec<char>) = (kept.chars().collect(), asked.chars().collect());
+    kept != asked
+        && kept.len() >= 4
+        && asked.len() >= 4
+        && kept.first() == asked.first()
+        && 2 * distance(&kept, &asked) <= kept.len().max(asked.len())
+}
+
+/// The words of `text`, lower case, letters only.
+fn words_of(text: &str) -> Vec<String> {
+    text.nfc()
+        .flat_map(char::to_lowercase)
+        .collect::<String>()
+        .split(|c: char| !c.is_alphabetic())
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// A round's own question that offers another word for one of `kept`, the
+/// text a `remember` just kept: "Kept as you said it … is that
+/// ranunculus?" after "Their favorite flower is a renunctinus." (C37,
+/// lamp-06c1, 10 Nov). The kept word and the offered one, lower case. The
+/// question opens a sentence or a clause with one of [`OFFERS`] and ends
+/// with '?' within [`OFFER_MOST`] bytes; exactly one word in it, none of
+/// [`NOT_OFFERED`] and not in `kept` already, is [`misheard_as`] exactly one
+/// word of `kept`. Otherwise `None`: "Is that everything?", "Is that for
+/// Monday?" after a Monday keep, or two words that both could be it.
+pub fn offered_word(said: &str, kept: &str) -> Option<(String, String)> {
+    let said: String = said
+        .nfc()
+        .flat_map(char::to_lowercase)
+        .map(|c| if c == '\u{2019}' { '\'' } else { c })
+        .collect();
+    let kept_words = words_of(kept);
+    let mut found: Option<(String, String)> = None;
+    for head in OFFERS {
+        for (at, _) in said.match_indices(head) {
+            // "… or is it a ranunculus?" opens one too.
+            let before = said[..at].trim_end_matches([' ', '"', '\'', '\u{201c}']);
+            let opens = before
+                .chars()
+                .next_back()
+                .is_none_or(|c| ".!?,;:\u{2014}\u{2013}\u{2026}-".contains(c))
+                || before == "or"
+                || before.ends_with(" or");
+            let after = &said[at + head.len()..];
+            if !opens || !after.starts_with(' ') {
+                continue;
+            }
+            let Some(end) = after.find(['?', '.', '!', '\n']) else {
+                continue;
+            };
+            if end > OFFER_MOST || !after[end..].starts_with('?') {
+                continue;
+            }
+            for asked in words_of(&after[..end]) {
+                if NOT_OFFERED.contains(&asked.as_str()) || kept_words.contains(&asked) {
+                    continue;
+                }
+                let mut like = kept_words.iter().filter(|word| misheard_as(word, &asked));
+                let (Some(word), None) = (like.next(), like.next()) else {
+                    continue;
+                };
+                let pair = (word.clone(), asked);
+                match &found {
+                    None => found = Some(pair),
+                    Some(other) if *other == pair => {}
+                    Some(_) => return None,
+                }
+            }
+        }
+    }
+    found
+}
+
+/// `text` with each whole word `kept` (any case) put as `offered`, its
+/// first letter upper case where the kept one's was: what their yes to
+/// [`offered_word`]'s question keeps.
+pub fn corrected(text: &str, kept: &str, offered: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut word = String::new();
+    let flush = |word: &mut String, out: &mut String| {
+        if word.to_lowercase() == kept {
+            let mut letters = offered.chars();
+            if word.chars().next().is_some_and(char::is_uppercase) {
+                out.extend(letters.next().into_iter().flat_map(char::to_uppercase));
+            }
+            out.extend(letters);
+        } else {
+            out.push_str(word);
+        }
+        word.clear();
+    };
+    for c in text.chars() {
+        if c.is_alphabetic() {
+            word.push(c);
+        } else {
+            flush(&mut word, &mut out);
+            out.push(c);
+        }
+    }
+    flush(&mut word, &mut out);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -530,5 +697,64 @@ mod tests {
     fn the_note_never_says_kept() {
         assert!(NOT_KEPT.contains("Never say it was kept"));
         assert!(!SKIPPED.contains("tulip"));
+    }
+
+    /// C37 (lamp-06c1, 10 Nov, twice): "renunctinus" kept, then "Kept as
+    /// you said it … is that ranunculus?". The question offers the right
+    /// word for the kept one, and their yes keeps that word.
+    #[test]
+    fn a_question_offering_another_word_for_the_kept_one_is_seen() {
+        let kept = "Their favorite flower is a renunctinus.";
+        for said in [
+            "Kept as you said it \u{2026} is that ranunculus?",
+            "Kept as you said it... is that ranunculus?",
+            "Got it. Is that ranunculus?",
+            "Kept. Did you mean ranunculus?",
+            "Did you say ranunculus?",
+            "Kept: renunctinus \u{2014} or is it a ranunculus?",
+        ] {
+            assert_eq!(
+                offered_word(said, kept),
+                Some(("renunctinus".to_owned(), "ranunculus".to_owned())),
+                "{said}"
+            );
+        }
+        assert_eq!(
+            corrected(kept, "renunctinus", "ranunculus"),
+            "Their favorite flower is a ranunculus."
+        );
+        assert_eq!(
+            corrected("Renunctinus, their favorite.", "renunctinus", "ranunculus"),
+            "Ranunculus, their favorite."
+        );
+    }
+
+    /// No other word offered, or one that is no mishearing of a kept word:
+    /// nothing is taken back.
+    #[test]
+    fn a_question_offering_no_other_word_is_none() {
+        let kept = "Their favorite flower is a renunctinus.";
+        for said in [
+            "",
+            "Kept: your favorite flower is a renunctinus.",
+            "Kept. Is that everything?",
+            "Kept. Is that right?",
+            "Kept. Is that a flower you grow?",
+            "Kept. Is it renunctinus season yet?",
+            "Kept. Is that ranunculus or rununculus?",
+            "Kept. Anything else? Ranunculus are lovely.",
+            "I see ranunculus? Not sure.",
+            "It is that ranunculus?",
+        ] {
+            assert_eq!(offered_word(said, kept), None, "{said}");
+        }
+        assert_eq!(
+            offered_word("Kept. Is that for Monday?", "Gym on Monday."),
+            None
+        );
+        assert_eq!(
+            offered_word("Kept. Is that Sunday?", "Lunch with Mai."),
+            None
+        );
     }
 }
