@@ -5622,7 +5622,7 @@ fn spelled_in(words: &[&str]) -> Option<String> {
     // The name said first is a word, never one letter: 21 letters spelled
     // are not "A" and then 20 letters.
     let (first, rest) = words.split_first()?;
-    if first.chars().filter(|c| !combining(*c)).count() < 2 {
+    if first.chars().filter(|c| !combining(*c)).count() < 2 || is_a_no(first) {
         return None;
     }
     let spelled = letters_spelled(&rest.join(" "))?;
@@ -5631,6 +5631,18 @@ fn spelled_in(words: &[&str]) -> Option<String> {
         return marks_capped(first).then(|| first.to_owned());
     }
     Some(spelled)
+}
+
+/// Whether `word` says no ("not", "no", "nope", "nah", or one ending in
+/// "n't"): never the name said before letters, so "No, it's not W A L T E
+/// R." refuses the name it spells rather than keeping it (the
+/// Reviewer-lead's P2 on #6446).
+fn is_a_no(word: &str) -> bool {
+    let word = word
+        .trim_matches(|c: char| !c.is_alphanumeric() && c != '\'' && c != '\u{2019}')
+        .to_lowercase()
+        .replace('\u{2019}', "'");
+    ["no", "not", "nope", "nah"].contains(&word.as_str()) || word.ends_with("n't")
 }
 
 /// The most letters a spelled name is read as: past it the line is no name
@@ -7475,6 +7487,18 @@ mod tests {
         }
         assert_eq!(spelled_name_in("Sorry."), None);
         assert_eq!(spelled_name_in("No, it's Walter."), None);
+        // A no that spells the refused name names nobody (the
+        // Reviewer-lead's P2 on #6446).
+        for line in [
+            "No, it's not W A L T E R.",
+            "Not W A L T E R.",
+            "Nope, not W A L T E R.",
+            "It isn't W A L T E R.",
+            "It\u{2019}s not W A L T E R.",
+            "Nah, W A L T E R.",
+        ] {
+            assert_eq!(spelled_name_in(line), None, "{line}");
+        }
     }
 
     /// A reviewer's P3 on #5695: "No, J O E." (four words, a plain no) and
@@ -9420,6 +9444,32 @@ mod tests {
             notes.iter().any(|note| note == PREFERENCES_NOTE),
             "{notes:?}"
         );
+
+        // A no that spells the refused name takes it back as a plain no
+        // does (the Reviewer-lead's P2 on #6446: "not" was read as the name
+        // said first, so the letters kept Walter).
+        for (at, answer) in ["No, it's not W A L T E R.", "Nope, not W A L T E R."]
+            .into_iter()
+            .enumerate()
+        {
+            let mut room = read_back_asked(&format!("read-back-no-spelled-{at}"));
+            room.walk.heard(answer, room.at);
+            room.wait(2 * S, Some(NEAR_MIDDLE));
+            room.walk
+                .lamp_words("Sorry about that. What should I call you?");
+            room.walk.lamp_said(room.at);
+            let notes = room.wait(STEP_GIVE_UP_US + S, Some(NEAR_MIDDLE));
+            assert!(
+                !notes.iter().any(|note| note == skill::NAME_ONLY),
+                "{answer}: {notes:?}"
+            );
+            assert_eq!(
+                room.outcome(Step::WhoYouAre),
+                Some(Outcome::Later),
+                "{answer}"
+            );
+            assert!(room.walk.kept().face_again_names.is_empty(), "{answer}");
+        }
 
         // A corrected name, read back and said yes to, is the one kept
         // ("Not perfect, it's Wally." and "That's Wally.": Jarvis's table
