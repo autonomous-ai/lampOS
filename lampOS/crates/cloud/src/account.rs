@@ -310,6 +310,35 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
+    /// The backend's TLS port (#6256 B11/F9): a reply with the same broker
+    /// and only a new port is taken, so the lamp reconnects to that port at
+    /// once (`online::run` starts again on any new account) instead of
+    /// retrying the old one.
+    #[test]
+    fn a_ping_reply_with_only_a_new_port_is_taken() {
+        let account = sample();
+        let tls = PingMqtt {
+            mqtt_server: account.mqtt_endpoint.clone(),
+            mqtt_port: "8883".into(),
+            ..PingMqtt::default()
+        };
+        let next = account.rotated(&tls).unwrap();
+        assert_eq!(next.mqtt_port, 8883);
+        assert_eq!(
+            Account {
+                mqtt_port: account.mqtt_port,
+                ..next.clone()
+            },
+            account
+        );
+        // and back: the old port on the next reply is taken again
+        let back = PingMqtt {
+            mqtt_port: account.mqtt_port.to_string(),
+            ..tls
+        };
+        assert_eq!(next.rotated(&back), Some(account));
+    }
+
     #[test]
     fn a_ping_reply_rotates_only_what_it_changes() {
         let account = sample();
