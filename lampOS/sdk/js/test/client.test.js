@@ -631,6 +631,46 @@ test('the fake light state shows what the ring draws', async () => {
   });
 });
 
+test('the fake light state shows pixels while a computer holds its own', async () => {
+  // `shows.pixels` (docs/control.md): the pixels as asked of the ring (each at the brightness), while that light
+  // lasts; the nearest named light beside them as lamp-control names it (parts.rs nearest_light: the real lamp's
+  // own answer for these is purple, level 4); none for a named light, once it lapses, or on a lamp that draws none.
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    const pixels = Array(32).fill('#000000');
+    pixels[0] = '#ff0000';
+    pixels[31] = '#0010ff';
+    await lamp.ring(pixels, { forMs: 4000, brightness: 80 });
+    const shows = (await lamp.get('light')).light.shows;
+    assert.equal(shows.pixels.length, 32);
+    assert.deepEqual([shows.pixels[0], shows.pixels[31]], ['#cc0000', '#000dcc']);
+    assert.deepEqual({ on: shows.on, colour: shows.colour, level: shows.level }, { on: true, colour: 'purple', level: 4 });
+    // A named light replaces it: no pixels.
+    await lamp.light('green', 3, 2000);
+    assert.deepEqual((await lamp.get('light')).light.shows, { on: true, colour: 'green', level: 3 });
+    // Pixels again, then they lapse: the person's own, no pixels.
+    fake.state.light = { on: true, colour: 'warm', level: 1 };
+    await lamp.ring(pixels, { forMs: 1500 });
+    assert.ok(Array.isArray((await lamp.get('light')).light.shows.pixels));
+    now += 1600;
+    assert.deepEqual((await lamp.get('light')).light.shows, { on: true, colour: 'warm', level: 1 });
+    // All dark: off, warm, level 1, and the pixels asked.
+    await lamp.ring(Array(32).fill('#000000'), { forMs: 1000 });
+    const dark = (await lamp.get('light')).light.shows;
+    assert.deepEqual({ on: dark.on, colour: dark.colour, level: dark.level }, { on: false, colour: 'warm', level: 1 });
+    assert.deepEqual(dark.pixels, Array(32).fill('#000000'));
+  });
+});
+
+test('the debug log shows a light\'s pixels as they are', async () => {
+  const debug = await import('../src/debug.js');
+  const shows = { on: true, colour: 'purple', level: 4, pixels: ['#cc0000', ...Array(30).fill('#000000'), '#000dcc'] };
+  const shown = debug.redact({ re: 2, ok: true, state: { light: { on: true, colour: 'purple', level: 4, shows } } });
+  assert.deepEqual(shown.state.light.shows, shows);
+  assert.doesNotMatch(JSON.stringify(shown), /not shown/);
+});
+
 test('the tour runs every step against a fake lamp', async () => {
   const { spawn } = await import('node:child_process');
   const fake = await FakeLamp.start({ grants: [...schema.grants] });

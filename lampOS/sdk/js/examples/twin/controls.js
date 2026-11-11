@@ -21,6 +21,14 @@ export const GESTURES = [...schema.gestures];
 export const PATTERNS = [...schema.patterns];
 export const FEELINGS = ['glad', 'lively', 'low'];
 
+// 32 colours each: `(k, count) => '#rrggbb'`.
+const hue = (h) => `#${[5, 3, 1].map((n) => { const k = (n + h * 6) % 6; return Math.round(255 * (1 - Math.max(0, Math.min(k, 4 - k, 1)))).toString(16).padStart(2, '0'); }).join('')}`;
+export const PIXEL_PRESETS = {
+  rainbow: (k, count) => hue(k / count),
+  'half red, half blue': (k, count) => (k < count / 2 ? '#ff0000' : '#0000ff'),
+  'one pixel': (k) => (k === 0 ? '#ffffff' : '#000000'),
+};
+
 // The values of `fields` from `args`: a default for a missing one, each within its limits, else `bad_request`.
 export function checked(fields, args = {}) {
   const out = {};
@@ -76,6 +84,15 @@ export const CONTROLS = [
     run: async ({ lamp }, a) => {
       await lamp.light(a.colour, a.level, a.for_ms, a.pattern);
       return `lamp.light(${q(a.colour)}, ${a.level}, ${a.for_ms}${a.pattern ? `, ${q(a.pattern)}` : ''})`;
+    } },
+  // A computer's own colours on the ring, one per pixel: a few presets (the SDK takes any 32 `#rrggbb`).
+  { id: 'light_pixels', group: 'Light', label: 'Light pixels',
+    fields: [select('preset', Object.keys(PIXEL_PRESETS), 'rainbow'), number('for_ms', 1, 30_000, 10_000, { integer: true })],
+    run: async ({ lamp }, a) => {
+      const count = lamp.ringPixels ?? 32;
+      const pixels = Array.from({ length: count }, (_, k) => PIXEL_PRESETS[a.preset](k, count));
+      await lamp.ring(pixels, { forMs: a.for_ms });
+      return `lamp.ring(${q(a.preset)} // ${count} pixels, { forMs: ${a.for_ms} })`;
     } },
   { id: 'light_off', group: 'Light', label: 'Light off', fields: [number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => { await lamp.lightOff({ forMs: a.for_ms }); return `lamp.lightOff({ forMs: ${a.for_ms} })`; } },

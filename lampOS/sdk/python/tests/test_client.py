@@ -908,6 +908,51 @@ def test_air_and_device_need_their_grants_and_air_changed_comes_on_a_new_reading
     run(go())
 
 
+def test_the_fakes_light_state_shows_pixels_while_a_computer_holds_its_own(tmp_path):
+    """`shows.pixels` (docs/control.md): the pixels as asked of the ring (each at the
+    brightness), while that light lasts; the nearest named light beside them as
+    lamp-control names it (parts.rs `nearest_light`, the real lamp's own answer for
+    these: purple, level 4); none for a named light, once it lapses, or for no pixels."""
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                now = [100.0]
+                fake.clock = lambda: now[0]
+                pixels = ["#000000"] * 32
+                pixels[0], pixels[31] = "#ff0000", "#0010ff"
+                await lamp.ring(pixels, for_ms=4_000, brightness=80)
+                shows = (await lamp.get("light"))["light"]["shows"]
+                assert shows["pixels"][0] == "#cc0000" and shows["pixels"][31] == "#000dcc" and len(shows["pixels"]) == 32
+                assert (shows["on"], shows["colour"], shows["level"]) == (True, "purple", 4)
+                # A named light replaces it: no pixels.
+                await lamp.light("green", 3, 2_000)
+                assert (await lamp.get("light"))["light"]["shows"] == {"on": True, "colour": "green", "level": 3}
+                # Pixels again, then they lapse: the person's own, no pixels.
+                fake.state["light"] = {"on": True, "colour": "warm", "level": 1}
+                await lamp.ring(pixels, for_ms=1_500)
+                assert "pixels" in (await lamp.get("light"))["light"]["shows"]
+                now[0] += 1.6
+                assert (await lamp.get("light"))["light"]["shows"] == {"on": True, "colour": "warm", "level": 1}
+                # All dark: the light is off, warm, level 1, and still the pixels asked.
+                await lamp.ring(["#000000"] * 32, for_ms=1_000)
+                dark = (await lamp.get("light"))["light"]["shows"]
+                assert (dark["on"], dark["colour"], dark["level"]) == (False, "warm", 1) and dark["pixels"] == ["#000000"] * 32
+
+    run(go())
+
+
+def test_the_debug_log_shows_a_light_s_pixels_as_they_are():
+    from lampos import debug
+
+    reply = {"re": 2, "ok": True, "state": {"light": {"on": True, "colour": "purple", "level": 4,
+                                                      "shows": {"on": True, "colour": "purple", "level": 4,
+                                                                "pixels": ["#cc0000"] + ["#000000"] * 30 + ["#000dcc"]}}}}
+    shown = debug.redact(reply)
+    assert shown["state"]["light"]["shows"]["pixels"][0] == "#cc0000", shown
+    assert "<not shown>" not in str(shown), shown
+
+
 def test_the_fakes_light_state_shows_what_the_ring_draws(tmp_path):
     async def go():
         async with FakeLamp(grants=("light",)) as fake:

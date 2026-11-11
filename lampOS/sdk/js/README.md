@@ -77,7 +77,8 @@ answered `busy`). `--everything` answers every op instead.
 
 `examples/twin/` draws the lamp in 3D from its rigged CAD and `model`, moving
 with `body.state`, the ring as 32 lights round the head: each one pixel of
-`light.shows.pixels` when the lamp says them (32 of `#rrggbb`; no lamp does yet),
+`light.shows.pixels` when the lamp says them (32 of `#rrggbb`: a lamp says them while a paired computer holds its
+own pixels, `lamp.ring(...)`, and the ring draws that light; the virtual lamp does, a lamp from before does not),
 else the light's colour on all 32. Dragging a joint's slider
 sends `joints` under a body lease, and the lamp follows.
 
@@ -252,7 +253,10 @@ await lamp.closed();
   asked, by those names, as lamp-control answers them: `{ presence: {...},
   lamp: {...} }`. Behaviour change: it used to resolve with the whole reply.
   `light` is the person's own (`on`, `colour`, `level`) with `shows`, what the
-  ring draws now; the fake's `shows` is the newest light asked while it lasts.
+  ring draws now; the fake's `shows` is the newest light asked while it lasts. `shows.pixels` (32 of `#rrggbb`,
+  optional) is there only while a computer holds its own pixels (`ring`, `lightRgb`) and the ring draws that light:
+  each as asked of the ring (at the `brightness`; the ring's own ceiling may draw it dimmer), and the nearest named
+  light beside them. The fake says them as lamp-control does.
 - **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`, and the turn and mute calls `startTurn`,
   `endTurn`, `setListening`. Each resolves when the lamp has taken it;
