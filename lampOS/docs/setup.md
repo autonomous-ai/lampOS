@@ -184,6 +184,7 @@ shutdown.md.
 lamp-setup check --plan PLAN.json
 lamp-setup resume-reset --plan PLAN.json --enable      # at start, before the lamp
 lamp-setup watch-reset --plan PLAN.json --bus-root /run/lampos-bus --enable
+lamp-setup forget-agents --dry-run [--root DIR]         # what a reset does to the agents' folders
 ```
 
 Controls already turns the reset button (chip 0 line 100) held 5 s or more and
@@ -314,7 +315,13 @@ lamp-setup reset-now`). That unit, in this order:
    writers stopped before the wipe, and `resume-reset` stops it too before
    it finishes an interrupted reset, since it starts at boot under
    `multi-user.target`, not ordered against setup; the next boot or the
-   updater's next round starts it again;
+   updater's next round starts it again. `lamp-setup forget-agents
+   --dry-run [--root DIR]` lists what this step would do under DIR (`/` by
+   default) and changes nothing: one line an entry, `keep PATH`, `remove
+   PATH`, `empty PATH`, or `cut PATH (keys: kept …; dropped …)` for a kept
+   settings file, key names only, never values. It is the reset's own walk
+   (`reset::plan_agents`), only not acted on, so the list cannot drift from
+   the reset;
 5. it removes the journal, syncs, and **starts setup again in place, with no
    reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl

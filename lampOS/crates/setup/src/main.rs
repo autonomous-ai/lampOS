@@ -78,6 +78,12 @@ usage: lamp-setup COMMAND [OPTIONS]
       voice is restarted at a quiet moment to take it. One reply line on
       standard output. A key is never printed.
       Without --enable every request is refused.
+  forget-agents --dry-run [--root DIR]
+      List what a reset would do to Hermes's and OpenClaw's folders under
+      DIR (/ by default), changing nothing and following no link (#6343):
+      one line an entry, `keep PATH`, `remove PATH`, `empty PATH`, or
+      `cut PATH (keys: kept …; dropped …)` for a kept settings file, key
+      names only, never values. The reset's own walk, only not acted on.
   wake
       From power-on until the voice asks for the ring: the waking face
       (#1681). Only with LAMP_WAKING_FACE=on; otherwise it exits at once.
@@ -154,6 +160,30 @@ fn clock_id(given: Option<&String>) -> io::Result<String> {
     }
 }
 
+/// `forget-agents --dry-run [--root DIR]`: [`reset::plan_agents`] printed,
+/// one step a line. Without `--dry-run` it is refused: the reset itself
+/// runs only as part of a reset.
+fn forget_agents_dry_run(
+    mut given: impl Iterator<Item = String>,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let mut dry_run = false;
+    let mut root = PathBuf::from("/");
+    while let Some(option) = given.next() {
+        match option.as_str() {
+            "--dry-run" => dry_run = true,
+            "--root" => root = PathBuf::from(given.next().ok_or("--root takes a folder")?),
+            _ => return Err("forget-agents takes --dry-run and --root DIR".into()),
+        }
+    }
+    if !dry_run {
+        return Err("forget-agents runs only with --dry-run".into());
+    }
+    for step in reset::plan_agents(&root)? {
+        println!("{step}");
+    }
+    Ok(true)
+}
+
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let mut given = std::env::args().skip(1);
     let command = given.next().ok_or("a command is required")?;
@@ -166,6 +196,9 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             return Err("wake takes no options".into());
         }
         return wake();
+    }
+    if command == "forget-agents" {
+        return forget_agents_dry_run(given);
     }
     if command == "change" {
         return change(given);
