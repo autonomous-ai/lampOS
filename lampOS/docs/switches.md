@@ -671,7 +671,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_HARNESS_AT_ONBOARDING` | A new lamp installs Harness by itself once it is online, so the app can sign it in. |
 | `LAMP_HERMES_ON_LAMP` | The lamp installs a coding agent of its own at a quiet time, so it can do a task when no computer is online. |
 | `LAMP_HERMES_SKILLS` | The lamp's own coding agent can use the lamp's skills, as the voice does, but not while the lamp is private. |
-| `LAMP_SKILL_TASKS` (lamp-update) | Nothing you'd notice alone: lets a skill's task run by the lamp's own agent reach the lamp, with a pass that works for that one run. |
+| `LAMP_SKILL_TASKS` | Nothing you'd notice alone: a skill's task reaches the lamp with a pass for that one run. |
 | `LAMP_OPENCLAW_ON_LAMP` | The lamp installs OpenClaw, its default coding agent, at a quiet time, so it can do a task when no computer is online. |
 | `LAMP_OPENCLAW_SKILLS` | The lamp's OpenClaw can use the lamp's skills, as the voice does, but not while the lamp is private. |
 | `LAMP_LAMP_ENGINE` | Nothing you'd notice: picks OpenClaw or Hermes for work done on the lamp itself, OpenClaw unless set. |
