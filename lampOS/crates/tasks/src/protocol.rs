@@ -133,8 +133,9 @@ pub enum Request {
         request: u64,
     },
     /// The owner's app starts Harness's sign-in (#5198, `serve
-    /// --app-socket`), by its code (the only method for now), or is given
-    /// back the one it started that is open. Only on the app's route.
+    /// --app-socket`), by its code or its QR (`"method":"qr"`), or is given
+    /// back the one it started that is open, whatever its method. Only on
+    /// the app's route.
     AppSignInStart {
         #[serde(default)]
         method: crate::sign_in::Method,
@@ -359,7 +360,7 @@ mod tests {
     }
 
     /// #5198: the app's sign-in operations are the app's route's alone,
-    /// never the voice's; they carry a method (only `code` for now), an id
+    /// never the voice's; they carry a method (`code` or `qr`), an id
     /// and a yes or a no, never a code or an email.
     #[test]
     fn app_sign_in_operations_are_their_own_and_take_only_a_method_or_an_answer() {
@@ -377,6 +378,10 @@ mod tests {
                     method: Method::Code,
                 },
             ),
+            (
+                br#"{"op":"app_sign_in_start","method":"qr"}"#,
+                Request::AppSignInStart { method: Method::Qr },
+            ),
             (br#"{"op":"app_sign_in_state"}"#, Request::AppSignInState {}),
             (
                 br#"{"op":"app_sign_in_answer","id":7,"answer":"no"}"#,
@@ -392,7 +397,7 @@ mod tests {
         }
         assert!(!Request::parse(br#"{"op":"sign_in_start"}"#).unwrap().app());
         for bytes in [
-            br#"{"op":"app_sign_in_start","method":"qr"}"#.as_slice(),
+            br#"{"op":"app_sign_in_start","method":"email"}"#.as_slice(),
             br#"{"op":"app_sign_in_start","code":"12345678"}"#,
             br#"{"op":"app_sign_in_state","email":"someone@example.com"}"#,
             br#"{"op":"app_sign_in_answer","answer":"yes"}"#,
