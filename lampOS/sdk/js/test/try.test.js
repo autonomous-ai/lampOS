@@ -42,7 +42,7 @@ async function started(t, flags) {
   t.after(() => rmSync(folder, { recursive: true, force: true }));
   // A stand-in lamp-sim: writes its arguments, one per line, and exits 0.
   const stub = join(folder, 'lamp-sim');
-  writeFileSync(stub, `#!/bin/sh\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${join(folder, 'argv')}"\n`);
+  writeFileSync(stub, `#!/bin/sh\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${join(folder, 'argv')}"\necho run >> "${join(folder, 'runs')}"\n`);
   chmodSync(stub, 0o755);
   const glb = join(folder, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
@@ -177,4 +177,15 @@ test('on the network the camera picture is given only while a page says it is on
     asked.end();
   });
   assert.equal(status, 403);
+});
+
+test('a held hand is one touch: repeats within 0.8 s are the same stroke and fork nothing', async (t) => {
+  const { port, token, folder } = await started(t, (dir, stub) => ['--stim-dir', dir, '--lamp-sim', stub]);
+  const { socket, results } = await talk(port, token);
+  t.after(() => socket.close());
+  for (let id = 1; id <= 9; id++) socket.send(JSON.stringify({ type: 'stim', id, name: 'touch', args: { kind: 'pet' } }));
+  await until(() => results.length >= 9);
+  assert.equal(readFileSync(join(folder, 'runs'), 'utf8').trim().split('\n').length, 1, 'lamp-sim ran once');
+  assert.equal(results.filter((r) => r.ok && r.answer === 'done').length, 1);
+  assert.equal(results.filter((r) => /^ignored: the same stroke/.test(r.answer)).length, 8);
 });
