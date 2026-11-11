@@ -365,10 +365,25 @@ sau:
      lần sửa được nói `its when, which is "appears", "present" or left
      out`; (d) `speak = true` trong `[permissions]` khi không có bước say,
      tiếng ngân (`cue`) hay `sound` và không đọc gì, điều giới hạn từ chối
-     ("it asks for its voice but never says anything"). Mỗi việc chỉ bỏ ra: một
-     dòng, hoặc một mục của bảng một dòng cùng dấu phẩy của nó, chỉ nhận
-     khi văn bản sau đó đọc ra đúng kỹ năng đó trừ đúng trường ấy; kỹ năng
-     giữ mọi bước, trigger và quyền nó dùng và không được thêm gì. Kỹ năng
+     ("it asks for its voice but never says anything"); (e) khoảng tắt của
+     một cái nháy: một bước `[[do]]` chỉ có đèn, tắt đèn (`out`) mà bên cạnh
+     có thứ khác ngoài `over` và `until`, như
+     `light = { out = true, for = "500ms" }`, đi cùng một bước làm đèn sáng
+     (lamp-9adf, 11/11 20:5x: "blink the light green twice when I arrive"
+     được viết thành một nhịp pulse và một bước như vậy, và mọi lần sửa đều
+     bị từ chối "out takes no colour, dim, level, for, pattern or
+     no_brighter: only over and until"). `out` không bao giờ nhận `for`,
+     nên khoảng tắt không phát được: cả bước bị bỏ ra (từ header `[[do]]`
+     của nó tới header kế tiếp, trừ các bảng `[do.…]` của chính nó), nhịp
+     pulse chạy một lần, và câu nói lại kết thúc bằng "The maker notes what
+     it couldn't do: blinking." (đặt trước lời bỏ sót của chính mô hình,
+     trừ khi lời đó đã nói tới nháy). Một `{ out = true }` thường, một bước
+     chỉ có `over` và `until`, và một `out` có `for` mà không có bước sáng
+     nào bên cạnh thì không bị đụng tới, để bước kiểm tra nói lý do. Mỗi
+     việc chỉ bỏ ra: một dòng, hoặc một mục của bảng một dòng cùng dấu
+     phẩy của nó, hoặc với (e) một bước, chỉ nhận khi văn bản sau đó đọc
+     ra đúng kỹ năng đó trừ đúng trường hay bước ấy; kỹ năng giữ mọi
+     trigger và quyền nó dùng và không được thêm gì. Kỹ năng
      viết kiểu khác (ví dụ khóa có dấu chấm) được trả lại nguyên như khi
      đến, để bước kiểm tra nói lý do. Mỗi việc ghi một dòng nhật ký:
      `lamp-voice: a made skill tidied: <what>`. Cử chỉ cạnh mood, một
@@ -414,10 +429,12 @@ sau:
      `a_repair_is_told_the_part_of_a_step_that_failed`,
      `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`,
      `a_getting_ups_unknown_when_is_tidied_and_another_topics_named`,
-     `a_getting_ups_wait_taken_out_is_said`, và
+     `a_getting_ups_wait_taken_out_is_said`,
+     `a_made_blinks_gap_is_taken_out_and_a_plain_out_kept`, và
      trong `tests/it/made.rs`
-     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` và
-     `a_made_nod_when_i_stand_up_is_tidied_and_packed` (`lamp-skills
+     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed`,
+     `a_made_nod_when_i_stand_up_is_tidied_and_packed` và
+     `a_made_blinks_gap_is_taken_out_and_packed` (`lamp-skills
      pack` thật).
    Việc đọc một dịch vụ liên kết
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và

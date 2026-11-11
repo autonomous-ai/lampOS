@@ -1014,6 +1014,43 @@ fn a_made_nod_when_i_stand_up_is_tidied_and_packed() {
     assert_eq!(tars(&keeping.directory).len(), 1);
 }
 
+/// lamp-9adf, 11 Nov 20:5x: "blink the light green twice when I arrive"
+/// was written as a pulse and an `out` step with a `for`, the blink's gap,
+/// and every repair was refused ("out takes no colour, dim, level, for,
+/// pattern or no_brighter"). The gap is taken out before the check, the
+/// real `lamp-skills pack` keeps the pulse, and the blinking is told as
+/// left out.
+#[test]
+fn a_made_blinks_gap_is_taken_out_and_packed() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let toml = made_body(
+        "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\n",
+        "light = { colour = \"green\", level = 3, for = \"2s\", pattern = { kind = \"pulse\" } }\n\n\
+         [[do]]\nlight = { out = true, for = \"500ms\" }",
+    )
+    .replace("body = true\n", "body = true\nlight = true\n");
+    let made = keep_asked(
+        &answer(&toml, "green-blink"),
+        false,
+        "s1:green-blink:1",
+        &keeping,
+        &Asked {
+            request: "blink the light green twice when I arrive",
+            ..Asked::default()
+        },
+    )
+    .unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert!(made.uses.light, "{made:?}");
+    assert!(
+        made.description
+            .ends_with("The maker notes what it couldn't do: blinking."),
+        "{}",
+        made.description
+    );
+    assert_eq!(tars(&keeping.directory).len(), 1);
+}
+
 /// lamp-9adf, 11 Nov 17:0x: "when someone sits down, look at them and say
 /// hi" failed all three repairs, `lamp-skills` refusing "a look at a face
 /// reads humans/faces/tracked, and humans/faces/tracked is not in
