@@ -1183,8 +1183,18 @@ pub struct Engine<P: Persistence> {
     /// `serve --close-told` (#1390): only a task made while it is on is
     /// marked `closable`, so turning it on later closes no older task.
     close_told: bool,
+    /// `LAMP_HERMES_ON_LAMP` with the lamp looked at (#5978): while the
+    /// lamp has no Hermes target yet (Hermes still installing), the
+    /// targets answer says `"lamp":"installing"`.
+    hermes_on_lamp: bool,
 }
 impl<P: Persistence> Engine<P> {
+    /// Whether the lamp's own Hermes may become a target
+    /// (`LAMP_HERMES_ON_LAMP`, #5978).
+    pub fn hermes_on_lamp(&mut self, on: bool) {
+        self.hermes_on_lamp = on;
+    }
+
     /// Whether tasks made from now on are closed once told
     /// (`serve --close-told`).
     pub fn close_told(&mut self, on: bool) {
@@ -1361,6 +1371,7 @@ impl<P: Persistence> Engine<P> {
             failed: false,
             last_handover: None,
             close_told: false,
+            hermes_on_lamp: false,
             kept_aside,
             set_aside,
             targets_newer: None,
@@ -1556,7 +1567,11 @@ impl<P: Persistence> Engine<P> {
             // `installed: false` only where its engine wasn't found on that
             // computer (#5199, `installed` null with `installable` true),
             // so the voice names only agents some computer has.
-            Request::Targets {} => Some(json!({"targets":self.targets.iter()
+            // `"lamp":"installing"` only with `LAMP_HERMES_ON_LAMP` on and
+            // no lamp Hermes target yet (#5978): the voice then says the
+            // lamp's own helper is still being installed.
+            Request::Targets {} => {
+                let mut told = json!({"targets":self.targets.iter()
                 .map(|(alias, target)| {
                     let mut told = match self.names.get(alias) {
                         Some(name) => json!({"alias":alias,"engine":target.engine,"name":name}),
@@ -1567,7 +1582,17 @@ impl<P: Persistence> Engine<P> {
                     }
                     told
                 })
-                .collect::<Vec<_>>()})),
+                .collect::<Vec<_>>()});
+                if self.hermes_on_lamp
+                    && !self.targets.values().any(|target| {
+                        target.engine == EngineKind::Hermes
+                            && target.project == crate::runtime::LAMP_PROJECT
+                    })
+                {
+                    told["lamp"] = "installing".into();
+                }
+                Some(told)
+            }
             Request::List { after_id, limit } => {
                 if !(1..=MAX_PAGE_SIZE).contains(limit) {
                     return Err(err("bad_request", "Page size must be between 1 and 8."));
@@ -4360,6 +4385,48 @@ mod tests {
         assert!(!reply.to_string().contains("lamp-tasks"));
         // A read: nothing is written.
         assert_eq!(engine.revision(), before);
+        assert!(reply.get("lamp").is_none(), "switch off: no lamp field");
+    }
+
+    #[test]
+    fn the_targets_say_the_lamp_is_installing_only_with_the_switch_on_and_no_lamp_hermes() {
+        let office = Target {
+            machine_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+            project: "lamp-tasks".into(),
+            engine: EngineKind::Claude,
+        };
+        let lamp = Target {
+            machine_id: "cccccccccccccccccccccccccccccccc".into(),
+            project: crate::runtime::LAMP_PROJECT.into(),
+            engine: EngineKind::Hermes,
+        };
+        let answer = |targets: BTreeMap<String, Target>, on: bool| {
+            let mut engine =
+                Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+            engine.hermes_on_lamp(on);
+            engine
+                .handle(&Request::Targets {}, &clock(0), false)
+                .unwrap()
+        };
+        let installing = answer(BTreeMap::new(), true);
+        assert_eq!(installing["lamp"], "installing");
+        assert_eq!(installing["targets"], json!([]));
+        let with_office = answer(
+            BTreeMap::from([("office".to_owned(), office.clone())]),
+            true,
+        );
+        assert_eq!(with_office["lamp"], "installing");
+        // Switch off: as before.
+        assert!(answer(BTreeMap::new(), false).get("lamp").is_none());
+        // Hermes installed on the lamp: as before.
+        let installed = answer(
+            BTreeMap::from([
+                ("office".to_owned(), office),
+                (crate::runtime::LAMP_TARGET.to_owned(), lamp),
+            ]),
+            true,
+        );
+        assert!(installed.get("lamp").is_none());
     }
 
     #[test]

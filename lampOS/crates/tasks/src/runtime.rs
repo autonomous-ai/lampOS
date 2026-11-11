@@ -3262,6 +3262,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     )
     .map_err(io::Error::other)?;
     engine.close_told(config.close_told);
+    engine.hermes_on_lamp(
+        config
+            .set_up_later
+            .as_ref()
+            .is_some_and(|later| later.lamp.is_some()),
+    );
     if let Some(version) = config.targets_newer {
         engine.targets_newer(version);
     }
