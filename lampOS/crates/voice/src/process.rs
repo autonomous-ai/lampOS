@@ -1735,8 +1735,8 @@ fn reminders_asked_worker_environment(
         .then_some((crate::tools::reminders_asked::ENVIRONMENT, "on"))
 }
 
-// A plain ask for a light scene or a light show calls its skill
-// (`tools::skill_asked`), passed the same narrow way: the exact `on`, to the
+// A plain ask for a light scene or a light show, or a plain question about
+// the lamp itself, calls its skill (`tools::skill_asked`), passed the same narrow way: the exact `on`, to the
 // second route, whose chat can be made to call a function.
 fn skill_asked_worker_environment(
     role: &str,
