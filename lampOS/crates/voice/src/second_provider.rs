@@ -1014,6 +1014,14 @@ pub const HISTORY_KEEPS_CALLS_ENVIRONMENT: &str = "LAMP_HISTORY_KEEPS_CALLS";
 /// every exchange is told as before.
 pub const HISTORY_AFTER_NOTE_ENVIRONMENT: &str = "LAMP_HISTORY_AFTER_NOTE";
 
+/// Each recent exchange is told to the chat once: as a history message,
+/// and no longer again in the thread's text of the same request
+/// (`worker::HISTORY_SAID_ONCE`,
+/// `thread::Thread::recall_for_leaving_out`, #6218: a long talk's prompt
+/// near 14k tokens had each of its last twelve exchanges twice). `on`, and
+/// nothing else; off, the thread's text is told whole, as before.
+pub const HISTORY_SAID_ONCE_ENVIRONMENT: &str = "LAMP_HISTORY_SAID_ONCE";
+
 /// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a carried line keeps the
 /// memory writer's conversation of the person it is carried for going
 /// (`remember::carried_line`, `DaysJob::Touch`): never journalled or stored
