@@ -441,8 +441,10 @@ pub struct AgentFolder {
 ///   ([`HERMES_SHELL_TEXT`]), so a person's `export TOKEN=…` a tool added
 ///   goes (the Reviewer-lead's P2); `.cache` and `.npm` are emptied and
 ///   kept. Everything else goes;
-/// - `.local`: `bin` (the `hermes` command `hermes_install::present` reads,
-///   and the commands the installer publishes beside it) and `share/uv`'s
+/// - `.local`: `bin`, in which only `hermes` ([`HERMES_COMMAND`], the one
+///   command the installer publishes there and `hermes_install::present`
+///   reads; a script a tool saved there, or a `uv tool` entry point, goes:
+///   Thirteen's P2), and `share/uv`'s
 ///   `python` (the uv-managed Python the installer's `bootstrap_python`
 ///   puts there, with `HOME` set to Hermes's); a `pip --user` install
 ///   (`lib`), a `uv tool` install (`share/uv/tools`) and anything else go;
@@ -469,7 +471,7 @@ pub struct AgentFolder {
 /// Beside them, the Hermes a pin change moved aside
 /// (`hermes_install::ASIDE`, kept until a new Hermes runs) is removed
 /// whole: it holds the old Hermes's sessions, memories and keys.
-pub const AGENT_FOLDERS: [AgentFolder; 7] = [
+pub const AGENT_FOLDERS: [AgentFolder; 8] = [
     AgentFolder {
         folder: "/var/lib/lampos-hermes",
         keep: &[".hermes", ".local", ".bashrc", ".profile"],
@@ -478,6 +480,11 @@ pub const AGENT_FOLDERS: [AgentFolder; 7] = [
     AgentFolder {
         folder: "/var/lib/lampos-hermes/.local",
         keep: &["bin", "share"],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.local/bin",
+        keep: &[HERMES_COMMAND],
         empty: &[],
     },
     AgentFolder {
@@ -626,6 +633,10 @@ pub fn forget_agents(root: &Path) -> io::Result<usize> {
 /// (`append_shell_path` with `SHELL_PATH_LINE`, `SHELL=/bin/sh`), and all
 /// a reset leaves there: `.local/bin` on `PATH`.
 pub const HERMES_SHELL_TEXT: &str = "\n# Hermes Agent command\ncase \":$PATH:\" in *\":$HOME/.local/bin:\"*) ;; *) export PATH=\"$HOME/.local/bin:$PATH\" ;; esac\n";
+
+/// The `hermes` command's name in `.local/bin`, the file name of
+/// [`lamp_update::hermes_install::HERMES`] (a test checks they agree).
+pub const HERMES_COMMAND: &str = "hermes";
 
 /// OpenClaw's state folder (`lamp_update::openclaw_install::STATE`).
 const OPENCLAW_STATE: &str = "/var/lib/lampos-openclaw/state";
@@ -866,14 +877,27 @@ fn harness_hooks(lines: &[&str]) -> String {
         }
     }
     let harness = |item: &Vec<&str>| {
-        item.iter().any(|line| {
+        let mut commands = 0;
+        let fits = item.iter().all(|line| {
             let line = line.trim_start();
             let line = line.strip_prefix('-').unwrap_or(line).trim_start();
-            line.strip_prefix("command:").is_some_and(|value| {
-                let value = value.trim().trim_matches(['"', '\'']);
-                value.starts_with("harness hook ")
-            })
-        })
+            let Some((key, value)) = line.split_once(':') else {
+                return false;
+            };
+            let value = unquoted(value.trim());
+            match key {
+                "command" => {
+                    commands += 1;
+                    harness_command(value)
+                }
+                "matcher" => value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"*|._-".contains(&byte)),
+                "timeout" => !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()),
+                _ => false,
+            }
+        });
+        fits && commands == 1
     };
     let mut out = String::new();
     for (event, alone, items) in events {
@@ -892,6 +916,36 @@ fn harness_hooks(lines: &[&str]) -> String {
         return out;
     }
     format!("{first}\n{out}")
+}
+
+/// A YAML scalar with one pair of matching quotes taken off.
+fn unquoted(value: &str) -> &str {
+    for quote in ['"', '\''] {
+        if let Some(inner) = value
+            .strip_prefix(quote)
+            .and_then(|rest| rest.strip_suffix(quote))
+        {
+            return inner;
+        }
+    }
+    value
+}
+
+/// Harness's own hook command, exactly: `harness hook` and its engine and
+/// event (`harness hook hermes session-start`), one or two plain words
+/// with nothing after them, so no shell text rides along (Thirteen's P3).
+fn harness_command(value: &str) -> bool {
+    let Some(rest) = value.strip_prefix("harness hook ") else {
+        return false;
+    };
+    let words: Vec<&str> = rest.split(' ').collect();
+    (1..=2).contains(&words.len())
+        && words.iter().all(|word| {
+            !word.is_empty()
+                && word
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+        })
 }
 
 /// The key of a top-level `key:` or `key: value` line, quotes allowed;

@@ -267,8 +267,9 @@ lamp-setup reset-now`). That unit, in this order:
    person's and removed, a name the reset does not know among them, so a
    newer Hermes's new store goes too. Said by count. Kept, so neither needs a
    reinstall: in `/var/lib/lampos-hermes` (Hermes's `HOME`, where its tools
-   write), `.hermes` and, in `.local`, `bin` (the `hermes` command and what
-   the installer publishes beside it) and `share/uv/python` (the uv-managed
+   write), `.hermes` and, in `.local`, only `bin/hermes` (the one command
+   the installer publishes; a script a tool saved in `bin`, or a `uv tool`
+   entry point, goes) and `share/uv/python` (the uv-managed
    Python the installer puts there); `.bashrc` and `.profile` are written
    again as exactly the installer's text (`reset::HERMES_SHELL_TEXT`, its
    `.local/bin` `PATH` line), so a person's `export TOKEN=…` a tool added
@@ -280,7 +281,9 @@ lamp-setup reset-now`). That unit, in this order:
    (`models_dev_cache.json`, `models_dev_cache.etag`,
    `provider_models_cache.json`) and `config.yaml`, cut to lamp-update's
    install-time settings (`hermes_install::CONFIG`) and Harness's own
-   hooks, the `hooks:` items whose `command` starts with `harness hook `
+   hooks, the `hooks:` items that are exactly Harness's: one `command` of
+   the form `harness hook ENGINE EVENT` with nothing after it, and only
+   `matcher` and `timeout` beside it
    (`reset::cut_hermes_config`): a person's own hooks, `mcp_servers`,
    `skills.external_dirs`, personality and every other key go, and
    lamp-tasks merges the lamp's provider back in at its next start; a
