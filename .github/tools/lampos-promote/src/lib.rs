@@ -297,7 +297,8 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
         .filter(|j| j.name == "lampOS — sign and publish the tested lamp-voice artifact")
         .collect();
     require(
-        arm.len() == 1 && arm.iter().all(good) && publish.len() == 1 && publish.iter().all(good),
+        // One ARM64 job per test runner: one before #6320, three on lamp-voice's push since.
+        !arm.is_empty() && arm.iter().all(good) && publish.len() == 1 && publish.iter().all(good),
         "successful source build and publication jobs are absent",
     )?;
     let inventory = assets(remote, release.id)?;

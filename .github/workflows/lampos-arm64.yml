@@ -8,10 +8,12 @@ name: lampOS on ARM64
 # a builder's work on a lamp without building it again. See
 # lampOS/docs/joining.md.
 #
-# The tests are split across four runners (cargo-nextest partitions), each
-# still running one test at a time, as on a lamp's few cores: one serial run
-# took about 20 of the job's 30 minutes. Doc tests, the two tests with their
-# own harness and the binaries' artifact come from the first runner only.
+# The full run's tests are split across four runners (cargo-nextest
+# partitions), each still running one test at a time, as on a lamp's few
+# cores: one serial run took about 20 of the job's 30 minutes. lamp-voice's
+# push splits its tests across three, in parallel: on one runner they were
+# 17.5 of its 27 minutes (#6320). Doc tests, the two tests with their own
+# harness, the binaries' artifact and the cache come from the first runner only.
 #
 # The realtime group (tests that wait on the real clock, 977 s of the 1,191 s
 # of test time on 2026-10-15; nextest group `realtime` in
@@ -23,7 +25,7 @@ name: lampOS on ARM64
 #
 #            | runners | profile   | tests at once | realtime | crates tested
 # pull req.  | 1       | `pr`      | one per core  | skipped  | its own, their users, three readers (below)
-# lamp-voice | 1       | `pr`      | one per core  | skipped  | all (binaries for updates.md; on the Studio when route says so)
+# lamp-voice | 3       | `pr`      | one per core  | skipped  | all (binaries for updates.md; on the Studio when route says so)
 # full       | 4       | `default` | one           | run      | all (cold: no cache)
 #
 # A pull request tests only the crates its diff changes, every crate that
@@ -63,11 +65,12 @@ name: lampOS on ARM64
 # when it found nothing to restore, as before: nothing else saves a cache it
 # may read (its own, its base's or main's; the reviewer on #2454).
 #
-# Without the realtime group the tests take about 4 minutes of test time,
-# mostly quick unit tests, so one runner runs them as many at once as it has
-# cores. Each runner compiles every test binary again (about 5 of its 10
-# minutes on 2026-10-15), so more runners would only cost more. The full run
-# keeps four, one test at a time, for the realtime tests.
+# Without the realtime group a pull request's tests run on one runner, as many
+# at once as it has cores: each runner compiles every test binary again
+# (about 5 of its 10 minutes on 2026-10-15). lamp-voice's push tests every
+# crate, 17.5 minutes on one runner by 11 Nov (42969353741), so it takes three,
+# each building from the cache in parallel (#6320); on the Studio's one slot it
+# keeps one. The full run keeps four, one test at a time, for the realtime tests.
 
 # Not on every push to every builder's branch: with nine builders and four
 # runners a run, that queued eleven runs behind eight on 2026-10-15, lamp-voice's
@@ -120,6 +123,11 @@ on:
         description: 'Full run: every test including the realtime group, four runners, one test at a time (the nightly run)'
         type: boolean
         default: false
+      shards:
+        description: 'Test runners for a build (not full): 3 as a lamp-voice push, 1 as a pull request'
+        type: choice
+        options: ['3', '1']
+        default: '3'
       promote_sequence:
         description: 'Promote an already published lamp-voice sequence to the stable feed; no product rebuild or signing (leave empty for a build)'
         type: string
@@ -205,8 +213,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Four for a full run (every test, one at a time), otherwise one.
-        shard: ${{ fromJSON(inputs.full && '[1, 2, 3, 4]' || '[1]') }}
+        # Four for a full run (every test, one at a time); three for lamp-voice's
+        # push or a run by hand that asks for three, except on the Studio's one
+        # slot; otherwise one.
+        shard: >-
+          ${{ fromJSON(inputs.full && '[1, 2, 3, 4]'
+          || ((github.event_name == 'push' || inputs.shards == '3') && needs.route.outputs.studio != 'true') && '[1, 2, 3]'
+          || '[1]') }}
     steps:
       - name: system packages
         # A fresh runner's unattended-upgrades can hold dpkg's lock as the job
