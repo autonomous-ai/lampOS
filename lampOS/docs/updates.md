@@ -1361,6 +1361,8 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | **The journal** (`acting`, at the round's start) | |
 | `the journal could not be read (…): kept as …, and the units are taken as they are` | a `journal.json` it can't parse is set aside, and the round goes on (#1505) |
 | `putting build N back: the switch was cut short (lamp-update stopped, or the lamp lost power)` | a journal left by a switch that didn't finish: that build is put back |
+| `build N is not refused: cut short T of 3 times in a row; the next round tries it again` | that put-back finished, below the third cut-short in a row of build N: the next round takes it again (#6266) |
+| `the journal cannot be marked with why build N is put back: …` | a put-back for a fault of the build left the journal, and its reason couldn't be written into it: the next start would take it for a cut-short |
 | **What the build brings** | |
 | `lamp-update.service is not carried by rounds; its installed unit is kept` | a new product build is planned and the installed updater unit is a regular file; policy only, since the manifest has no candidate text for it |
 | `… is kept: only comments, blank lines or trailing whitespace differ` | a carried unit has such text differences and the plan leaves it unchanged; never for a unit being rewritten with a binary or setting change |

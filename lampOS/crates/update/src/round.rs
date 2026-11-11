@@ -39,8 +39,8 @@ use crate::{
     quiet::{BETWEEN_TURNS, QUIET, Quiet},
     records,
     records::{
-        Added, Build, Journal, LinkBack, Records, SkillBack, State, Switching, replace_link,
-        sync_folder, sync_parent, write_whole,
+        Added, Build, CUT_SHORTS_REFUSE, Journal, LinkBack, Records, SkillBack, State, Switching,
+        replace_link, sync_folder, sync_parent, write_whole,
     },
     unit::{self, Program},
     world::{Clock, Disk, Ears, Systemd},
@@ -799,6 +799,7 @@ impl Run<'_, '_> {
                 record_skills(&mut state, &placing.steps);
             }
             state.installed = Some(build);
+            state.cut_short = None;
             return match self.records.save_state(&state) {
                 Ok(()) => Outcome::UpToDate(manifest.sequence),
                 Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
@@ -892,6 +893,7 @@ impl Run<'_, '_> {
         ));
         record_skills(state, &steps);
         state.installed = Some(build.clone());
+        state.cut_short = None;
         match self.records.save_state(state) {
             Ok(()) => Outcome::UpToDate(build.sequence),
             Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
@@ -2495,6 +2497,7 @@ impl Run<'_, '_> {
             models: self.model_backs.clone(),
             settings: !self.setting_writes.is_empty(),
             skills: skills.clone(),
+            refusing: None,
         };
         if let Err(error) = self
             .records
@@ -2665,6 +2668,8 @@ impl Run<'_, '_> {
         }
         record_skills(state, &steps);
         state.previous = state.installed.replace(build.clone());
+        // A finished switch ends any count of cut-shorts (#6266).
+        state.cut_short = None;
         if !self.placings.is_empty() {
             let mut before = state.models.clone();
             for placing in &self.placings {
@@ -2864,6 +2869,23 @@ impl Run<'_, '_> {
         // by the caller before anything is put back.
         told: String,
     ) -> Outcome {
+        self.put_back_as(state, build, backs, failed, why, told, false)
+    }
+
+    /// As [`Self::put_back`]; a switch `cut_short` (step 1) says nothing of
+    /// its build, so it is only counted, and refused at its
+    /// `CUT_SHORTS_REFUSE`th in a row (#6266).
+    #[allow(clippy::too_many_arguments)]
+    fn put_back_as(
+        &mut self,
+        state: &mut State,
+        build: &Build,
+        backs: &[Back],
+        failed: Option<&str>,
+        why: String,
+        told: String,
+        cut_short: bool,
+    ) -> Outcome {
         self.say(&format!(
             "putting build {} back: {why}{told}",
             build.sequence
@@ -2873,6 +2895,15 @@ impl Run<'_, '_> {
         if !files_back {
             // Not all is as it was: the journal stays, for the next start
             // to try again, and nothing is pruned that a path still names.
+            // A fault of the build is written into it, so that start refuses
+            // the build as this one would have, and does not take it for a
+            // cut-short (#6266).
+            if !cut_short && let Err(error) = self.records.mark_journal_refusing(&why) {
+                self.say(&format!(
+                    "the journal cannot be marked with why build {} is put back: {error}",
+                    build.sequence
+                ));
+            }
             return Outcome::RolledBack {
                 sequence: build.sequence,
                 why,
@@ -2880,7 +2911,20 @@ impl Run<'_, '_> {
                 told: Told { new: told, old },
             };
         }
-        state.refuse(build, &why);
+        if !cut_short {
+            state.refuse(build, &why);
+        } else {
+            let times = state.count_cut_short(build);
+            if times >= CUT_SHORTS_REFUSE {
+                state.cut_short = None;
+                state.refuse(build, &format!("{why}, {times} times in a row"));
+            } else {
+                self.say(&format!(
+                    "build {} is not refused: cut short {times} of {CUT_SHORTS_REFUSE} times in a row; the next round tries it again",
+                    build.sequence
+                ));
+            }
+        }
         if let Err(error) = self
             .records
             .save_state(state)
@@ -3060,8 +3104,13 @@ impl Run<'_, '_> {
         // already-restored prefix is excluded below. Legacy journals stay
         // byte-for-byte intact while their graph is reconstructed.
         self.rollback_order = journal.rollback_order.clone();
-        let why =
-            "the switch was cut short (lamp-update stopped, or the lamp lost power)".to_owned();
+        // A put-back for a fault of the build that could not finish says
+        // why in the journal: refused for it. Otherwise the switch was cut
+        // short, which says nothing of the build (#6266).
+        let cut_short = journal.refusing.is_none();
+        let why = journal.refusing.clone().unwrap_or_else(|| {
+            "the switch was cut short (lamp-update stopped, or the lamp lost power)".to_owned()
+        });
         self.say(&format!(
             "putting build {} back: {why}",
             journal.build.sequence
@@ -3144,7 +3193,15 @@ impl Run<'_, '_> {
             Ok(state) => state,
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
         };
-        self.put_back(&mut state, &journal.build, &backs, None, why, String::new())
+        self.put_back_as(
+            &mut state,
+            &journal.build,
+            &backs,
+            None,
+            why,
+            String::new(),
+            cut_short,
+        )
     }
 
     /// A signed build for a newer updater than this one: refused, with
