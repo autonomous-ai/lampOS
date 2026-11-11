@@ -601,7 +601,7 @@ fn the_namespace_script_shows_only_what_is_allowed_and_refuses_outside_its_names
     // The caller's folder, when it is hidden (a hand call from a login
     // home), gives way to Hermes's own with one line, not a bare cd error.
     let back = NS_TEXT
-        .find("cd \"$D\" 2>/dev/null || { echo \"hermes-ns: $D is not visible to Hermes; it starts in $H\" >&2; cd \"$H\"; } || fail ")
+        .find("cd \"$D\" 2>/dev/null || { echo \"hermes-ns: $D is not visible to Hermes; it starts in $H\" >&2; cd \"$H\" 2>/dev/null; } || fail \"neither $D nor $H is visible to Hermes\"")
         .expect("the cd back gives way to Hermes's folder");
     assert!(back < hermes);
     assert!(NS_TEXT.contains("[ \"$count\" != 4294967295 ] ||"));

@@ -312,7 +312,7 @@ for d in /dev/video* /dev/media* /dev/v4l-subdev* /dev/snd/* /dev/ttyACM* /dev/t
   [ -c "$d" ] || continue
   mount --bind /dev/null "$d" || fail "$d not hidden"
 done
-cd "$D" 2>/dev/null || { echo "hermes-ns: $D is not visible to Hermes; it starts in $H" >&2; cd "$H"; } || fail "$D is not visible to Hermes"
+cd "$D" 2>/dev/null || { echo "hermes-ns: $D is not visible to Hermes; it starts in $H" >&2; cd "$H" 2>/dev/null; } || fail "neither $D nor $H is visible to Hermes"
 U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H
 unset LAMP_NS_UID LAMP_NS_GID
 export HOME

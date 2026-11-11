@@ -1648,7 +1648,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
           not shown starts it in Hermes's own folder instead, with one
           line on stderr (`hermes-ns: <folder> is not visible to Hermes;
           it starts in <Hermes's folder>`), and only when that too fails
-          does it end;
+          does it end, with no raw `cd` error. A task started from such a
+          folder (a lamp-tasks hand-over included) then works in Hermes's
+          own folder, not the one it was started from: that stderr line,
+          in the pane or the journal, says so;
        6. `HOME` set to `/var/lib/lampos-hermes` and `unshare --user
           --map-user=<caller's uid> --map-group=<caller's gid>
           /var/lib/lampos-hermes/.local/bin/hermes`.
