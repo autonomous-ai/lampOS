@@ -1258,6 +1258,67 @@ cả hai người viết.
   DeepSeek: có giữ không, phần nói lại và thời gian. Người dùng của agent có
   thuộc nhóm `lamp-agents` trên đèn hay không.
 
+### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, tắt)
+
+Kỹ năng tạo tại đây, bằng giọng nói hay trong ứng dụng, là của chính người
+dùng, nên với `LAMP_MADE_SKILL_LOOSE=on` các kiểm tra của nó được nới lỏng
+(yêu cầu của chủ sở hữu trên Queue, #6059, 11/11; người xây dựng đầu tiên
+đồng ý ở đó lúc 22:44, với hai điều chỉnh: `[rest]` được giữ, và việc gửi,
+camera và micro luôn được nêu đúng tên). Tắt nếu không đặt, và không có trong unit sản phẩm nào.
+`lamp-voice` đọc nó (và chuyển đúng `on` cho worker `provider` và `second`,
+nơi tạo kỹ năng), trình quản lý của `lamp-skills` đọc nó qua
+`made_skill::capped` khi bật một kỹ năng tự tạo, và `lamp-services` đọc nó cho
+việc gửi. Chỉ kỹ năng tạo tại đây (`made_skill::keep_asked`) được nới: kỹ năng
+thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguyên kiểm tra.
+
+1. **Sửa, không từ chối** (`made_skill::loosened`). Khi `lamp-skills pack`
+   từ chối, trước mọi lần sửa, từng phần có thể bỏ được thử bỏ ra, mỗi lần
+   kiểm bằng `lamp-skills pack` thật (một khóa của loại bước, một loại của
+   bước có nhiều loại, một khóa của trigger trừ topic, rồi cả một bước
+   `[[do]]`; không bao giờ bước cuối cùng, một lần đọc hay một lần ghi).
+   Phần được lời từ chối nêu tên thử trước; phần làm kiểm tra qua thì được
+   lấy, phần được nêu tên mà bỏ đi làm lời từ chối đổi thì được lấy và theo
+   lời từ chối kế. Mỗi phần bỏ ra được ghi nhật ký theo khóa và nói ở cuối
+   lời thuật lại: "Left out: how long it lasts in a step that changes the
+   light." Tối đa 32 lần kiểm và 6 s; không còn gì kiểm tra nhận thì lời từ
+   chối giữ nguyên, để sửa như trước. Kỹ năng có ghi không bao giờ được nới.
+2. **Không giới hạn người dùng không yêu cầu** (`made_skill::mannered_with`).
+   Không thêm `most_a_day` hay `[budget]` chung, và bỏ những gì mô hình tự
+   viết, trừ khi lời yêu cầu tự nói tới giới hạn
+   (`made_skill::limits_asked`: "at most", "times a day", "once a day", "per
+   hour", "no more than", ...); khi đó đặt như trước. `[rest] after_ignored
+   = 2` được giữ: kỹ năng bị lờ hai lần thì nghỉ tới sáng. `[quiet]` 22:00-08:00
+   chỉ giữ cho kỹ năng có câu nói hay tiếng ngân. Brief chỉ bảo đặt chúng khi
+   lời yêu cầu nói tới giới hạn.
+3. **Cooldown của câu nói theo yêu cầu**. Kỹ năng tự tạo có câu nói hay tiếng
+   ngân được chạy thường như yêu cầu, cách nhau ít nhất một phút
+   (`LEAST_LOOSE_SAY_COOLDOWN_SECS`): `paced` chỉ đặt `"1m"` khi thiếu hay
+   ngắn hơn, và cap (`capped`, cả của trình quản lý) từ chối dưới một phút.
+   Không khí ngột ngạt giữ một giờ. Brief nói "a cooldown of \"1m\" or
+   longer, as often as the request asks" (khi tắt: `cooldown = "1h"` hoặc
+   lâu hơn).
+4. **Lời thuật lại không bao giờ từ chối** (`made_skill::plainly_as`). Bước
+   không nói rõ được thì nói bằng lời chung ("changes the light", "moves its
+   head", "says something", "plays a sound"), trigger là "When its moment
+   comes", phần bên cạnh là "under conditions of its own", giới hạn ở dạng
+   khác là "within limits of its own", và lời quá dài chỉ bằng lời chung.
+   Không bao giờ với việc gửi hay ghi, camera hay micro
+   (`made_skill::named_exactly`: các khóa của bước hay phần như `write`,
+   `look`, `look_at`, `listen`, hay một topic của mắt hoặc tai, `humans/…`,
+   `room/…`, `…/heard`): chúng luôn được nêu đúng tên, và phần không nêu đúng
+   được thì bị từ chối như trước. Điều đèn chưa làm được và một lần đọc vẫn
+   bị từ chối hay được nói trọn.
+
+Không đổi khi bật: lời đọc lại của một lần ghi và lời đồng ý nói ra cho
+SHA-256 nội dung của nó; 10 lần gửi một ngày cho mọi kỹ năng (`lamp-services`
+chỉ bỏ giới hạn 3 mỗi kỹ năng, `skill_writes::Ledger`); các từ chối vì riêng
+tư; quyền mã và lời đồng ý của #6071.
+
+Test: `made_skill::tests::loosened_*` (bốn thay đổi, bật và tắt),
+`skill_writes::tests::loose_a_skill_sends_past_three_but_every_skill_stays_at_ten`,
+và với `lamp-skills` thật `made::loosened_a_key_the_check_refuses_is_left_out_and_told`
+và `made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`.
+
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)
 
 Cùng người tạo đó, từ chữ gõ trong ứng dụng; được bật như trên, ngay, không cần

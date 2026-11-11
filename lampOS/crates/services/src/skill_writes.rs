@@ -59,6 +59,17 @@ use std::{
 
 /// The switch, here and in `lamp-skills`: `on` only.
 pub const ENVIRONMENT: &str = "LAMP_SKILL_WRITES";
+/// The switch that loosens a skill made here (the owner's ask on the Queue,
+/// #6059, 11 Nov): read here, in `lamp-voice` and in `lamp-skills`' manage
+/// helper. `on` only. Here it lifts [`PER_SKILL`]: only a made skill
+/// writes, and it sends as often as the person made it to, within
+/// [`ALL_SKILLS`].
+pub const LOOSE_ENVIRONMENT: &str = "LAMP_MADE_SKILL_LOOSE";
+
+/// Whether [`LOOSE_ENVIRONMENT`] is on in this process.
+pub fn loose_on() -> bool {
+    std::env::var(LOOSE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
 /// The function `lamp-skills` calls on the tools socket.
 pub const FUNCTION: &str = "skill_write";
 /// The voice's call, on its owner's yes: approve a skill's writes.
@@ -480,12 +491,22 @@ struct LedgerFile {
 #[derive(Debug)]
 pub struct Ledger {
     path: PathBuf,
+    /// [`PER_SKILL`], or none with [`LOOSE_ENVIRONMENT`] on.
+    per_skill: Option<usize>,
 }
 
 impl Ledger {
+    /// The ledger in `store`, its per-skill bound as [`loose_on`] has it.
     pub fn new(store: &Path) -> Self {
+        Self::loose(store, loose_on())
+    }
+
+    /// The ledger in `store`, with no per-skill bound when `loose`: only
+    /// [`ALL_SKILLS`] holds.
+    pub fn loose(store: &Path, loose: bool) -> Self {
         Ledger {
             path: store.join(LEDGER_FILE),
+            per_skill: (!loose).then_some(PER_SKILL),
         }
     }
 
@@ -515,9 +536,11 @@ impl Ledger {
         }
         sent.retain(|one| one.at > now - DAY_S);
         let mine = sent.iter().filter(|one| one.skill == skill).count();
-        if mine >= PER_SKILL {
+        if let Some(most) = self.per_skill
+            && mine >= most
+        {
             return Err(format!(
-                "a skill sends at most {PER_SKILL} times a day, and this one has"
+                "a skill sends at most {most} times a day, and this one has"
             ));
         }
         if sent.len() >= ALL_SKILLS {
@@ -758,6 +781,24 @@ mod tests {
                 .unwrap_err()
                 .contains("at most 10")
         );
+    }
+
+    #[test]
+    fn loose_a_skill_sends_past_three_but_every_skill_stays_at_ten() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger = Ledger::loose(dir.path(), true);
+        for n in 1..=ALL_SKILLS {
+            assert_eq!(ledger.take("a", 1_000).unwrap().0, n);
+        }
+        assert!(ledger.take("a", 1_000).unwrap_err().contains("at most 10"));
+        assert!(ledger.take("b", 1_000).unwrap_err().contains("at most 10"));
+        // Off, the same skill stops at three.
+        let off = tempfile::tempdir().unwrap();
+        let ledger = Ledger::loose(off.path(), false);
+        for _ in 0..PER_SKILL {
+            ledger.take("a", 1_000).unwrap();
+        }
+        assert!(ledger.take("a", 1_000).unwrap_err().contains("at most 3"));
     }
 
     #[test]

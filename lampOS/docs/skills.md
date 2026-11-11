@@ -3608,6 +3608,71 @@ the same code for both writers.
   say-back and the time with DeepSeek's. Whether the agent's user is in
   `lamp-agents` on a lamp.
 
+##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, off)
+
+A skill made here, by voice or in the app, is the person's own, so with
+`LAMP_MADE_SKILL_LOOSE=on` its checks loosen (the owner's ask on the Queue,
+#6059, 11 Nov; the first builder's yes there at 22:44, with two
+adjustments: `[rest]` stays, and a send, the camera and the microphone are
+always named exactly). Off unless
+set, and in no product unit. `lamp-voice` reads it (and gives the exact `on`
+to its `provider` and `second` workers, which make the skill),
+`lamp-skills`' manage helper reads it through `made_skill::capped` as it
+puts a made skill on, and `lamp-services` reads it for the sends. Only a
+skill made here (`made_skill::keep_asked`) loosens: one added from a file,
+written in the app, from the Store or installed keeps today's checks.
+
+1. **Fix, don't refuse** (`made_skill::loosened`). When `lamp-skills pack`
+   refuses a made skill, before any repair, the parts that may go are
+   tried out of it, one at a time, each checked by the real `lamp-skills
+   pack` (a key of a step's kind, a kind of a step with more than one, a
+   key of the trigger but its topic, then a whole `[[do]]` step; never its
+   last step, a read or a write). Those the check's own words name go
+   first; one the check then passes is taken, and one it names whose
+   taking changes the refusal is taken and the next refusal followed. Each
+   left out is journaled by its keys (`a made skill loosened: left out
+   [[do]] step 2, its light's for`) and told at the end of the say-back:
+   "Left out: how long it lasts in a step that changes the light." At most
+   32 checks and 6 s; nothing left that the check takes, and the refusal
+   stands, for a repair as before. A skill that writes is never loosened.
+2. **No limits the person didn't ask for** (`made_skill::mannered_with`).
+   No `most_a_day` or shared `[budget]` is added, and any the model wrote
+   alone is taken out, unless the request asks for limits in its own words
+   (`made_skill::limits_asked`: "at most", "times a day", "once a day",
+   "per hour", "no more than", ...); then they are set as before. Its
+   `[rest] after_ignored = 2` stays: a skill ignored twice rests till
+   morning. `[quiet]` 22:00-08:00 is kept only for a skill with a say or
+   its hum, and only as before (not for a time the person asked for). The
+   brief says to set them only when the request asks for limits.
+3. **A say's cooldown as asked**. A made skill that says something or hums
+   may run as often as asked, at least a minute apart
+   (`LEAST_LOOSE_SAY_COOLDOWN_SECS`): `paced` sets `"1m"` only when it is
+   missing or shorter, and the cap (`capped`, also the manage helper's)
+   refuses one under a minute. Stuffy air keeps its hour. The brief says
+   "a cooldown of \"1m\" or longer, as often as the request asks" (off:
+   `cooldown = "1h"` or longer).
+4. **The say-back never refuses** (`made_skill::plainly_as`). A step it
+   can't say plainly is said in general words ("changes the light", "moves
+   its head", "says something", "plays a sound"), a trigger as "When its
+   moment comes", a part beside them as "under conditions of its own",
+   manners in another shape as "within limits of its own", and one too
+   long for one breath in general words alone. Never a send or a write,
+   the camera or the microphone (`made_skill::named_exactly`: a step's or
+   a part's keys such as `write`, `look`, `look_at` or `listen`, or a
+   topic of the eyes or the ears, `humans/…`, `room/…`, `…/heard`): those
+   are always named exactly, and one that can't be is refused as before.
+   What the lamp can't do yet and a read are still refused or said whole.
+
+Unchanged with it on: a write's read-back and the spoken yes on its
+content's SHA-256; the 10 sends a day across all skills (`lamp-services`
+drops only the per-skill 3, `skill_writes::Ledger`); the privacy refusals;
+#6071's code grants and yes.
+
+Tests: `made_skill::tests::loosened_*` (the four, on and off),
+`skill_writes::tests::loose_a_skill_sends_past_three_but_every_skill_stays_at_ten`,
+and with the real `lamp-skills` `made::loosened_a_key_the_check_refuses_is_left_out_and_told`
+and `made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`.
+
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
 The same maker, from words typed in the app; put on as above, at once,
