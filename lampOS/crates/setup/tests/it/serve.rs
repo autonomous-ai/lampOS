@@ -511,6 +511,51 @@ fn the_first_update_file_stays_from_the_waits_end_until_the_marker_is_written() 
     assert!(status.lock().unwrap().set_up_completed);
 }
 
+/// The product's own wrapper (`main.rs`: `ReleasingSave { save: Files }`)
+/// passes the wait's end on too, after the marker and after a failed
+/// marker (the Reviewer-lead's P2 on #5965: it once did not, so the file
+/// stayed on a lamp although `Files` alone removed it).
+#[test]
+fn through_the_products_releasing_save_the_first_update_file_still_goes() {
+    for fails in [false, true] {
+        let root = Root::new();
+        let config = root.config(false);
+        if fails {
+            fs::create_dir_all(&config.marker).unwrap();
+        }
+        let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+        let mut asked = good();
+        asked["update_first"] = json!(true);
+        let accepted = check(&request(asked), &config).unwrap();
+        let mut save = lamp_setup::light::ReleasingSave {
+            save: Waits {
+                files: Files(&config),
+                seen: vec![],
+            },
+            light: None,
+        };
+        run(&status, &accepted, "VN", &mut Lamp::new(true), &mut save, || None);
+        assert_eq!(
+            save.save.seen.last().map(String::as_str),
+            Some(if fails {
+                "over: waiting=false done=false"
+            } else {
+                "over: waiting=false done=true"
+            }),
+            "fails={fails}: {:?}",
+            save.save.seen
+        );
+        assert!(
+            !config
+                .marker
+                .with_file_name(lamp_setup::first_update::WAITING)
+                .exists(),
+            "fails={fails}"
+        );
+        assert_eq!(status.lock().unwrap().set_up_completed, !fails);
+    }
+}
+
 #[test]
 fn a_marker_that_fails_after_the_first_update_takes_its_file_away() {
     let root = Root::new();
