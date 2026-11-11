@@ -404,6 +404,47 @@ fn a_done_event_is_refused_here() {
     assert!(by_key(&created).replaced_by.is_empty());
 }
 
+/// The tester's lamp, 11 Nov: a saved draft "changed" was saved again
+/// beside it. A saved draft's record keeps its id in Drafts (the save's
+/// `draft_id`) as its result id, for `update_draft` to name; a redo of it
+/// is refused with that way, nothing prepared or linked.
+#[test]
+fn a_saved_draft_keeps_its_id_and_is_never_saved_again_from_its_record() {
+    fresh(true);
+    let now = Instant::now();
+    let draft = json!({
+        "service": "gmail",
+        "action": "save_draft",
+        "to": ["octavia@home.test"],
+        "subject": "Party",
+        "text": "Party on Saturday at 7.",
+    });
+    let back = "Save a draft to octavia@home.test, in the Gmail Drafts of me@home.test. Subject: \"Party\". It says: \"Party on Saturday at 7.\". Nothing is sent.";
+    let _ = read_back(&draft, 20, "s8", back, now);
+    keep_send(
+        Some(8),
+        Some("s8"),
+        Got::Answered(
+            &json!({"sent": false, "saved": true, "service": "Gmail", "draft_id": "draft12"}),
+        ),
+    );
+    let saved = only(Status::Done);
+    assert_eq!(saved.result_id, "draft12");
+    assert_eq!(saved.reason, "saved as a draft");
+    let mut pending = None;
+    let redo = call(json!({
+        "service": "gmail",
+        "action": "save_draft",
+        FIELD: saved.key,
+        "text": "Party on Saturday at 7, at 12 Elm St. Wear something casual.",
+    }));
+    let told = gate(&mut pending, &redo, 21, &heard("add my address", 20), now).unwrap_err();
+    assert_eq!(told["error"], DRAFT_DONE);
+    assert!(DRAFT_DONE.contains("update_draft or delete_draft with its draft_id"));
+    assert_eq!(super::super::held().len(), 1);
+    assert!(by_key(&saved.key).replaced_by.is_empty());
+}
+
 /// Only the owner redoes: another line is refused by the services' owner
 /// check, and another person's id finds none of the owner's records.
 #[test]
