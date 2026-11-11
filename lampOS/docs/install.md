@@ -222,7 +222,7 @@ owner: "everything is a skill"). Install puts every product skill in
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
 equal, Laugh glance parked out of both): thirty-one folders are installed,
-twenty-five enabled (Bedtime and Morning since #5753; Comfort break is off by its own file, the five of `PRODUCT_SKILLS_OFF` by install), one of them hidden unless `LAMP_UNPLUG=on`, which the product sets (#5747). Welcome back, Reminders, Task news, Onboarding, Stretch
+twenty-six enabled (Bedtime and Morning since #5753; Comfort break is off by its own file, the four of `PRODUCT_SKILLS_OFF` by install), one of them hidden unless `LAMP_UNPLUG=on`, which the product sets (#5747). Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is on: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's
@@ -240,7 +240,9 @@ Bedtime and Morning is included enabled since #5753, after its nights on
 lamp-06c1 (#2803, #2804), with `LAMP_OUTPUT_CAPS=on` in the Actions, Skills
 and voice units for its night ceilings; it adds no advertised tool. Watches
 you leave (#1669) is on in the product since #2834, with
-the eyes' `LAMP_ACTIVITY=place`: the sitter followed
+the eyes' `LAMP_ACTIVITY=place`, and Music sway (#1669) since #5770, with
+the ears' sound classes (`LAMP_EARS_CLASSES=on` since #5748, YAMNet's files
+placed by `models.json`, #6232). Watches you leave follows the sitter
 by place only, never by a face print. With `room/activity` said, Stretch
 break, already on, also waits while a head is down (reading, writing) and
 lets that sitting's stretch go if they don't look up within its ten minutes.
@@ -248,10 +250,8 @@ Light show (#1679), a show of slow-changing colours a person asks for,
 comes with the product since #5745, its `light_show` reached through
 `use_skill`. Light scenes and Point the light (#1679) come with the
 product since #5744, asked for by a person only and reached through
-`use_skill` too. Five core skills waiting for their lamp checks are
-installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Music
-sway (#1669), which reads the ears' sound classes (on in the product with
-YAMNet's files placed by `models.json`, #6232), until its lamp row, Light out
+`use_skill` too. Four core skills waiting for their lamp checks are
+installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Light out
 when you leave (#1677, [presence.md](presence.md), which must never take the
 light of someone reading face down),
 Smoky air and Dusty air
