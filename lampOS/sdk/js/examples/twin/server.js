@@ -257,9 +257,17 @@ wss.on('connection', (page) => {
   });
   page.on('close', () => pages.delete(page));
 });
-server.listen(port, lan ? '0.0.0.0' : '127.0.0.1', () => {
+// Always on 127.0.0.1. With --lan also on the one address it prints (a second server that hands its requests and
+// upgrades to the first), never on every interface: a second network card or a VPN address does not get the twin.
+// No network address found: loopback only, said.
+server.listen(port, '127.0.0.1', () => {
   console.log(`the twin: http://localhost:${port}/?t=${token}`);
-  if (lanIp) console.log(`on your network: http://${lanIp}:${port}/?t=${token}`);
+  if (lan && !lanIp) console.log('no network address found: the twin is served on this computer only (127.0.0.1)');
+  if (!lanIp) return;
+  const network = createServer();
+  network.on('request', (...handed) => server.emit('request', ...handed));
+  network.on('upgrade', (...handed) => server.emit('upgrade', ...handed));
+  network.listen(port, lanIp, () => console.log(`on your network: http://${lanIp}:${port}/?t=${token}`));
 });
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
