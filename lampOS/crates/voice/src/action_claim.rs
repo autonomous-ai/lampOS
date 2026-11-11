@@ -65,8 +65,12 @@
 //! sentence's end, so "Okay, louder, right?" is none. Bare keeping/leaving
 //! and duration-state replies additionally close at the time and optional
 //! unit: "It stays on for ten minutes after a tap." is an explanation.
-//! After a comma these narrow runs allow only "as you asked" or "as
-//! requested", followed by an end slot that still rejects a question.
+//! State replies with "until" or "till" close the same way at the clock
+//! and an optional "am", "pm", "tonight" or "o'clock": "It stays on until
+//! ten on weeknights." is an explanation too.
+//! After a comma these narrow runs allow only "as you asked", "as
+//! requested" or "as asked", followed by an end slot that still rejects a
+//! question.
 //! A colour said ("My light is blue now.") is still no claim, nor is any
 //! sentence the run opens that ends in a '?'. Beside any call a worded
 //! claim stands, so work
@@ -1179,10 +1183,15 @@ const WORDED: [(&str, Claim); 74] = [
     // otherwise." and "The light is on until you turn it off." are none.
     // Duration states close at the time and optional unit, as bare keeping
     // does: "It stays on for ten minutes after a tap." describes behavior.
+    // "Until" and "till" states close the same way at the clock and an
+    // optional "am", "pm", "tonight" or "o'clock" ([`Slot::ClockEnd`],
+    // Reviewer-lead's HOLD on #5215): "It stays on until ten on
+    // weeknights." and "It'll stay on until 10 pm, then dims." explain a
+    // schedule.
     // Keep numeric punctuation inside the duration and reject comma-led
     // continuations or questions before releasing a claim decision.
     (
-        "the|my|your light|lights|lamp is|are on|off until|till #",
+        "the|my|your light|lights|lamp is|are on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
@@ -1190,7 +1199,7 @@ const WORDED: [(&str, Claim); 74] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp will be|remain on|off until|till #",
+        "the|my|your light|lights|lamp will be|remain on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
@@ -1198,7 +1207,7 @@ const WORDED: [(&str, Claim); 74] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light's|lamp's on|off until|till #",
+        "the|my|your light's|lamp's on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
@@ -1206,7 +1215,7 @@ const WORDED: [(&str, Claim); 74] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light's|lamp's staying on|off until|till #",
+        "the|my|your light's|lamp's staying on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
@@ -1214,22 +1223,25 @@ const WORDED: [(&str, Claim); 74] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light'll|lamp'll stay|be|remain on|off until|till #",
+        "the|my|your light'll|lamp'll stay|be|remain on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
         "the|my|your light'll|lamp'll stay|be|remain on|off for @ %",
         Claim::LightKept,
     ),
-    ("it stays|remains on|off until|till #", Claim::LightKept),
+    ("it stays|remains on|off until|till @ ^", Claim::LightKept),
     ("it stays|remains on|off for @ %", Claim::LightKept),
-    ("it'll stay|remain on|off until|till #", Claim::LightKept),
+    ("it'll stay|remain on|off until|till @ ^", Claim::LightKept),
     ("it'll stay|remain on|off for @ %", Claim::LightKept),
-    ("it will stay|remain on|off until|till #", Claim::LightKept),
+    (
+        "it will stay|remain on|off until|till @ ^",
+        Claim::LightKept,
+    ),
     ("it will stay|remain on|off for @ %", Claim::LightKept),
     // Not "it's staying": a streamed "It's" ("It's 9:39.") would wait a
     // word longer to be judged.
-    ("it is staying on|off until|till #", Claim::LightKept),
+    ("it is staying on|off until|till @ ^", Claim::LightKept),
     ("it is staying on|off for @ %", Claim::LightKept),
     // Said as it is done (#5215's rest): "Turning it up.", "Setting a timer
     // for one minute." Each closes at the sentence's end; a timer's "for"
@@ -1434,6 +1446,9 @@ enum Slot<'a> {
     TimeEnd,
     /// An optional duration unit followed by the narrow kept-time ending.
     DurationEnd,
+    /// An optional clock suffix ("am", "pm", "tonight", "o'clock")
+    /// followed by the narrow kept-time ending: an "until" state's close.
+    ClockEnd,
     /// A mark that is not a '?' (after a lead-in).
     Mark,
     /// A time: a word that opens with a digit, one of [`NUMBER_WORDS`],
@@ -1459,6 +1474,7 @@ fn slots(pattern: &str) -> Vec<Slot<'_>> {
             "#" => Slot::Time,
             "~" => Slot::TimeEnd,
             "%" => Slot::DurationEnd,
+            "^" => Slot::ClockEnd,
             "@" => Slot::ClockTime,
             words => Slot::Words(words),
         })
@@ -1548,6 +1564,17 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
                     .map(|ending| fits(ending, tokens, at, more)),
             )
         }
+        // An "until" state closes at its clock and optional suffix, as a
+        // "for" state closes at its length (Reviewer-lead's HOLD on #5215).
+        Slot::ClockEnd => any_of([
+            fits(&[Slot::TimeEnd], tokens, at, more),
+            fits(
+                &[Slot::Words("am|pm|tonight|o'clock"), Slot::TimeEnd],
+                tokens,
+                at,
+                more,
+            ),
+        ]),
         Slot::TimeEnd => match tokens.get(at) {
             None if more => None,
             None | Some(Token::Mark('.' | '!', _)) => Some(true),
@@ -1567,7 +1594,7 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
                     more,
                 ),
                 fits(
-                    &[Slot::Words("as"), Slot::Words("requested"), Slot::End],
+                    &[Slot::Words("as"), Slot::Words("requested|asked"), Slot::End],
                     tokens,
                     at + 1,
                     more,
