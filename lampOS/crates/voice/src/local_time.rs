@@ -315,6 +315,31 @@ pub fn month_and_year_here() -> Option<String> {
     Some(format!("{month} {year}"))
 }
 
+/// Today where the lamp stands and its UTC offset now, for a made skill's
+/// calendar write (#6066): ("Wednesday 2026-11-11", "+07:00"); `None` when
+/// the clock is not set or not known.
+pub fn today_and_offset_here() -> Option<(String, String)> {
+    if unset_here() {
+        return None;
+    }
+    let (file, now) = here()?;
+    today_and_offset(&file, now)
+}
+
+/// [`today_and_offset_here`] at `now` in the zone of this compiled file.
+pub fn today_and_offset(file: &[u8], now: i64) -> Option<(String, String)> {
+    let offset = offset_at(file, now)?;
+    let days = now.checked_add(i64::from(offset))?.div_euclid(86_400);
+    let (year, month, day) = civil(days);
+    let weekday = DAYS[days.rem_euclid(7) as usize];
+    let sign = if offset < 0 { '-' } else { '+' };
+    let minutes = offset.unsigned_abs() / 60;
+    Some((
+        format!("{weekday} {year}-{month:02}-{day:02}"),
+        format!("{sign}{:02}:{:02}", minutes / 60, minutes % 60),
+    ))
+}
+
 /// A zone's place as people say it: its last part, underscores as spaces
 /// (`America/New_York` is "New York").
 pub fn place_name(zone: &str) -> String {
@@ -869,6 +894,26 @@ mod tests {
         assert_eq!(
             offset_at(&ruled(0, "GMT0BST,M3.6.0,M10.5.0"), 1_792_316_400),
             None
+        );
+    }
+
+    /// A made skill's calendar write (#6066): today's local date and the
+    /// offset an event's start is written with, east and west of UTC, the
+    /// date the local one past midnight UTC.
+    #[test]
+    fn today_and_the_offset_are_the_local_ones() {
+        let at = 1_792_316_400; // 2026-10-18 09:40 UTC, a Sunday
+        assert_eq!(
+            today_and_offset(&ruled(25_200, "<+07>-7"), at),
+            Some(("Sunday 2026-10-18".to_owned(), "+07:00".to_owned()))
+        );
+        assert_eq!(
+            today_and_offset(&ruled(-18_000, "EST5EDT,M3.2.0,M11.1.0"), at - 36_000),
+            Some(("Saturday 2026-10-17".to_owned(), "-04:00".to_owned()))
+        );
+        assert_eq!(
+            today_and_offset(&ruled(19_800, "IST-5:30"), at + 54_000),
+            Some(("Monday 2026-10-19".to_owned(), "+05:30".to_owned()))
         );
     }
 
