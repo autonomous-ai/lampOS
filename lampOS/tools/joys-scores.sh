@@ -5,7 +5,7 @@
 # sway's bars, and the glances or sways each skill would have asked for. Run on
 # the lamp as root, with someone at the Mac to play the tracks:
 #
-#   sudo EARS_MODEL=/opt/lampOS/models/yamnet/yamnet.onnx lampOS/tools/joys-scores.sh laugh|music [--with-privacy-controls|--no-slide]
+#   sudo EARS_MODEL=/opt/lampOS/ears/models/yamnet.onnx lampOS/tools/joys-scores.sh laugh|music [--with-privacy-controls|--no-slide]
 #
 # Nothing moves: the skill is never installed. The bus is recorded
 # (`ears/classes`, `voice/state`, `humans/faces/tracked`) while the sound
@@ -33,15 +33,10 @@
 # does; the reviewer's P2 on #2113). A yes lamp-ears can't read scores
 # nothing, and the 20 s check below says so.
 #
-# The model: Qualcomm AI Hub's YAMNet ONNX float export, release v0.59.0
-# (`qai-hub-models/models/yamnet/releases/v0.59.0/yamnet-onnx-float.zip`):
-# `yamnet.onnx` 25,789 bytes, SHA-256
-# 970ea63f4dc1aa33c86ef7d61d854319fdfe6bdd078f5b3d674ee1db5dd96471, and
-# `yamnet.data` beside it, 14,915,108 bytes, SHA-256
-# 1d6dff488da4712190e10f1c841252aa58011381132d0126dcd5ee56a4e7ed31, pinned in
-# `crates/ears/src/classes.rs`. Neither is in the repository or the image
-# (its distribution review is open): copied to the lamp by hand, checked
-# against these, under /opt/lampOS/models/yamnet/. A wrong file publishes
+# The model: `yamnet.onnx` with `yamnet.data` beside it, our own conversion
+# of Google's YAMNet (#6232, tools/yamnet-convert.sh), pinned by size and
+# SHA-256 in `crates/ears/src/classes.rs` and placed by the update at
+# /opt/lampOS/ears/models/ (deploy/product/models.json). A wrong file publishes
 # `invalid_model`, and this script stops after 20 s with nothing measured.
 #
 # The recording (scores, face boxes and the voice's state; no sound, no

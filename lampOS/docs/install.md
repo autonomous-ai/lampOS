@@ -116,8 +116,8 @@ Binaries the build carries with no unit, which an install leaves alone:
 
 What else a part needs that no build carries: the voice's turn-end model
 and ONNX Runtime library (beside the voice in its folder,
-[endpoint-detection.md](endpoint-detection.md)), the eyes' models and the
-name's models, all from `deploy/product/models.json`, which install fetches
+[endpoint-detection.md](endpoint-detection.md)), the eyes' models, the
+ears' YAMNet pair and the name's models, all from `deploy/product/models.json`, which install fetches
 (a published build carries the same list as its manifest's models, which a
 round fetches only where `LAMP_UPDATE_MODELS=on`; with it off, a lamp
 whose install-placed file has another SHA-256 refuses the build,
@@ -250,8 +250,8 @@ comes with the product since #5745, its `light_show` reached through
 product since #5744, asked for by a person only and reached through
 `use_skill` too. Five core skills waiting for their lamp checks are
 installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Music
-sway (#1669), which reads the ears' sound classes, off in the product until
-YAMNet's weights may be shipped (sound-events.md), Light out
+sway (#1669), which reads the ears' sound classes (on in the product with
+YAMNet's files placed by `models.json`, #6232), until its lamp row, Light out
 when you leave (#1677, [presence.md](presence.md), which must never take the
 light of someone reading face down),
 Smoky air and Dusty air
@@ -2688,8 +2688,15 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   product's `lamp-voice.service` does at that path since 4 November, for
   the linked services alone ([same-voice.md](same-voice.md)). The voice's five
   recorded lines and their manifest are in `notices-2026-11-03`, placed in
-  `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). Those three
-  releases are published (`models-2026-10-16` since 26 Oct). A model that cannot be
+  `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). The ears'
+  YAMNet pair, `yamnet.onnx` (`c7e50179…`, 29,489 bytes) and `yamnet.data`
+  (`26771b49…`, 14,917,924 bytes), our own conversion of Google's
+  `yamnet.h5` (#6232, Apache-2.0, [sound-events.md](sound-events.md)), is in
+  `models-2026-11-11`, placed in `/opt/lampOS/ears/models`, where the
+  product's `lamp-ears.service` names it. Those three earlier
+  releases are published (`models-2026-10-16` since 26 Oct); `models-2026-11-11`
+  must be before a build listing it is promoted (lampos-promote refuses a
+  model whose release or asset is absent). A model that cannot be
   had is said and the install goes on. What
   install placed is recorded by SHA-256 as the settings are, so when
   `models.json` moves a pin, the earlier model it placed is replaced (its

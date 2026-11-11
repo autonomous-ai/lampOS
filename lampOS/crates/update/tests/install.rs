@@ -4097,13 +4097,15 @@ fn missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept() {
 /// on #811, 13:58). The same-voice check's CAM++ (#829) is the one
 /// docs/same-voice.md pins, placed beside the voice, and no product unit names
 /// it; the product's updater turns on models in a round (same-voice step 2).
+/// The ears' YAMNet pair (#6232) is the one `classes.rs` pins, from its own
+/// release, at the path the product's ears name.
 #[test]
 fn the_pinned_models_are_the_ones_their_parts_check() {
     let all = install::models().unwrap();
     let (notices, models): (Vec<_>, Vec<_>) = all
         .iter()
         .partition(|model| model.path.starts_with(NOTICES));
-    assert_eq!((models.len(), notices.len()), (10, 6));
+    assert_eq!((models.len(), notices.len()), (12, 6));
     let release = "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/";
     let same_voice_release =
         "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-11-04/";
@@ -4112,10 +4114,14 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
         assert_eq!(model.sha256.len(), 64);
         assert!(model.bytes > 0);
     }
+    let yamnet_release =
+        "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-11-11/";
     let campplus = "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx";
     for model in &models {
         let from = if model.path.ends_with(campplus) {
             same_voice_release
+        } else if model.path.starts_with("/opt/lampOS/ears/") {
+            yamnet_release
         } else {
             release
         };
@@ -4170,6 +4176,24 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
     assert!(fast.contains(&runtime.sha256));
     assert_eq!(runtime.bytes, 25_135_496);
     assert!(fast.contains("bytes: 25_135_496"));
+    let classes = include_str!("../../ears/src/classes.rs");
+    let ears = include_str!("../../../deploy/product/lamp-ears.service");
+    for (name, bytes) in [("yamnet.onnx", "29_489"), ("yamnet.data", "14_917_924")] {
+        let model = find(name);
+        assert_eq!(model.path, format!("/opt/lampOS/ears/models/{name}"));
+        assert_eq!(model.url, format!("{yamnet_release}{name}"));
+        assert!(classes.contains(&model.sha256), "{name}");
+        assert_eq!(model.bytes.to_string(), bytes.replace('_', ""), "{name}");
+        assert!(
+            classes.contains(&format!("BYTES: u64 = {bytes};")),
+            "{name}"
+        );
+        assert!(model.archive.is_none());
+    }
+    assert!(ears.contains(&format!(
+        "\nEnvironment=LAMP_EARS_CLASSES_MODEL={}\n",
+        find("yamnet.onnx").path
+    )));
     let eyes = include_str!("../../../deploy/product/lamp-eyes.service");
     for name in [
         "face_detection_yunet_2023mar.onnx",

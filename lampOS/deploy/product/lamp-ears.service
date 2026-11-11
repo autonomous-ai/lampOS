@@ -22,8 +22,8 @@ Nice=5
 Environment=LAMP_PRIVACY_CONTROLS=on
 # Room sound classes (#1669, docs/sound-events.md): speech, music, laughter, a door and footsteps scored on the lamp
 # from mic1, no audio written, at most one patch under 2 s in memory; music sway (#2834) reads `scores.music` (the
-# lead's ask on #5748, 9 Nov). YAMNet's two files are pinned in classes.rs but not yet in models.json (their
-# distribution review is open): a lamp without them publishes `invalid_model` and nothing sways.
+# lead's ask on #5748, 9 Nov). YAMNet's two files, our own conversion (#6232, tools/yamnet-convert.sh), are pinned in
+# classes.rs and placed by models.json; a lamp without them publishes `invalid_model`.
 Environment=LAMP_EARS_CLASSES=on
 Environment=LAMP_EARS_CLASSES_MODEL=/opt/lampOS/ears/models/yamnet.onnx
 # mic1's capture level, pinned (#694, 21 Oct): --rise-db 30 and the quiet in docs/ears.md were measured at the C-Media
