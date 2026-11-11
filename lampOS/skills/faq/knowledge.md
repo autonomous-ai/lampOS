@@ -23,7 +23,7 @@ Say "Hey Lamp", then ask in your own words. I can:
 - look things up, like tomorrow's weather.
 <!-- LAMP_SECOND_SEARCH=deepseek in the product -->
 - dance, when you ask (`dance`).
-- read and, after you say "send", write in the accounts you link in the app, such as Gmail and Google Calendar.
+- read and, once you say yes, write in the accounts you link in the app, such as Gmail and Google Calendar.
 <!-- LAMP_SERVICES, LAMP_SERVICES_WRITE: on in the product -->
 - hand work to Claude Code or Codex on your computer, and tell you when it's done.
 <!-- LAMP_TASKS_ASKED, LAMP_TASKS_SIGN_IN: on in the product -->
@@ -33,7 +33,7 @@ On my own I say hello when you come back (`welcome-back`), give short nudges aft
 ## connectors
 You link your accounts in the Autonomous app: Skills, then Connectors. The services there are Gmail, Google Calendar and Drive, Figma, GitHub, Linear, Asana, a Facebook Page, Slack, monday.com, HubSpot, Amplitude and Notion. Ahrefs can't be linked in the app yet. Spotify and other music services aren't among them yet.
 <!-- LAMP_SERVICES: on in the product -->
-Once one is linked, just ask me out loud, like "what's on my calendar today?". I read things to you; before I send an email or make anything, I read it back and do it only if you say "send".
+Once one is linked, just ask me out loud, like "what's on my calendar today?". I read things to you; before I send an email or make anything, I read it back and ask, and do it only if you say yes.
 <!-- LAMP_SERVICES_WRITE: on in the product -->
 Linking is done in the app, never by telling me: I never ask for a password, key or code.
 Removing a link in the app deletes it from the lamp, but doesn't cancel it at the service: to be sure, remove access there too.
