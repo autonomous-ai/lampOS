@@ -261,6 +261,10 @@ type Config struct {
 	FAChannel    string `json:"fa_channel" yaml:"faChannel"`
 	FDChannel    string `json:"fd_channel" yaml:"fdChannel"`
 
+	// MQTTTLS connects to the broker over TLS; off by default. The MQTT_TLS
+	// environment variable turns it on as well (see MQTTTLSEnabled).
+	MQTTTLS bool `json:"mqtt_tls,omitempty" yaml:"mqttTLS"`
+
 	// LocalIntent enables local keyword matching for common voice commands (default true).
 	// When false, all voice commands go through the agent (OpenClaw).
 	LocalIntent *bool `json:"local_intent,omitempty" yaml:"localIntent"`
@@ -739,12 +743,23 @@ func (c *Config) GetNotifyChannel() chan bool {
 	return c.notify
 }
 
+// MQTTTLSEnabled reports whether the broker connection uses TLS: the MQTT_TLS
+// environment variable (1/true/yes/on) or the mqtt_tls config.json key. Default off.
+func (c *Config) MQTTTLSEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MQTT_TLS"))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return c.MQTTTLS
+}
+
 func ProvideMQTTConfig(c *Config) mqtt.Config {
 	return mqtt.Config{
 		Endpoint: c.MQTTEndpoint,
 		Username: c.MQTTUsername,
 		Password: c.MQTTPassword,
 		Port:     c.MQTTPort,
+		TLS:      c.MQTTTLSEnabled(),
 	}
 }
 

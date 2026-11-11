@@ -23,5 +23,6 @@ func (f *Factory) GetClient(clientID string) *MQTT {
 		Username: f.config.Username,
 		Password: f.config.Password,
 		ClientID: clientID,
+		TLS:      f.config.TLS,
 	})
 }

@@ -38,6 +38,7 @@ func (s *Service) buildPingPayload(status string) beclient.PingPayload {
 		WakeWordEnabled:     s.config.WakeWordEnabled(),
 		VoiceInputMode:      s.config.GetVoiceInputMode(),
 		UnsupportedChannels: s.config.ChannelsUnsupported,
+		MQTTTLS:             s.config.MQTTTLSEnabled(),
 	}
 	if ip, err := s.networkService.GetCurrentIP(); err == nil && ip != apSetupIP {
 		p.LocalIP = ip
