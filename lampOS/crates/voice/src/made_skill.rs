@@ -1883,15 +1883,20 @@ pub fn limits_asked(request: &str) -> bool {
 /// its voice but never says anything"); and a `when` `lamp-skills`
 /// doesn't know on a `room/stood_up` or `controls/pet` trigger, one
 /// message each, which none reads the same (lamp-0c89, 11 Nov 10:35: "nod
-/// when I stand up" refused on "room/stood_up, its when"); and a blink's
+/// when I stand up" refused on "room/stood_up, its when"); a blink's
 /// gap, a light step that turns it `out` with a `for` beside a step that
-/// lights it, taken out whole ([`blink_gap`], lamp-9adf, 11 Nov 20:5x).
-/// Each only removes: the skill keeps every step,
-/// trigger and grant it uses, and gains nothing. Each removal is a line or
-/// an entry of a one-line table taken out, taken only when the text then
-/// reads as the same skill without that one field; a skill written
-/// otherwise is given back as it came, for the check to say why. One
-/// journal line for each.
+/// lights it, taken out whole ([`blink_gap`], lamp-9adf, 11 Nov 20:5x);
+/// and a `[[do]]` step that is only `cue = "hum"` beside a say or another
+/// hum, which [`capped`] refuses ([`HUM_DROPPED`]: the lamp plays one line
+/// or hum a run), the say kept, or with no say the first hum (a product
+/// lamp, 11 Nov: three repairs on it, the model writing the hum back each
+/// time). Each only removes: the skill keeps every trigger and grant it
+/// uses, every step but a hum the lamp would never play, and gains
+/// nothing. Each removal is a line or an entry of a one-line table taken
+/// out, or a lone hum's `[[do]]` block ([`step_taken_out`]), taken only
+/// when the text then reads as the same skill without that one field or
+/// step; a skill written otherwise is given back as it came, for the check
+/// to say why. One journal line for each.
 pub fn tidied(text: &str) -> String {
     let Ok(mut table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
@@ -2046,6 +2051,50 @@ pub fn tidied(text: &str) -> String {
             "speak",
             "[permissions] speak, with no say step, hum or read".to_owned(),
         );
+    }
+    // (f) A step that is only a hum, beside a say or another hum: the lamp
+    // plays one line or hum a run, and [`capped`] refuses the extra one
+    // (a product lamp, 11 Nov, from the app: three repairs on
+    // [`HUM_DROPPED`], the model writing the hum back each time). Taken
+    // from the last, so a lone hum stays, and with no say the first.
+    let steps = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .map_or(0, Vec::len);
+    for index in (0..steps).rev() {
+        let Some(steps) = table.get("do").and_then(toml::Value::as_array) else {
+            break;
+        };
+        let lone_hum = |step: &toml::Value| {
+            step.as_table().is_some_and(|step| {
+                step.len() == 1 && step.get("cue").and_then(toml::Value::as_str) == Some("hum")
+            })
+        };
+        if !steps.get(index).is_some_and(lone_hum) {
+            continue;
+        }
+        let others = || {
+            steps
+                .iter()
+                .enumerate()
+                .filter(|(at, _)| *at != index)
+                .map(|(_, step)| step)
+        };
+        let beside = if others().any(|step| step.get("say").is_some()) {
+            "its say"
+        } else if others().any(|step| step.get("cue").is_some()) {
+            "another hum"
+        } else {
+            continue;
+        };
+        if let Some((tidied, expected)) = step_taken_out(&text, &table, index) {
+            eprintln!(
+                "lamp-voice: a made skill tidied: [[do]] step {}, a hum beside {beside}",
+                index + 1
+            );
+            text = tidied;
+            table = expected;
+        }
     }
     text
 }
@@ -3251,7 +3300,9 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         }
         // A hum beside its line, or a second hum: the repair drops it
         // quietly, the line kept (the owner: lifting limits makes it
-        // simpler for the person, never a scolding).
+        // simpler for the person, never a scolding). A step that is only
+        // the hum is taken out before this ([`tidied`]); one sharing its
+        // step with more gets here.
         if says.len() + cues.len() > 1 {
             return Err(Refused::new(HUM_DROPPED));
         }
@@ -12041,6 +12092,55 @@ light = { colour = "green", level = 3, for = "20s" }
             kept.replace(&format!("\n\n[[do]]\n{pulse}\n"), "\n")
         );
         assert!(blink_gapped(&inline), "{inline}");
+        assert_eq!(tidied(&inline), inline);
+    }
+
+    /// A product lamp, 11 Nov, from the app: three repairs on
+    /// [`HUM_DROPPED`], the model writing its hum back beside its say each
+    /// time. A step that is only the hum, beside a say or another hum, is
+    /// taken out, the say or the first hum kept, and the skill then passes
+    /// the cap and is said; a lone hum, a hum sharing its step, or steps
+    /// written inline stay as they came, for the check to say why.
+    #[test]
+    fn a_made_hum_beside_its_say_is_tidied() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        let speaking = |step: &str| {
+            made_with(stood, step).replace("body = true\n", "body = true\nspeak = true\n")
+        };
+        let say = "say = { text = \"Off you go.\" }";
+        let hum = "cue = \"hum\"";
+        let said = speaking(say);
+        for text in [
+            speaking(&format!("{say}\n\n[[do]]\n{hum}")),
+            speaking(&format!("{hum}\n\n[[do]]\n{say}")),
+            speaking(&format!("{hum}\n\n[[do]]\n{say}\n\n[[do]]\n{hum}")),
+        ] {
+            assert_eq!(capped_with(&text, false).unwrap_err().0, HUM_DROPPED);
+            assert_eq!(tidied(&text), said, "{text}");
+            assert!(capped_with(&paced(&text), false).is_ok(), "{text}");
+            assert!(plainly_with(&paced(&text), false).is_ok(), "{text}");
+        }
+        // Two hums: the first kept.
+        let twice = speaking(&format!("{hum}\n\n[[do]]\n{hum}"));
+        assert_eq!(tidied(&twice), speaking(hum));
+        // Beside a nod, a lone hum is the skill's one sound: kept.
+        let nod = speaking(&format!("body = {{ gesture = \"nod\" }}\n\n[[do]]\n{hum}"));
+        assert_eq!(tidied(&nod), nod);
+        assert_eq!(tidied(&speaking(hum)), speaking(hum));
+        // A hum sharing its step with a nod, beside a say: not a lone hum.
+        let shared = speaking(&format!(
+            "{say}\n\n[[do]]\n{hum}\nbody = {{ gesture = \"nod\" }}"
+        ));
+        assert_eq!(tidied(&shared), shared);
+        assert_eq!(capped_with(&shared, false).unwrap_err().0, HUM_DROPPED);
+        // Steps written inline: given back as they came.
+        let inline = speaking(say)
+            .replace(&format!("\n[[do]]\n{say}\n"), "")
+            .replace(
+                "version = \"1.0.0\"\n",
+                &format!("version = \"1.0.0\"\ndo = [{{ {say} }}, {{ {hum} }}]\n"),
+            );
+        assert_eq!(capped_with(&inline, false).unwrap_err().0, HUM_DROPPED);
         assert_eq!(tidied(&inline), inline);
     }
 

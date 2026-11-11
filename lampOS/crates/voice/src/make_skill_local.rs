@@ -2149,13 +2149,16 @@ fn made_and_journaled_by(
         eprintln!("lamp-voice: a skill made here: no agent on the lamp: DeepSeek makes it alone");
     }
     let mut made = kept(ask(Arc::clone(&chat), brief.clone()));
+    // The last refusal a repair was asked for: what the person hears when
+    // a later answer is cut or never comes, never the model's cut alone.
+    let mut refused_before = None;
     // Refused by the lamp's check, by `plainly`, as TOML that can't be
     // read, or the example given back: its lines go back to the model, up
     // to [`MOST_REPAIRS`] times (`made_skill::repair_brief`; the owner,
     // 10 Nov: "re-run it yourself until it works"), each begun only while
     // one more round, two answers at worst, still fits [`MAKE_WITHIN`].
     if engine.is_none() {
-        made = repaired(
+        (made, refused_before) = repaired(
             made,
             request,
             "",
@@ -2187,6 +2190,23 @@ fn made_and_journaled_by(
         None => made,
     };
     let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
+    // A repair's answer cut or never come (a product lamp, 11 Nov, from the
+    // app: three repairs on its hum, then a cut stream, and the person
+    // heard "the lamp's model stopped before it finished writing it"):
+    // the person hears why the skill itself was refused. A first answer
+    // cut, with nothing refused before, is told as the cut.
+    let made = match (made, refused_before) {
+        (Err(Refused(why, _)), Some(before))
+            if [made_skill::MODEL_CUT_OFF, made_skill::MODEL_SILENT].contains(&why.as_str()) =>
+        {
+            eprintln!(
+                "lamp-voice: a made skill's last answer failed after its repairs: told why it \
+                 was refused"
+            );
+            Err(before)
+        }
+        (made, _) => made,
+    };
     // The person hears the lamp's own reason in everyday words, the
     // journal's line above keeping it whole (the owner, 11 Nov: reasons
     // "nobody understands"); the model's `cannot:` sentence goes as it is.
@@ -2202,13 +2222,15 @@ fn made_and_journaled_by(
 /// A refused `made`'s repairs: its check's lines go back to the writer
 /// (`again`), up to [`MOST_REPAIRS`] times, each begun only while `fits`.
 /// `by` names the writer in the journal ("" for DeepSeek, as before).
+/// Beside the last answer, the last refusal a repair was asked for.
 fn repaired(
     mut made: Result<Made, Refused>,
     request: &str,
     by: &str,
     fits: impl Fn() -> bool,
     mut again: impl FnMut(String) -> Result<Made, Refused>,
-) -> Result<Made, Refused> {
+) -> (Result<Made, Refused>, Option<Refused>) {
+    let mut refused_before = None;
     for round in 1..=MOST_REPAIRS {
         let Err(Refused(why, Some(lines))) = &made else {
             break;
@@ -2227,9 +2249,10 @@ fn repaired(
         // keys and topic, or the check's first line) is journaled where it
         // was refused, never the model's lines.
         eprintln!("lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}{by}: {why}");
+        refused_before = Some(Refused(why.clone(), None));
         made = again(repair);
     }
-    made
+    (made, refused_before)
 }
 
 /// A make DeepSeek didn't make (`deepseek`), handed to the lamp's agent
@@ -2277,7 +2300,7 @@ fn handed_to_agent(
             return deepseek;
         }
     };
-    let made = repaired(
+    let (made, _) = repaired(
         kept(Ok(first)),
         request,
         " by the agent",
@@ -5297,6 +5320,60 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         }
     }
 
+    /// A product lamp, 11 Nov, from the app: three repairs on what the
+    /// lamp refused, then the last answer cut twice, and the person heard
+    /// that the model stopped before it finished. A repair's answer cut or
+    /// never come is told as why the skill was refused; a first answer cut
+    /// twice, with nothing refused before, is still told as the model's
+    /// failure.
+    #[test]
+    fn a_cut_after_its_repairs_is_told_as_the_refusal() {
+        let (root, keeping) = keeping("cut-after-repairs");
+        let faces = good().replace(
+            "topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n",
+            "topic = \"humans/faces/tracked\"\nnear = 0.14\n",
+        );
+        let whole = good();
+        let cut = whole[..whole.rfind("```").unwrap()].to_owned();
+        let mut replies = vec![(200, faces.clone()); MOST_REPAIRS];
+        replies.extend([(BROKEN, cut.clone()), (BROKEN, cut.clone())]);
+        let (url, served) = service(replies);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY),
+            "{told}"
+        );
+        assert_eq!(
+            told["next"],
+            made_skill::not_made_in_their_language(made_skill::NOT_MADE_TRY)
+        );
+        assert_eq!(served.join().unwrap(), MOST_REPAIRS + 2);
+        // A repair never answered: the same.
+        let (url, served) = service(vec![
+            (200, faces),
+            (503, String::new()),
+            (503, String::new()),
+        ]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY),
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap(), 3);
+        // Cut the first time, twice: the model's own failure.
+        let (url, served) = service(vec![(BROKEN, cut.clone()), (BROKEN, cut)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW + 2);
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::MODEL_SILENT),
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap(), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The relay's 404 is asked once more, and the second answer is kept;
     /// a second failure is said as not made.
     #[test]
@@ -5974,7 +6051,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         made_skill::set_scripts_here(Some(true));
         made_skill::set_code_at_once_here(Some(true));
         let (root, mut keeping) = keeping("code-at-once-failed");
-        // The pack fails: not made, and why.
+        // The pack fails: not made, its repair unanswered, so told as the
+        // refusal.
         let failing = root.join("pack-fails");
         std::fs::write(&failing, "#!/bin/sh\necho 'no room left' >&2\nexit 1\n").unwrap();
         std::fs::set_permissions(&failing, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -6000,7 +6078,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             told["next"]
                 .as_str()
                 .unwrap()
-                .contains(made_skill::NOT_MADE_HEAD),
+                .contains(made_skill::NOT_MADE_TRY),
             "{told}"
         );
         assert!(told.get(crate::skill_write_yes::APPROVE_ID).is_none());

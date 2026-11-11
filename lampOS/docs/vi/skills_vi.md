@@ -379,16 +379,26 @@ sau:
      it couldn't do: blinking." (đặt trước lời bỏ sót của chính mô hình,
      trừ khi lời đó đã nói tới nháy). Một `{ out = true }` thường, một bước
      chỉ có `over` và `until`, và một `out` có `for` mà không có bước sáng
-     nào bên cạnh thì không bị đụng tới, để bước kiểm tra nói lý do. Mỗi
-     việc chỉ bỏ ra: một dòng, hoặc một mục của bảng một dòng cùng dấu
-     phẩy của nó, hoặc với (e) một bước, chỉ nhận khi văn bản sau đó đọc
-     ra đúng kỹ năng đó trừ đúng trường hay bước ấy; kỹ năng giữ mọi
-     trigger và quyền nó dùng và không được thêm gì. Kỹ năng
-     viết kiểu khác (ví dụ khóa có dấu chấm) được trả lại nguyên như khi
+     nào bên cạnh thì không bị đụng tới, để bước kiểm tra nói lý do; (f)
+     một bước `[[do]]` chỉ có `cue = "hum"` cạnh một câu say hay một tiếng
+     ngân khác, điều giới hạn từ chối (đèn phát một câu hoặc một tiếng ngân
+     mỗi lần chạy): giữ câu say, hoặc khi không có say thì giữ tiếng ngân
+     đầu (một đèn sản phẩm, 11/11, gõ trong ứng dụng: ba lần sửa vì "leave
+     out the extra cue = "hum" step", mô hình lần nào cũng viết lại tiếng
+     ngân). Mỗi việc chỉ bỏ ra: một dòng, hoặc một mục của bảng một dòng
+     cùng dấu phẩy của nó, hoặc với (e) và (f) khối `[[do]]` của một bước
+     (`made_skill::step_taken_out`), chỉ nhận khi văn bản sau đó đọc ra
+     đúng kỹ năng đó trừ đúng trường hay bước ấy; kỹ năng giữ mọi trigger
+     và quyền nó dùng, mọi bước trừ một khoảng tắt hay một tiếng ngân đèn
+     sẽ không bao giờ phát, và không được thêm gì. Kỹ năng viết kiểu khác
+     (ví dụ khóa có dấu chấm, hay các bước viết liền `do = [...]`) được trả
+     lại nguyên như khi
      đến, để bước kiểm tra nói lý do. Mỗi việc ghi một dòng nhật ký:
-     `lamp-voice: a made skill tidied: <what>`. Cử chỉ cạnh mood, một
-     `for` thật sự giữ, và giọng nói cạnh say, tiếng ngân hay việc đọc thì
-     không bị đụng tới. System prompt của mô hình tạo kỹ năng
+     `lamp-voice: a made skill tidied: <what>` (tiếng ngân: `[[do]] step N,
+     a hum beside its say`, hoặc `beside another hum`). Cử chỉ cạnh mood,
+     một `for` thật sự giữ, giọng nói cạnh say, tiếng ngân hay việc đọc,
+     một tiếng ngân đứng một mình cạnh cái gật đầu, và tiếng ngân chung
+     bước với thứ khác thì không bị đụng tới. System prompt của mô hình tạo kỹ năng
      (`MORE_STEPS`) nói giống vậy: `{ gesture = "nod" }` không có `for`
      (cử chỉ chạy một lần), `mood = "reading"` với `for = "1m"` (tối đa
      2m), đứng dậy không có `for` hay `absent_for`, `speak = true` chỉ đi
@@ -430,11 +440,13 @@ sau:
      `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`,
      `a_getting_ups_unknown_when_is_tidied_and_another_topics_named`,
      `a_getting_ups_wait_taken_out_is_said`,
-     `a_made_blinks_gap_is_taken_out_and_a_plain_out_kept`, và
+     `a_made_blinks_gap_is_taken_out_and_a_plain_out_kept`,
+     `a_made_hum_beside_its_say_is_tidied`, và
      trong `tests/it/made.rs`
      `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed`,
-     `a_made_nod_when_i_stand_up_is_tidied_and_packed` và
-     `a_made_blinks_gap_is_taken_out_and_packed` (`lamp-skills
+     `a_made_nod_when_i_stand_up_is_tidied_and_packed`,
+     `a_made_blinks_gap_is_taken_out_and_packed` và
+     `a_made_hum_beside_its_say_is_tidied_and_packed` (`lamp-skills
      pack` thật).
    Việc đọc một dịch vụ liên kết
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
@@ -1136,9 +1148,18 @@ sau:
      ghi, kiểm hay giữ được: "Something went wrong keeping it. Please try
      again." (`NOT_KEPT_TRY`). Bước đèn chưa làm được: "I can't do that yet:
      <điều đó>." Mô hình im lặng hay bị cắt: "I couldn't make that: the
-     lamp's model didn't answer." Câu `cannot:` của chính mô hình giữ
-     nguyên. `error` và `next` trong câu trả lời `make_skill` của giọng nói
-     mang cùng câu dễ hiểu đó. Test: `a_failed_make_is_told_in_plain_words`.
+     lamp's model didn't answer." Câu trả lời của một lần sửa bị cắt hay
+     không đến, sau khi đèn đã từ chối một câu trước, được nói là lời từ
+     chối đó, bằng lời thường (một đèn sản phẩm, 11/11, gõ trong ứng dụng:
+     ba lần sửa, rồi luồng bị cắt, và người dùng nghe "the lamp's model
+     stopped before it finished writing it"); chỉ câu trả lời đầu tiên bị
+     cắt hay im lặng, chưa có gì bị từ chối trước, mới được nói là bị cắt
+     hay im lặng. Nhật ký vẫn ghi việc bị cắt và nói `lamp-voice: a made
+     skill's last answer failed after its repairs: told why it was
+     refused`. Câu `cannot:` của chính mô hình giữ nguyên. `error` và
+     `next` trong câu trả lời `make_skill` của giọng nói mang cùng câu dễ
+     hiểu đó. Test: `a_failed_make_is_told_in_plain_words`,
+     `a_cut_after_its_repairs_is_told_as_the_refusal`.
    - **Tên đã có thì lấy tên trống** (chủ đèn, 11/11: khôi phục cài đặt gốc
      giữ lại kỹ năng của đèn, trong đó có welcome-back, bedtime-morning,
      light-out, sip-of-water, nên kỹ năng mô hình đặt tên welcome-back lần
