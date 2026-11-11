@@ -837,7 +837,9 @@ impl Lamp for Real {
             turn: turn.as_ref(),
         };
         let (data, line) = crate::onboarding_page::PAGES.lock().ok()?.done(seen)?;
-        crate::onboarding_page::say(&line, self.language() == "en");
+        if !line.is_empty() {
+            crate::onboarding_page::say(&line, self.language() == "en");
+        }
         data
     }
 

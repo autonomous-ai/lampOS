@@ -121,6 +121,7 @@ lamp says so.
 | `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_step_supported` | `true` with the same switch: this lamp sends `onboarding.step` as each walk step ends (#5979). No field otherwise ("Each setup step, told to the app" below) |
 | `system.info`'s `onboarding_page_supported` | `true` with the same switch: this lamp takes `onboarding.page` and sends `onboarding.page_done` (#6076). No field otherwise, so the app keeps its Next ("The app's onboarding pages, done on the lamp" below) |
+| `system.info`'s `onboarding_page_version` | `2` with the same switch (#6366): which `onboarding.page` contract the lamp speaks. 2 is per-tap Add (`added: [id]`, one tap a message, the page done with its first installed skill's line) and the `done` page (#6353). No field means 1, #6076's: picks sent once as Add is left, done at once. A version-2 lamp still ends Add on a 1-era leave of several ids. The app sends per-tap adds and `done` only when it reads `>= 2` |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
@@ -2274,7 +2275,8 @@ After the walk, the app's pages (Try first skill, Add a skill, Create your
 skill, and the last "skill master" screen) each get one line from the lamp,
 tied to the app (#6353); the person taps Next. Behind `onboarding.done`'s
 switch, `LAMP_APP_ONBOARDING_DONE=on` with a state folder; `system.info`
-says `onboarding_page_supported: true` then.
+says `onboarding_page_supported: true` then, and `onboarding_page_version:
+2` (#6366) for this contract.
 
 - **The app tells the page.** `onboarding.page` `{"page": "try" | "add" |
   "create" | "done" | null, "added"?: [id], "walk_id"?}`, answered `{}`;
@@ -2298,7 +2300,11 @@ says `onboarding_page_supported: true` then.
   "<Name> is on! Add more skills if you like, or tap Next to make your
   own.", each later one "<Name> is on too." An id not installed gets
   nothing (the app sends it again once the install lands); the lamp
-  installs nothing. Next on Add sends nothing.
+  installs nothing. Next on Add sends nothing. An app that reads no
+  `onboarding_page_version` (#6076's) sends its picks as it leaves Add;
+  several ids in one message still end the page: done with the first
+  installed id's line, or at once with no line if none is installed (one
+  id, or none, reads as a tap).
 - **create.** Nothing here: lamp-voice says the made skill's own line as
   it puts it on ("I made <Name>, and it's on.", `made_skill::on_line`).
 - **done.** `{"page": "done"}`: "You're a skill master now! Keep exploring,

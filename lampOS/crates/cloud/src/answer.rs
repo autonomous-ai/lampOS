@@ -491,6 +491,8 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 info["onboarding_step_supported"] = json!(true);
                 // And `onboarding.page`, its page done pushed (#6076).
                 info["onboarding_page_supported"] = json!(true);
+                // Which page contract (#6366): 2 is per-tap Add and `done`.
+                info["onboarding_page_version"] = json!(crate::onboarding_page::VERSION);
             }
             some(info)
         }
@@ -1251,6 +1253,9 @@ pub mod tests {
         // switch, and `onboarding.page` answered only then.
         assert_eq!(told["onboarding_page_supported"], true);
         assert!(info.get("onboarding_page_supported").is_none(), "{info}");
+        // #6366: the page contract's version beside it, same switch.
+        assert_eq!(told["onboarding_page_version"], 2);
+        assert!(info.get("onboarding_page_version").is_none(), "{info}");
         assert!(answer(&mut will, "onboarding.page", &json!({"page": "create"})).is_ok());
         assert!(
             answer(

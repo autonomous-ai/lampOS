@@ -18,6 +18,9 @@
 //!   from the lamp's installed skills (`skills.list`'s `title`, never the
 //!   app's words) in [`ADDED_FIRST`] for the page's first, [`ADDED_MORE`]
 //!   after. An id not installed gets nothing; the lamp installs nothing.
+//!   A #6076 app (`onboarding_page_version` < 2) sends its picks as it
+//!   leaves: several ids in one message end the page, done with the first
+//!   installed id's line, or at once with no line if none is installed.
 //! - **create:** nothing here: lamp-voice says the made skill's own line
 //!   (`made_skill::on_line`, "I made <Name>, and it's on.").
 //! - **done:** [`DONE`], once.
@@ -27,7 +30,8 @@
 //! these lines having no translation (`crate::say` in lamp-voice: said only
 //! once nobody is talking and the lamp's own line has ended). Behind
 //! `onboarding.done`'s switch (`LAMP_APP_ONBOARDING_DONE`), with
-//! `onboarding_page_supported: true` in `system.info`. No words heard.
+//! `onboarding_page_supported: true` and [`VERSION`] in `system.info`. No
+//! words heard.
 use lamp_msgs::{Light, SkillEvent, SkillStage};
 use serde_json::{Value, json};
 use std::collections::VecDeque;
@@ -39,6 +43,10 @@ pub const KIND: &str = "onboarding.page";
 
 /// The kind the lamp tells a page done by.
 pub const DONE_KIND: &str = "onboarding.page_done";
+
+/// `system.info`'s `onboarding_page_version`: 2 is this per-tap Add and
+/// the `done` page (#6353); an app that reads none is a #6076 one.
+pub const VERSION: u64 = 2;
 
 /// The asker's name on the say socket.
 pub const SAY_SKILL: &str = "onboarding-app";
@@ -143,6 +151,8 @@ struct Open {
     lines: VecDeque<String>,
     /// [`DONE_KIND`] pushed for this page.
     told: bool,
+    /// A #6076 leave with no id installed: done with no line.
+    end: bool,
     /// When the page opened, for [`LAPSE`].
     opened_at: Instant,
 }
@@ -162,7 +172,7 @@ pub static PAGES: Mutex<Pages> = Mutex::new(Pages { open: None });
 pub type Run = (Key, SkillEvent);
 
 /// A line due now: the [`DONE_KIND`] reply's `data` when the page is done
-/// with it, and the words.
+/// with it, and the words (none for a #6076 leave with nothing installed).
 pub type Due = (Option<Value>, String);
 
 /// The skill `id`'s own name in `skills.list`'s reply (`catalogue`), with
@@ -222,13 +232,21 @@ impl Pages {
                     VecDeque::new()
                 },
                 told: false,
+                end: false,
                 opened_at: Instant::now(),
             });
         }
         let open = self.open.as_mut().ok_or(PAGE)?;
         if page == Page::Add {
-            let ids = data.get("added").and_then(Value::as_array);
-            for id in ids.into_iter().flatten().filter_map(Value::as_str) {
+            let ids: Vec<&str> = data
+                .get("added")
+                .and_then(Value::as_array)
+                .map(|ids| ids.iter().filter_map(Value::as_str).collect())
+                .unwrap_or_default();
+            // Several ids at once are a #6076 app's picks on leaving: the
+            // page ends with them (a per-tap app sends one).
+            let before = open.added;
+            for &id in &ids {
                 if let Some(name) = name(id) {
                     let line = if open.added == 0 {
                         ADDED_FIRST
@@ -239,6 +257,7 @@ impl Pages {
                     open.added += 1;
                 }
             }
+            open.end |= ids.len() > 1 && open.added == before;
         }
         Ok(json!({}))
     }
@@ -265,6 +284,9 @@ impl Pages {
         let open = self.open.as_mut()?;
         if let Some(line) = open.lines.pop_front() {
             return Some((open.told(None), line));
+        }
+        if std::mem::take(&mut open.end) {
+            return Some((open.told(None), String::new()));
         }
         if open.page != Page::Try {
             return None;
@@ -614,6 +636,38 @@ mod tests {
                 .1
                 .ends_with("make your own.")
         );
+    }
+
+    /// #6366: a #6076 app's picks sent on leaving (several ids) still end
+    /// the page: with the first installed id's line, else at once, no line.
+    #[test]
+    fn an_old_apps_picks_on_leaving_end_the_page() {
+        let mut pages = Pages::default();
+        let leave = |pages: &mut Pages, ids: Value| {
+            pages
+                .open(
+                    &json!({"page": "add", "added": ids}),
+                    Seen::default(),
+                    installed,
+                )
+                .unwrap();
+        };
+        leave(&mut pages, json!(["glow-green", "glow-red"]));
+        assert_eq!(
+            pages.done(Seen::default()),
+            Some((Some(json!({"page": "add"})), String::new()))
+        );
+        assert!(pages.done(Seen::default()).is_none());
+        pages
+            .open(&json!({"page": null}), Seen::default(), none)
+            .unwrap();
+        leave(
+            &mut pages,
+            json!(["glow-green", "sip-of-water", "rest-your-eyes"]),
+        );
+        let (data, line) = pages.done(Seen::default()).unwrap();
+        assert_eq!(data, Some(json!({"page": "add"})));
+        assert!(line.starts_with("Sip of water is on!"), "{line}");
     }
 
     /// #6353: Create says nothing here (lamp-voice says the made line);
