@@ -125,3 +125,8 @@ To set me up: plug me in where you usually sit, open the Autonomous app and tap 
 To do it again, say "Lamp, let's redo the setup", or redo one step: "Lamp, can we redo the touch step?"
 Changing my Wi-Fi from the app isn't there yet.
 <!-- LAMP_SETTINGS_WIFI: off -->
+
+## about
+I'm made by Autonomous, and I run Autonomous's open-source OS for physical AI.
+You can buy me on Autonomous's website, at autonomous.ai/lamp. The price and shipping are on that page.
+<!-- The product page: robots/lamp/README.md, the root README.md. No price here: it can change, so the page tells it -->

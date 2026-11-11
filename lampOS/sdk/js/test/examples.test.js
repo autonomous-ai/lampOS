@@ -42,6 +42,8 @@ const EXAMPLE_RUNS = {
   'phrase.js': [[], 'phrase', [['light', { colour: 'warm', level: 2, pattern: 'breathe' }], ['gesture', { name: 'nod' }]]],
   'pomodoro.js': [[], null, [['light', { colour: 'warm', level: 2 }]]],
   'push-skill.js': [['../examples/hello-skill'], null, ['skill.push']],
+  // An arrival is counted in the day's note, quietly: no say, no light.
+  'visitors.js': [[], 'arrived', [['notes.get', {}], ['notes.set', { value: 1 }]]],
   'touch.js': [[], 'tap', [['light', { colour: 'warm', level: 3 }]]],
   // Pixel 0 white, a green pixel walking, the whole ring blue, given back.
   'ring-walk.js': [['50'], null, [

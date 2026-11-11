@@ -7,7 +7,7 @@ use crate::{
     follow::{CliWatch, Follows, WatchLane},
     harness::{
         AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
-        LaunchOutcome, Listed, MOST_WAITED, Observation, SignIn, Target,
+        LaunchOutcome, Listed, MOST_WAITED, Observation, SessionMachines, SignIn, Target,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
@@ -210,6 +210,52 @@ pub struct SetUpLater {
     /// computer is known offline, or its engine not found there or known not
     /// signed in ([`crate::readiness`]). Off unless set.
     pub engines: bool,
+    /// `LAMP_HERMES_ON_LAMP=on` (#5978), only with `engines`: the lamp's
+    /// own machine is looked at too, and kept as the target
+    /// [`LAMP_TARGET`], engine Hermes, while its look says Hermes is
+    /// installed ([`LampSide`]). `None`: off, as before.
+    pub lamp: Option<LampSide>,
+}
+
+/// `LAMP_HERMES_ON_LAMP` (#5978): what lamp-tasks keeps for the lamp's own
+/// Hermes. `home` is `lampos`'s (Harness's) home, under which its work
+/// folder [`LAMP_PROJECT`] is made; `machines`
+/// the machines a named hand-over to the lamp looks among for its session,
+/// kept from the targets as they are read and given to Harness's adapter
+/// ([`crate::harness::SessionMachines`]).
+#[derive(Clone, Debug, Default)]
+pub struct LampSide {
+    pub home: PathBuf,
+    pub machines: Arc<Mutex<SessionMachines>>,
+}
+
+impl LampSide {
+    pub fn new(home: PathBuf) -> Self {
+        Self {
+            home,
+            machines: Default::default(),
+        }
+    }
+}
+
+/// The switch for the lamp's own Hermes (#5978), in lamp-tasks' unit.
+pub const HERMES_ON_LAMP: &str = "LAMP_HERMES_ON_LAMP";
+
+/// Whether [`HERMES_ON_LAMP`] is on: `on` exactly. Unset, `off` or any
+/// other value is off, and work naming no machine goes to a computer as
+/// before the switch.
+pub fn hermes_on_lamp(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// [`SetUpLater::lamp`] from [`HERMES_ON_LAMP`]'s `value` and `lampos`'s
+/// (Harness's) `home`: `None`, the lamp no target, unless the switch is on
+/// and there is a home.
+pub fn lamp_side(value: Option<&str>, home: Option<PathBuf>) -> Option<LampSide> {
+    hermes_on_lamp(value)
+        .then_some(home)
+        .flatten()
+        .map(LampSide::new)
 }
 
 /// `serve --targets-from-machines` asks Harness for the machines once in
@@ -221,6 +267,21 @@ pub const MACHINES_EVERY_LOOKS: u32 = 5;
 /// #5541); one Harness still refuses for it is said with `serve
 /// --folder-missing` (#2840).
 pub const MACHINES_PROJECT: &str = "~/harnesses/lamp-tasks";
+/// `LAMP_HERMES_ON_LAMP` (#5978): the alias of the lamp's own machine as a
+/// target, with Hermes, and the folder it works in there. Never a
+/// computer's alias: a computer whose name makes `lamp` is `lamp-2`.
+pub const LAMP_TARGET: &str = "lamp";
+/// Hermes' own settings, `HERMES_HOME`, as Harness finds its sessions by
+/// it too (openharness `config/env.ts`, `engines/hermes/home.ts`): outside
+/// `lampos`'s home, apart from Harness's sign-in and lamp-cloud's
+/// credentials.
+pub const HERMES_HOME: &str = "/var/lib/lampos-hermes/.hermes";
+/// The lamp's own work folder, under `lampos`'s (Harness's) home, beside
+/// the computers' [`MACHINES_PROJECT`].
+pub const LAMP_PROJECT: &str = "~/harnesses/lamp-tasks/lamp";
+/// lamp-cloud's loopback forwarder for Hermes' DeepSeek
+/// (`lamp_cloud::hermes_llm::PORT`).
+pub const HERMES_FORWARDER_PORT: u16 = 7741;
 
 /// How often `serve --set-up-later` looks at the targets and the sign-in.
 pub const SET_UP_LOOK_EVERY: Duration = Duration::from_secs(60);
@@ -460,6 +521,17 @@ pub trait Adapter: Send + 'static {
     fn start_daemon(&self) -> Result<(), String> {
         Err("unsupported".into())
     }
+    /// Whether Harness's daemon is to be started again once at this start:
+    /// its env file got other words while it ran (#5978). None without it.
+    fn restart_wanted(&self) -> bool {
+        false
+    }
+    /// Start Harness's daemon again (`harness start --restart`), once, when
+    /// [`Self::restart_wanted`] and no task is busy. An adapter without it
+    /// says so.
+    fn restart_daemon(&self) -> Result<(), String> {
+        Err("unsupported".into())
+    }
 }
 impl Adapter for Cli {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
@@ -529,6 +601,12 @@ impl Adapter for Cli {
     }
     fn start_daemon(&self) -> Result<(), String> {
         Cli::start_daemon(self)
+    }
+    fn restart_wanted(&self) -> bool {
+        Cli::restart_wanted(self)
+    }
+    fn restart_daemon(&self) -> Result<(), String> {
+        Cli::restart_daemon(self)
     }
 }
 
@@ -625,6 +703,18 @@ impl Adapter for Production {
     fn start_daemon(&self) -> Result<(), String> {
         match self {
             Self::Cli(cli) => Adapter::start_daemon(&**cli),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn restart_wanted(&self) -> bool {
+        match self {
+            Self::Cli(cli) => Adapter::restart_wanted(&**cli),
+            Self::Absent => false,
+        }
+    }
+    fn restart_daemon(&self) -> Result<(), String> {
+        match self {
+            Self::Cli(cli) => Adapter::restart_daemon(&**cli),
             Self::Absent => Err("no_harness".into()),
         }
     }
@@ -794,6 +884,8 @@ enum Job {
     Machines,
     /// `harness start` after a sign-in by code (openharness#1463).
     StartDaemon,
+    /// `harness start --restart` once, its env file changed (#5978).
+    RestartDaemon,
 }
 enum Outcome {
     Launch(u64, LaunchOutcome),
@@ -803,6 +895,7 @@ enum Outcome {
     SignIn(Result<SignIn, String>),
     Machines(Result<Vec<AccountMachine>, String>),
     StartDaemon(Result<(), String>),
+    RestartDaemon(Result<(), String>),
 }
 struct Binding {
     path: PathBuf,
@@ -934,6 +1027,8 @@ type Switches = (
     Duration,
     // The lane for the computers' engines (`--engines-from-machines`).
     Option<Arc<dyn EnginesLane>>,
+    // Harness's daemon to be started again once ([`Adapter::restart_wanted`]).
+    bool,
 );
 
 fn owner<C: Clock>(
@@ -954,6 +1049,7 @@ fn owner<C: Clock>(
         mut sign_in_starter,
         daemon_retry_after,
         engines_lane,
+        mut restart_due,
     ): Switches,
 ) -> io::Result<()> {
     let mut requests = 0u64;
@@ -1050,6 +1146,15 @@ fn owner<C: Clock>(
         {
             targets_due = Instant::now() + later.every;
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
+            // The machines a named hand-over to the lamp looks among (#5978).
+            if let Some(side) = later.lamp.as_ref()
+                && let Ok(mut machines) = side.machines.lock()
+            {
+                // What the last machines' look said offline stays.
+                let offline = std::mem::take(&mut machines.offline);
+                *machines = SessionMachines::from_targets(engine.targets());
+                machines.offline = offline;
+            }
             look_at_names(&mut engine, &later.targets, &mut names_said);
             if engines_on {
                 look_at_engines(&mut engine, &later.targets, &mut engines_read_said);
@@ -1066,7 +1171,18 @@ fn owner<C: Clock>(
                 }
             }
             if let (Some(wanted), Some(listed)) = (later.from_machines, last_listed.as_ref()) {
-                let chosen = known.choices(listed, wanted, unix_ms());
+                let mut chosen = known.choices(listed, wanted, unix_ms());
+                // The lamp itself, with Hermes (#5978), as at the machines'
+                // look: without it, each look that comes back wrote the
+                // targets again without the lamp.
+                if let Some(side) = later.lamp.as_ref()
+                    && let Some(lamp) = known.lamp_with_hermes(listed, unix_ms())
+                {
+                    // Its work folder too, as at the machines' look: the
+                    // lamp may first be found here (a fresh lamp, #5978).
+                    make_lamp_folder(&side.home);
+                    chosen.insert(lamp, EngineKind::Hermes);
+                }
                 let said =
                     machines_written(&later.targets, listed, wanted, &chosen, &mut targets_due);
                 if said != machines_said {
@@ -1112,7 +1228,16 @@ fn owner<C: Clock>(
                             Ok(listed) => {
                                 let chosen = if engines_on {
                                     known.listed(&listed, unix_ms());
-                                    known.choices(&listed, wanted, unix_ms())
+                                    let mut chosen = known.choices(&listed, wanted, unix_ms());
+                                    // The lamp itself, with Hermes (#5978).
+                                    if let Some(side) = later.lamp.as_ref()
+                                        && let Some(lamp) =
+                                            known.lamp_with_hermes(&listed, unix_ms())
+                                    {
+                                        make_lamp_folder(&side.home);
+                                        chosen.insert(lamp, EngineKind::Hermes);
+                                    }
+                                    chosen
                                 } else {
                                     BTreeMap::new()
                                 };
@@ -1125,11 +1250,17 @@ fn owner<C: Clock>(
                                 );
                                 if engines_on {
                                     // Each computer listed and each a
-                                    // target names, the lamp left out.
+                                    // target names, the lamp left out
+                                    // unless it may be one (#5978).
                                     let mut looked: BTreeSet<String> = listed
                                         .iter()
                                         .filter(|machine| !machine.current)
                                         .take(8)
+                                        .chain(
+                                            listed
+                                                .iter()
+                                                .filter(|machine| later.lamp.is_some() && machine.current),
+                                        )
                                         .map(|machine| machine.machine_id.clone())
                                         .collect();
                                     looked.extend(
@@ -1146,6 +1277,14 @@ fn owner<C: Clock>(
                                         &mut engines_said,
                                         &mut targets_due,
                                     );
+                                    // The computers said offline, which a
+                                    // named hand-over to the lamp does not
+                                    // list (#5978).
+                                    if let Some(side) = later.lamp.as_ref()
+                                        && let Ok(mut machines) = side.machines.lock()
+                                    {
+                                        machines.offline = offline_machines(&listed);
+                                    }
                                     last_listed = Some(listed);
                                 }
                                 said
@@ -1177,6 +1316,17 @@ fn owner<C: Clock>(
                         Err(code) => eprintln!(
                             "tasks: Harness's daemon not started: {code}; \
                              {daemon_tries} tries, not tried again until the next sign-in or start"
+                        ),
+                    }
+                    Ok(())
+                }
+                Outcome::RestartDaemon(restarted) => {
+                    match restarted {
+                        Ok(()) => eprintln!(
+                            "tasks: Harness's daemon started again: its env file changed while it ran (#5978)"
+                        ),
+                        Err(code) => eprintln!(
+                            "tasks: Harness's daemon not started again: {code}; its env file changed while it ran (#5978)"
                         ),
                     }
                     Ok(())
@@ -1405,6 +1555,21 @@ fn owner<C: Clock>(
                     Some(Job::StartDaemon)
                 }
                 _ => None,
+            };
+            // Harness's env file got other words while its daemon ran
+            // (#5978): the daemon is started again once, never while a task
+            // is busy (watched), since a task's harness is the daemon's; a
+            // start due goes first.
+            let daemon = match daemon {
+                Some(job) => Some(job),
+                None if restart_due
+                    && start_daemon_due.is_none()
+                    && engine.watched(&now).is_empty() =>
+                {
+                    restart_due = false;
+                    Some(Job::RestartDaemon)
+                }
+                None => None,
             };
             let launch = match daemon {
                 Some(job) => Some(job),
@@ -1832,7 +1997,8 @@ fn app_sign_in_operation(
 
 /// The targets the person's machines give (`serve
 /// --targets-from-machines`): one for each machine but the lamp itself, at
-/// most 8, newest first as Harness lists them. The first is `office`, the
+/// most 8, newest first as Harness lists them (the lamp itself is kept only
+/// through [`write_targets_from_machines`]'s `chosen`, #5978). The first is `office`, the
 /// alias the voice asks for unless told another (`LAMP_TASKS_TARGET`); each
 /// other is its Harness name made into an alias (`MacBook Air` is
 /// `macbook-air`), or `computer` with none, and `-2`, `-3` … where two
@@ -1869,7 +2035,10 @@ fn label_of(label: &str) -> Option<String> {
 
 /// `chosen` gives a machine, by id, another engine than `engine`: the one
 /// that computer is known to have (`serve --engines-from-machines`, #5199,
-/// [`crate::readiness::Known::chosen`]). Empty without it.
+/// [`crate::readiness::Known::chosen`]). Empty without it. The lamp's own
+/// machine (`current`) is a target only where `chosen` gives it Hermes
+/// (`LAMP_HERMES_ON_LAMP`, #5978): [`LAMP_TARGET`] in [`LAMP_PROJECT`],
+/// with no name, and then at most 7 computers, so the file keeps its 8.
 fn from_machines(
     machines: &[AccountMachine],
     engine: EngineKind,
@@ -1877,7 +2046,17 @@ fn from_machines(
 ) -> (BTreeMap<String, Target>, BTreeMap<String, String>) {
     let mut targets = BTreeMap::new();
     let mut names = BTreeMap::new();
-    for (index, machine) in machines.iter().filter(|m| !m.current).take(8).enumerate() {
+    let lamp = machines
+        .iter()
+        .find(|m| m.current)
+        .filter(|m| chosen.get(&m.machine_id) == Some(&EngineKind::Hermes));
+    let most = if lamp.is_some() { 7 } else { 8 };
+    for (index, machine) in machines
+        .iter()
+        .filter(|m| !m.current)
+        .take(most)
+        .enumerate()
+    {
         let base = if index == 0 {
             "office".to_owned()
         } else {
@@ -1885,7 +2064,7 @@ fn from_machines(
         };
         let mut alias = base.clone();
         let mut next = 2;
-        while targets.contains_key(&alias) {
+        while targets.contains_key(&alias) || (lamp.is_some() && alias == LAMP_TARGET) {
             alias = format!("{base}-{next}");
             next += 1;
         }
@@ -1901,7 +2080,74 @@ fn from_machines(
             },
         );
     }
+    if let Some(lamp) = lamp {
+        targets.insert(
+            LAMP_TARGET.to_owned(),
+            Target {
+                machine_id: lamp.machine_id.clone(),
+                project: LAMP_PROJECT.into(),
+                engine: EngineKind::Hermes,
+            },
+        );
+    }
     (targets, names)
+}
+
+/// The lamp's own work folder, [`LAMP_PROJECT`] under `home`, `lampos`'s
+/// (#5978): made here when it is not there, 0700, since Harness makes
+/// only a `~/harnesses/<name>` folder. A failure is said; the hand-over
+/// then says the folder is missing. The lamp's guidance for Hermes, its
+/// `AGENTS.md` ([`crate::hermes_config::write_guidance`]), is written in
+/// it when what is there differs, with one journal line.
+fn make_lamp_folder(home: &Path) {
+    let folder = home.join(LAMP_PROJECT.trim_start_matches("~/"));
+    if !folder.is_dir() {
+        let made = fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&folder);
+        if let Err(error) = made {
+            eprintln!("tasks: the lamp's own work folder not made: {error}");
+            return;
+        }
+    }
+    match crate::hermes_config::write_guidance(&folder) {
+        Ok(true) => eprintln!("tasks: the lamp's guidance for Hermes written"),
+        Ok(false) => {}
+        Err(error) => eprintln!("tasks: the lamp's guidance for Hermes not written: {error}"),
+    }
+}
+
+/// `LAMP_HERMES_ON_LAMP` (#5978): Hermes' settings written at the part's
+/// start ([`crate::hermes_config::write`]) under `hermes_home`, for
+/// lamp-cloud's forwarder, with its local token read from `token_path`.
+/// Run as `lampos`, Hermes' own user (`hermes_config`). One journal line, never the token: a missing token skips it.
+pub fn set_up_hermes(hermes_home: &Path, token_path: &Path) -> String {
+    let token = match fs::read_to_string(token_path) {
+        Ok(token) => token,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return "tasks: Hermes' settings not written: no forwarder token yet".to_owned();
+        }
+        Err(error) => {
+            return format!("tasks: Hermes' settings not written: the token not read ({error})");
+        }
+    };
+    match crate::hermes_config::write(hermes_home, HERMES_FORWARDER_PORT, token.trim()) {
+        Ok(written) => format!(
+            "tasks: Hermes' settings for the lamp's DeepSeek: config {}, env {}",
+            if written.config_changed {
+                "written"
+            } else {
+                "unchanged"
+            },
+            if written.env_changed {
+                "written"
+            } else {
+                "unchanged"
+            }
+        ),
+        Err(error) => format!("tasks: Hermes' settings not written: {error}"),
+    }
 }
 
 /// The longest name a computer is told by (#1676).
@@ -2891,6 +3137,22 @@ pub fn serve<C: Clock>(
             executable.display()
         );
     }
+    // The lamp's own Hermes (#5978), only with the machines' engines looked
+    // at: its settings written now, and Harness told where its sessions are.
+    let lamp_side = config
+        .set_up_later
+        .as_ref()
+        .filter(|later| later.engines && later.from_machines.is_some())
+        .and_then(|later| later.lamp.clone());
+    if lamp_side.is_some() {
+        eprintln!(
+            "{}",
+            set_up_hermes(
+                Path::new(HERMES_HOME),
+                Path::new(crate::hermes_config::TOKEN_PATH)
+            )
+        );
+    }
     serve_with_adapter(config, clock, stop, move |session| {
         // Harness's launcher in its pinned shape with the update hold
         // (#5493), so a Harness command run by hand holds it too; a
@@ -2907,23 +3169,65 @@ pub fn serve<C: Clock>(
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
         switches.apply(&mut cli, &dir, from_machines);
-        // Harness held at the version installed (#5229), off unless set.
-        if crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref()) {
-            match crate::hold::hold(&mut cli.environment) {
-                Ok(path) => {
-                    eprintln!(
-                        "tasks: Harness's own updates held ({}=true, {}={})",
-                        crate::hold::DISABLE,
-                        crate::hold::ENV_FILE,
-                        path.display()
-                    );
-                    cli.health_after_start = true;
+        // A closed named session reopened with `harness resume`, off unless
+        // set (`LAMP_TASKS_RESUME_CLOSED=on` in lamp-tasks' own unit).
+        cli.resume_closed = crate::harness::resume_closed_on(
+            std::env::var(crate::harness::RESUME_CLOSED_SWITCH)
+                .ok()
+                .as_deref(),
+        );
+        // Harness held at the version installed (#5229), off unless set;
+        // and where the lamp's own Hermes keeps its sessions (#5978).
+        let held = crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref());
+        let hermes = lamp_side.as_ref().map(|_| Path::new(HERMES_HOME));
+        if held || hermes.is_some() {
+            match crate::hold::env_file_changed(&mut cli.environment, held, hermes) {
+                Ok((path, changed)) => {
+                    // Read by the daemon only at its start: one already
+                    // running is started again once (#5978). Nothing
+                    // listening on its port: the next start reads it.
+                    cli.restart_daemon =
+                        changed && crate::hold::ask(crate::hold::port(&cli.environment)).is_ok();
+                    if cli.restart_daemon {
+                        eprintln!(
+                            "tasks: Harness's env file changed while its daemon runs: it is started again once no task is busy"
+                        );
+                    }
+                    if held {
+                        eprintln!(
+                            "tasks: Harness's own updates held ({}=true, {}={})",
+                            crate::hold::DISABLE,
+                            crate::hold::ENV_FILE,
+                            path.display()
+                        );
+                        cli.health_after_start = true;
+                    }
+                    if hermes.is_some() {
+                        eprintln!(
+                            "tasks: Harness finds the lamp's own Hermes by {}={HERMES_HOME}",
+                            crate::hold::HERMES_HOME
+                        );
+                    }
                 }
-                Err(why) => eprintln!("tasks: Harness's own updates not held: {why}"),
+                Err(why) if held => eprintln!("tasks: Harness's own updates not held: {why}"),
+                Err(why) => eprintln!("tasks: Harness not told of the lamp's own Hermes: {why}"),
             }
         }
+        cli.session_machines = lamp_side.as_ref().map(|side| side.machines.clone());
         Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
     })
+}
+
+/// The machines a `harness machines` look said are offline (`status:
+/// offline`), the lamp itself left out: a named hand-over to the lamp does
+/// not list their sessions ([`SessionMachines::offline`]). A machine whose
+/// presence is `unknown` or not given is still listed.
+pub fn offline_machines(listed: &[AccountMachine]) -> BTreeSet<String> {
+    listed
+        .iter()
+        .filter(|machine| !machine.current && machine.status.as_deref() == Some("offline"))
+        .map(|machine| machine.machine_id.clone())
+        .collect()
 }
 
 /// Injection boundary for scripted host tests. Implementations must bound and
@@ -2965,6 +3269,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     if adapter.absent() {
         engine.no_harness();
     }
+    let restart_wanted = adapter.restart_wanted();
     let sign_in_starter = if config.sign_in_by_code {
         let starter = adapter.sign_in_starter();
         if starter.is_none() {
@@ -3075,6 +3380,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                             Job::SignIn => Outcome::SignIn(adapter.signed_in()),
                             Job::Machines => Outcome::Machines(adapter.machines()),
                             Job::StartDaemon => Outcome::StartDaemon(adapter.start_daemon()),
+                            Job::RestartDaemon => Outcome::RestartDaemon(adapter.restart_daemon()),
                         };
                         if outcomes_tx.try_send(result).is_err() {
                             break;
@@ -3117,6 +3423,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     sign_in_starter,
                     daemon_retry_after,
                     engines_lane,
+                    restart_wanted,
                 ),
             )
         })?;
@@ -4183,6 +4490,131 @@ mod tests {
         );
         let long = alias_of(&"x".repeat(80));
         assert_eq!(long.len(), 32);
+    }
+
+    /// #5978: the lamp's own machine is a target only where `chosen` gives
+    /// it Hermes: `lamp`, Hermes only, in its own folder, with no name; a
+    /// computer named so is `lamp-2`, and at most 7 computers keep the
+    /// file's 8. Given another engine, or none, it is left out as before.
+    #[test]
+    fn the_lamp_is_kept_only_with_hermes_chosen_for_it() {
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+            machine('c', "Lamp", false),
+        ];
+        let lamp = "a".repeat(32);
+        for engine in [EngineKind::Claude, EngineKind::Codex] {
+            let chosen = BTreeMap::from([(lamp.clone(), engine)]);
+            let (targets, _) = from_machines(&listed, EngineKind::Claude, &chosen);
+            assert!(
+                !targets.values().any(|t| t.machine_id == lamp),
+                "{engine:?}"
+            );
+            assert!(
+                targets.contains_key("lamp"),
+                "a computer named Lamp, as before"
+            );
+        }
+        let chosen = BTreeMap::from([(lamp.clone(), EngineKind::Hermes)]);
+        let (targets, names) = from_machines(&listed, EngineKind::Claude, &chosen);
+        assert_eq!(
+            targets.keys().collect::<Vec<_>>(),
+            ["lamp", "lamp-2", "office"]
+        );
+        assert_eq!(
+            targets["lamp"],
+            Target {
+                machine_id: lamp.clone(),
+                project: LAMP_PROJECT.into(),
+                engine: EngineKind::Hermes,
+            }
+        );
+        assert!(targets["lamp"].validate().is_ok());
+        assert_eq!(targets["lamp-2"].machine_id, "c".repeat(32));
+        assert_eq!(names.get("lamp"), None);
+        let mut many = vec![machine('a', "lamp", true)];
+        many.extend("bcdefghij".chars().map(|id| machine(id, "pc", false)));
+        let (eight, _) = from_machines(&many, EngineKind::Claude, &chosen);
+        assert_eq!(eight.len(), 8);
+        assert!(eight.contains_key("lamp"));
+        // Only the lamp: its target is written, not removed.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("targets.json");
+        let only = [machine('a', "lamp", true)];
+        assert!(
+            write_targets_from_machines(&path, &only, EngineKind::Claude, &chosen)
+                .unwrap()
+                .changed
+        );
+        assert_eq!(
+            read_targets(&path).unwrap().keys().collect::<Vec<_>>(),
+            ["lamp"]
+        );
+    }
+
+    /// #5978: Hermes' settings at the part's start: skipped with one line
+    /// while lamp-cloud has no token, written for the forwarder once it has,
+    /// Harness's hooks kept, and the token never in the line.
+    #[test]
+    fn hermes_settings_are_written_at_start_only_with_a_token() {
+        let dir = tempfile::tempdir().unwrap();
+        let hermes = dir.path().join(".hermes");
+        let token = dir.path().join("hermes-token");
+        let said = set_up_hermes(&hermes, &token);
+        assert_eq!(
+            said,
+            "tasks: Hermes' settings not written: no forwarder token yet"
+        );
+        assert!(!hermes.exists());
+        let secret = "0123456789abcdef".repeat(4);
+        fs::write(&token, format!("{secret}\n")).unwrap();
+        fs::create_dir_all(&hermes).unwrap();
+        fs::write(
+            hermes.join("config.yaml"),
+            "hooks:\n  on_session_start: harness\n",
+        )
+        .unwrap();
+        let said = set_up_hermes(&hermes, &token);
+        assert_eq!(
+            said,
+            "tasks: Hermes' settings for the lamp's DeepSeek: config written, env written"
+        );
+        assert!(!said.contains(&secret));
+        let config = fs::read_to_string(hermes.join("config.yaml")).unwrap();
+        assert!(
+            config.contains("hooks:\n  on_session_start: harness"),
+            "{config}"
+        );
+        assert!(config.contains("127.0.0.1:7741/v1/deepseek"), "{config}");
+        assert!(
+            config.contains("skills:\n  external_dirs:\n  - \"/var/lib/lampOS/skills\"\n"),
+            "{config}"
+        );
+        assert!(
+            fs::read_to_string(hermes.join(".env"))
+                .unwrap()
+                .contains(&secret)
+        );
+        assert!(set_up_hermes(&hermes, &token).ends_with("config unchanged, env unchanged"));
+    }
+
+    #[test]
+    fn the_lamp_folder_gets_the_guidance_once_and_again_when_changed() {
+        let home = tempfile::tempdir().unwrap();
+        make_lamp_folder(home.path());
+        let folder = home.path().join("harnesses/lamp-tasks/lamp");
+        let guidance = folder.join(crate::hermes_config::GUIDANCE_FILE);
+        let written = fs::read_to_string(&guidance).unwrap();
+        assert_eq!(written, crate::hermes_config::guidance());
+        assert_eq!(
+            fs::metadata(&folder).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        fs::write(&guidance, "changed by hand\n").unwrap();
+        make_lamp_folder(home.path());
+        assert_eq!(fs::read_to_string(&guidance).unwrap(), written);
+        assert!(!crate::hermes_config::write_guidance(&folder).unwrap());
     }
 
     /// #1676: the part writes the targets file only where it is its own: none

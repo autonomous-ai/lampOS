@@ -463,7 +463,7 @@ impl Chat {
     /// The request's body, with the tools declared now, as narrowed for
     /// its messages.
     #[cfg(test)]
-    fn body(&self, messages: &[Message]) -> Value {
+    pub(crate) fn body(&self, messages: &[Message]) -> Value {
         self.body_only(messages, None)
     }
 

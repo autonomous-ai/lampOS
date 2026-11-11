@@ -1644,11 +1644,22 @@ fn note_joined(words: &NewsWords, task: &Value, session: &Value) -> Option<Strin
         (None, Some(ask)) => (&words.joined_asked, "earlier", ask),
         (None, None) => return None,
     };
+    // Closed, and reopened for it (lamp-tasks' `LAMP_TASKS_RESUME_CLOSED`):
+    // said so, and whether its earlier conversation came back.
+    let reopened = match session["resumed"].as_bool() {
+        Some(true) => Some(&words.joined_reopened),
+        Some(false) => Some(&words.joined_fresh),
+        None => None,
+    };
     fitted(&asked, "", false, |asked, _, _| {
-        unprompted(&fill(
+        let said = fill(
             line,
             &[("asked", asked), ("who", who), (slot, value.as_str())],
-        ))
+        );
+        unprompted(&match reopened {
+            Some(reopened) => format!("{said} {reopened}"),
+            None => said,
+        })
     })
 }
 
@@ -1680,6 +1691,13 @@ fn note_failed(
         // A session the person named that is busy (#5535, `serve
         // --reply-named`) is told as a busy routed one.
         Some("agent_busy" | "session_busy" | "reply_not_idle") => Some(&words.failed_busy),
+        // A named session that is closed or only stopped (#5535, the first
+        // builder's ruling on #5784's follow-up): how to open it again, or
+        // a new one in the same project; nothing is started on its own.
+        Some("session_closed" | "session_stopped") => Some(&words.failed_closed),
+        // Reopening it could not be confirmed yet (`LAMP_TASKS_RESUME_CLOSED`):
+        // the same, and that they may try again in a moment.
+        Some("session_resume_unconfirmed") => Some(&words.failed_closed_soon),
         _ => None,
     };
     if let Some(line) = refused
@@ -1709,7 +1727,7 @@ pub(crate) fn unprompted(words: &str) -> String {
 /// work to is named in its news (a Hermes task was told as Claude Code's);
 /// Claude Code, the default target's, for a task naming no known engine.
 pub(crate) fn who(task: &Value) -> &'static str {
-    task["target"]["engine"]
+    engine_of(task)
         .as_str()
         .and_then(crate::agent_tasks::name_of)
         .unwrap_or("Claude Code")
@@ -1720,10 +1738,13 @@ pub(crate) fn who(task: &Value) -> &'static str {
 /// computer", as without it; for Devin Cloud, which works on no computer,
 /// "the Devin session in Harness".
 pub(crate) fn their_computer(task: &Value) -> String {
-    if task["target"]["engine"] == "devin-cloud" {
+    if engine_of(task) == "devin-cloud" {
         return "the Devin session in Harness".to_owned();
     }
-    task["target_alias"]
+    if on_the_lamp(task) {
+        return "the lamp".to_owned();
+    }
+    alias_of(task)
         .as_str()
         .and_then(crate::agent_tasks::machine_name)
         .map_or_else(
@@ -1731,6 +1752,44 @@ pub(crate) fn their_computer(task: &Value) -> String {
             |name| format!("their {name}"),
         )
 }
+
+/// Whether the work was done on the lamp itself, by Hermes there
+/// (`lamp-tasks` with `LAMP_HERMES_ON_LAMP`, #5978).
+pub(crate) fn on_the_lamp(task: &Value) -> bool {
+    *alias_of(task) == crate::agent_tasks::LAMP_TARGET && *engine_of(task) == "hermes"
+}
+
+/// Where the task's work is, as a `get_task` answer names it: the machine
+/// its named session was found on (`task.dispatch.joined_on`, #5978) when
+/// the lamp's hand-over joined one on a computer, else its target's alias
+/// (`task.target_alias`, or `target_alias` as a shaped entry names it).
+fn alias_of(task: &Value) -> &Value {
+    let joined = &task["task"]["dispatch"]["joined_on"]["alias"];
+    if joined.is_string() {
+        return joined;
+    }
+    let alias = &task["task"]["target_alias"];
+    if alias.is_string() {
+        alias
+    } else {
+        &task["target_alias"]
+    }
+}
+
+/// The engine of the agent doing the work: the joined session's (#5978),
+/// else the launch target's.
+fn engine_of(task: &Value) -> &Value {
+    let joined = &task["task"]["dispatch"]["joined_on"]["engine"];
+    if joined.is_string() {
+        joined
+    } else {
+        &task["target"]["engine"]
+    }
+}
+
+/// What a note of work done on the lamp itself adds (#5978): the person
+/// hears that the lamp did it, here.
+const ON_THE_LAMP: &str = " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\").";
 
 /// At most `most` characters of `text` on one line, with no double quotes
 /// to end the note's quotation early.
@@ -1751,6 +1810,7 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
     // A question task (`agent_tasks::QUESTION`) is told as its answer.
     let question = crate::agent_tasks::question_of(task["text"].as_str()?).is_some();
     let computer = their_computer(task);
+    let lamp = on_the_lamp(task) && data["state"] == "idle";
     let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
     let (answer, cut) = quoted(
         data["answer"].as_str().unwrap_or_default(),
@@ -1811,7 +1871,7 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
             ),
             _ => (&words.stopped, "", String::new()),
         };
-        unprompted(&fill(
+        let filled = fill(
             line,
             &[
                 ("who", who),
@@ -1822,7 +1882,12 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
                 ("no_question", no_question),
                 ("waiting", &waiting),
             ],
-        ))
+        );
+        if lamp {
+            unprompted(&format!("{filled}{ON_THE_LAMP}"))
+        } else {
+            unprompted(&filled)
+        }
     };
     fitted(&asked, &answer, cut, say)
 }
@@ -3272,7 +3337,6 @@ mod tests {
         for code in [
             "session_not_found",
             "session_ambiguous",
-            "session_stopped",
             "reply_off",
             "reply_named_off",
         ] {
@@ -3282,6 +3346,55 @@ mod tests {
                 "{code}"
             );
         }
+    }
+
+    /// `serve --reply-named` (#5535), the first builder's ruling on #5784's
+    /// follow-up: a named session that is closed (`session_closed`, Harness's
+    /// `NOT_RUNNING`) or only stopped (`session_stopped`) is told with the
+    /// plain line of how to open it again or start a new one, never as a
+    /// plain failure; one the lamp can't be sure of is told as before.
+    #[test]
+    fn a_closed_named_session_is_told_how_to_open_it_again() {
+        const LINE: &str = "That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project.";
+        let plain = note_failed(&own(), &task("claude", json!([])), false, None);
+        for code in ["session_closed", "session_stopped"] {
+            let told = note_failed(&own(), &task("claude", json!([])), false, Some(code));
+            assert!(
+                told.as_deref().is_some_and(|told| told.contains(LINE)),
+                "{code}: {told:?}"
+            );
+            assert_ne!(told, plain, "{code}");
+            assert_eq!(
+                note_failed(&own(), &task("claude", json!([])), true, Some(code)),
+                note_failed(&own(), &task("claude", json!([])), true, None),
+                "{code}"
+            );
+        }
+    }
+
+    /// `LAMP_TASKS_RESUME_CLOSED` (openharness#3606): a named session that was
+    /// closed and reopened for the work is said reopened, and whether it
+    /// starts fresh; one whose reopening wasn't confirmed is told closed,
+    /// and to try again in a moment.
+    #[test]
+    fn a_reopened_named_session_is_said_reopened_and_an_unconfirmed_one_closed() {
+        let task = task("claude", json!([]));
+        let open = note_joined(&own(), &task, &json!({"name":"docs"})).unwrap();
+        assert!(!open.contains("reopened"), "{open}");
+        let back = note_joined(&own(), &task, &json!({"name":"docs","resumed":true})).unwrap();
+        assert!(back.contains("\"I reopened that session\""), "{back}");
+        assert!(
+            back.contains("\"docs\"") && !back.contains("fresh"),
+            "{back}"
+        );
+        let fresh = note_joined(&own(), &task, &json!({"ask":"Fix it","resumed":false})).unwrap();
+        assert!(fresh.contains("\"I reopened that session\""), "{fresh}");
+        assert!(
+            fresh.contains("starts fresh, without the earlier conversation"),
+            "{fresh}"
+        );
+        let soon = note_failed(&own(), &task, false, Some("session_resume_unconfirmed")).unwrap();
+        assert!(soon.contains("That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project. Or try again in a moment."), "{soon}");
     }
 
     /// `serve --reply-named` (#5535), the Reviewer-lead's P2 on #5784 at
@@ -4757,5 +4870,34 @@ mod tests {
         cut_short(&["s:1:1".into(), "s:2:1".into()]);
         assert_eq!(take_cut_short(), ["s:1:1", "s:2:1"]);
         assert!(take_cut_short().is_empty());
+    }
+
+    /// #5978: work done on the lamp itself is told as done here on the
+    /// lamp, and the rest as on the lamp; work on a computer as before.
+    #[test]
+    fn work_done_on_the_lamp_is_told_as_done_here() {
+        let done =
+            json!({"state":"idle","answer":"A short poem about the rain.","truncated":false});
+        let fetched = |joined: Value| {
+            json!({"text":"Write a poem","target":{"engine":"hermes"},
+            "task":{"target_alias":"lamp","dispatch":{"joined_on":joined}}})
+        };
+        assert!(on_the_lamp(&fetched(Value::Null)));
+        assert_eq!(their_computer(&fetched(Value::Null)), "the lamp");
+        assert_eq!(who(&fetched(Value::Null)), "Hermes");
+        let elsewhere = fetched(json!({"alias":"office","machine_id":"m","engine":"codex"}));
+        assert!(!on_the_lamp(&elsewhere));
+        assert_eq!(their_computer(&elsewhere), "their computer");
+        assert_eq!(who(&elsewhere), "Codex");
+        let on = |alias: &str, engine: &str| json!({"text":"Write a poem","target":{"engine":engine},"target_alias":alias});
+        let lamp = note(&own(), &on("lamp", "hermes"), &done, 0).unwrap();
+        assert!(lamp.contains("Hermes"), "{lamp}");
+        assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
+        assert_eq!(their_computer(&on("lamp", "hermes")), "the lamp");
+        let office = note(&own(), &on("office", "claude"), &done, 0).unwrap();
+        assert!(!office.contains("on the lamp"), "{office}");
+        assert_eq!(their_computer(&on("office", "claude")), "their computer");
+        // A computer someone named `lamp` by hand is no lamp.
+        assert_eq!(their_computer(&on("lamp", "claude")), "their computer");
     }
 }

@@ -1,5 +1,9 @@
 //! Private Skills/Voice authorization for person-requested local audio.
 //! These are socket receipts, never model arguments or bus authority claims.
+//! lamp-skills takes a `requested_audio_context` and these operations only
+//! from lamp-voice's unit, by the peer's credentials (`SO_PEERCRED`) and its
+//! cgroup (#6128): another peer's context is dropped, as if none were given,
+//! and its operations are refused.
 use crate::Invalid;
 use serde::{Deserialize, Serialize};
 
@@ -113,8 +117,9 @@ pub enum RequestedAudioOutcome {
     Cancelled,
 }
 
-/// Private operations on Skills' existing call.sock. Unknown operations,
-/// phases and outcomes are refused, including in otherwise valid receipts.
+/// Private operations on Skills' existing call.sock, taken only from
+/// lamp-voice's unit (#6128). Unknown operations, phases and outcomes are
+/// refused, including in otherwise valid receipts.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RequestedAudioOperation {

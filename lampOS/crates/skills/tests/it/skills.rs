@@ -1918,6 +1918,8 @@ fn the_program_timed(
         }
     });
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command.args([
         "--dir".as_ref(),
         root.join("skills").as_os_str(),
@@ -3828,6 +3830,7 @@ fn an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted() 
     let clock = Clock::at(root);
     let mut running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 skills.as_os_str(),
@@ -3876,6 +3879,7 @@ fn an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted() 
     settled(&["dance"]);
     let command = |args: &[&OsStr]| {
         let out = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args(args)
             .output()
             .unwrap();
@@ -4005,6 +4009,7 @@ fn a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -4434,6 +4439,7 @@ fn a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way() {
         let worker = scope.spawn(move || one_action_reply(actions, &cancelled, None));
         running = Some(Running(
             Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+                .env("LAMP_SKILLS_ANY_ASKER", "on")
                 .args([
                     "--dir".as_ref(),
                     root.join("skills").as_os_str(),
@@ -4532,6 +4538,7 @@ fn a_repeat_tool_call_holds_the_runs_pose_again_and_only_that() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -4687,6 +4694,8 @@ fn asking_with(
         skill_with(&root.join("skills"), "hello", hello);
     }
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command
         .args([
             "--dir".as_ref(),
@@ -5915,6 +5924,8 @@ fn the_dance_asking(
     StandInBody::run(mood, &bus, says, clock.clone(), took, moved, lost);
     let tools = root.join("tools");
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command
         .args([
             "--dir".as_ref(),
@@ -6483,6 +6494,7 @@ fn the_program_dances_again_on_dance_again_but_not_on_a_noise() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -7697,6 +7709,8 @@ fn the_program_with_items(
         }
     });
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command.args([
         "--dir".as_ref(),
         root.join("skills").as_os_str(),
@@ -7852,6 +7866,7 @@ fn quiet_hours_keep_their_clock_hours_across_summer_time_in_the_lamps_zone() {
 /// within 5 s. One that starts serving instead is ended and fails the test.
 fn refused(args: &[&str]) -> (Option<i32>, String) {
     let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .env("LAMP_SKILLS_ANY_ASKER", "on")
         .args(args)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
@@ -7933,6 +7948,7 @@ fn the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills() {
     let tools = run.join("tools");
     let clock = Clock::at(root);
     let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .env("LAMP_SKILLS_ANY_ASKER", "on")
         .args([
             "--dir".as_ref(),
             root.join("skills").as_os_str(),
@@ -8113,6 +8129,7 @@ impl ToolProgram {
         let clock = Clock::at(&root);
         let running = Running(
             Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+                .env("LAMP_SKILLS_ANY_ASKER", "on")
                 .args([
                     "--dir".as_ref(),
                     root.join("skills").as_os_str(),
@@ -10354,6 +10371,7 @@ fn a_skills_stop_is_one_function_held_to_its_rules() {
     );
     fs::remove_dir_all(dir.path().join("zz-other")).unwrap();
     let listed = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .env("LAMP_SKILLS_ANY_ASKER", "on")
         .args(["list".as_ref(), "--dir".as_ref(), dir.path().as_os_str()])
         .output()
         .unwrap();
@@ -10507,6 +10525,7 @@ fn stop_program(root: &Path, start: u32) -> (Running, Bus, PathBuf) {
     let tools = root.join(format!("tools{start}"));
     let running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -10981,6 +11000,7 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -11191,6 +11211,8 @@ fn guard_mode_from_the_app_is_the_owners_alone_and_the_switch_closed_ends_it() {
         let tools = root.join("tools");
         let clock = Clock::at(root);
         let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+        // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+        command.env("LAMP_SKILLS_ANY_ASKER", "on");
         command
             .args([
                 "--dir".as_ref(),
@@ -11498,6 +11520,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -11700,6 +11723,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -11927,6 +11951,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -13645,6 +13670,7 @@ fn unplug_core_is_installed_but_hidden_and_uncallable_with_switch_off() {
     let tools = dir.path().join("tools");
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 skills.as_os_str(),
@@ -13707,6 +13733,7 @@ fn unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt()
     say.set_nonblocking(true).unwrap();
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 skills.as_os_str(),

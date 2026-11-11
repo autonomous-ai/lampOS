@@ -120,6 +120,7 @@ lamp says so.
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_step_supported` | `true` with the same switch: this lamp sends `onboarding.step` as each walk step ends (#5979). No field otherwise ("Each setup step, told to the app" below) |
+| `system.info`'s `onboarding_page_supported` | `true` with the same switch: this lamp takes `onboarding.page` and sends `onboarding.page_done` (#6076). No field otherwise, so the app keeps its Next ("The app's onboarding pages, done on the lamp" below) |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
@@ -2246,6 +2247,41 @@ Tests: `online::tests::each_walk_step_is_told_once_beside_the_walks_end`,
 `answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`, and
 `app_contract.rs`'s `system.info` row.
 
+## The app's onboarding pages, done on the lamp (#6076, `onboarding.page`)
+
+After the walk, the app's pages (Try first skill, Add a skill, Create your
+skill) go on by themselves, and the lamp says each one done. Behind
+`onboarding.done`'s switch, `LAMP_APP_ONBOARDING_DONE=on` with a state folder;
+`system.info` says `onboarding_page_supported: true` then.
+
+- **The app tells the page.** `onboarding.page` `{"page": "try" | "add" |
+  "create" | null, "added"?: [name], "walk_id"?}`, answered `{}`; `null`
+  closes it; any other page is refused. One page open at a time. A page
+  not done within 10 minutes is let go (an app killed before it sent
+  `null`), and nothing is read from the bus while no page is open.
+- **try.** Done by the first Try line run after the page opened: the light
+  turned on or to another colour (`light/state`; `how: "turn_blue"` for
+  blue, else `"light"`), or a `dance` run done (`skills/events`, a run not
+  made doesn't count; `how: "dance"`). A light already blue as the page
+  opened isn't seen to turn blue; the dance still counts.
+- **add.** The pick comes as the page is left: done at once, its line
+  "I'll remind you to sip water." for `sip-of-water` alone, else "Got it.
+  Those are on now."
+- **create.** Never done here: the app follows `skills.made` (#5985).
+- **The line.** "That's your first skill." for Try. Handed to the voice's say
+  socket (`LAMP_SAY_SOCKET`, else `/run/lampos-say/say.sock`) as a note,
+  skill `onboarding-app`, let go after 30 s: said in the person's language,
+  only once nobody is talking and no other line is playing (the say
+  service's gates), never waited for here.
+- **The push.** One unasked `data` reply on `fd_channel`, kind
+  `onboarding.page_done`, data `{"page", "how"?, "walk_id"?}`, once per page
+  opened, on the tick while connected, best effort as `onboarding.step` is.
+  The journal says `onboarding.page_done: handed to the client` or `not
+  handed to the client, not tried again`. The app goes on about 1 s after it.
+
+Tests: `onboarding_page::tests`,
+`answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`.
+
 ## The two yeses from the app (#5500, `consent.get`, `consent.set`)
 
 The owner's face expressions yes (lamp-eyes reads how a near face seems)
@@ -2420,6 +2456,61 @@ app that asks anyway is told `developer access is off on this lamp`.
   (`online::commanded`), and that channel is plain too. Broker TLS
   (`LAMP_CLOUD_TLS`) closes the rest. Until it is on this is an accepted risk,
   and the pairing is never described as end to end.
+
+## Hermes' DeepSeek, forwarded on the lamp (#5978, `LAMP_HERMES_ON_LAMP`)
+
+Hermes on the lamp (#5978) asks the lamp's own DeepSeek, through the
+Autonomous relay, with the same key the voice uses, without that key ever
+being in a file Hermes (user `lampos`) can read. lamp-cloud already holds the
+key (its unit's `LoadCredential=key`), so it forwards Hermes' requests and
+adds the key itself (`lamp_cloud::hermes_llm`).
+
+- **Off** unless `LAMP_HERMES_ON_LAMP=on` in lamp-cloud's environment (the
+  product unit doesn't set it yet), and only while lamp-cloud runs
+  (`LAMP_CLOUD=on`).
+- **Where:** `127.0.0.1:7741`, loopback only, and a peer that isn't loopback
+  is never answered. 7741 is used by no other lampOS part and by neither of
+  Hermes' own ports (8642, 8645).
+- **What:** only `POST /v1/deepseek/chat/completions`, to
+  `<relay>/chat/completions`, and `GET /v1/deepseek/models`, to
+  `<relay>/models`, with the voice's key as the bearer. The answer is sent
+  back as it comes (chunked, so a streamed Server-Sent Events answer reaches
+  Hermes piece by piece), with the relay's status and `Content-Type`. Any
+  other path is 404, another method on those two 405, a chunked request
+  body 411, and a chat whose JSON `model` isn't `deepseek-flash` (the
+  voice's model) 400, so nothing dearer is asked on the voice's key.
+- **Billing:** Hermes' requests go on the voice's key, so the relay bills
+  and attributes them to the lamp exactly as it does the voice's own
+  DeepSeek turns; it can't tell the two apart.
+- **The relay:** `<relay>` is the voice's DeepSeek: `second.json`'s
+  `deepseek_base_url`, else the company relay's DeepSeek under its
+  `llm_base_url` (`…/api/v1/ai/v1/deepseek`, as `second_config.rs`'s
+  `relay_deepseek`), read from a `second` credential when the unit hands
+  one in. The product unit hands in none yet, so it is the product
+  `second.json`'s, `https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`.
+  It is only ever on the company relay's host (`campaign-api.autonomous.ai`,
+  HTTPS): a `second.json` naming any other host gets that default, so the
+  key never goes anywhere else.
+- **The local token:** every request must carry
+  `Authorization: Bearer <token>`, or it is 401 and the relay is never
+  asked. The token is 32 random bytes in hex, made once into
+  `hermes-token` in lamp-cloud's state folder (`/var/lib/lampos-cloud`,
+  `lampos`'s, 0700; the file 0600) and kept across restarts; a reset that
+  empties the folder makes a new one. Hermes' `.env` holds only this token
+  (docs/tasks.md, "Hermes' settings on the lamp"), so other local users
+  can't use the forwarder, and nothing Hermes can read holds the relay's
+  key. The token is compared in constant time and never leaves the lamp.
+- **Bounds:** at most 16 connections being read at once (one more is
+  closed); a request head at most 16 KiB, read within 10 s; at most 4
+  requests at once and 60 started in any minute (429 past either), both
+  taken after the token and path are checked and before a body is read,
+  and a minute's start used only once one of the 4 places is held; a body
+  at most 2 MiB (413 before it is read), read within 30 s; the relay
+  connected within 10 s, each read of its answer within 120 s and the whole
+  answer within 10 min; each write to Hermes taken within 30 s. An
+  unreachable relay is 502. One request per connection.
+- **Logs:** one line when it starts listening, or why it couldn't (no state
+  folder, the port taken); never a body, the token or the key.
 
 ## Not yet known, for the backend (#1396)
 

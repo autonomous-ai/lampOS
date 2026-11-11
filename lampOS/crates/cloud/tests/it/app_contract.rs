@@ -47,6 +47,9 @@ const READ: &[(&str, &str, Type)] = &[
     // This lamp will send `onboarding.step` as each walk step ends (#5979),
     // with the same switch.
     ("system.info", "onboarding_step_supported", Type::Flag),
+    // This lamp takes `onboarding.page` and sends `onboarding.page_done`
+    // (#6076), with the same switch.
+    ("system.info", "onboarding_page_supported", Type::Flag),
     ("volume.get", "volume", Type::Percent),
     ("volume.get", "raw", Type::Whole),
     ("volume.get", "max_volume", Type::Whole),

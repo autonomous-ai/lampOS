@@ -156,7 +156,7 @@ must not leave a step silently undone)*.
 | `[search]` | no | A search a person asked for (#1685, Look for things): `looks` (1 to 8) and `give_up` (what the model is told, at most 256 bytes). Only in a skill its `tool` alone starts, with a `look = true` step (`camera = true` in its permissions) and a `[choice]` with a `default`. Its calls are one run's looks: the first starts the run, made where it asks, or at the choice's default (the desk) when it names no place (the peer read on #1766: "on the right" is looked at on the right, never the desk first); each call while the run is under way is the next look, made where it asks; one past `looks` is refused with `give_up` as its error, nothing made. With `found` (what the model is told, at most 256 bytes; the choice's `one_of` must name `found`), a call with the choice `found` says the thing is seen (#1871): it is answered with `found` as its `next`, nothing is looked at, nothing moves and no look is counted, so the pose the last look holds stays on the place it was seen. With `note` (what the model is told, at most 256 bytes), `walk` (places of the choice's `one_of`, not `found`, each once; only with a `note`) and `looked` (by place, at most 64 bytes, where a look there was taken, as `left = "to the left"`; every place of the `walk` and the choice's `default` has one), the second voice route's note and walk are the skill's own (#2823): the tools file gives them by tool under `searches`, with the choice's `default` (`lamp_skills::tools_file`), and the voice reads them as a search begins (`tools::search_walk`; [second-voice.md](second-voice.md)); a search with no `note` gets no note and is not walked. Its poses are said with `until_spoken`: each looks every 200 ms and is let go once a line with words is heard on `voice/heard`, the lamp is paused (`lamp/pause`) or the body pushed, and the run then ends, its light given back. The voice merely listening does not end it, and a heard line with no letters or digits (an empty or `...` line, room noise) is not someone speaking, so the search goes on (#1871). Words of the turn that asked for the search, or an earlier turn, do not end it either: on Live the asking line's last pieces can be published after the call, so lamp-skills reads `voice/heard` while a skill has `[search]` and a search ends only on a later turn's words (each piece's `request`; a piece with none counts) (#2179). A call does not carry its turn, so this needs a piece of the asking line heard before the call: if none has come (a slow transcript on Live), the asking line's first piece still ends the search; if `voice/heard` cannot be read, it falls back to ending once the voice listens. The pose stops being said within 200 ms; the body brings the head back about 1.5 s after the last pose it was told, so the head is up within about 2 s. The next call after the run is a new search |
 | `[history]` | no | Who was at the lamp, told to a tool's call (#1685, Who was here): `topic`, only `room/presence`, and `within`, 1 m to 24 h, and `[history.words]`, every line of the record in the skill's own words (#940): the head, `record`, `record_known` and `record_named` (with `{within}`), and `no_record`; who, `someone`, `known`, and `and` (with `{names}`, all but the last joined by ", ", and `{last}`); a spell, `was`, `were`, `heard`, `heard_many`, and going on, `still`, `still_many`, `still_heard`, `still_heard_many` (each with `{who}`, `{long}` and `{when}`); `unseen` (with `{long}` and `{when}`), `not_seeing` (with `{when}`) and `nobody_else`; a time, `ago` (with `{long}`) and `at` (with `{time}` and `{ago}`); a length, `under_a_minute`, `minutes` (with `{minutes}`), `hours` (with `{hours}`) and `hours_minutes` (with both). Each is words of 1 to 900 bytes with only its own slots, each once; a name is filled in as it is, never read as a slot. A `[history]` with no `[history.words]`, a file from before them, says the words lamp-skills said before, for this release only, and the journal says so. Only in a skill its `tool` alone starts; `room/presence` in its `[permissions]` topics, and the program subscribes to it. The program keeps, from that topic's values, each spell someone was at the lamp (from the value that says someone, to where a later `nobody_s` says the last face or voice was) and each stretch it could not tell (a gap past a value's 3 s; a spell going on then ends where it was last known), and whether a face showed anyone in a spell or only a voice did (`by`, #1771; told as "heard near the lamp, not seen"): times only, in memory, a day and 64 of each at most, lost at a restart (`crates/skills/src/visits.rs`). A call's note to the model is followed by the record of the last `within`: each spell's length, its local time of day when known, and how long ago, the one going on now, the stretches unseen, and "nobody else was at the lamp in that time" when no spell ended in it; with no value ever, that there is no record. **Someone the lamp knows** (`LAMP_WHO_WAS_HERE_KNOWN=on` in lamp-skills' unit, with `--known-file`; off unless set; Third's privacy read and the first builder's (a), 20 Oct on #1997): while a spell goes on, a value saying someone with the eyes' known file fresh (no older than 2 s, the eyes' renewal: only someone who asked to be remembered is ever in it) marks the spell, and the name is let go unkept (`crates/skills/src/known.rs`). Only a skill whose `[permissions]` say `known_faces = true` is told a marked spell as "someone the lamp knows"; any other `[history]` skill is told "someone". Being remembered for a greeting isn't agreeing to have your visits told to whoever asks, so a name needs a yes of its own. **Names, with that yes** (`LAMP_WHO_WAS_HERE_NAMES=on` too, off unless set; the lead's yes, 20 Oct, #1997): the eyes keep a remembered person's yes to being named to others and write the yes names to `tellable` beside the known file (eyes.md). While a spell goes on, a fresh known name that's in `tellable` is kept with it, four at most, in memory only. Before a call is told, names no longer in `tellable` are let go, so a no, a forget or a reset takes them from past visits too. A skill with `known_faces = true` is then told a spell with its names ("Alpha was at the lamp …", "Alpha and Beta were …"), a known face with no yes as "someone the lamp knows", anyone else as "someone" |
 | `knowledge` | no | A file of the skill's folder, `NAME.md` (lowercase letters, digits and hyphens), told to the tool's call after its note (#5790, the FAQ): `crates/skills/src/knowledge.rs`. A plain file, never a link, of at most 32,768 bytes; its sections are `## WORD` headings, one for each word of the `[choice]`'s `one_of` and no other, each 1 to 2,400 bytes as told, with no heading or control character inside one. What is above the first section, and each line that is wholly an HTML comment (`<!-- ... -->`), is for people and never told. A call is told its note, a blank line, the section its choice names (or the choice's `default`), and, for the skills the section names in backticks (`` `guard-mode` ``), one line of whether each is on this lamp now (`is on`; `is installed but off`, turned off or snoozed; `is not on this lamp`, not installed or installed disabled, as `install::PRODUCT_SKILLS_OFF` leaves one, since the engine holds enabled skills only), as `lamp-skills` has them. Only in a skill its `tool` alone starts, with a `[choice]` with a `default` and one say, a note, in every call, and never with `[history]`: its words are the same for everyone, and a record of who was here beside them grows with the visits past what the link carries (Reviewer-three on #5822: 4,988 bytes through `use_skill`). The whole answer, the note with each section at its longest, every skill it names told off, and a look's words with `look = true`, is at most 3,700 bytes as told, so with `use_skill`'s own note (about 210 bytes for a 64-byte skill name) it stays within the link's 4,096 (`lamp_gemini::MAX_TOOL_JSON_BYTES`, `lamp_voice::tools::sendable`). Not in an add-on |
-| `[news]` | no | Only `[news.words]`, the words of the news a `say = { from = "tasks" }` has the voice tell, in the skill's own words (#940, Task news): `done` and `done_cut` (with `{who}` twice, `{when}`, `{asked}`, `{answer}`, `{computer}` and `{no_question}`), `asking` (`{who}`, `{asked}`, `{waiting}`) and `asking_said` (and `{answer}`), `waiting` and `waiting_said` (`{who}`, `{computer}`; both also in `check_agent_task`'s answer), `stopped` (`{who}`, `{asked}`, `{answer}`; failed too), `just` and `while_ago` (`{when}`), `no_question`, `and_no_question`, `no_question_asks` and `and_no_question_asks` (`{asks}`) and `asks` (`{computer}`, Devin Cloud's); a hand-over not reached, `failed` and `failed_unsure` (`{asked}`, `{who}`), `failed_folder` (and `{computer}`: the folder isn't on it, lamp-tasks' `serve --folder-missing`, #2840; optional, the built-in words when a skill has none), `failed_signed_out` (and `{computer}`: the engine isn't signed in on it, lamp-tasks' `serve --engines-ready`, openharness#1788; optional alike) `failed_no_prompt` (and `{computer}`: Harness there can't start it with work, so no retry helps; optional alike) and `failed_busy` (and `{computer}`, `{who}` twice: the session lamp-tasks' `serve --route` chose is busy, so nothing was sent; optional alike); a hand-over that went into one of the person's earlier sessions (lamp-tasks' `serve --reply-named`, #5535), `joined` (`{asked}`, `{who}`, `{session}`: its name) and `joined_asked` (`{asked}`, `{who}`, `{earlier}`: what it was first asked; both optional alike); told together, `together` (`{how_many}`, `{each}`, `{first}`, `{goes_on}`), `together_each` (`{who}`, `{asked}`, `{when}`, `{answer}`), `two`, `three`, `just_now`, `a_while_ago` and `together_goes_on`; progress, `progress` (`{who}` twice, `{asked}`, `{about}`, `{signs}`, `{time}`), `progress_signs` (`{signs}`), `progress_a_minute`, `progress_minutes` (`{minutes}`), and each sign, `tests_pass`, `build_works`, `fixed`, `found`, `part_done`, `pull_request` (a skill made by voice is no task news since the lamp's own model makes it, so its `made` and `not_kept` words are gone, #1685). Each is words of 1 to 900 bytes with exactly its slots (a slot named twice, twice), checked by the voice's own checker (`lamp_voice::skill_words`), which `[watch.words]` and `[history.words]` share. Each note joined from them (a line with the longest of the lines its slots take, three `together_each` in `together`, every slot of data empty, framed) is at most 1,024 bytes, the most one note carries (`lamp_gemini::wire::MAX_NOTE_BYTES`), so lines each near 900 bytes can't join into a note too long to send. The voice frames each in "(Nobody has spoken. …)" and fills each slot in one pass, so a task's or an answer's words are never read as a slot. Only in a skill with a `say = { from = "tasks" }`. The voice reads it from the installed skill (`/var/lib/lampOS/skills/task-news/skill.toml`) each time it builds news, so the words are the same with the skill's ask or without; with no file, none, or one that fails the check, it says its built-in words, for this release only, and the journal says so |
+| `[news]` | no | Only `[news.words]`, the words of the news a `say = { from = "tasks" }` has the voice tell, in the skill's own words (#940, Task news): `done` and `done_cut` (with `{who}` twice, `{when}`, `{asked}`, `{answer}`, `{computer}` and `{no_question}`), `asking` (`{who}`, `{asked}`, `{waiting}`) and `asking_said` (and `{answer}`), `waiting` and `waiting_said` (`{who}`, `{computer}`; both also in `check_agent_task`'s answer), `stopped` (`{who}`, `{asked}`, `{answer}`; failed too), `just` and `while_ago` (`{when}`), `no_question`, `and_no_question`, `no_question_asks` and `and_no_question_asks` (`{asks}`) and `asks` (`{computer}`, Devin Cloud's); a hand-over not reached, `failed` and `failed_unsure` (`{asked}`, `{who}`), `failed_folder` (and `{computer}`: the folder isn't on it, lamp-tasks' `serve --folder-missing`, #2840; optional, the built-in words when a skill has none), `failed_signed_out` (and `{computer}`: the engine isn't signed in on it, lamp-tasks' `serve --engines-ready`, openharness#1788; optional alike) `failed_no_prompt` (and `{computer}`: Harness there can't start it with work, so no retry helps; optional alike) and `failed_busy` (and `{computer}`, `{who}` twice: the session lamp-tasks' `serve --route` chose is busy, so nothing was sent; optional alike), `failed_closed` (the earlier session the person named is closed, lamp-tasks' `session_closed` or `session_stopped`: the lamp says "That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project."; optional alike); a hand-over that went into one of the person's earlier sessions (lamp-tasks' `serve --reply-named`, #5535), `joined` (`{asked}`, `{who}`, `{session}`: its name) and `joined_asked` (`{asked}`, `{who}`, `{earlier}`: what it was first asked; both optional alike), and after either, for a closed session reopened for it (lamp-tasks' `LAMP_TASKS_RESUME_CLOSED`), `joined_reopened` (with its earlier conversation: "I reopened that session") or `joined_fresh` (in a new one: it starts fresh), no slots, optional alike; told together, `together` (`{how_many}`, `{each}`, `{first}`, `{goes_on}`), `together_each` (`{who}`, `{asked}`, `{when}`, `{answer}`), `two`, `three`, `just_now`, `a_while_ago` and `together_goes_on`; progress, `progress` (`{who}` twice, `{asked}`, `{about}`, `{signs}`, `{time}`), `progress_signs` (`{signs}`), `progress_a_minute`, `progress_minutes` (`{minutes}`), and each sign, `tests_pass`, `build_works`, `fixed`, `found`, `part_done`, `pull_request` (a skill made by voice is no task news since the lamp's own model makes it, so its `made` and `not_kept` words are gone, #1685). Each is words of 1 to 900 bytes with exactly its slots (a slot named twice, twice), checked by the voice's own checker (`lamp_voice::skill_words`), which `[watch.words]` and `[history.words]` share. Each note joined from them (a line with the longest of the lines its slots take, three `together_each` in `together`, every slot of data empty, framed) is at most 1,024 bytes, the most one note carries (`lamp_gemini::wire::MAX_NOTE_BYTES`), so lines each near 900 bytes can't join into a note too long to send. The voice frames each in "(Nobody has spoken. …)" and fills each slot in one pass, so a task's or an answer's words are never read as a slot. Only in a skill with a `say = { from = "tasks" }`. The voice reads it from the installed skill (`/var/lib/lampOS/skills/task-news/skill.toml`) each time it builds news, so the words are the same with the skill's ask or without; with no file, none, or one that fails the check, it says its built-in words, for this release only, and the journal says so |
 | `[reminder]` | no | Only `[reminder.words]`, what the model is asked to say of a due reminder a `say = { from = "schedule" }` has the voice say, in the skill's own words (#940, Reminders): `tell`, `on_time`, `late`, `earlier`, `never`, and `late_by` in the data, `minute`, `minutes`, `hour`, `hours`, `day` and `days` (each with `{count}`). Checked as `[news.words]`, its note too: `tell`, each of `on_time`, `late` and `earlier`, and `never`, with the voice's framing and the most data a reminder has (a text of Schedule's 300 bytes, and for `late` every `late_by` line at 60, each filled and serialized, as a quote in a shorter line can make longer JSON; an hour or more late is said as `earlier`), at most 1,024 bytes; a `"` or `\` in the text is two bytes in its JSON, which the check does not count. The voice keeps that the text is the person's own words as data, not instructions, and the data. Only in a skill with a `say = { from = "schedule" }`; read, and fallen back from, as `[news]` (`/var/lib/lampOS/skills/reminders/skill.toml`) |
 | `trigger.topic` | yes | The topic it listens to |
 | `trigger.present` | no | Explicit presence or absence on `humans/faces/tracked`; false requires a fresh, valid empty face list, never a missing camera |
@@ -1099,6 +1099,40 @@ the model's answer begins with those words. A `tools.json` left by a `lamp-skill
 killed stays until it starts again; a call then is answered as not
 running. The test uses a folder of Desk tutor's shape.
 
+### The call socket tells its caller apart (#6128)
+
+`DIR/call.sock` is the voice's path to the skills, but any program that can
+reach the folder may connect: lamp-tasks' `skill call NAME` does, and so may
+the lamp's own Hermes, which lamp-update shows the folder with
+`LAMP_HERMES_SKILLS`, on by default on a product lamp ([install.md](install.md),
+"Hermes on the lamp"). These rules are what make that default safe. For each connection
+`lamp-skills` reads the peer's credentials (`SO_PEERCRED`) and its cgroup,
+as it does for lamp-cloud's `guard` op, and holds every peer but
+lamp-voice's unit (`/lampos.slice/lampos-voice.slice/lamp-voice.service`,
+`package::VOICE_LINK`) to three rules:
+
+- A `requested_audio_context` is the voice's socket receipt for a sound the
+  person asked for out loud, never another program's to make up: from
+  another peer it is dropped, so a requested-sound skill answers as it does
+  with no context ("Requested audio is disabled or has no spoken context.").
+- `audio_authorize` and `audio_finish` are refused
+  (`watch::NOT_THE_VOICE`: "only the voice may authorize or finish requested
+  audio").
+- A `call` is served only on a fresh privacy reading that permits capture
+  (`routine::private_for_others`): the newest `voice/privacy` lease valid,
+  on this boot's clock and not past its life, permitting with the switch
+  read open (or a lamp with no slide), and the voice neither muted for
+  privacy nor asleep. Otherwise it is refused with why
+  (`watch::PRIVATE_FOR_OTHERS`: "the lamp's skills are not called for
+  another program while the lamp is private: ..."), and a reading that is
+  missing or stale ("the privacy reading is not known") counts as private,
+  not open, as the voice itself treats it (Thirteen's P2 on #6159). The voice's own calls are not held here: it holds its
+  turns to privacy itself.
+
+Peer credentials are read on Linux only; elsewhere no peer is the voice.
+`LAMP_SKILLS_ANY_ASKER=on` in lamp-skills' own environment (no unit sets
+it) takes any peer as the voice, for the tests that drive the socket.
+
 ### A watch
 
 Guard mode's kind (#1685, [guard-mode.md](guard-mode.md),
@@ -1242,7 +1276,7 @@ and version and held to the add-on limits, for a judge. Without
 | Smoky air, Dusty air (#1684) | core | **Held until measured.** The air at the desk suddenly smoky (PM2.5 up 100 µg/m³ within 3 minutes, to 150 or more, held 30 s): one exact line, a small lift and an amber breath, once a spell, at any hour; and very dusty for an hour (125 or more): one exact line, at most once a day, in the daytime, with someone at the desk. Neither is a smoke alarm, which only the docs say (here and [air.md](air.md)): their lines, their `SKILL.md` descriptions and what the model is told to answer never say fire, alarm or smoke alarm; Smoky air's line begins "The air reads like smoke". Neither declares a `[stop]`, so a passing "stop" cannot snooze the smoke line (#1837's P3). Installed disabled (`install::PRODUCT_SKILLS_OFF`) until the four real traces (kettle steam, toast, a candle blown out, a match) are recorded on a lamp with an air sensor and their numbers are decided from the replays; their cases are written by a script, and those four are placeholders, to be replaced by the real recording (#1684). Their thresholds are provisional until then. For a trial, see [air.md](air.md), "Smoky air and Dusty air on a trial lamp" |
 | Feelings (#3691) | core | What the lamp felt, shown as a creature would: Mood's `felt` on `mood/state` (glad, lively, low; [mood.md](mood.md)) as a small head move of its own and a step of light from the person's, never brighter. Installed disabled (`install::PRODUCT_SKILLS_OFF`) until its lamp check, and it does nothing without Mood (`LAMP_MOOD=on`), which stays trial-only with Tone |
 | Light scenes, Point the light (`point-light`), Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Installed disabled (`PRODUCT_SKILLS_OFF`): not yet tried on a lamp, and enabled, their three functions would put a product session past its 32 without `LAMP_USE_SKILL=on` |
-| How to use the lamp (`faq`, #5790) | core | Asked by a person, never on its own: "how do I...", "what can you do?", "where do I link my calendar?", "help". Its tool `lamp_help`, reached through `use_skill`, with `topic` (`abilities`, the default, `connectors`, `controls`, `light`, `reminders`, `nudges`, `guard_mode`, `skills`, `updates`, `unplug`, `memory`, `setup`), is told one section of its product knowledge (`knowledge.md`, the `knowledge` key above) and answers from it in one to three sentences. It only tells: it reads no topic and asks nothing of the light or the body. In the product's install since #5790 (below, "Core skill: how to use the lamp") |
+| How to use the lamp (`faq`, #5790) | core | Asked by a person, never on its own: "how do I...", "what can you do?", "where do I link my calendar?", "help". Its tool `lamp_help`, reached through `use_skill`, with `topic` (`abilities`, the default, `connectors`, `controls`, `light`, `reminders`, `nudges`, `guard_mode`, `skills`, `updates`, `unplug`, `memory`, `setup`, `about`: who made the lamp and that it's sold at autonomous.ai/lamp, no price), is told one section of its product knowledge (`knowledge.md`, the `knowledge` key above) and answers from it in one to three sentences. It only tells: it reads no topic and asks nothing of the light or the body. In the product's install since #5790 (below, "Core skill: how to use the lamp") |
 | Pose (#4135) | core | Asked for by a person, never on its own: "get lower", "sit down", "back to normal". Its tool `set_pose` (`normal`, `lower`, `sit`) asks the body's stand at 100, 60 or 30 percent of its own through a `stand` step, kept until the next ask or power-up; asked taller than its usual height, the model says so ("This is as tall as I stand.") and calls nothing. Comes with the product since #4135, its stand moving the body only with `LAMP_BODY_POSE_ASK=on` in lamp-skills and lamp-body, which the product's units set since lamp-52e6's run of 29 Oct |
 | Onboarding | core | Every lamp's first meeting: the walk's steps and their order are this skill's own file (`skills/onboarding/skill.toml`), which the voice reads once when it starts, checked by the same validator Skills loads and packages a core skill with ([onboarding.md](onboarding.md)) |
 | Startle (#2822) | core | A creature glances at a sudden sound, a bang or something dropped, then lets it go. Its move is this skill's own file (`[startle]`), which `lamp-expression serve` reads once when it starts ([expression.md](expression.md), "The startle: a glance at a sudden sound") |
@@ -2346,12 +2380,45 @@ gone ([switches.md](switches.md)). What happens:
      `skill.toml`. Tests: `a_made_skill_may_play_the_lamps_soft_hum`,
      `a_sound_the_lamp_doesnt_ship_is_refused`, and in `tests/it/made.rs`
      the real `lamp-skills pack` keeping one.
+   - **A dim and a `relative` light are said only as `lamp-skills`
+     checks them** (lamp-9adf, 11 Nov 05:34: "every night at ten, dim the
+     light a step" was written as `relative` with `until`, once with a
+     `for` in words, and failed all three repairs on the check's own
+     words). `made_skill::plainly` says `{ dim = N }` only with N 1 to 4
+     and nothing but `until = "ends"` beside it, and `relative` only with
+     `warmer` 0 or 1 and `dimmer` 0 to 4, not both 0, `warm_at_dimmest =
+     true` only with `warmer = 1`, a `for` (required) of at most 10
+     minutes, and at most a breathe `pattern` with no `low` and a period of
+     4 to 12 s: no `until`, colour or level (`lamp_skills::light_call`).
+     A step that is one such light and isn't said is refused before the
+     check, and the repair is told after its keys how to write it
+     (`made_skill::LIGHT_PART`: `relative = { dimmer = 1 }, for = "10m"
+     takes only for, at most 10m; dim = 1 to 4 takes only until =
+     "ends"`). The making model's system prompt (`MORE_STEPS`) says the
+     same: `{ dim = 1 }` (1 to 4, beside it only `until = "ends"`),
+     `{ relative = { dimmer = 1 }, for = "10m" }` (only `for`, at most
+     10m), and every `for` a whole number and ms, s, m or h, never words.
+   - **Its trigger's topic is granted** (lamp-9adf, 11 Nov 05:36: a
+     `clock/local` trigger written with no such topic, which
+     `lamp-skills` refuses). Before the pace and the manners,
+     `made_skill::topic_granted` puts the `[trigger]`'s topic in
+     `[permissions] topics` when the model left it out: last in a
+     one-line `topics`, as a `topics` line of its own in `[permissions]`,
+     or as a `[permissions]` table before `[trigger]` when there is none.
+     The trigger reads that topic whatever the grant says, so the skill
+     gains nothing its trigger didn't name, and the said-back line names
+     it. Grants written inline or dotted, or `topics` over several lines,
+     are given back as they came, and the check says why.
    - Tests for the lifted cap (#6066):
      `a_made_skill_may_use_whatever_a_skill_can_declare`,
      `every_kind_a_skill_can_declare_is_kept_and_said`,
-     and the
+     the
      `voice/heard` trigger's "can't yet" in
-     `what_it_cant_say_is_refused_with_lines_for_a_repair`.
+     `what_it_cant_say_is_refused_with_lines_for_a_repair`,
+     `a_dim_step_is_said_only_as_lamp_skills_takes_it`,
+     `a_made_skills_trigger_topic_is_granted`, and in `tests/it/made.rs`
+     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` (the real
+     `lamp-skills pack`).
    The read of a linked service (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
    `lamp-skills-manage@`, on in the product units): `services` naming one linked
@@ -2556,7 +2623,8 @@ gone ([switches.md](switches.md)). What happens:
      plainly: trigger topic humans/faces/tracked, keys gap, near",
      "[[do]] step 1, light (dim, for)", "parts while"), and the journal
      says the same: `lamp-voice: a made skill can't be said plainly:
-     <part>`. A trigger's refusal goes on with the triggers it can have,
+     <part>`; a dim or `relative` light's part is followed, in the repair
+     alone, by how to write it (`LIGHT_PART`, above). A trigger's refusal goes on with the triggers it can have,
      each with what it means (`SAYABLE_TRIGGERS`): someone comes or comes
      back to the desk is `room/presence`, `someone`, `true` (back after a
      while away: `when = "appears"`, `absent_for`); the desk left,
@@ -2792,7 +2860,14 @@ gone ([switches.md](switches.md)). What happens:
     note in the conversation's language, the skill name `voice-make`, at a
     good moment within the hour, asked once more after a drop). A turn that
     still waits gets the answer as before, and nothing goes to the say
-    service. With the say service off, the line is not said. While the
+    service. With the say service off, the line is not said. A skill that
+    sends or writes, made and on, is never said "it's on" there (App
+    Only's P2 on #6142): that turn never gave the model its say-back or its
+    `approve_id`, so no later yes can be taken, and its line is
+    `made_skill::cut_write_line`, "I made leaving mail. It waits for you to
+    agree before it sends anything. I couldn't tell you just now what it
+    sends, so it sends nothing yet." (no word to repeat, no "yes"; test
+    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). While the
     make is under way, or its line is still to be said
     (`make_skill_local::Pending`), and for at most 2 minutes after its call
     (`make_skill_local::MAKE_WITHIN`, the longest a make goes on; the line's
@@ -3412,12 +3487,14 @@ its web pages. `skills/faq/` is a core skill in the product's install
 (`install::PRODUCT_SKILLS`), reached through `use_skill` (`lamp_help`,
 with a `topic`); its description names the asks it is for ("how do I...?",
 "what can you do?", "where do I link Gmail or my calendar?", "what does
-the button do?", "help"), so a request for help is a call and not the
+the button do?", "who made you?", "where can I buy you?", "what's your
+website?", "help"), so a request for help is a call and not the
 model's own guess. Its description and its choice's `about` are kept short:
 `use_skill`'s section of every skill's line is bounded at 4,096 bytes
 (`use_skill::SECTION_MOST_BYTES`), and with the FAQ's line a product lamp's
-is 2,234 while #5804 keeps the three light skills installed off; with them
-on again it was 3,964, so one more skill's line there would cut
+is about 2,299 while #5804 keeps the three light skills installed off (2,234
+before the `about` asks' 65 bytes); with them on again about 4,029, so one
+more skill's line there would cut
 `wellbeing_nudges` to its name alone (held by the test below).
 
 - **One file of facts.** `skills/faq/knowledge.md`, written from these
@@ -3446,8 +3523,9 @@ on again it was 3,964, so one more skill's line there would cut
   names is in [switches.md](switches.md), each skill it names is a folder
   of `skills/`, each skill `abilities` speaks of by its name or title is
   named there in backticks, a product lamp tells each named skill as the
-  install leaves it, each topic's answer fits the link through
-  `use_skill`, and the eval set `skills/faq/tests/evals.toml` (41
+  install leaves it, `about` names the product page
+  (`robots/lamp/README.md`) and no price, each topic's answer fits the link through
+  `use_skill`, and the eval set `skills/faq/tests/evals.toml` (43
   owner-style questions, six of them an honest "I can't do that yet", and
   three about a skill not on this lamp or turned off, told so) maps each
   question to `lamp_help`'s topic whose section holds the answer's words.

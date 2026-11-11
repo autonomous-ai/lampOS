@@ -46,6 +46,8 @@ fn command() -> Command {
         .env_clear()
         .stdin(Stdio::null())
         .stdout(Stdio::null());
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command
 }
 

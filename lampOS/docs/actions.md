@@ -94,7 +94,7 @@ honest failure when called. It does not disable unrelated volume/light calls.
 | `repeat_reminder` | `text`, `time`, `every` (`daily` or `weekly`); `weekday` required only for weekly; optional `zone` | Set a local daily/weekly recurrence |
 | `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own and the room's reminders and timers; each item says when it was set (`set_day`, `set_clock`), `said_recently` lists the line's own already said (29e7), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
 | `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series, only the line's own or the room's (one set with nobody sure; [schedule.md](schedule.md)) |
-| `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it, only the line's own or the room's |
+| `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it, only the line's own or the room's; a one-time one said within the last two minutes is set again and snoozed (C68, [schedule.md](schedule.md)), and one said longer ago is `said_too_long_ago` |
 
 Each schedule call on the socket may carry a fourth key, `caller`
 (`lamp_actions::schedule::Caller`, `{"asker":{"person","owner"},"setter"}`),

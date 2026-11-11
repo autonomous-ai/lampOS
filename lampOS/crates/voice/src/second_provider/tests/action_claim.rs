@@ -1265,3 +1265,76 @@ fn words_and_a_forget_in_one_round_bring_no_false_note() {
         assert_eq!(went.said, said(&["I've forgotten it."]), "{name}: {went:?}");
     }
 }
+
+/// C68, lamp-06c1 at 11450 (11 Nov 01:30): "Call the plumber." was said,
+/// and 9 s later "snooze it" got only `list_reminders` and "Snoozing it for
+/// five minutes. Nothing is due right now, so there's nothing to snooze."
+/// That claim is never said beside the list alone: the model is asked
+/// again, and a snooze it then makes stands; a second claim with no snooze
+/// is the line that it wasn't done.
+#[test]
+fn a_snooze_claimed_beside_only_a_list_is_held_and_asked_again() {
+    let heard = "Lamp, snooze it.";
+    let claimed_reply =
+        "Snoozing it for five minutes. Nothing is due right now, so there's nothing to snooze.";
+    let went = claimed(
+        true,
+        heard,
+        calling("list_reminders"),
+        vec![
+            saying(claimed_reply),
+            calling("snooze_reminder"),
+            saying("Snoozed. I'll say it again at 1:35."),
+        ],
+    );
+    assert!(
+        went.said
+            .iter()
+            .all(|said| !said.contains("Nothing is due")),
+        "{went:?}"
+    );
+    assert_eq!(went.ran, ["list_reminders", "snooze_reminder"], "{went:?}");
+    assert!(told_claim(&went), "{went:?}");
+    assert!(went.said.concat().contains("Snoozed."), "{went:?}");
+    // The claim again with no snooze: the line that it wasn't done.
+    let went = claimed(
+        true,
+        heard,
+        calling("list_reminders"),
+        vec![saying(claimed_reply), saying(claimed_reply)],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    assert_eq!(went.ran, ["list_reminders"]);
+    // As on the lamp: the claim said in round 1, before its list call
+    // ("said words before its calls"). Held, the list runs, and the next
+    // round is told the snooze was not done.
+    let went = claimed(
+        true,
+        heard,
+        vec![
+            text("Snoozing it for five minutes."),
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                "list_reminders",
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![calling("snooze_reminder"), saying("Snoozed until 1:35.")],
+    );
+    assert!(
+        went.said.iter().all(|said| !said.contains("five minutes")),
+        "{went:?}"
+    );
+    assert_eq!(went.ran, ["list_reminders", "snooze_reminder"], "{went:?}");
+    assert!(
+        went.notes.contains(&crate::action_claim::beside_calls_note(
+            crate::action_claim::Claim::Snoozed
+        )),
+        "{went:?}"
+    );
+}

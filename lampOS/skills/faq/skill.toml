@@ -25,7 +25,7 @@ speak = true
 [choice]
 name = "topic"
 about = "What they asked about; abilities for anything else."
-one_of = ["abilities", "connectors", "controls", "light", "reminders", "nudges", "guard_mode", "skills", "updates", "unplug", "memory", "setup"]
+one_of = ["abilities", "connectors", "controls", "light", "reminders", "nudges", "guard_mode", "skills", "updates", "unplug", "memory", "setup", "about"]
 default = "abilities"
 
 # The model's line: what it is told to do with the section that follows.

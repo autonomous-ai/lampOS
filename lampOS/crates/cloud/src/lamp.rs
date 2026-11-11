@@ -477,6 +477,14 @@ impl Real {
         self.bus.as_ref()?.latest(topic).ok().flatten()
     }
 
+    /// `skills/events`' last message: its publisher's boot and seq, and the
+    /// run (#6076).
+    fn skill_run(&self) -> Option<crate::onboarding_page::Run> {
+        let message = self.latest(lamp_msgs::SkillEvent::TOPIC)?;
+        let run = message.parse::<lamp_msgs::SkillEvent>().ok()?;
+        Some(((message.header.boot.clone(), message.header.seq), run))
+    }
+
     /// The host's boot, the clock a preview's claim is on (the ring's own).
     fn boot(&self) -> Result<String, String> {
         Some(read(&self.places.proc.join("sys/kernel/random/boot_id")))
@@ -782,6 +790,30 @@ impl Lamp for Real {
             .parse::<lamp_msgs::OnboardingPending>()
             .ok()?;
         Some((pending.walk_id?, pending.steps_ended))
+    }
+
+    fn onboarding_page(&mut self, data: &Value) -> Result<Value, String> {
+        let light = self.light().ok();
+        let run = self.skill_run().map(|(key, _)| key);
+        crate::onboarding_page::PAGES
+            .lock()
+            .map_err(|_| "the page cannot be kept".to_owned())?
+            .open(data, light.as_ref(), run.as_ref())
+    }
+
+    fn onboarding_page_done(&mut self) -> Option<Value> {
+        // No bus read on a tick with no page open.
+        if !crate::onboarding_page::PAGES.lock().ok()?.is_open() {
+            return None;
+        }
+        let light = self.light().ok();
+        let run = self.skill_run();
+        let (data, line) = crate::onboarding_page::PAGES
+            .lock()
+            .ok()?
+            .done(light.as_ref(), run.as_ref())?;
+        crate::onboarding_page::say(&line);
+        Some(data)
     }
 
     fn make_skill(&self) -> Option<PathBuf> {

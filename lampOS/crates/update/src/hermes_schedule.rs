@@ -62,6 +62,10 @@ pub const MOST_FROZEN: Duration = Duration::from_secs(30 * 60);
 pub const LOST_AFTER: Duration = Duration::from_millis(250);
 /// How often the watch looks while the install runs.
 pub const LOOK_EVERY: Duration = Duration::from_millis(100);
+/// How long into an install the watch waits for a privacy lease before it
+/// says, once, that it runs with no privacy watch (the voice renews its
+/// lease every 10 ms, so a working bus has one long before this).
+pub const NO_LEASE_SAID_AFTER: Duration = Duration::from_secs(1);
 
 /// What [`window`] is told.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -211,6 +215,10 @@ pub struct Watch {
     /// The voice's boot whose lease was last read with the slide known:
     /// none until one is (a lamp whose voice says none is not judged).
     read_from: Option<String>,
+    /// When the watch first looked, on its clock.
+    began_ms: Option<u64>,
+    /// Whether "no privacy watch" was said for this install.
+    said_no_lease: bool,
 }
 
 impl Watch {
@@ -276,6 +284,26 @@ impl Watch {
                 }
             },
         }
+    }
+
+    /// The line to say once when no privacy lease was read with the slide
+    /// known in the install's first [`NO_LEASE_SAID_AFTER`]: such an install
+    /// runs with no privacy watch (a bus permission or a renamed topic would
+    /// look the same), and the journal says so. `None` otherwise, and after
+    /// it was said once.
+    pub fn no_lease_line(&mut self, now_ms: u64) -> Option<String> {
+        let began = *self.began_ms.get_or_insert(now_ms);
+        if self.read_from.is_some() || self.said_no_lease {
+            return None;
+        }
+        if now_ms.saturating_sub(began) < NO_LEASE_SAID_AFTER.as_millis() as u64 {
+            return None;
+        }
+        self.said_no_lease = true;
+        Some(format!(
+            "Hermes's install runs with no privacy watch: no privacy lease with the slide read was seen on voice/privacy in its first {} ms",
+            NO_LEASE_SAID_AFTER.as_millis()
+        ))
     }
 
     fn stop(&mut self, error: &'static str, why: String) -> Act {
@@ -363,6 +391,9 @@ fn watch_installs(bus_root: &Path, records: &Path, heard: &Mutex<Quiet>, began: 
             continue;
         };
         let act = current.look(now, quiet, &ears.lease());
+        if let Some(line) = current.no_lease_line(now) {
+            say(&line);
+        }
         let unix_ms = crate::records::unix_ms();
         match hermes_install::carry_out(&act, records, &mut systemd, unix_ms, &mut say) {
             Carried::Done => {}

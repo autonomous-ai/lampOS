@@ -278,12 +278,45 @@ sau:
      cạnh `skill.toml`. Kiểm thử: `a_made_skill_may_play_the_lamps_soft_hum`,
      `a_sound_the_lamp_doesnt_ship_is_refused`, và trong `tests/it/made.rs`
      `lamp-skills pack` thật giữ một kỹ năng như vậy.
+   - **Bước `dim` và đèn `relative` chỉ được nói khi `lamp-skills` cũng
+     nhận** (lamp-9adf, 11/11 05:34: "every night at ten, dim the light a
+     step" được viết thành `relative` có `until`, một lần có `for` bằng
+     chữ, và trượt cả ba lần sửa vì chỉ được nghe lời của bước kiểm tra).
+     `made_skill::plainly` chỉ nói `{ dim = N }` khi N từ 1 đến 4 và cạnh
+     nó chỉ có `until = "ends"`; chỉ nói `relative` khi `warmer` là 0 hoặc
+     1, `dimmer` từ 0 đến 4, không cả hai bằng 0, `warm_at_dimmest = true`
+     chỉ đi với `warmer = 1`, có `for` (bắt buộc) tối đa 10 phút, và nhiều
+     nhất một `pattern` breathe không có `low`, chu kỳ 4 đến 12 s: không
+     `until`, màu hay mức (`lamp_skills::light_call`). Một bước chỉ gồm
+     đèn như vậy mà không nói được thì bị từ chối trước bước kiểm tra, và
+     lần sửa được dặn, sau các khóa của nó, cách viết đúng
+     (`made_skill::LIGHT_PART`: `relative = { dimmer = 1 }, for = "10m"
+     takes only for, at most 10m; dim = 1 to 4 takes only until =
+     "ends"`). System prompt của mô hình tạo kỹ năng (`MORE_STEPS`) nói
+     giống vậy: `{ dim = 1 }` (1 đến 4, cạnh nó chỉ `until = "ends"`),
+     `{ relative = { dimmer = 1 }, for = "10m" }` (chỉ `for`, tối đa 10m),
+     và mọi `for` là số nguyên kèm ms, s, m hoặc h, không bao giờ bằng chữ.
+   - **Topic của trigger được cấp** (lamp-9adf, 11/11 05:36: một trigger
+     `clock/local` được viết mà không có topic đó, điều `lamp-skills` từ
+     chối). Trước khi đặt nhịp và phép tắc, `made_skill::topic_granted`
+     đưa topic của `[trigger]` vào `[permissions] topics` khi mô hình bỏ
+     sót: thêm vào cuối một `topics` viết trên một dòng, thành một dòng
+     `topics` riêng trong `[permissions]`, hoặc thành một bảng
+     `[permissions]` trước `[trigger]` khi chưa có. Trigger vẫn đọc topic
+     đó bất kể quyền ghi gì, nên kỹ năng không được thêm gì ngoài điều
+     trigger đã nêu, và câu nói lại có nêu nó. Quyền viết inline hoặc dạng
+     có dấu chấm, hay `topics` trải trên nhiều dòng, được trả lại nguyên
+     như khi đến, và bước kiểm tra nói lý do.
    - Kiểm thử cho giới hạn đã bỏ (#6066):
      `a_made_skill_may_use_whatever_a_skill_can_declare`,
      `every_kind_a_skill_can_declare_is_kept_and_said`,
-     và "can't yet" của
+     "can't yet" của
      trigger `voice/heard` trong
-     `what_it_cant_say_is_refused_with_lines_for_a_repair`.
+     `what_it_cant_say_is_refused_with_lines_for_a_repair`,
+     `a_dim_step_is_said_only_as_lamp_skills_takes_it`,
+     `a_made_skills_trigger_topic_is_granted`, và trong `tests/it/made.rs`
+     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` (`lamp-skills
+     pack` thật).
    Việc đọc một dịch vụ liên kết
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
    `lamp-skills-manage@`, bật trong các unit sản phẩm): `services` nêu một dịch vụ
@@ -733,7 +766,16 @@ sau:
     theo ngôn ngữ của cuộc trò chuyện, tên skill `voice-make`, vào lúc thích
     hợp trong vòng một giờ, hỏi lại một lần nếu bị bỏ). Lượt còn đang chờ
     thì nhận câu trả lời như trước, và không có gì đi qua dịch vụ nói. Khi
-    dịch vụ nói tắt, câu không được nói. Trong lúc đang tạo, hoặc câu của
+    dịch vụ nói tắt, câu không được nói. Một kỹ năng gửi hoặc ghi, đã tạo
+    và đã bật, không bao giờ được nói "it's on" ở đó (P2 của App Only trên
+    #6142): lượt đó chưa từng đưa mô hình câu đọc lại hay `approve_id` của
+    nó, nên không lời "có" nào sau đó được nhận, và câu của nó là
+    `made_skill::cut_write_line`, "I made leaving mail. It waits for you to
+    agree before it sends anything. I couldn't tell you just now what it
+    sends, so it sends nothing yet." (không có chữ nào để nhắc lại, không có
+    "yes"; kiểm thử
+    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). Trong lúc
+    đang tạo, hoặc câu của
     nó chưa được nói (`make_skill_local::Pending`), và tối đa 2 phút sau
     lời gọi (`make_skill_local::MAKE_WITHIN`, thời gian dài nhất một lần
     tạo chạy; câu có thể chờ tới một giờ để được nói, nhưng câu hỏi không bị
@@ -1078,3 +1120,34 @@ và `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
 | `trigger.days` | không | Các ngày trong tuần (giờ địa phương) mà cửa sổ `during` mở: một danh sách không rỗng gồm `"mon"` đến `"sun"`, `"weekdays"` (thứ Hai đến thứ Sáu) và `"weekend"` (thứ Bảy và Chủ nhật), hoặc chỉ một tên (`days = "weekdays"`); một ngày nêu hai lần vẫn là một ngày. Chỉ đi cùng `during` (`days goes with during`); tên khác bị từ chối khi nạp (`days: "funday" is not a day: …`), danh sách rỗng cũng vậy (`days names no day`). Mỗi ngày làm việc lúc 7 giờ: `during = { from = "07:00", to = "07:30" }`, `days = "weekdays"`, `once_per_day = true`. Ngày là ngày địa phương mà `during` và `once_per_day` vốn dùng; giờ sau nửa đêm của cửa sổ qua đêm thuộc về ngày cửa sổ mở (`23:00` đến `02:00` của thứ Sáu vẫn giữ lúc 01:00 sáng thứ Bảy, không giữ lúc 01:00 sáng thứ Sáu). Ngoài các ngày đó, trigger coi như ngoài cửa sổ: không giữ, việc theo dõi đang chạy bị đặt lại, và một `yields_to` trỏ tới nó không chờ. Kiểm thử (`crates/skills/tests/it/daily_engine.rs`): `a_weekday_trigger_runs_on_monday_at_seven_and_not_on_saturday`, `a_weekend_trigger_runs_on_saturday_and_sunday_only`, `an_overnight_window_runs_on_the_day_it_opened`, `days_are_checked_at_load` |
 
 Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).
+
+## Socket gọi kỹ năng phân biệt bên gọi (#6128)
+
+`/run/lampos-skills/call.sock` là đường của giọng nói tới các kỹ năng, nhưng
+chương trình nào tới được thư mục đó cũng có thể kết nối: `skill call NAME`
+của lamp-tasks, và Hermes trên đèn khi lamp-update cho nó thấy thư mục này
+(`LAMP_HERMES_SKILLS`, bật mặc định trên đèn sản phẩm, xem `docs/install.md`,
+"Hermes on the lamp"). Các quy tắc dưới đây là điều làm cho mặc định bật đó an toàn.
+Với mỗi kết nối, `lamp-skills` đọc danh tính của bên kia (`SO_PEERCRED`) và
+cgroup của nó, như với lệnh `guard` của lamp-cloud. Mọi bên không phải unit
+của lamp-voice (`/lampos.slice/lampos-voice.slice/lamp-voice.service`,
+`package::VOICE_LINK`) đều theo ba quy tắc:
+
+- `requested_audio_context` là biên nhận của giọng nói cho một âm thanh người
+  dùng đã nói ra để yêu cầu, chương trình khác không được tự tạo: từ bên khác
+  nó bị bỏ đi, nên kỹ năng phát âm thanh trả lời như khi không có ngữ cảnh
+  ("Requested audio is disabled or has no spoken context.").
+- `audio_authorize` và `audio_finish` bị từ chối (`watch::NOT_THE_VOICE`).
+- Một `call` chỉ được phục vụ khi có tín hiệu riêng tư còn mới và cho phép
+  thu âm (`routine::private_for_others`): lease `voice/privacy` mới nhất hợp
+  lệ, theo đồng hồ của lần khởi động này và chưa hết hạn, cho phép với công
+  tắc đọc là mở (hoặc đèn không có công tắc trượt), và giọng nói không bị tắt
+  mic vì riêng tư cũng không đang ngủ. Ngược lại nó bị từ chối kèm lý do
+  (`watch::PRIVATE_FOR_OTHERS`); tín hiệu thiếu hoặc đã cũ ("the privacy
+  reading is not known") được coi là riêng tư, không phải mở, như chính giọng
+  nói coi nó (P2 của Thirteen trên #6159). Lệnh gọi của chính giọng nói không bị chặn ở
+  đây: giọng nói tự giữ các lượt của nó theo quyền riêng tư.
+
+Danh tính bên gọi chỉ đọc được trên Linux; ở nơi khác không bên nào là giọng
+nói. `LAMP_SKILLS_ANY_ASKER=on` trong môi trường của chính lamp-skills (không
+unit nào đặt nó) coi mọi bên là giọng nói, chỉ dùng cho các bài kiểm thử.

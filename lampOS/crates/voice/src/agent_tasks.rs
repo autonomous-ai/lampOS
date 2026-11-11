@@ -162,7 +162,7 @@ pub const REPLY_NAMED_FLAG: &str = "--tasks-reply-named";
 /// (`lamp_tasks::harness::MOST_SESSION_BYTES`).
 const MOST_SESSION_BYTES: usize = 128;
 /// [`START`]'s `session` parameter with [`REPLY_NAMED_FLAG`].
-const SESSION: &str = "Only if the person means earlier work, not a new session: how they said it, its name or what it worked on (\"the book program one\"). Never guessed.";
+const SESSION: &str = "Only for earlier work, not new: as they said it, its name or what it worked on (\"the book program one\"). A change to work handed over in this talk is that work. Never guessed.";
 /// Where the second route reads whether a line whose own words ask one of
 /// the staff by name to do something ("ask Claude Code to …") has its
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
@@ -249,6 +249,11 @@ pub const DEADLINE: Duration = Duration::from_millis(3_500);
 const READ_AGAIN: Duration = Duration::from_secs(30);
 /// Who gets the work when the switch is off: as it always was.
 const CLAUDE_CODE: &str = "Claude Code";
+/// Who does the work on the lamp itself ([`LAMP_TARGET`], #5978).
+const HERMES: &str = "Hermes";
+/// What the model is told when the work was asked for on the lamp itself
+/// and the lamp has no target of its own (#5978): nothing goes elsewhere.
+const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that isn't set up on this lamp, so nothing was handed over. Say so plainly in a few words.";
 
 /// The task prepared and not yet started.
 #[derive(Clone, Debug)]
@@ -370,6 +375,97 @@ const KINDS: [Kind; 6] = [
     },
 ];
 
+/// The lamp's own target, Hermes on the lamp itself (`lamp-tasks` with
+/// `LAMP_HERMES_ON_LAMP`, #5978): never one of the staff, so the person's
+/// computers come first; the work goes there only when the person asks for
+/// it to be done on the lamp ([`START`]'s `where`), or when the tasks part
+/// finds no computer there and says it prepared it there instead.
+pub(crate) const LAMP_TARGET: &str = "lamp";
+/// Whether the tasks part last said it has the lamp's own target.
+static LAMP_THERE: AtomicBool = AtomicBool::new(false);
+
+/// Whether the tasks part has the lamp's own target now: as last read; a
+/// test sets its own, on its own thread.
+fn lamp_there() -> bool {
+    #[cfg(test)]
+    if let Some(there) = tests::LAMP_THERE_HERE.with(std::cell::Cell::get) {
+        return there;
+    }
+    LAMP_THERE.load(Ordering::Relaxed)
+}
+
+/// Whether `start_agent_task` was last declared with the lamp's words
+/// (`where`, new work to Hermes here, #5978), kept so a call naming no
+/// machine still goes to the lamp when [`LAMP_THERE`] went false since.
+#[cfg_attr(test, allow(dead_code))]
+static DECLARED_WITH_THE_LAMP: AtomicBool = AtomicBool::new(false);
+
+/// Keeps whether the tools were just declared with the lamp's words; a
+/// test keeps its own, on its own thread.
+fn declare_with_the_lamp(lamp: bool) {
+    #[cfg(test)]
+    {
+        tests::DECLARED_HERE.with(|here| here.set(lamp));
+    }
+    #[cfg(not(test))]
+    DECLARED_WITH_THE_LAMP.store(lamp, Ordering::Relaxed);
+}
+
+/// Whether the tools were last declared with the lamp's words.
+fn declared_with_the_lamp() -> bool {
+    #[cfg(test)]
+    {
+        tests::DECLARED_HERE.with(std::cell::Cell::get)
+    }
+    #[cfg(not(test))]
+    DECLARED_WITH_THE_LAMP.load(Ordering::Relaxed)
+}
+
+/// Whether a hand-over goes to the lamp's own Hermes (#5978): `where`
+/// `"lamp"`, or, while the lamp has its target, anything but `where`
+/// `"computer"` or an agent on a computer named (`who`), which go to a
+/// computer as before. `who` naming the lamp ("the lamp") or, while the
+/// lamp has its target, Hermes is the lamp's own Hermes, never a
+/// computer's. Without the lamp's target, only `where` `"lamp"` or `who`
+/// the lamp, which the tasks part then refuses as no such target; Hermes
+/// named then is a computer's, as before. `there` is whether the lamp has
+/// its target now or the tool was declared with the lamp's words: a call
+/// naming no machine from such a declaration goes to the lamp even when the
+/// target went away since, and is then said not set up, never sent to a
+/// computer.
+fn on_the_lamp_now(args: &Value, there: bool) -> bool {
+    let said = |key: &str| {
+        args.get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|said| !said.is_empty())
+    };
+    match said("where") {
+        Some(LAMP_TARGET) => true,
+        Some(_) => false,
+        None => match said("who") {
+            None => there,
+            Some(who) => {
+                let who = who.trim_start_matches("the ").trim();
+                who.eq_ignore_ascii_case(LAMP_TARGET) || (there && who.eq_ignore_ascii_case(HERMES))
+            }
+        },
+    }
+}
+
+/// `start_agent_task`'s `where` while the lamp has its own target (#5978).
+const WHERE: &str = "Where the work is done. Hand over work that takes longer than a quick answer: writing code or files, research across pages, a job of several steps. Leave it out and it goes into an earlier session of theirs that fits by its name or its work, the lamp's own first, else to a new one here on the lamp, done by the lamp's own Hermes. \"computer\" only when they name their computer (\"on my computer\", \"on the Mac\"): then it goes there, as when they name an agent on it. \"lamp\" when they say \"on the lamp\" or \"do it yourself\". The task is said back and starts on their yes, as always.";
+
+/// Whether the targets answer has the lamp's own target, Hermes.
+fn lamp_in(answer: &Value) -> bool {
+    answer.get("ok") == Some(&json!(true))
+        && answer["targets"].as_array().is_some_and(|targets| {
+            targets
+                .iter()
+                .any(|target| target["alias"] == LAMP_TARGET && target["engine"] == "hermes")
+        })
+}
+
 /// One of the staff: a target of the tasks part, and its kind.
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Member {
@@ -384,7 +480,9 @@ static READING: OnceLock<()> = OnceLock::new();
 /// The functions a session is told of: with [`WHO_FLAG`], for the staff as
 /// last read.
 pub fn tools(place: &Place) -> Vec<Tool> {
-    declared(place, &staff_now(place))
+    let lamp = lamp_there();
+    declare_with_the_lamp(lamp);
+    declared_on(place, &staff_now(place), lamp)
 }
 
 fn staff_now(place: &Place) -> Vec<Member> {
@@ -647,7 +745,15 @@ const TASK_COMPLETE: &str =
 const TASK_SHORT: &str =
     "The work, in the person's own words. A short ask is enough: the agent works out the details.";
 
+/// The tools as declared without the lamp's own target, as tests compare.
+#[cfg(test)]
 fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
+    declared_on(place, staff, false)
+}
+
+/// [`declared`], with `start_agent_task`'s `where` when the tasks part has
+/// the lamp's own target (`lamp`, #5978).
+fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
     let choosing = choosing(place, staff);
     // Who does it when nobody is named; without the switch, as always.
     let default = if place.who {
@@ -768,6 +874,31 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
             json!({"type": "string", "description": SESSION}),
         );
     }
+    let mut start_description = start_description;
+    if lamp {
+        start_parameters["properties"]["where"] = json!({
+            "type": "string",
+            "enum": [LAMP_TARGET, "computer"],
+            "description": WHERE
+        });
+        // Measured with tools/task-pick-eval.sh (#5978): the lamp does the
+        // work by default, so the description says what is handed over and
+        // what is not, a short ask is enough, and `who` is for a name said.
+        start_parameters["properties"]["task"]["description"] = json!(TASK_SHORT);
+        if let Some(who) = start_parameters["properties"]
+            .get_mut(WHO)
+            .and_then(|who| who.get_mut("description"))
+            && let Some(said) = who.as_str()
+        {
+            // Nobody named is the lamp's Hermes now, not the computer's agent.
+            let said = said.replace(
+                &format!("Leave it out if they named nobody: then {default} does it."),
+                "Leave it out if they named nobody.",
+            );
+            *who = json!(format!("{said}{WHO_ON_THE_LAMP}"));
+        }
+        start_description = on_the_lamp_description(place, staff);
+    }
     let mut tools = vec![
         Tool {
             name: START.into(),
@@ -784,14 +915,17 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      own, and not if they said no or something else. In the same breath, \
                      before you call it, say in a few natural words that you are giving it \
                      to whoever will do it (\"Okay, giving that to {default}.\"), and nothing \
-                     more until it answers.{}",
+                     more until it answers. With nothing prepared in this talk, call \
+                     start_agent_task first, never this.{}",
                     if place.correct { NOT_A_YES } else { "" }
                 )
             } else {
                 format!(
                     "Start the task you prepared with start_agent_task. Call it only right \
                      after the person has said yes to the task you read back; never on your \
-                     own, and not if they said no or something else.{}",
+                     own, and not if they said no or something else. With nothing prepared in this talk, \
+                     call start_agent_task first. Never say the work is given or started \
+                     unless this call answered that it is.{}",
                     if place.correct { NOT_A_YES } else { "" }
                 )
             },
@@ -843,6 +977,48 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
         tools.extend(crate::sign_in::tools());
     }
     tools
+}
+
+/// What `who`'s description gains while the lamp has its own target
+/// (#5978): an agent named sends the work to a computer, so it is never
+/// given for work the lamp does, or for a session or a computer named.
+const WHO_ON_THE_LAMP: &str = " Only a name they said: never for work done here on the lamp, for a session or for \"my computer\".";
+
+/// [`START`]'s description while the tasks part has the lamp's own target
+/// (#5978): work that takes more than a quick answer is handed over, here
+/// to the lamp's Hermes unless a computer or an agent on it is named, and
+/// what the lamp answers or does itself never is. Measured with
+/// `tools/task-pick-eval.sh` (`docs/tasks.md`).
+fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
+    let with_who = if choosing(place, staff) {
+        ", with who will do it,"
+    } else {
+        ""
+    };
+    // With no computer target (a lamp with no computer paired, #5978),
+    // no computer is offered.
+    let or_computer = if staff.is_empty() {
+        String::new()
+    } else {
+        format!(
+            ", or {} on the person's {}",
+            names(staff, "and"),
+            computer(place)
+        )
+    };
+    format!(
+        "Hand work to an agent: Hermes here on the lamp{or_computer}. Call it for more than a \
+         quick answer (code, files, research, a job of several steps) or asked of an agent. \
+         Never for what you can answer in a few words, a story or joke told aloud, or your own \
+         functions (your light, reminders, the time, the weather). New work goes to Hermes here \
+         on the lamp: leave out `where` and `who`, even for code or a website; `where` only if \
+         they name a machine (computer, Mac, laptop, PC). More on earlier work (\"in the sea \
+         poem, add a line\") is a new call with `session`, made now, before you say it back: \
+         never a recall or words alone. Don't ask for details or who first. {} You can do this: never say you cannot \
+         open files or do such work; asked to start an agent for nothing in particular, ask \
+         what for, then call this.",
+        read_back(place.lead_in, with_who, place.one_yes)
+    )
 }
 
 /// What [`CHECK`]'s description gains with [`NOW_FLAG`]: progress and work
@@ -1035,16 +1211,28 @@ pub fn session_note(place: &Place) -> Option<String> {
     } else {
         String::new()
     };
+    // With the lamp's own target (#5978), work to be written, coded or
+    // researched is handed over even when nobody is named: to Hermes here.
+    let (yours, lamp) = if lamp_there() {
+        (
+            "a story, a poem or an answer told aloud",
+            " Work to be written down, coded or looked into and written up (a file, a document, \
+         a script, a summary) is not told aloud: hand it over with start_agent_task even when \
+         they name nobody; Hermes here on the lamp does it unless they name their computer.",
+        )
+    } else {
+        ("a story, a poem or anything else", "")
+    };
     Some(format!(
         "\nWhen the person asks to have {whom} do something, it is theirs to do, not yours: \
          hand it over with start_agent_task every time, whatever it is, a story or a poem as \
          much as code, even one you could tell yourself, and even in the middle of a story you \
          are telling. Never do it yourself instead. A name that comes to you garbled, such as \
          \"Claude Co\" for Claude Code, still names them. Work on their {computer} is \
-         theirs too, named or not.{accounts}{questions} But a story, a poem or anything else they ask of you that \
+         theirs too, named or not.{accounts}{questions} But {yours} they ask of you that \
          names neither {whom} nor work on their {computer}, however long, is yours: tell \
          it yourself, gladly, and never offer it to {whom} or ask whether {whom} should, even \
-         after you handed something over earlier in this conversation."
+         after you handed something over earlier in this conversation.{lamp}"
     ))
 }
 
@@ -1267,6 +1455,10 @@ fn staff_from(answer: &Value) -> Option<Vec<Member>> {
         if target.get("installed") == Some(&json!(false)) {
             continue;
         }
+        // The lamp's own: asked for by `where`, never one of the staff.
+        if name == LAMP_TARGET && engine == "hermes" {
+            continue;
+        }
         // One member a name: Devin and Devin Cloud are both "Devin", so
         // with both targets the first is kept and the other left out, and
         // "Devin" names it (the reviewer's P3 3 on #2240).
@@ -1449,6 +1641,9 @@ pub(crate) fn machine_name(alias: &str) -> Option<String> {
 /// computer known by name ([`NAMES_FLAG`]), else "the office computer" (or
 /// "the computer"), as without it.
 fn where_done(place: &Place, alias: &str) -> String {
+    if alias == LAMP_TARGET {
+        return "the lamp".to_owned();
+    }
     match place.machine_names.then(|| machine_name(alias)).flatten() {
         Some(name) => format!("your {name}"),
         None => format!("the {}", computer(place)),
@@ -1538,6 +1733,7 @@ fn read_staff(socket: &Path, target: &str, deadline: Duration, who: bool) {
     let Some(read) = staff_from(&answer) else {
         return;
     };
+    LAMP_THERE.store(lamp_in(&answer), Ordering::Relaxed);
     if let Some(names) = names_from(&answer) {
         keep_names(names);
     }
@@ -2449,14 +2645,27 @@ fn run_for(
                     true,
                 );
             }
-            // Who is settled before the tasks part is asked anything.
-            let member = match chosen(place, staff, &call.args) {
-                Ok(member) => member,
-                Err(told) => return (told, true),
+            // Who is settled before the tasks part is asked anything. The
+            // lamp's own Hermes (#5978): asked for on the lamp, by name, or
+            // by default while the tasks part has it, unless the person
+            // named their computer or an agent on it; never a staff member,
+            // so never looked for among them.
+            let on_the_lamp = on_the_lamp_now(&call.args, lamp_there() || declared_with_the_lamp());
+            let member = if on_the_lamp {
+                None
+            } else {
+                match chosen(place, staff, &call.args) {
+                    Ok(member) => member,
+                    Err(told) => return (told, true),
+                }
             };
-            let (target, who) = member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
-                (member.alias.as_str(), member.kind.name)
-            });
+            let (target, who) = if on_the_lamp {
+                (LAMP_TARGET, HERMES)
+            } else {
+                member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
+                    (member.alias.as_str(), member.kind.name)
+                })
+            };
             // Devin's cloud has no sessions of the person's to name (the
             // Reviewer-lead's P3 on #5784): refused, never sent.
             if session.is_some() && member.is_some_and(|member| member.kind.engine == "devin-cloud")
@@ -2506,6 +2715,11 @@ fn run_for(
                 .as_ref()
                 .is_some_and(|answer| answer.get("error") == Some(&json!("target")))
             {
+                // Asked for on the lamp, which has no target of its own:
+                // never handed to a computer instead (#5978).
+                if target == LAMP_TARGET {
+                    return (json!({"error": LAMP_NOT_SET_UP}), true);
+                }
                 let engine = member.map_or("claude", |member| member.kind.engine);
                 match missing_target(place, request, target, engine, left()) {
                     Missing::Use(other) => {
@@ -2583,6 +2797,12 @@ fn run_for(
                     });
                     let place_said = if cloud {
                         format!("{who}, in Devin's cloud")
+                    } else if let Some(session) = session.filter(|_| sent_to == LAMP_TARGET) {
+                        // Looked for on the lamp first, then the computers
+                        // (#5978): where it is found is said once it is.
+                        format!(
+                            "the session \"{session}\", on the lamp or, found only there, on their computer, not a new one"
+                        )
                     } else if let Some(session) = session {
                         // The read-back says who, and where it goes (#5535).
                         format!(
@@ -3178,6 +3398,16 @@ fn nonce() -> u128 {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    std::thread_local! {
+        /// Whether the tasks part has the lamp's own target, for a test on
+        /// this thread only ([`super::lamp_there`], #5978).
+        pub(crate) static LAMP_THERE_HERE: std::cell::Cell<Option<bool>> =
+            const { std::cell::Cell::new(None) };
+        /// Whether the tools were last declared with the lamp's words, for
+        /// a test on this thread only ([`super::declared_with_the_lamp`]).
+        pub(crate) static DECLARED_HERE: std::cell::Cell<bool> =
+            const { std::cell::Cell::new(false) };
+    }
     /// A last step or an ask never brings a folder or a username to the
     /// model (the reviewer-lead's P2 on #5118).
     #[test]
@@ -5755,7 +5985,9 @@ pub(crate) mod tests {
                 name: CONFIRM.into(),
                 description: "Start the task you prepared with start_agent_task. Call it only right \
                               after the person has said yes to the task you read back; never on your \
-                              own, and not if they said no or something else."
+                              own, and not if they said no or something else. With nothing \
+                              prepared in this talk, call start_agent_task first. Never say the \
+                              work is given or started unless this call answered that it is."
                     .into(),
                 parameters: None,
                 silent: false,
@@ -5786,6 +6018,70 @@ pub(crate) mod tests {
             member("office-codex", "codex"),
         ]
     }
+    /// #5978, measured with tools/task-pick-eval.sh: while the lamp has
+    /// its own target, start_agent_task says the lamp's Hermes does work by
+    /// default and what is never handed over, a short ask is enough, and
+    /// `who` is only for a name said; the session note hands written work
+    /// over. Without the target, all of it is as before.
+    #[test]
+    fn with_the_lamps_target_the_hand_over_says_what_goes_where() {
+        let mut at = place(Path::new("/run/t"), true);
+        at.asked = true;
+        at.lead_in = true;
+        at.staff_note = true;
+        at.named_only = true;
+        at.reply_named = true;
+        let staff = vec![member("office", "claude")];
+        let start = |lamp: bool| {
+            declared_on(&at, &staff, lamp)
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .unwrap()
+        };
+        let (off, on) = (start(false), start(true));
+        assert_eq!(off, declared(&at, &staff)[0]);
+        assert!(on.validate().is_ok());
+        for words in [
+            "Hermes here on the lamp, or Claude Code on the person's office computer",
+            "more than a quick answer",
+            "Never for what you can answer in a few words, a story or joke told aloud",
+            "your light, reminders, the time, the weather",
+            "`where` only if they name a machine (computer, Mac, laptop, PC)",
+            "Don't ask for details or who first",
+        ] {
+            assert!(on.description.contains(words), "{words}");
+            assert!(!off.description.contains(words), "{words}");
+        }
+        let parameters = on.parameters.unwrap();
+        assert_eq!(parameters["properties"]["task"]["description"], TASK_SHORT);
+        let who = parameters["properties"]["who"]["description"]
+            .as_str()
+            .unwrap();
+        assert!(who.ends_with(WHO_ON_THE_LAMP), "{who}");
+        assert!(!who.contains("then Claude Code does it"), "{who}");
+        assert!(SESSION.contains("A change to work handed over in this talk is that work"));
+        let note = |there: bool| {
+            LAMP_THERE_HERE.with(|here| here.set(Some(there)));
+            let note = session_note(&at).unwrap();
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            note
+        };
+        let (before, lamp) = (note(false), note(true));
+        assert!(
+            before.contains("a story, a poem or anything else"),
+            "{before}"
+        );
+        assert!(!before.contains("Hermes"), "{before}");
+        assert!(
+            lamp.contains("a story, a poem or an answer told aloud"),
+            "{lamp}"
+        );
+        assert!(lamp.ends_with(
+            "hand it over with start_agent_task even when they name nobody; Hermes here on the \
+             lamp does it unless they name their computer."
+        ));
+    }
+
     /// `start_agent_task` says the staff's note names who only with the
     /// note on and work asked of the staff; otherwise it is as before.
     #[test]
@@ -6911,10 +7207,21 @@ pub(crate) mod tests {
                     switched.now = now;
                     // `LAMP_TASKS_ONE_YES`'s read-back sentence (#5169).
                     switched.one_yes = one_yes;
-                    for tool in super::declared(&switched, &staff) {
+                    // The lamp's own target (#5978) changes start_agent_task's
+                    // description and parameters; with the session's too.
+                    switched.reply_named = true;
+                    for (lamp, tool) in super::declared(&switched, &staff)
+                        .into_iter()
+                        .map(|tool| (false, tool))
+                        .chain(
+                            declared_on(&switched, &staff, true)
+                                .into_iter()
+                                .map(|tool| (true, tool)),
+                        )
+                    {
                         if tool.validate().is_err() {
                             refused.push(format!(
-                                "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}, correct {correct}, now {now}, one yes {one_yes}: {} bytes",
+                                "{} with {} of the staff, lamp {lamp}, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}, correct {correct}, now {now}, one yes {one_yes}: {} bytes",
                                 tool.name,
                                 staff.len(),
                                 tool.description.len()
@@ -8403,6 +8710,217 @@ pub(crate) mod tests {
             .collect();
         assert_eq!(ops, ["status", "prepare", "status", "prepare"]);
         assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 8);
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #5978, the owner's rule: a lamp with no computer paired works on
+    /// its own Hermes. The tasks part answers only `lamp`: no staff,
+    /// `start_agent_task` still declared, and a call naming no `where` and
+    /// no `who` goes to Hermes on the lamp, said with no computer.
+    #[test]
+    fn a_lamp_with_no_computer_still_hands_work_to_its_own_hermes() {
+        let answer = json!({"ok":true,"targets":[{"alias":"lamp","engine":"hermes"}]});
+        assert_eq!(staff_from(&answer).unwrap(), Vec::<Member>::new());
+        assert!(lamp_in(&answer));
+        let off = place(Path::new("/run/t"), false);
+        let start = declared_on(&off, &[], true)
+            .into_iter()
+            .find(|tool| tool.name == START)
+            .expect("start_agent_task declared");
+        assert!(start.validate().is_ok(), "{}", start.description.len());
+        assert!(
+            !start.description.contains("on the person's"),
+            "{}",
+            start.description
+        );
+        assert!(on_the_lamp_now(&json!({}), true));
+    }
+
+    /// #5978: the lamp's own target (`lamp`, Hermes) is never one of the
+    /// staff, and `start_agent_task` offers `where` only while the tasks
+    /// part has it, saying long work is handed over, an earlier session
+    /// first, else a new one on the lamp unless they name their computer.
+    /// With it, a hand-over naming nothing goes to the lamp; `where`
+    /// `"computer"` or an agent named goes to the computer as before.
+    /// Without it, nothing changes, and one asked for on the lamp is said
+    /// not set up, never handed to a computer instead.
+    #[test]
+    fn new_work_goes_to_the_lamp_unless_a_computer_is_named() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let answer = json!({"ok":true,"targets":[
+            {"alias":"lamp","engine":"hermes"},{"alias":"office","engine":"claude"}]});
+        assert_eq!(
+            staff_from(&answer).unwrap(),
+            vec![member("office", "claude")]
+        );
+        assert!(lamp_in(&answer));
+        assert!(!lamp_in(
+            &json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]})
+        ));
+        let off = place(Path::new("/run/t"), false);
+        let start = |lamp: bool| {
+            declared_on(&off, &[], lamp)
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .unwrap()
+        };
+        assert_eq!(
+            start(false).parameters.unwrap()["properties"].get("where"),
+            None
+        );
+        let on = start(true);
+        assert!(on.validate().is_ok());
+        let said = on.parameters.unwrap()["properties"]["where"].clone();
+        assert_eq!(said["enum"], json!(["lamp", "computer"]));
+        assert_eq!(said["description"], WHERE);
+        for words in [
+            "longer than a quick answer",
+            "writing code or files, research across pages, a job of several steps",
+            "an earlier session of theirs that fits by its name or its work, the lamp's own first",
+            "a new one here on the lamp, done by the lamp's own Hermes",
+            "\"computer\" only when they name their computer",
+            "\"on the lamp\" or \"do it yourself\"",
+            "starts on their yes",
+        ] {
+            assert!(WHERE.contains(words), "{words}");
+        }
+        assert_eq!(declared(&off, &[]), declared_on(&off, &[], false));
+        for (args, there, lamp) in [
+            (json!({}), true, true),
+            (json!({"where":"lamp"}), true, true),
+            (json!({"where":"computer"}), true, false),
+            (json!({"who":"Codex"}), true, false),
+            (json!({"who":"Hermes"}), true, true),
+            (json!({"who":"hermes"}), true, true),
+            (json!({"who":"the lamp"}), true, true),
+            (json!({"who":"Hermes","where":"computer"}), true, false),
+            (json!({"who":"Hermes"}), false, false),
+            (json!({"who":"the lamp"}), false, true),
+            (json!({}), false, false),
+            (json!({"where":"lamp"}), false, true),
+        ] {
+            assert_eq!(on_the_lamp_now(&args, there), lamp, "{args} {there}");
+        }
+
+        let directory = std::env::temp_dir().join(format!("agent-lamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                ("request.sock", prepared.clone()),
+                ("request.sock", status.clone()),
+                ("request.sock", prepared.clone()),
+                ("request.sock", status.clone()),
+                ("request.sock", prepared.clone()),
+                ("request.sock", status.clone()),
+                ("request.sock", json!({"ok":false,"error":"target"})),
+                ("request.sock", status),
+                ("request.sock", prepared),
+            ],
+        );
+        let at = place(&directory, false);
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args,
+        };
+        let run_with = |there: bool, args: Value, request: u64| {
+            LAMP_THERE_HERE.with(|here| here.set(Some(there)));
+            let told = run(&at, &call(args), request, true, PEER_WAIT).0;
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            told
+        };
+        let lamp = run_with(true, json!({"task":"Write a poem"}), 3);
+        assert_eq!(lamp["where"], "Hermes on the lamp", "{lamp}");
+        let computer = run_with(true, json!({"task":"Write a poem","where":"computer"}), 4);
+        assert_eq!(
+            computer["where"], "Claude Code on the office computer",
+            "{computer}"
+        );
+        let before = run_with(false, json!({"task":"Write a poem"}), 5);
+        assert_eq!(
+            before["where"], "Claude Code on the office computer",
+            "{before}"
+        );
+        let none = run_with(false, json!({"task":"Write a poem","where":"lamp"}), 6);
+        assert_eq!(none, json!({"error": LAMP_NOT_SET_UP}));
+        // Hermes named is the lamp's, never a computer's (the eval's find).
+        let named = run_with(true, json!({"task":"Write a poem","who":"Hermes"}), 7);
+        assert_eq!(named["where"], "Hermes on the lamp", "{named}");
+        let targets: Vec<Value> = (0..10)
+            .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
+            .filter(|line| line["op"] == "prepare")
+            .map(|line| line["target"].clone())
+            .collect();
+        assert_eq!(
+            targets,
+            [
+                json!("lamp"),
+                json!("office"),
+                json!("office"),
+                json!("lamp"),
+                json!("lamp")
+            ]
+        );
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #5978, the Reviewer-lead's P3 on #6094: declared with the lamp's
+    /// words ("new work goes to Hermes here"), then the lamp's target gone
+    /// before the call, a call naming no machine still goes to the lamp and
+    /// is said not set up; nothing is prepared on a computer.
+    #[test]
+    fn declared_with_the_lamp_an_unnamed_call_never_goes_to_a_computer() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory = std::env::temp_dir().join(format!("agent-gone-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status),
+                ("request.sock", json!({"ok":false,"error":"target"})),
+            ],
+        );
+        let at = place(&directory, false);
+        LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+        let start = tools(&at)
+            .into_iter()
+            .find(|tool| tool.name == START)
+            .unwrap();
+        assert_eq!(
+            start.parameters.unwrap()["properties"]["where"]["enum"],
+            json!(["lamp", "computer"])
+        );
+        LAMP_THERE_HERE.with(|here| here.set(Some(false)));
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task":"Write a poem"}),
+        };
+        let told = run(&at, &call, 8, true, PEER_WAIT).0;
+        LAMP_THERE_HERE.with(|here| here.set(None));
+        DECLARED_HERE.with(|here| here.set(false));
+        assert_eq!(told, json!({"error": LAMP_NOT_SET_UP}));
+        let prepared: Vec<Value> = seen
+            .try_iter()
+            .filter(|line| line["op"] == "prepare")
+            .map(|line| line["target"].clone())
+            .collect();
+        assert_eq!(prepared, [json!("lamp")]);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }

@@ -10,7 +10,8 @@ use lamp_tasks::{
     progress::SETTLED_FOR_MS,
     readiness::{Computer, engines_path, read_engines},
     runtime::{
-        Adapter, Clock, Config, EnginesLane, SetUpLater, WaitLane, request, serve_with_adapter,
+        Adapter, Clock, Config, EnginesLane, LampSide, SetUpLater, WaitLane, lamp_side, request,
+        serve_with_adapter,
     },
     store::Store,
 };
@@ -78,6 +79,8 @@ impl Clock for Injected {
 }
 #[derive(Default)]
 struct Counts {
+    /// Each machine a task was shown on, in order (#5978).
+    shown_on: Mutex<Vec<String>>,
     launches: AtomicUsize,
     reads: AtomicUsize,
     listings: AtomicUsize,
@@ -135,6 +138,12 @@ struct Counts {
     daemon_starts: AtomicUsize,
     /// How many daemon starts still fail, `start_failed` (lamp-75c9, 21 Oct).
     daemon_fails: AtomicUsize,
+    /// Whether the adapter says its daemon is to be started again (its env
+    /// file changed while it ran, #5978), and how many times it was.
+    restart_wanted: AtomicBool,
+    daemon_restarts: AtomicUsize,
+    /// Each launch's machine and engine, as it was asked of Harness.
+    launched_on: Mutex<Vec<(String, EngineKind)>>,
     /// Each launch and daemon start, in the order they ran, and a launch
     /// held on the job lane while set (the reviewer-lead's P2 on #2309).
     order: Mutex<Vec<&'static str>>,
@@ -231,8 +240,17 @@ struct Script {
 impl Script {
     /// What `show` finds, however long it took.
     fn shown(&self, machine: &str, id: &str) -> Result<Observation, String> {
-        // Read on the machine the task was started on.
-        assert_eq!(machine, "0123456789abcdef0123456789abcdef");
+        // Read on the machine the task was started on: the scripted one,
+        // or the lamp's own (#5978).
+        assert!(
+            machine == "0123456789abcdef0123456789abcdef" || machine == "a".repeat(32),
+            "{machine}"
+        );
+        self.counts
+            .shown_on
+            .lock()
+            .unwrap()
+            .push(machine.to_owned());
         assert_eq!(id, AGENT);
         if let Some(answer) = self.counts.plain.lock().unwrap().clone() {
             return Ok(Observation {
@@ -274,7 +292,12 @@ impl Adapter for Script {
     fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
         Some(Arc::new(ScriptEngines(self.counts.clone())))
     }
-    fn launch(&self, _: &Launch) -> LaunchOutcome {
+    fn launch(&self, launch: &Launch) -> LaunchOutcome {
+        self.counts
+            .launched_on
+            .lock()
+            .unwrap()
+            .push((launch.target.machine_id.clone(), launch.target.engine));
         self.counts.launches.fetch_add(1, Ordering::SeqCst);
         self.counts.order.lock().unwrap().push("launch");
         while self.counts.hold_launch.load(Ordering::SeqCst) && !self.stop.load(Ordering::Acquire) {
@@ -332,6 +355,14 @@ impl Adapter for Script {
         {
             return Err("start_failed".into());
         }
+        Ok(())
+    }
+    fn restart_wanted(&self) -> bool {
+        self.counts.restart_wanted.load(Ordering::SeqCst)
+    }
+    fn restart_daemon(&self) -> Result<(), String> {
+        self.counts.daemon_restarts.fetch_add(1, Ordering::SeqCst);
+        self.counts.order.lock().unwrap().push("restart");
         Ok(())
     }
     fn sign_in_starter(&self) -> Option<lamp_tasks::sign_in::Starter> {
@@ -1753,6 +1784,7 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
         every: Duration::from_millis(50),
         from_machines: None,
         engines: false,
+        lamp: None,
     });
     s.start();
     let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_some());
@@ -1826,6 +1858,7 @@ fn a_sign_in_read_failing_three_times_in_a_row_is_let_go_by_the_part() {
         every: Duration::from_millis(300),
         from_machines: None,
         engines: false,
+        lamp: None,
     });
     s.start();
     let signed_in = |s: &Running| s.status()["signed_in"].clone();
@@ -1870,6 +1903,7 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         every: Duration::from_millis(20),
         from_machines: Some(EngineKind::Claude),
         engines: false,
+        lamp: None,
     });
     let machine = |id: char, label: &str, current: bool| AccountMachine {
         machine_id: id.to_string().repeat(32),
@@ -1987,6 +2021,7 @@ fn engines_running(engines: bool) -> (Running, std::path::PathBuf) {
         every: Duration::from_millis(20),
         from_machines: Some(EngineKind::Claude),
         engines,
+        lamp: None,
     });
     let machine = |id: char, label: &str, current: bool| AccountMachine {
         machine_id: id.to_string().repeat(32),
@@ -2100,6 +2135,229 @@ fn engines_from_machines_choose_an_engine_there_and_refuse_early() {
         s.ask(json!({"op":"targets"}))["targets"][0].get("installed"),
         None
     );
+}
+
+/// Asks `targets` until they are `want`, within 5 s.
+fn targets_until(s: &Running, want: Value) {
+    let start = Instant::now();
+    loop {
+        let told = s.ask(json!({"op":"targets"}))["targets"].clone();
+        if told == want {
+            return;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "{told}");
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// Prepares to `target` until `done` holds for the answer, within 5 s.
+fn prepared_for(s: &Running, target: &str, done: impl Fn(&Value) -> bool) -> Value {
+    let start = Instant::now();
+    loop {
+        let answer = s.ask(
+            json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":target}),
+        );
+        if done(&answer) {
+            return answer;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "{answer}");
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// #5978: with `LAMP_HERMES_ON_LAMP` (`lamp`), the lamp's own machine is a
+/// target, `lamp` with Hermes, only while its look says Hermes is
+/// installed; off, or Hermes missing there, it is left out as before. A
+/// `prepare` for the office computer goes there while it is not known
+/// offline, and to the lamp, saying so, once it is; one asking for the
+/// lamp goes there whatever the computers.
+#[test]
+fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
+    let lamp_engines = |s: &Running, rows: Vec<EngineRow>| {
+        s.counts
+            .engines
+            .lock()
+            .unwrap()
+            .insert("a".repeat(32), Ok(rows));
+    };
+    let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    let both = json!([{"alias":"lamp","engine":"hermes"},{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    // Off: Hermes installed on the lamp changes nothing.
+    let (mut off, _) = engines_running(true);
+    office_engines(&off, Ok(vec![row("claude", Some(true), Some(true))]));
+    lamp_engines(&off, vec![row("hermes", Some(true), None)]);
+    off.start();
+    targets_until(&off, office.clone());
+    let looks = off.counts.engine_looks.load(Ordering::SeqCst);
+    let start = Instant::now();
+    while off.counts.engine_looks.load(Ordering::SeqCst) < looks + 3 {
+        assert!(start.elapsed() < Duration::from_secs(5), "not looked again");
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(off.ask(json!({"op":"targets"}))["targets"], office);
+    drop(off);
+
+    let home = tempfile::tempdir().unwrap();
+    let (mut s, _) = engines_running(true);
+    s.config.set_up_later.as_mut().unwrap().lamp = Some(LampSide::new(home.path().to_owned()));
+    office_engines(&s, Ok(vec![row("claude", Some(true), Some(true))]));
+    // On, Hermes not found on the lamp: left out.
+    lamp_engines(
+        &s,
+        vec![EngineRow {
+            installable: Some(true),
+            ..row("hermes", None, None)
+        }],
+    );
+    s.start();
+    targets_until(&s, office.clone());
+    // Installed there: the lamp is a target, its folder made under
+    // Harness's home, 0700.
+    lamp_engines(&s, vec![row("hermes", Some(true), None)]);
+    targets_until(&s, both);
+    let folder = fs::metadata(home.path().join("harnesses/lamp-tasks/lamp")).unwrap();
+    assert!(folder.is_dir());
+    assert_eq!(folder.permissions().mode() & 0o7777, 0o700);
+    // A computer asked for: it does the work, as before.
+    let prepared = prepared_until(&s, None);
+    assert_eq!(prepared.get("target"), None, "{prepared}");
+    // The lamp asked for: the lamp, whatever the computers.
+    let lamp = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = lamp["id"].clone();
+    let task = s.ask(json!({"op":"get_task","id":id}));
+    assert_eq!(task["target"]["engine"], "hermes", "{task}");
+    assert_eq!(task["target"]["machine_id"], "a".repeat(32));
+    assert_eq!(task["target"]["project"], "~/harnesses/lamp-tasks/lamp");
+    assert_eq!(task["task"]["target_alias"], "lamp");
+    // The computer asleep: a hand-over asked of it is refused, never moved
+    // to the lamp quietly.
+    s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
+    prepared_for(&s, "office", |answer| answer["error"] == "computer_offline");
+    // The lamp's task is followed as a computer's: started, shown on the
+    // lamp's own machine, its answer read.
+    s.counts.idle.store(true, Ordering::SeqCst);
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":lamp["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(
+        s.ask(json!({"op":"observe","guard":s.guard(),"id":id}))["ok"],
+        true
+    );
+    let task = s.wait(&id, |v| {
+        v["observations"].as_array().is_some_and(|v| !v.is_empty())
+    });
+    let observation = task["observations"][0]["id"].clone();
+    let observed = s.ask(json!({"op":"get_observation","id":id,"observation_id":observation}));
+    assert_eq!(
+        observed["data"]["answer"], "Lumi, Sunny and Archie.",
+        "{observed}"
+    );
+    assert_eq!(*s.counts.shown_on.lock().unwrap(), ["a".repeat(32)]);
+}
+
+/// #5978, the owner's rule: a fresh lamp after an update with no computer
+/// paired works on its own Hermes, the lamp being one device. Harness's
+/// machines list only the lamp, its engines say Hermes is installed: the
+/// targets are exactly `lamp` with Hermes, no error for having no
+/// computer, and a hand-over to `lamp` (what the voice prepares with no
+/// `where` and no `who`) is started with `harness new` on the lamp's own
+/// machine.
+#[test]
+fn a_lamp_with_no_computer_hands_work_to_its_own_hermes() {
+    let home = tempfile::tempdir().unwrap();
+    let (mut s, path) = engines_running(true);
+    s.config.set_up_later.as_mut().unwrap().lamp = Some(LampSide::new(home.path().to_owned()));
+    s.counts.machines.lock().unwrap().truncate(1);
+    s.counts
+        .engines
+        .lock()
+        .unwrap()
+        .insert("a".repeat(32), Ok(vec![row("hermes", Some(true), None)]));
+    s.start();
+    targets_until(&s, json!([{"alias":"lamp","engine":"hermes"}]));
+    let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    let targets = written["targets"].as_object().unwrap();
+    assert_eq!(targets.len(), 1, "{written}");
+    assert_eq!(targets["lamp"]["engine"], "hermes");
+    assert_eq!(targets["lamp"]["machine_id"], "a".repeat(32));
+    // The voice's call with no `where` and no `who` prepares for `lamp`.
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(
+        *s.counts.launched_on.lock().unwrap(),
+        [("a".repeat(32), EngineKind::Hermes)]
+    );
+}
+
+/// #5978, the PM: with `LAMP_HERMES_ON_LAMP` off (unset, `off`, or any
+/// value but `on`), routing is as on stable. The lamp is listed as a
+/// Harness machine with Hermes installed, yet it is no target: the targets
+/// are the office computer alone, work naming no machine (the voice's
+/// `prepare` for its place's target, `office`) is started on the office
+/// computer with Claude Code, and a `prepare` for `lamp` is refused as no
+/// such target, never moved anywhere.
+#[test]
+fn with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer() {
+    let home = tempfile::tempdir().unwrap();
+    for value in [None, Some("off"), Some(""), Some("ON")] {
+        let side = lamp_side(value, Some(home.path().to_owned()));
+        assert!(side.is_none(), "{value:?}");
+        let (mut s, path) = engines_running(true);
+        s.config.set_up_later.as_mut().unwrap().lamp = side;
+        office_engines(&s, Ok(vec![row("claude", Some(true), Some(true))]));
+        s.counts
+            .engines
+            .lock()
+            .unwrap()
+            .insert("a".repeat(32), Ok(vec![row("hermes", Some(true), None)]));
+        s.start();
+        let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
+        targets_until(&s, office.clone());
+        // Looked at again, the lamp is still left out.
+        let looks = s.counts.engine_looks.load(Ordering::SeqCst);
+        let start = Instant::now();
+        while s.counts.engine_looks.load(Ordering::SeqCst) < looks + 3 {
+            assert!(start.elapsed() < Duration::from_secs(5), "not looked again");
+            thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(s.ask(json!({"op":"targets"}))["targets"], office);
+        let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        let targets = written["targets"].as_object().unwrap();
+        assert_eq!(targets.len(), 1, "{value:?}: {written}");
+        assert!(!targets.contains_key("lamp"), "{value:?}: {written}");
+        assert!(
+            !home.path().join("harnesses/lamp-tasks/lamp").exists(),
+            "{value:?}"
+        );
+        // The lamp asked for: no such target, nothing prepared.
+        assert_eq!(
+            s.ask(json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"lamp"}))["error"],
+            "target",
+            "{value:?}"
+        );
+        // Work naming no machine: prepared and started on the computer.
+        let prepared = prepared_until(&s, None);
+        let id = prepared["id"].clone();
+        let task = s.ask(json!({"op":"get_task","id":id}));
+        assert_eq!(task["target"]["engine"], "claude", "{value:?}: {task}");
+        assert_eq!(task["target"]["machine_id"], "b".repeat(32));
+        assert_eq!(task["task"]["target_alias"], "office");
+        s.counts.idle.store(true, Ordering::SeqCst);
+        let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+        assert_eq!(s.trusted(confirm)["ok"], true, "{value:?}");
+        s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+        assert_eq!(
+            *s.counts.launched_on.lock().unwrap(),
+            [("b".repeat(32), EngineKind::Claude)],
+            "{value:?}"
+        );
+    }
+    // On, with a home: the lamp's side, as the on-case above.
+    assert!(lamp_side(Some("on"), Some(home.path().to_owned())).is_some());
+    assert!(lamp_side(Some("on"), None).is_none());
 }
 
 /// #5199: an engine not found on that computer (`installed` null with
@@ -2414,6 +2672,7 @@ fn a_part_started_signed_in_starts_harnesss_daemon_once() {
             every: Duration::from_millis(20),
             from_machines: None,
             engines: false,
+            lamp: None,
         });
         s.counts.signed_out.store(signed_out, Ordering::SeqCst);
         s.start();
@@ -2430,6 +2689,46 @@ fn a_part_started_signed_in_starts_harnesss_daemon_once() {
     assert_eq!(started(true, false), 1, "signed in at the start");
     assert_eq!(started(true, true), 0, "signed out at the start");
     assert_eq!(started(false, false), 0, "no sign-in by code");
+}
+
+/// #5978, lamp-c0a4 on 10 Nov: Harness's daemon reads its env file only at
+/// its start, so when lamp-tasks wrote it with other words while the
+/// daemon ran, the daemon is started again once, before a hand-over; never
+/// while a task is busy (watched): then it waits. An adapter that doesn't
+/// ask for it is never restarted.
+#[test]
+fn a_changed_env_file_restarts_harnesss_daemon_once_and_never_while_a_task_is_busy() {
+    // Asked, no task: once, however long the part runs.
+    let mut s = Running::new(false);
+    s.stop();
+    s.counts.restart_wanted.store(true, Ordering::SeqCst);
+    s.start();
+    let start = Instant::now();
+    while s.counts.daemon_restarts.load(Ordering::SeqCst) == 0 {
+        assert!(start.elapsed() < Duration::from_secs(5), "never restarted");
+        thread::sleep(Duration::from_millis(5));
+    }
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        !v["task"]["dispatch"]["finished"].is_null()
+    });
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 1);
+    assert_eq!(*s.counts.order.lock().unwrap(), ["restart", "launch"]);
+    // The part started again with that task still busy: no restart.
+    s.stop();
+    s.start();
+    thread::sleep(Duration::from_millis(300));
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 1);
+    // Not asked: never.
+    let s = Running::new(false);
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        !v["task"]["dispatch"]["finished"].is_null()
+    });
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
 }
 
 /// openharness#1463, the reviewer-lead's P2 on #2309: a hand-over waiting
@@ -2666,7 +2965,8 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
     s.stop();
     let mut store = released(&s);
     let mut newer: Value = serde_json::from_slice(&store.load().unwrap().unwrap()).unwrap();
-    newer["schema"] = json!(6);
+    // One past the engine's `SCHEMA` (6 since #5978's `joined_on`).
+    newer["schema"] = json!(7);
     store.commit(&serde_json::to_vec(&newer).unwrap()).unwrap();
     drop(store);
     s.start();
@@ -2686,7 +2986,7 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
         "Tasks set aside a store from a newer build; its tasks are not followed"
     );
     let kept = kept.expect("the kept file is named");
-    assert!(kept.starts_with("tasks.sqlite3.newer-6-"), "{kept}");
+    assert!(kept.starts_with("tasks.sqlite3.newer-7-"), "{kept}");
     // Restarted: the store opens well now, and the kept file is still said.
     s.stop();
     drop(released(&s));
@@ -3133,6 +3433,7 @@ fn the_apps_state_says_harness_signed_in_across_a_restart() {
         every: Duration::from_millis(20),
         from_machines: None,
         engines: false,
+        lamp: None,
     });
     let said_until = |s: &Running, want: &str| {
         let start = Instant::now();

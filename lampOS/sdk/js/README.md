@@ -58,7 +58,7 @@ LAMPOS_HOME=/tmp/lampos-try node examples/greet.js
 ```
 
 Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
-example runs this way: `tour.js` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `heat-watch.js` (a pulsing orange light once when a joint runs hot: `body.state`'s `temp_c`), `desk-health.js` (keeps the minutes of stuffy air in a note per day, says one line and glows orange after two minutes of it, puts its own light out when the air clears: `air`, `light`, `speak`, `notes`), `notes.js` (a run counter kept in a note on the lamp), `phrase.js`, `pomodoro.js`,
+example runs this way: `tour.js` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `heat-watch.js` (a pulsing orange light once when a joint runs hot: `body.state`'s `temp_c`), `desk-health.js` (keeps the minutes of stuffy air in a note per day, says one line and glows orange after two minutes of it, puts its own light out when the air clears: `air`, `light`, `speak`, `notes`), `visitors.js` (counts the day's arrivals in a note, says nothing when someone comes, and says the count when asked "how many visitors": `look`, `hear`, `speak`, `notes`), `notes.js` (a run counter kept in a note on the lamp), `phrase.js`, `pomodoro.js`,
 `ci-light.js`, `ask-the-person.js`, `camera.js` (needs a pairing with the `camera` grant, which the app does not offer yet: only a pairing code made on the lamp itself carries it, so on a lamp paired through the app the call is refused `no_grant`; saves `snapshot.jpg` and a stream's `last-frame.jpg`), `curious.js` (a move of your own from poses), `touch.js` (a tap lights the ring, a pet is answered with a feeling; a tap reaches a program from the next build), and `push-skill.js ../examples/hello-skill` (a pairing with `skills` and `speak`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
@@ -145,6 +145,23 @@ lamp's door on 127.0.0.1, default 7731), `--twin-port N` (default 8737), `--came
 window of its own the twin opens in where Chrome, Chromium or Edge is installed). It pairs afresh under `DIR/sdk` at each
 start (the lamp makes a new certificate then); to drive the lamp from your own program too, run it
 with `LAMPOS_HOME=DIR/sdk`. Linux for now (the real `lamp-body` runs only there).
+
+### Try it from a browser: `try.js`
+
+`examples/twin/try.js` is the same virtual lamp with a page to play with, on one URL for any device on your
+network: the 3D twin, a control panel whose every button is one SDK call (gesture, express, light, light off, say,
+look, move, sound, stop), buttons for the room (someone arrives or leaves, a phrase, a tap or pet, a hand, a sound,
+stuffy or clear air: `lamp-sim people|hear|touch|hand|sound|air`), and a log of the lamp's events and the answer
+to each call, a refusal in the lamp's own words.
+
+```sh
+node examples/twin/try.js --lamp-sim ../../target/debug/lamp-sim     # prints the URL; Ctrl-C stops and cleans up
+```
+
+The lamp runs in a private folder (`~/.lampsim-try-PID`, 0700) and listens on 127.0.0.1 only; the page is the one
+thing on the network and answers only with the token in its URL. The camera and the microphone are off: the lamp
+has neither grant, so no picture of the room is ever on the page. The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
+your own at the same lamp.
 
 ### The examples against a running lamp
 

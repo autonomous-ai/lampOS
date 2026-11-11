@@ -70,6 +70,13 @@ pub fn main() -> io::Result<()> {
         Some(steps) if !steps.is_empty() => &steps[before.min(steps.len() - 1)],
         _ => &plan[operation],
     };
+    // `{"by_arg": {"ARG": step, …}}` beside a step: a call with ARG among
+    // its arguments takes that step, so calls made together (the stopped
+    // rows' shows, #5978) are answered by what they ask, not by their turn.
+    let step = match plan[operation]["by_arg"].as_object() {
+        Some(steps) => args.iter().find_map(|arg| steps.get(arg)).unwrap_or(step),
+        None => step,
+    };
     // `{"with_new": step}` beside a step: a call that asks for `--new NAME`
     // takes it instead, so a plain folder and a made one can be answered
     // apart (#5541).
@@ -83,11 +90,14 @@ pub fn main() -> io::Result<()> {
         .append(true)
         .mode(0o600)
         .open(home.join("calls.jsonl"))?;
-    writeln!(
-        calls,
-        "{}",
+    // One write of the whole line: calls made together (the stopped rows'
+    // shows, #5978) append from several processes at once, and `writeln!`
+    // writes in pieces that interleave between them.
+    let line = format!(
+        "{}\n",
         json!({"args":args,"environment":environment,"pid":std::process::id()})
-    )?;
+    );
+    calls.write_all(line.as_bytes())?;
     calls.flush()?;
     if step["stdin_eof"] == true {
         let mut input = Vec::new();

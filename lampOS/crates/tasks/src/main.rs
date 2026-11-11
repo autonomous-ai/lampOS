@@ -13,7 +13,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let command = args
         .next()
-        .ok_or("usage: lamp-tasks serve [--enable ...] | request --socket ABS")?;
+        .ok_or("usage: lamp-tasks serve [--enable ...] | request --socket ABS | skill list | skill call NAME [JSON]")?;
     if command == "request" {
         if args.next().as_deref() != Some("--socket") {
             return Err("request requires --socket ABS".into());
@@ -152,6 +152,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .into(),
         );
     }
+    // The lamp's own machine as a target, with Hermes (#5978): read only
+    // here, and only with the machines' engines looked at.
+    let hermes_switch = std::env::var(lamp_tasks::runtime::HERMES_ON_LAMP).ok();
+    let hermes_on_lamp = lamp_tasks::runtime::hermes_on_lamp(hermes_switch.as_deref());
+    if hermes_on_lamp && !engines_from_machines {
+        eprintln!(
+            "tasks: LAMP_HERMES_ON_LAMP is on, but without --engines-from-machines the lamp's own Hermes is never looked for; the lamp is no target"
+        );
+    }
     if push_wait && !watch {
         return Err("--push-wait reads with the watch; it cannot go with --no-watch".into());
     }
@@ -204,6 +213,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             every: SET_UP_LOOK_EVERY,
             from_machines,
             engines: engines_from_machines,
+            // The work folder is under `lampos`'s (Harness's) home.
+            lamp: lamp_tasks::runtime::lamp_side(
+                hermes_switch.as_deref(),
+                std::env::var_os("HOME").map(PathBuf::from),
+            ),
         }),
         sign_in_by_code,
         app_socket,
@@ -235,6 +249,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    // `lamp-tasks skill ...` (#5978): the lamp's own Hermes calling the
+    // lamp's skill tools. A short client, one JSON line out, no service.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("skill") {
+        let (line, status) = lamp_tasks::skill_call::run(
+            std::path::Path::new(lamp_tasks::skill_call::TOOLS_DIR),
+            &args[1..],
+        );
+        println!("{line}");
+        std::process::exit(status);
+    }
     // Its log lines never block it or end it, and its last ones reach the
     // journal (`lamp_ipc::log_relay`).
     let _log = lamp_ipc::log_relay::guard();

@@ -2,9 +2,9 @@
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
-    EngineRow, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
-    PS_STDOUT_LIMIT, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent, WatchLine,
-    iso_unix_ms, parse_auth_status, parse_engines, parse_machines, parse_ps, parse_wait,
+    EngineRow, JoinedOn, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
+    PS_STDOUT_LIMIT, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent,
+    WatchLine, iso_unix_ms, parse_auth_status, parse_engines, parse_machines, parse_ps, parse_wait,
     parse_watch_line,
 };
 use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, targets_from_machines};
@@ -108,11 +108,14 @@ impl Rig {
             engines_ready: false,
             route: false,
             reply_named: false,
+            resume_closed: false,
+            restart_daemon: false,
             absolute_folder: false,
             new_folder: None,
             new_folder_only: None,
             journal: None,
             calls: None,
+            session_machines: None,
             health_after_start: false,
             user_runtime_root: root.path().join("run-user"),
         };
@@ -1162,7 +1165,7 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
         (json!({"error":"NOT_IDLE","detail":"…"}), "reply_not_idle"),
         (
             json!({"error":"NOT_RUNNING","detail":"…"}),
-            "reply_not_running",
+            "session_closed",
         ),
         (
             json!({"ok":false,"name":"x","id":AGENT,"message":null,"state":"failed"}),
@@ -1236,6 +1239,693 @@ fn with_reply_named_a_named_session_is_typed_into_and_never_started_new() {
         assert_eq!(rig.cli().launch(&request), not_sent("invalid_session"));
         assert!(verbs(&rig).is_empty());
     }
+}
+
+/// #5535, the first builder's ruling on #5784's follow-up: a named session
+/// Harness says was closed or stopped (`harness reply`'s `NOT_RUNNING`) is
+/// not sent with its own reason, `session_closed`, so the lamp can say how
+/// to open it again, and nothing is routed or started new in its place.
+#[test]
+fn with_reply_named_a_closed_session_is_told_closed_and_nothing_new_starts() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.route = true;
+    rig.config.engines_ready = true;
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"route":{"default":true},
+        "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":[
+            ps_row(AGENT, "Docs-Update", "idle", Some("/w/site"))
+        ],"next":[]})),
+        "reply":{"stdout":format!("{}\n", json!({
+            "error":"NOT_RUNNING",
+            "detail":"was closed or stopped. Run harness resume, or start a new harness with the whole task.",
+            "code":"NOT_RUNNING",
+            "next":[]
+        })),"exit":5}
+    }));
+    let mut request = launch();
+    request.session = Some("docs update".into());
+    assert_eq!(bare(rig.cli().launch(&request)), not_sent("session_closed"));
+    let called: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(called, ["machines", "ps", "reply"]);
+}
+
+/// `LAMP_TASKS_RESUME_CLOSED` (openharness#3606's provisional contract): a
+/// named session `harness reply` finds closed (`NOT_RUNNING`) is reopened
+/// once with `harness resume` and the words typed again, waited for first
+/// while it says it is working; any other end of the resume is
+/// `session_closed` (`session_resume_unconfirmed` for `RESUME_UNCONFIRMED`),
+/// nothing typed and nothing started new. Off, it is never resumed.
+#[test]
+fn with_resume_closed_a_closed_named_session_is_reopened_once_and_typed_into() {
+    let closed = json!({
+        "stdout":format!("{}\n", json!({
+            "error":"NOT_RUNNING","detail":"… Run harness resume …","code":"NOT_RUNNING","next":[]
+        })),"exit":5
+    });
+    let took = step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"}));
+    let reopened = |resumed: bool, state: &str| {
+        step(json!({
+            "ok":true,"name":"Docs-Update","id":AGENT,"state":state,
+            "resumed":resumed,"effect":"reopened","next":[]
+        }))
+    };
+    let named = |on: bool, plan: Value| {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.config.resume_closed = on;
+        rig.config.route = true;
+        let mut full = json!({
+            "machines":{"default":true},"new":{"default":true},"route":{"default":true},
+            // Harness 0.5.98's own help lists `resume`.
+            "--help":{"stdout":"Commands:\n  reply    Type into a harness\n  resume   Reopen a closed harness\n"},
+            "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":[
+                ps_row(AGENT, "Docs-Update", "idle", Some("/w/site"))
+            ],"next":[]})),
+        });
+        for (verb, answer) in plan.as_object().unwrap() {
+            full[verb] = answer.clone();
+        }
+        rig.plan(full);
+        let mut request = launch();
+        request.session = Some("docs update".into());
+        let outcome = rig.cli().launch(&request);
+        let called: Vec<String> = rig
+            .calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .collect();
+        (outcome, called, rig)
+    };
+    let joined = |resumed: bool| LaunchOutcome::Joined {
+        agent_id: AGENT.into(),
+        session: Some(lamp_tasks::harness::JoinedSession {
+            name: Some("Docs-Update".into()),
+            ask: None,
+            resumed: Some(resumed),
+        }),
+    };
+    // Reopened with its conversation, and typed into.
+    let (outcome, called, rig) = named(
+        true,
+        json!({"reply":{"each":[closed.clone(), took.clone()]},"resume":reopened(true, "idle")}),
+    );
+    assert_eq!(outcome, joined(true));
+    assert_eq!(
+        called,
+        ["machines", "ps", "reply", "--help", "resume", "reply"]
+    );
+    assert_eq!(
+        rig.calls()[4]["args"],
+        json!(["resume", "--machine", MACHINE, AGENT, "--json"])
+    );
+    // Open again in a new conversation: typed into, and said so.
+    let (outcome, called, _) = named(
+        true,
+        json!({"reply":{"each":[closed.clone(), took.clone()]},"resume":reopened(false, "idle")}),
+    );
+    assert_eq!(outcome, joined(false));
+    assert_eq!(
+        called,
+        ["machines", "ps", "reply", "--help", "resume", "reply"]
+    );
+    // Working once reopened: waited for, then typed into.
+    let idle = step(json!({"harnesses":[{"id":AGENT,"state":"idle"}]}));
+    let (outcome, called, rig) = named(
+        true,
+        json!({
+            "reply":{"each":[closed.clone(), took.clone()]},
+            "resume":reopened(true, "working"),"wait":idle
+        }),
+    );
+    assert_eq!(outcome, joined(true));
+    assert_eq!(
+        called,
+        [
+            "machines", "ps", "reply", "--help", "resume", "wait", "reply"
+        ]
+    );
+    let wait = rig.calls()[5]["args"].as_array().unwrap().clone();
+    assert_eq!(
+        wait[0..4],
+        json!(["wait", "--machine", MACHINE, AGENT])
+            .as_array()
+            .unwrap()[..]
+    );
+    assert_eq!(wait[4], "--timeout");
+    // Still working at the wait's end, or asking the person: busy.
+    let still = json!({"stdout":format!("{}\n", json!({"harnesses":[]})),"exit":124});
+    for plan in [
+        json!({"reply":closed.clone(),"resume":reopened(true, "working"),"wait":still}),
+        json!({"reply":closed.clone(),"resume":reopened(true, "needs-input")}),
+    ] {
+        let (outcome, called, _) = named(true, plan.clone());
+        assert_eq!(outcome, not_sent("session_busy"), "{plan}");
+        assert_eq!(called.iter().filter(|verb| *verb == "reply").count(), 1);
+    }
+    // Every failure: the session still closed, nothing typed, nothing new.
+    // As Harness answers them: `{"error","detail","code","next"}`.
+    let failed = |exit: i64, answer: Value| {
+        let mut answer = answer;
+        answer["code"] = answer["error"].clone();
+        answer["next"] = json!([]);
+        json!({"stdout":format!("{answer}\n"),"exit":exit})
+    };
+    for (resume, code) in [
+        (
+            failed(5, json!({"error":"NOT_YOURS","detail":"…"})),
+            "session_closed",
+        ),
+        (
+            failed(5, json!({"error":"REPLY_OFF","detail":"…"})),
+            "session_closed",
+        ),
+        (
+            failed(1, json!({"error":"RESUME_UNCONFIRMED","detail":"…"})),
+            "session_resume_unconfirmed",
+        ),
+        (
+            failed(1, json!({"error":"AGENT_CHANGED"})),
+            "session_closed",
+        ),
+        (
+            failed(1, json!({"error":"AGENT_NOT_FOUND"})),
+            "session_closed",
+        ),
+        (failed(1, json!({"error":"AGENT_BUSY"})), "session_closed"),
+        (
+            failed(1, json!({"error":"DELETE_IN_PROGRESS"})),
+            "session_closed",
+        ),
+        (
+            failed(1, json!({"error":"UNSUPPORTED_ON_REMOTE"})),
+            "session_closed",
+        ),
+        (
+            failed(1, json!({"error":"RESUME_PREPARATION_FAILED"})),
+            "session_closed",
+        ),
+        (failed(1, json!({"error":"TIMEOUT"})), "session_closed"),
+        (
+            failed(1, json!({"error":"UNKNOWN_HARNESS"})),
+            "session_closed",
+        ),
+        (
+            failed(1, json!({"error":"SOMETHING_NEW"})),
+            "session_closed",
+        ),
+        // Only `code`, as a later shape might give it.
+        (
+            json!({"stdout":format!("{}\n", json!({"code":"RESUME_UNCONFIRMED"})),"exit":1}),
+            "session_resume_unconfirmed",
+        ),
+        (
+            json!({"stdout":"Unknown command: resume\n","exit":1}),
+            "session_closed",
+        ),
+        // Exit 0 and not `ok`, another session, or no `resumed`: lenient.
+        (
+            step(json!({"ok":false,"id":AGENT,"state":"idle","resumed":true})),
+            "session_closed",
+        ),
+        (
+            step(
+                json!({"ok":true,"id":"33333333-3333-4333-8333-333333333333","state":"idle","resumed":true}),
+            ),
+            "session_closed",
+        ),
+        (
+            step(json!({"ok":true,"id":AGENT,"state":"idle"})),
+            "session_closed",
+        ),
+        (json!({"stdout":"not json\n"}), "session_closed"),
+    ] {
+        let (outcome, called, _) = named(
+            true,
+            json!({"reply":{"each":[closed.clone(), took.clone()]},"resume":resume}),
+        );
+        assert_eq!(outcome, not_sent(code), "{resume}");
+        assert_eq!(
+            called,
+            ["machines", "ps", "reply", "--help", "resume"],
+            "{resume}"
+        );
+    }
+    // Closed again after it reopened: never resumed a second time.
+    let (outcome, called, _) = named(
+        true,
+        json!({"reply":closed.clone(),"resume":reopened(true, "idle")}),
+    );
+    assert_eq!(outcome, not_sent("session_closed"));
+    assert_eq!(
+        called,
+        ["machines", "ps", "reply", "--help", "resume", "reply"]
+    );
+    // Off: as ruling 1, never resumed.
+    let (outcome, called, _) = named(
+        false,
+        json!({"reply":closed.clone(),"resume":reopened(true, "idle")}),
+    );
+    assert_eq!(outcome, not_sent("session_closed"));
+    assert_eq!(called, ["machines", "ps", "reply"]);
+}
+
+/// `LAMP_TASKS_RESUME_CLOSED`: a resume that leaves the reply under a second
+/// of the launch bound types nothing (`sessions_timeout`).
+#[test]
+fn with_resume_closed_a_resume_that_leaves_no_time_types_nothing() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.resume_closed = true;
+    rig.config.read_timeout = Duration::from_secs(3);
+    rig.config.launch_timeout = Duration::from_millis(5600);
+    let mut resume = step(json!({
+        "ok":true,"name":"docs","id":AGENT,"state":"idle","resumed":true,"effect":"x","next":[]
+    }));
+    resume["delay_ms"] = json!(5000);
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},
+        "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+        "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":[
+            ps_row(AGENT, "docs", "idle", None)
+        ],"next":[]})),
+        "reply":{"each":[
+            {"stdout":format!("{}\n", json!({"error":"NOT_RUNNING","code":"NOT_RUNNING","next":[]})),"exit":5},
+            step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"}))
+        ]},
+        "resume":resume
+    }));
+    let mut request = launch();
+    request.session = Some("docs".into());
+    // Under 1 s left after it, `sessions_timeout`; on a loaded host the
+    // resume itself may run past the bound, `session_closed`. Either way
+    // the words are never typed.
+    let outcome = rig.cli().launch(&request);
+    assert!(
+        outcome == not_sent("sessions_timeout") || outcome == not_sent("session_closed"),
+        "{outcome:?}"
+    );
+    let replies = rig
+        .calls()
+        .iter()
+        .filter(|call| call["args"][0] == "reply")
+        .count();
+    assert_eq!(replies, 1);
+}
+
+/// `LAMP_TASKS_RESUME_CLOSED` on a Harness older than 0.5.98: before the
+/// first resume, `harness --help` is asked once a start whether it has
+/// `resume`, and `harness resume --help` when its help doesn't list it; with
+/// neither, the session is told closed (`session_closed`), as with the
+/// switch off, and the answer is kept for the rest of the start. A help
+/// that doesn't list it, with `resume --help` exiting 0, has it.
+#[test]
+fn with_resume_closed_an_older_harness_without_resume_is_told_closed() {
+    let closed = json!({
+        "stdout":format!("{}\n", json!({"error":"NOT_RUNNING","code":"NOT_RUNNING","next":[]})),
+        "exit":5
+    });
+    let rows = step(json!({"you":null,"machine":"desk-pc","harnesses":[
+        ps_row(AGENT, "Docs-Update", "idle", None)
+    ],"next":[]}));
+    let verbs = |rig: &Rig| -> Vec<String> {
+        rig.calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let mut request = launch();
+    request.session = Some("docs update".into());
+    // Too old: no `resume` in its help, and `resume` unknown.
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.resume_closed = true;
+    rig.plan(json!({
+        "machines":{"default":true},"ps":rows.clone(),"reply":closed.clone(),
+        "--help":{"stdout":"Commands:\n  reply    Type into a harness\n"},
+        "resume":{"stdout":"Unknown command: resume\n","exit":1},
+        "--version":{"stdout":"0.5.97\n"}
+    }));
+    let cli = rig.cli();
+    assert_eq!(cli.launch(&request), not_sent("session_closed"));
+    assert_eq!(
+        verbs(&rig),
+        ["machines", "ps", "reply", "--help", "resume", "--version"]
+    );
+    assert_eq!(rig.calls()[4]["args"], json!(["resume", "--help"]));
+    // Kept for the start: asked no more.
+    assert_eq!(cli.launch(&request), not_sent("session_closed"));
+    let asked = verbs(&rig);
+    assert_eq!(asked.iter().filter(|verb| *verb == "--help").count(), 1);
+    assert_eq!(asked.iter().filter(|verb| *verb == "resume").count(), 1);
+    // Not in its help, and `resume --help` exits 0: it has it.
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.resume_closed = true;
+    rig.plan(json!({
+        "machines":{"default":true},"ps":rows,
+        "reply":{"each":[
+            closed,
+            step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"}))
+        ]},
+        "--help":{"stdout":"Usage: harness <command>\n"},
+        "resume":{"each":[
+            {"stdout":"Usage: harness resume [--machine <name>] <name|id> [--json]\n"},
+            step(json!({"ok":true,"name":"Docs-Update","id":AGENT,"state":"idle","resumed":true,"effect":"x","next":[]}))
+        ]}
+    }));
+    assert!(matches!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Joined { .. }
+    ));
+    assert_eq!(
+        verbs(&rig),
+        [
+            "machines", "ps", "reply", "--help", "resume", "resume", "reply"
+        ]
+    );
+}
+
+/// A stopped `harness ps --all` row as Harness CLI 0.6.2 lists it: no
+/// `about` and no `asks` (openharness cli commands.ts 602-605).
+fn stopped_row(id: &str, name: &str, last_active: &str) -> Value {
+    json!({"name":name,"id":id,"agent":"Hermes","machine":"lamp","state":"stopped",
+        "folder":"/var/lib/lampos-hermes/lamp-tasks","branch":null,"startedBy":"lamp",
+        "yours":true,"self":false,"lastActive":last_active})
+}
+
+/// What `harness show --json` gives of a stopped harness: its last turn.
+fn shown_stopped(id: &str, ask: &str) -> Value {
+    step(json!({"id":id,"state":"stopped","ask":ask,"answer":"Done.","truncated":false,"tools":1}))
+}
+
+/// #5978, lamp-c0a4 on 10 Nov: with `--close-told` the lamp closes a
+/// session once its done line is told, and `harness ps --all` then lists
+/// it stopped, without `about` or `asks`. So when no row fits by name,
+/// folder or work, the newest stopped rows' last asks are read with
+/// `harness show` (at most four, newest first by `lastActive`) and matched
+/// by work as a live row's asks are. Off, one that fits is said stopped,
+/// nothing typed; with `LAMP_TASKS_RESUME_CLOSED=on` it is reopened once
+/// with `harness resume` and typed into; two that fit are asked about.
+#[test]
+fn a_stopped_session_is_found_by_its_last_ask_and_reopened_with_the_switch() {
+    const THIRD: &str = "44444444-4444-4444-8444-444444444444";
+    const FOURTH: &str = "55555555-5555-4555-8555-555555555555";
+    const FIFTH: &str = "66666666-6666-4666-8666-666666666666";
+    let lamp_made = "lamp-0a1b2c3d";
+    // The newest last: read newest first.
+    let rows = json!([
+        stopped_row(FIFTH, lamp_made, "2026-11-10T01:00:00.000Z"),
+        stopped_row(AGENT, lamp_made, "2026-11-10T05:00:00.000Z"),
+        stopped_row(OTHER, lamp_made, "2026-11-10T04:00:00.000Z"),
+        stopped_row(THIRD, lamp_made, "2026-11-10T03:00:00.000Z"),
+        stopped_row(FOURTH, lamp_made, "2026-11-10T02:00:00.000Z"),
+    ]);
+    // Answered by the row each show asks about: the shows run together.
+    let shows = |asks: [&str; 4]| {
+        json!({"by_arg":{
+            AGENT: shown_stopped(AGENT, asks[0]),
+            OTHER: shown_stopped(OTHER, asks[1]),
+            THIRD: shown_stopped(THIRD, asks[2]),
+            FOURTH: shown_stopped(FOURTH, asks[3]),
+        }})
+    };
+    let run = |on: bool, show: Value| {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.config.resume_closed = on;
+        rig.plan(json!({
+            "machines":{"default":true},
+            "ps":step(json!({"you":null,"machine":"lamp","harnesses":rows,"next":[]})),
+            "show":show,
+            "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+            "resume":step(json!({"ok":true,"name":lamp_made,"id":AGENT,"state":"idle","resumed":true,"effect":"reopened","next":[]})),
+            "reply":step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"})),
+        }));
+        let mut request = launch();
+        request.session = Some("the moon poem".into());
+        let outcome = rig.cli().launch(&request);
+        let calls: Vec<Value> = rig
+            .calls()
+            .iter()
+            .map(|call| call["args"].clone())
+            .collect();
+        (outcome, calls)
+    };
+    let verbs = |calls: &[Value]| -> Vec<String> {
+        calls
+            .iter()
+            .map(|call| call[0].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let moon = [
+        "Write a short poem about the moon",
+        "Fix the login page",
+        "Sort my notes",
+        "Plan the trip",
+    ];
+    // Off: said stopped, nothing reopened or typed. The four newest are read
+    // (together, so in no set order); the fifth is never read.
+    let (outcome, calls) = run(false, shows(moon));
+    assert_eq!(outcome, not_sent("session_stopped"));
+    assert_eq!(
+        verbs(&calls),
+        ["machines", "ps", "show", "show", "show", "show"]
+    );
+    assert!(calls[2..].contains(&json!(["show", "--machine", MACHINE, AGENT, "--json"])));
+    let mut shown: Vec<&str> = calls[2..]
+        .iter()
+        .map(|call| call[3].as_str().unwrap())
+        .collect();
+    shown.sort_unstable();
+    let mut newest = [AGENT, OTHER, THIRD, FOURTH];
+    newest.sort_unstable();
+    assert_eq!(shown, newest);
+    // On: reopened once, then typed into, and known by its last ask.
+    let (outcome, calls) = run(true, shows(moon));
+    assert_eq!(
+        outcome,
+        LaunchOutcome::Joined {
+            agent_id: AGENT.into(),
+            session: Some(lamp_tasks::harness::JoinedSession {
+                name: None,
+                ask: Some("Write a short poem about the moon".into()),
+                resumed: Some(true),
+            }),
+        }
+    );
+    assert_eq!(
+        verbs(&calls),
+        [
+            "machines", "ps", "show", "show", "show", "show", "--help", "resume", "reply"
+        ]
+    );
+    assert_eq!(
+        calls[7],
+        json!(["resume", "--machine", MACHINE, AGENT, "--json"])
+    );
+    assert_eq!(calls[8][3], AGENT);
+    // Two stopped ones hold the work: asked about, nothing reopened.
+    let (outcome, calls) = run(
+        true,
+        shows([moon[0], "A moon poem for the kids", moon[2], moon[3]]),
+    );
+    assert_eq!(outcome, not_sent("session_ambiguous"));
+    assert!(
+        !verbs(&calls)
+            .iter()
+            .any(|verb| verb == "resume" || verb == "reply")
+    );
+    // None holds it: not found, nothing reopened.
+    let (outcome, calls) = run(true, shows([moon[1], moon[1], moon[2], moon[3]]));
+    assert_eq!(outcome, not_sent("session_not_found"));
+    assert!(
+        !verbs(&calls)
+            .iter()
+            .any(|verb| verb == "resume" || verb == "reply")
+    );
+    // A show that can't be read is passed over.
+    let (outcome, _) = run(false, json!({"stdout":"not json\n"}));
+    assert_eq!(outcome, not_sent("session_not_found"));
+}
+
+/// #5978, lamp-c0a4 on 10 Nov: each stopped row's `harness show` took about
+/// 2.3 s, and four read one after another cost about 9.2 s of a follow-up.
+/// They are read together: four shows of about 1 s each are all read in
+/// well under 4 s, and the one that fits is found as before.
+#[test]
+fn a_closed_sessions_last_asks_are_read_together() {
+    const THIRD: &str = "44444444-4444-4444-8444-444444444444";
+    const FOURTH: &str = "55555555-5555-4555-8555-555555555555";
+    let lamp_made = "lamp-0a1b2c3d";
+    let slow = |id: &str, ask: &str| {
+        let mut show = shown_stopped(id, ask);
+        show["delay_ms"] = json!(1000);
+        show
+    };
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"lamp","harnesses":[
+            stopped_row(AGENT, lamp_made, "2026-11-10T05:00:00.000Z"),
+            stopped_row(OTHER, lamp_made, "2026-11-10T04:00:00.000Z"),
+            stopped_row(THIRD, lamp_made, "2026-11-10T03:00:00.000Z"),
+            stopped_row(FOURTH, lamp_made, "2026-11-10T02:00:00.000Z"),
+        ],"next":[]})),
+        "show":{"by_arg":{
+            AGENT: slow(AGENT, "Fix the login page"),
+            OTHER: slow(OTHER, "Sort my notes"),
+            THIRD: slow(THIRD, "Write a short poem about the moon"),
+            FOURTH: slow(FOURTH, "Plan the trip"),
+        }},
+    }));
+    let mut request = launch();
+    request.session = Some("the moon poem".into());
+    let began = Instant::now();
+    let outcome = rig.cli().launch(&request);
+    let took = began.elapsed();
+    assert_eq!(outcome, not_sent("session_stopped"));
+    let shows = rig
+        .calls()
+        .iter()
+        .filter(|call| call["args"][0] == "show")
+        .count();
+    assert_eq!(shows, 4);
+    assert!(took < Duration::from_millis(2500), "took {took:?}");
+}
+
+/// #5978: words that name no work ("the one from before") read no stopped
+/// session's last ask: nothing to match it by.
+#[test]
+fn words_that_name_no_work_read_no_stopped_session() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"lamp","harnesses":[
+            stopped_row(AGENT, "lamp-0a1b2c3d", "2026-11-10T05:00:00.000Z")
+        ],"next":[]})),
+        "show":shown_stopped(AGENT, "Write a short poem about the moon"),
+    }));
+    let mut request = launch();
+    request.session = Some("the one from before".into());
+    assert_eq!(rig.cli().launch(&request), not_sent("session_not_found"));
+    assert!(!rig.calls().iter().any(|call| call["args"][0] == "show"));
+}
+
+/// #5978: a session stopped and found by its name is reopened with
+/// `LAMP_TASKS_RESUME_CLOSED=on`, its last ask never read.
+#[test]
+fn with_resume_closed_a_stopped_session_found_by_name_is_reopened() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.resume_closed = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"lamp","harnesses":[
+            stopped_row(AGENT, "Docs-Update", "2026-11-10T05:00:00.000Z")
+        ],"next":[]})),
+        "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+        "resume":step(json!({"ok":true,"name":"Docs-Update","id":AGENT,"state":"idle","resumed":false,"effect":"x","next":[]})),
+        "reply":step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"})),
+    }));
+    let mut request = launch();
+    request.session = Some("docs update".into());
+    let outcome = rig.cli().launch(&request);
+    assert!(
+        matches!(&outcome, LaunchOutcome::Joined { session: Some(session), .. }
+            if session.resumed == Some(false)),
+        "{outcome:?}"
+    );
+    let verbs: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(verbs, ["machines", "ps", "--help", "resume", "reply"]);
+}
+
+/// #5978, lamp-c0a4 on 10 Nov: a named hand-over to the lamp does not list
+/// a computer the last `harness machines` look said is offline (each such
+/// list only came back DISCONNECTED after about 2.2 s). Nowhere fitting is
+/// then said as a computer not read (`sessions_offline`), not as no such
+/// session; a computer still online is listed.
+#[test]
+fn a_computer_said_offline_is_not_listed_for_a_named_session() {
+    const LAPTOP: &str = "fedcba9876543210fedcba9876543210";
+    const DESK: &str = "abababababababababababababababab";
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.session_machines = Some(Arc::new(Mutex::new(SessionMachines {
+        lamp: Some(MACHINE.into()),
+        computers: vec![
+            ("office".into(), LAPTOP.into(), EngineKind::Claude),
+            ("desk".into(), DESK.into(), EngineKind::Codex),
+        ],
+        offline: [LAPTOP.to_owned()].into_iter().collect(),
+    })));
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"m","harnesses":[],"next":[]})),
+    }));
+    let mut request = launch();
+    request.target.engine = EngineKind::Hermes;
+    request.session = Some("docs".into());
+    assert_eq!(rig.cli().launch(&request), not_sent("sessions_offline"));
+    let listed: Vec<String> = rig
+        .calls()
+        .iter()
+        .filter(|call| call["args"][0] == "ps")
+        .map(|call| call["args"][2].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(listed, [MACHINE, DESK]);
+}
+
+/// #5978, the owner's rule: a lamp with no computer paired looks for a
+/// named session on the lamp alone, a closed one too: found by its last
+/// ask, reopened with the switch, typed into on the lamp.
+#[test]
+fn a_lamp_with_no_computer_finds_and_reopens_its_closed_session() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.resume_closed = true;
+    rig.config.session_machines = Some(Arc::new(Mutex::new(SessionMachines {
+        lamp: Some(MACHINE.into()),
+        computers: Vec::new(),
+        offline: Default::default(),
+    })));
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"lamp","harnesses":[
+            stopped_row(AGENT, "lamp-0a1b2c3d", "2026-11-10T05:00:00.000Z")
+        ],"next":[]})),
+        "show":shown_stopped(AGENT, "Write a short poem about the moon"),
+        "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+        "resume":step(json!({"ok":true,"name":"lamp-0a1b2c3d","id":AGENT,"state":"idle","resumed":true,"effect":"x","next":[]})),
+        "reply":step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"})),
+    }));
+    let mut request = launch();
+    request.target.engine = EngineKind::Hermes;
+    request.session = Some("the moon poem".into());
+    let outcome = rig.cli().launch(&request);
+    assert!(
+        matches!(&outcome, LaunchOutcome::Joined { agent_id, .. } if agent_id == AGENT),
+        "{outcome:?}"
+    );
+    let verbs: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        verbs,
+        ["machines", "ps", "show", "--help", "resume", "reply"]
+    );
 }
 
 /// A Devin Cloud agent's id, as Harness 0.4.27 gave one on 20 October.
@@ -3293,6 +3983,21 @@ fn a_harness_without_the_code_sign_in_is_told_apart_and_a_dropped_one_stops() {
     assert!(!alive);
 }
 
+/// #5978: Harness's daemon is started again with `harness start
+/// --restart` (Harness CLI 0.6.2), and a failure is said.
+#[test]
+fn the_daemon_is_started_again_with_harness_start_restart() {
+    let rig = Rig::new();
+    rig.plan(json!({"start":step(json!({}))}));
+    assert_eq!(rig.cli().restart_daemon(), Ok(()));
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["args"], json!(["start", "--restart"]));
+    let rig = Rig::new();
+    rig.plan(json!({"start":{"exit":1}}));
+    assert_eq!(rig.cli().restart_daemon(), Err("restart_failed".into()));
+}
+
 /// openharness#1463: after a sign-in by code, Harness's daemon is started
 /// with `harness start`, the CLI's own (through systemd where `harness
 /// service install` put it, as on a lamp), and a failure is said, not hidden.
@@ -4567,4 +5272,200 @@ fn a_watch_line_is_read_for_its_event_only() {
         assert_eq!(read.name(), event);
         assert_eq!(read.settled(), !matches!(event, "started" | "working"));
     }
+}
+
+/// #5978, `LAMP_HERMES_ON_LAMP`: a named hand-over to the lamp's own
+/// target (Hermes on the lamp's machine) looks for the session on the lamp
+/// and on each computer: one on the lamp wins a tie with a computer's, the
+/// lamp's own rules first (a stopped one there is said stopped); one only
+/// on a computer is typed into there and said so (`joined_on`); two
+/// computers that both fit are asked about. A hand-over to a computer, the
+/// person having named it, looks on that computer alone.
+#[test]
+fn a_named_session_is_looked_for_on_the_lamp_first_then_the_computers() {
+    const LAPTOP: &str = "fedcba9876543210fedcba9876543210";
+    const DESK: &str = "abababababababababababababababab";
+    let lamp_launch = || {
+        let mut request = launch();
+        request.target.engine = EngineKind::Hermes;
+        request.target.project = "/var/lib/lampos-hermes/lamp-tasks".into();
+        request.session = Some("docs".into());
+        request
+    };
+    let ps = |rows: Value| step(json!({"you":null,"machine":"m","harnesses":rows,"next":[]}));
+    let took =
+        |id: &str| step(json!({"ok":true,"name":"x","id":id,"message":"m1","state":"queued"}));
+    let run = |request: Launch, each: Vec<Value>, computers: &[(&str, &str)], reply: &str| {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.config.session_machines = Some(Arc::new(Mutex::new(SessionMachines {
+            lamp: Some(MACHINE.into()),
+            computers: computers
+                .iter()
+                .map(|(alias, id)| ((*alias).into(), (*id).into(), EngineKind::Claude))
+                .collect(),
+            offline: Default::default(),
+        })));
+        rig.plan(json!({
+            "machines":{"default":true},"ps":{"each":each},"reply":took(reply)
+        }));
+        let outcome = rig.cli().launch(&request);
+        let calls: Vec<Value> = rig
+            .calls()
+            .iter()
+            .map(|call| call["args"].clone())
+            .collect();
+        (outcome, calls)
+    };
+    let docs = |id: &str, state: &str| json!([ps_row(id, "docs", state, None)]);
+    let none = json!([]);
+    // Both fit: the lamp's, and the computer's list is never read (#5978:
+    // the lookup took 15.2 s on lamp-c0a4 reading every computer).
+    let (outcome, calls) = run(
+        lamp_launch(),
+        vec![ps(docs(AGENT, "idle")), ps(docs(OTHER, "idle"))],
+        &[("office", LAPTOP)],
+        AGENT,
+    );
+    assert!(
+        matches!(&outcome, LaunchOutcome::Joined { agent_id, .. } if agent_id == AGENT),
+        "{outcome:?}"
+    );
+    assert_eq!(
+        calls[1],
+        json!(["ps", "--machine", MACHINE, "--all", "--json"])
+    );
+    assert_eq!(calls[2][0], "reply");
+    assert_eq!(calls[2][2], MACHINE);
+    assert_eq!(calls.iter().filter(|call| call[0] == "ps").count(), 1);
+    // Only on a computer: typed there, and followed there.
+    let (outcome, calls) = run(
+        lamp_launch(),
+        vec![ps(none.clone()), ps(docs(OTHER, "idle"))],
+        &[("office", LAPTOP)],
+        OTHER,
+    );
+    match outcome {
+        LaunchOutcome::JoinedOn { agent_id, on, .. } => {
+            assert_eq!(agent_id, OTHER);
+            assert_eq!(
+                on,
+                JoinedOn {
+                    alias: "office".into(),
+                    machine_id: LAPTOP.into(),
+                    engine: EngineKind::Claude,
+                }
+            );
+        }
+        outcome => panic!("{outcome:?}"),
+    }
+    assert_eq!(
+        calls[3],
+        json!([
+            "reply",
+            "--machine",
+            LAPTOP,
+            OTHER,
+            "--json",
+            "--",
+            "Inspect the authored fixture"
+        ])
+    );
+    // A stopped one on the lamp and a live one on a computer: the lamp's
+    // rule first, nothing typed.
+    let (outcome, _) = run(
+        lamp_launch(),
+        vec![ps(docs(AGENT, "stopped")), ps(docs(OTHER, "idle"))],
+        &[("office", LAPTOP)],
+        OTHER,
+    );
+    assert_eq!(
+        outcome,
+        LaunchOutcome::NotSent {
+            code: "session_stopped".into()
+        }
+    );
+    // Two computers both fit, none on the lamp: asked about.
+    let (outcome, calls) = run(
+        lamp_launch(),
+        vec![
+            ps(none.clone()),
+            ps(docs(OTHER, "idle")),
+            ps(docs(AGENT, "idle")),
+        ],
+        &[("office", LAPTOP), ("desk", DESK)],
+        OTHER,
+    );
+    assert_eq!(
+        outcome,
+        LaunchOutcome::NotSent {
+            code: "session_ambiguous".into()
+        }
+    );
+    assert!(!calls.iter().any(|call| call[0] == "reply"), "{calls:?}");
+    // Nowhere: not found.
+    let (outcome, _) = run(
+        lamp_launch(),
+        vec![ps(none.clone()), ps(none.clone())],
+        &[("office", LAPTOP)],
+        OTHER,
+    );
+    assert_eq!(
+        outcome,
+        LaunchOutcome::NotSent {
+            code: "session_not_found".into()
+        }
+    );
+    // A machine named (a computer's target, not the lamp's): that one only.
+    let mut computer = lamp_launch();
+    computer.target.engine = EngineKind::Codex;
+    let (outcome, calls) = run(
+        computer,
+        vec![ps(docs(AGENT, "idle")), ps(docs(OTHER, "idle"))],
+        &[("office", LAPTOP)],
+        AGENT,
+    );
+    assert!(
+        matches!(outcome, LaunchOutcome::Joined { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(calls.iter().filter(|call| call[0] == "ps").count(), 1);
+}
+
+/// #5978: the machines a named hand-over to the lamp looks among, from
+/// the targets: the lamp's own (Hermes) apart, each computer once, no cloud
+/// agent.
+#[test]
+fn the_session_machines_come_from_the_targets() {
+    let target = |id: char, engine: EngineKind| Target {
+        machine_id: id.to_string().repeat(32),
+        project: "~/harnesses/lamp-tasks".into(),
+        engine,
+    };
+    let targets = BTreeMap::from([
+        ("lamp".to_owned(), target('a', EngineKind::Hermes)),
+        ("office".to_owned(), target('b', EngineKind::Claude)),
+        ("office-codex".to_owned(), target('b', EngineKind::Codex)),
+        (
+            "devin".to_owned(),
+            Target {
+                project: String::new(),
+                ..target('c', EngineKind::DevinCloud)
+            },
+        ),
+        ("laptop".to_owned(), target('d', EngineKind::Codex)),
+    ]);
+    let machines = SessionMachines::from_targets(&targets);
+    assert_eq!(machines.lamp, Some("a".repeat(32)));
+    assert_eq!(
+        machines.computers,
+        [
+            ("laptop".to_owned(), "d".repeat(32), EngineKind::Codex),
+            ("office".to_owned(), "b".repeat(32), EngineKind::Claude),
+        ]
+    );
+    // No lamp target: no lamp, the computers as they are.
+    let mut without = targets.clone();
+    without.remove("lamp");
+    assert_eq!(SessionMachines::from_targets(&without).lamp, None);
 }
