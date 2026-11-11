@@ -2890,20 +2890,23 @@ impl Run<'_, '_> {
             "putting build {} back: {why}{told}",
             build.sequence
         ));
+        // A fault of the build is written into the journal before anything
+        // is put back, so a start after a cut in the put-back, or before the
+        // state below is written, refuses the build as this one would have,
+        // and does not take it for a cut-short (#6266; Thirteen's P3 on
+        // #6416). A cut-short leaves the journal unmarked: tried again.
+        if !cut_short && let Err(error) = self.records.mark_journal_refusing(&why) {
+            self.say(&format!(
+                "the journal cannot be marked with why build {} is put back: {error}",
+                build.sequence
+            ));
+        }
         let (after, old, files_back) = self.restore(backs, failed);
         self.settings_now(state);
         if !files_back {
-            // Not all is as it was: the journal stays, for the next start
-            // to try again, and nothing is pruned that a path still names.
-            // A fault of the build is written into it, so that start refuses
-            // the build as this one would have, and does not take it for a
-            // cut-short (#6266).
-            if !cut_short && let Err(error) = self.records.mark_journal_refusing(&why) {
-                self.say(&format!(
-                    "the journal cannot be marked with why build {} is put back: {error}",
-                    build.sequence
-                ));
-            }
+            // Not all is as it was: the journal stays, marked as above, for
+            // the next start to try again, and nothing is pruned that a path
+            // still names.
             return Outcome::RolledBack {
                 sequence: build.sequence,
                 why,

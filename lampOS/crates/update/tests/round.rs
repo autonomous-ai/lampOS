@@ -281,13 +281,16 @@ struct FakeSystemd {
     cut_at_reload: bool,
     /// Run at each reload and restart with the call as recorded: true stops
     /// the round dead there, as a power cut would.
-    at_call: Option<Box<dyn FnMut(&str) -> bool>>,
+    at_call: Option<AtCall>,
     /// Independent recovery must be explicitly armed by a self-update fixture.
     self_recovery: Result<(), String>,
     self_recovery_queries: usize,
     /// `systemctl start` of a unit fails with this.
     start_refused: Option<String>,
 }
+
+/// What [`FakeSystemd::at_call`] runs at each reload and restart.
+type AtCall = Box<dyn FnMut(&str) -> bool>;
 
 impl FakeSystemd {
     fn cut_at(&mut self, call: &str) {
