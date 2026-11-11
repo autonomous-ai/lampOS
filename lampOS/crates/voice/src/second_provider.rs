@@ -89,8 +89,19 @@ mod tests;
 pub const ANNOUNCEMENT: &str = "My voice sounds a little different just now.";
 /// How long without an answer before the announcement is said again.
 pub const ANNOUNCE_AFTER: Duration = Duration::from_secs(120);
-/// Chat requests in one turn, tool rounds included.
+/// Chat requests in one turn, tool rounds included. A turn whose rounds all
+/// ended in calls is asked once more past it, told no function
+/// ([`WORDS_AFTER_CAP_NOTE`]).
 pub const MAX_ROUNDS: usize = 4;
+/// What the model is told before the one round asked after [`MAX_ROUNDS`]
+/// rounds that all ended in calls, declaring no function (#5826: lamp
+/// build 11830, 11 Nov, "find my email with the number … and tell me what
+/// its attachment says" read the mail four times and said only "I'll check
+/// your mail.").
+pub(crate) const WORDS_AFTER_CAP_NOTE: &str = "(For you to know: this request may call no more functions, and they have heard no answer yet. Answer them now, in a few words, from what the functions above answered: say what was found, or say plainly that you couldn't find it or couldn't do it. Never say you will check again.)";
+/// What the lamp says when that round has no words either: never silence
+/// after the person waited through every round.
+pub(crate) const UNFINISHED_LINE: &str = "Sorry, I couldn't finish that. Could you ask me again?";
 /// A turn's first chat round that has not begun (no word, no call) this
 /// long after it was asked, which is as soon as speech to text gave the
 /// words, is given up and the turn ends unanswered: an answer said 12 s
@@ -14026,6 +14037,7 @@ async fn answer(
         announcement,
         sentences,
         started: false,
+        pieces: 0,
         request,
         heard_at,
         tags: shared.speech_tags.map(speech_tags::Tags::new),
@@ -14686,7 +14698,17 @@ async fn answer(
         // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
         let mut dont_know_recalled = false;
         let mut round = 0;
-        while round < MAX_ROUNDS {
+        // The one round asked past MAX_ROUNDS, declaring no function: every
+        // round so far ended in calls, so nothing they found was said yet
+        // (#5826). A round with its own words and no call ends the turn
+        // before the cap, so no round is ever added to one that has words.
+        let mut words_round = false;
+        // What the voice was given before that round.
+        let mut past_cap_from = 0;
+        loop {
+            if round >= MAX_ROUNDS && std::mem::replace(&mut words_round, true) {
+                break;
+            }
             if let Some(note) = keep_claim_note.take() {
                 messages.push(Message::system(note));
             }
@@ -14696,17 +14718,26 @@ async fn answer(
             if let Some(note) = action_claim_note.take() {
                 messages.push(Message::system(note));
             }
+            if words_round {
+                past_cap_from = queue.pieces;
+                eprintln!(
+                    "lamp-voice second: request {request}: its {MAX_ROUNDS} chat rounds all ended in calls; asked once more with no function, for its words"
+                );
+                messages.push(Message::system(WORDS_AFTER_CAP_NOTE));
+            }
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                 return Err(Stop::Gone);
             }
             round += 1;
+            // What the voice was given before this round: whether it said any.
+            let pieces_before = queue.pieces;
             let mut refused = false;
             // At most one second try in a turn, whatever round 1 is asked again.
             let watch =
                 (may_go_twice && round == 1 && !tries.as_ref().is_some_and(|tries| tries.went()))
                     .then(net::Watch::default);
             let mut first_reach = watch.as_ref().map(net::Watch::reach);
-            let told = if quoted {
+            let told = if quoted || words_round {
                 ChatTold::Only(&[])
             } else {
                 told_for(scope.as_ref())
@@ -14725,6 +14756,8 @@ async fn answer(
                     Some(watch) => shared.services.chat_watched(messages.clone(), told, watch),
                     None => shared.services.chat_only(messages.clone(), &[]),
                 },
+                // The round past the cap: words only.
+                _ if words_round => shared.services.chat_only(messages.clone(), &[]),
                 Some(prepared) if round == 1 => {
                     if let Some(noted) = tools_noted
                         && let Ok(mut noted) = noted.lock()
@@ -15174,6 +15207,12 @@ async fn answer(
                             }
                         }
                     }
+                    // The round past the cap declares no function: a call
+                    // in it is never run.
+                    ChatEvent::ToolCalls(asked) if words_round => eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} call(s) past the round cap not run",
+                        asked.len()
+                    ),
                     ChatEvent::ToolCalls(asked) => {
                         called_us = monotonic_us();
                         calls = asked;
@@ -15895,6 +15934,11 @@ async fn answer(
                     instead_of_silence(shared, &mut quiet, queue.started, request)
                 {
                     queue.push(instead).await?;
+                } else if words_round && queue.pieces == pieces_before {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: no words past the round cap either; said \"{UNFINISHED_LINE}\""
+                    );
+                    queue.push(shared.fixed(UNFINISHED_LINE).to_owned()).await?;
                 }
                 return Ok(());
             }
@@ -16729,8 +16773,15 @@ async fn answer(
                 messages.push(Message::system(said_once_note(shared.fixed(CHECKING))));
             }
         }
-        // ponytail: a model still calling tools after MAX_ROUNDS ends the
-        // turn with what it has said; a spoken "I could not finish" if seen.
+        // Only a round past the cap that went on without ending the turn
+        // (one refused) ends here: with no words of its own, the plain line
+        // rather than nothing (#5826).
+        if queue.pieces == past_cap_from {
+            eprintln!(
+                "lamp-voice second: request {request}: the rounds ran out with nothing found said; said \"{UNFINISHED_LINE}\""
+            );
+            queue.push(shared.fixed(UNFINISHED_LINE).to_owned()).await?;
+        }
         Ok(())
     };
     let saying = async {
@@ -17141,6 +17192,8 @@ struct Queue<'a> {
     sentences: mpsc::Sender<(String, Packets)>,
     /// Some of the answer itself is on its way.
     started: bool,
+    /// How many pieces of it went to the voice: whether a round said any.
+    pieces: usize,
     /// Whose, and when its words were heard: for the journal's line when
     /// the first piece goes to the voice (#1712, the first builder at 17:27:
     /// the chat's first clause in about 0.9 s and the voice's first audio in
@@ -17209,6 +17262,7 @@ impl Queue<'_> {
             );
         }
         self.started = true;
+        self.pieces += 1;
         // As the saying half tells its pieces: the announcement's text is
         // never one of them.
         if text != ANNOUNCEMENT {
@@ -17242,6 +17296,7 @@ impl Queue<'_> {
             );
         }
         self.started = true;
+        self.pieces += 1;
         if let Ok(mut said) = self.shared.lamp_said.lock() {
             if said.0 != self.request {
                 *said = (self.request, String::new());

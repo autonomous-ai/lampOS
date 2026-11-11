@@ -1330,8 +1330,22 @@ impl<H: Http, M: Mail> Services<H, M> {
         args
     }
 
+    /// One `service_read`, and its journal line ([`read_said`]): the read's
+    /// kind and what became of it, never its words, its query or what came.
     async fn read(&self, args: &Value, asker: Asker) -> Result<Value, String> {
         let args = &self.gmail_args(args);
+        let read = self.read_staged(args, asker).await;
+        let code = args
+            .get("service")
+            .and_then(Value::as_str)
+            .and_then(|asked| self.named(asked))
+            .map(|service| service.code);
+        eprintln!("lamp-services: {}", read_said(asker, code, args, &read));
+        read.map_err(|(_, why)| why)
+    }
+
+    /// [`Self::read`], a refusal with where it was refused.
+    async fn read_staged(&self, args: &Value, asker: Asker) -> Result<Value, (Stage, String)> {
         // A send-only link is answered so whether or not it is linked, and
         // so is `gmail` when the lamp's one Gmail link is send-only.
         let asked = args.get("service").and_then(Value::as_str);
@@ -1340,23 +1354,41 @@ impl<H: Http, M: Mail> Services<H, M> {
                 .and_then(|asked| self.named(asked))
                 .and_then(|service| reads::never_read(service.code))
         }) {
-            return Err(why.into());
+            return Err((Stage::Link, why.into()));
         }
-        let (service, entry) = self.linked(args).await?;
+        let (service, entry) = self.linked(args).await.map_err(|why| (Stage::Link, why))?;
         if service.mcp.is_some() {
-            return self.mcp_read(service, &entry, args).await;
+            return self
+                .mcp_read(service, &entry, args)
+                .await
+                .map_err(|why| (Stage::Service, why));
         }
-        match reads::plan(service.code, args, &entry, crate::now_secs())? {
+        let plan = reads::plan(service.code, args, &entry, crate::now_secs())
+            .map_err(|why| (Stage::Asked, why))?;
+        self.read_planned(service, &entry, plan, asker)
+            .await
+            .map_err(|why| (Stage::Service, why))
+    }
+
+    /// A read planned: asked of the service.
+    async fn read_planned(
+        &self,
+        service: &'static catalog::Service,
+        entry: &Entry,
+        plan: Plan,
+        asker: Asker,
+    ) -> Result<Value, String> {
+        match plan {
             Plan::Mail(ask) => {
                 let mut items = if entry.oauth() {
-                    self.gmail_api_read(service, &entry, &ask).await?
+                    self.gmail_api_read(service, entry, &ask).await?
                 } else {
                     self.mail
-                        .read(&entry.account(), &app_password(&entry), &ask)
+                        .read(&entry.account(), &app_password(entry), &ask)
                         .await
                         .map_err(|failure| failure.words().to_owned())?
                 };
-                scrub_mail(&mut items, &entry);
+                scrub_mail(&mut items, entry);
                 // The owner's own read says a security mail masked; a made
                 // skill's leaves it out, as before.
                 Ok(match asker {
@@ -1374,16 +1406,16 @@ impl<H: Http, M: Mail> Services<H, M> {
             // why the pick read nothing, else the attachment as quoted data.
             Plan::Attachment(id, pick) => {
                 let mut item = if entry.oauth() {
-                    self.gmail_api_attachment(service, &entry, &id, &pick)
+                    self.gmail_api_attachment(service, entry, &id, &pick)
                         .await?
                 } else {
                     self.mail
-                        .attachment(&entry.account(), &app_password(&entry), &id, &pick)
+                        .attachment(&entry.account(), &app_password(entry), &id, &pick)
                         .await
                         .map_err(|failure| failure.words().to_owned())?
                         .ok_or_else(|| format!("{} has no such item", service.name))?
                 };
-                scrub_mail(std::slice::from_mut(&mut item), &entry);
+                scrub_mail(std::slice::from_mut(&mut item), entry);
                 if !mail::is_security_item(&item) {
                     mail::chosen(&item.attachments, &pick)?;
                 }
@@ -1391,7 +1423,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             Plan::Http { method, url, body } => {
                 let text = self
-                    .call(service, &entry, method, url, body.map(Body::Json), false)
+                    .call(service, entry, method, url, body.map(Body::Json), false)
                     .await?;
                 Ok(reads::quoted(service.name, reads::items(&text)))
             }
@@ -1663,6 +1695,97 @@ fn link_refused(reply: &net::Reply) -> bool {
 }
 
 /// A refused link, in the lamp's words.
+/// Where a `service_read` was refused or failed, for its journal line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stage {
+    /// The service named: unknown, not linked, expired or send-only.
+    Link,
+    /// The call's own arguments, before anything is asked of the service.
+    Asked,
+    /// Asked of the service.
+    Service,
+}
+
+/// A `what` as the journal names it: a word of the read lists, else
+/// "another": never the model's own text.
+fn what_said(args: &Value) -> &str {
+    args.get("what")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|what| {
+            !what.is_empty()
+                && what.len() <= 24
+                && what.chars().all(|c| c.is_ascii_lowercase() || c == '_')
+        })
+        .unwrap_or("another")
+}
+
+/// Why a read was refused, in a few fixed words ([`Stage::Link`] and
+/// [`Stage::Asked`]), or how it failed ([`Stage::Service`]): nothing of the
+/// service's own answer.
+fn why_said(stage: Stage, why: &str) -> &'static str {
+    let has = |words: &str| why.contains(words);
+    match stage {
+        Stage::Link if why == reads::GMAIL_APP_NO_READS => "refused: a send-only link",
+        Stage::Link if why.ends_with(NOT_LINKED) => "refused: not linked",
+        Stage::Link if has("has expired") => "refused: its link has expired",
+        Stage::Link if has(CANT_LINK) => "refused: a service the lamp can't link",
+        Stage::Link => "refused: its link",
+        Stage::Asked if has(" needs id") => "refused: no id",
+        Stage::Asked if has(" needs query") => "refused: no query",
+        Stage::Asked if has(" needs ") => "refused: an argument missing",
+        Stage::Asked if has("what to read is needed") => "refused: no what",
+        Stage::Asked if has("is the one a list gave") || has("is not an id") => {
+            "refused: an id no list gave"
+        }
+        Stage::Asked if has(" reads: ") => "refused: a what it doesn't read",
+        Stage::Asked => "refused: its arguments",
+        Stage::Service if has("has no such item") => "none: no such item",
+        Stage::Service if has("didn't answer in time") => "error: not answered in time",
+        Stage::Service if has("refused the lamp's link") => "error: the link refused",
+        Stage::Service => "error",
+    }
+}
+
+/// The journal line of one `service_read` (#5826: the lamp's journal said
+/// four reads answered, two in 2 ms, and nothing of why): who asked, the
+/// service and the kind of read, and what became of it, as found N (the
+/// items quoted and left out), none, refused with why, or an error. Never
+/// the call's query, a mail's words or anything the service gave.
+fn read_said(
+    asker: Asker,
+    code: Option<&str>,
+    args: &Value,
+    read: &Result<Value, (Stage, String)>,
+) -> String {
+    let outcome = match read {
+        Ok(told) => match told.get("quoted").and_then(Value::as_array) {
+            Some(quoted) => {
+                let left_out = told
+                    .get("left_out")
+                    .and_then(Value::as_u64)
+                    .and_then(|left_out| usize::try_from(left_out).ok())
+                    .unwrap_or(0);
+                match quoted.len() + left_out {
+                    0 => "none".to_owned(),
+                    found => format!("found {found}"),
+                }
+            }
+            None => "answered".to_owned(),
+        },
+        Err((stage, why)) => why_said(*stage, why).to_owned(),
+    };
+    format!(
+        "{} service_read of {} {}: {outcome}",
+        match asker {
+            Asker::Owner => "the voice's",
+            Asker::Skill => "a skill's",
+        },
+        code.unwrap_or("an unknown service"),
+        what_said(args),
+    )
+}
+
 fn relink(name: &str) -> String {
     format!("{name} refused the lamp's link: it may need linking again in the app")
 }
@@ -3654,6 +3777,119 @@ mod tests {
             assert!(!text.contains("goodpassword"), "{text}");
             assert!(!text.contains("good password"), "{text}");
         }
+    }
+
+    /// #5826: "find my email with the number 2420783 and tell me what its
+    /// attachment says" was answered twice in 2 ms before the mail was
+    /// searched. An attachment asked with search words and no id is refused
+    /// before anything is asked of Gmail, told how to find its id; the
+    /// search then finds the mail and its id reads the attachment. Each read's
+    /// journal line names its kind and what became of it, never its query.
+    #[test]
+    fn a_mail_read_with_no_id_is_told_to_search_first_and_each_read_is_journalled() {
+        let dir = tempfile::tempdir().unwrap();
+        let invoice = MailItem {
+            id: "all41".into(),
+            from: "Shop".into(),
+            to: String::new(),
+            subject: "Invoice".into(),
+            date: "d".into(),
+            text: "See attached".into(),
+            attachments: vec![mail::Attachment {
+                name: "invoice.md".into(),
+                kind: "text/markdown".into(),
+                size: 2_048,
+                at: "2".into(),
+                ..mail::Attachment::default()
+            }],
+        };
+        let services = Services::new(
+            Store(dir.path().join("s")),
+            FakeHttp::default(),
+            FakeMail {
+                inbox: vec![invoice],
+                ..FakeMail::default()
+            },
+            None,
+            false,
+        );
+        run(services.admin(&app_password_gmail("me@home.test")));
+        let read = |args: Value| {
+            let args = services.gmail_args(&args);
+            let read = run(services.read_staged(&args, Asker::Owner));
+            let code = args["service"]
+                .as_str()
+                .and_then(|asked| services.named(asked));
+            let said = read_said(Asker::Owner, code.map(|service| service.code), &args, &read);
+            (read, said)
+        };
+        for args in [
+            json!({"service":"gmail","what":"attachment","query":"2420783"}),
+            json!({"service":"gmail","what":"message","query":"2420783"}),
+        ] {
+            let (refused, said) = read(args.clone());
+            let (stage, why) = refused.unwrap_err();
+            assert_eq!(stage, Stage::Asked, "{args}");
+            assert!(why.contains(reads::MAIL_FOUND_BY_SEARCH), "{why}");
+            assert!(said.ends_with(": refused: no id"), "{said}");
+            assert!(!said.contains("2420783"), "{said}");
+        }
+        // An id no list gave is told the same way.
+        let (refused, said) =
+            read(json!({"service":"gmail","what":"attachment","id":"number 2420783"}));
+        assert!(refused.unwrap_err().1.contains(reads::MAIL_FOUND_BY_SEARCH));
+        assert!(said.ends_with("refused: an id no list gave"), "{said}");
+        // Nothing was asked of Gmail for any of them.
+        assert!(services.mail.asked.lock().unwrap().is_empty());
+        let (found, said) = read(json!({"service":"gmail","what":"search","query":"2420783"}));
+        let id = found.unwrap()["quoted"][0]["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(said, "the voice's service_read of gmail search: found 1");
+        let (read_one, said) = read(json!({"service":"gmail","what":"attachment","id":id}));
+        assert_eq!(
+            read_one.unwrap()["quoted"][0]["attachment"]["text"],
+            "the text of invoice.md"
+        );
+        assert_eq!(
+            said,
+            "the voice's service_read of gmail attachment: found 1"
+        );
+        let (_, said) = read(json!({"service":"google_drive","what":"files","query":"x"}));
+        assert_eq!(
+            said,
+            "the voice's service_read of google_drive files: refused: not linked"
+        );
+        let (_, said) = read(json!({"service":"gmail","what":"Tell me $$"}));
+        assert!(
+            said.contains("gmail another: refused: a what it doesn't read"),
+            "{said}"
+        );
+    }
+
+    /// A read that found nothing says so in its journal line.
+    #[test]
+    fn a_read_that_found_nothing_is_journalled_none() {
+        let told = json!({"source":"Gmail","quoted":[]});
+        assert_eq!(
+            read_said(
+                Asker::Skill,
+                Some("gmail"),
+                &json!({"what":"search"}),
+                &Ok(told)
+            ),
+            "a skill's service_read of gmail search: none"
+        );
+        let cut = json!({"quoted":[{"id":"1"}],"left_out":3});
+        assert!(
+            read_said(Asker::Owner, Some("gmail"), &json!({}), &Ok(cut)).ends_with(": found 4")
+        );
+        let late = Err((Stage::Service, "Gmail didn't answer in time".to_owned()));
+        assert!(
+            read_said(Asker::Owner, None, &json!({"what":"recent"}), &late)
+                .ends_with("an unknown service recent: error: not answered in time")
+        );
     }
 
     /// An app password's mail names its attachments and reads one, as a
