@@ -961,6 +961,14 @@ class Lamp:
         await self.light(colour, level, hold_ms, pattern)
         return LightHold(self, colour, level, pattern, hold_ms, on_error)
     @property
+    def language(self) -> str:
+        """The owner's language, from hello: `en`, `vi`, `ja`, `zh` or `ko`, so a
+        program's own lines can follow it. `en` from a lamp that says none (one
+        from before this), and from a code this SDK does not know."""
+        said = self.info.get("language")
+        return said if said in ("en", "vi", "ja", "zh", "ko") else "en"
+
+    @property
     def ring_pixels(self) -> int | None:
         """How many pixels the ring has, from hello's limits (none from a lamp
         before pixel lights)."""

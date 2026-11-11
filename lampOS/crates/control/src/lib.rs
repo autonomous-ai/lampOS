@@ -21,6 +21,7 @@ pub mod cert;
 pub mod feelings;
 pub mod hands;
 pub mod journal;
+pub mod language;
 pub mod lease;
 pub mod microphone;
 pub mod motion_done;

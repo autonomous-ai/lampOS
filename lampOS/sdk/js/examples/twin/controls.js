@@ -63,6 +63,8 @@ export const CONTROLS = [
       return `lamp.withLease(['body'], () => lamp.movePoses(${q(poses)}, { wait: true }))`;
     } },
   { id: 'stop', group: 'Body', label: 'Stop', fields: [], run: async ({ lamp }) => { await lamp.stop(); return 'lamp.stop()'; } },
+  // The owner's language the lamp said in hello: a read, so the log says the code it got.
+  { id: 'language', group: 'Voice', label: 'Language', fields: [], run: async ({ lamp }) => `lamp.language // ${q(lamp.language)}` },
   { id: 'light', group: 'Light', label: 'Light',
     fields: [select('colour', COLOURS, 'warm'), number('level', 1, 5, 3, { integer: true }), select('pattern', ['', ...PATTERNS], '', { optional: true }), number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => {
