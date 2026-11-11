@@ -256,6 +256,12 @@
         },
         {
           "$ref": "#/$defs/microphone.stream"
+        },
+        {
+          "$ref": "#/$defs/service.read"
+        },
+        {
+          "$ref": "#/$defs/service.write"
         }
       ]
     },
@@ -1309,7 +1315,14 @@
             "grants": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/grant"
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/grant"
+                  },
+                  {
+                    "$ref": "#/$defs/service_grant"
+                  }
+                ]
               },
               "uniqueItems": true
             },
@@ -1610,6 +1623,9 @@
               "type": "boolean"
             },
             "value": {},
+            "result": {
+              "description": "service.read and service.write (a skill's run only): lamp-services' answer as it gave it, quoted data from the person's service or a write's read_back, held: true and next (never a send_id). Personal: never logged."
+            },
             "deleted": {
               "type": "boolean"
             },
@@ -3302,6 +3318,82 @@
         "id",
         "op",
         "on"
+      ],
+      "additionalProperties": false
+    },
+    "service_grant": {
+      "description": "A linked service's grant, a skill run's alone (on the control socket, from the owner's yes; never a paired computer's): <code>-read reads it, <code>-write prepares a write the person's spoken yes sends. The codes are lamp-services' (gmail covers gmail-app, figma covers figma-api).",
+      "type": "string",
+      "pattern": "^(gmail|google_calendar|google_drive|figma|github|linear|asana|ahrefs|facebook|slack|mondaydotcom|hubspot|amplitude|notion)-(read|write)$"
+    },
+    "service_code": {
+      "description": "A linked service's code, as lamp-services' catalog has it.",
+      "enum": [
+        "gmail",
+        "gmail-app",
+        "google_calendar",
+        "google_drive",
+        "figma",
+        "figma-api",
+        "github",
+        "linear",
+        "asana",
+        "ahrefs",
+        "facebook",
+        "slack",
+        "mondaydotcom",
+        "hubspot",
+        "amplitude",
+        "notion"
+      ]
+    },
+    "service.read": {
+      "description": "A skill's run only (the control socket, LAMP_SKILL_TASKS=on): one read of a linked service through lamp-services' service_read, args as that function takes them, without service. Needs the <service>-read grant. The reply's result is lamp-services' answer; its refusal comes as refused, with off while the switch is off.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "service.read"
+        },
+        "service": {
+          "$ref": "#/$defs/service_code"
+        },
+        "args": {
+          "description": "service_read's own arguments (what, query, id, count, ...), never service. Personal: never logged.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "service"
+      ],
+      "additionalProperties": false
+    },
+    "service.write": {
+      "description": "A skill's run only (the control socket, LAMP_SKILL_TASKS=on): one write to a linked service, only prepared by lamp-services' service_write, read back and held for the person's spoken yes, which sends it; never sent by the run. Needs the <service>-write grant. The reply's result is the read_back, sent false and held true, with no send_id.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "service.write"
+        },
+        "service": {
+          "$ref": "#/$defs/service_code"
+        },
+        "args": {
+          "description": "service_write's own arguments (action, to, subject, text, ...), never service, send_id or said. Personal: never logged.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "service"
       ],
       "additionalProperties": false
     }
