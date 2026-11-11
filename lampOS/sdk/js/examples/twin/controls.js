@@ -8,9 +8,12 @@
 // `optional: true` lets a field be left empty. `run(ctx, values)` makes the SDK call and returns the call as the
 // log says it; `ctx` is `{ lamp, release, listenFor }` (`release()` gives back the twin's own slider lease first).
 // A refusal comes back as the lamp's own words; a value outside its field is refused here, before any call.
+import { fileURLToPath } from 'node:url';
 import { LampError, schema } from 'lampos';
 
 const q = JSON.stringify;
+// The one skill the app may put on the lamp: a folder of its own with one recorded move, never one the page names.
+const TRY_SKILL = fileURLToPath(new URL('./skills/try-wave', import.meta.url));
 const refuse = (why) => new LampError(why, { code: 'bad_request' });
 
 export const COLOURS = [...schema.colours];
@@ -77,6 +80,25 @@ export const CONTROLS = [
     run: async ({ lamp }, a) => { await lamp.say(a.text); return `lamp.say(${q(a.text)})`; } },
   // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
   { id: 'sound', group: 'Voice', label: 'Sound (hum)', fields: [], run: async ({ lamp }) => { await lamp.sound('hum'); return "lamp.sound('hum')"; } },
+  { id: 'skill_push', group: 'Skills', label: 'Push the try-wave skill', fields: [],
+    run: async ({ lamp }) => {
+      const skill = await lamp.pushSkill(TRY_SKILL);
+      return `lamp.pushSkill('skills/try-wave')  // ${skill.held ? `held: ${skill.held}` : skill.on ? 'on' : 'off'}`;
+    } },
+  { id: 'skills', group: 'Skills', label: 'List my skills', fields: [],
+    run: async ({ lamp }) => {
+      const kept = await lamp.skills();
+      return `lamp.skills()  // ${kept.map((k) => `${k.name} ${k.version}${k.on ? '' : ' (off)'}`).join(', ') || 'none'}`;
+    } },
+  { id: 'play', group: 'Skills', label: 'Play a recorded move', fields: [select('name', ['small-nod'])],
+    run: async ({ lamp, release }, a) => {
+      // `play` needs the body lease at the door, as a look does.
+      await release();
+      await lamp.withLease(['body'], () => lamp.play(a.name, { wait: true }));
+      return `lamp.withLease(['body'], () => lamp.play(${q(a.name)}, { wait: true }))`;
+    } },
+  { id: 'skill_remove', group: 'Skills', label: 'Remove the try-wave skill', fields: [],
+    run: async ({ lamp }) => { await lamp.removeSkill('try-wave'); return "lamp.removeSkill('try-wave')"; } },
 ];
 
 // The world, not the SDK: `lamp-sim <verb> ... DIR` writes what the lamp's stand-ins read. `argv` is an array,

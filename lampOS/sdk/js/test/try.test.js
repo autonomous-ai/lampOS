@@ -278,3 +278,18 @@ test('a held hand is one touch: repeats within 0.8 s are the same stroke and for
   assert.equal(results.filter((r) => r.ok && r.answer === 'done').length, 1);
   assert.equal(results.filter((r) => /^ignored: the same stroke/.test(r.answer)).length, 8);
 });
+
+test('the skills rows: push the try-wave skill, list it, play its move, remove it', async (t) => {
+  const { port, token } = await started(t, (dir, stub) => ['--stim-dir', dir, '--lamp-sim', stub]);
+  const { socket, results } = await talk(port, token);
+  t.after(() => socket.close());
+  const order = ['skill_push', 'skills', 'play', 'skill_remove', 'skills'];
+  for (const [i, name] of order.entries()) {
+    socket.send(JSON.stringify({ type: 'call', id: i + 1, name, args: {} }));
+    await until(() => results.length > i);
+  }
+  const answers = results.map((r) => r.call);
+  assert.ok(results.every((r) => r.ok), `every step answers ok: ${JSON.stringify(answers)}`);
+  assert.match(answers[1], /try-wave/);
+  assert.match(answers[4], /none/);
+});
