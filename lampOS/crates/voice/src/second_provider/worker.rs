@@ -2536,6 +2536,16 @@ pub fn serve(
             "lamp-voice second: a turn that is the known face's own person is told their name, as the Live route tells it (LAMP_SECOND_FACE_NAME)"
         );
     }
+    // With it, the eyes' faces in view, so a turn with a face at the lamp
+    // and nobody known is told so (#5750, "who is this?").
+    let nobody_known_bus = known_name
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok())
+        })
+        .flatten();
     // The typed name, told only to the owner's line, with
     // LAMP_PERSON_NAME_OWNER_ONLY=on (#2602): out of the character, and
     // judged each turn on its own person and the faces in view. Keyed on
@@ -2755,7 +2765,12 @@ pub fn serve(
                 // which #4090 and #4132 give the owner alone, through the
                 // typed name (the readers' HOLDs on #4158: a silent known
                 // guest's nod would name an off-camera caller's answer).
-                + &known_name_told(known_name, who.as_deref(), named.as_deref());
+                + &known_name_told(known_name, who.as_deref(), named.as_deref())
+                + &nobody_known_told(
+                    known_name,
+                    who.as_deref(),
+                    nobody_known_bus.as_ref().and_then(crate::known_faces::faces_in_view),
+                );
             // Beside the character, where the instruction had it: told after
             // the exchanges, the model used it for the owner a third as
             // often (EN, the #2602 probe).
@@ -5599,6 +5614,26 @@ pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>
     );
     format!("\n\n{}", crate::known_faces::note(&name))
 }
+
+/// What a turn is told when the eyes see a face at the lamp (`in_view`) and
+/// know nobody (#5750): no known file and no unsure hold of one, so "who is
+/// this?" is answered "I don't know them" with no call, and a face from a
+/// photo still waiting for its yes stays unnamed. Never a name, a count or
+/// anything of who anyone else is. With [`known_name_told`]'s switch.
+// ponytail: a known face in its first second, before the eyes decide, reads
+// as nobody known; a hold on the eyes' own first decision if that shows.
+pub(crate) fn nobody_known_told(on: bool, who: Option<&Path>, in_view: Option<usize>) -> String {
+    let Some(who) = who.filter(|_| on && in_view.unwrap_or(0) > 0) else {
+        return String::new();
+    };
+    if crate::known_faces::known_now(who).is_some() || crate::speaking_faces::known_unsure(who) {
+        return String::new();
+    }
+    format!("\n\n{NOBODY_KNOWN}")
+}
+
+/// [`nobody_known_told`]'s line.
+pub(crate) const NOBODY_KNOWN: &str = "(The face at the lamp is not anyone the lamp knows.)";
 
 /// What a Live session is told of the moment beside what it hears, told
 /// here in each turn's system message, since each chat starts with nothing:
@@ -22358,6 +22393,54 @@ mod tests {
         // The face gone: no known file.
         std::fs::remove_file(&known).unwrap();
         assert_eq!(known_name_told(true, Some(&known), Some(&pippa)), "");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #5750 (row-5750b S2, a stranger at the lamp asked "who is this?"): a
+    /// face in view and nobody known is told so, after the memory; a known
+    /// face, an unsure hold of one, nobody in view, no look, no eyes or the
+    /// switch off are told nothing. Made-up names.
+    #[test]
+    fn a_face_at_the_lamp_that_nobody_knows_is_told_so() {
+        let dir = std::env::temp_dir().join(format!("lv-nobody-known-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let known = dir.join("known");
+        let told = nobody_known_told(true, Some(&known), Some(1));
+        assert_eq!(told, format!("\n\n{NOBODY_KNOWN}"));
+        let message = system_message(
+            "You are a lamp.",
+            None,
+            &format!("\n\nYour memory\n- tea, no sugar{told}"),
+            None,
+            None,
+        );
+        assert!(
+            message
+                .text
+                .contains("- tea, no sugar\n\n(The face at the lamp is not anyone"),
+            "{}",
+            message.text
+        );
+        for (on, who, in_view) in [
+            (false, Some(known.as_path()), Some(1)),
+            (true, None, Some(1)),
+            (true, Some(known.as_path()), Some(0)),
+            (true, Some(known.as_path()), None),
+        ] {
+            assert_eq!(
+                nobody_known_told(on, who, in_view),
+                "",
+                "{on} {who:?} {in_view:?}"
+            );
+        }
+        // A known face: their name is told instead, never this.
+        std::fs::write(&known, "Pippa").unwrap();
+        assert_eq!(nobody_known_told(true, Some(&known), Some(1)), "");
+        // An unsure hold of a known face is not nobody (#5738).
+        std::fs::remove_file(&known).unwrap();
+        std::fs::write(crate::speaking_faces::known_unsure_of(&known), "Pippa").unwrap();
+        assert_eq!(nobody_known_told(true, Some(&known), Some(1)), "");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
