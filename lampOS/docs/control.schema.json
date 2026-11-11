@@ -1348,7 +1348,7 @@
                     "object",
                     "null"
                   ],
-                  "description": "The person's own light (`on`, `colour`, `level`, from light/state), and `shows`: what the ring draws now (light/drawn), the person's light or one asked for over it. Each is left out until the lamp has said it; null until either is known.",
+                  "description": "The person's own light (`on`, `colour`, `level`, from light/state), and `shows`: what the ring draws now (light/drawn), the person's light or one asked for over it. Each is left out until the lamp has said it; null until either is known. `shows.pixels` is optional (see its description).",
                   "properties": {
                     "on": {
                       "type": "boolean"
@@ -1370,6 +1370,16 @@
                         },
                         "level": {
                           "type": "integer"
+                        },
+                        "pixels": {
+                          "description": "Optional. The ring's own pixels, as a paired computer asked for them (`light` with `rgb` or `pixels`): present only while that computer holds them and the ring draws that light; left out otherwise, and on a lamp that does not say it. Each is `#rrggbb`, the colour asked of the ring (the ring's own channel ceiling may draw it dimmer).",
+                          "type": "array",
+                          "minItems": 32,
+                          "maxItems": 32,
+                          "items": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          }
                         }
                       },
                       "required": [
