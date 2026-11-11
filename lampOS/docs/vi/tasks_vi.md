@@ -542,3 +542,67 @@ của giọng nói và `lamp-tasks --reply-named`):
   bao lâu khi các phiên được liệt kê. Ngày 10/11 trên lamp-c0a4, lần tìm phiên
   khi giao việc mất 15,2 s vì có hai máy offline. Một lần tìm phiên ở đây cũng
   đọc đúng những danh sách đó.
+- **Các phiên do đèn khởi động, giữ theo tên** (#6274, quyết định của
+  builder đầu tiên ngày 11/11; đi cùng `serve --reply-named`, không có công
+  tắc riêng). `harness ps --all` chỉ liệt kê phiên đang mở hoặc đã dừng trong
+  7 ngày qua, nên "mở phiên Christmas dates" cho một phiên cũ hơn do đèn
+  khởi động thì không tìm thấy (`session_not_found`). lamp-tasks giữ một chỉ
+  mục các phiên nó đã khởi động (`new`, id nằm ở `agent.id`), đã gõ vào (giao
+  việc vào phiên có tên, phiên router chọn) hoặc đã mở (xem có `join`), trong
+  file `sessions-started.json` của thư mục tasks (`--dir`,
+  `SESSION_INDEX_FILE`, `crate::session_index`): theo từng máy, mỗi phiên chỉ
+  có `id`, `name` và `last_used` (unix ms), không gì khác, không bao giờ có
+  câu hỏi, câu trả lời, `about` hay thư mục của nó. Tên của phiên mới khởi
+  động là tên do đèn đặt, nên chưa giữ tên nào cho đến khi một danh sách cho
+  thấy tiêu đề của nó: mỗi lần lamp-tasks đọc `harness ps` (các danh sách khi
+  tìm theo tên, lần đọc tiến độ) và mỗi lần `show` dưới đây đều cập nhật tên
+  hiện ra cho phiên có trong chỉ mục. Tối đa 200 (`MOST_INDEXED`) cho mọi máy
+  cộng lại; thêm một phiên thì phiên lâu không dùng nhất bị bỏ. File được ghi
+  trọn cạnh file cũ rồi đổi tên đè lên, quyền 0600, không bao giờ ghi qua
+  link; file không đọc được thì coi như trống.
+  - Dùng khi tìm theo tên (`find_named`), chỉ khi không dòng nào trong danh
+    sách của các máy đã đọc khớp theo tên, thư mục hay việc đã làm: các phiên
+    trong chỉ mục trên những máy đó mà danh sách không có được so bằng đúng
+    các quy tắc tên ấy (`by_name`: tên đúng như nói, rồi mỗi từ nói ra là
+    phần đầu một từ của tên, theo thứ tự), máy của đèn trước. Mỗi phiên khớp
+    được đọc theo id, `harness show --machine <m> <id> --json` (tối đa 4,
+    cùng lúc, trong phần thời gian còn lại trừ phần dành cho reply), để biết
+    trạng thái và tên. Phiên Harness nói không còn nữa (`UNKNOWN_HARNESS`,
+    `GONE`) bị bỏ khỏi chỉ mục và việc tìm tiếp tục; phiên không đọc được
+    thì bỏ qua (`sessions_failed` nếu không gì khác khớp). Phiên còn đó theo
+    đúng quy tắc của phiên có trong danh sách: rảnh thì vào, bận thì
+    `session_busy`, đã dừng thì chỉ được mở lại theo id bằng `harness resume`
+    khi bật `LAMP_TASKS_RESUME_CLOSED` và chỉ khi gọi đúng tên (nếu không thì
+    `session_stopped`), sau đó việc giao được gõ vào; hai phiên khớp là
+    `session_ambiguous`, không bao giờ đoán. Khi xem (không phải khi giao việc
+    gõ vào phiên), tên nói gần đúng được thử với các tên trong chỉ mục như với
+    danh sách (`nearest_rows`): phiên của chỉ mục chỉ được chọn khi gần hơn
+    mọi phiên trong danh sách, gần ngang nhau là `session_ambiguous`, và phiên
+    tìm ra kiểu này không bao giờ được mở lại. Một lần tìm không thấy gì trong
+    danh sách tốn thêm một lần `show` (khoảng 2,3 s trên lamp-c0a4, 10/11) cho
+    mỗi phiên khớp trong chỉ mục, đọc cùng lúc; không phiên nào khớp thì không
+    tốn thêm gì.
+  - Xóa: nút reset của đèn xóa `/var/lib/lampos-tasks/store` (kế hoạch reset
+    của sản phẩm, `crates/setup/fixtures/reset-plan-product.json`), chính thư
+    mục chứa file. Lệnh "quên hết" của chủ đèn (được guard của route thứ hai
+    đánh dấu, bộ nhớ của họ đã được xóa, giống nhật ký được giữ) hỏi lamp-tasks
+    trên socket của giọng nói `{"op":"forget_sessions"}`
+    (`agent_tasks::forget_sessions_with_everything`); lamp-tasks xóa file và
+    trả `{"forgotten":true|false}`. Câu trả lời giọng nói nói với người dùng
+    vẫn như cũ.
+  - Test: `tests/harness.rs`
+    `an_older_session_not_listed_is_found_by_its_name_through_the_index`,
+    `a_listed_session_is_found_as_before_and_the_index_only_adds`,
+    `an_indexed_session_that_is_gone_is_dropped`,
+    `an_ambiguous_index_match_is_asked_about`,
+    `the_index_never_makes_a_near_name_reopen_a_closed_session`,
+    `the_lamp_keeps_the_sessions_it_starts_and_their_names_as_listed`,
+    `the_index_lives_in_the_tasks_folder_the_reset_wipes`;
+    `tests/session_index.rs` `the_index_holds_only_id_name_and_last_use`,
+    `the_index_keeps_the_most_lately_used`, `forgetting_removes_the_index`;
+    `tests/runtime.rs`
+    `forget_sessions_removes_the_index_of_the_sessions_the_lamp_started`;
+    `agent_tasks::tests::the_owners_forget_everything_forgets_the_sessions_the_lamp_started`.
+  - Chưa chạy trên đèn: mở lại theo id một phiên cũ hơn 7 ngày (Harness
+    0.6.12 nói `resume <id>` và `show <id>` tới được phiên đó), và thời gian
+    thêm của một lần `show`.
