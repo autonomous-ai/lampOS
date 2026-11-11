@@ -148,6 +148,18 @@ impl<M: Mixer> Volume<M> {
         })
     }
 
+    /// What a limit lowered (from, to), while it is still to be given back.
+    pub fn lowered(&self) -> Option<(u8, u8)> {
+        self.lowered
+    }
+
+    /// The (from, to) a limit lowered before a restart, as [`Volume::lowered`]
+    /// said it then. The release gives `from` back only while the mixer still
+    /// reads `to`, so a change made meanwhile still stands.
+    pub fn restore_lowered(&mut self, lowered: (u8, u8)) {
+        self.lowered = Some(lowered);
+    }
+
     /// Apply a raw ceiling of 1..=100, bounded by the product's ceiling.
     /// A louder mixer is lowered now; a quieter or muted one is left alone.
     /// The restriction stays active even if its hardware change fails:
@@ -157,8 +169,9 @@ impl<M: Mixer> Volume<M> {
     /// lowered, and only while the mixer still reads what that limit wrote:
     /// any person's change in between stands (#5753). A remembered pre-mute
     /// level is lowered with the limit too, never restored on release, so a
-    /// later unmute cannot revive that old level. The given-back level lives
-    /// in this process only: a restart under the limit leaves it lowered.
+    /// later unmute cannot revive that old level. The level to give back is
+    /// read with [`Volume::lowered`] and put back after a restart with
+    /// [`Volume::restore_lowered`]; the caller keeps it durable (#6479).
     /// The result reports the actual level, not proof of durable storage;
     /// the caller owns the limit's lifetime and restart recovery.
     pub fn set_limit(&mut self, limit: Option<u8>) -> Result<Level, String> {
