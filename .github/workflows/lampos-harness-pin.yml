@@ -88,7 +88,11 @@ jobs:
           def fetch(url, most):
               if not url.startswith("https://"):
                   fail(f"not https: {url}")
-              with urllib.request.urlopen(url, timeout=120) as answer:
+              # cdn.autonomous.ai answers Python's own User-Agent
+              # ("Python-urllib/3.x") with 403, so name the workflow instead.
+              asked = urllib.request.Request(
+                  url, headers={"User-Agent": "lampos-harness-pin/1 (GitHub Actions)"})
+              with urllib.request.urlopen(asked, timeout=120) as answer:
                   data = answer.read(most + 1)
               if len(data) > most:
                   fail(f"over {most} bytes: {url}")
