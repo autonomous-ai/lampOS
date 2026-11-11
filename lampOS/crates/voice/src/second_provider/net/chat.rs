@@ -808,6 +808,13 @@ impl ChatStream {
         self.deltas.usage.as_ref()
     }
 
+    /// Whether the service stopped the answer at its cap on tokens
+    /// (`finish_reason` `length`): a stream that ended whole on an answer
+    /// that did not.
+    pub fn stopped_at_length(&self) -> bool {
+        self.deltas.at_length
+    }
+
     /// The next event; `None` after `Done`. Each wait for the service is
     /// bounded by the client's stall limit.
     pub async fn next(&mut self) -> Result<Option<ChatEvent>> {
@@ -895,6 +902,9 @@ pub(crate) struct Deltas {
     calls: Vec<Pending>,
     /// A chunk said why the completion stopped (`finish_reason`).
     finished: bool,
+    /// That reason was the service's cap on the answer's tokens
+    /// (`length`): the stream ended whole, the answer did not.
+    at_length: bool,
     /// `reasoning_details` as they came, in order.
     reasoning: Vec<Value>,
     /// A chunk carried the web search's results.
@@ -933,9 +943,11 @@ impl Deltas {
         let chunk: Value =
             serde_json::from_str(data).map_err(|_| Error::Protocol("chat stream data"))?;
         let mut out = Vec::new();
-        self.finished |= chunk
+        let reason = chunk
             .pointer("/choices/0/finish_reason")
-            .is_some_and(Value::is_string);
+            .and_then(Value::as_str);
+        self.finished |= reason.is_some();
+        self.at_length |= reason == Some("length");
         if let Some(usage) = chunk.get("usage").filter(|usage| usage.is_object()) {
             self.usage = Some(usage.clone());
         }
@@ -1407,6 +1419,15 @@ data: [DONE]
         deltas
             .data(r#"{"choices":[{"delta":{},"finish_reason":"stop"}]}"#)
             .unwrap();
+        assert!(!deltas.at_length);
+        assert_eq!(deltas.end().unwrap(), [ChatEvent::Done]);
+        // Stopped at the service's cap on tokens: whole as a stream, told
+        // as stopped at its length.
+        let mut deltas = Deltas::default();
+        deltas
+            .data(r#"{"choices":[{"delta":{"content":"It is"},"finish_reason":"length"}]}"#)
+            .unwrap();
+        assert!(deltas.at_length);
         assert_eq!(deltas.end().unwrap(), [ChatEvent::Done]);
     }
 

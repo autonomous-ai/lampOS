@@ -2216,9 +2216,21 @@ gone ([switches.md](switches.md)). What happens:
    route's chat (`llm_*`, the relay or the person's own DeepSeek), with no
    tools, streamed, on a thread and runtime of its own, at most 30 s
    (`WRITE_WITHIN`) and 20 KiB. A 404 (the relay's, about one in ten on
-   2 Nov), a 5xx, a timeout, a broken connection or an answer cut before
-   its last fence closed is asked once more (`make_skill_local::again`);
-   anything else is not. The model is shown a whole skill the check takes
+   2 Nov), a 5xx, a timeout, a broken connection, a stream that ended
+   without the service's end (`chat stream cut`), an answer the service
+   stopped at its cap on tokens (`finish_reason` `length`) or one with no
+   fenced block at all is asked once more (`make_skill_local::again`);
+   anything else is not. An answer whose stream ended whole with its last
+   fence never written (a product lamp on 11798, 11 Nov: two answers of
+   about 250 tokens taken for cut streams, the make failing as cut off)
+   has that fence closed at its end and goes on to be checked, journaled
+   as "a made skill's last fence closed at the end of its answer"
+   (`made_skill::open_fence`); the second answer gets the same. The
+   fences are read as the model writes them: a name in any case or its
+   language (`toml`, `md`, `markdown`), backticks or tildes, three or
+   more, indented, bare (`SKILL.md` by its front matter), a closing fence
+   at the end of a line, `SKILL.md` opened before `skill.toml` closed, and
+   a block within `SKILL.md` kept as its words. The model is shown a whole skill the check takes
    (`make_skill_local::EXAMPLE`, `example-only`: cyan at level 2 for 25 s
    on someone being there, named as an example of the form, "never answer
    with it") and told
