@@ -85,7 +85,8 @@ export const STIMULI = [
   { id: 'people', group: 'People', label: 'Set people', fields: [number('n', 0, 5, 1, { integer: true })], argv: (a) => ['people', String(a.n)] },
   { id: 'hear', group: 'Sound', label: 'Hear it', fields: [text('text', 120, 'good night lamp')], argv: (a) => ['hear', a.text], listensFor: (a) => a.text },
   { id: 'sound', group: 'Sound', label: 'Make the sound', fields: [select('kind', ['music', 'laughter', 'door', 'footsteps'])], argv: (a) => ['sound', a.kind] },
-  { id: 'touch', group: 'Touch', label: 'Touch', fields: [select('kind', ['tap', 'pet'])], argv: (a) => ['touch', a.kind] },
+  // A held hand is ONE pet (a real lamp tells one per stroke): a touch within `gapMs` of the last is the same stroke.
+  { id: 'touch', group: 'Touch', label: 'Touch', fields: [select('kind', ['tap', 'pet'])], argv: (a) => ['touch', a.kind], gapMs: 800 },
   { id: 'hand', group: 'Touch', label: 'A hand', fields: [], argv: () => ['hand'] },
   { id: 'air', group: 'Air', label: 'Air', fields: [select('kind', ['stuffy', 'clear'])],
     argv: (a) => ['air', ...(a.kind === 'stuffy' ? ['co2_ppm=1600', 'pm2_5=45'] : ['co2_ppm=450', 'pm2_5=5'])] },
