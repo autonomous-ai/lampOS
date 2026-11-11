@@ -13638,6 +13638,9 @@ fn conversation_with_gate_inner(
         // the lamp's own turn under news' gates, at the first pause after
         // any turn, never in the quiet hours, once; the yes is the waiting
         // write's (`crate::run_write_yes`).
+        if let Some(waits) = run_writes.as_mut() {
+            waits.poll(std::time::Instant::now());
+        }
         if let Some(waits) = run_writes.as_mut()
             && !reminder_waiting
             && crate::task_news::quiet_for_news(
@@ -13665,19 +13668,26 @@ fn conversation_with_gate_inner(
             && !submission_draining
             && snapshot.listening_ready(now())
             && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
-            && let Some(run) = waits.due(std::time::Instant::now())
             && !crate::run_write_yes::quiet_hours_now()
+            // As `LAMP_PRIVATE_ROOM` holds what only the owner may hear:
+            // outside it, the owner seen alone; else it lapses quietly.
+            && crate::run_write_yes::read_back_allowed_now()
+            && let Some(say) = waits.next(std::time::Instant::now())
         {
-            waits.told(&run.send_id);
-            eprintln!(
-                "lamp-voice: reading back a skill run's held write to {} for a yes (#6432)",
-                run.service
-            );
+            match &say {
+                crate::run_write_yes::Say::ReadBack(run) => eprintln!(
+                    "lamp-voice: reading back a skill run's held write to {} for a yes (#6432)",
+                    run.service
+                ),
+                crate::run_write_yes::Say::Lapsed(_) => eprintln!(
+                    "lamp-voice: telling a skill run's write that lapsed unheard, once (#6432)"
+                ),
+            }
             snapshot = commit_written_turn(
                 owner,
                 reply,
                 &mut provider_queue,
-                &run.note(),
+                &say.note(),
                 false,
                 crate::run_write_yes::BASIS,
                 provider_session,

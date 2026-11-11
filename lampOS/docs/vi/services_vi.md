@@ -2358,11 +2358,21 @@ lẫn lượt chạy đều không giữ token nào.
   ghi còn ít nhất 30 giây giữ được nói một lần, như lượt viết của chính đèn
   (`run_write_read_back`), dưới các cổng của tin công việc: có người ở đèn,
   khoảng lặng đầu tiên sau bất kỳ lượt nào (người đang nói dở, hay đèn, thì
-  được chờ cho xong), không nợ câu trả lời nào, phòng không bận, và không
-  bao giờ trong giờ yên lặng của đèn (`lamp_local_time::quiet_hours`; giờ
+  được chờ cho xong), không nợ câu trả lời nào, phòng không bận, và, khi
+  `LAMP_PRIVATE_ROOM` tắt, chỉ khi chủ đèn được thấy một mình (khuôn mặt
+  quen mà mắt nhận ra là của chủ đèn, chỉ một khuôn mặt trong tầm nhìn,
+  `services::owner_sees_alone`, như một lần đọc đầy đủ; nếu không thì không
+  nói và việc giữ lặng lẽ hết hạn); không bao giờ trong giờ yên lặng của đèn (`lamp_local_time::quiet_hours`; giờ
   địa phương không biết thì coi là yên lặng, như với kỹ năng). Mô hình được
   bảo nói nguyên văn lời đọc lại của chương trình này sau tên kỹ năng:
   "Your <skill> skill wants to send: …. Shall I send it?", và không gọi gì.
+  Câu nói nằm trong ghi chú như một chuỗi JSON sau phần đầu mà worker đọc
+  trước, nên không gì lượt chạy viết ra (một `")`, một dòng mới, một phần
+  đầu giả) đóng được nó hay mở một ghi chú khác. Một lần ghi hết thời gian
+  giữ mà chưa được nói (không có ai, giờ yên lặng, hay còn dưới 30 giây khi
+  thấy) được kể một lần sau đó, khi đèn được nói: "Your <skill> skill wanted
+  to send a mail, but nobody was here to say yes, so nothing was sent." Chỉ
+  giữ trong bộ nhớ: khởi động lại không bao giờ kể lại.
   Một lời đọc lại quá dài cho một ghi chú (1 024 byte) không bao giờ bị cắt:
   đèn chỉ nói rằng kỹ năng muốn gửi một thứ quá dài để đọc ra, không gì chờ,
   và việc giữ tự hết hạn.
@@ -2372,8 +2382,11 @@ lẫn lượt chạy đều không giữ token nào.
   hai phút của nó tính từ lúc chương trình này giữ. Vì vậy cổng của giọng
   nói giữ nó (`services::gate`): nghe trực tiếp, một request sau, lời đọc
   lại không bị cắt, trong thời gian giữ, kiểm tra giọng ở đuôi tiếng vọng,
-  chỉ tuyến thứ hai, và không kiểm tra danh tính (`LAMP_PRIVATE_ROOM`: ai
-  trả lời cũng được). Thêm vào đó, lần gửi của lượt chạy cần một lời đồng ý
+  chỉ tuyến thứ hai. Nó theo `LAMP_PRIVATE_ROOM` như một lần ghi do người
+  dùng chuẩn bị: bật thì ai trả lời cũng được (mọi câu nghe được là của chủ
+  đèn, `owner_seen_saying`); tắt thì chỉ lời đồng ý của chủ đèn, thấy khuôn
+  mặt họ nói, hoặc giọng họ đạt `same_voice::SERVICES_SAME_FROM` (0.55) trở
+  lên so với bản giọng của họ, người khác bị huỷ với `OTHER_VOICE`. Thêm vào đó, lần gửi của lượt chạy cần một lời đồng ý
   đơn giản (`services::plain_yes`: "yes", "send it", "ừ, gửi đi", nhiều nhất
   sáu từ và không gì khác), để không gì lượt chạy viết ra lái được mô hình
   gửi đi; với bất kỳ câu nào khác nó bị huỷ ("a skill's write goes only on a
