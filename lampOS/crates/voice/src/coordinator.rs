@@ -110,6 +110,9 @@ pub const OFFLINE_VOICE_ENVIRONMENT: &str = "LAMP_OFFLINE_VOICE";
 /// unless set.
 pub const SERVICE_DOWN_LINE_ENVIRONMENT: &str = "LAMP_SERVICE_DOWN_LINE";
 const DIAGNOSTIC_SHUTDOWN_GRACE: Duration = Duration::from_millis(750);
+/// The workers' shared grace on a stop without audio diagnostics, as `serve`
+/// always runs. A worker not gone by then is killed and reaped.
+const SHUTDOWN_GRACE: Duration = Duration::from_millis(300);
 /// `TimeoutStopSec` of `deploy/product/lamp-voice.service`: systemd kills
 /// what is left of the voice this long after its SIGTERM. Checked against
 /// the unit by a test.
@@ -2556,7 +2559,7 @@ impl Rig {
         let grace = if self.diagnostic_directory.is_some() {
             DIAGNOSTIC_SHUTDOWN_GRACE
         } else {
-            Duration::from_millis(300)
+            SHUTDOWN_GRACE
         };
         let deadline = Instant::now() + grace;
         let stop_requested_at_us = monotonic_us();
@@ -17599,18 +17602,36 @@ mod tests {
     };
     use lamp_turn_owner::BoundaryGuard;
 
-    /// #6406: the endpoint worker's exit wait, after the other workers'
-    /// longest shared grace, leaves at least half of the unit's stop timeout
-    /// for the rest of the stop, and the timeout is the unit's.
+    /// #6406: every bounded wait of a stop, summed at its worst, stays inside
+    /// the unit's `TimeoutStopSec`, and the timeout is the unit's. In order:
+    /// a ring restart still starting waits out its worker startup; then the
+    /// workers' shared grace; then the endpoint worker's exit wait, which is
+    /// the larger of what is left of the grace and its own bound. The motor,
+    /// camera and ring steps run inside the shared grace, and the diagnostic
+    /// reads after it are not timed. `serve` never runs audio diagnostics, so
+    /// the unit's grace is the plain one. With a ring restart in flight the
+    /// sum is 4.8 s, so the margin is 200 ms, not half. Without one, a stop
+    /// with either grace stays within half of the timeout.
     #[test]
-    fn the_endpoint_exit_wait_stays_well_inside_the_units_stop_timeout() {
+    fn every_bounded_step_of_a_stop_stays_inside_the_units_stop_timeout() {
         let unit = include_str!("../../../deploy/product/lamp-voice.service");
         assert!(
             unit.lines()
                 .any(|line| line == format!("TimeoutStopSec={}s", UNIT_STOP_TIMEOUT.as_secs())),
             "lamp-voice.service's TimeoutStopSec is not {UNIT_STOP_TIMEOUT:?}"
         );
-        assert!(DIAGNOSTIC_SHUTDOWN_GRACE + ENDPOINT_EXIT_WAIT <= UNIT_STOP_TIMEOUT / 2);
+        // The exit wait covers what is left of either grace.
+        assert!(SHUTDOWN_GRACE.max(DIAGNOSTIC_SHUTDOWN_GRACE) <= ENDPOINT_EXIT_WAIT);
+        let ring_restart = crate::process::WORKER_STARTUP_TIMEOUT;
+        let margin = Duration::from_millis(200);
+        let stop = ring_restart + SHUTDOWN_GRACE + ENDPOINT_EXIT_WAIT;
+        assert!(
+            stop + margin <= UNIT_STOP_TIMEOUT,
+            "a stop can take {stop:?} of the unit's {UNIT_STOP_TIMEOUT:?}"
+        );
+        for grace in [SHUTDOWN_GRACE, DIAGNOSTIC_SHUTDOWN_GRACE] {
+            assert!(grace + ENDPOINT_EXIT_WAIT <= UNIT_STOP_TIMEOUT / 2);
+        }
         assert!(ENDPOINT_EXIT_WAIT > Duration::from_millis(500));
     }
 
