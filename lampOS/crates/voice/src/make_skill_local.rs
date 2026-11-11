@@ -587,10 +587,59 @@ pub const READ_BACK: &str = "read_back";
 pub const READ_BACK_NOT_ASKED: &str =
     "a skill is read back only when the person asks for it out loud";
 
+/// Who asks for a made skill's read-back ([`read_back`]), and where.
+#[derive(Clone, Copy, Debug)]
+pub struct Asking {
+    /// The line's request.
+    pub request: u64,
+    /// A line someone spoke.
+    pub heard: bool,
+    /// What only the owner may hear is said to it: the private room, or
+    /// the owner seen saying it (`services::owner_hears`, as a read in full).
+    pub owner_hears: bool,
+    /// The route with the echo judge, where a yes may be taken
+    /// (`services::sends_here`).
+    pub sends_here: bool,
+}
+
+/// What the model is told of a skill that sends, read back to a line the
+/// owner was not seen saying, outside the private room: its name only.
+pub fn sends_unsaid(spoken: &str) -> String {
+    format!(
+        "Say only this, in the conversation's language: \"{spoken} sends something on its own; \
+         only its owner can hear what.\" Never whom it sends to or what it says. Ask nothing, \
+         call nothing."
+    )
+}
+
+/// What the model is told of a skill waiting for its yes, read back on a
+/// route that can't take one (the Live route): it waits, and no wait starts.
+pub fn yes_not_here(spoken: &str) -> String {
+    format!(
+        "Say plainly, in the conversation's language, that {spoken} waits for their yes before \
+         it sends anything, and that I can't take that yes on this voice. Ask nothing, call \
+         nothing."
+    )
+}
+
+/// What the model is told of a skill whose package on the lamp is not the
+/// one made (changed since, or being put on again): asked again later.
+pub fn changed_since_made(spoken: &str) -> String {
+    format!(
+        "Say plainly, in the conversation's language, that {spoken} changed on the lamp since \
+         it was made, so I can't read back what it sends right now, and that they can ask me \
+         again in a moment. Ask nothing, call nothing."
+    )
+}
+
 /// A made skill read back by voice ("what does my leaving mail skill
-/// send?", the owner, 11 Nov), in `request` (`heard`: a line someone
+/// send?", the owner, 11 Nov), asked by `asking` (`heard`: a line someone
 /// spoke), at `now`: the kept skill on the lamp named `name`
 /// ([`made_skill::kept_on_named`]), from the made skills' `directory`.
+/// One that sends or writes is read back only to the owner
+/// (`owner_hears`: the private room, or the owner seen saying the line, as
+/// a services read in full; App Only's P2 on #6230); to anyone else its
+/// name only, that it sends ([`sends_unsaid`]), and no wait starts.
 /// One that sends or writes and is not approved for what it sends now
 /// (`approved`, `lamp-services`' `skill_writes_approved`; not told is not
 /// approved) is said back as its make said it ([`made_skill::on_line`],
@@ -599,17 +648,21 @@ pub const READ_BACK_NOT_ASKED: &str =
 /// comes as `approve_id` in a later heard line, with every guard of the
 /// make's (said whole, uncut; the echo held; the second route; the
 /// package said back; the link). Approved already, it is said with
-/// [`made_skill::approved_line`] and nothing is asked. One that sends
-/// nothing, or none of that name, is said so. What the model is told.
+/// [`made_skill::approved_line`] and nothing is asked. On a route that
+/// can't take a yes (`sends_here` false), it is said to wait, no wait
+/// starts and a pending make's wait is left as it is ([`yes_not_here`];
+/// App Only's P3 on #6230). Its package on the lamp not the one made is
+/// said so ([`changed_since_made`]). One that sends nothing, or none of
+/// that name, is said so. What the model is told.
 pub fn read_back(
     name: &str,
-    request: u64,
-    heard: bool,
+    asking: Asking,
     directory: &std::path::Path,
     approved: impl FnOnce(&crate::skill_write_yes::Asks) -> Option<(bool, bool)>,
     now: std::time::Instant,
 ) -> Value {
-    if !heard {
+    let request = asking.request;
+    if !asking.heard {
         eprintln!(
             "lamp-voice: request {request}: a made skill wasn't read back: no one asked aloud"
         );
@@ -642,12 +695,26 @@ pub fn read_back(
             )
         });
     };
+    if !asking.owner_hears {
+        eprintln!(
+            "lamp-voice: request {request}: a made skill read back by name only: the owner wasn't seen asking"
+        );
+        return json!({
+            "skill": made.name,
+            "sends": true,
+            "next": sends_unsaid(&spoken)
+        });
+    }
     match approved(&asks) {
         Some((false, _)) => {
             eprintln!(
                 "lamp-voice: request {request}: a made skill to read back is not the one on the lamp"
             );
-            not_on(Vec::new())
+            json!({
+                "skill": made.name,
+                "error": "the skill on the lamp changed since it was made",
+                "next": changed_since_made(&spoken)
+            })
         }
         Some((true, true)) => {
             eprintln!("lamp-voice: request {request}: a made skill read back: approved already");
@@ -659,6 +726,19 @@ pub fn read_back(
                     "{} Ask nothing, call nothing: it is agreed already.",
                     crate::skill_write_yes::say_whole(&made_skill::approved_line(&made))
                 )
+            })
+        }
+        // Not approved, or not told, on a route that can't take its yes:
+        // said to wait, and no wait started (a pending make's kept).
+        _ if !asking.sends_here => {
+            eprintln!(
+                "lamp-voice: request {request}: a made skill read back: its yes can't be taken on this route"
+            );
+            json!({
+                "skill": made.name,
+                "sends": true,
+                "error": "this voice can't take a yes",
+                "next": yes_not_here(&spoken)
             })
         }
         // Not approved, or not told: said back, and its yes awaited.
@@ -965,7 +1045,12 @@ fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Val
 pub const NOT_ASKED_ALOUD: &str =
     "a skill is made only when the person asks for one out loud, or with MAKE IT in the app";
 
-pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value {
+pub fn answer(
+    call: &lamp_gemini::ToolCall,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Value {
     // The person's yes to a made skill's writes (#6066): the waiting
     // skill's, in a later heard line, approved by the voice itself.
     if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
@@ -992,10 +1077,15 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
         let Some(keeping) = Keeping::when(true) else {
             return crate::tools::unavailable();
         };
-        return read_back(
-            name,
+        let asking = Asking {
             request,
             heard,
+            owner_hears: crate::services::owner_hears(request, heard, lease),
+            sends_here: crate::services::sends_here(),
+        };
+        return read_back(
+            name,
+            asking,
             &keeping.directory,
             |asks| {
                 crate::services::skill_writes_approved(
@@ -1041,7 +1131,7 @@ pub(crate) mod tests {
             args: serde_json::json!({"request": "Glow green when I come back to my desk."}),
         };
         assert_eq!(
-            answer(&call, 1, false),
+            answer(&call, 1, false, None),
             serde_json::json!({"error": NOT_ASKED_ALOUD})
         );
     }
@@ -1669,6 +1759,17 @@ light = { dim = 1 }
         (root, keeping, line.to_owned())
     }
 
+    /// A heard line of `request`, the owner's, on the route with the echo
+    /// judge: who a read-back is read whole to.
+    fn asking(request: u64) -> Asking {
+        Asking {
+            request,
+            heard: true,
+            owner_hears: true,
+            sends_here: true,
+        }
+    }
+
     fn not_approved(_: &crate::skill_write_yes::Asks) -> Option<(bool, bool)> {
         Some((true, false))
     }
@@ -1689,8 +1790,7 @@ light = { dim = 1 }
         let now = std::time::Instant::now();
         let told = read_back(
             "my Leaving mail skill",
-            20,
-            true,
+            asking(20),
             &keeping.directory,
             not_approved,
             now,
@@ -1748,8 +1848,7 @@ light = { dim = 1 }
         let ask = |request| {
             read_back(
                 "leaving mail",
-                request,
-                true,
+                asking(request),
                 &keeping.directory,
                 not_approved,
                 now,
@@ -1795,8 +1894,7 @@ light = { dim = 1 }
         let mut asked = 0;
         let told = read_back(
             "leaving mail",
-            20,
-            true,
+            asking(20),
             &keeping.directory,
             |asks| {
                 asked += 1;
@@ -1815,7 +1913,13 @@ light = { dim = 1 }
         assert_eq!(told["error"], crate::skill_write_yes::NOT_APPROVED);
         // Not told by lamp-services whether it is approved: read back and
         // asked, as not approved.
-        let told = read_back("leaving mail", 30, true, &keeping.directory, |_| None, now);
+        let told = read_back(
+            "leaving mail",
+            asking(30),
+            &keeping.directory,
+            |_| None,
+            now,
+        );
         assert_eq!(told["writes_wait_for_yes"], true, "{told}");
         made_skill::set_writes_here(None);
         let _ = std::fs::remove_dir_all(&root);
@@ -1829,8 +1933,7 @@ light = { dim = 1 }
         let now = std::time::Instant::now();
         let told = read_back(
             "leaving-mail",
-            20,
-            true,
+            asking(20),
             &keeping.directory,
             |_| Some((true, true)),
             now,
@@ -1871,7 +1974,7 @@ light = { dim = 1 }
         let now = std::time::Instant::now();
         let unasked =
             |_: &crate::skill_write_yes::Asks| -> Option<(bool, bool)> { panic!("asked") };
-        let told = read_back("evening dim", 20, true, &keeping.directory, unasked, now);
+        let told = read_back("evening dim", asking(20), &keeping.directory, unasked, now);
         assert_eq!(told["sends"], false, "{told}");
         assert!(
             told["next"]
@@ -1880,29 +1983,144 @@ light = { dim = 1 }
                 .contains("evening dim doesn't send or write anything"),
             "{told}"
         );
-        let told = read_back("morning mail", 20, true, &keeping.directory, unasked, now);
+        let told = read_back("morning mail", asking(20), &keeping.directory, unasked, now);
         assert!(told["error"].is_string(), "{told}");
         assert_eq!(told["on"], json!(["evening dim"]), "{told}");
-        let told = read_back("evening dim", 20, false, &keeping.directory, unasked, now);
+        let told = read_back(
+            "evening dim",
+            Asking {
+                heard: false,
+                ..asking(20)
+            },
+            &keeping.directory,
+            unasked,
+            now,
+        );
         assert_eq!(told["error"], READ_BACK_NOT_ASKED);
         assert!(!crate::skill_write_yes::awaited(now));
         made_skill::set_writes_here(None);
         let _ = std::fs::remove_dir_all(&root);
-        // A write skill whose package on the lamp is another: not on.
+        // A write skill whose package on the lamp is another: said to have
+        // changed since it was made, and to ask again (App Only's P3 on
+        // #6230), never that no skill is on by that name.
         let (root, keeping, _) = made_write("read-back-other");
         let told = read_back(
             "leaving mail",
-            20,
-            true,
+            asking(20),
             &keeping.directory,
             |_| Some((false, false)),
             now,
         );
         assert!(told["error"].is_string(), "{told}");
+        assert!(told.get("on").is_none(), "{told}");
+        assert_eq!(told["next"], changed_since_made("leaving mail"), "{told}");
         assert!(
             told.get(crate::skill_write_yes::APPROVE_ID).is_none(),
             "{told}"
         );
+        assert!(told.get("writes_wait_for_yes").is_none(), "{told}");
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// App Only's P2 on #6230: a write skill's recipients and words are
+    /// read back only in the private room or to the owner seen saying the
+    /// line (`services::owner_seen_saying`, as a read in full); to anyone
+    /// else its name only, that it sends, nothing asked of `lamp-services`
+    /// and no wait started.
+    #[test]
+    fn a_read_back_is_said_whole_only_in_the_private_room_or_to_the_owner_seen() {
+        let (root, keeping, made_line) = made_write("read-back-who");
+        let now = std::time::Instant::now();
+        for (why, private_room, owner, seen, whole) in [
+            ("the private room", true, Some("owner"), false, true),
+            ("the owner seen saying it", false, Some("owner"), true, true),
+            ("the owner not seen", false, Some("owner"), false, false),
+            ("no owner's line", false, None, true, false),
+        ] {
+            let owner_hears = private_room
+                || crate::services::owner_seen_saying(true, private_room, owner, |_| seen);
+            let mut asked = false;
+            let told = read_back(
+                "leaving mail",
+                Asking {
+                    owner_hears,
+                    ..asking(20)
+                },
+                &keeping.directory,
+                |_| {
+                    asked = true;
+                    Some((true, false))
+                },
+                now,
+            );
+            let next = told["next"].as_str().unwrap();
+            if whole {
+                assert_eq!(told["writes_wait_for_yes"], true, "{why}: {told}");
+                assert_eq!(next.split('"').nth(1).unwrap(), made_line, "{why}");
+                assert!(crate::skill_write_yes::awaited(now), "{why}");
+            } else {
+                assert!(!asked, "{why}");
+                assert_eq!(next, sends_unsaid("leaving mail"), "{why}");
+                assert!(!next.contains("mai@example.com"), "{why}: {next}");
+                assert!(!next.contains("leaving now"), "{why}: {next}");
+                assert!(
+                    told.get(crate::skill_write_yes::APPROVE_ID).is_none(),
+                    "{why}: {told}"
+                );
+                assert!(told.get("writes_wait_for_yes").is_none(), "{why}");
+            }
+        }
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// App Only's P3 on #6230: on a route that can't take the yes (the
+    /// Live route), a waiting skill read back is said to wait, no wait
+    /// starts, and a pending make's wait is left as it is.
+    #[test]
+    fn a_read_back_on_a_route_with_no_yes_starts_no_wait() {
+        let (root, keeping, _) = made_write("read-back-live");
+        let now = std::time::Instant::now();
+        let first = read_back(
+            "leaving mail",
+            asking(20),
+            &keeping.directory,
+            not_approved,
+            now,
+        );
+        let id = first[crate::skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let told = read_back(
+            "leaving mail",
+            Asking {
+                sends_here: false,
+                ..asking(30)
+            },
+            &keeping.directory,
+            not_approved,
+            now,
+        );
+        assert_eq!(told["next"], yes_not_here("leaving mail"), "{told}");
+        assert!(
+            told.get(crate::skill_write_yes::APPROVE_ID).is_none(),
+            "{told}"
+        );
+        assert!(told.get("writes_wait_for_yes").is_none(), "{told}");
+        // The wait before it goes on, its id unchanged.
+        assert!(crate::skill_write_yes::awaited(now));
+        crate::skill_write_yes::lamp_said(
+            20,
+            first["next"].as_str().unwrap().split('"').nth(1).unwrap(),
+        );
+        let mut approved = false;
+        let told = crate::skill_write_yes::approve(&id, 31, true, true, now, |_| {
+            approved = true;
+            Ok(json!({"approved": 1, "public": []}))
+        });
+        assert!(approved, "{told}");
         made_skill::set_writes_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }

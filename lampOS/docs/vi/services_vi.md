@@ -209,7 +209,7 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
-  | `{"op":"skill_write_approve","skill":"<name>","writes":[...],"sha256"?}`, lời đồng ý của ứng dụng cho các lần ghi của kỹ năng tự tạo (với `LAMP_SKILL_WRITES=on`; `sha256`, không bắt buộc, là package được nói lại, bị từ chối nếu không phải package đang cài; "Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...],"sha256"?}`, để dành cho lời đồng ý của ứng dụng với các lần ghi của kỹ năng tự tạo, điều chưa gì gửi: `lamp-cloud` không có kind đó và ứng dụng không có lời đồng ý nào (với `LAMP_SKILL_WRITES=on`; `sha256`, không bắt buộc, là package được nói lại, bị từ chối nếu không phải package đang cài; "Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
 
   Một dòng có trường mà op của nó không nhận, hoặc một code mà danh mục không
   biết, bị từ chối mà không lặp lại nó.
@@ -1878,13 +1878,15 @@ trong `lamp-skills`, kỹ năng như vậy không được nạp.
 chủ đèn đồng ý, mỗi lần chạy bị từ chối với "not sent: waiting for the
 owner's yes".
 
-**Sự đồng ý của chủ đèn** (`skill_write_approve`). Nó đến từ đường đồng ý
-của giọng nói hoặc từ ứng dụng, không bao giờ từ `lamp-skills`. Trên socket
+**Sự đồng ý của chủ đèn** (`skill_write_approve`). Nó chỉ đến từ đường đồng ý
+của giọng nói, không bao giờ từ `lamp-skills`; ứng dụng không có lời đồng
+ý nào cho nó ("Chưa làm", bên dưới). Trên socket
 tools chỉ cgroup của `lamp-voice.service` tới được nó. Nó không có trong
 `tools.json` và không nằm trong ba hàm giọng nói đưa cho mô hình
 (`services::NAMES`), nên mô hình không bao giờ gọi được nó. Trên socket
 admin, nó là op `{"op": "skill_write_approve", "skill", "writes"}` của
-`lamp-cloud`, cho ứng dụng. Không kiểm tra ai đã đồng ý (chủ đèn, 10/11:
+`lamp-cloud`, để dành cho lời đồng ý của ứng dụng mà `lamp-cloud` chưa
+gửi. Không kiểm tra ai đã đồng ý (chủ đèn, 10/11:
 không kiểm tra khuôn mặt, dấu giọng hay chủ đèn; ở phòng riêng, ai đang ở
 bên đèn là chủ của nó). Dòng của giọng nói là
 `{"skill": "<name>", "writes": [<content>, ...]}`, mỗi nội dung là đúng
@@ -2000,7 +2002,11 @@ năng được cài đúng package đó, `approved` khi nội dung của mọi l
 đúng liên kết đã đồng ý, như lúc gửi kiểm tra. Nó không đồng ý gì (các lần
 đồng ý của một package đã đổi bị bỏ, như lúc gửi); `lamp-skills` bị từ chối
 (`SKILL_READS_AND_WRITES_ONLY`), và khi công tắc tắt thì bị từ chối. Kiểm thử
-`whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`.
+`whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`. Giọng
+nói chỉ hỏi nó cho một lần đọc lại đầy đủ: trong phòng riêng hoặc cho chủ
+đèn được thấy đang nói dòng đó (`services::owner_hears`, chốt chặn của một
+lần đọc đầy đủ); với người khác chỉ có tên kỹ năng và việc nó gửi, không
+hỏi gì ([skills_vi.md](skills_vi.md), "Đọc lại, và đồng ý khi đó").
 
 **Phía giọng nói** ([skills_vi.md](skills_vi.md), "Made by voice", cho
 toàn bộ):
@@ -2047,7 +2053,11 @@ toàn bộ):
 **Chưa làm:**
 
 - Lời đồng ý từ ứng dụng: `lamp-cloud` chưa có kind cho
-  `skill_write_approve`, và danh sách của ứng dụng chỉ hiện `uses.sends_to`
+  `skill_write_approve`, và ứng dụng không có lời đồng ý nào. Nên giọng
+  nói không bao giờ bảo ai vào ứng dụng để đồng ý: một lời đồng ý bị từ
+  chối được bảo hỏi đèn kỹ năng đó gửi gì ("what does my … skill send?")
+  để nghe lại và đồng ý khi đó (`skill_write_yes::NOT_APPROVED`,
+  `NOT_HERE`; HOLD của Thirteen trên #6223). Danh sách của ứng dụng chỉ hiện `uses.sends_to`
   ("sends to …") của kỹ năng tự tạo khi ứng dụng làm (chữ của nó nằm trong
   ứng dụng).
 - Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
