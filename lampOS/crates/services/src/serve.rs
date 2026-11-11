@@ -1388,6 +1388,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             .map_err(|why| (Stage::Asked, why))?;
         self.read_planned(service, &entry, plan, asker)
             .await
+            .map(|quoted| reads::drive_none_told(service.code, args, quoted))
             .map_err(|why| (Stage::Service, why))
     }
 
@@ -3359,6 +3360,50 @@ mod tests {
                              "https://www.googleapis.com/auth/userinfo.email",
                              "https://www.googleapis.com/auth/userinfo.profile"]}),
         )
+    }
+
+    /// 11 Nov, a tester's lamp: a find of a file made elsewhere came back
+    /// empty, as `drive.file` hides it, and the lamp said nothing was
+    /// found. An empty Drive find says the lamp sees only its own files and
+    /// how to find another; a find with files, or another service's empty
+    /// read, says nothing of it.
+    #[test]
+    fn an_empty_drive_find_says_the_lamp_sees_only_its_own_files() {
+        let find = read_line(json!({"service":"google_drive","what":"files","query":"Sunday"}));
+        let dir = tempfile::tempdir().unwrap();
+        let empty = services(dir.path(), r#"{"files":[]}"#, false);
+        run(empty.admin(&drive_line("planted-drive")));
+        let answer = run(empty.tool(&find));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(answer["result"]["quoted"], json!([]));
+        assert_eq!(answer["result"]["nothing_found_why"], reads::DRIVE_ONLY_OWN);
+        // The newest files, with no query, the same.
+        let newest = read_line(json!({"service":"google_drive","what":"files"}));
+        assert_eq!(
+            run(empty.tool(&newest))["result"]["nothing_found_why"],
+            reads::DRIVE_ONLY_OWN
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let found = services(
+            dir.path(),
+            r#"{"files":[{"id":"f1","name":"Sunday plan"}]}"#,
+            false,
+        );
+        run(found.admin(&drive_line("planted-drive")));
+        let answer = run(found.tool(&find));
+        assert_eq!(answer["result"]["quoted"][0]["name"], "Sunday plan");
+        assert!(answer["result"].get("nothing_found_why").is_none());
+        let dir = tempfile::tempdir().unwrap();
+        let github = services(dir.path(), "[]", false);
+        run(github.admin(&set_line(
+            "github",
+            json!({"auth_type":"oauth","access_token":"gho_planted"}),
+        )));
+        let answer = run(github.tool(&read_line(
+            json!({"service":"github","what":"issues","repo":"o/r"}),
+        )));
+        assert_eq!(answer["result"]["quoted"], json!([]), "{answer}");
+        assert!(answer["result"].get("nothing_found_why").is_none());
     }
 
     /// A Drive link with no scope that makes files is refused at the first
