@@ -315,10 +315,16 @@ pub fn tool() -> lamp_gemini::Tool {
     if writes {
         description.push_str(READ_BACK_TOLD);
     }
+    // A skill's task read back (`LAMP_SKILL_TASKS`, #6305): what its
+    // script uses, and its wait for the person's agreement.
+    let tasks = crate::skill_task_yes::on();
+    if tasks {
+        description.push_str(TASKS_READ_BACK_TOLD);
+    }
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description,
-        parameters: Some(parameters(writes)),
+        parameters: Some(parameters_with(writes, tasks)),
         silent: false,
     }
 }
@@ -327,9 +333,20 @@ pub fn tool() -> lamp_gemini::Tool {
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
      what a skill they made sends or to hear one read back, saying nothing before it.";
 
+/// What [`tool`]'s description adds with a skill's tasks on (#6305).
+pub const TASKS_READ_BACK_TOLD: &str = " Call it with read_back alone too when the person \
+     asks what a skill on the lamp uses, saying nothing before it.";
+
 /// The function's parameters: the request, and with a made skill's writes
 /// on (#6066) the yes to one that waits for it, `approve_id`, given alone.
+#[cfg(test)]
 fn parameters(writes: bool) -> Value {
+    parameters_with(writes, false)
+}
+
+/// [`parameters`], and with a skill's tasks on (#6305) the same
+/// `approve_id` and `read_back` for a skill's task.
+fn parameters_with(writes: bool, tasks: bool) -> Value {
     let mut parameters = json!({
         "type": "object",
         "properties": {
@@ -340,14 +357,21 @@ fn parameters(writes: bool) -> Value {
         },
         "required": ["request"]
     });
-    if writes {
+    if writes || tasks {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
             "type": "string",
             "description": "Only when a skill you just made or read back waits for the person's yes and they then agree, in any words: its approve_id, given alone with no request."
         });
+        let asked = match (writes, tasks) {
+            (true, false) => "what a skill they made sends, or to hear it read back",
+            (false, _) => "what a skill on the lamp uses",
+            (true, true) => {
+                "what a skill they made sends, what a skill on the lamp uses, or to hear one read back"
+            }
+        };
         parameters["properties"][READ_BACK] = json!({
             "type": "string",
-            "description": "Only when the person asks what a skill they made sends, or to hear it read back: its name, given alone with no request."
+            "description": format!("Only when the person asks {asked}: its name, given alone with no request.")
         });
         parameters["required"] = json!([]);
     }
@@ -603,6 +627,7 @@ fn asks_of(directory: &std::path::Path, made: &Made) -> Option<crate::skill_writ
         sha256: made.sha256.clone(),
         writes,
         say_back,
+        grants: None,
     })
 }
 
@@ -1109,18 +1134,29 @@ pub fn answer(
             heard,
             crate::services::sends_here(),
             std::time::Instant::now(),
-            |asks| {
-                crate::services::skill_write_approve(
+            |asks| match asks.grants {
+                // A skill's task (#6305): recorded by lamp-control, for
+                // the folder and grants said back, as the manage helper
+                // reads the skill again.
+                Some(_) => crate::skill_task_yes::approve_by(
+                    std::path::Path::new(made_skill::MANAGE_SOCKET),
+                    std::path::Path::new(crate::skill_task_yes::CONTROL_SOCKET),
+                    asks,
+                ),
+                None => crate::services::skill_write_approve(
                     std::path::Path::new(crate::services::FOLDER),
                     asks,
-                )
+                ),
             },
         );
     }
     // A made skill read back by voice (`LAMP_SKILL_WRITES`): what it
-    // sends, and its yes awaited again when it waits for one.
+    // sends, and its yes awaited again when it waits for one. Or a skill on
+    // the lamp with a task (`LAMP_SKILL_TASKS`, #6305): what its script
+    // uses, and its yes awaited.
     if let Some(name) = call.args[READ_BACK].as_str() {
-        if !made_skill::writes_on() {
+        let (writes, tasks) = (made_skill::writes_on(), crate::skill_task_yes::on());
+        if !writes && !tasks {
             return crate::tools::unavailable();
         }
         let Some(keeping) = Keeping::when(true) else {
@@ -1132,6 +1168,23 @@ pub fn answer(
             owner_hears: crate::services::owner_hears(request, heard, lease),
             sends_here: crate::services::sends_here(),
         };
+        if tasks
+            && made_skill::kept_on_named(&keeping.directory, name).is_none()
+            && let Some(told) = crate::skill_task_yes::read_back(
+                name,
+                asking,
+                |asked| {
+                    crate::skill_task_yes::asks_by(
+                        &keeping.manage,
+                        std::path::Path::new(crate::skill_task_yes::CONTROL_SOCKET),
+                        asked,
+                    )
+                },
+                std::time::Instant::now(),
+            )
+        {
+            return told;
+        }
         return read_back(
             name,
             asking,

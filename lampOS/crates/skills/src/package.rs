@@ -1353,7 +1353,20 @@ pub fn grants_asked(skill: &Skill) -> Vec<(&'static str, &'static str)> {
     ]
     .into_iter()
     .filter_map(|(asked, grant)| asked.then_some(grant))
-    .collect()
+    // A `do.task`'s script's grants (#6305): a computer pushes one only
+    // with every grant its script would reach.
+    .chain(skill.grants.iter().filter_map(|grant| {
+        Some((
+            lamp_voice::skill_task_yes::grant_named(grant)?,
+            lamp_voice::skill_task_yes::grant_words(grant)?,
+        ))
+    }))
+    .fold(Vec::new(), |mut asked, grant| {
+        if !asked.iter().any(|(name, _)| *name == grant.0) {
+            asked.push(grant);
+        }
+        asked
+    })
 }
 
 /// The pushed skill of `push`'s one push in flight, put into the developer
@@ -1914,9 +1927,12 @@ pub struct Pushes<'a> {
 /// Which part asked the manage helper, by its unit ([`asker_of`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Asker {
-    /// `lamp-cloud` (the owner's app) or the voice: the Store's requests,
-    /// made skills and the app's off and on.
+    /// `lamp-cloud` (the owner's app): the Store's requests and the app's
+    /// off and on.
     App,
+    /// The voice: what `App` asks, and made skills. The person's yes to a
+    /// skill's task (#6305) is recorded by lamp-control, never here.
+    Voice,
     /// `lamp-control`, a paired computer's door: the pushed requests only.
     Control,
     /// Any peer, with [`ANY_ASKER`] on, as in the tests.
@@ -2624,6 +2640,18 @@ fn taken_off(
         if yes.remove(name) {
             super::keep_names(&file, &yes).map_err(failed)?;
         }
+        // And the owner's yes to its task (#6305), likewise: lamp-control
+        // keeps it, so it is asked to take it back. lamp-control off or not
+        // reached removes the skill still (no task runs without it), and
+        // the journal says the yes may stay.
+        if let Err(why) = lamp_voice::skill_task_yes::forget_by(
+            Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
+            name,
+        ) {
+            eprintln!(
+                "lamp-skills: {name}: its task's yes, if any, was not taken back from lamp-control: {why}"
+            );
+        }
     }
     // Gone at once for the running program, then deleted.
     let old = hidden_place(skills, "removed", name);
@@ -2919,12 +2947,15 @@ pub fn from_an_asker(cgroup: &str) -> bool {
 }
 
 /// Which of [`ASKERS`] `/proc/<pid>/cgroup`'s text puts the process in,
-/// if any: lamp-control's own requests are not the app's.
+/// if any: lamp-control's own requests are not the app's, and the voice's
+/// yes to a skill's task is the voice's alone.
 pub fn asker_of(cgroup: &str) -> Option<Asker> {
     if from_one_of(cgroup, &[CONTROL]) {
         Some(Asker::Control)
+    } else if from_one_of(cgroup, &[VOICE_LINK]) {
+        Some(Asker::Voice)
     } else {
-        from_one_of(cgroup, &ASKERS[..2]).then_some(Asker::App)
+        from_one_of(cgroup, &[APP_LINK]).then_some(Asker::App)
     }
 }
 
@@ -2991,8 +3022,67 @@ pub const ASKED_MOST: u64 = 4_096;
 /// What the manage helper says of a line that is no request.
 pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
     {\"install\": {\"url\": URL, \"sha256\": HASH, \"name\": NAME, \"version\": VERSION}}, all but url optional, \
-    {\"install_made\": SHA256}, {\"off\": NAME}, {\"on\": NAME}, {\"camera\": NAME}, {\"camera_off\": NAME} \
-    or {\"forget_counts\": {}}";
+    {\"install_made\": SHA256}, {\"off\": NAME}, {\"on\": NAME}, {\"camera\": NAME}, {\"camera_off\": NAME}, \
+    {\"task_asks\": NAME} or {\"forget_counts\": {}}";
+
+/// The folder of the skill `name`: the skills folder's, else, with `dev`,
+/// the developer folder's (pushed); and whether it is pushed.
+fn task_folder(skills: &Path, dev: Option<&Path>, name: &str) -> Option<(PathBuf, bool)> {
+    let here = skills.join(name);
+    if here.join("skill.toml").is_file() {
+        return Some((here, false));
+    }
+    let pushed = dev?.join(name);
+    pushed
+        .join("skill.toml")
+        .is_file()
+        .then_some((pushed, true))
+}
+
+/// The skill `name`'s `do.task` as the voice says it back (#6305,
+/// `{"task_asks": NAME}`): `{"name", "sha256", "grants", "task", "from"}`,
+/// its folder hashed now ([`crate::task::folder_sha256`]) and where its
+/// script came from. Whether the owner agreed is lamp-control's to say,
+/// never this helper's (`lamp_voice::skill_task_yes::agreed_by`).
+/// `{"task": null}` for a skill with no `do.task`, or none of that name.
+/// Refused with the switch off, or for a skill that may not carry one
+/// ([`crate::task::origin_refuses`]).
+pub fn task_asks(
+    skills: &Path,
+    dev: Option<&Path>,
+    name: &str,
+) -> Result<serde_json::Value, String> {
+    if !crate::task::on() {
+        return Err(lamp_voice::skill_task_yes::OFF.to_owned());
+    }
+    if !skill_name_ok(name) {
+        return Err(NOT_A_NAME.to_owned());
+    }
+    let none = serde_json::json!({ "task": null });
+    let Some((folder, pushed)) = task_folder(skills, dev, name) else {
+        return Ok(none);
+    };
+    let skill = super::load(&folder).map_err(|why| format!("{name} does not load: {why}"))?;
+    let Some(step) = skill.task_step() else {
+        return Ok(none);
+    };
+    if let Some(why) = crate::task::origin_refuses(&folder, pushed) {
+        return Err(why);
+    }
+    let sha256 = crate::task::folder_sha256(&folder)?;
+    let from = if pushed {
+        format!("your computer {}", super::pushed_by(&folder))
+    } else {
+        "the Skills Store".to_owned()
+    };
+    Ok(serde_json::json!({
+        "name": name,
+        "sha256": sha256,
+        "grants": skill.grants,
+        "task": step.task,
+        "from": from,
+    }))
+}
 
 /// One request to the manage helper, read from `input`, done in `skills`,
 /// and answered on `output` in one line: `{"done": WHAT}` or
@@ -3059,13 +3149,22 @@ pub fn asked(
     let done: Result<serde_json::Value, String> = match pushed_asked {
         // Skills pushed from a computer (#3869), asked by lamp-control.
         Some((key, value)) => match pushes {
-            Some(pushes) if pushes.asker == Asker::App => Err(NOT_ITS_REQUEST.to_owned()),
+            Some(pushes) if matches!(pushes.asker, Asker::App | Asker::Voice) => {
+                Err(NOT_ITS_REQUEST.to_owned())
+            }
             Some(pushes) => pushed_request(skills, state, pushes, key, value, lock_wait),
             None => Err(PUSH_OFF.to_owned()),
         },
         None if pushes.is_some_and(|pushes| pushes.asker == Asker::Control) => {
             Err(NOT_ITS_REQUEST.to_owned())
         }
+        // A skill's task read back (#6305): what the voice says of it.
+        None if only("task_asks").is_some() => match only("task_asks") {
+            Some(serde_json::Value::String(name)) => {
+                task_asks(skills, pushes.map(|pushes| pushes.dev), name)
+            }
+            _ => Err(NOT_A_REQUEST.to_owned()),
+        },
         None => match (only("remove"), install) {
             _ if only("install_made").is_some() => match only("install_made") {
                 Some(serde_json::Value::String(sha256)) => {

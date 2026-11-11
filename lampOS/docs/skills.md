@@ -144,6 +144,7 @@ must not leave a step silently undone)*.
 | `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
 | `format` | no | `1` (as when left out) or `2` ([skill-format.md](skill-format.md), "The format"): in format 2 `look` is presence alone, with the presence topics, and `camera` the only picture. Any other is refused by name |
 | `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `camera`, `messages`, `known_faces`, `who`, `output_limits`, each `true` or left out; for an add-on alone, `propose`, the acts it may propose ([addons.md](addons.md)); `services`, the one linked service a `read` step reads, as `{ <service> = "read" }` (`do.read`), or with `LAMP_SKILL_WRITES=on` the one a `write` step writes to, as `{ <service> = "write" }` (`do.write`); and for a core skill alone, `core`, its core-only grants (below, "Permissions"). A key not listed refuses the skill, and so does a read or a step it does not give |
+| `grants` | only beside a `do.task` | What a `do.task`'s script may reach through lamp-control (#6305): a list of lamp-control's grants (`body`, `light`, `speak`, `look`, `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`, `speech`), once each, never `skills`; an unknown one refuses the skill. Said back in plain words, and the owner's yes covers exactly these (below, "A skill's task") |
 | `[watch]` | no | The skill is a watch (below, "A watch"): `every`, `asked_within`, `if_heard`, `most` and `mark`, and `[watch.words]`, every line it says or tells the model, in its own words (#940): `on`, `on_unknown`, `already_on`, `on_again`, `off`, `was_off`, `not_asked`, `no_mark`, `closed`, `paused_from_app`, `blind`, `paused`, `off_guard`, `stopped` (with `{hours}`, from `an_hour` or `hours` with `{hours}`), and a visit's text, `visit` or `came_in` with `{who}`, `{at}` and `{long}` from `known`, `unknown`, `someone`, `at` (with `{time}`), `under_a_minute`, `a_minute` and `minutes` (with `{minutes}`). Each is words of 1 to 900 bytes with only its own slots, each once. A watch with no `[watch.words]`, a file from before them, says the words lamp-skills said before, for this release only, and the journal says so. Then it has a `tool` whose `[choice]` is exactly `on` and `off` with no default, and no trigger, `[[do]]`, `[flag]`, `[again]`, `still`, `[quiet]`, `[[while]]` or `[ask]` |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
@@ -212,6 +213,7 @@ must not leave a step silently undone)*.
 | `do.remind` | no | A timer or reminder set in the lamp's schedule (#6066): `{ at = "HH:MM", words = "..." }` through the actions part's `set_reminder` (the next local `HH:MM` from the run), or `{ in = D, words = "..." }` through its `set_timer` (D from the run, `1m` to `24h`, whole seconds), the same calls the voice makes when a person asks, with `LAMP_SCHEDULE_TOOLS=on` in `lamp-actions`. It needs that function in `[permissions] actions` (`set_reminder` or `set_timer`), checked at load and again at the call. `words` are the skill's own fixed text, never the model's, with a made skill's say limits (`remind::plain_words`): at most 120 characters, one or two sentences, no web address, no quotes, braces or backticks, no control or format character; anything else refuses the skill at load. Only in a skill a trigger starts, never one with a `tool` (a person asking for a reminder asks the voice, which says its time back), and not in a step for some choices. Manners: a skill sets at most 3 in any 24 hours (`remind::MOST_A_DAY`, counted when the set is asked, kept while the program runs as `most_a_day` is), and never stacks one: before a set it reads the schedule's `list_reminders`, and words already set and not yet said (case and spacing aside) mean nothing new; a list it can't read whole sets nothing. The read-back is the schedule's: the run's journal says `set, due HH:MM` only for a `committed` answer, with its `clock`, and never the words. The call names no caller, so the reminder is the room's: said to whoever is at the lamp when it comes due. It reads no memory and writes nothing beyond the schedule's entry. Tests: `tests/it/remind.rs` and `a_remind_step_is_made_through_the_actions_part` |
 | `do.read` | no | A read of one of the owner's linked services (proposal #5288, `LAMP_SKILL_READS=on` in `lamp-skills` and `lamp-services`, on in the product units): `{ service, what, ... }`, any service with a fixed read (not the send-only `gmail-app`, the MCP services or Ahrefs), any of its fixed reads, never one that gives a whole text or a free-form one (a GraphQL `query`, `get` on any path, an MCP `call`; `lamp_services::spoken::skill_read_refused`, held again by `lamp-services` at its door), a calendar's `events` with `day = "today"` or `"tomorrow"` (`service_read::ReadFile`). The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "read" }` and `speak = true`. `lamp-skills` reads it itself through `lamp-services`' tools socket, once a local day, when the owner's known face is alone in view and steady 5 s, no voice was heard in the last minute and the lamp is not private, paused or in quiet hours (waiting up to 60 minutes, then skipping the day unsaid), and says the count and then each item's short line as exact text, judging the gate again before each; someone coming stops it with "I'll tell you the rest later." The journal keeps counts and the gate's outcome only ([services.md](services.md), "A made skill's read"). A read refused because the service isn't linked says nothing, unless `LAMP_SKILL_LINK_NOTE=on` (with `--state-dir`; off): then it says `lamp-services`' "<Service> isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors." once, behind the same gate, kept per skill in the state folder's `link-noted` until a read succeeds again ([services.md](services.md), "Not linked at the run") |
 | `do.write` | no | A fixed write to one of the owner's linked services (#6066, `LAMP_SKILL_WRITES=on` in `lamp-skills`, its manage helper and `lamp-services`; off in every product unit): `{ service, action, ... }`, a mail (`gmail` or `gmail-app` `send_mail`: `to`, `cc`, `subject`, `text`), a calendar event (`google_calendar` `create_event`), a GitHub issue or comment, a Linear issue, an Asana task or a Figma comment (`lamp_services::skill_writes::KINDS`); never a public post, a draft or an MCP tool call. Every field is fixed in the file and checked as it loads (`service_write::WriteFile`), nothing filled at run time. The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "write" }`; with the switch off the skill does not load. `lamp-skills` sends the step's exact content with the skill's name on `lamp-services`' tools socket (`skill_write`), which sends it only if the owner said yes to that content for that skill as installed (its package: an updated or removed skill waits for a new yes) under the same link (unlinking drops the yes) (given by the voice's yes path only, never by installing, and never in the app, which has no yes for it: "not sent: waiting for the owner's yes"), not signed out, at most 3 times a skill and 10 across every skill in any 24 hours. A link gone or another account's stops the skill's writes until `lamp-skills` restarts. The journal keeps the outcome only, never a recipient or a text ([services.md](services.md), "A made skill's write") |
+| `do.task` | no | A task handed to the lamp's agent, its script in the skill's own `scripts/` (#6305, `LAMP_SKILL_TASKS=on` in `lamp-skills`, its manage helper, `lamp-voice` and `lamp-control`; off in every product unit): `{ task = "...", run = "scripts/main.py" }`, alone in its `[[do]]` table, one a skill, in an installable skill from the Skills Store or pushed by the owner's own computer only. Handed over only on the owner's yes to the skill's `grants` and its folder's SHA-256, kept by lamp-control (a changed script asks again), one at a time, at most 3 a skill and 10 in all in any 24 hours; the skill's other steps run at once beside it. Off, it loads and hands nothing over, and the journal says why (below, "A skill's task") |
 
 A duration is a whole number and one of `ms`, `s`, `m` or `h` (`"5m"`).
 
@@ -1319,6 +1321,124 @@ mark = { colour = "blue", level = 1 }   # a faint light while on: level 1 or 2, 
   mark given back `ends`, a text `text`. The known file is not on the bus, so
   a case says it as `[[known]]`, `at` and an optional `name` (none: nobody
   known), in `expect.toml`; only a watch's case may.
+
+### A skill's task (`do.task`, #6305, `LAMP_SKILL_TASKS`, off)
+
+Part 2 of #6071 (the first builder's conditions there): a skill that reacts
+at once with its own steps and hands the slower part to the lamp's agent, a
+script in its own `scripts/` folder. Off unless `LAMP_SKILL_TASKS=on`, in
+`lamp-skills`, its manage helper, `lamp-voice` (passed to both routes) and
+`lamp-control` (itself on, `LAMP_CONTROL=on`), which keeps the owner's yes;
+no product unit sets it, and it stays off until #6308's rows pass.
+`lamp_skills::task`, `lamp_skills::package::task_asks`,
+`lamp_voice::skill_task_yes`, `lamp_control::task_yes`.
+
+```toml
+version = "1.0.0"
+grants = ["camera", "light"]
+tool = "photo_booth"
+
+[permissions]
+light = true
+speak = true
+
+[[do]]
+light = { colour = "warm" }
+
+[[do]]
+say = "Say cheese."
+
+[[do]]
+task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" }
+```
+
+- **The step.** `task = { task, run }`, alone in its `[[do]]` table (no
+  `on`, `after` or `if_choice`), one a skill, in an installable skill only.
+  `task` is 1 to 500 bytes of words; `run` a plain file inside the skill's
+  own `scripts/` (relative, at most four parts, no `..`, no hidden part, no
+  link anywhere on it). Its `[permissions]` do not hold it: its reach is its
+  `grants`.
+- **Its grants.** `grants = [...]` at the top of `skill.toml`, only beside a
+  `do.task`: each one of lamp-control's grants
+  (`lamp_voice::skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`,
+  `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
+  `speech`), once each, never `skills` (a script never puts skills on the
+  lamp). An unknown one refuses the skill. A pushed skill is held to its
+  computer's own grants for them too (`package::grants_asked`).
+- **First kind only.** A skill with a `do.task` loads only when its script
+  came from the Skills Store (its `.package.json` says `from_store`) or was
+  pushed by the owner's own paired computer (the developer folder,
+  `/var/lib/lampOS/skills-dev`). One put on by hand from a folder or a file,
+  or marked `made: here` or `added: file`, does not load, and the journal
+  says why. The made cap (`made_skill::put_on_cap`) refuses a made or added
+  skill with `grants` or a `task` step outright: model-written scripts are
+  #6307's, behind a switch of their own.
+- **Said back, and the yes.** Asked what such a skill uses ("what does my
+  photo booth skill use?"), the model calls `make_skill` with only
+  `read_back`. The voice asks the manage helper (`{"task_asks": NAME}`,
+  from the app's link or the voice), which reads the skill on the lamp now:
+  its task, its grants, where its script came from and the SHA-256 of its
+  folder (`task::folder_sha256`: every file, hidden ones too, but the
+  lamp's own `.package.json`, `.pushed.json` and `.revoked.json` at its
+  top; a link refuses it; each as a
+  `SHA256  PATH` line in path order, those lines hashed); and it asks
+  lamp-control whether the owner's yes holds for exactly that
+  (`{"task_yes_check": …}`, docs/control.md, "The owner's side"). The lamp
+  says "Photo booth hands one
+  task to the lamp's agent: “Take a photo and send it to my phone”. Its
+  script comes from the Skills Store, and it uses the camera and changes
+  the light. It runs only once you agree.", each grant in plain words. The
+  yes is taken as a made skill's write yes is (`skill_write_yes`: the
+  say-back heard whole and uncut first, a later heard line, the echo held,
+  the second route only). The voice reads the skill again through the
+  manage helper and, only while its folder still hashes to that SHA-256
+  and declares exactly those grants, asks lamp-control to record the yes
+  (`{"task_yes_record": {"name", "sha256", "grants"}}` on
+  `/run/lampos-control/admin.sock`); otherwise "the skill on the lamp is
+  not the one said back: nothing was agreed" and nothing is recorded.
+  lamp-control takes the record from the voice's cgroup alone and keeps it
+  in its own `--state-dir`'s `task-yes.json` (`/var/lib/lampos-control`,
+  0600, at most 50): the skill, its folder's SHA-256, the grants and when
+  (the first builder's ruling on #6059: the yes goes to lamp-control),
+  read and written never through a link. Every part runs as `lampos`, so
+  what keeps the others from writing it is each unit's: lamp-skills (and
+  every other part under `ProtectSystem=strict`) has no write path there,
+  and lamp-tasks (where a task's script will run, #6306), lamp-body and
+  lamp-eyes, which have no `ProtectSystem=strict`, hide the folder
+  (`InaccessiblePaths=-/var/lib/lampos-control`; `-` because lamp-control
+  makes it at its first start, so on the very first boot a part started
+  before it is not hidden from it until its next start). lamp-update's
+  install test `no_other_lampos_unit_can_write_lamp_controls_yes` holds
+  every `lampos` unit to one of the two, and lamp-control takes a record
+  only from the voice's cgroup. lamp-skills only asks (`task_yes_check`).
+  The move pays off once #6304 mints the one-run token in lamp-control,
+  from this record. A remove
+  asks lamp-control to take the yes back (`task_yes_forget`); lamp-control
+  off or not reached, the skill is removed still and the journal says its
+  yes may stay. Agreed already, the read-back says so and asks nothing.
+- **At each run.** The skill's other steps (light, cue, say) run at once.
+  The task goes on its own thread: with the switch off, nothing is handed
+  over and the journal says "do.task: not handed over: a skill's tasks are
+  off on this lamp (LAMP_SKILL_TASKS is not on)". On, the folder is hashed
+  again and lamp-control asked: no yes waits ("waiting for the owner's
+  yes"), a yes for other bytes or grants asks again ("its script or grants
+  changed since the owner's yes, so it asks again"), and lamp-control off
+  or not reached hands nothing over ("lamp-control, which keeps the owner's
+  yes, can't be asked"). Then one at a time a skill, and at most 3 a skill
+  and 10 across every skill in any 24 hours (`task-runs.json` in
+  `--state-dir`; an unreadable ledger or one with a run after now counts as
+  full).
+- **The hand-over** (#6306's to build): one line on lamp-tasks' socket
+  (`--tasks-socket`, or `LAMP_SKILLS_TASKS_SOCKET`; no unit passes either
+  yet, so a run says "no lamp-tasks hand-over on this lamp yet"):
+  `{"op": "skill_task", "skill", "task", "run", "folder", "sha256",
+  "grants"}`. lamp-tasks answers `{"ok": true, "id"?}` when the run ends, or
+  `{"ok": false, "error", "message"}`, waited for at most 15 minutes; the
+  skill holds its one place until then. The run itself (target `lamp`, the
+  lamp's Hermes, the one-run token from lamp-control scoped to the grants
+  and the folder's SHA-256, #6304, minted from lamp-control's kept yes
+  alone, `lamp_control::task_yes::yes_for_token`) and its result as Task
+  news are #6306's and #6304's. The journal keeps the outcome, never the task's words.
 
 ### Core and installable skills
 
@@ -2720,7 +2840,8 @@ gone ([switches.md](switches.md)). What happens:
      yes (its make's turn cut, no answer then, or a "no") is heard again
      by asking "what does my leaving mail skill send?" or "read me my
      leaving mail skill". The model calls `make_skill` with only
-     `read_back`, the skill's name (offered with `LAMP_SKILL_WRITES` alone;
+     `read_back`, the skill's name (offered with `LAMP_SKILL_WRITES`, or
+     with `LAMP_SKILL_TASKS` for a skill's task, "A skill's task" above;
      "my" and "skill" dropped, `made_skill::name_asked`), and the voice
      finds the kept skill on the lamp of that name. Not approved for what
      it sends now, as `lamp-services` tells it (`skill_writes_approved`,

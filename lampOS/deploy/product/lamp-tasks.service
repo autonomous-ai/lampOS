@@ -38,6 +38,10 @@ RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks
 StateDirectoryMode=0700
+# lamp-control's state folder hidden (#6305): it keeps the owner's yes to a skill's task, which a part
+# running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
+# made at lamp-control's first start, and a part started before it is not refused.
+InaccessiblePaths=-/var/lib/lampos-control
 # --progress puts how each task goes on the bus (tasks/status), which the voice's news reads (#1156);
 # --push-wait holds Harness's own wait so a result is known within about 10 s of the agent ending (#560).
 # On lamp-75c9 (Ten, 2026-10-16): 8.3 to 10.2 s against 39 to 41 s without, about 1 point more of

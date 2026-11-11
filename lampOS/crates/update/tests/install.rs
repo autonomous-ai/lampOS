@@ -7318,6 +7318,61 @@ fn a_servo_port_not_there_never_fails_a_unit_that_hides_it() {
     assert!(hiding.len() >= 5, "only {hiding:?} hide the servo port");
 }
 
+/// lamp-control's state folder keeps the owner's yes to a skill's task
+/// (#6305, `lamp_control::task_yes`), from which #6304's one-run token is
+/// minted. Every other product unit that runs as `lampos`, as lamp-control
+/// does, can't write it: `ProtectSystem=strict` with no write path over it,
+/// or the folder hidden (`InaccessiblePaths=-/var/lib/lampos-control`, the
+/// Reviewer-lead's P2 on #6346). A new `lampos` unit is held to it too.
+#[test]
+fn no_other_lampos_unit_can_write_lamp_controls_yes() {
+    const FOLDER: &str = "/var/lib/lampos-control";
+    let covers = |path: &str| {
+        let path = path.trim_start_matches(['-', '+']).trim_end_matches('/');
+        path.is_empty() || FOLDER == path || FOLDER.starts_with(&format!("{path}/"))
+    };
+    let mut held = Vec::new();
+    for (name, text) in PRODUCT.iter() {
+        let service = section(text, "Service");
+        if !service.contains(&"User=lampos") || *name == "lamp-control.service" {
+            continue;
+        }
+        let values = |key: &str| -> Vec<String> {
+            service
+                .iter()
+                .filter_map(|line| line.strip_prefix(key))
+                .flat_map(|paths| {
+                    paths
+                        .split_whitespace()
+                        .map(str::to_owned)
+                        .collect::<Vec<_>>()
+                })
+                .collect()
+        };
+        let hidden = values("InaccessiblePaths=")
+            .iter()
+            .any(|path| path.trim_start_matches('-') == FOLDER);
+        let strict = service.contains(&"ProtectSystem=strict")
+            && !values("ReadWritePaths=").iter().any(|path| covers(path))
+            && !values("StateDirectory=")
+                .iter()
+                .any(|dir| dir == "lampos-control");
+        assert!(
+            hidden || strict,
+            "{name} runs as lampos and could write {FOLDER}: add InaccessiblePaths=-{FOLDER}"
+        );
+        held.push(*name);
+    }
+    for name in [
+        "lamp-tasks.service",
+        "lamp-body.service",
+        "lamp-eyes.service",
+        "lamp-skills.service",
+    ] {
+        assert!(held.contains(&name), "{name} was not checked: {held:?}");
+    }
+}
+
 /// A build from before the voice carried its same-voice check still
 /// installs every part; the check is said missing, once, and not put beside
 /// the voice, while the turn-end worker still is.

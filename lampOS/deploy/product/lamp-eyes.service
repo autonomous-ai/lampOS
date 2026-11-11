@@ -20,6 +20,10 @@ RuntimeDirectory=lampos-eyes
 RuntimeDirectoryMode=0755
 StateDirectory=lampos-eyes
 StateDirectoryMode=0700
+# lamp-control's state folder hidden (#6305): it keeps the owner's yes to a skill's task, which a part
+# running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
+# made at lamp-control's first start, and a part started before it is not refused.
+InaccessiblePaths=-/var/lib/lampos-control
 # Looking is never worth a late word.
 Nice=10
 Environment=LAMP_BUS=on

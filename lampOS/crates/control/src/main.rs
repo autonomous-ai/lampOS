@@ -423,6 +423,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     if let Some(manage) = manage {
         shared.set_manage_socket(manage);
     }
+    // The owner's yeses to skills' tasks (#6305), in its own state folder,
+    // which lamp-skills can't write (`lamp_control::task_yes`).
+    shared.set_task_yes_folder(state.clone());
     let _ = sink.set(shared.binary());
     let remote = match option(arguments, "--remote")
         .or_else(|| std::env::var(REMOTE_ENVIRONMENT).ok())

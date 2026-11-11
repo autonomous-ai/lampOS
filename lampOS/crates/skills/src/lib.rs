@@ -33,6 +33,7 @@ pub mod requested_audio;
 pub mod routine;
 pub mod service_read;
 pub mod service_write;
+pub mod task;
 pub mod unplug;
 pub mod usage;
 pub mod visits;
@@ -278,6 +279,9 @@ struct SkillFile {
     watch: Option<watch::WatchFile>,
     /// Output ceilings are independent of a presentation's permission.
     limits: Option<routine::LimitsFile>,
+    /// What a `do.task`'s script may reach through lamp-control, each one
+    /// of its grants ([`task::grants_of`], #6305): only beside a `do.task`.
+    grants: Option<Vec<String>>,
     #[serde(rename = "do", default)]
     steps: Vec<StepFile>,
 }
@@ -780,6 +784,9 @@ struct StepFile {
     /// A timer or reminder set in the schedule, its words the skill's own
     /// ([`remind`], #6066).
     remind: Option<remind::RemindFile>,
+    /// A task handed to the lamp's agent, its script in the skill's own
+    /// `scripts/` ([`task`], #6305): alone in its `[[do]]` table.
+    task: Option<task::TaskFile>,
 }
 
 /// `propose = { ... }`: what an add-on suggests, as its folder writes it.
@@ -1471,7 +1478,9 @@ impl Permissions {
             // Its function, which [permissions] actions must list.
             Call::Remind(remind) => return self.refuses_action(remind.action()),
             Call::PrepareUnplug => unreachable!("handled above"),
-            Call::AfterSay | Call::Ends => return None,
+            // Its reach is its `grants`, held by the owner's yes and
+            // lamp-control's one-run token (#6304), not `[permissions]`.
+            Call::AfterSay | Call::Ends | Call::Task(_) => return None,
         };
         (!given).then(|| {
             format!(
@@ -1938,9 +1947,20 @@ pub struct Skill {
     pub watch: Option<watch::Spec>,
     /// With the `prepare_unplug` grant, what it says ([`UnplugLines`]).
     pub unplug: Option<UnplugLines>,
+    /// `grants = [...]`: what its `do.task`'s script may reach ([`task`],
+    /// #6305); empty without one.
+    pub grants: Vec<String>,
 }
 
 impl Skill {
+    /// Its `do.task` step, if it has one ([`task`], #6305): one a skill.
+    pub fn task_step(&self) -> Option<&task::TaskStep> {
+        self.steps.iter().find_map(|(_, step)| match step {
+            Step::Call(Call::Task(task)) => Some(task.as_ref()),
+            _ => None,
+        })
+    }
+
     pub fn is_routine(&self) -> bool {
         self.limits.is_some()
             || self
@@ -2642,6 +2662,10 @@ pub enum Call {
     /// A timer or reminder set in the schedule through the actions part's
     /// `set_timer` or `set_reminder` ([`remind`], #6066).
     Remind(remind::Remind),
+    /// A task handed to the lamp's agent, its script the skill's own, on
+    /// the owner's yes to its folder and grants ([`task`], #6305): on its
+    /// own beside the run's other steps, which go on at once.
+    Task(Box<task::TaskStep>),
 }
 
 /// A say written as a table: `{ text = "..." }` or `{ note = "..." }`, with
@@ -2881,6 +2905,7 @@ impl Call {
             Self::ServiceRead(read) => ("read", read.named()),
             Self::ServiceWrite(write) => ("write", write.named()),
             Self::Remind(remind) => ("remind", remind.named()),
+            Self::Task(task) => ("task", json!({"task": task.task, "run": task.run})),
         }
     }
 }
@@ -4082,6 +4107,7 @@ fn manifest(
                 && step.stand.is_none()
                 && step.propose.is_none()
                 && step.remind.is_none()
+                && step.task.is_none()
                 && step.on.is_none()
                 && step.after.is_none()
                 && step.if_choice.is_none()
@@ -4097,9 +4123,54 @@ fn manifest(
             ));
         }
     }
+    // A task handed to the lamp's agent (#6305): one a skill, its grants
+    // beside it and nowhere else, in an installable skill only.
+    let tasks = file.steps.iter().filter(|step| step.task.is_some()).count();
+    if tasks > 1 {
+        return Err("do.task: a skill hands over one task, so it has one do.task step".into());
+    }
+    if tasks == 1 && kind != SkillKind::Installable {
+        return Err(format!(
+            "do.task: only an installable skill hands a task over, never kind = \"{}\"",
+            kind.name()
+        ));
+    }
+    let grants = match (tasks, file.grants.take()) {
+        (0, Some(_)) => {
+            return Err("grants: what a do.task's script may reach, only beside one".into());
+        }
+        (_, grants) => task::grants_of(&grants.unwrap_or_default())?,
+    };
     for step in file.steps {
         if let Some(read) = step.read {
             steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
+            ons.resize(steps.len(), None);
+            continue;
+        }
+        if let Some(task) = step.task {
+            if step.body.is_some()
+                || step.light.is_some()
+                || step.say.is_some()
+                || step.sound.is_some()
+                || step.cue.is_some()
+                || step.rest.is_some()
+                || step.requested_audio.is_some()
+                || step.look.is_some()
+                || step.show.is_some()
+                || step.stand.is_some()
+                || step.propose.is_some()
+                || step.remind.is_some()
+                || step.write.is_some()
+                || step.on.is_some()
+                || step.after.is_some()
+                || step.if_choice.is_some()
+            {
+                return Err(
+                    "do.task is alone in its [[do]] table: the light, a cue or a say are steps of their own"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Task(Box::new(task.step(dir)?))));
             ons.resize(steps.len(), None);
             continue;
         }
@@ -4122,7 +4193,7 @@ fn manifest(
             && step.remind.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose, remind or read"
+                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose, remind, read or task"
                     .into(),
             );
         }
@@ -4842,6 +4913,7 @@ fn manifest(
         steps,
         watch,
         unplug,
+        grants,
     };
     // A watch shows a faint mark while it is on, texts the person, and
     // tells a known face from one it does not know: each needs its key.
@@ -5298,7 +5370,7 @@ fn budget_group_in(folder: &Path) -> Option<String> {
 
 /// The computer a pushed skill's [`PUSHED_FROM`] names, read without
 /// following a link and at most 1 KiB; "a computer" when it says none.
-fn pushed_by(folder: &Path) -> String {
+pub(crate) fn pushed_by(folder: &Path) -> String {
     use std::{io::Read, os::unix::fs::OpenOptionsExt};
     #[derive(Deserialize)]
     struct From {
@@ -5486,7 +5558,11 @@ pub fn load_each_with(
     let mut loaded: Vec<(PathBuf, Result<Skill, String>)> = folders_in(root)
         .into_iter()
         .map(|folder| {
-            let skill = load(&folder);
+            let skill = load(&folder).and_then(|skill| match skill.task_step() {
+                // A script only from the Store here (#6305).
+                Some(_) => task::origin_refuses(&folder, false).map_or(Ok(skill), Err),
+                None => Ok(skill),
+            });
             (folder, skill)
         })
         .collect();
@@ -5520,6 +5596,12 @@ pub fn load_each_with(
             } else {
                 load(&folder).and_then(|mut skill| {
                     if let Some(why) = pushed_refuses(&skill) {
+                        return Err(why);
+                    }
+                    // Pushed by the owner's computer, never made here (#6305).
+                    if skill.task_step().is_some()
+                        && let Some(why) = task::origin_refuses(&folder, true)
+                    {
                         return Err(why);
                     }
                     if let Some((group, _)) = skill.budget.as_ref().filter(|(group, _)| groups.contains(group)) {
@@ -10201,5 +10283,249 @@ mod tests {
             .contains("LAMP_SKILL_WRITES")
         );
         service_write::set_on_here(None);
+    }
+
+    const PHOTO_BOOTH: &str = "version = \"1.0.0\"\ngrants = [\"camera\", \"light\"]\n\
+        tool = \"photo_booth\"\n[permissions]\nlight = true\nspeak = true\n\
+        [[do]]\nlight = { colour = \"warm\" }\n[[do]]\nsay = \"Say cheese.\"\n\
+        [[do]]\ntask = { task = \"Take a photo and send it to my phone\", run = \"scripts/main.py\" }\n";
+
+    /// A skill folder with a script, `toml` its skill.toml.
+    fn task_skill(dir: &Path, name: &str, toml: &str) -> PathBuf {
+        let folder = write_skill(dir, name, toml);
+        std::fs::create_dir_all(folder.join(task::SCRIPTS)).unwrap();
+        std::fs::write(folder.join("scripts/main.py"), "print('cheese')\n").unwrap();
+        folder
+    }
+
+    /// The `.package.json` a Store install writes into `folder`.
+    fn from_store(folder: &Path, name: &str, store: bool) {
+        let installed = package::Installed {
+            sha256: "ab".repeat(32),
+            manifest: package::Manifest {
+                format: package::FORMAT,
+                name: name.into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: store,
+        };
+        std::fs::write(
+            folder.join(package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// #6305: a `do.task` loads with its grants beside the skill's other
+    /// steps, which stay steps of their own; its grants and its step are
+    /// checked as it loads.
+    #[test]
+    fn a_task_step_and_its_grants_load_checked() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = task_skill(dir.path(), "photo-booth", PHOTO_BOOTH);
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.grants, ["camera", "light"]);
+        let step = skill.task_step().unwrap();
+        assert_eq!(step.run, "scripts/main.py");
+        assert_eq!(skill.steps.len(), 3, "the light and the cue run beside it");
+        assert_eq!(
+            skill
+                .permissions
+                .refuses(&Call::Task(Box::new(step.clone()))),
+            None
+        );
+        let refused = |name: &str, toml: String, why: &str| {
+            let folder = task_skill(dir.path(), name, &toml);
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        };
+        refused(
+            "unknown-grant",
+            PHOTO_BOOTH.replace("\"light\"]", "\"root\"]"),
+            "is not a grant",
+        );
+        refused(
+            "skills-grant",
+            PHOTO_BOOTH.replace("\"light\"]", "\"skills\"]"),
+            "never a script's",
+        );
+        refused(
+            "grants-alone",
+            "version = \"1.0.0\"\ngrants = [\"light\"]\ntool = \"x_y\"\n[permissions]\nlight = true\n[[do]]\nlight = { colour = \"warm\" }\n".into(),
+            "only beside one",
+        );
+        refused(
+            "two-tasks",
+            format!(
+                "{PHOTO_BOOTH}[[do]]\ntask = {{ task = \"again\", run = \"scripts/main.py\" }}\n"
+            ),
+            "one do.task step",
+        );
+        refused(
+            "not-alone",
+            PHOTO_BOOTH.replace(
+                "[[do]]\ntask =",
+                "[[do]]\nlight = { colour = \"warm\" }\ntask =",
+            ),
+            "alone in its [[do]] table",
+        );
+        refused(
+            "out-of-scripts",
+            PHOTO_BOOTH.replace("scripts/main.py", "skill.toml"),
+            "inside the skill's own scripts/",
+        );
+        refused(
+            "unknown-key",
+            PHOTO_BOOTH.replace("run = ", "net = true, run = "),
+            "unknown field",
+        );
+        refused(
+            "core-task",
+            format!("kind = \"core\"\n{PHOTO_BOOTH}"),
+            "only an installable skill",
+        );
+    }
+
+    /// #6305: only a skill from the Store, or pushed by the owner's own
+    /// computer, loads with a `do.task`; one put on by hand, marked as not
+    /// from the Store, or made here does not, and says why.
+    #[test]
+    fn a_task_loads_only_from_the_store_or_the_owners_computer() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let dev = dir.path().join("dev");
+        std::fs::create_dir_all(&dev).unwrap();
+        let store = task_skill(&root, "photo-booth", PHOTO_BOOTH);
+        from_store(&store, "photo-booth", true);
+        task_skill(
+            &root,
+            "by-hand",
+            &PHOTO_BOOTH.replace("photo_booth", "by_hand"),
+        );
+        let not_store = task_skill(
+            &root,
+            "not-store",
+            &PHOTO_BOOTH.replace("photo_booth", "not_store"),
+        );
+        from_store(&not_store, "not-store", false);
+        let made = task_skill(
+            &root,
+            "made-here",
+            &PHOTO_BOOTH.replace("photo_booth", "made_here"),
+        );
+        from_store(&made, "made-here", true);
+        std::fs::write(
+            made.join("SKILL.md"),
+            "---\nname: made-here\ndescription: x\nmade: here\n---\n",
+        )
+        .unwrap();
+        task_skill(
+            &dev,
+            "pushed-booth",
+            &PHOTO_BOOTH.replace("photo_booth", "pushed_booth"),
+        );
+        let none = BTreeSet::new();
+        let loaded = load_each_with(
+            &root,
+            Some(Pushed {
+                dir: &dev,
+                picture_yes: &none,
+            }),
+        );
+        let result = |name: &str| {
+            loaded
+                .iter()
+                .find(|(folder, _)| folder.ends_with(name))
+                .map(|(_, result)| result.clone())
+                .unwrap()
+        };
+        assert!(result("photo-booth").is_ok());
+        let pushed = result("pushed-booth").unwrap();
+        assert!(pushed.pushed_by.is_some() && pushed.task_step().is_some());
+        for (name, why) in [
+            ("by-hand", "Skills Store or pushed"),
+            ("not-store", "Skills Store or pushed"),
+            ("made-here", "made or added on the lamp"),
+        ] {
+            let refused = result(name).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        }
+    }
+
+    /// #6305: the manage helper reads a skill's task back for the voice,
+    /// and keeps no yes: whether the owner agreed is lamp-control's, so a
+    /// `task_yes` is no request here, the voice's included, and its answer
+    /// never says `approved`. Off, it reads nothing back.
+    #[test]
+    fn the_helper_reads_a_task_back_and_keeps_no_yes() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let state = dir.path().join("state");
+        std::fs::create_dir_all(&state).unwrap();
+        let folder = task_skill(&root, "photo-booth", PHOTO_BOOTH);
+        from_store(&folder, "photo-booth", true);
+        task::set_on_here(Some(false));
+        assert!(
+            package::task_asks(&root, None, "photo-booth")
+                .unwrap_err()
+                .contains("LAMP_SKILL_TASKS")
+        );
+        task::set_on_here(Some(true));
+        let asks = package::task_asks(&root, None, "photo-booth").unwrap();
+        assert_eq!(asks["from"], "the Skills Store");
+        assert_eq!(asks["grants"], json!(["camera", "light"]));
+        assert!(asks.get("approved").is_none(), "{asks}");
+        assert_eq!(asks["task"], "Take a photo and send it to my phone");
+        assert_eq!(
+            package::task_asks(&root, None, "no-such").unwrap(),
+            json!({"task": null})
+        );
+        let sha256 = asks["sha256"].as_str().unwrap().to_owned();
+        let wait = std::time::Duration::from_secs(2);
+        let line = json!({"task_yes": {"name": "photo-booth", "sha256": sha256,
+            "grants": ["camera", "light"]}})
+        .to_string();
+        let made = dir.path().join("made");
+        let (push, dev) = (dir.path().join("push"), dir.path().join("dev"));
+        let key = dir.path().join("key");
+        let pushes = |asker| package::Pushes {
+            dev: &dev,
+            push: &push,
+            asker,
+            key_file: &key,
+        };
+        for asker in [
+            package::Asker::Voice,
+            package::Asker::App,
+            package::Asker::Any,
+        ] {
+            let mut out = Vec::new();
+            assert!(
+                !package::asked(
+                    &root,
+                    &made,
+                    &state,
+                    wait,
+                    None,
+                    Some(pushes(asker)),
+                    line.as_bytes(),
+                    &mut out,
+                )
+                .unwrap()
+            );
+            let said = String::from_utf8_lossy(&out);
+            assert!(said.contains("refused"), "{said}");
+        }
+        // Nothing of a yes in lamp-skills' state.
+        assert!(!state.join("task-yes.json").exists());
+        // A changed script reads back with its new SHA-256.
+        std::fs::write(folder.join("scripts/main.py"), "print('changed')\n").unwrap();
+        let again = package::task_asks(&root, None, "photo-booth").unwrap();
+        assert_ne!(again["sha256"], sha256.as_str());
+        // A remove goes on with lamp-control not reached.
+        package::remove(&root, Some(&state), "photo-booth").unwrap();
+        assert!(!folder.exists());
+        task::set_on_here(None);
     }
 }

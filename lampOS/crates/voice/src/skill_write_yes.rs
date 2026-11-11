@@ -59,6 +59,10 @@ pub struct Asks {
     /// What the lamp must have said whole before the yes: each write's
     /// plain words ([`crate::made_skill::write_said`]).
     pub say_back: String,
+    /// For a skill's `do.task` (#6305, [`crate::skill_task_yes`]): the
+    /// grants said back, which the yes covers with `sha256`, then the
+    /// skill's folder's; `writes` is empty. None for a made skill's writes.
+    pub grants: Option<Vec<String>>,
 }
 
 /// A made skill's writes waiting for the yes.
@@ -291,7 +295,7 @@ pub fn approve(
 ) -> Value {
     enum Took {
         Nothing,
-        NotSaid(String, String),
+        NotSaid(String, String, bool),
         Waiting(Box<Waiting>),
     }
     let took = kept::waiting(|kept| {
@@ -302,7 +306,11 @@ pub fn approve(
             && sends_here
             && !said_whole_before(waiting, request)
         {
-            return Took::NotSaid(waiting.id.clone(), waiting.asks.say_back.clone());
+            return Took::NotSaid(
+                waiting.id.clone(),
+                waiting.asks.say_back.clone(),
+                waiting.asks.grants.is_some(),
+            );
         }
         kept.take()
             .map_or(Took::Nothing, |waiting| Took::Waiting(Box::new(waiting)))
@@ -312,13 +320,18 @@ pub fn approve(
             eprintln!("lamp-voice: request {request}: a made skill's yes found nothing waiting");
             return json!({ "error": NOT_APPROVED });
         }
-        Took::NotSaid(id, say_back) => {
+        Took::NotSaid(id, say_back, task) => {
             eprintln!(
                 "lamp-voice: request {request}: a made skill's yes not taken: its say-back was not heard whole"
             );
+            let wait = if task {
+                crate::skill_task_yes::then_wait(&id)
+            } else {
+                then_wait(&id)
+            };
             return json!({
                 "error": NOT_SAID_WHOLE,
-                "next": format!("{} {}", say_whole(&say_back), then_wait(&id)),
+                "next": format!("{} {wait}", say_whole(&say_back)),
             });
         }
         Took::Waiting(waiting) => waiting,
@@ -334,6 +347,13 @@ pub fn approve(
         return json!({ "error": NOT_HERE });
     }
     match approve(&waiting.asks) {
+        // A skill's task (#6305): its grants and folder kept, as said.
+        Ok(_) if waiting.asks.grants.is_some() => {
+            eprintln!(
+                "lamp-voice: request {request}: a skill's task approved on the person's yes (#6305)"
+            );
+            json!({ "approved": true, "next": crate::skill_task_yes::APPROVED_NEXT })
+        }
         Ok(result) => {
             eprintln!(
                 "lamp-voice: request {request}: a made skill's {} write(s) approved on the person's yes (#6066)",
@@ -383,6 +403,7 @@ mod tests {
             sha256: "ab".repeat(32),
             writes: writes.to_vec(),
             say_back: SAY_BACK.to_owned(),
+            grants: None,
         }
     }
 
@@ -549,6 +570,11 @@ mod tests {
             crate::make_skill_local::sends_unsaid("leaving mail"),
             crate::make_skill_local::yes_not_here("leaving mail"),
             crate::make_skill_local::changed_since_made("leaving mail"),
+            crate::skill_task_yes::then_wait("ab12"),
+            crate::skill_task_yes::APPROVED_NEXT.to_owned(),
+            crate::skill_task_yes::yes_not_here("photo booth"),
+            crate::skill_task_yes::unread("photo booth"),
+            crate::make_skill_local::TASKS_READ_BACK_TOLD.to_owned(),
         ];
         for line in &lines {
             let words: Vec<String> = line
@@ -583,6 +609,7 @@ mod tests {
             ("skill_write_yes.rs", include_str!("skill_write_yes.rs")),
             ("made_skill.rs", include_str!("made_skill.rs")),
             ("make_skill_local.rs", include_str!("make_skill_local.rs")),
+            ("skill_task_yes.rs", include_str!("skill_task_yes.rs")),
         ] {
             let code = source.split("mod tests {").next().unwrap();
             for (number, line) in code.lines().enumerate() {

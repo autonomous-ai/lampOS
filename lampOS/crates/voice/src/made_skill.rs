@@ -2114,6 +2114,26 @@ pub fn capped_added(text: &str) -> Result<(String, Uses), Refused> {
     held(&table, true, false)
 }
 
+/// What a skill made or added here is told of a `do.task` step or `grants`
+/// (#6305): a script's task comes only from the Store or the owner's own
+/// computer for now.
+pub const SCRIPT_NOT_YET: &str = "a skill made on the lamp can't hand a task to a script yet";
+
+/// Whether a `skill.toml`'s table has `grants` or a `[[do]]` step with a
+/// `task` (`lamp_skills::task`, #6305).
+fn carries_task(table: &toml::Table) -> bool {
+    table.contains_key("grants")
+        || table
+            .get("do")
+            .and_then(toml::Value::as_array)
+            .is_some_and(|steps| {
+                steps.iter().any(|step| {
+                    step.as_table()
+                        .is_some_and(|step| step.contains_key("task"))
+                })
+            })
+}
+
 /// [`capped`]'s check of a table, past its tool: `speak` taken only for a
 /// skill added from a file ([`capped_added`]), or with `reads` on for one
 /// that reads a linked service.
@@ -2129,6 +2149,12 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
     let Some(version) = table.get("version").and_then(|version| version.as_str()) else {
         return Err(Refused::new("it's missing its version number"));
     };
+    // A script's task and its grants (#6305) only come from the Store or the
+    // owner's own computer: a skill made or added here carries none until
+    // #6307, behind its own switch.
+    if carries_task(table) {
+        return Err(Refused::new(SCRIPT_NOT_YET));
+    }
     // A skill added from a file keeps the cap from before #6066 (App
     // Only's P2 on #6103): the lift is for a skill made on the lamp only.
     if added {
