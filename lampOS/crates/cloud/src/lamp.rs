@@ -485,6 +485,15 @@ impl Real {
         Some(((message.header.boot.clone(), message.header.seq), run))
     }
 
+    /// `voice/turn`'s last turn said to the lamp: its publisher's boot and
+    /// seq, never its words (#6353).
+    fn answered_turn(&self) -> Option<crate::onboarding_page::Key> {
+        let message = self.latest(lamp_msgs::VoiceTurn::TOPIC)?;
+        let turn = message.parse::<lamp_msgs::VoiceTurn>().ok()?;
+        (turn.verdict == lamp_msgs::TurnVerdict::Answered)
+            .then(|| (message.header.boot.clone(), message.header.seq))
+    }
+
     /// The host's boot, the clock a preview's claim is on (the ring's own).
     fn boot(&self) -> Result<String, String> {
         Some(read(&self.places.proc.join("sys/kernel/random/boot_id")))
@@ -794,11 +803,24 @@ impl Lamp for Real {
 
     fn onboarding_page(&mut self, data: &Value) -> Result<Value, String> {
         let light = self.light().ok();
-        let run = self.skill_run().map(|(key, _)| key);
+        let run = self.skill_run();
+        let turn = self.answered_turn();
+        // The installed skills, read for an Add page's taps only (#6353).
+        let catalogue = (data["page"] == "add")
+            .then(|| self.skills())
+            .flatten()
+            .and_then(|places| crate::skills::list(&places).ok());
+        let seen = crate::onboarding_page::Seen {
+            light: light.as_ref(),
+            run: run.as_ref(),
+            turn: turn.as_ref(),
+        };
         crate::onboarding_page::PAGES
             .lock()
             .map_err(|_| "the page cannot be kept".to_owned())?
-            .open(data, light.as_ref(), run.as_ref())
+            .open(data, seen, |id| {
+                crate::onboarding_page::name_in(catalogue.as_ref()?, id)
+            })
     }
 
     fn onboarding_page_done(&mut self) -> Option<Value> {
@@ -808,12 +830,17 @@ impl Lamp for Real {
         }
         let light = self.light().ok();
         let run = self.skill_run();
-        let (data, line) = crate::onboarding_page::PAGES
-            .lock()
-            .ok()?
-            .done(light.as_ref(), run.as_ref())?;
-        crate::onboarding_page::say(&line);
-        Some(data)
+        let turn = self.answered_turn();
+        let seen = crate::onboarding_page::Seen {
+            light: light.as_ref(),
+            run: run.as_ref(),
+            turn: turn.as_ref(),
+        };
+        let (data, line) = crate::onboarding_page::PAGES.lock().ok()?.done(seen)?;
+        if !line.is_empty() {
+            crate::onboarding_page::say(&line, self.language() == "en");
+        }
+        data
     }
 
     fn make_skill(&self) -> Option<PathBuf> {

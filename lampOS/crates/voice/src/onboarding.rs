@@ -520,13 +520,21 @@ pub struct Progress {
     /// reset wipes it with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub yes_taken_back: BTreeMap<String, u64>,
-    /// When the walk first handed out its done line, in Unix ms: the app is
-    /// told once from it (`lamp_msgs::OnboardingPending::done_at_unix_ms`,
-    /// lamp-cloud's `onboarding.done`). Set once, kept through a redo of a
-    /// step or of the whole walk, so a redo never tells the app again; a
-    /// reset wipes it with the file. An older build reads past it.
+    /// When the walk's first closing line ("All done, <Name>! …") finished
+    /// playing, whole or cut, in Unix ms (#6353: the app went on while the
+    /// lamp still spoke): the app is told once from it
+    /// (`lamp_msgs::OnboardingPending::done_at_unix_ms`, lamp-cloud's
+    /// `onboarding.done`). Set once, kept through a redo of a step or of the
+    /// whole walk, so a redo never tells the app again; a reset wipes it
+    /// with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done_at_unix_ms: Option<u64>,
+    /// The walk ended and [`Self::done_at_unix_ms`] waits for its closing
+    /// line to finish (#6353); a closing never said (lost to a restart, a
+    /// redo or a turn never begun) dates it at once
+    /// ([`Onboarding::date_once_closed`]). An older build reads past it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub done_waits_closing: bool,
     /// This walk's id, when it began in Unix ms (#5979): set as its first
     /// step is asked, kept through a redo of one step, gone with a redo of
     /// the whole walk, whose first step sets a new one. The app tells one
@@ -547,6 +555,7 @@ impl Progress {
             harness_line: self.harness_line,
             yes_taken_back: self.yes_taken_back.clone(),
             done_at_unix_ms: self.done_at_unix_ms,
+            done_waits_closing: self.done_waits_closing,
             ..Self::default()
         };
         for step in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
@@ -2677,8 +2686,11 @@ impl Onboarding {
         let Some((line, then)) = self.owed_note.line.take() else {
             return;
         };
+        let closing = self.owed_note.closing.take();
         if delivery != Delivery::Unsaid {
             self.owed_note.unsaid = 0;
+            // The closing played, whole or to its cut: the walk ends now.
+            self.date_once_closed();
             return;
         }
         let again =
@@ -2688,10 +2700,24 @@ impl Onboarding {
         if again {
             self.owed_note.unsaid += 1;
             self.owed_note.again = true;
-            match self.owed_note.closing.take() {
+            match closing {
                 Some(done) => self.closing = Some(done),
                 None => self.owed = Some(line),
             }
+        }
+        self.date_once_closed();
+    }
+
+    /// The walk's end dated ([`Progress::done_at_unix_ms`], #6353) once
+    /// its closing is neither owed nor playing: said, cut, or given up.
+    fn date_once_closed(&mut self) {
+        if self.desired.done_waits_closing
+            && self.closing.is_none()
+            && self.owed_note.closing.is_none()
+        {
+            self.desired.done_waits_closing = false;
+            self.desired.done_at_unix_ms.get_or_insert_with(unix_ms);
+            self.save();
         }
     }
 
@@ -3207,7 +3233,11 @@ impl Onboarding {
                 && (self.owed.is_some() || self.closing.is_some())
                 && !hello_after_lamp
                 && quiet_us < START_QUIET_US);
-        self.owed_note.bindable = false;
+        // Handed out last loop and never bound to a turn: never said, never
+        // owed again.
+        if std::mem::take(&mut self.owed_note.bindable) {
+            self.owed_note.closing = None;
+        }
         let owed = self.owed.clone().or_else(|| self.closing_line());
         let closing = self.owed.is_none().then(|| self.closing.clone()).flatten();
         let note = self.tick_led(now_us, quiet_us, can_speak, paused, face, still)?;
@@ -3289,6 +3319,7 @@ impl Onboarding {
         if !self.storage_idle() {
             return None;
         }
+        self.date_once_closed();
         // While the model service refuses (#4265), nothing is begun while
         // turns are held: once a minute the walk goes on, so its own re-offer
         // tries the service and the person is never left in silence.
@@ -4078,8 +4109,11 @@ impl Onboarding {
         {
             // Kept without a name: the name is the one known when it is said.
             self.closing = Some(self.preferences_done().to_owned());
-            // Dated once per setup, for the app (`Progress::done_at_unix_ms`).
-            self.desired.done_at_unix_ms.get_or_insert_with(unix_ms);
+            // Dated once per setup, for the app, once the closing finished
+            // (`Progress::done_at_unix_ms`, #6353).
+            if self.desired.done_at_unix_ms.is_none() {
+                self.desired.done_waits_closing = true;
+            }
         }
         if self.redoing_one == Some(step) {
             self.redoing_one = None;
@@ -7894,6 +7928,67 @@ mod tests {
         room.said = room.at;
         let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
         assert_eq!(notes, [skill::PREFERENCES_DONE], "{notes:?}");
+    }
+
+    /// The two-step walk ended, its closing handed out but not yet played:
+    /// the walk's end is not dated yet (#6353).
+    fn closing_handed_out(name: &str) -> (Room, BootId, u64) {
+        let mut room = Room::new(name);
+        room.walk.definition = two_steps();
+        room.walk
+            .finish(Step::WhereYouSit, Outcome::Done, None, room.at);
+        room.walk
+            .finish(Step::WhoYouAre, Outcome::Done, None, room.at);
+        room.walk.owed = None;
+        room.walk.owed_after = None;
+        let mut said = None;
+        for _ in 0..16 {
+            room.at += S / 4;
+            room.walk.drain_storage_for_test(room.at);
+            said = room.walk.tick(
+                room.at,
+                START_QUIET_US,
+                true,
+                false,
+                Some(NEAR_MIDDLE),
+                true,
+            );
+            if said.is_some() {
+                break;
+            }
+        }
+        assert!(
+            said.expect("the closing is handed out")
+                .starts_with("(Say only this")
+        );
+        let (boot, turn) = (BootId::new([3; 16]).unwrap(), room.at + 1);
+        assert!(room.walk.bind_opener(boot, turn));
+        assert_eq!(room.walk.desired.done_at_unix_ms, None);
+        (room, boot, turn)
+    }
+
+    /// #6353, Mobile's ask 1: the walk's end (`onboarding.done`) is dated
+    /// only once its closing line has played, never as the last step ends;
+    /// one never played is said again first.
+    #[test]
+    fn the_walks_end_is_dated_once_its_closing_has_played() {
+        let (mut room, boot, turn) = closing_handed_out("done-after-closing");
+        room.walk
+            .invitation_finished(boot, turn, Delivery::Unsaid, room.at);
+        assert_eq!(room.walk.desired.done_at_unix_ms, None);
+        let notes = room.wait(4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!(room.walk.desired.done_at_unix_ms.is_some());
+        assert!(!room.walk.desired.done_waits_closing);
+    }
+
+    /// #6353: a closing cut by someone speaking ends the walk at the cut.
+    #[test]
+    fn a_cut_closing_ends_the_walk_at_the_cut() {
+        let (mut room, boot, turn) = closing_handed_out("done-at-cut");
+        room.walk
+            .invitation_finished(boot, turn, Delivery::Cut, room.at);
+        assert!(room.walk.desired.done_at_unix_ms.is_some());
     }
 
     /// The shipped skill cut to #5499's two-step walk (the order before

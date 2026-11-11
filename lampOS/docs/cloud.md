@@ -121,6 +121,7 @@ lamp says so.
 | `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_step_supported` | `true` with the same switch: this lamp sends `onboarding.step` as each walk step ends (#5979). No field otherwise ("Each setup step, told to the app" below) |
 | `system.info`'s `onboarding_page_supported` | `true` with the same switch: this lamp takes `onboarding.page` and sends `onboarding.page_done` (#6076). No field otherwise, so the app keeps its Next ("The app's onboarding pages, done on the lamp" below) |
+| `system.info`'s `onboarding_page_version` | `2` with the same switch (#6366): which `onboarding.page` contract the lamp speaks. 2 is per-tap Add (`added: [id]`, one tap a message, the page done with its first installed skill's line) and the `done` page (#6353). No field means 1, #6076's: picks sent once as Add is left, done at once. A version-2 lamp still ends Add on a 1-era leave: an `added` of no ids or several. The app sends per-tap adds and `done` only when it reads `>= 2` |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
@@ -2229,8 +2230,10 @@ state folder (`STATE_DIRECTORY`); on in the product unit, the lead's call on
   `harness.sign_in.state` is pushed:
   `{"type":"data","kind":"onboarding.done","status":"success","data":{"at":<unix ms>},"device":"lamp",...}`.
   `data` holds `at` only, the app's dedupe key.
-- **When.** `at` is the voice's own date for the walk's done line,
-  `onboarding/pending`'s `done_at_unix_ms` ([onboarding.md](onboarding.md)):
+- **When.** `at` is the voice's own date for the walk's done line, set
+  once that closing line ("All done, <Name>! …") has finished playing, or
+  at its cut (#6353: the app no longer moves on while the lamp still
+  speaks), `onboarding/pending`'s `done_at_unix_ms` ([onboarding.md](onboarding.md)):
   kept through `redo_setup`, so a redo never sends it again, and wiped by a
   factory reset, so a new owner gets it. A lamp set up before it was dated
   has none and never sends it. lamp-cloud reads the heartbeat's latest value
@@ -2300,34 +2303,56 @@ Tests: `online::tests::each_walk_step_is_told_once_beside_the_walks_end`,
 ## The app's onboarding pages, done on the lamp (#6076, `onboarding.page`)
 
 After the walk, the app's pages (Try first skill, Add a skill, Create your
-skill) go on by themselves, and the lamp says each one done. Behind
-`onboarding.done`'s switch, `LAMP_APP_ONBOARDING_DONE=on` with a state folder;
-`system.info` says `onboarding_page_supported: true` then.
+skill, and the last "skill master" screen) each get one line from the lamp,
+tied to the app (#6353); the person taps Next. Behind `onboarding.done`'s
+switch, `LAMP_APP_ONBOARDING_DONE=on` with a state folder; `system.info`
+says `onboarding_page_supported: true` then, and `onboarding_page_version:
+2` (#6366) for this contract.
 
 - **The app tells the page.** `onboarding.page` `{"page": "try" | "add" |
-  "create" | null, "added"?: [name], "walk_id"?}`, answered `{}`; `null`
-  closes it; any other page is refused. One page open at a time. A page
-  not done within 10 minutes is let go (an app killed before it sent
+  "create" | "done" | null, "added"?: [id], "walk_id"?}`, answered `{}`;
+  `null` closes it; any other page is refused. One page open at a time. A
+  page not done within 10 minutes is let go (an app killed before it sent
   `null`), and nothing is read from the bus while no page is open.
 - **try.** Done by the first Try line run after the page opened: the light
   turned on or to another colour (`light/state`; `how: "turn_blue"` for
   blue, else `"light"`), or a `dance` run done (`skills/events`, a run not
   made doesn't count; `how: "dance"`). A light already blue as the page
-  opened isn't seen to turn blue; the dance still counts.
-- **add.** The pick comes as the page is left: done at once, its line
-  "I'll remind you to sip water." for `sip-of-water` alone, else "Got it.
-  Those are on now."
-- **create.** Never done here: the app follows `skills.made` (#5985).
-- **The line.** "That's your first skill." for Try. Handed to the voice's say
-  socket (`LAMP_SAY_SOCKET`, else `/run/lampos-say/say.sock`) as a note,
-  skill `onboarding-app`, let go after 30 s: said in the person's language,
-  only once nobody is talking and no other line is playing (the say
-  service's gates), never waited for here.
+  opened isn't seen to turn blue; the dance still counts. The line names
+  the colour set: "Blue it is! That's your first skill. Tap Next in the
+  app." (a fixed map of the ten light colours, `warm` said "Warm white");
+  a dance or a colour not in it: "That's your first skill. Tap Next in the
+  app." A turn said to the lamp (`voice/turn`, answered; never its words)
+  that changes no light within 8 s gets, once per Try page: "Want to try a
+  skill? Say turn blue."
+- **add.** One message per tap, `{"page": "add", "added": ["<id>"]}`. The
+  lamp says the skill by its own name from its installed skills (the
+  `title` `skills.list` gives, never the app's words): the page's first
+  "<Name> is on! Add more skills if you like, or tap Next to make your
+  own.", each later one "<Name> is on too." An id not installed gets
+  nothing (the app sends it again once the install lands); the lamp
+  installs nothing. Next on Add sends nothing. An app that reads no
+  `onboarding_page_version` (#6076's) sends its picks as it leaves Add;
+  an `added` of no ids (`[]`) or several still ends the page: done with
+  the first installed id's line, or at once with no line if none is
+  installed. One id reads as a tap; no `added` opens the page.
+- **create.** Nothing here: lamp-voice says the made skill's own line as
+  it puts it on ("I made <Name>, and it's on.", `made_skill::on_line`).
+- **done.** `{"page": "done"}`: "You're a skill master now! Keep exploring,
+  just say Hey Lamp anytime. Have fun!", once.
+- **The line.** Every line is in `crate::onboarding_page`, one constant
+  each. Handed to the voice's say socket (`LAMP_SAY_SOCKET`, else
+  `/run/lampos-say/say.sock`), skill `onboarding-app`, let go after 30 s:
+  as written (`exact`, no chat) for an English owner; as a note said in the
+  person's language otherwise, these lines having no translation. Only
+  once nobody is talking and no other line is playing (the say service's
+  gates), never waited for here.
 - **The push.** One unasked `data` reply on `fd_channel`, kind
   `onboarding.page_done`, data `{"page", "how"?, "walk_id"?}`, once per page
-  opened, on the tick while connected, best effort as `onboarding.step` is.
-  The journal says `onboarding.page_done: handed to the client` or `not
-  handed to the client, not tried again`. The app goes on about 1 s after it.
+  opened, as its first line is handed out (a nudge pushes nothing), on the
+  tick while connected, best effort as `onboarding.step` is. The journal
+  says `onboarding.page_done: handed to the client` or `not handed to the
+  client, not tried again`.
 
 Tests: `onboarding_page::tests`,
 `answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`.
