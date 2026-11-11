@@ -1887,7 +1887,16 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     (C88, #5022) it removes that keep by its id, in the same person's
     scope, when the session's last memory call was their own `remember`
     within 60 s (`remember::just_kept`); past 60 s nothing was given just
-    before, so it asks what or which, as above (C35). The
+    before, so it asks what or which, as above (C35). That keep stays
+    "that" though the forget's own line reads the note again and opens a
+    new session (#2540), when that session is for the same known person
+    (`remember::replace_session`; lamp-06c1, 11 Nov, builds 11450 and
+    11716: "Lamp, forget that." 18 s after the umbrella keep, seen spoken,
+    found nothing given and asked which of 9 shown); another person's
+    session, nobody known's or a recall since lets it go. The
+    model told to ask which is told never to say there was nothing to
+    forget or remove (there it said "Nothing was forgotten — there was
+    nothing to remove"). The
     keep's answer tells the model what "that" now is, as on lamp-06c1 (4
     and 5 Nov) a bare "Lamp, forget that." after the umbrella keep was
     answered in words. Only a line whose mouth was seen saying it forgets
