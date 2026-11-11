@@ -327,9 +327,10 @@ pub fn repair_brief(request: &str, lines: &str) -> Result<String, &'static str> 
     ))
 }
 
-/// Why a made skill is not kept, in plain words the lamp can say; and when
-/// the lamp's check refused it, the check's lines for a repair
-/// ([`check_lines`]), never said.
+/// Why a made skill is not kept, in the lamp's words for the journal (the
+/// person hears [`plain_reason`]'s, or the model's own `cannot:`
+/// sentence); and when the lamp's check refused it, the check's lines for
+/// a repair ([`check_lines`]), never said.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Refused(pub String, pub Option<String>);
 
@@ -384,14 +385,72 @@ pub const NOT_READABLE: &str =
 pub const NOT_PASSED: &str = "it didn't pass the lamp's own check of what a skill may do; try \
                               again, maybe more simply";
 
+/// The lamp's model gave no answer.
+pub const MODEL_SILENT: &str = "the lamp's model didn't answer";
+/// The lamp's model gave back the maker's own example.
+pub const EXAMPLE_GIVEN_BACK_WHY: &str =
+    "the lamp's model gave back its own example, not what was asked; try asking again";
+/// The lamp couldn't write, check or keep what was made: its own fault,
+/// never the person's ask.
+pub const NOT_KEPT_HERE: &str = "the lamp couldn't keep it";
+pub const NOT_CHECKED: &str = "the lamp couldn't check it";
+pub const NOT_CHECKED_IN_TIME: &str = "the lamp couldn't check it in time";
+
+/// What the person hears of a make the lamp's check refused after the
+/// repairs were used up, or that couldn't be said plainly (the owner, 11
+/// Nov: makes failed "with reasons nobody understands"): one thing to ask,
+/// never the check's words.
+pub const NOT_MADE_TRY: &str =
+    "I couldn't make that one. Try asking for one thing, like 'say hello when I sit down'.";
+/// What the person hears when the lamp couldn't keep what it made.
+pub const NOT_KEPT_TRY: &str = "Something went wrong keeping it. Please try again.";
+
+/// The reasons [`plain_reason`] gives as they are: the model's silence or
+/// cut, said plainly with what to try.
+const PLAIN_REASONS: [&str; 2] = [MODEL_CUT_OFF, MODEL_SILENT];
+
+/// Why a make failed, as the person hears it and the app shows it: the
+/// lamp's own reason `why` (never the model's `cannot:` sentence, which
+/// is already the person's words and goes as it is) in everyday words.
+/// What it can't do yet ([`CANT_YET`]), that they already have it
+/// ([`ALREADY_HAVE`]), the model's silence or cut and a name with no free
+/// one left go as they are; the lamp failing to write, check or keep it is
+/// [`NOT_KEPT_TRY`]; any other (the check's refusal, a skill that couldn't
+/// be said plainly, a form the lamp can't read, each with its repairs used
+/// up) is [`NOT_MADE_TRY`]. The detailed reason stays in the journal.
+pub fn plain_reason(why: &str) -> String {
+    let why = why.trim();
+    if why.starts_with(CANT_YET)
+        || why.starts_with(ALREADY_HAVE)
+        || why.starts_with(NAME_TAKEN_HEAD)
+        || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
+        || PLAIN_REASONS.contains(&why)
+    {
+        return why.to_owned();
+    }
+    if [NOT_KEPT_HERE, NOT_CHECKED, NOT_CHECKED_IN_TIME].contains(&why) {
+        return NOT_KEPT_TRY.to_owned();
+    }
+    NOT_MADE_TRY.to_owned()
+}
+
+/// How the reason begins when no free name is left ([`free_name`]).
+const NAME_TAKEN_HEAD: &str = "a skill called ";
+
 /// What the lamp says of a skill it couldn't make, by voice or from the
-/// app: "I couldn't make that:" and why as it is, ending as a sentence
-/// (#5977). Every reason the lamp gives says what to try, or is the
-/// model's own `cannot:` sentence with what to ask instead.
+/// app: a whole line of its own ([`CANT_YET`], [`ALREADY_HAVE`],
+/// [`NOT_MADE_TRY`], [`NOT_KEPT_TRY`]) as it is, or "I couldn't make
+/// that:" and why, ending as a sentence (#5977). `why` is
+/// [`plain_reason`]'s, or the model's own `cannot:` sentence with what to
+/// ask instead.
 pub fn not_made_line(why: &str) -> String {
     let why = why.trim();
-    // What it can't do yet is said as itself (#6066).
-    if why.starts_with(CANT_YET) {
+    // What it can't do yet is said as itself (#6066), as are the lines
+    // whole already.
+    if why.starts_with(CANT_YET)
+        || why.starts_with(ALREADY_HAVE)
+        || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
+    {
         return match why.ends_with(['.', '!', '?']) {
             true => why.to_owned(),
             false => format!("{why}."),
@@ -1007,7 +1066,10 @@ pub fn paced_asked(text: &str, asked: &[(u32, u32)]) -> String {
 /// Nov 10:01: "say hello when I come back to my desk" refused on
 /// "room/presence, its for"); and `speak = true` in `[permissions]` with
 /// no say step, no hum and no read, which [`capped`] refuses ("it asks for
-/// its voice but never says anything"). Each only removes: the skill keeps every step,
+/// its voice but never says anything"); and a `when` `lamp-skills`
+/// doesn't know on a `room/stood_up` or `controls/pet` trigger, one
+/// message each, which none reads the same (lamp-0c89, 11 Nov 10:35: "nod
+/// when I stand up" refused on "room/stood_up, its when"). Each only removes: the skill keeps every step,
 /// trigger and grant it uses, and gains nothing. Each removal is a line or
 /// an entry of a one-line table taken out, taken only when the text then
 /// reads as the same skill without that one field; a skill written
@@ -1091,7 +1153,29 @@ pub fn tidied(text: &str) -> String {
             );
         }
     }
-    // (c) Its voice asked with nothing to say: no say step, no sound and
+    // (c) A `when` `lamp-skills` doesn't know on a getting up or a pat,
+    // one message each: none is the same trigger, "present", which it
+    // reads as every message (lamp-0c89, 11 Nov 10:35: "nod when I stand
+    // up" refused on "room/stood_up, its when").
+    if let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table)
+        && let Some(topic @ (STOOD_UP_TOPIC | PET_TOPIC)) =
+            trigger.get("topic").and_then(toml::Value::as_str)
+        && trigger.get("when").is_some_and(|when| {
+            !when
+                .as_str()
+                .is_some_and(|when| KNOWN_WHENS.contains(&when))
+        })
+    {
+        let what = format!("trigger topic {topic}, a when lamp-skills doesn't know");
+        tidy(
+            &mut text,
+            &mut table,
+            &|table| table.get_mut("trigger")?.as_table_mut(),
+            "when",
+            what,
+        );
+    }
+    // (d) Its voice asked with nothing to say: no say step, no sound and
     // no read, as [`capped`] holds it.
     let steps = || {
         table
@@ -2235,9 +2319,10 @@ impl Unsaid {
     }
 }
 
-/// What the person is told when [`plainly`] refused, the app's note and
-/// the lamp's line: plain words, and what to try (the owner, 10 Nov: "when
-/// making fails I hear no reason from the lamp, nor in the app").
+/// The lamp's reason when [`plainly`] refused, journaled; the repair is
+/// told its own lines ([`Unsaid::repair`]), and the person, the repairs
+/// used up, hears [`NOT_MADE_TRY`] ([`plain_reason`]; the owner, 11 Nov:
+/// reasons "nobody understands").
 pub const UNSAID: &str = "when it would run and what it would do didn't come out in plain \
                           words; try saying when it should run, like 'when I come to my desk', \
                           and what it should do, like 'glow green'";
@@ -2807,6 +2892,14 @@ fn trigger_named(trigger: &toml::Table) -> String {
 
 /// When a skill's one `[trigger]` runs, in plain words, and the trigger;
 /// or the part that can't be said, by its topic and keys ([`Unsaid`]).
+/// What a repair is told of a `when` [`trigger_plainly`] can't say: the
+/// ones `lamp-skills` knows that it says, or none.
+const WHEN_PART: &str = "when, which is \"appears\", \"present\" or left out";
+
+/// The `when`s `lamp-skills` knows on a trigger (`lamp_skills::When`):
+/// any other is refused by its check.
+const KNOWN_WHENS: [&str; 3] = ["appears", "present", "changes"];
+
 /// Six triggers are said: someone comes to the desk (or comes back, after
 /// it was empty a while), the desk is left, the lamp goes quiet, a face
 /// comes into view (after none, or none for a while), someone at the desk
@@ -2873,7 +2966,7 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
     let appears = match trigger.get("when").map(toml::Value::as_str) {
         None | Some(Some("present")) => false,
         Some(Some("appears")) => true,
-        Some(_) => return Err(its("when")),
+        Some(_) => return Err(its(WHEN_PART)),
     };
     let absent = match trigger.get("absent_for") {
         Some(absent) => Some(
@@ -3242,6 +3335,28 @@ pub const MORE_STEPS: &str = "A light step may also be { dim = 1 } (dim = 1 to 4
 const PLAIN_OR_READ: &str = "; or, for a read of a linked service, only one [[do]] step: that \
                              service's read step exactly as your instructions list it, and \
                              nothing else";
+
+/// A `room/stood_up` trigger's `for` or `absent_for` of more than nothing,
+/// spelled ("10 minutes"): what [`tidied`] takes out, since a getting up
+/// never lasts. None for one of nothing, taken out without a word.
+fn dropped_wait(text: &str) -> Option<String> {
+    let table: toml::Table = toml::from_str(text).ok()?;
+    let trigger = table.get("trigger")?.as_table()?;
+    if trigger.get("topic")?.as_str()? != STOOD_UP_TOPIC {
+        return None;
+    }
+    ["for", "absent_for"].iter().find_map(|key| {
+        let wait = trigger.get(*key)?.as_str()?;
+        (whole_ms(wait)? > 0).then(|| spell(wait)).flatten()
+    })
+}
+
+/// What the say-back adds of a getting up's wait taken out
+/// ([`dropped_wait`]): "nod when I've been up 10 minutes" is told it nods
+/// on every getting up.
+fn cant_wait(wait: &str) -> String {
+    format!("It can't wait {wait} for that: it runs each time someone gets up.")
+}
 
 /// The model's [`LEFT_OUT`] words in a fixed frame, as its own note: no
 /// quotes, and one clause, so they can't read as another sentence of what
@@ -4230,8 +4345,9 @@ fn written_plainly(table: &toml::Table) -> Option<String> {
 /// written here from the person's words ([`Written::toml`],
 /// [`Written::card`]), held to [`written_capped`], checked and packed by
 /// `lamp-skills pack`, and kept as a made skill is, at most [`KEPT_MOST`].
-/// A name any skill on the lamp has (in `installed`, or pushed beside it)
-/// is refused; a kept one of that name not on is replaced. Kept once:
+/// A name any skill on the lamp has (in `installed`, pushed beside it, or
+/// kept here and on) gives the first free one ([`free_name`]); a kept one
+/// of that name not on is replaced. Kept once:
 /// asked again, the kept one is given back. Nothing is put on here: the
 /// caller puts it on next ([`put_on`]).
 pub fn keep_written(
@@ -4242,19 +4358,27 @@ pub fn keep_written(
 ) -> Result<Made, Refused> {
     let unkept = |why: io::Error| {
         eprintln!("lamp-voice: a written skill was not kept: {why}");
-        Refused::new("the lamp couldn't keep it")
+        Refused::new(NOT_KEPT_HERE)
     };
     ensure_private(&keeping.directory).map_err(unkept)?;
     drop_unfinished(&keeping.directory);
     if let Some(made) = kept(&keeping.directory, from) {
         return Ok(made);
     }
+    // A name a skill on the lamp has: the first free one, or "you already
+    // have that skill" for the person's own of the same words ([`free_name`]).
+    let free = free_name(
+        keeping,
+        installed,
+        &written.name,
+        &written.toml(),
+        MOST_WRITTEN_NAME_BYTES,
+    )?;
+    let written = &Written {
+        name: free,
+        ..written.clone()
+    };
     let name = &written.name;
-    if installed.join(name).exists() || pushed(installed).join(name).exists() {
-        return Err(Refused::new(format!(
-            "a skill called {name} is already on the lamp or kept"
-        )));
-    }
     let toml = written.toml();
     let (version, uses) = written_capped(&toml)?;
     let said = plainly(&toml)?;
@@ -4316,6 +4440,9 @@ pub struct Keeping {
     pub directory: PathBuf,
     pub program: PathBuf,
     pub manage: PathBuf,
+    /// The lamp's installed skills (`crate::skill_words::INSTALLED`): a
+    /// made skill's name is never one of theirs ([`free_name`]).
+    pub installed: PathBuf,
 }
 
 /// Whether the switch is on in this process's environment: the
@@ -4338,6 +4465,7 @@ impl Keeping {
             directory: PathBuf::from(DIRECTORY),
             program: PathBuf::from(PROGRAM),
             manage: PathBuf::from(MANAGE_SOCKET),
+            installed: PathBuf::from(crate::skill_words::INSTALLED),
         })
     }
 }
@@ -4392,7 +4520,7 @@ pub fn keep_asked(
     let asked = &asked_windows(request.request)[..];
     let unkept = |why: io::Error| {
         eprintln!("lamp-voice: a made skill was not kept: {why}");
-        Refused::new("the lamp couldn't keep it")
+        Refused::new(NOT_KEPT_HERE)
     };
     ensure_private(&keeping.directory).map_err(unkept)?;
     drop_unfinished(&keeping.directory);
@@ -4403,9 +4531,13 @@ pub fn keep_asked(
         return Err(Refused::new(MODEL_CUT_OFF));
     }
     let mut files = files(answer)?;
+    // A getting up's wait, which [`tidied`] takes out: said with what it
+    // does, never dropped without a word (App Only's P2 on #6249).
+    let waited = dropped_wait(&files.toml);
     // A say's pace set, never refused (#6062): the text checked, said and
     // packed is the paced one.
     files.toml = paced_asked(&files.toml, asked);
+    let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
     let (version, uses) = capped(&files.toml)?;
     // A write's words and recipients are the request's own (#6066): the
     // heard line's, for a make by voice.
@@ -4415,9 +4547,15 @@ pub fn keep_asked(
     }
     // Said only once the check has passed: its lines, which name the
     // field, go to a repair before these do.
-    let said = said_mannered(&files.toml, asked).map(|does| match &files.left_out {
-        Some(what) => format!("{does} {}", left_out(what)),
-        None => does,
+    let said = said_mannered(&files.toml, asked).map(|does| {
+        let does = match &waited {
+            Some(wait) => format!("{does} {}", cant_wait(wait)),
+            None => does,
+        };
+        match &files.left_out {
+            Some(what) => format!("{does} {}", left_out(what)),
+            None => does,
+        }
     });
     // A dim or `relative` light [`plainly`] refused is one the check
     // refuses too, as it says them alike: its plain hint ([`LIGHT_PART`])
@@ -4437,12 +4575,27 @@ pub fn keep_asked(
         said.as_deref().unwrap_or_default(),
         Maker::of(from),
     )?;
+    // A name a skill on the lamp has already (a factory reset keeps the
+    // lamp's own, welcome-back among them): the first free one, or "you
+    // already have that skill" for the person's own of the same words.
+    let free = free_name(
+        keeping,
+        &keeping.installed,
+        &name,
+        &files.toml,
+        MOST_NAME_BYTES,
+    )?;
+    let marked = if free == name {
+        marked
+    } else {
+        renamed_card(&marked, &free)
+    };
     packed_and_kept(
         keeping,
         from,
         Card {
             toml: &files.toml,
-            name,
+            name: free,
             marked,
             version,
             uses,
@@ -4450,6 +4603,111 @@ pub fn keep_asked(
         said,
         false,
     )
+}
+
+/// The most of a made skill's name, as `lamp-skills` holds a skill's.
+const MOST_NAME_BYTES: usize = 64;
+
+/// What the person hears when the skill asked for is their own made one,
+/// on the lamp already with the same `skill.toml` ([`free_name`]): never a
+/// twin of it.
+pub const ALREADY_HAVE: &str = "You already have that skill:";
+
+/// [`ALREADY_HAVE`] with the skill's spoken name, and that it is on.
+pub fn already_have_line(name: &str) -> String {
+    format!("{ALREADY_HAVE} {}. It's on.", spoken_name(name))
+}
+
+/// Whether a skill called `name` is on the lamp already: installed in
+/// `installed`, pushed beside it, or kept here and put on. One kept here
+/// and not on is no skill on the lamp: a newer one of its name takes its
+/// place, as [`remember`] and [`forget_others`] keep it (Seventh's P2 on
+/// #5072).
+fn name_taken(keeping: &Keeping, installed: &Path, name: &str) -> bool {
+    installed.join(name).exists()
+        || pushed(installed).join(name).exists()
+        || index(&keeping.directory)
+            .iter()
+            .any(|entry| entry["name"] == name && entry["on"] == true)
+}
+
+/// Whether the skill called `name` on the lamp is the person's own made
+/// one with the same `toml`: installed here with `made: here` and that
+/// `skill.toml`, or kept here, on, with that `skill.toml`'s SHA-256.
+fn same_made_on(keeping: &Keeping, installed: &Path, name: &str, toml: &str) -> bool {
+    let there = installed.join(name);
+    let installed_same = fs::read_to_string(there.join("SKILL.md"))
+        .is_ok_and(|card| card.lines().any(|line| line.trim() == "made: here"))
+        && fs::read_to_string(there.join("skill.toml")).is_ok_and(|kept| kept == toml);
+    let sha256 = hex(&Sha256::digest(toml.as_bytes()));
+    installed_same
+        || index(&keeping.directory).iter().any(|entry| {
+            entry["name"] == name && entry["on"] == true && entry["toml_sha256"] == sha256
+        })
+}
+
+/// A made skill's name, free on the lamp (owner, 11 Nov: makes failed
+/// again and again on "a skill called welcome back is already on the
+/// lamp", a factory reset keeping the lamp's own skills): `name` when no
+/// skill on the lamp has it ([`name_taken`]); else, when the one that has
+/// it is the person's own made skill of the same `toml`, "you already have
+/// that skill" ([`already_have_line`]), never a twin; else the first of
+/// `name-2`, `name-3`, … that is free (or, of the same words, already
+/// had), its stem cut so it is at most `most` bytes and a skill's name.
+fn free_name(
+    keeping: &Keeping,
+    installed: &Path,
+    name: &str,
+    toml: &str,
+    most: usize,
+) -> Result<String, Refused> {
+    if !name_taken(keeping, installed, name) {
+        return Ok(name.to_owned());
+    }
+    if same_made_on(keeping, installed, name, toml) {
+        eprintln!("lamp-voice: a made skill is the person's own {name}, on already");
+        return Err(Refused::new(already_have_line(name)));
+    }
+    for number in 2..=MOST_NAME_TRIES {
+        let suffix = format!("-{number}");
+        let stem = cut_bytes(name, most.saturating_sub(suffix.len())).trim_end_matches('-');
+        if stem.is_empty() {
+            break;
+        }
+        let free = format!("{stem}{suffix}");
+        if !name_taken(keeping, installed, &free) {
+            eprintln!("lamp-voice: a made skill's name {name} is taken: made as {free}");
+            return Ok(free);
+        }
+        // One made before under a number, of the same words.
+        if same_made_on(keeping, installed, &free, toml) {
+            eprintln!("lamp-voice: a made skill is the person's own {free}, on already");
+            return Err(Refused::new(already_have_line(&free)));
+        }
+    }
+    Err(Refused::new(format!(
+        "{NAME_TAKEN_HEAD}{} is already on the lamp",
+        spoken_name(name)
+    )))
+}
+
+/// The most numbers [`free_name`] tries after a taken name.
+const MOST_NAME_TRIES: u32 = 99;
+
+/// A marked `SKILL.md` ([`card_marked`]) with its front matter's `name:`
+/// line saying `name`.
+fn renamed_card(card: &str, name: &str) -> String {
+    let mut done = false;
+    card.split_inclusive('\n')
+        .map(|line| {
+            if !done && line.starts_with("name:") {
+                done = true;
+                format!("name: {name}\n")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect()
 }
 
 /// A skill's two files as they are packed: its `skill.toml` as written,
@@ -4474,7 +4732,7 @@ struct Card<'a> {
 pub fn keep_added(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, Refused> {
     let unkept = |why: io::Error| {
         eprintln!("lamp-voice: a skill added from a file was not kept: {why}");
-        Refused::new("the lamp couldn't keep it")
+        Refused::new(NOT_KEPT_HERE)
     };
     ensure_private(&keeping.directory).map_err(unkept)?;
     drop_unfinished(&keeping.directory);
@@ -4567,7 +4825,7 @@ fn packed_and_kept(
 ) -> Result<Made, Refused> {
     let unkept = |why: io::Error| {
         eprintln!("lamp-voice: a made skill was not kept: {why}");
-        Refused::new("the lamp couldn't keep it")
+        Refused::new(NOT_KEPT_HERE)
     };
     let Card {
         toml,
@@ -4625,7 +4883,8 @@ fn packed_and_kept(
             uses,
             package: kept_as,
         };
-        remember(&keeping.directory, from, &made, added).map_err(unkept)?;
+        let toml_sha256 = hex(&Sha256::digest(toml.as_bytes()));
+        remember(&keeping.directory, from, &made, added, &toml_sha256).map_err(unkept)?;
         // A write's exact contents, kept beside it for the person's yes
         // (#6066, [`writes_of`]): the voice's own folder, as the package.
         let writes = writes_in(toml);
@@ -4647,7 +4906,7 @@ fn pack(program: &Path, folder: &Path, out: &Path, name: &str) -> Result<(), Ref
     let said = out.with_file_name("check.err");
     let stderr = fs::File::create(&said).map_err(|why| {
         eprintln!("lamp-voice: a made skill was not checked: {why}");
-        Refused::new("the lamp couldn't check it")
+        Refused::new(NOT_CHECKED)
     })?;
     let mut child = Command::new(program)
         .arg("pack")
@@ -4660,7 +4919,7 @@ fn pack(program: &Path, folder: &Path, out: &Path, name: &str) -> Result<(), Ref
         .spawn()
         .map_err(|why| {
             eprintln!("lamp-voice: a made skill was not checked: {why}");
-            Refused::new("the lamp couldn't check it")
+            Refused::new(NOT_CHECKED)
         })?;
     let began = Instant::now();
     let status = loop {
@@ -4672,7 +4931,7 @@ fn pack(program: &Path, folder: &Path, out: &Path, name: &str) -> Result<(), Ref
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(Refused::new("the lamp couldn't check it in time"));
+                return Err(Refused::new(NOT_CHECKED_IN_TIME));
             }
         }
     };
@@ -4908,14 +5167,22 @@ pub fn name_asked(asked: &str) -> String {
 /// skill made twice listed twice pushed out a skill that was on).
 /// Eviction lets go the oldest that is not on, never the one just kept;
 /// with every other one on, all are kept, past the cap. A package another
-/// entry still names stays.
-fn remember(directory: &Path, from: &str, made: &Made, added: bool) -> io::Result<()> {
+/// entry still names stays. `toml_sha256` is its `skill.toml`'s, so a make
+/// of the same words is known as the person's own ([`free_name`]).
+fn remember(
+    directory: &Path,
+    from: &str,
+    made: &Made,
+    added: bool,
+    toml_sha256: &str,
+) -> io::Result<()> {
     let mut entries = index(directory);
     let mut entry = json!({
         "from": from,
         "name": made.name,
         "version": made.version,
         "sha256": made.sha256,
+        "toml_sha256": toml_sha256,
         "description": made.description,
         "uses": made.uses.json(),
         "package": made.package.file_name().and_then(|name| name.to_str()).unwrap_or_default(),
@@ -7410,7 +7677,10 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(part(&back("absent_for = \"10m\"\n")).starts_with(&format!(
             "{presence}, its absent_for, which goes with when = \"appears\"."
         )));
-        assert!(part(&back("when = \"changes\"\n")).starts_with(&format!("{presence}, its when.")));
+        assert!(
+            part(&back("when = \"changes\"\n"))
+                .starts_with(&format!("{presence}, its {WHEN_PART}."))
+        );
         assert!(
             part(&back("when = \"appears\"\nabsent_for = \"soon\"\n"))
                 .starts_with(&format!("{presence}, its absent_for"))
@@ -7638,6 +7908,7 @@ light = { colour = "green", level = 3, for = "20s" }
                 directory: PathBuf::from(DIRECTORY),
                 program: PathBuf::from(PROGRAM),
                 manage: PathBuf::from(MANAGE_SOCKET),
+                installed: PathBuf::from(crate::skill_words::INSTALLED),
             })
         );
         assert_eq!(Keeping::when(false), None);
@@ -7654,6 +7925,7 @@ light = { colour = "green", level = 3, for = "20s" }
             directory: dir.clone(),
             program: dir.join("no-such-program"),
             manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
         };
         let kept = keep(&answer(TOML, CARD), false, "s:1:2", &keeping);
         assert_eq!(kept.unwrap_err().0, "the lamp couldn't check it");
@@ -7715,6 +7987,7 @@ light = { colour = "green", level = 3, for = "20s" }
             directory: dir.join("made"),
             program,
             manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
         };
         let refused = keep(&answer(TOML, CARD), false, "s:1:2", &keeping).unwrap_err();
         assert_eq!(refused.0, NOT_PASSED);
@@ -7799,6 +8072,7 @@ light = { colour = "green", level = 3, for = "20s" }
             directory: dir.join("made"),
             program,
             manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
         };
         let began = Instant::now();
         let kept = keep(&answer(TOML, CARD), false, "s:1:4", &keeping);
@@ -7857,14 +8131,14 @@ light = { colour = "green", level = 3, for = "20s" }
     fn a_skill_kept_twice_is_one_entry() {
         let dir = scratch("made-once");
         let made = made_as(&dir, "water", 'a');
-        remember(&dir, "local:1", &made, false).unwrap();
-        remember(&dir, "local:2", &made, false).unwrap();
+        remember(&dir, "local:1", &made, false, "").unwrap();
+        remember(&dir, "local:2", &made, false, "").unwrap();
         assert_eq!(names(&dir), ["water"]);
         assert_eq!(kept(&dir, "local:2").unwrap().sha256, made.sha256);
         assert!(kept(&dir, "local:1").is_none());
         assert!(made.package.is_file());
         let other = made_as(&dir, "water", 'b');
-        remember(&dir, "local:3", &other, false).unwrap();
+        remember(&dir, "local:3", &other, false, "").unwrap();
         assert_eq!(names(&dir), ["water"]);
         assert_eq!(index(&dir)[0]["sha256"], other.sha256);
         assert!(!made.package.exists() && other.package.is_file());
@@ -7872,11 +8146,11 @@ light = { colour = "green", level = 3, for = "20s" }
         let mut entries = index(&dir);
         entries[0]["on"] = json!(true);
         write_index(&dir, &entries).unwrap();
-        remember(&dir, "local:4", &other, false).unwrap();
+        remember(&dir, "local:4", &other, false, "").unwrap();
         assert_eq!(index(&dir).len(), 1);
         assert_eq!(index(&dir)[0]["on"], true);
         let third = made_as(&dir, "water", 'c');
-        remember(&dir, "local:5", &third, false).unwrap();
+        remember(&dir, "local:5", &third, false, "").unwrap();
         assert_eq!(names(&dir), ["water", "water"]);
         assert!(other.package.is_file() && third.package.is_file());
         let _ = fs::remove_dir_all(&dir);
@@ -7898,11 +8172,11 @@ light = { colour = "green", level = 3, for = "20s" }
             ],
         )
         .unwrap();
-        remember(&dir, "local:6", &made_as(&dir, "six", '6'), false).unwrap();
+        remember(&dir, "local:6", &made_as(&dir, "six", '6'), false, "").unwrap();
         assert_eq!(names(&dir), ["on-one", "three", "shared-b", "five", "six"]);
         assert!(dir.join("on-one.tar").is_file());
         assert!(dir.join("shared.tar").is_file());
-        remember(&dir, "local:7", &made_as(&dir, "seven", '7'), false).unwrap();
+        remember(&dir, "local:7", &made_as(&dir, "seven", '7'), false, "").unwrap();
         assert!(!dir.join("three.tar").exists());
         // All on: kept, past the cap.
         let mut entries = index(&dir);
@@ -7911,7 +8185,7 @@ light = { colour = "green", level = 3, for = "20s" }
         }
         write_index(&dir, &entries).unwrap();
         let eighth = made_as(&dir, "eight", '8');
-        remember(&dir, "local:8", &eighth, false).unwrap();
+        remember(&dir, "local:8", &eighth, false, "").unwrap();
         assert_eq!(index(&dir).len(), KEPT_MOST + 1);
         assert!(eighth.package.is_file());
         let _ = fs::remove_dir_all(&dir);
@@ -7935,7 +8209,7 @@ light = { colour = "green", level = 3, for = "20s" }
         .unwrap();
         let water = made_as(&dir, "water-on-return", 'w');
         for at in 0..4 {
-            remember(&dir, &format!("local:{at}"), &water, false).unwrap();
+            remember(&dir, &format!("local:{at}"), &water, false, "").unwrap();
         }
         for (at, sha) in ['p', 'q', 'r'].into_iter().enumerate() {
             remember(
@@ -7943,6 +8217,7 @@ light = { colour = "green", level = 3, for = "20s" }
                 &format!("app:{at}"),
                 &made_as(&dir, &format!("more-{at}"), sha),
                 false,
+                "",
             )
             .unwrap();
         }
@@ -8249,8 +8524,8 @@ light = { colour = "green", level = 3, for = "20s" }
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// A name any skill on the lamp has, installed or pushed, is refused, and
-    /// nothing is kept. A kept one of that name not on, marked to go on or
+    /// A name any skill on the lamp has, installed or pushed, gets the first
+    /// free one. A kept one of that name not on, marked to go on or
     /// not, is replaced by the new one, its package and its mark with it,
     /// so a fix sent after it goes at once (Seventh's P2 on #5072).
     #[test]
@@ -8262,11 +8537,13 @@ light = { colour = "green", level = 3, for = "20s" }
             root.join("skills-dev/study-mode"),
         ] {
             fs::create_dir_all(&on_lamp).unwrap();
-            let refused = keep_written(&study_mode(), "written:app:1:1", &keeping, &installed);
-            assert!(refused.unwrap_err().0.contains("already on the lamp"));
+            let made =
+                keep_written(&study_mode(), "written:app:1:1", &keeping, &installed).unwrap();
+            assert_eq!(made.name, "study-mode-2");
             fs::remove_dir_all(&on_lamp).unwrap();
         }
-        assert!(index(&keeping.directory).is_empty());
+        assert_eq!(index(&keeping.directory).len(), 1);
+        write_index(&keeping.directory, &[]).unwrap();
         // Kept and not yet asked about: the next takes its place.
         keep_written(&study_mode(), "written:app:2:1", &keeping, &installed).unwrap();
         let first = keep_written(&study_mode(), "written:app:3:1", &keeping, &installed).unwrap();
@@ -9097,5 +9374,235 @@ light = { colour = "green", level = 3, for = "20s" }
             "{lines}"
         );
         assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+    }
+
+    /// lamp-0c89, 11 Nov 10:35: "nod when I stand up" written with a
+    /// `when` lamp-skills doesn't know on its `room/stood_up` trigger. It
+    /// is taken out, so the nod is said; a known one stays, and on a topic
+    /// whose `when` means something the repair is told the ones it may be.
+    #[test]
+    fn a_getting_ups_unknown_when_is_tidied_and_another_topics_named() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        let step = "body = { gesture = \"nod\" }";
+        let nod = made_with(stood, step);
+        for when in ["when = \"stands\"\n", "when = \"up\"\n", "when = 1\n"] {
+            let text = made_with(&format!("{stood}{when}"), step);
+            assert!(plainly_with(&text, false).is_err(), "{when}");
+            assert_eq!(tidied(&text), nod, "{when}");
+            assert!(plainly_with(&paced(&text), false).is_ok(), "{when}");
+        }
+        let known = made_with(&format!("{stood}when = \"appears\"\n"), step);
+        assert_eq!(tidied(&known), known);
+        let presence = made_with(
+            "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\nwhen = \"arrives\"\n",
+            step,
+        );
+        assert_eq!(tidied(&presence), presence);
+        let Err(Refused(_, Some(lines))) = plainly_with(&presence, false) else {
+            panic!("refused with lines");
+        };
+        assert!(
+            lines.contains("its when, which is \"appears\", \"present\" or left out"),
+            "{lines}"
+        );
+    }
+
+    /// A folder of installed skills, `name` among them: the lamp's own
+    /// (`made` false) or one made here, with `toml`.
+    fn installed_skill(installed: &Path, name: &str, made: bool, toml: &str) {
+        let folder = installed.join(name);
+        fs::create_dir_all(&folder).unwrap();
+        let mark = if made { "made: here\n" } else { "" };
+        fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: d\n{mark}---\nbody\n"),
+        )
+        .unwrap();
+        fs::write(folder.join("skill.toml"), toml).unwrap();
+    }
+
+    fn name_keeping(dir: &Path) -> Keeping {
+        Keeping {
+            directory: dir.join("made"),
+            program: dir.join("no-such-program"),
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        }
+    }
+
+    /// The owner, 11 Nov: a factory reset keeps the lamp's own skills, so
+    /// "say hello when I come back", named welcome-back, failed every time.
+    /// A name the lamp's own skill has gets the first free one; a pushed
+    /// one's is taken too; a long name is cut to fit with its number.
+    #[test]
+    fn a_built_in_skills_name_gets_the_first_free_one() {
+        let dir = scratch("made-name-free");
+        let keeping = name_keeping(&dir);
+        let installed = &keeping.installed;
+        installed_skill(installed, "welcome-back", false, "kind = \"core\"\n");
+        let free = |name: &str, most| free_name(&keeping, installed, name, TOML, most);
+        assert_eq!(free("evening-dim", 64).unwrap(), "evening-dim");
+        assert_eq!(free("welcome-back", 64).unwrap(), "welcome-back-2");
+        installed_skill(installed, "welcome-back-2", false, "kind = \"core\"\n");
+        fs::create_dir_all(pushed(installed).join("welcome-back-3")).unwrap();
+        assert_eq!(free("welcome-back", 64).unwrap(), "welcome-back-4");
+        let long = format!("{}-ab", "a".repeat(60));
+        installed_skill(installed, &long, false, "kind = \"core\"\n");
+        let cut = free(&long, 64).unwrap();
+        assert_eq!(cut, format!("{}-a-2", "a".repeat(60)));
+        assert!(cut.len() <= 64);
+        // A written skill's cap, its stem's trailing dash dropped.
+        let written = format!("{}-b", "w".repeat(37));
+        installed_skill(installed, &written, false, "kind = \"core\"\n");
+        let cut = free(&written, MOST_WRITTEN_NAME_BYTES).unwrap();
+        assert_eq!(cut, format!("{}-2", "w".repeat(37)));
+        // The card says the new name.
+        let card = "---\nname: welcome-back\ndescription: \"d\"\nmade: here\n---\nname: body\n";
+        assert_eq!(
+            renamed_card(card, "welcome-back-2"),
+            "---\nname: welcome-back-2\ndescription: \"d\"\nmade: here\n---\nname: body\n"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The person's own made skill, on the lamp with the same skill.toml,
+    /// is never made twice: "You already have that skill", said and shown
+    /// as it is. Another made skill of that name, other words, gets `-2`;
+    /// one kept and not on gives way, as before.
+    #[test]
+    fn the_persons_own_same_skill_is_already_had_and_another_gets_a_number() {
+        let dir = scratch("made-name-own");
+        let keeping = name_keeping(&dir);
+        let installed = &keeping.installed;
+        installed_skill(installed, "evening-dim", true, TOML);
+        let free = |toml: &str| free_name(&keeping, installed, "evening-dim", toml, 64);
+        let Err(Refused(why, None)) = free(TOML) else {
+            panic!("already had");
+        };
+        assert_eq!(why, "You already have that skill: evening dim. It's on.");
+        assert_eq!(plain_reason(&why), why);
+        assert_eq!(not_made_line(&why), why);
+        let other = TOML.replace("dim = 1", "dim = 2");
+        assert_eq!(free(&other).unwrap(), "evening-dim-2");
+        // The lamp's own of that name and the same words is no made one.
+        installed_skill(installed, "light-out", false, TOML);
+        assert_eq!(
+            free_name(&keeping, installed, "light-out", TOML, 64).unwrap(),
+            "light-out-2"
+        );
+        // Kept here and on, by its skill.toml's SHA-256 alone.
+        fs::create_dir_all(&keeping.directory).unwrap();
+        let sha = hex(&Sha256::digest(other.as_bytes()));
+        let entries = vec![
+            json!({"name": "bedtime", "on": true, "toml_sha256": sha}),
+            json!({"name": "unused", "on": false, "toml_sha256": sha}),
+        ];
+        write_index(&keeping.directory, &entries).unwrap();
+        let Err(Refused(why, None)) = free_name(&keeping, installed, "bedtime", &other, 64) else {
+            panic!("already had");
+        };
+        assert!(why.starts_with(ALREADY_HAVE), "{why}");
+        assert_eq!(
+            free_name(&keeping, installed, "bedtime", TOML, 64).unwrap(),
+            "bedtime-2"
+        );
+        assert_eq!(
+            free_name(&keeping, installed, "unused", TOML, 64).unwrap(),
+            "unused"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The owner, 11 Nov: makes failed "with reasons nobody understands".
+    /// Every reason the lamp's own check gives is said in everyday words:
+    /// none says the check's internals, and each mapped reason has its line.
+    /// The model's own `cannot:` sentence is said as it is.
+    #[test]
+    fn a_failed_make_is_told_in_plain_words() {
+        let internal = [
+            UNSAID.to_owned(),
+            NOT_PASSED.to_owned(),
+            NOT_READABLE.to_owned(),
+            NOT_A_SKILLS_FORM.to_owned(),
+            SAY_NOT_TEXT.to_owned(),
+            HUM_DROPPED.to_owned(),
+            WRITE_NOT_FIXED.to_owned(),
+            WRITTEN_UNSAID.to_owned(),
+            EXAMPLE_GIVEN_BACK_WHY.to_owned(),
+            "it would say something without asking for its voice (speak = true)".to_owned(),
+            "Can't be said plainly: [[do]] step 1, body (gesture, for)".to_owned(),
+            "trigger topic room/stood_up, its when".to_owned(),
+            "not packed: lamp-skills refused skill.toml".to_owned(),
+        ];
+        let forbidden = [
+            "[[",
+            "toml",
+            "plainly",
+            "packed",
+            "kept",
+            "lamp-skills",
+            "room/",
+            "/",
+            "=",
+        ];
+        for why in &internal {
+            let line = not_made_line(&plain_reason(why));
+            assert_eq!(line, NOT_MADE_TRY, "{why}");
+        }
+        for why in [NOT_KEPT_HERE, NOT_CHECKED, NOT_CHECKED_IN_TIME] {
+            assert_eq!(not_made_line(&plain_reason(why)), NOT_KEPT_TRY, "{why}");
+        }
+        let cant = cant_yet("sending a message or writing to a linked service");
+        assert_eq!(
+            not_made_line(&plain_reason(&cant)),
+            "I can't do that yet: sending a message or writing to a linked service."
+        );
+        assert_eq!(
+            not_made_line(&plain_reason(MODEL_SILENT)),
+            "I couldn't make that: the lamp's model didn't answer."
+        );
+        // The model's own words, never mapped where it said `cannot:`.
+        assert_eq!(
+            not_made_line("A skill can't hear words; ask for one that runs when you sit down."),
+            "I couldn't make that: A skill can't hear words; ask for one that runs when you sit \
+             down."
+        );
+        let mut lines: Vec<String> = internal
+            .iter()
+            .chain([NOT_KEPT_HERE.to_owned(), MODEL_CUT_OFF.to_owned()].iter())
+            .map(|why| not_made_line(&plain_reason(why)))
+            .collect();
+        lines.push(not_made_line(&plain_reason(&cant)));
+        lines.push(already_have_line("welcome-back-2"));
+        for line in &lines {
+            for word in forbidden {
+                assert!(!line.contains(word), "{line:?} says {word:?}");
+            }
+        }
+    }
+
+    /// App Only's P2 on #6249: "nod when I've been up 10 minutes" written
+    /// with a `for` on its getting up, which a getting up never lasts. It
+    /// is taken out and the say-back says so; one of nothing is taken out
+    /// without a word.
+    #[test]
+    fn a_getting_ups_wait_taken_out_is_said() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        let step = "body = { gesture = \"nod\" }";
+        let held = made_with(&format!("{stood}for = \"10m\"\n"), step);
+        assert_eq!(dropped_wait(&held).as_deref(), Some("10 minutes"));
+        assert_eq!(dropped_wait(&tidied(&held)), None);
+        assert_eq!(
+            cant_wait("10 minutes"),
+            "It can't wait 10 minutes for that: it runs each time someone gets up."
+        );
+        let absent = made_with(&format!("{stood}absent_for = \"1m\"\n"), step);
+        assert_eq!(dropped_wait(&absent).as_deref(), Some("a minute"));
+        for nothing in ["for = \"0s\"\n", "absent_for = \"0m\"\n"] {
+            let text = made_with(&format!("{stood}{nothing}"), step);
+            assert_eq!(dropped_wait(&text), None, "{nothing}");
+        }
+        let face = made_with("topic = \"humans/faces/tracked\"\nfor = \"10m\"\n", step);
+        assert_eq!(dropped_wait(&face), None);
     }
 }

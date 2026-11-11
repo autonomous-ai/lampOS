@@ -2484,11 +2484,21 @@ gone ([switches.md](switches.md)). What happens:
      gesture plays once; `lamp-skills` refuses "a body mood goes with its
      for, and a for with a mood"); (b) a `for` or `absent_for` on a
      `room/stood_up` trigger (one message a getting up, which never
-     lasts), and on any trigger a `for` or `absent_for` of nothing
-     (`"0s"`, `"0m"`, `"0ms"`), which `lamp-skills` reads as none; (c)
-     `speak = true` in `[permissions]` with no say step, no hum (`cue`)
-     and no read, which the cap refuses ("it asks for its voice but never
-     says anything"). Each only removes: a line, or one entry of a
+     lasts), and on any trigger a `for` or `absent_for` of nothing (any
+     zero length, `"0s"`, `"0m"`, `"0h"` or `"0ms"` alike), which
+     `lamp-skills` reads as none; a getting up's wait of more than nothing
+     is not dropped without a word: the say-back ends "It can't wait 10
+     minutes for that: it runs each time someone gets up." (App Only's P2
+     on #6249: "nod when I've been up 10 minutes" was otherwise told as a
+     plain nod); (c) a `when` `lamp-skills` doesn't know (only `appears`,
+     `present` and `changes`) on a `room/stood_up` or `controls/pet`
+     trigger, one message each, which none reads the same (lamp-0c89, 11
+     Nov 10:35: "nod when I stand up" refused on "room/stood_up, its
+     when"); on any other topic it stays, and the repair is told `its
+     when, which is "appears", "present" or left out`; (d) `speak = true`
+     in `[permissions]` with no say, hum (`cue`) or `sound` step and no
+     read, which the cap refuses ("it asks for its voice but never says
+     anything"). Each only removes: a line, or one entry of a
      one-line table with its comma, taken only when the text then reads as
      the same skill without that one field; the skill keeps every step,
      trigger and grant it uses and gains nothing. A skill written
@@ -2534,7 +2544,9 @@ gone ([switches.md](switches.md)). What happens:
      `a_made_skills_voice_asked_with_nothing_said_is_tidied`,
      `a_body_step_is_said_only_as_lamp_skills_takes_it`,
      `a_repair_is_told_the_part_of_a_step_that_failed`,
-     `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`, and in
+     `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`,
+     `a_getting_ups_unknown_when_is_tidied_and_another_topics_named`,
+     `a_getting_ups_wait_taken_out_is_said`, and in
      `tests/it/made.rs`
      `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` and
      `a_made_nod_when_i_stand_up_is_tidied_and_packed` (the real
@@ -2787,11 +2799,10 @@ gone ([switches.md](switches.md)). What happens:
      in the package (`SKILL.md`'s, in place of the one written, its
      continuation lines too), in `made.json`, in the app and in what the
      lamp says; the model is told to say it leaving nothing out, not to
-     sum it up. Refused, the person is told `made_skill::UNSAID` ("when it
-     would run and what it would do didn't come out in plain words; try
-     saying when it should run, like 'when I come to my desk', and what it
-     should do, like 'glow green'"), and it is repaired as a check's
-     refusal is. The repair names the part it couldn't say, by its keys
+     sum it up. Refused, the journal says `made_skill::UNSAID` ("when it
+     would run and what it would do didn't come out in plain words; ..."),
+     and it is repaired as a check's refusal is; the repairs used up, the
+     person hears the plain line below ("I couldn't make that one. ..."). The repair names the part it couldn't say, by its keys
      and the trigger's topic alone, never a value ("Can't be said
      plainly: trigger topic humans/faces/tracked, keys gap, near",
      "[[do]] step 1, light (dim, for)", "parts while"), and the journal
@@ -2934,7 +2945,44 @@ gone ([switches.md](switches.md)). What happens:
      in N ms: <why>` (#5977), the lamp's own words, never the person's
      request; for the model's `cannot:` reason, which may echo the
      person's words, only `made_skill::MODELS_CANNOT_JOURNALED` (Second's
-     HOLD on #5985). When part
+     HOLD on #5985).
+   - **A failed make is told in plain words** (the owner, 11 Nov: makes
+     failed again and again "with reasons nobody understands"). The
+     person, by voice and in the app's `not_kept`, never hears the check's
+     internals (`[[do]]`, toml keys, topic paths, "plainly", "packed",
+     "lamp-skills"): the lamp's own reason is mapped by
+     `made_skill::plain_reason`, and the detail stays in the journal
+     (`lamp-voice: a skill made here wasn't kept in N ms: <why>`). The
+     check's refusal, a skill that couldn't be said plainly, or a form the
+     lamp can't read, each with its repairs used up: "I couldn't make that
+     one. Try asking for one thing, like 'say hello when I sit down'."
+     (`NOT_MADE_TRY`). The lamp failing to write, check or keep it:
+     "Something went wrong keeping it. Please try again." (`NOT_KEPT_TRY`).
+     A step it can't do yet: "I can't do that yet: <what>." The model's
+     silence or cut: "I couldn't make that: the lamp's model didn't
+     answer." The model's own `cannot:` sentence goes as it is. The voice's
+     `make_skill` answer's `error` and `next` carry the same plain line.
+     Test: `a_failed_make_is_told_in_plain_words`.
+   - **A name taken gets a free one** (the owner, 11 Nov: a factory reset
+     keeps the lamp's own skills, welcome-back, bedtime-morning,
+     light-out, sip-of-water among them, so a skill the model named
+     welcome-back failed on "a skill called welcome back is already on the
+     lamp" every time). Before it is packed (`made_skill::free_name`), a
+     name a skill on the lamp has (installed, pushed, or kept here and
+     on) becomes the first free `NAME-2`, `NAME-3`, …, its stem cut so it
+     stays a skill's name within 64 bytes (40 for a written one). The
+     card, the say-back, the line and the app all name the new one. When
+     the one that has it (or a numbered one) is the person's own made
+     skill with the same `skill.toml` (installed with `made: here` and that
+     file, or kept and on with its SHA-256, `toml_sha256` in `made.json`),
+     no twin is made: "You already have that skill: <name>. It's on."
+     (`made_skill::ALREADY_HAVE`). One kept and not on still gives way to
+     the newer one of its name. Tests:
+     `a_built_in_skills_name_gets_the_first_free_one`,
+     `the_persons_own_same_skill_is_already_had_and_another_gets_a_number`,
+     and in `tests/it/made.rs`
+     `a_made_skill_named_as_the_lamps_own_gets_a_free_name_and_goes_on`.
+     When part
      of a request can't be done ("dim slowly over a minute"), the model
      makes the rest and adds a line outside the blocks that begins
      `left out:` (`made_skill::LEFT_OUT`, #5041). It is said after what
@@ -3006,7 +3054,8 @@ gone ([switches.md](switches.md)). What happens:
    - no answer within 8 s: "the lamp didn't say in time whether it is on"
      (the helper may still put it on);
    - a skill of that name put on another way: "a skill called evening dim
-     is already on the lamp";
+     is already on the lamp" (the helper's own guard; the voice gives a
+     taken name a free one before packing, above);
    - any other refusal: "the lamp's check didn't let it on".
    Never without `LAMP_MAKE_SKILL`, whatever the model calls: without it
    `make_skill` is nobody's. Taking a made skill off (the app's remove, or
@@ -3132,9 +3181,10 @@ to say aloud what it made; without either the app socket isn't started
    thread of their own by the lamp's own model, the same example, check
    and up to three repairs (`make_skill_local::make_kept`,
    `app_make::make_here`). Not made (or a written one not kept), the app
-   is told `not_kept` with the plain reason and the lamp says it too,
-   `made_skill::not_made_line` ("I couldn't make that: " and the reason
-   with what to try) as a say note in the conversation's language
+   is told `not_kept` with the plain reason (`made_skill::plain_reason`,
+   above; the detail journaled) and the lamp says it too,
+   `made_skill::not_made_line` (a plain line of its own, or "I couldn't
+   make that: " and the model's own reason) as a say note in the conversation's language
    (`not_made_in_their_language`). Every such note, made or not, begins
    `made_skill::ALREADY_DONE` ("This has happened already and nothing is
    left to do: call no tool, make_skill least of all; only speak"): on
@@ -3349,8 +3399,11 @@ rewrites a word of it (`made_skill::Written`, `made_skill::keep_written`,
    `made: here`, `written: app`, and the instructions, as written, as its
    body.
 3. **Held and kept as a made skill is** (`made_skill::keep_written`): a
-   name a skill on the lamp has (`/var/lib/lampOS/skills/NAME`, or pushed,
-   `/var/lib/lampOS/skills-dev/NAME`) is refused; a kept one of that name
+   name a skill on the lamp has (`/var/lib/lampOS/skills/NAME`, pushed,
+   `/var/lib/lampOS/skills-dev/NAME`, or kept here and on) gets the first
+   free `NAME-2`, … within 40 bytes, its function's name with it, or "You
+   already have that skill" for the person's own of the same words
+   (`made_skill::free_name`, above); a kept one of that name
    not on is replaced by the new one, its package and its mark to go on
    with it, so a fix sent after it goes at once;
    then the cap (`written_capped`: exactly
