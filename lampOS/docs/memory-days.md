@@ -681,7 +681,11 @@ unchanged.
   it removes every record of `person` instead, `about` not read, and a put
   asked before it is refused as after a `forget_all`: the voice's forget
   everything sends it for the services' owner id when that is not the
-  speaker's own (the private room).
+  speaker's own (the private room), only when the speaker is the owner
+  under another of their ids (`person::owner_ids`). A known person who is
+  not the owner sends none for the owner's id (the owner's call of 11 Nov,
+  after a guest's forget everything on lamp-06c1 removed every record and
+  contact of the owner's).
 - **A put asked before a forget is refused** `forgotten`: one whose
   `asked_unix_ms` is before the person's latest `forget_all` or
   `forget_person` (or everyone's `forget_all`), kept in

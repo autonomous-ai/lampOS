@@ -2440,8 +2440,15 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   đang bật hay tắt, nên bản ghi giữ lúc còn bật không bị bỏ lại; không hoàn
   tác gì ở dịch vụ. Quên về một việc xóa bản ghi và liên hệ thư dưới cùng
   id chủ đã dùng khi lưu (`services::owner_of`; trong phòng riêng là id chủ
-  đầu tiên, không phải id của người nói). Quên tất cả cũng xóa mọi bản ghi
-  và liên hệ của id chủ đó khi nó không phải id của người nói.
+  đầu tiên, không phải id của người nói) khi người nói là chủ
+  (`person::owner_ids`) hoặc không phải người quen. Quên tất cả cũng xóa mọi
+  bản ghi và liên hệ của id chủ đó khi nó không phải id của người nói, chỉ
+  khi người nói là chủ, dưới một id khác của chủ (#6334). Một người quen
+  không phải chủ chỉ quên bộ nhớ và vai trò của chính họ cùng các đồng ý của
+  gia đình, và lệnh quên về một việc của họ chỉ chạm tới các dòng dưới id
+  của chính họ; bản ghi và liên hệ của chủ vẫn còn (quyết định
+  của chủ ngày 11/11, "chỉ chủ mới xóa", sau khi lệnh quên tất cả của một
+  khách trên lamp-06c1 xóa hết bản ghi và liên hệ của chủ).
   Quên một liên hệ thư ("forget Octavia's address") cũng xóa, trong cùng lần
   quên, mọi bản ghi gửi tới địa chỉ đó (`to`, `cc` hay `bcc`), dù chữ của
   bản ghi là gì, ở memory và bản sao trong voice, nên một thư `done` được kể

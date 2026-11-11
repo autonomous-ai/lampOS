@@ -2368,8 +2368,15 @@ the store's side in [memory-days](memory-days.md)):
   and in the voice; a forget about a thing takes the records and mail
   contacts that name it, under the same owner id they were saved under
   (`services::owner_of`; in the private room the first owner id, not the
-  speaker's own). Forget everything also removes every record and contact
-  of that owner id when it is not the speaker's own.
+  speaker's own) when the speaker is the owner (`person::owner_ids`) or no
+  known person. Forget everything also removes every record and contact
+  of that owner id when it is not the speaker's own, only when the speaker
+  is the owner, under another of their ids (#6334). A known person who is
+  not the owner forgets only their own memory and role and the household
+  consents, and a forget about by them reaches only rows under their own
+  id; the owner's records and contacts stay (the owner's call of 11 Nov,
+  "only the owner clears", after a guest's forget everything on lamp-06c1
+  removed every one of the owner's).
   Both reach the memory with `LAMP_SERVICE_RECORDS` on or off, so records
   kept while it was on are never left behind.
   On every forget the changes still waiting go: those of the person (or
