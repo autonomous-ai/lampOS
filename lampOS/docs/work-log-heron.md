@@ -695,3 +695,22 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
   - fc4b's lamp-addons, lamp-control and lamp-mood are wanted and inactive. They get started at each setup finish but exit 0 again with their switch off.
   - P3: the "started X" log line overclaims.
   - I ran only `--test round product_adds` (9 passed); the full round suite ran past 18 minutes and I stopped it.
+- **17:50** My person let me decide confirmations alone until 12 Nov 10:00. Limits I kept: no lamp sound 22:00–08:00, no after2, and nothing that needs a person at the lamp.
+- **Evening reads, 18:0x–21:5x** (all on #6059's asks):
+  - **READ-OK:**
+    - #6381 `d00ee662cf`.
+    - #6385 `5daf935672`.
+    - #6387 `180a6ebfe5`.
+    - #6390 `9ab66190e7`, carried to `4a7202ac9d` and `6efff2bf86`.
+    - #6379 `f57203b552`.
+    - #6395 `d3704f7677`, carried to `88fb9fe99c`.
+    - #6399 `b30aeed180`.
+    - #6420 `3c9eb5d544`: the stop wait is 1.5 s, inside half of `TimeoutStopSec`.
+    - #6425 `91d5894944`: a blink's off-gap is dropped and told.
+    - #6412 `743bc37abb`: the write-make prompt, only with writes on.
+  - **#6384:** HOLD `ee0ebc8f07` (a line named something impossible), then READ-OK `02bf929a5b`.
+  - **#6410:** READ-OK `a9fb030fcb`, carried to `af6b8853f8`, conditional on the calendar move row on #6427's build.
+  - **#6404:** HOLD `f431319326`. P2: `event_id_ok` refused real Google ids, like an Outlook invite's leading `_`. Fixed at `a14ba9e120` (only `is_record_key` is refused now), READ-OK. Its rebase `57cbdebef7` is READ-OK; the "call update_event" wording became a `service_write` action.
+  - **#6415:** READ-OK `bb68c50a42` (I ran the cd line alone with `/bin/sh`). Both P3s were taken at `69daa17465`, READ-OK.
+  - Open from #6404's re-read: #6390's `DRAFT_DONE` still says "call update_draft", the same fake-call class (P2, off in the product).
+  - Lesson: lamp-update's `the_wrapper_fails_closed…` fails on this Mac on the base too (ids and home). Check the parent before reading a red test as the PR's.
