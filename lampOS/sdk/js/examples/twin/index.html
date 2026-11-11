@@ -242,6 +242,9 @@ document.getElementById('copy').addEventListener('click', async () => {
 // The live link.
 let ws;
 const send = (message) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
+window.twinSend = send;
+// The try-it panel, when the server has one (--stim-dir): its buttons, its log.
+fetch(withToken('/panel.js')).then((r) => { if (r.ok) import(withToken('/panel.js')); }).catch(() => {});
 function connect() {
   ws = new WebSocket(`ws://${location.host}${withToken('/live')}`);
   ws.onopen = () => log('connected');
@@ -249,6 +252,7 @@ function connect() {
   ws.onmessage = (message) => {
     const data = JSON.parse(message.data);
     if (data.type === 'said') return log(data.text);
+    if (data.type === 'result' || data.type === 'event') return window.dispatchEvent(new CustomEvent('twin-message', { detail: data }));
     if (data.type !== 'state') return;
     const { joints = {}, lamp = {} } = data.state;
     for (const [name, joint] of Object.entries(joints)) {
