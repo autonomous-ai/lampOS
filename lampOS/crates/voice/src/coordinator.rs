@@ -1495,7 +1495,18 @@ impl Reply {
             .reminder
             .as_ref()
             .is_none_or(crate::reminders::Receipt::completion_recorded);
-        say.answer(if played_whole && reminder_complete {
+        let spoken = played_whole && reminder_complete;
+        // An exact line said is the lamp's own line in the thread, as a
+        // written turn's answer is, so the model's next turn knows it was
+        // said (lamp-52e6, 10 Nov: an unplug ask kept out of the history).
+        if spoken
+            && self.notice.origin() == SpeechOrigin::ExactLine
+            && let Some(text) = say.said()
+            && let Ok(mut thread) = crate::thread::THREAD.lock()
+        {
+            thread.lamp(self.owner.turn(), text, std::time::Instant::now());
+        }
+        say.answer(if spoken {
             crate::say::Outcome::Spoken
         } else {
             let why = if played_whole && !reminder_complete {
@@ -14489,7 +14500,7 @@ fn play_exact_line(
             if let Some((_, ticket)) = says.take_exact(at_us) {
                 record(
                     trace,
-                    json!({"kind":"exact_line","at_us":at_us,"skill":ticket.skill(),"plays":false,"why":why}),
+                    json!({"kind":"exact_line","at_us":at_us,"skill":ticket.skill(),"text":ticket.said(),"plays":false,"why":why}),
                 )?;
                 ticket.answer(crate::say::Outcome::Refused(why.into()));
             }
@@ -14503,7 +14514,7 @@ fn play_exact_line(
     let frames = samples.len();
     record(
         trace,
-        json!({"kind":"exact_line","at_us":at_us,"skill":ticket.skill(),"plays":true,"frames":frames}),
+        json!({"kind":"exact_line","at_us":at_us,"skill":ticket.skill(),"text":ticket.said(),"plays":true,"frames":frames}),
     )?;
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,

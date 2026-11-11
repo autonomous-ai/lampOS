@@ -874,16 +874,33 @@ pub const MOST_WORDS_BYTES: usize = 900;
 pub struct UnplugLines {
     /// Said as written, once the fold and the asleep look are confirmed.
     pub ready: String,
-    /// A note for the voice when the fold isn't confirmed.
+    /// Said as written (#5777) when the fold isn't confirmed.
     pub failed: String,
-    /// A note for the voice when the person says to stay plugged in.
+    /// Said as written (#5777) when the person says to stay plugged in.
     pub stay: String,
-    /// A note for the voice when it gets back up after the wait.
+    /// Said as written (#5777) when it gets back up after the wait.
     pub timeout: String,
-    /// A note for the voice, said once when a preparation that was Ready
+    /// Said as written (#5777), once when a preparation that was Ready
     /// fails before any cancel, or when the body fails one after the cancel
     /// (no stand within 60 s): it can't get up by itself.
     pub check: String,
+    /// Said as written (#5777) when a confirmed fold could not turn the lamp
+    /// off (`unplug::OFF_SOCKET_ENVIRONMENT` set, the helper refused or
+    /// was not reached, #5763): it must not be unplugged yet. A file from
+    /// before it says the built-in words.
+    #[serde(default = "UnplugLines::built_in_not_off")]
+    pub not_off: String,
+    /// Said as written (#5777) at a confirmed fold with a turn-off socket,
+    /// asking whether to turn off: only a spoken yes to it turns the lamp
+    /// off (#5774's P2). A file from before it says the built-in words.
+    #[serde(default = "UnplugLines::built_in_ask_off")]
+    pub ask_off: String,
+    /// Said as written (#5777) when an update holds the turn-off: the lamp
+    /// can't turn off yet, stands up and asks to be told again (#5763's
+    /// call (a), point 5; #5777's P2: an update restarts lamp-skills, so
+    /// nothing waits for it).
+    #[serde(default = "UnplugLines::built_in_updating")]
+    pub updating: String,
 }
 
 impl UnplugLines {
@@ -893,17 +910,31 @@ impl UnplugLines {
     /// older `skill.toml` past a newer lamp-skills, by an updater from
     /// before the skills bundle, a lamp's own `--dir` (lamp-4ace's), or a
     /// file changed on the lamp, which a round keeps (#1913). The next
-    /// release removes them, and such a file is then refused.
+    /// release removes them, and such a file is then refused. Their English
+    /// is the voice's, which says them in the owner's language (#5777's P3).
     pub fn built_in() -> Self {
         Self {
-            ready: "My arm is folded. You can unplug me now.".into(),
-            failed:
-                "Say briefly: I could not confirm a safe folded position. Please do not unplug yet."
-                    .into(),
-            stay: "Say exactly: Okay, I'll stay.".into(),
-            timeout: "Say exactly: I'm still plugged in, so I'm getting back up.".into(),
-            check: "Say exactly: I can't get up by myself; I need to be checked.".into(),
+            ready: lamp_voice::language::UNPLUG_READY.into(),
+            failed: lamp_voice::language::UNPLUG_FAILED.into(),
+            stay: lamp_voice::language::UNPLUG_STAY.into(),
+            timeout: lamp_voice::language::UNPLUG_TIMEOUT.into(),
+            check: lamp_voice::language::UNPLUG_CHECK.into(),
+            not_off: Self::built_in_not_off(),
+            ask_off: Self::built_in_ask_off(),
+            updating: Self::built_in_updating(),
         }
+    }
+
+    fn built_in_not_off() -> String {
+        lamp_voice::language::UNPLUG_NOT_OFF.into()
+    }
+
+    fn built_in_ask_off() -> String {
+        lamp_voice::language::UNPLUG_ASK_OFF.into()
+    }
+
+    fn built_in_updating() -> String {
+        lamp_voice::language::UNPLUG_UPDATING.into()
     }
 
     /// Each line is words, as a say's own are: 1 to [`MOST_WORDS_BYTES`]
@@ -915,6 +946,9 @@ impl UnplugLines {
             ("stay", &self.stay),
             ("timeout", &self.timeout),
             ("check", &self.check),
+            ("not_off", &self.not_off),
+            ("ask_off", &self.ask_off),
+            ("updating", &self.updating),
         ] {
             if line.trim().is_empty()
                 || line.len() > MOST_WORDS_BYTES

@@ -12326,7 +12326,7 @@ pub(crate) fn steady_first_message_withheld(
 /// and the exchanges as messages, both `whose` alone (a person's memory id,
 /// or none for the room), under the thread's one lock; with a name
 /// `withheld`, said in neither.
-fn thread_and_history(
+pub(crate) fn thread_and_history(
     used: usize,
     file: Option<&Path>,
     whose: Option<&str>,

@@ -3400,6 +3400,28 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
     }
     let failure = loop {
         match unplug::read(bus, &request, since, clock::now_us()) {
+            // A product lamp turns off at the fold (#5763's P1): a running
+            // lamp, its storage still written, never says it may be unplugged.
+            // Only after a spoken yes (#5774's P2: a voice turn-off only
+            // with one, shutdown.md): a false fold stands up, never off.
+            Ok(Progress::Ready) if std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).is_some() => {
+                let socket = std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).unwrap_or_default();
+                return match yes_to_turn_off(skill, sockets, bus) {
+                    Ok(()) => turn_off(skill, sockets, bus, &request, since, Path::new(&socket)),
+                    Err(why) => {
+                        let line = sockets
+                            .may
+                            .unplug
+                            .as_ref()
+                            .map(|lines| lines.stay.clone())
+                            .unwrap_or_default();
+                        format!(
+                            "unplug: not turned off: {why}; {}",
+                            stay(sockets, bus, &request, &line)
+                        )
+                    }
+                };
+            }
             Ok(Progress::Ready) => {
                 // Recheck after the socket opens, immediately before sending.
                 // The voice must not queue a readiness claim for a later scene.
@@ -3481,7 +3503,7 @@ fn stay(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
         &sockets.say,
         "staying plugged in",
         &sockets.may.skill,
-        json!({"note": line, "priority": 8}),
+        exact(line, 8),
         &[],
         || cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us())),
     );
@@ -3530,7 +3552,7 @@ fn say_check(sockets: &Sockets) -> String {
         &sockets.say,
         "unplug needs checking",
         &sockets.may.skill,
-        json!({"note": lines.check, "priority": 8}),
+        exact(&lines.check, 8),
         &[],
         || {},
     )
@@ -3592,6 +3614,21 @@ fn ready_for(ready_since: &mut Option<u64>, ready: bool, now: u64, wait: Duratio
     now.saturating_sub(*ready_since.get_or_insert(now)) >= wait.as_micros() as u64
 }
 
+/// A line of the skill's `[unplug]` words as the voice's exact words
+/// (#5777): rendered as written, never a note the chat model may decline or
+/// reword, and waiting while the person talks rather than dropped as
+/// `user_interrupted` (lamp-52e6, 10 Nov 12:43: the ask refused, the stay
+/// dropped). The readiness line stays guarded text (`say_unplug_ready`).
+/// A file from before them, which a lamp may keep (`UnplugLines::built_in`),
+/// wrote its lines as notes: their "Say exactly: " is never read out.
+fn exact(line: &str, priority: u8) -> serde_json::Value {
+    let line = ["Say exactly: ", "Say briefly: "]
+        .iter()
+        .find_map(|note| line.strip_prefix(note))
+        .unwrap_or(line);
+    json!({"text": line, "exact": true, "priority": priority})
+}
+
 fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
     if let Some(why) = sockets.may.refuses(&Call::Say(String::new())) {
         return why;
@@ -3603,10 +3640,171 @@ fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
         &sockets.say,
         "unplug preparation failed",
         skill,
-        json!({"note": lines.failed, "priority": 5}),
+        exact(&lines.failed, 5),
         &[],
         || {},
     )
+}
+
+/// Setup's change helper's request for the app's Turn off
+/// (`lamp_keeper::restart::SHUTDOWN_REQUEST`; lamp-skills doesn't depend
+/// on the keeper) and how long its answer is waited for (lamp-cloud's
+/// `RESTART_WAIT`: the helper reads one line and checks one lock).
+const TURN_OFF_REQUEST: &str = r#"{"shutdown":"lamp"}"#;
+const TURN_OFF_WAIT: Duration = Duration::from_secs(2);
+/// How long a spoken yes to the turn-off is waited for, once the ask's
+/// words have ended (#5774's P2).
+const OFF_YES_WAIT: Duration = Duration::from_secs(30);
+/// The helper's refusal while an update installs
+/// (`lamp_keeper::restart::INSTALLING`). An install round restarts
+/// lamp-skills, so nothing may wait here for the update to end (#5777's
+/// P2): the lamp says `updating`, stands up at once, and is asked again.
+const OFF_UPDATING: &str = "an update is being installed: try again once it is done";
+
+/// At a proven fold with a turn-off socket: the skill's `ask_off` said,
+/// then a spoken yes waited for, judged by the lamp's one spoken yes
+/// (`first_stand::is_yes`, as the first stand's): a short line opening
+/// with yes, heard 1.5 s or more after the ask's words ended (never their
+/// echo), in a room that isn't busy, within [`OFF_YES_WAIT`]. The first
+/// finished line after the ask decides: any other words are no yes. In a
+/// language other than English nothing is asked, since the yes is heard by
+/// English words only: the lamp stays (#5774's P2).
+fn yes_to_turn_off(skill: &str, sockets: &Sockets, bus: &Bus) -> Result<(), String> {
+    use lamp_body::first_stand;
+    let lines = sockets
+        .may
+        .unplug
+        .as_ref()
+        .ok_or("the skill says no [unplug] words")?;
+    if let Some(refused) = sockets.may.refuses(&Call::Say(String::new())) {
+        return Err(refused);
+    }
+    if first_stand::speaks_other_than_english(first_stand::language_text().as_deref()) {
+        return Err("a spoken yes is heard in English words only".into());
+    }
+    // Subscribed before the ask, so no line after it is missed.
+    let mut heard = bus
+        .subscribe(Speech::TOPICS[0], "skills_unplug_yes")
+        .map_err(|error| format!("voice/heard not read: {error}"))?;
+    let said = say(
+        &sockets.say,
+        "unplug: turn-off asked",
+        skill,
+        exact(&lines.ask_off, 8),
+        &[],
+        || {},
+    );
+    if !said.ends_with(": spoken") {
+        return Err(said);
+    }
+    let opens = lamp_ipc::monotonic_us().saturating_add(first_stand::ECHO_TAIL_US);
+    let until = Instant::now() + OFF_YES_WAIT;
+    let (mut line, mut early) = (String::new(), false);
+    while Instant::now() < until {
+        let Some(message) = receive(&mut heard, Duration::from_millis(200)) else {
+            continue;
+        };
+        let Ok(speech) = message.parse::<Speech>() else {
+            continue;
+        };
+        early |= message.header.at_us < opens;
+        line.push_str(&speech.text);
+        if !speech.finished {
+            continue;
+        }
+        let text = std::mem::take(&mut line);
+        if std::mem::take(&mut early)
+            || text.trim().is_empty()
+            || first_stand::is_echo(&text, &lines.ask_off)
+        {
+            continue;
+        }
+        if !first_stand::is_yes(&text) {
+            return Err("words that aren't a yes were heard".into());
+        }
+        let busy = bus
+            .latest(lamp_msgs::RoomState::TOPIC)
+            .ok()
+            .flatten()
+            .filter(|message| !message.expired)
+            .and_then(|message| message.parse::<lamp_msgs::RoomState>().ok())
+            .is_some_and(|room| room.state == lamp_msgs::Room::Busy);
+        return if busy {
+            Err("a yes in a busy room is not taken".into())
+        } else {
+            Ok(())
+        };
+    }
+    Err(format!("no spoken yes within {} s", OFF_YES_WAIT.as_secs()))
+}
+
+/// At a confirmed fold, with a turn-off socket: Ready read once more, then
+/// the helper asked to turn the lamp off, as the app's Turn off asks. Its
+/// runner (`lamp-setup shutdown-now`) says the last words, stops every
+/// part, lets the arm go, lights green, syncs and powers off. Refused or
+/// not reached: the `not_off` note, and the latch kept, as for any failure.
+fn turn_off(
+    skill: &str,
+    sockets: &Sockets,
+    bus: &Bus,
+    request: &str,
+    since: u64,
+    socket: &Path,
+) -> String {
+    let asked = || -> io::Result<serde_json::Value> {
+        let mut stream = UnixStream::connect(socket)?;
+        stream.set_write_timeout(Some(TURN_OFF_WAIT))?;
+        stream.set_read_timeout(Some(TURN_OFF_WAIT))?;
+        if lamp_skills::unplug::read(bus, request, since, clock::now_us())?
+            != lamp_skills::unplug::Progress::Ready
+        {
+            return Err(io::Error::other("the fold was no longer proven"));
+        }
+        writeln!(stream, "{TURN_OFF_REQUEST}")?;
+        let mut line = String::new();
+        BufReader::new(stream.take(64 * 1_024)).read_line(&mut line)?;
+        Ok(serde_json::from_str(&line)?)
+    };
+    let why = match asked() {
+        Ok(answer) if answer["done"]["shutting_down"] == true => {
+            return format!("unplug: folded for {request}; the lamp turns off (setup's shutdown)");
+        }
+        // An update installing: it can't turn off now, so it says so, stands
+        // up at once as a "never mind" does, and asks to be told again;
+        // nothing is left waiting for the update's restart to lose.
+        Ok(answer) if answer["refused"] == OFF_UPDATING => {
+            let line = sockets
+                .may
+                .unplug
+                .as_ref()
+                .map(|lines| lines.updating.clone())
+                .unwrap_or_default();
+            return format!(
+                "unplug: an update holds the turn-off; {}",
+                stay(sockets, bus, request, &line)
+            );
+        }
+        Ok(answer) => format!("the turn-off was not taken: {answer}"),
+        Err(error) => format!("the turn-off could not be asked: {error}"),
+    };
+    if let Some(refused) = sockets.may.refuses(&Call::Say(String::new())) {
+        return format!("unplug: {why}; {refused}");
+    }
+    let note = sockets
+        .may
+        .unplug
+        .as_ref()
+        .map(|lines| lines.not_off.clone())
+        .unwrap_or_default();
+    let said = say(
+        &sockets.say,
+        "unplug: not turned off",
+        skill,
+        exact(&note, 8),
+        &[],
+        || {},
+    );
+    format!("unplug: {why}; {said}")
 }
 
 fn say_unplug_ready(
@@ -5214,6 +5412,19 @@ mod tests {
         assert!(files > 0, "no file under deploy/");
     }
 
+    /// #5777: an unplug line is exact words; a kept file's note prefix is
+    /// never read out.
+    #[test]
+    fn an_unplug_line_is_exact_words_and_a_kept_files_note_prefix_is_never_said() {
+        for line in ["Okay, I'll stay.", "Say exactly: Okay, I'll stay."] {
+            assert_eq!(
+                exact(line, 8),
+                json!({"text": "Okay, I'll stay.", "exact": true, "priority": 8})
+            );
+        }
+        assert_eq!(exact("Say briefly: Wait.", 5)["text"], "Wait.");
+    }
+
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no
     /// latest of, reaches the read's gate as a voice heard just now
     /// (`LampRoom::seen`), so a skill's read waits a minute after it
@@ -5551,11 +5762,17 @@ mod tests {
             unplug_lines(),
             lamp_skills::UnplugLines {
                 ready: "My arm is folded. You can unplug me now.".into(),
-                failed: "Say briefly: I could not confirm a safe folded position. Please do not unplug yet."
+                failed: "I could not confirm a safe folded position. Please do not unplug yet."
                     .into(),
-                stay: "Say exactly: Okay, I'll stay.".into(),
-                timeout: "Say exactly: I'm still plugged in, so I'm getting back up.".into(),
-                check: "Say exactly: I can't get up by myself; I need to be checked.".into(),
+                stay: "Okay, I'll stay.".into(),
+                timeout: "I'm still plugged in, so I'm getting back up.".into(),
+                check: "I can't get up by myself; I need to be checked.".into(),
+                // #5763: said when a confirmed fold could not turn the lamp off.
+                not_off:
+                    "I couldn't turn myself off just now, so please don't unplug me yet."
+                        .into(),
+                ask_off: "My arm is folded. Shall I turn myself off now? Say yes, and I will.".into(),
+                updating: "I'm in the middle of an update, so I can't turn myself off yet. I'll get back up; ask me again once it's done.".into(),
             }
         );
     }
@@ -5686,7 +5903,11 @@ mod tests {
                 BufReader::new(&stream).read_line(&mut line).unwrap();
                 let asked: serde_json::Value = serde_json::from_str(&line).unwrap();
                 heard.push((
-                    asked["note"].as_str().unwrap().to_owned(),
+                    asked["text"]
+                        .as_str()
+                        .filter(|_| asked["exact"] == true)
+                        .unwrap()
+                        .to_owned(),
                     cancels(&bus).is_some(),
                 ));
                 let mut stream = &stream;

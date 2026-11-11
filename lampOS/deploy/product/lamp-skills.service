@@ -37,6 +37,15 @@ Environment=LAMP_BODY_POSE_ASK=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): a skill's read step, said behind its
 # gate (the owner's face alone, no voice, not private), through lamp-services' tools socket. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
+# (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
+Environment=LAMP_UNPLUG=on
+# A confirmed fold turns the lamp off through setup's change helper, as the app's Turn off does, so a running lamp
+# never says it may be unplugged (#5763's P1, shutdown.md): its runner stops every part, syncs and powers off.
+Environment=LAMP_UNPLUG_OFF_SOCKET=/run/lampos-setup-change/change.sock
+# The owner's language, as the voice reads it (#4473): the turn-off's spoken yes is heard by English words only, so
+# an owner who speaks another language is never asked for one, and the lamp stays (#5777, unplug.md step 7).
+Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
 # The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,
 # systemd 252). One newline, never empty: an empty SetCredential= in a unit file fails the start at CREDENTIALS

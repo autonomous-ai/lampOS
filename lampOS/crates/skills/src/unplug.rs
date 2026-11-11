@@ -25,6 +25,12 @@ const STAY_DESCRIPTION: &str = "Call only when, after you began preparing to be 
 /// Unbroken minutes Ready, with Skills still up, before the lamp gets back up.
 pub const STAY_ENVIRONMENT: &str = "LAMP_UNPLUG_STAY_MIN";
 const STAY_DEFAULT_MIN: u64 = 10;
+/// Setup's change helper socket (`/run/lampos-setup-change/change.sock` in
+/// the product, #5763's P1). Set, a confirmed fold turns the lamp off through
+/// the helper, as the app's Turn off does (shutdown.md): a running lamp,
+/// its storage still written, never says it may be unplugged. Unset, the
+/// skill's `ready` line is said, as before.
+pub const OFF_SOCKET_ENVIRONMENT: &str = "LAMP_UNPLUG_OFF_SOCKET";
 pub const WAIT_US: u64 = 32_000_000;
 const FRESH_US: u64 = 500_000;
 
