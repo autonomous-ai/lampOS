@@ -10,18 +10,26 @@
 //! - **The line is checked whole** ([`HandOver::parse`]): a field more or
 //!   less, a skill folder outside the lamp's skills, a `run` outside its
 //!   `scripts/`, a grant written twice or `skills` is refused.
-//! - **A one-run token** ([`Tokens`]): minted by lamp-control (#6304) for
-//!   exactly this skill, its folder's SHA-256 and its grants, given to the
-//!   run as [`TOKEN_ENV`] beside [`SOCKET_ENV`], and ended when the run
-//!   ends, however it ends. Until #6304 lands, [`NoTokens`] refuses every
-//!   run (`no_token`): nothing runs without a token.
+//! - **A one-run token** ([`Tokens`]): minted by lamp-control (#6304,
+//!   PR #6408) on its admin socket ([`ControlTokens`]) for this skill and a
+//!   run id of lamp-tasks' own ([`run_id`]). lamp-control reads the owner's
+//!   yes itself and names its grants; a run whose minted grants are not
+//!   exactly the ones its line asks is refused (`no_token`) and its token
+//!   ended. The token is given to the run as [`TOKEN_ENV`] beside
+//!   [`SOCKET_ENV`], and ended when the run ends, however it ends.
+//!   [`NoTokens`] refuses every run: nothing runs without a token.
 //! - **The run** ([`Runner`]): one task for target `lamp` (the lamp's own
 //!   Hermes), its words the skill's task and its script's place
 //!   ([`SkillRun::prompt`]). The runner blocks until the run ends.
 use crate::protocol::refusal;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use std::collections::BTreeSet;
+use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::UnixStream;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The switch, `on` exactly; off unless set. lamp-skills reads the same one
 /// (#6305): a skill's tasks are on or off as one.
@@ -37,6 +45,12 @@ pub const CONTROL_SOCKET: &str = "/run/lampos-control/control.sock";
 pub const SOCKET_ENV: &str = "LAMP_CONTROL_SOCKET";
 /// The variable a run is given its one-run token in.
 pub const TOKEN_ENV: &str = "LAMP_CONTROL_TOKEN";
+/// lamp-control's admin socket (lampos's, 0600 in a 0700 folder), where
+/// lamp-tasks mints and ends a run's token (#6408, docs/control.md, "The
+/// control socket, lamp-control's side").
+pub const ADMIN_SOCKET: &str = "/run/lampos-control/admin.sock";
+/// How long one ask on [`ADMIN_SOCKET`] may take, each way.
+pub const ADMIN_WAIT: Duration = Duration::from_secs(5);
 /// The folder a skill's script is in (#6305, `lamp_skills::task::SCRIPTS`).
 pub const SCRIPTS: &str = "scripts";
 /// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`).
@@ -156,24 +170,124 @@ impl std::fmt::Debug for RunToken {
     }
 }
 
-/// lamp-control's one-run tokens (#6304): minted from the owner's yes for
-/// exactly `skill`, its folder's `sha256` and `grants`, ended with the run.
-/// The adapter for its `control.sock` plugs in here once #6304 lands.
-pub trait Tokens {
-    fn mint(&self, skill: &str, sha256: &str, grants: &[String]) -> Result<RunToken, String>;
-    /// The run ended: the token is refused from now on.
-    fn end(&self, token: &RunToken);
+/// A token lamp-control minted, and the grants it names: the owner's yes
+/// for the skill, read by lamp-control, never what the asker said.
+#[derive(Debug)]
+pub struct Minted {
+    pub token: RunToken,
+    pub grants: Vec<String>,
 }
 
-/// No lamp-control token yet (#6304 not landed): every run is refused.
+/// lamp-control's one-run tokens (#6304): minted from the owner's yes for
+/// `skill`, one for run id `run`, ended with the run.
+pub trait Tokens {
+    fn mint(&self, skill: &str, run: &str) -> Result<Minted, String>;
+    /// The run ended: its token is refused from now on.
+    fn end(&self, run: &str);
+}
+
+/// No lamp-control token: every run is refused.
 pub struct NoTokens;
 
 impl Tokens for NoTokens {
-    fn mint(&self, _: &str, _: &str, _: &[String]) -> Result<RunToken, String> {
+    fn mint(&self, _: &str, _: &str) -> Result<Minted, String> {
         Err("no one-run token on this lamp yet (lamp-control's control.sock, #6304)".into())
     }
 
-    fn end(&self, _: &RunToken) {}
+    fn end(&self, _: &str) {}
+}
+
+/// lamp-control's admin socket: one JSON line asked, one answered, a
+/// connection each (#6408): `{"mint": {"skill", "run"}}` answered
+/// `{"token", "run", "skill", "grants", "expires_in_ms"}` or `{"error"}`,
+/// and `{"end": {"run"}}`.
+pub struct ControlTokens {
+    pub socket: PathBuf,
+    pub wait: Duration,
+}
+
+impl Default for ControlTokens {
+    fn default() -> Self {
+        Self {
+            socket: PathBuf::from(ADMIN_SOCKET),
+            wait: ADMIN_WAIT,
+        }
+    }
+}
+
+impl ControlTokens {
+    fn ask(&self, asked: &Value) -> Result<Value, String> {
+        let unreachable = |error: std::io::Error| format!("lamp-control is not reachable: {error}");
+        let mut stream = UnixStream::connect(&self.socket).map_err(unreachable)?;
+        stream
+            .set_read_timeout(Some(self.wait))
+            .map_err(unreachable)?;
+        stream
+            .set_write_timeout(Some(self.wait))
+            .map_err(unreachable)?;
+        let mut line = asked.to_string();
+        line.push('\n');
+        stream.write_all(line.as_bytes()).map_err(unreachable)?;
+        let mut answer = String::new();
+        BufReader::new(std::io::Read::take(stream, MOST_ANSWER_BYTES))
+            .read_line(&mut answer)
+            .map_err(unreachable)?;
+        serde_json::from_str(answer.trim()).map_err(|_| "lamp-control's answer is not JSON".into())
+    }
+}
+
+/// At most this many bytes of an admin answer are read.
+const MOST_ANSWER_BYTES: u64 = 64 * 1024;
+
+impl Tokens for ControlTokens {
+    fn mint(&self, skill: &str, run: &str) -> Result<Minted, String> {
+        let answer = self.ask(&json!({"mint": {"skill": skill, "run": run}}))?;
+        if let Some(why) = answer.get("error") {
+            return Err(why
+                .as_str()
+                .unwrap_or("lamp-control refused the token")
+                .into());
+        }
+        let token = answer["token"].as_str().filter(|token| !token.is_empty());
+        let grants = answer["grants"].as_array().and_then(|grants| {
+            grants
+                .iter()
+                .map(|grant| grant.as_str().map(str::to_owned))
+                .collect::<Option<Vec<_>>>()
+        });
+        match (token, grants, answer["run"].as_str() == Some(run)) {
+            (Some(token), Some(grants), true) => Ok(Minted {
+                token: RunToken::new(token.to_owned()),
+                grants,
+            }),
+            _ => {
+                self.end(run);
+                Err("lamp-control's token answer is not one this lamp-tasks reads".into())
+            }
+        }
+    }
+
+    fn end(&self, run: &str) {
+        if let Err(why) = self.ask(&json!({"end": {"run": run}})) {
+            // The token still ends at its own time (10 minutes at most).
+            eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
+        }
+    }
+}
+
+/// A run id of lamp-tasks' own, new for each hand-over: plain characters,
+/// under lamp-control's 64. A second mint for the same id would replace the
+/// first run's token, so two hand-overs never share one.
+pub fn run_id() -> String {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis());
+    format!(
+        "task-{millis}-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    )
 }
 
 /// One run for the lamp's own Hermes: its words, the skill's folder, and
@@ -225,12 +339,12 @@ pub trait Runner {
 /// Ends the token however the run ends, a panic too.
 struct Ending<'a> {
     tokens: &'a dyn Tokens,
-    token: RunToken,
+    run: String,
 }
 
 impl Drop for Ending<'_> {
     fn drop(&mut self) {
-        self.tokens.end(&self.token);
+        self.tokens.end(&self.run);
     }
 }
 
@@ -254,14 +368,28 @@ pub fn answer(
         Ok(hand) => hand,
         Err((code, why)) => return refusal(code, &why),
     };
-    let token = match tokens.mint(&hand.skill, &hand.sha256, &hand.grants) {
-        Ok(token) => token,
+    let run_id = run_id();
+    let minted = match tokens.mint(&hand.skill, &run_id) {
+        Ok(minted) => minted,
         Err(why) => return refusal("no_token", &why),
     };
-    let ending = Ending { tokens, token };
-    let run = SkillRun::of(&hand, &ending.token);
+    let ending = Ending {
+        tokens,
+        run: run_id,
+    };
+    let asked: BTreeSet<&String> = hand.grants.iter().collect();
+    if minted.grants.iter().collect::<BTreeSet<_>>() != asked {
+        drop(ending);
+        return refusal(
+            "no_token",
+            "the owner's yes for this skill names other grants than its task asks: \
+             the owner says yes again in the app",
+        );
+    }
+    let run = SkillRun::of(&hand, &minted.token);
     let ran = runner.run(&run);
     drop(run);
+    drop(minted);
     drop(ending);
     match ran {
         Ok(id) => json!({"ok": true, "id": id}),
@@ -293,27 +421,36 @@ mod tests {
     #[derive(Default)]
     struct FakeTokens {
         refuse: bool,
-        minted: RefCell<Vec<(String, String, Vec<String>)>>,
-        live: RefCell<Vec<String>>,
+        /// The grants the owner's yes names; the line's own when `None`.
+        yes: Option<Vec<String>>,
+        /// (skill, run id) of each mint.
+        minted: RefCell<Vec<(String, String)>>,
+        /// (run id, token) of each live run.
+        live: RefCell<Vec<(String, String)>>,
         ended: RefCell<Vec<String>>,
     }
 
     impl Tokens for FakeTokens {
-        fn mint(&self, skill: &str, sha256: &str, grants: &[String]) -> Result<RunToken, String> {
+        fn mint(&self, skill: &str, run: &str) -> Result<Minted, String> {
             if self.refuse {
-                return Err("no yes for these grants".into());
+                return Err("the owner's yes names no grant for this skill".into());
             }
-            self.minted
-                .borrow_mut()
-                .push((skill.into(), sha256.into(), grants.to_vec()));
+            self.minted.borrow_mut().push((skill.into(), run.into()));
             let secret = format!("tok-{}", self.minted.borrow().len());
-            self.live.borrow_mut().push(secret.clone());
-            Ok(RunToken::new(secret))
+            self.live.borrow_mut().push((run.into(), secret.clone()));
+            let grants = self
+                .yes
+                .clone()
+                .unwrap_or_else(|| vec!["light".into(), "camera".into()]);
+            Ok(Minted {
+                token: RunToken::new(secret),
+                grants,
+            })
         }
 
-        fn end(&self, token: &RunToken) {
-            self.live.borrow_mut().retain(|live| live != token.secret());
-            self.ended.borrow_mut().push(token.secret().into());
+        fn end(&self, run: &str) {
+            self.live.borrow_mut().retain(|(live, _)| live != run);
+            self.ended.borrow_mut().push(run.into());
         }
     }
 
@@ -337,7 +474,12 @@ mod tests {
                 .find(|(name, _)| *name == TOKEN_ENV)
                 .map(|(_, value)| value.clone())
                 .unwrap_or_default();
-            let live = self.tokens.live.borrow().contains(&token);
+            let live = self
+                .tokens
+                .live
+                .borrow()
+                .iter()
+                .any(|(_, live)| *live == token);
             self.seen
                 .borrow_mut()
                 .push((run.prompt.clone(), run.env.clone(), live));
@@ -381,13 +523,13 @@ mod tests {
         let runner = runner(&tokens, Ok(42));
         let answer = answer(&line(|_| {}), true, skills(), &tokens, &runner);
         assert_eq!(answer, json!({"ok": true, "id": 42}));
-        assert_eq!(
-            *tokens.minted.borrow(),
-            vec![(
-                "photo-booth".to_owned(),
-                SHA.to_owned(),
-                vec!["camera".to_owned(), "light".to_owned()]
-            )]
+        let minted = tokens.minted.borrow();
+        assert_eq!(minted.len(), 1);
+        let (skill, run_id) = &minted[0];
+        assert_eq!(skill, "photo-booth");
+        assert!(
+            run_id.starts_with("task-") && run_id.len() <= 64,
+            "{run_id}"
         );
         let seen = runner.seen.borrow();
         let (prompt, env, live) = &seen[0];
@@ -404,7 +546,7 @@ mod tests {
         assert!(prompt.contains("/var/lib/lampOS/skills/photo-booth"));
         assert!(!prompt.contains("tok-1"), "the token is never in the words");
         assert!(tokens.live.borrow().is_empty());
-        assert_eq!(*tokens.ended.borrow(), vec!["tok-1".to_owned()]);
+        assert_eq!(*tokens.ended.borrow(), vec![run_id.clone()]);
     }
 
     #[test]
@@ -473,6 +615,142 @@ mod tests {
             answer(&long, true, skills(), &tokens, &runner)["error"],
             "too_long"
         );
+    }
+
+    #[test]
+    fn a_yes_naming_other_grants_ends_the_token_and_runs_nothing() {
+        for yes in [vec!["camera"], vec!["camera", "light", "speak"], vec![]] {
+            let tokens = FakeTokens {
+                yes: Some(yes.iter().map(|grant| grant.to_string()).collect()),
+                ..FakeTokens::default()
+            };
+            let runner = runner(&tokens, Ok(1));
+            let answer = answer(&line(|_| {}), true, skills(), &tokens, &runner);
+            assert_eq!(answer["error"], "no_token", "{yes:?}");
+            assert!(runner.seen.borrow().is_empty(), "{yes:?}");
+            assert!(tokens.live.borrow().is_empty(), "{yes:?}");
+            assert_eq!(tokens.ended.borrow().len(), 1, "{yes:?}");
+        }
+    }
+
+    #[test]
+    fn each_hand_over_gets_a_run_id_of_its_own() {
+        let first = run_id();
+        let second = run_id();
+        assert_ne!(first, second);
+        for id in [&first, &second] {
+            assert!(id.len() <= 64, "{id}");
+            assert!(
+                id.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.')),
+                "{id}"
+            );
+        }
+    }
+
+    /// A stand-in admin socket: answers each connection's one line with
+    /// `reply(line)` and keeps the lines asked.
+    fn admin(
+        reply: impl Fn(&Value) -> Value + Send + 'static,
+        connections: usize,
+    ) -> (
+        tempfile::TempDir,
+        ControlTokens,
+        std::thread::JoinHandle<Vec<Value>>,
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("admin.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let mut asked = Vec::new();
+            for _ in 0..connections {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let value: Value = serde_json::from_str(&line).unwrap();
+                let mut out = reply(&value).to_string();
+                out.push('\n');
+                (&stream).write_all(out.as_bytes()).unwrap();
+                asked.push(value);
+            }
+            asked
+        });
+        let tokens = ControlTokens {
+            socket,
+            wait: Duration::from_secs(5),
+        };
+        (dir, tokens, served)
+    }
+
+    #[test]
+    fn control_tokens_mint_and_end_on_lamp_controls_admin_socket() {
+        let (_dir, tokens, served) = admin(
+            |asked| match asked.get("mint") {
+                Some(mint) => json!({
+                    "token": "t".repeat(43),
+                    "run": mint["run"],
+                    "skill": mint["skill"],
+                    "grants": ["camera", "light"],
+                    "expires_in_ms": 600_000,
+                }),
+                None => json!({"ended": true}),
+            },
+            2,
+        );
+        let minted = tokens.mint("photo-booth", "task-1").unwrap();
+        assert_eq!(minted.token.secret(), "t".repeat(43));
+        assert_eq!(minted.grants, vec!["camera", "light"]);
+        tokens.end("task-1");
+        assert_eq!(
+            served.join().unwrap(),
+            vec![
+                json!({"mint": {"skill": "photo-booth", "run": "task-1"}}),
+                json!({"end": {"run": "task-1"}}),
+            ]
+        );
+    }
+
+    #[test]
+    fn control_tokens_pass_on_lamp_controls_refusal_and_never_take_a_bad_answer() {
+        let (_dir, tokens, served) = admin(
+            |_| json!({"error": "no skill yes is kept on this lamp yet"}),
+            1,
+        );
+        assert_eq!(
+            tokens.mint("photo-booth", "task-1").unwrap_err(),
+            "no skill yes is kept on this lamp yet"
+        );
+        served.join().unwrap();
+        // Another run's token, or none: refused, and the run ended.
+        for reply in [
+            json!({"token": "t".repeat(43), "run": "task-9", "grants": []}),
+            json!({"run": "task-1", "grants": ["light"]}),
+            json!({"token": "t".repeat(43), "run": "task-1", "grants": [1]}),
+        ] {
+            let (_dir, tokens, served) = admin(
+                move |asked| {
+                    if asked.get("mint").is_some() {
+                        reply.clone()
+                    } else {
+                        json!({"ended": true})
+                    }
+                },
+                2,
+            );
+            assert!(tokens.mint("photo-booth", "task-1").is_err());
+            assert_eq!(served.join().unwrap()[1], json!({"end": {"run": "task-1"}}));
+        }
+    }
+
+    #[test]
+    fn control_tokens_with_no_lamp_control_refuse() {
+        let dir = tempfile::tempdir().unwrap();
+        let tokens = ControlTokens {
+            socket: dir.path().join("admin.sock"),
+            wait: Duration::from_secs(1),
+        };
+        let why = tokens.mint("photo-booth", "task-1").unwrap_err();
+        assert!(why.starts_with("lamp-control is not reachable"), "{why}");
     }
 
     #[test]
