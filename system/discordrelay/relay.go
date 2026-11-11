@@ -15,6 +15,7 @@ package discordrelay
 import (
 	"context"
 	"log/slog"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -83,8 +84,9 @@ type Relay struct {
 	runs   map[string]run
 	seen   map[string]time.Time
 	// joined holds the threads the owner has @mentioned the bot in, oldest first.
-	// It lives in memory: after a restart one new @mention brings a thread back.
-	joined []string
+	// It is saved to joinedPath (when set) so a restart or update keeps it.
+	joined     []string
+	joinedPath string
 	// guestCalls holds each guest's recent answers, for the hourly limit.
 	guestCalls map[string][]time.Time
 
@@ -110,7 +112,9 @@ var ProviderSet = wire.NewSet(ProvideRelay)
 
 // ProvideRelay is the Wire provider for Relay.
 func ProvideRelay(cfg *config.Config, gw domain.AgentGateway) *Relay {
-	return New(cfg, gw)
+	r := New(cfg, gw)
+	r.loadJoined(filepath.Join(config.Dir(), joinedFile))
+	return r
 }
 
 // New builds a Relay. The uplink is installed later with SetUplink, once the MQTT
@@ -247,6 +251,7 @@ func (r *Relay) joinThread(channelID string) {
 	if len(r.joined) > maxJoinedThreads {
 		r.joined = r.joined[1:]
 	}
+	r.saveJoinedLocked()
 }
 
 // send waits for the agent to be idle, hands it the turn and, meanwhile, keeps the

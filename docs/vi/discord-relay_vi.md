@@ -45,7 +45,7 @@ nội dung):
 - Thiết bị đã setup Discord (`discord_managed` và có `discord_user_id`).
 - Người gửi là `discord_user_id`.
 - Tin nhắn riêng (`guild_id` rỗng) luôn hợp lệ. Tin nhắn trong server phải đến từ
-  `discord_guild_id` **và** mention bot; phần mention bị gỡ khỏi nội dung. Không cần mention trong kênh có trong `discord_open_channels`, trong thread của kênh đó, hoặc trong thread mà chủ thiết bị đã mention bot (`parent_channel_id` đánh dấu thread). Tin nhắn gửi cho người khác, một role hoặc mọi người (`mentions_others`) vẫn cần mention bot. Sau khi khởi động lại, chỉ cần mention một lần để thread hoạt động lại. Kiểm tra chủ thiết bị và server luôn được áp dụng.
+  `discord_guild_id` **và** mention bot; phần mention bị gỡ khỏi nội dung. Không cần mention trong kênh có trong `discord_open_channels`, trong thread của kênh đó, hoặc trong thread mà chủ thiết bị đã mention bot (`parent_channel_id` đánh dấu thread). Tin nhắn gửi cho người khác, một role hoặc mọi người (`mentions_others`) vẫn cần mention bot. Thiết bị lưu các thread đã tham gia (tối đa 256) trong `discord_threads.json` cạnh `config.json`, nên chúng vẫn còn sau khi khởi động lại hoặc cập nhật. Kiểm tra chủ thiết bị và server luôn được áp dụng.
 - `event_id` chưa gặp trong 5 phút gần nhất (relay có thể gửi lại).
 
 Tin nhắn được nhận trở thành một lượt chat bình thường trên runtime đang chạy, bất kể runtime nào:
