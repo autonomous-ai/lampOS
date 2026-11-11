@@ -27,6 +27,7 @@ pub mod install;
 pub mod judge;
 pub mod manifest;
 pub mod models;
+pub mod openclaw_install;
 pub mod own;
 pub mod product_skills;
 pub mod publish;

@@ -21,6 +21,7 @@
 //! watches each install, as the rounds go on.
 use crate::{
     hermes_install::{self, Carried},
+    openclaw_install,
     quiet::{BETWEEN_TURNS, Heard, Quiet},
     world::{BusEars, Ears, Systemctl, Systemd},
 };
@@ -291,7 +292,9 @@ fn watch_installs(bus_root: &Path, records: &Path, began: Instant) {
         }
         let quiet = rested(&heard, now);
         if look % 10 == 0 {
-            let under_way = hermes_install::installing(records);
+            // Hermes's or OpenClaw's (#6226): one watch, one one-shot.
+            let under_way =
+                hermes_install::installing(records) || openclaw_install::installing(records);
             if !under_way {
                 watch = None;
             } else if watch.is_none() {
@@ -306,11 +309,34 @@ fn watch_installs(bus_root: &Path, records: &Path, began: Instant) {
             say(&line);
         }
         let unix_ms = crate::records::unix_ms();
-        match hermes_install::carry_out(&act, records, &mut systemd, unix_ms, &mut say) {
+        match carry_out_turns(&act, records, &mut systemd, unix_ms, &mut say) {
             Carried::Done => {}
             Carried::NotRunning | Carried::Stopped => watch = None,
         }
     }
+}
+
+/// The watch's `act` carried out on Harness's one-shot for the install
+/// whose turn it is (#6226): Hermes's while its record says it is under
+/// way, else OpenClaw's. One freeze or thaw serves both; a stop stops the
+/// one-shot whole, so the other's install, under way in it too, is
+/// recorded stopped as well.
+pub fn carry_out_turns(
+    act: &Act,
+    records: &Path,
+    systemd: &mut dyn Systemd,
+    now_unix_ms: u64,
+    say: &mut dyn FnMut(&str),
+) -> Carried {
+    if *act == Act::Nothing {
+        return Carried::Done;
+    }
+    let (turn, other) = if hermes_install::installing(records) {
+        (&hermes_install::TURN, &openclaw_install::TURN)
+    } else {
+        (&openclaw_install::TURN, &hermes_install::TURN)
+    };
+    hermes_install::carry_out_for(turn, &[other], act, records, systemd, now_unix_ms, say)
 }
 
 #[cfg(test)]

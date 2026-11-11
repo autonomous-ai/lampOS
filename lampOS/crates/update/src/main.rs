@@ -67,7 +67,14 @@ harness-install run by lamp-update-harness.service, which a `serve` round starts
         Hermes after it (on by default on a product lamp, LAMP_HERMES_ON_LAMP=off
         turns it off), pinned, as lampos, only in its quiet window and watched by
         serve while it runs (#5978); with LAMP_HERMES_SKILLS (on by default on a
-        product lamp), its namespace shows lamp-skills' socket (#6128).
+        product lamp), its namespace shows lamp-skills' socket (#6128). Then OpenClaw
+        after Hermes (on by default on a product lamp, LAMP_OPENCLAW_ON_LAMP=off turns
+        it off; off with Harness off): a pinned Node 24 and the pinned openclaw package,
+        as lampos, in the same namespace and the same window, taking turns with Hermes,
+        with its gateway lamp-openclaw-gateway.service on loopback, enabled and always
+        on while the switch is (disabled and stopped with it off); with
+        LAMP_OPENCLAW_SKILLS (on by default on a product lamp) its namespace shows
+        lamp-skills' socket (#6226).
 back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
         lamp-update.service's failure and its timer): when lamp-update switched to its own
         new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
@@ -449,8 +456,8 @@ fn harness_on(options: &BTreeMap<String, String>) -> Result<(), String> {
     Ok(())
 }
 
-/// `lamp-update harness-install`: Harness's one-shot (#5197), and Hermes
-/// after it (#5978). Ends with 1 when Harness's install failed or another
+/// `lamp-update harness-install`: Harness's one-shot (#5197), Hermes
+/// after it (#5978), and OpenClaw after Hermes (#6226). Ends with 1 when Harness's install failed or another
 /// held its lock; the records say why. Hermes's failure is its own record's.
 fn harness_install(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
@@ -927,10 +934,43 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // left for lampos to run (its wrapper and namespace script).
         acts.then_some((on, skills))
     };
+    // OpenClaw on the lamp (#6226): as Hermes, beside it, on Harness's one-shot.
+    let openclaw = {
+        use lamp_update::{harness_install::product, openclaw_install as openclaw};
+        let acts = config.apply && command == "serve";
+        // On by this build's default on a product lamp (PRODUCT_DEFAULT true: the lamp's
+        // default engine under Harness); LAMP_OPENCLAW_ON_LAMP=off turns it off, and
+        // another lamp needs `on`. Its skills switch is read the same way.
+        let product = acts && product::product_lamp(&config.root, &config.on(&config.units));
+        let wanted = openclaw::wanted(
+            std::env::var(openclaw::SWITCH).ok().as_deref(),
+            product,
+            openclaw::PRODUCT_DEFAULT,
+        );
+        let skills = openclaw::wanted(
+            std::env::var(openclaw::SKILLS_SWITCH).ok().as_deref(),
+            product,
+            openclaw::SKILLS_PRODUCT_DEFAULT,
+        );
+        if acts && wanted && harness.is_none() {
+            say("OpenClaw on the lamp: off, as Harness before the sign-in is off");
+        }
+        let on = acts && wanted && harness.is_some();
+        if acts {
+            openclaw::at_start(
+                &config.root,
+                &records,
+                on,
+                skills,
+                lamp_update::records::unix_ms(),
+            );
+        }
+        acts.then_some((on, skills))
+    };
     // Hermes's schedule (#5978): each install watched while it runs, the
     // voice heard from the start, so speech freezes it and a lost privacy
-    // reading stops it.
-    let hermes_watch = matches!(hermes, Some((true, _)))
+    // reading stops it; one watch for Hermes's and OpenClaw's both (#6226).
+    let hermes_watch = (matches!(hermes, Some((true, _))) || matches!(openclaw, Some((true, _))))
         .then(|| lamp_update::hermes_schedule::Watcher::start(&bus_root, &records));
     // `update/status` (#2194): where each round is, and how the last ended,
     // only for a round that acts; Harness's record looked at often only
@@ -1003,6 +1043,24 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     &mut say,
                 );
             }
+            // OpenClaw after Hermes, in its own window by its own record's
+            // last try; Hermes's install under way holds it to a later round.
+            if let (Some(_), Some((true, skills))) = (&hermes_watch, openclaw) {
+                use lamp_update::{hermes_schedule, openclaw_install};
+                let now_unix_ms = lamp_update::records::unix_ms();
+                let window = hermes_schedule::window(&hermes_schedule::Moment {
+                    walk_under_way: lamp_update::walk::under_way(&config),
+                });
+                openclaw_install::after_round(
+                    &config.root,
+                    &records,
+                    skills,
+                    &mut systemd,
+                    now_unix_ms,
+                    window,
+                    &mut say,
+                );
+            }
         }
         if matches!(hermes, Some((false, _)))
             && !matches!(
@@ -1011,6 +1069,19 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             )
         {
             lamp_update::hermes_install::after_round_off(
+                &config.root,
+                &records,
+                &mut systemd,
+                &mut say,
+            );
+        }
+        if matches!(openclaw, Some((false, _)))
+            && !matches!(
+                outcome,
+                Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
+            )
+        {
+            lamp_update::openclaw_install::after_round_off(
                 &config.root,
                 &records,
                 &mut systemd,
