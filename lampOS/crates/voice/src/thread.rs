@@ -1914,28 +1914,57 @@ impl Thread {
         most: usize,
         lineage: Option<u64>,
     ) -> Vec<Recent> {
-        let mut recent: Vec<Recent> = self
-            .exchanges
+        self.recent_of(
+            &self.recent_picks_for(scope, now, within, most, lineage),
+            false,
+        )
+    }
+
+    /// The indexes in the thread of the exchanges [`Self::recent_after_note`]
+    /// gives, newest first: what a turn's history tells as messages, so
+    /// its thread text can leave them out
+    /// ([`Self::recall_for_leaving_out`], `LAMP_HISTORY_SAID_ONCE`).
+    pub fn recent_picks_for(
+        &self,
+        scope: Option<&str>,
+        now: Instant,
+        within: Duration,
+        most: usize,
+        lineage: Option<u64>,
+    ) -> Vec<usize> {
+        self.exchanges
             .iter()
+            .enumerate()
             .rev()
-            .filter(|exchange| {
+            .filter(|(_, exchange)| {
                 exchange.whose.as_deref() == scope
                     && now.saturating_duration_since(exchange.at) <= within
                     && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
             })
             .take(most)
-            .filter(|exchange| !Self::in_note(exchange, lineage))
-            .map(|exchange| Recent {
-                written: exchange.written.clone(),
-                person: exchange.person.trim().to_owned(),
-                lamp: exchange.lamp.trim().to_owned(),
-                room: false,
-                cut: exchange.cut,
-                calls: exchange.kept_calls(),
+            .filter(|(_, exchange)| !Self::in_note(exchange, lineage))
+            .map(|(index, _)| index)
+            .collect()
+    }
+
+    /// The exchanges at `picks` (newest first), oldest first, each marked
+    /// as the room's when `room_marks` and it is the room's.
+    fn recent_of(&self, picks: &[usize], room_marks: bool) -> Vec<Recent> {
+        picks
+            .iter()
+            .rev()
+            .map(|&index| {
+                let exchange = &self.exchanges[index];
+                Recent {
+                    written: exchange.written.clone(),
+                    person: exchange.person.trim().to_owned(),
+                    lamp: exchange.lamp.trim().to_owned(),
+                    room: room_marks && exchange.whose.is_none(),
+                    cut: exchange.cut,
+                    calls: exchange.kept_calls(),
+                }
             })
-            .collect();
-        recent.reverse();
-        recent
+            .collect()
     }
 
     /// [`Self::recent_for`] `person` (a memory id), with the room's exchanges
@@ -1977,6 +2006,23 @@ impl Thread {
         most: usize,
         lineage: Option<u64>,
     ) -> Vec<Recent> {
+        self.recent_of(
+            &self.recent_picks_with_room_lines(person, now, within, most, lineage),
+            true,
+        )
+    }
+
+    /// The indexes in the thread of the exchanges
+    /// [`Self::recent_with_room_lines_after_note`] gives, newest first
+    /// ([`Self::recent_picks_for`]).
+    pub fn recent_picks_with_room_lines(
+        &self,
+        person: &str,
+        now: Instant,
+        within: Duration,
+        most: usize,
+        lineage: Option<u64>,
+    ) -> Vec<usize> {
         let mut later = now;
         let mut start = self.exchanges.len();
         for (index, exchange) in self.exchanges.iter().enumerate().rev() {
@@ -1993,8 +2039,7 @@ impl Thread {
         }
         let first_theirs = (start..self.exchanges.len())
             .find(|&index| self.exchanges[index].whose.as_deref() == Some(person));
-        let mut recent: Vec<Recent> = self
-            .exchanges
+        self.exchanges
             .iter()
             .enumerate()
             .rev()
@@ -2014,17 +2059,8 @@ impl Thread {
             .filter(|(_, exchange)| {
                 exchange.whose.as_deref() != Some(person) || !Self::in_note(exchange, lineage)
             })
-            .map(|(_, exchange)| Recent {
-                written: exchange.written.clone(),
-                person: exchange.person.trim().to_owned(),
-                lamp: exchange.lamp.trim().to_owned(),
-                room: exchange.whose.is_none(),
-                cut: exchange.cut,
-                calls: exchange.kept_calls(),
-            })
-            .collect();
-        recent.reverse();
-        recent
+            .map(|(index, _)| index)
+            .collect()
     }
 
     /// What to tell a new session, if anything was said lately, in at most
@@ -2052,6 +2088,25 @@ impl Thread {
         room: usize,
         lineage: Option<u64>,
     ) -> Option<String> {
+        self.recall_for_leaving_out(scope, now, room, lineage, &[])
+    }
+
+    /// [`Self::recall_after_note`] without the exchanges at `told_already`
+    /// (indexes in the thread, as [`Self::recent_picks_for`] gives them):
+    /// those a turn's history already tells as messages
+    /// (`LAMP_HISTORY_SAID_ONCE`, #6218), so each is said to the model
+    /// once. The note stays the one for the scope's newest exchange, told
+    /// or not: how long ago the talk was. None when nothing else is left.
+    /// With `told_already` empty, the same as [`Self::recall_after_note`],
+    /// byte for byte.
+    pub fn recall_for_leaving_out(
+        &self,
+        scope: Option<&str>,
+        now: Instant,
+        room: usize,
+        lineage: Option<u64>,
+        told_already: &[usize],
+    ) -> Option<String> {
         // An answer with no word in it ("...") is the model keeping quiet
         // aloud. Told back to it, it is what it does next. One cut before any
         // of it played (`unheard`) is told, for the person's words (the
@@ -2065,7 +2120,13 @@ impl Thread {
         let note = note(now.saturating_duration_since(newest.at));
         let mut kept: Vec<String> = Vec::new();
         let mut bytes = note.len();
-        for exchange in self.exchanges.iter().rev().filter(told) {
+        for (_, exchange) in self
+            .exchanges
+            .iter()
+            .enumerate()
+            .rev()
+            .filter(|(index, exchange)| told(exchange) && !told_already.contains(index))
+        {
             let mut lines = String::new();
             if !exchange.person.trim().is_empty() {
                 lines.push_str("Person: ");
@@ -4498,6 +4559,92 @@ mod tests {
                 .is_empty()
         );
         assert!(thread.recall_for(Some(&a), now, 4096).is_none());
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` (#6218): the recall leaves out the
+    /// exchanges the history picked, by their place in the thread; the
+    /// older ones stay, another scope's are never told, nothing left is
+    /// none, and nothing left out is the recall as before.
+    #[test]
+    fn recall_leaving_out_the_historys_exchanges_tells_the_rest_once() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        for n in 1..=4u64 {
+            thread.person(&format!("A asks {n}"), true, now);
+            thread.lamp_for(n, &format!("A told {n}"), now, Some(&a));
+            thread.person(&format!("B asks {n}"), true, now);
+            thread.lamp_for(10 + n, &format!("B told {n}"), now, Some(&b));
+        }
+        assert_eq!(
+            thread.recall_for_leaving_out(Some(&a), now, 4096, None, &[]),
+            thread.recall_for(Some(&a), now, 4096)
+        );
+        let picks = thread.recent_picks_for(Some(&a), now, REMEMBERED_FOR, 2, None);
+        let told = thread.recent_for(Some(&a), now, REMEMBERED_FOR, 2);
+        assert_eq!(picks.len(), 2);
+        assert_eq!(told[0].person, "A asks 3");
+        assert_eq!(told[1].person, "A asks 4");
+        let rest = thread
+            .recall_for_leaving_out(Some(&a), now, 4096, None, &picks)
+            .unwrap();
+        assert!(rest.starts_with(GOING_ON), "{rest}");
+        assert!(
+            rest.ends_with("Person: A asks 1\nYou: A told 1\nPerson: A asks 2\nYou: A told 2\n")
+        );
+        assert!(!rest.contains("A asks 3") && !rest.contains("A asks 4"));
+        assert!(!rest.contains("B "), "never another scope's");
+        let all = thread.recent_picks_for(Some(&a), now, REMEMBERED_FOR, 12, None);
+        assert!(
+            thread
+                .recall_for_leaving_out(Some(&a), now, 4096, None, &all)
+                .is_none()
+        );
+    }
+
+    /// `LAMP_HISTORY_AFTER_NOTE` and `LAMP_HISTORY_SAID_ONCE` together
+    /// (#6218): the folded exchanges leave the history's picks and the
+    /// thread text, the history's picks leave the thread text too, and
+    /// what is left is the scope's older, unfolded exchanges alone.
+    #[test]
+    fn recall_after_note_and_said_once_together_tells_neither_twice() {
+        let now = Instant::now();
+        let tom = Some("tom");
+        let mut thread = Thread::new();
+        for request in 1..=11u64 {
+            thread.person(&format!("Line number {request:02}"), true, now);
+            thread.lamp_for(request, &format!("Answer number {request:02}."), now, tom);
+        }
+        let due = thread.summary_due(crate::conversation_summary::KEEP_VERBATIM, now);
+        thread.folded(tom, &due[0].exchanges, 9);
+        // The history's newest two, none of them folded.
+        let picks = thread.recent_picks_for(tom, now, REMEMBERED_FOR, 2, Some(9));
+        let history = thread.recent_after_note(tom, now, REMEMBERED_FOR, 2, Some(9));
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].person, "Line number 10");
+        let told = thread
+            .recall_for_leaving_out(tom, now, usize::MAX, Some(9), &picks)
+            .unwrap();
+        assert!(told.starts_with(GOING_ON), "{told}");
+        for request in [1, 2, 3, 4, 5, 6, 7, 10, 11] {
+            assert!(!told.contains(&format!("number {request:02}")), "{told}");
+        }
+        assert!(
+            told.ends_with(
+                "Person: Line number 08\nYou: Answer number 08.\nPerson: Line number 09\nYou: Answer number 09.\n"
+            ),
+            "{told}"
+        );
+        // The folded among the history's places leave it, not the picks
+        // of another: all eleven asked, the newest four told, none twice.
+        let all = thread.recent_picks_for(tom, now, REMEMBERED_FOR, EXCHANGES, Some(9));
+        assert_eq!(all.len(), 4);
+        assert!(
+            thread
+                .recall_for_leaving_out(tom, now, usize::MAX, Some(9), &all)
+                .is_none()
+        );
     }
 
     /// The exchanges a route gives a model as messages: the person's only,
