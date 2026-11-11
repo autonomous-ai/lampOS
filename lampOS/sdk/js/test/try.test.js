@@ -179,6 +179,35 @@ test('on the network the camera picture is given only while a page says it is on
   assert.equal(status, 403);
 });
 
+test('the vendored three.js is served from a fixed list without the token, and nothing else under /vendor/ is', async (t) => {
+  const { port, token } = await started(t, (dir, stub) => ['--lan', '--stim-dir', dir, '--lamp-sim', stub]);
+  const base = `http://127.0.0.1:${port}`;
+  for (const path of ['/vendor/three/three.module.min.js', '/vendor/three/jsm/loaders/GLTFLoader.js', '/vendor/three/jsm/controls/OrbitControls.js', '/vendor/three/jsm/utils/BufferGeometryUtils.js']) {
+    const got = await fetch(`${base}${path}`);
+    assert.equal(got.status, 200, path);
+    assert.match(got.headers.get('content-type'), /^text\/javascript/, path);
+    assert.ok((await got.text()).length > 1000, path);
+  }
+  // The page's import map points at the same list, and the lamp's own files still need the token.
+  const page = await (await fetch(`${base}/?t=${token}`)).text();
+  assert.match(page, /"three": "\/vendor\/three\/three\.module\.min\.js"/);
+  assert.equal((await fetch(`${base}/try.json`)).status, 403);
+  // Not on the list: no token, no file; with the token, no such file (a file that is in the folder is not served).
+  for (const path of ['/vendor/three/README.md', '/vendor/three/jsm/', '/vendor/../server.js', '/vendor/three/%2e%2e/server.js', '/vendor/three/jsm/loaders/GLTFLoader.js/x']) {
+    assert.equal((await fetch(`${base}${path}`)).status, 403, path);
+    assert.equal((await fetch(`${base}${path}?t=${token}`)).status, 404, path);
+  }
+  // Only a read: no other method.
+  assert.equal((await fetch(`${base}/vendor/three/three.module.min.js`, { method: 'POST' })).status, 403);
+  // The Host check still comes first on the network.
+  const status = await new Promise((resolve, reject) => {
+    const asked = request({ host: '127.0.0.1', port, path: '/vendor/three/three.module.min.js', headers: { host: `evil.example:${port}` } }, (response) => { response.resume(); resolve(response.statusCode); });
+    asked.on('error', reject);
+    asked.end();
+  });
+  assert.equal(status, 403);
+});
+
 test('with --lan the twin listens on loopback and the printed address, never on every interface', async (t) => {
   if (!existsSync('/proc/net/tcp')) return t.skip('needs /proc/net/tcp (Linux)');
   const { port } = await started(t, () => ['--lan']);
