@@ -648,7 +648,7 @@ context after forgetting. None of these scenes has been run for task 29.
 
 ## Service records (`service_record`, the voice's `LAMP_SERVICE_RECORDS`)
 
-The voice's `LAMP_SERVICE_RECORDS` (off by default; the connector records
+The voice's `LAMP_SERVICE_RECORDS` (off by default, on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064; the connector records
 plan, PR 1a, 10 Nov) keeps one record for each thing a known person asked of
 a linked service, in `service_records(person, key, service, action, status,
 reason, detail, result_id, asked_unix_ms, changed_unix_ms, links,
@@ -699,7 +699,7 @@ operations, so the voice sends them only with its switch on.
 
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 
-The voice's `LAMP_SERVICE_CONTACTS` (off by default, beside
+The voice's `LAMP_SERVICE_CONTACTS` (off by default, on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, beside
 `LAMP_SERVICE_RECORDS`; the connector records plan, PR 1c) keeps the
 owner's mail contacts in `service_contacts(person, name_key, name, address,
 saved_unix_ms, changed_unix_ms)`, keyed `(person, name_key)`, `name_key`

@@ -602,17 +602,6 @@ Environment=LAMP_MEMORY_DOUBT_UNDOES=on
 # https://github.com/autonomous-ai/lampOS/pull/5503#issuecomment-6678298333). Each needs a lamp-memory from the
 # same build, which a product install ships. LAMP_MEMORY_NEWER_FIRST stays off: with REPLACES and KEEP_QUIETLY on,
 # a played correction is either replaced or kept alone, so its earlier:true is not reachable as played.
-# LAMP_SERVICE_RECORDS stays off (connector records, PR 1a): each linked-service ask kept in memory with its status,
-# until its lamp check on lamp-06c1 (create, cancel, ask; restart; forget about it; time to first audio) passes.
-# LAMP_SERVICE_RECORDS_TOLD stays off too (PR 1b): the owner's turns told their recent records, recall searching them,
-# acting only with LAMP_SERVICE_RECORDS; until its lamp check on lamp-06c1 (create an event, cancel it, "what happened
-# with the party?"; restart lamp-voice, ask again; time to first audio) passes and its rule is measured on the real model.
-# LAMP_SERVICE_CONTACTS stays off (connector records, PR 1c; acts only with LAMP_SERVICE_RECORDS on): mail addresses
-# from confirmed read-backs saved as contacts, until its lamp check on lamp-06c1 (spell an address and confirm it; later
-# "mail Octavia" with no spelling; "forget Octavia's address") passes.
-# LAMP_SERVICE_REDO stays off too (connector records, PR 1d): a write redone from its record ("do it again at 8 PM"),
-# acting only beside LAMP_SERVICE_RECORDS, until its lamp check on lamp-06c1 (create, cancel, redo at 8 PM, confirm,
-# the calendar read) passes.
 Environment=LAMP_MEMORY_STRENGTH=on
 Environment=LAMP_MEMORY_PROFILE=on
 # The nightly pass (extraction plan C, step B; docs/memory.md, "The nightly pass"): 03:00 to 06:00 local, after
@@ -629,6 +618,13 @@ Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on
 # whose. Private-room mode above does not hold names back; outside that mode a held-back name suppresses this note.
 # Second route and Days only; needs same-build lamp-memory (role_set_session, role_end_session), which a product install ships.
 Environment=LAMP_MEMORY_ROLE=on
+# Connector records (PRs 1a to 1d, docs/services.md): each linked-service ask kept in memory with its status, told
+# to the owner's turns, redone from its record, and confirmed mail addresses kept as contacts. On: the owner's call
+# of 11 Nov, on the lamp-06c1 row https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064 (its two forget gaps follow later). Needs same-build lamp-memory.
+Environment=LAMP_SERVICE_RECORDS=on
+Environment=LAMP_SERVICE_RECORDS_TOLD=on
+Environment=LAMP_SERVICE_CONTACTS=on
+Environment=LAMP_SERVICE_REDO=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
