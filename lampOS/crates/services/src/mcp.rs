@@ -19,7 +19,11 @@ use crate::net::{self, Call, Http, Reply};
 use crate::reads;
 use crate::store::Entry;
 use serde_json::{Map, Value, json};
-use std::{fmt, time::Duration};
+use std::{
+    fmt,
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 /// The MCP revision the lamp asks for.
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
@@ -293,6 +297,17 @@ pub struct Endpoint {
     pub url: String,
     header: (String, String),
     secrets: Vec<String>,
+    /// Set when the service refused the link itself: a 401, or its words
+    /// for a dead token ([`DEAD_TOKEN`]). Never on a 403.
+    refused: AtomicBool,
+}
+
+/// An MCP service's or Slack's own words for a token it no longer takes.
+pub const DEAD_TOKEN: &[&str] = &["invalid_auth", "token_expired", "token_revoked"];
+
+/// Whether `text` says the token is dead, in [`DEAD_TOKEN`]'s words.
+pub fn says_dead_token(text: &str) -> bool {
+    DEAD_TOKEN.iter().any(|word| text.contains(word))
 }
 
 impl fmt::Debug for Endpoint {
@@ -322,7 +337,17 @@ impl Endpoint {
                 .filter(|secret| !secret.is_empty())
                 .cloned()
                 .collect(),
+            refused: AtomicBool::new(false),
         })
+    }
+
+    /// Whether the service refused the link itself in a call through here.
+    pub fn refused(&self) -> bool {
+        self.refused.load(Ordering::Relaxed)
+    }
+
+    fn mark_refused(&self) {
+        self.refused.store(true, Ordering::Relaxed);
     }
 
     /// `text` with every secret of the link taken out.
@@ -477,9 +502,14 @@ impl<'a, H: Http> Client<'a, H> {
             300..=399 => Err(format!(
                 "{name} answered with a redirect, which the lamp doesn't follow"
             )),
-            401 | 403 => Err(format!(
-                "{name} refused the lamp's link: it may need linking again in the app"
-            )),
+            401 | 403 => {
+                if reply.status == 401 {
+                    endpoint.mark_refused();
+                }
+                Err(format!(
+                    "{name} refused the lamp's link: it may need linking again in the app"
+                ))
+            }
             404 if self.session.is_some() => Err(format!("{name} ended the session: try again")),
             429 => Err(format!("{name} is busy: try again in a while")),
             _ => Err(format!("{name} answered with an error")),
@@ -508,6 +538,9 @@ impl<'a, H: Http> Client<'a, H> {
             .ok_or_else(|| format!("{name}'s answer had no reply to the lamp's call"))?;
         if let Some(error) = message.get("error") {
             let said = error.get("message").and_then(Value::as_str).unwrap_or("");
+            if says_dead_token(&error.to_string()) {
+                self.endpoint.mark_refused();
+            }
             return Err(format!(
                 "{name} refused the call (its words, quoted: \"{}\")",
                 self.endpoint.scrub(&mail::tidy(said, 200))
@@ -558,9 +591,17 @@ impl<'a, H: Http> Client<'a, H> {
     }
 
     /// Call one tool; its result.
+    /// A tool's error that says the token is dead marks the link refused.
     pub async fn call(&mut self, tool: &str, arguments: &Value) -> Result<Value, String> {
-        self.request("tools/call", json!({"name": tool, "arguments": arguments}))
-            .await
+        let result = self
+            .request("tools/call", json!({"name": tool, "arguments": arguments}))
+            .await?;
+        if result.get("isError").and_then(Value::as_bool) == Some(true)
+            && says_dead_token(&result.to_string())
+        {
+            self.endpoint.mark_refused();
+        }
+        Ok(result)
     }
 }
 
@@ -868,6 +909,8 @@ pub(crate) mod fake {
         pub sse: bool,
         /// The text a call's answer carries, beside its echo.
         pub said: String,
+        /// An error every `tools/list` answers with, when set.
+        pub refusal: Mutex<Option<Value>>,
     }
 
     impl FakeMcp {
@@ -919,6 +962,16 @@ pub(crate) mod fake {
                     return Ok(Reply {
                         status: 202,
                         ..Reply::default()
+                    });
+                }
+                "tools/list" if self.refusal.lock().unwrap().is_some() => {
+                    let error = self.refusal.lock().unwrap().clone();
+                    return Ok(Reply {
+                        status: 200,
+                        body: json!({"jsonrpc":"2.0","id":message["id"],"error":error})
+                            .to_string()
+                            .into_bytes(),
+                        headers: vec![("content-type".into(), "application/json".into())],
                     });
                 }
                 "tools/list" => json!({"tools": tools()}),

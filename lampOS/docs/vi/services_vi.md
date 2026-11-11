@@ -251,10 +251,11 @@ trọn (bên cạnh dưới tên `.<code>.json.new`, sync, đổi tên đè lên
 sync). Một code không bao giờ là một đường dẫn: chỉ một code trong danh mục
 mới đặt tên cho một file. File là `ConnectorCreds` của V1: `connector`,
 `auth_type`, `access_token`, `refresh_token`, `token_type`, `expires_at` (0
-cho thông tin xác thực không bao giờ hết hạn), `api_key`, `scopes`,
+cho thông tin xác thực không bao giờ hết hạn theo thời gian), `api_key`, `scopes`,
 `user_email`, `client_id`, `credentials` (`email` của Gmail, `page_id` của
 một Page, `mcp_url` và `mcp_auth_header` của một dịch vụ MCP), `refresh` và
-`obtained_at`. `Debug` của nó hiện `<hidden>` cho mỗi bí mật và chỉ tên của
+`obtained_at`, cùng `link_id` và `refused` của riêng đèn (dịch vụ đã từ chối
+một liên kết không có hạn theo thời gian: [Làm mới](#làm-mới)). `Debug` của nó hiện `<hidden>` cho mỗi bí mật và chỉ tên của
 `credentials`; không lời từ chối nào nêu một giá trị. Một thông tin xác thực
 dài hơn 8,192 byte, hoặc có một ký tự điều khiển (một dấu xuống dòng có thể
 tách một header), bị từ chối ở `set`.
@@ -286,8 +287,8 @@ Bị xoá khi:
   the services' tokens").
 
 `list` và `services_connected` cho biết code của một dịch vụ, tài khoản của
-nó và `expired` (hết hạn mà không có refresh token, nên cần liên kết lại),
-không bao giờ một bí mật.
+nó và `expired` (hết hạn mà không có refresh token, hoặc bị chính dịch vụ
+từ chối, nên cần liên kết lại), không bao giờ một bí mật.
 
 ## Các dịch vụ
 
@@ -346,9 +347,13 @@ của V1 đặt tên; cả hai đều được nhận biết. Facebook được 
 `MQTTConnectorSetData` của V1): `auth_type` là bắt buộc, cùng một
 `access_token` hoặc một `api_key`. Token được gửi dưới dạng
 `Authorization: Bearer`, nhưng của Figma với `auth_type: "pat"` thì dưới dạng
-`X-Figma-Token`. Một liên kết OAuth (`expires_in` hoặc `expires_at`, nếu
-không có: một giờ kể từ bây giờ) có thể mang một `refresh_token` và
-`refresh: true`; một khoá tĩnh (`pat`, hoặc một `api_key` không có access
+`X-Figma-Token`. Một liên kết OAuth (`expires_in` hoặc `expires_at`) có thể
+mang một `refresh_token` và `refresh: true`. Không được cho thời hạn, liên
+kết có cả hai được cho một giờ kể từ bây giờ, để được gia hạn trước lúc đó;
+liên kết không có chúng thì không giữ hạn đoán nào (`expires_at` 0) và được
+dùng cho đến khi dịch vụ của nó từ chối ([Làm mới](#làm-mới)): token của một
+GitHub OAuth App hay một token Slack không xoay vòng không bao giờ hết hạn ở
+dịch vụ. Một khoá tĩnh (`pat`, hoặc một `api_key` không có access
 token) không cho thời hạn thì không bao giờ hết hạn. Mật khẩu ứng dụng Gmail
 cần email của tài khoản (của một đăng nhập Google thì được đọc từ Gmail ở
 `set` khi liên kết không có; của một liên kết `gmail-app` thì phải có sẵn
@@ -2089,7 +2094,35 @@ hồi khác giữ nguyên liên kết. Một liên kết quá hạn bị từ ch
 <Service> has expired: link it again in the app". Journal ghi lý do một liên
 kết không được làm mới ("<code>'s link not renewed: …", kèm status của
 backend, hoặc "has expired and it has no refresh token" / "it is not marked to
-be renewed"), không bao giờ ghi token hay câu trả lời.
+be renewed" / "its service refused it"), không bao giờ ghi token hay câu trả
+lời.
+
+Một liên kết OAuth không được cho thời hạn và không có refresh token với
+`refresh: true` thì không có hạn theo thời gian (`expires_at` 0,
+`store::expires_at`): không gì gia hạn được nó, và một giờ đoán chỉ làm kết
+thúc một token vẫn còn dùng được ở dịch vụ (người thử phải liên kết lại Slack
+và GitHub mỗi ngày). Nó được dùng cho đến khi chính dịch vụ từ chối: một 401
+cho một lần gọi HTTP (kể cả "Bad credentials" của GitHub, nhưng không phải
+một 401 có body nói scope quá ít), hoặc một 401 của dịch vụ MCP hay lời của
+nó cho một token chết (`invalid_auth`, `token_expired`, `token_revoked`,
+trong một lỗi JSON-RPC hoặc lỗi của một tool; `mcp::DEAD_TOKEN`). Lần gọi đó
+được trả lời như trước ("<Service> refused the lamp's link: it may need
+linking again in the app"), và file của liên kết giữ `refused: true`
+(`serve::mark_refused`; journal ghi "<code> refused its link: kept as
+expired until it is linked again"): `list` và `services_connected` hiện nó
+`expired: true`, và lần gọi kế tiếp được bảo "the link to <Service> has
+expired: link it again in the app" mà không hỏi dịch vụ. Một 403, một lời từ
+chối scope hay mọi lỗi khác không đánh dấu gì. Liên kết lại trong ứng dụng
+ghi một mục mới, dấu bị xoá. Một liên kết được cho thời hạn, một liên kết
+được gia hạn qua backend và một khoá tĩnh vẫn như trước: lời từ chối không
+đánh dấu chúng.
+
+Một dịch vụ có token ngắn hạn (Slack có xoay vòng token, user token của một
+GitHub App, OAuth của Notion và các máy chủ MCP khác) chỉ giữ được liên kết
+nếu backend gửi `refresh_token` của nó với `refresh: true` và thời hạn, và
+`POST <base>/connector/refresh-token` nhận code của connector đó: không có
+chúng thì token của nó hết hạn ở dịch vụ, dịch vụ từ chối, và nó hiện là hết
+hạn.
 
 ## Các kind của ứng dụng
 
