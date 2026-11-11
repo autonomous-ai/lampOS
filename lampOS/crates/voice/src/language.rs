@@ -396,6 +396,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "미안해요, 하려던 말을 놓쳤어요. 다시 한 번 물어봐 주세요.",
         ],
     ),
+    // What it says when the round asked past the round cap, with no
+    // function, has no words either (#5826).
+    (
+        crate::second_provider::UNFINISHED_LINE,
+        [
+            "Xin lỗi, mình chưa làm xong việc đó. Bạn hỏi lại mình được không?",
+            "ごめんね、最後までできなかった。もう一度聞いてくれる？",
+            "抱歉，我没能完成。你能再问我一次吗？",
+            "미안해요, 끝까지 하지 못했어요. 다시 한 번 물어봐 주세요.",
+        ],
+    ),
     // What it says when an answer to its own question gets no words
     // (`LAMP_ANSWER_ASK_AGAIN`, off in the product; Queue #4710, item 3).
     (
@@ -911,7 +922,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 36);
+        assert_eq!(FIXED_LINES.len(), 37);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }

@@ -273,6 +273,33 @@ fn zone_here() -> Option<String> {
     lamp_local_time::LocalTime::zone("system").ok()?.name()
 }
 
+/// How a mail is found when a read of one mail (`message`, `attachment`)
+/// came with no id, or one no list gave: told with the refusal, so the
+/// model's next call is a valid one (#5826: on build 11830, 11 Nov, "find
+/// my email with the number … and tell me what its attachment says" was
+/// refused twice in 2 ms, then searched, and the four rounds ran out).
+pub const MAIL_FOUND_BY_SEARCH: &str = "To find a mail by its words or a number in it, call service_read with what search and those words as query first, then this read with the id of the mail the search gave. Never ask the person for an id.";
+
+/// The id a Gmail `message` or `attachment` read names: one a list gave,
+/// over IMAP a UID (the inbox's, All Mail's or Drafts'), Gmail's own id
+/// with a Google sign-in. Refused with [`MAIL_FOUND_BY_SEARCH`].
+fn mail_id<'a>(args: &'a Value, what: &str, entry: &Entry) -> Result<&'a str, String> {
+    let id = text(args, "id").ok_or_else(|| {
+        format!("{what} needs id, the id a search or a list gave. {MAIL_FOUND_BY_SEARCH}")
+    })?;
+    let fits = if entry.oauth() {
+        mail::api_id_ok(id)
+    } else {
+        mail::imap_id_ok(id)
+    };
+    if !fits {
+        return Err(format!(
+            "a mail's id is the one a list gave. {MAIL_FOUND_BY_SEARCH}"
+        ));
+    }
+    Ok(id)
+}
+
 /// How `what` is read from `code`, for `entry`'s account, at `now`.
 pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, String> {
     let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
@@ -296,30 +323,11 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
             // Over IMAP a UID, the inbox's, All Mail's (`all41`, from a
             // search) or Drafts' (`draft12`); Gmail's own id with a Google
             // sign-in.
-            "message" => {
-                let id = needed(args, "id", what)?;
-                let fits = if entry.oauth() {
-                    mail::api_id_ok(id)
-                } else {
-                    mail::imap_id_ok(id)
-                };
-                if !fits {
-                    return Err("a mail's id is the one a list gave".into());
-                }
-                MailAsk::Message(id.to_owned())
-            }
+            "message" => MailAsk::Message(mail_id(args, what, entry)?.to_owned()),
             // One attachment's text, by the mail's id and its name or
             // place in the list `message` gave; none named, its only one.
             "attachment" => {
-                let id = needed(args, "id", what)?;
-                let fits = if entry.oauth() {
-                    mail::api_id_ok(id)
-                } else {
-                    mail::imap_id_ok(id)
-                };
-                if !fits {
-                    return Err("a mail's id is the one a list gave".into());
-                }
+                let id = mail_id(args, what, entry)?;
                 let pick = match (text(args, "name"), args.get("index")) {
                     (Some(_), _) => Pick::Name(words(args, "name", what)?.to_owned()),
                     (None, Some(index)) => Pick::Index(

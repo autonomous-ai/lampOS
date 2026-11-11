@@ -2541,6 +2541,16 @@ order is kept. A written turn is the same from the chat on.
   ([memory.md](memory.md), the correction's journal).
 
 - Up to four chat requests in a turn, tool rounds included (`MAX_ROUNDS`).
+  A turn whose four rounds all ended in calls (words beside them are only
+  "Let me check."-style, never what was found) is asked once more, declaring
+  no function and told `WORDS_AFTER_CAP_NOTE`: say what the calls found, or
+  plainly that it couldn't find or do it. A call in that round is never
+  run; with no words in it either, the lamp says `UNFINISHED_LINE` ("Sorry,
+  I couldn't finish that. Could you ask me again?", in the owner's
+  language). A round with its own words and no call ends the turn as
+  before, so no round is added to it (#5826: on build 11830 a mail read four
+  times said only "I'll check your mail."). Journal: "its 4 chat rounds all
+  ended in calls; asked once more with no function, for its words".
 - A call to `not_for_me` ends the turn silently, before the unfinished last
   words are said.
 - A due reminder is deferred (`ReminderDeferral::Disabled`): this route
