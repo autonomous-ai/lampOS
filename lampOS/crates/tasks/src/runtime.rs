@@ -7,8 +7,8 @@ use crate::{
     follow::{CliWatch, Follows, WatchLane},
     harness::{
         AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
-        LaunchOutcome, Listed, MOST_WAITED, Observation, SessionMachines, SignIn, Target,
-        this_computer,
+        LaunchOutcome, Listed, MOST_WAITED, Observation, SessionMachines, SessionSeen, SignIn,
+        Target, this_computer,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
@@ -556,6 +556,40 @@ impl WaitLane for Cli {
     }
 }
 
+/// Looks at a session the person named (#6274, [`Cli::look_session`]),
+/// beside the adapter's one lane: a look lists sessions for seconds, and
+/// never waits behind a hand-over or holds one up.
+pub trait SessionLane: Send + Sync + 'static {
+    /// How the session the person named on `target`'s computer stands;
+    /// with `join`, open to them (one stopped reopened under the resume
+    /// switch). `Err` with why not, never a guess.
+    fn look_session(
+        &self,
+        target: &Target,
+        session: &str,
+        join: bool,
+    ) -> Result<SessionSeen, String>;
+}
+impl SessionLane for Cli {
+    fn look_session(
+        &self,
+        target: &Target,
+        session: &str,
+        join: bool,
+    ) -> Result<SessionSeen, String> {
+        Cli::look_session(self, target, session, join)
+    }
+}
+
+/// No Harness behind the part (`serve --set-up-later`): every look is
+/// `no_harness`, as every hand-over is.
+struct NoSessions;
+impl SessionLane for NoSessions {
+    fn look_session(&self, _: &Target, _: &str, _: bool) -> Result<SessionSeen, String> {
+        Err("no_harness".into())
+    }
+}
+
 pub trait Adapter: Send + 'static {
     fn launch(&self, launch: &Launch) -> LaunchOutcome;
     /// The lamp's OpenClaw Gateway (#6226), started before an OpenClaw
@@ -583,6 +617,12 @@ pub trait Adapter: Send + 'static {
     /// A lane for `machines engines`, apart from this adapter's own
     /// (`serve --engines-from-machines`); none when it has no such thing.
     fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
+        None
+    }
+    /// A lane for looks at a named session (#6274), apart from this
+    /// adapter's own; none when the adapter has no such thing, and then a
+    /// look is refused `unsupported`.
+    fn session_lane(&self) -> Option<Arc<dyn SessionLane>> {
         None
     }
     /// Close a harness this lamp started, its result told (#1390). An
@@ -682,6 +722,15 @@ impl Adapter for Cli {
             }
         }
     }
+    fn session_lane(&self) -> Option<Arc<dyn SessionLane>> {
+        match Cli::session_lane(self) {
+            Ok(lane) => Some(Arc::new(lane)),
+            Err(error) => {
+                eprintln!("tasks: no lane for looks at a named session: {error}");
+                None
+            }
+        }
+    }
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
         Cli::launch(self, launch)
     }
@@ -767,6 +816,12 @@ impl Adapter for Production {
         match self {
             Self::Cli(cli) => Adapter::openclaw_gateway(&**cli),
             Self::Absent => None,
+        }
+    }
+    fn session_lane(&self) -> Option<Arc<dyn SessionLane>> {
+        match self {
+            Self::Cli(cli) => Adapter::session_lane(&**cli),
+            Self::Absent => Some(Arc::new(NoSessions)),
         }
     }
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
@@ -1176,7 +1231,111 @@ type Switches = (
     Option<Arc<dyn EnginesLane>>,
     // Harness's daemon to be started again once ([`Adapter::restart_wanted`]).
     bool,
+    // The lane for looks at a named session (#6274).
+    Option<Arc<dyn SessionLane>>,
 );
+
+/// The most looks at a named session kept at once (#6274, [`Looks`]): the
+/// voice makes one at a time, and polls it.
+const MOST_LOOKS: usize = 4;
+
+/// How long a look's answer is kept for the voice to read (#6274): longer
+/// than [`crate::harness::LOOK_BOUND`] and the voice's wait after it.
+const LOOK_KEPT: Duration = Duration::from_secs(60);
+
+/// A look's answer once its thread has one.
+type LookSlot = Arc<Mutex<Option<Result<SessionSeen, String>>>>;
+
+/// Looks at a named session (#6274, `{"op":"session"}` on the voice's
+/// route): a request answers at once, as every request must within its
+/// 1.1 s, while the look itself lists the person's sessions for seconds on
+/// a thread of its own ([`SessionLane`]). The voice asks again with the
+/// same `look` until it is `done`. At most [`MOST_LOOKS`], each kept
+/// [`LOOK_KEPT`].
+struct Looks {
+    lane: Option<Arc<dyn SessionLane>>,
+    kept: Vec<(String, Instant, LookSlot)>,
+}
+
+impl Looks {
+    fn new(lane: Option<Arc<dyn SessionLane>>) -> Self {
+        Self {
+            lane,
+            kept: Vec::new(),
+        }
+    }
+
+    /// The look `look`: begun on its first ask for `target` (`None`: no
+    /// such target), and how it stands on each after.
+    fn ask(
+        &mut self,
+        look: &str,
+        target: Option<&Target>,
+        session: &str,
+        join: bool,
+    ) -> Result<Value, EngineError> {
+        let refused = |code, message| Err(EngineError { code, message });
+        if look.is_empty()
+            || look.len() > 96
+            || !look
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        {
+            return refused(
+                "bad_request",
+                "A look needs an id of letters, digits, - and _.",
+            );
+        }
+        self.kept.retain(|(_, at, _)| at.elapsed() < LOOK_KEPT);
+        if let Some((_, _, slot)) = self.kept.iter().find(|(id, ..)| id == look) {
+            let answer = slot.lock().ok().and_then(|answer| answer.clone());
+            return Ok(match answer {
+                None => json!({"look":look,"done":false}),
+                Some(Ok(found)) => json!({"look":look,"done":true,"found":found}),
+                Some(Err(code)) => json!({"look":look,"done":true,"code":code}),
+            });
+        }
+        let Some(lane) = self.lane.clone() else {
+            return refused("unsupported", "This part has no looks at a named session.");
+        };
+        let Some(target) = target.cloned() else {
+            return refused("target", "No task target has that alias.");
+        };
+        if self.kept.len() >= MOST_LOOKS {
+            let finished = self
+                .kept
+                .iter()
+                .position(|(_, _, slot)| slot.lock().ok().is_some_and(|answer| answer.is_some()));
+            match finished {
+                Some(at) => {
+                    self.kept.remove(at);
+                }
+                None => {
+                    return refused(
+                        "busy",
+                        "Too many looks are under way; this one did not start.",
+                    );
+                }
+            }
+        }
+        let slot: LookSlot = Arc::new(Mutex::new(None));
+        let filled = slot.clone();
+        let session = session.to_owned();
+        let begun = thread::Builder::new()
+            .name("tasks-session-look".into())
+            .spawn(move || {
+                let found = lane.look_session(&target, &session, join);
+                if let Ok(mut answer) = filled.lock() {
+                    *answer = Some(found);
+                }
+            });
+        if begun.is_err() {
+            return refused("busy", "The look could not start.");
+        }
+        self.kept.push((look.to_owned(), Instant::now(), slot));
+        Ok(json!({"look":look,"done":false}))
+    }
+}
 
 fn owner<C: Clock>(
     mut engine: Engine<Store>,
@@ -1197,8 +1356,10 @@ fn owner<C: Clock>(
         daemon_retry_after,
         engines_lane,
         mut restart_due,
+        session_lane,
     ): Switches,
 ) -> io::Result<()> {
+    let mut looks = Looks::new(session_lane);
     let mut requests = 0u64;
     let mut busy = false;
     // Declared before `waits`, so dropped after it, but still before the
@@ -1678,6 +1839,27 @@ fn owner<C: Clock>(
                 {
                     record.refresh(&engine.recent(&clock.sample()?), tracker, unix_ms());
                     let answer = engine.identified(record.body(unix_ms()));
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
+                } else if let Request::Session {
+                    look,
+                    target,
+                    session,
+                    join,
+                } = &work.request
+                {
+                    // On the voice's route only: a look may reopen a
+                    // session of the person's (#6274).
+                    let answer = if work.route == Route::Voice {
+                        looks
+                            .ask(look, engine.targets().get(target), session, *join)
+                            .and_then(|body| engine.identified(body))
+                    } else {
+                        Err(EngineError {
+                            code: "untrusted",
+                            message: "This operation requires the trusted Voice route.",
+                        })
+                    };
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                 } else {
@@ -3674,6 +3856,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     } else {
         None
     };
+    let session_lane = adapter.session_lane();
     let current = Arc::new(Mutex::new(Report {
         updated: Instant::now(),
         summary: engine.summary(),
@@ -3784,6 +3967,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     daemon_retry_after,
                     engines_lane,
                     restart_wanted,
+                    session_lane,
                 ),
             )
         })?;
