@@ -1396,6 +1396,15 @@ impl Says {
         started.or_else(|| Self::from_environment(recordings))
     }
 
+    /// The own asks of the service bound at start, while it is parked:
+    /// for a part that starts before the first run, the app-make socket
+    /// (a tester's lamp, 11 Nov: it waited 70 minutes on an unreadable
+    /// privacy switch). They go to the same queue each run takes, and
+    /// during a wait each is refused at once, as a client's is.
+    pub fn parked_asks() -> Option<OwnAsks> {
+        parked().as_ref().map(Self::own_asks)
+    }
+
     /// While no run holds the service (the privacy wait): each ask is
     /// refused at once with `why`. Nothing is said while the microphones
     /// are closed, as before.
@@ -4853,6 +4862,18 @@ mod tests {
         };
         let refused = format!("{}\n", Outcome::Refused("the lamp is muted".into()).line());
         assert_eq!(during_wait(&path), refused);
+        // Its own asks, taken before any run (the app-make socket's): one
+        // asked during the wait is refused at once, never said.
+        let own = Says::parked_asks().expect("the service bound at start");
+        let answered = own.text("app-make", "Done.", NORMAL_PRIORITY, 60_000);
+        let told = loop {
+            Says::refuse_parked("the lamp is muted");
+            match answered.try_recv() {
+                Ok(Answer::Done(outcome)) => break outcome,
+                _ => thread::sleep(Duration::from_millis(2)),
+            }
+        };
+        assert_eq!(told, Outcome::Refused("the lamp is muted".into()));
         // A run takes it, and hands it back as it ends: the next wait
         // answers on the same socket.
         let run = Says::for_run(Recordings::none()).expect("the service bound at start");
@@ -4862,6 +4883,7 @@ mod tests {
         assert_eq!(during_wait(&path), refused);
         Says::stop();
         assert!(!path.exists());
+        assert!(Says::parked_asks().is_none());
         let _ = fs::remove_dir(&dir);
     }
 
