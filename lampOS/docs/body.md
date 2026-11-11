@@ -1850,7 +1850,9 @@ report counts. It is held to what the generator promises the clips:
   gesture (a lamp whose `--reach` roll is 1 does not tilt for a gesture, but
   does for an app's move) follow it. A head or base joint whose servo stores the whole turn
   (`0..=4095`, never calibrated) has no range to take 90% of: it keeps today's reach, and
-  its pitch floor is left alone. The head's pitch floor follows the servo's own limit
+  its pitch floor is left alone. On such a lamp (lamp-sim's servos today) the switch lifts the door's pre-check but not the body's reach: a move past today's caps
+  is no longer refused `bad_request` at the door, it is taken and then dropped by the body (`done`
+  `dropped`, "past this lamp's reach"), which the SDK sees as a `done`, not an error. The head's pitch floor follows the servo's own limit
   less a margin everywhere in the run, so with the switch on the lamp's own look and idle
   may take the head that low too, not only an app's move. The lamp's own life (but for that
   pitch floor), the anti-tip rule
