@@ -243,6 +243,15 @@ jobs:
               no_arch=" ".join(no_arch) or "none")
           PY
 
+      # lamp-update's tests build alsa-sys, which needs ALSA's headers and
+      # pkg-config: the same packages the clippy job installs.
+      - name: Build packages for lamp-update's tests
+        if: steps.pin.outputs.changed == 'true'
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev
+
       - name: lamp-update's harness_install tests
         if: steps.pin.outputs.changed == 'true'
         working-directory: lampOS
