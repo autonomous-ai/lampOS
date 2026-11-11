@@ -38,6 +38,17 @@ pub struct Build {
     pub commit: String,
 }
 
+/// Cut-shorts in a row of the same build that refuse it (#6266).
+pub const CUT_SHORTS_REFUSE: u32 = 3;
+
+/// A build whose switches were cut short in a row, and how often.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CutShort {
+    pub sequence: u64,
+    pub commit: String,
+    pub times: u32,
+}
+
 /// A build that was switched to and put back.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Refusal {
@@ -79,6 +90,12 @@ pub struct State {
     pub models: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub models_before: BTreeMap<String, String>,
+    /// The build whose switches were cut short in a row, and how often
+    /// (#6266). A cut-short says nothing of the build, so it is tried again;
+    /// only `CUT_SHORTS_REFUSE` in a row refuse it. A finished switch or a
+    /// different build starts it again. Absent from a state written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cut_short: Option<CutShort>,
     /// Fields a later build wrote that this one does not know: kept as
     /// they were across a save, for that build to read again (#1505).
     #[serde(flatten)]
@@ -90,6 +107,23 @@ impl State {
         self.refused
             .iter()
             .find(|refusal| refusal.sequence == sequence)
+    }
+
+    /// One more cut-short of `build` counted: one, unless the last were of
+    /// the same build. How many in a row now.
+    pub fn count_cut_short(&mut self, build: &Build) -> u32 {
+        let times = match &self.cut_short {
+            Some(cut) if cut.sequence == build.sequence && cut.commit == build.commit => {
+                cut.times.saturating_add(1)
+            }
+            _ => 1,
+        };
+        self.cut_short = Some(CutShort {
+            sequence: build.sequence,
+            commit: build.commit.clone(),
+            times,
+        });
+        times
     }
 
     pub fn refuse(&mut self, build: &Build, why: &str) {
@@ -170,6 +204,13 @@ pub struct Journal {
     /// before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<SkillBack>,
+    /// Why the build was being put back, when a put-back for a fault of the
+    /// build (a part not well, a failed watch) could not put every file back
+    /// and left the journal (#6266). Its recovery refuses the build for this
+    /// reason; a journal without it was cut short, which refuses nothing
+    /// until the third in a row. Absent from a journal written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refusing: Option<String>,
 }
 
 impl Journal {
@@ -422,6 +463,29 @@ impl Records {
         write_whole(&self.folder.join("journal.json"), &bytes, 0o600)
     }
 
+    /// The journal of a switch, if any, marked with why its build is being
+    /// put back ([`Journal::refusing`]). Only that member is added: every
+    /// other one, a later build's included, is kept as it was.
+    pub fn mark_journal_refusing(&self, why: &str) -> io::Result<()> {
+        let path = self.folder.join("journal.json");
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error),
+        };
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+        let Some(members) = value.as_object_mut() else {
+            return Err(io::Error::other("the journal is not an object"));
+        };
+        if members.get("refusing").and_then(serde_json::Value::as_str) == Some(why) {
+            return Ok(());
+        }
+        members.insert("refusing".into(), serde_json::Value::from(why));
+        let bytes = serde_json::to_vec_pretty(&value).map_err(io::Error::other)?;
+        write_whole(&path, &bytes, 0o600)
+    }
+
     pub fn clear_journal(&self) -> io::Result<()> {
         match fs::remove_file(self.folder.join("journal.json")) {
             Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
@@ -648,6 +712,7 @@ mod tests {
             }],
             models: Vec::new(),
             settings: false,
+            refusing: None,
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));
@@ -771,6 +836,7 @@ mod tests {
                 "e".repeat(64),
             )]
             .into(),
+            cut_short: None,
             later: Default::default(),
         };
         let journal = Journal {
@@ -800,6 +866,7 @@ mod tests {
                 wrote: "9".repeat(64),
                 made: Vec::new(),
             }],
+            refusing: None,
         };
         (state, journal)
     }
