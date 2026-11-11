@@ -53,6 +53,8 @@ mod models_file;
 #[path = "round/asleep_quiet.rs"]
 mod asleep_quiet;
 
+#[path = "round/cut_short.rs"]
+mod cut_short;
 #[path = "round/product_adds.rs"]
 mod product_adds;
 #[path = "round/product_carrier.rs"]
@@ -1807,9 +1809,11 @@ fn a_switch_cut_short_is_put_back_at_the_next_start() {
     );
     assert_eq!(lamp.calls(), ["reload", "restart lamp-voice.service"]);
     assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
-    // Build 2 is not taken again once published.
+    // A cut-short says nothing of build 2: it is not refused, and taken
+    // once published (#6266).
+    assert!(lamp.state()["refused"].as_array().is_none_or(Vec::is_empty));
     build_two(&mut lamp);
-    assert!(matches!(lamp.round(), Outcome::Refused(why) if why.contains("was put back")));
+    assert_eq!(lamp.round(), Outcome::Switched(2));
 }
 
 /// Tests' P3 on #4431: a cut just after the round stopped the voice first
