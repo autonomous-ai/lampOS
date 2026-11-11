@@ -2206,6 +2206,18 @@ pub fn serve(
         let (declared, searched) = (declared.clone(), searched.clone());
         move || chat_tools(&declared, &searched, false)
     });
+    // Functions offered only while they apply (#6218, off unless set).
+    let they_apply = std::env::var(WHILE_THEY_APPLY_ENVIRONMENT).ok().as_deref() == Some("on");
+    if they_apply {
+        eprintln!(
+            "lamp-voice second: setup's step is offered only while the walk is under way ({WHILE_THEY_APPLY_ENVIRONMENT})"
+        );
+    }
+    let declare = if they_apply {
+        while_they_apply(declare)
+    } else {
+        declare
+    };
     // Texts from the Autonomous app (#1673): a client of their own, on the
     // same model, beside the spoken turns.
     let texts = match (&files.bus_root, files.messages) {
@@ -2236,6 +2248,11 @@ pub fn serve(
     // A forget called unasked is held for their yes (`LAMP_FORGET_ASKED`):
     // the forget functions say so to spoken turns.
     let spoken_declare = with_held_forgets(spoken_declare);
+    let spoken_declare = if they_apply {
+        while_they_apply(spoken_declare)
+    } else {
+        spoken_declare
+    };
     // A few emotion tags, given to the voice only when it reads them
     // (ElevenLabs, with a model that reads them, the speech socket's too),
     // with `LAMP_SECOND_SPEECH_TAGS=on` (#2901).
@@ -5398,6 +5415,70 @@ fn with_name_signal(
         declared.push(crate::attention::name_tool());
         declared
     })
+}
+
+/// The switch for functions offered only while they apply (#6218, the
+/// base request's PR 5): only the exact value `on`; off, every request is
+/// given what it was before.
+pub(crate) const WHILE_THEY_APPLY_ENVIRONMENT: &str = "LAMP_SECOND_WHILE_THEY_APPLY";
+
+/// `declare`'s functions, those that apply to nothing now left out
+/// ([`applying`]), read as each request is made.
+fn while_they_apply(
+    declare: crate::second_provider::net::Declare,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || applying(declare(), crate::onboarding::under_way_now()))
+}
+
+/// `tools` without `setup_step` unless the walk is under way (`walk`,
+/// [`crate::onboarding::under_way_now`], told to this worker with each turn):
+/// it reports the end of a step the walk leads, and outside the walk none
+/// is led, so it is 830 bytes of every request for nothing. `redo_setup`
+/// stays, to lead a step again; a late `setup_step` is routed by its name
+/// and answered by the walk's runner as before.
+pub(crate) fn applying(mut tools: Vec<lamp_gemini::Tool>, walk: bool) -> Vec<lamp_gemini::Tool> {
+    if !walk {
+        tools.retain(|tool| tool.name != crate::onboarding::STEP);
+    }
+    tools
+}
+
+#[cfg(test)]
+mod while_they_apply_tests {
+    use super::*;
+
+    fn names(tools: &[lamp_gemini::Tool]) -> Vec<String> {
+        tools.iter().map(|tool| tool.name.clone()).collect()
+    }
+
+    /// Outside the walk `setup_step` is left out and `redo_setup` stays;
+    /// while it is under way both are given, as with the switch off (#6218).
+    #[test]
+    fn setup_step_is_offered_only_while_the_walk_is_under_way() {
+        let mut declared = vec![lamp_gemini::Tool {
+            name: "light_on".into(),
+            description: "Turn the light on.".into(),
+            parameters: None,
+            silent: false,
+        }];
+        declared.extend(crate::onboarding::tools());
+        let all = names(&declared);
+        let source = declared.clone();
+        let declare = while_they_apply(Arc::new(move || source.clone()));
+        crate::onboarding::set_under_way(false);
+        assert_eq!(
+            names(&declare()),
+            ["light_on", crate::onboarding::REDO],
+            "outside the walk"
+        );
+        crate::onboarding::set_under_way(true);
+        assert_eq!(names(&declare()), all, "while the walk is under way");
+        crate::onboarding::set_under_way(false);
+        assert_eq!(names(&applying(declared.clone(), true)), all);
+        // A late call is still the walk's: routed by its name, whatever the
+        // request was given.
+        assert!(crate::onboarding::is_tool(crate::onboarding::STEP));
+    }
 }
 
 /// Spoken turns' forget functions say that one called unasked is held for

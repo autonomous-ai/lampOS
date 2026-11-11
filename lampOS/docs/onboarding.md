@@ -201,6 +201,12 @@ run. Existing `setup_step` and `redo_setup` provider tools still follow
 `LAMP_ONBOARDING` and its file setting; they are not removed by this failure.
 Repair the file and restart Voice to recover the automatic walk.
 
+With `LAMP_SECOND_WHILE_THEY_APPLY=on` (#6218, off unless set), the second
+route offers `setup_step` only while the walk is under way, as the
+coordinator tells the worker with each turn; `redo_setup` is offered as
+before, and a late `setup_step` still reaches the walk's runner by its name
+([switches.md](switches.md)).
+
 `order` names the walk's steps, each a stable step ID at most once, and must
 hold `where_you_sit` and `who_you_are` (the shipped order is just those two,
 #5499); `steps` provides `first` and `reoffer` notes for all nine IDs. The
