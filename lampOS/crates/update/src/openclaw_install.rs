@@ -264,17 +264,19 @@ T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   exit 1
 }
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
-export LAMP_HERMES_TOKEN="$T" OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state PATH="/var/lib/lampos-openclaw/node/bin:$PATH" LAMP_NS_UID LAMP_NS_GID
+export LAMP_HERMES_TOKEN="$T" OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state OPENCLAW_NO_AUTO_UPDATE=1 PATH="/var/lib/lampos-openclaw/node/bin:$PATH" LAMP_NS_UID LAMP_NS_GID
 unset T
 A=${LAMP_OPENCLAW_GATEWAY-}
 unset LAMP_OPENCLAW_GATEWAY
 if [ "$A" = on ]; then
   exec /usr/bin/unshare --map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private /usr/local/lib/lampos/openclaw-ns "$@"
 fi
-# The gateway's namespaces, by its unit's main process (that unshare, as lampos, in a user namespace of its own).
+# The gateway's namespaces, by its unit's main process (that unshare, as lampos, in a user namespace of its own, still in
+# the unit's cgroup, so a pid reused after the gateway stopped is never taken for it). LAMP_OPENCLAW_GATEWAY=on from any
+# other caller only gives that caller namespaces of its own, never a way into the lamp's.
 P=$(/usr/bin/systemctl show -p MainPID --value lamp-openclaw-gateway.service 2>/dev/null) || P=
 case $P in '' | 0 | *[!0-9]*) P= ;; esac
-if [ -n "$P" ] && { [ "$(stat -c %u "/proc/$P" 2>/dev/null)" != "$LAMP_NS_UID" ] || [ "$(readlink "/proc/$P/ns/user")" = "$(readlink /proc/self/ns/user)" ]; }; then P=; fi
+if [ -n "$P" ] && { [ "$(stat -c %u "/proc/$P" 2>/dev/null)" != "$LAMP_NS_UID" ] || [ "$(readlink "/proc/$P/ns/user")" = "$(readlink /proc/self/ns/user)" ] || ! grep -q '/lamp-openclaw-gateway\.service$' "/proc/$P/cgroup" 2>/dev/null; }; then P=; fi
 [ -n "$P" ] || {
   echo "openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it" >&2
   exit 1
