@@ -25,18 +25,20 @@
 //! skills read-only) over the same empty read-only `/run`, `/var/lib` and
 //! `/etc/lampOS`, its own `/tmp`, and no camera, mic or serial device. The
 //! gateway runs the tools the model chooses, so it is the gateway that runs
-//! in the namespace. Unlike Hermes, OpenClaw shares the lamp's PID
-//! namespace ([`NS_FLAGS`]: a user and mount namespace only). OpenClaw
-//! 2026.11.2 refuses to open its state from a PID namespace other than its
-//! Gateway's (`GatewayLockNamespaceError`), so with one each, every Harness
-//! pane exited at once on lamp-c0a4 and no task was delivered. So OpenClaw
-//! sees the lamp's process list (names and command lines in `/proc`). It
-//! still reaches no file, socket or device beyond what its mount namespace
-//! shows: another user namespace's processes' `/proc/<pid>/root`, `cwd`,
-//! `fd` and `environ` are refused to it (the kernel's ptrace check). But it
-//! runs as `lampos`, the user every lamp service runs as, so it can send
-//! them signals; its own PID namespace prevented that, and a namespace
-//! shared by the Gateway and its panes is the follow-up that would again. It is given only lamp-cloud's
+//! in the namespace. As Hermes, OpenClaw has a PID namespace of its own,
+//! but one for the Gateway and all its panes: OpenClaw 2026.11.2 refuses
+//! to open its state from a PID namespace other than its Gateway's
+//! (`GatewayLockNamespaceError`; with one per call every Harness pane
+//! exited at once on lamp-c0a4). The gateway's unit ([`GATEWAY_ENV`] on)
+//! starts it in a new user, mount and PID namespace ([`NS_FLAGS`]); every
+//! other call joins the running gateway's, found by its unit's `MainPID`
+//! (systemd's, not a file OpenClaw could write), with `nsenter`, and drops
+//! back to the caller's ids in a nested user namespace as [`NS`] does. So
+//! OpenClaw's `/proc` lists only OpenClaw's processes, and it can signal
+//! none of the lamp's services though it runs as `lampos`, as they do.
+//! With no gateway running, a call fails closed: it never runs in a new
+//! namespace of its own nor in the lamp's. A restart of the gateway ends
+//! its panes with its namespace. It is given only lamp-cloud's
 //! local forwarder token ([`TOKEN`], as [`TOKEN_ENV`]: the forwarder is the
 //! one Hermes uses). With [`SKILLS_SWITCH`] on, the namespace also shows
 //! lamp-skills' socket folder, read-only, as Hermes's does with its own
@@ -212,9 +214,23 @@ pub const LOCKFILE_SHA256: &str =
 /// Set to `on` for [`NS`], it runs `npm ci` in [`PREFIX`] instead of
 /// OpenClaw: lamp-update's install step, in OpenClaw's namespace.
 pub const NPM_CI_ENV: &str = "LAMP_OPENCLAW_NPM_CI";
-/// The flags of the first `unshare` (the wrapper's and the install's): a
-/// user and mount namespace, no PID namespace (see the module's notes).
-pub const NS_FLAGS: [&str; 4] = ["--map-root-user", "--mount", "--propagation", "private"];
+/// The flags of the first `unshare` (the gateway's and the install's): a
+/// user, mount and PID namespace of its own, with its own `/proc`, the
+/// `unshare` its parent (`--kill-child`: killing it kills OpenClaw).
+pub const NS_FLAGS: [&str; 8] = [
+    "--map-root-user",
+    "--mount",
+    "--pid",
+    "--fork",
+    "--kill-child",
+    "--mount-proc",
+    "--propagation",
+    "private",
+];
+/// Set to `on` by the gateway's unit only ([`UNIT_TEXT`]): [`WRAPPER`]
+/// then makes the namespaces ([`NS_FLAGS`]); without it, a call joins the
+/// running gateway's. Taken out of OpenClaw's environment either way.
+pub const GATEWAY_ENV: &str = "LAMP_OPENCLAW_GATEWAY";
 /// The hard bound of each of OpenClaw's long steps ([`runs_long_step`]:
 /// a fetch, Node's unpacking, npm's install), past which the step is
 /// killed and the install recorded `failed` with `timeout` (#6226: on
@@ -229,17 +245,20 @@ const MOST_BYTES: &str = "536870912";
 const DOWNLOADS: &str = "lamp-update-openclaw-";
 
 /// [`WRAPPER`]: Hermes's wrapper with OpenClaw's state folder and the
-/// pinned Node first on the `PATH`. Reads the token, fails closed without
-/// it, and runs [`NS`] in a new user and mount namespace ([`NS_FLAGS`]),
-/// in the lamp's PID namespace, which every OpenClaw process shares with
-/// its Gateway.
+/// pinned Node first on the `PATH`. Reads the token and fails closed
+/// without it. Run by the gateway's unit ([`GATEWAY_ENV`] on), it runs
+/// [`NS`] in a new user, mount and PID namespace ([`NS_FLAGS`]); run by
+/// anyone else (a Harness pane), it joins the running gateway's
+/// namespaces, found by the unit's `MainPID`, and runs OpenClaw there as
+/// the caller's ids, or fails closed with no gateway running.
 pub const WRAPPER_TEXT: &str = r#"#!/bin/sh
 # lampOS: OpenClaw on the lamp (#6226; lampOS/docs/install.md, "OpenClaw on the lamp"). Written by lamp-update.
 # OpenClaw (its gateway and each Harness pane) runs as its caller (lampos), in a user and mount namespace where it sees
 # only its own folder, its work folder and the skills, no lamp service's files or sockets and no camera, mic or serial
-# device; it is given only lamp-cloud's local forwarder token. It shares the lamp's PID namespace (OpenClaw opens its
-# state only from its Gateway's): it sees the lamp's process list and, as lampos, can signal lampos's processes, but
-# reads none of their files or environment. It is never run any other way.
+# device; it is given only lamp-cloud's local forwarder token. Its gateway's unit (LAMP_OPENCLAW_GATEWAY=on) starts it in
+# a PID namespace of its own, and every other call joins the running gateway's namespaces, so OpenClaw sees and can
+# signal only OpenClaw's processes, never a lamp service; with no gateway running, a call fails. It is never run any
+# other way.
 T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   echo "openclaw: no forwarder token at /var/lib/lampos-cloud/hermes-token; lamp-cloud makes it with LAMP_OPENCLAW_ON_LAMP=on" >&2
   exit 1
@@ -247,7 +266,21 @@ T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
 export LAMP_HERMES_TOKEN="$T" OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state PATH="/var/lib/lampos-openclaw/node/bin:$PATH" LAMP_NS_UID LAMP_NS_GID
 unset T
-exec /usr/bin/unshare --map-root-user --mount --propagation private /usr/local/lib/lampos/openclaw-ns "$@"
+A=${LAMP_OPENCLAW_GATEWAY-}
+unset LAMP_OPENCLAW_GATEWAY
+if [ "$A" = on ]; then
+  exec /usr/bin/unshare --map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private /usr/local/lib/lampos/openclaw-ns "$@"
+fi
+# The gateway's namespaces, by its unit's main process (that unshare, as lampos, in a user namespace of its own).
+P=$(/usr/bin/systemctl show -p MainPID --value lamp-openclaw-gateway.service 2>/dev/null) || P=
+case $P in '' | 0 | *[!0-9]*) P= ;; esac
+if [ -n "$P" ] && { [ "$(stat -c %u "/proc/$P" 2>/dev/null)" != "$LAMP_NS_UID" ] || [ "$(readlink "/proc/$P/ns/user")" = "$(readlink /proc/self/ns/user)" ]; }; then P=; fi
+[ -n "$P" ] || {
+  echo "openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it" >&2
+  exit 1
+}
+export HOME=/var/lib/lampos-openclaw
+exec /usr/bin/nsenter --user="/proc/$P/ns/user" --mount="/proc/$P/ns/mnt" --pid="/proc/$P/ns/pid_for_children" --preserve-credentials --wd="$PWD" -- /usr/bin/unshare --user --map-user="$LAMP_NS_UID" --map-group="$LAMP_NS_GID" /var/lib/lampos-openclaw/npm/node_modules/.bin/openclaw "$@"
 "#;
 
 /// What [`ns_text`] changes in Hermes's namespace script, in order, each
@@ -321,7 +354,8 @@ pub const UNIT_TEXT: &str = "\
 # lamp-openclaw-gateway: OpenClaw's gateway on the lamp, which Harness's OpenClaw panes talk to (lampOS/docs/install.md,
 # \"OpenClaw on the lamp\", #6226). Written by a round of lamp-update with LAMP_OPENCLAW_ON_LAMP on, enabled and always
 # on while it is (the owner: every lamp has 6 GB), disabled and stopped with it off. It runs only through
-# /usr/local/bin/openclaw, in the namespace that wrapper makes, as lampos, on loopback port 18789 with its own token.
+# /usr/local/bin/openclaw, in the namespaces that wrapper makes for it (LAMP_OPENCLAW_GATEWAY=on: its own PID namespace,
+# which Harness's panes join), as lampos, on loopback port 18789 with its own token.
 [Unit]
 Description=lampOS OpenClaw gateway for Harness (lamp-openclaw-gateway)
 After=network-online.target lamp-cloud.service
@@ -332,7 +366,7 @@ StartLimitBurst=5
 Type=simple
 User=lampos
 Group=lampos
-Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state
+Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state LAMP_OPENCLAW_GATEWAY=on
 WorkingDirectory=/var/lib/lampos-openclaw/state
 ExecStart=/usr/local/bin/openclaw gateway run
 Restart=on-failure

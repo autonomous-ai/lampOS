@@ -367,7 +367,7 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
     );
     let (uid, gid) = own_ids();
     let ns = format!(
-        "LAMP_NS_UID={uid} LAMP_NS_GID={gid} {{}}/usr/bin/unshare --map-root-user --mount --propagation private {NS}"
+        "LAMP_NS_UID={uid} LAMP_NS_GID={gid} {{}}/usr/bin/unshare --map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private {NS}"
     );
     for wanted in [
         format!("{AS_LAMPOS}tar -xzf "),
@@ -465,11 +465,12 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
     );
 }
 
-/// The wrapper is Hermes's: the forwarder token or nothing, then only the
-/// namespace script in a new user and mount namespace; OpenClaw's state
-/// folder and the pinned Node's `bin` given. (#6226) No PID namespace of
-/// its own: OpenClaw 2026.11.2 opens its state only from its Gateway's, and
-/// with one each every Harness pane exited at once on lamp-c0a4.
+/// The wrapper is Hermes's: the forwarder token or nothing; OpenClaw's
+/// state folder and the pinned Node's `bin` given. (#6226) One PID
+/// namespace for the Gateway and its panes: the gateway's unit makes it
+/// (`--pid --fork --kill-child --mount-proc`), every other call joins the
+/// running gateway's by its unit's `MainPID`, and with none running a call
+/// fails closed, never in a namespace of its own nor in the lamp's.
 #[test]
 fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(WRAPPER_TEXT.starts_with("#!/bin/sh\n"));
@@ -477,57 +478,103 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(WRAPPER_TEXT.contains(&format!(
         "export {TOKEN_ENV}=\"$T\" {STATE_ENV}={STATE} PATH=\"{NODE_BIN}:$PATH\" "
     )));
-    assert!(WRAPPER_TEXT.ends_with(&format!(
-        "exec /usr/bin/unshare --map-root-user --mount --propagation private {NS} \"$@\"\n"
-    )));
     assert_eq!(
         NS_FLAGS.join(" "),
-        "--map-root-user --mount --propagation private"
+        "--map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private"
     );
-    for own_pid in ["--pid", "--kill-child", "--mount-proc"] {
-        assert!(!WRAPPER_TEXT.contains(own_pid), "{own_pid}");
-    }
-    assert_eq!(WRAPPER_TEXT.matches("exec ").count(), 1);
-    assert!(!WRAPPER_TEXT.contains(OPENCLAW), "never OpenClaw itself");
+    // The gateway's path: its own namespaces, only with its unit's switch.
+    assert!(WRAPPER_TEXT.contains(&format!(
+        "if [ \"$A\" = on ]; then\n  exec /usr/bin/unshare {} {NS} \"$@\"\nfi\n",
+        NS_FLAGS.join(" ")
+    )));
+    assert!(WRAPPER_TEXT.contains(&format!("A=${{{GATEWAY_ENV}-}}\nunset {GATEWAY_ENV}\n")));
+    assert!(UNIT_TEXT.contains(&format!(" {GATEWAY_ENV}=on\n")));
+    // Every other call: the gateway's namespaces by systemd's MainPID, its
+    // PID namespace the one its children are in, then the caller's ids.
+    assert!(WRAPPER_TEXT.contains(&format!(
+        "P=$(/usr/bin/systemctl show -p MainPID --value {UNIT} 2>/dev/null) || P=\n"
+    )));
+    assert!(WRAPPER_TEXT.ends_with(&format!(
+        "exec /usr/bin/nsenter --user=\"/proc/$P/ns/user\" --mount=\"/proc/$P/ns/mnt\" --pid=\"/proc/$P/ns/pid_for_children\" --preserve-credentials --wd=\"$PWD\" -- /usr/bin/unshare --user --map-user=\"$LAMP_NS_UID\" --map-group=\"$LAMP_NS_GID\" {OPENCLAW} \"$@\"\n"
+    )));
+    assert_eq!(WRAPPER_TEXT.matches("exec ").count(), 2);
+    assert_eq!(
+        WRAPPER_TEXT.matches(OPENCLAW).count(),
+        1,
+        "only in the gateway's namespaces"
+    );
     let folder = tempfile::tempdir().unwrap();
     let printer = folder.path().join("unshare");
     fs::write(
         &printer,
-        "#!/bin/sh\necho \"token=$LAMP_HERMES_TOKEN state=$OPENCLAW_STATE_DIR path=$PATH\"\necho \"args: $*\"\n",
+        "#!/bin/sh\necho \"token=$LAMP_HERMES_TOKEN state=$OPENCLAW_STATE_DIR path=$PATH gateway=${LAMP_OPENCLAW_GATEWAY-unset}\"\necho \"args: $*\"\n",
     )
     .unwrap();
     fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
+    // systemd's answer: 0 (no gateway), or this test's own pid (a process
+    // in the caller's own user namespace, so never a gateway's).
+    let systemctl = folder.path().join("systemctl");
+    let main_pid = folder.path().join("main-pid");
+    fs::write(
+        &systemctl,
+        format!("#!/bin/sh\ncat {}\n", main_pid.to_string_lossy()),
+    )
+    .unwrap();
+    fs::set_permissions(&systemctl, fs::Permissions::from_mode(0o755)).unwrap();
     let token = folder.path().join("hermes-token");
     let wrapper = folder.path().join("openclaw");
     fs::write(
         &wrapper,
         WRAPPER_TEXT
             .replace(TOKEN, &token.to_string_lossy())
-            .replace("/usr/bin/unshare", &printer.to_string_lossy()),
+            .replace("/usr/bin/unshare", &printer.to_string_lossy())
+            .replace("/usr/bin/nsenter", &printer.to_string_lossy())
+            .replace("/usr/bin/systemctl", &systemctl.to_string_lossy()),
     )
     .unwrap();
-    let ran = || {
-        std::process::Command::new("/bin/sh")
+    let ran = |gateway: bool| {
+        let mut command = std::process::Command::new("/bin/sh");
+        command
             .arg(&wrapper)
             .args(["gateway", "run"])
             .env("PATH", "/usr/bin:/bin")
-            .output()
-            .unwrap()
+            .env_remove(GATEWAY_ENV);
+        if gateway {
+            command.env(GATEWAY_ENV, "on");
+        }
+        command.output().unwrap()
     };
-    let refused = ran();
+    fs::write(&main_pid, "0\n").unwrap();
+    let refused = ran(true);
     assert!(!refused.status.success());
     assert!(refused.stdout.is_empty(), "nothing run");
     assert!(String::from_utf8_lossy(&refused.stderr).contains("no forwarder token"));
     fs::write(&token, "tok_0123456789abcdef\n").unwrap();
-    let good = ran();
+    let good = ran(true);
     assert!(good.status.success(), "{good:?}");
     let out = String::from_utf8_lossy(&good.stdout);
     assert!(out.contains(&format!(
-        "token=tok_0123456789abcdef state={STATE} path={NODE_BIN}:/usr/bin:/bin\n"
+        "token=tok_0123456789abcdef state={STATE} path={NODE_BIN}:/usr/bin:/bin gateway=unset\n"
     )));
-    assert!(out.contains(&format!(
-        "args: --map-root-user --mount --propagation private {NS} gateway run\n"
-    )));
+    assert!(out.contains(&format!("args: {} {NS} gateway run\n", NS_FLAGS.join(" "))));
+    // A pane with no gateway running, or with a "gateway" in its own user
+    // namespace: refused, nothing run, never a namespace of its own.
+    for pid in [
+        "0".to_owned(),
+        "".to_owned(),
+        "x1".to_owned(),
+        std::process::id().to_string(),
+    ] {
+        fs::write(&main_pid, format!("{pid}\n")).unwrap();
+        let pane = ran(false);
+        assert!(!pane.status.success(), "{pid}: {pane:?}");
+        assert!(pane.stdout.is_empty(), "{pid}: nothing run");
+        assert!(
+            String::from_utf8_lossy(&pane.stderr)
+                .contains("its gateway (lamp-openclaw-gateway.service) is not running"),
+            "{pid}: {pane:?}"
+        );
+    }
 }
 
 /// The namespace script is Hermes's, line for line, but for OpenClaw's
@@ -798,7 +845,7 @@ fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
         "Restart=on-failure",
         "Nice=10",
         "CPUQuota=100%",
-        "Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state",
+        "Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state LAMP_OPENCLAW_GATEWAY=on",
         "MemoryMax=2500M",
         "[Install]",
         "WantedBy=multi-user.target",
@@ -892,10 +939,10 @@ fn a_node_below_what_openclaw_runs_on_is_old_node() {
     assert!(!lamp.at(WRAPPER).exists());
 }
 
-/// (#6226) The wrapper the lamp runs, as written by hand on lamp-c0a4:
+/// (#6226) The wrapper the lamp runs, as tried by hand on lamp-c0a4:
 /// the pinned Node first on `PATH`, OpenClaw's state folder, the forwarder
-/// token from its file, root's 0755, and ending in `exec`, so no shell of
-/// the wrapper stays above OpenClaw.
+/// token from its file, root's 0755, and each path ending in `exec`, so no
+/// shell of the wrapper stays above OpenClaw.
 #[test]
 fn the_wrapper_puts_the_lamps_node_first_and_ends_in_exec() {
     assert!(WRAPPER_TEXT.contains(&format!("PATH=\"{NODE_BIN}:$PATH\"")));
