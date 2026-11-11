@@ -195,10 +195,11 @@ Environment=LAMP_SPOKEN_STOP_ENDS=on
 # the stop line said 3/8 off, 6/8 with this (committed 5/8 against 6/8), the old FAIL's pattern 0/8 in both.
 Environment=LAMP_STOP_WORDS_KEYTERM=on
 # A short stop over the answer reads as neither talk nor quiet, and the answer went on: on lamp-06c1 9 of 9 spoken
-# stops were lost (#5032). Only a yield's audio goes to the speech to text, a yield that resumes as well as one that
-# commits; its words only judge a stop and are never kept (the first builder's yes on #5032). A stop commits the
-# yield, as talk does.
-Environment=LAMP_STOP_WORDS=heard
+# stops were lost (#5032). Everything heard while the lamp speaks goes to the speech to text, and a short stop command
+# stops the answer as the hand does, whether or not the lamp paused: on lamp-52e6 on 11 Nov a 0.5 s "Stop." made no
+# pause, so `heard` (a pause's audio only) never heard it (the lead's call on #5905). Its words only judge a stop and are
+# never kept (the first builder's condition on #5032). Its cost: the whole answer's audio streamed (stop-word.md).
+Environment=LAMP_STOP_WORDS=heard-always
 # An answer cut by a line or a stop is kept as the words that were played, so "go on" picks up from the cut
 # (#3997): probe-cut-in on lamp-06c1 on 30 Oct, resume 19/20 to 20/20 with LAMP_CUT_IN_TOLD; two played demos, 2 of 2.
 Environment=LAMP_SAID_AS_HEARD=on
