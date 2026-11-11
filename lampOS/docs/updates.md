@@ -238,6 +238,22 @@ makes starts on the promoted build. Until a first promotion the feed is absent
 and such a lamp keeps the build it has. This tool does not install anything on
 a lamp.
 
+**Harness on the two feeds (#6300, (B)).** Which feed a lamp's updater
+follows also decides whether Harness may update itself there. On the
+lamp-voice feed (`--channel-url` exactly
+`https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/`:
+a dev or beta lamp, which takes each lamp-voice publish) the
+`LAMP_HARNESS_HOLD_UPDATES` hold is lifted, so Harness's own updater runs and
+these lamps are the canary for Harness's releases. On the stable feed, every
+other feed (a `file:///` folder, a numbered release's folder) and when the line
+can't be read, the hold stays exactly as before, pin and all. The feed is read
+from lamp-update's own `ExecStart`, which no round switches; the signed
+`--channel` is `lamp-voice` on both feeds, so it is not what decides. One
+predicate decides it for lamp-tasks and lamp-update both
+(`crates/msgs/src/harness_hold.rs`; tasks.md, "Dev and beta lamps: the hold
+lifted"). Moving the stable pin only after the canary has run a version is
+#6300's second part, not built yet.
+
 The verified stable head can only advance. Repeating the same sequence and
 identical envelope is a no-op; a lower sequence or different bytes at the
 same sequence is refused. A corrective build needs a higher sequence.

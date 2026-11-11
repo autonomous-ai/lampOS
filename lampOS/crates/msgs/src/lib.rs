@@ -127,6 +127,11 @@ pub mod chosen_voice;
 /// ears, given by voice or in the app (#5500, `docs/onboarding.md`).
 pub mod consent;
 
+/// Whether Harness's own self-update is held: on the stable feed and any
+/// other, not on the lamp-voice feed (the canary, #6300). Decided here for
+/// lamp-tasks and lamp-update both.
+pub mod harness_hold;
+
 /// The safe shutdown's line (#3697, `docs/shutdown.md`): said by
 /// `lamp-setup shutdown-now` and rendered ahead into the voice's speech
 /// cache, which is keyed by these exact words, so both take them from here.

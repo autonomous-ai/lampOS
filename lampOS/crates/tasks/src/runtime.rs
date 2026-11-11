@@ -3154,13 +3154,19 @@ pub fn serve<C: Clock>(
         );
     }
     serve_with_adapter(config, clock, stop, move |session| {
-        // Harness's launcher in its pinned shape with the update hold
-        // (#5493), so a Harness command run by hand holds it too; a
-        // missing launcher is only said. Off unless set.
-        if let Some(line) = crate::hold::pin_at_start(
+        // The update hold (#5229), off unless set: held, or lifted on a
+        // lamp following the lamp-voice feed, the canary (#6300), decided
+        // once for every writer below.
+        let hold = lamp_msgs::harness_hold::harness_hold(
             std::env::var(crate::hold::SWITCH).ok().as_deref(),
-            std::env::var_os("HOME").as_deref().map(Path::new),
-        ) {
+            crate::hold::lamp_update_exec_start().as_deref(),
+        );
+        // Harness's launcher in its pinned shape with the update hold
+        // (#5493), so a Harness command run by hand holds it too, or with
+        // it taken out on the canary; a missing launcher is only said.
+        if let Some(line) =
+            crate::hold::pin_at_start(hold, std::env::var_os("HOME").as_deref().map(Path::new))
+        {
             eprintln!("{line}");
         }
         if absent {
@@ -3178,10 +3184,10 @@ pub fn serve<C: Clock>(
         );
         // Harness held at the version installed (#5229), off unless set;
         // and where the lamp's own Hermes keeps its sessions (#5978).
-        let held = crate::hold::on(std::env::var(crate::hold::SWITCH).ok().as_deref());
+        let held = hold == lamp_msgs::harness_hold::HarnessHold::Held;
         let hermes = lamp_side.as_ref().map(|_| Path::new(HERMES_HOME));
-        if held || hermes.is_some() {
-            match crate::hold::env_file_changed(&mut cli.environment, held, hermes) {
+        if let Some(written) = crate::hold::env_file_for(hold, &mut cli.environment, hermes) {
+            match written {
                 Ok((path, changed)) => {
                     // Read by the daemon only at its start: one already
                     // running is started again once (#5978). Nothing
@@ -3200,8 +3206,14 @@ pub fn serve<C: Clock>(
                             crate::hold::ENV_FILE,
                             path.display()
                         );
-                        cli.health_after_start = true;
                     }
+                    if hold == lamp_msgs::harness_hold::HarnessHold::Lifted {
+                        eprintln!(
+                            "tasks: Harness's own updates not held: this lamp follows the lamp-voice feed, the canary for Harness's releases (#6300)"
+                        );
+                    }
+                    // The health line after each start, held or lifted.
+                    cli.health_after_start = hold != lamp_msgs::harness_hold::HarnessHold::Off;
                     if hermes.is_some() {
                         eprintln!(
                             "tasks: Harness finds the lamp's own Hermes by {}={HERMES_HOME}",
@@ -3210,6 +3222,9 @@ pub fn serve<C: Clock>(
                     }
                 }
                 Err(why) if held => eprintln!("tasks: Harness's own updates not held: {why}"),
+                Err(why) if hold == lamp_msgs::harness_hold::HarnessHold::Lifted => eprintln!(
+                    "tasks: Harness's hold not taken off on the canary (its env file as it was): {why}"
+                ),
                 Err(why) => eprintln!("tasks: Harness not told of the lamp's own Hermes: {why}"),
             }
         }
