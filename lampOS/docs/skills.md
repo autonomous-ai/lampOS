@@ -1154,7 +1154,9 @@ sitting.
   (for its `cooldown`) and since when its chance waits for its `[[while]]`
   (`wait`). Nothing about a person. It is written whole beside it and moved
   over it, when a hold begins, ends or changes, and every 30 s while one is
-  kept (`holds::WRITE_EVERY_US`), never at each message. The product's
+  kept (`holds::WRITE_EVERY_US`), never at each message. A write that
+  fails removes the file, best effort, so a hold dropped since (or a chance
+  had since) is never taken back from an older one. The product's
   unit gives `--tools-dir /run/lampos-skills`, tmpfs, gone at a reboot, and
   `RuntimeDirectoryPreserve=restart`, so the folder stays through a restart
   (an update's `systemctl restart`, or `Restart=on-failure`) and goes at a
@@ -1169,8 +1171,9 @@ sitting.
 - **Not kept while a restart would forget what holds the skill back.** A
   snooze, a rest after nudges nobody noticed or a nudge still being judged,
   its day's `most_a_day` reached, a run of its `[budget]` group within the
-  last hour, or a `stands_in_for_group` word still to come are in memory
-  only, and a restart forgets them. While any of them holds a skill back,
+  last hour, a `stands_in_for_group` word still to come, or a read of a
+  linked service under way or already made on this local day (its once a
+  day, #5288) are in memory only, and a restart forgets them. While any of them holds a skill back,
   its hold is not written, and begins again after a restart, as before. So
   a hold taken back never brings a nudge sooner than on a lamp that never
   restarted.
@@ -1188,6 +1191,14 @@ sitting.
   boot's file, or one that can't be read keeps nothing. The day's count,
   the group's hour, `[rest]` and a snooze stay in memory as before; `off`
   and the daily journal are kept as they were.
+- **The tools list at the start.** The folder kept through a restart keeps
+  the last run's `tools.json` too, which the voice reads as each session
+  opens. So the program removes it first thing at the start, before its
+  `call.sock` is bound, and the first load writes it again from what it
+  loaded, a moment on: a session opened meanwhile has no skill tools, as
+  when the folder went with each restart, and is never offered a tool an
+  update dropped or renamed. Left: the moment between the old run's end
+  and the new one's start (`RestartSec=5s` after a failure).
 
 Tests (`crates/skills/tests/it/holds.rs`):
 `a_hold_kept_across_a_short_restart_comes_at_its_own_time` (held 30
@@ -1196,7 +1207,10 @@ as on a lamp that never restarted),
 `a_hold_begins_again_past_its_gap_on_another_boot_or_edited`,
 `a_hold_taken_back_is_dropped_by_a_first_message_that_does_not_hold`,
 `a_hold_that_ran_keeps_its_cooldown_across_a_restart`,
-`a_snoozed_skills_hold_is_not_kept`; the file's own in `src/holds.rs`.
+`a_snoozed_skills_hold_is_not_kept`,
+`a_reads_hold_is_not_kept_once_its_read_came_due_today`,
+`a_kept_folders_tools_list_is_written_again_at_the_start`; the file's own
+in `src/holds.rs` (`a_failed_write_leaves_no_hold_to_take_back`).
 
 ### A watch
 

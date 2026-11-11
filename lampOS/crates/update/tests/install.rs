@@ -3479,6 +3479,10 @@ fn the_skills_tools_are_in_their_own_folder_which_the_voice_reads() {
     };
     let skills = unit("lamp-skills.service");
     assert!(skills.contains("\nRuntimeDirectory=lampos-skills\n"));
+    // Kept through a restart (an update's), never a stop: its holds.json
+    // keeps a long held trigger's start (`docs/skills.md`, "A hold kept
+    // across a restart"); tmpfs, so never across a reboot.
+    assert!(skills.contains("\nRuntimeDirectoryPreserve=restart\n"));
     // The skills a person turned off are kept across a restart in its own
     // state folder (#1685), the one #1732's daily journal shares.
     assert!(skills.contains(" --state-dir /var/lib/lampos-skills-state "));

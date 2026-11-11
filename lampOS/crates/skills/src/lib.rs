@@ -6181,7 +6181,8 @@ impl Engine {
     /// The holds to keep at `now_us`: each [`kept_hold`] trigger that holds,
     /// of a skill nothing a restart forgets holds back now (a snooze, a rest
     /// or a nudge still being judged, its day's most, a run of its group
-    /// within the hour, a word that stands in for its group still to come).
+    /// within the hour, a word that stands in for its group still to come,
+    /// a read of a service under way or made today: [`read_spent`]).
     /// Such a hold is not kept, and begins again after a restart, as before:
     /// a hold taken back never brings a nudge sooner than a lamp that never
     /// restarted.
@@ -6205,7 +6206,8 @@ impl Engine {
                         began.iter().any(|at| now_us.saturating_sub(*at) < HOUR_US)
                     })
                 })
-                || self.stood_in_by(name, now_us).is_some();
+                || self.stood_in_by(name, now_us).is_some()
+                || read_spent(&self.reads, self.clock, name, now_us).is_some();
             if held_back {
                 continue;
             }
