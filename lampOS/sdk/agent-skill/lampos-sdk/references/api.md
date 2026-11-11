@@ -14,6 +14,7 @@ naming every public call, tool, event and error code they have.
 | pair once (owner's code and pin) | `await Lamp.pair(code, host, pin=pin, name=name)` | `await Lamp.pair(code, host, { pin, name })` | run `lamp pair` first |
 | connect, say hello | `await Lamp.connect()` (or `Lamp.connect(lamp_id, host=..., keyring=...)`) | `await Lamp.connect()` (or `Lamp.connect(lampId, { host, keyring })`) | `lamp-mcp` connects at start (`--lamp ID`) |
 | the lamp, grants, limits | `lamp.info`, `lamp.grants`, `lamp.limits` | `lamp.info`, `lamp.grants`, `lamp.limits` | in `lamp_state("lamp")` and the tool list |
+| the owner's language (`en`, `vi`, `ja`, `zh`, `ko`), from hello, so a program's own lines follow it | `lamp.language` | `lamp.language` | — |
 | close | `await lamp.close()`, or `async with` | `await lamp.close()` | — |
 | wait until it ends | `await lamp.wait_closed()` | `await lamp.closed()` | — |
 | keep running across the lamp's restarts (every update) | `await Lamp.keep_connected(setup)`: connects, runs `setup(lamp)`, connects again after each close; raises on what can't mend (`NotPaired`, `no_grant`, ...) | `await Lamp.keepConnected(setup, { signal })` | — (an agent's tools have no setup to keep: lamp-mcp's README says how it meets a restart) |

@@ -20,6 +20,7 @@ pub mod camera;
 pub mod cert;
 pub mod feelings;
 pub mod journal;
+pub mod language;
 pub mod lease;
 pub mod microphone;
 pub mod motion_done;

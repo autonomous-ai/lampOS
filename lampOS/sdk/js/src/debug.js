@@ -22,6 +22,8 @@ export const SUMMARISED = new Set(['text', 'prompt', 'data', 'jpeg']);
 // an MCP client keeps of stderr: a registered phrase and a `phrase.heard`
 // phrase, events' fields, and a refusal's `why`.
 export const SHOWN = new Set([
+  // hello's lamp: the owner's language (en, vi, ja, zh, ko).
+  'language',
   // A dev lamp's `--rates off`, said in hello's limits.
   'rates',
   // `say`'s choice of the model's words over the exact ones.

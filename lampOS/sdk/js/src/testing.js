@@ -358,7 +358,7 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null } = {}) {
     // `followsHand: false` answers a look at `hand` as a lamp-control from
     // before #4183 does: taken, with no `follow`, and nothing follows it.
     // 'all': every grant the protocol names, as `lamp fake` pairs with. The default
@@ -367,7 +367,8 @@ export class FakeLamp {
     if (typeof grants === 'string' && grants !== 'all') throw new TypeError(`grants is 'all' or an array of grant names, not '${grants}'`);
     Object.assign(this, { code, grants: grants === 'all' ? [...schema.grants] : [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand, motionDone, faceLook, face });
     this.asker = new Map();
-    this.lamp = { id: lampId, name, v: schema.VERSION };
+    // The owner's language the lamp says in welcome and hello; null leaves it out, as a lamp from before it does.
+    this.lamp = { id: lampId, name, v: schema.VERSION, ...(language === null ? {} : { language }) };
     this.clients = new Map();
     this.requests = [];
     this.received = [];

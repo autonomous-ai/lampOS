@@ -450,6 +450,7 @@ class FakeLamp:
         grants: tuple[str, ...] | str = ("body", "light", "speak"),
         lamp_id: str = "lamp-fake",
         name: str = "Fake lamp",
+        language: str | None = "en",
         auto_done: bool = True,
         refuses: dict[str, str] | None = None,
         follows_hand: bool = True,
@@ -486,6 +487,10 @@ class FakeLamp:
             raise ValueError(f'grants is "all" or a list of grant names, not {grants!r}')
         self.grants = list(schema.grants()) if grants == "all" else list(grants)
         self.lamp = {"id": lamp_id, "name": name, "v": schema.VERSION}
+        # The owner's language the lamp says in welcome and hello; None leaves
+        # it out, as a lamp from before it does.
+        if language is not None:
+            self.lamp["language"] = language
         self.host = "127.0.0.1"
         self.port = 0
         # The certificate's pin (full SHA-256), as the owner's app shows it,

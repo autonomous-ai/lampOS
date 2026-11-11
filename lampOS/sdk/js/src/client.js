@@ -700,6 +700,10 @@ export class Lamp {
     return { stop: () => clearInterval(timer) };
   }
   // How many pixels the ring has, from hello's limits (undefined from a lamp before pixel lights).
+  // The owner's language, from hello: 'en', 'vi', 'ja', 'zh' or 'ko', so a program's own lines can follow it. 'en' from a lamp
+  // that says none (one from before this), and from a code this SDK does not know.
+  get language() { return ['en', 'vi', 'ja', 'zh', 'ko'].includes(this.info.language) ? this.info.language : 'en'; }
+
   get ringPixels() { return this.limits.ring?.pixels; }
   // Light the ring pixel by pixel for `forMs` (30 s at most): one colour per pixel, from pixel 0 around the ring,
   // each '#rrggbb' or [r, g, b] from 0 to 255, exactly `ringPixels` of them, at `brightness` 0-100 (100 by default).

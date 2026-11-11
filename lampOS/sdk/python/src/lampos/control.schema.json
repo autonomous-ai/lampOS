@@ -1319,6 +1319,10 @@
                 },
                 "v": {
                   "const": 1
+                },
+                "language": {
+                  "description": "The owner's language (en, vi, ja, zh or ko), from the lamp's setup, so a program's own lines can follow it; en when the owner has not chosen one. Lamps from before this say none: read it as en.",
+                  "enum": ["en", "vi", "ja", "zh", "ko"]
                 }
               },
               "required": [
@@ -2184,6 +2188,10 @@
                   },
                   "v": {
                     "const": 1
+                  },
+                  "language": {
+                    "description": "The owner's language (en, vi, ja, zh or ko), from the lamp's setup, so a program's own lines can follow it; en when the owner has not chosen one. Lamps from before this say none: read it as en.",
+                    "enum": ["en", "vi", "ja", "zh", "ko"]
                   }
                 },
                 "required": [
