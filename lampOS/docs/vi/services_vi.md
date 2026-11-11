@@ -2226,7 +2226,7 @@ căn phòng cho một lần đọc lịch (lamp-9adf, 4/11 21:45: "Let me look."
 `service_read`, rồi "I see a laptop screen…" không ai hỏi). Cái nhìn của một
 kỹ năng trong cùng lượt vẫn giữ.
 
-## Bản ghi dịch vụ (`LAMP_SERVICE_RECORDS`, tắt trừ khi bật)
+## Bản ghi dịch vụ (`LAMP_SERVICE_RECORDS`, tắt trừ khi bật; bật trong sản phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
 
 Với `LAMP_SERVICE_RECORDS=on` (chỉ tuyến thứ hai, cùng bộ nhớ Days; PR 1a
 của kế hoạch bản ghi connector), mỗi kết quả của `service_read` hoặc
@@ -2261,9 +2261,22 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   mỗi khi memory trả lời ok, dù có xóa được gì hay không. Memory từ chối một
   thay đổi được hỏi trước lần quên mà đến sau nó (`forgotten`, xem
   `memory-days_vi.md`).
+- **Lỗ hổng đã biết (bật trong sản phẩm, 11/11; theo quyết định của chủ đèn,
+  phần quên làm sau).** Thấy trên lamp-06c1
+  (https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064):
+  - Quên tất cả và quên một người chỉ xóa id bộ nhớ của người nói. Bản ghi
+    và liên hệ được giữ dưới id chủ dịch vụ (`owner_of`), nên khi hai id
+    khác nhau (phòng riêng) chúng vẫn còn. Bản sửa là #6334.
+  - "Quên địa chỉ của X" xóa liên hệ, nhưng một bản ghi gửi thư `done` có
+    chứa địa chỉ đó mà không khớp với lời quên thì vẫn được giữ. Khi bật
+    `LAMP_SERVICE_RECORDS_TOLD`, bản ghi này được báo cho mô hình, và mô hình
+    có thể đọc lại địa chỉ (bước 5d; không có thư nào được gửi).
+  - Quên về một việc xóa các bản ghi dịch vụ của nó, nhưng không xóa các
+    đoạn trò chuyện về việc đó trong bộ nhớ trò chuyện, nên recall vẫn có
+    thể nhắc lại (bước 6).
 - Tắt: không giữ, không ghi gì.
 
-### Báo lại các bản ghi (`LAMP_SERVICE_RECORDS_TOLD`, tắt trừ khi bật)
+### Báo lại các bản ghi (`LAMP_SERVICE_RECORDS_TOLD`, tắt trừ khi bật; bật trong sản phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
 
 Khi bật thêm `LAMP_SERVICE_RECORDS_TOLD=on` (chỉ tuyến thứ hai; chỉ có tác
 dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b,
@@ -2319,7 +2332,62 @@ dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b
   đủ hay không, không bao giờ nội dung. **Tắt**, không báo gì và recall như
   trước. Tác dụng của quy tắc lên lời model nói vẫn cần đo trên model thật
   trên lamp-06c1.
-### Làm lại hay sửa từ một bản ghi (`LAMP_SERVICE_REDO`, tắt trừ khi bật)
+
+## Danh bạ dịch vụ (`LAMP_SERVICE_CONTACTS`, tắt trừ khi bật; bật trong sản phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
+
+Với `LAMP_SERVICE_CONTACTS=on` và `LAMP_SERVICE_RECORDS=on` (chỉ tuyến thứ
+hai, cùng bộ nhớ Days; PR 1c của kế hoạch bản ghi connector), địa chỉ của
+các thư Gmail của chủ đèn được lưu thành danh bạ, mỗi tên một địa chỉ, giữ
+đến khi bị quên (`crates/voice/src/service_contacts.rs`; phía kho ở
+[memory-days](memory-days_vi.md)). Trên lamp-3e83 ngày 10/11, một địa chỉ
+được đánh vần đã được đọc lại và xác nhận, và một phút sau đèn nói nó không
+có địa chỉ nào cho người bạn ấy.
+
+- **Chỉ lưu từ một lần đọc lại đã xác nhận.** Các liên hệ mà một thư sẽ lưu
+  được lên kế hoạch khi đọc lại thư đó và chỉ được lưu khi lần gửi của lệnh
+  ghi ấy đã đi (`sent:true`). Một địa chỉ nghe nhầm và được đọc lại, rồi bị
+  sửa, hủy hay bỏ qua, không bao giờ được lưu; một thư gửi thất bại cũng
+  vậy.
+- **Chỉ chủ đèn đặt tên.** Tên lấy từ chính các câu của chủ đèn trong mười
+  phút gần nhất ("send it to Octavia", "email my friend Octavia", "gửi mail
+  cho Mai") hoặc từ lời chào của bản nháp ("Hi Octavia,", "Chào chị Mai,"),
+  không bao giờ từ lời của đèn hay từ một lần đọc của dịch vụ: một thư người
+  khác gửi không đặt tên cho liên hệ nào. Khi có nhiều địa chỉ, một tên về
+  địa chỉ có phần riêng chứa tên đó (Octavia, `octavia@…`); một địa chỉ duy
+  nhất nhận tên trong lời chào, hoặc một tên duy nhất chủ đèn đã nói. Địa chỉ
+  không có tên như vậy thì không được lưu.
+- **Dùng ở bước gửi thư.** `to` của `service_write` được báo rằng một tên
+  đứng riêng sẽ được điền vào. Trước khi các dịch vụ chuẩn bị một thư, mỗi
+  tên đứng riêng trong `to` hoặc `cc` được thay bằng địa chỉ đã lưu của nó
+  (một lần tra tối đa 400 ms trên socket cục bộ), nên lần đọc lại nói địa
+  chỉ và cổng gửi không đổi. Một tên chưa lưu địa chỉ nào thì không chuẩn
+  bị gì, và mô hình được bảo hỏi địa chỉ, đánh vần (`NO_CONTACT`); bộ nhớ
+  không trả lời cũng vậy (`NO_CONTACTS_NOW`), không bao giờ đoán.
+- **Không bao giờ thay thầm lặng.** Một địa chỉ cho một tên đã lưu địa chỉ
+  khác thêm một câu vào lần đọc lại: "For Octavia I have … saved, not ….
+  Sending this saves … for Octavia instead; if you meant …, say so." Kiểm
+  tra đọc lại giữ trọn câu đó. Chỉ một lần gửi đã xác nhận mới thay địa chỉ
+  đã lưu; mọi trường hợp khác giữ nguyên nó. Khi bộ nhớ không trả lời, địa
+  chỉ hoàn toàn không được lên kế hoạch.
+- **Của ai.** Chỉ id bộ nhớ của chủ đèn, như kiểm tra chủ của các dịch vụ
+  (`OWNER_ONLY`) đưa ra.
+- **Không bao giờ làm chậm câu trả lời.** Một lần lưu được ghi bởi một luồng
+  riêng, tối đa ba lần thử; nhật ký nói bao nhiêu được lưu và được thay, và
+  kết quả mỗi lần thử, không bao giờ một tên hay một địa chỉ.
+- **Quên.** Quên tất cả xóa các liên hệ của người đó trong bộ nhớ và mọi liên
+  hệ đã lên kế hoạch cho một lệnh ghi đang chờ; "forget Octavia's address"
+  xóa liên hệ đó qua đường quên về một việc, và câu trả lời đếm nó và nói
+  thư đã gửi thì vẫn đã gửi.
+  Lỗ hổng đã biết: một bản ghi gửi thư `done` có chứa địa chỉ vẫn còn, và khi
+  bật `LAMP_SERVICE_RECORDS_TOLD` mô hình có thể đọc lại địa chỉ từ đó
+  (lamp-06c1, 11/11, bước 5d); trong phòng riêng, quên tất cả để lại các liên
+  hệ của id chủ cho đến #6334. Cũng trong lần chạy đó, "gửi lại cho họ" khi
+  liên hệ còn giữ thì đọc lại đúng địa chỉ nhưng không chuẩn bị gì (bước 5b,
+  một phần).
+- **Tắt** (hoặc khi `LAMP_SERVICE_RECORDS` tắt), không có gì được lưu, tra
+  hay điền vào, và một thư được chuẩn bị đúng như trước.
+
+### Làm lại hay sửa từ một bản ghi (`LAMP_SERVICE_REDO`, tắt trừ khi bật; bật trong sản phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
 
 Với `LAMP_SERVICE_REDO=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ tuyến thứ
 hai; riêng nó thì không làm gì; kế hoạch bản ghi connector, PR 1d),
