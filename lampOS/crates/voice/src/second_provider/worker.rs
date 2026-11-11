@@ -3034,6 +3034,21 @@ pub fn serve(
     if let Some(linked) = linked_told.clone() {
         engine = engine.telling_what_is_linked(linked_noting(linked));
     }
+    // The owner's recent service records, told beside the owner's own line
+    // (`LAMP_SERVICE_RECORDS_TOLD=on`, with `LAMP_SERVICE_RECORDS=on`).
+    if crate::service_records::told::on() {
+        eprintln!(
+            "lamp-voice second: the owner's spoken line is told their recent service records, the status only when someone else may be here; no other line is (LAMP_SERVICE_RECORDS_TOLD)"
+        );
+        engine = engine.telling_service_records(records_noting());
+        // After a start the voice holds none: the owner's are asked of the
+        // memory now, beside the turns, so the first turn is told them.
+        for owner in crate::person::owner_ids() {
+            if let Some(person) = crate::service_records::told::person_for(&owner) {
+                crate::service_records::told::load_ahead(&person);
+            }
+        }
+    }
     // What memory holds that may fit a spoken turn's words (#2176 row 5c,
     // `LAMP_SECOND_MEMORY_HITS=on`, Days only, on in the product since the
     // memory owner's call of 4 Nov): searched within `HITS_WITHIN` and told
@@ -5533,6 +5548,34 @@ pub(crate) fn linked_noting(
         eprintln!(
             "lamp-voice second: request {request}: the owner's line is told {} service(s) linked in the app",
             names.len()
+        );
+        Some(note)
+    })
+}
+
+/// The note for the owner's spoken line with their recent service records
+/// (`LAMP_SERVICE_RECORDS_TOLD=on`, `crate::service_records::told`): the
+/// services' owner check (`services::owner_of`), in full only as a read
+/// is (`services::records_in_full`) or in the private room;
+/// journalled by count, never by content.
+pub(crate) fn records_noting() -> crate::second_provider::Remembered {
+    Arc::new(move |request, _words, lease| {
+        let owner = crate::services::owner_of(lease)?;
+        let in_full = crate::services::records_in_full(lease?.key().request, &owner);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| u64::try_from(since.as_millis()).unwrap_or(0));
+        let offset = crate::local_time::system().map_or(0, |zone| zone.offset_minutes_at(now));
+        let note = crate::service_records::told::note_now(Some(&owner), in_full, now, offset)?;
+        eprintln!(
+            "lamp-voice second: request {request}: the owner's line is told {} service record(s), {}, {} bytes (LAMP_SERVICE_RECORDS_TOLD)",
+            note.lines().filter(|line| line.starts_with("- ")).count(),
+            if in_full {
+                "in full"
+            } else {
+                "the status only"
+            },
+            note.len()
         );
         Some(note)
     })

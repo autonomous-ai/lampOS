@@ -2247,6 +2247,87 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   `memory-days_vi.md`).
 - Tắt: không giữ, không ghi gì.
 
+### Báo lại các bản ghi (`LAMP_SERVICE_RECORDS_TOLD`, tắt trừ khi bật)
+
+Khi bật thêm `LAMP_SERVICE_RECORDS_TOLD=on` (chỉ tuyến thứ hai; chỉ có tác
+dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b,
+`crates/voice/src/service_records/told.rs`), đèn biết mình đã làm gì:
+
+- **Ghi chú.** Mỗi câu nói qua kiểm tra chủ (`owner_of`, như `OWNER_ONLY`;
+  không bao giờ là quy tắc một khuôn mặt của memory) được báo kèm các bản
+  ghi gần đây của chủ, mỗi bản một dòng, mới nhất trước, ví dụ
+  `Calendar · create 'Hamburger party' · Sun 15 Nov 19:00–22:00 · cancelled:
+  the lamp answered after the read-back with no send · today 15:40`,
+  `Drive · search 'Sunday' · no result · today 15:34`. Gồm 5
+  bản mới nhất, cộng các bản còn
+  `prepared` hay `failed` đổi trong 7 ngày qua, tối đa 10 dòng và 1.200 byte
+  (dòng cũ nhất bỏ trước, và nói bỏ bao nhiêu). Kèm quy tắc: "Your past
+  service actions are listed with their status. Never claim something was
+  done unless its record says done; never say you can't do something a
+  record shows you did." Đọc từ những gì voice giữ, không bao giờ chờ; sau
+  khi khởi động, các bản ghi của chủ được hỏi memory một lần bên cạnh các
+  lượt (câu trả lời hỏi trước một lần quên chạy sau đó bị bỏ), và một lần
+  ghi còn `prepared` qua lần khởi động lại thành `timed_out` ("no send came
+  before the lamp restarted"). Một ghi chú năm dòng lịch hay thư khoảng 700
+  byte.
+- **Recall.** Các từ của `recall` tìm trong mọi bản ghi của chủ ở memory,
+  bất kể cũ đến đâu (`service_records` với `about`, tối đa 5), và câu trả
+  lời mang chúng dưới `service_records`: dòng, trạng thái, lý do, thời điểm
+  và những gì được hỏi (lần ghi thì đầy đủ).
+- **Ai được nghe.** Chỉ đầy đủ như một lần đọc được nói đầy đủ
+  (`services::told_in_full`, cùng các kiểm tra của `read_in_full`): mặt chủ
+  được thấy đang nói câu đó, chủ là khuôn mặt duy nhất trong tầm nhìn, và
+  câu nói đúng giọng của cuộc trò chuyện (bản giọng đã đăng ký của chủ nếu
+  có) từ 0,55 trở lên, hỏi một lần và không bao giờ chờ. Thiếu hay chưa
+  biết bất kỳ điều nào, ghi chú và recall chỉ nói dịch vụ, trạng thái và
+  thời điểm của mỗi bản ghi, không bao giờ nội dung, lý do hay những gì lần
+  đọc tìm thấy. Trong phòng riêng (`LAMP_PRIVATE_ROOM`) luôn đầy đủ, như các
+  lần đọc.
+- **Dữ liệu được trích.** Những gì lần đọc tìm thấy luôn là dữ liệu của dịch
+  vụ: tiêu đề đầu tiên được đánh dấu «…» trong ghi chú cùng `DATA_NOTE`, và
+  các kết quả nằm dưới `quoted` cùng `DATA_NOTE` trong recall.
+- **Quên từ ứng dụng.** Khi memory quên một người theo yêu cầu từ ứng dụng,
+  các bản ghi voice giữ của người đó bị bỏ, dù tóm tắt chạy bật hay tắt
+  (`conversation_summary::memory_forgot_waiting` cũng như
+  `memory_forgot_from`), nên sau đó không còn gì của họ được báo.
+- Mỗi ghi chú hay recall được báo một dòng nhật ký: số lượng, byte và có đầy
+  đủ hay không, không bao giờ nội dung. **Tắt**, không báo gì và recall như
+  trước. Tác dụng của quy tắc lên lời model nói vẫn cần đo trên model thật
+  trên lamp-06c1.
+### Làm lại hay sửa từ một bản ghi (`LAMP_SERVICE_REDO`, tắt trừ khi bật)
+
+Với `LAMP_SERVICE_REDO=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ tuyến thứ
+hai; riêng nó thì không làm gì; kế hoạch bản ghi connector, PR 1d),
+`service_write` nhận `from_record`, khóa của một bản ghi dịch vụ, nên câu
+"làm lại lúc 8 giờ tối" sau một sự kiện đã hủy không cần nói lại gì
+(`crates/voice/src/service_records/redo.rs`):
+
+- **Điền đủ, rồi mới đổi.** Trong cổng, sau các kiểm tra nghe thấy, chủ đèn
+  (`OWNER_ONLY`) và nhìn thấy, voice điền mọi chi tiết bản ghi của chủ đã
+  lưu và chỉ đè lên những trường lệnh gọi đưa ra, mỗi trường nguyên vẹn
+  ("thêm cả Mai" đưa cả danh sách người dự), giữ dịch vụ và hành động của
+  chính bản ghi (khác thì bị từ chối). Sau đó dịch vụ chuẩn bị nó, rồi phần
+  đọc lại và lệnh gửi diễn ra y như mọi lệnh ghi.
+- **Bản ghi nào.** Một lệnh ghi `cancelled`, `failed`, `timed_out` hay
+  `refused` thì làm lại được. Một thư `done` không bao giờ bị sửa: một thư
+  tiếp theo gửi cùng những người ấy được dựng từ nó (`Re:` tiêu đề của nó
+  trừ khi lệnh gọi đưa tiêu đề khác, cùng nội dung mới của lệnh gọi; không
+  có thì mô hình được bảo hỏi), và câu trả lời mang `follow_up`, bảo mô hình
+  nói rõ thư đã gửi thì không sửa được. Một sự kiện lịch `done` bị từ chối:
+  sửa một sự kiện đã tạo là một hành động riêng. Một lần đọc, mọi lệnh ghi
+  `done` khác, và một bản ghi có nội dung bị cắt mà không đưa nội dung mới
+  cũng bị từ chối.
+- **Liên kết.** `links` của bản ghi mới chỉ đến bản cũ, và bản cũ nhận
+  `replaced_by` (trạng thái cuối của nó giữ nguyên), cả hai được ghi vào bộ
+  nhớ.
+- **Chỉ của chủ.** Chỉ tìm các bản ghi của chính chủ. Một bản ghi có từ
+  trước khi voice khởi động được đọc từ bộ nhớ Days (`service_records`, tối
+  đa 50, tối đa 1,5 giây) trước cổng, chỉ cho câu nói nghe thấy của chủ.
+- **Nhật ký.** Mỗi lần điền một dòng: khóa, trạng thái cũ, bao nhiêu trường
+  đổi và có phải thư tiếp theo không; không bao giờ một chữ nào của nó.
+- **Tắt** (bất kỳ công tắc nào), `from_record` không được đưa ra, và lệnh
+  ghi được nhận đúng như đã yêu cầu.
+
 ## Giọng nói được báo những gì đã liên kết (`LAMP_SERVICES_TOLD`, #5523, tắt trừ khi bật)
 
 Ngày 6/11 một người thử của nhóm marketing liên kết một dịch vụ trong mục
