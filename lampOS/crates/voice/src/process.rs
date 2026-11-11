@@ -1205,6 +1205,10 @@ fn worker_command(
             role,
             var(crate::capture_cores::ENVIRONMENT),
         ))
+        .envs(bus_root_worker_environment(
+            role,
+            var(lamp_bus::ROOT_VARIABLE),
+        ))
         .envs(capture_stages_worker_environment(
             role,
             var(crate::stage_cost::ENVIRONMENT).as_deref(),
@@ -1927,6 +1931,18 @@ fn vad_input_worker_environment(
     let value =
         crate::activity::DetectorInput::parse(value.and_then(std::ffi::OsStr::to_str)).value()?;
     (role == "capture").then_some((crate::activity::INPUT_ENVIRONMENT, value))
+}
+
+// The bus folder (`LAMP_BUS_ROOT`), to the capture worker only, as set and only
+// when an absolute path: `--microphone-device bus:mic1` opens the bus there, and
+// a worker without it opened `/run/lampos-bus`, never the folder beside lamp-sim.
+fn bus_root_worker_environment(
+    role: &str,
+    value: Option<std::ffi::OsString>,
+) -> Option<(&'static str, std::ffi::OsString)> {
+    value
+        .filter(|path| role == "capture" && Path::new(path).is_absolute())
+        .map(|path| (lamp_bus::ROOT_VARIABLE, path))
 }
 
 // The capture worker's cores (#705), to capture only, as set: the worker
@@ -2981,6 +2997,62 @@ mod tests {
             }
         }
     }
+
+    /// The bus folder reaches the capture worker only, and only as an absolute path.
+    #[test]
+    fn the_bus_root_reaches_capture_only_as_an_absolute_path() {
+        use std::ffi::OsString;
+        for role in BUS_ROOT_ROLES {
+            for (value, passes) in [
+                (Some("/x/bus"), true),
+                (Some("x/bus"), false),
+                (Some(""), false),
+                (None, false),
+            ] {
+                let got = bus_root_worker_environment(role, value.map(OsString::from));
+                let expected = (passes && role == "capture")
+                    .then(|| ("LAMP_BUS_ROOT", OsString::from("/x/bus")));
+                assert_eq!(got, expected, "role {role}, value {value:?}");
+            }
+        }
+    }
+
+    /// Started through `worker_command`, the capture worker has `LAMP_BUS_ROOT`
+    /// and no other worker does.
+    #[test]
+    fn the_bus_root_is_in_the_started_capture_workers_environment_alone() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let only =
+            |name: &str| (name == "LAMP_BUS_ROOT").then(|| std::ffi::OsString::from("/x/bus"));
+        let boot = new_boot().unwrap();
+        for role in BUS_ROOT_ROLES {
+            let status = status_of_fresh(&mut worker_command(
+                &script,
+                &home.path,
+                role,
+                (boot, boot),
+                &[],
+                only,
+            ));
+            assert!(status.success(), "{role}");
+            let written =
+                std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
+            assert_eq!(
+                written.lines().any(|line| line == "LAMP_BUS_ROOT=/x/bus"),
+                role == "capture",
+                "{role}"
+            );
+        }
+    }
+
+    const BUS_ROOT_ROLES: [&str; 10] = [
+        "capture", "provider", "second", "speaker", "ring", "camera", "denoise", "echo", "privacy",
+        "unknown",
+    ];
 
     /// The detector's input (#828) goes to the capture worker only, and only
     /// as one of its two exact values.
