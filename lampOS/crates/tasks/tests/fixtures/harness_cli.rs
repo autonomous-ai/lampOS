@@ -142,7 +142,12 @@ pub fn main() -> io::Result<()> {
     // kept alive once, the question, the answer read from stdin and kept
     // under HOME, and the result for it.
     if step["code_flow"] == true {
-        let code = json!({"type":"code","code":"12345678","expiresIn":120});
+        // `login --qr --json` (#5198): the QR's link in place of the code.
+        let code = if args.iter().any(|arg| arg == "--qr") {
+            json!({"type":"qr","url":"https://harness.autonomous.ai/signin#k=hnq_abcDEF123","expiresIn":120})
+        } else {
+            json!({"type":"code","code":"12345678","expiresIn":120})
+        };
         println!("{code}");
         println!("{code}");
         // The code stays the only thing said until this file exists, or for
