@@ -280,6 +280,9 @@ document.getElementById('copy').addEventListener('click', async () => {
   renderer.domElement.addEventListener('pointerdown', (event) => {
     if (latched || !onHead(event)) return;
     latched = true;
+    // The pointer stays this canvas's until it is up, even if it leaves the canvas first: the release is
+    // always seen, so the hold never stays latched (a lost release would block every later touch).
+    try { renderer.domElement.setPointerCapture(event.pointerId); } catch { /* a pointer that is already gone */ }
     down = { x: event.clientX, y: event.clientY, at: Date.now() };
     pet = setTimeout(() => { if (down) { down = null; touch('pet'); } }, 600);
   });
@@ -288,6 +291,10 @@ document.getElementById('copy').addEventListener('click', async () => {
   });
   renderer.domElement.addEventListener('pointerup', finish);
   renderer.domElement.addEventListener('pointercancel', () => { down = null; finish(); });
+  // A release outside the canvas, or the page losing focus mid-hold (a switched tab, a dialog), ends the hold too:
+  // no pet from a hold nobody is making, and the latch is let go.
+  window.addEventListener('pointerup', () => { if (latched) finish(); });
+  window.addEventListener('blur', () => { down = null; finish(); });
   renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
 }
 
