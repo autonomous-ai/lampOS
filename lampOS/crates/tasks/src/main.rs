@@ -164,7 +164,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     );
     if !lamp_engines.is_empty() && !engines_from_machines {
         eprintln!(
-            "tasks: LAMP_OPENCLAW_ON_LAMP or LAMP_HERMES_ON_LAMP is on, but without --engines-from-machines the lamp's own engine is never looked for; the lamp is no target"
+            "tasks: LAMP_OPENCLAW_ON_LAMP or LAMP_HERMES_ON_LAMP is on, but without --engines-from-machines the lamp's own engine is never looked for while Harness is signed in; the lamp is a target only signed out (#6407)"
         );
     }
     if push_wait && !watch {
