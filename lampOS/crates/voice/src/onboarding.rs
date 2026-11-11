@@ -5519,13 +5519,18 @@ fn name_in(text: &str) -> Option<String> {
     (1..=2).contains(&words.len()).then(|| words.join(" "))
 }
 
+/// The no words a spelled name may follow and still be read: "No, J O E.",
+/// "Nope, W A L T E R." and "Nah, W A L T E R." read the same (Jarvis's P3
+/// on #6446). Each is also [`is_a_no`], so none is ever the name itself.
+const NO_LEADS: [&str; 3] = ["no", "nope", "nah"];
+
 /// A line that spells a name ([`spelled_in`]), as the word it spells, read
 /// as [`name_in`] reads a line: "W a l t e r." is "Walter". A name said
 /// without its letters is none. English words only.
 fn spelled_name_in(text: &str) -> Option<String> {
     // "No, J O E." is four words, so read as a plain no before any lead is
-    // taken off: a leading "no" or "nope" is dropped and the rest read
-    // (a reviewer's P3 on #5695). "No." and "No, thanks." stay no name.
+    // taken off: a leading "no", "nope" or "nah" ([`NO_LEADS`]) is dropped
+    // and the rest read (a reviewer's P3 on #5695). "No." and "No, thanks." stay no name.
     let mut rest = text;
     let mut words = loop {
         if let Some(words) = name_words(rest) {
@@ -5536,7 +5541,7 @@ fn spelled_name_in(text: &str) -> Option<String> {
         let first = trimmed[..end]
             .trim_matches(|c: char| !c.is_alphanumeric())
             .to_lowercase();
-        if text.contains('?') || !["no", "nope"].contains(&first.as_str()) {
+        if text.contains('?') || !NO_LEADS.contains(&first.as_str()) {
             return None;
         }
         rest = &trimmed[end..];
@@ -5549,6 +5554,7 @@ fn spelled_name_in(text: &str) -> Option<String> {
         &["sorry"][..],
         &["no"],
         &["nope"],
+        &["nah"],
         &["it's"],
         &["its"],
         &["it", "is"],
@@ -5642,7 +5648,7 @@ fn is_a_no(word: &str) -> bool {
         .trim_matches(|c: char| !c.is_alphanumeric() && c != '\'' && c != '\u{2019}')
         .to_lowercase()
         .replace('\u{2019}', "'");
-    ["no", "not", "nope", "nah"].contains(&word.as_str()) || word.ends_with("n't")
+    NO_LEADS.contains(&word.as_str()) || word == "not" || word.ends_with("n't")
 }
 
 /// The most letters a spelled name is read as: past it the line is no name
@@ -7495,7 +7501,7 @@ mod tests {
             "Nope, not W A L T E R.",
             "It isn't W A L T E R.",
             "It\u{2019}s not W A L T E R.",
-            "Nah, W A L T E R.",
+            "Nah, not W A L T E R.",
         ] {
             assert_eq!(spelled_name_in(line), None, "{line}");
         }
@@ -7512,6 +7518,10 @@ mod tests {
             ("Nope, J O E.", "Joe"),
             ("Nope, it's W A L T E R.", "Walter"),
             ("Nope, it\u{2019}s A N N.", "Ann"),
+            // "Nah" leads as "no" and "nope" do (Jarvis's P3 on #6446).
+            ("Nah, J O E.", "Joe"),
+            ("Nah, W A L T E R.", "Walter"),
+            ("Nah, it's W A L T E R.", "Walter"),
         ] {
             assert_eq!(spelled_name_in(line).as_deref(), Some(name), "{line}");
         }
@@ -7519,7 +7529,9 @@ mod tests {
             "No.",
             "No, thanks.",
             "Nope.",
+            "Nah.",
             "No, no.",
+            "Nah, no thanks.",
             "No, J O E?",
             "No, A J.",
         ] {
