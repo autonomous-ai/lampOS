@@ -6,8 +6,8 @@
 //! unit stays inactive. `lamp-services --pdf-text` is the service's own
 //! child for one PDF's text (`mail::pdf`), never started by hand.
 use lamp_services::{
-    CALENDAR_EDITS_ENVIRONMENT, DRAFT_EDITS_ENVIRONMENT, ENVIRONMENT, SKILL_READS_ENVIRONMENT,
-    SKILL_TASKS_ENVIRONMENT, WRITE_ENVIRONMENT,
+    CALENDAR_EDITS_ENVIRONMENT, DRAFT_EDITS_ENVIRONMENT, ENVIRONMENT, LINKED_TOOLS_ENVIRONMENT,
+    SKILL_READS_ENVIRONMENT, SKILL_TASKS_ENVIRONMENT, WRITE_ENVIRONMENT,
     mail::{self, Gmail},
     net::Https,
     on,
@@ -117,27 +117,28 @@ fn main() -> ExitCode {
     if draft_edits {
         say("Gmail draft edits on: a saved draft changed or deleted only on a spoken yes");
     }
-    let services = Arc::new(
-        serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
-            .with_skill_reads(skill_reads)
-            .with_skill_writes(skill_writes)
-            .with_skill_tasks(skill_tasks)
-            .with_calendar_edits(calendar_edits)
-            .with_draft_edits(draft_edits),
-    );
+    // The voice's tools name only the linked services (#6218).
+    let linked_tools = on(std::env::var(LINKED_TOOLS_ENVIRONMENT).ok().as_deref());
+    if linked_tools {
+        say("linked tools on: the voice is offered only the linked services");
+    }
+    let services = serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
+        .with_skill_reads(skill_reads)
+        .with_skill_writes(skill_writes)
+        .with_skill_tasks(skill_tasks)
+        .with_calendar_edits(calendar_edits)
+        .with_draft_edits(draft_edits);
     let tools_dir = run.join("tools");
+    let edits = tools::Edits {
+        calendar: calendar_edits,
+        drafts: draft_edits,
+    };
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
         fs::create_dir_all(&tools_dir)?;
         fs::set_permissions(&tools_dir, fs::Permissions::from_mode(0o755))?;
         let admin = bind(&run.join("admin.sock"))?;
         let calls = bind(&tools_dir.join(tools::CALL_SOCKET))?;
-        tools::write_for(
-            &tools_dir,
-            tools::Edits {
-                calendar: calendar_edits,
-                drafts: draft_edits,
-            },
-        )?;
+        tools::write_for(&tools_dir, edits)?;
         Ok((admin, calls))
     })();
     let (admin, calls) = match opened {
@@ -147,6 +148,12 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // Over the whole catalog written above, once the folder is there.
+    let services = Arc::new(if linked_tools {
+        services.with_linked_tools(tools_dir.clone(), edits)
+    } else {
+        services
+    });
     say(&format!("serving {}", run.display()));
     let admin_services = services.clone();
     std::thread::spawn(move || serve::serve(admin, admin_services, serve::Door::Admin));
