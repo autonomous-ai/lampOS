@@ -279,6 +279,9 @@ struct FakeSystemd {
     back_began: Option<u64>,
     /// The next reload stops the round dead, as a power cut would.
     cut_at_reload: bool,
+    /// Run at each reload and restart with the call as recorded: true stops
+    /// the round dead there, as a power cut would.
+    at_call: Option<Box<dyn FnMut(&str) -> bool>>,
     /// Independent recovery must be explicitly armed by a self-update fixture.
     self_recovery: Result<(), String>,
     self_recovery_queries: usize,
@@ -287,6 +290,12 @@ struct FakeSystemd {
 }
 
 impl FakeSystemd {
+    fn cut_at(&mut self, call: &str) {
+        if self.at_call.as_mut().is_some_and(|at| at(call)) {
+            panic!("the lamp lost power");
+        }
+    }
+
     fn start(&mut self, unit: &str) {
         let text = fs::read_to_string(self.root.join("etc/systemd/system").join(unit)).unwrap();
         if unit.ends_with(".socket") || unit.ends_with(".timer") {
@@ -397,11 +406,13 @@ impl Systemd for FakeSystemd {
         if std::mem::take(&mut self.cut_at_reload) {
             panic!("the lamp lost power");
         }
+        self.cut_at("reload");
         Ok(())
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
         self.calls.borrow_mut().push(format!("restart {unit}"));
+        self.cut_at(&format!("restart {unit}"));
         if unit == apply::UNIT {
             return self.applier.as_mut().map_or(Ok(()), |applier| applier());
         }
@@ -654,6 +665,7 @@ impl Lamp {
             writer: None,
             back_began: None,
             cut_at_reload: false,
+            at_call: None,
             self_recovery: Err("lamp-update-back.timer is not active".into()),
             self_recovery_queries: 0,
             start_refused: None,

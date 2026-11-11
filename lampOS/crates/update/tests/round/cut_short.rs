@@ -169,3 +169,114 @@ fn a_state_from_before_the_count_still_loads() {
     assert_eq!(lamp.state()["cut_short"]["times"], 1);
     assert_eq!(lamp.round(), Outcome::Switched(2));
 }
+
+/// Build 2, whose voice crashes: a fault of the build, put back and refused.
+fn publish_crashing_voice(lamp: &mut Lamp) {
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 2, which crashes"),
+            ("lamp-turn-end", "turn-end 2"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+}
+
+/// Thirteen's P3 on #6416: a power cut while a fault of the build is being
+/// put back leaves the journal saying why, so the next start refuses the
+/// build at once and does not count it as a cut short to try again.
+#[test]
+fn a_cut_while_a_fault_is_put_back_still_refuses_the_build() {
+    let mut lamp = Lamp::new();
+    publish_crashing_voice(&mut lamp);
+    // The switch's reload passes; the put-back's own reload, with the old
+    // units half written back, is where the power goes.
+    let mut reloads = 0;
+    lamp.systemd.at_call = Some(Box::new(move |call| {
+        reloads += usize::from(call == "reload");
+        reloads == 2
+    }));
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
+    assert!(cut.is_err(), "the put-back was not cut: {:?}", lamp.calls());
+    lamp.systemd.at_call = None;
+    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("lamp-voice.service ended")),
+        "{outcome:?}"
+    );
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert_eq!(refused(&lamp), vec![2]);
+    assert!(lamp.state().get("cut_short").is_none(), "{}", lamp.state());
+    assert_eq!(running(&lamp)["lamp-voice.service"], "voice 1");
+    assert!(matches!(lamp.round(), Outcome::Refused(why) if why.contains("was put back")));
+}
+
+/// As above, with the files all put back and the state not yet written: the
+/// next start still refuses the build.
+#[test]
+fn a_fault_put_back_whose_state_is_not_written_still_refuses_the_build() {
+    let mut lamp = Lamp::new();
+    publish_crashing_voice(&mut lamp);
+    // At the put-back's restart of the old voice (the second restart of
+    // lamp-voice), the files are back; the state then cannot be written.
+    let beside = lamp
+        .root
+        .join("var/lib/lampos-update/.state.json.lamp-update");
+    let blocker = beside.clone();
+    let mut restarts = 0;
+    lamp.systemd.at_call = Some(Box::new(move |call| {
+        restarts += usize::from(call == "restart lamp-voice.service");
+        if restarts == 2 {
+            fs::create_dir_all(blocker.join("in the way")).unwrap();
+        }
+        false
+    }));
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Failed(why) if why.contains("the state cannot be written")),
+        "{outcome:?}"
+    );
+    lamp.systemd.at_call = None;
+    assert_eq!(running(&lamp)["lamp-voice.service"], "voice 1");
+    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
+    fs::remove_dir_all(&beside).unwrap();
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("lamp-voice.service ended")),
+        "{outcome:?}"
+    );
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert_eq!(refused(&lamp), vec![2]);
+    assert!(lamp.state().get("cut_short").is_none(), "{}", lamp.state());
+    assert!(matches!(lamp.round(), Outcome::Refused(why) if why.contains("was put back")));
+}
+
+/// A switch cut short is put back with no `refusing` in its journal: a cut
+/// during that put-back is still a cut short, counted and tried again.
+#[test]
+fn a_cut_while_a_cut_short_is_put_back_is_still_only_counted() {
+    let mut lamp = Lamp::new();
+    publish_voice(&mut lamp, 2);
+    lamp.systemd.cut_at_reload = true;
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
+    assert!(cut.is_err());
+    // The next start's put-back is cut at its reload in turn.
+    lamp.systemd.cut_at_reload = true;
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
+    assert!(cut.is_err(), "the put-back was not cut: {:?}", lamp.calls());
+    let journal: serde_json::Value =
+        serde_json::from_str(&lamp.read("/var/lib/lampos-update/journal.json")).unwrap();
+    assert!(journal.get("refusing").is_none(), "{journal}");
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("cut short")),
+        "{outcome:?}"
+    );
+    assert_eq!(refused(&lamp), Vec::<u64>::new());
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+}
