@@ -1384,7 +1384,11 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   over it (below).
 - **The send is the model's call with the `send_id`.** Each later turn's
   waiting note gives the model the write's `send_id` (below), since history
-  keeps a call's name, never its answer. A `service_write` with no
+  never keeps a write's answer: with `LAMP_HISTORY_KEEPS_CALLS`, an earlier
+  `service_write` is told as a call with only its `service`, `action` and
+  `send_id` and its status (prepared, done or not done), never its
+  read-back, a recipient, a subject or a body (`second_provider::kept_args`,
+  `kept_result`; `docs/second-voice.md`). A `service_write` with no
   `send_id` is a new write, as before.
 - **Send:** a `service_write` with a `send_id` is passed on as
   `{"service": <the service the write was prepared for>, "send_id": <its
