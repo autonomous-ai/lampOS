@@ -58,6 +58,11 @@ Environment=LAMP_SKILL_WRITES=on
 # A skill's run on the lamp's Hermes (#6432, services.md): the lamp-control.service cgroup onto the tools socket
 # for service_read and service_write alone, by the run's grants; a write still waits for the person's yes.
 Environment=LAMP_SKILL_TASKS=on
+# Moving or cancelling a Google Calendar event (#6067; lamp-3e83, 10 Nov: an event the lamp made could not be
+# changed): with LAMP_SERVICES_WRITE above, the one event read first and the change read back from it, then held
+# 2 min and sent once on the person's spoken yes, as any write. A drop-in setting LAMP_CALENDAR_EDITS=off leaves
+# create_event only.
+Environment=LAMP_CALENDAR_EDITS=on
 ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services
 Restart=on-failure
 RestartSec=5s
