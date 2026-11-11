@@ -158,24 +158,25 @@ pub(crate) fn set_writes_here(on: Option<bool>) {
 }
 
 /// The switch that loosens a skill made here (the owner's ask on the Queue,
-/// #6059, 11 Nov: a made skill is the person's own): here, in `lamp-skills`'
-/// manage helper (which holds it again to [`capped`]) and in
-/// `lamp-services` (no per-skill send bound). `on` only; off unless set, in
-/// no product unit. On, for a skill made here alone (never one added from a
-/// file, from the Store or installed):
+/// #6059, 11 Nov: a made skill is the person's own): here and in
+/// `lamp-skills`' manage helper (which holds it again to [`capped`]). `on`
+/// only; off unless set, in no product unit. On, for a skill made here alone
+/// (never one added from a file, from the Store or installed):
 ///
-/// - a `[[do]]` step or a step's or the trigger's key `lamp-skills pack`
-///   refuses is left out, not refused, and told ([`loosened`]);
-/// - no `most_a_day`, `[budget]` or `[rest]` is added unless the request
-///   asks for limits ([`limits_asked`]), and `[quiet]` only for a skill that
-///   says something or hums ([`mannered_with`]);
+/// - a `[[do]]` step, or a key of a step, `lamp-skills pack` refuses is left
+///   out, not refused, and told ([`loosened`]); never a trigger's key;
+/// - no `most_a_day` or shared `[budget]` is added unless the request asks
+///   for limits ([`limits_asked`]), its `[rest]` stays, and `[quiet]` only
+///   for a skill that says something or hums ([`mannered_with`]);
 /// - a say's cooldown is at least [`LEAST_LOOSE_SAY_COOLDOWN_SECS`], not an
 ///   hour;
-/// - a step [`plainly`] can't say is said in general words.
+/// - a step [`plainly`] can't say is said in general words, never a send,
+///   the camera or the microphone ([`named_exactly`]).
 ///
-/// A write's read-back and yes, the sends across all skills, privacy
-/// refusals and the code grants stay as they are.
-pub const LOOSE_ENVIRONMENT: &str = lamp_services::skill_writes::LOOSE_ENVIRONMENT;
+/// A write's read-back and yes, the sends (3 a skill, 10 across all skills
+/// a day, in `lamp-services`), privacy refusals and the code grants stay
+/// as they are.
+pub const LOOSE_ENVIRONMENT: &str = "LAMP_MADE_SKILL_LOOSE";
 
 thread_local! {
     /// [`LOOSE_ENVIRONMENT`] as a test of this thread sets it.
@@ -187,7 +188,7 @@ pub fn loose_on() -> bool {
     if let Some(on) = LOOSE_HERE.with(std::cell::Cell::get) {
         return on;
     }
-    lamp_services::skill_writes::loose_on()
+    std::env::var(LOOSE_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// [`loose_on`] for the calling thread alone, for tests (this crate's and
@@ -5836,8 +5837,30 @@ const LOOSE_WITHIN: Duration = Duration::from_secs(6);
 /// How often [`loosened`] looks whether a check has ended.
 const LOOSE_POLL: Duration = Duration::from_millis(5);
 
-/// One part [`loosened`] may leave out of a made skill: never its trigger's
-/// topic, its last step, a read or a write.
+/// One part [`loosened`] may leave out of a made skill: a key of a step or
+/// a whole step, never its last step, a read or a write. Never a key of its
+/// trigger, nor a key inside a step that sends or writes, or uses the
+/// camera or the microphone ([`named_exactly`]): what the check refuses
+/// there stays refused, as before (Heron's P2 on #6437).
+/// Keys that say when a part runs, never taken out alone by [`loosened`]
+/// (the Reviewer-lead's P3 on #6437): a step's guards (`on`, `if_choice`,
+/// `after`) and every trigger key, wherever they are written. Whole steps
+/// may still go.
+const GUARD_KEYS: [&str; 12] = [
+    "on",
+    "if_choice",
+    "after",
+    "equals",
+    "above",
+    "below",
+    "field",
+    "days",
+    "when",
+    "cooldown",
+    "rearm",
+    "during",
+];
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Loose {
     /// A key of a step's kind: `light = { out = true, for = "1s" }`'s `for`.
@@ -5849,8 +5872,6 @@ enum Loose {
     /// One kind of a step with more than one: `{ light = …, body = … }`'s
     /// `body`.
     StepKind { step: usize, kind: String },
-    /// A key of the trigger.
-    TriggerKey(String),
     /// A whole `[[do]]` step.
     Step(usize),
 }
@@ -5869,31 +5890,40 @@ impl Loose {
                 .cloned()
         };
         let mut parts = Vec::new();
-        for (index, step) in steps.iter().enumerate() {
-            let Some(step) = open(step) else {
+        for (index, whole) in steps.iter().enumerate() {
+            let Some(step) = open(whole) else {
                 continue;
             };
-            for (kind, value) in &step {
-                for key in value.as_table().into_iter().flat_map(toml::Table::keys) {
-                    parts.push(Self::KindKey {
-                        step: index,
-                        kind: kind.clone(),
-                        key: key.clone(),
-                    });
+            // Its keys only when nothing in it must be named exactly: a
+            // look's `for` never goes alone. A guard never goes alone
+            // either ([`GUARD_KEYS`]): the step would run where it didn't.
+            let kinds: Vec<&String> = step
+                .keys()
+                .filter(|kind| !GUARD_KEYS.contains(&kind.as_str()))
+                .collect();
+            if !named_exactly(whole) {
+                for kind in &kinds {
+                    let keys = step[kind.as_str()]
+                        .as_table()
+                        .into_iter()
+                        .flat_map(toml::Table::keys)
+                        .filter(|key| !GUARD_KEYS.contains(&key.as_str()));
+                    for key in keys {
+                        parts.push(Self::KindKey {
+                            step: index,
+                            kind: (*kind).clone(),
+                            key: key.clone(),
+                        });
+                    }
                 }
             }
-            if step.len() > 1 {
-                for kind in step.keys() {
+            if kinds.len() > 1 {
+                for kind in kinds {
                     parts.push(Self::StepKind {
                         step: index,
                         kind: kind.clone(),
                     });
                 }
-            }
-        }
-        if let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table) {
-            for key in trigger.keys().filter(|key| *key != "topic") {
-                parts.push(Self::TriggerKey(key.clone()));
             }
         }
         if steps.len() > 1 {
@@ -5910,7 +5940,7 @@ impl Loose {
     /// step one of its kinds.
     fn named_in(&self, words: &str, table: &toml::Table) -> bool {
         match self {
-            Self::KindKey { key, .. } | Self::TriggerKey(key) => word_in(words, key),
+            Self::KindKey { key, .. } => word_in(words, key),
             Self::StepKind { kind, .. } => word_in(words, kind),
             Self::Step(index) => step_at(table, *index)
                 .and_then(toml::Value::as_table)
@@ -5946,12 +5976,6 @@ impl Loose {
                 },
                 kind,
             ),
-            Self::TriggerKey(key) => field_taken_out(
-                text,
-                table,
-                &|table| table.get_mut("trigger")?.as_table_mut(),
-                key,
-            ),
             Self::Step(step) => step_taken_out(text, table, *step),
         }
     }
@@ -5963,7 +5987,6 @@ impl Loose {
                 format!("[[do]] step {}, its {kind}'s {key}", step + 1)
             }
             Self::StepKind { step, kind } => format!("[[do]] step {}, its {kind}", step + 1),
-            Self::TriggerKey(key) => format!("[trigger] {key}"),
             Self::Step(step) => format!("[[do]] step {}", step + 1),
         }
     }
@@ -5993,13 +6016,6 @@ impl Loose {
                     });
                 format!("that one step also {}", does(kind_alone.as_ref()))
             }
-            Self::TriggerKey(key) => match key.as_str() {
-                "cooldown" => "the pause between its runs".to_owned(),
-                "during" => "the hours it runs in".to_owned(),
-                "for" | "absent_for" => "how long it waits before it runs".to_owned(),
-                "when" => "the moment it runs".to_owned(),
-                key => format!("its {} when it starts", key.replace('_', " ")),
-            },
             Self::Step(step) => format!("a step that {}", does(step_at(table, *step))),
         }
     }
@@ -6063,8 +6079,8 @@ fn check_words(words: &str, folder: &Path) -> String {
 /// A made skill's `skill.toml` the check refused, with what it refuses left
 /// out (the owner's ask on the Queue, #6059, with [`LOOSE_ENVIRONMENT`]
 /// on): driven by `lamp-skills pack`'s own refusal, as #6425 takes out a
-/// blink's gap. Each part that may go ([`Loose::of`]: a key of a step or of
-/// the trigger, then a whole step) is tried out of the skill, those the
+/// blink's gap. Each part that may go ([`Loose::of`]: a key of a step, then
+/// a whole step; never a trigger's key) is tried out of the skill, those the
 /// check's words name first. One the check then passes is taken, and the
 /// skill with it; one the check's words name whose taking changes its
 /// refusal is taken and the next refusal followed. Each is told in plain
@@ -12106,10 +12122,9 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         };
         assert!(parts.contains(&gap_for), "{parts:?}");
         assert!(parts.contains(&Loose::Step(1)));
-        assert!(!parts.contains(&Loose::TriggerKey("topic".into())));
         let words = "not packed: out takes no colour, dim, level, for, pattern or no_brighter";
         assert!(gap_for.named_in(words, &table));
-        assert!(!Loose::TriggerKey("cooldown".into()).named_in(words, &table));
+        assert!(!Loose::Step(0).named_in("a trigger's cooldown", &table));
         let (cut, cut_table) = gap_for.taken_out(&blink, &table).unwrap();
         assert!(cut.contains("light = { out = true }"), "{cut}");
         assert_eq!(cut_table["do"][1]["light"].as_table().unwrap().len(), 1);
@@ -12134,5 +12149,53 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
                 .iter()
                 .any(|part| matches!(part, Loose::Step(0) | Loose::KindKey { step: 0, .. }))
         );
+    }
+
+    /// Heron's P2 on #6437: [`Loose::of`] never offers a trigger's key, nor
+    /// a key inside a step on the camera or the microphone ([`named_exactly`]):
+    /// a look's `for` never goes alone. The whole step may still go.
+    #[test]
+    fn loosened_never_takes_a_triggers_key_or_a_camera_steps_key_alone() {
+        let looking = made_with(
+            "topic = \"room/presence\"\nfield = \"someone\"\nequals = false\ncooldown = \"1m\"\n",
+            "body = { look_at = \"face\", for = \"1m\" }\n\n[[do]]\nlight = { dim = 1 }",
+        );
+        let table: toml::Table = toml::from_str(&looking).unwrap();
+        let parts = Loose::of(&table);
+        assert!(
+            !parts
+                .iter()
+                .any(|part| matches!(part, Loose::KindKey { step: 0, .. })),
+            "{parts:?}"
+        );
+        assert!(parts.contains(&Loose::Step(0)), "{parts:?}");
+        assert!(parts.contains(&Loose::KindKey {
+            step: 1,
+            kind: "light".into(),
+            key: "dim".into(),
+        }));
+        // Nothing else: no trigger key (`equals`, `cooldown`) is a part.
+        assert_eq!(parts.len(), 3, "{parts:?}");
+        // A step's guards never go alone (the Reviewer-lead's P3): its
+        // `on` and a kind's `after` stay, the step whole may go.
+        let guarded: toml::Table = toml::from_str(
+            "[[do]]\non = \"arrived\"\nlight = { dim = 1, after = \"say\" }\n\
+             body = { gesture = \"nod\" }\n\n[[do]]\nlight = { dim = 2 }\n",
+        )
+        .unwrap();
+        let parts = Loose::of(&guarded);
+        assert!(
+            !parts.iter().any(|part| matches!(
+                part,
+                Loose::StepKind { kind, .. } | Loose::KindKey { key: kind, .. }
+                    if GUARD_KEYS.contains(&kind.as_str())
+            )),
+            "{parts:?}"
+        );
+        assert!(parts.contains(&Loose::StepKind {
+            step: 0,
+            kind: "body".into()
+        }));
+        assert!(parts.contains(&Loose::Step(0)));
     }
 }
