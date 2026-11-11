@@ -1224,6 +1224,14 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         assert!(!out.status.success(), "{lines:#?}");
         assert!(String::from_utf8_lossy(&out.stderr).contains("a link besides lo"));
         assert!(!lines.iter().any(|line| line.ends_with(" chat -q a b")));
+        // The kernel's fallback tunnels (Heron's P3 on #6443): a new
+        // namespace gets `sit0@NONE` and the like when their modules are
+        // loaded; nothing is under them, so the run goes on.
+        fs::write(&more, "sit0@NONE").unwrap();
+        let (out, lines) = run("");
+        fs::remove_file(&more).unwrap();
+        assert!(out.status.success(), "{lines:#?}");
+        assert!(lines.iter().any(|line| line.ends_with(" chat -q a b")));
         // Fail closed: no `ip` to bring `lo` up, or no bridge socket (the
         // switch off in lamp-tasks), and Hermes never runs.
         let ip = stubs.join("ip");
