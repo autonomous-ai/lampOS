@@ -876,6 +876,12 @@ export class Lamp {
     const { re: _re, ok: _ok, ...rest } = await this.request('notes.list', prefix ? { prefix } : {});
     return rest;
   }
+  // A skill run's linked services (the control socket only, #6432): one read of `service` (a lamp-services code,
+  // such as `gmail`) with `service_read`'s own `args`; lamp-services' `result`. Needs `<service>-read`.
+  async serviceRead(service, args = {}) { return (await this.request('service.read', { service, args })).result; }
+  // A write to `service`, only prepared: `result` holds its `read_back` and `held: true`, and the person's spoken
+  // yes sends it, never the run. Needs `<service>-write`.
+  async serviceWrite(service, args = {}) { return (await this.request('service.write', { service, args })).result; }
   // Turns and listening (docs/control.md): the person wins over each.
   // Opens a conversation turn, as a tap on the head does: the person's next
   // line is answered as spoken to the lamp; with `prompt`, the lamp says it
