@@ -2548,7 +2548,7 @@ fn asked_round(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesInstall
     after_round(
         lamp.root(),
         &lamp.records(),
-        false,
+        Shown::default(),
         systemd,
         at,
         Ok(crate::hermes_schedule::Window::Asked),
