@@ -774,10 +774,12 @@ the call in one generation and speaks in another, after the answer; with
 `provider.json`'s thinking budget of 128 each may think first.
 
 This mode measures that against the model alone, with nothing on the lamp
-touched (`crates/voice/src/tool_turns.rs`). It asks six written requests,
+touched (`crates/voice/src/tool_turns.rs`). It asks seven written requests,
 ROUNDS times (1 to 20), each on a connection of its own told of the
-voice's `not_for_me`, a sample `light_colour` and the agent tasks'
-three functions as on the lamp:
+voice's `not_for_me`, the actions part's light functions (`light_on`,
+`light_off`, `light_colour`, `light_brighter`, `light_dimmer`,
+`light_warmer`, `light_cooler`, #6456) and the agent tasks' three
+functions as on the lamp:
 
 | Request | Function expected |
 |---|---|
@@ -787,6 +789,7 @@ three functions as on the lamp:
 | "Can you ask Claude Code on my office computer to write a short poem about a desk lamp?" | `start_agent_task` |
 | the same, then "Yes, go ahead." (only the second is timed) | `confirm_agent_task` |
 | "How is the work you gave Claude Code going?" | `check_agent_task` |
+| "Tell me a short story about a fox.", then the cut-in "Hold on. Hey, Lamp. Make the light a little warm." as lamp-52e6 heard it (#6456; only the second is timed) | `light_warmer` |
 
 Every call is answered at once by a stand-in of the real answer's shape
 (`tool_turns::stand_in`), so nothing reaches the tasks part or the
