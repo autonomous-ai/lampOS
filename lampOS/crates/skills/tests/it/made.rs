@@ -1224,3 +1224,130 @@ fn a_made_skill_named_as_the_lamps_own_gets_a_free_name_and_goes_on() {
     let made = keep(&answer(&other, "welcome-back"), false, "s1:3:1", &keeping).unwrap();
     assert_eq!(made.name, "welcome-back-3");
 }
+
+/// The loosened switch for this test's thread, put back as it ends.
+struct LooseHere;
+
+impl LooseHere {
+    fn set(on: bool) -> Self {
+        lamp_voice::made_skill::set_loose_here(Some(on));
+        Self
+    }
+}
+
+impl Drop for LooseHere {
+    fn drop(&mut self) {
+        lamp_voice::made_skill::set_loose_here(None);
+    }
+}
+
+/// #6059 (1), against the real `lamp-skills pack`: off, a key the check
+/// refuses fails the make for a repair; loosened, it is left out before
+/// any repair, the rest packed and kept, and the say-back tells it.
+#[test]
+fn loosened_a_key_the_check_refuses_is_left_out_and_told() {
+    let toml = made_body(
+        "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n",
+        "light = { out = true, colour = \"green\" }",
+    )
+    .replace("body = true\n", "light = true\n")
+    .replace("needs = [\"body\"]", "needs = [\"light\"]");
+    let request = Asked {
+        request: "turn the light off when I stand up",
+        ..Asked::default()
+    };
+    {
+        let _off = LooseHere::set(false);
+        let dir = tempfile::tempdir().unwrap();
+        let keeping = keeping(dir.path());
+        let refused = keep_asked(
+            &answer(&toml, "up-off"),
+            false,
+            "s1:up-off:1",
+            &keeping,
+            &request,
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, lamp_voice::made_skill::NOT_PASSED, "{refused:?}");
+        assert!(refused.1.unwrap().contains("colour"));
+    }
+    let _on = LooseHere::set(true);
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let made = keep_asked(
+        &answer(&toml, "up-off"),
+        false,
+        "s1:up-off:1",
+        &keeping,
+        &request,
+    )
+    .unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert!(made.uses.light, "{made:?}");
+    assert!(
+        made.description
+            .contains("Left out: its colour in a step that changes the light."),
+        "{}",
+        made.description
+    );
+    // No limits it didn't ask for, and no quiet hours with nothing said;
+    // its rest stays.
+    let tar = fs::read(&made.package).unwrap();
+    let packed = String::from_utf8_lossy(&tar);
+    assert!(packed.contains("[rest]"), "{packed}");
+    assert!(
+        !["most_a_day", "[budget]", "[quiet]"]
+            .iter()
+            .any(|part| packed.contains(part)),
+        "{packed}"
+    );
+    assert_eq!(tars(&keeping.directory).len(), 1);
+}
+
+/// #6059 (1): loosened, a whole step the check refuses is left out and the
+/// rest kept; a skill with nothing left that the check takes is refused as
+/// before, for a repair.
+#[test]
+fn loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused() {
+    let _on = LooseHere::set(true);
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let toml = made_body(
+        "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n",
+        "body = { gesture = \"nod\" }\n\n[[do]]\nbody = { gesture = \"cartwheel\" }",
+    );
+    let made = keep_asked(
+        &answer(&toml, "up-nod"),
+        false,
+        "s1:up-nod:1",
+        &keeping,
+        &Asked {
+            request: "nod and cartwheel when I stand up",
+            ..Asked::default()
+        },
+    )
+    .unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert!(made.description.contains("it nods"), "{}", made.description);
+    assert!(
+        made.description.contains("Left out: "),
+        "{}",
+        made.description
+    );
+    assert!(made.uses.body);
+    // Its only step refused: nothing is left, so it is refused as before.
+    let alone = made_body(
+        "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n",
+        "body = { gesture = \"cartwheel\" }",
+    );
+    let refused = keep_asked(
+        &answer(&alone, "up-wheel"),
+        false,
+        "s1:up-wheel:1",
+        &keeping,
+        &Asked {
+            request: "cartwheel when I stand up",
+            ..Asked::default()
+        },
+    )
+    .unwrap_err();
+    assert_eq!(refused.0, lamp_voice::made_skill::NOT_PASSED, "{refused:?}");
+}

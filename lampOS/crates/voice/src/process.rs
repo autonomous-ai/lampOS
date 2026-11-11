@@ -1274,6 +1274,10 @@ fn worker_command(
             role,
             var(crate::made_skill::SCRIPTS_ENVIRONMENT).as_deref(),
         ))
+        .envs(skill_loose_worker_environment(
+            role,
+            var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
+        ))
         .envs(onboarding_worker_environment(
             role,
             var(crate::onboarding::ENVIRONMENT).as_deref(),
@@ -1375,6 +1379,17 @@ fn skill_tasks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::skill_task_yes::ENVIRONMENT, "on"))
+}
+
+// A made skill loosened (#6059, `made_skill::loose_on`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` briefs,
+// paces, says and checks the skill.
+fn skill_loose_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::LOOSE_ENVIRONMENT, "on"))
 }
 
 // The second route's scoped context (#1675, #1839), passed the same narrow
@@ -2488,6 +2503,10 @@ mod tests {
             ),
             (
                 crate::made_skill::SCRIPTS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::LOOSE_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {
