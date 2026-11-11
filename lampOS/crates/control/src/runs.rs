@@ -167,6 +167,13 @@ impl Runs {
             .filter(|live| now_us < live.until_us)
     }
 
+    /// The run whose client is `client`, if it is live at `now_us`.
+    pub fn of_client(&self, client: &str, now_us: u64) -> Option<&Run> {
+        self.by_token
+            .values()
+            .find(|live| live.client == client && now_us < live.until_us)
+    }
+
     /// Ends run `run`: its record, whether it was live.
     pub fn end(&mut self, run: &str) -> Option<Run> {
         let key = self
