@@ -3185,8 +3185,8 @@ product-installed lamp (updates.md), so lamps already in homes get it too.
 `lamp-tasks serve --sign-in-by-code --app-socket PATH` binds a third socket,
 the owner's app's route (`/run/lampos-tasks/app.sock`, reached by
 `lamp-cloud` for the app's `harness.sign_in.*`, `docs/cloud.md`, which keeps the code and the email off the broker and hands them to the backend over HTTPS). It takes
-only `app_sign_in_start` (`{"method":"code"}`, the default and, for now, the
-only method), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`);
+only `app_sign_in_start` (`{"method":"code"}`, the default, or
+`{"method":"qr"}`), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`);
 any other op there is `not_on_this_route`, and those three on the public or
 voice socket are `untrusted`. Without `--sign-in-by-code` the socket isn't
 bound. The contract the app builds on is in #5198.
@@ -3202,8 +3202,26 @@ bound. The contract the app builds on is in #5198.
   (`unit none` when it can't be read), never anything the caller sent.
 
 - **Who started it.** Each sign-in records `by` (`voice` or `app`) and
-  `method` (`code`). A start from the app while the app's own is open gives
-  it back; while a voice-started one is open it is `voice_sign_in_open`.
+  `method` (`code` or `qr`). A start from the app while the app's own is
+  open gives it back, whatever its method; while a voice-started one is open
+  it is `voice_sign_in_open`.
+- **The QR (#5198, `"method":"qr"`, only from the app).** lamp-tasks runs
+  `harness login --qr --json` (Harness 0.6.16, the pinned version) in place
+  of `--code`. Harness prints
+  `{"type":"qr","url":"https://harness.autonomous.ai/signin#k=…","expiresIn":N}`,
+  again when it is kept alive, then the same `confirm` and `result` as the
+  code. The link is read only when it begins with Harness's sign-in page and
+  `#k=` (`sign_in::QR_PREFIX`), is at most 512 plain bytes, and is good for
+  1 to 600 s; anything else ends the sign-in `unreadable`. The app's view is
+  `sign_in:"qr"` with `qr_url`, `expires_in` and `expires_at`; the app shows
+  the link as a QR, which the Harness phone app scans
+  (Settings ▸ Sign in a computer). Then the question "Sign in as …?" is the
+  app's to answer, as for the code. The voice reads it as the app's
+  (`in_app`) and never sees the link. A code line in a QR sign-in, or a link
+  in a code one, is passed over. Harness's own message is never kept when it
+  holds `#k=`. One that ran out says "The QR code ran out of time. Start again
+  for a new one." The link is journalled as "QR given (good for N s)", never
+  itself.
 - **The voice never says an app-started one.** On the voice route it is only
   `{"sign_in":"in_app","id":N}`: `sign_in_start` is `started_in_app`, its code
   claim `not_available`, `sign_in_asked` and `sign_in_answer` `started_in_app`.

@@ -1,6 +1,8 @@
 //! Signing the lamp's Harness in from the owner's app (#5198):
 //! `harness.sign_in.start` (no method, or `{"method":"code"}`: Harness's
-//! 8-digit code, the only method for now; `"qr"` is `method_not_supported`),
+//! 8-digit code; `{"method":"qr"}`: Harness's QR, a link the app shows as a
+//! QR for the Harness phone app to scan; any other is
+//! `method_not_supported`),
 //! `harness.sign_in.state` and `harness.sign_in.answer`
 //! (`{"id":N,"answer":"yes"}` or `"no"`), each handed to lamp-tasks' own
 //! route for the app (`serve --app-socket`, [`SOCKET`]) as one JSON line
@@ -22,8 +24,9 @@
 //!
 //! **The code and the email never go on the broker** (the PM's privacy
 //! rule on #5198). A view replied or pushed on `fd_channel` holds the state
-//! fields only ([`BROKER_FIELDS`]). The code (with its `expires_at`) and an
-//! app-started question's email are handed to the backend over HTTPS
+//! fields only ([`BROKER_FIELDS`]). The code or the QR's link (`qr_url`),
+//! each with its `expires_at`, and an app-started question's email are
+//! handed to the backend over HTTPS
 //! ([`HandOffs`], [`Secrets`]), and taken back there when the sign-in ends.
 //! No journal line, error or `Debug` here holds either.
 //!
@@ -77,7 +80,7 @@ pub const HAND_OFF_WITHIN: Duration = Duration::from_secs(10);
 /// Hand-offs waiting for that thread at most; more are dropped and said.
 const HAND_OFFS_QUEUED: usize = 8;
 
-/// A method the lamp does not take yet (Harness's QR: later, #5198).
+/// A method the lamp does not take: only `code` and `qr` (#5198).
 pub const METHOD_NOT_SUPPORTED: &str = "method_not_supported";
 
 /// What the app is told when lamp-tasks can't be reached or answers what
@@ -115,7 +118,8 @@ pub fn switched_on(value: Option<&str>) -> bool {
 
 /// The secret parts' way to the backend, over HTTPS (#5198).
 pub trait Secrets: Send + Sync {
-    /// `{"id","code","expires_at"}` or `{"id","email"}`. The reason for a
+    /// `{"id","code","expires_at"}`, `{"id","qr_url","expires_at"}` or
+    /// `{"id","email"}`. The reason for a
     /// failure never holds the body.
     fn put(&self, body: &Value) -> Result<(), String>;
     /// The sign-in `id`'s parts taken back, best effort.
@@ -287,12 +291,13 @@ impl HandOff {
     }
 }
 
-/// What was handed for the sign-in open: its id, the code as handed (with
-/// its `expires_at`), and whether its question was.
+/// What was handed for the sign-in open: its id, the code or the QR's link
+/// as handed (with its `expires_at`), and whether its question was.
 #[derive(Default)]
 struct Handed {
     open: Option<u64>,
     code: Option<(String, u64)>,
+    qr_url: Option<(String, u64)>,
     asked: bool,
 }
 
@@ -392,6 +397,19 @@ impl HandOffs {
                     ));
                 }
             }
+            // The QR's link, as the code: only an app starts one (#5198).
+            "qr" => {
+                if let (Some(url), Some(expires_at)) =
+                    (view["qr_url"].as_str(), view["expires_at"].as_u64())
+                    && handed.qr_url.as_ref() != Some(&(url.to_owned(), expires_at))
+                {
+                    handed.open = Some(id);
+                    handed.qr_url = Some((url.to_owned(), expires_at));
+                    self.hand(HandOff::Put(
+                        json!({"id": id, "qr_url": url, "expires_at": expires_at}),
+                    ));
+                }
+            }
             // The email only for the app's own question: a voice-started
             // sign-in's is asked aloud, and the app shows only its code.
             "asking" if view["by"] == "app" => {
@@ -442,11 +460,12 @@ fn op(kind: &str, data: &Value) -> Result<Value, String> {
     let field = |name: &str| data.get(name).filter(|value| !value.is_null());
     match kind {
         "harness.sign_in.start" => {
-            match field("method").map(Value::as_str) {
-                None | Some(Some("code")) => {}
+            let method = match field("method").map(Value::as_str) {
+                None | Some(Some("code")) => "code",
+                Some(Some("qr")) => "qr",
                 Some(_) => return Err(METHOD_NOT_SUPPORTED.into()),
-            }
-            Ok(json!({"op": "app_sign_in_start", "method": "code"}))
+            };
+            Ok(json!({"op": "app_sign_in_start", "method": method}))
         }
         "harness.sign_in.state" => Ok(json!({"op": "app_sign_in_state"})),
         "harness.sign_in.answer" => {
@@ -466,7 +485,7 @@ fn op(kind: &str, data: &Value) -> Result<Value, String> {
 /// What the app shows for a refusal's `error`, as is (#5198).
 pub fn message_for(error: &str) -> &'static str {
     match error {
-        METHOD_NOT_SUPPORTED => "This lamp signs in to Harness with a code only.",
+        METHOD_NOT_SUPPORTED => "This lamp signs in to Harness with a code or a QR only.",
         "voice_sign_in_open" => {
             "A sign-in started by voice is open on the lamp. Its code is shown here."
         }
@@ -577,7 +596,7 @@ impl Follow {
         let open = view.as_ref().is_some_and(|view| {
             matches!(
                 view["sign_in"].as_str(),
-                Some("starting" | "code" | "asking" | "answered")
+                Some("starting" | "code" | "qr" | "asking" | "answered")
             )
         });
         self.next = now + if open { OPEN_EVERY } else { IDLE_EVERY };
@@ -683,6 +702,63 @@ pub(crate) mod tests {
 
     const CODE: &str = "12345678";
     const EMAIL: &str = "someone@example.com";
+    const QR_URL: &str = "https://harness.autonomous.ai/signin#k=hnq_abcDEF123";
+
+    /// #5198: the app's QR sign-in goes to lamp-tasks as `"method":"qr"`;
+    /// its link (with `expires_at`) goes to the backend as `qr_url`, again
+    /// when a keepalive moves `expires_at`, never on the broker, and is
+    /// taken back when it ends. No journal line holds it.
+    #[test]
+    fn the_apps_qr_sign_in_hands_its_link_to_the_backend_and_never_the_broker() {
+        let dir = folder("qr");
+        let asked = tasks(
+            &dir,
+            vec![
+                r#"{"ok":true,"sign_in":"qr","id":8,"revision":8001,"instance_id":"a","by":"app","method":"qr","answer_here":false,"qr_url":"https://harness.autonomous.ai/signin#k=hnq_abcDEF123","expires_in":120,"expires_at":1800000000000}"#,
+                r#"{"ok":true,"sign_in":"qr","id":8,"revision":8001,"instance_id":"a","by":"app","method":"qr","answer_here":false,"qr_url":"https://harness.autonomous.ai/signin#k=hnq_abcDEF123","expires_in":119,"expires_at":1800000000000}"#,
+                r#"{"ok":true,"sign_in":"qr","id":8,"revision":8002,"instance_id":"a","by":"app","method":"qr","answer_here":false,"qr_url":"https://harness.autonomous.ai/signin#k=hnq_abcDEF123","expires_in":120,"expires_at":1800000120000}"#,
+                r#"{"ok":true,"sign_in":"done","id":8,"revision":8004,"instance_id":"a","by":"app","method":"qr","result":"error","error":"EXPIRED","message":"The QR code ran out of time. Start again for a new one."}"#,
+            ],
+        );
+        let kept = Arc::new(Kept::default());
+        let place = place(&dir, kept.clone());
+        let started = ask(&place, "harness.sign_in.start", &json!({"method": "qr"}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
+            json!({"op": "app_sign_in_start", "method": "qr"})
+        );
+        assert_eq!(started["sign_in"], "qr");
+        assert_eq!(started["method"], "qr");
+        assert_eq!(started["expires_at"], 1_800_000_000_000_u64);
+        assert!(started.get("qr_url").is_none(), "{started}");
+        assert!(!started.to_string().contains("#k="), "{started}");
+        // The same link read again: not handed again.
+        let again = ask(&place, "harness.sign_in.state", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert!(again.get("qr_url").is_none());
+        // Kept alive: handed again with the new expires_at.
+        ask(&place, "harness.sign_in.state", &json!({})).unwrap();
+        assert_eq!(
+            *kept.puts.lock().unwrap(),
+            [
+                json!({"id": 8, "qr_url": QR_URL, "expires_at": 1_800_000_000_000_u64}),
+                json!({"id": 8, "qr_url": QR_URL, "expires_at": 1_800_000_120_000_u64}),
+            ]
+        );
+        let done = ask(&place, "harness.sign_in.state", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(done["error"], "EXPIRED");
+        assert_eq!(*kept.deletes.lock().unwrap(), [8]);
+        JOURNAL.with(|journal| {
+            for line in journal.borrow().iter() {
+                assert!(!line.contains("#k=") && !line.contains("hnq_"), "{line}");
+            }
+        });
+    }
 
     /// #5198: each kind goes to lamp-tasks as its own op with only what the
     /// app may say; the view comes back with neither the code nor the email
@@ -749,9 +825,9 @@ pub(crate) mod tests {
             .unwrap();
         assert_eq!(done["result"], "success");
         assert_eq!(*kept.deletes.lock().unwrap(), [7]);
-        // QR waits for later: refused here, never run.
+        // A method the lamp doesn't take: refused here, never run.
         assert_eq!(
-            ask(&place, "harness.sign_in.start", &json!({"method": "qr"})),
+            ask(&place, "harness.sign_in.start", &json!({"method": "email"})),
             Err(METHOD_NOT_SUPPORTED.to_owned())
         );
         for (kind, data) in [

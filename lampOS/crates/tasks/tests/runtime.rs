@@ -3380,9 +3380,9 @@ fn the_apps_sign_in_is_its_own_routes_and_never_the_voices() {
         assert_eq!(s.trusted(op.clone())["error"], "untrusted", "{op}");
         assert_eq!(s.ask(op.clone())["error"], "untrusted", "{op}");
     }
-    // Only the code for now.
+    // Only the code or the QR (#5198).
     assert_eq!(
-        s.app(json!({"op":"app_sign_in_start","method":"qr"}))["error"],
+        s.app(json!({"op":"app_sign_in_start","method":"email"}))["error"],
         "bad_request"
     );
     let none = s.app(json!({"op":"app_sign_in_state"}));

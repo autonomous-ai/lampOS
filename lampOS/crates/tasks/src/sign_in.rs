@@ -18,10 +18,18 @@
 //!
 //! The owner's app may start one too (#5198, `serve --app-socket`), by the
 //! same code, which the app shows and the person types into Harness. Each
-//! sign-in records who started it ([`By`]) and how ([`Method`], only the
-//! code for now; Harness's QR sign-in may be added later): only the app
-//! answers an app-started one, only the voice a voice-started one, and the
-//! voice never sees an app-started one's code or email.
+//! sign-in records who started it ([`By`]) and how ([`Method`]): only the
+//! app answers an app-started one, only the voice a voice-started one, and
+//! the voice never sees an app-started one's code or email.
+//!
+//! The app may instead start Harness's QR sign-in (#5198, `"method":"qr"`):
+//! `harness login --qr --json` (Harness 0.6.16, the pinned version) prints
+//! `{"type":"qr","url":"https://harness.autonomous.ai/signin#k=…","expiresIn":N}`
+//! in place of the code, again when it is kept alive, and then the same
+//! `confirm` and `result`. The app shows the link as a QR, which the Harness
+//! phone app scans. Only the app starts one: the voice has nothing to show
+//! it on. The link is handled as the code is: never said, journalled or put
+//! on the broker.
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
@@ -36,23 +44,31 @@ const MOST_EMAIL_BYTES: usize = 254;
 pub const ANSWER_WINDOW: Duration = Duration::from_secs(120);
 const MOST_EXPIRES_IN: u64 = 600;
 
-/// How a sign-in is done: Harness's 8-digit code, the only method for now
-/// (#5198). Named in the app's view, so another (Harness's QR) can be
-/// added later without changing what the app reads.
+/// How a sign-in is done (#5198): Harness's 8-digit code, or its QR (only
+/// from the app). Named in the app's view.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Method {
     #[default]
     Code,
+    Qr,
 }
 
 impl Method {
     pub fn name(self) -> &'static str {
         match self {
             Self::Code => "code",
+            Self::Qr => "qr",
         }
     }
 }
+
+/// What a QR sign-in's link must begin with: Harness's sign-in page, with
+/// its key after `#k=` (Harness 0.6.16's `signin#k=`, the backend's own
+/// check on #5198 refuses any other).
+pub const QR_PREFIX: &str = "https://harness.autonomous.ai/signin#k=";
+/// The longest QR link taken.
+const MOST_QR_BYTES: usize = 512;
 
 /// Who started a sign-in (#5198): only they answer its question.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -80,6 +96,12 @@ pub enum Event {
         code: String,
         expires_in: u64,
     },
+    /// The link to show as a QR (`--qr`), and how many seconds it stays
+    /// good.
+    Qr {
+        url: String,
+        expires_in: u64,
+    },
     /// The person approved in Harness: ask them whether to sign in as this.
     Confirm {
         email: String,
@@ -101,12 +123,14 @@ const MOST_MESSAGE_BYTES: usize = 200;
 /// Harness's `message` as the app may show it: plain, bounded text, with
 /// no address in it and no code: no eight digits in a row once every
 /// non-digit is taken out (the privacy reader's P3 on #5236, the
-/// reviewer-lead's P2 on #5579), so a quoted code never reaches the broker.
+/// reviewer-lead's P2 on #5579), so a quoted code never reaches the broker;
+/// and no QR link's key (`#k=`, #5198).
 fn message(value: Option<&Value>) -> Option<String> {
     let message = value?.as_str()?.trim();
     (!message.is_empty()
         && message.len() <= MOST_MESSAGE_BYTES
         && !message.contains('@')
+        && !message.contains("#k=")
         && !has_eight_digits(message)
         && !message.chars().any(char::is_control))
     .then(|| message.to_owned())
@@ -146,6 +170,9 @@ impl std::fmt::Debug for Event {
             Self::Code { expires_in, .. } => {
                 write!(f, "Code {{ code: <hidden>, expires_in: {expires_in} }}")
             }
+            Self::Qr { expires_in, .. } => {
+                write!(f, "Qr {{ url: <hidden>, expires_in: {expires_in} }}")
+            }
             Self::Confirm { .. } => write!(f, "Confirm {{ email: <hidden> }}"),
             Self::Result(done) => write!(f, "Result({done:?})"),
             Self::ResultWith {
@@ -179,6 +206,7 @@ impl std::fmt::Debug for State {
         match self {
             Self::Starting => write!(f, "Starting"),
             Self::Code { .. } => write!(f, "Code {{ code: <hidden> }}"),
+            Self::Qr { .. } => write!(f, "Qr {{ url: <hidden> }}"),
             Self::Asking { .. } => write!(f, "Asking {{ email: <hidden> }}"),
             Self::Answered { yes } => write!(f, "Answered {{ yes: {yes} }}"),
             Self::Done(done) => write!(f, "Done({done:?})"),
@@ -217,6 +245,23 @@ pub fn parse_line(line: &str) -> Result<Option<Event>, &'static str> {
             }
             Event::Code {
                 code: code.to_owned(),
+                expires_in,
+            }
+        }
+        "qr" => {
+            let url = value["url"].as_str().ok_or(unreadable)?;
+            let expires_in = value["expiresIn"].as_u64().ok_or(unreadable)?;
+            if !url.starts_with(QR_PREFIX)
+                || url.len() == QR_PREFIX.len()
+                || url.len() > MOST_QR_BYTES
+                || !url.bytes().all(|b| b.is_ascii_graphic())
+                || expires_in == 0
+                || expires_in > MOST_EXPIRES_IN
+            {
+                return Err(unreadable);
+            }
+            Event::Qr {
+                url: url.to_owned(),
                 expires_in,
             }
         }
@@ -261,7 +306,7 @@ pub fn parse_line(line: &str) -> Result<Option<Event>, &'static str> {
 }
 
 /// What starts a sign-in: Harness's own, on a lane of its own, by the
-/// method asked (only `--code` for now).
+/// method asked (`--code` or `--qr`).
 pub type Starter = Box<dyn FnMut(Method) -> Result<Box<dyn Link>, String> + Send>;
 
 /// A running `harness login --code --json`: dropping it stops the program.
@@ -282,6 +327,12 @@ pub enum State {
     /// The code to say, and when it stops being good.
     Code {
         code: String,
+        until: Instant,
+    },
+    /// The QR's link for the app to show, and when it stops being good
+    /// (#5198).
+    Qr {
+        url: String,
         until: Instant,
     },
     /// The person approved in Harness: the lamp asks whether to sign in as
@@ -447,9 +498,11 @@ impl Session {
         let mut said = Vec::new();
         while let Some(read) = self.link.as_mut().and_then(|link| link.poll()) {
             match read {
-                // A code after the question isn't one to say.
+                // A code after the question isn't one to say, nor one in a
+                // QR sign-in.
                 Ok(Event::Code { code, expires_in })
-                    if matches!(self.state, State::Starting | State::Code { .. }) =>
+                    if self.method == Method::Code
+                        && matches!(self.state, State::Starting | State::Code { .. }) =>
                 {
                     // The same code kept alive is no change to say.
                     if !matches!(&self.state, State::Code { code: was, .. } if *was == code) {
@@ -464,10 +517,31 @@ impl Session {
                     self.expires_at_ms = Some(unix_ms().saturating_add(expires_in * 1000));
                 }
                 Ok(Event::Code { .. }) => {}
+                // The QR's link, as the code above: only in a QR sign-in,
+                // before the question; the same link kept alive is no
+                // change to say. Its key is never journalled.
+                Ok(Event::Qr { url, expires_in })
+                    if self.method == Method::Qr
+                        && matches!(self.state, State::Starting | State::Qr { .. }) =>
+                {
+                    if !matches!(&self.state, State::Qr { url: was, .. } if *was == url) {
+                        said.push(format!("QR given (good for {expires_in} s)"));
+                    }
+                    self.state = State::Qr {
+                        url,
+                        until: now + Duration::from_secs(expires_in),
+                    };
+                    self.changes += 1;
+                    self.expires_at_ms = Some(unix_ms().saturating_add(expires_in * 1000));
+                }
+                Ok(Event::Qr { .. }) => {}
                 // Asked once: a question after it was answered is passed
                 // over, so only one answer is ever written (Jarvis's P3).
                 Ok(Event::Confirm { email })
-                    if matches!(self.state, State::Starting | State::Code { .. }) =>
+                    if matches!(
+                        self.state,
+                        State::Starting | State::Code { .. } | State::Qr { .. }
+                    ) =>
                 {
                     said.push("approved in Harness: asking whether to sign in".into());
                     self.state = State::Asking { email };
@@ -663,6 +737,9 @@ impl Session {
                 "expires_in": until.saturating_duration_since(now).as_secs(),
                 "code_told": self.code_given.as_ref() == Some(code),
             }),
+            // Only the app starts a QR sign-in, so the voice reads it as
+            // the app's above; never its link.
+            State::Qr { .. } => json!({"sign_in": "in_app"}),
             State::Asking { email } => json!({"sign_in": "asking", "email": email}),
             State::Answered { yes } => {
                 json!({"sign_in": "answered", "answer": if *yes { "yes" } else { "no" }})
@@ -691,6 +768,12 @@ impl Session {
                 "expires_in": until.saturating_duration_since(now).as_secs(),
                 "expires_at": self.expires_at_ms,
             }),
+            State::Qr { url, until } => json!({
+                "sign_in": "qr",
+                "qr_url": url,
+                "expires_in": until.saturating_duration_since(now).as_secs(),
+                "expires_at": self.expires_at_ms,
+            }),
             State::Asking { email } if mine => {
                 let told_at = *self.told.get_or_insert((0, now));
                 json!({
@@ -716,7 +799,10 @@ impl Session {
                 "sign_in": "done",
                 "result": "error",
                 "error": code,
-                "message": self.message.as_deref().unwrap_or(done_message(code)),
+                "message": self.message.as_deref().unwrap_or(match (self.method, code.as_str()) {
+                    (Method::Qr, "EXPIRED") => QR_EXPIRED,
+                    _ => done_message(code),
+                }),
             }),
         };
         if self.relay_failed && self.open() {
@@ -731,6 +817,9 @@ impl Session {
         view
     }
 }
+
+/// What the app shows for a QR sign-in that ran out of time (#5198).
+pub const QR_EXPIRED: &str = "The QR code ran out of time. Start again for a new one.";
 
 /// What the app shows when lamp-cloud's put of the code or the question
 /// to the backend failed (#5198).
@@ -805,6 +894,131 @@ mod tests {
             code: code.into(),
             expires_in: 120,
         }))
+    }
+
+    const QR_URL: &str = "https://harness.autonomous.ai/signin#k=hnq_abcDEF123";
+
+    fn qr(url: &str) -> Option<Result<Event, &'static str>> {
+        Some(Ok(Event::Qr {
+            url: url.into(),
+            expires_in: 120,
+        }))
+    }
+
+    /// #5198: `harness login --qr --json`'s link line is read only when it
+    /// is Harness's sign-in page with a key, bounded and plain, and its
+    /// `Debug` hides the link.
+    #[test]
+    fn a_qr_line_is_read_only_as_harness_sign_in_page_and_its_debug_hides_it() {
+        let line = |url: &str, expires_in: u64| {
+            json!({"type": "qr", "url": url, "expiresIn": expires_in}).to_string()
+        };
+        let read = parse_line(&line(QR_URL, 120)).unwrap().unwrap();
+        assert_eq!(
+            read,
+            Event::Qr {
+                url: QR_URL.into(),
+                expires_in: 120
+            }
+        );
+        assert!(!format!("{read:?}").contains("hnq_"), "{read:?}");
+        let long = format!("{QR_PREFIX}{}", "a".repeat(600));
+        for (url, expires_in) in [
+            ("https://evil.example/signin#k=hnq_abc", 120),
+            ("http://harness.autonomous.ai/signin#k=hnq_abc", 120),
+            (QR_PREFIX, 120),
+            ("https://harness.autonomous.ai/signin#k=hnq abc", 120),
+            (long.as_str(), 120),
+            (QR_URL, 0),
+            (QR_URL, 601),
+        ] {
+            assert_eq!(
+                parse_line(&line(url, expires_in)),
+                Err("unreadable"),
+                "{url}"
+            );
+        }
+    }
+
+    /// #5198: an app-started QR sign-in shows its link to the app alone,
+    /// as `qr_url` with `expires_at`; the voice reads it as the app's and
+    /// can't claim it; a keepalive is no new change to say; then the same
+    /// question and answer as a code. A code line in it, or a link in a
+    /// code sign-in, is passed over. No journal line holds the link.
+    #[test]
+    fn an_app_qr_sign_in_shows_its_link_to_the_app_only() {
+        let now = Instant::now();
+        let (session, lines, answers) = scripted(now);
+        let mut session = session.started_by(By::App, Method::Qr);
+        lines.lock().unwrap().push_back(code("12345678"));
+        lines.lock().unwrap().push_back(qr(QR_URL));
+        let said = session.tend(now);
+        assert_eq!(said, ["QR given (good for 120 s)"]);
+        let app = session.app_view(now + Duration::from_secs(1));
+        assert_eq!(app["sign_in"], "qr");
+        assert_eq!(app["method"], "qr");
+        assert_eq!(app["qr_url"], QR_URL);
+        assert_eq!(app["expires_in"], 119);
+        assert!(app["expires_at"].as_u64().is_some());
+        assert!(app.get("code").is_none());
+        assert_eq!(session.view(now), json!({"sign_in": "in_app", "id": 1}));
+        assert_eq!(
+            session.take_code(1, now),
+            json!({"claim": "not_available", "id": 1})
+        );
+        let revision = session.revision();
+        lines.lock().unwrap().push_back(qr(QR_URL));
+        assert!(session.tend(now + Duration::from_secs(60)).is_empty());
+        assert!(session.revision() > revision, "the extension is a change");
+        lines.lock().unwrap().push_back(Some(Ok(Event::Confirm {
+            email: "someone@example.com".into(),
+        })));
+        let said = session.tend(now + Duration::from_secs(61));
+        assert_eq!(said, ["approved in Harness: asking whether to sign in"]);
+        let asking = session.app_view(now + Duration::from_secs(62));
+        assert_eq!(asking["sign_in"], "asking");
+        assert_eq!(asking["answer_here"], true);
+        assert!(asking.get("qr_url").is_none());
+        session
+            .answer_from_app(1, true, now + Duration::from_secs(63))
+            .unwrap();
+        assert_eq!(*answers.lock().unwrap(), [true]);
+        // A code sign-in passes a link over.
+        let (code_session, lines, _) = scripted(now);
+        let mut code_session = code_session.started_by(By::App, Method::Code);
+        lines.lock().unwrap().push_back(qr(QR_URL));
+        assert!(code_session.tend(now).is_empty());
+        assert_eq!(code_session.app_view(now)["sign_in"], "starting");
+    }
+
+    /// #5198: a QR sign-in that ran out of time says so as a QR, and a
+    /// Harness message quoting a link's key is never kept for the app.
+    #[test]
+    fn a_qr_that_ran_out_says_so_and_a_message_with_its_key_is_dropped() {
+        let now = Instant::now();
+        let (session, lines, _) = scripted(now);
+        let mut session = session.started_by(By::App, Method::Qr);
+        lines.lock().unwrap().push_back(qr(QR_URL));
+        lines
+            .lock()
+            .unwrap()
+            .push_back(Some(Ok(Event::Result(Done::Error {
+                code: "EXPIRED".into(),
+            }))));
+        session.tend(now);
+        let done = session.app_view(now);
+        assert_eq!(done["error"], "EXPIRED");
+        assert_eq!(done["message"], QR_EXPIRED);
+        assert!(done.get("qr_url").is_none());
+        let quoted = json!({"type": "result", "status": "error", "code": "DENIED",
+            "message": "Not approved: https://harness.autonomous.ai/signin#k=hnq_abcDEF123"})
+        .to_string();
+        assert_eq!(
+            parse_line(&quoted).unwrap(),
+            Some(Event::Result(Done::Error {
+                code: "DENIED".into()
+            }))
+        );
     }
 
     #[test]
@@ -1308,10 +1522,9 @@ mod tests {
                 "{kept}"
             );
         }
+        // A kind this part doesn't know is passed over.
         assert_eq!(
-            parse_line(
-                r#"{"type":"qr","url":"https://harness.autonomous.ai/signin#k=x","expiresIn":120}"#
-            ),
+            parse_line(r#"{"type":"browser","url":"https://example.com/","expiresIn":120}"#),
             Ok(None)
         );
         let now = Instant::now();
