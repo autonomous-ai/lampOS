@@ -132,7 +132,6 @@ impl Lamp {
 }
 
 const NODE_BYTES: &[u8] = b"a stand-in for node-v24.22.2-linux-arm64.tar.gz";
-const PACKAGE_BYTES: &[u8] = b"a stand-in for openclaw-2026.11.2.tgz";
 
 fn leak(text: String) -> &'static str {
     Box::leak(text.into_boxed_str())
@@ -142,7 +141,6 @@ fn leak(text: String) -> &'static str {
 fn kit() -> Kit {
     Kit {
         node_sha256: leak(crate::manifest::sha256_hex(NODE_BYTES)),
-        package_integrity: leak(integrity_of(PACKAGE_BYTES)),
         ..Kit::BUILT
     }
 }
@@ -153,8 +151,8 @@ fn own_ids() -> (String, String) {
 }
 
 /// A runner that logs each command and answers it: `id` with the test's
-/// own ids, `curl -o` by writing the stand-in bytes, `tar` by putting a
-/// Node of `node` there, npm by putting the package at `package`,
+/// own ids, `curl -o` by writing the stand-in Node bytes, `tar` by putting
+/// a Node of `node` there, `npm ci` by putting the package at `package`,
 /// `install -d` by making the folder; `fail_on` makes the first command
 /// holding it fail; the rest with nothing.
 struct Runs {
@@ -201,17 +199,12 @@ impl Runs {
                 Ok(String::new())
             } else if argv[0] == "curl" {
                 let out = argv.iter().position(|arg| arg == "-o").unwrap() + 1;
-                let bytes = if argv.last().unwrap() == NODE_URL {
-                    NODE_BYTES
-                } else {
-                    PACKAGE_BYTES
-                };
-                fs::write(&argv[out], bytes).unwrap();
+                fs::write(&argv[out], NODE_BYTES).unwrap();
                 Ok(String::new())
             } else if line.contains(" tar -xzf ") {
                 put_node(&self.root, self.node);
                 Ok(String::new())
-            } else if line.contains(&format!("{NPM} install ")) {
+            } else if line.contains(&format!("{NPM_CI_ENV}=on")) {
                 put_package(&self.root, self.package);
                 Ok(String::new())
             } else if line.ends_with(" --version") {
@@ -360,21 +353,29 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
     assert_eq!(said.node.as_deref(), Some(NODE_VERSION));
     assert_eq!(lamp.asked(), None, "answered");
     let lines = runs.lines();
-    for url in [NODE_URL, PACKAGE_URL] {
-        assert!(
-            lines.iter().any(|line| line.starts_with(&format!(
-                "curl -fsSL --proto =https --tlsv1.2 --max-filesize {MOST_BYTES} -o /"
-            )) && line.contains(&format!("/{DOWNLOADS}"))
-                && line.ends_with(&format!(" {url}"))),
-            "{lines:#?}"
-        );
-    }
+    assert!(
+        lines.iter().any(|line| line.starts_with(&format!(
+            "curl -fsSL --proto =https --tlsv1.2 --max-filesize {MOST_BYTES} -o /"
+        )) && line.contains(&format!("/{DOWNLOADS}"))
+            && line.ends_with(&format!(" {NODE_URL}"))),
+        "{lines:#?}"
+    );
+    assert_eq!(
+        lines.iter().filter(|line| line.starts_with("curl")).count(),
+        1,
+        "only Node is fetched by lamp-update: npm fetches the locked tree"
+    );
+    let (uid, gid) = own_ids();
+    let ns = format!(
+        "LAMP_NS_UID={uid} LAMP_NS_GID={gid} {{}}/usr/bin/unshare --map-root-user --mount --propagation private {NS}"
+    );
     for wanted in [
         format!("{AS_LAMPOS}tar -xzf "),
         format!(
-            "{AS_LAMPOS}{NPM} install --global --prefix {PREFIX} --omit=dev --no-audit --no-fund --no-update-notifier "
+            "{AS_LAMPOS}{}",
+            ns.replace("{}", &format!("{NPM_CI_ENV}=on "))
         ),
-        format!("{AS_LAMPOS}{NODE} {OPENCLAW} --version"),
+        format!("{AS_LAMPOS}{} --version", ns.replace("{}", "")),
         format!("install -d -o lampos -g lampos -m 0700 {PLACE}"),
         format!("install -d -o lampos -g lampos -m 0700 {STATE}"),
         format!("chown -h lampos:lampos {GATEWAY_TOKEN}"),
@@ -386,12 +387,21 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
     }
     assert!(
         runs.position(NODE_URL) < runs.position(" tar -xzf ")
-            && runs.position(" tar -xzf ") < runs.position(PACKAGE_URL)
-            && runs.position(PACKAGE_URL) < runs.position(&format!("{NPM} install"))
-            && runs.position(&format!("{NPM} install"))
-                < runs.position(&format!("systemctl restart {UNIT}")),
+            && runs.position(" tar -xzf ") < runs.position(NPM_CI_ENV)
+            && runs.position(NPM_CI_ENV) < runs.position(" --version")
+            && runs.position(" --version") < runs.position(&format!("systemctl restart {UNIT}")),
         "{lines:#?}"
     );
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("runuser") && line.contains(NPM)),
+        "npm never runs outside the namespace: {lines:#?}"
+    );
+    for (path, text) in [(MANIFEST_AT, MANIFEST), (LOCKFILE_AT, LOCKFILE)] {
+        assert_eq!(fs::read_to_string(lamp.at(path)).unwrap(), text);
+        assert_eq!(mode(&lamp.at(path)), 0o644);
+    }
     assert!(
         !lines
             .iter()
@@ -456,8 +466,10 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
 }
 
 /// The wrapper is Hermes's: the forwarder token or nothing, then only the
-/// namespace script in a new user, mount and PID namespace; OpenClaw's
-/// state folder and the pinned Node's `bin` given.
+/// namespace script in a new user and mount namespace; OpenClaw's state
+/// folder and the pinned Node's `bin` given. (#6226) No PID namespace of
+/// its own: OpenClaw 2026.11.2 opens its state only from its Gateway's, and
+/// with one each every Harness pane exited at once on lamp-c0a4.
 #[test]
 fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(WRAPPER_TEXT.starts_with("#!/bin/sh\n"));
@@ -466,9 +478,15 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
         "export {TOKEN_ENV}=\"$T\" {STATE_ENV}={STATE} PATH=\"{NODE_BIN}:$PATH\" "
     )));
     assert!(WRAPPER_TEXT.ends_with(&format!(
-        "exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc \
-         --propagation private {NS} \"$@\"\n"
+        "exec /usr/bin/unshare --map-root-user --mount --propagation private {NS} \"$@\"\n"
     )));
+    assert_eq!(
+        NS_FLAGS.join(" "),
+        "--map-root-user --mount --propagation private"
+    );
+    for own_pid in ["--pid", "--kill-child", "--mount-proc"] {
+        assert!(!WRAPPER_TEXT.contains(own_pid), "{own_pid}");
+    }
     assert_eq!(WRAPPER_TEXT.matches("exec ").count(), 1);
     assert!(!WRAPPER_TEXT.contains(OPENCLAW), "never OpenClaw itself");
     let folder = tempfile::tempdir().unwrap();
@@ -508,8 +526,7 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
         "token=tok_0123456789abcdef state={STATE} path={NODE_BIN}:/usr/bin:/bin\n"
     )));
     assert!(out.contains(&format!(
-        "args: --map-root-user --mount --pid --kill-child --mount-proc --propagation private \
-         {NS} gateway run\n"
+        "args: --map-root-user --mount --propagation private {NS} gateway run\n"
     )));
 }
 
@@ -525,7 +542,15 @@ fn the_namespace_script_is_hermess_for_openclaw() {
         );
     }
     for skills in [false, true] {
-        let ours = ns_text(skills);
+        let with_mode = ns_text(skills);
+        assert_eq!(with_mode.matches(NPM_CI_MODE).count(), 1);
+        assert!(with_mode.ends_with(&format!("{NPM_CI_MODE}{RUN_LINE}")));
+        let checked = std::process::Command::new("/bin/sh")
+            .args(["-n", "-c", &with_mode])
+            .output()
+            .unwrap();
+        assert!(checked.status.success(), "{checked:?}");
+        let ours = with_mode.replacen(NPM_CI_MODE, "", 1);
         let hermes = hermes_install::ns_text(skills);
         assert!(!ours.to_ascii_lowercase().contains("hermes"), "{ours}");
         assert!(!ours.contains("#5978") && !ours.contains("#6128"));
@@ -582,16 +607,82 @@ fn the_pins_are_node_24_and_the_measured_package() {
         format!("https://registry.npmjs.org/openclaw/-/openclaw-{VERSION}.tgz")
     );
     assert!(PACKAGE_INTEGRITY.starts_with("sha512-") && PACKAGE_INTEGRITY.len() == 95);
-    assert_eq!(PACKAGE_SHASUM.len(), 40);
     assert_eq!(
         integrity_of(b""),
         "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="
     );
 }
 
-/// A Node or package whose bytes are not the pinned ones is
-/// `pin_mismatch`: nothing unpacked or installed, no entry point, the
-/// gateway disabled.
+/// The lockfile shipped is the pinned one: its SHA-256, a project that
+/// wants `openclaw` at [`VERSION`] exactly (as [`MANIFEST`] does), and its
+/// `openclaw` the registry tarball at [`PACKAGE_URL`] with
+/// [`PACKAGE_INTEGRITY`]; every other package fetched from the registry
+/// with a sha512 integrity, or bundled in one that is.
+#[test]
+fn the_lockfile_pins_the_whole_tree_and_the_measured_package() {
+    assert_eq!(
+        crate::manifest::sha256_hex(LOCKFILE.as_bytes()),
+        LOCKFILE_SHA256
+    );
+    lockfile_pinned(LOCKFILE, LOCKFILE_SHA256, VERSION).unwrap();
+    let manifest: serde_json::Value = serde_json::from_str(MANIFEST).unwrap();
+    assert_eq!(
+        manifest["dependencies"],
+        serde_json::json!({"openclaw": VERSION})
+    );
+    assert_eq!(manifest["private"], true);
+    let lock: serde_json::Value = serde_json::from_str(LOCKFILE).unwrap();
+    assert_eq!(lock["name"], manifest["name"]);
+    assert!(lock["packages"].as_object().unwrap().len() > 100);
+
+    let refused = |text: &str, version: &str| {
+        let sha = crate::manifest::sha256_hex(text.as_bytes());
+        lockfile_pinned(text, &sha, version).unwrap_err()
+    };
+    assert!(
+        lockfile_pinned(LOCKFILE, &"0".repeat(64), VERSION)
+            .unwrap_err()
+            .contains("sha256")
+    );
+    assert!(refused(LOCKFILE, "2026.11.1").contains("wants"));
+    let other = LOCKFILE.replacen(PACKAGE_INTEGRITY, "sha512-other", 1);
+    assert!(refused(&other, VERSION).contains("the lockfile's openclaw"));
+    let mut loose = lock.clone();
+    loose["packages"]["node_modules/zod"]
+        .as_object_mut()
+        .unwrap()
+        .remove("integrity");
+    assert!(refused(&loose.to_string(), VERSION).contains("node_modules/zod"));
+}
+
+/// A lockfile that is not the pinned one is `pin_mismatch` before anything
+/// is fetched or written.
+#[test]
+fn a_lockfile_not_the_pinned_one_is_refused_before_any_fetch() {
+    let lamp = Lamp::new();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let other = Kit {
+        lockfile: leak(LOCKFILE.replacen(PACKAGE_INTEGRITY, "sha512-other", 1)),
+        ..kit()
+    };
+    let said = install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut runs.runner(),
+        &mut || 6,
+        &mut quiet(),
+        &other,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(said.error.as_deref(), Some("pin_mismatch"));
+    assert!(!runs.lines().iter().any(|line| line.starts_with("curl")));
+    assert!(!lamp.at(LOCKFILE_AT).exists() && !lamp.at(NS).exists());
+}
+
+/// A Node whose bytes are not the pinned ones is `pin_mismatch`: nothing
+/// unpacked or installed, no entry point, the gateway disabled.
 #[test]
 fn bytes_not_the_pinned_ones_are_refused() {
     let lamp = Lamp::new();
@@ -619,7 +710,7 @@ fn a_failed_install_takes_the_entry_points_out_and_stops_the_gateway() {
     for (fail_on, error) in [
         (NODE_URL, "fetch"),
         (" tar -xzf ", "installer"),
-        ("npm install", "installer"),
+        (NPM_CI_ENV, "installer"),
         ("systemctl restart lamp-openclaw", "gateway"),
         ("--map-root-user", "no_userns"),
         ("command -v tar", "no_tools"),
@@ -728,22 +819,21 @@ fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
 }
 
 /// (#6226) npm hung 38 min at its extract on lamp-c0a4 with no output
-/// flags: it runs with `--foreground-scripts --loglevel=http`, and each
-/// long step under a hard 20 min bound. One that runs past it ends
-/// `failed` with `timeout`, never `installing` for good.
+/// flags: `npm ci` runs with `--loglevel=http` (and no install scripts),
+/// and each long step under a hard 20 min bound. One that runs past it
+/// ends `failed` with `timeout`, never `installing` for good.
 #[test]
-fn npm_runs_with_output_and_a_long_step_past_its_bound_is_timeout() {
+fn npm_ci_runs_with_output_and_a_long_step_past_its_bound_is_timeout() {
+    assert!(NPM_CI_MODE.contains(&format!(
+        "{NODE} {NPM} ci --omit=dev --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=http\n"
+    )));
+    assert!(NPM_CI_MODE.contains(&format!("cd {PREFIX} ")));
     let lamp = Lamp::new();
     fs::write(lamp.unit(), UNIT_TEXT).unwrap();
     lamp.ask();
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 1).unwrap().install, "installed");
-    let npm = &runs.lines()[runs.position(&format!("{NPM} install"))];
-    assert!(
-        npm.contains(" --foreground-scripts --loglevel=http /"),
-        "{npm}"
-    );
-    for step in [NODE_URL, " tar -xzf ", "npm install", PACKAGE_URL] {
+    for step in [NODE_URL, " tar -xzf ", NPM_CI_ENV] {
         let lamp = Lamp::new();
         lamp.ask();
         let runs = Runs {
@@ -798,7 +888,7 @@ fn a_node_below_what_openclaw_runs_on_is_old_node() {
             .any(|line| line.contains("24.15.0, below what OpenClaw runs on")),
         "{lines:?}"
     );
-    assert!(!runs.lines().iter().any(|line| line.contains("npm install")));
+    assert!(!runs.lines().iter().any(|line| line.contains(NPM_CI_ENV)));
     assert!(!lamp.at(WRAPPER).exists());
 }
 
@@ -823,19 +913,19 @@ fn the_wrapper_puts_the_lamps_node_first_and_ends_in_exec() {
     assert_eq!(mode(&lamp.at(WRAPPER)), 0o755);
 }
 
-/// Each fetch, the unpacking and npm's install get [`STEP_WITHIN`];
-/// OpenClaw's other steps the plain bound.
+/// Each fetch, the unpacking and `npm ci` get [`STEP_WITHIN`]; OpenClaw's
+/// other steps the plain bound.
 #[test]
 fn openclaw_s_long_steps_get_the_long_bound() {
     let downloads = Downloads::make().unwrap();
-    let file = downloads
-        .file("openclaw.tgz")
-        .to_string_lossy()
-        .into_owned();
-    let npm = as_lampos(&[NPM, "install", "--global", file.as_str()]);
+    let file = downloads.file("node.tar.gz").to_string_lossy().into_owned();
+    let unpack = as_lampos(&["tar", "-xzf", file.as_str()]);
+    assert!(runs_long_step(&unpack));
+    assert_eq!(install::bound_of(&unpack), STEP_WITHIN);
+    let npm = in_namespace("1000", "1000", true, &[]);
     assert!(runs_long_step(&npm));
     assert_eq!(install::bound_of(&npm), STEP_WITHIN);
-    let version = as_lampos(&[NODE, OPENCLAW, "--version"]);
+    let version = in_namespace("1000", "1000", false, &["--version"]);
     assert!(!runs_long_step(&version));
     assert_eq!(install::bound_of(&version), crate::world::RESTART_WITHIN);
 }
