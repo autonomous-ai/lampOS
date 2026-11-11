@@ -657,12 +657,13 @@ impl Door {
         client: &str,
         grants: BTreeSet<Grant>,
     ) -> Result<GrantsSet, SetGrantsRefused> {
-        let Some(before) = self.clients.set_grants(client, grants.clone()) else {
+        let Some((before, unknown)) = self.clients.set_grants(client, grants.clone()) else {
             return Err(SetGrantsRefused::NoSuchComputer);
         };
         let added: Vec<Grant> = grants.difference(&before).copied().collect();
         let removed: Vec<Grant> = before.difference(&grants).copied().collect();
-        if added.is_empty() && removed.is_empty() {
+        // Clearing grants this build does not know is a change too: it is saved.
+        if added.is_empty() && removed.is_empty() && unknown.is_empty() {
             return Ok(GrantsSet {
                 grants,
                 added,
@@ -671,7 +672,7 @@ impl Door {
             });
         }
         if let Err(error) = self.save() {
-            self.clients.set_grants(client, before);
+            self.clients.restore_grants(client, (before, unknown));
             return Err(SetGrantsRefused::NotSaved(error.to_string()));
         }
         self.new_rev(client);
@@ -1868,9 +1869,10 @@ mod tests {
         );
     }
 
-    /// Grants this build does not know (a newer lamp-control's, kept in the file) survive a change of grants.
+    /// Grants this build does not know (a newer lamp-control's, kept in the file) are cleared by a change of grants,
+    /// saved even when the known list is the same: "exactly that list", and none comes back with an update.
     #[test]
-    fn a_change_of_grants_keeps_the_ones_this_build_does_not_know() {
+    fn a_change_of_grants_clears_the_ones_this_build_does_not_know() {
         let newer = pairing::Client {
             id: "c_newer".to_owned(),
             name: "laptop".to_owned(),
@@ -1888,12 +1890,18 @@ mod tests {
             },
             None,
         );
+        // The same known list still clears the unknown one, and says what moved (nothing known).
+        let same = door
+            .set_grants("c_newer", [Grant::Light].into())
+            .expect("a paired computer");
+        assert!(same.added.is_empty() && same.removed.is_empty());
+        assert!(door.clients().clients[0].unknown_grants.is_empty());
         let _ = door
             .set_grants("c_newer", [Grant::Body].into())
             .expect("a paired computer");
         let kept = &door.clients().clients[0];
         assert_eq!(kept.grants, [Grant::Body].into());
-        assert_eq!(kept.unknown_grants, ["teleport".to_owned()].into());
+        assert!(kept.unknown_grants.is_empty());
     }
 
     /// A client with no key at all (the lamp's own local agent) has its grants
