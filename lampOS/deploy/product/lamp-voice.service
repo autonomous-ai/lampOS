@@ -584,11 +584,6 @@ Environment=LAMP_MEMORY_FORGET_JUST_KEPT=on
 # Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
 # alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
 Environment=LAMP_MEMORY_RECALL_V2=on
-# A keep the round right after it doubts is taken back and held for the person's yes (C37, docs/memory.md): the
-# memory owner's call A on 11 Nov, after lamp-06c1 kept "renunctinus" twice on 10 Nov and then asked "is that
-# ranunculus?". A round asking whether a kept word was another keeps the asked word on their yes. Needs
-# LAMP_MEMORY_FORGET_ALL and LAMP_EYES_SPEAKING, both on here.
-Environment=LAMP_MEMORY_DOUBT_UNDOES=on
 # Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md). The session note keeps the
 # person's tastes and kept facts first (PROFILE): the memory owner's call on 5 Nov, off for the candidate on 6 Nov
 # (#5464), back on after its played check passed on lamp-06c1 with ElevenLabs voices on 6 Nov (PASS bd98421414,

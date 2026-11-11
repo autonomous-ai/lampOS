@@ -1384,10 +1384,11 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `remember::doubted::tests`,
   `second_provider::tests::a_keep_its_own_round_doubts_is_not_run`.
 - **A doubt right after the keep takes it back** (C37,
-  `LAMP_MEMORY_DOUBT_UNDOES=on`, the second route; off unless set, and on
-  in the product by the memory owner's call A on 11 Nov: on by their call
-  on 5 Nov, off again the same night (#5454) until the matcher passed the
-  readers' keep closings). On lamp-06c1 on 5 Nov
+  `LAMP_MEMORY_DOUBT_UNDOES=on`, the second route; off unless set, and
+  off in the product again: on by the memory owner's call A on 11 Nov
+  (#6189), off by its switch-off until its rows on lamp-06c1 pass; on by
+  their call on 5 Nov, off again the same night (#5454) until the matcher
+  passed the readers' keep closings). On lamp-06c1 on 5 Nov
   round 1 was a bare `remember` and round 2 said "Was that 'rhinodulus'
   right — I want to be sure", with "rhinodulus" already kept (id 391).
   With the switch, the Days memory, `LAMP_MEMORY_FORGET_ALL` and the eyes'
