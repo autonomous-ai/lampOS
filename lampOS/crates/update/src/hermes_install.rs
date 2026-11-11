@@ -205,6 +205,29 @@ pub const SKILLS_SOCKET: &str = "/run/lampos-skills";
 /// read-only, when it is there. Never the folder, so lamp-control's
 /// owner socket (`admin.sock`) beside it stays hidden.
 pub const CONTROL_SOCKET: &str = "/run/lampos-control/control.sock";
+/// The variable a skill's run is started with (`run` exactly, set by
+/// lamp-tasks' `skill_task::HermesRunner`, `lamp_tasks::skill_task::NET_ENV`)
+/// to have a network namespace of its own: with [`TASKS_SWITCH`] on,
+/// [`wrapper_text`] then adds `--net` to its first `unshare`, and [`NS`]
+/// shows [`MODEL_SOCKET`] and starts [`RELAY`] in it. Opting in only takes
+/// access away. Any other value, or unset, is the network as before:
+/// Hermes started by Harness's panes never sets it.
+pub const NET_ENV: &str = "LAMP_NS_NET";
+/// lamp-tasks' bridge to lamp-cloud's model forwarder
+/// (`lamp_tasks::net_bridge::MODEL_SOCKET`, `lampos`'s, 0600 in its 0700
+/// runtime folder): with [`NET_ENV`] `run`, the one file under
+/// `/run/lampos-tasks` [`NS`] shows, read-only.
+pub const MODEL_SOCKET: &str = "/run/lampos-tasks/model.sock";
+/// What [`NS`] starts inside a skill run's network namespace, in the
+/// background before Hermes, as the caller's own ids in a nested user
+/// namespace of its own: lamp-tasks' `net-relay`, listening on
+/// lamp-cloud's forwarder address (`lamp_cloud::hermes_llm::PORT`) and
+/// piping each connection to [`MODEL_SOCKET`]. `/opt` is not hidden, and
+/// this is lamp-tasks.service's own `ExecStart` program.
+pub const RELAY: &str = "/opt/lampOS/tasks/current/lamp-tasks";
+/// The address [`RELAY`] listens on: where Hermes's model calls go
+/// (`http://127.0.0.1:7741/v1/deepseek`).
+pub const RELAY_LISTEN: &str = "127.0.0.1:7741";
 /// All [`NS`] shows Hermes of what it lays [`OVERLAID`] over: its own
 /// folder, the work folder and the skills (read-only), plus the file
 /// `/etc/resolv.conf` resolves to when that is under `/run` (read-only,
@@ -276,6 +299,40 @@ export LAMP_HERMES_TOKEN="$T" HERMES_HOME=/var/lib/lampos-hermes/.hermes LAMP_NS
 unset T
 exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/hermes-ns "$@"
 "#;
+
+/// What [`wrapper_text`] changes in [`WRAPPER_TEXT`] with [`TASKS_SWITCH`]
+/// on, each found exactly once (a test holds it): with [`NET_ENV`] `run`
+/// exactly, `--net` is added to the first `unshare`, so the new network
+/// namespace is owned by the new user namespace (one `unshare(2)` with
+/// `CLONE_NEWUSER`), and the variable passed on to [`NS`]; any other
+/// value is unset, so [`NS`] never sees `run` without `--net`.
+const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
+    (
+        "# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.\n",
+        "# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.\n\
+         # LAMP_SKILL_TASKS=on (#6306): a skill's run, started with LAMP_NS_NET=run, also gets a network namespace of its own,\n\
+         # with only lo: out only to control.sock and lamp-cloud's model forwarder, through lamp-tasks' bridge socket.\n",
+    ),
+    (
+        "unset T\nexec /usr/bin/unshare --map-root-user --mount ",
+        "unset T\n\
+         if [ \"${LAMP_NS_NET-}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n\
+         exec /usr/bin/unshare --map-root-user $N --mount ",
+    ),
+];
+
+/// [`WRAPPER`]'s text: [`WRAPPER_TEXT`], with [`WRAPPER_TASKS_EDITS`] when
+/// `tasks` ([`TASKS_SWITCH`]). Written by root beside [`ns_text`]'s, with
+/// the same switch.
+pub fn wrapper_text(tasks: bool) -> String {
+    let mut text = WRAPPER_TEXT.to_owned();
+    if tasks {
+        for (from, to) in WRAPPER_TASKS_EDITS {
+            text = text.replacen(from, to, 1);
+        }
+    }
+    text
+}
 
 /// [`NS`]: only inside a user namespace (refused in the lamp's own, where
 /// it would hide the lamp's files from the whole lamp). An allow-list:
@@ -382,28 +439,54 @@ const SKILLS_EDITS: [(&str, &str); 6] = [
 /// before `/run` is hidden (skipped when no socket is there), moved back
 /// into an otherwise empty `/run/lampos-control` and remounted read-only,
 /// and its staging file removed. `admin.sock` is never named.
-const TASKS_EDITS: [(&str, &str); 5] = [
+///
+/// With [`NET_ENV`] `run` (a skill's run, in its own network namespace from
+/// [`wrapper_text`]) it also: stages [`MODEL_SOCKET`], the file alone, and
+/// shows it read-only the same way (missing, the run ends); brings `lo` up
+/// with `ip` (`/usr/sbin/ip` or `/sbin/ip`; none, the run ends); and starts
+/// [`RELAY`] `net-relay` in the background as the caller's own ids in a
+/// nested user namespace (so it holds no capability over these mounts),
+/// waiting for its `ready` line (none, the run ends). The PID namespace
+/// ends the relay with Hermes. No other address is reachable: the
+/// namespace has only `lo`.
+const TASKS_EDITS: [(&str, &str); 6] = [
     (
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n",
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n\
          # LAMP_SKILL_TASKS=on (#6306): it also shows lamp-control's socket /run/lampos-control/control.sock alone, read-only,\n\
-         # so a skill's run reaches the lamp with its one-run token; nothing else of lamp-control's folder is shown.\n",
+         # so a skill's run reaches the lamp with its one-run token; nothing else of lamp-control's folder is shown.\n\
+         # With LAMP_NS_NET=run (a skill's run, its own network namespace) it shows lamp-tasks' model.sock alone, read-only,\n\
+         # brings lo up and starts lamp-tasks net-relay on 127.0.0.1:7741 to it: the run's only other way out.\n",
     ),
     (
         " S=/tmp/.lampos-ns\n",
-        " L=/run/lampos-control/control.sock S=/tmp/.lampos-ns\n",
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns\n",
     ),
     (
         "if [ -n \"$R\" ]; then touch \"$S/r\" && mount --bind \"$R\" \"$S/r\" || fail \"no $R\"; fi\n",
         "if [ -n \"$R\" ]; then touch \"$S/r\" && mount --bind \"$R\" \"$S/r\" || fail \"no $R\"; fi\n\
-         if [ -S \"$L\" ]; then touch \"$S/l\" && mount --bind \"$L\" \"$S/l\" || fail \"no $L\"; else L=; fi\n",
+         if [ -S \"$L\" ]; then touch \"$S/l\" && mount --bind \"$L\" \"$S/l\" || fail \"no $L\"; else L=; fi\n\
+         if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n",
     ),
     (
         "&& mount --move \"$S/r\" \"$R\" && ro \"$R\" || fail \"$R not shown\"; fi\n",
         "&& mount --move \"$S/r\" \"$R\" && ro \"$R\" || fail \"$R not shown\"; fi\n\
-         if [ -n \"$L\" ]; then mkdir -p \"${L%/*}\" && touch \"$L\" && mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n",
+         if [ -n \"$L\" ]; then mkdir -p \"${L%/*}\" && touch \"$L\" && mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n\
+         if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n",
     ),
-    ("rm -f \"$S/r\" &&", "rm -f \"$S/r\" \"$S/l\" &&"),
+    ("rm -f \"$S/r\" &&", "rm -f \"$S/r\" \"$S/l\" \"$S/b\" &&"),
+    (
+        "unset LAMP_NS_UID LAMP_NS_GID\nexport HOME\n",
+        "unset LAMP_NS_UID LAMP_NS_GID\nexport HOME\n\
+         if [ \"${LAMP_NS_NET-}\" = run ]; then\n\
+         \x20 I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x \"$p\" ]; then I=$p; break; fi; done\n\
+         \x20 [ -n \"$I\" ] || fail \"no ip: lo not up, the run has no way out\"\n\
+         \x20 \"$I\" link set lo up || fail \"lo not up\"\n\
+         \x20 M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /opt/lampOS/tasks/current/lamp-tasks net-relay --listen 127.0.0.1:7741 --to \"$B\" &)\n\
+         \x20 [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n\
+         fi\n\
+         unset LAMP_NS_NET\n",
+    ),
 ];
 
 /// [`NS`]'s text for what it shows: [`NS_TEXT`] with [`SKILLS_EDITS`]
@@ -668,7 +751,7 @@ pub(crate) fn holds(root: &Path, path: &str, text: &str) -> bool {
 pub fn present(root: &Path, shown: Shown) -> bool {
     fs::metadata(on(root, HERMES)).is_ok()
         && head(root).as_deref() == Some(COMMIT)
-        && holds(root, WRAPPER, WRAPPER_TEXT)
+        && holds(root, WRAPPER, &wrapper_text(shown.tasks))
         && holds(root, NS, &ns_text(shown.skills, shown.tasks))
 }
 
@@ -1472,7 +1555,8 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
 /// so `lampos` never finds a wrapper before what it runs.
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
     let ns = ns_text(shown.skills, shown.tasks);
-    for (path, text) in [(NS, ns.as_str()), (WRAPPER, WRAPPER_TEXT)] {
+    let wrapper = wrapper_text(shown.tasks);
+    for (path, text) in [(NS, ns.as_str()), (WRAPPER, wrapper.as_str())] {
         let place = on(root, path);
         if let Some(folder) = place.parent()
             && !folder.is_dir()

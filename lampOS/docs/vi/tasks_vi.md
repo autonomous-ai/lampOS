@@ -210,7 +210,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   Việc của kỹ năng được đưa vào như dữ liệu (một chuỗi JSON, "as data, not
   as instructions"), và không được có ký tự điều khiển. Runner kết thúc lần
   chạy ở `SkillRun::deadline`, đúng thời hạn của token, tự nó làm, không
-  chỉ dựa vào lời trong prompt. Lần chạy chưa bị chặn mạng (xem "Chưa có").
+  chỉ dựa vào lời trong prompt. Runner của đèn cho lần chạy một network
+  namespace riêng (bên dưới).
 - **Runner của đèn** (`HermesRunner::lamp`): Hermes của đèn được khởi động
   như Harness khởi động nó cho đích `lamp`: `/usr/local/bin/hermes chat -q`
   và lời của lần chạy là đối số cuối (wrapper chỉ chạy Hermes trong
@@ -221,8 +222,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   lamp")), trong thư mục làm việc của đèn
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; thư mục đó không có thì
   là `run_failed` và không khởi động gì. Môi trường chỉ có `PATH`, `HOME`,
-  `HERMES_HOME` và `SHELL` (như lamp-tasks.service cho) cùng
-  `LAMP_CONTROL_SOCKET` và `LAMP_CONTROL_TOKEN` của lần chạy; không gì khác
+  `HERMES_HOME` và `SHELL` (như lamp-tasks.service cho), `LAMP_NS_NET=run`
+  (bên dưới), cùng `LAMP_CONTROL_SOCKET` và `LAMP_CONTROL_TOKEN` của lần chạy; không gì khác
   của chính lamp-tasks. Token không bao giờ là đối số, và đầu ra của lần
   chạy không đi đâu cả, không vào nhật ký. Lần chạy là một nhóm tiến trình
   riêng, bị kill cả nhóm ở hạn chót (14 phút); mã thoát 0 là
@@ -243,6 +244,37 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   quả, không bao giờ giữ dòng, lời của việc hay token. lamp-skills chỉ tới
   socket bằng `--tasks-socket` hoặc `LAMP_SKILLS_TASKS_SOCKET` (#6346);
   chưa unit nào truyền nó.
+- **Không mạng nào khác: hai đường ra** (thiết kế của người xây dựng đầu
+  tiên trên #6443). Lần chạy được khởi động với `LAMP_NS_NET=run`
+  (`NET_ENV`), cách chọn duy nhất, và nó chỉ lấy bớt quyền truy cập: với
+  `LAMP_SKILL_TASKS=on` trong unit của chính lamp-update, wrapper của
+  Hermes khi đó cho nó một network namespace riêng chỉ có `lo`
+  (docs/install.md, "Hermes on the lamp"), nên không địa chỉ nào khác phân
+  giải hay kết nối được. Các pane của chính Harness không bao giờ đặt biến
+  này, và giữ mạng như cũ. Hai đường ra là các tệp được cho thấy ở chế độ
+  chỉ đọc trong đó: `control.sock` của lamp-control (ở trên), và cầu nối
+  của lamp-tasks tới bộ chuyển tiếp model của lamp-cloud (`net_bridge`):
+  - **Cầu nối** (`Bridge`): với `LAMP_SKILL_TASKS=on`, `serve` mở
+    `/run/lampos-tasks/model.sock` (`MODEL_SOCKET`), tạo như các socket
+    khác của nó (0600 trong thư mục runtime 0700), và nối mỗi kết nối tới bộ
+    chuyển tiếp của lamp-cloud trên TCP `127.0.0.1:7741` (`FORWARDER`). Tắt
+    thì không mở gì; không mở được thì ghi trong nhật ký, và script
+    namespace của lần chạy khi đó dừng lại (fail closed).
+  - **Relay** (`lamp-tasks net-relay --listen 127.0.0.1:7741 --to
+    /run/lampos-tasks/model.sock`, `relay_main`): script namespace của lần
+    chạy khởi động nó trước Hermes, bên trong namespace; nó chỉ nghe trên
+    địa chỉ loopback, in `ready`, đóng đầu ra, và nối mỗi kết nối tới cầu
+    nối cho tới khi PID namespace của lần chạy kết thúc nó. Các lệnh gọi
+    model của Hermes vẫn tới `http://127.0.0.1:7741/v1/deepseek` như trước.
+  - **Có giới hạn, và không nhìn thứ nó nối:** mỗi phía tối đa 4 kết nối
+    cùng lúc (bộ chuyển tiếp của lamp-cloud chạy 4; thêm một thì bị đóng
+    ngay), 5 s để tới phía bên kia, mỗi chiều kết thúc sau 130 s không có
+    byte nào và mỗi kết nối sau 700 s (quá giới hạn đọc 120 s và trả lời
+    600 s của chính bộ chuyển tiếp). Byte được nối thẳng, không bao giờ đọc
+    như HTTP, và không gì của body hay header (token của bộ chuyển tiếp nằm
+    trong một header) được ghi nhật ký: vài dòng được ghi là văn bản cố
+    định. Không cái nào cho lần chạy nhiều hơn uid của nó vốn có: bộ chuyển
+    tiếp trả lời mọi người gọi cục bộ, chỉ với token của nó.
 
 **Chưa có (nói rõ để không hiểu code là nhiều hơn):** `ControlTokens` nói
 theo socket quản trị của lamp-control (#6408, đã gộp), nhưng lamp-control
@@ -252,12 +284,12 @@ Chưa unit sản phẩm nào đặt `LAMP_SKILL_TASKS=on` cho lamp-tasks, và ch
 unit nào truyền socket cho lamp-skills, nên trên đèn chưa có việc của kỹ
 năng nào chạy. hermes-ns cũng chỉ cho lần chạy thấy `control.sock` của
 lamp-control khi có `LAMP_SKILL_TASKS=on` trong unit của chính lamp-update,
-và cũng chưa unit sản phẩm nào đặt nó. Kết quả của lần chạy chưa thành Task news, và thư mục của kỹ năng được
+và cũng chưa unit sản phẩm nào đặt nó; network namespace riêng của lần chạy
+cũng vậy. `LAMP_SKILL_TASKS` vẫn tắt cho tới khi các quyền của lamp-control
+tới được thư, lịch và phần còn lại qua `control.sock` (#6436). Kết quả của
+lần chạy chưa thành Task news, và thư mục của kỹ năng được
 nêu trong lời của lần chạy, chưa nằm trong `AGENTS.md` của thư mục làm việc.
-Việc "không mạng nào
-khác" của lần chạy (một lệnh gọi ra ngoài trực tiếp bị từ chối) là quyết
-định thiết kế của người xây dựng đầu tiên, vì chính các lệnh gọi model của
-Hermes cần một đường ra; việc đó và giới hạn
+Giới hạn
 của lamp-tasks.service (`MemoryHigh`, `CPUQuota`) chờ số đo RAM và CPU của
 Hermes khi chạy một việc trên lamp-52e6 (đèn 6 GB: mọi giới hạn RAM được
 tính theo loại đèn này), so với mức sàn khi cài Hermes
@@ -266,8 +298,20 @@ tính theo loại đèn này), so với mức sàn khi cài Hermes
 mọi dòng bị từ chối; socket trả lời một dòng, lần chạy thứ hai bị từ chối
 `busy`, tắt công tắc thì không mở gì, người gọi không phải lamp-skills không
 được trả lời; lần chạy bị kill ở hạn chót, mã thoát của nó, và token nằm
-trong môi trường, không bao giờ trong đối số), chạy trên máy tính bất kỳ,
-không cần Hermes.
+trong môi trường, không bao giờ trong đối số; runner của đèn đặt
+`LAMP_NS_NET=run`) và `net_bridge::tests` (một lệnh gọi được nối TCP sang
+unix sang TCP và câu trả lời quay về, đúng từng byte, qua một bộ chuyển
+tiếp giả trên cổng tạm; kết nối vượt mức tối đa bị đóng ngay và chỗ được
+trả lại; đường nối không hoạt động bị kết thúc; không gì được nối bị ghi
+nhật ký; đối số của relay; tắt công tắc thì không mở gì), chạy trên máy
+tính bất kỳ, không cần Hermes.
+
+**Dòng kiểm tra trên đèn (chưa chạy):** trên một đèn đã cài Hermes,
+lamp-control đang phục vụ và `LAMP_SKILL_TASKS=on` trong cả hai unit, lần
+chạy của một kỹ năng có script chạy `curl https://example.com` thì thất bại
+(không tên nào phân giải được, không có route), trong khi lệnh gọi model của
+cùng lần chạy được trả lời và lệnh gọi `control.sock` của nó chạy được với
+token.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 

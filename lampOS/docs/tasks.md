@@ -2211,8 +2211,8 @@ for each run, and is answered once the run ends
   JSON string, "as data, not as instructions"), and the one way to the
   lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
   run's end. The runner ends the run at `SkillRun::deadline`, the token's
-  life, itself, never by the prompt's words alone. The run is not held off
-  the network (see "Not yet").
+  life, itself, never by the prompt's words alone. The lamp's runner gives
+  the run its own network namespace (next).
 - **The lamp's runner** (`HermesRunner::lamp`): the lamp's Hermes started
   as Harness starts it for target `lamp`: `/usr/local/bin/hermes chat -q`
   and the run's words as the last argument (the wrapper runs Hermes only in
@@ -2222,8 +2222,8 @@ for each run, and is answered once the run ends
   `admin.sock` (docs/install.md, "Hermes on the lamp")), in the lamp's work folder
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; that folder not there
   is `run_failed` with nothing started. Its environment is only `PATH`,
-  `HOME`, `HERMES_HOME` and `SHELL` (as lamp-tasks.service gives them) and
-  the run's `LAMP_CONTROL_SOCKET` and `LAMP_CONTROL_TOKEN`; nothing else of
+  `HOME`, `HERMES_HOME` and `SHELL` (as lamp-tasks.service gives them),
+  `LAMP_NS_NET=run` (below), and the run's `LAMP_CONTROL_SOCKET` and `LAMP_CONTROL_TOKEN`; nothing else of
   lamp-tasks' own. The token is never an argument, and the run's output
   goes nowhere, not into the journal. The run is its own process group,
   killed whole at its deadline (14 minutes); exit status 0 is
@@ -2244,6 +2244,37 @@ for each run, and is answered once the run ends
   The journal keeps each outcome's code only, never the line, the task's
   words or the token. lamp-skills names the socket with `--tasks-socket` or
   `LAMP_SKILLS_TASKS_SOCKET` (#6346); no unit passes it yet.
+- **No other network: two ways out** (the first builder's design on
+  #6443). The run is started with `LAMP_NS_NET=run` (`NET_ENV`), the only
+  opt-in, which only takes access away: with `LAMP_SKILL_TASKS=on` in
+  lamp-update's own unit, Hermes's wrapper then gives it a network
+  namespace of its own with only `lo` (docs/install.md, "Hermes on the
+  lamp"), so no other address resolves or connects. Harness's own panes
+  never set it, and keep their network. Its two ways out are files shown
+  read-only in it: lamp-control's `control.sock` (above), and lamp-tasks'
+  bridge to lamp-cloud's model forwarder (`net_bridge`):
+  - **The bridge** (`Bridge`): with `LAMP_SKILL_TASKS=on`, `serve` binds
+    `/run/lampos-tasks/model.sock` (`MODEL_SOCKET`), made as its other
+    sockets are (0600 in its 0700 runtime folder), and pipes each
+    connection to lamp-cloud's forwarder on TCP `127.0.0.1:7741`
+    (`FORWARDER`). Off, nothing is bound; one not bound is said in the
+    journal, and a run's namespace script then fails closed.
+  - **The relay** (`lamp-tasks net-relay --listen 127.0.0.1:7741 --to
+    /run/lampos-tasks/model.sock`, `relay_main`): started by the run's
+    namespace script before Hermes, inside the namespace; it listens on a
+    loopback address only, prints `ready`, closes its output, and pipes
+    each connection to the bridge until the run's PID namespace ends it.
+    Hermes's model calls go to `http://127.0.0.1:7741/v1/deepseek` as
+    before.
+  - **Bounded, and blind to what it pipes:** each side at most 4
+    connections at once (lamp-cloud's forwarder runs 4; one more is closed
+    at once), 5 s to reach the other side, each direction ended after
+    130 s with no byte and each connection after 700 s (past the
+    forwarder's own 120 s read and 600 s answer bounds). Bytes are piped,
+    never read as HTTP, and nothing of a body or a header (the forwarder's
+    token travels in one) is logged: the few lines said are fixed text.
+    Neither gives the run more than its uid already had: the forwarder
+    answers any local caller, only with its token.
 
 **Not yet (said so the code is not read as more):** `ControlTokens` speaks
 lamp-control's admin socket (#6408, merged), but lamp-control keeps no skill
@@ -2251,11 +2282,12 @@ yes yet, so every mint is refused there today. No product unit sets
 `LAMP_SKILL_TASKS=on` for lamp-tasks, and none passes lamp-skills the
 socket, so nothing on a lamp runs a skill's task. hermes-ns shows the run
 lamp-control's `control.sock` only with `LAMP_SKILL_TASKS=on` in
-lamp-update's own unit too, which no product unit sets either. The run's result is not yet Task news, and the
+lamp-update's own unit too, which no product unit sets either; its own
+network namespace is the same. `LAMP_SKILL_TASKS` stays off until
+lamp-control's grants reach mail, the calendar and the rest through
+`control.sock` (#6436). The run's result is not yet Task news, and the
 skill's folder is named in the run's words, not in the work folder's
-`AGENTS.md`. The run's "no other
-network" (a direct outbound call refused) is a design call for the first
-builder, as Hermes's own model calls need a way out; it and the caps on
+`AGENTS.md`. The caps on
 lamp-tasks.service (`MemoryHigh`, `CPUQuota`) wait for measurements of
 Hermes's RAM and CPU running a task on lamp-52e6 (a 6 GB lamp: every
 RAM cap is sized to one) against Hermes's install floor (≥1,350 MB available), with the voice answering a line during the
@@ -2263,8 +2295,19 @@ run. Tests: `skill_task::tests` (the switch, the token's life, a failed
 run, no token, every refused line; the socket answering a line, a second
 run refused `busy`, the switch off binding nothing, a caller not
 lamp-skills given no answer; a run killed at its deadline, its exit status,
-and the token in its environment, never its arguments), on any computer,
-with no Hermes.
+and the token in its environment, never its arguments; the lamp's runner
+setting `LAMP_NS_NET=run`) and `net_bridge::tests` (a call piped TCP to
+unix to TCP and its answer back, byte for byte, through a stand-in
+forwarder on an ephemeral port; a connection past the most closed at once
+and the bound let go; an idle pipe ended; nothing piped ever said; the
+relay's arguments; the switch off binding nothing), on any computer, with
+no Hermes.
+
+**The lamp row (not yet run):** on a lamp with Hermes installed,
+lamp-control serving and `LAMP_SKILL_TASKS=on` in both units, a skill's run
+whose script runs `curl https://example.com` gets a failure (no name
+resolves, no route), while the same run's model call is answered and its
+`control.sock` call works with its token.
 
 ## Devin (#1854)
 
