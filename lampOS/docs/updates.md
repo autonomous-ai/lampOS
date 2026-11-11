@@ -59,7 +59,7 @@ Read for this task: `docs/bootstrap-ota.md` (sections 1, 2, 4 and 5) and
 | GO-3.5 | The signed feed: an `autonomous-ota/v1` envelope, Ed25519 over the exact payload bytes, the public key given at setup and never read from the feed, a key fingerprint (first 16 hex of its SHA-256) | `rebuild from the idea` | Right, and small. Taken: Ed25519 over the manifest's exact bytes, one envelope so the two are always read together, a local key, the fingerprint. Not taken: the unsigned "legacy" mode and the unsigned top-level copy kept for old workers (`security.go`: "Compatibility feeds keep legacy top-level entries"); here an unsigned build is never one. Added: a sequence that only goes up, which V1's envelope lacks, so an old signed manifest cannot be played back | `lamp-update` | built |
 | GO-3.5 | Each cycle downloads a new updater script and runs it after `bash -n` (`updater_refresh.go`) | `ignore` | Code fetched and run is a second, unsigned path. `lamp-update` runs nothing it fetches but the parts' binaries, each named by its SHA-256 in a signed manifest | Nowhere | none |
 | GO-3.4 | `min_version` floor beside `version`; `software-update KEY` over SSH ignores the floor | `ignore` | A channel replaces it: the lamp follows the newest build of one branch, and a build is tried by hand from a folder on the lamp (`--channel-url file:///...`), not by a second number | Nowhere | none |
-| GO-3.4 | `rollback_versions`: the version a rollback removed is skipped by later polls until another is published | `rebuild from the idea` | Taken as "refused builds": a build put back is never tried again; the next one is | `lamp-update`, `state.json` | built |
+| GO-3.4 | `rollback_versions`: the version a rollback removed is skipped by later polls until another is published | `rebuild from the idea` | Taken as "refused builds": a build put back is never tried again; the next one is. A switch cut short is put back but tried again, and refused only on its third cut-short in a row (#6266) | `lamp-update`, `state.json` | built |
 | GO-3.4 | State written to a temporary file, synced, renamed; a corrupt state kept aside as `state.json.corrupt-<time>` and begun again, its key paths marked as once written (#1263) | `rebuild from the idea` | Taken as it is, for every record, with the folder synced too | `lamp-update`, `records.rs` | built |
 | GO-3.4 | `componentInstalled`: a component the device does not have is not updated | `rebuild from the idea` | Taken: only parts with a unit installed on this lamp are updated; a binary the build carries and the lamp does not run is not fetched | `lamp-update` | built |
 | GO-3.6 | Five safeguards "learned the hard way" (`bootstrap-ota.md`, "Invariants") | `take the cases` | (1) One run at a time: taken, `flock` on the records' `lock`. (2) A missing installation is a reinstall: taken, a unit whose folder is gone gets the build's binary afresh. (3) Publish with the live tree's mode: taken, folders 0755 and binaries 0755, never a temporary folder's 0700. (4) A virtualenv is not relocatable: nothing here is relocated; files are installed under their final folder's parent and renamed. (5) Failure feedback is temporary: no light at all (the ring is the voice's) | `lamp-update` | built, (5) not needed |
@@ -664,8 +664,25 @@ each under the quiet rule. A round
    truthfully records whether it was active before the switch. The graph is
    checked before any restoration write: a
    cycle or unsupported ordering syntax leaves the journal and the existing
-   recovery prefix in place for another attempt. A completed put-back
-   refuses the build.
+   recovery prefix in place for another attempt. A cut-short says nothing
+   of the build (#6266: lamp-29e7 was held off two good builds this way),
+   so a completed put-back does **not** refuse it: the next round tries the
+   same build again. `state.json` counts the cut-shorts in a row as
+   `cut_short` (`{"sequence", "commit", "times"}`, absent when there are
+   none, and absent from a state written before, which still loads); the
+   third in a row of the same build refuses it (`the switch was cut short
+   (...), 3 times in a row`), so a build that itself reboots the lamp
+   mid-switch is still stopped. One below three is said: `build N is not
+   refused: cut short T of 3 times in a row; the next round tries it
+   again`. A different build starts the count again at one, and a finished
+   switch (or a round that takes the build with nothing to switch) clears
+   it. A put-back that leaves the journal (not all files back) counts
+   nothing. Every other put-back (a part not well, a failed watch, a
+   settings or skills step, a local override that leaves a part not well)
+   refuses the build at once, as before. When such a put-back cannot put
+   every file back and leaves the journal, its reason is written into the
+   journal as `refusing`, and the recovery at the next start refuses the
+   build for that reason, not as a cut-short.
 2. **The channel.** `lampos-manifest.json` is read from `--channel-url`.
    No network: `nothing changed: the channel cannot be reached: ...`, status
    3. Nothing published: `nothing changed: the channel has published no
