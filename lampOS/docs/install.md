@@ -1512,7 +1512,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      The one exception is the setup walk itself: while it is under way
      (the voice's onboarding file, as the round's own walk hold reads it,
      `crates/update/src/walk.rs`) the round waits.
-     Harness's own install is not held by it. lamp-update's sandbox reads
+     Harness's own install is not held by it. **The app's tap** (#6240,
+     `LAMP_APP_ENGINES=on` in lamp-update's and lamp-cloud's units,
+     `crates/update/src/engines.rs`; docs/cloud.md, "The lamp's agents"):
+     the app shows Hermes's state (`off`, `not_installed`, `waiting`,
+     `installing`, `frozen`, `installed`, `failed`) and, for one missing
+     or failed, `engines.install` puts one `update/engine_install` on the
+     bus. `serve` marks it asked and starts its next round; that round's
+     step opens `Window::Asked`, which still waits out the setup walk, and
+     a recent failure does not hold it. Everything below (the floors, the
+     freeze, the privacy stop) is the same. lamp-update's sandbox reads
      all of these: `ProtectSystem=strict` keeps `/var/lib` and `/etc`
      readable, and `/run/lampos-bus` is among its `ReadWritePaths`. The
      voice is heard by a thread of `serve` that listens from its start
