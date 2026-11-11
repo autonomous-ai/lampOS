@@ -250,7 +250,7 @@ pub const PRODUCT: &[(&str, &str)] = &[
         include_str!("../../../deploy/product/lamp-waking.service"),
     ),
     // Setup's hotspot again when a set-up lamp's saved network is gone
-    // (#3020); off unless `LAMP_WIFI_RECOVERY=on`.
+    // (#3020); `LAMP_WIFI_RECOVERY=on` in the unit (#5758).
     (
         "lamp-setup-recover.service",
         include_str!("../../../deploy/product/lamp-setup-recover.service"),
