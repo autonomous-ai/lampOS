@@ -271,10 +271,13 @@ lamp-setup reset-now`). That unit, in this order:
    `HERMES_HOME` (`.hermes`), the checkout `hermes-agent`, `tools` (uv,
    ffmpeg), `installs`, the public model lists' caches
    (`models_dev_cache.json`, `models_dev_cache.etag`,
-   `provider_models_cache.json`) and `config.yaml`, which holds lamp-update's
-   install-time settings and Harness's `hooks:` block, written again only by
-   a reinstall (lamp-tasks merges the lamp's provider into it at each start
-   and takes any other provider's address and key out); the installer's
+   `provider_models_cache.json`) and `config.yaml`, cut to lamp-update's
+   install-time settings (`hermes_install::CONFIG`) and Harness's `hooks:`
+   block (`reset::cut_hermes_config`): a person's `mcp_servers`,
+   `skills.external_dirs`, personality and every other key go, and
+   lamp-tasks merges the lamp's provider back in at its next start; a
+   `config.yaml` the cut can't read (not UTF-8, a tab, a document marker, a
+   top-level line that is not a key) is removed; the installer's
    folders `cron`, `sessions`, `logs`, `pairing`, `hooks`, `image_cache`,
    `audio_cache`, `memories` and `skills` are emptied and kept (Hermes copies
    its bundled skills back, and writes `SOUL.md` again, at its next start).
@@ -284,14 +287,23 @@ lamp-setup reset-now`). That unit, in this order:
    the hooks allow-list, `auth.lock` and anything else. In
    `/var/lib/lampos-openclaw`, kept: `node`, `npm` (and an earlier `pkg`),
    `.npm`, `.cache`, the lamp's `gateway-token` and `state`; in its `state`,
-   only `openclaw.json`, whose `gateway` block lamp-update writes only at an
-   install (lamp-tasks merges its keys in at each start). Removed: the
+   only `openclaw.json`, cut to its `gateway` key, which lamp-update writes
+   only at an install (`reset::cut_openclaw_config`): another provider's
+   key, a channel's token, a person's skill folders and plugins go, and
+   lamp-tasks merges the lamp's keys back in at each start; one that is not
+   a JSON object is removed. The lamp's `gateway-token` is kept as it is:
+   made once per lamp, it is the lamp's, not the person's. The Hermes a pin
+   change moved aside (`/var/lib/lampos-hermes.old`,
+   `hermes_install::ASIDE`), with the old Hermes's sessions, memories and
+   keys, is removed whole. Removed: the
    gateway's log, OpenClaw's database, `agents`, `workspace`, `media`, `tmp`,
    `plugin-skills`, `openclaw.json.last-good` and anything else. A missing
    folder removes nothing, and no link is followed. OpenClaw's gateway
    (`lamp-openclaw-gateway.service`, outside `lampos.target`) is among the
-   writers stopped before the wipe; the next boot or the updater's next
-   round starts it again;
+   writers stopped before the wipe, and `resume-reset` stops it too before
+   it finishes an interrupted reset, since it starts at boot under
+   `multi-user.target`, not ordered against setup; the next boot or the
+   updater's next round starts it again;
 5. it removes the journal, syncs, and **starts setup again in place, with no
    reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl
@@ -352,7 +364,8 @@ lamp with no marker starts only `lamp-setup.service`. So if the stop fails,
 `lamp-setup` reboots at once without wiping; if the power goes during the
 wipe, the lamp also comes back with no marker and a journal. Either way
 `resume-reset`, the first thing `lamp-setup.service` runs, finishes the wipe
-with nothing of the lamp running, without a second reboot. A power cut between
+with nothing of the lamp running, without a second reboot; only OpenClaw's
+gateway, which starts at boot outside the lamp's target, is stopped first. A power cut between
 the journal and the marker's removal leaves both, so the lamp starts; then
 `watch-reset` finds the journal at its start and carries on with the reset. A plan is refused unless every path is absolute and
 plain (no `.` or `..`, read from the text itself), at least two levels below a
