@@ -252,6 +252,10 @@ pub struct Watch {
     /// What the ring draws now (`light/drawn`): the person's light, or a
     /// light a computer or a skill asked for over it; none until it says.
     shows: Option<Value>,
+    /// Pixels a computer asked the ring to draw and still holds, for
+    /// `shows.pixels` while the ring says that light is the one it draws
+    /// ([`Watch::hold_pixels`]); newest last.
+    held_pixels: Vec<HeldPixels>,
     mood: Value,
     /// The speaker's volume (`speaker/volume`): `{level, muted}`, none until
     /// lamp-actions says it.
@@ -285,9 +289,74 @@ pub struct Watch {
     pet_told: Option<(String, u64)>,
 }
 
+/// A computer's own pixels (`light` with `rgb` or `pixels`), kept while its
+/// request holds: the light the request named beside them (what `light/drawn`
+/// says when the ring draws it) and each pixel as `#rrggbb`, as asked of the ring.
+#[derive(Clone, Debug)]
+struct HeldPixels {
+    client: String,
+    on: bool,
+    colour: String,
+    level: u8,
+    pixels: Vec<String>,
+    until_us: u64,
+}
+
 impl Watch {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// `client` asked the ring for its own `pixels` with the named `light`
+    /// beside them, lapsing at `until_us` (the boot's monotonic clock). Kept
+    /// to be shown as `shows.pixels` for as long as the request holds and the
+    /// ring's `light/drawn` says that light is the one drawn: never the ring's
+    /// own message (docs/control.md, "Events").
+    pub fn hold_pixels(
+        &mut self,
+        client: &str,
+        light: &lamp_msgs::Light,
+        pixels: &[[u8; 3]],
+        until_us: u64,
+    ) {
+        let now = lamp_ipc::monotonic_us();
+        self.held_pixels
+            .retain(|held| held.client != client && held.until_us > now);
+        self.held_pixels.push(HeldPixels {
+            client: client.to_owned(),
+            on: light.on,
+            colour: light.colour.clone(),
+            level: light.level,
+            pixels: pixels
+                .iter()
+                .map(|[r, g, b]| format!("#{r:02x}{g:02x}{b:02x}"))
+                .collect(),
+            until_us,
+        });
+    }
+
+    /// `client` asked the ring for another light, or gave its light back: its
+    /// pixels are no longer asked for.
+    pub fn release_pixels(&mut self, client: &str) {
+        self.held_pixels.retain(|held| held.client != client);
+    }
+
+    /// What the ring draws now (`light/drawn`), with `pixels` (each `#rrggbb`)
+    /// while a computer's own pixels are held, still lasting, and the ring's
+    /// light is the one they named. None until the ring says.
+    fn shows_now(&self) -> Option<Value> {
+        let mut shows = self.shows.clone()?;
+        let now = lamp_ipc::monotonic_us();
+        let held = self.held_pixels.iter().rev().find(|held| {
+            held.until_us > now
+                && shows["on"] == json!(held.on)
+                && shows["colour"] == json!(held.colour)
+                && shows["level"] == json!(held.level)
+        });
+        if let Some(held) = held {
+            shows["pixels"] = json!(held.pixels);
+        }
+        Some(shows)
     }
 
     /// What [`Watch::take`] reads from a state topic's message, for the bus
@@ -452,7 +521,7 @@ impl Watch {
             "body/joint_states" => {
                 self.body_joints = Some((payload.clone(), now_us));
                 let lamp = json!({
-                    "light": self.shows.clone().unwrap_or_else(|| self.light.clone()),
+                    "light": self.shows_now().unwrap_or_else(|| self.light.clone()),
                     "talking": self.talking,
                     "private": self.private,
                 });
@@ -642,11 +711,11 @@ impl Watch {
                 json!({"count": self.count, "near": self.near, "facing": self.facing})
             }
             // The person's own light as before, and what shows beside it.
-            StateKind::Light => match (&self.light, &self.shows) {
+            StateKind::Light => match (&self.light, self.shows_now()) {
                 (light, None) => light.clone(),
                 (light, Some(shows)) => {
                     let mut state = light.as_object().cloned().unwrap_or_default();
-                    state.insert("shows".to_owned(), shows.clone());
+                    state.insert("shows".to_owned(), shows);
                     Value::Object(state)
                 }
             },
@@ -1462,6 +1531,95 @@ mod tests {
             watch.state(StateKind::Light)["shows"],
             json!({"on": true, "colour": "warm", "level": 1})
         );
+    }
+
+    /// A computer's own pixels are `shows.pixels` while it holds them and the ring
+    /// says that light is the one it draws: not before, not after the hold lapses
+    /// or ends, not while the ring draws another light, and never in the ring's
+    /// own message (the first builder's yes on `shows.pixels`, option B).
+    #[test]
+    fn a_computers_held_pixels_show_while_held_and_drawn() {
+        let light = lamp_msgs::Light {
+            on: true,
+            colour: "red".to_owned(),
+            level: 3,
+        };
+        let mut pixels = [[0u8, 0, 0]; 32];
+        pixels[0] = [255, 0, 0];
+        pixels[31] = [0, 16, 255];
+        let mut expected = vec!["#000000".to_owned(); 32];
+        expected[0] = "#ff0000".to_owned();
+        expected[31] = "#0010ff".to_owned();
+        let later = lamp_ipc::monotonic_us() + 60 * S;
+        let mut watch = Watch::new();
+        let red = json!({"on": true, "colour": "red", "level": 3});
+        let warm = json!({"on": true, "colour": "warm", "level": 1});
+        // Drawn, nothing held: `shows` is the ring's own words.
+        watch.take("light/drawn", &red, S);
+        assert_eq!(
+            watch.state(StateKind::Light)["shows"],
+            json!({"on": true, "colour": "red", "level": 3})
+        );
+        // Held and drawn: the pixels beside them.
+        watch.hold_pixels("c_1", &light, &pixels, later);
+        let shows = watch.state(StateKind::Light)["shows"].clone();
+        assert_eq!(shows["pixels"], json!(expected), "{shows}");
+        assert_eq!(shows["colour"], "red");
+        // The ring draws the person's light again: no pixels.
+        watch.take("light/drawn", &warm, 2 * S);
+        assert!(watch.state(StateKind::Light)["shows"]["pixels"].is_null());
+        // And back to the held light: they show again.
+        watch.take("light/drawn", &red, 3 * S);
+        assert!(watch.state(StateKind::Light)["shows"]["pixels"].is_array());
+        // Another computer's own pixels of another light: the one drawn wins.
+        let blue = lamp_msgs::Light {
+            on: true,
+            colour: "blue".to_owned(),
+            level: 2,
+        };
+        watch.hold_pixels("c_2", &blue, &[[0, 0, 255]; 32], later);
+        assert_eq!(
+            watch.state(StateKind::Light)["shows"]["pixels"][0],
+            "#ff0000"
+        );
+        watch.take(
+            "light/drawn",
+            &json!({"on": true, "colour": "blue", "level": 2}),
+            4 * S,
+        );
+        assert_eq!(
+            watch.state(StateKind::Light)["shows"]["pixels"][0],
+            "#0000ff"
+        );
+        // Its hold ends (a plain light of its own, or its stop): no pixels.
+        watch.release_pixels("c_2");
+        assert!(watch.state(StateKind::Light)["shows"]["pixels"].is_null());
+        watch.take("light/drawn", &red, 5 * S);
+        watch.release_pixels("c_1");
+        assert!(watch.state(StateKind::Light)["shows"]["pixels"].is_null());
+        // A hold that lapsed shows none, though the ring still draws that light.
+        watch.hold_pixels("c_1", &light, &pixels, 1);
+        assert!(watch.state(StateKind::Light)["shows"]["pixels"].is_null());
+        // The same field is in `body.state`'s light.
+        watch.hold_pixels("c_1", &light, &pixels, later);
+        watch.take(
+            "body/limits",
+            &json!({"joints": [{"name": "base_yaw", "min": 1975, "max": 2055, "home": 2015}], "speed": 50.0}),
+            6 * S,
+        );
+        let out = watch.take(
+            "body/joint_states",
+            &json!({"name": ["base_yaw"], "position": [0.0]}),
+            6 * S,
+        );
+        let state = out
+            .iter()
+            .find_map(|out| match out {
+                Out::Event(EventKind::BodyState, state) => Some(state.clone()),
+                _ => None,
+            })
+            .expect("a body.state");
+        assert_eq!(state["lamp"]["light"]["pixels"], json!(expected), "{state}");
     }
 
     fn air(pm2_5: f32, co2: u16, feel: &str) -> Value {
