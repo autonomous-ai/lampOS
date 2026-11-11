@@ -408,6 +408,68 @@ refusal), and nothing is started new in any case:
     Mac, and how long the person waits while the sessions are listed. A
     hand-over's lookup took 15.2 s on lamp-c0a4 on 10 Nov with two
     computers offline; a look is the same lists.
+- **The sessions the lamp started, kept by name** (#6274, the first
+  builder's ruling of 11 Nov; with `serve --reply-named`, no switch of its
+  own): `harness ps --all` lists only sessions open or stopped in the last
+  7 days, so "open the Christmas dates one" for an older session the lamp
+  started found nothing (`session_not_found`). lamp-tasks keeps an index of
+  the sessions it started (`new`, the id under `agent.id`), typed into (a
+  named hand-over, the router's pick) or opened (a look with `join`), in
+  `sessions-started.json` of the tasks folder (`--dir`,
+  `SESSION_INDEX_FILE`, `crate::session_index`): by machine, each one's
+  `id`, `name` and `last_used` (unix ms), nothing else, never its asks,
+  answers, `about` or folder. A started session's name is the lamp's own,
+  so none is kept until a list shows its title: each `harness ps` lamp-tasks
+  reads (the named lookup's lists, the progress read) and each `show` below
+  keeps the name it shows for a session the index has. At most 200
+  (`MOST_INDEXED`) on every machine together; one more lets the least
+  lately used go. Written whole beside the file and renamed over it, mode
+  0600, never through a link; one that can't be read is none.
+  - Used in the named lookup (`find_named`) only when no listed row fits by
+    name, folder or work on any machine read: the index's sessions on those
+    machines that their lists do not show are matched by the same name
+    rules (`by_name`: the name as said, then each word said beginning one of
+    its words, in order), the lamp's own first. Each that fits is read by
+    its id, `harness show --machine <m> <id> --json` (at most 4, together,
+    within what is left of the bound less the reply's floor), for its state
+    and name. One Harness says is no longer there (`UNKNOWN_HARNESS`,
+    `GONE`) is let go from the index and the lookup goes on; one that can't
+    be read is passed over (`sessions_failed` if nothing else fits). One
+    still there follows a listed session's rules: idle is joined, busy is
+    `session_busy`, stopped is reopened by its id with `harness resume`
+    only under `LAMP_TASKS_RESUME_CLOSED` and only named as it is (else
+    `session_stopped`), and the hand-over types into it after; two that fit
+    are `session_ambiguous`, never a guess. A look (not the hand-over that
+    types) then tries a name said nearly right among the index's names as
+    among the lists' (`nearest_rows`): the index's is taken only when it is
+    nearer than any listed, two as near are `session_ambiguous`, and one
+    found so is never reopened. A lookup that finds nothing in the lists
+    costs one more `show` (about 2.3 s on lamp-c0a4, 10 Nov) per index
+    session that fits, read together; when none fits, nothing more.
+  - Cleared: the lamp's reset wipes `/var/lib/lampos-tasks/store` (the
+    product's reset plan, `crates/setup/fixtures/reset-plan-product.json`),
+    the folder the file is in. The owner's "forget everything" (marked by
+    the second route's guard, their memory emptied, as the kept journal
+    goes) asks lamp-tasks on the voice's socket `{"op":"forget_sessions"}`
+    (`agent_tasks::forget_sessions_with_everything`), which removes the
+    file and answers `{"forgotten":true|false}`; the voice's answer to the
+    person is as it was.
+  - Tests: `tests/harness.rs`
+    `an_older_session_not_listed_is_found_by_its_name_through_the_index`,
+    `a_listed_session_is_found_as_before_and_the_index_only_adds`,
+    `an_indexed_session_that_is_gone_is_dropped`,
+    `an_ambiguous_index_match_is_asked_about`,
+    `the_index_never_makes_a_near_name_reopen_a_closed_session`,
+    `the_lamp_keeps_the_sessions_it_starts_and_their_names_as_listed`,
+    `the_index_lives_in_the_tasks_folder_the_reset_wipes`;
+    `tests/session_index.rs` `the_index_holds_only_id_name_and_last_use`,
+    `the_index_keeps_the_most_lately_used`, `forgetting_removes_the_index`;
+    `tests/runtime.rs`
+    `forget_sessions_removes_the_index_of_the_sessions_the_lamp_started`;
+    `agent_tasks::tests::the_owners_forget_everything_forgets_the_sessions_the_lamp_started`.
+  - Not yet shown on a lamp: a session older than 7 days reopened by its
+    id (Harness 0.6.12 says `resume <id>` and `show <id>` reach one), and
+    the time one more `show` adds.
 
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads
 how each task handed over is going with one `harness ps` a machine and puts
@@ -528,6 +590,7 @@ inspection evidence, not a playback grant.
 | `tasks_now` | none | With `serve --progress` only: every task being worked on or lately settled, newest first, with its last step in the agent's words marked untrusted, in under 2 KiB (["Tasks now"](#tasks-now-4342-serve---progress)) |
 | `prepare` | `guard`, `text`, `target` alias | Immutable proposal; no CLI call |
 | `session` | `look` (the voice's id for it), `target` alias, `session` (the person's words), optional `join` | Trusted, with `serve --reply-named` only (else `reply_named_off`, #6274): a look at a named session, to open it (`join`) or to say how it is. Answers at once, `done:false`, while the look runs on its own lane; asked again with the same `look`, `done:true` with `found` (`near` when found only by a name said nearly right) or `code`. Never types or routes; with `join` it may reopen a closed session named as it is (`LAMP_TASKS_RESUME_CLOSED`), never one found near. The voice asks only for the lamp's owner, heard |
+| `forget_sessions` | none | Trusted (#6274): the index of the sessions the lamp started (`sessions-started.json`) removed, for the owner's "forget everything"; answers `forgotten` |
 | `confirm` | `guard`, `id`, `prepared_digest`, `session_id` | Trusted person's spoken confirmation |
 | `cancel` | `guard`, `id` | Only before dispatch attempt |
 | `observe` | `guard`, `id` | Explicit `show` of the bound accepted agent |
