@@ -364,6 +364,11 @@ pub struct SessionSeen {
     /// target's own machine (#5978).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on: Option<String>,
+    /// Found only by a name said nearly right ([`near_session`]): the
+    /// closest to what was said, which the voice names so the person hears
+    /// which one it is; a closed one found so is never reopened.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub near: bool,
 }
 
 /// [`SessionSeen`] from `agent_id`'s row of a `harness ps --all --json`
@@ -394,6 +399,7 @@ fn session_seen(
         last_active_unix_ms: row["lastActive"].as_str().and_then(iso_unix_ms),
         resumed: None,
         on: on.map(|on| on.alias.clone()),
+        near: false,
     }
 }
 
@@ -1390,18 +1396,25 @@ impl Cli {
     /// [`Cli::look_session`] look for it: among `target`'s machine's sessions
     /// (`harness ps --all`), and, for the lamp's own target (#5978), each
     /// computer's after it, then by the newest stopped ones' last asks
-    /// ([`Cli::stopped_by_work`]). `Ok` with what fits ([`Named::Idle`],
-    /// [`Named::Stopped`] or [`Named::Busy`]), the machine it was found on
-    /// when not `target`'s own, and that machine's list; else why nothing
-    /// fits or nothing could be read (`session_not_found`,
-    /// `session_ambiguous`, `sessions_…`, `cancelled`).
+    /// ([`Cli::stopped_by_work`]). With `near` (a look only, never the
+    /// hand-over that types), when no machine has one that fits so, a name
+    /// said nearly right ([`near_session`]) among every list read: the
+    /// closest anywhere, two as close (on one machine or two) asked about.
+    /// So a session named as it is on a computer always beats a near one on
+    /// the lamp (the Reviewer-lead's P2 on #6422). `Ok` with what fits
+    /// ([`Named::Idle`], [`Named::Stopped`] or [`Named::Busy`]), the machine
+    /// it was found on when not `target`'s own, that machine's list, and
+    /// whether it was found only near; else why nothing fits or nothing
+    /// could be read (`session_not_found`, `session_ambiguous`,
+    /// `sessions_…`, `cancelled`).
     fn find_named(
         &self,
         target: &Target,
         session: &str,
+        near: bool,
         began: Instant,
         seen: &mut Seen,
-    ) -> Result<(Named, Option<JoinedOn>, Vec<u8>), String> {
+    ) -> Result<(Named, Option<JoinedOn>, Vec<u8>, bool), String> {
         // The machines looked among: the launch's own, and with the lamp's
         // own target (#5978) each computer's too, the lamp first. A
         // computer the last `harness machines` look said is offline is not
@@ -1497,24 +1510,57 @@ impl Cli {
             }
             unread.get_or_insert(code);
         }
-        match chosen_session(found) {
-            Ok((Named::Refused(code), _)) | Err(code) => {
-                // Nowhere fits while a computer couldn't be read: said as
-                // that, not as no such session.
-                Err(match unread {
-                    Some(unread) if code == "session_not_found" => unread,
-                    _ => code.to_owned(),
-                })
-            }
+        let list_of = |lists: Vec<(Option<JoinedOn>, Vec<u8>)>, on: &Option<JoinedOn>| {
+            lists
+                .into_iter()
+                .find(|(there, _)| there == on)
+                .map(|(_, list)| list)
+                .unwrap_or_default()
+        };
+        let code = match chosen_session(found) {
+            Ok((Named::Refused(code), _)) | Err(code) => code,
             Ok((named, on)) => {
-                let list = lists
-                    .into_iter()
-                    .find(|(there, _)| *there == on)
-                    .map(|(_, list)| list)
-                    .unwrap_or_default();
-                Ok((named, on, list))
+                let list = list_of(lists, &on);
+                return Ok((named, on, list, false));
+            }
+        };
+        // Nothing fits by name, folder or work on any machine read: a name
+        // said nearly right, for a look only, the closest among them all.
+        if near && code == "session_not_found" {
+            let mut closest: Option<usize> = None;
+            let mut nearest: Vec<(Named, Option<JoinedOn>)> = Vec::new();
+            for (on, list) in &lists {
+                let Some((edits, named)) = near_session(list, session) else {
+                    continue;
+                };
+                match closest {
+                    Some(best) if edits > best => {}
+                    Some(best) if edits == best => nearest.push((named, on.clone())),
+                    _ => {
+                        closest = Some(edits);
+                        nearest = vec![(named, on.clone())];
+                    }
+                }
+            }
+            match nearest.len() {
+                0 => {}
+                1 => {
+                    let (named, on) = nearest.remove(0);
+                    if let Named::Refused(code) = named {
+                        return Err(code.to_owned());
+                    }
+                    let list = list_of(lists, &on);
+                    return Ok((named, on, list, true));
+                }
+                _ => return Err("session_ambiguous".to_owned()),
             }
         }
+        // Nowhere fits while a computer couldn't be read: said as that, not
+        // as no such session.
+        Err(match unread {
+            Some(unread) if code == "session_not_found" => unread,
+            _ => code.to_owned(),
+        })
     }
 
     /// #5535, `serve --reply-named`: the session the person named, found
@@ -1542,7 +1588,10 @@ impl Cli {
         let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
         let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let began = Instant::now();
-        let (named, on, _) = match self.find_named(&launch.target, session, began, seen) {
+        // A name as it is only, never one said nearly right: the read-back
+        // says the person's own words, so their yes could not catch a near
+        // pick (the Reviewer-lead's P2 on #6422).
+        let (named, on, _, _) = match self.find_named(&launch.target, session, false, began, seen) {
             Ok(found) => found,
             Err(code) => {
                 if code != "cancelled" {
@@ -1670,12 +1719,14 @@ impl Cli {
     /// hand-over finds it ([`Cli::find_named`], near-miss names included)
     /// but with no words to type: `join` for "open the customer survey
     /// one", where one idle live session is open to them as it is, one
-    /// busy is said to be busy, and one stopped is reopened under
+    /// busy is said to be busy, and one stopped and named as it is (not
+    /// only nearly right, [`SessionSeen::near`]) is reopened under
     /// `LAMP_TASKS_RESUME_CLOSED` as a hand-over reopens it
-    /// ([`Cli::resume_named`]; off: `session_stopped`); not `join` for "how
-    /// far has the customer survey one got", where whatever fits is said
-    /// as it stands, stopped too, nothing reopened. Nothing is typed,
-    /// routed or started either way. More than one fitting is
+    /// ([`Cli::resume_named`], which starts its agent again on that
+    /// computer; off: `session_stopped`); not `join` for "how far has the
+    /// customer survey one got", where whatever fits is said as it stands,
+    /// stopped too, nothing reopened. Nothing is typed or routed either
+    /// way, and nothing but that reopening starts. More than one fitting is
     /// `session_ambiguous`, none `session_not_found`, never a guess; with
     /// `serve --reply-named` off, `reply_named_off` before anything runs.
     /// Within this adapter's launch bound ([`Cli::session_lane`]'s
@@ -1719,14 +1770,19 @@ impl Cli {
         {
             return Err("invalid_session".into());
         }
-        let (named, on, listed) = self.find_named(target, session, began, seen)?;
+        let (named, on, listed, near) = self.find_named(target, session, true, began, seen)?;
         let (agent_id, joined, stopped) = match named {
             Named::Idle(id, joined) | Named::Busy(id, joined) => (id, joined, false),
             Named::Stopped(id, joined) => (id, joined, true),
             Named::Refused(code) => return Err(code.into()),
         };
         let mut found = session_seen(&listed, &agent_id, joined, on.as_ref());
-        if stopped && join {
+        found.near = near;
+        // Found only by a name said nearly right, a closed session is told
+        // as closed, never reopened: a resume starts its agent again on
+        // that computer, so only its name said as it is does (the
+        // Reviewer-lead's P2 on #6422).
+        if stopped && join && !near {
             if !self.config.resume_closed {
                 return Err("session_stopped".into());
             }
@@ -1737,7 +1793,8 @@ impl Cli {
             found.state = "idle".into();
             found.resumed = Some(resumed);
         } else if stopped {
-            // Found stopped by its last ask, its list row says so too.
+            // Found stopped by its last ask, its list row says so too; or
+            // found near, not reopened.
             found.state = "stopped".into();
         }
         Ok(found)
@@ -4152,10 +4209,10 @@ fn words_of(text: &str) -> Vec<String> {
 /// row is that, when each word said begins one of its words, in order
 /// ("docs" fits "Docs-Update"; "api" never fits "rapid-prototype": the
 /// Reviewer-lead's P2 on #5779), or, when none is, by what it worked on
-/// ([`by_its_work`]), or, when nothing does, by a name said nearly right
-/// (#6274, [`near_name`]: the one closest, two as close asked about). Of
-/// those that fit, one live session is the one; a stopped one is said to
-/// be stopped; more than one live is asked about, never guessed.
+/// ([`by_its_work`]). Of those that fit, one live session is the one; a
+/// stopped one is said to be stopped; more than one live is asked about,
+/// never guessed. A name said nearly right is [`near_session`]'s, asked
+/// only once no machine has a session that fits so (#6274).
 fn named_session(bytes: &[u8], session: &str) -> Named {
     let Ok(answer) = serde_json::from_slice::<Value>(bytes) else {
         return Named::Refused("sessions_failed");
@@ -4168,16 +4225,7 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
         return Named::Refused("session_not_found");
     }
     let said_words = words_of(session);
-    let parts = |row: &Value| -> [String; 2] {
-        let folder = row["folder"]
-            .as_str()
-            .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
-            .unwrap_or_default();
-        [
-            row["name"].as_str().unwrap_or_default().to_owned(),
-            folder.to_owned(),
-        ]
-    };
+    let parts = name_parts;
     let names = |row: &Value| parts(row).map(|part| session_words(&part));
     // Each word said begins a word of the name, in order.
     let begins = |part: &str| {
@@ -4201,45 +4249,12 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
     // worked on ("the book program one"), found in what it was asked and
     // what it says it did (the owner, 9 Nov: a person remembers the work,
     // never a session's name or id).
-    let mut by_work = fits.is_empty();
-    let mut fits = if by_work {
+    let by_work = fits.is_empty();
+    let fits = if by_work {
         by_its_work(rows, &said_words)
     } else {
         fits
     };
-    // Nothing fits by its name, folder or work: a name said nearly right,
-    // one word misheard or misspelt ("costumer survey" for "Customer
-    // Survey", "survay"), finds the one closest session (#6274,
-    // [`near_name`]). Two as close are asked about, never guessed, live
-    // or stopped.
-    if fits.is_empty() {
-        let mut closest: Option<usize> = None;
-        let mut near: Vec<&Value> = Vec::new();
-        for row in rows {
-            let Some(edits) = parts(row)
-                .iter()
-                .filter_map(|part| near_name(part, &said_words))
-                .min()
-            else {
-                continue;
-            };
-            match closest {
-                Some(best) if edits > best => {}
-                Some(best) if edits == best => near.push(row),
-                _ => {
-                    closest = Some(edits);
-                    near = vec![row];
-                }
-            }
-        }
-        if near.len() > 1 {
-            return Named::Refused("session_ambiguous");
-        }
-        if !near.is_empty() {
-            by_work = false;
-            fits = near;
-        }
-    }
     let gone = |row: &&Value| {
         matches!(
             row["state"].as_str(),
@@ -4272,6 +4287,70 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
             _ => Named::Refused("sessions_failed"),
         },
         _ => Named::Refused("session_ambiguous"),
+    }
+}
+
+/// A row's name and its folder's last part, as the person might say
+/// either.
+fn name_parts(row: &Value) -> [String; 2] {
+    let folder = row["folder"]
+        .as_str()
+        .and_then(|folder| folder.trim_end_matches('/').rsplit('/').next())
+        .unwrap_or_default();
+    [
+        row["name"].as_str().unwrap_or_default().to_owned(),
+        folder.to_owned(),
+    ]
+}
+
+/// The session a name said nearly right finds among a computer's (#6274),
+/// one word misheard or misspelt ("costumer survey" for "Customer Survey",
+/// "survay", [`near_name`]), with how many slips: the closest row, or
+/// `session_ambiguous` when two are as close, never a guess. `None` when
+/// no row is near. Asked only by a look ([`Cli::look_session`]) and only
+/// once no machine's session fits by its name, folder or work
+/// ([`Cli::find_named`]); never by the hand-over that types into one.
+fn near_session(bytes: &[u8], session: &str) -> Option<(usize, Named)> {
+    let answer = serde_json::from_slice::<Value>(bytes).ok()?;
+    let rows = answer["harnesses"].as_array()?;
+    let said_words = words_of(session);
+    let mut closest: Option<usize> = None;
+    let mut near: Vec<&Value> = Vec::new();
+    for row in rows {
+        let Some(edits) = name_parts(row)
+            .iter()
+            .filter_map(|part| near_name(part, &said_words))
+            .min()
+        else {
+            continue;
+        };
+        match closest {
+            Some(best) if edits > best => {}
+            Some(best) if edits == best => near.push(row),
+            _ => {
+                closest = Some(edits);
+                near = vec![row];
+            }
+        }
+    }
+    let edits = closest?;
+    let named = match near.as_slice() {
+        [row] => one_named(row),
+        _ => Named::Refused("session_ambiguous"),
+    };
+    Some((edits, named))
+}
+
+/// What one row that fits is ([`Named`]): live and idle, live and busy,
+/// stopped (it may be reopened), or failed or offline (said stopped).
+fn one_named(row: &Value) -> Named {
+    let id = row["id"].as_str().filter(|id| agent_id(id));
+    match (id, row["state"].as_str()) {
+        (Some(id), Some("idle")) => Named::Idle(id.to_owned(), joined_session(row)),
+        (Some(id), Some("stopped")) => Named::Stopped(id.to_owned(), joined_session(row)),
+        (_, Some("failed" | "offline")) => Named::Refused("session_stopped"),
+        (Some(id), _) => Named::Busy(id.to_owned(), joined_session(row)),
+        (None, _) => Named::Refused("sessions_failed"),
     }
 }
 
