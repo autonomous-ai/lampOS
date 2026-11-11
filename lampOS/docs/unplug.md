@@ -123,7 +123,8 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    line after the ask decides; any other words, a busy room, no line within
    the wait, or an owner's language other than English (the yes is heard by
    English words only) are no yes: Skills says `stay` and stands up, as a
-   "never mind" does, and never powers off (#5774's P2: a TV's "I'm
+   "never mind" does (on heard words that aren't a yes, even if `stay`
+   never begins; see "Never mind" below), and never powers off (#5774's P2: a TV's "I'm
    unplugging you" or "I'm unplugging the kettle" folds the arm, then stands
    up). Only on the yes, Ready read once more,
    Skills sends setup's change helper `{"shutdown":"lamp"}`, the app's Turn
@@ -319,7 +320,15 @@ Skills checks first that the latch is in force and the body's own state is
 fresh (500 ms), names that request, and is Folding (spoken only) or Ready,
 never Failed. It then asks Voice for the line ("Okay, I'll stay." or the
 timeout's) at priority 8, and publishes the cancel only once Voice says the
-line has begun. A line that never begins cancels nothing.
+line has begun. For the timeout, and for silence or a yes not taken at the
+turn-off ask, a line that never begins cancels nothing: someone may be
+unplugging it quietly, hands at the arm. A spoken "never mind" and a heard
+refusal at the turn-off ask (words that aren't a yes) publish the cancel even
+when the line never begins (expired, the voice not reached): the person is
+there and said so. On lamp-52e6 (build 12130) a "No." whose `stay` line
+expired cancelled nothing, and a "never mind" 75 s later, past the ask, with
+the request still kept, did not stand it either. A "never mind" needs no run
+under way, only the kept request.
 
 The body checks again itself. It accepts a cancel only if its source label is
 `skills`, its identifier equals the request it accepted, and the preparation
