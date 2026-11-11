@@ -2182,6 +2182,41 @@ const SOUND_NOT_SHIPPED: &str = "I can't do that yet: a sound other than its sof
 /// build work.
 pub const CANT_YET: &str = "I can't do that yet:";
 
+/// The `cannot:` sentences the making model's system prompt itself asks
+/// for (`make_skill_local`'s `system_with`, `services`, `write_rules` and
+/// `event_times`), kept here beside the brief so they can't drift (a test
+/// holds each to the prompt): a DeepSeek `cannot:` with one of them is said
+/// as it is and never handed to the lamp's agent (`LAMP_MAKE_SKILL_AGENT`,
+/// the Reviewer-lead on #6439).
+pub const BRIEFS_OWN_REFUSALS: &[&str] = &[
+    "hear what is said",
+    "know who someone is",
+    "sending a message",
+    "Ask me for a reminder instead",
+    "sending what you didn't say word for word",
+    "adding an event with no day and time",
+    "adding a calendar event while my clock isn't set",
+    "You can ask me for it yourself any time",
+    SENDS_ON_ITS_OWN,
+    "Not possible yet: a skill can't",
+];
+
+/// Whether the model's `cannot:` reason `why` is one of the brief's own
+/// refusals ([`BRIEFS_OWN_REFUSALS`]), in any case, a verb's "-ing" said
+/// as the prompt says it ("hearing what is said" for "hear what is said").
+pub fn briefs_own_refusal(why: &str) -> bool {
+    let plain = |text: &str| {
+        text.to_lowercase()
+            .replace("hearing ", "hear ")
+            .replace("knowing ", "know ")
+            .replace("sending ", "send ")
+    };
+    let why = plain(why);
+    BRIEFS_OWN_REFUSALS
+        .iter()
+        .any(|refusal| why.contains(&plain(refusal)))
+}
+
 /// [`CANT_YET`] with what: "I can't do that yet: sending a message".
 pub fn cant_yet(what: &str) -> String {
     format!("{CANT_YET} {what}")

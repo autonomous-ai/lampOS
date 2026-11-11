@@ -1054,70 +1054,101 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, tắt, đề xuất trên #6059)
 
 Đề xuất trên #6059 (chủ sở hữu đồng ý, 11/11), first builder đã đồng ý
-(Queue #6059, 11/11 22:44 +07). Khi bật công tắc, một lần tạo bằng giọng nói mà mô hình của đèn không tạo
-được sẽ được giao cho agent riêng của đèn, OpenClaw hoặc Hermes, như
-skill-creator của V1 từng giao cho agent của nó (`crate::make_skill_agent`).
-Chỉ người viết thay đổi; phần dọn, `lamp-skills pack`, phần nói lại, brief
-sửa và việc giữ là cùng một mã cho cả hai người viết.
+(Queue #6059, 11/11 22:44 +07). Khi bật công tắc, một lần tạo bằng giọng
+nói mà mô hình của đèn không tạo được sẽ được giao cho agent riêng của đèn,
+OpenClaw hoặc Hermes, như skill-creator của V1 từng giao cho agent của nó
+(`crate::make_skill_agent`). Chỉ người viết thay đổi; phần dọn,
+`lamp-skills pack`, phần nói lại, brief sửa và việc giữ là cùng một mã cho
+cả hai người viết.
 
-- **Thứ tự.** DeepSeek viết trước, như khi tắt công tắc. Khi đèn có agent
-  (target `lamp` của phần tasks, đọc bằng `{"op":"targets"}` trước khi hỏi
-  DeepSeek), DeepSeek được một lần thử và không được sửa. Nếu câu trả lời đó
-  không được giữ (phần dọn, kiểm tra, phần nói lại, `cannot:` của nó, hoặc
-  không trả lời), nó được giao ngay cho agent, với cùng system prompt và yêu
-  cầu, và agent được các lần sửa (tối đa 3, `MOST_REPAIRS`). Câu trả lời của
-  agent đi qua đúng các kiểm tra đó. Khi đèn không có agent, DeepSeek giữ 3
-  lần sửa và thất bại của nó vẫn như hôm nay.
+- **Thứ tự.** DeepSeek viết trước. Khi đèn có agent (target `lamp` của
+  phần tasks, đọc bằng `{"op":"targets"}` trước khi hỏi DeepSeek, một lần
+  đọc cục bộ mỗi lần tạo), DeepSeek được một lần thử và không được sửa. Nếu
+  câu trả lời đó không được giữ (phần dọn, kiểm tra, phần nói lại, một
+  `cannot:` của nó, hoặc không trả lời), nó được giao ngay cho agent, với
+  cùng system prompt và yêu cầu, và agent được các lần sửa (tối đa 3,
+  `MOST_REPAIRS`). Câu trả lời của agent đi qua đúng các kiểm tra đó. Khi đèn
+  không có agent, DeepSeek giữ 3 lần sửa và thất bại của nó vẫn như hôm nay.
+- **Những lời từ chối của chính brief vẫn là của DeepSeek.** Một `cannot:`
+  của DeepSeek mà câu của nó là câu system prompt yêu cầu (nghe điều được
+  nói, biết ai là ai, gửi tin nhắn, câu về lời nhắc, gửi điều không được nói
+  nguyên văn, sự kiện không có ngày giờ hoặc khi đồng hồ chưa đặt, câu "You
+  can ask me for it yourself any time" của phần đọc, và các câu còn lại
+  trong `made_skill::BRIEFS_OWN_REFUSALS`, giữ cạnh brief và được một test
+  đối chiếu với prompt) được nói nguyên như vậy và không bao giờ giao cho
+  agent. Mọi `cannot:` khác được giao cho agent.
+- **`cannot:` của chính agent không bao giờ được nói nguyên văn.** Đèn nói
+  câu cố định của nó, "I couldn't make that one."
+  (`make_skill_agent::CANNOT_LINE`).
 - **Cách tới agent.** Như giọng nói giao bất kỳ việc nào (`crate::agent_tasks`,
   #5978, #6226): chuẩn bị cho target `lamp` trên socket request của phần
   tasks và xác nhận ngay trên socket riêng của giọng nói (lời người dùng nói
   là lời yêu cầu), rồi đọc từ các quan sát của task, mà `lamp-tasks serve
   --push-wait` giữ ngay khi agent kết thúc lượt, xem mỗi 0,5 giây. Không có
-  đường truyền mới. Phần tasks nhận tối đa 2.000 byte văn bản và system prompt
-  dài hơn, nên system prompt và brief nằm trong một tệp riêng,
-  `/run/lampos-make-skill/make-<ngẫu nhiên>.md`, task ghi tên tệp đó: thư
-  mục 0750 và tệp 0640, cùng thuộc nhóm `lamp-agents` của các agent cục bộ
-  (trình cài đặt tạo nhóm này, cùng người dùng `lampagent`), tệp được xóa
-  khi có câu trả lời; nếu không có nhóm đó thì 0700 và 0600, có ghi nhật ký. Văn bản task bắt đầu như một brief
+  đường truyền mới. Phần tasks nhận tối đa 2.000 byte văn bản và system
+  prompt dài hơn, nên system prompt và brief nằm trong một tệp riêng,
+  `/run/lampos-make-skill/make-<ngẫu nhiên>.md` (16 byte từ nguồn ngẫu nhiên
+  của kernel), task ghi tên tệp đó: thư mục 0750 và tệp 0640, cùng thuộc
+  nhóm `lamp-agents` của các agent cục bộ (trình cài đặt tạo nhóm này, cùng
+  người dùng `lampagent`), tệp được xóa khi có câu trả lời; nếu không có
+  nhóm đó thì 0700 và 0600, có ghi nhật ký. Worker của tuyến thứ hai dọn mọi
+  `make-*.md` còn sót ở đó khi khởi động. Địa chỉ riêng của người dùng
+  (người nhận của chính họ khi ghi) không bao giờ nằm trong tệp: mỗi địa chỉ
+  là một chỗ giữ (`own1.lamp@example.invalid`), được đặt lại trong câu trả
+  lời của agent trước khi kiểm tra. Văn bản task bắt đầu như một brief
   (`made_skill::is_brief`), nên câu trả lời, hay lần giao thất bại, không bao
-  giờ được kể như tin. Đọc xong, câu trả lời được đánh dấu đã kể, nên
-  `--close-told` đóng phiên của agent. Agent không trả lời trong 45 giây
-  thì task bị hủy (`cancel`); phần tasks chỉ nhận lệnh này cho việc chưa
-  giao cho agent và không có lệnh nào kết thúc việc agent đang làm, nên việc
-  đó tiếp tục chạy, có ghi nhật ký, và tin của nó, là một brief, không bao
-  giờ được kể.
+  giờ được kể như tin, và cả "việc của tôi thế nào" lẫn "các agent đang làm
+  gì" đều không nhắc tới nó (`check` và `tasks_now` của `agent_tasks` bỏ
+  qua). Đọc xong, câu trả lời được đánh dấu đã kể, nên `--close-told` đóng
+  phiên của agent.
+- **Agent im lặng.** Agent không trả lời trong 45 giây thì task được gửi
+  `cancel`, các lần thử nằm trong một hạn 1,5 giây. Phần tasks chỉ nhận
+  `cancel` cho việc chưa giao cho agent và không có lệnh nào kết thúc việc
+  agent đang làm, nên việc đó tiếp tục chạy, có ghi nhật ký, và tin của nó,
+  là một brief, không bao giờ được kể.
 - **Công cụ của agent.** Agent chạy với công cụ riêng của nó trong lúc tạo:
   chưa có chế độ tắt công cụ. Công tắc vẫn tắt cho tới khi điều đó được
   quyết định.
 - **Giới hạn.** Mỗi câu trả lời của agent trong 45 giây
-  (`make_skill_agent::WRITE_WITHIN`); một lần sửa chỉ bắt đầu khi thêm một câu
-  trả lời vẫn vừa 120 giây của agent (`make_skill_agent::MAKE_WITHIN`).
-  Agent không trả lời trong 45 giây, lỗi, hay không có câu trả lời đầu: thất
-  bại của DeepSeek vẫn như hôm nay. Một lần tạo khi đó có thể kéo dài tới 240
-  giây, và tuyến thứ hai chờ câu của lần tạo theo đúng mức đó
-  (`make_skill_local::longest_make`).
+  (`make_skill_agent::WRITE_WITHIN`); một lần sửa chỉ bắt đầu khi thêm một
+  câu trả lời vẫn vừa 120 giây của agent (`make_skill_agent::MAKE_WITHIN`).
+  Agent không trả lời trong 45 giây, lỗi, hay không có câu trả lời đầu: kỹ
+  năng không được tạo, và điều được nói là thất bại của câu trả lời duy nhất
+  của DeepSeek, vốn không được sửa (khi đèn có agent DeepSeek không được sửa
+  lần nào), nên đây không phải thất bại sau 3 lần sửa như hôm nay. Một lần
+  tạo có thể kéo dài tới 240 giây, và tuyến thứ hai chờ câu của lần tạo theo
+  đúng mức đó (`make_skill_local::longest_make`).
 - **Người dùng nghe gì.** "I'll make it now" vẫn nói ngay, không đổi. Khi
-  agent bắt đầu, đèn nói "Let me think about that a little longer." qua dịch
-  vụ nói (`app_make::say_waiting_at`, một lần, không bắt đầu sau 15 giây).
-  Câu báo đã tạo không đổi.
+  lần giao đầu tiên cho agent được nhận, đèn nói "Let me think about that a
+  little longer." qua dịch vụ nói (`app_make::say_waiting_at`, một lần,
+  không bắt đầu sau 15 giây); không bao giờ khi lần giao thất bại ngay, hay
+  khi lượt đã bị cắt. Câu báo đã tạo không đổi.
 - **Nhật ký.** "made by DeepSeek", "DeepSeek failed: handed to the agent
   (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes) wasn't
   kept", "the agent (Hermes) made none (no answer within 45 s): DeepSeek's
-  failure stands", "no agent on the lamp: DeepSeek makes it alone"; lần sửa
-  của agent ghi "by the agent".
+  one answer, given no repairs, stands as not made", "DeepSeek's cannot is
+  one the brief asks for: not handed to the agent", "no agent on the lamp:
+  DeepSeek makes it alone"; lần sửa của agent ghi "by the agent".
 - **Tắt** (mặc định, không có trong unit sản phẩm nào): không có gì ở trên;
   đường đi giữ nguyên từng byte như hôm nay. Tạo bằng cách gõ trong ứng dụng
   vẫn do DeepSeek.
 - **Test:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
   `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
-  `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`, và
-  `make_skill_agent::tests` (luật trong một tệp, task là một brief trong
-  2.000 byte, được xác nhận và đánh dấu đã kể; không có target `lamp` là
-  không có agent; agent im lặng thì hết giờ).
+  `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`,
+  `the_briefs_own_refusals_stay_deepseeks_and_others_go_to_the_agent`,
+  `each_of_the_briefs_own_refusals_is_in_the_system_prompt`,
+  `the_agents_own_cannot_is_said_as_the_lamps_line`,
+  `own_addresses_are_placeholders_for_the_agent`,
+  `agent_tasks::tests::a_check_after_a_make_handed_to_the_agent_tells_the_persons_task`,
+  và `make_skill_agent::tests` (luật trong một tệp của nhóm agent, task là
+  một brief trong 2.000 byte, được xác nhận và đánh dấu đã kể; không có
+  target `lamp` là không có agent; agent im lặng thì hết giờ và được gửi
+  `cancel`; `cancel` luôn bị trả lời busy vẫn kết thúc đúng hạn; tệp luật cũ
+  được dọn).
 - **Chưa thử trên đèn:** hàng kiểm tra của nó, 16 lần tạo (mười hai lần đơn
-  giản, bốn lỗi DeepSeek đã biết) trên một đèn có agent, so sánh với DeepSeek:
-  có giữ không, phần nói lại và thời gian.
-  Người dùng của agent có thuộc nhóm `lamp-agents` trên đèn hay không.
+  giản, bốn lỗi DeepSeek đã biết) trên một đèn có agent, so sánh với
+  DeepSeek: có giữ không, phần nói lại và thời gian. Người dùng của agent có
+  thuộc nhóm `lamp-agents` trên đèn hay không.
 
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)
 

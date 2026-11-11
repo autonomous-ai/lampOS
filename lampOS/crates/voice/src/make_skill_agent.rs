@@ -55,8 +55,13 @@ pub const GROUP_FILE: &str = "/etc/group";
 /// What the lamp says, through the say service, as the agent begins, so
 /// the person isn't left in silence.
 pub const WAITING_LINE: &str = "Let me think about that a little longer.";
+/// What the lamp says when the agent's own answer is `cannot:`: never the
+/// agent's words.
+pub const CANNOT_LINE: &str = "I couldn't make that one.";
 /// How long the waiting line may wait to be said: past it, it is old.
 const WAITING_WITHIN_MS: u64 = 15_000;
+/// The longest ending a timed-out task takes, all its tries.
+const CANCEL_WITHIN: Duration = Duration::from_millis(1_500);
 /// Between two looks at the task.
 const LOOK_EVERY: Duration = Duration::from_millis(500);
 /// The most of an answer taken, as the lamp's own model's.
@@ -76,9 +81,13 @@ fn on_with(value: Option<&str>) -> bool {
 /// (`--tasks-dir`).
 static TASKS: OnceLock<PathBuf> = OnceLock::new();
 
-/// Kept by the second route's worker as it starts, with a tasks part.
+/// Kept by the second route's worker as it starts, with a tasks part;
+/// with the switch, the rules files an earlier worker left are swept.
 pub fn set_tasks_dir(directory: PathBuf) {
     let _ = TASKS.set(directory);
+    if on() {
+        sweep(Path::new(RULES_DIR));
+    }
 }
 
 /// The lamp's agent, reached through the tasks part.
@@ -161,8 +170,9 @@ impl Agent {
     }
 
     /// The agent's answer to `system` and `brief`, as it wrote it, within
-    /// [`Agent::within`].
-    pub fn write(&self, system: &str, brief: &str) -> Result<String, NotWritten> {
+    /// [`Agent::within`]. With `waiting`, [`WAITING_LINE`] is said once the
+    /// hand-over is taken, never when it failed at once.
+    pub fn write(&self, system: &str, brief: &str, waiting: bool) -> Result<String, NotWritten> {
         let began = Instant::now();
         let left = || self.within.saturating_sub(began.elapsed());
         let group = agents_group(&self.groups);
@@ -176,6 +186,9 @@ impl Agent {
             .map_err(|error| NotWritten::Failed(format!("its rules not written: {error}")))?;
         let text = task_text(&rules.path);
         let (store, session, id) = self.hand_over(&text, &left)?;
+        if waiting {
+            self.say_waiting();
+        }
         let answer = match self.answered(id, &left) {
             Ok(answer) => answer,
             Err(NotWritten::Timeout) => {
@@ -264,14 +277,17 @@ impl Agent {
                 let newest = task["observations"]
                     .as_array()
                     .and_then(|seen| seen.iter().filter_map(|seen| seen["id"].as_u64()).max());
-                if let Some(observation) = newest.filter(|newest| read != Some(*newest)) {
-                    read = Some(observation);
-                    let seen = agent_tasks::ask(
+                if let Some(observation) = newest.filter(|newest| read != Some(*newest))
+                    && let Some(seen) = agent_tasks::ask(
                         &request,
                         &json!({"op":"get_observation","id":id,"observation_id":observation}),
                         left(),
-                    );
-                    let data = seen.as_ref().map_or(&Value::Null, |seen| &seen["data"]);
+                    )
+                    .filter(|seen| seen.get("data").is_some_and(Value::is_object))
+                {
+                    // Only an observation read whole is not read again.
+                    read = Some(observation);
+                    let data = &seen["data"];
                     let text = data["answer"].as_str().unwrap_or_default();
                     match data["state"].as_str().unwrap_or("unknown") {
                         "idle" if !text.trim().is_empty() => {
@@ -298,8 +314,11 @@ impl Agent {
     /// that is left running, journaled; its news is a brief's, never told.
     fn cancel(&self, id: u64) {
         let request = self.tasks.join("request.sock");
-        let within = Duration::from_millis(1_500);
-        let answer = agent_tasks::ask(&request, &json!({"op":"status"}), within)
+        // One deadline for the whole cancel, so a tasks part that keeps
+        // answering busy, uncertain or timeout ends it (Twelve's P2).
+        let until = Instant::now() + CANCEL_WITHIN;
+        let left = || until.saturating_duration_since(Instant::now());
+        let answer = agent_tasks::ask(&request, &json!({"op":"status"}), left())
             .and_then(|status| {
                 agent_tasks::guard(&status, format!("make-{}", agent_tasks::nonce()))
             })
@@ -307,7 +326,7 @@ impl Agent {
                 agent_tasks::ask_until_sure(
                     &request,
                     &json!({"op":"cancel","guard":guard,"id":id}),
-                    || within,
+                    left,
                 )
             });
         match answer {
@@ -403,7 +422,7 @@ impl Rules {
         std::fs::create_dir_all(directory)?;
         std::os::unix::fs::chown(directory, None, group)?;
         std::fs::set_permissions(directory, std::fs::Permissions::from_mode(folder))?;
-        let path = directory.join(format!("make-{:032x}.md", agent_tasks::nonce()));
+        let path = directory.join(format!("make-{}.md", random_name()?));
         // Made 0600 and given its group and mode before a byte is written.
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -415,6 +434,40 @@ impl Rules {
         file.set_permissions(std::fs::Permissions::from_mode(file_mode))?;
         file.write_all(format!("{system}\n\n{brief}\n").as_bytes())?;
         Ok(rules)
+    }
+}
+
+/// 16 random bytes as hex, from the kernel, as the voice's boot id is.
+fn random_name() -> std::io::Result<String> {
+    use std::io::Read;
+    let mut bytes = [0u8; 16];
+    std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// Rules files a make left behind in `directory` (a worker stopped while
+/// the agent wrote), removed: run as the second route's worker starts,
+/// when no make of its own is under way. Only `make-*.md` files.
+pub fn sweep(directory: &Path) {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+    let mut swept = 0;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with("make-")
+            && name.ends_with(".md")
+            && entry.file_type().is_ok_and(|kind| kind.is_file())
+            && std::fs::remove_file(entry.path()).is_ok()
+        {
+            swept += 1;
+        }
+    }
+    if swept > 0 {
+        eprintln!(
+            "lamp-voice: a skill made here: {swept} old rules file(s) of the agent's removed"
+        );
     }
 }
 
@@ -494,11 +547,13 @@ pub(crate) mod tests {
     type Handed = Arc<Mutex<Vec<(String, Option<String>)>>>;
 
     pub(crate) fn stub(engine: Option<&'static str>, answers: Answers) -> StubTasks {
+        static MADE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let dir = Folder(PathBuf::from(format!(
-            "/tmp/msa-{}-{:x}",
+            "/tmp/msa-{}-{}",
             std::process::id(),
-            agent_tasks::nonce() & 0xffff_ffff
+            MADE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         )));
+        let _ = std::fs::remove_dir_all(dir.path());
         std::fs::create_dir_all(dir.path()).unwrap();
         let sent = Arc::new(Mutex::new(Vec::new()));
         let tasks: Handed = Arc::default();
@@ -516,6 +571,9 @@ pub(crate) mod tests {
                     sent.lock().unwrap().push(asked.clone());
                     let answer = match asked["op"].as_str().unwrap_or_default() {
                         "targets" => match engine {
+                            Some("busy") => {
+                                json!({"ok":true,"targets":[{"alias":"lamp","engine":"hermes"}]})
+                            }
                             Some(engine) => {
                                 json!({"ok":true,"targets":[{"alias":"lamp","engine":engine}]})
                             }
@@ -530,7 +588,9 @@ pub(crate) mod tests {
                             json!({"ok":true,"id":tasks.len(),"prepared_digest":"d"})
                         }
                         "confirm" | "told" => json!({"ok":true}),
-                        // Work its agent has can't be cancelled.
+                        // Work its agent has can't be cancelled; a busy
+                        // part keeps saying so.
+                        "cancel" if engine == Some("busy") => json!({"ok":false,"error":"busy"}),
                         "cancel" => json!({"ok":false,"error":"already_attempted"}),
                         "get_task" => {
                             let id = asked["id"].as_u64().unwrap() as usize;
@@ -581,7 +641,7 @@ pub(crate) mod tests {
         let agent = tasks.agent();
         assert_eq!(agent.engine(), Some("Hermes"));
         assert_eq!(
-            agent.write("SYSTEM", "BRIEF").unwrap(),
+            agent.write("SYSTEM", "BRIEF", false).unwrap(),
             "```skill.toml\nx\n```"
         );
         let sent = tasks.sent.lock().unwrap().clone();
@@ -606,10 +666,16 @@ pub(crate) mod tests {
     fn no_lamp_target_is_no_agent_and_an_agent_that_never_answers_times_out() {
         let none = stub(None, Arc::new(|_: &str| None));
         assert_eq!(none.agent().engine(), None);
-        assert_eq!(none.agent().write("S", "B"), Err(NotWritten::NoAgent));
+        assert_eq!(
+            none.agent().write("S", "B", false),
+            Err(NotWritten::NoAgent)
+        );
         let silent = stub(Some("openclaw"), Arc::new(|_: &str| None));
         let began = Instant::now();
-        assert_eq!(silent.agent().write("S", "B"), Err(NotWritten::Timeout));
+        assert_eq!(
+            silent.agent().write("S", "B", false),
+            Err(NotWritten::Timeout)
+        );
         assert!(began.elapsed() < Duration::from_secs(4));
         // Its task is asked to end, and its rules are gone.
         let sent = silent.sent.lock().unwrap().clone();
@@ -657,6 +723,39 @@ pub(crate) mod tests {
         );
         assert_eq!(std::fs::metadata(&folder).unwrap().mode() & 0o777, 0o700);
         assert_eq!(std::fs::read_to_string(&alone.path).unwrap(), "S\n\nB\n");
+    }
+
+    /// Twelve's P2 on #6439: a cancel the tasks part answers `busy` every
+    /// time still ends within its one deadline.
+    #[test]
+    fn a_cancel_always_answered_busy_ends_in_time() {
+        let busy = stub(Some("busy"), Arc::new(|_: &str| None));
+        let began = Instant::now();
+        busy.agent().cancel(1);
+        assert!(began.elapsed() < CANCEL_WITHIN + Duration::from_millis(500));
+        let tries = busy
+            .sent
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|line| line["op"] == "cancel")
+            .count();
+        assert!(tries > 1, "{tries}");
+    }
+
+    /// Rules files left behind are swept; nothing else in the folder is.
+    #[test]
+    fn old_rules_files_are_swept() {
+        let tasks = stub(None, Arc::new(|_: &str| None));
+        let folder = tasks.dir.path().join("rules");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("make-ab.md"), "x").unwrap();
+        std::fs::write(folder.join("other.md"), "x").unwrap();
+        sweep(&folder);
+        assert!(!folder.join("make-ab.md").exists());
+        assert!(folder.join("other.md").exists());
+        // Two rules files never share a name.
+        assert_ne!(random_name().unwrap(), random_name().unwrap());
     }
 
     #[test]

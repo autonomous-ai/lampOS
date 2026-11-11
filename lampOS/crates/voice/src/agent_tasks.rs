@@ -3173,7 +3173,7 @@ fn check(
     let started = Instant::now();
     let left = || deadline.saturating_sub(started.elapsed());
     let socket = place.directory.join("request.sock");
-    let mut newest: Option<u64> = None;
+    let mut accepted: Vec<u64> = Vec::new();
     let mut store;
     let mut after = 0;
     loop {
@@ -3186,7 +3186,7 @@ fn check(
                 && only.is_none_or(|member| item["target_alias"] == json!(member.alias))
                 && let Some(id) = item["id"].as_u64()
             {
-                newest = newest.max(Some(id));
+                accepted.push(id);
             }
         }
         match page["next_after_id"].as_u64() {
@@ -3194,7 +3194,21 @@ fn check(
             _ => break,
         }
     }
-    let Some(id) = newest else {
+    // The newest that is the person's work: a make handed to the lamp's
+    // agent (`LAMP_MAKE_SKILL_AGENT`, a brief's text) is never theirs to
+    // ask after (Twelve's P2 on #6439).
+    accepted.sort_unstable_by(|a, b| b.cmp(a));
+    let mut newest = None;
+    for id in accepted {
+        let Some(task) = ask(&socket, &json!({"op":"get_task","id":id}), left()) else {
+            return (unreached(place), false);
+        };
+        if !crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default()) {
+            newest = Some((id, task));
+            break;
+        }
+    }
+    let Some((id, task)) = newest else {
         let next = only.map_or_else(
             || "Tell them there is no work handed over just now.".to_owned(),
             |member| {
@@ -3205,9 +3219,6 @@ fn check(
             },
         );
         return (json!({"none": true, "next": next}), true);
-    };
-    let Some(task) = ask(&socket, &json!({"op":"get_task","id":id}), left()) else {
-        return (unreached(place), false);
     };
     let who = crate::task_news::who(&task);
     let (asked, _) = crate::task_news::quoted(
@@ -3312,9 +3323,20 @@ fn tasks_now(place: &Place, deadline: Duration) -> (Value, bool) {
             let asked = ask(&socket, &json!({"op":"get_task","id":id}), left())
                 .filter(|got| got.get("ok") == Some(&json!(true)))
                 .and_then(|got| got["text"].as_str().map(str::to_owned));
+            // A make handed to the lamp's agent is not the person's work
+            // (Twelve's P2 on #6439).
+            if asked.as_deref().is_some_and(crate::made_skill::is_brief) {
+                return None;
+            }
             Some(now_entry(task, asked.as_deref()))
         })
         .collect();
+    if tasks.is_empty() {
+        return (
+            json!({"none": true, "next": "Tell them in a few words that no work is with their agents just now."}),
+            true,
+        );
+    }
     let mut answered = json!({"tasks": tasks, "next": NOW_NEXT});
     if let Some(left_out) = record["left_out"].as_u64().filter(|count| *count > 0) {
         answered["not_listed"] = json!(left_out);
@@ -5920,6 +5942,61 @@ pub(crate) mod tests {
             )
             .1
         );
+    }
+
+    /// Twelve's P2 on #6439: a make handed to the lamp's agent after the
+    /// person's own hand-over (`LAMP_MAKE_SKILL_AGENT`, a brief's text) is
+    /// never the work a check tells: the person's task is.
+    #[test]
+    fn a_check_after_a_make_handed_to_the_agent_tells_the_persons_task() {
+        let directory =
+            std::env::temp_dir().join(format!("agent-check-make-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let told = directory.join("told");
+        let place = serving_place(&directory);
+        let make = format!(
+            "{}: everything you need is in the file /x.",
+            crate::made_skill::BRIEF_HEAD
+        );
+        let seen = tasks_part(
+            &directory,
+            vec![
+                (
+                    "request.sock",
+                    json!({"ok":true,"store_id":"s1","items":[
+                    {"id":2,"dispatch":{"state":"accepted"}},{"id":3,"dispatch":{"state":"accepted"}}]}),
+                ),
+                (
+                    "request.sock",
+                    json!({"ok":true,"text":make,"target":{"engine":"hermes"},
+                        "observations":[{"id":5,"state":"idle"}]}),
+                ),
+                (
+                    "request.sock",
+                    json!({"ok":true,"text":"Suggest three names","target":{"engine":"claude"},
+                        "observations":[{"id":4,"state":"idle"}]}),
+                ),
+                (
+                    "request.sock",
+                    json!({"ok":true,"data":{"state":"idle","answer":"Lumi, Sunny and Archie.","truncated":false}}),
+                ),
+            ],
+        );
+        let (told_model, answered) = check(&place, None, &told, PEER_WAIT);
+        assert!(answered);
+        assert_eq!(
+            told_model["answer"], "Lumi, Sunny and Archie.",
+            "{told_model}"
+        );
+        assert_eq!(seen.recv().unwrap()["op"], "list");
+        assert_eq!(seen.recv().unwrap(), json!({"op":"get_task","id":3}));
+        assert_eq!(seen.recv().unwrap(), json!({"op":"get_task","id":2}));
+        assert_eq!(
+            seen.recv().unwrap(),
+            json!({"op":"get_observation","id":2,"observation_id":4})
+        );
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
