@@ -857,10 +857,11 @@ pub fn after_round_off(
 }
 
 /// `lamp-update harness-install` (Harness's one-shot, as root): Harness's
-/// install ([`harness_install::install_now`]) when Harness is missing and
-/// a round asked for it, then Hermes's ([`install_now`]) when a round
-/// asked for it, whatever Harness's did. Started for Hermes alone, with
-/// Harness there or its switch off, Harness's record is left as it is. An
+/// install ([`harness_install::install_now`]) whenever a round's ask is
+/// there (#6275): it installs a missing Harness, moves one there when the
+/// ask says so (#5957), and records one there as it is; then Hermes's
+/// ([`install_now`]) when a round asked for it, whatever Harness's did.
+/// With no Harness ask (its switch off), Harness's record is left as it is. An
 /// error only for Harness: a Hermes failure is said and recorded, never
 /// the unit's.
 pub fn one_shot(
@@ -870,7 +871,9 @@ pub fn one_shot(
     now_unix_ms: &mut dyn FnMut() -> u64,
     say: &mut dyn FnMut(&str),
 ) -> Result<(), String> {
-    let harness = (!harness_install::present(root) && records.join(harness_install::ASK).exists())
+    let harness = records
+        .join(harness_install::ASK)
+        .exists()
         .then(|| harness_install::install_now(root, records, run, now_unix_ms, say));
     match install_now(root, records, run, now_unix_ms, say) {
         Ok(Some(said)) => {

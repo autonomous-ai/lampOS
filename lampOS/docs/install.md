@@ -1352,7 +1352,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          instead of saying "already at …, nothing installed". The record
          is `installing` with `from_version` and the words "Updating
          Harness on the lamp.". An ask or record without the new fields
-         reads as before.
+         reads as before. The one-shot runs Harness's part whenever the
+         ask is there, also when a round started it for Hermes (#6275:
+         it ran Hermes's part alone, and the record stayed `installing`).
+         Every end of the move records `installed` or `failed`, and then
+         spends the ask: `upgrade_from` is taken out, the pin kept, so a
+         later one-shot for Hermes moves nothing and a round asks again
+         when due. Only another install holding `harness.lock` leaves
+         `installing`, for that install to answer or for a round to ask
+         again past 30 min.
        - **The move:** the one-shot reads `harness version` again (none:
          left alone, `installed`). That version, not the record's (Harness
          may have moved itself), is the `from_version` of the `installing`
@@ -1536,8 +1544,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      by the next try, as a cut-off try's is, and the entry points are
      written only as an install ends.
    - **The one-shot:** `lamp-update harness-install` runs Harness's install
-     when Harness is missing (started for Hermes alone, Harness's record is
-     left as it is), then Hermes's when the ask is there, whatever
+     whenever `harness-ask.json` is there (#6275): a missing Harness is
+     installed, one there is moved when the ask carries `upgrade_from`,
+     else recorded `installed` with its version (a `failed` `version` or
+     `upgrade` kept); with no Harness ask (its switch off), Harness's
+     record is left as it is. Then Hermes's when the ask is there, whatever
      Harness's install did. The unit's result is Harness's alone: a Hermes
      failure is journaled and recorded, never the unit's, and never stops
      Harness or the round. The ask is removed once answered. One Hermes
