@@ -54,6 +54,11 @@ pub const CALENDAR_EDITS_ENVIRONMENT: &str = "LAMP_CALENDAR_EDITS";
 /// `on`, and only with [`WRITE_ENVIRONMENT`] on too.
 pub const DRAFT_EDITS_ENVIRONMENT: &str = "LAMP_GMAIL_DRAFT_EDITS";
 
+/// The switch for the voice's tools naming only the linked services
+/// (#6218), read by this program: off unless `on`, when every service the
+/// lamp can link is named, linked or not.
+pub const LINKED_TOOLS_ENVIRONMENT: &str = "LAMP_SERVICES_LINKED_TOOLS";
+
 /// Whether a switch is on, as `var` gives it.
 pub fn on(var: Option<&str>) -> bool {
     var == Some("on")
