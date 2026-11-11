@@ -39,6 +39,8 @@ const EXAMPLE_RUNS = {
   'desk-health.js': [[], 'stuffy', ['say', ['light', { colour: 'orange', level: 2, pattern: 'breathe' }]]],
   'greet.js': [[], 'arrived', [['gesture', { name: 'greeting' }]]],
   'notes.js': [[], null, [['notes.get', { key: 'runs' }], ['notes.set', { key: 'runs', value: 1 }], ['light', { colour: 'warm', level: 1 }]]],
+  // A long stretch at the desk (SIT_AFTER_S below): one slow tilt, counted in the day's note.
+  'posture.js': [[], 'arrived', ['lease.take', ['move', { frames: posesToFrames([{ roll: 3, pitch: 1 }, { roll: -2 }], { holdMs: 600 }) }], ['notes.set', { value: 1 }]]],
   'phrase.js': [[], 'phrase', [['light', { colour: 'warm', level: 2, pattern: 'breathe' }], ['gesture', { name: 'nod' }]]],
   'pomodoro.js': [[], null, [['light', { colour: 'warm', level: 2 }]]],
   'push-skill.js': [['../examples/hello-skill'], null, ['skill.push']],
@@ -86,7 +88,7 @@ test('every example runs against a fake lamp and sends what it is for', async ()
       const home = folder();
       await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
       // Not execFileSync: the fake answers on this process's event loop.
-      const child = spawn(process.execPath, [new URL(name, examples).pathname, ...args], { cwd: WRITES_FILES.has(name) ? home : sdkJs, env: { ...process.env, LAMPOS_HOME: home, DESK_STUFFY_AFTER_S: "1" } });
+      const child = spawn(process.execPath, [new URL(name, examples).pathname, ...args], { cwd: WRITES_FILES.has(name) ? home : sdkJs, env: { ...process.env, LAMPOS_HOME: home, DESK_STUFFY_AFTER_S: "1", SIT_AFTER_S: "1" } });
       let out = '';
       child.stdout.on('data', (chunk) => { out += chunk; });
       child.stderr.on('data', (chunk) => { out += chunk; });
