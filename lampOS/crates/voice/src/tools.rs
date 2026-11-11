@@ -5145,13 +5145,14 @@ mod tests {
             "{said}"
         );
         assert!(said.contains(" (past use_skill's bound)"), "{said}");
-        let (named, left) = crate::use_skill::cut(crate::use_skill::offered(&all));
-        assert!(!named.is_empty() && !left.is_empty());
+        let cut = crate::use_skill::cut(crate::use_skill::offered(&all), &core_skills(&settings));
+        assert!(!cut.named_alone.is_empty() && !cut.left_out.is_empty());
         assert!(
             said.ends_with(&format!(
-                "; use_skill's lines: {} named alone, {} left out",
-                named.len(),
-                left.len()
+                "; use_skill's lines: {} shortened, {} named alone, {} left out",
+                cut.shortened.len(),
+                cut.named_alone.len(),
+                cut.left_out.len()
             )),
             "{said}"
         );

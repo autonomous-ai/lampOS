@@ -10287,6 +10287,26 @@ fn stop(engine: &mut Engine, how: &str, at_s: u64) -> Result<String, String> {
         })
 }
 
+/// The tools file's `core` names a core skill's `[stop]` function, shared
+/// with an installable skill or not, and `stay_plugged_in` with the core
+/// unplug skill, so the voice's `use_skill` lines keep them whole past
+/// their bound; an installable skill's own `[stop]` is not named.
+#[test]
+fn the_tools_files_core_names_a_core_skills_stop_and_stay_plugged_in() {
+    let dir = tempfile::tempdir().unwrap();
+    let installable = load(&stoppable(dir.path())).unwrap();
+    assert_eq!(installable.kind, SkillKind::Installable);
+    let meal = load(&skills_root().join("meal-check")).unwrap();
+    let sip = load(&skills_root().join("sip-of-water")).unwrap();
+    let unplug = load(&skills_root().join("prepare-unplug")).unwrap();
+    let tools = tools_file(&[installable, meal, sip, unplug]);
+    assert_eq!(
+        tools["core"],
+        serde_json::json!(["prepare_to_unplug", "stay_plugged_in", "wellbeing_nudges"]),
+        "{tools}"
+    );
+}
+
 /// #1685: a skill's `[stop]` is one function for the model, its choice
 /// `how`: `snooze` until the next local morning, `off` until it is asked
 /// for again, `on` to have it again. It stops only what the skill starts
