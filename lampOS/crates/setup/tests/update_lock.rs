@@ -538,6 +538,60 @@ fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
     change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
     assert_eq!(units.calls[1].0, "stop lamp-control.service");
     assert!(!config.agent_dropin.exists());
+    // Developer off with only the agent's drop-in left (no developer one):
+    // cleared, and the unit stopped.
+    fs::write(&config.agent_dropin, "x").unwrap();
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    drop(records.lock().ok());
+    let (reply, _) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut units,
+    )
+    .unwrap();
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    assert!(!config.agent_dropin.exists());
+    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    // A removal that fails (the agent's drop-in is a folder here) does not
+    // leave the door open: the developer drop-in is still removed, the unit
+    // stopped, and the failure answered in words; the retry is on this path.
+    answer(r#"{"control": true}"#, &config, true);
+    fs::create_dir_all(config.agent_dropin.join("inside")).unwrap();
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    drop(records.lock().ok());
+    let (reply, done) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut units,
+    )
+    .unwrap();
+    assert!(
+        reply["refused"]
+            .as_str()
+            .is_some_and(|why| why.starts_with("the change could not be saved")),
+        "{reply}"
+    );
+    assert!(done.is_none());
+    assert!(
+        !config.control_dropin.exists(),
+        "the developer drop-in went"
+    );
+    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    let _ = fs::remove_dir_all(&config.agent_dropin);
     let _ = fs::remove_dir_all(folder);
 }
 
