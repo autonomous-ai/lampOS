@@ -1389,6 +1389,10 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
 | `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
+| `started <unit>, added by build N` | the watch passed and the build is kept; a long-running part of `lampos.target` the switch added, enabled and inactive, was started with `--no-block` ("A part added over the air") |
+| `<unit> could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
+| `the parts build N added start with lampos.target, which is not running` | the lamp is not set up (or stopped): the added parts are left for the target |
+| `the parts build N added are not started: systemd cannot say how they are (…); they start at the next boot` | their states could not be read: none is started |
 | `build N kept; held: <unit> held, nothing moves: …` | the watch passed with a unit held as before the switch (#6113, step 9): the round ends `held` |
 | **Putting a build back** | |
 | `putting build N back: …` | before a `put back` end, with why |
@@ -2065,11 +2069,11 @@ is here or added with it. Each is enabled only if `install` enables it
 there (an old enable) is left as it is, and stays on the way back too. An
 `[Install]` with anything else (`Alias=`, `Also=`), or a template's, is
 refused. As `install` leaves it, an added unit is enabled for the lamp's
-next start and not started now. Some product units end at once when they
+next start and not started inside the switch's watch. Some product units end at once when they
 have nothing to do (the waking face without `LAMP_WAKING_FACE=on`, the
 Wi-Fi restore, recovery). Started and watched, one of those would read as
 stopped, and every build would be put back. The waking face would also
-start mid-day. The one exception is recovery (`lamp-setup-recover.service`,
+start mid-day. One exception is recovery (`lamp-setup-recover.service`,
 #4863): once a switching round's watch has passed and the build is kept,
 outside the watch, the round starts it once when it is enabled and
 `LAMP_WIFI_RECOVERY` reads `on` through its drop-ins (`crate::switches`,
@@ -2078,6 +2082,27 @@ said and the round stays switched; nothing it does can put a build back. Each of
 its starts, the round's too, first returns a radio left a hotspot to the
 station, whatever the switch says (setup.md, "When the saved network is
 gone"); a round still starts it only with the switch on.
+
+The other exception is a long-running part of the lamp
+(`crate::added::to_start`, `Round::start_added`). Without it, a part a round
+added stayed dead until the lamp's next reboot. A tester's lamp showed it
+with `lamp-services`: the app showed an account linked, and the link went
+nowhere. So, at the same moment as recovery's start (the watch passed, the
+build kept, outside the watch), the round starts each unit it added that is:
+
+- a service, not a template, whose `Type=` is not `oneshot`;
+- enabled into `lampos.target` (its `[Install]` says `WantedBy=lampos.target`
+  and the link `lampos.target.wants/<unit>` is there);
+- inactive, while `lampos.target` itself is active.
+
+`lamp-services.service` goes first, then the others in the switch's order.
+Each is started once with `systemctl start --no-block`, which returns once
+systemd has the job, and each start writes one journal line. A running part
+is never restarted. A failed part, a timer, a socket, a timed service, and a
+unit wanted only by another target (the waking face, the Wi-Fi restore,
+recovery) are left for the next start, as `install` leaves them. A lamp whose
+`lampos.target` is not running (not set up) starts none: the target starts
+them. A start that fails is said, and the round stays switched.
 
 All of it rides the switch's journal (`Switching::added`). A build put
 back, or a switch cut short and recovered at the next start, stops each

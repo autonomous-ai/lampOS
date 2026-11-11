@@ -4,6 +4,7 @@ pub mod first_volume;
 pub mod http;
 pub mod keys;
 pub mod light;
+pub mod parts;
 pub mod recover;
 pub mod reset;
 pub mod scan;
