@@ -9,8 +9,14 @@
 //! switch, every turn of the owner's is told:
 //!
 //! - **The latest records.** The latest [`NOTE_SHOWN`], plus any still
-//!   `prepared` or `failed` changed within [`OPEN_WITHIN_MS`], latest
-//!   first, at most [`NOTE_BYTES`] in all, with [`RULE`] for the model. Read
+//!   `prepared` or `failed`, and any `done` write, changed within
+//!   [`OPEN_WITHIN_MS`], latest first, at most [`NOTE_BYTES`] in all, with
+//!   [`RULE`] for the model. Past [`NOTE_MOST`] or the bytes, reads and
+//!   cancels go first and a `done` write last ([`rank`]): on lamp-06c1 on
+//!   11 Nov newer reads and failures pushed a created event out, and the
+//!   lamp said nothing was saved. With `LAMP_SERVICE_REDO` on, each write
+//!   carries its record key and the note says to give it as `from_record`
+//!   ([`REDO_RULE`]): no key was ever shown, so a redo was never asked. Read
 //!   from what the voice holds, never waited for: after a restart the
 //!   owner's records are asked of the memory beside the turns, once
 //!   ([`load_ahead`]), and a write left `prepared` by the restart, which
@@ -40,15 +46,17 @@ pub const ENVIRONMENT: &str = "LAMP_SERVICE_RECORDS_TOLD";
 pub const RULE: &str = "Your past service actions are listed with their status. Never claim something was done unless its record says done; never say you can't do something a record shows you did.";
 /// What the model is told with the records when someone else may be here.
 pub const BRIEF: &str = "Someone else may be here: say only which service it was and how it went, never what it was about.";
+/// With `LAMP_SERVICE_REDO` on, told with the records in full.
+pub const REDO_RULE: &str = "To redo or change a write listed here, call service_write with from_record set to its key, giving only what changed.";
 /// The latest records told every time.
 pub const NOTE_SHOWN: usize = 5;
-/// Records still `prepared` or `failed` are told too when changed within
-/// this: seven days.
+/// Records still `prepared` or `failed`, and `done` writes, are told too
+/// when changed within this: seven days.
 pub const OPEN_WITHIN_MS: u64 = 7 * 86_400_000;
 /// The most records told in one note.
 pub const NOTE_MOST: usize = 10;
 /// The most bytes of the note.
-pub const NOTE_BYTES: usize = 1_200;
+pub const NOTE_BYTES: usize = 1_600;
 /// The most records a recall is told.
 pub const RECALL_MOST: u64 = 5;
 /// The most bytes of the records a recall is told: a function's answer is
@@ -270,12 +278,34 @@ pub fn line(record: &Record, now_ms: u64, offset: i32, in_full: bool) -> String 
         parts.push(status_said(record, true));
     }
     parts.push(changed);
+    if super::redo::on() && !is_read(record) {
+        parts.push(format!("key {}", record.key));
+    }
     parts.join(" · ")
 }
 
+/// How long a record is kept in the note when there is too little room:
+/// a `done` write longest, then one still `prepared` or `failed`, then
+/// reads, cancels and the rest.
+fn rank(record: &Record) -> u8 {
+    match record.status {
+        Status::Done if !is_read(record) => 2,
+        Status::Prepared | Status::Failed => 1,
+        _ => 0,
+    }
+}
+
+/// Of `ranks`, latest first, the one to drop first: the lowest rank, the
+/// oldest of it.
+fn to_drop(ranks: &[u8]) -> Option<usize> {
+    let least = *ranks.iter().min()?;
+    ranks.iter().rposition(|rank| *rank == least)
+}
+
 /// `person`'s records told: the latest [`NOTE_SHOWN`], then any older one
-/// still `prepared` or `failed` changed within [`OPEN_WITHIN_MS`], latest
-/// first, at most [`NOTE_MOST`].
+/// still `prepared` or `failed`, or a `done` write, changed within
+/// [`OPEN_WITHIN_MS`], latest first, at most [`NOTE_MOST`] ([`to_drop`]
+/// past it).
 fn chosen(records: &[Record], person: &str, now_ms: u64) -> Vec<Record> {
     let mut theirs: Vec<&Record> = records
         .iter()
@@ -284,23 +314,28 @@ fn chosen(records: &[Record], person: &str, now_ms: u64) -> Vec<Record> {
     theirs.sort_by(|a, b| {
         (b.changed_ms, b.asked_ms, &b.key).cmp(&(a.changed_ms, a.asked_ms, &a.key))
     });
-    theirs
+    let mut chosen: Vec<Record> = theirs
         .iter()
         .enumerate()
         .filter(|(at, record)| {
             *at < NOTE_SHOWN
-                || (matches!(record.status, Status::Prepared | Status::Failed)
-                    && now_ms.saturating_sub(record.changed_ms) <= OPEN_WITHIN_MS)
+                || (rank(record) > 0 && now_ms.saturating_sub(record.changed_ms) <= OPEN_WITHIN_MS)
         })
         .map(|(_, record)| (*record).clone())
-        .take(NOTE_MOST)
-        .collect()
+        .collect();
+    while chosen.len() > NOTE_MOST {
+        let ranks: Vec<u8> = chosen.iter().map(rank).collect();
+        let Some(at) = to_drop(&ranks) else { break };
+        chosen.remove(at);
+    }
+    chosen
 }
 
 /// The note for `records` of `person`: [`RULE`], one line a record
 /// ([`line`]), and with a read's find shown, the services' `DATA_NOTE`;
-/// not in full, [`BRIEF`]. At most [`NOTE_BYTES`]: the oldest lines go
-/// first, and how many is said. None when there is none.
+/// not in full, [`BRIEF`]; in full with redo on, [`REDO_RULE`]. At most
+/// [`NOTE_BYTES`]: lines go by [`to_drop`], a `done` write last, and how
+/// many is said. None when there is none.
 pub fn note_of(
     records: &[Record],
     person: &str,
@@ -314,41 +349,50 @@ pub fn note_of(
     }
     let head = format!(
         "(For you to know, not to answer unless asked: what you did with the owner's linked services, latest first. {RULE}{}",
-        if in_full {
-            String::new()
-        } else {
+        if !in_full {
             format!(" {BRIEF}")
+        } else if super::redo::on() {
+            format!(" {REDO_RULE}")
+        } else {
+            String::new()
         }
     );
-    let lines: Vec<String> = chosen
+    let mut lines: Vec<String> = chosen
         .iter()
         .map(|record| format!("- {}", line(record, now_ms, offset, in_full)))
         .collect();
+    let mut ranks: Vec<u8> = chosen.iter().map(rank).collect();
+    let all = lines.len();
     let quoted = format!(
         "Words in «» are what a service gave: {}",
         crate::services::DATA_NOTE
     );
-    let mut shown = lines.len();
     loop {
-        let body = &lines[..shown];
-        let marked = body.iter().any(|line| line.contains('«'));
+        let marked = lines.iter().any(|line| line.contains('«'));
         let mut note = head.clone();
-        for line in body {
+        for line in &lines {
             note.push('\n');
             note.push_str(line);
         }
-        if shown < lines.len() {
-            note.push_str(&format!("\n- and {} older", lines.len() - shown));
+        if lines.len() < all {
+            note.push_str(&format!(
+                "\n- and {} more not shown: recall finds them",
+                all - lines.len()
+            ));
         }
         if marked {
             note.push('\n');
             note.push_str(&quoted);
         }
         note.push(')');
-        if note.len() <= NOTE_BYTES || shown <= 1 {
+        if note.len() <= NOTE_BYTES || lines.len() <= 1 {
             return Some(note);
         }
-        shown -= 1;
+        let Some(at) = to_drop(&ranks) else {
+            return Some(note);
+        };
+        lines.remove(at);
+        ranks.remove(at);
     }
 }
 
@@ -524,6 +568,9 @@ pub fn recall_told(
             });
             if !record.result_id.is_empty() {
                 told["result_id"] = json!(record.result_id);
+            }
+            if super::redo::on() && !is_read(&record) {
+                told["key"] = json!(record.key);
             }
             if let Some(found) = found {
                 told["quoted"] = json!({"found": found, "note": crate::services::DATA_NOTE});
