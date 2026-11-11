@@ -2170,7 +2170,9 @@ kept **unconfirmed**, until its person says yes at the lamp:
   `people.json`. An older build never reads it, so never takes it for
   someone who asked. At most 20. It's **never named, counted, greeted or
   used for "who is this?"**: recognition, the known file, `humans/familiar`
-  and the hello read the people's file only. The answer is
+  and the hello read the people's file only. With such a face at the lamp the
+  second voice is told only that it is not anyone the lamp knows
+  (`worker::nobody_known_told`, #5750). The answer is
   `{"added":NAME,"unconfirmed":true}`. A face already someone's who asked is
   theirs: `{"remembered":NAME}` for the same name, `known_as` for another.
 - **When it's at the lamp:** recognition finds nobody who asked, but an
