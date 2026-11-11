@@ -884,7 +884,8 @@ impl Hearer {
 
     /// More of what the microphone hears, 16 kHz, one channel. A score
     /// for every step that became whole with it, oldest first: none for
-    /// about the first two seconds after a start, then one every 80 ms.
+    /// about the first two seconds after a start, then one every 80 ms
+    /// (lamp-name gives it 1.95 s of silence first, `quiet::LEAD`, #6114).
     pub fn hear(&mut self, samples: &[i16]) -> Result<Vec<Score>, String> {
         let awake = self.wake.is_none() || self.awake_steps > 0;
         if self.wake.is_some() && self.streams.len() > 1 && self.woken.is_none() {

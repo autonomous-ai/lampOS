@@ -44,7 +44,7 @@
 //!   before every line's start.
 use lamp_name::{
     hear::{Hearer, STEP, WINDOW},
-    quiet::{Models, Quiet},
+    quiet::{LEAD, Models, Quiet},
     said::Stops,
 };
 use std::{
@@ -446,8 +446,9 @@ fn scores<M: Models>(
         let first = (newest + 1).saturating_sub(heard.scores.len());
         for (step, score) in (first..).zip(heard.scores) {
             let stop = score.stop.ok_or("the stop model gave no score")?;
-            // Step k (from 1) ends at sample WINDOW + (k - 1) * STEP.
-            all.push((clock.at(WINDOW + (step - 1) * STEP - 1), stop));
+            // Step k (from 1) ends at sample WINDOW + (k - 1) * STEP counted
+            // from the start's silence (`quiet::LEAD`, #6114).
+            all.push((clock.at(WINDOW + (step - 1) * STEP - LEAD - 1), stop));
         }
     }
     Ok(all)

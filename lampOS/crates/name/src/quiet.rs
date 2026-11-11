@@ -16,6 +16,14 @@
 //! Scores fall where they always did: on the steps counted from the last
 //! [`Quiet::forget`] (a start, a gap, lost sound), never from where the
 //! models last woke.
+//!
+//! A start or a forget takes [`LEAD`] samples of silence as heard before it
+//! (#6114): a score needs 2.03 s of sound, so from nothing a "Lamp" said in
+//! the first second and a half after the microphone's sound came back had
+//! no score of its own (0.0000 against 0.95 at 2 s, on a clip; on 52e6, the
+//! first "Lamp, …" after a restart with `heard=0`). With the silence before
+//! it, the first 80 ms of sound already gives a score. Silence, not a guess
+//! at the room: digital zeros never sound like the name.
 use crate::hear::{Hearer, STEP, Score, WINDOW};
 use std::collections::VecDeque;
 
@@ -36,6 +44,10 @@ impl Models for Hearer {
         Hearer::forget(self)
     }
 }
+
+/// The silence taken as heard before a start or a forget: a window less a
+/// step, so the first step of sound is the first score's.
+pub const LEAD: usize = WINDOW - STEP;
 
 /// What is said of no sound at all, in dBFS.
 pub const SILENCE_DB: f32 = -96.0;
@@ -104,6 +116,9 @@ pub struct Quiet<M> {
     running: bool,
     /// Steps not worked out, since the program started.
     pub rested_steps: u64,
+    /// The models are still to hear [`LEAD`]'s silence (only with no bar:
+    /// with one it is kept, and heard from there at the first sound).
+    lead_due: bool,
 }
 
 impl<M: Models> Quiet<M> {
@@ -111,14 +126,29 @@ impl<M: Models> Quiet<M> {
     /// is quiet; without it the models always run.
     pub fn new(models: M, quiet_below: Option<f32>) -> Self {
         let bar = quiet_below.map(bar_of);
-        Self {
+        let mut quiet = Self {
             models,
             bar,
-            kept: VecDeque::with_capacity(WINDOW + STEP),
+            kept: VecDeque::with_capacity(WINDOW + 2 * STEP),
             fed: 0,
             sound_until: None,
             running: bar.is_none(),
             rested_steps: 0,
+            lead_due: false,
+        };
+        quiet.lead();
+        quiet
+    }
+
+    /// [`LEAD`]'s silence, as heard: counted, kept to start the models
+    /// from with a bar, and given to the models at the next block without
+    /// one (so a start or a forget does no work of its own).
+    fn lead(&mut self) {
+        self.fed = LEAD;
+        if self.bar.is_some() {
+            self.kept.extend(std::iter::repeat_n(0, LEAD));
+        } else {
+            self.lead_due = true;
         }
     }
 
@@ -137,14 +167,20 @@ impl<M: Models> Quiet<M> {
     pub fn forget(&mut self) {
         self.models.forget();
         self.kept.clear();
-        self.fed = 0;
         self.sound_until = None;
         self.running = self.bar.is_none();
+        self.lead_due = false;
+        self.lead();
     }
 
     /// One block of what the microphone hears.
     pub fn hear(&mut self, block: &[i16]) -> Result<Heard, String> {
         let Some(bar) = self.bar else {
+            if self.lead_due {
+                // A window less a step: never a score of its own.
+                self.models.hear(&vec![0; LEAD])?;
+                self.lead_due = false;
+            }
             self.fed += block.len();
             return Ok(Heard {
                 scores: self.models.hear(block)?,
@@ -341,7 +377,7 @@ mod tests {
         let blocks = room(&STRETCHES);
         let (always, _) = scores(None, &blocks);
         let (rested, _) = scores(Some(BAR_DB), &blocks);
-        assert_eq!(always.len(), steps_by(blocks.len() * 320));
+        assert_eq!(always.len(), steps_by(LEAD + blocks.len() * 320));
         assert!(!rested.is_empty());
         for (step, score) in &rested {
             assert_eq!(always[step - 1], (*step, *score), "step {step}");
@@ -353,11 +389,12 @@ mod tests {
     #[test]
     fn exactly_the_steps_whose_window_held_sound_are_worked_out() {
         let blocks = room(&STRETCHES);
-        let needed: Vec<usize> = (1..=steps_by(blocks.len() * 320))
+        // Counted from the start's silence ([`LEAD`]).
+        let needed: Vec<usize> = (1..=steps_by(LEAD + blocks.len() * 320))
             .filter(|step| {
                 let end = WINDOW + (step - 1) * STEP;
                 blocks.iter().enumerate().any(|(at, (sound, _))| {
-                    *sound && at * 320 < end && (at + 1) * 320 > end - WINDOW
+                    *sound && LEAD + at * 320 < end && LEAD + (at + 1) * 320 > end - WINDOW
                 })
             })
             .collect();
@@ -372,7 +409,7 @@ mod tests {
         assert!(quiet.rested_steps > 40, "{}", quiet.rested_steps);
         assert_eq!(
             quiet.rested_steps as usize + needed.len(),
-            steps_by(blocks.len() * 320)
+            steps_by(LEAD + blocks.len() * 320)
         );
     }
 
@@ -401,7 +438,7 @@ mod tests {
     fn without_a_bar_every_step_is_worked_out_and_a_forget_starts_again() {
         let blocks = room(&[(false, 300)]);
         let (always, models) = scores(None, &blocks);
-        assert_eq!(always.len(), steps_by(300 * 320));
+        assert_eq!(always.len(), steps_by(LEAD + 300 * 320));
         assert_eq!(models.worked, always.len());
         let mut quiet = Quiet::new(Sums::default(), Some(BAR_DB));
         for (_, block) in &blocks[..200] {
@@ -409,15 +446,64 @@ mod tests {
         }
         quiet.forget();
         assert_eq!(quiet.steps(), 0);
-        // Sound 1 s after the forget: the first score is the 2.03 s after
-        // it, as from a start.
+        // Sound 1 s after the forget: the first score is of the first step
+        // that ends after the sound began, counted from the forget's
+        // silence ([`LEAD`]), as from a start.
         let mut first = None;
         for (at, (_, block)) in room(&[(false, 50), (true, 100)]).iter().enumerate() {
             if first.is_none() && !quiet.hear(block).unwrap().scores.is_empty() {
                 first = Some((at, quiet.steps()));
             }
         }
-        assert_eq!(first, Some((WINDOW.div_ceil(320) - 1, 1)));
+        let steps_before = (LEAD + 50 * 320 - WINDOW) / STEP + 1;
+        let end = WINDOW + steps_before * STEP;
+        assert_eq!(
+            first,
+            Some(((end - LEAD).div_ceil(320) - 1, steps_before + 1))
+        );
+    }
+
+    /// #6114: from nothing, a score needed 2.03 s of sound, so a "Lamp"
+    /// said in the first second and a half after a start or a forget (the
+    /// microphone's sound coming back after a restart) had no score of its
+    /// own. With the silence taken as heard before it, the first step of
+    /// sound gives one, with or without a bar, and it is the score of that
+    /// silence and the sound.
+    #[test]
+    fn a_name_said_just_after_a_start_or_a_forget_is_scored() {
+        let sound = room(&[(true, 20)]);
+        for bar in [None, Some(BAR_DB)] {
+            for forgot in [false, true] {
+                let mut quiet = Quiet::new(Sums::default(), bar);
+                if forgot {
+                    for (_, block) in &room(&[(true, 200)]) {
+                        quiet.hear(block).unwrap();
+                    }
+                    quiet.forget();
+                }
+                let mut first = None;
+                for (at, (_, block)) in sound.iter().enumerate() {
+                    let heard = quiet.hear(block).unwrap();
+                    if first.is_none() && !heard.scores.is_empty() {
+                        first = Some((at, quiet.steps(), heard.scores[0].name));
+                    }
+                }
+                // The step's 1280 samples are four 20 ms blocks.
+                let mut alone = Sums::default();
+                let mut heard = vec![0i16; LEAD];
+                heard.extend(
+                    sound[..4]
+                        .iter()
+                        .flat_map(|(_, block)| block.iter().copied()),
+                );
+                let expected = alone.hear(&heard).unwrap()[0].name;
+                assert_eq!(
+                    first,
+                    Some((3, 1, expected)),
+                    "bar {bar:?}, after a forget: {forgot}"
+                );
+            }
+        }
     }
 
     /// A block whose loudest sample is exactly at the bar is sound; one a

@@ -344,8 +344,24 @@ a skipped count, or half a second or more between two by the voice's own
 monotonic clock (the bus message's `at_us`), or a new publisher (the voice
 restarted). Not by when lamp-name got to them, since a woken grid's
 catch-up can keep blocks waiting, and not by a wall clock, which a lamp
-with no battery clock has set 30 to 70 s after boot (#2759). Then the models start afresh: they need about two seconds of sound
-before they give a score again. A hearing that was open at that moment is
+with no battery clock has set 30 to 70 s after boot (#2759). Then the models start afresh.
+
+**The silence before a start (#6114).** A score is of 2.03 s of sound, so
+from nothing the models gave no score for the first two seconds after a
+start or a fresh start, and a "Lamp" said in the first second and a half
+had no score of its own: on 52e6, the first "Lamp, …" after a restart was
+missed with `heard=0` and no near hearing. On a clip, said 0 to 1 s after a
+start it scored 0.0000 to 0.04, and 0.95 at 2 s. Now a start and every
+fresh start take 1.95 s of silence as heard before them (`quiet::LEAD`, a
+window less a step): the first 80 ms of sound already gives a score, and
+the same clips score 0.88 to 0.9999 at `--step-ms 10` (four lines without
+the name, at most 0.21). It is digital zeros, never a guess at the room,
+and with no `--quiet-below` the models hear it with the first block after
+the start (about 0.1 s of one core on a Mac, once). With `--quiet-below` it
+is kept, and heard only when sound comes. `check` dates each score from
+the file's start: the first is of its first 80 ms.
+
+A hearing that was open at that moment is
 said then, dated from its first high score (it was dated 0.8 s earlier
 than that until 2026-10-14, which left a call 0.7 s, not 1.5 s, to count
 for the request after it).
