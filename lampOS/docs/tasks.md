@@ -1615,6 +1615,34 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     kept, `AGENTS.md` written in the work folder, and a skill's tool
     (such as `dance`) called by `lamp-tasks skill call` from Hermes'
     own namespace.
+- **The lamp itself, with OpenClaw** (`LAMP_OPENCLAW_ON_LAMP=on`, only
+  with `--engines-from-machines`; off unless set, #6226). OpenClaw is the
+  lamp's default engine: it takes Hermes's place as the lamp's own target
+  in exactly Hermes's role (above), and Hermes stays selectable. The
+  lamp-tasks side is another coder's part of #6226; the voice's side is
+  described here.
+  - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
+    `openclaw`. The lamp's target is still `lamp`, with that engine; when
+    the one chosen is not installed but the other is, the other.
+  - **Started** as Harness starts OpenClaw:
+    `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
+    no permission modes and no model routing (OpenClaw picks its own
+    model, from its settings below).
+  - **The voice** (`agent_tasks`, `task_news`): reads the lamp's target's
+    engine from `{"op":"targets"}` and names it, so a hand-over naming no
+    machine is said as "OpenClaw on the lamp" and the tool descriptions
+    say "OpenClaw here on the lamp"; with `hermes` there, "Hermes" as
+    before. Until the targets are read it says OpenClaw, the default.
+    `who` "OpenClaw" or "Hermes", while the lamp has its target, is the
+    lamp's own, never a computer's. OpenClaw is also one of the agents the
+    voice can name on a computer, heard as "OpenClaw", "open claw", "open
+    clause", "open close", "open clow" or "open klaw". News of work done by
+    either engine on the lamp is told as done here on the lamp.
+  - **Shown only in tests:** `agent_tasks::tests::new_work_goes_to_openclaw_on_the_lamp`,
+    `agent_tasks::tests::with_the_lamps_target_the_hand_over_says_what_goes_where`,
+    `agent_tasks::tests::with_named_only_the_words_name_an_agent_not_set_up`,
+    `task_news::tests::work_done_by_openclaw_on_the_lamp_is_told_as_done_here`.
+    Not shown on a lamp.
 
 Signing in a lamp with no screen is by a spoken code since Harness 0.4.23
 (openharness#1410; ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
@@ -1927,6 +1955,24 @@ forwarded on the lamp").
   merge safely (a tab, a document marker, a key twice, a list or anchor
   where a mapping is set, a top level that isn't a mapping) is left as it
   is, and nothing is written, `.env` included.
+
+## OpenClaw's settings on the lamp (#6226)
+
+With `LAMP_OPENCLAW_ON_LAMP` on, lamp-tasks at its start merges what
+OpenClaw on the lamp needs into `<state>/openclaw.json`
+(`/var/lib/lampos-openclaw/state`, JSON5), exactly as `hermes_config` does
+for Hermes, and keeps every other key (lamp-update's `gateway` block among
+them). This is another coder's part of #6226; the design:
+
+- `models`: `mode: "merge"`, with the provider `lampos`: `baseUrl`
+  `http://127.0.0.1:7741/v1/deepseek` (lamp-cloud's forwarder, docs/cloud.md),
+  `apiKey` `"${LAMP_HERMES_TOKEN}"` (the wrapper exports it from the
+  forwarder's token file), `api` `"openai-completions"`, and one model,
+  `deepseek-flash` (the forwarder's only model). A loopback target may
+  need `request.allowPrivateNetwork: true` on the provider.
+- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`.
+- The lamp's skills keys, and the guidance (`AGENTS.md`) written in
+  OpenClaw's workspace (`<state>/workspace`), as for Hermes.
 
 ## Devin (#1854)
 

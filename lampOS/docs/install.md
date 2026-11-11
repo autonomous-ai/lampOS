@@ -1871,6 +1871,51 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the same installer as `lampos`, the same six stages): 557 s in all,
      +3.0 GB, inside each stage's 15-min bound and the unit's hour.
 
+   **OpenClaw on the lamp** (#6226; `LAMP_OPENCLAW_ON_LAMP` in
+   `lamp-update.service`'s environment, read as `LAMP_HERMES_ON_LAMP` is:
+   set, on only when `on` exactly; unset, on on a lamp installed as the
+   product, off on any other lamp; no product unit sets it). OpenClaw is
+   the lamp's default engine under Harness (Harness's engine id
+   `openclaw`), installed beside Hermes in exactly Hermes's role and under
+   the same rules: the same schedule (window, freeze while the voice is
+   not quiet, stop on a lost privacy reading, the one-shot's bounds), the
+   same user `lampos` in its own user namespace, its DeepSeek through
+   lamp-cloud's forwarder, and the lamp's skills. Hermes stays installed
+   and selectable (`LAMP_LAMP_ENGINE` in lamp-tasks, docs/tasks.md). The
+   install itself is another coder's part of #6226; this is the design it
+   follows, not a description of a run.
+   - **What lamp-update puts in:** a Node 24 runtime in
+     `/var/lib/lampos-openclaw/node` (OpenClaw needs Node 24, and Harness
+     reads OpenClaw only on Node 24, while the lamp's Harness stays pinned
+     on Node 22); the npm package `openclaw` under
+     `/var/lib/lampos-openclaw`; the wrapper `/usr/local/bin/openclaw`, so
+     Harness finds `openclaw` on `lampos`'s login `PATH`; the namespace
+     script `/usr/local/lib/lampos/openclaw-ns`; OpenClaw's state in
+     `/var/lib/lampos-openclaw/state` (`OPENCLAW_STATE_DIR`), its tools
+     working in `<state>/workspace`; and an initial
+     `<state>/openclaw.json` with only its `gateway` block
+     (`mode: "local"`, `bind: "loopback"`, token auth). lamp-tasks merges
+     the rest in at its start (docs/tasks.md, "OpenClaw's settings on the
+     lamp").
+   - **The Gateway:** OpenClaw's TUI panes need a running Gateway, and
+     Harness never starts or configures one.
+     `lamp-openclaw-gateway.service` runs `openclaw gateway run` through
+     the wrapper as `lampos`, on loopback `ws://127.0.0.1:18789`, with the
+     token in `/var/lib/lampos-openclaw/gateway-token` (0600 `lampos`),
+     made once by lamp-update at the install. One Gateway serves every
+     pane.
+   - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
+     lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
+     for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).
+   - **The lamp's skills** behind `LAMP_OPENCLAW_SKILLS` (unset, on on every
+     product lamp, read only with `LAMP_OPENCLAW_ON_LAMP` on), as
+     `LAMP_HERMES_SKILLS` does for Hermes: on, `openclaw-ns` shows
+     `/run/lampos-skills` read-only; off, nothing under `/run`.
+   - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
+     (the ask) and `openclaw.lock` (one install at a time), beside
+     Hermes's in lamp-update's records.
+   - **Not shown on a lamp.**
+
    **Undone by `lamp-update harness-off`** (as root, #811; the first
    builder's yes on #705, 18 Oct): with that record, as `lampos` with the
    same `HOME` and `XDG_RUNTIME_DIR`, the Harness CLI's own `harness service
