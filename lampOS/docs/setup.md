@@ -267,8 +267,9 @@ lamp-setup reset-now`). That unit, in this order:
    (`reset::stop_and_wait_keeping`). First it empties what a reboot
    emptied by being memory, `reset::VOLATILE`: every folder a part keeps in
    `/run` past its stop, the tmpfiles' `/run/lampos-bus` (the bus's latest
-   messages, which can say a person's name or words) and
-   `/run/lampos-photos`, and the voice's and the records' own folders
+   messages, which can say a person's name or words),
+   `/run/lampos-photos` and `/run/lampos-eyes-kept` (the eyes' sitting kept
+   across a restart, eyes.md), and the voice's and the records' own folders
    (`RuntimeDirectoryPreserve=yes`: the thread's set-aside words, the room).
    Every other part's `RuntimeDirectory=` goes as its unit stops. If they
    can't be emptied it reboots instead. Then, best effort, it forgets what

@@ -46,6 +46,7 @@ pub mod repair_writer;
 pub mod seems;
 pub mod seems_log;
 pub mod sight;
+pub mod sitting;
 pub mod speaking;
 pub mod steady;
 pub mod still;
