@@ -146,6 +146,23 @@ window of its own the twin opens in where Chrome, Chromium or Edge is installed)
 start (the lamp makes a new certificate then); to drive the lamp from your own program too, run it
 with `LAMPOS_HOME=DIR/sdk`. Linux for now (the real `lamp-body` runs only there).
 
+### Try it from a browser: `try.js`
+
+`examples/twin/try.js` is the same virtual lamp with a page to play with, on one URL for any device on your
+network: the 3D twin, a control panel whose every button is one SDK call (gesture, express, light, light off, say,
+look, move, sound, stop), buttons for the room (someone arrives or leaves, a phrase, a tap or pet, a hand, a sound,
+stuffy or clear air: `lamp-sim people|hear|touch|hand|sound|air`), and a log of the lamp's events and the answer
+to each call, a refusal in the lamp's own words.
+
+```sh
+node examples/twin/try.js --lamp-sim ../../target/debug/lamp-sim     # prints the URL; Ctrl-C stops and cleans up
+```
+
+The lamp runs in a private folder (`~/.lampsim-try-PID`, 0700) and listens on 127.0.0.1 only; the page is the one
+thing on the network and answers only with the token in its URL. The camera and the microphone are off: the lamp
+has neither grant, so no picture of the room is ever on the page. The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
+your own at the same lamp.
+
 ### The examples against a running lamp
 
 `conformance/examples.js` runs the SDK's examples as programs against the paired lamp and checks

@@ -16,13 +16,15 @@
 // token in the URL it prints: any website open in the browser could otherwise
 // reach localhost and drive the lamp (guard.js). The lamp's door is spoken to
 // through the SDK, so the page never holds the computer's key.
+import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
+import { networkInterfaces } from 'node:os';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { Keyring, Lamp, LampError, model } from 'lampos';
+import { Keyring, Lamp, LampError, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
 import { newToken, originOk, tokenOk } from './guard.js';
 
@@ -30,6 +32,12 @@ const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const options = parse(process.argv.slice(2));
 const port = Number(options.port ?? 8737);
 const token = newToken();
+// `--lan`: the page is served on this computer's network address too (not only 127.0.0.1), still only with the
+// token in the URL. `--stim-dir DIR` (with `--lamp-sim PATH`) is the try-it app: a panel that drives the lamp
+// through this SDK connection, stimuli buttons that run `lamp-sim <verb> ... DIR`, and a log of the lamp's events.
+const lan = Boolean(options.lan);
+const stimDir = options['stim-dir'];
+const lampSimBin = options['lamp-sim'] ?? 'lamp-sim';
 const glbPath = options.glb ?? here('../../../../../robots/lamp/hardware/cad/glb/lamp.glb');
 if (!existsSync(glbPath) || readFileSync(glbPath).toString('latin1', 0, 4) !== 'glTF') {
   console.error(`${glbPath}: no rigged CAD here (a clone needs \`git lfs pull\`); give --glb PATH`);
@@ -100,10 +108,123 @@ async function release() {
   }
 }
 
+// The try-it app (`--stim-dir`): every button is one SDK call, or one `lamp-sim` stimulus, and the log
+// says the call and the lamp's own answer, a refusal in its words.
+const COLOURS = [...schema.colours];
+const GESTURES = [...schema.gestures];
+const PATTERNS = [...schema.patterns];
+const FEELINGS = ['glad', 'lively', 'low'];
+const oneOf = (value, list, what) => {
+  if (!list.includes(value)) throw new LampError(`${what}: one of ${list.join(', ')}`, { code: 'bad_request' });
+  return value;
+};
+const number = (value, low, high, what) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < low || n > high) throw new LampError(`${what}: a number from ${low} to ${high}`, { code: 'bad_request' });
+  return n;
+};
+const text = (value, most, what) => {
+  if (typeof value !== 'string' || !value.trim() || value.length > most) throw new LampError(`${what}: 1 to ${most} characters`, { code: 'bad_request' });
+  return value;
+};
+// One entry per button: what it calls, and how it is said in the log.
+const CALLS = {
+  gesture: async (a) => { const name = oneOf(a.name, GESTURES, 'gesture'); await lamp.gesture(name); return [`lamp.gesture(${JSON.stringify(name)})`]; },
+  express: async (a) => { const feeling = oneOf(a.feeling, FEELINGS, 'feeling'); await lamp.express(feeling); return [`lamp.express(${JSON.stringify(feeling)})`]; },
+  light: async (a) => {
+    const colour = oneOf(a.colour, COLOURS, 'colour');
+    const level = Math.round(number(a.level ?? 3, 1, 5, 'level'));
+    const pattern = a.pattern ? oneOf(a.pattern, PATTERNS, 'pattern') : undefined;
+    const forMs = Math.round(number(a.for_ms ?? 10_000, 1, 30_000, 'for_ms'));
+    await lamp.light(colour, level, forMs, pattern);
+    return [`lamp.light(${JSON.stringify(colour)}, ${level}, ${forMs}${pattern ? `, ${JSON.stringify(pattern)}` : ''})`];
+  },
+  light_off: async (a) => { const forMs = Math.round(number(a.for_ms ?? 10_000, 1, 30_000, 'for_ms')); await lamp.lightOff({ forMs }); return [`lamp.lightOff({ forMs: ${forMs} })`]; },
+  say: async (a) => { const words = text(a.text, 200, 'say'); await lamp.say(words); return [`lamp.say(${JSON.stringify(words)})`]; },
+  look: async (a) => {
+    const at = { yaw: number(a.yaw ?? 0, -180, 180, 'yaw'), pitch: number(a.pitch ?? 0, -90, 90, 'pitch') };
+    await release();
+    await lamp.withLease(['body'], () => lamp.look(at, { wait: true }));
+    return [`lamp.withLease(['body'], () => lamp.look(${JSON.stringify(at)}, { wait: true }))`];
+  },
+  move: async () => {
+    const poses = [{ pitch: 12, yaw: -15 }, { pitch: -6, yaw: 15 }, { pitch: 8, yaw: 0 }];
+    // A move needs the body lease at the door, as a look does.
+    await release();
+    await lamp.withLease(['body'], () => lamp.movePoses(poses, { wait: true }));
+    return [`lamp.withLease(['body'], () => lamp.movePoses(${JSON.stringify(poses)}, { wait: true }))`];
+  },
+  // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
+  sound: async () => { await lamp.sound('hum'); return ["lamp.sound('hum')"]; },
+  stop: async () => { await lamp.stop(); return ['lamp.stop()']; },
+};
+// The world, not the SDK: `lamp-sim <verb> ... DIR` writes what the lamp's stand-ins read. Arguments are an
+// array, never a shell string.
+const STIMULI = {
+  people: (a) => ['people', String(Math.round(number(a.n ?? 1, 0, 5, 'people')))],
+  hear: (a) => ['hear', text(a.text, 120, 'hear')],
+  hand: () => ['hand'],
+  sound: (a) => ['sound', oneOf(a.kind, ['music', 'laughter', 'door', 'footsteps'], 'sound')],
+  touch: (a) => ['touch', oneOf(a.kind, ['tap', 'pet'], 'touch')],
+  air: (a) => ['air', ...(oneOf(a.kind, ['stuffy', 'clear'], 'air') === 'stuffy' ? ['co2_ppm=1600', 'pm2_5=45'] : ['co2_ppm=450', 'pm2_5=5'])],
+};
+const said = (id, call, ok, answer) => tell({ type: 'result', id, call, ok, answer });
+let stimulating = Promise.resolve();
+async function press(message) {
+  const { id, name, args = {} } = message;
+  try {
+    if (message.type === 'call') {
+      if (!Object.hasOwn(CALLS, name)) throw new LampError(`no button ${name}`, { code: 'bad_request' });
+      const [call] = await CALLS[name](args);
+      said(id, call, true, 'taken');
+    } else {
+      if (!Object.hasOwn(STIMULI, name)) throw new LampError(`no stimulus ${name}`, { code: 'bad_request' });
+      const argv = [...STIMULI[name](args), stimDir];
+      if (name === 'hear') await listenFor(argv[1]);
+      const [verb, ...rest] = argv;
+      // One stimulus at a time: a button pressed often cannot fork lamp-sim without end.
+      const run = stimulating.then(() => new Promise((resolve, reject) => execFile(lampSimBin, argv, { timeout: 10_000 }, (error, stdout, stderr) => (error ? reject(new Error((stderr || error.message).trim().split('\n')[0])) : resolve(stdout)))));
+      stimulating = run.catch(() => {});
+      await run;
+      said(id, `lamp-sim ${verb} ${rest.slice(0, -1).join(' ')}`.trim(), true, 'done');
+    }
+  } catch (error) {
+    // The SDK's refusals already say their code first ("bad_request: ...").
+    const why = error instanceof LampError ? (error.message.startsWith(`${error.code}:`) ? error.message : `${error.code}: ${error.message}`) : `failed: ${error.message}`;
+    said(id, name, false, why);
+  }
+}
+// The lamp's events, said in the log (not `body.state`: twelve a second, and the twin draws it; `time`: noise);
+// a busy kind (a hand, a sound) at most five times a second.
+const quiet = new Map();
+// A phrase the lamp is to hear is asked of it first (`phrase.heard` comes only for phrases a program listed).
+const listening = new Set();
+async function listenFor(phrase) {
+  const key = phrase.trim().toLowerCase();
+  if (listening.has(key)) return;
+  await lamp.on('phrase.heard', (frame) => tell({ type: 'event', event: 'phrase.heard', frame: { phrase: frame.phrase, ...(frame.confidence === undefined ? {} : { confidence: frame.confidence }) } }), { phrases: [phrase] });
+  listening.add(key);
+}
+if (stimDir) {
+  listenFor('good night lamp').catch((error) => console.log(`not listening for a phrase: ${error.message}`));
+  for (const event of [...schema.events.filter((e) => e !== 'body.state' && e !== 'time' && e !== 'phrase.heard'), 'lease', 'done']) {
+    lamp.on(event, (frame) => {
+      const now = Date.now();
+      if (now - (quiet.get(event) ?? 0) < 200) return;
+      quiet.set(event, now);
+      const { ev: _ev, at: _at, ...rest } = frame ?? {};
+      tell({ type: 'event', event, frame: rest });
+    }).catch((error) => console.log(`not subscribed to ${event}: ${error.code ?? ''} ${error.message}`));
+  }
+}
+const lanAddress = () => Object.values(networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal)?.address;
+
 const files = {
   '/': ['text/html; charset=utf-8', () => readFileSync(here('./index.html'))],
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
+  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ gestures: GESTURES, colours: COLOURS, patterns: PATTERNS })] } : {}),
+  ...(stimDir ? { '/panel.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./panel.js'))] } : {}),
 };
 // What the lamp's camera sees now, for the page's "what the lamp sees" panel: the lamp's own newest
 // picture through the SDK (the `camera` grant), so the lamp's rules hold (never while private, the ring's
@@ -134,12 +255,12 @@ const server = createServer((request, response) => {
     response.writeHead(404).end();
     return;
   }
-  response.writeHead(200, { 'content-type': file[0], 'cache-control': 'no-store' }).end(file[1]());
+  response.writeHead(200, { 'content-type': file[0], 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }).end(file[1]());
 });
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 server.on('upgrade', (request, socket, head) => {
   const path = new URL(request.url, 'http://localhost').pathname;
-  if (path !== '/live' || !tokenOk(request.url, token) || !originOk(request.headers.origin, port)) {
+  if (path !== '/live' || !tokenOk(request.url, token) || !originOk(request.headers.origin, port, lan ? request.headers.host : undefined)) {
     socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
     return;
   }
@@ -147,6 +268,8 @@ server.on('upgrade', (request, socket, head) => {
 });
 wss.on('connection', (page) => {
   pages.add(page);
+  // A frame over the cap (or a broken one) closes that page's socket; it must not end the twin.
+  page.on('error', () => page.terminate());
   if (last) page.send(JSON.stringify({ type: 'state', state: last }));
   page.on('message', (data) => {
     let message;
@@ -157,10 +280,15 @@ wss.on('connection', (page) => {
     }
     if (message.type === 'drag') drag(message.joint, Number(message.deg));
     if (message.type === 'let_go') release();
+    if (stimDir && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message);
   });
   page.on('close', () => pages.delete(page));
 });
-server.listen(port, '127.0.0.1', () => console.log(`the twin: http://localhost:${port}/?t=${token}`));
+server.listen(port, lan ? '0.0.0.0' : '127.0.0.1', () => {
+  console.log(`the twin: http://localhost:${port}/?t=${token}`);
+  const address = lan ? lanAddress() : undefined;
+  if (address) console.log(`on your network: http://${address}:${port}/?t=${token}`);
+});
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
     await release();
@@ -174,7 +302,7 @@ function parse(args) {
   const out = {};
   for (let i = 0; i < args.length; i++) {
     const key = args[i].replace(/^--/, '');
-    if (key === 'fake') out.fake = true;
+    if (key === 'fake' || key === 'lan') out[key] = true;
     else out[key] = args[++i];
   }
   return out;
