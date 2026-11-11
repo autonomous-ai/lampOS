@@ -148,9 +148,22 @@ fn wait(long: Duration, cancelled: &AtomicBool) {
     }
 }
 
+/// Whether `path` may be handed to a player as its argument: an absolute path,
+/// never one that starts with `-` (read as an option).
+fn playable(path: &str) -> bool {
+    path.starts_with('/')
+}
+
 /// Plays the clip at `path` on the host: the first of the host's players that
 /// starts, else a silent wait; cut off when `cancelled`.
 fn play(path: &str, cancelled: &AtomicBool) {
+    // The players read a path that starts with `-` as an option (`ffplay -f ...`):
+    // lamp-control gives the path of a clip it checked, which is absolute; anything
+    // else is not played.
+    if !playable(path) {
+        wait(Duration::from_millis(600), cancelled);
+        return;
+    }
     let engines: [(&str, &[&str]); 4] = [
         ("paplay", &[path]),
         ("aplay", &["-q", path]),
@@ -190,7 +203,9 @@ fn speak(text: &str, cancelled: &AtomicBool) {
     }
 }
 
-/// Speaks `text` with the first of `engines` that starts; false if none did.
+/// Speaks `text` with the first of `engines` that starts and does not fail at
+/// once (a player that is installed but exits with an error, such as `paplay`
+/// with no sound server, is passed over for the next); false if none spoke.
 fn speak_with(engines: &[(&str, &[&str])], text: &str, cancelled: &AtomicBool) -> bool {
     for (program, args) in engines {
         let Ok(mut child) = Command::new(program)
@@ -207,18 +222,20 @@ fn speak_with(engines: &[(&str, &[&str])], text: &str, cancelled: &AtomicBool) -
         }
         // Until it ends, or the words are cancelled: then it is cut off.
         loop {
-            if matches!(child.try_wait(), Ok(Some(_))) {
-                break;
+            match child.try_wait() {
+                // It ended: spoken if it says so, else the next engine tries.
+                Ok(Some(status)) if status.success() => return true,
+                Ok(Some(_)) => break,
+                _ => {}
             }
             if cancelled.load(Ordering::SeqCst) {
                 let _ = child.kill();
                 let _ = child.wait();
                 cut_off(program);
-                break;
+                return true;
             }
             thread::sleep(Duration::from_millis(20));
         }
-        return true;
     }
     false
 }
@@ -485,6 +502,44 @@ mod tests {
             std::fs::read_to_string(&log).unwrap(),
             "--wait --pipe-mode\n--cancel\n"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_player_that_fails_at_once_is_passed_over_for_the_next_and_a_dash_path_is_no_clip() {
+        let _one_at_a_time = crate::FAKE_PROGRAM
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let dir = scratch("fails");
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = |name: &str, body: &str| {
+            use std::os::unix::fs::PermissionsExt;
+            let path = dir.join(name);
+            std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+            path
+        };
+        let (log, first, second) = (dir.join("log"), script("first", ""), script("second", ""));
+        std::fs::write(
+            &first,
+            format!("#!/bin/sh\necho first >> {}\nexit 1\n", log.display()),
+        )
+        .unwrap();
+        std::fs::write(
+            &second,
+            format!("#!/bin/sh\necho second >> {}\nexit 0\n", log.display()),
+        )
+        .unwrap();
+        let cancelled = AtomicBool::new(false);
+        let (a, b) = (first.to_str().unwrap(), second.to_str().unwrap());
+        // The first fails at once, so the second is tried and speaks.
+        assert!(speak_with(&[(a, &[]), (b, &[])], "", &cancelled));
+        assert_eq!(std::fs::read_to_string(&log).unwrap(), "first\nsecond\n");
+        // Every engine failing is no engine: the caller's silent wait follows.
+        assert!(!speak_with(&[(a, &[]), (a, &[])], "", &cancelled));
+        // A path that starts with a dash is no clip for a player.
+        assert!(playable("/clips/a.wav"));
+        assert!(!playable("-f/etc/hostname") && !playable("clips/a.wav"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
