@@ -248,6 +248,8 @@ await Lamp.keep_connected(setup)
 `FakeLamp.restart()` closes every connection as a lamp's restart does, to
 test it.
 
+**On the lamp itself**, a skill's script connects as its run with `await Lamp.local(token)` (the token from `LAMP_CONTROL_TOKEN`, the socket `LAMP_CONTROL_SOCKET`, default `/run/lampos-control/control.sock`): the same `Lamp`, with exactly the grants the owner said yes to for that skill; `lamp.run` is the run's id and `lamp.skill` the skill it runs for. No pairing: the one-run token is the way in, and a wrong or ended one is refused `no_grant`. It is not the local agent's socket (docs/control.md, "The control socket"). The fake lamp serves it with `FakeLamp(local=True)`, `fake.mint_token(grants, run)` and `fake.end_run(run)`.
+
 **Dependencies** (`websockets`, `cryptography`; `zeroconf` to find lamps)
 have lower bounds only, as a library's should: the application that uses
 it pins them.
@@ -259,7 +261,7 @@ Tests: `PYTHONPATH=src python3 -m pytest tests` (needs `pytest`; with
 lamp is printed to stderr, one line each (`lampos -> {...}` sent, `lampos <-
 {...}` received). It's off by default. Nothing that would pair or say hello as
 this computer, or give away the lamp's pin, is printed: `proof`, `sig`, `key`,
-`nonce`, `pin` and `fp` show as `<redacted>`, and so does a pair request's
+`nonce`, `pin`, `fp` and a control-socket `token` show as `<redacted>`, and so does a pair request's
 `code`. A said `text` shows only as its
 length and a tag keyed for this run (an HMAC: the same text tags the same within
 a run, and nobody can test a guess against it), and a pushed skill part's
