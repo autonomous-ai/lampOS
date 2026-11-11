@@ -81,7 +81,10 @@ against lamp-06c1.
 - **Pings the backend every 15 s**, as V1's `status_reporter`: `POST
   {base}/ping`, where `base` is `llm_base_url` with a trailing `/v1` cut,
   `?mqtt=true` while no broker is kept, with the voice's key as the bearer
-  and V1's `PingPayload` fields V2 has. A reply that carries a different
+  and V1's `PingPayload` fields V2 has. With `LAMP_CLOUD_TLS=on` the body
+  also says `"mqtt_tls": true`, so the backend can hand the lamp its TLS
+  broker; with the switch off or unset the key is left out and the body is
+  as before (#6031). A reply that carries a different
   broker (`mqtt_server`, `mqtt_port`, `mqtt_usr`, `mqtt_pwd` and the
   channels) or a new `device_id` replaces the account: the connection is made
   again with it, and the rotated login is kept in `lamp-cloud`'s own state
