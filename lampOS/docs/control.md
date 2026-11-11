@@ -323,11 +323,26 @@ A skill that carries code (a `do.task` run, lamp-tasks) reaches the lamp's hardw
 - **It ends with the run.** `{"end": {"run": RUN_ID}}` (lamp-tasks, when the run ends) closes the run's connections, stops what it asked for that still goes (as its `stop` would) and ends its token; so does the token's time (`expires_in_ms`, at most 30 minutes, 10 by default; checked once a second by the door's clock) and a restart of lamp-control (tokens are not kept). At most 8 runs at once.
 - **Limits.** At most 16 connections on the socket. A connection that ends because its run did says why in its close frame ("the run ended"; "the run started again" for the connections of a token a newer mint replaced), as a revoke's does.
 
+### The control socket, the SDKs' side (`Lamp.local`)
+
+A skill's script on the lamp connects with the SDK, not by hand. `Lamp.local(token)` (Python `await Lamp.local(token)`,
+JS `await Lamp.local(token)`) connects to `LAMP_CONTROL_SOCKET` (default `/run/lampos-control/control.sock`) with the
+token (default `LAMP_CONTROL_TOKEN`, which lamp-tasks puts in the run's environment); `lamp.run` is the run's id and
+`lamp.skill` its skill. No pairing, no certificate pin: the socket's owner check and the token are the trust. The fake
+lamps serve it too (`FakeLamp(local=True)` and `mint_token`/`mintToken`, `end_run`/`endRun`), with the refusals above
+(a missing or ended token `no_grant`; `pair`, a token on the TLS door, and a real client id or signature beside the token `bad_request`).
+
+**Not the local agent's socket.** The lamp's own local agent (`/run/lampos-agent/agent.sock`, no token) is a different
+door for one named user the owner turned on; a skill's script never gets it. The control socket takes no connection
+without a token, and a token carries only the grants the owner said yes to for that skill and that folder's bytes: a
+changed script asks again.
+
 ## The wire
 
 **Where:** `wss://<lamp>.local:7731/v1`, served by `lamp-control`. Nothing
 listens until the owner turns developer access on in the app. Script skills
-(phase 3) use the same messages on `/run/lampos-control/control.sock`.
+(phase 3) use the same messages on `/run/lampos-control/control.sock`
+("The control socket", below).
 
 **Finding the lamp:** planned: mDNS `_lampos._tcp`, with TXT `id`, `name`,
 `v=1` and `fp`: the first 16 hex characters of the SHA-256 of the lamp's

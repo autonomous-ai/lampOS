@@ -310,6 +310,11 @@
           "type": "string",
           "pattern": "^c_[0-9a-f]{1,32}$"
         },
+        "token": {
+          "description": "On the control socket only (/run/lampos-control/control.sock): the one-run token a skill's run holds, 43 characters of base64url; the client is then c_0 and the sig 64 zero bytes. A secret: never logged.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
         "sig": {
           "description": "The client key's Ed25519 signature over \"lampos/v1/hello\" and a zero byte, then the welcome's 32 nonce bytes; base64 (64 bytes).",
           "type": "string",

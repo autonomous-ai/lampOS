@@ -3100,3 +3100,102 @@ def test_a_close_the_lamp_explains_is_logged_once_with_its_reason(tmp_path, capl
     run(go())
     lines = [r.getMessage() for r in caplog.records if r.name == "lampos"]
     assert lines == ["the lamp closed the connection: the lamp restarts"]
+
+
+def test_a_skills_run_connects_on_the_control_socket_with_its_token(monkeypatch):
+    """`Lamp.local(token)`: the token's grants and no more, the run it is for, refused without a good token, the
+    environment's token and socket when none are given, and its connection closed when the run ends."""
+
+    async def go():
+        async with FakeLamp(local=True, grants=("body", "light")) as fake:
+            token = fake.mint_token(["light"], run="r1", skill="water")
+            async with await Lamp.local(token, path=fake.local_path) as lamp:
+                assert (lamp.grants, lamp.run, lamp.skill) == (["light"], "r1", "water")
+                assert (await lamp.light("warm", 3, 1000))["to"] == "ring"
+                with pytest.raises(errors.BY_CODE["no_grant"], match="not granted: body"):
+                    await lamp.gesture("nod")
+                await fake.end_run("r1")
+                await asyncio.wait_for(lamp.wait_closed(), timeout=5)
+                assert lamp.close_reason == "the run ended"
+            for bad in ("A" * 43, token):
+                with pytest.raises(errors.BY_CODE["no_grant"], match="no token for this run"):
+                    await Lamp.local(bad, path=fake.local_path)
+            monkeypatch.delenv("LAMP_CONTROL_TOKEN", raising=False)
+            with pytest.raises(errors.BY_CODE["no_grant"], match="LAMP_CONTROL_TOKEN"):
+                await Lamp.local(path=fake.local_path)
+            second = fake.mint_token(["body"], run="r2")
+            monkeypatch.setenv("LAMP_CONTROL_TOKEN", second)
+            monkeypatch.setenv("LAMP_CONTROL_SOCKET", fake.local_path)
+            async with await Lamp.local() as lamp:
+                assert (lamp.grants, lamp.run) == (["body"], "r2")
+            # A second mint for one run replaces the first.
+            third = fake.mint_token(["light"], run="r2")
+            with pytest.raises(errors.BY_CODE["no_grant"]):
+                await Lamp.local(second, path=fake.local_path)
+            async with await Lamp.local(third, path=fake.local_path) as lamp:
+                assert lamp.grants == ["light"]
+
+    run(go())
+
+
+def test_the_control_socket_is_not_for_pairing(tmp_path):
+    async def go():
+        async with FakeLamp(local=True) as fake:
+            from websockets.asyncio.client import unix_connect
+
+            ws = await unix_connect(fake.local_path, uri="ws://localhost/v1")
+            await ws.recv()
+            await ws.send(json.dumps({"id": 1, "op": "pair", "name": "x", "key": "A" * 43 + "=", "proof": "A" * 43 + "="}))
+            reply = json.loads(await ws.recv())
+            assert (reply["error"]["code"], reply["error"]["why"]) == ("bad_request", "this socket is not for pairing: it is a skill run's"), reply
+            await ws.close()
+
+    run(go())
+
+
+def test_the_control_socket_refuses_a_real_clients_id_or_signature_beside_a_token(tmp_path):
+    """As lamp-control: a hello here is client c_0, the zero signature and the token; any other id or signature is
+    `bad_request`, not a token refusal."""
+
+    async def go():
+        async with FakeLamp(local=True) as fake:
+            from websockets.asyncio.client import unix_connect
+
+            token = fake.mint_token(["light"])
+            zero = base64.b64encode(bytes(64)).decode()
+            for client, sig in (("c_1", zero), ("c_0", base64.b64encode(b"\x01" * 64).decode())):
+                ws = await unix_connect(fake.local_path, uri="ws://localhost/v1")
+                await ws.recv()
+                await ws.send(json.dumps({"id": 1, "op": "hello", "client": client, "sig": sig, "token": token}))
+                reply = json.loads(await ws.recv())
+                assert reply["error"]["code"] == "bad_request", reply
+                assert reply["error"]["why"] == "on this socket hello is client c_0, a zero sig and the token", reply
+                await ws.close()
+
+    run(go())
+
+
+def test_a_token_is_never_logged_by_the_debug_trace(monkeypatch, capsys):
+    from lampos import debug
+
+    monkeypatch.setattr(debug, "on", lambda: True)
+    debug.frame("->", {"id": 0, "op": "hello", "client": "c_0", "sig": "x", "token": "SECRETTOKEN" + "A" * 32})
+    seen = capsys.readouterr().err
+    assert "SECRETTOKEN" not in seen, seen
+
+
+def test_a_token_on_the_tls_door_is_refused_as_the_lamp_does():
+    async def go():
+        async with FakeLamp(local=True) as fake:
+            token = fake.mint_token(["light"], run="r1")
+            from lampos.client import _open
+            from lampos.keys import b64
+
+            ws = await _open(fake.host, fake.port, fake.pin)
+            await ws.recv()
+            await ws.send(json.dumps({"id": 1, "op": "hello", "client": "c_0", "sig": b64(bytes(64)), "token": token}))
+            reply = json.loads(await ws.recv())
+            assert (reply["error"]["code"], reply["error"]["why"]) == ("bad_request", "token: only on a skill run's socket"), reply
+            await ws.close()
+
+    run(go())
