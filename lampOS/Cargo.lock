@@ -2039,6 +2039,7 @@ dependencies = [
  "lamp-msgs",
  "lamp-skills",
  "lamp-voice",
+ "libc",
  "rcgen",
  "ring",
  "rustls",

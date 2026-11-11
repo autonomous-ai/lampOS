@@ -1496,3 +1496,61 @@ trong `src/holds.rs` (`a_failed_write_leaves_no_hold_to_take_back`,
 `limits_written_at_a_change_and_an_older_file_read_without_them`). Bản
 đầy đủ ở [skills.md](../skills.md),
 "A hold kept across a restart".
+
+## Tác vụ của kỹ năng (`do.task`, #6305, `LAMP_SKILL_TASKS`, tắt)
+
+Phần 2 của #6071 (theo các điều kiện của first builder ở đó): một kỹ năng
+phản ứng ngay bằng các bước của chính nó và giao phần chậm hơn cho agent của
+đèn, một script trong thư mục `scripts/` của chính kỹ năng. Tắt trừ khi
+`LAMP_SKILL_TASKS=on`, trong `lamp-skills`, manage helper của nó,
+`lamp-voice` (truyền cho cả hai route) và `lamp-control` (bản thân nó cũng
+bật, `LAMP_CONTROL=on`), nơi giữ cái "có"; không unit sản phẩm nào đặt nó, và nó
+tắt cho tới khi các hàng của #6308 đạt. Chi tiết đầy đủ ở
+[skills.md](../skills.md), "A skill's task".
+
+- **Bước:** `[[do]] task = { task = "...", run = "scripts/main.py" }`, đứng
+  riêng trong bảng `[[do]]` của nó, một bước mỗi kỹ năng, chỉ ở kỹ năng
+  installable. `run` là một tệp thường bên trong `scripts/` của kỹ năng
+  (không `..`, không phần ẩn, không link).
+- **`grants = [...]`:** ở đầu `skill.toml`, chỉ đi cùng `do.task`: mỗi mục là
+  một grant của lamp-control (`body`, `light`, `speak`, `look`, `hear`,
+  `sound`, `air`, `device`, `camera`, `microphone`, `notes`, `speech`), mỗi
+  mục một lần, không bao giờ `skills`; grant lạ làm kỹ năng bị từ chối.
+- **Chỉ loại đầu tiên:** kỹ năng có `do.task` chỉ nạp khi script đến từ
+  Skills Store (`.package.json` có `from_store`) hoặc được máy tính đã ghép
+  đôi của chủ đèn đẩy lên (thư mục developer). Kỹ năng đặt bằng tay, hoặc
+  đánh dấu `made: here` / `added: file`, không nạp; script do model viết là
+  việc của #6307.
+- **Nói lại và cái "có":** hỏi "kỹ năng photo booth của tôi dùng gì?", đèn
+  nói tác vụ, nguồn của script và từng grant bằng lời thường ("it uses the
+  camera"). Cái "có" được nhận như cái "có" cho việc ghi của kỹ năng tự tạo
+  (`skill_write_yes`). Giọng nói đọc lại kỹ năng qua manage helper, và chỉ
+  khi thư mục vẫn đúng SHA-256 và các grant đã nói lại thì mới nhờ
+  lamp-control ghi nhận (`task_yes_record` trên socket chủ đèn
+  `/run/lampos-control/admin.sock`, chỉ nhận từ cgroup của giọng nói).
+  lamp-control giữ nó trong `task-yes.json` ở `--state-dir` của chính nó
+  (`/var/lib/lampos-control`, 0600): tên kỹ năng, SHA-256 thư mục
+  (`task::folder_sha256`: mọi tệp, kể cả tệp ẩn, trừ `.package.json`,
+  `.pushed.json`, `.revoked.json` của đèn ở gốc thư mục; link thì bị từ
+  chối), các grant và thời điểm (phán quyết của first builder trên #6059);
+  tệp không bao giờ được đọc hay ghi qua link. Mọi phần đều chạy bằng user
+  `lampos`, nên thứ ngăn các phần khác ghi nó là unit của từng phần:
+  lamp-skills (và mọi phần chạy `ProtectSystem=strict`) không có đường ghi
+  ở đó; lamp-tasks (nơi script sẽ chạy, #6306), lamp-body và lamp-eyes
+  giấu thư mục (`InaccessiblePaths=-/var/lib/lampos-control`); test
+  `no_other_lampos_unit_can_write_lamp_controls_yes` của lamp-update giữ
+  mọi unit `lampos` theo một trong hai cách; và lamp-control chỉ nhận
+  `task_yes_record` từ cgroup của giọng nói. lamp-skills chỉ hỏi
+  (`task_yes_check`). Việc chuyển này có ích khi #6304 đúc token một lần
+  trong lamp-control từ bản ghi này. Gỡ kỹ năng thì nhờ lamp-control
+  bỏ cái "có" (`task_yes_forget`). Script đổi thì hỏi lại.
+- **Mỗi lần chạy:** các bước khác (đèn, cue, say) chạy ngay. Tắt công tắc:
+  không giao gì, journal ghi lý do. Bật: thư mục được băm lại và hỏi
+  lamp-control; không có "có" thì chờ, "có" cho byte hay grant khác thì hỏi
+  lại, không hỏi được lamp-control thì không giao gì; một tác vụ một lúc mỗi
+  kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ.
+- **Giao cho lamp-tasks** (#6306 xây): một dòng `{"op": "skill_task", ...}`
+  trên `--tasks-socket`; chưa unit nào truyền socket này. Token một lần
+  (#6304, lamp-control đúc từ cái "có" nó giữ,
+  `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
+  #6304 và #6306.
