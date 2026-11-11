@@ -520,7 +520,9 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   2026-10-16: with the locks 0775 the body never opened the servo port, and
   without the sessions folder the voice could not start.
   It also makes `/run/lampos-photos` (`lampos`'s, 0700), the app's photos
-  for the eyes when `LAMP_PHOTO_FACES` is on (cloud.md). And it keeps
+  for the eyes when `LAMP_PHOTO_FACES` is on (cloud.md), and
+  `/run/lampos-eyes-kept` (`lampos`'s, 0700), where the eyes keep a sitting
+  across a short restart (eyes.md, "A sitting kept across a restart"). And it keeps
   PulseAudio out of the board user's session (#4332): it masks
   `pulseaudio.socket` and `pulseaudio.service` for every user session
   (`/etc/systemd/user/`, links to `/dev/null`) and turns libpulse's

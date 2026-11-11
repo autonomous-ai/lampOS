@@ -2547,6 +2547,36 @@ fn the_product_takes_a_misheard_name_said_as_a_sentence() {
     );
 }
 
+/// The eyes keep a sitting across a short restart of lamp-eyes
+/// (`lamp_eyes::sitting::PATH`, docs/eyes.md, "A sitting kept across a
+/// restart") in a folder the product's tmpfiles make: `lampos`'s, 0700, on
+/// tmpfs, and not the eyes' runtime folder, which a restart still empties so
+/// no frame outlives it.
+#[test]
+fn the_product_makes_the_folder_the_eyes_keep_a_sitting_in() {
+    assert!(
+        install::TMPFILES
+            .lines()
+            .any(|line| line.split_whitespace().collect::<Vec<_>>()
+                == [
+                    "d",
+                    "/run/lampos-eyes-kept",
+                    "0700",
+                    "lampos",
+                    "lampos",
+                    "-"
+                ]),
+        "lampos.conf does not make /run/lampos-eyes-kept"
+    );
+    let eyes = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-eyes.service")
+        .expect("lamp-eyes.service")
+        .1;
+    assert!(eyes.contains("\nRuntimeDirectory=lampos-eyes\n"));
+    assert!(!eyes.contains("RuntimeDirectoryPreserve="));
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.
