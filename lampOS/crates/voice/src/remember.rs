@@ -10016,11 +10016,17 @@ impl DaysClient {
                 // under the services' owner id (`services::owner_of`), not
                 // always the speaker's own: those go too, every one, or
                 // forget everything leaves them (the switch-on row on
-                // lamp-06c1, 11 Nov).
-                if let Some(owner) = crate::services::owner_of(lease)
-                    .filter(|owner| owner != person)
-                    .filter(|owner| lamp_msgs::known::is_person_id(owner))
-                {
+                // lamp-06c1, 11 Nov). Only when the speaker is the owner,
+                // under another of their ids ([`owner_forgets_rows_of`]):
+                // the private room acts for whoever speaks, but only the
+                // owner clears the owner's rows (the owner's call, 11 Nov,
+                // after a known guest's forget everything on lamp-06c1 took
+                // every record and contact of the owner's).
+                if let Some(owner) = owner_forgets_rows_of(
+                    crate::services::owner_of(lease),
+                    person,
+                    &crate::person::owner_ids(),
+                ) {
                     let left = deadline.saturating_sub(started.elapsed());
                     self.forget_all_service_rows(&owner, Instant::now() + left);
                 }
@@ -10311,9 +10317,15 @@ impl DaysClient {
         // (`services::owner_of`), which in the private room is the first
         // owner id, not always the scope's person: forgotten under the same
         // id, or a forget removes none (the switch-on row on lamp-06c1,
-        // 11 Nov).
-        let owner = crate::services::owner_of(lease);
-        let theirs = owner.as_deref().or(person);
+        // 11 Nov). Only the owner's forget reaches the owner's rows: a
+        // known person who is not the owner forgets under their own id
+        // ([`rows_forgotten_under`], the owner's call, 11 Nov).
+        let owner = rows_forgotten_under(
+            crate::services::owner_of(lease),
+            person,
+            &crate::person::owner_ids(),
+        );
+        let theirs = owner.as_deref();
         let records = self.forget_records_about(about, theirs, until);
         let (contacts, sent_to) = self
             .forget_contacts_about(about, theirs, until)
@@ -10347,8 +10359,9 @@ impl DaysClient {
 
     /// Every service record and mail contact of `owner` removed in the
     /// memory (`service_records_forget` and `service_contacts_forget` with
-    /// `all`), and the voice's copies with them: forget everything for the
-    /// services' owner id when it is not the speaker's own. Asked with the
+    /// `all`), and the voice's copies with them: the owner's forget
+    /// everything under another of their ids ([`owner_forgets_rows_of`]).
+    /// Asked with the
     /// switches on or off, as a forget about asks; an older memory refuses
     /// the form, and nothing is said removed.
     fn forget_all_service_rows(&self, owner: &str, until: Instant) {
@@ -14048,6 +14061,43 @@ mod no_wait;
 /// Told with a kept rule when the older rule it corrects could not be
 /// forgotten (the reviewer-lead's P3 on #5439).
 const REPLACED_NOT_FORGOTTEN: &str = "Kept, but the earlier rule it corrects could not be taken back yet, so it may still apply: ask them to say the correction once more.";
+
+/// The memory id whose service records and mail contacts a forget about
+/// by `speaker` reaches: `owner`, the services' owner id
+/// (`services::owner_of`), when the speaker is one of `owners`, the
+/// owner's memory ids (`person::owner_ids`), or no known person; a known
+/// person who is not the owner reaches only rows under their own id, never
+/// the owner's (the owner's call, 11 Nov: "only the owner clears"). With no
+/// owner id, the speaker's own.
+fn rows_forgotten_under(
+    owner: Option<String>,
+    speaker: Option<&str>,
+    owners: &[String],
+) -> Option<String> {
+    match speaker {
+        Some(speaker) if !owners.iter().any(|id| id == speaker) => Some(speaker.to_owned()),
+        _ => owner.or_else(|| speaker.map(str::to_owned)),
+    }
+}
+
+/// The owner id whose every service record and mail contact goes with
+/// `speaker`'s forget everything: `owner`, the services' owner id
+/// (`services::owner_of`), when it is a known person's and not the
+/// speaker's own, and the speaker is one of `owners`, the owner's memory
+/// ids (`person::owner_ids`): the owner speaking under a second id while
+/// their rows sit under the first (#6334). Anyone else's forget everything
+/// clears only their own memory and role, never the owner's rows (the
+/// owner's call, 11 Nov: "only the owner clears").
+fn owner_forgets_rows_of(
+    owner: Option<String>,
+    speaker: &str,
+    owners: &[String],
+) -> Option<String> {
+    owner
+        .filter(|owner| owner != speaker)
+        .filter(|owner| lamp_msgs::known::is_person_id(owner))
+        .filter(|_| owners.iter().any(|id| id == speaker))
+}
 
 #[cfg(test)]
 mod tests {
@@ -18016,26 +18066,28 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
-    /// The switch-on row on lamp-06c1 (11 Nov): in the private room the
-    /// records and contacts are kept under the services' owner id
-    /// (`services::owner_of`), the first owner id, while the forget's scope
-    /// is the speaker's own memory id. The forget about removes them under
-    /// the owner id the saves used, not the scope's.
-    #[test]
-    fn a_forget_about_in_the_private_room_removes_the_records_and_contacts_kept_under_the_owner_id()
-    {
-        const SPEAKER: &str = "p-0123456789abcdef";
-        crate::person::set_private_room_for_test(Some(true));
+    /// The services' forgets a forget about `about` by `speaker` sent the
+    /// memory, private room `room`, the owner's typed name "Owner Example"
+    /// (the first owner id) and their face kept as "Owner" (the second).
+    /// The memory is answered with dummy lines once the voice is done.
+    fn services_forgotten_on_forget_about(
+        name: &str,
+        room: bool,
+        speaker: &str,
+        about: &str,
+    ) -> Vec<Value> {
+        let dir = std::env::temp_dir().join(format!("lamp-remember-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        std::fs::write(&file, "Owner Example\n").unwrap();
+        crate::person::set_for_test(Some(file));
+        crate::person::set_private_room_for_test(Some(room));
         crate::known_faces::owner_for_test(Some(Some("Owner".to_owned())));
-        let owner = crate::services::owner_of(None).expect("the private room's owner");
-        assert!(lamp_msgs::known::is_person_id(&owner), "{owner}");
-        assert_ne!(owner, SPEAKER);
         crate::service_records::on_for_test(true);
         crate::service_contacts::on_for_test(true);
         crate::service_records::forgot(None);
-        let (socket, served) = memory("records-forget-owner-id", 3, |request| match request["op"]
-            .as_str()
-        {
+        let (socket, served) = memory(name, 4, |request| match request["op"].as_str() {
             Some("service_records_forget") | Some("service_contacts_forget") => {
                 json!({"ok":true,"removed":1})
             }
@@ -18046,54 +18098,154 @@ mod tests {
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_about.store(true, Ordering::Release);
         let (told, answered) = client.run_at(
-            &call(FORGET, json!({"about":"party"})),
+            &call(FORGET, json!({ "about": about })),
             FIRST_READ,
             NOW,
             Some(&EAST),
-            Some(SPEAKER),
+            Some(speaker),
         );
-        assert!(answered, "{told}");
-        let read = served.join().unwrap();
-        for op in ["service_records_forget", "service_contacts_forget"] {
-            let sent = read
-                .iter()
-                .find(|request| request["op"] == op)
-                .unwrap_or_else(|| panic!("no {op}: {read:?}"));
-            assert_eq!(sent["person"], owner.as_str(), "{op} under the owner id");
+        for _ in 0..4 {
+            if let Ok(mut end) = UnixStream::connect(&socket) {
+                let _ = end.write_all(b"{\"op\":\"done\"}\n");
+                let _ = BufReader::new(end).read_line(&mut String::new());
+            }
         }
-        assert_eq!(told["records"], 1, "{told}");
-        assert_eq!(told["contacts"], 1, "{told}");
+        let read = served.join().unwrap();
         crate::service_records::on_for_test(false);
         crate::service_contacts::on_for_test(false);
         crate::known_faces::owner_for_test(None);
         crate::person::set_private_room_for_test(None);
+        crate::person::set_for_test(None);
         drop(client);
         let _ = std::fs::remove_file(&socket);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(answered, "{told}");
+        let sent: Vec<Value> = read
+            .into_iter()
+            .filter(|request| {
+                ["service_records_forget", "service_contacts_forget"]
+                    .contains(&request["op"].as_str().unwrap_or(""))
+            })
+            .collect();
+        assert!(
+            sent.iter()
+                .any(|request| request["op"] == "service_contacts_forget"),
+            "{about}: {sent:?}"
+        );
+        sent
     }
 
-    /// The switch-on row on lamp-06c1 (11 Nov), forget everything: in the
-    /// private room the records and contacts are kept under the services'
-    /// owner id, not the speaker's own, so forget everything empties the
-    /// speaker's memory and then removes every record and contact of the
-    /// owner id too.
+    /// The switch-on row on lamp-06c1 (11 Nov): in the private room the
+    /// records and contacts are kept under the services' owner id
+    /// (`services::owner_of`), the first owner id, while the owner's forget
+    /// may be under their second. The owner's forget about a thing or an
+    /// address removes them under the owner id the saves used.
     #[test]
-    fn a_forget_everything_in_the_private_room_removes_the_owner_ids_records_and_contacts() {
-        const SPEAKER: &str = "p-0123456789abcdef";
-        crate::person::set_private_room_for_test(Some(true));
+    fn the_owners_forget_about_under_a_second_id_removes_the_first_ids_records_and_contacts() {
+        let speaker = crate::known_faces::memory_person("Owner");
+        let first = crate::known_faces::memory_person("Owner Example");
+        assert_ne!(first, speaker);
+        for (name, about) in [
+            ("forget-about-second-owner-id", "party"),
+            ("forget-address-second-owner-id", "Octavia's address"),
+        ] {
+            let sent = services_forgotten_on_forget_about(name, true, &speaker, about);
+            for request in &sent {
+                assert_eq!(request["person"], first.as_str(), "{about}: {request}");
+            }
+        }
+    }
+
+    /// The owner's call (11 Nov), "only the owner clears": in the private
+    /// room a known person who is not the owner forgets about a thing or an
+    /// address only under their own id; the owner's records and contacts
+    /// are never asked to go (the Reviewer-lead's P1 on #6424).
+    #[test]
+    fn a_known_guests_forget_about_in_the_private_room_leaves_the_owners_records_and_contacts() {
+        const GUEST: &str = "p-0123456789abcdef";
+        for (name, about) in [
+            ("forget-about-guest", "party"),
+            ("forget-address-guest", "Octavia's address"),
+        ] {
+            let sent = services_forgotten_on_forget_about(name, true, GUEST, about);
+            for request in &sent {
+                assert_eq!(request["person"], GUEST, "{about}: {request}");
+            }
+        }
+    }
+
+    /// Outside the private room a forget about reaches the rows of the
+    /// speaker's own id, owner or guest, as before.
+    #[test]
+    fn a_forget_about_outside_the_private_room_reaches_the_speakers_own_rows() {
+        for (name, speaker) in [
+            (
+                "forget-about-off-owner",
+                crate::known_faces::memory_person("Owner"),
+            ),
+            ("forget-about-off-guest", "p-0123456789abcdef".to_owned()),
+        ] {
+            let sent = services_forgotten_on_forget_about(name, false, &speaker, "party");
+            for request in &sent {
+                assert_eq!(request["person"], speaker.as_str(), "{request}");
+            }
+        }
+    }
+
+    /// [`rows_forgotten_under`]: the owner id for the owner or no known
+    /// speaker, the speaker's own id for anyone else.
+    #[test]
+    fn a_forget_about_reaches_the_owner_ids_rows_only_for_the_owner() {
+        const FIRST: &str = "p-00000000000000a1";
+        const SECOND: &str = "p-00000000000000a2";
+        const GUEST: &str = "p-0123456789abcdef";
+        let owners = [FIRST.to_owned(), SECOND.to_owned()];
+        let owner = || Some(FIRST.to_owned());
+        assert_eq!(
+            rows_forgotten_under(owner(), Some(SECOND), &owners).as_deref(),
+            Some(FIRST)
+        );
+        assert_eq!(
+            rows_forgotten_under(owner(), Some(GUEST), &owners).as_deref(),
+            Some(GUEST)
+        );
+        assert_eq!(
+            rows_forgotten_under(owner(), None, &owners).as_deref(),
+            Some(FIRST)
+        );
+        assert_eq!(
+            rows_forgotten_under(None, Some(GUEST), &owners).as_deref(),
+            Some(GUEST)
+        );
+        assert_eq!(rows_forgotten_under(None, None, &owners), None);
+    }
+
+    /// The services' forgets a confirmed forget everything by `speaker`
+    /// sent the memory, private room `room`, the owner's typed name "Owner
+    /// Example" (the first owner id) and their face kept as "Owner" (the
+    /// second). The memory is answered with dummy lines once the voice is
+    /// done, so a forget everything that sends none is not waited out.
+    fn services_forgotten_on_forget_everything(
+        name: &str,
+        room: bool,
+        speaker: &str,
+    ) -> Vec<Value> {
+        let dir = std::env::temp_dir().join(format!("lamp-remember-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        std::fs::write(&file, "Owner Example\n").unwrap();
+        crate::person::set_for_test(Some(file));
+        crate::person::set_private_room_for_test(Some(room));
         crate::known_faces::owner_for_test(Some(Some("Owner".to_owned())));
-        let owner = crate::services::owner_of(None).expect("the private room's owner");
-        assert!(lamp_msgs::known::is_person_id(&owner), "{owner}");
-        assert_ne!(owner, SPEAKER);
         crate::service_records::on_for_test(true);
         crate::service_contacts::on_for_test(true);
         crate::service_records::forgot(None);
-        let (socket, served) = memory("records-forget-all-owner-id", 3, |request| {
-            match request["op"].as_str() {
-                Some("forget_all") => json!({"ok":true,"removed":0}),
-                Some("service_records_forget") => json!({"ok":true,"removed":2}),
-                Some("service_contacts_forget") => json!({"ok":true,"removed":1}),
-                _ => json!({"ok":false}),
-            }
+        let (socket, served) = memory(name, 3, |request| match request["op"].as_str() {
+            Some("forget_all") => json!({"ok":true,"removed":0}),
+            Some("service_records_forget") => json!({"ok":true,"removed":2}),
+            Some("service_contacts_forget") => json!({"ok":true,"removed":1}),
+            _ => json!({"ok":false}),
         });
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
@@ -18102,24 +18254,111 @@ mod tests {
             FIRST_READ,
             NOW,
             Some(&EAST),
-            Some(SPEAKER),
+            Some(speaker),
         );
-        let read = served.join().unwrap();
-        assert_eq!(read[0]["op"], "forget_all", "{read:?}");
-        for op in ["service_records_forget", "service_contacts_forget"] {
-            let sent = read
-                .iter()
-                .find(|request| request["op"] == op)
-                .unwrap_or_else(|| panic!("no {op}: {read:?}"));
-            assert_eq!(sent["person"], owner.as_str(), "{op} under the owner id");
-            assert_eq!(sent["all"], true, "{op} takes every row");
+        for _ in 0..3 {
+            if let Ok(mut end) = UnixStream::connect(&socket) {
+                let _ = end.write_all(b"{\"op\":\"done\"}\n");
+                let _ = BufReader::new(end).read_line(&mut String::new());
+            }
         }
+        let read = served.join().unwrap();
         crate::service_records::on_for_test(false);
         crate::service_contacts::on_for_test(false);
         crate::known_faces::owner_for_test(None);
         crate::person::set_private_room_for_test(None);
+        crate::person::set_for_test(None);
         drop(client);
         let _ = std::fs::remove_file(&socket);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(read[0]["op"], "forget_all", "{read:?}");
+        read.into_iter()
+            .filter(|request| {
+                ["service_records_forget", "service_contacts_forget"]
+                    .contains(&request["op"].as_str().unwrap_or(""))
+            })
+            .collect()
+    }
+
+    /// #6334, the switch-on row on lamp-06c1 (11 Nov): in the private room
+    /// the records and contacts are kept under the services' owner id, the
+    /// first owner id, so the owner's forget everything under their second
+    /// id empties their memory and then removes every record and contact of
+    /// the first id too.
+    #[test]
+    fn the_owners_forget_everything_under_a_second_id_removes_the_first_ids_records_and_contacts() {
+        let speaker = crate::known_faces::memory_person("Owner");
+        let first = crate::known_faces::memory_person("Owner Example");
+        assert_ne!(first, speaker);
+        let sent =
+            services_forgotten_on_forget_everything("forget-all-second-owner-id", true, &speaker);
+        for op in ["service_records_forget", "service_contacts_forget"] {
+            let sent = sent
+                .iter()
+                .find(|request| request["op"] == op)
+                .unwrap_or_else(|| panic!("no {op}: {sent:?}"));
+            assert_eq!(
+                sent["person"],
+                first.as_str(),
+                "{op} under the first owner id"
+            );
+            assert_eq!(sent["all"], true, "{op} takes every row");
+        }
+    }
+
+    /// The owner's call (11 Nov), "only the owner clears": on lamp-06c1 a
+    /// known guest's forget everything in the private room took every
+    /// record and contact of the owner's. A known person who is not the
+    /// owner forgets only their own; no forget of the owner's rows is sent.
+    #[test]
+    fn a_known_guests_forget_everything_in_the_private_room_leaves_the_owners_records_and_contacts()
+    {
+        const GUEST: &str = "p-0123456789abcdef";
+        let sent = services_forgotten_on_forget_everything("forget-all-guest", true, GUEST);
+        assert!(
+            sent.is_empty(),
+            "nothing of the owner's forgotten: {sent:?}"
+        );
+    }
+
+    /// Outside the private room the services' owner id is the speaker's
+    /// own when it is one at all, so forget everything sends no forget of
+    /// another id's rows, owner or guest, as before.
+    #[test]
+    fn a_forget_everything_outside_the_private_room_sends_no_owner_rows_forget() {
+        for (name, speaker) in [
+            (
+                "forget-all-off-owner",
+                crate::known_faces::memory_person("Owner"),
+            ),
+            ("forget-all-off-guest", "p-0123456789abcdef".to_owned()),
+        ] {
+            let sent = services_forgotten_on_forget_everything(name, false, &speaker);
+            assert!(sent.is_empty(), "{speaker}: {sent:?}");
+        }
+    }
+
+    /// [`owner_forgets_rows_of`]: only the owner, under an id other than
+    /// the one their rows sit under, clears that id's rows.
+    #[test]
+    fn only_the_owner_under_another_id_clears_the_owner_ids_rows() {
+        const FIRST: &str = "p-00000000000000a1";
+        const SECOND: &str = "p-00000000000000a2";
+        const GUEST: &str = "p-0123456789abcdef";
+        let owners = [FIRST.to_owned(), SECOND.to_owned()];
+        let owner = || Some(FIRST.to_owned());
+        assert_eq!(
+            owner_forgets_rows_of(owner(), SECOND, &owners).as_deref(),
+            Some(FIRST)
+        );
+        assert_eq!(owner_forgets_rows_of(owner(), FIRST, &owners), None);
+        assert_eq!(owner_forgets_rows_of(owner(), GUEST, &owners), None);
+        assert_eq!(owner_forgets_rows_of(owner(), GUEST, &[]), None);
+        assert_eq!(owner_forgets_rows_of(None, SECOND, &owners), None);
+        assert_eq!(
+            owner_forgets_rows_of(Some("the-owner".to_owned()), SECOND, &owners),
+            None
+        );
     }
 
     /// A contact saved while `LAMP_SERVICE_CONTACTS` was on is still
