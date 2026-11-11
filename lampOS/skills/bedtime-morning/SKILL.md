@@ -3,8 +3,8 @@ name: bedtime-morning
 description: A quiet evening glow, a morning hum, and lower light and volume at night.
 ---
 
-This installed core skill is disabled until measured on a lamp. It has no
-model tool. The shared `use_skill` catalogue therefore gains no function.
+This core skill comes with the lamp, on since #5753, after its nights on
+lamp-06c1. It has no model tool. The shared `use_skill` catalogue therefore gains no function.
 
 At night, apply bounded light and volume ceilings without restoring an old
 setting afterward. The lamp's sleep and its wake are not this skill's: Night

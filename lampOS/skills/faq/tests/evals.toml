@@ -150,7 +150,8 @@ holds = ["not today", "snooze it until tomorrow morning"]
 [[ask]]
 said = "What's quiet focus?"
 topic = "nudges"
-holds = ["45 minutes head down", "nicely done"]
+holds = ["not yet on every lamp", "45 minutes head down", "nicely done"]
+missing = "quiet-focus"
 
 [[ask]]
 said = "Why do you keep telling me to stretch?"

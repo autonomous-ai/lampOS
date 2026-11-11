@@ -17,13 +17,16 @@ the desk.
 
 What it says and when:
 
-- It says nothing, ever.
+- It says one short, light line, worded by the voice the way a friend
+  would: no lecture, nothing about health.
 - Once an hour at most while you stay, four times a day at most, never while you read or write head down
   (with the eyes' activity on), and never in the middle of a conversation, before 09:00, after 20:00 or at night.
 - With the eyes' activity on, the sitting is yours: someone else sitting down in
   your chair begins it again, so it is never theirs at your 45 minutes.
 - At most one of the wellbeing nudges (this, A sip of water, Stand up and
-  Wind down) an hour between them.
+  Wind down) an hour between them; with the lamp's `LAMP_NUDGES_PRESENT`
+  switch on (#5207, set in the product's skills units), two an hour, never
+  within half an hour of each other.
 - With Quiet focus on the lamp, when it is due as you look up after a long
   focus, Quiet focus's word comes in its place (for every wellbeing nudge
   then, not only this one), and it does not tilt too.
@@ -36,9 +39,9 @@ What it says and when:
 It keeps nothing about you: only, in memory, how many times it went today
 and whether it is resting; off is one line with its name.
 
-An installable skill: its owner puts it on the lamp (`lamp-skills install`)
-and takes it off. Not in the product yet.
+A core skill: it comes with the lamp, on, and can be turned off by voice
+or in the app.
 
 If asked about it, the lamp says something like: "Every so often, when
-you've been at the screen a while, I soften my light a moment, a hint to
-look up and rest your eyes. Tell me 'not today' and I'll leave it."
+you've been at the screen a while, I soften my light a moment and suggest
+you look up and rest your eyes. Tell me 'not today' and I'll leave it."

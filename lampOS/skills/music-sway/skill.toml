@@ -1,7 +1,8 @@
 # Music sway (#1669, the owner, 19 Oct 07:2x: "a small sway while music
 # plays ... rare and small, and never while the lamp is speaking or someone
 # is talking to it"; docs/creature.md, Joys). It reads ears/classes
-# (LAMP_EARS_CLASSES=on in lamp-ears) and sways its head a little, once,
+# (only with LAMP_EARS_CLASSES=on in lamp-ears, which no product unit sets
+# yet) and sways its head a little, once,
 # when music has played in the room for a while. Written to lamp-skills'
 # schema (docs/skills.md).
 needs = ["ears", "body"]

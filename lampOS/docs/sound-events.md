@@ -175,10 +175,11 @@ on a jazz vocal (60 s and 22 s in), never on the empty office, and not on an
 upbeat track whose 60 s held under the bar too often. Each skill keeps one
 case made of that run's own scores.
 
-The first of them, the music sway, is installed on in the product since
-#2834 (`skills/music-sway`), but the product's `lamp-ears.service` doesn't set
-`LAMP_EARS_CLASSES` until the weights' distribution review below (#5748) is read and released, so
-on a product lamp it has nothing to read and never sways; it reads
+The first of them, the music sway (`skills/music-sway`, #2834), is installed
+off in the product (`install::PRODUCT_SKILLS_OFF`): the product's
+`lamp-ears.service` doesn't set `LAMP_EARS_CLASSES` until the weights'
+distribution review below (#5748) is read and released, so on a product lamp
+it would have nothing to read and never sway; it reads
 `scores.music` and does nothing without this topic. It never sways to the
 lamp's own music (#2833): a requested recording (#1757) plays while
 `voice/state` is `listening`, which its `resting` condition holds back, and

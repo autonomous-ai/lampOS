@@ -305,8 +305,8 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Twenty-four keep their
-/// folders' own default: twenty-three enabled (Bedtime and Morning since #5753,
+/// `tests/install.rs` holds the two lists equal). Twenty-three keep their
+/// folders' own default: twenty-two enabled (Bedtime and Morning since #5753,
 /// with `LAMP_OUTPUT_CAPS=on` in the product units), and Comfort break
 /// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
 /// the product's skills units set (#5207); those of
@@ -336,11 +336,9 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // The startle (#2822): Expression's glance at a sudden sound, its move
     // read from this skill's file when Expression starts.
     "startle",
-    // Music sway and watch you leave (#2834): core skills on in the product,
-    // each reading what the product's units turn on (the ears' sound
-    // classes behind the privacy route, the eyes' activity).
+    // Watch you leave (#2834): a core skill on in the product, reading the
+    // eyes' activity (`LAMP_ACTIVITY=place` in lamp-eyes).
     "watch-you-leave",
-    "music-sway",
     // The wellbeing nudges (#1685), each saying one short line since the
     // owner's 25 Oct "talk to the user": water, the eyes, standing up and
     // winding down, with Stretch break's budget of one an hour between them.
@@ -370,12 +368,14 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // it answers from its own product knowledge (`knowledge.md`), reached
     // through `use_skill`; it only tells, and changes nothing.
     "faq",
+    // Stand by voice (#4135): Pose's `set_pose`, on in the product.
+    "pose",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
+    "music-sway",
     "light-out",
     "light-scenes",
     "point-light",
     "light-show",
-    "pose",
     "smoky-air",
     "dusty-air",
     "feelings",
@@ -387,11 +387,18 @@ pub const PRODUCT_SKILLS: &[&str] = &[
 /// default and its cases. A skill leaves this list once its lamp check has
 /// passed; until then a person or a trial turns it on on the lamp itself.
 pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
+    // #2834's music sway: nothing to read in the product yet.
+    (
+        "music-sway",
+        "it reads `ears/classes`, which the ears say only with `LAMP_EARS_CLASSES=on` and a \
+         pinned YAMNet (#1669), and no product unit sets either nor does install ship the model: \
+         off until the sound classes ship (#5748) and its lamp row after a full update is seen",
+    ),
     (
         "light-out",
-        "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
-         until the light going out and coming back has been seen on a lamp: someone reading face \
-         down at the desk must never lose their light",
+        "not yet seen on a lamp (#1677): the eyes say `room/presence` in the product since \
+         `LAMP_PRESENCE=on` (#4955), but the light going out and coming back waits for its own \
+         lamp check: someone reading face down at the desk must never lose their light",
     ),
     // #1679's three core skills, built and not yet tried on a lamp: each
     // comes with the product once lamp-4ace has played it with a person.
@@ -617,7 +624,7 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("head-pat-wiggle", "SKILL.md"),
     skill_file!("head-pat-wiggle", "README.md"),
     skill_file!("head-pat-wiggle", "moves/pat-wiggle.json"),
-    skill_file!("music-sway", "skill.toml"),
+    skill_file_off!("music-sway"),
     skill_file!("music-sway", "SKILL.md"),
     skill_file!("music-sway", "moves/sway.json"),
     skill_file_off!("light-scenes"),

@@ -18,7 +18,7 @@ passer-by crossing the picture is not the person who sat there: only the
 sitter's leaving counts.
 
 It knows someone left from the eyes' word that the sitter stood up and left
-(`room/stood_up`, with `LAMP_ACTIVITY=on` in lamp-eyes), which says the side
+(`room/stood_up`, with `LAMP_ACTIVITY=place` in lamp-eyes), which says the side
 of the picture they left by. Without it it does nothing.
 
 If asked about it: "When you get up and go, I watch you go for a moment,
