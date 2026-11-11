@@ -1216,14 +1216,18 @@ pub const HERMES_STAGE_WITHIN: Duration =
 
 /// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
 /// which fetches, gets [`INSTALLER_WITHIN`], and a stage of Hermes's,
-/// which may be frozen too, [`HERMES_STAGE_WITHIN`].
+/// which may be frozen too, [`HERMES_STAGE_WITHIN`]; each of OpenClaw's
+/// long steps (#6226, [`crate::openclaw_install::runs_long_step`]) its
+/// own hard [`crate::openclaw_install::STEP_WITHIN`].
 pub fn output_of(argv: &[String]) -> Result<String, String> {
     output_of_within(argv, bound_of(argv))
 }
 
 /// How long [`output_of`] waits for `argv`.
 pub fn bound_of(argv: &[String]) -> Duration {
-    if runs_hermes_stage(argv) {
+    if crate::openclaw_install::runs_long_step(argv) {
+        crate::openclaw_install::STEP_WITHIN
+    } else if runs_hermes_stage(argv) {
         HERMES_STAGE_WITHIN
     } else if runs_installer(argv) {
         INSTALLER_WITHIN

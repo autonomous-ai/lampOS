@@ -560,7 +560,7 @@ fn failed(at_unix_ms: u64, error: &str) -> HermesInstall {
     HermesInstall::new("failed", Some(error), at_unix_ms)
 }
 
-fn on(root: &Path, path: &str) -> PathBuf {
+pub(crate) fn on(root: &Path, path: &str) -> PathBuf {
     root.join(path.trim_start_matches('/'))
 }
 
@@ -584,7 +584,7 @@ fn head(root: &Path) -> Option<String> {
 
 /// Whether the file at `path` under `root` is a regular file holding
 /// `text`, not followed through a link.
-fn holds(root: &Path, path: &str, text: &str) -> bool {
+pub(crate) fn holds(root: &Path, path: &str, text: &str) -> bool {
     let place = on(root, path);
     fs::symlink_metadata(&place).is_ok_and(|meta| meta.is_file())
         && fs::read(&place).is_ok_and(|bytes| bytes == text.as_bytes())
@@ -687,6 +687,12 @@ pub fn after_round(
             return None;
         }
     };
+    // Turns in the one-shot (#6226): OpenClaw's install under way holds
+    // Hermes's to a later round, so no ask is left for a one-shot past it.
+    if crate::openclaw_install::under_way(records, now_unix_ms) {
+        say("Hermes waits its turn: OpenClaw's install is under way in Harness's one-shot");
+        return None;
+    }
     say(&format!("Hermes may be installed now: {}", window.name()));
     if let Err(error) = ask(records, false, skills) {
         say(&format!(
@@ -758,8 +764,46 @@ pub fn carry_out(
     now_unix_ms: u64,
     say: &mut dyn FnMut(&str),
 ) -> Carried {
+    carry_out_for(&TURN, &[], act, records, systemd, now_unix_ms, say)
+}
+
+/// One engine's install in Harness's one-shot, as the watch carries out
+/// its acts (#6226): Hermes's ([`TURN`]) and OpenClaw's
+/// ([`crate::openclaw_install::TURN`]) take turns in the same one-shot,
+/// frozen and thawed as one.
+pub struct Turn {
+    /// The engine, as said.
+    pub name: &'static str,
+    /// Whether its record says an install is under way.
+    pub installing: fn(&Path) -> bool,
+    /// Its install recorded `failed` with the error, its ask taken away.
+    pub stopped: fn(&Path, &str, u64),
+}
+
+/// Hermes's [`Turn`].
+pub const TURN: Turn = Turn {
+    name: "Hermes",
+    installing,
+    stopped: |records, error, now_unix_ms| {
+        stopped(records, error, now_unix_ms);
+    },
+};
+
+/// [`carry_out`] for `turn`'s install; a stop also stops each of `also`
+/// whose record says it is under way (its turn in the same one-shot, which
+/// is stopped whole), recorded `failed` with the same error.
+pub fn carry_out_for(
+    turn: &Turn,
+    also: &[&Turn],
+    act: &crate::hermes_schedule::Act,
+    records: &Path,
+    systemd: &mut dyn Systemd,
+    now_unix_ms: u64,
+    say: &mut dyn FnMut(&str),
+) -> Carried {
     use crate::hermes_schedule::Act;
     let unit = harness_install::UNIT;
+    let name = turn.name;
     if *act == Act::Nothing {
         return Carried::Done;
     }
@@ -776,7 +820,7 @@ pub fn carry_out(
         Act::Freeze(why) => match systemd.freeze_harness_unit() {
             Ok(()) => {
                 say(&format!(
-                    "Hermes's install is frozen while the voice is not quiet: {why}"
+                    "{name}'s install is frozen while the voice is not quiet: {why}"
                 ));
                 return Carried::Done;
             }
@@ -784,7 +828,9 @@ pub fn carry_out(
         },
         Act::Thaw => match systemd.thaw_harness_unit() {
             Ok(()) => {
-                say("Hermes's install goes on: the voice is quiet again");
+                say(&format!(
+                    "{name}'s install goes on: the voice is quiet again"
+                ));
                 return Carried::Done;
             }
             Err(refused) => ("interrupted", format!("{unit} not thawed: {refused}")),
@@ -795,10 +841,19 @@ pub fn carry_out(
     if let Err(refused) = systemd.stop(unit) {
         say(&format!("{unit} not stopped: {refused}"));
     }
-    stopped(records, error, now_unix_ms);
+    (turn.stopped)(records, error, now_unix_ms);
     say(&format!(
-        "Hermes's install is stopped ({error}): {why}; tried again in a later window"
+        "{name}'s install is stopped ({error}): {why}; tried again in a later window"
     ));
+    for other in also {
+        if (other.installing)(records) {
+            (other.stopped)(records, error, now_unix_ms);
+            say(&format!(
+                "{}'s install, in the same one-shot, is stopped too ({error}); tried again in a later window",
+                other.name
+            ));
+        }
+    }
     Carried::Stopped
 }
 
@@ -861,7 +916,8 @@ pub fn after_round_off(
 /// install ([`harness_install::install_now`]) whenever a round's ask is
 /// there (#6275): it installs a missing Harness, moves one there when the
 /// ask says so (#5957), and records one there as it is; then Hermes's
-/// ([`install_now`]) when a round asked for it, whatever Harness's did.
+/// ([`install_now`]) when a round asked for it, whatever Harness's did, then
+/// OpenClaw's ([`crate::openclaw_install::install_now`], #6226) the same way.
 /// With no Harness ask (its switch off), Harness's record is left as it is. An
 /// error only for Harness: a Hermes failure is said and recorded, never
 /// the unit's.
@@ -884,6 +940,17 @@ pub fn one_shot(
         }
         Ok(None) => {}
         Err(why) => say(&format!("Hermes is not installed: {why}")),
+    }
+    // OpenClaw after Hermes (#6226), whatever Hermes's did; never the
+    // unit's failure either.
+    match crate::openclaw_install::install_now(root, records, run, now_unix_ms, say) {
+        Ok(Some(said)) => {
+            if let Some(error) = said.error {
+                say(&format!("OpenClaw is not installed: {error}"));
+            }
+        }
+        Ok(None) => {}
+        Err(why) => say(&format!("OpenClaw is not installed: {why}")),
     }
     match harness.transpose()?.and_then(|said| said.error) {
         None => Ok(()),
@@ -1172,7 +1239,7 @@ fn steps(
 }
 
 /// `user`'s group id, from `id -g`, through `run`.
-fn gid_of(run: &mut Runner, user: &str) -> Result<String, String> {
+pub(crate) fn gid_of(run: &mut Runner, user: &str) -> Result<String, String> {
     let gid = run(&["id".to_owned(), "-g".to_owned(), user.to_owned()])?
         .trim()
         .to_owned();
@@ -1183,7 +1250,7 @@ fn gid_of(run: &mut Runner, user: &str) -> Result<String, String> {
 }
 
 /// The owner's uid of `path` under `root`, not followed through a link.
-fn owner(root: &Path, path: &str) -> Option<String> {
+pub(crate) fn owner(root: &Path, path: &str) -> Option<String> {
     fs::symlink_metadata(on(root, path))
         .ok()
         .filter(|meta| meta.is_dir())
@@ -1251,14 +1318,14 @@ fn remove_aside(root: &Path, say: &mut dyn FnMut(&str)) {
 
 /// The KiB free in `/var/lib`, where [`PLACE`] goes, from `df -Pk`: its
 /// second line's fourth field.
-fn free_kb(run: &mut Runner) -> Option<u64> {
+pub(crate) fn free_kb(run: &mut Runner) -> Option<u64> {
     let text = run(&["df", "-Pk", "/var/lib"].map(str::to_owned)).ok()?;
     text.lines().nth(1)?.split_whitespace().nth(3)?.parse().ok()
 }
 
 /// The KiB of memory available, from [`MEMINFO`]'s `MemAvailable` line;
 /// none when the file or the line is not read.
-fn available_kb(root: &Path) -> Option<u64> {
+pub(crate) fn available_kb(root: &Path) -> Option<u64> {
     let text = fs::read_to_string(on(root, MEMINFO)).ok()?;
     let line = text
         .lines()
@@ -1422,16 +1489,28 @@ impl Drop for InstallerFile {
 
 /// [`LOCK`], held while this install runs; one held already is refused.
 fn lock(records: &Path) -> Result<fs::File, String> {
+    lock_named(records, LOCK, "Hermes")
+}
+
+/// The lock file `name` in `records`, held while `engine`'s install runs
+/// (Hermes's [`LOCK`], OpenClaw's own, #6226); one held already is refused.
+pub(crate) fn lock_named(records: &Path, name: &str, engine: &str) -> Result<fs::File, String> {
     fs::create_dir_all(records).map_err(|error| format!("{}: {error}", records.display()))?;
     let file = fs::OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(false)
         .mode(0o600)
-        .open(records.join(LOCK))
-        .map_err(|error| format!("{LOCK}: {error}"))?;
+        .open(records.join(name))
+        .map_err(|error| format!("{name}: {error}"))?;
     rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive).map_err(
-        |_| io::Error::new(ErrorKind::WouldBlock, "another Hermes install is at work").to_string(),
+        |_| {
+            io::Error::new(
+                ErrorKind::WouldBlock,
+                format!("another {engine} install is at work"),
+            )
+            .to_string()
+        },
     )?;
     Ok(file)
 }
