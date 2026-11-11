@@ -2308,3 +2308,182 @@ async fn a_phrase_heard_on_the_bus_reaches_its_subscriber() {
         "{told}"
     );
 }
+
+// The local agent (docs/control.md, "The local agent"): a unix socket for one
+// named user, no pairing, the grants the owner left it.
+
+type AgentSocket = tokio_tungstenite::WebSocketStream<tokio::net::UnixStream>;
+
+/// This test process's own uid: the folder it made is its own.
+fn my_uid(lamp: &Lamp) -> u32 {
+    use std::os::unix::fs::MetadataExt as _;
+    std::fs::metadata(&lamp.dir).unwrap().uid()
+}
+
+/// The agent socket for `user`, whom the lamp takes as `named_uid`; its path
+/// and the record's client id.
+async fn agent_socket(lamp: &Lamp, user: &str, named_uid: u32) -> (std::path::PathBuf, String) {
+    let client = lamp.shared.ensure_local(user, 1).unwrap();
+    let path = lamp.dir.join("agent.sock");
+    let listener = tokio::net::UnixListener::bind(&path).unwrap();
+    tokio::spawn(server::serve_agent(
+        listener,
+        named_uid,
+        user.to_owned(),
+        client.clone(),
+        lamp.shared.clone(),
+    ));
+    (path, client)
+}
+
+async fn agent_connect(
+    path: &std::path::Path,
+) -> Result<AgentSocket, tokio_tungstenite::tungstenite::Error> {
+    let stream = tokio::net::UnixStream::connect(path).await.unwrap();
+    tokio_tungstenite::client_async("ws://lamp.local/v1", stream)
+        .await
+        .map(|(socket, _)| socket)
+}
+
+async fn agent_next(socket: &mut AgentSocket) -> Option<Value> {
+    loop {
+        match tokio::time::timeout(Duration::from_secs(3), socket.next()).await {
+            Ok(Some(Ok(Message::Text(text)))) => return Some(serde_json::from_str(&text).unwrap()),
+            Ok(Some(Ok(Message::Ping(_) | Message::Pong(_)))) => continue,
+            _ => return None,
+        }
+    }
+}
+
+async fn agent_hello(socket: &mut AgentSocket) -> Value {
+    let welcome = agent_next(socket).await.expect("a welcome");
+    assert_eq!(welcome["ev"], "welcome");
+    socket
+        .send(Message::text(
+            // Well formed and meaningless: the socket's peer check is what says who it is.
+            json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])})
+                .to_string(),
+        ))
+        .await
+        .unwrap();
+    agent_next(socket).await.expect("hello's answer")
+}
+
+#[tokio::test]
+async fn the_local_agent_says_hello_with_no_key_and_has_only_the_first_grants() {
+    let lamp = lamp("agent-hello").await;
+    let (path, _client) = agent_socket(&lamp, "agent", my_uid(&lamp)).await;
+    let mut socket = agent_connect(&path).await.unwrap();
+    let hello = agent_hello(&mut socket).await;
+    assert_eq!(hello["ok"], true, "{hello}");
+    let mut grants: Vec<String> = hello["grants"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|g| g.as_str().unwrap().to_owned())
+        .collect();
+    grants.sort();
+    assert_eq!(
+        grants,
+        ["body", "light", "look", "skills", "speak"],
+        "{hello}"
+    );
+    // It is listed as a client of the lamp like any, named for its user.
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    assert_eq!(
+        listed["clients"][0]["name"], "local agent agent",
+        "{listed}"
+    );
+    // Not a socket for pairing.
+    socket
+        .send(Message::text(
+            // A well-formed pair (a name, a 32-byte key, a 32-byte proof), so it is
+            // the socket's rule that refuses it, not the frame's shape.
+            json!({"id": 2, "op": "pair", "name": "x", "key": STANDARD.encode([1u8; 32]), "proof": STANDARD.encode([2u8; 32])}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let pair = agent_next(&mut socket).await.unwrap();
+    assert_eq!(pair["ok"], false, "{pair}");
+    assert!(
+        pair["error"]["why"]
+            .as_str()
+            .unwrap()
+            .contains("not for pairing"),
+        "{pair}"
+    );
+    // What it was not given is refused in the lamp's words.
+    socket
+        .send(Message::text(
+            json!({"id": 3, "op": "camera.snapshot"}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let camera = agent_next(&mut socket).await.unwrap();
+    assert_eq!(camera["error"]["code"], "no_grant", "{camera}");
+}
+
+/// The guard is the peer's uid, not the socket's group: `lampos` (whose
+/// processes run the lamp's skills) is in the socket's group, and still
+/// refused (the lead, 12:4x).
+#[test]
+fn only_the_named_users_uid_passes_not_lamposs() {
+    // lampos 994, the agent 1001: the group is shared, the uid is the guard.
+    assert!(!server::agent_peer_ok(994, 1001));
+    assert!(!server::agent_peer_ok(0, 1001));
+    assert!(server::agent_peer_ok(1001, 1001));
+}
+
+#[tokio::test]
+async fn a_peer_with_another_uid_is_closed_before_a_byte_is_read() {
+    let lamp = lamp("agent-uid").await;
+    // The lamp names a uid that is not this process's: this peer is "lampos".
+    let (path, _client) = agent_socket(&lamp, "agent", my_uid(&lamp) + 1).await;
+    let refused = tokio::time::timeout(Duration::from_secs(3), agent_connect(&path))
+        .await
+        .expect("closed in time");
+    assert!(refused.is_err(), "a peer with another uid reached the door");
+}
+
+#[tokio::test]
+async fn the_record_without_a_key_is_never_reached_by_a_wss_hello() {
+    let lamp = lamp("agent-wss").await;
+    let (_path, client) = agent_socket(&lamp, "agent", my_uid(&lamp)).await;
+    let mut socket = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut socket).await;
+    // Any signature: an empty one, a made one.
+    for sig in [STANDARD.encode([0u8; 64]), STANDARD.encode([7u8; 64])] {
+        let hello = send(
+            &mut socket,
+            json!({"id": 1, "op": "hello", "client": client, "sig": sig}),
+        )
+        .await;
+        assert_eq!(hello["error"]["code"], "unpaired", "{hello}");
+        // A refused hello closes the connection: a new one for the next try.
+        socket = connect(&lamp, "/v1").await.unwrap();
+        let _welcome = next(&mut socket).await;
+    }
+}
+
+#[tokio::test]
+async fn a_revoke_leaves_the_local_agent_nothing_and_a_restart_does_not_give_it_back() {
+    let lamp = lamp("agent-revoke").await;
+    let (path, client) = agent_socket(&lamp, "agent", my_uid(&lamp)).await;
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(agent_hello(&mut socket).await["ok"], true);
+    let revoked = admin(&lamp, json!({"revoke": client})).await;
+    assert_eq!(revoked["revoked"], true, "{revoked}");
+    // Its connection closes at once, and a new one is refused in words.
+    assert!(agent_next(&mut socket).await.is_none());
+    let mut again = agent_connect(&path).await.unwrap();
+    let refused = agent_hello(&mut again).await;
+    assert_eq!(refused["error"]["code"], "unpaired", "{refused}");
+    // The record stays, with no grants; a restart reads the file and makes
+    // no new one with the first grants.
+    let mut restarted = pairing::Clients::load(&lamp.dir.join("clients.json")).unwrap();
+    let kept = restarted.get(&client).expect("the record is kept");
+    assert!(kept.grants.is_empty() && kept.is_local());
+    let (again_id, made) = restarted.ensure_local("agent", 2);
+    assert_eq!((again_id.clone(), made), (client, false));
+    assert!(restarted.get(&again_id).unwrap().grants.is_empty());
+}

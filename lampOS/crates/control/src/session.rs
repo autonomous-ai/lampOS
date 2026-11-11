@@ -189,6 +189,11 @@ pub struct Session {
     /// (a motion's `done`) goes to this connection alone, never another of
     /// the same computer's (Second's P2 on #5835).
     connection: Option<u64>,
+    /// Set for a connection that came by the agent socket: the local agent's
+    /// client id. Its `hello` names no key and signs nothing; the socket's
+    /// peer check has already said who it is (docs/control.md, "The local
+    /// agent").
+    local: Option<String>,
 }
 
 /// What a computer beyond the lamp's own network is told when it asks for
@@ -583,6 +588,7 @@ impl Door {
             phrases: Vec::new(),
             remote: false,
             connection: None,
+            local: None,
         };
         use base64::Engine as _;
         let welcome = json!({
@@ -591,6 +597,27 @@ impl Door {
             "lamp": self.lamp_info(),
         });
         (session, welcome)
+    }
+
+    /// A connection that came by the agent socket, whose peer the socket
+    /// has already checked: its `hello` is taken as the local agent `client`
+    /// (a record [`Door::ensure_local`] made), with no key and no signature.
+    pub fn open_local(&mut self, client: &str) -> (Session, Value) {
+        let (mut session, welcome) = self.open();
+        session.local = Some(client.to_owned());
+        (session, welcome)
+    }
+
+    /// The local agent `user`'s record, made on the first start with the
+    /// first grants and kept as the owner's app changes it; its client id.
+    pub fn ensure_local(&mut self, user: &str, wall_s: u64) -> std::io::Result<String> {
+        let (id, made) = self.clients.ensure_local(user, wall_s);
+        // Not kept: the socket stays off (the caller says why), and the
+        // record made in memory is never reached, since nothing names it.
+        if made {
+            self.save()?;
+        }
+        Ok(id)
     }
 
     /// The owner's app asks for a pairing code with `grants`.
@@ -822,6 +849,15 @@ impl Door {
             return outcome;
         }
         match &op {
+            Op::Pair { .. } if session.local.is_some() => {
+                return reply_refused(
+                    Some(re),
+                    Error::new(
+                        ErrorCode::BadRequest,
+                        "this socket is not for pairing: it is the local agent's",
+                    ),
+                );
+            }
             Op::Pair { name, key, proof } => {
                 let outcome = self.pair(session, re, name, key, proof, now_us, wall_s);
                 for (client, media) in std::mem::take(&mut self.media_dropped) {
@@ -1316,7 +1352,38 @@ impl Door {
                 Error::new(ErrorCode::BadRequest, "hello once a connection"),
             );
         }
-        let Some(paired) = self.clients.hello(client, &session.nonce, sig) else {
+        // By the agent socket: no key, no signature; the record the socket
+        // named, with grants left (the owner may have taken them all away).
+        let local = session
+            .local
+            .clone()
+            .and_then(|id| self.clients.get(&id).filter(|c| c.is_local()).cloned());
+        let (client, local_grants) = match (&session.local, local) {
+            (Some(_), Some(record)) if !record.grants.is_empty() => {
+                (record.id.clone(), Some(record.grants.clone()))
+            }
+            (Some(_), _) => {
+                let mut outcome = reply_refused(
+                    Some(re),
+                    Error::new(
+                        ErrorCode::Unpaired,
+                        "the owner has not given the local agent anything: turn it on in the app",
+                    ),
+                );
+                outcome.close = true;
+                return outcome;
+            }
+            (None, _) => (client.to_owned(), None),
+        };
+        let client = client.as_str();
+        let paired = match local_grants {
+            Some(grants) => Some(grants),
+            None => self
+                .clients
+                .hello(client, &session.nonce, sig)
+                .map(|paired| paired.grants.clone()),
+        };
+        let Some(grants) = paired else {
             let mut outcome = reply_refused(
                 Some(re),
                 Error::new(
@@ -1327,7 +1394,6 @@ impl Door {
             outcome.close = true;
             return outcome;
         };
-        let grants = paired.grants.clone();
         *self.open.entry(client.to_owned()).or_default() += 1;
         session.client = Some(client.to_owned());
         let mut limits = limits(

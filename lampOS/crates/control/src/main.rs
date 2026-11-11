@@ -442,6 +442,17 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
     );
     let tls = server::acceptor(&identity).map_err(|e| format!("tls: {e}"))?;
+    // The local agent's socket: only when the owner turned a user on (the
+    // flag, or LAMP_CONTROL_LOCAL_AGENT; the flag wins; `off` is off).
+    let local_agent = option(arguments, "--local-agent")
+        .or_else(|| std::env::var("LAMP_CONTROL_LOCAL_AGENT").ok())
+        .filter(|user| !user.is_empty() && user != "off");
+    let agent_socket = PathBuf::from(
+        option(arguments, "--agent-socket")
+            .unwrap_or_else(|| lamp_control::agent::SOCKET.to_owned()),
+    );
+    let agent_group =
+        option(arguments, "--agent-group").unwrap_or_else(|| lamp_control::agent::GROUP.to_owned());
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -471,6 +482,19 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         std::fs::set_permissions(&admin, std::fs::Permissions::from_mode(0o600))
             .map_err(|e| e.to_string())?;
         tokio::spawn(server::admin(owner, shared.clone()));
+        if let Some(user) = local_agent {
+            match start_agent(&user, &agent_socket, &agent_group, &shared) {
+                Ok((listener, uid, client)) => {
+                    eprintln!(
+                        "lamp-control: the local agent {user} (uid {uid}) may use {}: no pairing, the grants the owner left it",
+                        agent_socket.display()
+                    );
+                    tokio::spawn(server::serve_agent(listener, uid, user, client, shared.clone()));
+                }
+                // Off, and said why: never a socket for a user that could not be named.
+                Err(why) => eprintln!("lamp-control: the local agent {user}: off: {why}"),
+            }
+        }
         if let Some(bus) = &bus {
             server::watch_bus(bus, watch, shared.clone())
                 .map_err(|e| format!("bus topics: {e}"))?;
@@ -492,6 +516,33 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
         Ok::<(), String>(())
     })
+}
+
+/// The local agent `user`'s socket: its uid and its record, made if the lamp
+/// had none. Any failure is the whole answer: no socket.
+fn start_agent(
+    user: &str,
+    path: &std::path::Path,
+    group: &str,
+    shared: &std::sync::Arc<server::Shared>,
+) -> Result<(tokio::net::UnixListener, u32, String), String> {
+    use lamp_control::agent;
+    if !agent::user_name_ok(user) {
+        return Err("not a user name".to_owned());
+    }
+    let passwd = std::fs::read_to_string("/etc/passwd").map_err(|e| format!("/etc/passwd: {e}"))?;
+    let uid = agent::uid_of(user, &passwd).ok_or_else(|| "no such user".to_owned())?;
+    let groups = std::fs::read_to_string("/etc/group").map_err(|e| format!("/etc/group: {e}"))?;
+    let gid = agent::gid_of(group, &groups).ok_or_else(|| format!("no group {group}"))?;
+    let wall = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or_default();
+    let client = shared
+        .ensure_local(user, wall)
+        .map_err(|e| format!("its record could not be kept: {e}"))?;
+    let listener = agent::bind(path, gid).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok((listener, uid, client))
 }
 
 /// When the ring last drew each computer's mark, as it says on

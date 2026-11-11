@@ -195,6 +195,12 @@ pub struct Shared {
 }
 
 impl Shared {
+    /// The local agent `user`'s record, made if the lamp had none; its id
+    /// (`Door::ensure_local`).
+    pub fn ensure_local(&self, user: &str, wall_s: u64) -> std::io::Result<String> {
+        self.door.lock().expect("door").ensure_local(user, wall_s)
+    }
+
     pub fn new(door: Door, parts: Box<dyn Parts + Send>, pin: String) -> Arc<Self> {
         Arc::new(Self {
             door: Mutex::new(door),
@@ -917,8 +923,84 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             })
             .await;
             if let Ok(Some(socket)) = opened {
-                connection(socket, shared, remote).await;
+                connection(socket, shared, remote, None).await;
             }
+        });
+    }
+}
+
+/// The most connections the agent socket holds at once.
+const AGENT_MAX: usize = 16;
+
+/// Whether the agent socket's peer is the named user: only its uid is the
+/// answer, never the socket's mode or group (`lampos`, whose processes run
+/// the lamp's skills, is in the socket's group, and is refused here).
+pub fn agent_peer_ok(peer_uid: u32, named_uid: u32) -> bool {
+    peer_uid == named_uid
+}
+
+/// The local agent's socket (docs/control.md, "The local agent"): the same
+/// WebSocket protocol as the door's, on a unix socket with no TLS, for the
+/// one user the owner turned on. The kernel says who connects
+/// (`SO_PEERCRED`); a peer with any other uid is closed before a byte is
+/// read, and said in the journal. The connection says `hello` with no key and
+/// is the local agent `client`, with the grants the owner left it.
+pub async fn serve_agent(
+    listener: tokio::net::UnixListener,
+    named_uid: u32,
+    user: String,
+    client: String,
+    shared: Arc<Shared>,
+) {
+    let held = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    loop {
+        let (stream, _) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(_) => {
+                tokio::time::sleep(ACCEPT_BACKOFF).await;
+                continue;
+            }
+        };
+        let cred = match stream.peer_cred() {
+            Ok(cred) => cred,
+            Err(error) => {
+                eprintln!(
+                    "lamp-control: local agent socket: refused a peer: no credentials: {error}"
+                );
+                continue;
+            }
+        };
+        if !agent_peer_ok(cred.uid(), named_uid) {
+            eprintln!(
+                "lamp-control: local agent socket: refused uid {} (pid {}): only {user} (uid {named_uid})",
+                cred.uid(),
+                cred.pid().unwrap_or(-1)
+            );
+            continue;
+        }
+        if held.fetch_add(1, Ordering::AcqRel) >= AGENT_MAX {
+            held.fetch_sub(1, Ordering::AcqRel);
+            continue;
+        }
+        eprintln!(
+            "lamp-control: local agent {user}: a connection from pid {}",
+            cred.pid().unwrap_or(-1)
+        );
+        let (shared, client, held) = (shared.clone(), client.clone(), held.clone());
+        tokio::spawn(async move {
+            let within = shared.limits.lock().expect("limits").handshake;
+            let config = WebSocketConfig::default()
+                .max_message_size(Some(FRAME_MAX))
+                .max_frame_size(Some(FRAME_MAX));
+            let opened = tokio::time::timeout(
+                within,
+                tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
+            )
+            .await;
+            if let Ok(Ok(socket)) = opened {
+                connection(socket, shared, false, Some(client)).await;
+            }
+            held.fetch_sub(1, Ordering::AcqRel);
         });
     }
 }
@@ -942,6 +1024,7 @@ async fn connection<S>(
     mut socket: tokio_tungstenite::WebSocketStream<S>,
     shared: Arc<Shared>,
     remote: bool,
+    local: Option<String>,
 ) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
@@ -956,7 +1039,13 @@ async fn connection<S>(
     let mut body_open = true;
     // Weak, so a revoke that drops the connection's outbox still closes it.
     let answers = outbox.downgrade();
-    let (mut session, welcome) = shared.door.lock().expect("door").open();
+    let (mut session, welcome) = {
+        let mut door = shared.door.lock().expect("door");
+        match &local {
+            Some(client) => door.open_local(client),
+            None => door.open(),
+        }
+    };
     session.set_connection(id);
     if remote {
         session.set_remote();
