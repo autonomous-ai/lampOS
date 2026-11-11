@@ -2854,14 +2854,23 @@ gone ([switches.md](switches.md)). What happens:
      before the model's own left-out words, unless those already say a
      blink). A plain `{ out = true }`, one with only `over` and `until`, and
      an `out` with a `for` with no lit step beside it are untouched, for
-     the check to say why. Each only removes: a line, or one entry of a
-     one-line table with its comma, or for (e) one step, taken only when
-     the text then reads as the same skill without that one field or step;
-     the skill keeps every trigger and grant it uses and gains nothing. A skill written
-     otherwise (dotted keys, say) is given back as it came, for the check
-     to say why. Each is journaled: `lamp-voice: a made skill tidied:
-     <what>`. A gesture beside a mood, a `for` that holds, and a voice
-     beside a say, a hum or a read are untouched. The making model's
+     the check to say why; (f) a `[[do]]` step that is only `cue = "hum"`
+     beside a say or another hum, which the cap refuses (the lamp plays one
+     line or hum a run): the say kept, or with no say the first hum (a
+     product lamp, 11 Nov, typed in the app: three repairs on "leave out
+     the extra cue = "hum" step", the model writing the hum back each
+     time). Each only removes: a line, or one entry of a one-line table
+     with its comma, or for (e) and (f) one step's `[[do]]` block
+     (`made_skill::step_taken_out`), taken only when the text then reads as
+     the same skill without that one field or step; the skill keeps every
+     trigger and grant it uses, every step but a gap or a hum the lamp
+     would never play, and gains nothing. A skill written otherwise (dotted
+     keys, steps inline as `do = [...]`, say) is given back as it came, for
+     the check to say why. Each is journaled: `lamp-voice: a made skill
+     tidied: <what>` (the hum: `[[do]] step N, a hum beside its say`, or
+     `beside another hum`). A gesture beside a mood, a `for` that holds, a
+     voice beside a say, a hum or a read, a lone hum beside a nod, and a
+     hum sharing its step with more are untouched. The making model's
      system prompt (`MORE_STEPS`) says the same: `{ gesture = "nod" }`
      with no `for` (a gesture plays once), `mood = "reading"` with
      `for = "1m"` (at most 2m), a getting up with no `for` or
@@ -2903,11 +2912,13 @@ gone ([switches.md](switches.md)). What happens:
      `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`,
      `a_getting_ups_unknown_when_is_tidied_and_another_topics_named`,
      `a_getting_ups_wait_taken_out_is_said`,
-     `a_made_blinks_gap_is_taken_out_and_a_plain_out_kept`, and in
+     `a_made_blinks_gap_is_taken_out_and_a_plain_out_kept`,
+     `a_made_hum_beside_its_say_is_tidied`, and in
      `tests/it/made.rs`
      `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed`,
-     `a_made_nod_when_i_stand_up_is_tidied_and_packed` and
-     `a_made_blinks_gap_is_taken_out_and_packed` (the real
+     `a_made_nod_when_i_stand_up_is_tidied_and_packed`,
+     `a_made_blinks_gap_is_taken_out_and_packed` and
+     `a_made_hum_beside_its_say_is_tidied_and_packed` (the real
      `lamp-skills pack`).
    The read of a linked service (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
@@ -3515,9 +3526,17 @@ gone ([switches.md](switches.md)). What happens:
      "Something went wrong keeping it. Please try again." (`NOT_KEPT_TRY`).
      A step it can't do yet: "I can't do that yet: <what>." The model's
      silence or cut: "I couldn't make that: the lamp's model didn't
-     answer." The model's own `cannot:` sentence goes as it is. The voice's
-     `make_skill` answer's `error` and `next` carry the same plain line.
-     Test: `a_failed_make_is_told_in_plain_words`.
+     answer." A repair's answer cut or never come, after the lamp refused
+     an earlier one, is told as that refusal, plainly (a product lamp, 11
+     Nov, typed in the app: three repairs, then a cut stream, and the
+     person heard "the lamp's model stopped before it finished writing
+     it"); only a first answer cut or silent, nothing refused before, is
+     told as the cut or the silence. The journal keeps the cut and says
+     `lamp-voice: a made skill's last answer failed after its repairs:
+     told why it was refused`. The model's own `cannot:` sentence goes as
+     it is. The voice's `make_skill` answer's `error` and `next` carry the
+     same plain line. Tests: `a_failed_make_is_told_in_plain_words`,
+     `a_cut_after_its_repairs_is_told_as_the_refusal`.
    - **A name taken gets a free one** (the owner, 11 Nov: a factory reset
      keeps the lamp's own skills, welcome-back, bedtime-morning,
      light-out, sip-of-water among them, so a skill the model named

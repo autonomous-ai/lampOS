@@ -1093,6 +1093,41 @@ fn a_made_look_and_hi_when_someone_sits_down_is_granted_its_faces_and_packed() {
     assert_eq!(tars(&keeping.directory).len(), 1);
 }
 
+/// A product lamp, 11 Nov, typed in the app: three repairs on a hum the
+/// lamp's model wrote as a step of its own beside its say. The lone hum is
+/// taken out before the check, and the real `lamp-skills pack` keeps it,
+/// said as its line when someone gets up.
+#[test]
+fn a_made_hum_beside_its_say_is_tidied_and_packed() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let toml = made_body(
+        "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n",
+        "say = { text = \"Off you go.\" }\n\n[[do]]\ncue = \"hum\"",
+    )
+    .replace("body = true\n", "speak = true\n");
+    let made = keep_asked(
+        &answer(&toml, "stand-bye"),
+        false,
+        "s1:stand-bye:1",
+        &keeping,
+        &Asked {
+            request: "say off you go and hum when I stand up",
+            ..Asked::default()
+        },
+    )
+    .unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert!(
+        made.description
+            .starts_with("When someone sitting at the desk gets up, it says"),
+        "{}",
+        made.description
+    );
+    assert!(!made.description.contains("hum"), "{}", made.description);
+    assert!(made.uses.speak);
+    assert_eq!(tars(&keeping.directory).len(), 1);
+}
+
 /// #6070, the Reviewer-lead's P2: a made skill on a face coming into view
 /// that only moves, made by voice with no `absent_for`, kept, put on and
 /// run by the real engine. Someone at the desk who glances away for a frame
