@@ -63,6 +63,26 @@ pub const RUN_WRITE_WAITS: &str =
 /// names) first: a skill run's call goes to whichever is linked
 /// ([`Services::run_code`]).
 pub const RUN_PAIRS: [(&str, &str); 2] = [("gmail", "gmail-app"), ("figma", "figma-api")];
+/// The voice's own call (never offered to its model), with
+/// `LAMP_SKILL_TASKS=on`: the write a skill's run prepared, if it still
+/// waits, for the voice to read back and take the person's yes
+/// ([`Services::run_waiting`], #6432).
+pub const RUN_WAITING: &str = "run_write_waiting";
+/// What a run's send is told when the voice's `sha256` is not that of the
+/// read-back held: what was said is not what waits.
+pub const RUN_NOT_SAID: &str =
+    "not sent: what the lamp read back is not the write that waits; nothing was sent";
+
+/// The SHA-256 of a held write's read-back, as hex: a skill run's send
+/// names it (`sha256`), so only the very words the voice read back are sent
+/// (#6432).
+pub fn read_back_sha256(read_back: &str) -> String {
+    ring::digest::digest(&ring::digest::SHA256, read_back.as_bytes())
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
 /// What a skill run's prepared write tells it: nothing went.
 pub const RUN_HELD: &str = "Nothing is sent. The lamp reads it back to the person and sends it only if they say yes; say nothing of it as sent.";
 /// What a skill's call to anything but a read is told.
@@ -220,6 +240,7 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
                 skill_writes::APPROVE,
                 skill_writes::SENT,
                 skill_writes::APPROVED,
+                RUN_WAITING,
             ]
             .contains(name)
         })
@@ -542,6 +563,31 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
     }
 
+    /// The write a skill's run prepared, if it still waits at `now`:
+    /// `{"waiting": {"send_id", "service", "skill", "read_back", "left_ms"}}`,
+    /// `service` the code it was prepared for and `read_back` this
+    /// program's own words; `{"waiting": null}` otherwise. It stays held:
+    /// only the voice's send with its `send_id`, after the person's yes,
+    /// sends it.
+    pub fn run_waiting(&self, now: Instant) -> Value {
+        let held = self
+            .run_held
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        let waiting = held.and_then(|(send_id, skill)| {
+            let (service, read_back, left) = self.desk.peek(&send_id, now)?;
+            Some(json!({
+                "send_id": send_id,
+                "service": service,
+                "skill": skill,
+                "read_back": read_back,
+                "left_ms": u64::try_from(left.as_millis()).unwrap_or(u64::MAX),
+            }))
+        });
+        json!({ "waiting": waiting })
+    }
+
     /// The skill whose run prepared the write `send_id` names, taken: its
     /// send counts against that skill's bounds.
     fn run_skill_of(&self, send_id: &str) -> Option<String> {
@@ -701,6 +747,10 @@ impl<H: Http, M: Mail> Services<H, M> {
                 }
                 skill_writes::APPROVED if asker == Asker::Owner => {
                     self.skill_writes_approved(&args)
+                }
+                // The voice's own: a skill run's write waiting for its yes.
+                RUN_WAITING if asker == Asker::Owner && self.skill_tasks => {
+                    Ok(self.run_waiting(Instant::now()))
                 }
                 // A made skill's write is `lamp-skills`' alone.
                 _ => Err("no such function".into()),
@@ -1780,6 +1830,13 @@ impl<H: Http, M: Mail> Services<H, M> {
         // skill's fixed write does: taken before it is sent, under the same
         // lock, a send that then fails still counted.
         if let Some(skill) = &run_skill {
+            // Only the words the voice read back: their SHA-256 named.
+            if args.get("sha256").and_then(Value::as_str)
+                != Some(read_back_sha256(&pending.read_back).as_str())
+            {
+                eprintln!("lamp-services: a skill run's write refused: not the one read back");
+                return Err(RUN_NOT_SAID.into());
+            }
             let taken = {
                 let _one = self
                     .skill_send
@@ -2601,9 +2658,11 @@ mod tests {
         // counted for the skill.
         let id = services.run_held.lock().unwrap().clone().unwrap();
         assert_eq!(id.1, "mail-count");
+        let read_back = held["result"]["read_back"].as_str().unwrap().to_owned();
         let send = |id: &str| {
-            json!({"op":"call","name":"service_write","args":{"service":"gmail","send_id":id,"said":"send"}})
-                .to_string()
+            json!({"op":"call","name":"service_write","args":{"service":"gmail","send_id":id,
+                "said":"send","sha256":read_back_sha256(&read_back)}})
+            .to_string()
         };
         assert_eq!(run(services.tool(&send(&id.0)))["result"]["sent"], true);
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
@@ -2622,6 +2681,79 @@ mod tests {
             "{refused}"
         );
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
+    }
+
+    /// #6432: the voice asks for a run's held write (its own call, with
+    /// LAMP_SKILL_TASKS=on alone) and is given it whole, still held; its
+    /// send goes only with the SHA-256 of that very read-back, and a no
+    /// cancels it unsent.
+    #[test]
+    fn the_voice_is_told_a_runs_held_write_and_sends_only_what_it_read_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let waiting = json!({"op":"call","name":RUN_WAITING,"args":{}}).to_string();
+        // Off: no such call.
+        let off = services(dir.path(), "[]", true);
+        assert_eq!(run(off.tool(&waiting))["ok"], false);
+        let services = services(dir.path(), "[]", true).with_skill_tasks(true);
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        assert_eq!(
+            run(services.tool(&waiting))["result"],
+            json!({"waiting": null})
+        );
+        let draft = json!({"service":"gmail","action":"send_mail","to":["mom@home.test"],
+            "subject":"Dinner","text":"Home by 7"});
+        let held = run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
+        let told = run(services.tool(&waiting));
+        let waits = &told["result"]["waiting"];
+        assert_eq!(waits["skill"], "mail-count", "{told}");
+        assert_eq!(waits["service"], "gmail");
+        assert_eq!(waits["read_back"], held["result"]["read_back"]);
+        assert!(waits["left_ms"].as_u64().unwrap() > 110_000);
+        // Asked again, still there: asking takes nothing.
+        assert_eq!(run(services.tool(&waiting))["result"]["waiting"], *waits);
+        let send = |sha: &str, said: &str| {
+            json!({"op":"call","name":"service_write","args":{"service":"gmail",
+                "send_id":waits["send_id"],"said":said,"sha256":sha}})
+            .to_string()
+        };
+        // Another read-back's SHA: not sent, and the write is gone.
+        let other = read_back_sha256("Send a mail to someone else");
+        assert_eq!(
+            run(services.tool(&send(&other, "send")))["error"],
+            RUN_NOT_SAID
+        );
+        assert!(services.mail.sent.lock().unwrap().is_empty());
+        assert_eq!(
+            run(services.tool(&waiting))["result"],
+            json!({"waiting": null})
+        );
+        // A no: cancelled, nothing sent.
+        run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
+        let waits = run(services.tool(&waiting))["result"]["waiting"].clone();
+        let sha = read_back_sha256(waits["read_back"].as_str().unwrap());
+        let no = json!({"op":"call","name":"service_write","args":{"service":"gmail",
+            "send_id":waits["send_id"],"said":"no","sha256":sha}});
+        assert_eq!(
+            run(services.tool(&no.to_string()))["result"]["cancelled"],
+            true
+        );
+        assert!(services.mail.sent.lock().unwrap().is_empty());
+        // The yes with its read-back's SHA: sent once.
+        run(services.run_tool(&run_line(tools::WRITE, draft)));
+        let waits = run(services.tool(&waiting))["result"]["waiting"].clone();
+        let sha = read_back_sha256(waits["read_back"].as_str().unwrap());
+        let yes = json!({"op":"call","name":"service_write","args":{"service":"gmail",
+            "send_id":waits["send_id"],"said":"send","sha256":sha}});
+        assert_eq!(run(services.tool(&yes.to_string()))["result"]["sent"], true);
+        assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
+        // A skill's run can't ask what waits: that call is the voice's.
+        assert_eq!(
+            run(services.run_tool(&run_line(RUN_WAITING, json!({}))))["error"],
+            RUN_READS_AND_WRITES_ONLY
+        );
     }
 
     /// #5288: a skill reads as the voice does, quoted and with security
