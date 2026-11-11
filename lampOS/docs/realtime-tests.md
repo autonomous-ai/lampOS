@@ -9,8 +9,8 @@ started first, beside the rest (below). In the ARM64 run
 
 | Run | Runners | nextest profile | Tests at once | Realtime group |
 |---|---|---|---|---|
-| Pull request into `lamp-voice`, manual run | 1 | `pr` | one per core | run, one at a time, started first |
-| Push to `lamp-voice` (every merge; its binaries are what [updates](updates.md) downloads) | 1 | `pr` | one per core | run, one at a time, started first |
+| Pull request into `lamp-voice`, manual run with `shards` 1 | 1 | `pr` | one per core | run, one at a time, started first |
+| Push to `lamp-voice` (every merge; its binaries are what [updates](updates.md) downloads), manual run with `shards` 3 (the default) | 3 (1 on the Studio) | `pr` | one per core | run, one at a time, started first |
 | Full run: nightly, or manual with `full` | 4 | `default` | one, as before | run |
 
 The nightly full run is set for 19:00 UTC (02:00 in Vietnam) in
@@ -37,7 +37,12 @@ about a minute in parallel (run 38721013037: 4,399 tests, 55 s, 4 cores).
 A merge cost one runner for about 11 minutes on 17 Oct (until 2026-10-15 it
 cost four for about 15). On 31 Oct, with three times the tests, a push's ARM64
 job took 25 to 27 minutes (the last five), and its whole run, signing and
-publishing included, 28 to 30.
+publishing included, 28 to 30. On 11 Nov the test step alone was 17.5 of a
+push's 27 minutes (run 42969353741), so since #6320 a push to `lamp-voice`
+splits its tests across three runners (nextest `--partition hash:N/3`), each
+building from the cache in parallel; every test still runs once. Doc tests,
+the two own-harness tests, the binaries' artifact and the cache come from the
+first runner only, and publishing waits for all three.
 
 ## Why
 
