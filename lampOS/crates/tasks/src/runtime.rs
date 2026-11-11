@@ -8,6 +8,7 @@ use crate::{
     harness::{
         AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
         LaunchOutcome, Listed, MOST_WAITED, Observation, SessionMachines, SignIn, Target,
+        this_computer,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
@@ -219,8 +220,9 @@ pub struct SetUpLater {
     /// `LAMP_OPENCLAW_ON_LAMP=on` or `LAMP_HERMES_ON_LAMP=on` (#5978,
     /// #6226), only with `engines`: the lamp's own machine is looked at
     /// too, and kept as the target [`LAMP_TARGET`], with the lamp's engine
-    /// ([`LampSide::order`]) its look says is installed. `None`: off, as
-    /// before.
+    /// ([`LampSide::order`]) its look says is installed. Harness signed out
+    /// (#6407), the first of those installed here ([`LampSide::bin`]) is
+    /// the target, under this computer's own id. `None`: off, as before.
     pub lamp: Option<LampSide>,
 }
 
@@ -241,6 +243,11 @@ pub struct LampSide {
     /// What the Harness lane tells the targets (#6226): a Harness too old
     /// for OpenClaw.
     pub gateway: Arc<crate::gateway::Shared>,
+    /// Where Harness finds the lamp's own engines, each by its name
+    /// ([`LAMP_ENGINES_BIN`] on a lamp): signed out, Harness can't say what
+    /// is installed here (its `machines engines` needs the sign-in), so an
+    /// engine is installed here while its program is there (#6407).
+    pub bin: PathBuf,
 }
 
 impl LampSide {
@@ -255,6 +262,7 @@ impl LampSide {
             machines: Default::default(),
             order,
             gateway: Default::default(),
+            bin: PathBuf::from(LAMP_ENGINES_BIN),
         }
     }
 }
@@ -270,6 +278,24 @@ pub fn lamp_order(side: &LampSide) -> Vec<EngineKind> {
         .copied()
         .filter(|engine| !(refused && *engine == EngineKind::Openclaw))
         .collect()
+}
+
+/// Where lamp-update puts each of the lamp's own engines for Harness, by
+/// its name: on `lampos`'s `PATH`, as Harness finds them
+/// (`lamp_update::hermes_install::WRAPPER`, `/usr/local/bin/hermes`;
+/// `lamp_update::openclaw_install::WRAPPER`, `/usr/local/bin/openclaw`).
+pub const LAMP_ENGINES_BIN: &str = "/usr/local/bin";
+
+/// The first of the lamp's engines in [`lamp_order`] (switched on, the one
+/// [`LAMP_ENGINE`] chooses first, OpenClaw left out while the Harness here
+/// is too old for it) whose program is where Harness finds it
+/// ([`LampSide::bin`]): an executable file named as Harness names the
+/// engine (#6407). None when none is.
+fn lamp_engine_here(side: &LampSide) -> Option<EngineKind> {
+    lamp_order(side).into_iter().find(|engine| {
+        fs::metadata(side.bin.join(engine.argument()))
+            .is_ok_and(|found| found.is_file() && found.permissions().mode() & 0o111 != 0)
+    })
 }
 
 /// The switch for the lamp's own Hermes (#5978), in lamp-tasks' unit.
@@ -588,6 +614,12 @@ pub trait Adapter: Send + 'static {
     fn signed_in(&self) -> Result<SignIn, String> {
         Err("unsupported".into())
     }
+    /// [`Adapter::signed_in`], with this computer's own id when Harness
+    /// names one (#6407): the id work is started under while signed out.
+    /// An adapter without it names none.
+    fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
+        self.signed_in().map(|sign_in| (sign_in, None))
+    }
     /// The machines on the person's account (`serve
     /// --targets-from-machines`). An adapter without it says so.
     fn machines(&self) -> Result<Vec<AccountMachine>, String> {
@@ -678,6 +710,9 @@ impl Adapter for Cli {
     }
     fn signed_in(&self) -> Result<SignIn, String> {
         Cli::signed_in(self)
+    }
+    fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
+        Cli::signed_in_here(self)
     }
     fn machines(&self) -> Result<Vec<AccountMachine>, String> {
         Cli::machines(self)
@@ -780,6 +815,12 @@ impl Adapter for Production {
     fn signed_in(&self) -> Result<SignIn, String> {
         match self {
             Self::Cli(cli) => cli.signed_in(),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
+        match self {
+            Self::Cli(cli) => cli.signed_in_here(),
             Self::Absent => Err("no_harness".into()),
         }
     }
@@ -947,6 +988,10 @@ struct SetUp {
     sign_in_answered: bool,
     /// Failed reads of the sign-in since the last that answered.
     sign_in_failures: u32,
+    /// The lamp's own target names this computer's own id (#6407): work
+    /// goes to the lamp's engine signed out, and only the computers need
+    /// the sign-in.
+    here: bool,
 }
 
 /// Failed reads of Harness's sign-in in a row after which what was last read
@@ -990,7 +1035,7 @@ enum Outcome {
     Observe(ObservationJob, Result<Observation, String>),
     Status(String, Result<Vec<Listed>, String>),
     Close(CloseJob, Result<Closed, String>),
-    SignIn(Result<SignIn, String>),
+    SignIn(Result<(SignIn, Option<String>), String>),
     Machines(Result<Vec<AccountMachine>, String>),
     StartDaemon(Result<(), String>),
     RestartDaemon(Result<(), String>),
@@ -1184,6 +1229,8 @@ fn owner<C: Clock>(
     // What the last write from the machines said, so the journal has one
     // line a change, not one a look.
     let mut machines_said = String::new();
+    // What the last write of the lamp's own target signed out said (#6407).
+    let mut here_said = String::new();
     // `serve --engines-from-machines` (#5199): what is known of each
     // computer, the machines as last listed, the looks at their engines,
     // and when a refusal last made the part look again.
@@ -1248,6 +1295,10 @@ fn owner<C: Clock>(
         {
             targets_due = Instant::now() + later.every;
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
+            found.here = engine
+                .targets()
+                .get(LAMP_TARGET)
+                .is_some_and(|target| this_computer(&target.machine_id));
             // The machines a named hand-over to the lamp looks among (#5978).
             if let Some(side) = later.lamp.as_ref()
                 && let Ok(mut machines) = side.machines.lock()
@@ -1439,6 +1490,24 @@ fn owner<C: Clock>(
                     Ok(())
                 }
                 Outcome::SignIn(read) => {
+                    // Signed out, the lamp's own target from the lamp
+                    // itself (#6407).
+                    if let (Some(later), Ok((sign_in, computer))) = (set_up_later.as_ref(), &read) {
+                        let said = lamp_here_written(
+                            later,
+                            *sign_in,
+                            computer.as_deref(),
+                            engine.targets(),
+                            &mut targets_due,
+                        );
+                        if let Some(said) = said
+                            && said != here_said
+                        {
+                            eprintln!("tasks: {said}");
+                            here_said = said;
+                        }
+                    }
+                    let read = read.map(|(sign_in, _)| sign_in);
                     if let Some(found) = set_up.as_mut() {
                         match read {
                             Ok(sign_in) => {
@@ -1451,13 +1520,21 @@ fn owner<C: Clock>(
                                 // install puts Harness on with no daemon at
                                 // boot, so a signed-in lamp had none after a
                                 // reboot (lamp-c0a4, 5 Nov, #5379).
+                                // Signed out too while the lamp may be its
+                                // own target (#6407): its work runs on this
+                                // computer's daemon.
+                                let lamp_side = set_up_later
+                                    .as_ref()
+                                    .is_some_and(|later| later.lamp.is_some());
                                 if !found.sign_in_answered
                                     && sign_in_starter.is_some()
                                     && start_daemon_due.is_none()
-                                    && matches!(sign_in, SignIn::In | SignIn::Offline)
+                                    && (matches!(sign_in, SignIn::In | SignIn::Offline)
+                                        || (sign_in == SignIn::Out && lamp_side))
                                 {
                                     eprintln!(
-                                        "tasks: Harness signed in at this start: its daemon is started (#5379)"
+                                        "tasks: Harness read {} at this start: its daemon is started (#5379, #6407)",
+                                        sign_in.name()
                                     );
                                     start_daemon_due = Some(Instant::now());
                                     daemon_tries = 0;
@@ -2605,6 +2682,79 @@ fn machines_written(
     }
 }
 
+/// Harness signed out (#6407): the lamp's own target, from the lamp
+/// itself, not from the machines (which need the sign-in). With the lamp's
+/// side on and the targets written by this part
+/// ([`write_targets_from_machines`]), the lamp alone, under this computer's
+/// own id, with the first of its engines installed here
+/// ([`lamp_engine_here`]); none installed, a lamp target written so before
+/// is removed. Signed in, or offline, the machines write the targets, as
+/// before, and nothing is done here. What it did, for the journal; `None`:
+/// nothing to do.
+fn lamp_here_written(
+    later: &SetUpLater,
+    sign_in: SignIn,
+    computer: Option<&str>,
+    targets: &BTreeMap<String, Target>,
+    targets_due: &mut Instant,
+) -> Option<String> {
+    let (Some(side), Some(wanted), SignIn::Out) =
+        (later.lamp.as_ref(), later.from_machines, sign_in)
+    else {
+        return None;
+    };
+    let Some(computer) = computer.filter(|id| this_computer(id)) else {
+        return Some(
+            "Harness signed out and names no id for this computer: the lamp is no target".into(),
+        );
+    };
+    let lamp = AccountMachine {
+        machine_id: computer.to_owned(),
+        label: String::new(),
+        current: true,
+        status: None,
+    };
+    let chosen = match lamp_engine_here(side) {
+        Some(engine) => {
+            make_lamp_folder(&side.home, engine);
+            BTreeMap::from([(computer.to_owned(), engine)])
+        }
+        // Not installed here: a target written so before goes; any other is
+        // left for the machines to write once signed in.
+        None if targets
+            .get(LAMP_TARGET)
+            .is_some_and(|target| this_computer(&target.machine_id)) =>
+        {
+            BTreeMap::new()
+        }
+        None => return Some(
+            "Harness signed out, and no engine of the lamp's installed here: the lamp is no target"
+                .into(),
+        ),
+    };
+    Some(
+        match write_targets_from_machines(&later.targets, &[lamp], wanted, &chosen) {
+            Ok(written) => {
+                if written.changed {
+                    *targets_due = Instant::now();
+                }
+                match chosen.values().next() {
+                    Some(engine) => format!(
+                        "Harness signed out: the lamp's own target, {}, under this computer's own id; {}",
+                        engine.argument(),
+                        written.said
+                    ),
+                    None => format!(
+                        "Harness signed out, and no engine of the lamp's installed here: {}",
+                        written.said
+                    ),
+                }
+            }
+            Err(error) => format!("the lamp's own target not written signed out: {error}"),
+        },
+    )
+}
+
 /// How soon after one early refusal another may make the part look at the
 /// machines again (`serve --engines-from-machines`, #5199).
 pub const RELOOK_AFTER: Duration = Duration::from_secs(30);
@@ -3587,7 +3737,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                                 let result = close_told(&adapter, &job);
                                 Outcome::Close(job, result)
                             }
-                            Job::SignIn => Outcome::SignIn(adapter.signed_in()),
+                            Job::SignIn => Outcome::SignIn(adapter.signed_in_here()),
                             Job::Machines => Outcome::Machines(adapter.machines()),
                             Job::StartDaemon => Outcome::StartDaemon(adapter.start_daemon()),
                             Job::RestartDaemon => Outcome::RestartDaemon(adapter.restart_daemon()),
@@ -3743,6 +3893,8 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                         None
                     } else if report.summary["targets"] == 0 {
                         Some(("no_computer", "No computer to hand tasks to yet: the task targets are missing or empty"))
+                    } else if found.sign_in == Some(SignIn::Out) && found.here {
+                        Some(("computers_need_sign_in", "Harness is not signed in: tasks go to the lamp's own agent; sign in to hand tasks to your computers"))
                     } else if found.sign_in == Some(SignIn::Out) {
                         Some(("not_signed_in", "Harness is not signed in to the person's account; hand-overs fail until it is"))
                     } else {

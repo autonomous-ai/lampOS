@@ -4163,7 +4163,10 @@ fn signed_out_the_computers_own_id_is_read_with_the_sign_in() {
     );
     assert_eq!(rig.calls().len(), 1);
     for (reply, read) in [
-        (json!({"loggedIn":false,"computerId":"c"}), (SignIn::Out, None)),
+        (
+            json!({"loggedIn":false,"computerId":"c"}),
+            (SignIn::Out, None),
+        ),
         (json!({"loggedIn":false}), (SignIn::Out, None)),
         (
             json!({"loggedIn":false,"computerId":COMPUTER.to_uppercase()}),
@@ -4213,7 +4216,11 @@ fn the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine
     assert!(cli.observe(COMPUTER, AGENT).is_ok());
     assert_eq!(cli.status(COMPUTER).map(|listed| listed.len()), Ok(1));
     assert_eq!(cli.close(COMPUTER, AGENT), Ok(Closed::Closed));
-    let calls: Vec<Value> = rig.calls().into_iter().map(|call| call["args"].clone()).collect();
+    let calls: Vec<Value> = rig
+        .calls()
+        .into_iter()
+        .map(|call| call["args"].clone())
+        .collect();
     assert_eq!(
         calls,
         [

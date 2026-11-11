@@ -175,7 +175,10 @@ cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng
   `more_computers`; `working`: số việc đang làm, không có lời của việc nào,
   và bỏ trống khi `tasks_now` bị từ chối; `next`: chỉ trả lời điều được hỏi,
   một hai câu. Khi chưa đăng nhập, chỉ mời đăng nhập bằng giọng nói khi có
-  `LAMP_TASKS_SIGN_IN`, không thì bảo đăng nhập trong app.
+  `LAMP_TASKS_SIGN_IN`, không thì bảo đăng nhập trong app. Chưa đăng nhập mà đèn có
+  target của chính nó (#6407), `next` nói trước là việc vẫn đi tới trợ lý của
+  chính đèn, và chỉ cần "sign in to hand tasks to your computers", không bao
+  giờ nói là chưa đăng nhập thì không làm được gì.
 - **Khi lỗi.** Không có phần tasks thì nói như mọi lệnh giao việc khác. `status`
   bị từ chối thì nói nhẹ nhàng là không làm được, journal chỉ ghi mã lỗi.
 - **Tắt** thì hàm không được khai báo, các hàm khác giữ nguyên từng chữ.
@@ -185,7 +188,8 @@ cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng
   (TWO READS).
 - **Test** (`agent_tasks`): `harness_status_is_declared_and_run_only_with_its_switch`,
   `harness_status_says_the_sign_in_the_computers_and_the_work_as_counts`,
-  `harness_status_refused_says_it_lightly`.
+  `harness_status_refused_says_it_lightly`,
+  `harness_status_signed_out_with_the_lamps_own_target_says_computers_need_the_sign_in`.
 
 ## Chính đèn, với OpenClaw (#6226)
 
@@ -239,3 +243,44 @@ là phần của một coder khác trong #6226; thiết kế:
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` trong
   home của `lampos`), nơi các khóa skill của đèn trỏ tới và hướng dẫn
   (`AGENTS.md`) được ghi, như với Hermes.
+
+## Đèn chưa đăng nhập vẫn giao việc cho engine của chính nó (#6407)
+
+Một đèn product chưa từng đăng nhập Harness, đã cài Hermes 0.22.2, trả lời
+"I can't reach Hermes": target `lamp` chỉ được ghi từ `harness machines`, mà
+lệnh đó chỉ chạy khi đã đăng nhập. Harness 0.6 khi chưa đăng nhập từ chối
+`machines` và mọi `--machine`, còn `start` và `new` không có `--machine` vẫn
+chạy trên chính máy này, dưới id riêng của nó (`computerId`, một UUID, mà
+`auth status --json` vẫn trả khi chưa đăng nhập; id máy của tài khoản là 32 chữ
+số hex). Vì vậy, khi bật `LAMP_OPENCLAW_ON_LAMP` hoặc `LAMP_HERMES_ON_LAMP`
+và có `--targets-from-machines`:
+
+- **Target lấy từ chính đèn.** Mỗi lần đọc sign-in thấy chưa đăng nhập và có id
+  của máy này, engine của đèn coi là đã cài khi chương trình của nó nằm ở chỗ
+  Harness tìm, `/usr/local/bin/<engine>` (`LAMP_ENGINES_BIN`; `hermes` và
+  `openclaw` là wrapper của lamp-update), chạy được. Khi đó file target được ghi như khi ghi
+  từ danh sách máy, không bao giờ đè file mà phần tasks không tự ghi, chỉ có
+  đèn: `lamp`, engine đó, `~/harnesses/lamp-tasks/lamp`, dưới id của máy này.
+  Target của các máy tính ghi trước đó bị bỏ, vì chưa đăng nhập thì không tới
+  được. Chưa cài thì target ghi kiểu này trước đó bị xoá; file khác giữ
+  nguyên. Engine là engine đầu tiên theo `lamp_order` (đang bật, theo
+  `LAMP_LAMP_ENGINE`: OpenClaw trước nếu không đặt; bỏ OpenClaw khi Harness
+  quá cũ) mà đã cài ở đây; không ghi cứng Hermes hay OpenClaw.
+- **Không xem danh sách máy, không `--machine`.** Target mang id của máy này
+  được giao không cần `machines --json` trước, và mọi lệnh cho việc của nó
+  (`new`, `show`, `ps`, `wait`, `watch`, `reply`, `resume`, `close`, `route`)
+  bỏ `--machine`; dòng journal vẫn ghi máy.
+- **Daemon lúc khởi động.** Lần đọc sign-in đầu tiên thấy chưa đăng nhập cũng
+  khởi động daemon của Harness, khi bật target của đèn.
+- **Đăng nhập lại** thì danh sách máy ghi target như trước, và target của đèn
+  mang id máy của tài khoản. Việc đã bắt đầu dưới id máy của tài khoản chỉ đọc
+  được khi đã đăng nhập; các máy tính vẫn cần đăng nhập.
+- **Lời nói.** Dòng health nói `computers_need_sign_in` ("Harness is not signed
+  in: tasks go to the lamp's own agent; sign in to hand tasks to your
+  computers") thay cho `not_signed_in`, và `harness_status` của giọng nói nói
+  như trên.
+- **Test:** `a_lamp_never_signed_in_hands_work_to_its_own_engine`,
+  `the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine`,
+  `signed_out_the_computers_own_id_is_read_with_the_sign_in`.
+- **Chưa thử trên đèn:** chưa đăng nhập, "ask Hermes …" được trả lời và câu hỏi
+  tiếp theo tới đúng session đó.
