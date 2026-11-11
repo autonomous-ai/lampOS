@@ -276,7 +276,11 @@ fn main() -> ExitCode {
         schedule: lamp_cloud::schedule::from_environment(),
         // The lamp's software update for the app (#2194): only with LAMP_APP_UPDATE=on.
         update_page: lamp_cloud::update::from_environment(),
-        update_checks: Default::default(),
+        // The lamp's agents, a missing one installed from the app (#6240): only with
+        // LAMP_APP_ENGINES=on as well.
+        update_checks: lamp_cloud::update::Checks::with_engines(
+            lamp_cloud::update::engines_from_environment(),
+        ),
         // A restart from the app, asked of setup's change helper (#2193): only with LAMP_APP_RESTART=on.
         restart: (std::env::var(lamp_cloud::lamp::RESTART_ENVIRONMENT)
             .ok()

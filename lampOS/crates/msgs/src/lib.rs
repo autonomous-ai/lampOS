@@ -1474,6 +1474,100 @@ pub struct UpdateStatus {
     /// over it, and a status without it reads as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub round: Option<UpdateRound>,
+    /// The agents (engines) the lamp's Harness has, by name (#6240): only
+    /// with lamp-update's `LAMP_APP_ENGINES=on`, else absent. `hermes` is
+    /// the only one said now. An older reader passes over it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engines: Option<BTreeMap<String, EngineInstall>>,
+}
+
+/// One agent (engine) of the lamp's Harness, for the app (#6240): `state`
+/// one of [`EngineInstall::STATES`], `version` with `installed` only,
+/// `reason` with `failed` only and always with it, one of
+/// [`EngineInstall::REASONS`], never free text. `at_unix_ms` is when the
+/// install's record last changed, absent when there is none.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EngineInstall {
+    pub state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_unix_ms: Option<u64>,
+}
+
+impl EngineInstall {
+    /// Turned off on this lamp; missing; missing, and the app's tap waits
+    /// for lamp-update's next round; being put there; being put there,
+    /// frozen while someone speaks; there; the last try failed.
+    pub const STATES: [&str; 7] = [
+        "off",
+        "not_installed",
+        "waiting",
+        "installing",
+        "frozen",
+        "installed",
+        "failed",
+    ];
+    /// Why the last try failed, for the app: too little memory or disk,
+    /// no user namespace for the agent, stopped as the voice was not quiet
+    /// too long, stopped as the voice's privacy reading was lost, or any
+    /// other failure.
+    pub const REASONS: [&str; 6] = [
+        "no_memory",
+        "no_space",
+        "no_userns",
+        "interrupted",
+        "privacy_lost",
+        "failed",
+    ];
+
+    /// Whether every field is one lamp-update could have said: a known
+    /// `state`, a `reason` only with `failed` (and always with it) and from
+    /// the list, a `version` only with `installed`, of letters, digits and
+    /// dots.
+    pub fn check(&self) -> bool {
+        Self::STATES.contains(&self.state.as_str())
+            && match &self.reason {
+                None => self.state != "failed",
+                Some(reason) => self.state == "failed" && Self::REASONS.contains(&reason.as_str()),
+            }
+            && self.version.as_ref().is_none_or(|version| {
+                self.state == "installed"
+                    && !version.is_empty()
+                    && version.len() <= 64
+                    && version
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'.')
+            })
+    }
+}
+
+/// The app's install of a missing agent (`update/engine_install`, #6240):
+/// lamp-cloud asks `lamp-update serve` to install `engine` at its next
+/// round, past the install's own quiet-stretch and clock windows; the
+/// round's other rules and the install's own floors, freeze and privacy
+/// stop stay. Said once for each ask lamp-cloud takes, at most one a
+/// minute. Only a `serve` with `LAMP_APP_ENGINES=on` subscribes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EngineInstallAsk {
+    pub engine: String,
+}
+
+impl EngineInstallAsk {
+    pub const TYPE: &str = "lamp_msgs/EngineInstallAsk";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "update/engine_install";
+    /// The least time between two asks taken, on either side: lamp-cloud
+    /// refuses an ask sooner, and `serve` drops one.
+    pub const AGAIN_AFTER: Duration = Duration::from_secs(60);
+
+    /// A stream with no period, as [`UpdateCheck`]: nothing is kept, so a
+    /// lamp-update that starts later never takes an old ask for a new one.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
 }
 
 /// A round under way (#5473): when it began (its `checking`), when the step
@@ -3617,6 +3711,7 @@ mod tests {
             last: None,
             harness: None,
             round: None,
+            engines: None,
         };
         round_trip(&idle, r#"{"running":null,"now":"idle","last":null}"#);
         let fetching = UpdateStatus {
@@ -3653,6 +3748,126 @@ mod tests {
         assert_eq!(serde_json::from_str::<Older>(text).unwrap().now, "fetching");
     }
 
+    /// #6240: `engines` is absent unless set, so a status without it reads
+    /// and writes as before; with it, each engine by name, its optional
+    /// fields left out when none, and only what lamp-update could say passes.
+    #[test]
+    fn an_update_status_carries_engines_only_when_set_and_checked() {
+        let without = UpdateStatus {
+            running: None,
+            now: "idle".into(),
+            last: None,
+            harness: None,
+            round: None,
+            engines: None,
+        };
+        round_trip(&without, r#"{"running":null,"now":"idle","last":null}"#);
+        let installed = EngineInstall {
+            state: "installed".into(),
+            version: Some("0.22.2".into()),
+            reason: None,
+            at_unix_ms: Some(7),
+        };
+        round_trip(
+            &UpdateStatus {
+                engines: Some(BTreeMap::from([("hermes".into(), installed.clone())])),
+                ..without.clone()
+            },
+            r#"{"running":null,"now":"idle","last":null,"engines":{"hermes":{"state":"installed","version":"0.22.2","at_unix_ms":7}}}"#,
+        );
+        round_trip(
+            &EngineInstall {
+                state: "off".into(),
+                version: None,
+                reason: None,
+                at_unix_ms: None,
+            },
+            r#"{"state":"off"}"#,
+        );
+        assert!(installed.check());
+        for state in EngineInstall::STATES {
+            let one = EngineInstall {
+                state: state.into(),
+                version: None,
+                reason: (state == "failed").then(|| "no_memory".into()),
+                at_unix_ms: None,
+            };
+            assert!(one.check(), "{state}");
+        }
+        let failed = EngineInstall {
+            state: "failed".into(),
+            version: None,
+            reason: Some("failed".into()),
+            at_unix_ms: Some(1),
+        };
+        for reason in EngineInstall::REASONS {
+            assert!(
+                EngineInstall {
+                    reason: Some(reason.into()),
+                    ..failed.clone()
+                }
+                .check(),
+                "{reason}"
+            );
+        }
+        for bad in [
+            EngineInstall {
+                state: "gone".into(),
+                ..installed.clone()
+            },
+            EngineInstall {
+                reason: None,
+                ..failed.clone()
+            },
+            EngineInstall {
+                reason: Some("/var/lib/x".into()),
+                ..failed.clone()
+            },
+            EngineInstall {
+                reason: Some("pin_mismatch".into()),
+                ..failed.clone()
+            },
+            EngineInstall {
+                reason: Some("failed".into()),
+                ..installed.clone()
+            },
+            EngineInstall {
+                version: Some("1.0".into()),
+                ..failed.clone()
+            },
+            EngineInstall {
+                version: Some("0.22.2 /x".into()),
+                ..installed.clone()
+            },
+            EngineInstall {
+                version: Some(String::new()),
+                ..installed.clone()
+            },
+        ] {
+            assert!(!bad.check(), "{bad:?}");
+        }
+    }
+
+    /// #6240: the app's install ask is an event on its own topic, kept by
+    /// nobody, at most one a minute.
+    #[test]
+    fn an_engine_install_ask_is_an_event_with_its_own_topic() {
+        round_trip(
+            &EngineInstallAsk {
+                engine: "hermes".into(),
+            },
+            r#"{"engine":"hermes"}"#,
+        );
+        let declared = EngineInstallAsk::declaration();
+        assert_eq!(
+            (declared.type_name.as_str(), declared.kind),
+            (EngineInstallAsk::TYPE, Kind::Event)
+        );
+        assert_eq!(declared.period(), None);
+        assert_ne!(EngineInstallAsk::TOPIC, UpdateCheck::TOPIC);
+        assert_eq!(EngineInstallAsk::AGAIN_AFTER, Duration::from_secs(60));
+    }
+
     /// #5197: `harness` is absent unless set, so a status without it reads
     /// and writes as before; with it, only what lamp-update could say passes.
     #[test]
@@ -3663,6 +3878,7 @@ mod tests {
             last: None,
             harness: None,
             round: None,
+            engines: None,
         };
         round_trip(&without, r#"{"running":null,"now":"idle","last":null}"#);
         let installed = HarnessInstall {

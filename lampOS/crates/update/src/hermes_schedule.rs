@@ -27,6 +27,10 @@ use crate::{
 };
 use std::{
     path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -65,12 +69,17 @@ pub struct Moment {
 pub enum Window {
     /// A round reached the channel, the setup walk not under way.
     Reached,
+    /// A round reached, and the person asked for the install from the app
+    /// (#6240): a recent failure does not hold it. Still never while the
+    /// setup walk is under way, and it still freezes while someone speaks.
+    Asked,
 }
 
 impl Window {
     pub fn name(self) -> &'static str {
         match self {
             Self::Reached => "a round reached, the setup walk not under way",
+            Self::Asked => "asked from the app",
         }
     }
 }
@@ -252,7 +261,9 @@ pub const LISTENER: &str = "update_hermes";
 /// watches each Hermes install while the record says one is under way,
 /// freezing, thawing or stopping Harness's one-shot as [`Watch::look`]
 /// says.
-pub struct Watcher;
+pub struct Watcher {
+    frozen: Arc<AtomicBool>,
+}
 
 impl Watcher {
     /// Started for a `serve` with Hermes on. First a one-shot left frozen
@@ -262,15 +273,24 @@ impl Watcher {
         let began = Instant::now();
         let _ = Systemctl::default().thaw_harness_unit();
         let (bus_root, records) = (bus_root.to_owned(), records.to_owned());
+        let frozen = Arc::new(AtomicBool::new(false));
+        let held = Arc::clone(&frozen);
         let started = thread::Builder::new()
             .name("hermes-watch".to_owned())
-            .spawn(move || watch_installs(&bus_root, &records, began));
+            .spawn(move || watch_installs(&bus_root, &records, &held, began));
         if let Err(error) = started {
             // Nothing watches the install: it runs with no freeze and no
             // privacy watch.
             eprintln!("lamp-update: the Hermes install's watch did not start: {error}");
         }
-        Self
+        Self { frozen }
+    }
+
+    /// Set while the watch holds the install's one-shot frozen, cleared
+    /// once it is thawed or stopped, or the install ended (#6240: the
+    /// app's `frozen`).
+    pub fn frozen(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.frozen)
     }
 }
 
@@ -278,7 +298,7 @@ impl Watcher {
 /// quiet, and, while [`hermes_install::installing`] (read once a second)
 /// says an install is under way, looks with a [`Watch`] of its own and
 /// carries out what it says ([`hermes_install::carry_out`]).
-fn watch_installs(bus_root: &Path, records: &Path, began: Instant) {
+fn watch_installs(bus_root: &Path, records: &Path, frozen: &AtomicBool, began: Instant) {
     let mut say = |line: &str| eprintln!("lamp-update: {line}");
     let mut ears = BusEars::named(bus_root, LISTENER, &mut say);
     let mut systemd = Systemctl::default();
@@ -302,6 +322,7 @@ fn watch_installs(bus_root: &Path, records: &Path, began: Instant) {
             }
         }
         let Some(current) = &mut watch else {
+            frozen.store(false, Ordering::Relaxed);
             continue;
         };
         let act = current.look(now, quiet, &ears.lease());
@@ -313,6 +334,7 @@ fn watch_installs(bus_root: &Path, records: &Path, began: Instant) {
             Carried::Done => {}
             Carried::NotRunning | Carried::Stopped => watch = None,
         }
+        frozen.store(watch.as_ref().is_some_and(Watch::frozen), Ordering::Relaxed);
     }
 }
 

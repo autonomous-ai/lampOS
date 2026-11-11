@@ -7,6 +7,11 @@
 //! check that came while a round ran is dropped, never queued for after it,
 //! and at most one a minute starts a round. Only a `serve` with `--apply on`
 //! subscribes; with nobody saying a check, it waits as before.
+//!
+//! With `LAMP_APP_ENGINES=on` (#6240, [`crate::engines`]) the same wait
+//! also hears the app's tap to install a missing agent: one taken ends the
+//! wait as a check does, and the next round's Hermes step takes it up.
+//! One said while a round ran is kept as asked, without ending a wait.
 use crate::world::Ears;
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::UpdateCheck;
@@ -27,6 +32,8 @@ pub struct AppCheck {
     /// [`LOOK_EVERY`] on a lamp; shorter only in tests, so none sleeps
     /// for whole seconds (#1806).
     look: Duration,
+    /// The app's taps to install an agent (#6240), with its switch on.
+    engines: Option<crate::engines::Asks>,
 }
 
 impl AppCheck {
@@ -51,7 +58,15 @@ impl AppCheck {
             checks,
             last: None,
             look: LOOK_EVERY,
+            engines: None,
         }
+    }
+
+    /// The same check, hearing the app's taps to install an agent too
+    /// (#6240, `LAMP_APP_ENGINES=on`).
+    pub fn with_engines(mut self, asks: crate::engines::Asks) -> Self {
+        self.engines = Some(asks);
+        self
     }
 
     /// The same check, looking every `look` instead of [`LOOK_EVERY`].
@@ -63,8 +78,13 @@ impl AppCheck {
 
     /// Drops every check that came while a round ran: a round never starts
     /// another, and the app reads the round it asked for on `update/status`.
-    pub fn forget(&mut self) {
+    /// A tap to install an agent said meanwhile is kept as asked (#6240):
+    /// the install waits for a round anyway.
+    pub fn forget(&mut self, say: &mut dyn FnMut(&str)) {
         self.waiting();
+        if let Some(engines) = &mut self.engines {
+            engines.take(Instant::now(), say);
+        }
     }
 
     /// Whether a check came since the last look and may start a round at
@@ -98,10 +118,19 @@ impl AppCheck {
     }
 
     /// The wait between rounds: `ears` listen for `every`, as before, and
-    /// a check taken ends it early, true. Without a subscription it is one
-    /// listen of `every`.
-    pub fn wait(&mut self, ears: &mut dyn Ears, every: Duration) -> bool {
-        if self.checks.is_none() {
+    /// a check or a tap to install an agent taken ends it early, true.
+    /// Without a subscription it is one listen of `every`.
+    pub fn wait(
+        &mut self,
+        ears: &mut dyn Ears,
+        every: Duration,
+        say: &mut dyn FnMut(&str),
+    ) -> bool {
+        let engines = self
+            .engines
+            .as_ref()
+            .is_some_and(crate::engines::Asks::listens);
+        if self.checks.is_none() && !engines {
             let _ = ears.listen(every);
             return false;
         }
@@ -112,7 +141,12 @@ impl AppCheck {
                 return false;
             }
             let _ = ears.listen(left.min(self.look));
-            if self.asked(Instant::now()) {
+            let now = Instant::now();
+            let installs = self
+                .engines
+                .as_mut()
+                .is_some_and(|engines| engines.take(now, say));
+            if self.asked(now) || installs {
                 return true;
             }
         }
@@ -166,7 +200,7 @@ mod tests {
 
         // Nothing asked: the whole wait, in looks of `LOOK`.
         let started = Instant::now();
-        assert!(!check.wait(&mut ears, Duration::from_millis(120)));
+        assert!(!check.wait(&mut ears, Duration::from_millis(120), &mut |_| {}));
         assert!(started.elapsed() >= Duration::from_millis(120));
         // How many looks depends on the runner's load (one late wake can
         // outlast the whole wait), so only their shape is asked: every look
@@ -182,14 +216,14 @@ mod tests {
             cloud
         });
         let started = Instant::now();
-        assert!(check.wait(&mut ears, Duration::from_secs(60)));
+        assert!(check.wait(&mut ears, Duration::from_secs(60), &mut |_| {}));
         let took = started.elapsed();
         assert!(took < Duration::from_secs(1), "{took:?}");
         let mut cloud = sender.join().unwrap();
 
         // Asked again within the minute: dropped, and the wait goes on.
         cloud.publish_json(0, &UpdateCheck {}).unwrap();
-        assert!(!check.wait(&mut ears, Duration::from_millis(120)));
+        assert!(!check.wait(&mut ears, Duration::from_millis(120), &mut |_| {}));
         // A minute after the last that started a round, it may again.
         cloud.publish_json(0, &UpdateCheck {}).unwrap();
         assert!(check.asked(Instant::now() + UpdateCheck::AGAIN_AFTER));
@@ -203,7 +237,7 @@ mod tests {
         // Two taps while the round ran.
         cloud.publish_json(0, &UpdateCheck {}).unwrap();
         cloud.publish_json(0, &UpdateCheck {}).unwrap();
-        check.forget();
+        check.forget(&mut |_| {});
         assert!(!check.asked(Instant::now()));
         // The next is taken.
         cloud.publish_json(0, &UpdateCheck {}).unwrap();
@@ -234,9 +268,65 @@ mod tests {
         let mut check = AppCheck::new(&file, &mut |line| said.push(line.to_owned()));
         assert_eq!(said.len(), 1, "{said:?}");
         let mut ears = Waits::default();
-        assert!(!check.wait(&mut ears, Duration::from_millis(30)));
+        assert!(!check.wait(&mut ears, Duration::from_millis(30), &mut |_| {}));
         assert_eq!(ears.0, [Duration::from_millis(30)]);
-        check.forget();
+        check.forget(&mut |_| {});
         assert!(!check.asked(Instant::now()));
+    }
+
+    /// #6240: a tap to install a missing Hermes ends the wait as a check
+    /// does and marks it asked; one said during a round is kept as asked.
+    #[test]
+    fn a_tap_to_install_an_agent_ends_the_wait_and_is_kept_from_a_round() {
+        use crate::engines::{Asks, Engines};
+        use lamp_msgs::EngineInstallAsk;
+        let tap = EngineInstallAsk {
+            engine: "hermes".into(),
+        };
+        let lamp = || {
+            let root = tempfile::tempdir().unwrap();
+            let records = tempfile::tempdir().unwrap();
+            let engines = Engines {
+                hermes_on: true,
+                ..Engines::default()
+            };
+            let asks = Asks::new(root.path(), records.path(), engines.clone(), &mut |_| {});
+            let check = AppCheck::new(root.path(), &mut |_| {})
+                .looking_every(LOOK)
+                .with_engines(asks);
+            let cloud = Bus::new(root.path())
+                .unwrap()
+                .publisher_declared(
+                    EngineInstallAsk::TOPIC,
+                    &EngineInstallAsk::declaration(),
+                    "cloud",
+                )
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(250));
+            (root, records, engines, check, cloud)
+        };
+        let mut ears = Waits::default();
+
+        // Said during the wait: ends it within about a look.
+        let (_root, _records, engines, mut check, mut cloud) = lamp();
+        let said = tap.clone();
+        let sender = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            cloud.publish_json(0, &said).unwrap();
+            cloud
+        });
+        let started = Instant::now();
+        assert!(check.wait(&mut ears, Duration::from_secs(60), &mut |_| {}));
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert!(engines.pending());
+        drop(sender.join().unwrap());
+
+        // Said during a round: kept as asked, and no wait ended by it.
+        let (_root, _records, engines, mut check, mut cloud) = lamp();
+        cloud.publish_json(0, &tap).unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        check.forget(&mut |_| {});
+        assert!(engines.pending());
+        assert!(!check.wait(&mut ears, Duration::from_millis(120), &mut |_| {}));
     }
 }

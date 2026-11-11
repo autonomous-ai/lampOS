@@ -94,7 +94,8 @@ pub struct Real {
     /// (#2194, `crate::update`).
     pub update_page: bool,
     /// The app's checks for an update asked of lamp-update, with the same
-    /// switch (#4153, `crate::update::Checks`).
+    /// switch (#4153, `crate::update::Checks`), and its installs of a
+    /// missing agent with `LAMP_APP_ENGINES=on` too (#6240).
     pub update_checks: crate::update::Checks,
     /// Setup's change helper's socket ([`crate::settings::SOCKET`]), asked
     /// to restart the lamp, with `LAMP_APP_RESTART=on` (#2193,
@@ -881,6 +882,15 @@ impl Lamp for Real {
 
     fn check_update(&mut self, now: Instant) -> Result<(), String> {
         self.update_checks.ask(self.bus.as_ref(), now)
+    }
+
+    fn engines_page(&self) -> bool {
+        self.update_page && self.update_checks.engines()
+    }
+
+    fn install_engine(&mut self, engine: &str, now: Instant) -> Result<(), String> {
+        self.update_checks
+            .ask_install(self.bus.as_ref(), engine, now)
     }
 
     fn restart(&mut self) -> Result<Value, String> {
