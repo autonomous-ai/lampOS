@@ -1292,7 +1292,8 @@ mood socket, and says it again at least once every 1.5 s
   and followed at `--speed` through the same window and rules as every pose.
   Held while `reading` with it is said; a `reading` without it, or the pose
   let go, takes it away at the same speed. Nothing without `--gaze`, which
-  alone says how far a place in the picture is, and nothing in any other
+  alone says how far a place in the picture is (so Skills refuses such a
+  call aloud when nothing listens on the gaze socket, skills.md), and nothing in any other
   mood or paused. A `toward` past -1 to 1 turns nothing. The place is the
   model's, from the voice's look at the desk (Point the light,
   `skills/point-light`): the eyes find faces only. A body before this
