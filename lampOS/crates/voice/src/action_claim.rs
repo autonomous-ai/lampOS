@@ -35,7 +35,9 @@
 //!   `calls=none`): "I'll", "I will" or "Let me" with the change, closing at
 //!   the sentence's end bare or after "now", "a touch", "a bit", "a little"
 //!   or "for you". An offer, a condition, a question, "I'll tell you when
-//!   …" and "I'll remember that." are none.
+//!   …" and "I'll remember that." are none. "It" or "that" turned off or
+//!   down may be an alarm, so a Schedule call or `cancel_reminder` backs it
+//!   too ([`Claim::OffOrDown`]).
 //!
 //! Such a claim stands when its turn made a call of its kind
 //! ([`Claim::made_by`]); otherwise it is held, the model is asked once more
@@ -233,6 +235,11 @@ pub enum Claim {
     /// made lamp test event: …", "I made x, and it's on."): only a
     /// `make_skill` makes it.
     Made,
+    /// "I'll turn it off." or "I'll switch that down." promised
+    /// ([`PROMISED`]): "it" may be the light, the volume, or an alarm or a
+    /// timer, so a light or volume call, a Schedule set or a
+    /// `cancel_reminder` makes it (the Reviewer-lead's P3 on #6467).
+    OffOrDown,
 }
 
 impl Claim {
@@ -256,6 +263,11 @@ impl Claim {
             Self::Forgot => false,
             Self::Snoozed => name == "snooze_reminder",
             Self::Made => name == crate::made_skill::MAKE,
+            Self::OffOrDown => {
+                Self::LightOrVolume.made_by(name)
+                    || Self::Schedule.made_by(name)
+                    || name == "cancel_reminder"
+            }
         }
     }
 
@@ -270,6 +282,7 @@ impl Claim {
             Self::Forgot => "a forget",
             Self::Snoozed => "a reminder snoozed",
             Self::Made => "a skill made",
+            Self::OffOrDown => "turning something off or down",
         }
     }
 
@@ -284,6 +297,7 @@ impl Claim {
             Self::Forgot => "forget",
             Self::Snoozed => "snooze",
             Self::Made => "made",
+            Self::OffOrDown => "off or down",
         }
     }
 }
@@ -1443,22 +1457,58 @@ const WORDED: [(&str, Claim); 74] = [
 /// "now", "a touch", "a bit", "a little" or "for you", so an offer or a
 /// condition ("I'll turn it off if it freezes.", "I'll dim the light when
 /// you go to bed.") and a question are none.
-const PROMISED: [(&str, Claim); 87] = [
+const PROMISED: [(&str, Claim); 123] = [
     (
-        "i'll warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off $",
+        "i'll warm|cool|dim|brighten it|that|things up|down|on|off $",
         Claim::LightOrVolume,
     ),
     (
-        "i'll warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off now $",
+        "i'll turn|switch things up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    ("i'll turn|switch it|that up|on $", Claim::LightOrVolume),
+    ("i'll turn|switch it|that off|down $", Claim::OffOrDown),
+    (
+        "i'll warm|cool|dim|brighten it|that|things up|down|on|off now $",
         Claim::LightOrVolume,
     ),
     (
-        "i'll warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off a touch|bit|little $",
+        "i'll turn|switch things up|down|on|off now $",
+        Claim::LightOrVolume,
+    ),
+    ("i'll turn|switch it|that up|on now $", Claim::LightOrVolume),
+    ("i'll turn|switch it|that off|down now $", Claim::OffOrDown),
+    (
+        "i'll warm|cool|dim|brighten it|that|things up|down|on|off a touch|bit|little $",
         Claim::LightOrVolume,
     ),
     (
-        "i'll warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off for you $",
+        "i'll turn|switch things up|down|on|off a touch|bit|little $",
         Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch it|that up|on a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch it|that off|down a touch|bit|little $",
+        Claim::OffOrDown,
+    ),
+    (
+        "i'll warm|cool|dim|brighten it|that|things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch it|that up|on for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch it|that off|down for you $",
+        Claim::OffOrDown,
     ),
     (
         "i'll warm|cool|dim|brighten it|that $",
@@ -1561,20 +1611,62 @@ const PROMISED: [(&str, Claim); 87] = [
         Claim::Schedule,
     ),
     (
-        "i will warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off $",
+        "i will warm|cool|dim|brighten it|that|things up|down|on|off $",
         Claim::LightOrVolume,
     ),
     (
-        "i will warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off now $",
+        "i will turn|switch things up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    ("i will turn|switch it|that up|on $", Claim::LightOrVolume),
+    ("i will turn|switch it|that off|down $", Claim::OffOrDown),
+    (
+        "i will warm|cool|dim|brighten it|that|things up|down|on|off now $",
         Claim::LightOrVolume,
     ),
     (
-        "i will warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off a touch|bit|little $",
+        "i will turn|switch things up|down|on|off now $",
         Claim::LightOrVolume,
     ),
     (
-        "i will warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off for you $",
+        "i will turn|switch it|that up|on now $",
         Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch it|that off|down now $",
+        Claim::OffOrDown,
+    ),
+    (
+        "i will warm|cool|dim|brighten it|that|things up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch things up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch it|that up|on a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch it|that off|down a touch|bit|little $",
+        Claim::OffOrDown,
+    ),
+    (
+        "i will warm|cool|dim|brighten it|that|things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch it|that up|on for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch it|that off|down for you $",
+        Claim::OffOrDown,
     ),
     (
         "i will warm|cool|dim|brighten it|that $",
@@ -1677,20 +1769,62 @@ const PROMISED: [(&str, Claim); 87] = [
         Claim::Schedule,
     ),
     (
-        "let me warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off $",
+        "let me warm|cool|dim|brighten it|that|things up|down|on|off $",
         Claim::LightOrVolume,
     ),
     (
-        "let me warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off now $",
+        "let me turn|switch things up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    ("let me turn|switch it|that up|on $", Claim::LightOrVolume),
+    ("let me turn|switch it|that off|down $", Claim::OffOrDown),
+    (
+        "let me warm|cool|dim|brighten it|that|things up|down|on|off now $",
         Claim::LightOrVolume,
     ),
     (
-        "let me warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off a touch|bit|little $",
+        "let me turn|switch things up|down|on|off now $",
         Claim::LightOrVolume,
     ),
     (
-        "let me warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off for you $",
+        "let me turn|switch it|that up|on now $",
         Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch it|that off|down now $",
+        Claim::OffOrDown,
+    ),
+    (
+        "let me warm|cool|dim|brighten it|that|things up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch things up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch it|that up|on a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch it|that off|down a touch|bit|little $",
+        Claim::OffOrDown,
+    ),
+    (
+        "let me warm|cool|dim|brighten it|that|things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch it|that up|on for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch it|that off|down for you $",
+        Claim::OffOrDown,
     ),
     (
         "let me warm|cool|dim|brighten it|that $",
@@ -2646,7 +2780,7 @@ pub(crate) mod tests {
             ("Let me dim the light a bit.", Claim::LightOrVolume),
             ("I will turn the volume down.", Claim::LightOrVolume),
             ("I'll make it a little warmer.", Claim::LightOrVolume),
-            ("I'll turn it off now.", Claim::LightOrVolume),
+            ("I'll turn it off now.", Claim::OffOrDown),
             ("I'll set a timer for ten minutes.", Claim::Schedule),
             ("Sure, I'll start a timer.", Claim::Schedule),
         ] {
@@ -2685,6 +2819,56 @@ pub(crate) mod tests {
         }
         // Undecided while it streams, until the sentence ends.
         assert_eq!(claim("I'll warm it up", false), None);
+    }
+
+    /// The Reviewer-lead's P3 on #6467: "it" or "that" turned off or down
+    /// may be an alarm or a timer, so a Schedule call or a
+    /// `cancel_reminder` backs it as well as a light or volume call; the
+    /// light or the volume named, or turned on or up, still needs its own.
+    #[test]
+    fn it_turned_off_or_down_stands_beside_a_schedule_call_too() {
+        let none = serde_json::json!({});
+        for reply in [
+            "I'll turn it off.",
+            "Okay, I'll switch that off now.",
+            "I'll turn it down a bit.",
+            "Let me turn that off for you.",
+        ] {
+            assert_eq!(
+                claim(reply, true),
+                Some(Some(Claim::OffOrDown)),
+                "{reply:?}"
+            );
+            for name in [
+                "light_off",
+                "volume_down",
+                "cancel_reminder",
+                "snooze_reminder",
+            ] {
+                assert!(
+                    stands(Claim::OffOrDown, reply, false, [(name, &none)]),
+                    "{reply:?} beside {name}"
+                );
+            }
+            assert!(!stands(Claim::OffOrDown, reply, false, []), "{reply:?}");
+            assert!(
+                !stands(Claim::OffOrDown, reply, false, [("list_reminders", &none)]),
+                "{reply:?}"
+            );
+        }
+        for (reply, kind) in [
+            ("I'll turn the light off.", Claim::LightOrVolume),
+            ("I'll turn the volume down.", Claim::LightOrVolume),
+            ("I'll turn it on.", Claim::LightOrVolume),
+            ("I'll turn it up a touch.", Claim::LightOrVolume),
+            ("I'll dim it.", Claim::LightOrVolume),
+        ] {
+            assert_eq!(claim(reply, true), Some(Some(kind)), "{reply:?}");
+            assert!(
+                !stands(kind, reply, false, [("cancel_reminder", &none)]),
+                "{reply:?}"
+            );
+        }
     }
 
     /// Ordinary talk with the same words, questions and status answers are

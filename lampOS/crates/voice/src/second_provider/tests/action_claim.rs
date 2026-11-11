@@ -372,6 +372,38 @@ fn a_change_promised_with_no_call_is_held_and_asked_again() {
     assert!(!told_claim(&went), "{went:?}");
 }
 
+/// The Reviewer-lead's P3 on #6467: "I'll turn it off." about an alarm,
+/// beside the `cancel_reminder` that stopped it, is said as it came; with
+/// no call it is asked again.
+#[test]
+fn it_turned_off_beside_a_cancel_is_said_as_it_came() {
+    let heard = "Lamp, turn the alarm off.";
+    let went = claimed(
+        true,
+        heard,
+        vec![
+            text("I'll turn it off."),
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                "cancel_reminder",
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![saying("It's off.")],
+    );
+    assert!(!told_claim(&went), "{went:?}");
+    assert_eq!(went.ran, ["cancel_reminder"], "{went:?}");
+    let went = claimed(
+        true,
+        heard,
+        saying("I'll turn it off."),
+        vec![calling("cancel_reminder"), saying("It's off.")],
+    );
+    assert!(told_claim(&went), "{went:?}");
+    assert_eq!(went.ran, ["cancel_reminder"], "{went:?}");
+}
+
 /// A turn that made the call is untouched, byte for byte: the claim beside
 /// its call, and the claim after it.
 #[test]
