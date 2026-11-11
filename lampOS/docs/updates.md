@@ -3296,7 +3296,10 @@ as "the updater's", and a round never takes it for a part's unit. Its
 record, `harness-install.json`, is said on `update/status` as `harness`.
 The same unit moves a Harness older than the build's pin to it, when
 Harness is not in use, and puts the older one back if the move fails
-(#5957; `docs/install.md`, "A newer pin moves an older Harness").
+(#5957; `docs/install.md`, "A newer pin moves an older Harness"); the unit
+runs Harness's part whenever a round's ask is there, also when started for
+Hermes, so a move's record never stays `installing`, and a move answered
+spends its ask (#6275).
 
 ### A fixed copy, checked (#3689)
 
