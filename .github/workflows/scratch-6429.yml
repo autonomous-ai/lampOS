@@ -1,0 +1,24 @@
+name: scratch 6429 ARM64 apt probe
+on:
+  push:
+    branches: [seventh/scratch-6429]
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04-arm, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: probe
+        run: |
+          echo "== packages already present"
+          for p in ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file; do
+            if dpkg -s "$p" >/dev/null 2>&1; then echo "HAVE $p"; else echo "MISS $p"; fi
+          done
+          echo "== sources"; cat /etc/apt/apt-mirrors.txt 2>/dev/null; grep -rh "^deb \|^URIs" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+          echo "== resolve"
+          for h in ports.ubuntu.com azure.ports.ubuntu.com archive.ubuntu.com azure.archive.ubuntu.com mirrors.edge.kernel.org mirror.us.leaseweb.net ftp.tu-chemnitz.de mirrors.ocf.berkeley.edu mirror.kumi.systems ftp.jaist.ac.jp ubuntu.mirror.garr.it; do
+            if getent hosts "$h" >/dev/null; then echo "RESOLVES $h"; else echo "NORESOLVE $h"; fi
+          done
+          cat /etc/resolv.conf
