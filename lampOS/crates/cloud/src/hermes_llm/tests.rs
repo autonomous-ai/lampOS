@@ -252,6 +252,62 @@ fn either_engines_switch_serves_the_forwarder() {
     assert_eq!(OPENCLAW_SWITCH, "LAMP_OPENCLAW_ON_LAMP");
 }
 
+/// #6226: either switch alone starts the listener, which then answers
+/// (401 without the token); neither on, nothing is listened on.
+#[tokio::test]
+async fn either_switch_alone_starts_the_listener() {
+    for (hermes, openclaw, listens) in [
+        (Some("on"), None, true),
+        (None, Some("on"), true),
+        (None, None, false),
+        (Some("off"), Some("off"), false),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let (said, mut lines) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let mut say = |line: &str| {
+            let _ = said.send(line.to_owned());
+        };
+        // The forwarder never returns: it is driven beside the look, on
+        // this task, and dropped with it.
+        let serving = serve_when(
+            on_from(hermes, openclaw),
+            0,
+            Some(dir.path()),
+            None,
+            KEY,
+            &mut say,
+        );
+        let look = async {
+            let line = tokio::time::timeout(Duration::from_secs(2), lines.recv())
+                .await
+                .ok()
+                .flatten()?;
+            let at: SocketAddr = line
+                .strip_prefix("the Hermes forwarder listens on ")
+                .unwrap_or_else(|| panic!("{line}"))
+                .parse()
+                .unwrap();
+            assert!(at.ip().is_loopback());
+            let (status, _, _) = ask(
+                at,
+                b"GET /v1/deepseek/models HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n",
+            )
+            .await;
+            Some(status)
+        };
+        let status = tokio::select! {
+            () = serving => unreachable!("the forwarder never returns"),
+            status = look => status,
+        };
+        if listens {
+            assert_eq!(status, Some(401), "{hermes:?} {openclaw:?}");
+        } else {
+            assert_eq!(status, None, "{hermes:?} {openclaw:?}");
+            assert!(!dir.path().join(TOKEN_FILE).exists());
+        }
+    }
+}
+
 /// #6226: the product's lamp-cloud unit turns on both engines' switch.
 #[test]
 fn the_product_unit_turns_on_both_switches() {
