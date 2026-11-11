@@ -767,11 +767,12 @@ pub const CLOSE_INSTALLING: &str = "an update is installing: try again in a few 
 pub const CLOSE_MAY_STAY_OPEN: &str = "the door may stay open until the lamp next restarts";
 
 /// What the local agent's switch is refused with while the lamp lacks the
-/// agent's group or its socket folder: a unit that names either does not
-/// start, and lamp-control (the developer door too) would be down. The
-/// installer makes both (`lamp-update install`); a lamp that has not had that
-/// step has to have it first.
-pub const AGENT_NOT_READY: &str = "this lamp needs one more step before the local agent can be turned on: its user and group are made by a reinstall step (lamp-update install), which this lamp has not had";
+/// agent's group, user or socket folder and they were not made: a unit that
+/// names the group or the folder does not start, and lamp-control (the
+/// developer door too) would be down. The owner's tap makes all three first
+/// ([`make_agent_account`]), so this is only said where that was not run.
+pub const AGENT_NOT_READY: &str =
+    "the local agent's user, group or socket folder is not on this lamp yet";
 
 /// Whether the agent's group is in the group file and its socket folder is
 /// there.
@@ -781,6 +782,142 @@ fn agent_ready(config: &Config) -> bool {
         text.lines()
             .any(|line| line.split(':').next() == Some(group))
     }) && config.agent_folder.is_dir()
+}
+
+/// The lamp's accounts, as the change helper makes the local agent's: the
+/// fixed group, the fixed user and the socket's folder, never anything a
+/// request names. Injected for tests.
+pub trait Accounts {
+    fn has_group(&self, group: &str) -> bool;
+    fn has_user(&self, user: &str) -> bool;
+    /// A system group `group`; why not.
+    fn make_group(&mut self, group: &str) -> Result<(), String>;
+    /// The unprivileged user `user` with a home and a shell, in `group` and no
+    /// other, no password, no sudo; why not.
+    fn make_user(&mut self, user: &str, group: &str) -> Result<(), String>;
+    /// The folder `path`, 0755 and `lampos`'s; why not.
+    fn make_folder(&mut self, path: &std::path::Path) -> Result<(), String>;
+}
+
+/// The real accounts: `/etc/group` and `/etc/passwd` read here, and each step
+/// run by systemd itself as a **transient unit** (`systemd-run --wait`), not by
+/// this helper: the helper's own unit is sandboxed (`ProtectSystem=strict`,
+/// `ProtectHome=yes`) and rightly so, and the steps need `/home` and `/run`,
+/// which a wider unit would give the helper for every change. Each unit runs
+/// one fixed program with the constants' arguments and nothing else, and ends.
+pub struct System;
+
+impl System {
+    fn run(program: &str, args: &[&str]) -> Result<(), String> {
+        match std::process::Command::new("/usr/bin/systemd-run")
+            .args(["--wait", "--collect", "--quiet", "--"])
+            .arg(program)
+            .args(args)
+            .status()
+        {
+            Ok(status) if status.success() => Ok(()),
+            Ok(status) => Err(format!("{program}: {status}")),
+            Err(error) => Err(format!("systemd-run: {error}")),
+        }
+    }
+    fn listed(file: &str, name: &str) -> bool {
+        fs::read_to_string(file).is_ok_and(|text| {
+            text.lines()
+                .any(|line| line.split(':').next() == Some(name))
+        })
+    }
+}
+
+impl Accounts for System {
+    fn has_group(&self, group: &str) -> bool {
+        Self::listed("/etc/group", group)
+    }
+    fn has_user(&self, user: &str) -> bool {
+        Self::listed("/etc/passwd", user)
+    }
+    fn make_group(&mut self, group: &str) -> Result<(), String> {
+        Self::run("/usr/sbin/groupadd", &["--system", group])
+    }
+    fn make_user(&mut self, user: &str, group: &str) -> Result<(), String> {
+        // Its primary group is the agents' group, so no group of its own can
+        // clash with one the lamp already has by the user's name.
+        Self::run(
+            "/usr/sbin/useradd",
+            &[
+                "--create-home",
+                "--shell",
+                "/bin/bash",
+                "--no-user-group",
+                "--gid",
+                group,
+                user,
+            ],
+        )
+    }
+    fn make_folder(&mut self, path: &std::path::Path) -> Result<(), String> {
+        let path = path.to_string_lossy();
+        Self::run(
+            "/usr/bin/install",
+            &["-d", "-m", "0755", "-o", "lampos", "-g", "lampos", &path],
+        )
+    }
+}
+
+/// The local agent turned on (`{"local_agent": true}`) with developer access
+/// on, on a lamp that has not had the installer's step (the group, the user
+/// or the socket's folder missing): the owner's tap makes them first, from the
+/// fixed names of `lamp_msgs::local_agent` and nothing from the request, under
+/// lamp-update's lock (at most [`CLOSE_LOCK_MOST`]); then [`answer`] writes the
+/// drop-in as for any lamp. `None`: nothing to make (the request is another, or
+/// all is there already, or developer access is off, which [`parse`] refuses in
+/// words). `Some(reply)`: refused, with nothing changed beyond what was made.
+pub fn make_agent_account(
+    line: &str,
+    config: &Config,
+    enabled: bool,
+    records: &lamp_update::records::Records,
+    ears: &mut impl Ears,
+    accounts: &mut impl Accounts,
+) -> Option<Value> {
+    if !enabled {
+        return None;
+    }
+    let asked: Value = serde_json::from_str(line.trim_end_matches(['\n', '\r'])).ok()?;
+    let object = asked.as_object()?;
+    if object.len() != 1 || object.get("local_agent") != Some(&Value::Bool(true)) {
+        return None;
+    }
+    if fs::symlink_metadata(&config.control_dropin).is_err() {
+        return None;
+    }
+    let (group, user) = (lamp_msgs::local_agent::GROUP, lamp_msgs::local_agent::USER);
+    let missing =
+        !accounts.has_group(group) || !accounts.has_user(user) || !config.agent_folder.is_dir();
+    if !missing {
+        return None;
+    }
+    let _held = match unlocked(ears, records, CLOSE_LOCK_EVERY, CLOSE_LOCK_MOST) {
+        Ok(lock) => lock,
+        Err(_) => return Some(json!({ "refused": CLOSE_INSTALLING })),
+    };
+    let made = (|| {
+        if !accounts.has_group(group) {
+            accounts.make_group(group)?;
+        }
+        if !accounts.has_user(user) {
+            accounts.make_user(user, group)?;
+        }
+        if !config.agent_folder.is_dir() {
+            accounts.make_folder(&config.agent_folder)?;
+        }
+        Ok::<(), String>(())
+    })();
+    match made {
+        Ok(()) => None,
+        Err(why) => Some(json!({
+            "refused": format!("the agent's user could not be set up: {why}")
+        })),
+    }
 }
 
 /// systemd, as the change helper drives it for lamp-control. Injected for tests.

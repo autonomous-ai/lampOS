@@ -693,6 +693,27 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
             }
         };
     }
+    // The local agent turned on where the installer's step was never made
+    // (a lamp updated by the channel): the owner's tap makes its group, user
+    // and folder first, from the fixed names, under lamp-update's lock.
+    if let Some(refused) = change::make_agent_account(
+        &line,
+        &config,
+        enabled,
+        &records,
+        &mut change::Clock::default(),
+        &mut change::System,
+    ) {
+        {
+            let mut out = io::stdout().lock();
+            writeln!(out, "{refused}")?;
+            out.flush()?;
+        }
+        if let Some(why) = refused.get("refused") {
+            eprintln!("lamp-setup: change refused: {}", why.as_str().unwrap_or(""));
+        }
+        return Ok(true);
+    }
     // Developer access turned off with its drop-in there: the door is closed
     // (lamp-update's lock, the drop-in removed, reload, stop) before the
     // reply is written. Every other change is answered first, and a new
