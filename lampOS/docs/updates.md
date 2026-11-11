@@ -288,8 +288,11 @@ until repository variable `LAMPOS_CDN_MIRROR` is exactly `on`, and a failure
 in it never fails the promotion: the GitHub stable feed above stays the one
 lamps read until a lamp is pointed at the CDN one.
 
-The job reads the stable envelope, checks it with the trusted public key
-(`lamp-update check`, as `publish` does), then downloads every file, unit
+The job builds `lamp-update` from its own commit and never runs an updater
+it downloads. It reads the stable envelope, refuses it unless its files
+folder is the build's own release (`lampos-lamp-voice-<sequence>`), and
+verifies its signature with the trusted public key using that locally built
+`lamp-update check` before anything else is fetched. It then downloads every file, unit
 and model the signed manifest names from the build's own releases and checks
 each size and SHA-256. It copies them to `lampos/stable/<sequence>/files/`
 and `lampos/stable/<sequence>/models/<release>/<name>`. A folder of one

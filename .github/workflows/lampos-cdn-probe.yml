@@ -28,7 +28,7 @@ jobs:
       - name: only lamp-voice
         run: |
           test "$GITHUB_REF" = refs/heads/lamp-voice || { echo "::error::the probe runs from lamp-voice only"; exit 1; }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/scripts

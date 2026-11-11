@@ -917,10 +917,19 @@ jobs:
       group: lampos-cdn-mirror
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      # The updater that verifies the envelope and signs is built here, from
+      # this run's own commit; the mirror never runs a downloaded one.
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: build lamp-update from this commit
+        working-directory: lampOS
+        run: cargo build --locked --release -p lamp-update --bin lamp-update
       # Logs of this repository are public: the three values stay out of them.
       - name: keep the mirror's values out of the logs
         env:
@@ -943,6 +952,7 @@ jobs:
           LAMPOS_MIRROR_BUCKET: ${{ vars.LAMPOS_MIRROR_BUCKET }}
           PROMOTE_SEQUENCE: ${{ inputs.promote_sequence }}
           LAMPOS_UPDATE_PUBLIC_KEY: ${{ vars.LAMPOS_UPDATE_PUBLIC_KEY }}
+          LAMPOS_MIRROR_UPDATER: ${{ github.workspace }}/lampOS/target/release/lamp-update
           # The same branch-restricted environment secret `publish` signs with.
           LAMPOS_UPDATE_KEY: ${{ secrets.LAMPOS_UPDATE_KEY }}
         run: python3 -I .github/scripts/lampos-mirror.py mirror
