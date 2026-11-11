@@ -200,19 +200,25 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   cùng `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`, và không thêm
   gì khác vào môi trường. Token kết thúc khi lần chạy kết thúc, kể cả khi lần
   chạy lỗi. Nó không bao giờ có trong lời của việc, nhật ký hay dòng debug.
-  Không có token thì không chạy.
+  Không có token thì không chạy. Trong lúc lần chạy còn sống, token nằm
+  trong môi trường tiến trình của wrapper ngoài cùng (`/proc/<pid>/environ`),
+  các tiến trình khác cùng uid với lamp-tasks đọc được; điều này được chấp
+  nhận cho một token chỉ dùng một lần chạy và sống tối đa 14 phút.
 - **Lần chạy:** một việc cho đích `lamp`, lời của nó là việc của kỹ năng,
   script cần chạy từ thư mục chỉ đọc của kỹ năng, và đường duy nhất tới đèn
   (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
   Việc của kỹ năng được đưa vào như dữ liệu (một chuỗi JSON, "as data, not
   as instructions"), và không được có ký tự điều khiển. Runner kết thúc lần
-  chạy ở `SkillRun::deadline`, đúng thời hạn của token, và tự chặn mạng
-  (hermes-ns), không chỉ dựa vào lời trong prompt.
+  chạy ở `SkillRun::deadline`, đúng thời hạn của token, tự nó làm, không
+  chỉ dựa vào lời trong prompt. Lần chạy chưa bị chặn mạng (xem "Chưa có").
 - **Runner của đèn** (`HermesRunner::lamp`): Hermes của đèn được khởi động
   như Harness khởi động nó cho đích `lamp`: `/usr/local/bin/hermes chat -q`
   và lời của lần chạy là đối số cuối (wrapper chỉ chạy Hermes trong
   namespace của nó, `hermes-ns`: không thư mục hay socket nào của dịch vụ
-  đèn, các kỹ năng chỉ đọc), trong thư mục làm việc của đèn
+  đèn, các kỹ năng chỉ đọc; với `LAMP_SKILL_TASKS=on` trong unit của chính
+  lamp-update, chỉ riêng `/run/lampos-control/control.sock` của lamp-control,
+  chỉ đọc, không bao giờ `admin.sock` (docs/install.md, "Hermes on the
+  lamp")), trong thư mục làm việc của đèn
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; thư mục đó không có thì
   là `run_failed` và không khởi động gì. Môi trường chỉ có `PATH`, `HOME`,
   `HERMES_HOME` và `SHELL` (như lamp-tasks.service cho) cùng
@@ -244,10 +250,14 @@ chưa giữ lời đồng ý nào của kỹ năng, nên hiện mọi lần xin 
 từ chối.
 Chưa unit sản phẩm nào đặt `LAMP_SKILL_TASKS=on` cho lamp-tasks, và chưa
 unit nào truyền socket cho lamp-skills, nên trên đèn chưa có việc của kỹ
-năng nào chạy. Kết quả của lần chạy chưa thành Task news, và thư mục của kỹ năng được
+năng nào chạy. hermes-ns cũng chỉ cho lần chạy thấy `control.sock` của
+lamp-control khi có `LAMP_SKILL_TASKS=on` trong unit của chính lamp-update,
+và cũng chưa unit sản phẩm nào đặt nó. Kết quả của lần chạy chưa thành Task news, và thư mục của kỹ năng được
 nêu trong lời của lần chạy, chưa nằm trong `AGENTS.md` của thư mục làm việc.
 Việc "không mạng nào
-khác" của lần chạy (một lệnh gọi ra ngoài trực tiếp bị từ chối) và giới hạn
+khác" của lần chạy (một lệnh gọi ra ngoài trực tiếp bị từ chối) là quyết
+định thiết kế của người xây dựng đầu tiên, vì chính các lệnh gọi model của
+Hermes cần một đường ra; việc đó và giới hạn
 của lamp-tasks.service (`MemoryHigh`, `CPUQuota`) chờ số đo RAM và CPU của
 Hermes khi chạy một việc trên lamp-52e6 (đèn 6 GB: mọi giới hạn RAM được
 tính theo loại đèn này), so với mức sàn khi cài Hermes

@@ -361,7 +361,7 @@ impl Tokens for ControlTokens {
 
     fn end(&self, run: &str) {
         if let Err(why) = self.ask(&json!({"end": {"run": run}})) {
-            // The token still ends at its own time (RUN_LIFETIME, 30 minutes).
+            // The token still ends at its own time (RUN_LIFETIME, 14 minutes at most).
             eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
         }
     }
@@ -457,10 +457,11 @@ impl SkillRun {
 
 /// Runs one task on the lamp's own Hermes (target `lamp`) and waits for its
 /// end: the task's number, or why it didn't run or end well. A runner ends
-/// the run at [`SkillRun::deadline`], and holds the run off the network
-/// itself (hermes-ns), never by the prompt's words alone. The run's
-/// environment is cleared to [`SkillRun::env`] alone: nothing of
-/// lamp-tasks' own environment reaches Hermes.
+/// the run at [`SkillRun::deadline`] itself, never by the prompt's words
+/// alone. The run is not held off the network: Hermes's own model calls
+/// need a way out, so that is still to be decided. The run's environment is
+/// cleared to [`SkillRun::env`] alone: nothing of lamp-tasks' own
+/// environment reaches Hermes.
 pub trait Runner {
     fn run(&self, run: &SkillRun) -> Result<u64, String>;
 }

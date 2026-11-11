@@ -2,6 +2,22 @@ use super::*;
 use crate::judge::UnitState;
 use std::{cell::RefCell, os::unix::fs::symlink, rc::Rc};
 
+/// Nothing shown past [`ALLOWED`]: both switches off.
+const OFF: Shown = Shown {
+    skills: false,
+    tasks: false,
+};
+/// [`SKILLS_SWITCH`] on alone.
+const SKILLS_ON: Shown = Shown {
+    skills: true,
+    tasks: false,
+};
+/// [`TASKS_SWITCH`] on alone.
+const TASKS_ON: Shown = Shown {
+    skills: false,
+    tasks: true,
+};
+
 /// What a round asked systemd, in order.
 #[derive(Default)]
 struct Fake {
@@ -284,7 +300,7 @@ fn round(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesInstall> {
     after_round(
         lamp.root(),
         &lamp.records(),
-        false,
+        OFF,
         systemd,
         at,
         Ok(crate::hermes_schedule::Window::Reached),
@@ -297,7 +313,7 @@ fn closed_round(lamp: &Lamp, systemd: &mut Fake, at: u64, why: &str) -> Option<H
     after_round(
         lamp.root(),
         &lamp.records(),
-        false,
+        OFF,
         systemd,
         at,
         Err(why.to_owned()),
@@ -310,7 +326,7 @@ fn round_with_skills(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesI
     after_round(
         lamp.root(),
         &lamp.records(),
-        true,
+        SKILLS_ON,
         systemd,
         at,
         Ok(crate::hermes_schedule::Window::Reached),
@@ -348,12 +364,12 @@ fn the_switch_is_on_by_default_on_a_product_lamp_only() {
     assert!(wanted(Some("on"), false, PRODUCT_DEFAULT));
     assert!(wanted(Some("on"), true, PRODUCT_DEFAULT));
     let lamp = Lamp::new();
-    at_start(lamp.root(), &lamp.records(), false, false, 1);
+    at_start(lamp.root(), &lamp.records(), false, OFF, 1);
     assert_eq!(fs::read_dir(lamp.records()).unwrap().count(), 0);
-    at_start(lamp.root(), &lamp.records(), true, false, 1);
+    at_start(lamp.root(), &lamp.records(), true, OFF, 1);
     assert_eq!(lamp.said().unwrap().install, "absent");
     lamp.ask();
-    at_start(lamp.root(), &lamp.records(), false, false, 2);
+    at_start(lamp.root(), &lamp.records(), false, OFF, 2);
     assert_eq!(lamp.said(), None);
     assert_eq!(lamp.asked(), None);
     // No ask, no Hermes: a one-shot run for Harness alone runs nothing of it.
@@ -398,7 +414,7 @@ fn on_with_harness_there_installs_the_pinned_hermes_as_lampos() {
     assert_eq!(said.commit.as_deref(), Some(COMMIT));
     assert_eq!(lamp.said(), Some(said));
     assert_eq!(lamp.asked(), None, "answered");
-    assert!(present(lamp.root(), false));
+    assert!(present(lamp.root(), OFF));
 
     let lines = runs.lines();
     let at = |wanted: &str| {
@@ -478,6 +494,7 @@ impl Ask {
             version,
             remove: false,
             skills: false,
+            tasks: false,
         }
     }
 }
@@ -765,7 +782,7 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
     assert!(!NS_TEXT.contains(SKILLS_SOCKET));
     // On (#6128): exactly one lamp service folder is shown, lamp-skills'
     // tools folder, and nothing beside or above it under /run.
-    let on = ns_text(true);
+    let on = ns_text(true, false);
     let mut named: Vec<&String> = folders
         .iter()
         .filter(|folder| on.contains(&format!("={folder} ")))
@@ -784,6 +801,16 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
         );
     }
     assert!(under(SKILLS_SOCKET, "/run"));
+    // The tasks switch on (#6306): no lamp service folder is shown whole,
+    // only lamp-control's one socket file.
+    let tasks = ns_text(false, true);
+    assert!(
+        !folders
+            .iter()
+            .any(|folder| tasks.contains(&format!("={folder} "))),
+        "{folders:?}"
+    );
+    assert!(under(CONTROL_SOCKET, "/run"));
 }
 
 /// The namespace script run under `sh` with every mount stubbed, on a
@@ -795,7 +822,7 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
 /// step failing ends it with Hermes not run.
 #[test]
 fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
-    stages_the_allowed_and_stops_at_any_failing_step(false);
+    stages_the_allowed_and_stops_at_any_failing_step(OFF);
 }
 
 /// [`SKILLS_SWITCH`] on (#6128): the same script, run the same way, also
@@ -806,13 +833,35 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
 /// folder (no lamp-skills), it is skipped and Hermes still runs.
 #[test]
 fn with_the_skills_switch_on_the_namespace_script_shows_the_skills_socket_read_only() {
-    stages_the_allowed_and_stops_at_any_failing_step(true);
+    stages_the_allowed_and_stops_at_any_failing_step(SKILLS_ON);
 }
 
-/// [`ns_text`]`(skills)` run under `sh`, every mount stubbed, on a
-/// stand-in root that has [`SKILLS_SOCKET`] either way: off, nothing of
-/// it is touched.
-fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
+/// [`TASKS_SWITCH`] on (#6306): the same script, run the same way, also
+/// stages [`CONTROL_SOCKET`], the file alone, before `/run` is hidden,
+/// moves it back and remounts it read-only, and removes its staging file;
+/// each of those steps failing ends it before Hermes runs. `admin.sock`
+/// beside it is never named. With no control socket, it is skipped and
+/// Hermes still runs.
+#[test]
+fn with_the_tasks_switch_on_the_namespace_script_shows_the_control_socket_alone_read_only() {
+    stages_the_allowed_and_stops_at_any_failing_step(TASKS_ON);
+}
+
+/// Both switches on: both sockets shown, each in its place.
+#[test]
+fn with_both_switches_on_the_namespace_script_shows_both_sockets_read_only() {
+    stages_the_allowed_and_stops_at_any_failing_step(Shown {
+        skills: true,
+        tasks: true,
+    });
+}
+
+/// [`ns_text`] for `shown` run under `sh`, every mount stubbed, on a
+/// stand-in root that has [`SKILLS_SOCKET`] and [`CONTROL_SOCKET`] (a
+/// real unix socket, with `admin.sock` beside it) either way: a switch
+/// off, nothing of its socket is touched.
+fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
+    let Shown { skills, tasks } = shown;
     let folder = tempfile::tempdir().unwrap();
     let base = folder.path().to_string_lossy().into_owned();
     let at = |path: &str| format!("{base}/root{path}");
@@ -831,6 +880,12 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
         fs::create_dir_all(at(made)).unwrap();
     }
     fs::write(&resolv, "nameserver 127.0.0.53\n").unwrap();
+    let control = at(CONTROL_SOCKET);
+    let control_folder = at("/run/lampos-control");
+    fs::create_dir_all(&control_folder).unwrap();
+    let _control = std::os::unix::net::UnixListener::bind(&control).unwrap();
+    let _admin =
+        std::os::unix::net::UnixListener::bind(format!("{control_folder}/admin.sock")).unwrap();
     let uid_map = folder.path().join("uid_map");
     fs::write(&uid_map, "         0        996          1\n").unwrap();
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
@@ -845,7 +900,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
     }
     // Each path the script names, moved under the stand-in root in one
     // pass (placeholders first, so no root is moved twice).
-    let mut text = ns_text(skills);
+    let mut text = ns_text(skills, tasks);
     let moved = [
         "/var/tmp",
         "/var/lib",
@@ -906,6 +961,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
     // With the switch on, the skills' socket folder's own steps, in their
     // place; off, none.
     let when = |line: String| skills.then_some(line);
+    let when_tasks = |line: String| tasks.then_some(line);
     let order = [
         Some(format!(
             "mount -t tmpfs -o size=256m,mode=1777,nosuid,nodev none {}",
@@ -921,6 +977,8 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
         Some(format!("mount --bind {} {stage}/k", at(SKILLS))),
         when(format!("mount --bind {socket} {stage}/c")),
         Some(format!("mount --bind {resolv} {stage}/r")),
+        when_tasks(format!("touch {stage}/l")),
+        when_tasks(format!("mount --bind {control} {stage}/l")),
         Some(format!(
             "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
             at("/run")
@@ -948,6 +1006,17 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
         Some(format!(
             "mount -o remount,bind,ro,nosuid,nodev,relatime {resolv}"
         )),
+        when_tasks(format!("mkdir -p {control_folder}")),
+        when_tasks(format!("touch {control}")),
+        when_tasks(format!("mount --move {stage}/l {control}")),
+        when_tasks(format!(
+            "mount -o remount,bind,ro,nosuid,nodev,relatime {control}"
+        )),
+        Some(if tasks {
+            format!("rm -f {stage}/r {stage}/l")
+        } else {
+            format!("rm -f {stage}/r")
+        }),
         Some(if skills {
             format!("rmdir {stage}/h {stage}/w {stage}/k {stage}/c {stage}")
         } else {
@@ -980,6 +1049,19 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
             "{lines:#?}"
         );
     }
+    if !tasks {
+        // Off: nothing of lamp-control's folder, there on this root, is
+        // named, so it stays under the empty /run.
+        assert!(
+            !lines.iter().any(|line| line.contains(&control_folder)),
+            "{lines:#?}"
+        );
+    }
+    // Never lamp-control's owner socket, either way.
+    assert!(
+        !lines.iter().any(|line| line.contains("admin.sock")),
+        "{lines:#?}"
+    );
     assert!(places.windows(2).all(|two| two[0] < two[1]), "{lines:#?}");
     assert_eq!(*places.last().unwrap(), lines.len() - 1, "Hermes last");
     let shown: Vec<&str> = lines
@@ -992,6 +1074,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
         .map(|path| at(path))
         .chain(skills.then(|| socket.clone()))
         .chain([resolv.clone()])
+        .chain(tasks.then(|| control.clone()))
         .collect();
     assert_eq!(
         shown,
@@ -1026,8 +1109,16 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
         format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/var/lib")),
         format!("remount,bind,ro,nosuid,nodev,noexec {}", at("/etc/lampOS")),
     ];
+    let control_steps = [
+        format!("touch {stage}/l"),
+        format!("--bind {control}"),
+        format!("mount --move {stage}/l"),
+        format!("findmnt -no VFS-OPTIONS -M {control}"),
+        format!("remount,bind,ro,nosuid,nodev,relatime {control}"),
+    ];
     let socket_steps = if skills { &socket_steps[..] } else { &[] };
-    for fail_on in steps.iter().chain(socket_steps) {
+    let control_steps = if tasks { &control_steps[..] } else { &[] };
+    for fail_on in steps.iter().chain(socket_steps).chain(control_steps) {
         let (out, lines) = run(fail_on);
         assert!(!out.status.success(), "{fail_on}: {lines:#?}");
         assert!(
@@ -1038,6 +1129,18 @@ fn stages_the_allowed_and_stops_at_any_failing_step(skills: bool) {
             lines.iter().any(|line| line.contains(fail_on.as_str())),
             "{fail_on}: never reached"
         );
+    }
+    if tasks {
+        // A lamp with no control socket (lamp-control not serving): skipped,
+        // and Hermes still runs, with nothing of lamp-control's shown.
+        fs::remove_file(&control).unwrap();
+        let (out, lines) = run("");
+        assert!(out.status.success(), "{out:?}");
+        assert!(
+            !lines.iter().any(|line| line.contains(&control_folder)),
+            "{lines:#?}"
+        );
+        fs::remove_dir_all(&control_folder).unwrap();
     }
     if !skills {
         return;
@@ -1116,7 +1219,7 @@ fn no_user_namespace_is_no_userns_and_nothing_is_installed() {
 #[test]
 fn on_with_harness_missing_hermes_is_installed_right_after_harness() {
     let lamp = Lamp::new();
-    at_start(lamp.root(), &lamp.records(), true, false, 1);
+    at_start(lamp.root(), &lamp.records(), true, OFF, 1);
     let mut systemd = Fake::default();
     let harness_said = harness_install::after_round(
         lamp.root(),
@@ -1394,7 +1497,7 @@ fn another_hermes_is_moved_aside_then_removed_once_the_new_one_runs() {
     lamp.hermes_at(OTHER);
     fs::write(lamp.at(&format!("{HERMES_HOME}/config.yaml")), "old: 1\n").unwrap();
     fs::write(lamp.at(WRAPPER), "#!/bin/sh\nexec old\n").unwrap();
-    assert!(!present(lamp.root(), false));
+    assert!(!present(lamp.root(), OFF));
     lamp.ask();
     // First a failed try: the old one stays aside.
     let runs = Runs {
@@ -1419,7 +1522,7 @@ fn another_hermes_is_moved_aside_then_removed_once_the_new_one_runs() {
     assert_eq!(said.install, "installed", "{said:?}");
     assert!(!lamp.at(ASIDE).exists(), "removed once the new one runs");
     assert_eq!(head(lamp.root()).as_deref(), Some(COMMIT));
-    assert!(present(lamp.root(), false));
+    assert!(present(lamp.root(), OFF));
     let lines = runs.lines();
     let ran = lines
         .iter()
@@ -1453,7 +1556,7 @@ fn an_older_wrapper_over_the_pinned_hermes_is_written_anew_with_no_install() {
     let lamp = Lamp::new();
     lamp.hermes_there();
     fs::write(lamp.at(WRAPPER), "#!/bin/sh\nexec sudo old\n").unwrap();
-    assert!(!present(lamp.root(), false));
+    assert!(!present(lamp.root(), OFF));
     lamp.ask();
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
@@ -1462,7 +1565,7 @@ fn an_older_wrapper_over_the_pinned_hermes_is_written_anew_with_no_install() {
     assert!(runs.ran(&format!(
         "{AS_LAMPOS}{HERMES} config set updates.check false"
     )));
-    assert!(present(lamp.root(), false));
+    assert!(present(lamp.root(), OFF));
 }
 
 /// The switch off: a round that finds an entry point asks the one-shot to
@@ -1486,6 +1589,7 @@ fn the_switch_off_takes_the_wrapper_out() {
             version: 1,
             remove: true,
             skills: false,
+            tasks: false,
         })
     );
     let runs = Runs::new(&lamp);
@@ -1548,7 +1652,7 @@ fn a_checkout_at_another_commit_is_version() {
         Some("version")
     );
     assert!(lamp.entry_points().is_empty());
-    assert!(!present(lamp.root(), false));
+    assert!(!present(lamp.root(), OFF));
     assert_eq!(round(&lamp, &mut Fake::default(), 6), None);
     assert_eq!(
         round(&lamp, &mut Fake::default(), 5 + 24 * HOUR_MS)
@@ -1741,10 +1845,10 @@ fn the_skills_switch_is_on_by_default_on_every_lamp() {
 /// removes its staging folder; nothing else of the script changes.
 #[test]
 fn the_skills_text_is_the_namespace_script_with_only_the_skills_socket_added() {
-    assert_eq!(ns_text(false), NS_TEXT);
+    assert_eq!(ns_text(false, false), NS_TEXT);
     assert!(!NS_TEXT.contains(SKILLS_SOCKET));
     assert!(!NS_TEXT.contains("$C"));
-    let on = ns_text(true);
+    let on = ns_text(true, false);
     for (from, to) in SKILLS_EDITS {
         assert_eq!(NS_TEXT.matches(from).count(), 1, "{from}");
         assert!(on.contains(to), "{to}");
@@ -1778,6 +1882,168 @@ fn the_skills_text_is_the_namespace_script_with_only_the_skills_socket_added() {
     );
 }
 
+/// The tasks switch (#6306) is lamp-tasks' own name, off unless `on`
+/// exactly on any lamp, and no product unit names it.
+#[test]
+fn the_tasks_switch_is_lamp_tasks_own_and_off_unless_on() {
+    assert_eq!(TASKS_SWITCH, "LAMP_SKILL_TASKS");
+    for product in [true, false] {
+        assert!(!wanted(None, product, false), "unset");
+        for value in ["off", "", "ON", "1", "yes"] {
+            assert!(!wanted(Some(value), product, false), "{value:?}");
+        }
+        assert!(wanted(Some("on"), product, false));
+    }
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if let Ok(text) = fs::read_to_string(&path) {
+            assert!(!text.contains(TASKS_SWITCH), "{}", path.display());
+        }
+    }
+}
+
+/// [`ns_text`] with [`TASKS_SWITCH`] on: each of [`TASKS_EDITS`] found
+/// once in [`NS_TEXT`] (and once with [`SKILLS_EDITS`] made) and made, so
+/// the text names [`CONTROL_SOCKET`], the file alone, and stages it before
+/// `/run` is hidden, moves it back after, remounts it read-only and
+/// removes its staging file, all before `/run` is made read-only and
+/// Hermes runs. `admin.sock` and the folder alone are never named.
+/// Off, the text is unchanged.
+#[test]
+fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
+    assert_eq!(ns_text(false, false), NS_TEXT);
+    assert!(!NS_TEXT.contains("lampos-control"));
+    assert!(!NS_TEXT.contains("\"$L\""));
+    let with_skills = ns_text(true, false);
+    let on = ns_text(false, true);
+    for (from, to) in TASKS_EDITS {
+        assert_eq!(NS_TEXT.matches(from).count(), 1, "{from}");
+        assert_eq!(with_skills.matches(from).count(), 1, "{from}");
+        assert!(on.contains(to), "{to}");
+    }
+    assert!(on.contains(&format!(" L={CONTROL_SOCKET} ")));
+    assert!(!on.contains("admin.sock"));
+    assert!(!on.contains("L=/run/lampos-control "));
+    assert_eq!(
+        on.matches("lampos-control").count(),
+        2,
+        "the comment and L="
+    );
+    // Only lines added or widened: every line off is in the text on.
+    let lines_on: Vec<&str> = on.lines().collect();
+    for line in NS_TEXT.lines().filter(|line| {
+        !TASKS_EDITS
+            .iter()
+            .any(|(from, _)| from.contains(line) || line.contains(from.trim_end()))
+    }) {
+        assert!(lines_on.contains(&line), "{line}");
+    }
+    let staged = on
+        .find("if [ -S \"$L\" ]; then touch \"$S/l\" && mount --bind \"$L\" \"$S/l\"")
+        .unwrap();
+    let hidden = on.find("none /run ||").unwrap();
+    let shown = on
+        .find("mount --move \"$S/l\" \"$L\" && ro \"$L\"")
+        .unwrap();
+    let unstaged = on.find("rm -f \"$S/r\" \"$S/l\" &&").unwrap();
+    let ro_run = on
+        .find("mount -o remount,bind,ro,nosuid,nodev,noexec /run")
+        .unwrap();
+    let hermes = on.find("exec /usr/bin/unshare --user").unwrap();
+    assert!(staged < hidden && hidden < shown && shown < unstaged);
+    assert!(unstaged < ro_run && ro_run < hermes);
+    assert_eq!(
+        on.matches("LAMP_").count(),
+        NS_TEXT.matches("LAMP_").count() + 1,
+        "only the comment names the switch"
+    );
+}
+
+/// Both switches on: every edit of both made, both sockets staged and
+/// shown read-only, and still never `admin.sock`.
+#[test]
+fn both_switches_on_make_both_edits() {
+    let both = ns_text(true, true);
+    // Every tasks edit whole; every skills edit whole once the tasks
+    // edits are made in it too (two widen the same lines).
+    for (_, to) in TASKS_EDITS {
+        assert!(both.contains(to), "{to}");
+    }
+    for (_, to) in SKILLS_EDITS {
+        let mut to = to.to_owned();
+        for (from, tasks) in TASKS_EDITS {
+            to = to.replacen(from, tasks, 1);
+        }
+        assert!(both.contains(&to), "{to}");
+    }
+    for (from, _) in TASKS_EDITS {
+        assert_eq!(ns_text(true, false).matches(from).count(), 1, "{from}");
+    }
+    assert!(both.contains("mount --move \"$S/c\" \"$C\" && ro \"$C\""));
+    assert!(both.contains("mount --move \"$S/l\" \"$L\" && ro \"$L\""));
+    assert!(both.contains(" C=/run/lampos-skills L=/run/lampos-control/control.sock S="));
+    assert!(!both.contains("admin.sock"));
+    assert_eq!(
+        both.matches("LAMP_").count(),
+        NS_TEXT.matches("LAMP_").count() + 2
+    );
+}
+
+/// Turning the tasks switch on with Hermes there (written with it off):
+/// a round finds the script not as this build puts it and asks with
+/// `tasks`; the one-shot runs no installer stage and writes the script
+/// with the control socket. Off again writes it back without.
+#[test]
+fn turning_the_tasks_switch_on_or_off_writes_the_namespace_script_again() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    lamp.hermes_there();
+    assert!(present(lamp.root(), OFF) && !present(lamp.root(), TASKS_ON));
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, 5).unwrap().install, "installed");
+    let with_tasks = |lamp: &Lamp, systemd: &mut Fake, at: u64| {
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            TASKS_ON,
+            systemd,
+            at,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        )
+    };
+    assert_eq!(
+        with_tasks(&lamp, &mut systemd, 10).unwrap().install,
+        "installing"
+    );
+    let text = fs::read_to_string(lamp.records().join(ASK)).unwrap();
+    assert!(
+        text.contains("\"tasks\":true") && !text.contains("skills"),
+        "{text}"
+    );
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
+    assert!(runs.stages().is_empty(), "no installer stage");
+    assert_eq!(
+        fs::read_to_string(lamp.at(NS)).unwrap(),
+        ns_text(false, true)
+    );
+    assert!(present(lamp.root(), TASKS_ON) && !present(lamp.root(), OFF));
+    assert_eq!(with_tasks(&lamp, &mut systemd, 30), None, "nothing to do");
+
+    // Off again.
+    assert_eq!(
+        round(&lamp, &mut systemd, 40).unwrap().install,
+        "installing"
+    );
+    let text = fs::read_to_string(lamp.records().join(ASK)).unwrap();
+    assert!(!text.contains("tasks"), "{text}");
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 50).unwrap().install, "installed");
+    assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), NS_TEXT);
+}
+
 /// Turning the skills switch on with Hermes there (written with it off):
 /// a round finds Hermes not there as this build puts it and asks the
 /// one-shot with `skills`; the one-shot runs no installer stage, writes
@@ -1788,8 +2054,8 @@ fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
     let lamp = Lamp::new();
     lamp.harness_there();
     lamp.hermes_there();
-    assert!(present(lamp.root(), false));
-    assert!(!present(lamp.root(), true));
+    assert!(present(lamp.root(), OFF));
+    assert!(!present(lamp.root(), SKILLS_ON));
     let mut systemd = Fake::default();
     assert_eq!(round(&lamp, &mut systemd, 5).unwrap().install, "installed");
     let said = round_with_skills(&lamp, &mut systemd, 10).unwrap();
@@ -1799,7 +2065,8 @@ fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
         Some(Ask {
             version: 1,
             remove: false,
-            skills: true
+            skills: true,
+            tasks: false,
         })
     );
     let text = fs::read_to_string(lamp.records().join(ASK)).unwrap();
@@ -1807,10 +2074,13 @@ fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
     assert!(runs.stages().is_empty(), "no installer stage");
-    assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), ns_text(true));
+    assert_eq!(
+        fs::read_to_string(lamp.at(NS)).unwrap(),
+        ns_text(true, false)
+    );
     assert_eq!(fs::read_to_string(lamp.at(WRAPPER)).unwrap(), WRAPPER_TEXT);
     assert_eq!(mode(&lamp.at(NS)), 0o755);
-    assert!(present(lamp.root(), true) && !present(lamp.root(), false));
+    assert!(present(lamp.root(), SKILLS_ON) && !present(lamp.root(), OFF));
     assert_eq!(
         round_with_skills(&lamp, &mut systemd, 30),
         None,
@@ -1829,7 +2099,7 @@ fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
     assert_eq!(install(&lamp, &runs, 50).unwrap().install, "installed");
     assert!(runs.stages().is_empty());
     assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), NS_TEXT);
-    assert!(present(lamp.root(), false));
+    assert!(present(lamp.root(), OFF));
 }
 
 /// An ask an older build wrote, with no `skills`, is read as off: the
@@ -1840,7 +2110,7 @@ fn an_ask_without_skills_is_off() {
     assert_eq!(ask, Ask::default_with(1));
     let lamp = Lamp::new();
     lamp.hermes_there();
-    fs::write(lamp.at(NS), ns_text(true)).unwrap();
+    fs::write(lamp.at(NS), ns_text(true, false)).unwrap();
     lamp.ask();
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");

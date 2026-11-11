@@ -327,12 +327,13 @@ if [ \"$M\" = on ]; then
 fi
 ";
 
-/// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills)`, the
-/// same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]), with
-/// its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
-/// `skills`, lamp-skills' socket folder is shown read-only too.
+/// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills, false)`,
+/// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
+/// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
+/// `skills`, lamp-skills' socket folder is shown read-only too; never
+/// lamp-control's socket, which only a skill's run under Hermes reaches.
 pub fn ns_text(skills: bool) -> String {
-    let mut text = hermes_install::ns_text(skills);
+    let mut text = hermes_install::ns_text(skills, false);
     for (from, to) in ENGINE_EDITS {
         text = text.replace(from, to);
     }
