@@ -1799,10 +1799,12 @@ pub(crate) fn their_computer(task: &Value) -> String {
         )
 }
 
-/// Whether the work was done on the lamp itself, by Hermes there
-/// (`lamp-tasks` with `LAMP_HERMES_ON_LAMP`, #5978).
+/// Whether the work was done on the lamp itself, by OpenClaw or Hermes
+/// there (`lamp-tasks` with `LAMP_OPENCLAW_ON_LAMP` or `LAMP_HERMES_ON_LAMP`,
+/// #5978, #6226).
 pub(crate) fn on_the_lamp(task: &Value) -> bool {
-    *alias_of(task) == crate::agent_tasks::LAMP_TARGET && *engine_of(task) == "hermes"
+    *alias_of(task) == crate::agent_tasks::LAMP_TARGET
+        && (*engine_of(task) == "hermes" || *engine_of(task) == "openclaw")
 }
 
 /// Where the task's work is, as a `get_task` answer names it: the machine
@@ -3048,6 +3050,7 @@ mod tests {
             ("codex", "Codex"),
             ("opencode", "OpenCode"),
             ("hermes", "Hermes"),
+            ("openclaw", "OpenClaw"),
         ] {
             let told = note(&own(), &task(engine, json!([])), &waiting, 0).unwrap();
             assert_eq!(
@@ -3075,6 +3078,7 @@ mod tests {
             ("devin", "Devin"),
             ("devin-cloud", "Devin"),
             ("hermes", "Hermes"),
+            ("openclaw", "OpenClaw"),
         ] {
             assert_eq!(who(&json!({"target":{"engine":engine}})), name, "{engine}");
         }
@@ -5034,5 +5038,25 @@ mod tests {
         assert_eq!(their_computer(&on("office", "claude")), "their computer");
         // A computer someone named `lamp` by hand is no lamp.
         assert_eq!(their_computer(&on("lamp", "claude")), "their computer");
+    }
+
+    /// #6226: work done by OpenClaw on the lamp itself, the lamp's default
+    /// engine, is told as done here on the lamp, by OpenClaw, as Hermes's.
+    #[test]
+    fn work_done_by_openclaw_on_the_lamp_is_told_as_done_here() {
+        let done =
+            json!({"state":"idle","answer":"A short poem about the rain.","truncated":false});
+        let on =
+            json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"lamp"});
+        assert!(on_the_lamp(&on));
+        assert_eq!(who(&on), "OpenClaw");
+        assert_eq!(their_computer(&on), "the lamp");
+        let lamp = note(&own(), &on, &done, 0).unwrap();
+        assert!(lamp.contains("OpenClaw"), "{lamp}");
+        assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
+        let office =
+            json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"office"});
+        assert!(!on_the_lamp(&office));
+        assert_eq!(their_computer(&office), "their computer");
     }
 }

@@ -257,8 +257,12 @@ pub const DEADLINE: Duration = Duration::from_millis(3_500);
 const READ_AGAIN: Duration = Duration::from_secs(30);
 /// Who gets the work when the switch is off: as it always was.
 const CLAUDE_CODE: &str = "Claude Code";
-/// Who does the work on the lamp itself ([`LAMP_TARGET`], #5978).
+/// Who does the work on the lamp itself when `lamp-tasks` runs Hermes there
+/// ([`LAMP_TARGET`], #5978).
 const HERMES: &str = "Hermes";
+/// Who does the work on the lamp itself when `lamp-tasks` runs OpenClaw
+/// there, the lamp's default engine (`LAMP_LAMP_ENGINE` unset, #6226).
+const OPENCLAW: &str = "OpenClaw";
 /// What the model is told when the work was asked for on the lamp itself
 /// and the lamp has no target of its own (#5978): nothing goes elsewhere.
 const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that isn't set up on this lamp, so nothing was handed over. Say so plainly in a few words.";
@@ -334,8 +338,10 @@ pub fn agent_names() -> Vec<&'static str> {
 /// way: a lamp has one or the other. Hermes (#3504, 27 Oct: asked for in a
 /// demo, the work went to Claude Code unsaid) may come as "Hermès", which is
 /// `herms` once plain, or "her mes"; "air mess" is said to the model, never
-/// taken.
-const KINDS: [Kind; 6] = [
+/// taken. OpenClaw (#6226), the lamp's own default engine, may come as
+/// "open claw", "open clause" or "open close", and with a Vietnamese
+/// accent as "open clow", "open clau" or "open klaw".
+const KINDS: [Kind; 7] = [
     Kind {
         engine: "claude",
         name: CLAUDE_CODE,
@@ -386,10 +392,35 @@ const KINDS: [Kind; 6] = [
         close: &["hermes", "herms", "hermez", "hermess", "hermies"],
         heard: &["hermes"],
     },
+    Kind {
+        engine: "openclaw",
+        name: "OpenClaw",
+        sounds: "\"OpenClaw\" or \"Open Claw\", which can sound like \"open clause\", \"open close\" or \"open clow\"",
+        close: &[
+            "openclaw",
+            "openclaws",
+            "openclause",
+            "openclaus",
+            "openclose",
+            "openclow",
+            "openclau",
+            "openklaw",
+        ],
+        heard: &[
+            "openclaw",
+            "open claw",
+            "open claws",
+            "open clause",
+            "open close",
+            "open clow",
+            "open klaw",
+        ],
+    },
 ];
 
-/// The lamp's own target, Hermes on the lamp itself (`lamp-tasks` with
-/// `LAMP_HERMES_ON_LAMP`, #5978): never one of the staff, so the person's
+/// The lamp's own target, OpenClaw or Hermes on the lamp itself
+/// (`lamp-tasks` with `LAMP_OPENCLAW_ON_LAMP` or `LAMP_HERMES_ON_LAMP`,
+/// #5978, #6226): never one of the staff, so the person's
 /// computers come first; the work goes there only when the person asks for
 /// it to be done on the lamp ([`START`]'s `where`), or when the tasks part
 /// finds no computer there and says it prepared it there instead.
@@ -405,6 +436,30 @@ fn lamp_there() -> bool {
         return there;
     }
     LAMP_THERE.load(Ordering::Relaxed)
+}
+
+/// Whether the lamp's own target was last said to run Hermes; else it is
+/// OpenClaw, the lamp's default engine (#6226).
+static LAMP_HERMES: AtomicBool = AtomicBool::new(false);
+
+/// Who does the work on the lamp itself, as the person calls them: the
+/// engine of the lamp's own target as last read, OpenClaw until read (the
+/// lamp's default engine, #6226); a test sets its own, on its own thread.
+fn lamp_name() -> &'static str {
+    #[cfg(test)]
+    if let Some(name) = tests::LAMP_NAME_HERE.with(std::cell::Cell::get) {
+        return name;
+    }
+    if LAMP_HERMES.load(Ordering::Relaxed) {
+        HERMES
+    } else {
+        OPENCLAW
+    }
+}
+
+/// Whether `engine` is one the lamp's own target runs (#5978, #6226).
+fn lamp_engine(engine: &str) -> bool {
+    engine == "hermes" || engine == "openclaw"
 }
 
 /// Whether `start_agent_task` was last declared with the lamp's words
@@ -434,14 +489,15 @@ fn declared_with_the_lamp() -> bool {
     DECLARED_WITH_THE_LAMP.load(Ordering::Relaxed)
 }
 
-/// Whether a hand-over goes to the lamp's own Hermes (#5978): `where`
-/// `"lamp"`, or, while the lamp has its target, anything but `where`
-/// `"computer"` or an agent on a computer named (`who`), which go to a
-/// computer as before. `who` naming the lamp ("the lamp") or, while the
-/// lamp has its target, Hermes is the lamp's own Hermes, never a
-/// computer's. Without the lamp's target, only `where` `"lamp"` or `who`
-/// the lamp, which the tasks part then refuses as no such target; Hermes
-/// named then is a computer's, as before. `there` is whether the lamp has
+/// Whether a hand-over goes to the lamp's own engine, OpenClaw or Hermes
+/// (#5978, #6226): `where` `"lamp"`, or, while the lamp has its target,
+/// anything but `where` `"computer"` or an agent on a computer named
+/// (`who`), which go to a computer as before. `who` naming the lamp ("the
+/// lamp") or, while the lamp has its target, OpenClaw or Hermes is the
+/// lamp's own engine, never a computer's. Without the lamp's target, only
+/// `where` `"lamp"` or `who` the lamp, which the tasks part then refuses as
+/// no such target; OpenClaw or Hermes named then is a computer's, as
+/// before. `there` is whether the lamp has
 /// its target now or the tool was declared with the lamp's words: a call
 /// naming no machine from such a declaration goes to the lamp even when the
 /// target went away since, and is then said not set up, never sent to a
@@ -460,23 +516,39 @@ fn on_the_lamp_now(args: &Value, there: bool) -> bool {
             None => there,
             Some(who) => {
                 let who = who.trim_start_matches("the ").trim();
-                who.eq_ignore_ascii_case(LAMP_TARGET) || (there && who.eq_ignore_ascii_case(HERMES))
+                who.eq_ignore_ascii_case(LAMP_TARGET)
+                    || (there
+                        && (who.eq_ignore_ascii_case(HERMES) || who.eq_ignore_ascii_case(OPENCLAW)))
             }
         },
     }
 }
 
-/// `start_agent_task`'s `where` while the lamp has its own target (#5978).
-const WHERE: &str = "Where the work is done. Hand over work that takes longer than a quick answer: writing code or files, research across pages, a job of several steps. Leave it out and it goes into an earlier session of theirs that fits by its name or its work, the lamp's own first, else to a new one here on the lamp, done by the lamp's own Hermes. \"computer\" only when they name their computer (\"on my computer\", \"on the Mac\"): then it goes there, as when they name an agent on it. \"lamp\" when they say \"on the lamp\" or \"do it yourself\". The task is said back and starts on their yes, as always.";
+/// `start_agent_task`'s `where` while the lamp has its own target (#5978),
+/// naming the lamp's own engine (`name`, #6226).
+fn where_description(name: &str) -> String {
+    format!(
+        "Where the work is done. Hand over work that takes longer than a quick answer: writing code or files, research across pages, a job of several steps. Leave it out and it goes into an earlier session of theirs that fits by its name or its work, the lamp's own first, else to a new one here on the lamp, done by the lamp's own {name}. \"computer\" only when they name their computer (\"on my computer\", \"on the Mac\"): then it goes there, as when they name an agent on it. \"lamp\" when they say \"on the lamp\" or \"do it yourself\". The task is said back and starts on their yes, as always."
+    )
+}
 
-/// Whether the targets answer has the lamp's own target, Hermes.
-fn lamp_in(answer: &Value) -> bool {
-    answer.get("ok") == Some(&json!(true))
-        && answer["targets"].as_array().is_some_and(|targets| {
-            targets
-                .iter()
-                .any(|target| target["alias"] == LAMP_TARGET && target["engine"] == "hermes")
-        })
+/// The lamp's own target in the targets answer, OpenClaw or Hermes
+/// (#5978, #6226): the name the person calls its engine by, or `None`
+/// without it.
+fn lamp_target_in(answer: &Value) -> Option<&'static str> {
+    if answer.get("ok") != Some(&json!(true)) {
+        return None;
+    }
+    answer["targets"].as_array()?.iter().find_map(|target| {
+        if target["alias"] != LAMP_TARGET {
+            return None;
+        }
+        match target["engine"].as_str()? {
+            "openclaw" => Some(OPENCLAW),
+            "hermes" => Some(HERMES),
+            _ => None,
+        }
+    })
 }
 
 /// One of the staff: a target of the tasks part, and its kind.
@@ -892,7 +964,7 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
         start_parameters["properties"]["where"] = json!({
             "type": "string",
             "enum": [LAMP_TARGET, "computer"],
-            "description": WHERE
+            "description": where_description(lamp_name())
         });
         // Measured with tools/task-pick-eval.sh (#5978): the lamp does the
         // work by default, so the description says what is handed over and
@@ -903,7 +975,7 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
             .and_then(|who| who.get_mut("description"))
             && let Some(said) = who.as_str()
         {
-            // Nobody named is the lamp's Hermes now, not the computer's agent.
+            // Nobody named is the lamp's own engine now, not the computer's agent.
             let said = said.replace(
                 &format!("Leave it out if they named nobody: then {default} does it."),
                 "Leave it out if they named nobody.",
@@ -1007,7 +1079,7 @@ const WHO_ON_THE_LAMP: &str = " Only a name they said: never for work done here 
 
 /// [`START`]'s description while the tasks part has the lamp's own target
 /// (#5978): work that takes more than a quick answer is handed over, here
-/// to the lamp's Hermes unless a computer or an agent on it is named, and
+/// to the lamp's own engine, OpenClaw or Hermes (#6226), unless a computer or an agent on it is named, and
 /// what the lamp answers or does itself never is. Measured with
 /// `tools/task-pick-eval.sh` (`docs/tasks.md`).
 fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
@@ -1027,11 +1099,12 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
             computer(place)
         )
     };
+    let name = lamp_name();
     format!(
-        "Hand work to an agent: Hermes here on the lamp{or_computer}. Call it for more than a \
+        "Hand work to an agent: {name} here on the lamp{or_computer}. Call it for more than a \
          quick answer (code, files, research, a job of several steps) or asked of an agent. \
          Never for what you can answer in a few words, a story or joke told aloud, or your own \
-         functions (your light, reminders, the time, the weather). New work goes to Hermes here \
+         functions (your light, reminders, the time, the weather). New work goes to {name} here \
          on the lamp: leave out `where` and `who`, even for code or a website; `where` only if \
          they name a machine (computer, Mac, laptop, PC). More on earlier work (\"in the sea \
          poem, add a line\") is a new call with `session`, made now, before you say it back: \
@@ -1253,13 +1326,19 @@ pub fn session_note(place: &Place) -> Option<String> {
         String::new()
     };
     // With the lamp's own target (#5978), work to be written, coded or
-    // researched is handed over even when nobody is named: to Hermes here.
+    // researched is handed over even when nobody is named: to the lamp's
+    // own engine here, OpenClaw or Hermes (#6226).
+    let lamp_words;
     let (yours, lamp) = if lamp_there() {
-        (
-            "a story, a poem or an answer told aloud",
+        lamp_words = format!(
             " Work to be written down, coded or looked into and written up (a file, a document, \
          a script, a summary) is not told aloud: hand it over with start_agent_task even when \
-         they name nobody; Hermes here on the lamp does it unless they name their computer.",
+         they name nobody; {} here on the lamp does it unless they name their computer.",
+            lamp_name()
+        );
+        (
+            "a story, a poem or an answer told aloud",
+            lamp_words.as_str(),
         )
     } else {
         ("a story, a poem or anything else", "")
@@ -1497,7 +1576,7 @@ fn staff_from(answer: &Value) -> Option<Vec<Member>> {
             continue;
         }
         // The lamp's own: asked for by `where`, never one of the staff.
-        if name == LAMP_TARGET && engine == "hermes" {
+        if name == LAMP_TARGET && lamp_engine(engine) {
             continue;
         }
         // One member a name: Devin and Devin Cloud are both "Devin", so
@@ -1780,7 +1859,9 @@ fn read_staff(socket: &Path, target: &str, deadline: Duration, who: bool) {
     let Some(read) = staff_from(&answer) else {
         return;
     };
-    LAMP_THERE.store(lamp_in(&answer), Ordering::Relaxed);
+    let lamp = lamp_target_in(&answer);
+    LAMP_THERE.store(lamp.is_some(), Ordering::Relaxed);
+    LAMP_HERMES.store(lamp == Some(HERMES), Ordering::Relaxed);
     if let Some(names) = names_from(&answer) {
         keep_names(names);
     }
@@ -2731,7 +2812,7 @@ fn run_for(
                 );
             }
             // Who is settled before the tasks part is asked anything. The
-            // lamp's own Hermes (#5978): asked for on the lamp, by name, or
+            // lamp's own engine, OpenClaw or Hermes (#5978, #6226): asked for on the lamp, by name, or
             // by default while the tasks part has it, unless the person
             // named their computer or an agent on it; never a staff member,
             // so never looked for among them.
@@ -2745,7 +2826,7 @@ fn run_for(
                 }
             };
             let (target, who) = if on_the_lamp {
-                (LAMP_TARGET, HERMES)
+                (LAMP_TARGET, lamp_name())
             } else {
                 member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
                     (member.alias.as_str(), member.kind.name)
@@ -3641,6 +3722,10 @@ pub(crate) mod tests {
         /// Whether the tasks part has the lamp's own target, for a test on
         /// this thread only ([`super::lamp_there`], #5978).
         pub(crate) static LAMP_THERE_HERE: std::cell::Cell<Option<bool>> =
+            const { std::cell::Cell::new(None) };
+        /// Who does the work on the lamp itself, for a test on this thread
+        /// only ([`super::lamp_name`], #6226).
+        pub(crate) static LAMP_NAME_HERE: std::cell::Cell<Option<&'static str>> =
             const { std::cell::Cell::new(None) };
         /// Whether the tools were last declared with the lamp's words, for
         /// a test on this thread only ([`super::declared_with_the_lamp`]).
@@ -6286,6 +6371,19 @@ pub(crate) mod tests {
                 .find(|tool| tool.name == START)
                 .unwrap()
         };
+        // The lamp's default engine, OpenClaw (#6226), named the same way.
+        LAMP_NAME_HERE.with(|here| here.set(None));
+        let openclaw = start(true);
+        assert!(openclaw.validate().is_ok());
+        assert!(
+            openclaw.description.contains(
+                "OpenClaw here on the lamp, or Claude Code on the person's office computer"
+            ),
+            "{}",
+            openclaw.description
+        );
+        assert!(!openclaw.description.contains("Hermes"));
+        LAMP_NAME_HERE.with(|here| here.set(Some(HERMES)));
         let (off, on) = (start(false), start(true));
         assert_eq!(off, declared(&at, &staff)[0]);
         assert!(on.validate().is_ok());
@@ -6326,6 +6424,13 @@ pub(crate) mod tests {
         );
         assert!(lamp.ends_with(
             "hand it over with start_agent_task even when they name nobody; Hermes here on the \
+             lamp does it unless they name their computer."
+        ));
+        LAMP_NAME_HERE.with(|here| here.set(Some(OPENCLAW)));
+        let openclaw = note(true);
+        LAMP_NAME_HERE.with(|here| here.set(None));
+        assert!(openclaw.ends_with(
+            "hand it over with start_agent_task even when they name nobody; OpenClaw here on the \
              lamp does it unless they name their computer."
         ));
     }
@@ -8640,7 +8745,14 @@ pub(crate) mod tests {
         let who = &told[0].parameters.as_ref().unwrap()["properties"]["who"];
         assert_eq!(
             who["enum"],
-            json!(["Claude Code", "Codex", "OpenCode", "Devin", "Hermes"])
+            json!([
+                "Claude Code",
+                "Codex",
+                "OpenCode",
+                "Devin",
+                "Hermes",
+                "OpenClaw"
+            ])
         );
         let hint = who["description"].as_str().unwrap();
         assert!(
@@ -8797,6 +8909,19 @@ pub(crate) mod tests {
         // after an asking word (Fourteen's P3 on #3723).
         assert!(named_in_words(&on, "Ask Lumi about my Hermès bag.").is_empty());
         assert!(named_in_words(&on, "I left my hermes scarf at home.").is_empty());
+        // OpenClaw (#6226) as speech to text gives it, a Vietnamese accent
+        // included: two words make it, after an asking word or not.
+        for heard in [
+            "Ask OpenClaw to write a poem.",
+            "ask open claw to write a poem",
+            "ask open clause to write a poem",
+            "ask open close to write a poem",
+            "ask open clow to write a poem",
+            "ask open klaw to write a poem",
+        ] {
+            assert_eq!(named_in_words(&on, heard), ["OpenClaw"], "{heard}");
+        }
+        assert!(named_in_words(&on, "Open the door. Close it after.").is_empty());
         STAFF.lock().unwrap().clear();
     }
 
@@ -9274,7 +9399,12 @@ pub(crate) mod tests {
     fn a_lamp_with_no_computer_still_hands_work_to_its_own_hermes() {
         let answer = json!({"ok":true,"targets":[{"alias":"lamp","engine":"hermes"}]});
         assert_eq!(staff_from(&answer).unwrap(), Vec::<Member>::new());
-        assert!(lamp_in(&answer));
+        assert!(lamp_target_in(&answer).is_some());
+        assert_eq!(lamp_target_in(&answer), Some(HERMES));
+        // OpenClaw on the lamp (#6226) is the lamp's own target the same way.
+        let openclaw = json!({"ok":true,"targets":[{"alias":"lamp","engine":"openclaw"}]});
+        assert_eq!(staff_from(&openclaw).unwrap(), Vec::<Member>::new());
+        assert_eq!(lamp_target_in(&openclaw), Some(OPENCLAW));
         let off = place(Path::new("/run/t"), false);
         let start = declared_on(&off, &[], true)
             .into_iter()
@@ -9308,10 +9438,11 @@ pub(crate) mod tests {
             staff_from(&answer).unwrap(),
             vec![member("office", "claude")]
         );
-        assert!(lamp_in(&answer));
-        assert!(!lamp_in(
-            &json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]})
-        ));
+        assert!(lamp_target_in(&answer).is_some());
+        assert_eq!(
+            lamp_target_in(&json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]})),
+            None
+        );
         let off = place(Path::new("/run/t"), false);
         let start = |lamp: bool| {
             declared_on(&off, &[], lamp)
@@ -9327,7 +9458,8 @@ pub(crate) mod tests {
         assert!(on.validate().is_ok());
         let said = on.parameters.unwrap()["properties"]["where"].clone();
         assert_eq!(said["enum"], json!(["lamp", "computer"]));
-        assert_eq!(said["description"], WHERE);
+        assert_eq!(said["description"], where_description(OPENCLAW));
+        let where_said = where_description(HERMES);
         for words in [
             "longer than a quick answer",
             "writing code or files, research across pages, a job of several steps",
@@ -9337,7 +9469,7 @@ pub(crate) mod tests {
             "\"on the lamp\" or \"do it yourself\"",
             "starts on their yes",
         ] {
-            assert!(WHERE.contains(words), "{words}");
+            assert!(where_said.contains(words), "{words}");
         }
         assert_eq!(declared(&off, &[]), declared_on(&off, &[], false));
         for (args, there, lamp) in [
@@ -9350,6 +9482,10 @@ pub(crate) mod tests {
             (json!({"who":"the lamp"}), true, true),
             (json!({"who":"Hermes","where":"computer"}), true, false),
             (json!({"who":"Hermes"}), false, false),
+            (json!({"who":"OpenClaw"}), true, true),
+            (json!({"who":"openclaw"}), true, true),
+            (json!({"who":"OpenClaw","where":"computer"}), true, false),
+            (json!({"who":"OpenClaw"}), false, false),
             (json!({"who":"the lamp"}), false, true),
             (json!({}), false, false),
             (json!({"where":"lamp"}), false, true),
@@ -9386,7 +9522,9 @@ pub(crate) mod tests {
         };
         let run_with = |there: bool, args: Value, request: u64| {
             LAMP_THERE_HERE.with(|here| here.set(Some(there)));
+            LAMP_NAME_HERE.with(|here| here.set(Some(HERMES)));
             let told = run(&at, &call(args), request, true, PEER_WAIT).0;
+            LAMP_NAME_HERE.with(|here| here.set(None));
             LAMP_THERE_HERE.with(|here| here.set(None));
             told
         };
@@ -9536,5 +9674,74 @@ pub(crate) mod tests {
         assert_ne!(used, json!({"error": LAMP_INSTALLING}), "{used}");
         assert_eq!(prepares.last(), Some(&json!("office-claude")), "{used}");
         let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// #6226: with OpenClaw on the lamp, the lamp's default engine, new
+    /// work naming no machine goes to the lamp and is said as OpenClaw's;
+    /// OpenClaw named is the lamp's, never a computer's; the lamp's own
+    /// target is never one of the staff.
+    #[test]
+    fn new_work_goes_to_openclaw_on_the_lamp() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let answer = json!({"ok":true,"targets":[
+            {"alias":"lamp","engine":"openclaw"},{"alias":"office","engine":"claude"}]});
+        assert_eq!(
+            staff_from(&answer).unwrap(),
+            vec![member("office", "claude")]
+        );
+        assert_eq!(lamp_target_in(&answer), Some(OPENCLAW));
+        let directory = std::env::temp_dir().join(format!("agent-claw-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let prepared = json!({"ok":true,"id":9,"prepared_digest":"abc","revision":1});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                ("request.sock", prepared.clone()),
+                ("request.sock", status),
+                ("request.sock", prepared),
+            ],
+        );
+        let at = place(&directory, false);
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args,
+        };
+        LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+        LAMP_NAME_HERE.with(|here| here.set(Some(OPENCLAW)));
+        let lamp = run(
+            &at,
+            &call(json!({"task":"Write a poem"})),
+            3,
+            true,
+            PEER_WAIT,
+        )
+        .0;
+        let named = run(
+            &at,
+            &call(json!({"task":"Write a poem","who":"OpenClaw"})),
+            4,
+            true,
+            PEER_WAIT,
+        )
+        .0;
+        LAMP_NAME_HERE.with(|here| here.set(None));
+        LAMP_THERE_HERE.with(|here| here.set(None));
+        assert_eq!(lamp["where"], "OpenClaw on the lamp", "{lamp}");
+        assert_eq!(named["where"], "OpenClaw on the lamp", "{named}");
+        let targets: Vec<Value> = (0..4)
+            .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
+            .filter(|line| line["op"] == "prepare")
+            .map(|line| line["target"].clone())
+            .collect();
+        assert_eq!(targets, [json!("lamp"), json!("lamp")]);
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }
