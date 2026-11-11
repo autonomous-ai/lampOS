@@ -682,7 +682,10 @@ each under the quiet rule. A round
    refuses the build at once, as before. When such a put-back cannot put
    every file back and leaves the journal, its reason is written into the
    journal as `refusing`, and the recovery at the next start refuses the
-   build for that reason, not as a cut-short.
+   build for that reason, not as a cut-short. That mark is written before
+   any file is put back, so a power cut during the put-back (or before
+   `state.json` is written) still refuses the build at the next start; a
+   cut-short's put-back writes none, so it is still tried again.
 2. **The channel.** `lampos-manifest.json` is read from `--channel-url`.
    No network: `nothing changed: the channel cannot be reached: ...`, status
    3. Nothing published: `nothing changed: the channel has published no
