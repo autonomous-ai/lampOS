@@ -124,6 +124,8 @@ struct Counts {
     /// Reading whether Harness is signed in fails while set (#5488
     /// follow-up), as `harness auth status` that cannot be read.
     sign_in_fails: AtomicBool,
+    /// This computer's own id, as `auth status` names it (#6407).
+    computer: Mutex<Option<String>>,
     /// What `harness machines` lists, and how often it was asked (#1676).
     machines: Mutex<Vec<AccountMachine>>,
     machine_reads: AtomicUsize,
@@ -386,6 +388,10 @@ impl Adapter for Script {
         } else {
             SignIn::In
         })
+    }
+    fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
+        let sign_in = self.signed_in()?;
+        Ok((sign_in, self.counts.computer.lock().unwrap().clone()))
     }
     fn status(&self, machine: &str) -> Result<Vec<Listed>, String> {
         self.counts.listings.fetch_add(1, Ordering::SeqCst);
@@ -2350,6 +2356,109 @@ fn the_lamps_engine_is_openclaw_by_default_hermes_when_chosen_or_the_one_install
             "{chosen:?}"
         );
     }
+}
+
+/// This computer's own id, as Harness keeps it while no account is signed
+/// in (#6407).
+const COMPUTER: &str = "9d14f36b-e73a-4acb-9922-0bbb39cbc22e";
+
+/// #6407, a product lamp never signed in, Hermes installed: the ask was
+/// answered "I can't reach Hermes", since the lamp's target came only from
+/// `harness machines`, which needs the sign-in. Now, signed out, the lamp
+/// is its own target while its engine is installed here (on Harness's
+/// `PATH`) and switched on, the one `LAMP_LAMP_ENGINE` puts first
+/// (OpenClaw unless set, #6226) among those installed: `lamp`, under this
+/// computer's own id, which Harness starts work on with no `--machine`.
+/// Harness's daemon is started at boot signed out too, the machines are
+/// never asked, and the health line says only the computers need the
+/// sign-in.
+#[test]
+fn a_lamp_never_signed_in_hands_work_to_its_own_engine() {
+    let home = tempfile::tempdir().unwrap();
+    let bin = tempfile::tempdir().unwrap();
+    let (mut s, path) = engines_running(true);
+    s.config.sign_in_by_code = true;
+    // Both of the lamp's engines on, neither chosen: OpenClaw first.
+    let mut side = lamp_side(Some("on"), Some("on"), None, Some(home.path().to_owned())).unwrap();
+    side.bin = bin.path().to_owned();
+    s.config.set_up_later.as_mut().unwrap().lamp = Some(side);
+    s.counts.signed_out.store(true, Ordering::SeqCst);
+    *s.counts.computer.lock().unwrap() = Some(COMPUTER.into());
+    s.start();
+    // Not installed here: no target, nothing written.
+    let start = Instant::now();
+    while s.counts.sign_in_reads.load(Ordering::SeqCst) < 5 {
+        assert!(start.elapsed() < Duration::from_secs(5), "no sign-in read");
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(told_targets(&s), 0);
+    assert!(!path.exists());
+    // The daemon at boot, signed out too, once.
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 1);
+    let install = |name: &str| {
+        let program = bin.path().join(name);
+        fs::write(&program, "#!/bin/sh\n").unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    };
+    // Hermes alone installed: the lamp is its own target with Hermes,
+    // under its own id.
+    install("hermes");
+    targets_until(&s, json!([{"alias":"lamp","engine":"hermes"}]));
+    let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    let targets = written["targets"].as_object().unwrap();
+    assert_eq!(targets.len(), 1, "{written}");
+    assert_eq!(targets["lamp"]["machine_id"], COMPUTER);
+    assert_eq!(targets["lamp"]["engine"], "hermes");
+    assert_eq!(targets["lamp"]["project"], "~/harnesses/lamp-tasks/lamp");
+    assert!(home.path().join("harnesses/lamp-tasks/lamp").is_dir());
+    let report = tasks_diagnostic_until(&s, |d| {
+        said(d, "handovers_off").as_deref() == Some("computers_need_sign_in")
+    });
+    assert_eq!(
+        report.message,
+        "Harness is not signed in: tasks go to the lamp's own agent; sign in to hand tasks to your computers"
+    );
+    // The voice's call with no `where` prepares for `lamp`, and it starts.
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(
+        *s.counts.launched_on.lock().unwrap(),
+        [(COMPUTER.to_owned(), EngineKind::Hermes)]
+    );
+    // OpenClaw installed too: the one chosen first, still under its own id.
+    install("openclaw");
+    targets_until(&s, json!([{"alias":"lamp","engine":"openclaw"}]));
+    let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(written["targets"]["lamp"]["machine_id"], COMPUTER);
+    assert_eq!(written["targets"]["lamp"]["engine"], "openclaw");
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(
+        s.counts.launched_on.lock().unwrap().last(),
+        Some(&(COMPUTER.to_owned(), EngineKind::Openclaw))
+    );
+    assert_eq!(s.counts.machine_reads.load(Ordering::SeqCst), 0);
+    // Switched off (no lamp side): nothing of this, as before.
+    drop(s);
+    let (mut off, path) = engines_running(true);
+    off.config.sign_in_by_code = true;
+    off.counts.signed_out.store(true, Ordering::SeqCst);
+    *off.counts.computer.lock().unwrap() = Some(COMPUTER.into());
+    off.start();
+    let start = Instant::now();
+    while off.counts.sign_in_reads.load(Ordering::SeqCst) < 5 {
+        assert!(start.elapsed() < Duration::from_secs(5), "no sign-in read");
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(told_targets(&off), 0);
+    assert!(!path.exists());
+    assert_eq!(off.counts.daemon_starts.load(Ordering::SeqCst), 0);
 }
 
 /// #5978, the PM: with `LAMP_HERMES_ON_LAMP` off (unset, `off`, or any

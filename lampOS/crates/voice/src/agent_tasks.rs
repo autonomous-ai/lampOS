@@ -7589,6 +7589,56 @@ pub(crate) mod tests {
         }
     }
 
+    /// #6407: signed out, a lamp whose own engine is its target still hands
+    /// work to it, so the words say only the computers need the sign-in,
+    /// never that nothing works until it is signed in.
+    #[test]
+    fn harness_status_signed_out_with_the_lamps_own_target_says_computers_need_the_sign_in() {
+        let call = ToolCall {
+            id: "c".into(),
+            name: STATUS.into(),
+            args: json!({}),
+        };
+        for sign_in in [true, false] {
+            let directory = std::env::temp_dir().join(format!(
+                "agent-tasks-status-here-{}-{sign_in}",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_dir_all(&directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            let _seen = tasks_part(
+                &directory,
+                vec![
+                    (
+                        "request.sock",
+                        json!({"ok":true,"store_id":"s1","revision":3,"signed_in":"no","summary":{}}),
+                    ),
+                    (
+                        "request.sock",
+                        json!({"ok":true,"targets":[{"alias":"lamp","engine":"hermes"}]}),
+                    ),
+                    ("request.sock", json!({"ok":false,"error":"progress_off"})),
+                ],
+            );
+            let place = Place {
+                harness_status: true,
+                sign_in,
+                ..serving_place(&directory)
+            };
+            let (answered, ok) = run_for(&place, &[], &call, 3, true, PEER_WAIT);
+            assert!(ok, "{answered}");
+            assert_eq!(answered["signed_in"], "no");
+            let next = answered["next"].as_str().unwrap();
+            assert!(
+                next.starts_with(
+                    "signed_in no: Harness is not signed in, so work goes to the lamp's own agent; sign in to hand tasks to your computers"
+                ),
+                "{next}"
+            );
+            std::fs::remove_dir_all(&directory).unwrap();
+        }
+    }
+
     /// #6061 part B: a `status` the tasks part refuses is the light words of
     /// a part that can't do it, its code alone journalled.
     #[test]
