@@ -613,6 +613,23 @@ pub fn say_line_at(socket: &Path, line: &str) -> Option<crate::say::Outcome> {
     })
 }
 
+/// One short `line` said while a voice make goes on (the lamp's agent
+/// writing it, `LAMP_MAKE_SKILL_AGENT`), asked as written on the say socket
+/// at `socket` under [`VOICE_MAKE_SKILL`], not begun after `within_ms`.
+/// Asked once, never again after a drop; nothing waits on it but the
+/// caller's own thread. Its outcome is journaled.
+pub fn say_waiting_at(socket: &Path, line: &str, within_ms: u64) {
+    let answered = socket_ask(socket, line, false, within_ms);
+    let outcome = loop {
+        match answered.recv() {
+            Ok(crate::say::Answer::Done(outcome)) => break Some(outcome),
+            Ok(_) => continue,
+            Err(_) => break None,
+        }
+    };
+    eprintln!("lamp-voice: a skill made by voice: its waiting line: {outcome:?}");
+}
+
 /// One ask of `words` on the say socket at `socket`, as a note or as
 /// written, not begun after `within_ms`: its answers, read until the
 /// outcome. The receiver's sender is dropped, with no outcome, when the

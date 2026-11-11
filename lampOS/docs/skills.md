@@ -3265,6 +3265,66 @@ Tests:
   `made::a_made_skill_goes_on_through_the_helper_with_no_yes` (the
   voice's call through the real helper).
 
+##### Handed to the lamp's agent when DeepSeek fails (`LAMP_MAKE_SKILL_AGENT=on`, off, proposal on #6059)
+
+A proposal on #6059 (the owner's OK, 11 Nov), with the first builder's
+yes (Queue #6059, 11 Nov 22:44 +07). With the switch, a voice make the lamp's own model didn't
+make goes to the lamp's own agent, OpenClaw or Hermes, as V1's
+skill-creator handed a make to its agent (`crate::make_skill_agent`). Only
+the writer changes; the tidies, `lamp-skills pack`, the say-back, the
+repairs' briefs and the keeping are the same code for both writers.
+
+- **The order.** DeepSeek writes first, as without the switch. With an
+  agent on the lamp (the tasks part's `lamp` target, read with
+  `{"op":"targets"}` before DeepSeek is asked), DeepSeek gets one try and
+  no repairs. If that one answer isn't kept (the tidies, the check, the
+  say-back, its own `cannot:`, or no answer at all), it goes to the agent
+  at once, with the same system prompt and request, and the agent gets
+  the repairs (up to 3, `MOST_REPAIRS`). Its answers go through the very
+  same checks. With no agent on the lamp, DeepSeek keeps its 3 repairs and
+  its failure stands, as today.
+- **How the agent is reached.** The way the voice hands it any work
+  (`crate::agent_tasks`, #5978, #6226): prepared for the `lamp` target on
+  the tasks part's request socket and confirmed at once on the voice's own
+  socket (the person's spoken ask is the ask), then read from the task's
+  observations, which `lamp-tasks serve --push-wait` keeps as soon as the
+  agent ends its turn, looked at every 0.5 s. No new transport. The tasks
+  part takes 2,000 bytes of text and the system prompt is longer, so the
+  system prompt and the brief go in a file of their own,
+  `/run/lampos-make-skill/make-<random>.md` (the folder 0711, the file
+  0644, removed once the answer is in), which the task names. The task's
+  text begins as a brief does (`made_skill::is_brief`), so its answer, or
+  its failed hand-over, is never told as news. Once read, the answer is
+  marked told, so `--close-told` closes the agent's session.
+- **Bounds.** Each of the agent's answers within 45 s
+  (`make_skill_agent::WRITE_WITHIN`); a repair is begun only while one
+  more answer fits the agent's 120 s (`make_skill_agent::MAKE_WITHIN`).
+  No answer from it in 45 s, an error, or its first answer not given:
+  DeepSeek's failure stands, as today. A make can then go on up to 240 s,
+  which the second route's wait for a make's line follows
+  (`make_skill_local::longest_make`).
+- **What is heard.** "I'll make it now" is said at once, unchanged. As the
+  agent begins, the lamp says "Let me think about that a little longer."
+  through the say service (`app_make::say_waiting_at`, once, not begun
+  after 15 s). The made line is the same either way.
+- **The journal.** "made by DeepSeek", "DeepSeek failed: handed to the
+  agent (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes)
+  wasn't kept", "the agent (Hermes) made none (no answer within 45 s):
+  DeepSeek's failure stands", "no agent on the lamp: DeepSeek makes it
+  alone"; an agent's repair says "by the agent".
+- **Off** (unless set, in no product unit): nothing above; the path is
+  byte for byte today's. The app's typed makes stay DeepSeek's.
+- **Tests:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
+  `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
+  `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`, and
+  `make_skill_agent::tests` (the rules in a file, the task a brief within
+  2,000 bytes, confirmed and told; no `lamp` target is no agent; a silent
+  agent times out).
+- **Not yet shown on a lamp:** its row, the 16 makes (twelve simple, four
+  known DeepSeek failures) on a lamp with an agent, comparing kept, the
+  say-back and the time with DeepSeek's. Which user the agent runs as is part 1's (install); the
+  rules file is readable by any user for that reason.
+
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
 The same maker, from words typed in the app; put on as above, at once,

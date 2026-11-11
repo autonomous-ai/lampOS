@@ -535,7 +535,7 @@ fn where_description(name: &str) -> String {
 /// The lamp's own target in the targets answer, OpenClaw or Hermes
 /// (#5978, #6226): the name the person calls its engine by, or `None`
 /// without it.
-fn lamp_target_in(answer: &Value) -> Option<&'static str> {
+pub(crate) fn lamp_target_in(answer: &Value) -> Option<&'static str> {
     if answer.get("ok") != Some(&json!(true)) {
         return None;
     }
@@ -3669,13 +3669,13 @@ fn next(
 
 /// The tasks part's guard for a mutation: its store, its revision now, and
 /// a request id of our own.
-fn guard(status: &Value, request_id: String) -> Option<Value> {
+pub(crate) fn guard(status: &Value, request_id: String) -> Option<Value> {
     let store = status.get("store_id")?.as_str()?;
     let revision = status.get("revision")?.as_u64()?;
     Some(json!({"store_id": store, "revision": revision, "request_id": request_id}))
 }
 
-fn ask(socket: &Path, line: &Value, deadline: Duration) -> Option<Value> {
+pub(crate) fn ask(socket: &Path, line: &Value, deadline: Duration) -> Option<Value> {
     if deadline.is_zero() {
         return None;
     }
@@ -3695,7 +3695,11 @@ const AGAIN_AFTER: Duration = Duration::from_millis(100);
 /// were answered `uncertain` after 1.1 s, while the lamp's disk was busy just
 /// after a restart, and the lamp said the work could not be prepared; the
 /// tasks part had prepared each of them a moment later.
-fn ask_until_sure(socket: &Path, line: &Value, left: impl Fn() -> Duration) -> Option<Value> {
+pub(crate) fn ask_until_sure(
+    socket: &Path,
+    line: &Value,
+    left: impl Fn() -> Duration,
+) -> Option<Value> {
     loop {
         let answer = ask(socket, line, left())?;
         let again = answer.get("ok") != Some(&json!(true))
@@ -3710,7 +3714,7 @@ fn ask_until_sure(socket: &Path, line: &Value, left: impl Fn() -> Duration) -> O
     }
 }
 
-fn nonce() -> u128 {
+pub(crate) fn nonce() -> u128 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_nanos())

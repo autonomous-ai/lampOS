@@ -1505,6 +1505,10 @@ fn read_once_with(
                 if !told.contains(&key)
                     && !offered.contains(&key)
                     && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
+                    // A make handed to the lamp's agent
+                    // (`LAMP_MAKE_SKILL_AGENT`): the voice says what became
+                    // of it, never this news.
+                    && !crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default())
                     && let Some(note) = note_failed(&words, &task, failed, code)
                 {
                     news.push(News {

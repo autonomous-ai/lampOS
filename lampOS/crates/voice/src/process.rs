@@ -2064,6 +2064,8 @@ fn second_route_worker_environment(
         // A skill made by this worker's own chat (Fourteen's proposal on #4710),
         // the only maker since 3 Nov.
         crate::made_skill::ENVIRONMENT,
+        // A make it didn't make handed to the lamp's agent (#6059's proposal).
+        crate::make_skill_agent::ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -2308,6 +2310,7 @@ mod tests {
             crate::untied_going_on::GRACE_ENVIRONMENT,
             crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT,
             crate::made_skill::ENVIRONMENT,
+            crate::make_skill_agent::ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::opens_further::ENVIRONMENT,
@@ -3202,6 +3205,7 @@ mod tests {
                     || name == crate::untied_going_on::GRACE_ENVIRONMENT
                     || name == crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT
                     || name == crate::made_skill::ENVIRONMENT
+                    || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::opens_further::ENVIRONMENT
@@ -3369,6 +3373,7 @@ mod tests {
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MAKE_SKILL=on",
+                    "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_DONT_KNOW_RECALLS=on",
                     "LAMP_MEMORY_DOUBT_UNDOES=on",
