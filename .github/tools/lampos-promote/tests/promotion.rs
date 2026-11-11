@@ -90,8 +90,10 @@ impl Fake {
                 },
             },
             jobs: [
-                "lampOS — build and test on Linux ARM64 (1/1)",
+                "lampOS — build and test on Linux ARM64 (1/3)",
                 "lampOS — sign and publish the tested lamp-voice artifact",
+                "lampOS — build and test on Linux ARM64 (2/3)",
+                "lampOS — build and test on Linux ARM64 (3/3)",
             ]
             .map(|name| Job {
                 name: name.into(),
@@ -508,7 +510,7 @@ fn wrong_trusted_key_refuses_before_writes() {
 }
 #[test]
 fn source_provenance_must_match_original_successful_attempt() {
-    for change in 0..13 {
+    for change in 0..15 {
         let mut fake = Fake::new(Some(9));
         match change {
             0 => fake.run.run_attempt = 3,
@@ -527,6 +529,9 @@ fn source_provenance_must_match_original_successful_attempt() {
                     .insert("lampos-lamp-voice-10".into(), "b".repeat(40));
             }
             12 => fake.releases[0].body = "unproven release".into(),
+            // A later test runner of the same build failed, or none is there.
+            13 => fake.jobs[3].conclusion = Some("failure".into()),
+            14 => fake.jobs.retain(|j| !j.name.contains("ARM64")),
             _ => unreachable!(),
         }
         assert!(promote(&mut fake, &context(10)).is_err(), "case {change}");
