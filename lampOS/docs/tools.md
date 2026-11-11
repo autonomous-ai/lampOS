@@ -311,9 +311,24 @@ and none of the skills' own (`crate::use_skill`):
   before. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
   lines naming those asks, and "Lamp, movie light." (2 of 2) and "Lamp,
   show me a light show." (3 of 3) were answered in words with no call;
-  "reading light" and "light my book" did call. Host tests:
+  "reading light" and "light my book" did call. A line that is only a
+  plain question about the lamp itself, whole ("who made you", "who
+  built you", "what company made you", "where can I buy you", "where can
+  I get you", "where can I buy one", "where can I buy a lamp like you",
+  "how much do you cost", "how much are you", "what's your price" and the
+  like; `tools::skill_asked::asks_about`), with only a greeting, the
+  lamp's name, "please" or "thanks" around it, is forced the same way to
+  the help skill: `skill` told only `lamp_help` (faq's function: `use_skill`
+  names a skill by its function, as `light_scene` for light-scenes); the
+  topic is still the model's. A question with any other word ("who made
+  you sad", "where can I buy milk", "do you know who made you") is the
+  model's. On build 11756 on 11 Nov (#6216's row) "Hey Lamp, who made
+  you?" and "Hey Lamp, where can I buy you?" called nothing, and the
+  second said "autonomous.ai" without faq's /lamp page. Host tests:
   `a_plain_ask_for_a_scene_or_a_show_is_told_apart`,
-  `a_plain_ask_forces_its_skill_only_when_offered`.
+  `a_plain_ask_forces_its_skill_only_when_offered`,
+  `a_plain_question_about_the_lamp_asks_its_help`,
+  `a_plain_question_about_the_lamp_forces_its_help_only_when_offered`.
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
