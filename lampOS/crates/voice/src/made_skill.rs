@@ -1154,9 +1154,9 @@ fn says_aloud(table: &toml::Table) -> bool {
 /// same text. Anything else, or a skill that can't be read, is given back
 /// as it came. Then every skill that starts itself is given the runtime's
 /// manners ([`mannered`], #6066 (a)): both the floors and the manners apply.
-/// First the fields that can't apply are taken out ([`tidied`]), and its
-/// trigger's own topic is put in its `[permissions] topics` when the model
-/// left it out ([`topic_granted`]).
+/// First the fields that can't apply are taken out ([`tidied`]), and the
+/// topics its trigger and a look at a face read are put in its
+/// `[permissions] topics` when the model left them out ([`topic_granted`]).
 pub fn paced(text: &str) -> String {
     paced_asked(text, &[])
 }
@@ -1381,40 +1381,63 @@ fn entries_of(line: &str, key: &str) -> Vec<(usize, usize)> {
     spans
 }
 
-/// A made skill's `skill.toml` with its `[trigger]`'s topic in its
-/// `[permissions] topics`, added when the model left it out (lamp-9adf, 11
-/// Nov 05:36: "dims the light at 10 pm" written on `clock/local` with no
-/// such grant, which `lamp-skills` refuses: a skill reads only the topics
-/// it is given). Its trigger reads that topic whatever the grant says, so
-/// adding it gives the skill nothing its trigger didn't already name, and
-/// the say-back names it ([`plainly`]). Added as a line in `[permissions]`,
-/// the topic written last in a one-line `topics` or as one of its own, so
+/// A made skill's `skill.toml` with the topics its own parts read in its
+/// `[permissions] topics`, added when the model left them out: its
+/// `[trigger]`'s topic (lamp-9adf, 11 Nov 05:36: "dims the light at 10 pm"
+/// written on `clock/local` with no such grant, which `lamp-skills`
+/// refuses: a skill reads only the topics it is given), and the faces in
+/// view ([`FACES_TOPIC`]) for a step's look at a face, `body = { look_at =
+/// "face" }` (lamp-9adf, 11 Nov 17:0x: "when someone sits down, look at
+/// them and say hi" failed all three repairs on "a look at a face reads
+/// humans/faces/tracked"). Its trigger and its look read those topics
+/// whatever the grant says, so adding them gives the skill nothing its
+/// parts didn't already name, and the say-back says them ([`plainly`]: the
+/// trigger, and "turns to the face it sees"). No other grant is added: a
+/// look still needs `body = true`, a real grant the person hears, which
+/// the check asks the model for. Added as a line in `[permissions]`, the
+/// topics written last in a one-line `topics` or as one of its own, so
 /// what is checked, said and packed is one text; a skill written otherwise
 /// (its grants inline or dotted, its topics over several lines), or one
-/// that then doesn't read as the same skill with that one topic more, is
+/// that then doesn't read as the same skill with those topics more, is
 /// given back as it came, and the check says why.
 pub fn topic_granted(text: &str) -> String {
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
     };
-    let Some(topic) = table
+    let trigger = table
         .get("trigger")
         .and_then(|trigger| trigger.get("topic"))
-        .and_then(toml::Value::as_str)
-    else {
-        return text.to_owned();
-    };
+        .and_then(toml::Value::as_str);
+    // A look at a face, as `lamp-skills` reads one: a `[[do]]` step's
+    // `body` with `look_at = "face"`.
+    let looks = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|steps| {
+            steps.iter().any(|step| {
+                step.get("body")
+                    .and_then(|body| body.get("look_at"))
+                    .and_then(toml::Value::as_str)
+                    == Some("face")
+            })
+        });
     let permissions = table.get("permissions");
     let granted: Vec<toml::Value> = match permissions.map(|granted| granted.get("topics")) {
         None | Some(None) => Vec::new(),
         Some(Some(toml::Value::Array(topics))) => topics.clone(),
         Some(Some(_)) => return text.to_owned(),
     };
-    if granted.iter().any(|given| given.as_str() == Some(topic)) {
+    let mut topics = granted;
+    let mut added = false;
+    for topic in trigger.into_iter().chain(looks.then_some(FACES_TOPIC)) {
+        if !topics.iter().any(|given| given.as_str() == Some(topic)) {
+            topics.push(toml::Value::String(topic.to_owned()));
+            added = true;
+        }
+    }
+    if !added {
         return text.to_owned();
     }
-    let mut topics = granted;
-    topics.push(toml::Value::String(topic.to_owned()));
     // Each a basic string, as JSON writes one: the round trip below holds
     // the text to the same topics.
     let Some(quoted) = topics
@@ -9069,6 +9092,100 @@ light = { colour = "green", level = 3, for = "20s" }
         assert_eq!(
             topic_granted(&TOML.replace("[trigger]", "[when]")),
             TOML.replace("[trigger]", "[when]")
+        );
+    }
+
+    /// lamp-9adf, 11 Nov 17:0x: "when someone sits down, look at them and
+    /// say hi" failed all three repairs, its look at a face written with no
+    /// `humans/faces/tracked` in its topics, which `lamp-skills` refuses:
+    /// that topic, the one its look reads, is put in its topics, beside its
+    /// trigger's when that is left out too; no other grant is added, and a
+    /// skill written otherwise is given back as it came.
+    #[test]
+    fn a_made_looks_faces_topic_is_granted() {
+        let presence = "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n";
+        let look = "body = { look_at = \"face\" }";
+        let topics = |text: &str| -> Vec<String> {
+            let table: toml::Table = toml::from_str(text).unwrap();
+            table["permissions"]["topics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|topic| topic.as_str().unwrap().to_owned())
+                .collect()
+        };
+        let all = "topics = [\"humans/faces/tracked\", \"room/stood_up\", \"clock/local\"]";
+        // Its trigger's topic granted, the faces left out: added last.
+        let made = made_with(presence, look).replace(all, "topics = [\"room/presence\"]");
+        let granted = topic_granted(&made);
+        assert_eq!(topics(&granted), ["room/presence", "humans/faces/tracked"]);
+        // Nothing else changed: the same skill with that one topic more.
+        assert_eq!(
+            granted.replace(", \"humans/faces/tracked\"]", "]"),
+            made,
+            "{granted}"
+        );
+        // Granted already: as it came.
+        let given = made_with(presence, look).replace(
+            all,
+            "topics = [\"room/presence\", \"humans/faces/tracked\"]",
+        );
+        assert_eq!(topic_granted(&given), given);
+        // Its trigger's topic left out too: both added, the trigger's first.
+        let neither = made_with(presence, look).replace(&format!("{all}\n"), "");
+        assert_eq!(
+            topics(&topic_granted(&neither)),
+            ["room/presence", "humans/faces/tracked"]
+        );
+        // A look in a later step, as a table of its own: found.
+        let later = made_with(presence, "say = { text = \"Hi!\" }")
+            .replace(all, "topics = [\"room/presence\"]")
+            + "\n[[do]]\n[do.body]\nlook_at = \"face\"\n";
+        assert_eq!(
+            topics(&topic_granted(&later)),
+            ["room/presence", "humans/faces/tracked"]
+        );
+        // No body grant is added: a look still needs the person to hear it.
+        let bodiless = made.replace("body = true\n", "");
+        let granted = topic_granted(&bodiless);
+        assert!(!granted.contains("body = true"), "{granted}");
+        assert_eq!(topics(&granted), ["room/presence", "humans/faces/tracked"]);
+        // No look, or a look at something else: nothing added.
+        let nod = made_with(presence, "body = { gesture = \"nod\" }")
+            .replace(all, "topics = [\"room/presence\"]");
+        assert_eq!(topic_granted(&nod), nod);
+        let elsewhere = made.replace("look_at = \"face\"", "look_at = \"door\"");
+        assert_eq!(topic_granted(&elsewhere), elsewhere);
+        // Grants inline, or topics over several lines: as it came.
+        let inline = made.replace(
+            "[permissions]\nlight = true\nbody = true\ntopics = [\"room/presence\"]\n",
+            "permissions = { body = true, topics = [\"room/presence\"] }\n",
+        );
+        assert!(inline.contains("permissions = {"), "{inline}");
+        assert_eq!(topic_granted(&inline), inline);
+        let lines = made.replace(
+            "topics = [\"room/presence\"]",
+            "topics = [\n  \"room/presence\",\n]",
+        );
+        assert_eq!(topic_granted(&lines), lines);
+        // Paced with it, and so passed by the cap and said.
+        let paced_made = paced(&made);
+        assert_eq!(
+            topics(&paced_made),
+            ["room/presence", "humans/faces/tracked"]
+        );
+        assert!(
+            capped_with(&paced_made, false)
+                .unwrap()
+                .1
+                .topics
+                .contains(&"humans/faces/tracked".to_owned())
+        );
+        assert!(
+            plainly_with(&paced_made, false)
+                .unwrap()
+                .contains("turns to the face it sees"),
+            "{paced_made}"
         );
     }
 

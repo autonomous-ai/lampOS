@@ -331,9 +331,16 @@ sau:
      `topics` riêng trong `[permissions]`, hoặc thành một bảng
      `[permissions]` trước `[trigger]` khi chưa có. Trigger vẫn đọc topic
      đó bất kể quyền ghi gì, nên kỹ năng không được thêm gì ngoài điều
-     trigger đã nêu, và câu nói lại có nêu nó. Quyền viết inline hoặc dạng
-     có dấu chấm, hay `topics` trải trên nhiều dòng, được trả lại nguyên
-     như khi đến, và bước kiểm tra nói lý do.
+     trigger đã nêu, và câu nói lại có nêu nó. Tương tự, một bước nhìn
+     vào khuôn mặt (`body = { look_at = "face" }`) được cấp
+     `humans/faces/tracked`, topic mà bước nhìn đọc (lamp-9adf, 11/11
+     17:0x: "when someone sits down, look at them and say hi" thất bại cả
+     ba lần sửa vì "a look at a face reads humans/faces/tracked"); câu nói
+     lại nói nó là "turns to the face it sees". Chỉ các topic đó được
+     thêm: `body = true` của bước nhìn là một quyền thật mà người dùng
+     được nghe, không bao giờ được thêm thay mô hình. Quyền viết inline
+     hoặc dạng có dấu chấm, hay `topics` trải trên nhiều dòng, được trả
+     lại nguyên như khi đến, và bước kiểm tra nói lý do.
    - **Điều không áp dụng được thì bị bỏ ra** (lamp-74ff, 11/11
      09:48-09:50: "nod when I stand up", yêu cầu từ app, trượt cả ba lần
      sửa, hai lần liền: `speak = true` mà không nói gì, một `for` trên

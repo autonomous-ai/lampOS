@@ -998,6 +998,48 @@ fn a_made_nod_when_i_stand_up_is_tidied_and_packed() {
     assert_eq!(tars(&keeping.directory).len(), 1);
 }
 
+/// lamp-9adf, 11 Nov 17:0x: "when someone sits down, look at them and say
+/// hi" failed all three repairs, `lamp-skills` refusing "a look at a face
+/// reads humans/faces/tracked, and humans/faces/tracked is not in
+/// [permissions] topics". The topic its look reads is put in its topics
+/// before the check, and the real `lamp-skills pack` keeps it, said as a
+/// turn to the face and a hi; its body grant is the model's own, never
+/// added.
+#[test]
+fn a_made_look_and_hi_when_someone_sits_down_is_granted_its_faces_and_packed() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let toml = made_body(
+        "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n",
+        "body = { look_at = \"face\" }\n\n[[do]]\nsay = { text = \"Hi!\" }",
+    )
+    .replace(
+        "topics = [\"humans/faces/tracked\", \"room/stood_up\", \"clock/local\"]\nbody = true\n",
+        "topics = [\"room/presence\"]\nbody = true\nspeak = true\n",
+    );
+    // As the lamp's model wrote it: a look with no faces in its topics.
+    assert!(!toml.contains("humans/faces/tracked"), "{toml}");
+    let made = keep_asked(
+        &answer(&toml, "sit-hi"),
+        false,
+        "s1:sit-hi:1",
+        &keeping,
+        &Asked {
+            request: "when someone sits down, look at them and say hi",
+            ..Asked::default()
+        },
+    )
+    .unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert_eq!(made.uses.topics, ["room/presence", "humans/faces/tracked"]);
+    assert!(made.uses.body && made.uses.speak);
+    assert!(
+        made.description.contains("turns to the face it sees") && made.description.contains("Hi!"),
+        "{}",
+        made.description
+    );
+    assert_eq!(tars(&keeping.directory).len(), 1);
+}
+
 /// #6070, the Reviewer-lead's P2: a made skill on a face coming into view
 /// that only moves, made by voice with no `absent_for`, kept, put on and
 /// run by the real engine. Someone at the desk who glances away for a frame

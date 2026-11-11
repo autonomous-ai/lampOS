@@ -2499,8 +2499,15 @@ gone ([switches.md](switches.md)). What happens:
      or as a `[permissions]` table before `[trigger]` when there is none.
      The trigger reads that topic whatever the grant says, so the skill
      gains nothing its trigger didn't name, and the said-back line names
-     it. Grants written inline or dotted, or `topics` over several lines,
-     are given back as they came, and the check says why.
+     it. In the same way, a step's look at a face (`body = { look_at =
+     "face" }`) is given `humans/faces/tracked`, the topic the look reads
+     (lamp-9adf, 11 Nov 17:0x: "when someone sits down, look at them and
+     say hi" failed all three repairs on "a look at a face reads
+     humans/faces/tracked"); the said-back line says it as "turns to the
+     face it sees". Only those topics are added: a look's `body = true`
+     is a real grant the person hears, never added for the model. Grants
+     written inline or dotted, or `topics` over several lines, are given
+     back as they came, and the check says why.
    - **What can't apply is taken out** (lamp-74ff, 11 Nov 09:48-09:50:
      "nod when I stand up", asked from the app, failed all three repairs
      twice: `speak = true` with nothing said, a `for` on its
