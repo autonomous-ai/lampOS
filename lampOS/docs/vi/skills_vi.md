@@ -676,9 +676,28 @@ sau:
      photo booth: …", không bao giờ là "it's on"; `uses` của ứng dụng mang
      `code` và `grants`.
    - **Không bao giờ bật ngay.** `made_skill::put_on` từ chối nó và giữ lý
-     do (`made_skill::CODE_BY_VOICE`), nên MAKE IT của ứng dụng để nó tắt và
-     nói "I made it but couldn't put it on: a skill that runs its own code
-     goes on only once you agree to it out loud; ask me for it by voice."
+     do (`made_skill::CODE_BY_VOICE`), nên câu trả lời `made` của ứng dụng
+     vẫn là `not_kept`, lý do "it couldn't be put on: a skill that runs its
+     own code goes on only once you agree to it out loud at the lamp, after
+     it says what that code may use".
+   - **Tạo từ ứng dụng, đọc lại tại đèn.** MAKE IT của ứng dụng
+     (`app_make::put_on_line`) sau đó giữ nó là đã hỏi
+     (`made_skill::code_asked`, `code_asked_at_unix_ms`) và để đèn nói đúng
+     câu của lần tạo bằng giọng nói ("I made photo booth: …"), được báo cho
+     giọng nói nguyên văn như lời đọc lại của lần tạo bằng giọng nói
+     (`say_note` của `app_make`: `made_skill::ALREADY_DONE` và
+     `skill_write_yes::say_whole`), ở mức ưu tiên câu của ứng dụng. Khi
+     route thứ hai nhận câu đó như một lượt viết (không bao giờ là câu
+     trích của add-on) trong thời gian chờ lâu nhất của dịch vụ nói kể từ
+     lúc hỏi (`make_skill_local::app_code_asked`), lời đồng ý của kỹ năng
+     chờ ở đó qua đúng cơ chế chờ của lần tạo bằng giọng nói
+     (`skill_write_yes::wait_for_yes_noted`) từ request đó, lượt kết thúc
+     như của lần tạo bằng giọng nói (`skill_write_yes::then_wait`); vì
+     lịch sử không giữ câu trả lời của lời gọi nào, mỗi dòng nghe được sau
+     đó được báo `approve_id` của nó trong một ghi chú
+     (`skill_write_yes::waiting_note`). Lời đồng ý sau đó được nhận đúng
+     như của lần tạo bằng giọng nói, bên dưới. Chỉ được nói trên route
+     Live, hoặc không bao giờ được nói, thì không có gì chờ và nó vẫn tắt.
      Bằng giọng nói, lần tạo chờ lời đồng ý qua đúng cơ chế chờ của lần ghi
      (`crate::skill_write_yes`, `Asks::code`), với mọi chốt chặn của nó:
      phải nói đủ trước (câu về mã là phần phải được nghe), chỉ một dòng
