@@ -2985,3 +2985,18 @@ def test_a_fake_lamp_with_grants_all_takes_every_grant_the_protocol_names_and_th
     for slip in ("hear", "All", ""):
         with pytest.raises(ValueError):
             FakeLamp(grants=slip)
+
+
+def test_a_missing_camera_grant_says_the_app_does_not_grant_it_and_another_keeps_its_short_words(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path / "light")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]) as camera:
+                    await lamp.camera_snapshot()
+                assert camera.value.why == "not granted: camera (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
+                with pytest.raises(errors.BY_CODE["no_grant"]) as say:
+                    await lamp.say("x")
+                assert say.value.why == "not granted: speak"
+
+    run(go())

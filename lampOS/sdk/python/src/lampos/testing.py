@@ -438,6 +438,15 @@ AIR = {"pm1_0": 2.1, "pm2_5": 5.3, "pm4_0": 6.8, "pm10": 7.9, "co2_ppm": 620, "h
 DEVICE = {"cpu_load": 0.25, "memory_used": 0.4, "disk_free": 0.6, "uptime_s": 3600,
           "temperature_c": {"cpu_thermal": 55.0}, "known": True}
 
+def _not_granted(missing: list[str]) -> str:
+    """What the lamp says for a missing grant (lamp-control's `not_granted`): for `camera` and `microphone` it
+    says the way out."""
+    said = f"not granted: {', '.join(missing)}"
+    if any(g in ("camera", "microphone") for g in missing):
+        return f"{said} (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
+    return said
+
+
 class FakeLamp:
     """A lamp that speaks the protocol on 127.0.0.1 and records what it's asked."""
 
@@ -1122,7 +1131,7 @@ class FakeLamp:
         grants = self.clients[client]["grants"]
         missing = [g for g in self._needs(op, request) if g not in grants]
         if missing:
-            await self._refuse(ws, id_, "no_grant", f"needs {missing[0]}")
+            await self._refuse(ws, id_, "no_grant", _not_granted(missing))
             return
         if self._refusals[op]:
             code, why, retry_ms = self._refusals[op].pop(0)

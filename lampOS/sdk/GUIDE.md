@@ -216,7 +216,8 @@ refusals in the lamp's own words, and its status.
   so. *Planned* means it is named in the protocol but nothing serves it yet.
 - **Every op but `pair` and `hello`** needs `hello` first on the connection (`no_hello`,
   "say hello first"). A missing grant is always `no_grant`, "not granted: …" with the grant's
-  name.
+  name; for `camera` and `microphone` it adds "(the app does not grant it yet: only a pairing code made on the lamp itself carries it)",
+  since the app does not offer these two (the fakes say the same).
 - **The rates are off by default** on customer lamps (`limits.rates` is `"off"`). The rates in
   the Limits column hold only where the lamp's `--rates default` is set, except the phrase
   cap and "refused actions: 20 a second", which always hold.

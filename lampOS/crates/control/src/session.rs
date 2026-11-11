@@ -762,10 +762,7 @@ impl Door {
             .map(|grant| json!(grant).as_str().unwrap_or_default().to_owned())
             .collect();
         if !missing.is_empty() {
-            return refuse(
-                ErrorCode::NoGrant,
-                format!("not granted: {}", missing.join(", ")),
-            );
+            return refuse(ErrorCode::NoGrant, not_granted(&missing));
         }
         if session.remote
             && op
@@ -1505,6 +1502,24 @@ fn refused_by_lease(re: u64, refusal: Refusal) -> Outcome {
     reply_refused(Some(re), error)
 }
 
+/// What a refusal for a missing grant says. For `camera` and `microphone` it adds the honest way out: the app
+/// does not offer these two (App Only, 11 Nov), only a pairing code made on the lamp itself carries them (a
+/// developer who needed them, #6257's author, edited the pairing by hand).
+pub(crate) const APP_DOES_NOT_GRANT_HINT: &str =
+    "the app does not grant it yet: only a pairing code made on the lamp itself carries it";
+
+fn not_granted(missing: &[String]) -> String {
+    let said = format!("not granted: {}", missing.join(", "));
+    if missing
+        .iter()
+        .any(|grant| grant == "camera" || grant == "microphone")
+    {
+        format!("{said} ({APP_DOES_NOT_GRANT_HINT})")
+    } else {
+        said
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2098,6 +2113,44 @@ mod tests {
         let unknown = door.handle(&mut session, say, &mut fake, 2 * S, at(12));
         assert_eq!(code_of(&unknown), Some("quiet_hours"));
         assert!(fake.did.is_empty());
+    }
+
+    /// A refusal for `camera` or `microphone` says the app doesn't grant it yet (only a code made on the lamp does); the others keep
+    /// their short words.
+    #[test]
+    fn a_missing_camera_or_microphone_grant_says_the_app_does_not_grant_it() {
+        let send = |door: &mut Door, session: &mut Session, fake: &mut Fake, frame: &str| {
+            door.handle(session, frame, fake, 2 * S, 1)
+        };
+        let (mut door, mut session, mut fake) = paired(&Computer::new(1), &[Grant::Light]);
+        let refused = send(
+            &mut door,
+            &mut session,
+            &mut fake,
+            r#"{"id":3,"op":"camera.snapshot"}"#,
+        );
+        assert_eq!(code_of(&refused), Some("no_grant"));
+        assert_eq!(
+            reply(&refused)["error"]["why"],
+            "not granted: camera (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
+        );
+        let refused = send(
+            &mut door,
+            &mut session,
+            &mut fake,
+            r#"{"id":4,"op":"microphone.stream","on":true}"#,
+        );
+        assert_eq!(
+            reply(&refused)["error"]["why"],
+            "not granted: microphone (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
+        );
+        let refused = send(
+            &mut door,
+            &mut session,
+            &mut fake,
+            r#"{"id":5,"op":"say","text":"x"}"#,
+        );
+        assert_eq!(reply(&refused)["error"]["why"], "not granted: speak");
     }
 
     /// docs/control.md, "Turns and listening": `turn.start` needs `speak`
