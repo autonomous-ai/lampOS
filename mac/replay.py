@@ -46,20 +46,25 @@ def tap(path):
 
 
 def requests(items):
-    """{request: (first_at, finished text, else the longest)}"""
+    """{request: (first_at, text)}. A finished piece with text is the whole
+    line (voice/heard); else the pieces are joined in order (voice/said
+    streams its reply in pieces and ends with an empty finished one)."""
     reqs = {}
     for at, p in items:
-        text = (p.get("text") or "").strip()
-        if not text:
-            continue
+        text = p.get("text") or ""
         r = p.get("request", f"t{int(at)}")
-        first, best, fin = reqs.get(r, (at, "", False))
-        if p.get("finished"):
-            best, fin = text, True
-        elif not fin and len(text) > len(best):
-            best = text
-        reqs[r] = (min(first, at), best, fin)
-    return {r: (v[0], v[1]) for r, v in reqs.items()}
+        first, pieces, whole = reqs.get(r, (at, [], None))
+        if p.get("finished") and text.strip():
+            whole = text.strip()
+        elif text.strip():
+            pieces.append(text)
+        reqs[r] = (min(first, at), pieces, whole)
+    out = {}
+    for r, (first, pieces, whole) in reqs.items():
+        joined = whole if whole is not None else " ".join("".join(pieces).split())
+        if joined:
+            out[r] = (first, joined)
+    return out
 
 
 def main(dirs):
