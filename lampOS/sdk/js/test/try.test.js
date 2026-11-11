@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
+import { CONTROLS, STIMULI, checked, describe } from '../examples/twin/controls.js';
 import { originOk } from '../examples/twin/guard.js';
 
 const server = fileURLToPath(new URL('../examples/twin/server.js', import.meta.url));
@@ -59,7 +60,7 @@ test('without --stim-dir there is no panel; with it the token is still needed', 
   const tried = await started(t, (folder, stub) => ['--stim-dir', folder, '--lamp-sim', stub]);
   assert.equal((await fetch(`http://127.0.0.1:${tried.port}/panel.js`)).status, 403);
   assert.equal((await fetch(`http://127.0.0.1:${tried.port}/panel.js?t=${tried.token}`)).status, 200);
-  assert.deepEqual(Object.keys(await (await fetch(`http://127.0.0.1:${tried.port}/try.json?t=${tried.token}`)).json()), ['gestures', 'colours', 'patterns']);
+  assert.deepEqual(Object.keys(await (await fetch(`http://127.0.0.1:${tried.port}/try.json?t=${tried.token}`)).json()), ['controls', 'stimuli', 'camera', 'microphone']);
 });
 
 test('a stimulus runs lamp-sim with an argument array and the lamp folder last; a call is one SDK call', async (t) => {
@@ -85,12 +86,12 @@ test('a stimulus runs lamp-sim with an argument array and the lamp folder last; 
   const by = Object.fromEntries(results.map((r) => [r.id, r]));
   assert.equal(by[1].ok, true);
   assert.equal(by[3].ok, false);
-  assert.match(by[3].answer, /touch: one of tap, pet/);
+  assert.match(by[3].answer, /kind: one of tap, pet/);
   assert.equal(by[4].ok, false);
   assert.equal(by[5].ok, true);
   assert.equal(by[5].call, 'lamp.light("green", 3, 2000)');
   assert.equal(by[6].ok, false);
-  assert.match(by[6].answer, /^bad_request: gesture: one of nod/);
+  assert.match(by[6].answer, /^bad_request: name: one of nod/);
   assert.match(by[7].call, /^lamp\.withLease\(\['body'\], \(\) => lamp\.movePoses\(/);
   assert.equal(by[8].call, "lamp.sound('hum')");
 });
@@ -105,4 +106,32 @@ test('a frame over the cap closes that socket and the server still answers the n
   const again = await talk(port, token);
   t.after(() => again.socket.close());
   assert.equal((await fetch(`http://127.0.0.1:${port}/try.json?t=${token}`)).status, 200);
+});
+
+test('the table: every control and stimulus has a label, its fields are checked, and each runs with its defaults', async (t) => {
+  // The table the page is drawn from.
+  const { controls, stimuli } = describe();
+  assert.equal(controls.length, CONTROLS.length);
+  assert.equal(stimuli.length, STIMULI.length);
+  for (const entry of [...CONTROLS, ...STIMULI]) assert.ok(entry.id && entry.group && entry.label, `${entry.id}: id, group, label`);
+  assert.equal(new Set(CONTROLS.map((c) => c.id)).size, CONTROLS.length, 'a control id is used once');
+  assert.equal(new Set(STIMULI.map((c) => c.id)).size, STIMULI.length, 'a stimulus id is used once');
+  // A value outside its field never reaches a call; a default always passes.
+  const light = CONTROLS.find((c) => c.id === 'light');
+  assert.throws(() => checked(light.fields, { colour: 'NOT A COLOUR' }), /colour: one of/);
+  assert.throws(() => checked(light.fields, { level: 9 }), /level: a number from 1 to 5/);
+  assert.throws(() => checked(CONTROLS.find((c) => c.id === 'say').fields, { text: '' }), /text: 1 to 200 characters/);
+  for (const entry of [...CONTROLS, ...STIMULI]) assert.doesNotThrow(() => checked(entry.fields, {}), `${entry.id} defaults`);
+  // Each entry, pressed with its defaults against the SDK's fake lamp and a stand-in lamp-sim, answers: taken or
+  // done, or the lamp's refusal in words, never a crash.
+  const { port, token } = await started(t, (dir, stub) => ['--stim-dir', dir, '--lamp-sim', stub]);
+  const { socket, results } = await talk(port, token);
+  t.after(() => socket.close());
+  let id = 0;
+  const ids = {};
+  for (const entry of CONTROLS) { ids[++id] = entry.id; socket.send(JSON.stringify({ type: 'call', id, name: entry.id, args: {} })); }
+  for (const entry of STIMULI) { ids[++id] = entry.id; socket.send(JSON.stringify({ type: 'stim', id, name: entry.id, args: {} })); }
+  await until(() => results.length >= id);
+  for (const result of results) assert.ok(result.ok || !/^failed:/.test(result.answer), `${ids[result.id]}: ${result.answer}`);
+  assert.ok(results.filter((r) => r.ok).length >= STIMULI.length, 'every stimulus ran');
 });

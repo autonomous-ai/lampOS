@@ -239,6 +239,40 @@ document.getElementById('copy').addEventListener('click', async () => {
   });
 }
 
+// Touching the lamp's head in the picture (the try-it app, where the server has stimuli): a click or tap on it is a
+// tap, a hold of 0.6 s without moving is a pet, sent as the room's `touch` stimulus (the head's sensor is the lamp's,
+// not the page's). A drag turns the view as before.
+{
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const onHead = (event) => {
+    const box = renderer.domElement.getBoundingClientRect();
+    pointer.set(((event.clientX - box.left) / box.width) * 2 - 1, -((event.clientY - box.top) / box.height) * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObject(gltf.scene, true)[0]?.object;
+    // The meshes sit under CAD groups named like the bones ('5_wrist_pitch' for 'wrist_pitch'): the head is the
+    // last two joints of the chain (the roll and the pitch of the wrist).
+    const names = model.chain.slice(-2).map((name) => model.joints.find((j) => j.name === name).bone);
+    for (let node = hit; node; node = node.parent) if (names.some((bone) => node.name === bone || node.name.endsWith(`_${bone}`))) return true;
+    return false;
+  };
+  let down = null;
+  let pet = null;
+  renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (!onHead(event)) return;
+    down = { x: event.clientX, y: event.clientY, at: Date.now() };
+    pet = setTimeout(() => { if (down) { down = null; window.twinSend?.({ type: 'stim', id: Date.now(), name: 'touch', args: { kind: 'pet' } }); } }, 600);
+  });
+  renderer.domElement.addEventListener('pointermove', (event) => {
+    if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6) { down = null; clearTimeout(pet); }
+  });
+  renderer.domElement.addEventListener('pointerup', () => {
+    clearTimeout(pet);
+    if (down && Date.now() - down.at < 600) window.twinSend?.({ type: 'stim', id: Date.now(), name: 'touch', args: { kind: 'tap' } });
+    down = null;
+  });
+}
+
 // The live link.
 let ws;
 const send = (message) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
