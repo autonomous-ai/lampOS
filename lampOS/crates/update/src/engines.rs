@@ -14,9 +14,16 @@
 //! one-shot runs as it always does, with its memory and disk floors, its
 //! freeze while someone speaks and its stop when the privacy reading is
 //! lost.
+//!
+//! OpenClaw (#6240, beside Hermes) is said from its own install's record,
+//! [`OPENCLAW_RECORD`] in the same records folder, only while that file is
+//! there and [`OPENCLAW_SWITCH`] is not `off` ([`openclaw`]). This build
+//! has no OpenClaw installer, so a tap for it is dropped with a line, and
+//! lamp-cloud refuses it as not installable on this build yet.
 use crate::hermes_install::{self, HermesInstall};
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{EngineInstall, EngineInstallAsk};
+use serde::Deserialize;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -41,6 +48,132 @@ pub const SAID_REASONS: [&str; 5] = [
     "interrupted",
     "privacy_lost",
 ];
+
+/// OpenClaw's name among the engines, as the app reads it.
+pub const OPENCLAW: &str = "openclaw";
+/// OpenClaw's install record, in lamp-update's records, next to Hermes's
+/// [`hermes_install::RECORD`]. Written by OpenClaw's installer, not by this
+/// build.
+pub const OPENCLAW_RECORD: &str = "openclaw-install.json";
+/// OpenClaw's switch, in lamp-update's own unit: on by the product's
+/// default, `off` turns it off.
+pub const OPENCLAW_SWITCH: &str = "LAMP_OPENCLAW_ON_LAMP";
+/// Why OpenClaw's last try failed, as its record may say. Only those the
+/// app also has a name for ([`SAID_REASONS`]) are said as they are; every
+/// other is `failed`, so the app's list stays as it is.
+pub const OPENCLAW_ERRORS: [&str; 13] = [
+    "no_userns",
+    "serve",
+    "timeout",
+    "fetch",
+    "installer",
+    "version",
+    "old_node",
+    "config",
+    "entry",
+    "gateway",
+    "not_started",
+    "privacy_lost",
+    "interrupted",
+];
+
+/// Where OpenClaw's install is, as [`OPENCLAW_RECORD`] keeps it: Hermes's
+/// shape, with `node` the Node pin beside `version` the OpenClaw pin, both
+/// with `installed` only.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct OpenClawInstall {
+    pub install: String,
+    #[serde(default)]
+    pub revision: u64,
+    pub at_unix_ms: u64,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub node: Option<String>,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+impl OpenClawInstall {
+    /// Whether every field is one its installer could have written: a
+    /// state of [`HermesInstall::INSTALL`], an `error` only with `failed`
+    /// (any code: one this build does not know is said as `failed`), and
+    /// `version` and `node` plain, with `installed` only.
+    pub fn check(&self) -> bool {
+        let plain = |text: &Option<String>| {
+            text.as_ref().is_none_or(|text| {
+                self.install == "installed"
+                    && !text.is_empty()
+                    && text.len() <= 64
+                    && text.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.')
+            })
+        };
+        HermesInstall::INSTALL.contains(&self.install.as_str())
+            && self.error.as_ref().is_none_or(|_| self.install == "failed")
+            && plain(&self.version)
+            && plain(&self.node)
+    }
+}
+
+/// OpenClaw's record under `records`: none when the file is not there; a
+/// file there that does not read, or holds what its installer could not
+/// have written, is taken as a failed install.
+pub fn openclaw_record(records: &Path) -> Option<OpenClawInstall> {
+    let bytes = std::fs::read(records.join(OPENCLAW_RECORD)).ok()?;
+    Some(
+        serde_json::from_slice::<OpenClawInstall>(&bytes)
+            .ok()
+            .filter(OpenClawInstall::check)
+            .unwrap_or(OpenClawInstall {
+                install: "failed".to_owned(),
+                revision: 0,
+                at_unix_ms: 0,
+                version: None,
+                node: None,
+                error: None,
+            }),
+    )
+}
+
+/// OpenClaw as the app is told it: none without its record or with its
+/// switch off; else as Hermes's ([`hermes`]): `absent` `not_installed`,
+/// `installing`, `installed` with its version, `failed` with its error
+/// when the app has a name for it, else `failed`. `at_unix_ms` is the
+/// record's (none for a record that did not read).
+pub fn openclaw(on: bool, record: Option<&OpenClawInstall>) -> Option<EngineInstall> {
+    let record = record.filter(|_| on)?;
+    let at_unix_ms = Some(record.at_unix_ms).filter(|at| *at > 0);
+    let engine = |state: &str| EngineInstall {
+        state: state.to_owned(),
+        version: None,
+        reason: None,
+        at_unix_ms,
+    };
+    Some(match record.install.as_str() {
+        "absent" => engine("not_installed"),
+        "installing" => engine("installing"),
+        "installed" => EngineInstall {
+            version: record.version.clone(),
+            ..engine("installed")
+        },
+        _ => EngineInstall {
+            reason: Some(
+                record
+                    .error
+                    .as_deref()
+                    .filter(|error| SAID_REASONS.contains(error))
+                    .unwrap_or("failed")
+                    .to_owned(),
+            ),
+            ..engine("failed")
+        },
+    })
+}
+
+/// [`OPENCLAW_SWITCH`]'s value: anything but `off` is on.
+pub fn openclaw_on(value: Option<&str>) -> bool {
+    value != Some("off")
+}
 
 /// [`SWITCH`]'s value: `on` exactly.
 pub fn on(value: Option<&str>) -> bool {
@@ -109,12 +242,14 @@ pub struct Engines {
     pub frozen: Arc<AtomicBool>,
     /// The app asked for Hermes and no round has started its install yet.
     pub pending: Arc<AtomicBool>,
+    /// OpenClaw's switch is not `off` ([`openclaw_on`]).
+    pub openclaw_on: bool,
 }
 
 impl Engines {
     /// Each engine now, by name.
     pub fn read(&self, records: &Path) -> BTreeMap<String, EngineInstall> {
-        BTreeMap::from([(
+        let mut engines = BTreeMap::from([(
             HERMES.to_owned(),
             hermes(
                 self.hermes_on,
@@ -122,7 +257,11 @@ impl Engines {
                 self.frozen.load(Ordering::Relaxed),
                 self.pending(),
             ),
-        )])
+        )]);
+        if let Some(said) = openclaw(self.openclaw_on, openclaw_record(records).as_ref()) {
+            engines.insert(OPENCLAW.to_owned(), said);
+        }
+        engines
     }
 
     /// Whether a tap waits for a round's Hermes step.
@@ -205,6 +344,12 @@ impl Asks {
             let Ok(ask) = message.parse::<EngineInstallAsk>() else {
                 continue;
             };
+            if ask.engine == OPENCLAW {
+                say(
+                    "the app asked to install OpenClaw: ignored, it is not installable on this build yet",
+                );
+                continue;
+            }
             if ask.engine != HERMES {
                 say("the app asked to install an engine this lamp does not have: ignored");
                 continue;
@@ -378,6 +523,102 @@ mod tests {
         }
     }
 
+    fn write_openclaw(records: &Path, text: &str) {
+        std::fs::write(records.join(OPENCLAW_RECORD), text).unwrap();
+    }
+
+    /// OpenClaw is said only while its record is there and its switch is
+    /// not off, mapped as Hermes is; an error the app has no name for, or
+    /// one this build does not know, is `failed`.
+    #[test]
+    fn openclaw_is_said_only_with_its_record_and_its_switch_not_off() {
+        let folder = tempfile::tempdir().unwrap();
+        let engines = Engines {
+            hermes_on: true,
+            openclaw_on: true,
+            ..Engines::default()
+        };
+        // No record: Hermes only.
+        assert_eq!(
+            engines.read(folder.path()).keys().collect::<Vec<_>>(),
+            ["hermes"]
+        );
+        write_openclaw(
+            folder.path(),
+            r#"{"install":"installed","revision":2,"at_unix_ms":9,"version":"2026.11.1","node":"22.11.0"}"#,
+        );
+        let told = engines.read(folder.path());
+        assert_eq!(
+            told["openclaw"],
+            EngineInstall {
+                state: "installed".into(),
+                version: Some("2026.11.1".into()),
+                reason: None,
+                at_unix_ms: Some(9),
+            }
+        );
+        assert!(told["openclaw"].check());
+        // Its switch off: not said, whatever the record.
+        let off = Engines {
+            openclaw_on: openclaw_on(Some("off")),
+            ..engines.clone()
+        };
+        assert!(!off.read(folder.path()).contains_key("openclaw"));
+        assert!(openclaw_on(None) && openclaw_on(Some("on")) && !openclaw_on(Some("off")));
+        for (text, state) in [
+            (
+                r#"{"install":"absent","revision":1,"at_unix_ms":3}"#,
+                "not_installed",
+            ),
+            (
+                r#"{"install":"installing","revision":1,"at_unix_ms":3}"#,
+                "installing",
+            ),
+        ] {
+            write_openclaw(folder.path(), text);
+            assert_eq!(engines.read(folder.path())["openclaw"].state, state);
+        }
+        // Failed: a code the app knows is said, one it has no name for and
+        // one no build knows are `failed`.
+        for (error, reason) in [
+            ("no_userns", "no_userns"),
+            ("privacy_lost", "privacy_lost"),
+            ("old_node", "failed"),
+            ("gateway", "failed"),
+            ("something_new", "failed"),
+        ] {
+            write_openclaw(
+                folder.path(),
+                &format!(r#"{{"install":"failed","revision":4,"at_unix_ms":7,"error":"{error}"}}"#),
+            );
+            let said = engines.read(folder.path())["openclaw"].clone();
+            assert_eq!(
+                (said.state.as_str(), said.reason.as_deref()),
+                ("failed", Some(reason)),
+                "{error}"
+            );
+            assert!(said.check(), "{said:?}");
+        }
+        for error in OPENCLAW_ERRORS {
+            let record = OpenClawInstall {
+                install: "failed".into(),
+                revision: 1,
+                at_unix_ms: 1,
+                version: None,
+                node: None,
+                error: Some(error.into()),
+            };
+            assert!(openclaw(true, Some(&record)).unwrap().check(), "{error}");
+        }
+        // A file that does not read is a failed install, never a crash.
+        write_openclaw(folder.path(), "not json");
+        let said = engines.read(folder.path())["openclaw"].clone();
+        assert_eq!(
+            (said.state.as_str(), said.reason.as_deref(), said.at_unix_ms),
+            ("failed", Some("failed"), None)
+        );
+    }
+
     fn write_record(records: &Path, record: &HermesInstall) {
         std::fs::write(
             records.join(hermes_install::RECORD),
@@ -447,6 +688,11 @@ mod tests {
         let mut say = |line: &str| lines.push(line.to_owned());
         let now = Instant::now();
 
+        cloud.publish_json(0, &ask("picoclaw")).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(!asks.take(now, &mut say));
+        assert!(!engines.pending());
+        // OpenClaw: this build has no installer for it.
         cloud.publish_json(0, &ask("openclaw")).unwrap();
         std::thread::sleep(Duration::from_millis(100));
         assert!(!asks.take(now, &mut say));
@@ -470,13 +716,17 @@ mod tests {
         cloud.publish_json(0, &ask("hermes")).unwrap();
         std::thread::sleep(Duration::from_millis(100));
         assert!(!asks.take(now + EngineInstallAsk::AGAIN_AFTER, &mut say));
-        assert_eq!(lines.len(), 3, "{lines:?}");
+        assert_eq!(lines.len(), 4, "{lines:?}");
         assert!(lines[0].contains("does not have"), "{lines:?}");
         assert!(
-            lines[1].contains("the next round may start it"),
+            lines[1].contains("not installable on this build yet"),
             "{lines:?}"
         );
-        assert!(lines[2].contains("not missing"), "{lines:?}");
+        assert!(
+            lines[2].contains("the next round may start it"),
+            "{lines:?}"
+        );
+        assert!(lines[3].contains("not missing"), "{lines:?}");
 
         // Hermes off: dropped.
         let other = tempfile::tempdir().unwrap();
