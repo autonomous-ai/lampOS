@@ -28,7 +28,10 @@ export const RUNS = [
   { name: 'ci-light.js', args: ['pass'], shows: async (lamp) => (await colour(lamp)) === 'green' },
   { name: 'pomodoro.js', args: [], shows: async (lamp) => (await colour(lamp)) === 'warm' },
   { name: 'ring-walk.js', args: ['50'], shows: async () => true },
-  { name: 'curious.js', args: [], needs: 'body', shows: async () => true },
+  // Its move takes about 3 s under a body lease it gives back at its end: wait for its own words, or the runner
+  // kills it mid-move and the lease stays (a client's lease ends when its LAST connection closes, and this runner's
+  // own connection stays open), which a later row meets as `busy`.
+  { name: 'curious.js', args: [], needs: 'body', shows: async (_lamp, _before, out) => /looked:|not now:/.test(out) },
   { name: 'ask-the-person.js', args: [], shows: async () => true },
   {
     name: 'greet.js', args: [], needs: 'sim',
