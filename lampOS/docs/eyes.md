@@ -2744,6 +2744,49 @@ few prints above, on frames the eyes already have: no model or frame is
 added. Its cost on a lamp is #1678's CPU run; how well the states are told
 apart is its scripted sitting.
 
+#### A sitting kept across a restart
+
+`sitting_s` is counted in the eyes' memory from the sitting's first face,
+so before this every restart of lamp-eyes (an update restarts it, several
+times a day) began it at 0, and every nudge that waits on it (a sip of
+water after 50 minutes, rest your eyes after 45, stand up after 100, a
+comfort break after 90) waited its whole time again. Now, while activity is
+said, the eyes keep the sitting in `/run/lampos-eyes-kept/sitting.json`
+(`crates/eyes/src/sitting.rs`): written at once when a sitting begins, ends
+(removed) or changes its baseline or state, and every 30 s while it goes on;
+0600, written whole beside it and moved over it, never through a link. The
+folder is `lampos`'s, 0700, made at boot by the product's tmpfiles
+(install.md), on tmpfs, so a reboot empties it. It is not the eyes'
+runtime folder `/run/lampos-eyes`, which a restart still empties, so no
+sight frame, full look or known file outlives the run that wrote it. The
+file holds the boot id, when it was written, when the sitting began, when
+and where the sitter's face was last seen (its box and pitch), the
+sitting's baseline and the state said, on the bus's monotonic clock. Never
+a print, a yawn count or a picture: after a restart the yawns begin at 0,
+and with the recogniser the sitter's prints are taken again.
+
+At the start it is read only if it is this boot's
+(`/proc/sys/kernel/random/boot_id`) and was written within the sitting's
+two-minute gap (`RoomActivity::SITTING_GAP_S`), and taken back only at the
+run's first look, only if the sitter was last seen within that gap of the
+look and a near face of that look is at the sitter's place, or where they
+sat. The restart's seconds then count as a gap in the sitting, exactly as a
+look away of as long does, so `sitting_s` is never longer than a sitting
+the eyes could have seen. A file of another boot, an older one, nobody at
+the first look, or a face elsewhere: nothing is taken, and the sitting
+begins at that look as before. With `LAMP_ACTIVITY=on` and the recogniser
+(the sitter told by face) it is never taken back: their prints are never
+written, so after a restart no print could tell them from someone else
+sitting down in their place (`LAMP_ACTIVITY=place`, the product's, takes it
+back by place). Until the first look has tried it, the file is left as it
+is, so a second restart before the camera opens does not lose it. With no
+look within the gap (the camera closed), it is let go and the file removed.
+A reset that starts setup in place empties the folder (`reset::VOLATILE`,
+setup.md). The journal says what was kept and whether it was taken back.
+Pure tests in `sitting.rs`: kept across a 10 s restart on one boot; not past
+the gap, across a boot, or without the sitter at their place; told by face,
+someone else at the place begins a new sitting.
+
 #### A sitting's yawns (`LAMP_EYES_YAWN=on`, #3709)
 
 With `LAMP_EYES_YAWN=on`, `--mouth-model` and `--seems-blendshapes` (as

@@ -416,15 +416,17 @@ fn remove_installed_skills_with(
 }
 
 /// What a part keeps in `/run` past its own stop: the tmpfiles' folders (the
-/// bus's latest messages, which can say a person's name or words, and the
-/// app's photos for the eyes) and each `RuntimeDirectory=` its unit keeps
+/// bus's latest messages, which can say a person's name or words, the app's
+/// photos for the eyes, and the eyes' sitting kept across a restart) and each
+/// `RuntimeDirectory=` its unit keeps
 /// (`RuntimeDirectoryPreserve=yes`: the voice's, with the thread's set-aside
 /// words and the room, and the records'). Every other `RuntimeDirectory=` is
 /// removed by systemd as its unit stops. A reboot empties `/run`; a reset
 /// that starts setup in place empties these, with every part stopped.
-pub const VOLATILE: [&str; 4] = [
+pub const VOLATILE: [&str; 5] = [
     "/run/lampos-bus",
     "/run/lampos-photos",
+    "/run/lampos-eyes-kept",
     "/run/lampos-voice",
     "/run/lamp-records",
 ];
