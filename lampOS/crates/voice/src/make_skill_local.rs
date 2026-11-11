@@ -1026,6 +1026,7 @@ fn made_and_journaled(
     from: &str,
 ) -> (Result<Made, Refused>, String) {
     let began = std::time::Instant::now();
+    let brief_for_trace = brief.clone();
     let chat = Arc::new(chat);
     // The person's own words: the times of day they name, so only a window
     // within one runs at night without quiet hours (Thirteen's HOLD on
@@ -1041,6 +1042,21 @@ fn made_and_journaled(
     let models_cannot = std::cell::Cell::new(false);
     let kept = |answer: Result<String, String>| {
         models_cannot.set(matches!(&answer, Ok(text) if made_skill::says_cannot(text)));
+        // Test lamps only (#6223's trace): the request and the model's whole answer.
+        {
+            eprintln!(
+                "lamp-voice: made skill trace: writes {} reads {} own {:?} request {request:?} brief {:?} answer {:?}",
+                made_skill::writes_on(),
+                made_skill::reads_on(),
+                asked
+                    .own
+                    .iter()
+                    .map(|(code, _)| code.as_str())
+                    .collect::<Vec<_>>(),
+                brief_for_trace,
+                answer
+            );
+        }
         match answer {
             // The maker's own example is never kept: refused as the check
             // refuses, so it goes back to the model once.
