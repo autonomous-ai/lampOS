@@ -160,8 +160,9 @@ fn main() -> ExitCode {
     let key = std::fs::read_to_string(credentials.join("key"))
         .map(|key| key.trim().to_owned())
         .unwrap_or_default();
-    // Hermes on the lamp (#5978): its DeepSeek through lamp-cloud's loopback
-    // forwarder, with this key; only with LAMP_HERMES_ON_LAMP=on. The voice's
+    // Hermes or OpenClaw on the lamp (#5978, #6226): its DeepSeek through
+    // lamp-cloud's loopback forwarder, with this key; only with
+    // LAMP_HERMES_ON_LAMP=on or LAMP_OPENCLAW_ON_LAMP=on. The voice's
     // second.json, when the unit hands it in as `second`, names the relay.
     let hermes_key = key.clone();
     let hermes_second = std::fs::read_to_string(credentials.join("second")).ok();

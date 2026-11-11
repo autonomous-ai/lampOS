@@ -5,8 +5,12 @@
 //! local token ([`TOKEN_FILE`]), so the relay's key is never in a file
 //! Hermes, or a command Hermes runs, can read.
 //!
-//! Off unless `LAMP_HERMES_ON_LAMP=on`. Served, with the token as the
-//! bearer:
+//! OpenClaw on the lamp (#6226) chats through the same forwarder, port,
+//! token and paths (its provider `lampos`, base
+//! `http://127.0.0.1:7741/v1/deepseek`).
+//!
+//! Off unless `LAMP_HERMES_ON_LAMP=on` or `LAMP_OPENCLAW_ON_LAMP=on`.
+//! Served, with the token as the bearer:
 //! - `POST /v1/deepseek/chat/completions`: to `<relay>/chat/completions`,
 //!   the answer streamed back as it comes (Server-Sent Events included);
 //! - `GET /v1/deepseek/models`: to `<relay>/models`.
@@ -25,8 +29,11 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-/// The switch.
+/// The switch for Hermes on the lamp.
 pub const SWITCH: &str = "LAMP_HERMES_ON_LAMP";
+/// The switch for OpenClaw on the lamp (#6226): the same forwarder serves
+/// it.
+pub const OPENCLAW_SWITCH: &str = "LAMP_OPENCLAW_ON_LAMP";
 /// The forwarder's port, on loopback only. Not used by any other lampOS
 /// part (deploy/product), nor by Hermes' own (8642, 8645).
 pub const PORT: u16 = 7741;
@@ -67,9 +74,18 @@ const CONNECT_WITHIN: Duration = Duration::from_secs(10);
 const READ_WITHIN: Duration = Duration::from_secs(120);
 const ANSWER_WITHIN: Duration = Duration::from_secs(600);
 
-/// Whether `LAMP_HERMES_ON_LAMP=on`.
+/// Whether `LAMP_HERMES_ON_LAMP=on` or `LAMP_OPENCLAW_ON_LAMP=on`.
 pub fn on_from_environment() -> bool {
-    std::env::var(SWITCH).ok().as_deref() == Some("on")
+    on_from(
+        std::env::var(SWITCH).ok().as_deref(),
+        std::env::var(OPENCLAW_SWITCH).ok().as_deref(),
+    )
+}
+
+/// Whether the forwarder is served, from the two switches' values: either
+/// exactly `on` (#5978, #6226).
+pub fn on_from(hermes: Option<&str>, openclaw: Option<&str>) -> bool {
+    hermes == Some("on") || openclaw == Some("on")
 }
 
 /// The relay's DeepSeek base from the voice's `second.json` text, as the
@@ -512,7 +528,8 @@ impl Forwarder {
     }
 }
 
-/// Runs the forwarder when `LAMP_HERMES_ON_LAMP=on`: the token kept in
+/// Runs the forwarder when `LAMP_HERMES_ON_LAMP=on` or
+/// `LAMP_OPENCLAW_ON_LAMP=on`: the token kept in
 /// `state` (lamp-cloud's state folder), the relay from `second_json` (the
 /// voice's `second.json`, when handed in) and the voice's `key`. Never
 /// returns; with the switch off, or when it can't start, it says why once
