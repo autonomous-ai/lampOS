@@ -215,6 +215,17 @@ pub fn tools(folder: &Path) -> Vec<Tool> {
         .into_iter()
         .filter(|tool| is_tool(&tool.name))
         .map(|mut tool| {
+            // Whether lamp-services lists a saved draft's change
+            // (`LAMP_GMAIL_DRAFT_EDITS`, its switch alone): a record's
+            // redo names it only then.
+            if tool.name == WRITE {
+                let listed = tool.description.contains("update_draft")
+                    || tool
+                        .parameters
+                        .as_ref()
+                        .is_some_and(|parameters| parameters.to_string().contains("update_draft"));
+                crate::service_records::redo::drafts_listed(listed);
+            }
             let rule = if tool.name == WRITE {
                 format!("{WRITE_RULE} {RULE}")
             } else {
@@ -252,7 +263,7 @@ pub fn tools(folder: &Path) -> Vec<Tool> {
                         crate::service_records::redo::FIELD.into(),
                         json!({
                             "type": "string",
-                            "description": crate::service_records::redo::DESCRIPTION,
+                            "description": crate::service_records::redo::description(),
                         }),
                     );
                 }

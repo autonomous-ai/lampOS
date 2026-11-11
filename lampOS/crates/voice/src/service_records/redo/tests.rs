@@ -418,14 +418,9 @@ fn a_done_event_is_refused_here() {
     assert!(by_key(&created).replaced_by.is_empty());
 }
 
-/// The tester's lamp, 11 Nov: a saved draft "changed" was saved again
-/// beside it. A saved draft's record keeps its id in Drafts (the save's
-/// `draft_id`) as its result id, for `update_draft` to name; a redo of it
-/// is refused with that way, nothing prepared or linked.
-#[test]
-fn a_saved_draft_keeps_its_id_and_is_never_saved_again_from_its_record() {
-    fresh(true);
-    let now = Instant::now();
+/// The party draft saved in Drafts as `draft12` (the save's `draft_id`):
+/// its record `done`, the id its result id. Its key.
+fn saved_draft(now: Instant) -> String {
     let draft = json!({
         "service": "gmail",
         "action": "save_draft",
@@ -445,18 +440,187 @@ fn a_saved_draft_keeps_its_id_and_is_never_saved_again_from_its_record() {
     let saved = only(Status::Done);
     assert_eq!(saved.result_id, "draft12");
     assert_eq!(saved.reason, "saved as a draft");
-    let mut pending = None;
-    let redo = call(json!({
-        "service": "gmail",
-        "action": "save_draft",
-        FIELD: saved.key,
-        "text": "Party on Saturday at 7, at 12 Elm St. Wear something casual.",
-    }));
-    let told = gate(&mut pending, &redo, 21, &heard("add my address", 20), now).unwrap_err();
-    assert_eq!(told["error"], DRAFT_DONE);
-    assert!(DRAFT_DONE.contains("update_draft or delete_draft with its draft_id"));
+    saved.key
+}
+
+/// Never named as a function of its own (the 9adf fake writes).
+fn names_no_draft_function(told: &str) {
+    for alone in [
+        "call update_draft",
+        "call delete_draft",
+        "calling update_draft",
+    ] {
+        assert!(!told.contains(alone), "{alone}: {told}");
+    }
+}
+
+/// The tester's lamp, 11 Nov: a saved draft "changed" was saved again
+/// beside it. A saved draft's record keeps its id in Drafts (the save's
+/// `draft_id`) as its result id; a redo of it is refused, nothing prepared
+/// or linked. While lamp-services lists `update_draft` the refusal gives
+/// that way; otherwise (`LAMP_GMAIL_DRAFT_EDITS` off, the product) it names
+/// no action the lamp doesn't have.
+#[test]
+fn a_saved_draft_keeps_its_id_and_is_never_saved_again_from_its_record() {
+    for listed in [false, true] {
+        fresh(true);
+        drafts_listed(listed);
+        let now = Instant::now();
+        let saved = saved_draft(now);
+        let mut pending = None;
+        let redo = call(json!({
+            "service": "gmail",
+            "action": "save_draft",
+            FIELD: saved,
+            "text": "Party on Saturday at 7, at 12 Elm St. Wear something casual.",
+        }));
+        let told = gate(&mut pending, &redo, 21, &heard("add my address", 20), now).unwrap_err();
+        let error = told["error"].as_str().unwrap();
+        if listed {
+            assert_eq!(error, DRAFT_DONE);
+            assert!(error.contains(
+                "call service_write with action update_draft (or delete_draft) and from_record"
+            ));
+        } else {
+            assert_eq!(error, DRAFT_DONE_OFF);
+            assert!(error.contains("changing a saved draft isn't on this lamp"));
+            assert!(!error.contains("update_draft") && !error.contains("delete_draft"));
+        }
+        names_no_draft_function(error);
+        assert_eq!(super::super::held().len(), 1);
+        assert!(by_key(&saved).replaced_by.is_empty());
+    }
+}
+
+/// A saved draft changed or deleted from its record while `update_draft`
+/// is listed: its `draft_id` is the record's result id, never the key, and
+/// only what the call gave is laid on (the services carry the rest from
+/// the draft in Drafts); it still needs its read-back and a yes. Not
+/// listed, it is refused with the plain off words, nothing prepared.
+#[test]
+fn a_saved_draft_is_changed_or_deleted_by_its_records_draft_id() {
+    for action in ["update_draft", "delete_draft"] {
+        fresh(true);
+        drafts_listed(true);
+        let now = Instant::now();
+        let saved = saved_draft(now);
+        let mut asked = json!({"service": "gmail", "action": action, FIELD: saved});
+        if action == "update_draft" {
+            asked["text"] = json!("Party on Saturday at 7, at 12 Elm St.");
+        }
+        let mut pending = None;
+        let passed = gate(
+            &mut pending,
+            &call(asked.clone()),
+            21,
+            &heard("add my address", 20),
+            now,
+        )
+        .expect("the owner's change is prepared");
+        let args = &passed.args;
+        assert_eq!(args["service"], "gmail", "{args}");
+        assert_eq!(args["action"], action, "{args}");
+        assert_eq!(args["draft_id"], "draft12", "{args}");
+        assert_ne!(args["draft_id"], json!(saved));
+        // Nothing of the save's but its id.
+        assert!(args.get("to").is_none(), "{args}");
+        assert!(args.get("subject").is_none(), "{args}");
+        if action == "update_draft" {
+            assert_eq!(args["text"], "Party on Saturday at 7, at 12 Elm St.");
+        } else {
+            assert!(args.get("text").is_none(), "{args}");
+        }
+        assert!(args.get("said").is_none(), "a prepare, never a send");
+        assert!(pending.is_none(), "nothing waits before the read-back");
+
+        drafts_listed(false);
+        let told = gate(
+            &mut pending,
+            &call(asked),
+            22,
+            &heard("add my address", 21),
+            now,
+        )
+        .unwrap_err();
+        assert_eq!(told["error"], DRAFT_DONE_OFF, "{action}");
+        assert!(pending.is_none());
+    }
+}
+
+/// A saved draft's record with no result id names no draft: refused with a
+/// plain reason, nothing prepared.
+#[test]
+fn a_saved_draft_with_no_draft_id_is_refused() {
+    fresh(true);
+    drafts_listed(true);
+    let now = Instant::now();
+    let saved = saved_draft(now);
+    kept::ledger(|ledger| {
+        for record in &mut ledger.records {
+            record.result_id.clear();
+        }
+    });
+    for action in ["update_draft", "delete_draft"] {
+        let mut pending = None;
+        let told = gate(
+            &mut pending,
+            &call(json!({"service":"gmail","action":action,FIELD: saved})),
+            21,
+            &heard("delete it", 20),
+            now,
+        )
+        .unwrap_err();
+        assert_eq!(told["error"], NO_DRAFT_ID, "{action}");
+        assert!(pending.is_none());
+    }
     assert_eq!(super::super::held().len(), 1);
-    assert!(by_key(&saved.key).replaced_by.is_empty());
+}
+
+/// `from_record`'s description names a saved draft's change only when
+/// lamp-services' `tools.json` lists `update_draft`
+/// (`LAMP_GMAIL_DRAFT_EDITS`), and still fits the link's most.
+#[test]
+fn the_field_names_draft_edits_only_when_listed() {
+    assert!(DESCRIPTION.ends_with(TOLD_LAST));
+    for drafts in [false, true] {
+        fresh(true);
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-services-redo-drafts-{}-{drafts}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        lamp_services::tools::write_for(
+            &dir,
+            lamp_services::tools::Edits {
+                calendar: true,
+                drafts,
+            },
+        )
+        .unwrap();
+        let offered = crate::services::tools(&dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let write = offered.iter().find(|tool| tool.name == WRITE).unwrap();
+        let parameters = write.parameters.as_ref().unwrap();
+        let said = parameters["properties"][FIELD]["description"]
+            .as_str()
+            .unwrap();
+        if drafts {
+            assert!(
+                said.starts_with(DESCRIPTION.trim_end_matches(TOLD_LAST)),
+                "{said}"
+            );
+            assert!(
+                said.ends_with(&format!("{DRAFT_NOTE}{TOLD_LAST}")),
+                "{said}"
+            );
+        } else {
+            assert_eq!(said, DESCRIPTION);
+            assert!(!said.contains("update_draft"), "{said}");
+        }
+        names_no_draft_function(said);
+        assert!(parameters.to_string().len() <= lamp_gemini::MAX_TOOL_JSON_BYTES);
+    }
 }
 
 /// Only the owner redoes: another line is refused by the services' owner

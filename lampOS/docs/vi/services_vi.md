@@ -1317,7 +1317,9 @@ Calendar được nêu trong mô tả của `event_id`.
   drafts read gave, like draft12", nên không hộp thư nào khác bị đụng tới.
   Làm lại một bản nháp đã lưu từ bản ghi của nó (`LAMP_SERVICE_REDO`) bị từ
   chối kèm cách đổi nó (`redo::DRAFT_DONE`), không bao giờ lưu thêm một bản
-  bên cạnh.
+  bên cạnh; `update_draft` hoặc `delete_draft` với `from_record` chỉ đến
+  bản ghi đó được điền `draft_id` từ bản ghi ("Làm lại hay sửa từ một bản
+  ghi", bên dưới).
 - **Đọc lại từ bản nháp như nó đang là.** Không có `send_id`, đèn trước hết
   đọc đúng bản nháp đó theo id của nó (`EXAMINE` Drafts và UID của nó, chỉ
   đọc, như `message {id}`). Không có ở đó (đã gửi, đã xoá hay đã đổi trong
@@ -2723,11 +2725,17 @@ mà ghi chú bản ghi và recall hiện kèm mỗi lệnh ghi), nên câu
   (or delete_event) and the record's event_id, or from_record set to its
   key" thay vào đó (`redo::EVENT_DONE`). Mô tả của `event_id` trong
   `tools.json` cũng nói như vậy. Một bản nháp Gmail `done` (`save_draft` hay
-  `update_draft`) bị từ chối kèm cách đổi nó, `redo::DRAFT_DONE`:
-  `update_draft` hoặc `delete_draft` với `draft_id` của nó, id kết quả của
-  bản ghi, khi được liệt kê (`LAMP_GMAIL_DRAFT_EDITS`), không bao giờ lưu
-  thêm một bản bên cạnh bản cũ. Một lần đọc, mọi lệnh ghi `done` khác, và
-  một bản ghi có nội dung bị cắt mà không đưa nội dung mới cũng bị từ chối.
+  `update_draft`) không bao giờ được lưu thêm một bản bên cạnh bản cũ. Khi
+  `tools.json` của lamp-services liệt kê `update_draft`
+  (`LAMP_GMAIL_DRAFT_EDITS=on`, công tắc riêng của lamp-services, nên voice
+  đọc nó từ chính lời mô tả của hàm ghi mỗi lần đọc các hàm), nó bị từ chối
+  kèm cách đổi nó, `redo::DRAFT_DONE`: "call service_write with action
+  update_draft (or delete_draft) and from_record set to its key, giving only
+  what changed". Ngược lại (tắt trong sản phẩm) lời từ chối không nêu action
+  nào đèn không có, `redo::DRAFT_DONE_OFF`: "Not done: that draft is already
+  saved in their Gmail Drafts, and changing a saved draft isn't on this
+  lamp. Say so plainly." Một lần đọc, mọi lệnh ghi `done` khác, và một bản
+  ghi có nội dung bị cắt mà không đưa nội dung mới cũng bị từ chối.
 - **Dời hay huỷ một sự kiện đã tạo.** `update_event` hoặc `delete_event`
   với `from_record` chỉ đến một bản ghi Google Calendar `create_event` hay
   `update_event` `done` là lệnh sửa sự kiện ấy, không phải làm lại:
@@ -2737,7 +2745,23 @@ mà ghi chú bản ghi và recall hiện kèm mỗi lệnh ghi), nên câu
   lại thay đổi và chỉ gửi khi được đồng ý, như mọi lệnh sửa ("Đổi hoặc huỷ
   một sự kiện lịch", ở trên, khi bật `LAMP_CALENDAR_EDITS`). Một bản ghi
   không có `result_id` bị từ chối: "Not done: that record keeps no event id,
-  so the event can't be found from it. …" (`NO_EVENT_ID`).
+  so the event can't be found from it. …" (`NO_EVENT_ID`). Mô tả của
+  `from_record` nói điều này trong một câu.
+- **Đổi hay xoá một bản nháp đã lưu.** Tương tự cho Gmail, khi
+  `update_draft` được liệt kê: `update_draft` hoặc `delete_draft` với
+  `from_record` chỉ đến một bản ghi Gmail `save_draft` hay `update_draft`
+  `done` là lệnh đổi bản nháp ấy, `draft_id` của nó là `result_id` của bản
+  ghi (id của nó trong Drafts, `draft12`) và chỉ những gì lệnh gọi đưa được
+  đặt lên; dịch vụ lấy phần còn lại từ bản nháp như Drafts đang có, đọc lại
+  và chỉ lưu hay xoá khi được đồng ý ("Đổi hoặc xoá một bản nháp Gmail đã
+  lưu", ở trên). Một bản ghi không có `result_id` bị từ chối: "Not done:
+  that record keeps no draft id, so the draft can't be found from it. …"
+  (`NO_DRAFT_ID`). Chỉ khi đó mô tả của `from_record` mới thêm "A Gmail
+  draft they saved (done) likewise, with action update_draft (or
+  delete_draft): its draft_id is filled in." (`redo::DRAFT_NOTE`, giữ ngắn:
+  khi cả hai loại sửa được liệt kê, `service_write` gần chạm 4.096 byte của
+  liên kết). Không được liệt kê, lệnh gọi như vậy bị từ chối bằng
+  `redo::DRAFT_DONE_OFF`.
 - **Liên kết.** `links` của bản ghi mới chỉ đến bản cũ, và bản cũ nhận
   `replaced_by` (trạng thái cuối của nó giữ nguyên), cả hai được ghi vào bộ
   nhớ.
