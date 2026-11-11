@@ -60,6 +60,20 @@ pub enum Request {
         prepared_digest: String,
         session_id: String,
     },
+    /// A look at the session the person named on `target`'s computer, in
+    /// their words (#6274, [`crate::harness::Cli::look_session`]), on the
+    /// voice's route only: with `join`, to open it to them (one stopped is
+    /// reopened under `LAMP_TASKS_RESUME_CLOSED`); without, to say how it
+    /// stands. Answered at once, `done` false while the look runs; asked
+    /// again with the same `look` (the voice's own id) for its `found` or
+    /// its `code`.
+    Session {
+        look: String,
+        target: String,
+        session: String,
+        #[serde(default)]
+        join: bool,
+    },
     Cancel {
         guard: Guard,
         id: u64,
@@ -181,6 +195,7 @@ impl Request {
         matches!(
             self,
             Self::Confirm { .. }
+                | Self::Session { .. }
                 | Self::ClaimSpeech { .. }
                 | Self::AckSpeech { .. }
                 | Self::Told { .. }
@@ -225,6 +240,7 @@ impl Request {
             Self::TasksNow {} => "tasks_now",
             Self::Prepare { .. } => "prepare",
             Self::Confirm { .. } => "confirm",
+            Self::Session { .. } => "session",
             Self::Cancel { .. } => "cancel",
             Self::Observe { .. } => "observe",
             Self::ClaimSpeech { .. } => "claim_speech",
