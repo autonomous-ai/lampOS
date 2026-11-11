@@ -264,6 +264,7 @@ document.getElementById('copy').addEventListener('click', async () => {
   let down = null;
   let pet = null;
   let latched = false;
+  let pressedId = null; // the pointer that made the press: another finger's release or cancel is not its release
   let lastSent = 0;
   const touch = (kind) => {
     const now = Date.now();
@@ -280,6 +281,7 @@ document.getElementById('copy').addEventListener('click', async () => {
   renderer.domElement.addEventListener('pointerdown', (event) => {
     if (latched || !onHead(event)) return;
     latched = true;
+    pressedId = event.pointerId;
     // The pointer stays this canvas's until it is up, even if it leaves the canvas first: the release is
     // always seen, so the hold never stays latched (a lost release would block every later touch).
     try { renderer.domElement.setPointerCapture(event.pointerId); } catch { /* a pointer that is already gone */ }
@@ -289,11 +291,11 @@ document.getElementById('copy').addEventListener('click', async () => {
   renderer.domElement.addEventListener('pointermove', (event) => {
     if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6) { down = null; clearTimeout(pet); }
   });
-  renderer.domElement.addEventListener('pointerup', finish);
-  renderer.domElement.addEventListener('pointercancel', () => { down = null; finish(); });
+  renderer.domElement.addEventListener('pointerup', (event) => { if (event.pointerId === pressedId) finish(); });
+  renderer.domElement.addEventListener('pointercancel', (event) => { if (event.pointerId === pressedId) { down = null; finish(); } });
   // A release outside the canvas, or the page losing focus mid-hold (a switched tab, a dialog), ends the hold too:
   // no pet from a hold nobody is making, and the latch is let go.
-  window.addEventListener('pointerup', () => { if (latched) finish(); });
+  window.addEventListener('pointerup', (event) => { if (latched && event.pointerId === pressedId) finish(); });
   window.addEventListener('blur', () => { down = null; finish(); });
   renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
 }
