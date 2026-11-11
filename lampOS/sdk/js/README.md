@@ -160,7 +160,9 @@ node examples/twin/try.js --lamp-sim ../../target/debug/lamp-sim     # prints th
 
 The lamp runs in a private folder (`~/.lampsim-try-PID`, 0700) and listens on 127.0.0.1 only; the page is the one
 thing on the network and answers only with the token in its URL. The camera and the microphone are off: the lamp
-has neither grant, so no picture of the room is ever on the page. The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
+has neither grant, so no picture of the room is ever on the page. `--camera` and `--microphone` turn them on for
+one run (the host's, opened only while the lamp's own mark shows): then the page can show the room, over plain
+HTTP, to anyone on your network who has the link. The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
 your own at the same lamp.
 
 Every button is one entry of the table in `examples/twin/controls.js` (a label, its fields, and the SDK call it makes, or the `lamp-sim` stimulus), and the page is drawn from that table: a new SDK feature is a new entry there, and `test/try.test.js` runs every entry with its defaults.

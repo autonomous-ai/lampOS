@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { request } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,9 +11,19 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
 import { CONTROLS, STIMULI, checked, describe } from '../examples/twin/controls.js';
-import { originOk } from '../examples/twin/guard.js';
+import { hostOk, originOk } from '../examples/twin/guard.js';
+import { grantsFor, parseArguments } from '../examples/twin/virtual-lamp.js';
 
 const server = fileURLToPath(new URL('../examples/twin/server.js', import.meta.url));
+
+test('only the printed LAN address, localhost and 127.0.0.1 are the twin\'s own Host and Origin', () => {
+  assert.equal(hostOk('192.168.1.5:8737', 8737, '192.168.1.5:8737'), true);
+  assert.equal(hostOk('evil.example:8737', 8737, '192.168.1.5:8737'), false);
+  assert.equal(hostOk('192.168.1.9:8737', 8737, '192.168.1.5:8737'), false);
+  assert.equal(hostOk('192.168.1.5:8737', 8737), false);
+  assert.equal(hostOk('127.0.0.1:8737', 8737), true);
+  assert.equal(originOk('http://evil.example:8737', 8737, '192.168.1.5:8737'), false);
+});
 
 test('the page origin may be the host it was opened at only on the LAN', () => {
   assert.equal(originOk('http://192.168.1.5:8737', 8737, '192.168.1.5:8737'), true);
@@ -134,4 +145,36 @@ test('the table: every control and stimulus has a label, its fields are checked,
   await until(() => results.length >= id);
   for (const result of results) assert.ok(result.ok || !/^failed:/.test(result.answer), `${ids[result.id]}: ${result.answer}`);
   assert.ok(results.filter((r) => r.ok).length >= STIMULI.length, 'every stimulus ran');
+});
+
+test('the try-it lamp has no camera or microphone grant unless asked, and every grant for the virtual lamp', () => {
+  const grants = (...args) => grantsFor(parseArguments(args).flags, true).split(',');
+  assert.equal(grants('--try').includes('camera'), false);
+  assert.equal(grants('--try').includes('microphone'), false);
+  assert.equal(grants('--try', '--camera').includes('camera'), true);
+  assert.equal(grants('--try', '--camera').includes('microphone'), false);
+  assert.equal(grants('--try', '--camera', '--microphone').includes('microphone'), true);
+  assert.equal(grantsFor([], false).includes('camera'), true);
+});
+
+test('on the network the camera picture is given only while a page says it is on, and only to the twin\'s own Host', async (t) => {
+  const { port, token } = await started(t, (dir, stub) => ['--lan', '--stim-dir', dir, '--lamp-sim', stub]);
+  const url = `http://127.0.0.1:${port}/camera.jpg?t=${token}`;
+  // A token alone gets no picture.
+  assert.equal((await fetch(url)).status, 403);
+  // A page that has the camera on says so over its live link, then asks.
+  const { socket } = await talk(port, token);
+  t.after(() => socket.close());
+  socket.send(JSON.stringify({ type: 'camera_on' }));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const picture = await fetch(url);
+  assert.equal(picture.status, 200);
+  assert.equal(picture.headers.get('content-type'), 'image/jpeg');
+  // Another Host name (a rebinding page) is refused before the token is looked at.
+  const status = await new Promise((resolve, reject) => {
+    const asked = request({ host: '127.0.0.1', port, path: `/try.json?t=${token}`, headers: { host: `evil.example:${port}` } }, (response) => { response.resume(); resolve(response.statusCode); });
+    asked.on('error', reject);
+    asked.end();
+  });
+  assert.equal(status, 403);
 });
