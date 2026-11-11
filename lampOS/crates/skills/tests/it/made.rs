@@ -127,7 +127,8 @@ fn a_skill_made_by_voice_is_checked_packed_and_kept() {
 
 /// What the checker refuses is not kept: a step the skill's permissions
 /// don't give (a gesture, with only the light), as an install would refuse
-/// it. What the cap refuses never reaches the checker.
+/// it. What the cap refuses never reaches the checker, and what can't
+/// apply is taken out first.
 #[test]
 fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
     let dir = tempfile::tempdir().unwrap();
@@ -141,8 +142,17 @@ fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
     // The check's own lines come back for a repair (#2813 piece 2).
     assert!(refused.1.is_some_and(|lines| !lines.is_empty()));
     let speaking = TOML.replace("light = true\n", "light = true\nspeak = true\n");
-    let capped = keep(&answer(&speaking, "evening-dim"), false, "s1:9:1", &keeping);
-    assert!(capped.unwrap_err().0.contains("never says anything"));
+    // Its voice asked with nothing said is taken out before the cap
+    // (lamp-74ff, 11 Nov 09:48), never refused: kept, and it never speaks.
+    let elsewhere = tempfile::tempdir().unwrap();
+    let made = keep(
+        &answer(&speaking, "evening-dim"),
+        false,
+        "s1:9:1",
+        &self::keeping(elsewhere.path()),
+    )
+    .unwrap();
+    assert!(!made.uses.speak && made.uses.light);
     assert!(tars(&keeping.directory).is_empty());
     // A say step, its voice asked for (#6062): its exact words. Its pace is
     // set, never refused: on the lamp's resting its window is narrowed to
@@ -924,6 +934,67 @@ fn a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed() {
         ),
         "{lines}"
     );
+    assert_eq!(tars(&keeping.directory).len(), 1);
+}
+
+/// lamp-74ff, 11 Nov 09:48-09:50: "nod when I stand up", asked from the
+/// app, failed all three repairs twice: the lamp's model wrote `speak =
+/// true` with nothing said, a `for` on its `room/stood_up` trigger and a
+/// `for` beside its nod. All three are taken out before the check, and the
+/// real `lamp-skills pack` keeps it, said as a nod when someone gets up.
+#[test]
+fn a_made_nod_when_i_stand_up_is_tidied_and_packed() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let toml = made_body(
+        "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\nfor = \"5s\"\n",
+        "body = { gesture = \"nod\", for = \"2s\" }",
+    )
+    .replace("body = true\n", "body = true\nspeak = true\n");
+    // As lamp-74ff's model wrote it, lamp-skills refuses it.
+    assert!(toml.contains("speak = true") && toml.contains("for = \"2s\""));
+    let made = keep_asked(
+        &answer(&toml, "stand-nod"),
+        false,
+        "s1:stand-nod:1",
+        &keeping,
+        &Asked {
+            request: "nod when I stand up",
+            ..Asked::default()
+        },
+    )
+    .unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert!(
+        made.description
+            .starts_with("When someone sitting at the desk gets up, it nods"),
+        "{}",
+        made.description
+    );
+    assert!(made.uses.body && !made.uses.speak);
+    assert_eq!(tars(&keeping.directory).len(), 1);
+    // A say beside a light of a colour the light hasn't, in one step
+    // (lamp-9adf, 11 Nov 10:01, "say hello when I come back to my desk"):
+    // refused before the check, the repair told the colours and to split
+    // the step, never the say's form.
+    let hello = made_body(
+        "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n",
+        "light = { colour = \"gold\", level = 3, for = \"20s\" }\nsay = { text = \"Bye!\" }",
+    )
+    .replace("body = true\n", "body = true\nlight = true\nspeak = true\n");
+    let refused = keep(
+        &answer(&hello, "bye-gold"),
+        false,
+        "s1:bye-gold:1",
+        &keeping,
+    )
+    .unwrap_err();
+    assert_eq!(refused.0, lamp_voice::made_skill::UNSAID);
+    let lines = refused.1.unwrap();
+    assert!(
+        lines.contains("colour is one of yellow, red, green") && lines.contains("one kind a"),
+        "{lines}"
+    );
+    assert!(!lines.contains("one or two short sentences"), "{lines}");
     assert_eq!(tars(&keeping.directory).len(), 1);
 }
 

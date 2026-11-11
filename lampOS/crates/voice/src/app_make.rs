@@ -448,6 +448,14 @@ pub const LOCAL_STORE: &str = "local:app";
 /// The longest the line said once it is on waits for a good moment: an
 /// hour, the say service's longest.
 pub const LINE_WAITS_MS: u64 = crate::say::LONGEST_EXPIRY_MS;
+/// The priority an app's ask's own line is asked at: urgent
+/// ([`crate::say::URGENT_FROM`]), as the body's and the language's own
+/// answers are, so it is said a second after the lamp's last turn rather
+/// than after the say service's whole quiet ([`crate::say::QUIET_US`]),
+/// while the person is still at the app (the first builder, 11 Nov 10:16:
+/// on lamp-74ff a refusal came about 30 s later). Every other gate holds:
+/// mid-speech, with someone being heard or an answer owed, it waits.
+pub const LINE_PRIORITY: u8 = crate::say::URGENT_FROM;
 
 /// The app's ask `request_id`, its `brief` recorded by [`begin`] at
 /// `at_unix_ms`, made by the lamp's own model (`chat`) with the voice's
@@ -574,10 +582,11 @@ pub fn write_here(
 /// already. Dropped once begun (on lamp-74ff, 10 Nov 17:40, talk cut a made
 /// skill's line, `user_interrupted`, and it was never said), it is asked
 /// once more, said at the next good moment within what is left of
-/// [`LINE_WAITS_MS`].
+/// [`LINE_WAITS_MS`]. Asked at [`LINE_PRIORITY`]: said as soon as the
+/// lamp is free, never after the whole quiet a nudge waits.
 pub fn say_line(asks: &crate::say::OwnAsks, line: &str) {
     said("an app's skill", line, |words, note, within_ms| {
-        let priority = crate::say::NORMAL_PRIORITY;
+        let priority = LINE_PRIORITY;
         if note {
             asks.note("app-make", words, priority, within_ms)
         } else {
@@ -1293,6 +1302,30 @@ mod tests {
         }
         assert_eq!(say_line_at(&dir.join("none.sock"), line), None);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The first builder, 11 Nov 10:16: an app make's refusal was said
+    /// about 30 s after it, through the say service's whole quiet. The
+    /// app's own line, made, refused or written, is asked urgent, so it is
+    /// said a second after the lamp's last turn, every other gate kept.
+    #[test]
+    fn an_app_makes_own_line_is_asked_urgent() {
+        let (asks, asked) = crate::say::OwnAsks::for_test();
+        for line in [
+            made_skill::not_made_line(made_skill::UNSAID),
+            "I made x, and it's on.".to_owned(),
+        ] {
+            let asks = asks.clone();
+            let saying = std::thread::spawn(move || say_line(&asks, &line));
+            assert_eq!(
+                asked(),
+                Some(("app-make".to_owned(), crate::say::URGENT_FROM))
+            );
+            // The ask dropped, with no outcome: nothing more is asked.
+            saying.join().unwrap();
+        }
+        drop(asks);
+        assert_eq!(asked(), None);
     }
 
     /// One at a time, a request id each, the words within the voice's own
