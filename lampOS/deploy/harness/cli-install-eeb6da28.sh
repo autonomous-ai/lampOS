@@ -553,7 +553,7 @@ node_is_usable() {
   [ -x "$1" ] || return 1
   _major="$(node_major "$1")"
   [ -n "$_major" ] || return 1
-  [ "$_major" -ge 20 ] 2>/dev/null || return 1
+  [ "$_major" -ge 22 ] 2>/dev/null || return 1
   return 0
 }
 
@@ -566,7 +566,7 @@ if [ -n "$NODE_BIN" ]; then
     exit 1
   fi
   if ! node_is_usable "$NODE_BIN"; then
-    echo "✗ HARNESS_NODE_BINARY is older than Node 20: $NODE_BIN ($("$NODE_BIN" -v 2>/dev/null || echo unknown))" >&2
+    echo "✗ HARNESS_NODE_BINARY is older than Node 22: $NODE_BIN ($("$NODE_BIN" -v 2>/dev/null || echo unknown))" >&2
     exit 1
   fi
 fi
@@ -607,8 +607,8 @@ if [ -z "$NODE_BIN" ]; then
       echo "▸ No managed Node runtime is published for $(uname -s)/$(uname -m) — using $path_node"
       NODE_BIN="$path_node"
     else
-      echo "✗ No managed Node runtime is published for $(uname -s)/$(uname -m), and no Node >= 20 on PATH." >&2
-      echo "  Install Node 20+ from https://nodejs.org, then re-run this installer." >&2
+      echo "✗ No managed Node runtime is published for $(uname -s)/$(uname -m), and no Node >= 22 on PATH." >&2
+      echo "  Install Node 22+ from https://nodejs.org, then re-run this installer." >&2
       exit 1
     fi
   fi
