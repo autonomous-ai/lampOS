@@ -154,7 +154,7 @@ export async function start(options, log = console.log) {
     const pairing = await Lamp.pair(given.code, '127.0.0.1', { pin: given.pin, port, name: 'virtual lamp viewer', keyring: new Keyring(home) });
     log(`paired with ${pairing.name} as ${pairing.client}; your own programs: LAMPOS_HOME=${home}`);
     const twin = spawn(process.execPath, [fileURLToPath(new URL('server.js', import.meta.url)), '--port', String(options['twin-port'] ?? 8737), ...(options.glb ? ['--glb', options.glb] : []),
-      ...(tryApp ? ['--lan', '--stim-dir', dir, '--lamp-sim', lampSim] : [])], {
+      ...(tryApp ? ['--lan', ...(options['lan-address'] ? ['--lan-address', options['lan-address']] : []), '--stim-dir', dir, '--lamp-sim', lampSim] : [])], {
       env: { ...process.env, LAMPOS_HOME: home }, stdio: ['ignore', 'pipe', 'inherit'],
     });
     children.push(twin);

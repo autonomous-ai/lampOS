@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
+import { chooseLan, lanAddresses } from '../examples/twin/guard.js';
 import { CONTROLS, STIMULI, checked, describe } from '../examples/twin/controls.js';
 import { hostOk, originOk } from '../examples/twin/guard.js';
 import { grantsFor, parseArguments } from '../examples/twin/virtual-lamp.js';
@@ -206,6 +207,50 @@ test('the vendored three.js is served from a fixed list without the token, and n
     asked.end();
   });
   assert.equal(status, 403);
+});
+
+// A laptop like the one this was found on: Ethernet, Wi-Fi, a tailscale tunnel, Docker and its bridges, loopback.
+const table = (name, address, internal = false) => [name, [{ family: 'IPv4', address, internal }]];
+const laptop = Object.fromEntries([
+  table('lo', '127.0.0.1', true), table('docker0', '172.17.0.1'), table('br-1a2b3c', '172.18.0.1'), table('enp3s0', '172.168.21.8'),
+  table('wlp0s20f3', '172.168.20.172'), table('tailscale0', '100.64.0.2'), table('veth9f', '172.19.0.1'),
+]);
+
+test('--lan names a real Ethernet or Wi-Fi address, never a Docker, VPN or loopback one, and a chosen address must be the computer\'s own', () => {
+  assert.deepEqual(lanAddresses(laptop).map((a) => a.name), ['enp3s0', 'wlp0s20f3']);
+  const first = chooseLan(laptop);
+  assert.equal(first.address, '172.168.21.8');
+  assert.deepEqual(first.others.map((a) => a.address), ['172.168.20.172']);
+  // The person's choice: the Wi-Fi one, the other listed.
+  const chosen = chooseLan(laptop, '172.168.20.172');
+  assert.equal(chosen.address, '172.168.20.172');
+  assert.deepEqual(chosen.others.map((a) => a.address), ['172.168.21.8']);
+  // Not this computer's address: an error with the addresses it has; a computer with no real address: an error.
+  assert.match(chooseLan(laptop, '8.8.8.8').error, /not an IPv4 address of this computer/);
+  assert.ok(chooseLan(laptop, '8.8.8.8').own.length >= 5);
+  assert.match(chooseLan({ lo: laptop.lo, docker0: laptop.docker0 }).error, /no network address found/);
+  // One real address and no choice: nothing to say about others.
+  assert.deepEqual(chooseLan({ eth0: laptop.enp3s0 }).others, []);
+});
+
+test('--lan-address with an address that is not this computer\'s ends the twin with the list, and without --lan it is refused', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'try-lan-'));
+  const glb = join(folder, 'lamp.glb');
+  writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
+  try {
+    for (const [flags, said] of [[['--lan', '--lan-address', '8.8.8.8'], /8\.8\.8\.8 is not an IPv4 address of this computer; this computer's addresses: /], [['--lan-address', '127.0.0.1'], /--lan-address goes with --lan/]]) {
+      const { code, err } = await new Promise((resolve) => {
+        const child = spawn(process.execPath, [server, '--fake', '--port', '0', '--glb', glb, ...flags], { stdio: ['ignore', 'ignore', 'pipe'] });
+        let err = '';
+        child.stderr.on('data', (chunk) => { err += chunk; });
+        child.on('close', (code) => resolve({ code, err }));
+      });
+      assert.equal(code, 2, `${flags}: ${err}`);
+      assert.match(err, said);
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test('with --lan the twin listens on loopback and the printed address, never on every interface', async (t) => {
