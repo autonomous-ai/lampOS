@@ -592,6 +592,37 @@ fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
         "the developer drop-in went"
     );
     assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    // The words say the unit was stopped but comes back while a drop-in is there.
+    assert!(
+        reply["refused"]
+            .as_str()
+            .unwrap()
+            .contains("lamp-control was stopped for now"),
+        "{reply}"
+    );
+    // The same removal failing and the stop failing too: both are said, the
+    // stop failure is not swallowed.
+    answer(r#"{"control": true}"#, &config, true);
+    drop(records.lock().ok());
+    let mut failing = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: true,
+    };
+    let (reply, _) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut failing,
+    )
+    .unwrap();
+    let why = reply["refused"].as_str().unwrap();
+    assert!(
+        why.starts_with("the change could not be saved") && why.contains("did not stop either"),
+        "{reply}"
+    );
     let _ = fs::remove_dir_all(&config.agent_dropin);
     let _ = fs::remove_dir_all(folder);
 }

@@ -1035,9 +1035,18 @@ pub fn close_before_answer(
     let stopped = systemd
         .systemctl(&["daemon-reload"])
         .and_then(|()| systemd.systemctl(&[verb, CONTROL_UNIT]));
+    // Refused, and said in full: what could not be removed, and whether
+    // lamp-control was nevertheless stopped (it comes back at its next start
+    // while a drop-in is still there) or the stop failed too.
     if let Some(kind) = failed {
+        let then = match &stopped {
+            Ok(()) => format!(
+                "; lamp-control was {did} for now, and comes back at its next start while the drop-in is there"
+            ),
+            Err(why) => format!("; lamp-control did not {verb} either ({why})"),
+        };
         return Some((
-            json!({"refused": format!("the change could not be saved: {kind}")}),
+            json!({"refused": format!("the change could not be saved: {kind}{then}")}),
             None,
         ));
     }
