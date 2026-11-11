@@ -162,7 +162,7 @@ The lamp runs in a private folder (`~/.lampsim-try-PID`, 0700) and listens on 12
 thing on the network and answers only with the token in its URL. The camera and the microphone are off: the lamp
 has neither grant, so no picture of the room is ever on the page. `--camera` and `--microphone` turn them on for
 one run (the host's, opened only while the lamp's own mark shows): then the page can show the room, over plain
-HTTP, to anyone on your network who has the link. The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
+HTTP, to anyone on your network who has the link. It has `speech`, so the event log shows every line the lamp says out loud (`lamp.said`): never a person's. The virtual lamp tells a computer's own `say` (a word-for-word line) as `lamp.said`; its replies and cached phrases it has none of (it has no model). The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
 your own at the same lamp.
 
 Every button is one entry of the table in `examples/twin/controls.js` (a label, its fields, and the SDK call it makes, or the `lamp-sim` stimulus), and the page is drawn from that table: a new SDK feature is a new entry there, and `test/try.test.js` runs every entry with its defaults.
