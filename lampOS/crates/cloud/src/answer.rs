@@ -190,11 +190,11 @@ pub trait Lamp {
         crate::onboarding_page::PAGES
             .lock()
             .map_err(|_| "the page cannot be kept".to_owned())?
-            .open(data, None, None)
+            .open(data, crate::onboarding_page::Seen::default(), |_| None)
     }
 
-    /// The open page done now, its line handed to the voice: the reply's
-    /// `data` (#6076).
+    /// The open page's line due now handed to the voice, and the reply's
+    /// `data` when the page is done with it (#6076, #6353).
     fn onboarding_page_done(&mut self) -> Option<Value> {
         None
     }
