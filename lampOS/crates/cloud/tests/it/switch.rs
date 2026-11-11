@@ -228,3 +228,15 @@ fn the_unit_may_reach_lamp_voices_app_make_socket() {
         Some(std::path::Path::new("/run/lampos-app-make"))
     );
 }
+
+/// Reviewer-lead's P3 on #6132: lamp-cloud's unit may reach lamp-voice's say
+/// socket for the onboarding pages' line; a lamp without it still starts (`-`).
+#[test]
+fn the_unit_may_reach_lamp_voices_say_socket() {
+    let writable: Vec<&str> = UNIT
+        .lines()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .collect();
+    assert!(writable.contains(&"-/run/lampos-say"), "{writable:?}");
+}

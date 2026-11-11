@@ -802,6 +802,10 @@ impl Lamp for Real {
     }
 
     fn onboarding_page_done(&mut self) -> Option<Value> {
+        // No bus read on a tick with no page open.
+        if !crate::onboarding_page::PAGES.lock().ok()?.is_open() {
+            return None;
+        }
         let light = self.light().ok();
         let run = self.skill_run();
         let (data, line) = crate::onboarding_page::PAGES

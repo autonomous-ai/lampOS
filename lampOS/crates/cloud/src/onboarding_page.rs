@@ -23,6 +23,7 @@
 use lamp_msgs::{Light, SkillEvent, SkillStage};
 use serde_json::{Value, json};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 /// The kind the app tells its open page by.
 pub const KIND: &str = "onboarding.page";
@@ -45,6 +46,10 @@ pub const ADD_DONE: &str = "Got it. Those are on now.";
 /// How long the voice may hold the line before it is let go, in ms.
 const SAY_EXPIRES_MS: u64 = 30_000;
 
+/// How long an open page may wait to be done: an app killed or sent to the
+/// background never sends `null`, and its page is let go after this.
+const LAPSE: Duration = Duration::from_secs(10 * 60);
+
 /// An app page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Page {
@@ -64,6 +69,8 @@ struct Open {
     run: Option<(String, u64)>,
     /// The Add page's line.
     line: String,
+    /// When the page opened, for [`LAPSE`].
+    opened_at: Instant,
 }
 
 /// The page the app has open.
@@ -119,13 +126,30 @@ impl Pages {
             light: light.map(|light| (light.on, light.colour.clone())),
             run: run.cloned(),
             line: line.to_owned(),
+            opened_at: Instant::now(),
         });
         Ok(json!({}))
     }
 
+    /// Whether a page is open, a page open longer than [`LAPSE`] let go.
+    pub fn is_open(&mut self) -> bool {
+        if self
+            .open
+            .as_ref()
+            .is_some_and(|open| open.opened_at.elapsed() > LAPSE)
+        {
+            self.open = None;
+        }
+        self.open.is_some()
+    }
+
     /// The page done now, its reply's `data` and the line to say: Try once
-    /// the light changed or a dance ran since it opened, Add at once, once.
+    /// the light changed or a dance ran since it opened, Add at once, once;
+    /// nothing once the page has lapsed.
     pub fn done(&mut self, light: Option<&Light>, run: Option<&Run>) -> Option<(Value, String)> {
+        if !self.is_open() {
+            return None;
+        }
         let open = self.open.as_ref()?;
         let (how, line) = match open.page {
             Page::Create => return None,
@@ -314,6 +338,23 @@ mod tests {
         pages.open(&json!({"page": null}), None, None).unwrap();
         assert!(pages.done(Some(&light(true, "blue")), None).is_none());
         assert!(pages.open(&json!({"page": "next"}), None, None).is_err());
+    }
+
+    /// Reviewer-lead's P2 on #6132: a Try page left open by an app killed
+    /// before it sent `null` is let go after [`LAPSE`]; a light turned on
+    /// later is no first skill.
+    #[test]
+    fn a_page_open_past_the_lapse_is_let_go() {
+        let mut pages = Pages::default();
+        pages
+            .open(&json!({"page": "try"}), Some(&light(false, "warm")), None)
+            .unwrap();
+        assert!(pages.is_open());
+        pages.open.as_mut().unwrap().opened_at = Instant::now()
+            .checked_sub(LAPSE + Duration::from_secs(1))
+            .unwrap();
+        assert!(pages.done(Some(&light(true, "blue")), None).is_none());
+        assert!(!pages.is_open());
     }
 
     /// #6076: the line goes to the say socket as a note.
