@@ -105,7 +105,14 @@ ghi `lamp-voice provider: a bare forget is not run: nothing was given just
 before and N shown could be meant, asked which`. Khi chưa cho thấy gì, mô
 hình hỏi họ muốn quên gì, và nhật ký ghi `lamp-voice provider: a bare forget
 is not run: nothing was given just before and nothing was shown, asked
-what`. Với
+what`. Với `LAMP_MEMORY_FORGET_JUST_KEPT`, thứ vừa giữ của chính người đó
+vẫn là «cái đó» dù câu yêu cầu quên đọc lại ghi chú và mở một phiên mới,
+miễn phiên mới là của cùng người được nhận ra, trong vòng 60 giây
+(`remember::replace_session`; lamp-06c1, 11/11, bản 11450 và 11716: «Lamp,
+forget that.» 18 giây sau khi giữ chiếc ô, được thấy nói, lại hỏi là thứ nào
+trong 9 thứ đã cho thấy). Phiên của người khác, của phòng khi không nhận ra
+ai, hoặc một lần nhắc lại sau đó thì bỏ nó. Khi được báo hỏi là thứ nào, mô
+hình không bao giờ nói là không có gì để quên hay để xóa. Với
 `LAMP_MEMORY_FORGET_ABOUT`, `about` của mô hình chỉ chạy đúng như gọi khi
 không nghe được gì hoặc các từ của nó có trong phần yêu cầu quên của câu;
 một `about` chưa từng được nói bị bỏ và lệnh quên được xem là không nêu tên
