@@ -50,6 +50,14 @@ pub const CONTROL_SOCKET: &str = "/run/lampos-control/control.sock";
 pub const SOCKET_ENV: &str = "LAMP_CONTROL_SOCKET";
 /// The variable a run is given its one-run token in.
 pub const TOKEN_ENV: &str = "LAMP_CONTROL_TOKEN";
+/// The variable, [`NET_RUN`] exactly, that has Hermes's wrapper give a run
+/// a network namespace of its own (`lamp_update::hermes_install::NET_ENV`):
+/// only `lo`, out only to [`CONTROL_SOCKET`] and lamp-cloud's model
+/// forwarder through [`crate::net_bridge::MODEL_SOCKET`]. The only opt-in,
+/// and it only takes access away. Harness's own panes never set it.
+pub const NET_ENV: &str = "LAMP_NS_NET";
+/// [`NET_ENV`]'s one value.
+pub const NET_RUN: &str = "run";
 /// lamp-control's admin socket (lampos's, 0600 in a 0700 folder), where
 /// lamp-tasks mints and ends a run's token (#6408, docs/control.md, "The
 /// control socket, lamp-control's side").
@@ -458,10 +466,10 @@ impl SkillRun {
 /// Runs one task on the lamp's own Hermes (target `lamp`) and waits for its
 /// end: the task's number, or why it didn't run or end well. A runner ends
 /// the run at [`SkillRun::deadline`] itself, never by the prompt's words
-/// alone. The run is not held off the network: Hermes's own model calls
-/// need a way out, so that is still to be decided. The run's environment is
-/// cleared to [`SkillRun::env`] alone: nothing of lamp-tasks' own
-/// environment reaches Hermes.
+/// alone. A lamp's runner ([`HermesRunner`]) gives the run its own network
+/// namespace ([`NET_ENV`]). The run's environment is cleared to
+/// [`SkillRun::env`] alone: nothing of lamp-tasks' own environment reaches
+/// Hermes.
 pub trait Runner {
     fn run(&self, run: &SkillRun) -> Result<u64, String>;
 }
@@ -547,7 +555,8 @@ pub const RUN_TICK: Duration = Duration::from_millis(50);
 /// folder (`runtime::LAMP_PROJECT`, the one Hermes is started in there).
 ///
 /// - **Its environment** is [`HermesRunner::env`] (what lamp-tasks.service
-///   gives: `PATH`, `HOME`, `HERMES_HOME`, `SHELL`) and the run's own
+///   gives: `PATH`, `HOME`, `HERMES_HOME`, `SHELL`, and [`NET_ENV`] `run`,
+///   so the wrapper gives the run a network namespace of its own) and the run's own
 ///   ([`SkillRun::env`]: the socket and the token), nothing of lamp-tasks'
 ///   own besides. The token is never in its arguments, and lamp-tasks
 ///   never writes the environment anywhere.
@@ -587,6 +596,7 @@ impl HermesRunner {
                     crate::runtime::HERMES_HOME.into(),
                 ),
                 ("SHELL".into(), "/bin/sh".into()),
+                (NET_ENV.into(), NET_RUN.into()),
             ],
             tick: RUN_TICK,
         }
@@ -1619,6 +1629,12 @@ mod tests {
                 .env
                 .iter()
                 .all(|(name, _)| name != TOKEN_ENV && name != SOCKET_ENV)
+        );
+        // Its own network namespace: the one opt-in, `run` exactly.
+        assert!(
+            runner
+                .env
+                .contains(&("LAMP_NS_NET".to_owned(), "run".to_owned()))
         );
     }
 
