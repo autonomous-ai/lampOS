@@ -22,6 +22,9 @@ User=root
 StateDirectory=lampos-setup
 StateDirectoryMode=0700
 ExecStart=/opt/lampOS/setup/current/lamp-setup serve --config /etc/lampOS/setup/serve.json --plan /etc/lampOS/setup/reset-plan.json --enable
+# A new or reset lamp's first words at 70 %, not the 100 % a new speaker control starts at; a level
+# the person chooses later is never touched (#5551, lampOS/docs/setup.md, "A new lamp's first volume").
+Environment=LAMP_FIRST_VOLUME=on
 # However it ends, V1's nginx does not stay on.
 ExecStopPost=/usr/bin/systemctl stop nginx
 Restart=on-failure
