@@ -542,6 +542,20 @@ either kind of `gmail` link:
   `date` and `attachment: {name, type, size, text}`, without the mail's own
   text, quoted as every read. Text is at most 3,000 characters (`TEXT_MOST`)
   before the quoted answer's own cut.
+- **Found by a search first:** a `message` or `attachment` read with no id
+  ("attachment needs id, the id a search or a list gave.") or one no list
+  gave ("a mail's id is the one a list gave.") is refused before anything
+  is asked of Gmail, and told the way to a valid call
+  (`reads::MAIL_FOUND_BY_SEARCH`): "To find a mail by its words or a
+  number in it, call service_read with what search and those words as
+  query first, then this read with the id of the mail the search gave.
+  Never ask the person for an id." The read's `query` says "Search words,
+  or a number to find; for gmail as its own search takes them." and its
+  `id` "An id a search or a list gave; to read a mail or its attachment,
+  search first for its id." (#5826: on build 11830 "find my email with the
+  number … and tell me what its attachment says" was refused twice in 2 ms,
+  most likely an `attachment` asked with the number as `query` and no id,
+  before the model searched.)
 - **Kinds read:** `text/plain`, `text/csv`, `text/tab-separated-values`,
   `text/markdown` and `text/html` (its tags taken out as a body's are); a
   part typed `application/octet-stream` by its ending (`.txt`, `.csv`,
@@ -760,6 +774,19 @@ refuses it", any other (a scope or sign-in refused, no reason) the
 link words as a 401; 404 "has no such item", 429 "is busy: try again in a
 while", else "answered with an error". The token and the refresh token are
 scrubbed from any answer (each spelling, plain or URL-encoded).
+
+Each `service_read` has one journal line (`serve::read_said`, #5826): who
+asked, the service's code and the read's kind, and what became of it, as
+"lamp-services: the voice's service_read of gmail search: found 2". The
+kind is a `what` of lowercase letters and `_` only, else "another"; the
+outcome is "found N" (the items quoted and left out), "none", "answered"
+(an MCP tool's), "refused: <why>" in fixed words (a send-only link, not
+linked, its link has expired, a service the lamp can't link, no id, no
+query, an argument missing, no what, an id no list gave, a what it doesn't
+read, its arguments), "none: no such item", or "error" ("error: not
+answered in time", "error: the link refused"). Never the query, an id, a
+mail's words or anything the service gave. A refusal by the voice's own
+gate is the voice's journal line ("refused by the voice: …").
 
 ## Quoted data
 

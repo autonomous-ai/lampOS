@@ -31,6 +31,7 @@ mod short_done;
 mod unplayed_join;
 mod voice_confirms;
 mod wake_not_name;
+mod words_after_cap;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;

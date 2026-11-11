@@ -129,8 +129,8 @@ fn catalog_for(offset_minutes: Option<i32>, edits: bool) -> Value {
                 "properties": {
                     "service": {"type": "string", "enum": codes()},
                     "what": string("What to read, as listed for the service."),
-                    "query": string("Search words."),
-                    "id": string("An id a list gave."),
+                    "query": string("Search words, or a number to find; for gmail as its own search takes them."),
+                    "id": string("An id a search or a list gave; to read a mail or its attachment, search first for its id."),
                     "name": string("For attachment: its name, as message listed it."),
                     "index": {"type": "integer", "description": "For attachment: its place in message's list, from 1."},
                     "from": time_field("Start", 9, offset_minutes),

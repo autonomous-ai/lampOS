@@ -587,6 +587,20 @@ với cả hai loại liên kết `gmail`:
   text}`, không kèm nội dung riêng của thư, được trích dẫn như mọi lần đọc.
   Nội dung tối đa 3,000 ký tự (`TEXT_MOST`) trước khi câu trả lời trích dẫn
   tự cắt.
+- **Tìm bằng search trước:** một lần đọc `message` hay `attachment` không có
+  id ("attachment needs id, the id a search or a list gave.") hoặc với một id
+  không do danh sách nào đưa ("a mail's id is the one a list gave.") bị từ
+  chối trước khi hỏi Gmail bất cứ điều gì, và được chỉ cách gọi đúng
+  (`reads::MAIL_FOUND_BY_SEARCH`): "To find a mail by its words or a
+  number in it, call service_read with what search and those words as
+  query first, then this read with the id of the mail the search gave.
+  Never ask the person for an id." Tham số `query` của hàm đọc ghi "Search
+  words, or a number to find; for gmail as its own search takes them." và
+  `id` ghi "An id a search or a list gave; to read a mail or its
+  attachment, search first for its id." (#5826: trên bản dựng 11830, "find
+  my email with the number … and tell me what its attachment says" bị từ
+  chối hai lần trong 2 ms, nhiều khả năng là một `attachment` hỏi với con số
+  làm `query` và không có id, trước khi mô hình tìm kiếm.)
 - **Các loại được đọc:** `text/plain`, `text/csv`,
   `text/tab-separated-values`, `text/markdown` và `text/html` (bỏ thẻ như
   với nội dung thư); một phần kiểu `application/octet-stream` theo đuôi tệp
@@ -815,6 +829,20 @@ refuses it", mọi lý do khác (scope hay đăng nhập bị từ chối, khôn
 là câu liên kết lại như 401; 404 "has no such item", 429 "is busy: try again in a
 while", còn lại "answered with an error". Token và refresh token được xoá khỏi
 mọi câu trả lời (mọi cách viết, thuần hay mã hoá URL).
+
+Mỗi `service_read` có một dòng nhật ký (`serve::read_said`, #5826): ai hỏi,
+mã dịch vụ và loại đọc, và kết quả ra sao, như
+"lamp-services: the voice's service_read of gmail search: found 2". Loại
+đọc là một `what` chỉ gồm chữ thường và `_`, nếu không thì "another"; kết
+quả là "found N" (số mục được trích dẫn và bị bỏ ra), "none", "answered"
+(của một công cụ MCP), "refused: <lý do>" bằng các chữ cố định (a send-only
+link, not linked, its link has expired, a service the lamp can't link, no
+id, no query, an argument missing, no what, an id no list gave, a what it
+doesn't read, its arguments), "none: no such item", hoặc "error" ("error:
+not answered in time", "error: the link refused"). Không bao giờ có câu
+truy vấn, một id, chữ của thư hay bất cứ gì dịch vụ đưa. Một lần từ chối
+bởi cổng riêng của giọng nói là dòng nhật ký của giọng nói ("refused by the
+voice: …").
 
 ## Dữ liệu trích dẫn
 
