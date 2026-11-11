@@ -3207,9 +3207,11 @@ the model also has `harness_status`. It answers "is Harness signed in?",
   - `signed_in`: `yes`, `offline` (signed in, but Harness can't reach its
     service just now), `no`, or `unknown` (not read yet since lamp-tasks
     started, or any other value).
-  - `computers`: each computer once, in the targets' order, called by its
-    own name where the tasks part has one (trimmed, one line, at most 40
-    characters), else by its alias, with the agents it has by name. A target
+  - `computers`: each computer once, in the targets' order (targets with
+    the same own name are one computer), with the agents it has by name.
+    It is called by its own name (trimmed, one line, at most 40 characters)
+    only with `LAMP_TASKS_MACHINE_NAMES`, as the read-backs are; otherwise,
+    or with no own name, by its first alias (Thirteen's P2 on #6222). A target
     whose engine wasn't found there (`installed: false`, #5199), one whose
     alias isn't an alias's shape, and an engine the voice doesn't know are
     left out. At most three are listed, and `more_computers` counts the rest.
@@ -3227,14 +3229,15 @@ the model also has `harness_status`. It answers "is Harness signed in?",
   `tasks_now` that doesn't answer only leaves its part out.
 - **Off**, the function is not declared, and every other tool's description
   is word for word as before (a test holds it).
-- **Who hears it.** Whoever asks the lamp hears the person's computer names
-  and agents. That is the same as the read-backs with
-  `LAMP_TASKS_MACHINE_NAMES`, but here it is asked for directly, so the switch
-  stays off in the product until the first builder judges it (TWO READS).
+- **Who hears it.** Whoever asks the lamp hears the person's computers and
+  agents: by alias (`office`), or by the computers' own names, which can name
+  a person, only with `LAMP_TASKS_MACHINE_NAMES` too, the same rule as the
+  read-backs. The switch stays off in the product until the first builder
+  judges it (TWO READS).
 - **Tests** (`agent_tasks`):
   - `harness_status_is_declared_and_run_only_with_its_switch`;
   - `harness_status_says_the_sign_in_the_computers_and_the_work_as_counts`
-    (each `signed_in`, grouping, names, the cap, no task words, within
+    (each `signed_in`, grouping, names only with `machine_names`, the cap, no task words, within
     500 ms of a local tasks part);
   - `harness_status_refused_says_it_lightly`.
 
