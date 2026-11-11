@@ -265,6 +265,7 @@ has its own line on the consent screen.
 lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
                    [--mood-socket PATH] [--say-socket PATH] [--actions-socket PATH] [--bus-root DIR] [--boot-id ID]
                    [--lease-socket PATH] [--zone ZONE] [--manage-socket PATH]
+                   [--local-agent USER [--agent-socket PATH] [--agent-group GROUP]]
 lamp-control code --grants body,light,speak,look  # the owner's side: a pairing code and the pin; look for presence events
 lamp-control grants c_… --grants body,light  # change a paired computer's grants (the whole list), no new code
 lamp-control revoke c_…
@@ -296,6 +297,18 @@ lamp-control clients
   - `{"clients": true}` → `{"clients": [{"id", "name", "grants", "paired_at", "paired_at_unix_ms"}], "shown": {"body": "can move the lamp's body", …}}`: `shown` is the words for every grant this build knows, by wire name, once per answer (and in `set_grants`'s answer), so the app never shows a raw wire name for a grant it has no label of its own for (App Only's ask, 11 Nov). `paired_at` is Unix seconds, as `clients.json` keeps it, left for older readers; `paired_at_unix_ms` is the same in milliseconds.
 
   **The app's path:** the app reaches it through lamp-cloud, given the socket with `--control-admin-socket` (docs/cloud.md, "The developer door"): `control.code`, `control.clients`, `control.revoke`, `control.code_cancel`, `control.take_back` and `control.set_grants`. `control.code`'s code and pin go back to the app sealed to a one-time key the app sends (HPKE), never in the clear on the company link; what that does and does not stop is in docs/cloud.md, "The developer door".
+
+### The local agent (`--local-agent USER`, L1)
+
+A coding agent that runs on the lamp itself needs no pairing and no certificate: the owner turns on **one named user** (a new unprivileged user for the lamp's agents, never `lampos`), and a program of that user reaches the door on a unix socket, as a computer with the grants the owner left it. Off unless `--local-agent USER` (or `LAMP_CONTROL_LOCAL_AGENT=USER`; the flag wins, `off` is off) is given; the owner's switch in the app writes it (L2, with the user and the group). Nothing listens without it.
+
+- **The socket:** `--agent-socket PATH` (default `/run/lampos-agent/agent.sock`), in a folder of its own (`RuntimeDirectory=lampos-agent`, 0755: lamp-control's own folder is 0700, and no other user could walk into it), mode 0660, group `--agent-group` (default `lamp-agents`: lamp-control's user and the agent's are in it, so lamp-control may give the socket to it). It speaks the door's WebSocket at `/v1` with no TLS, the same frames.
+- **The guard is the peer's uid.** The kernel says who connects (`SO_PEERCRED`); a peer whose uid is not the named user's is closed before a byte is read, and the journal says its uid and pid. The group is **not** the guard: `lampos`, whose processes run the lamp's skills, is in it (for the `chgrp`) and is refused. Skills never get this socket.
+- **`hello` names no key.** On this socket `hello` is taken as the local agent: send any well-formed `client` and `sig` (the SDKs send `c_0` and 64 zero bytes, L3); neither is read. A `pair` here is refused ("this socket is not for pairing").
+- **A client like any other.** The lamp keeps one record, `local agent USER`, whose id is `c_` and 16 hex digits of a hash of the user's name, and whose key is empty: **no signature can say `hello` as it on the door's TLS socket, and no pairing code replaces it.** It is made the first time with body, light, speak, look and skills, and never with `camera`, `microphone`, `speech`, `logs` or `speaker`; after that the owner's app changes its grants with `set_grants` (the record is listed with the other computers, named for its user). Leases, notes, clips, rates, the ring's marks and the journal's lines are the ones every computer has; its connections are never `remote`.
+- **Revoke leaves it nothing.** A revoke (the app's, or the admin socket's `revoke`) closes its connections, ends its leases and takes its notes and clips as for any computer, and keeps the record with no grants: a restart does not make it again with the first grants, and a connection is refused "the owner has not given the local agent anything: turn it on in the app" until the owner gives it some.
+- **Fails closed.** A user that is not in `/etc/passwd`, a name that is not a plain user name, no such group, a record that could not be kept or a socket that could not be made: no socket, and the journal says why. The journal also names each connection's pid and uid; never what it says.
+- **Limits.** At most 16 connections at once. Any process running as the named user can use it, as any program holding a paired key can: the owner gives that user to the agent only.
 
 ## The wire
 
