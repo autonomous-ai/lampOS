@@ -136,7 +136,11 @@ the tasks part's home (`/var/lib/lampos-tasks/.harness/` `auth`,
 `connections`, `computer-id`, `cli/data`, `agent-messages`, `hook-routes`
 and `logs`: the sign-in, the pairings and what they left; not `.harness`
 whole, which is Harness itself, its CLI and its own Node, and not the
-Harness service `install` set up, #934; Nine on #1016), the user's key
+Harness service `install` set up, #934; Nine on #1016), the work folder
+Hermes and OpenClaw share on the lamp (`/var/lib/lampos-tasks/harnesses/lamp-tasks`,
+emptied; lamp-tasks writes the lamp's `AGENTS.md` again at its start), and
+Hermes's and OpenClaw's own per-person files, in a step of their own after
+the plan's paths (`reset::forget_agents`, #6343, below), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
 16:13), the person's own keys (`/etc/lampOS/voice/own`, `LAMP_OWN_KEYS`), the
 name (`/etc/lampOS/person/name`), the owner's place from the app
@@ -257,7 +261,37 @@ lamp-setup reset-now`). That unit, in this order:
    even before they have a package mark, through the same durable rename.
    `NAME` and `PID` follow the installer's bounds (1–64
    lowercase letters, digits or hyphens, and 1–10 digits). A link there is
-   passed over, and links inside a removed folder are unlinked, never followed;
+   passed over, and links inside a removed folder are unlinked, never followed.
+   Then Hermes's and OpenClaw's per-person files go, each folder by what it
+   keeps (`reset::AGENT_FOLDERS`, #6343): every other name in it is the
+   person's and removed, a name the reset does not know among them, so a
+   newer Hermes's new store goes too. Said by count. Kept, so neither needs a
+   reinstall: in `/var/lib/lampos-hermes`, `.local` (the `hermes` command and
+   its Python), `.cache`, `.npm`, `.bashrc`, `.profile` and `.hermes`; in
+   `HERMES_HOME` (`.hermes`), the checkout `hermes-agent`, `tools` (uv,
+   ffmpeg), `installs`, the public model lists' caches
+   (`models_dev_cache.json`, `models_dev_cache.etag`,
+   `provider_models_cache.json`) and `config.yaml`, which holds lamp-update's
+   install-time settings and Harness's `hooks:` block, written again only by
+   a reinstall (lamp-tasks merges the lamp's provider into it at each start
+   and takes any other provider's address and key out); the installer's
+   folders `cron`, `sessions`, `logs`, `pairing`, `hooks`, `image_cache`,
+   `audio_cache`, `memories` and `skills` are emptied and kept (Hermes copies
+   its bundled skills back, and writes `SOUL.md` again, at its next start).
+   Removed there: `.env` (the keys; lamp-tasks writes the forwarder's token
+   line again), `state.db*`, `runtime`, `terminal-sessions`, `sandboxes`,
+   `spawn-ledger.json`, `backups`, `cache`, `SOUL.md`, the skills snapshot,
+   the hooks allow-list, `auth.lock` and anything else. In
+   `/var/lib/lampos-openclaw`, kept: `node`, `npm` (and an earlier `pkg`),
+   `.npm`, `.cache`, the lamp's `gateway-token` and `state`; in its `state`,
+   only `openclaw.json`, whose `gateway` block lamp-update writes only at an
+   install (lamp-tasks merges its keys in at each start). Removed: the
+   gateway's log, OpenClaw's database, `agents`, `workspace`, `media`, `tmp`,
+   `plugin-skills`, `openclaw.json.last-good` and anything else. A missing
+   folder removes nothing, and no link is followed. OpenClaw's gateway
+   (`lamp-openclaw-gateway.service`, outside `lampos.target`) is among the
+   writers stopped before the wipe; the next boot or the updater's next
+   round starts it again;
 5. it removes the journal, syncs, and **starts setup again in place, with no
    reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl
