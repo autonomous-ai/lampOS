@@ -2127,6 +2127,22 @@ order is kept. A written turn is the same from the chat on.
   not 429 or 5xx) with kept calls in the history is asked once more
   without them, in words only (`without_kept_calls`, the Reviewer-lead's
   P2 on #5018). Off, the history is as before, byte for byte.
+- **What a stored running note holds is not told again as history**
+  (`LAMP_HISTORY_AFTER_NOTE=on`, off in the product; #6218). With
+  `LAMP_CONVERSATION_SUMMARY` on, a turn's system message tells its scope's
+  running note ("Earlier in this conversation"), then the thread's lines,
+  and the chat is given the newest exchanges as history; off, the
+  exchanges the note was made from are still in both. With the switch,
+  those exchanges are left out of the thread's lines and the history,
+  their kept calls with them, but only once the job that gave them had its
+  note kept (`Thread::folded`), and only while that note (its lineage) is
+  the one told: a dropped, failed, empty or forgotten job, or no note told,
+  leaves every exchange told as before. The same newest exchanges are
+  chosen, then the folded leave; the room's lines told to a person stay;
+  a withheld name is taken out as before. The mark is RAM only, as the
+  note is: after a restart everything is told in full
+  ([conversation-thread.md](conversation-thread.md)). Off, the system
+  message and history are as before, byte for byte.
 - **A tool call knows whether it was heard.** The engine passes `heard`
   to the tool runner: true in a spoken turn, false in a written one, as the
   Live route does, so a yes to prepared work cannot come in a turn the lamp

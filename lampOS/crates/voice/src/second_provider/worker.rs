@@ -3224,6 +3224,17 @@ pub fn serve(
         HISTORY_KEEPS_CALLS.store(true, std::sync::atomic::Ordering::Release);
     }
     engine = engine.keeping_calls(keeps_calls);
+    // The exchanges a stored running note holds are told in it alone, not
+    // again as the thread's lines and history (#6218,
+    // `LAMP_HISTORY_AFTER_NOTE=on`).
+    if std::env::var(crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT)
+        .is_ok_and(|value| value == "on")
+    {
+        eprintln!(
+            "lamp-voice second: the exchanges a stored running note holds are told in it alone, not again as history (LAMP_HISTORY_AFTER_NOTE)"
+        );
+        HISTORY_AFTER_NOTE.store(true, std::sync::atomic::Ordering::Release);
+    }
     if std::env::var(crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT)
         .is_ok_and(|value| value == "on")
     {
@@ -12395,8 +12406,19 @@ pub(crate) fn thread_and_history(
         whose,
         withheld,
         ROOM_LINES_TOLD.load(std::sync::atomic::Ordering::Acquire),
+        HISTORY_AFTER_NOTE.load(std::sync::atomic::Ordering::Acquire),
     )
 }
+
+/// `LAMP_HISTORY_AFTER_NOTE=on` (#6218), set once as the worker starts
+/// ([`serve`]): the exchanges the scope's running note holds, once a job
+/// that gave them had that note kept (`crate::thread::Thread::folded`),
+/// are left out of the thread's lines and the history (their kept calls
+/// with them) of a turn told that note, so the same talk is not told
+/// twice. A turn told no note, or a note of another lineage, is told
+/// every exchange as before.
+pub(crate) static HISTORY_AFTER_NOTE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// `LAMP_CONVERSATION_ROOM_LINES_TOLD=on` (#4339), set once as the worker
 /// starts ([`serve`]): a person's turn is also given the room's exchanges of
@@ -12414,21 +12436,29 @@ pub(crate) const SAID_IN_THE_ROOM: &str = "(said in the room)";
 /// person's history (`whose` some) then takes the room's exchanges of the
 /// same conversation too, marked; the thread's text and the running
 /// summary stay the scope's own, and a turn of the room's is told only
-/// the room's, as ever. In memory, under the thread's one lock: no new
-/// read on the reply's path.
+/// the room's, as ever. With `after_note` as [`HISTORY_AFTER_NOTE`], the
+/// exchanges the running note told here holds are left out of both. In
+/// memory, under the thread's one lock: no new read on the reply's path.
 fn thread_and_history_told(
     used: usize,
     file: Option<&Path>,
     whose: Option<&str>,
     withheld: Option<&str>,
     room_lines: bool,
+    after_note: bool,
 ) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
     // The scope's own running summary first, within the room, never
     // another scope's (`LAMP_CONVERSATION_SUMMARY`); a name withheld is
-    // taken out of it as out of the thread.
-    let summary = crate::conversation_summary::told(whose, now, room);
+    // taken out of it as out of the thread. The lineage of the note told
+    // (`LAMP_HISTORY_AFTER_NOTE`): none when none is, so nothing is left
+    // out for it.
+    let (summary, note) = if after_note {
+        crate::conversation_summary::told_with_lineage(whose, now, room)
+    } else {
+        (crate::conversation_summary::told(whose, now, room), None)
+    };
     let summary = match withheld {
         Some(name) if !summary.is_empty() => crate::person::without_name(&summary, name),
         _ => summary,
@@ -12436,12 +12466,16 @@ fn thread_and_history_told(
     let room = room.saturating_sub(summary.len());
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
-            thread.recall_for(whose, now, room),
+            thread.recall_after_note(whose, now, room, note),
             match whose {
-                Some(person) if room_lines => {
-                    thread.recent_with_room_lines(person, now, HISTORY_WITHIN, HISTORY_EXCHANGES)
-                }
-                _ => thread.recent_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES),
+                Some(person) if room_lines => thread.recent_with_room_lines_after_note(
+                    person,
+                    now,
+                    HISTORY_WITHIN,
+                    HISTORY_EXCHANGES,
+                    note,
+                ),
+                _ => thread.recent_after_note(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
             },
         )
     })
@@ -21436,7 +21470,7 @@ mod tests {
                 .cloned()
                 .collect()
         };
-        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true);
+        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true, false);
         assert_eq!(
             users(&theirs),
             [
@@ -21446,18 +21480,18 @@ mod tests {
             ],
             "A's turn: the room's line among A's, marked"
         );
-        let (_, rooms) = thread_and_history_told(0, None, None, None, true);
+        let (_, rooms) = thread_and_history_told(0, None, None, None, true, false);
         assert_eq!(
             users(&rooms),
             [Message::user("Can you look it up?")],
             "the room's turn: never A's"
         );
-        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true);
+        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true, false);
         assert!(
             others.is_empty(),
             "B's turn: neither A's nor A's conversation's"
         );
-        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false);
+        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false, false);
         assert_eq!(
             users(&off),
             [
@@ -21467,8 +21501,137 @@ mod tests {
             "off: A's alone"
         );
         crate::thread::THREAD.lock().unwrap().forget();
-        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true);
+        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true, false);
         assert!(forgotten.is_empty(), "a forget drops the room's lines too");
+    }
+
+    /// #6218 (`LAMP_HISTORY_AFTER_NOTE`): a person's conversation of twelve
+    /// exchanges, the oldest seven given to the running summary. With the
+    /// note kept and the switch on, those seven are left out of the thread's
+    /// lines and the history, the newest five told, the note told; off, or
+    /// with the job never folding (dropped or failed), everything is told
+    /// byte for byte as before. With the room's lines told, a room's line
+    /// among the folded ones stays: the room's note is never told here.
+    #[test]
+    fn exchanges_a_stored_note_holds_are_told_in_it_alone() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let tom = crate::remember::person_id("Fold Tom");
+        let note = |_: &str| Some("Current activity: none\nKey facts:\n- NOTE-HOLDS".to_owned());
+        let sized = |told: &(String, Vec<Message>)| {
+            told.0.len() + serde_json::to_string(&told.1).unwrap().len()
+        };
+        // Tom's exchanges, the room's one among them at `room_at`, the
+        // first batch given to the summary and, with `fold`, its note kept
+        // and folded; then the rest. Each told as `told` gives it.
+        let told_with = |room_at: Option<u64>,
+                         fold: bool,
+                         told: &dyn Fn() -> (String, Vec<Message>)|
+         -> (String, Vec<Message>) {
+            // A forget elsewhere in the run may clear the notes in between:
+            // made again, a few times at most.
+            for _ in 0..5 {
+                let now = Instant::now();
+                let mut thread = crate::thread::THREAD.lock().unwrap();
+                thread.forget();
+                let add = |thread: &mut crate::thread::Thread, request: u64| {
+                    let whose = (room_at != Some(request)).then_some(tom.as_str());
+                    thread.person(&format!("Tom asks question {request:02}?"), true, now);
+                    thread.lamp_for(
+                        request,
+                        &format!("The lamp answers question {request:02} at some length."),
+                        now,
+                        whose,
+                    );
+                };
+                // Eleven of Tom's: the oldest seven are due.
+                let first = 11 + u64::from(room_at.is_some());
+                for request in 1..=first {
+                    add(&mut thread, request);
+                }
+                let due = thread.summary_due(crate::conversation_summary::KEEP_VERBATIM, now);
+                drop(thread);
+                for due in due {
+                    if fold {
+                        crate::conversation_summary::summarize_now_here(
+                            due.whose,
+                            due.exchanges,
+                            &note,
+                            now,
+                        );
+                    } else {
+                        // The note kept, but not from this job (it was
+                        // dropped or failed): nothing folded.
+                        crate::conversation_summary::summarize_now_here(
+                            due.whose,
+                            vec![(0, "other".into(), "other".into())],
+                            &note,
+                            now,
+                        );
+                    }
+                }
+                let mut thread = crate::thread::THREAD.lock().unwrap();
+                add(&mut thread, first + 1);
+                drop(thread);
+                let told = told();
+                if told.0.contains("NOTE-HOLDS") {
+                    return told;
+                }
+            }
+            panic!("the note was never kept");
+        };
+        let off = || thread_and_history_told(0, None, Some(&tom), None, false, false);
+        let on = || thread_and_history_told(0, None, Some(&tom), None, false, true);
+        let off_folded = told_with(None, true, &off);
+        let off_unfolded = told_with(None, false, &off);
+        assert_eq!(off_folded, off_unfolded, "off: byte for byte as before");
+        let on_unfolded = told_with(None, false, &on);
+        assert_eq!(on_unfolded, off_unfolded, "nothing folded: as before");
+        let on_folded = told_with(None, true, &on);
+        let (text, history) = &on_folded;
+        let history_text = serde_json::to_string(history).unwrap();
+        assert!(text.contains("Earlier in this conversation"), "{text}");
+        assert!(text.contains("NOTE-HOLDS"), "{text}");
+        for request in 1..=7 {
+            let line = format!("question {request:02}");
+            assert!(!text.contains(&line), "{line} in {text}");
+            assert!(!history_text.contains(&line), "{line} in {history_text}");
+        }
+        for request in 8..=12 {
+            let line = format!("question {request:02}");
+            assert!(text.contains(&line), "{line} not in {text}");
+            assert!(history_text.contains(&line), "{line} not in {history_text}");
+        }
+        assert_eq!(history.len(), 10, "five exchanges, two messages each");
+        println!(
+            "LAMP_HISTORY_AFTER_NOTE: 12 exchanges, 7 folded: off {} bytes, on {} bytes, {} saved",
+            sized(&off_folded),
+            sized(&on_folded),
+            sized(&off_folded) - sized(&on_folded)
+        );
+        // The room's lines told: the room's line at 3, among Tom's folded
+        // ones, stays, marked; Tom's folded ones leave.
+        let rooms_on = || thread_and_history_told(0, None, Some(&tom), None, true, true);
+        let rooms_off = || thread_and_history_told(0, None, Some(&tom), None, true, false);
+        let (_, rooms) = told_with(Some(3), true, &rooms_on);
+        let rooms_text = serde_json::to_string(&rooms).unwrap();
+        assert!(
+            rooms_text.contains(&format!("{SAID_IN_THE_ROOM} Tom asks question 03?")),
+            "{rooms_text}"
+        );
+        for request in [1, 2, 4, 5, 6, 7, 8] {
+            let line = format!("question {request:02}");
+            assert!(!rooms_text.contains(&line), "{line} in {rooms_text}");
+        }
+        for request in 9..=13 {
+            let line = format!("question {request:02}");
+            assert!(rooms_text.contains(&line), "{line} not in {rooms_text}");
+        }
+        assert_eq!(
+            told_with(Some(3), true, &rooms_off),
+            told_with(Some(3), false, &rooms_off),
+            "off with the room's lines: as before"
+        );
+        crate::thread::THREAD.lock().unwrap().forget();
     }
 
     /// #3997's cut-in proposal: an answer cut while it played and kept as
