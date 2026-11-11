@@ -2020,16 +2020,28 @@ linked Slack and GitHub again every day). It is used until the service
 itself refuses it: a 401 to an HTTP call (GitHub's "Bad credentials" among
 them, but not a 401 whose body says the scopes are too few), or an MCP
 service's 401 or its words for a dead token (`invalid_auth`,
-`token_expired`, `token_revoked`, in a JSON-RPC error or a tool's error;
-`mcp::DEAD_TOKEN`). That call is answered as before ("<Service> refused the
+`token_expired`, `token_revoked`; `mcp::DEAD_TOKEN`) in a field of its own
+error: a JSON-RPC error's `message`, a text `code`, `error` or `data`, or
+`data`'s own `error`, `code` or `message`; a tool's error (`isError`) by its
+`structuredContent`'s same fields or its first content block, as text or as
+a JSON object's fields (Slack's `{"ok":false,"error":"invalid_auth"}`). The
+field must be the word, alone or leading its explanation, after an optional
+"Error:" (`mcp::says_dead_token`): the word quoted anywhere else, as in a
+message or an issue a tool returns, a later block, or a successful result,
+marks nothing. That call is answered as before ("<Service> refused the
 lamp's link: it may need linking again in the app"), and the link's file
 keeps `refused: true` (`serve::mark_refused`; the journal says "<code>
 refused its link: kept as expired until it is linked again"): `list` and
 `services_connected` show it `expired: true`, and the next call is told
 "the link to <Service> has expired: link it again in the app" without
 asking the service. A 403, a scope refusal or any other error marks
-nothing. Linking it again in the app writes a new entry, the mark gone. A
-link given its time, one renewed through the backend and a static key are
+nothing. Linking it again in the app writes a new entry, the mark gone.
+Removing it in the app deletes it, and so does a factory reset: the reset
+plan wipes `/var/lib/lampos-services` (`store::DIR`;
+`crates/setup/fixtures/reset-plan-product.json`), every link and its mark
+with it, so after a reset each service is linked again in the app. Neither
+revokes anything at the service ([What removing the lamp does not
+undo](#what-removing-the-lamp-does-not-undo)). A link given its time, one renewed through the backend and a static key are
 as before: a refusal doesn't mark them.
 
 A service whose tokens are short-lived (Slack with token rotation, a GitHub
