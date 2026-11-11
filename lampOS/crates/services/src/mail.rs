@@ -42,6 +42,10 @@ pub const WITHIN: Duration = Duration::from_secs(20);
 pub const CONNECT_WITHIN: Duration = Duration::from_secs(5);
 /// The longest protocol line read.
 const LINE_MOST: usize = 65_536;
+/// The most of one `* SEARCH` line read: past [`LINE_MOST`] it is read on
+/// without being kept ([`search_newest`]), so a busy mailbox's every UID
+/// (some 2 million at 8 bytes each) is read through, only the newest kept.
+const SEARCH_LINE_MOST: usize = 16 << 20;
 /// The most untagged responses taken while a literal waits for its `+`.
 const UNTAGGED_BEFORE_MOST: usize = 100;
 /// How long LOGOUT's answer is waited for: past a saved draft or a read,
@@ -76,7 +80,8 @@ pub enum Failure {
     Refused,
     /// Gmail's REST API refused a Google sign-in's token.
     SignInRefused,
-    /// No answer, a broken one, or a command refused after login.
+    /// No answer, a broken one, or a command refused after login. Which
+    /// one is said only to the journal ([`Imap`]'s `why`).
     Unreached,
 }
 
@@ -1937,6 +1942,14 @@ pub struct Imap<S> {
     /// The longest literal taken now: [`LITERAL_MOST`], or a whole PDF's
     /// part while it is fetched ([`attachments::PDF_FETCH`]).
     literal_most: usize,
+    /// While a UID SEARCH runs, how many of its newest UIDs are kept.
+    search_keep: Option<usize>,
+    /// The step running: the greeting, or the command's name alone.
+    step: &'static str,
+    /// Why the exchange last failed, for the journal only: the step, and
+    /// the limit reached or the server's status and code; never anything
+    /// of a mail, a mailbox's name, the words searched or the login.
+    why: Option<String>,
 }
 
 /// Before a UID from All Mail in a mail's id over IMAP (`all41`); a bare
@@ -2063,12 +2076,37 @@ fn imap_quoted(text: &str) -> Option<String> {
     ))
 }
 
-async fn read_line<S: AsyncRead + Unpin>(io: &mut BufReader<S>) -> Result<Vec<u8>, Failure> {
+/// Why reading a line broke, for the journal.
+struct Broke(String);
+
+impl From<Broke> for Failure {
+    fn from(_: Broke) -> Self {
+        Failure::Unreached
+    }
+}
+
+fn read_broke(why: std::io::Error) -> Broke {
+    Broke(format!("a read error ({:?})", why.kind()))
+}
+
+fn line_over(read: usize) -> Broke {
+    Broke(format!(
+        "a line over LINE_MOST ({LINE_MOST} bytes; {read} read)"
+    ))
+}
+
+/// One line, at most [`LINE_MOST`]; with `search_keep`, a longer
+/// `* SEARCH` line is read on with only its newest UIDs kept
+/// ([`search_newest`]).
+async fn read_line<S: AsyncRead + Unpin>(
+    io: &mut BufReader<S>,
+    search_keep: Option<usize>,
+) -> Result<Vec<u8>, Broke> {
     let mut line = Vec::new();
     loop {
-        let buffer = io.fill_buf().await.map_err(|_| Failure::Unreached)?;
+        let buffer = io.fill_buf().await.map_err(read_broke)?;
         if buffer.is_empty() {
-            return Err(Failure::Unreached);
+            return Err(Broke("the connection closed".into()));
         }
         if let Some(at) = buffer.iter().position(|&b| b == b'\n') {
             line.extend_from_slice(&buffer[..=at]);
@@ -2079,13 +2117,159 @@ async fn read_line<S: AsyncRead + Unpin>(io: &mut BufReader<S>) -> Result<Vec<u8
         line.extend_from_slice(buffer);
         io.consume(n);
         if line.len() > LINE_MOST {
-            return Err(Failure::Unreached);
+            return match search_keep {
+                Some(keep) if line.starts_with(b"* SEARCH") => search_newest(io, line, keep).await,
+                _ => Err(line_over(line.len())),
+            };
         }
     }
     if line.len() > LINE_MOST {
-        return Err(Failure::Unreached);
+        return match search_keep {
+            Some(keep) if line.starts_with(b"* SEARCH") => {
+                Ok(Newest::new(keep).taken(&line[8..]).line())
+            }
+            _ => Err(line_over(line.len())),
+        };
     }
     Ok(line)
+}
+
+/// The highest UIDs of a `* SEARCH` line, at most `keep` of them, read a
+/// piece at a time.
+struct Newest {
+    keep: usize,
+    kept: std::collections::BinaryHeap<std::cmp::Reverse<u32>>,
+    /// The number being read, `None` between numbers.
+    number: Option<u64>,
+}
+
+impl Newest {
+    fn new(keep: usize) -> Self {
+        Newest {
+            keep,
+            kept: std::collections::BinaryHeap::new(),
+            number: None,
+        }
+    }
+
+    fn taken(mut self, bytes: &[u8]) -> Self {
+        for &byte in bytes {
+            if byte.is_ascii_digit() {
+                let digit = u64::from(byte - b'0');
+                self.number = Some(
+                    self.number
+                        .unwrap_or(0)
+                        .saturating_mul(10)
+                        .saturating_add(digit),
+                );
+            } else {
+                self.end_number();
+            }
+        }
+        self
+    }
+
+    /// The number just read kept, when it is a UID among the highest.
+    fn end_number(&mut self) {
+        if let Some(uid) = self.number.take().and_then(|n| u32::try_from(n).ok()) {
+            self.kept.push(std::cmp::Reverse(uid));
+            if self.kept.len() > self.keep {
+                self.kept.pop();
+            }
+        }
+    }
+
+    /// The line again: `* SEARCH` and the UIDs kept, oldest first.
+    fn line(mut self) -> Vec<u8> {
+        self.end_number();
+        let mut uids: Vec<u32> = self.kept.into_iter().map(|uid| uid.0).collect();
+        uids.sort_unstable();
+        let mut line = String::from("* SEARCH");
+        for uid in uids {
+            line.push(' ');
+            line.push_str(&uid.to_string());
+        }
+        line.push_str("\r\n");
+        line.into_bytes()
+    }
+}
+
+/// The rest of a `* SEARCH` line too long to keep, read through to its end
+/// with only its newest `keep` UIDs (the highest) kept, and the line given
+/// back with those alone. Gmail's UIDs run to seven digits and more, so
+/// [`LINE_MOST`] holds some 8,000 of them: a busy inbox's `UID SEARCH ALL`
+/// is longer, and its read was refused whole as "Gmail couldn't be
+/// reached" (11 Nov, a tester's lamp). At most [`SEARCH_LINE_MOST`] is
+/// read.
+async fn search_newest<S: AsyncRead + Unpin>(
+    io: &mut BufReader<S>,
+    head: Vec<u8>,
+    keep: usize,
+) -> Result<Vec<u8>, Broke> {
+    let mut read = head.len();
+    let mut newest = Newest::new(keep).taken(&head[8..]);
+    loop {
+        let buffer = io.fill_buf().await.map_err(read_broke)?;
+        if buffer.is_empty() {
+            return Err(Broke("the connection closed".into()));
+        }
+        let (piece, end) = match buffer.iter().position(|&b| b == b'\n') {
+            Some(at) => (at + 1, true),
+            None => (buffer.len(), false),
+        };
+        newest = newest.taken(&buffer[..piece]);
+        io.consume(piece);
+        read += piece;
+        if read > SEARCH_LINE_MOST {
+            return Err(Broke(format!(
+                "a SEARCH answer over SEARCH_LINE_MOST ({SEARCH_LINE_MOST} bytes; {read} read)"
+            )));
+        }
+        if end {
+            return Ok(newest.line());
+        }
+    }
+}
+
+/// A command's step for the journal: its name alone (`UID FETCH` is
+/// FETCH), never its arguments, which carry the login, a mailbox's name or
+/// the words searched.
+fn step_of(command: &str) -> &'static str {
+    let mut words = command.split(' ');
+    let mut name = words.next().unwrap_or("");
+    if name.eq_ignore_ascii_case("UID") {
+        name = words.next().unwrap_or("");
+    }
+    [
+        "LOGIN", "EXAMINE", "SELECT", "LIST", "SEARCH", "FETCH", "APPEND", "LOGOUT",
+    ]
+    .into_iter()
+    .find(|step| step.eq_ignore_ascii_case(name))
+    .unwrap_or("a command")
+}
+
+/// An answer's status for the journal: its word (NO, BAD, BYE) and the
+/// first word of its code in brackets (`NO [ALERT]`), never the server's
+/// text, which may name a mailbox, the words searched or an address.
+fn status_told(status: &str) -> String {
+    let (word, rest) = status.split_once(' ').unwrap_or((status, ""));
+    let word: String = word
+        .chars()
+        .take(8)
+        .filter(char::is_ascii_alphabetic)
+        .collect();
+    let code: String = rest
+        .strip_prefix('[')
+        .unwrap_or("")
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .take(32)
+        .collect();
+    if code.is_empty() {
+        word
+    } else {
+        format!("{word} [{code}]")
+    }
 }
 
 /// A line's literal size, when it ends with `{n}`.
@@ -2100,6 +2284,9 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
             io: BufReader::new(stream),
             tag: 0,
             literal_most: LITERAL_MOST,
+            search_keep: None,
+            step: "the greeting",
+            why: None,
         }
     }
 
@@ -2107,24 +2294,39 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
         let mut response = Response::default();
         let mut total = 0;
         loop {
-            let raw = read_line(&mut self.io).await?;
+            let raw = match read_line(&mut self.io, self.search_keep).await {
+                Ok(raw) => raw,
+                Err(Broke(why)) => return Err(self.broke(Failure::Unreached, why)),
+            };
             let line = String::from_utf8_lossy(&raw)
                 .trim_end_matches(['\r', '\n'])
                 .to_owned();
             match literal_size(&line) {
                 Some(size) => {
                     total += size;
-                    if size > self.literal_most
-                        || total > RESPONSE_MOST.max(self.literal_most + LINE_MOST)
-                    {
-                        return Err(Failure::Unreached);
+                    let most = RESPONSE_MOST.max(self.literal_most + LINE_MOST);
+                    if size > self.literal_most {
+                        let why = format!(
+                            "a literal of {size} bytes, over LITERAL_MOST ({} bytes)",
+                            self.literal_most
+                        );
+                        return Err(self.broke(Failure::Unreached, why));
+                    }
+                    if total > most {
+                        let why = format!(
+                            "literals of {total} bytes in one answer, over RESPONSE_MOST ({most} bytes)"
+                        );
+                        return Err(self.broke(Failure::Unreached, why));
                     }
                     let label = line[..line.rfind('{').unwrap_or(0)].to_owned();
                     let mut literal = vec![0; size];
-                    self.io
-                        .read_exact(&mut literal)
-                        .await
-                        .map_err(|_| Failure::Unreached)?;
+                    if let Err(why) = self.io.read_exact(&mut literal).await {
+                        let why = format!(
+                            "a literal of {size} bytes not read whole: {}",
+                            read_broke(why).0
+                        );
+                        return Err(self.broke(Failure::Unreached, why));
+                    }
                     response.text.push_str(&label);
                     response.text.push_str("{}");
                     response.literals.push((label, literal));
@@ -2139,20 +2341,26 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
 
     async fn write(&mut self, bytes: &[u8]) -> Result<(), Failure> {
         let stream = self.io.get_mut();
-        stream
-            .write_all(bytes)
-            .await
-            .map_err(|_| Failure::Unreached)?;
-        stream.flush().await.map_err(|_| Failure::Unreached)
+        let wrote = match stream.write_all(bytes).await {
+            Ok(()) => stream.flush().await,
+            Err(why) => Err(why),
+        };
+        wrote.map_err(|why| {
+            let why = format!("a write error ({:?})", why.kind());
+            self.broke(Failure::Unreached, why)
+        })
     }
 
     /// The server's greeting.
     pub async fn greet(&mut self) -> Result<(), Failure> {
+        self.step = "the greeting";
         let greeting = self.response().await?;
         if greeting.text.starts_with("* OK") || greeting.text.starts_with("* PREAUTH") {
             Ok(())
         } else {
-            Err(Failure::Unreached)
+            let status = greeting.text.get(2..).unwrap_or("");
+            let why = format!("a greeting of {}", status_told(status));
+            Err(self.broke(Failure::Unreached, why))
         }
     }
 
@@ -2164,6 +2372,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
         literal: Option<&[u8]>,
     ) -> Result<Vec<Response>, Failure> {
         self.tag += 1;
+        self.step = step_of(command);
         let tag = format!("A{}", self.tag);
         let mut untagged = Vec::new();
         match literal {
@@ -2192,10 +2401,12 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
                         untagged.push(go_on);
                         continue;
                     }
-                    return Err(if go_on.text.starts_with(&format!("{tag} ")) {
-                        Failure::Refused
-                    } else {
-                        Failure::Unreached
+                    return Err(match go_on.text.strip_prefix(&format!("{tag} ")) {
+                        Some(status) => self.broke(
+                            Failure::Refused,
+                            format!("a tagged {}", status_told(status)),
+                        ),
+                        None => self.broke(Failure::Unreached, "an answer that isn't the go-ahead"),
                     });
                 }
                 let mut rest = literal.to_vec();
@@ -2209,13 +2420,17 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
                 return if status.starts_with("OK") {
                     Ok(untagged)
                 } else {
-                    Err(Failure::Refused)
+                    Err(self.broke(
+                        Failure::Refused,
+                        format!("a tagged {}", status_told(status)),
+                    ))
                 };
             }
             if response.text.starts_with("* ") {
                 untagged.push(response);
             } else {
-                return Err(Failure::Unreached);
+                let why = "an answer neither untagged nor this command's";
+                return Err(self.broke(Failure::Unreached, why));
             }
         }
     }
@@ -2223,7 +2438,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
     /// LOGIN; a refusal is [`Failure::Refused`].
     pub async fn login(&mut self, user: &str, pass: &str) -> Result<(), Failure> {
         let (Some(user), Some(pass)) = (imap_quoted(user), imap_quoted(pass)) else {
-            return Err(Failure::Refused);
+            self.step = "LOGIN";
+            return Err(self.broke(Failure::Refused, "a login that can't be quoted"));
         };
         self.run(&format!("LOGIN {user} {pass}"), None)
             .await
@@ -2232,7 +2448,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
 
     /// EXAMINE: the mailbox opened read-only.
     pub async fn examine(&mut self, mailbox: &str) -> Result<(), Failure> {
-        let mailbox = imap_quoted(mailbox).ok_or(Failure::Unreached)?;
+        let Some(mailbox) = imap_quoted(mailbox) else {
+            self.step = "EXAMINE";
+            return Err(self.broke(Failure::Unreached, "a mailbox name that can't be quoted"));
+        };
         self.run(&format!("EXAMINE {mailbox}"), None)
             .await
             .map(|_| ())
@@ -2263,7 +2482,11 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
     ) -> Result<Option<String>, Failure> {
         match self.run("LIST \"\" \"*\"", None).await {
             Ok(listed) => Ok(listed.iter().find_map(name)),
-            Err(Failure::Refused) => Ok(None),
+            Err(Failure::Refused) => {
+                // A refused LIST is no failure of the read.
+                self.why = None;
+                Ok(None)
+            }
             Err(_) => Err(Failure::Unreached),
         }
     }
@@ -2294,9 +2517,12 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
             .map_err(|_| Failure::Unreached)
     }
 
-    /// UID SEARCH: every UID found, oldest first. `words` are Gmail's own
-    /// search (`X-GM-RAW`); none is every mail.
-    pub async fn search(&mut self, words: Option<&str>) -> Result<Vec<u32>, Failure> {
+    /// UID SEARCH: the newest `most` UIDs found (the highest), oldest
+    /// first. `words` are Gmail's own search (`X-GM-RAW`); none is every
+    /// mail. However many it finds, only those are kept, even when the
+    /// answer is far longer than [`LINE_MOST`] ([`search_newest`]).
+    pub async fn search(&mut self, words: Option<&str>, most: usize) -> Result<Vec<u32>, Failure> {
+        self.search_keep = Some(most);
         let found = match words {
             None => self.run("UID SEARCH ALL", None).await,
             Some(words) => match imap_quoted(words) {
@@ -2304,23 +2530,26 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
                     self.run(&format!("UID SEARCH X-GM-RAW {quoted}"), None)
                         .await
                 }
+                None if words.chars().any(char::is_control) => {
+                    self.step = "SEARCH";
+                    Err(self.broke(Failure::Unreached, "words with a control character"))
+                }
                 None => {
-                    if words.chars().any(char::is_control) {
-                        return Err(Failure::Unreached);
-                    }
                     self.run("UID SEARCH CHARSET UTF-8 X-GM-RAW", Some(words.as_bytes()))
                         .await
                 }
             },
-        }
-        .map_err(|_| Failure::Unreached)?;
+        };
+        self.search_keep = None;
+        let found = found.map_err(|_| Failure::Unreached)?;
         let mut uids: Vec<u32> = found
             .iter()
             .filter_map(|response| response.text.strip_prefix("* SEARCH"))
             .flat_map(|rest| rest.split_whitespace().filter_map(|n| n.parse().ok()))
             .collect();
         uids.sort_unstable();
-        Ok(uids)
+        uids.dedup();
+        Ok(uids.split_off(uids.len().saturating_sub(most)))
     }
 
     /// UID FETCH of each mail's From, Subject and Date, and the first
@@ -2412,29 +2641,91 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
 /// A whole read: login, the mailbox opened read-only (`recent` the inbox;
 /// `search` All Mail, else the inbox; `drafts` Drafts; `message` the one its
 /// id names), the search or the one mail, logout. Only a draft keeps whom
-/// it is to.
+/// it is to. Within [`WITHIN`]; a failure's step and why go to the journal
+/// ([`read_failed`]).
 pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
     stream: S,
     user: &str,
     pass: &str,
     ask: &MailAsk,
 ) -> Result<Vec<MailItem>, Failure> {
+    read_mail_told(stream, user, pass, ask, WITHIN)
+        .await
+        .map_err(read_failed)
+}
+
+/// A Gmail read's failure told the journal: the step and why, nothing of
+/// a mail ([`Imap`]'s `why`).
+pub(crate) fn read_failed((failure, why): (Failure, String)) -> Failure {
+    eprintln!("lamp-services: a Gmail read failed at {why}");
+    failure
+}
+
+/// [`read_mail`] within `within`, a failure with its step and why.
+async fn read_mail_told<S: AsyncRead + AsyncWrite + Unpin>(
+    stream: S,
+    user: &str,
+    pass: &str,
+    ask: &MailAsk,
+    within: Duration,
+) -> Result<Vec<MailItem>, (Failure, String)> {
     let mut imap = Imap::new(stream);
+    let read = tokio::time::timeout(within, read_on(&mut imap, user, pass, ask)).await;
+    imap.told(read, within)
+}
+
+impl<S> Imap<S> {
+    /// `failure`, its reason kept with the step for the journal.
+    fn broke(&mut self, failure: Failure, why: impl std::fmt::Display) -> Failure {
+        self.why = Some(format!("{}: {why}", self.step));
+        failure
+    }
+
+    /// Why the exchange last failed: the step and the reason, nothing of a
+    /// mail.
+    fn why_told(&self) -> String {
+        self.why
+            .clone()
+            .unwrap_or_else(|| format!("{}: no reason kept", self.step))
+    }
+
+    /// A read's end: its items, or its failure with the step and why
+    /// ([`Imap`]'s `why`); past `within`, the step that was waiting.
+    pub(crate) fn told<T>(
+        &self,
+        read: Result<Result<T, Failure>, tokio::time::error::Elapsed>,
+        within: Duration,
+    ) -> Result<T, (Failure, String)> {
+        match read {
+            Ok(Ok(found)) => Ok(found),
+            Ok(Err(failure)) => Err((failure, self.why_told())),
+            Err(_) => Err((
+                Failure::Unreached,
+                format!("{}: no whole answer within {within:?}", self.step),
+            )),
+        }
+    }
+}
+
+async fn read_on<S: AsyncRead + AsyncWrite + Unpin>(
+    imap: &mut Imap<S>,
+    user: &str,
+    pass: &str,
+    ask: &MailAsk,
+) -> Result<Vec<MailItem>, Failure> {
     imap.greet().await?;
     imap.login(user, pass).await?;
     let mut items = match ask {
         MailAsk::Recent(most) => {
             imap.examine("INBOX").await?;
-            let uids = imap.search(None).await?;
-            let newest = &uids[uids.len().saturating_sub(*most)..];
-            imap.fetch(newest, PREVIEW_FETCH, PREVIEW_MOST).await?
+            let newest = imap.search(None, *most).await?;
+            imap.fetch(&newest, PREVIEW_FETCH, PREVIEW_MOST).await?
         }
         MailAsk::Search(words, most) => {
             let all = imap.all_mail().await?;
             imap.examine(all.as_deref().unwrap_or("INBOX")).await?;
-            let uids = imap.search(Some(words)).await?;
-            let newest = &uids[uids.len().saturating_sub(*most)..];
-            let mut items = imap.fetch(newest, PREVIEW_FETCH, PREVIEW_MOST).await?;
+            let newest = imap.search(Some(words), *most).await?;
+            let mut items = imap.fetch(&newest, PREVIEW_FETCH, PREVIEW_MOST).await?;
             if all.is_some() {
                 for item in &mut items {
                     item.id = format!("{ALL_MAIL_ID}{}", item.id);
@@ -2445,16 +2736,18 @@ pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
         MailAsk::Drafts(most) => {
             let drafts = imap.drafts().await?;
             imap.examine(&drafts).await?;
-            let uids = imap.search(None).await?;
-            let newest = &uids[uids.len().saturating_sub(*most)..];
-            let mut items = imap.fetch(newest, PREVIEW_FETCH, PREVIEW_MOST).await?;
+            let newest = imap.search(None, *most).await?;
+            let mut items = imap.fetch(&newest, PREVIEW_FETCH, PREVIEW_MOST).await?;
             for item in &mut items {
                 item.id = format!("{DRAFTS_ID}{}", item.id);
             }
             items
         }
         MailAsk::Message(id) => {
-            let (folder, uid) = imap_id(id).ok_or(Failure::Unreached)?;
+            let Some((folder, uid)) = imap_id(id) else {
+                imap.step = "the mail's id";
+                return Err(imap.broke(Failure::Unreached, "an id that names no mail"));
+            };
             if imap.examine_named(folder).await? {
                 let mut items = imap.fetch(&[uid], MESSAGE_FETCH, TEXT_MOST).await?;
                 for item in &mut items {
@@ -2628,7 +2921,7 @@ async fn smtp_reply<S: AsyncRead + Unpin>(
 ) -> Result<(u16, Vec<String>), Failure> {
     let mut lines = Vec::new();
     loop {
-        let raw = read_line(io).await?;
+        let raw = read_line(io, None).await?;
         let line = String::from_utf8_lossy(&raw)
             .trim_end_matches(['\r', '\n'])
             .to_owned();
@@ -2924,28 +3217,51 @@ pub fn api_send_body(from: &str, out: &Outgoing, date: &str, id: &str) -> Value 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Gmail;
 
-async fn connect(
-    host: &str,
-    port: u16,
-) -> Result<tokio_rustls::client::TlsStream<tokio::net::TcpStream>, Failure> {
+type Tls = tokio_rustls::client::TlsStream<tokio::net::TcpStream>;
+
+async fn connect(host: &str, port: u16) -> Result<Tls, Failure> {
+    connect_told(host, port)
+        .await
+        .map_err(|_| Failure::Unreached)
+}
+
+/// [`connect`], a failure with its step and why, for the journal.
+async fn connect_told(host: &str, port: u16) -> Result<Tls, (Failure, String)> {
+    let broke = |why: String| (Failure::Unreached, format!("connecting: {why}"));
     // The app password never goes to the REST host.
     if ![IMAP_HOST, SMTP_HOST].contains(&host) || !catalog::host_allowed("gmail", host) {
-        return Err(Failure::Unreached);
+        return Err(broke("a host not allowed".into()));
     }
-    let config = Arc::new(net::tls().map_err(|_| Failure::Unreached)?);
+    let config = Arc::new(net::tls().map_err(|_| broke("no TLS set-up".into()))?);
     let tcp = tokio::time::timeout(CONNECT_WITHIN, tokio::net::TcpStream::connect((host, port)))
         .await
-        .map_err(|_| Failure::Unreached)?
-        .map_err(|_| Failure::Unreached)?;
-    let name =
-        rustls::pki_types::ServerName::try_from(host.to_owned()).map_err(|_| Failure::Unreached)?;
+        .map_err(|_| broke(format!("no TCP within {} s", CONNECT_WITHIN.as_secs())))?
+        .map_err(|why| broke(format!("TCP refused ({:?})", why.kind())))?;
+    let name = rustls::pki_types::ServerName::try_from(host.to_owned())
+        .map_err(|_| broke("a host name TLS can't take".into()))?;
     tokio::time::timeout(
         CONNECT_WITHIN,
         tokio_rustls::TlsConnector::from(config).connect(name, tcp),
     )
     .await
-    .map_err(|_| Failure::Unreached)?
-    .map_err(|_| Failure::Unreached)
+    .map_err(|_| broke(format!("no TLS within {} s", CONNECT_WITHIN.as_secs())))?
+    .map_err(|why| broke(format!("TLS refused ({:?})", why.kind())))
+}
+
+/// A read over a new connection to Gmail's IMAP host: connecting and the
+/// read within [`WITHIN`] in all, a failure's step and why told the
+/// journal ([`read_failed`]).
+async fn read_over<T, F>(read: impl FnOnce(Tls, Duration) -> F) -> Result<T, Failure>
+where
+    F: Future<Output = Result<T, (Failure, String)>>,
+{
+    let start = tokio::time::Instant::now();
+    let stream = connect_told(IMAP_HOST, IMAP_PORT)
+        .await
+        .map_err(read_failed)?;
+    read(stream, WITHIN.saturating_sub(start.elapsed()))
+        .await
+        .map_err(read_failed)
 }
 
 impl Mail for Gmail {
@@ -2958,11 +3274,7 @@ impl Mail for Gmail {
     }
 
     async fn read(&self, user: &str, pass: &str, ask: &MailAsk) -> Result<Vec<MailItem>, Failure> {
-        tokio::time::timeout(WITHIN, async {
-            read_mail(connect(IMAP_HOST, IMAP_PORT).await?, user, pass, ask).await
-        })
-        .await
-        .map_err(|_| Failure::Unreached)?
+        read_over(|stream, within| read_mail_told(stream, user, pass, ask, within)).await
     }
 
     async fn attachment(
@@ -2972,11 +3284,10 @@ impl Mail for Gmail {
         id: &str,
         pick: &Pick,
     ) -> Result<Option<MailItem>, Failure> {
-        tokio::time::timeout(WITHIN, async {
-            read_attachment(connect(IMAP_HOST, IMAP_PORT).await?, user, pass, id, pick).await
+        read_over(|stream, within| {
+            attachments::read_attachment_told(stream, user, pass, id, pick, within)
         })
         .await
-        .map_err(|_| Failure::Unreached)?
     }
 
     async fn send(&self, user: &str, pass: &str, out: &Outgoing) -> Result<(), Failure> {
@@ -3358,6 +3669,238 @@ pub(crate) mod tests {
         );
         assert_eq!(items.unwrap(), Vec::new());
         assert!(!heard.contains("EXAMINE") && !heard.contains("FETCH"));
+    }
+
+    /// One read against a script held open `hold` after it, within
+    /// `within`: the read, its failure with the step and why, and all the
+    /// client sent.
+    fn scripted_why(
+        ask: MailAsk,
+        replies: Vec<String>,
+        hold: Duration,
+        within: Duration,
+    ) -> (Result<Vec<MailItem>, (Failure, String)>, String) {
+        // Room for a whole reply, so one the client stops reading is still
+        // written.
+        let (client, server) = duplex(1 << 20);
+        run(async {
+            let server = tokio::spawn(scripted_holding(
+                server,
+                "* OK Gimap ready\r\n",
+                replies,
+                hold,
+            ));
+            let read = read_mail_told(client, "a@b.c", "pw", &ask, within).await;
+            (read, server.await.unwrap())
+        })
+    }
+
+    /// The failure and why of a `recent` read whose SEARCH is answered
+    /// `search`, then whose FETCH is answered `fetch`.
+    fn recent_why(search: &str, fetch: &str) -> (Failure, String) {
+        let mut replies = vec![
+            "A1 OK\r\n".to_owned(),
+            "A2 OK [READ-ONLY] examined\r\n".to_owned(),
+            search.to_owned(),
+        ];
+        if !fetch.is_empty() {
+            replies.push(fetch.to_owned());
+        }
+        let (read, _) = scripted_why(MailAsk::Recent(3), replies, Duration::ZERO, WITHIN);
+        read.unwrap_err()
+    }
+
+    /// 11 Nov, a tester's lamp: a busy inbox's every mail read "Gmail
+    /// couldn't be reached" while its login saved a draft. Its `UID SEARCH
+    /// ALL` answer, one line of every UID, ran past [`LINE_MOST`]. Now it
+    /// is read through with the newest kept, and the newest mails read.
+    #[test]
+    fn a_busy_inboxs_long_search_answer_reads_its_newest_mails() {
+        // 30,000 seven-digit UIDs: some 240 KB on one line.
+        let uids: Vec<String> = (1_000_000..1_030_000).map(|uid| uid.to_string()).collect();
+        let search = format!("* SEARCH {}\r\nA3 OK\r\n", uids.join(" "));
+        assert!(search.len() > 3 * LINE_MOST);
+        let (items, heard) = scripted_why(
+            MailAsk::Recent(3),
+            vec![
+                "A1 OK\r\n".into(),
+                "A2 OK [READ-ONLY] examined\r\n".into(),
+                search,
+                fetched("A4", 1_029_999, "Mom", "Dinner", "See you at 7"),
+                "A5 OK\r\n".into(),
+            ],
+            Duration::ZERO,
+            WITHIN,
+        );
+        assert_eq!(items.unwrap()[0].id, "1029999");
+        let fetch = heard.lines().nth(3).unwrap();
+        assert!(
+            fetch.starts_with("A4 UID FETCH 1029997,1029998,1029999 ("),
+            "{fetch}"
+        );
+        // A search's answer the same, its UIDs in any order.
+        let mut uids = uids;
+        uids.reverse();
+        let search = format!("* SEARCH {}\r\nA4 OK\r\n", uids.join(" "));
+        let (items, heard) = scripted_why(
+            MailAsk::Search("receipt".into(), 2),
+            vec![
+                "A1 OK\r\n".into(),
+                format!("{LIST_VI}A2 OK listed\r\n"),
+                "A3 OK [READ-ONLY] examined\r\n".into(),
+                search,
+                fetched("A5", 1_029_999, "Shop", "Receipt", "Thanks"),
+                "A6 OK\r\n".into(),
+            ],
+            Duration::ZERO,
+            WITHIN,
+        );
+        assert_eq!(items.unwrap()[0].id, "all1029999");
+        let fetch = heard.lines().nth(4).unwrap();
+        assert!(
+            fetch.starts_with("A5 UID FETCH 1029998,1029999 ("),
+            "{fetch}"
+        );
+        // Only the highest are kept, a number past a UID's none.
+        let newest = Newest::new(2).taken(b" 9 4 12 7 4294967296 3");
+        assert_eq!(newest.line(), b"* SEARCH 9 12\r\n");
+    }
+
+    /// Each way a read fails says to the journal which step and why: the
+    /// command's name, the limit and the size reached, or the server's
+    /// status and code alone, never its text, the login or the words.
+    #[test]
+    fn a_failed_read_tells_its_step_and_why() {
+        // A line over LINE_MOST in a FETCH.
+        let long = format!(
+            "* 1 FETCH (UID 41 X-GM-LABELS ({}))\r\n",
+            "a".repeat(70_000)
+        );
+        let (failure, why) = recent_why("* SEARCH 41\r\nA3 OK\r\n", &long);
+        assert_eq!(failure, Failure::Unreached);
+        assert!(
+            why.starts_with("FETCH: a line over LINE_MOST (65536 bytes; "),
+            "{why}"
+        );
+        // A literal over LITERAL_MOST.
+        let (_, why) = recent_why(
+            "* SEARCH 41\r\nA3 OK\r\n",
+            "* 1 FETCH (UID 41 BODY[HEADER.FIELDS (FROM)] {2000000}\r\n",
+        );
+        assert_eq!(
+            why,
+            format!("FETCH: a literal of 2000000 bytes, over LITERAL_MOST ({LITERAL_MOST} bytes)")
+        );
+        // Literals over RESPONSE_MOST in one answer.
+        let first = "x".repeat(1_000_000);
+        let (_, why) = recent_why(
+            "* SEARCH 41\r\nA3 OK\r\n",
+            &format!(
+                "* 1 FETCH (UID 41 BODY[TEXT] {{1000000}}\r\n{first} BODY[1] {{1000000}}\r\n{first} BODY[2] {{200000}}\r\n"
+            ),
+        );
+        assert_eq!(
+            why,
+            format!(
+                "FETCH: literals of 2200000 bytes in one answer, over RESPONSE_MOST ({RESPONSE_MOST} bytes)"
+            )
+        );
+        // A SEARCH answer over SEARCH_LINE_MOST.
+        let (_, why) = recent_why(
+            &format!(
+                "* SEARCH {}\r\n",
+                "1234567 ".repeat(SEARCH_LINE_MOST / 8 + 1)
+            ),
+            "",
+        );
+        assert!(
+            why.starts_with("SEARCH: a SEARCH answer over SEARCH_LINE_MOST"),
+            "{why}"
+        );
+        // A tagged NO: its code alone, none of its text.
+        let (failure, why) =
+            recent_why("A3 NO [CANNOT] Can't search \"pay slip\" for a@b.c\r\n", "");
+        assert_eq!(failure, Failure::Unreached);
+        assert_eq!(why, "SEARCH: a tagged NO [CANNOT]");
+        // A tagged BAD at EXAMINE, with no code.
+        let (read, _) = scripted_why(
+            MailAsk::Recent(3),
+            vec![
+                "A1 OK\r\n".into(),
+                "A2 BAD Could not parse \"INBOX\"\r\n".into(),
+            ],
+            Duration::ZERO,
+            WITHIN,
+        );
+        assert_eq!(read.unwrap_err().1, "EXAMINE: a tagged BAD");
+        // A refused login: never its user or password.
+        let (read, _) = scripted_why(
+            MailAsk::Recent(3),
+            vec!["A1 NO [AUTHENTICATIONFAILED] Invalid credentials a@b.c\r\n".into()],
+            Duration::ZERO,
+            WITHIN,
+        );
+        assert_eq!(
+            read.unwrap_err(),
+            (
+                Failure::Refused,
+                "LOGIN: a tagged NO [AUTHENTICATIONFAILED]".into()
+            )
+        );
+        // The connection closed mid-answer.
+        let (_, why) = recent_why(
+            "* SEARCH 41\r\nA3 OK\r\n",
+            "* 1 FETCH (UID 41 BODY[TEXT] {10}\r\nabc",
+        );
+        assert!(
+            why.starts_with("FETCH: a literal of 10 bytes not read whole"),
+            "{why}"
+        );
+        let (read, _) = scripted_why(
+            MailAsk::Recent(3),
+            vec!["A1 OK\r\n".into(), "* 3 EXISTS".into()],
+            Duration::ZERO,
+            WITHIN,
+        );
+        assert_eq!(read.unwrap_err().1, "EXAMINE: the connection closed");
+        // A broken greeting, an answer out of place, and no answer in time.
+        let (client, server) = duplex(1 << 16);
+        let read = run(async {
+            let server = tokio::spawn(scripted(server, "* BYE [UNAVAILABLE] down\r\n", vec![]));
+            let read = read_mail_told(client, "a@b.c", "pw", &MailAsk::Recent(3), WITHIN).await;
+            server.await.unwrap();
+            read
+        });
+        assert_eq!(
+            read.unwrap_err().1,
+            "the greeting: a greeting of BYE [UNAVAILABLE]"
+        );
+        let (_, why) = recent_why("A9 OK\r\n", "");
+        assert_eq!(why, "SEARCH: an answer neither untagged nor this command's");
+        let (read, _) = scripted_why(
+            MailAsk::Recent(3),
+            vec!["A1 OK\r\n".into(), "A2 OK\r\n".into()],
+            Duration::from_millis(500),
+            Duration::from_millis(100),
+        );
+        assert_eq!(
+            read.unwrap_err(),
+            (
+                Failure::Unreached,
+                "SEARCH: no whole answer within 100ms".into()
+            )
+        );
+        // An id that names no mail.
+        let (read, _) = scripted_why(
+            MailAsk::Message("x41".into()),
+            vec!["A1 OK\r\n".into()],
+            Duration::ZERO,
+            WITHIN,
+        );
+        assert_eq!(
+            read.unwrap_err().1,
+            "the mail's id: an id that names no mail"
+        );
     }
 
     /// Gmail's LIST of a Vietnamese account with its Drafts: `[Gmail]/Thư

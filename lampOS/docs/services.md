@@ -379,7 +379,20 @@ heard line only, nothing kept.
   characters of each; `message {id}` (an id a list gave) up to 3,000. Text
   comes from a plain part first, else HTML with its tags taken out;
   quoted-printable, base64 and RFC 2047 words are decoded. 5 s to connect,
-  20 s for the whole exchange.
+  20 s for the whole exchange. `UID SEARCH` keeps only the newest UIDs a
+  read needs: a busy mailbox's answer, one line of every UID (Gmail's run to
+  seven digits, so 64 KB holds some 8,000), is read through up to 16 MB with
+  only those kept, rather than refused at the 64 KB line limit (11 Nov, a
+  tester's busy inbox read "Gmail couldn't be reached" while its login saved
+  a draft). A read that fails is said to the person as "Gmail couldn't be
+  reached"; the journal says at which step and why: "a Gmail read failed at
+  SEARCH: a tagged NO [CANNOT]", "… at FETCH: a literal of 2000000 bytes,
+  over LITERAL_MOST (1048576 bytes)", "… at connecting: no TLS within 5 s".
+  It names the command, the limit and the size reached, or the server's
+  status and the code in brackets, never the server's text, an address, a
+  subject, a mailbox's name or the words searched. With a Google sign-in
+  the journal says the step (the list, a mail's get), Gmail's HTTP status,
+  and the lamp's own words for why.
 - **Writes:** SMTP over TLS to `smtp.gmail.com:465`: `EHLO`, `AUTH PLAIN`
   (else `LOGIN`), `MAIL`, `RCPT` for each recipient, `DATA`, `QUIT`. One plain
   text message in UTF-8, its body in base64, from the account itself.
