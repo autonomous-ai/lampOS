@@ -989,7 +989,7 @@ comes first. So a burst followed by silence still says it.
 
 ## The camera
 
-With the `camera` grant, ticked by the owner at pairing like any other, a computer sees what the lamp's camera sees (`crates/control/src/camera.rs`).
+With the `camera` grant, which a pairing code made on the lamp itself carries (the app offers no `camera` tick, App Only, 11 Nov 2026), a computer sees what the lamp's camera sees (`crates/control/src/camera.rs`).
 
 - **The eyes own the camera, and the door never opens it.** With `--sight-file`, the eyes keep their newest frame in one file while the camera is open: a JPEG 320 across, about six a second, removed when the camera closes (eyes.md). lamp-control reads that file (`--sight-file`, `/run/lampos-eyes/sight.jpg` unless given, `off` for none). The eyes and the voice go on as before.
 - **`camera.snapshot`** answers with that frame, as `jpeg` (base64), `bytes` and `age_ms`. A frame older than 2 s is the camera closed (`refused: the camera is closed`). A frame caught mid-write is refused with `ask again`.
@@ -1003,7 +1003,7 @@ With the `camera` grant, ticked by the owner at pairing like any other, a comput
 
 ## The microphone
 
-With the `microphone` grant, ticked by the owner at pairing like any other, a computer hears what the lamp's room microphone hears (`crates/control/src/microphone.rs`).
+With the `microphone` grant, carried the same way (the app offers no `microphone` tick either), a computer hears what the lamp's room microphone hears (`crates/control/src/microphone.rs`).
 
 - **The ears own the microphone, and the door never opens it.** With `LAMP_BUS_AUDIO=on`, the ears publish each block they hear on `mic1/audio` (`lamp_msgs::Audio`, `json+pcm`: mono, 16 kHz, S16LE, 320 samples every 20 ms, `sequence` counting blocks; ears.md, "Optional mic1 PCM export"). That switch is off unless set, and no ears unit sets it: it is the owner's privacy decision, not this door's. (The voice's unit sets the same name for its own export, `mic2/audio` after its echo canceller, which lamp-name reads; this door never reads it.) lamp-control subscribes to `mic1/audio` only while at least one stream is on, on one thread for every stream, and lets the subscription go when the last one ends, so an idle door reads nothing. Without `--bus-root` there is no microphone at all.
 - **Off unless the owner switches it on.** lamp-control serves `microphone.stream` only with `--microphone on` (or `LAMP_CONTROL_MICROPHONE=on`; off unless given, said in the journal at start). Off, `on: true` is refused, "the microphone stream is off on this lamp (LAMP_CONTROL_MICROPHONE)". No unit or deploy file sets it, nor the ears' `LAMP_BUS_AUDIO`: both stay off until the owner decides.
