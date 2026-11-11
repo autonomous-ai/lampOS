@@ -7,10 +7,22 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 export const newToken = () => randomBytes(24).toString('base64url');
 
+// A request's target as a URL, or null when it is not one (`//`, `http://[`, `//a b`: `new URL` throws on each, and a
+// request made of one must be answered, never allowed to end the twin).
+export function parseUrl(url) {
+  try {
+    return new URL(url, 'http://localhost');
+  } catch {
+    return null;
+  }
+}
+
 // The request's `t`, compared in constant time; any other length is refused
 // before the compare, which needs equal lengths.
 export function tokenOk(url, token) {
-  const given = Buffer.from(new URL(url, 'http://localhost').searchParams.get('t') ?? '');
+  const parsed = parseUrl(url);
+  if (!parsed) return false;
+  const given = Buffer.from(parsed.searchParams.get('t') ?? '');
   const wanted = Buffer.from(token);
   return given.length === wanted.length && timingSafeEqual(given, wanted);
 }
