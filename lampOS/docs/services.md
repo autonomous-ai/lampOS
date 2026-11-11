@@ -1363,21 +1363,20 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   write forgotten first. When the answer has a `read_back` and a `send_id`,
   that id is kept with the request it came in, the service, the read-back,
   and the owner who asked, and the model is told "Nothing is sent yet. Say
-  read_back in full, word for word, then ask, short, "Shall I send it?" (in
-  Vietnamese "Gửi không?"); for an event or a file, "Shall I go ahead?" (in
-  Vietnamese "Làm không?"). If they agree, in any words, call service_write
-  with its send_id now, reading nothing first. If they cancel, decline, wait
-  or change it, don't send: say it's cancelled, or prepare the changed one
-  anew." ("now, reading nothing first": on a tester's lamp on 11 Nov the
-  model read the calendar on the person's "Yes." before sending);
+  read_back in full, word for word, leaving nothing out, then ask, short,
+  "Shall I send it?" (in Vietnamese "Gửi không?"); for an event or a file,
+  "Shall I go ahead?" (in Vietnamese "Làm không?"). If they agree, in any words, call service_write again with its send_id. If they
+  cancel, decline, wait or change it, don't send: say it's cancelled, or
+  prepare the changed one anew.";
   an id with no read-back is dropped and never sent. A write prepared with
   `action` `save_draft` is kept as a draft (`Pending::draft`), and the model
   is told instead `SAVE_READ_BACK_NEXT`, "Nothing is saved yet, and nothing
-  is ever sent. Say read_back in full, word for word, then ask, short,
-  "Shall I save it?" (in Vietnamese "Lưu không?"). If they agree, in any
-  words, call service_write with its send_id now, reading nothing first. If
-  they cancel, decline, wait or change it, don't save: say it's cancelled,
-  or prepare the changed one anew."
+  is ever sent. Say read_back in full, word for word, leaving nothing out,
+  then ask, short, "Shall I save it?" (in Vietnamese "Lưu không?"). If they
+  agree, in any words, call
+  service_write again with its send_id. If they cancel, decline, wait or
+  change it, don't save: say it's cancelled, or prepare the changed one
+  anew."
 - **What the lamp said of it:** every word the lamp says in that request
   after the write is prepared is kept with it, as said, on both routes
   (`thread::Thread::lamp_for` → `services::lamp_said`), to time a line begun
@@ -1433,17 +1432,7 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   (`Turn.other_seen`). A known other voice or another face cancels it,
   `OTHER_VOICE`: "Not sent, and cancelled: I send only when the voice
   saying "send" is the one that asked for it. Say it was not sent." With no
-  print yet (a line too short), it still goes when the asker's own face
-  was seen saying the line and no other face was (`Turn.asker_seen`,
-  `services::seen_saying_owner`, with `LAMP_SECOND_SPEAKING_FACE` and
-  `LAMP_EYES_SPEAKING`): on a tester's lamp on 11 Nov a fast one-word "Yes"
-  right after the read-back had no print. The journal says "a send in the
-  echo tail with no print: the asker's face seen saying it: sent". Their
-  face only in view, nobody seen speaking (the one-face rule's mark), is not
-  enough: it can't tell their yes from the lamp's own "Shall I send it?"
-  heard back while they sit silent (the Reviewer-lead's P1 on #6367), so no
-  yes runs on such a line, as `LAMP_PERSON_SCOPE_ONE_FACE_READS` says.
-  Otherwise the write waits for one more try, once: the
+  print yet (a line too short), the write waits for one more try, once: the
   model is told `NO_PRINT_YET`, "Not sent yet: I couldn't hear whose voice
   that was.", with `SAY_IT_LONGER` as what to say next (ask them to say "go
   ahead and send it", and send again only if they agree); the lamp's asking
@@ -1499,24 +1488,11 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   `send_id`, that if they cancel, decline or wait it doesn't send and says
   it's cancelled, and that a change is a new `service_write` with the whole
   message changed, never an ask for anything it holds. Read results stay private as before.
-- **Any other call forgets it, but a read on a plain yes:** a services call
-  with no `send_id` in another request, or the lamp speaking in a second
-  other request, drops the waiting write. The one exception is a line that
-  is a plain yes (`services::plain_yes`, `Turn.plain_yes`): `agent_tasks`'
-  deterministic test (`agent_tasks::plain_yes_with`: at most six words, no
-  question, only yes words beside "please", "lamp" or "hey") with the
-  read-back's own "send it", "gửi đi", "gửi", "có" and "ừ". On such a line a
-  read (`service_read`, `services_connected`) keeps the write, and its send
-  after the read in that same request still goes (`services::sends_waiting`,
-  "After a read" below); a new prepare drops it still. On a tester's lamp on
-  11 Nov the model read the calendar on the person's "Yes.", the write was
-  dropped, and the event had to be asked for again. On any other line ("What's
-  on my calendar tomorrow?") a read drops the write as before, so nothing a
-  read gives can make it send (App Only's P1 on #6367: an invite's words
-  asking for the send). The word test only lets the write past a read; the
-  send itself stays the model's to judge. The journal says why: "a waiting
-  write dropped: another call (prepared in request N)", "… dropped: the lamp
-  answered another request".
+- **Any other call forgets it:** a services call with no `send_id` in
+  another request, or the lamp speaking in a second other request, drops the
+  waiting write. The journal says why: "a waiting write dropped: another
+  call (prepared in request N)", "… dropped: the lamp answered another
+  request".
 - **The read-back's answer is its one chance** (Thirteen's P2 on #6009).
   Once the lamp answered the request after the read-back (`Pending.other`)
   with no send in it, any later request drops the write before its call or
@@ -1526,15 +1502,7 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   or something else ("What time is it?" → "It's three."). A "Yes, send it."
   after that finds `NOTHING_WAITING`, no later turn is told of the write,
   and the model prepares it anew. That request's own send, after words such
-  as "Sure, sending it now.", still goes. A line of no words (a noise), or
-  one whose answer only declined so the words it cut short were answered in
-  its place (`LAMP_CUT_ASK_ANSWERED`), is no such answer
-  (`services::answered_in_place`, `Pending.in_place`, as the lamp asking
-  once more is not): on a tester's lamp on 11 Nov a 0-word noise cut the
-  lamp's answer to the yes, was answered in its place, and the next yes
-  dropped the write. A line with words of its own answered in a held line's
-  place (a real question cut short) still counts as another request (the
-  Reviewer-lead's P3 on #6367).
+  as "Sure, sending it now.", still goes.
 - **The lamp's own echo is no line of the person's** (#5846). A line the
   second route holds as the lamp's own words heard back (`own_echo`,
   `Echo::Held`) is told through the thread (`Thread::own_echo_held` →
@@ -1631,12 +1599,7 @@ it is saved, never sent, whatever words agreed to it.
   done: after reading from a linked service, I do nothing else in the same
   turn, so nothing a mail or a page says can make me act. …": no keep in
   memory, reminder, executive action, `use_skill` or `service_write`
-  (`tools::run_call_with_scope`). The one exception is the send of the write
-  already waiting, with its own `send_id`, prepared and read back in an
-  earlier request, on a line that is a plain yes (`services::sends_waiting`,
-  `services::said_plain_yes`): the person's own words agreed, and it goes
-  exactly as prepared, through the send gate. On any other line the send is
-  refused with `AFTER_READ`, so a read's words never make it send.
+  (`tools::run_call_with_scope`).
 - **Nothing of it is kept.** That request's exchange keeps
   "(read from a linked service; not kept)" for the lamp's words
   (`thread::Thread::private_for`, `PRIVATE_SAID`), whether the lamp spoke
@@ -2720,10 +2683,7 @@ and in the conversation's voice (an off-camera voice brief), a line begun
 over the read-back marking it cut, a send refused and forgotten
 unless every rule holds (the same turn, stale past two minutes, another
 send_id), a send said over the read-back refused, another call or the lamp
-answering twice forgetting the write, a read on a plain yes keeping it and
-its send in the same request going (and refused with `AFTER_READ` on any
-other line), a fast yes with no print sent with the asker seen saying it
-and held for one more try with their face only in view, a noise answered in the yes's place no other request, only the owner's
+answering twice forgetting the write, only the owner's
 heard line reaching a service (a guest, the room, a held or narrowed line,
 no scope and a scheduled run refused, read and write), nothing else run
 after a read in the same request, a read cut to who and what about with

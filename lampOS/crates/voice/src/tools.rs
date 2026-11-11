@@ -1749,19 +1749,9 @@ fn run_call_with_scope(
     }
     // Once a linked service's read answered in this request, nothing else
     // in it runs but another read: a mail's or a page's words never become
-    // a keep, a reminder, an action, a skill or a write. The one exception
-    // is the send of the write already waiting, prepared and read back in
-    // an earlier request, on a line that is a plain yes: the person's own
-    // words agreed, and it goes exactly as prepared (lamp-29e7, 11 Nov: the
-    // model checked the calendar on the person's "Yes." first).
+    // a keep, a reminder, an action, a skill or a write.
     if crate::services::after_read(request)
-        && !(matches!(route, Route::Services(_))
-            && (crate::services::reads_only(&call.name)
-                || crate::services::sends_waiting(
-                    call,
-                    request,
-                    heard && crate::services::said_plain_yes(request),
-                )))
+        && !(matches!(route, Route::Services(_)) && crate::services::reads_only(&call.name))
     {
         return (
             "the services",
@@ -6561,86 +6551,6 @@ mod tests {
             }
         });
         (dir, asked)
-    }
-
-    /// lamp-29e7, 11 Nov, and App Only's P1 on #6367: on a "Yes." whose
-    /// model reads the calendar first, the waiting write's send after the
-    /// read still goes, once; on "What's on my calendar tomorrow?" the read
-    /// drops the write and a send after it (an invite's words asking for
-    /// it) is refused by the after-read rule, the service never asked.
-    #[test]
-    fn a_waiting_writes_send_after_a_read_goes_only_on_a_plain_yes() {
-        // The thread's lines are the process's: no other test's thread
-        // meanwhile.
-        let _thread = crate::provider_worker::tests::one_thread();
-        let (dir, asked) = services_folder("services-yes-read");
-        let services = Route::Services(dir.clone());
-        crate::known_faces::owner_for_test(Some(Some("Ann".into())));
-        crate::services::judging_voices(std::sync::Arc::new(|_| None));
-        let call = |name: &str, args: Value| ToolCall {
-            id: "c".into(),
-            name: name.into(),
-            args,
-        };
-        for (request, said, sends) in [
-            (4_720_002_u64, "Yes.", true),
-            (4_720_012, "What's on my calendar tomorrow?", false),
-        ] {
-            let mut waiting = crate::services::Pending::new(
-                "s1",
-                request - 1,
-                Instant::now(),
-                "To Ann: hello",
-                "Ann",
-            );
-            waiting.service = "gmail".into();
-            crate::services::pending_for_test(Some(waiting));
-            crate::thread::THREAD.lock().unwrap().line_of(request, said);
-            let owner = crate::memory_scope::RequestScope::new(
-                crate::memory_scope::RequestKey {
-                    worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
-                    session: 1,
-                    request,
-                },
-                crate::memory_scope::ScopeSnapshot::of("Ann"),
-            );
-            let (_, (told, _)) = run_call_scoped(
-                &services,
-                &call(
-                    crate::services::READ,
-                    json!({"service":"google_calendar","what":"tomorrow"}),
-                ),
-                request,
-                true,
-                &owner.lease(),
-            );
-            assert!(told.get("error").is_none(), "{said}: {told}");
-            assert_eq!(crate::services::pending_for_test_is_some(), sends, "{said}");
-            let before = asked.lock().unwrap().len();
-            let (_, (told, _)) = run_call_scoped(
-                &services,
-                &call(
-                    crate::services::WRITE,
-                    json!({"service":"gmail","send_id":"s1"}),
-                ),
-                request,
-                true,
-                &owner.lease(),
-            );
-            let sent: Vec<Value> = asked.lock().unwrap()[before..]
-                .iter()
-                .filter(|line| line["name"] == crate::services::WRITE)
-                .cloned()
-                .collect();
-            if sends {
-                assert_eq!(sent.len(), 1, "{said}: sent once: {told}");
-                assert_eq!(sent[0]["args"]["send_id"], "s1");
-            } else {
-                assert_eq!(told["error"], crate::services::AFTER_READ, "{said}");
-                assert!(sent.is_empty(), "{said}: never asked");
-            }
-            assert!(!crate::services::pending_for_test_is_some(), "{said}");
-        }
     }
 
     #[test]

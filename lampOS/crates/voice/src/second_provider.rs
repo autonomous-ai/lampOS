@@ -8945,11 +8945,6 @@ async fn spoken(
         eprintln!("lamp-voice second: request {request}: no name came after it: answered as it is");
     }
     let empty = text.trim().is_empty();
-    // A line of no words: the lamp's answer to it is no answer of a new
-    // request's to a waiting write's read-back (`services::answered_in_place`).
-    if empty {
-        crate::services::answered_in_place(request);
-    }
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
     // shows it was said to the lamp, so it is never held as a short sound.
     // Nor, with `LAMP_ENDPOINT_PAUSE_JOIN`, a line begun with the name set
@@ -10095,7 +10090,6 @@ async fn answered_if_declined(
         "lamp-voice second: request {request} only declined, so request {}'s words, cut short by it, are answered in its place (LAMP_CUT_ASK_ANSWERED)",
         carried.request
     );
-    crate::services::answered_in_place(request);
     unsay_carried(shared, request, &carried);
     let owner = carried.memory_write_owner.clone();
     put_in_flight(
