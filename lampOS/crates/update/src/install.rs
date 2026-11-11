@@ -1036,6 +1036,9 @@ pub trait Host {
     /// home of its own and a shell, which a coding agent needs, and no
     /// password. Never `lampos`.
     fn add_agent_user(&mut self, user: &str, group: &str) -> Result<(), String>;
+    /// `user` put in `group` (`usermod --append --groups`): the repair for a
+    /// user that exists without the agent's group.
+    fn add_to_group(&mut self, user: &str, group: &str) -> Result<(), String>;
     /// `systemctl daemon-reload`, then `systemctl enable` each unit.
     fn enable(&mut self, units: &[String]) -> Result<(), String>;
     /// `systemd-tmpfiles --create` of one file.
@@ -1104,11 +1107,13 @@ impl Host for System {
         if !there {
             run(Command::new("groupadd").args(["--system", group]))?;
         }
-        let mut command = Command::new("useradd");
-        command.args(["--create-home", "--user-group", "--shell", "/bin/bash"]);
-        run(command.arg(user))?;
+        run(Command::new("useradd").args(agent_user_args(user, group)))?;
         // `useradd --groups` did not put the user in the group on lamp-75c9
         // (12:57 run, 11 Nov): said again, as its own step.
+        self.add_to_group(user, group)
+    }
+
+    fn add_to_group(&mut self, user: &str, group: &str) -> Result<(), String> {
         run(Command::new("usermod").args(["--append", "--groups", group, user]))
     }
 
@@ -1993,7 +1998,15 @@ fn before_units(
     // turns the switch on in the app. The names are constants, never `lampos`.
     {
         use lamp_msgs::local_agent::{GROUP, USER as AGENT};
-        if !has_user(config, AGENT) {
+        if has_user(config, AGENT) {
+            // A failed `usermod` once left the user out of the group, and
+            // the check above would never look again: repaired here.
+            if !in_group(config, AGENT, GROUP) {
+                host.add_to_group(AGENT, GROUP)?;
+                say(&format!("put the user {AGENT} in the group {GROUP}"));
+                changed.push(format!("put the user {AGENT} in the group {GROUP}"));
+            }
+        } else {
             host.add_agent_user(AGENT, GROUP)?;
             // Said now as well as listed: a lamp-update that is not the
             // build's own hands over by `exec` below, which drops this list
@@ -3189,6 +3202,52 @@ pub fn provision_device_key(
     Ok(wanted)
 }
 
+/// The arguments of `useradd` for the agent's user: the group `group` as its
+/// own and no group of the user's name, which a stray `lampagent` group
+/// already in the image would make `useradd` refuse.
+fn agent_user_args(user: &str, group: &str) -> Vec<String> {
+    [
+        "--create-home",
+        "--no-user-group",
+        "--gid",
+        group,
+        "--shell",
+        "/bin/bash",
+        user,
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+
+/// Whether `user` is in `group`: listed among its members, or with its gid
+/// as the user's own.
+fn in_group(config: &Install, user: &str, group: &str) -> bool {
+    let groups = fs::read_to_string(config.on("/etc/group")).unwrap_or_default();
+    let passwd = fs::read_to_string(config.on("/etc/passwd")).unwrap_or_default();
+    in_group_text(&passwd, &groups, user, group)
+}
+
+fn in_group_text(passwd: &str, groups: &str, user: &str, group: &str) -> bool {
+    let Some(line) = groups
+        .lines()
+        .find(|line| line.split(':').next() == Some(group))
+    else {
+        return false;
+    };
+    let fields: Vec<&str> = line.split(':').collect();
+    if fields
+        .get(3)
+        .is_some_and(|members| members.split(',').any(|m| m == user))
+    {
+        return true;
+    }
+    let gid = fields.get(2).copied().unwrap_or("");
+    passwd
+        .lines()
+        .map(|line| line.split(':').collect::<Vec<_>>())
+        .any(|f| f.first() == Some(&user) && f.get(3).is_some_and(|g| !gid.is_empty() && *g == gid))
+}
+
 fn has_user(config: &Install, name: &str) -> bool {
     fs::read_to_string(config.on("/etc/passwd")).is_ok_and(|text| {
         text.lines()
@@ -3257,6 +3316,24 @@ fn saved_zone(config: &Install) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_agents_user_takes_the_agents_group_not_one_of_its_own() {
+        let args = super::agent_user_args("lampagent", "lamp-agents");
+        assert!(args.windows(2).any(|w| w == ["--gid", "lamp-agents"]));
+        assert!(args.contains(&"--no-user-group".to_owned()));
+        assert!(!args.contains(&"--user-group".to_owned()));
+        assert_eq!(args.last().map(String::as_str), Some("lampagent"));
+    }
+
+    #[test]
+    fn a_user_is_in_a_group_by_its_member_list_or_by_its_own_gid() {
+        let passwd = "a:x:1:20::/h:/b\nb:x:2:30::/h:/b\n";
+        let groups = "g:x:30:\nh:x:40:a,c\n";
+        assert!(super::in_group_text(passwd, groups, "b", "g"));
+        assert!(super::in_group_text(passwd, groups, "a", "h"));
+        assert!(!super::in_group_text(passwd, groups, "a", "g"));
+        assert!(!super::in_group_text(passwd, groups, "a", "none"));
+    }
     use super::*;
 
     /// The first builder's P3 4 on #2617: install never lists the Wi-Fi

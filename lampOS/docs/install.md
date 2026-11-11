@@ -521,7 +521,12 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   (0755, `lampos`'s) is made here too; the install step creates the group
   `lamp-agents` and the user `lampagent` in it when the lamp has none (a
   round carries the tmpfiles line but never makes a user or a group, so a
-  lamp already in a home gets them from `lamp-update install` run again),
+  lamp already in a home gets them from `lamp-update install` run again).
+  The user is made with `lamp-agents` as its own group (`useradd
+  --no-user-group --gid lamp-agents`), so a stray `lampagent` group in the
+  image does not stop it; a `lampagent` that exists but is not in
+  `lamp-agents` (a failed `usermod`) is put in it by the next `install`,
+  which says so,
   and the owner's switch in the app only turns the door on (setup.md,
   `local_agent`). Both were found on lamp-06c1 on
   2026-10-16: with the locks 0775 the body never opened the servo port, and

@@ -101,6 +101,23 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn add_to_group(&mut self, user: &str, group: &str) -> Result<(), String> {
+        let groups = self.root.join("etc/group");
+        let text = fs::read_to_string(&groups).unwrap_or_default();
+        let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();
+        match lines
+            .iter_mut()
+            .find(|line| line.split(':').next() == Some(group))
+        {
+            Some(line) if line.ends_with(':') => line.push_str(user),
+            Some(line) => line.push_str(&format!(",{user}")),
+            None => lines.push(format!("{group}:x:997:{user}")),
+        }
+        fs::write(groups, lines.join("\n") + "\n").unwrap();
+        self.calls.push(format!("ingroup {user} {group}"));
+        Ok(())
+    }
+
     fn enable(&mut self, units: &[String]) -> Result<(), String> {
         self.calls.push(format!("enable {}", units.join(" ")));
         if self.failing_enables > 0 {
@@ -744,6 +761,42 @@ fn run_twice_it_changes_nothing() {
     assert_eq!(again.changed, Vec::<String>::new());
     assert_eq!(tree(&lamp.root), before);
     assert_eq!(lamp.host.calls.len(), calls, "nothing asked of the machine");
+}
+
+#[test]
+fn an_agent_user_left_out_of_its_group_is_put_in_it_once_and_said() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    // A failed `usermod` once: the user is there, its group has no member.
+    let groups = lamp.root.join("etc/group");
+    let text = fs::read_to_string(&groups).unwrap();
+    fs::write(
+        &groups,
+        text.replace("lamp-agents:x:997:lampagent", "lamp-agents:x:997:"),
+    )
+    .unwrap();
+    let again = lamp.install().unwrap();
+    assert!(
+        again
+            .changed
+            .contains(&"put the user lampagent in the group lamp-agents".to_owned()),
+        "{:?}",
+        again.changed
+    );
+    let calls = lamp.host.calls.join("\n");
+    assert_eq!(
+        calls.matches("ingroup lampagent lamp-agents").count(),
+        1,
+        "{calls}"
+    );
+    assert_eq!(
+        calls.matches("agentuser").count(),
+        1,
+        "no second user: {calls}"
+    );
+    // And once repaired, nothing more.
+    let third = lamp.install().unwrap();
+    assert_eq!(third.changed, Vec::<String>::new());
 }
 
 #[test]

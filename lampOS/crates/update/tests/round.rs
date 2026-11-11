@@ -3114,6 +3114,14 @@ impl lamp_update::install::Host for InstallHost {
         Ok(())
     }
 
+    fn add_to_group(&mut self, user: &str, group: &str) -> Result<(), String> {
+        let groups = self.0.join("etc/group");
+        let mut text = fs::read_to_string(&groups).unwrap_or_default();
+        text.push_str(&format!("{group}:x:997:{user}\n"));
+        fs::write(groups, text).unwrap();
+        Ok(())
+    }
+
     fn enable(&mut self, _: &[String]) -> Result<(), String> {
         Ok(())
     }
