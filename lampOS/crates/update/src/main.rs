@@ -927,14 +927,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // left for lampos to run (its wrapper and namespace script).
         acts.then_some((on, skills))
     };
-    // Hermes's schedule (#5978): the voice heard from the start, so a round
-    // knows the quiet stretch, and each install watched while it runs.
+    // Hermes's schedule (#5978): each install watched while it runs, the
+    // voice heard from the start, so speech freezes it and a lost privacy
+    // reading stops it.
     let hermes_watch = matches!(hermes, Some((true, _)))
         .then(|| lamp_update::hermes_schedule::Watcher::start(&bus_root, &records));
-    let local_time = hermes_watch
-        .as_ref()
-        .and_then(|_| lamp_local_time::LocalTime::zone("system").ok());
-    let mut rounds: u64 = 0;
     // `update/status` (#2194): where each round is, and how the last ended,
     // only for a round that acts; Harness's record looked at often only
     // with its switch on.
@@ -943,7 +940,6 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         lamp_update::status::Telling::start(&bus_root, &records, harness.is_some(), &mut say)
     }));
     loop {
-        rounds = rounds.saturating_add(1);
         let outcome = {
             let mut phase = |now: &'static str| {
                 if let Some(telling) = telling.borrow_mut().as_mut() {
@@ -991,21 +987,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 },
                 &mut say,
             );
-            if let (Some(watch), Some((true, skills))) = (&hermes_watch, hermes) {
+            if let (Some(_), Some((true, skills))) = (&hermes_watch, hermes) {
                 use lamp_update::{hermes_install, hermes_schedule};
                 let now_unix_ms = lamp_update::records::unix_ms();
                 let window = hermes_schedule::window(&hermes_schedule::Moment {
-                    round: rounds,
-                    quiet: watch.quiet(),
                     walk_under_way: lamp_update::walk::under_way(&config),
-                    walk_ended_unix_ms: lamp_update::walk::ended_at_unix_ms(&config),
-                    tried_unix_ms: hermes_schedule::last_try_unix_ms(
-                        hermes_install::record(&records).as_ref(),
-                    ),
-                    now_unix_ms,
-                    local_minute: local_time
-                        .as_ref()
-                        .map(|local| local.minute_of_day(now_unix_ms)),
                 });
                 hermes_install::after_round(
                     &config.root,

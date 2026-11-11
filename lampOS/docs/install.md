@@ -1470,10 +1470,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `lamp-update.service`'s environment: set, on only when `on` exactly, so
    any other value is off and `off` turns a product lamp off; unset, on on
    a lamp installed as the product, the build's default `PRODUCT_DEFAULT`
-   being on (the product owner's decision, 10 Nov, which the first builder
-   allows with the schedule below: it installs only in a quiet window,
-   gives way while someone speaks and stops if the privacy reading is
-   lost), and off on any other lamp; no product unit sets it). Hermes (NousResearch
+   being on (the product owner's decision, 10 Nov, under the lead's
+   schedule below, V2 15:44 on #5978: it installs in the first round
+   reached but for the setup walk, gives way while someone speaks and
+   stops if the privacy reading is lost), and off on any other lamp; no product unit sets it). Hermes (NousResearch
    hermes-agent) is a coding agent Harness already knows as an engine.
    Harness finds an engine only by `command -v` in its user's login shell,
    so a `hermes` on `lampos`'s login `PATH` is all it needs: the wrapper
@@ -1497,40 +1497,22 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      window, below; outside it the round writes no ask, takes back an
      install ask an earlier round left (an ask to remove is kept), and
      journals `Hermes 0.22.2 is not set up yet: it waits, <why>`.
-   - **The window** (`crates/update/src/hermes_schedule.rs`, the first
-     builder's rules for the default-on, 10 Nov). Measured on a 4 GB lamp
-     with an SD card, the install (about 2.4 GB of writes, 7 to 12 min)
-     slipped lamp-controls' 50 ms privacy reading and kept the voice's
-     microphones closed. A round starts it (or asks Harness's one-shot for
-     it) only when all of these hold:
-     - not the first round after lamp-update started (a boot, an update's
-       restart, its own switch);
-     - the setup walk not under way (the voice's onboarding file, as the
-       round's own walk hold reads it, `crates/update/src/walk.rs`);
-     - a quiet stretch: the voice seen resting on the bus and nobody heard
-       or answered for 10 min (`QUIET_STRETCH`), by the round's own quiet
-       gate (`voice/state`, `voice/heard`, `voice/said`, `voice/mute`,
-       `voice/privacy`, `crates/update/src/quiet.rs`), heard by a thread
-       of `serve` that listens from its start (subscribed as
-       `update_hermes`), so a stretch needs 10 min of listening;
-     - and either right after the setup walk ended: the walk's
-       `done_at_unix_ms` in the voice's onboarding file
-       (`/var/lib/lampOS/voice/onboarding/progress.json`, or the file the
-       voice unit's `LAMP_ONBOARDING_FILE` names), within 6 h
-       (`AFTER_WALK_LASTS`), for the first try since (a try recorded
-       `installing` or `failed` after it waits for the night); or, by
-       day, the first quiet stretch of a lamp that never tried (no
-       `installing` or `failed` record: one that just took the update with
-       Hermes on, so it is usable the same day; the first builder's day
-       window, 11 Nov on #6059), and a try after it waits for the night; or
-       the quiet hour at night, 01:00 up to 05:00 local
-       (`NIGHT_FROM_MINUTE`, `NIGHT_TO_MINUTE`), in the lamp's zone
-       (`/etc/localtime`, which setup points at the phone's zone, read by
-       `lamp-local-time` as the other parts read it). A wall clock before
-       2026 is not set: no local time, so only the walk's window.
+   - **The window** (`crates/update/src/hermes_schedule.rs`, the lead's
+     rule, V2 15:44 on #5978, as V1 did): any reached round starts it (or
+     asks Harness's one-shot for it), the first round after lamp-update
+     started too, with no quiet stretch, no night window and no wait for
+     the walk to end, whatever the voice is doing; Hermes's install rides
+     after Harness's in Harness's one-shot, at the build's Harness pin.
+     The one exception is the setup walk itself: while it is under way
+     (the voice's onboarding file, as the round's own walk hold reads it,
+     `crates/update/src/walk.rs`) the round waits.
      Harness's own install is not held by it. lamp-update's sandbox reads
      all of these: `ProtectSystem=strict` keeps `/var/lib` and `/etc`
-     readable, and `/run/lampos-bus` is among its `ReadWritePaths`.
+     readable, and `/run/lampos-bus` is among its `ReadWritePaths`. The
+     voice is heard by a thread of `serve` that listens from its start
+     (subscribed as `update_hermes`), by the round's own quiet gate
+     (`voice/state`, `voice/heard`, `voice/said`, `voice/mute`,
+     `voice/privacy`, `crates/update/src/quiet.rs`).
    - **Gives way while it runs** (the same thread, every 100 ms, while the
      record says `installing` and systemd says the one-shot is
      `activating`):
@@ -1538,10 +1520,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        resting, or not seen): the unit's own `cgroup.freeze` (systemd 252 refuses `systemctl freeze` for a oneshot still activating, "Unit has a pending job")
        journaled `Hermes's
        install is frozen while the voice is not quiet: <why>`; thawed with
-       `cgroup.freeze` back to 0 once the quiet stretch (10 min) is back. Frozen
-       30 min in all (`MOST_FROZEN`), over one freeze or several, it is
-       stopped as `interrupted`, so with the install's own 7 to 12 min it
-       ends inside the unit's hour (`TimeoutStartSec` counts on while
+       `cgroup.freeze` back to 0 once the voice has rested 5 s, nobody
+       heard (`RESTED`, the quiet gate's rest between turns), with no
+       quiet stretch to rebuild. Frozen 40 min in all (`MOST_FROZEN`,
+       raised from 30 min so a busy office still finishes), over one
+       freeze or several, it is stopped as `interrupted` and tried again
+       in the next round, so with a stage's own 15-min bound it ends
+       inside the unit's hour (`TimeoutStartSec` counts on while
        frozen). A freeze or thaw systemd refuses stops it too, so the
        one-shot is never left frozen; and a `serve` that starts thaws it
        first, in case one ended mid-freeze;
@@ -1809,8 +1794,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      tools come through its package manager only as a build asks for them.
      `setup` and `gateway` need a person and are not run; `complete` writes
      only a marker. Each stage has the installer's 15-min bound
-     and the 30 min it may be kept frozen while someone speaks
-     (`HERMES_STAGE_WITHIN`, 45 min: a stage's clock goes on while frozen,
+     and the 40 min it may be kept frozen while someone speaks
+     (`HERMES_STAGE_WITHIN`, 55 min: a stage's clock goes on while frozen,
      and on c0a4 a products stage frozen 21 min was taken for timed out
      the moment it thawed); the unit's is an hour for Harness and Hermes
      together.
@@ -1856,9 +1841,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    - **Tried again** by the first reached round 24 h after a failure
      (`RETRY_AFTER`), or after `installing` for over 70 min; `serve`,
      `not_started`, `privacy_lost` and `interrupted` at the next round
-     whose window is open (`RETRY_IN_NEXT_WINDOW`): a failure after the
-     walk's window is tried in the quiet hour at night. Every retry waits
-     for its window. A failed install takes out the
+     whose window is open (`RETRY_IN_NEXT_WINDOW`), that is the next
+     round reached outside the setup walk. Every retry waits for its
+     window. A failed install takes out the
      wrapper and the namespace script, but keeps its partial
      `/var/lib/lampos-hermes` (up to about 2.4 GB) until that retry 24 h
      later, which continues it when its checkout is at the pin or not made

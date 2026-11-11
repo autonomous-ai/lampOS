@@ -2,167 +2,31 @@ use super::*;
 use lamp_msgs::Voice;
 
 const MIN: u64 = 60_000;
-const HOUR: u64 = 60 * MIN;
-/// 10 Nov 2026, 12:00 UTC: a set clock.
-const NOON: u64 = 1_794_312_000_000;
+const S: u64 = 1000;
 
-/// A moment that opens the night window: the third round, quiet, no walk,
-/// tried once long ago (a lamp that never tried opens by day too), 02:00
-/// local.
-fn night() -> Moment {
-    Moment {
-        round: 3,
-        quiet: Ok(()),
-        walk_under_way: false,
-        walk_ended_unix_ms: None,
-        tried_unix_ms: Some(NOON - 30 * HOUR),
-        now_unix_ms: NOON,
-        local_minute: Some(2 * 60),
-    }
-}
-
-/// The quiet hour at night opens it: 01:00 up to 05:00 local, not 05:00,
-/// not by day, and not without a local time or a set clock.
+/// The lead's rule (V2, 15:44 on #5978), as V1 did: the first round
+/// reached installs, with no quiet stretch, no night and no wait for the
+/// walk to end; whatever the voice is doing, speech only pauses it.
 #[test]
-fn the_quiet_hour_at_night_opens_the_window() {
-    for minute in [60, 2 * 60, 5 * 60 - 1] {
-        let moment = Moment {
-            local_minute: Some(minute),
-            ..night()
-        };
-        assert_eq!(window(&moment), Ok(Window::Night), "{minute}");
-    }
-    for minute in [0, 59, 5 * 60, 12 * 60, 23 * 60 + 59] {
-        let moment = Moment {
-            local_minute: Some(minute),
-            ..night()
-        };
-        let why = window(&moment).unwrap_err();
-        assert!(
-            why.contains("outside the quiet hour at night (01:00 to 05:00)"),
-            "{why}"
-        );
-    }
-    let unknown = Moment {
-        local_minute: None,
-        ..night()
-    };
-    assert!(
-        window(&unknown)
-            .unwrap_err()
-            .contains("local time is not known")
-    );
-    let unset = Moment {
-        now_unix_ms: 5 * HOUR,
-        ..night()
-    };
-    assert!(window(&unset).is_err(), "a clock not set yet");
-}
-
-/// Never in the first round after lamp-update starts, never while the
-/// walk is under way, never outside a quiet stretch: whatever the hour.
-#[test]
-fn the_first_round_a_walk_or_someone_speaking_closes_it() {
-    let first = Moment {
-        round: 1,
-        ..night()
-    };
-    assert!(window(&first).unwrap_err().contains("first round"));
-    assert!(
+fn the_first_reached_round_installs_with_no_quiet() {
+    assert_eq!(
         window(&Moment {
-            round: 0,
-            ..night()
+            walk_under_way: false
+        }),
+        Ok(Window::Reached)
+    );
+}
+
+/// The one exception: the setup walk itself.
+#[test]
+fn the_setup_walk_blocks_it() {
+    assert_eq!(
+        window(&Moment {
+            walk_under_way: true
         })
-        .is_err()
+        .unwrap_err(),
+        crate::walk::UNDER_WAY
     );
-    assert_eq!(
-        window(&Moment {
-            round: 2,
-            ..night()
-        }),
-        Ok(Window::Night)
-    );
-    let walking = Moment {
-        walk_under_way: true,
-        ..night()
-    };
-    assert_eq!(window(&walking).unwrap_err(), crate::walk::UNDER_WAY);
-    let spoken = Moment {
-        quiet: Err("someone was heard or answered 30 s ago".into()),
-        ..night()
-    };
-    assert_eq!(
-        window(&spoken).unwrap_err(),
-        "not a quiet stretch: someone was heard or answered 30 s ago"
-    );
-}
-
-/// Right after the setup walk ended, its first quiet stretch opens it by
-/// day, within six hours and only for the first try since the walk: a try
-/// after it (failed or stopped) waits for the night.
-#[test]
-fn the_first_quiet_stretch_after_the_walk_opens_it_by_day() {
-    let day = Moment {
-        local_minute: Some(14 * 60),
-        walk_ended_unix_ms: Some(NOON - 20 * MIN),
-        ..night()
-    };
-    assert_eq!(window(&day), Ok(Window::AfterWalk));
-    let tried_before = Moment {
-        tried_unix_ms: Some(NOON - 2 * HOUR),
-        ..day.clone()
-    };
-    assert_eq!(window(&tried_before), Ok(Window::AfterWalk));
-    let tried_since = Moment {
-        tried_unix_ms: Some(NOON - 5 * MIN),
-        ..day.clone()
-    };
-    assert!(window(&tried_since).is_err());
-    assert_eq!(
-        window(&Moment {
-            local_minute: Some(3 * 60),
-            ..tried_since
-        }),
-        Ok(Window::Night)
-    );
-    let long_after = Moment {
-        walk_ended_unix_ms: Some(NOON - 6 * HOUR),
-        ..day.clone()
-    };
-    assert!(window(&long_after).is_err());
-    let ahead = Moment {
-        walk_ended_unix_ms: Some(NOON + MIN),
-        ..day.clone()
-    };
-    assert!(window(&ahead).is_err(), "an end after now is not trusted");
-    let still_first = Moment {
-        round: 1,
-        ..day.clone()
-    };
-    assert!(window(&still_first).is_err());
-    let not_quiet = Moment {
-        quiet: Err("the voice is speaking".into()),
-        ..day
-    };
-    assert!(window(&not_quiet).is_err());
-}
-
-/// A try is one begun or failed: `absent` or `installed` is none.
-#[test]
-fn a_try_is_an_install_begun_or_failed() {
-    let said = |install: &str| HermesInstall {
-        install: install.to_owned(),
-        revision: 1,
-        at_unix_ms: 42,
-        version: None,
-        commit: None,
-        error: None,
-    };
-    assert_eq!(last_try_unix_ms(None), None);
-    assert_eq!(last_try_unix_ms(Some(&said("absent"))), None);
-    assert_eq!(last_try_unix_ms(Some(&said("installed"))), None);
-    assert_eq!(last_try_unix_ms(Some(&said("installing"))), Some(42));
-    assert_eq!(last_try_unix_ms(Some(&said("failed"))), Some(42));
 }
 
 fn read(boot: &str) -> Lease {
@@ -176,10 +40,10 @@ fn read(boot: &str) -> Lease {
 const NOT_QUIET: fn() -> Result<(), String> = || Err("the voice is hearing someone".to_owned());
 
 /// Someone heard freezes the install at once; it stays frozen while the
-/// voice is not quiet and thaws when the quiet stretch is back; each
-/// freeze is one act, never repeated.
+/// voice is not quiet and thaws when it has rested again; each freeze is
+/// one act, never repeated.
 #[test]
-fn someone_heard_freezes_it_and_the_quiet_stretch_thaws_it() {
+fn someone_heard_freezes_it_and_rest_thaws_it() {
     let mut watch = Watch::default();
     assert_eq!(watch.look(0, Ok(()), &read("a")), Act::Nothing);
     assert_eq!(
@@ -188,10 +52,49 @@ fn someone_heard_freezes_it_and_the_quiet_stretch_thaws_it() {
     );
     assert!(watch.frozen());
     assert_eq!(watch.look(200, NOT_QUIET(), &read("a")), Act::Nothing);
-    assert_eq!(watch.look(11 * MIN, NOT_QUIET(), &read("a")), Act::Nothing);
-    assert_eq!(watch.look(12 * MIN, Ok(()), &read("a")), Act::Thaw);
+    assert_eq!(watch.look(MIN, NOT_QUIET(), &read("a")), Act::Nothing);
+    assert_eq!(watch.look(MIN + 100, Ok(()), &read("a")), Act::Thaw);
     assert!(!watch.frozen());
-    assert_eq!(watch.look(12 * MIN + 100, Ok(()), &read("a")), Act::Nothing);
+    assert_eq!(watch.look(MIN + 200, Ok(()), &read("a")), Act::Nothing);
+}
+
+/// The rest that thaws it is a few seconds of the voice resting after the
+/// last word, not a 10-minute stretch (the lead, V2 15:44 on #5978): the
+/// voice seen resting and nobody heard for [`RESTED`] (5 s). A voice that
+/// says nothing is still not rested.
+#[test]
+fn a_few_seconds_of_rest_after_speech_thaw_it() {
+    assert_eq!(RESTED, Duration::from_secs(5));
+    let mut quiet = Quiet::new(0);
+    assert!(rested(&quiet, MIN).is_err(), "nothing said");
+    for at in (0..=10 * S).step_by(1000) {
+        quiet.hear(Heard::State(Voice::Resting), at);
+    }
+    assert_eq!(rested(&quiet, 10 * S), Ok(()));
+    quiet.hear(Heard::Speech, 10 * S);
+    assert!(rested(&quiet, 10 * S).is_err(), "speech freezes it");
+    for at in (11 * S..=15 * S).step_by(1000) {
+        quiet.hear(Heard::State(Voice::Resting), at);
+    }
+    assert!(rested(&quiet, 15 * S - 1).is_err());
+    assert_eq!(rested(&quiet, 15 * S), Ok(()));
+}
+
+/// A busy office still finishes (the lead, V2 15:44 on #5978): talk
+/// 45 s of every minute for 50 min, rest 15 s, and the install, running
+/// 12.5 min in all between turns, is never stopped for its freezes.
+#[test]
+fn a_long_busy_stretch_still_finishes() {
+    let mut watch = Watch::default();
+    for minute in 0..50 {
+        let at = minute * MIN;
+        assert!(
+            matches!(watch.look(at, NOT_QUIET(), &read("a")), Act::Freeze(_)),
+            "minute {minute}"
+        );
+        assert_eq!(watch.look(at + 45 * S, Ok(()), &read("a")), Act::Thaw);
+    }
+    assert!(!watch.frozen());
 }
 
 /// No lease read with the slide known in the install's first second is
@@ -212,44 +115,44 @@ fn an_install_with_no_privacy_lease_says_so_once() {
     assert_eq!(seen.no_lease_line(2_000), None);
 }
 
-/// Frozen 30 min in all, over one freeze or several, stops it as
-/// `interrupted`: never frozen for good, and inside the one-shot's hour.
+/// Frozen [`MOST_FROZEN`] (40 min) in all, over one freeze or several,
+/// stops it as `interrupted`, tried again in the next round: never frozen
+/// for good, and inside the one-shot's hour.
 #[test]
 fn frozen_too_long_in_all_stops_it() {
+    const MOST: u64 = 40 * MIN;
+    assert_eq!(MOST_FROZEN.as_millis() as u64, MOST);
     let mut watch = Watch::default();
     assert!(matches!(
         watch.look(0, NOT_QUIET(), &read("a")),
         Act::Freeze(_)
     ));
-    assert_eq!(
-        watch.look(30 * MIN - 1, NOT_QUIET(), &read("a")),
-        Act::Nothing
-    );
-    match watch.look(30 * MIN, NOT_QUIET(), &read("a")) {
+    assert_eq!(watch.look(MOST - 1, NOT_QUIET(), &read("a")), Act::Nothing);
+    match watch.look(MOST, NOT_QUIET(), &read("a")) {
         Act::Stop { error, why } => {
             assert_eq!(error, "interrupted");
-            assert!(why.contains("frozen 30 min in all"), "{why}");
+            assert!(why.contains("frozen 40 min in all"), "{why}");
         }
         other => panic!("{other:?}"),
     }
     assert!(!watch.frozen());
-    // Two freezes: 20 min, then 10 more.
+    // Two freezes: 30 min, then 10 more.
     let mut watch = Watch::default();
     assert!(matches!(
         watch.look(0, NOT_QUIET(), &read("a")),
         Act::Freeze(_)
     ));
-    assert_eq!(watch.look(20 * MIN, Ok(()), &read("a")), Act::Thaw);
+    assert_eq!(watch.look(30 * MIN, Ok(()), &read("a")), Act::Thaw);
     assert!(matches!(
-        watch.look(25 * MIN, NOT_QUIET(), &read("a")),
+        watch.look(35 * MIN, NOT_QUIET(), &read("a")),
         Act::Freeze(_)
     ));
     assert_eq!(
-        watch.look(35 * MIN - 1, NOT_QUIET(), &read("a")),
+        watch.look(45 * MIN - 1, NOT_QUIET(), &read("a")),
         Act::Nothing
     );
     assert!(matches!(
-        watch.look(35 * MIN, NOT_QUIET(), &read("a")),
+        watch.look(45 * MIN, NOT_QUIET(), &read("a")),
         Act::Stop {
             error: "interrupted",
             ..
@@ -329,25 +232,6 @@ fn the_privacy_reading_lost_stops_it_at_once() {
     ));
 }
 
-/// The quiet stretch is the voice's quiet gate over 10 min: the voice seen
-/// resting, nobody heard for 10 min, and 10 min of listening; a voice
-/// that says nothing is never quiet.
-#[test]
-fn the_quiet_stretch_is_ten_minutes_of_the_quiet_gate() {
-    let mut quiet = Quiet::new(0);
-    assert!(quiet_stretch(&quiet, 11 * MIN).is_err(), "nothing said");
-    for at in (0..=11 * MIN).step_by(1000) {
-        quiet.hear(Heard::State(Voice::Resting), at);
-    }
-    assert_eq!(quiet_stretch(&quiet, 11 * MIN), Ok(()));
-    quiet.hear(Heard::Speech, 11 * MIN);
-    for at in (11 * MIN..=21 * MIN).step_by(1000) {
-        quiet.hear(Heard::State(Voice::Resting), at);
-    }
-    assert!(quiet_stretch(&quiet, 21 * MIN - 1000).is_err());
-    assert_eq!(quiet_stretch(&quiet, 21 * MIN), Ok(()));
-}
-
 /// The bus takes a subscriber named `[a-z][a-z0-9_]{0,31}` only: c0a4 refused
 /// `update-hermes`, and the quiet stretch then never heard the voice.
 #[test]
@@ -360,48 +244,6 @@ fn the_listener_has_a_name_the_bus_takes() {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'),
         "{name}"
     );
-}
-
-/// The day window (the first builder, 11 Nov 01:15 on #6059): a lamp that
-/// never tried, as one that just took the update, installs at its first
-/// quiet stretch by day, with or without a local time; still never in the
-/// first round, the walk or while someone speaks. Once it tried, by day is
-/// closed again and the night stands.
-#[test]
-fn a_lamp_that_never_tried_installs_at_its_first_quiet_stretch_by_day() {
-    let updated = Moment {
-        tried_unix_ms: None,
-        local_minute: Some(7 * 60 + 20),
-        ..night()
-    };
-    assert_eq!(window(&updated), Ok(Window::AfterUpdate));
-    assert_eq!(
-        window(&Moment {
-            local_minute: None,
-            ..updated.clone()
-        }),
-        Ok(Window::AfterUpdate)
-    );
-    for closed in [
-        Moment {
-            round: 1,
-            ..updated.clone()
-        },
-        Moment {
-            walk_under_way: true,
-            ..updated.clone()
-        },
-        Moment {
-            quiet: Err("the voice is speaking".into()),
-            ..updated.clone()
-        },
-        Moment {
-            tried_unix_ms: Some(NOON - HOUR),
-            ..updated.clone()
-        },
-    ] {
-        assert!(window(&closed).is_err(), "{closed:?}");
-    }
 }
 
 /// c0a4, 11 Nov: the products stage, frozen 21 min while someone spoke, was
