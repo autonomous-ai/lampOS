@@ -216,7 +216,7 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits) -> Value {
             .find(|(code, _)| *code == "google_calendar")
             .map_or("", |(_, actions)| actions);
         tools["tools"][2]["parameters"]["properties"]["event_id"] = string(&format!(
-            "A calendar event's id, as a read or a create gave it. google_calendar actions: {calendar}, {}.",
+            "A calendar event's id, as a read, a create or a service record's event_id gave it, never a record key. To move or cancel an event, call service_write with action update_event (or delete_event) and its event_id. google_calendar actions: {calendar}, {}.",
             writes::CALENDAR_EDITS
         ));
     }

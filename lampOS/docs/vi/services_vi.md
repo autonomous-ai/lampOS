@@ -1232,7 +1232,9 @@ các action của Google Calendar trong `tools.json` thêm `update_event
 calendar}` (`writes::CALENDAR_EDITS`), và `service_write` nhận một
 `event_id`: id mà một lần đọc lịch hoặc một lần tạo đưa ra (một
 `create_event` đã xác nhận giờ trả lời `{"sent": true, "service",
-"event_id"}`). Mô tả của hàm ghi liệt kê Google Calendar là `create_event,
+"event_id"}`), hoặc `event_id` của một bản ghi dịch vụ ("Báo lại các
+bản ghi" và "Làm lại hay sửa từ một bản ghi", bên dưới), không bao giờ là
+khóa bản ghi. Mô tả của hàm ghi liệt kê Google Calendar là `create_event,
 update_event, delete_event: see event_id` (`writes::CALENDAR_ACTIONS_SHORT`),
 và mô tả riêng của `event_id` nêu cả ba cùng các trường của chúng: mô tả hàm
 ghi không còn chỗ cho chúng trong 1.024 byte mà liên kết của nó nhận.
@@ -1261,16 +1263,31 @@ ghi không còn chỗ cho chúng trong 1.024 byte mà liên kết của nó nh�
   …/events/<id>?sendUpdates=all` không có nội dung; cả hai đều có trong danh
   sách ghi của Calendar (`catalog.rs`) và không gì khác.
 - **Giới hạn.** `event_id` và `calendar` là id trong đường dẫn (không `/`,
-  `\`, `?`, `#`, tối đa 256 byte); một lần dời giờ đưa cả start và end, mỗi
-  cái có độ lệch UTC của chính đèn; một `update_event` cần ít nhất một thay
-  đổi.
+  `\`, `?`, `#`; `calendar` tối đa 256 byte, `event_id` tối đa 1.024).
+  Dạng của `event_id` không được kiểm thêm: một sự kiện từ lời mời Outlook
+  hay từ một lần nhập có thể có id dạng khác (chẳng hạn bắt đầu bằng `_`),
+  nên lần đọc của Google quyết định, và một id mà Google không có sự kiện
+  nào là "Không tìm thấy" (bên dưới). Chỉ khóa của một bản ghi dịch vụ
+  (`v<chữ số>-<n>`) được trả lời "that is a record key, not an event id; use
+  the record's event_id" (`writes::RECORD_KEY_NOT_EVENT`), trước khi hỏi
+  Google. Một lần dời giờ đưa cả start và end, mỗi cái có độ lệch UTC của
+  chính đèn; một `update_event` cần ít nhất một thay đổi.
+- **Không tìm thấy.** Một 404 ở lần đọc trước phần đọc lại là một id mà
+  Google không có sự kiện nào, có thể là id sai cũng như sự kiện đã xoá
+  (trên lamp-06c1 ngày 11/11, một khóa bản ghi gửi làm id nhận 404 như vậy
+  và bị nói là "không còn trên lịch"). Nó trả lời `writes::EVENT_NOT_FOUND`:
+  "I can't find that event on the Google Calendar, and nothing was changed.
+  Don't say it was deleted: the event_id may be wrong. Use the event_id a
+  create, a read or their service records gave, or offer to look for it."
+  Không gì được giữ. Dịch vụ không giữ danh sách các id đã thấy, nên mọi
+  404 ở đó đều được trả lời như vậy.
 - **Đã mất trong Google.** Khi sự kiện đã bị xoá, hoặc bị đổi như vậy, ngay
-  trong Google, lần đọc hoặc lần gửi của nó nhận 404 hoặc 410, hoặc sự kiện
-  đọc ra `"status":"cancelled"`. Mỗi trường hợp trả lời `writes::EVENT_GONE`:
-  "That event is no longer on the Google Calendar: it was deleted or changed
-  there, and nothing was changed. Say it's no longer there, and offer to
-  create it again with create_event." (sau "not sent: " ở một lần gửi). Không
-  gì được giữ.
+  trong Google, lần đọc của nó nhận 410 hoặc đọc ra `"status":"cancelled"`,
+  hoặc lần gửi nhận 404 hoặc 410 (nó vừa được đọc ngay trước đó). Mỗi trường
+  hợp trả lời `writes::EVENT_GONE`: "That event is no longer on the Google
+  Calendar: it was deleted or changed there, and nothing was changed. Say
+  it's no longer there, and offer to create it again with create_event."
+  (sau "not sent: " ở một lần gửi). Không gì được giữ.
 
 ### Đổi hoặc xoá một bản nháp Gmail đã lưu (`LAMP_GMAIL_DRAFT_EDITS`)
 
@@ -2480,16 +2497,26 @@ dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b
   `Drive · search 'Sunday' · no result · today 15:34`. Gồm 5
   bản mới nhất, cộng các bản còn
   `prepared` hay `failed`, và mọi lệnh ghi `done`, đổi trong 7 ngày qua, tối
-  đa 10 dòng và 1.800 byte. Vượt mức, bản đọc và bản hủy bỏ trước, rồi
+  đa 10 dòng và 1.900 byte. Vượt mức, bản đọc và bản hủy bỏ trước, rồi
   `prepared`/`failed`, lệnh ghi `done` bỏ sau cùng, mỗi loại bỏ cũ nhất
   trước, và nói bỏ bao nhiêu ("and N more not shown: recall finds them").
   Trên lamp-06c1 ngày 11/11, các lần đọc lịch mới hơn và một lần hủy thất
   bại đẩy sự kiện đã tạo ra khỏi 5 bản mới nhất, nên đèn nói không có gì
   được lưu. Khi bật `LAMP_SERVICE_REDO`, dòng của mỗi lệnh ghi kết thúc bằng
   khóa bản ghi (`· key v1794373881497-2`), recall trả nó ở `key`, và ghi chú
-  thêm "To redo or change a write listed here, call service_write with
-  from_record set to its key, giving only what changed."; không bao giờ
-  trong ghi chú tóm tắt, không bao giờ cho bản đọc. Kèm quy tắc: "Your past
+  thêm "To redo a write listed here, call service_write with from_record
+  set to its key, giving only what changed. To move or cancel an event
+  already made, call service_write with action update_event (or
+  delete_event) and the record's event_id, or from_record set to its key; a
+  key is never an event_id." Nó chỉ gọi `update_event` và `delete_event` là
+  action của `service_write`, không bao giờ là hàm riêng: viết như hàm, đó
+  có thể là thứ khiến mô hình bịa ra phần đọc lại và báo "xong" mà không gọi
+  gì. Không bao
+  giờ trong ghi chú tóm tắt, không bao giờ cho bản đọc. Một `create_event`
+  hay `update_event` Google Calendar `done` có `result_id` (id của Google,
+  như lần gửi trả lời) cũng kết thúc dòng bằng `· event_id <id>`, chỉ trong
+  ghi chú đầy đủ: trên lamp-06c1 ngày 11/11 chỉ khóa được hiện, và mô hình
+  đã gửi khóa làm id của sự kiện. Kèm quy tắc: "Your past
   service actions are listed with their status. Never claim something was
   done unless its record says done; never say you can't do something a
   record shows you did.", rồi, cả khi đầy đủ lẫn tóm tắt, và kèm các bản
@@ -2593,7 +2620,8 @@ Với `LAMP_SERVICE_REDO=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ tuyến th�
 hai; riêng nó thì không làm gì; kế hoạch bản ghi connector, PR 1d),
 `service_write` nhận `from_record`, khóa của một bản ghi dịch vụ (`key`
 mà ghi chú bản ghi và recall hiện kèm mỗi lệnh ghi), nên câu
-"làm lại lúc 8 giờ tối" sau một sự kiện đã hủy không cần nói lại gì
+"làm lại lúc 8 giờ tối" sau một sự kiện đã hủy không cần nói lại gì, và
+"dời sang 8 giờ tối" hay "huỷ nó" sau một sự kiện đã tạo chỉ đúng sự kiện ấy
 (`crates/voice/src/service_records/redo.rs`):
 
 - **Điền đủ, rồi mới đổi.** Trong cổng, sau các kiểm tra nghe thấy, chủ đèn
@@ -2607,14 +2635,26 @@ mà ghi chú bản ghi và recall hiện kèm mỗi lệnh ghi), nên câu
   tiếp theo gửi cùng những người ấy được dựng từ nó (`Re:` tiêu đề của nó
   trừ khi lệnh gọi đưa tiêu đề khác, cùng nội dung mới của lệnh gọi; không
   có thì mô hình được bảo hỏi), và câu trả lời mang `follow_up`, bảo mô hình
-  nói rõ thư đã gửi thì không sửa được. Một sự kiện lịch `done` bị từ chối:
-  sửa một sự kiện đã tạo là một hành động riêng. Một bản nháp Gmail `done`
-  (`save_draft` hay `update_draft`) bị từ chối kèm cách đổi nó,
-  `redo::DRAFT_DONE`: `update_draft` hoặc `delete_draft` với `draft_id` của
-  nó, id kết quả của bản ghi, khi được liệt kê (`LAMP_GMAIL_DRAFT_EDITS`),
-  không bao giờ lưu thêm một bản bên cạnh bản cũ. Một lần đọc, mọi lệnh ghi
-  `done` khác, và một bản ghi có nội dung bị cắt mà không đưa nội dung mới
-  cũng bị từ chối.
+  nói rõ thư đã gửi thì không sửa được. Một sự kiện lịch `done` không được
+  tạo lại: mô hình được bảo "call service_write with action update_event
+  (or delete_event) and the record's event_id, or from_record set to its
+  key" thay vào đó (`redo::EVENT_DONE`). Mô tả của `event_id` trong
+  `tools.json` cũng nói như vậy. Một bản nháp Gmail `done` (`save_draft` hay
+  `update_draft`) bị từ chối kèm cách đổi nó, `redo::DRAFT_DONE`:
+  `update_draft` hoặc `delete_draft` với `draft_id` của nó, id kết quả của
+  bản ghi, khi được liệt kê (`LAMP_GMAIL_DRAFT_EDITS`), không bao giờ lưu
+  thêm một bản bên cạnh bản cũ. Một lần đọc, mọi lệnh ghi `done` khác, và
+  một bản ghi có nội dung bị cắt mà không đưa nội dung mới cũng bị từ chối.
+- **Dời hay huỷ một sự kiện đã tạo.** `update_event` hoặc `delete_event`
+  với `from_record` chỉ đến một bản ghi Google Calendar `create_event` hay
+  `update_event` `done` là lệnh sửa sự kiện ấy, không phải làm lại:
+  `event_id` của nó là `result_id` của bản ghi (id của Google), `calendar`
+  là của bản ghi trừ khi lệnh gọi đưa, và chỉ những gì lệnh gọi đưa được
+  đặt lên; không điền gì khác từ bản ghi. Sau đó dịch vụ đọc sự kiện, đọc
+  lại thay đổi và chỉ gửi khi được đồng ý, như mọi lệnh sửa ("Đổi hoặc huỷ
+  một sự kiện lịch", ở trên, khi bật `LAMP_CALENDAR_EDITS`). Một bản ghi
+  không có `result_id` bị từ chối: "Not done: that record keeps no event id,
+  so the event can't be found from it. …" (`NO_EVENT_ID`).
 - **Liên kết.** `links` của bản ghi mới chỉ đến bản cũ, và bản cũ nhận
   `replaced_by` (trạng thái cuối của nó giữ nguyên), cả hai được ghi vào bộ
   nhớ.
