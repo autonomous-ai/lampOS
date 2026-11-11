@@ -3242,7 +3242,7 @@ fn run_start_record(
         "camera_context_requested":camera_requested,
         "motor_worker_requested":motor_requested,
         "microphone":options.microphone,
-        "capture_device_requested":options.microphone.device(),
+        "capture_device_requested":options.capture_device(),
         "software_processing_requested":options.noise_suppression.software_processing(),
         "playout_start_horizon_us":options.playout_start.as_micros(),
         "playout_continuity":options.playout_start.policy().map(|policy| json!({"margin_us":policy.margin_us,"hold_us":policy.hold_us,"cover_us":policy.cover_us})),

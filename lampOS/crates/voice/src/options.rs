@@ -91,6 +91,48 @@ impl FromStr for Microphone {
     }
 }
 
+/// Where the capture worker gets the microphone's sound. `Board`, the default and
+/// every product unit's, is the ALSA device of the chosen [`Microphone`]. `Bus` is
+/// `--microphone-device bus:mic1`, for a developer's computer: the sound a
+/// `lamp-sim --microphone` publishes on the bus topic `mic1/audio` (one open of the
+/// host's microphone, the same on Linux and a Mac). Nothing but `bus:mic1` is accepted.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum MicrophoneDevice {
+    #[default]
+    Board,
+    Bus,
+}
+impl MicrophoneDevice {
+    /// The one spelling `--microphone-device` takes.
+    pub const BUS_MIC1: &'static str = "bus:mic1";
+}
+impl FromStr for MicrophoneDevice {
+    type Err = io::Error;
+    fn from_str(value: &str) -> io::Result<Self> {
+        match value {
+            Self::BUS_MIC1 => Ok(Self::Bus),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "--microphone-device takes bus:mic1 only",
+            )),
+        }
+    }
+}
+
+/// The bus's sound would be published back onto the topic it is read from.
+fn refuse_bus_microphone_with_bus_audio(
+    device: MicrophoneDevice,
+    audio_on: bool,
+) -> io::Result<()> {
+    if device == MicrophoneDevice::Bus && audio_on {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "--microphone-device bus:mic1 reads mic1/audio, which LAMP_BUS_AUDIO=on would publish too: leave LAMP_BUS_AUDIO off",
+        ));
+    }
+    Ok(())
+}
+
 /// Admission experiment only; neither mode identifies a person or addressee.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -314,6 +356,9 @@ impl FromStr for EchoReference {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct DirectedOptions {
     pub microphone: Microphone,
+    /// `--microphone-device bus:mic1`: a developer's computer. Absent, the board's ALSA
+    /// device and every argument as before.
+    pub microphone_device: MicrophoneDevice,
     pub playout_start: PlayoutStart,
     pub turn_taking: TurnTaking,
     pub reference_clock: ReferenceClock,
@@ -355,6 +400,15 @@ pub struct DirectedOptions {
     pub faint_level: Option<u8>,
 }
 impl DirectedOptions {
+    /// The device the capture worker is named: the chosen microphone's ALSA device, or
+    /// with `--microphone-device bus:mic1` that spelling.
+    pub fn capture_device(self) -> &'static str {
+        match self.microphone_device {
+            MicrophoneDevice::Board => self.microphone.device(),
+            MicrophoneDevice::Bus => MicrophoneDevice::BUS_MIC1,
+        }
+    }
+
     /// Used directly by the real capture-worker spawn path. The default keeps
     /// its exact previous device and arguments; no extra process or I/O.
     /// The capture worker's argv. `stop_words`: what each frame also
@@ -373,7 +427,7 @@ impl DirectedOptions {
             echo_reference: self.echo_reference,
             stop_words,
         }
-        .child_arguments(self.microphone.device(), true)
+        .child_arguments(self.capture_device(), true)
     }
 
     pub fn parse(arguments: &[String]) -> io::Result<Self> {
@@ -387,12 +441,17 @@ impl DirectedOptions {
         let mut echo_seen = false;
         let mut continuation_seen = false;
         let mut microphone_seen = false;
+        let mut microphone_device_seen = false;
         let mut arguments = arguments.iter();
         while let Some(argument) = arguments.next() {
             match argument.as_str() {
                 "--microphone" if !microphone_seen => {
                     options.microphone = required_value(&mut arguments)?.parse()?;
                     microphone_seen = true;
+                }
+                "--microphone-device" if !microphone_device_seen => {
+                    options.microphone_device = required_value(&mut arguments)?.parse()?;
+                    microphone_device_seen = true;
                 }
                 "--diagnostics" if !options.diagnostics => options.diagnostics = true,
                 "--playout-start-ms" if !playout_seen => {
@@ -707,8 +766,16 @@ impl SessionOptions {
             _ => return Err(invalid_options()),
         };
         controls.validate()?;
+        let directed = DirectedOptions::parse(&remaining)?;
+        refuse_bus_microphone_with_bus_audio(
+            directed.microphone_device,
+            std::env::var(crate::bus_out::AUDIO_ENVIRONMENT)
+                .ok()
+                .as_deref()
+                == Some("on"),
+        )?;
         Ok(Self {
-            directed: DirectedOptions::parse(&remaining)?,
+            directed,
             controls,
             cue_socket,
             camera_config,
@@ -924,6 +991,54 @@ mod tests {
     use super::*;
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
+    }
+    #[test]
+    fn the_microphone_device_is_bus_mic1_only_and_absent_changes_nothing() {
+        let absent = DirectedOptions::parse(&args(&[])).unwrap();
+        assert_eq!(absent.microphone_device, MicrophoneDevice::Board);
+        assert_eq!(absent.capture_device(), "plug:device_micro2");
+        let argv =
+            |options: DirectedOptions| options.capture_arguments(None, Source::Processed).unwrap();
+        let board = argv(absent);
+        assert_eq!(board[0], "plug:device_micro2");
+        let chosen = DirectedOptions::parse(&args(&["--microphone-device", "bus:mic1"])).unwrap();
+        assert_eq!(chosen.microphone_device, MicrophoneDevice::Bus);
+        assert_eq!(chosen.capture_device(), "bus:mic1");
+        let on_bus = argv(chosen);
+        // Only the device differs: every other argument is what it was.
+        assert_eq!(on_bus[0], "bus:mic1");
+        assert_eq!(on_bus[1..], board[1..]);
+        let with_mic1 = DirectedOptions::parse(&args(&[
+            "--microphone",
+            "mic1",
+            "--microphone-device",
+            "bus:mic1",
+        ]))
+        .unwrap();
+        assert_eq!(argv(with_mic1)[0], "bus:mic1");
+        for bad in [
+            vec!["--microphone-device"],
+            vec!["--microphone-device", "bus:mic2"],
+            vec!["--microphone-device", "plug:device_micro1"],
+            vec!["--microphone-device", "hw:0"],
+            vec!["--microphone-device", "BUS:MIC1"],
+            vec![
+                "--microphone-device",
+                "bus:mic1",
+                "--microphone-device",
+                "bus:mic1",
+            ],
+        ] {
+            assert!(DirectedOptions::parse(&args(&bad)).is_err(), "{bad:?}");
+        }
+    }
+    #[test]
+    fn the_bus_microphone_is_refused_with_the_buses_audio_on_and_only_then() {
+        use MicrophoneDevice::{Board, Bus};
+        assert!(refuse_bus_microphone_with_bus_audio(Bus, true).is_err());
+        assert!(refuse_bus_microphone_with_bus_audio(Bus, false).is_ok());
+        assert!(refuse_bus_microphone_with_bus_audio(Board, true).is_ok());
+        assert!(refuse_bus_microphone_with_bus_audio(Board, false).is_ok());
     }
     #[test]
     fn microphone_selection_reaches_the_capture_spawn_without_changing_processing() {
@@ -1741,6 +1856,7 @@ mod tests {
                         call_wait_blocks: None,
                         faint_level: None,
                         microphone: Microphone::Mic2,
+                        microphone_device: MicrophoneDevice::Board,
                         playout_start: PlayoutStart::default(),
                         turn_taking: TurnTaking::VadOnly,
                         reference_clock: ReferenceClock::Fixed,
