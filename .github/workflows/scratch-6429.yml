@@ -1,24 +1,21 @@
-name: scratch 6429 ARM64 apt probe
-on:
+name: scratch 6429 fallback test
+'on':
   push:
-    branches: [seventh/scratch-6429]
+    branches:
+    - seventh/scratch-6429
 jobs:
-  probe:
+  t:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04-arm, ubuntu-22.04]
+        os:
+        - ubuntu-22.04-arm
+        - ubuntu-22.04
+        - ubuntu-24.04
     runs-on: ${{ matrix.os }}
     steps:
-      - name: probe
-        run: |
-          echo "== packages already present"
-          for p in ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file; do
-            if dpkg -s "$p" >/dev/null 2>&1; then echo "HAVE $p"; else echo "MISS $p"; fi
-          done
-          echo "== sources"; cat /etc/apt/apt-mirrors.txt 2>/dev/null; grep -rh "^deb \|^URIs" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
-          echo "== resolve"
-          for h in ports.ubuntu.com azure.ports.ubuntu.com archive.ubuntu.com azure.archive.ubuntu.com mirrors.edge.kernel.org mirror.us.leaseweb.net ftp.tu-chemnitz.de mirrors.ocf.berkeley.edu mirror.kumi.systems ftp.jaist.ac.jp ubuntu.mirror.garr.it; do
-            if getent hosts "$h" >/dev/null; then echo "RESOLVES $h"; else echo "NORESOLVE $h"; fi
-          done
-          cat /etc/resolv.conf
+    - name: system packages
+      run: "# The runner's mirror can stop resolving (azure.archive.ubuntu.com, #6429):\n# apt-get update exits 0 on fetch failures unless --error-on=any; then point the sources at a mirror that resolves and try once more.\nif ! sudo apt-get -o DPkg::Lock::Timeout=300 --error-on=any update; then\n  # Every *.ubuntu.com name failed to resolve on GitHub's runners (11 Nov), so try\n  # mirrors outside that domain first and take the first that resolves.\n  if [ \"$(dpkg --print-architecture)\" = amd64 ]; then d=ubuntu; else d=ubuntu-ports; fi\n  u=http://archive.ubuntu.com/ubuntu\n  [ \"$d\" = ubuntu ] || u=http://ports.ubuntu.com/ubuntu-ports\n  for h in mirrors.edge.kernel.org mirrors.ocf.berkeley.edu; do\n    if getent hosts \"$h\" >/dev/null; then u=http://$h/$d; break; fi\n  done\n  echo \"::warning::apt-get update failed; retrying with $u\"\n  for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do\n    [ -f \"$f\" ] && sudo sed -i -E \"s#mirror\\+file:/etc/apt/apt-mirrors\\.txt|https?://[a-z0-9.-]*(archive\\\
+        .ubuntu\\.com/ubuntu|ports\\.ubuntu\\.com/ubuntu-ports)/?#$u#g\" \"$f\"\n  done\n  sudo apt-get -o DPkg::Lock::Timeout=300 update\nfi\nsudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends \\\n  ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file\n"
+    - name: check
+      run: clang --version && dpkg -s libasound2-dev libclang-dev >/dev/null && echo PKGS-OK
