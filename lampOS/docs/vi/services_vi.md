@@ -1458,8 +1458,12 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   (`thread::Thread::lamp_for` → `services::lamp_said`), để tính giờ một câu
   bắt đầu đè lên nó (bên dưới).
 - **Lần gửi là lệnh gọi của mô hình có `send_id`.** Ghi chú chờ của mỗi lượt
-  sau đưa cho mô hình `send_id` của lần ghi (ở dưới), vì lịch sử giữ tên một
-  lệnh gọi, không bao giờ giữ câu trả lời của nó. Một `service_write` không
+  sau đưa cho mô hình `send_id` của lần ghi (ở dưới), vì lịch sử không bao
+  giờ giữ câu trả lời của một lần ghi: với `LAMP_HISTORY_KEEPS_CALLS`, một
+  `service_write` trước đó được kể như một lệnh gọi chỉ với `service`,
+  `action` và `send_id` cùng trạng thái của nó (đã chuẩn bị, đã làm hoặc
+  không làm), không bao giờ có lời đọc lại, người nhận, tiêu đề hay nội dung
+  (`second_provider::kept_args`, `kept_result`; `docs/second-voice.md`). Một `service_write` không
   có `send_id` là một lần ghi mới, như trước.
 - **Gửi:** một `service_write` có `send_id` được chuyển tiếp dưới dạng
   `{"service": <dịch vụ mà lần ghi đã được chuẩn bị>, "send_id": <id của
