@@ -45,12 +45,12 @@ pub const PRODUCT_DEFAULT: bool = true;
 
 /// The Harness manifest this build pins for a product lamp: a byte-for-byte
 /// copy of Harness's CDN manifest ([`ORIGIN`]) when it named [`VERSION`].
-pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.2.metadata.json");
+pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.17.metadata.json");
 /// [`MANIFEST`]'s SHA-256, checked by a test and again before each install.
 pub const MANIFEST_SHA256: &str =
-    "96a730bd8bef4459996ce8c58281e671ee9cfcedd1559e09a223af239823f5c2";
+    "2a71d93583785cffbd0a09cd49350860465e3575748b1e8ae667cbc2a907ce61";
 /// The Harness version [`MANIFEST`] names (its `cli.version`).
-pub const VERSION: &str = "0.6.2";
+pub const VERSION: &str = "0.6.17";
 /// Where [`MANIFEST`] was copied from: said, never fetched.
 pub const ORIGIN: &str =
     "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json";
@@ -58,10 +58,10 @@ pub const ORIGIN: &str =
 /// Harness's installer, a byte-for-byte copy of [`INSTALLER_ORIGIN`] as it
 /// was when [`MANIFEST`] was copied. Every pinned install runs this copy,
 /// from a file, never the one at its URL (#5229).
-pub const INSTALLER: &[u8] = include_bytes!("../../../../deploy/harness/cli-install-98f9d886.sh");
+pub const INSTALLER: &[u8] = include_bytes!("../../../../deploy/harness/cli-install-eeb6da28.sh");
 /// [`INSTALLER`]'s SHA-256, checked by a test and again before each run.
 pub const INSTALLER_SHA256: &str =
-    "98f9d886b386c3f2f0a452b37c6fdafa3dd27538b4894935080599b221943a76";
+    "eeb6da28f372d3a39a55e62b940f7b3c5f32e59ed3ca2181b46adfe3d1c1a6b5";
 /// Where [`INSTALLER`] was copied from: said, never fetched.
 pub const INSTALLER_ORIGIN: &str = crate::install::HARNESS_INSTALLER;
 
@@ -87,8 +87,8 @@ pub const MANIFESTS: [Manifest; 4] = [
     Manifest {
         env: "HARNESS_RUNTIME_METADATA_URL",
         path: "/runtime/metadata.json",
-        bytes: include_bytes!("../../../../deploy/harness/runtime-node-v22.23.2.metadata.json"),
-        sha256: "7e229eb66d8af4001672336373e66909e1d2428f560facb0359d6a203b293ffc",
+        bytes: include_bytes!("../../../../deploy/harness/runtime-node-v24.22.2.metadata.json"),
+        sha256: "bfc5936f43d698b1b64f3bb2e26d4c7be41863a5c341647b77b06b50a2bde485",
         origin: "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/metadata.json",
     },
     Manifest {
