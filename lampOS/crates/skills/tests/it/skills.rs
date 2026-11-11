@@ -10352,6 +10352,28 @@ fn the_tools_files_core_names_a_core_skills_stop_and_stay_plugged_in() {
     );
 }
 
+/// #5747: lamp-52e6 heard "Lamp, I'm unplugging you now." twice and the
+/// model answered in words, no call: the line said only "will unplug". The
+/// line the model is given names the present tense and the call comes
+/// first, and still keeps out a quoted or example sentence.
+#[test]
+fn the_unplug_line_names_the_present_tense_and_the_call_before_words() {
+    let unplug = load(&skills_root().join("prepare-unplug")).unwrap();
+    let tools = tools_file(&[unplug]);
+    let line = tools["tools"][0]["description"].as_str().unwrap();
+    assert_eq!(tools["tools"][0]["name"], "prepare_to_unplug", "{tools}");
+    for wanted in [
+        "I'm unplugging you now",
+        "I'm going to unplug you",
+        "I'll unplug you",
+        "turning you off",
+        "before saying anything else",
+        "quoted/example unplug sentence",
+    ] {
+        assert!(line.contains(wanted), "{wanted}: {line}");
+    }
+}
+
 /// #1685: a skill's `[stop]` is one function for the model, its choice
 /// `how`: `snooze` until the next local morning, `off` until it is asked
 /// for again, `on` to have it again. It stops only what the skill starts
