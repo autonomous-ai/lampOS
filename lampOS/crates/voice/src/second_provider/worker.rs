@@ -3235,6 +3235,16 @@ pub fn serve(
         );
         HISTORY_AFTER_NOTE.store(true, std::sync::atomic::Ordering::Release);
     }
+    // A recent exchange told as a history message is not told again in the
+    // thread's text (`LAMP_HISTORY_SAID_ONCE=on`, #6218).
+    if std::env::var(crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT)
+        .is_ok_and(|value| value == "on")
+    {
+        eprintln!(
+            "lamp-voice second: each recent exchange is told once, as a history message, and left out of the thread's text (LAMP_HISTORY_SAID_ONCE)"
+        );
+        HISTORY_SAID_ONCE.store(true, std::sync::atomic::Ordering::Release);
+    }
     if std::env::var(crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT)
         .is_ok_and(|value| value == "on")
     {
@@ -12420,8 +12430,17 @@ pub(crate) fn thread_and_history(
         withheld,
         ROOM_LINES_TOLD.load(std::sync::atomic::Ordering::Acquire),
         HISTORY_AFTER_NOTE.load(std::sync::atomic::Ordering::Acquire),
+        HISTORY_SAID_ONCE.load(std::sync::atomic::Ordering::Acquire),
     )
 }
+
+/// `LAMP_HISTORY_SAID_ONCE=on` (#6218), set once as the worker starts
+/// ([`serve`]): an exchange told as a history message is left out of the
+/// thread text of the same request
+/// ([`crate::thread::Thread::recall_for_leaving_out`]), so each recent
+/// exchange reaches the model once, not twice.
+pub(crate) static HISTORY_SAID_ONCE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// `LAMP_HISTORY_AFTER_NOTE=on` (#6218), set once as the worker starts
 /// ([`serve`]): the exchanges the scope's running note holds, once a job
@@ -12450,8 +12469,10 @@ pub(crate) const SAID_IN_THE_ROOM: &str = "(said in the room)";
 /// same conversation too, marked; the thread's text and the running
 /// summary stay the scope's own, and a turn of the room's is told only
 /// the room's, as ever. With `after_note` as [`HISTORY_AFTER_NOTE`], the
-/// exchanges the running note told here holds are left out of both. In
-/// memory, under the thread's one lock: no new read on the reply's path.
+/// exchanges the running note told here holds are left out of both. With
+/// `said_once` as [`HISTORY_SAID_ONCE`], the thread's text also leaves out
+/// the exchanges the history tells. In memory, under the thread's one
+/// lock: no new read on the reply's path.
 fn thread_and_history_told(
     used: usize,
     file: Option<&Path>,
@@ -12459,37 +12480,82 @@ fn thread_and_history_told(
     withheld: Option<&str>,
     room_lines: bool,
     after_note: bool,
+    said_once: bool,
+) -> (String, Vec<Message>) {
+    thread_and_history_summed(
+        used,
+        file,
+        whose,
+        withheld,
+        room_lines,
+        said_once,
+        |whose, now, room| {
+            // The lineage of the note told (`LAMP_HISTORY_AFTER_NOTE`):
+            // none when none is, so nothing is left out for it.
+            if after_note {
+                crate::conversation_summary::told_with_lineage(whose, now, room)
+            } else {
+                (crate::conversation_summary::told(whose, now, room), None)
+            }
+        },
+    )
+}
+
+/// [`thread_and_history_told`] with the scope's running summary and the
+/// lineage of its note from `summary` (as
+/// `crate::conversation_summary::told_with_lineage`, or a test's).
+fn thread_and_history_summed(
+    used: usize,
+    file: Option<&Path>,
+    whose: Option<&str>,
+    withheld: Option<&str>,
+    room_lines: bool,
+    said_once: bool,
+    summary: impl FnOnce(Option<&str>, Instant, usize) -> (String, Option<u64>),
 ) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
     // The scope's own running summary first, within the room, never
     // another scope's (`LAMP_CONVERSATION_SUMMARY`); a name withheld is
-    // taken out of it as out of the thread. The lineage of the note told
-    // (`LAMP_HISTORY_AFTER_NOTE`): none when none is, so nothing is left
-    // out for it.
-    let (summary, note) = if after_note {
-        crate::conversation_summary::told_with_lineage(whose, now, room)
-    } else {
-        (crate::conversation_summary::told(whose, now, room), None)
-    };
+    // taken out of it as out of the thread.
+    let (summary, note) = summary(whose, now, room);
     let summary = match withheld {
         Some(name) if !summary.is_empty() => crate::person::without_name(&summary, name),
         _ => summary,
     };
     let room = room.saturating_sub(summary.len());
     let (thread, recent) = crate::thread::current(file, |thread| {
-        (
-            thread.recall_after_note(whose, now, room, note),
+        let recent = match whose {
+            Some(person) if room_lines => thread.recent_with_room_lines_after_note(
+                person,
+                now,
+                HISTORY_WITHIN,
+                HISTORY_EXCHANGES,
+                note,
+            ),
+            _ => thread.recent_after_note(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
+        };
+        // The exchanges the history tells, picked as it picks them (the
+        // note's left out already), left out of the thread's text
+        // (`LAMP_HISTORY_SAID_ONCE`); off, the text is the scope's recall
+        // less the note's, as before.
+        let told = if said_once {
             match whose {
-                Some(person) if room_lines => thread.recent_with_room_lines_after_note(
+                Some(person) if room_lines => thread.recent_picks_with_room_lines(
                     person,
                     now,
                     HISTORY_WITHIN,
                     HISTORY_EXCHANGES,
                     note,
                 ),
-                _ => thread.recent_after_note(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
-            },
+                _ => thread.recent_picks_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
+            }
+        } else {
+            Vec::new()
+        };
+        (
+            thread.recall_for_leaving_out(whose, now, room, note, &told),
+            recent,
         )
     })
     .unwrap_or_default();
@@ -21490,7 +21556,7 @@ mod tests {
                 .cloned()
                 .collect()
         };
-        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true, false);
+        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true, false, false);
         assert_eq!(
             users(&theirs),
             [
@@ -21500,18 +21566,18 @@ mod tests {
             ],
             "A's turn: the room's line among A's, marked"
         );
-        let (_, rooms) = thread_and_history_told(0, None, None, None, true, false);
+        let (_, rooms) = thread_and_history_told(0, None, None, None, true, false, false);
         assert_eq!(
             users(&rooms),
             [Message::user("Can you look it up?")],
             "the room's turn: never A's"
         );
-        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true, false);
+        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true, false, false);
         assert!(
             others.is_empty(),
             "B's turn: neither A's nor A's conversation's"
         );
-        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false, false);
+        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false, false, false);
         assert_eq!(
             users(&off),
             [
@@ -21521,7 +21587,7 @@ mod tests {
             "off: A's alone"
         );
         crate::thread::THREAD.lock().unwrap().forget();
-        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true, false);
+        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true, false, false);
         assert!(forgotten.is_empty(), "a forget drops the room's lines too");
     }
 
@@ -21599,8 +21665,8 @@ mod tests {
             }
             panic!("the note was never kept");
         };
-        let off = || thread_and_history_told(0, None, Some(&tom), None, false, false);
-        let on = || thread_and_history_told(0, None, Some(&tom), None, false, true);
+        let off = || thread_and_history_told(0, None, Some(&tom), None, false, false, false);
+        let on = || thread_and_history_told(0, None, Some(&tom), None, false, true, false);
         let off_folded = told_with(None, true, &off);
         let off_unfolded = told_with(None, false, &off);
         assert_eq!(off_folded, off_unfolded, "off: byte for byte as before");
@@ -21630,8 +21696,8 @@ mod tests {
         );
         // The room's lines told: the room's line at 3, among Tom's folded
         // ones, stays, marked; Tom's folded ones leave.
-        let rooms_on = || thread_and_history_told(0, None, Some(&tom), None, true, true);
-        let rooms_off = || thread_and_history_told(0, None, Some(&tom), None, true, false);
+        let rooms_on = || thread_and_history_told(0, None, Some(&tom), None, true, true, false);
+        let rooms_off = || thread_and_history_told(0, None, Some(&tom), None, true, false, false);
         let (_, rooms) = told_with(Some(3), true, &rooms_on);
         let rooms_text = serde_json::to_string(&rooms).unwrap();
         assert!(
@@ -21651,6 +21717,188 @@ mod tests {
             told_with(Some(3), false, &rooms_off),
             "off with the room's lines: as before"
         );
+        // With `LAMP_HISTORY_SAID_ONCE` on too: the history is the same, and
+        // the thread's text leaves out both the folded exchanges and those
+        // the history tells, so it is the note alone, each exchange told
+        // once, with the room's lines or without.
+        let both = || thread_and_history_told(0, None, Some(&tom), None, false, true, true);
+        let (both_text, both_history) = told_with(None, true, &both);
+        assert_eq!(both_history, on_folded.1, "the history is the same");
+        assert!(both_text.contains("NOTE-HOLDS"), "{both_text}");
+        assert!(!both_text.contains("question"), "{both_text}");
+        assert!(on_folded.0.starts_with(&both_text) && on_folded.0.len() > both_text.len());
+        let rooms_both = || thread_and_history_told(0, None, Some(&tom), None, true, true, true);
+        let (rooms_both_text, rooms_both_history) = told_with(Some(3), true, &rooms_both);
+        assert_eq!(
+            serde_json::to_string(&rooms_both_history).unwrap(),
+            rooms_text,
+            "the room's lines: the history is the same"
+        );
+        assert!(!rooms_both_text.contains("question"), "{rooms_both_text}");
+        crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// #6218's thread for `LAMP_HISTORY_SAID_ONCE`: A's eight exchanges,
+    /// then six of the room's in the same conversation, the lamp's words
+    /// naming the owner, Minh.
+    fn said_once_thread(a: &str) {
+        let now = Instant::now();
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.forget();
+        for n in 1..=8u64 {
+            thread.person(&format!("Question {n} from A?"), true, now);
+            thread.lamp_for(n, &format!("Answer {n} for you, Minh."), now, Some(a));
+        }
+        for n in 9..=14u64 {
+            thread.person(&format!("Room question {n}?"), true, now);
+            thread.lamp_for(n, &format!("Room answer {n}."), now, None);
+        }
+    }
+
+    /// The history's messages as one text, for what it says.
+    fn history_text(history: &[Message]) -> String {
+        serde_json::to_string(history).unwrap()
+    }
+
+    /// No running summary, no note: for [`thread_and_history_summed`].
+    fn no_summary(_: Option<&str>, _: Instant, _: usize) -> (String, Option<u64>) {
+        (String::new(), None)
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` off (#6218): the thread's text is the
+    /// scope's whole recall, byte for byte as before, the history's
+    /// exchanges among it.
+    #[test]
+    fn history_said_once_off_tells_the_thread_whole() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        said_once_thread(&a);
+        let expected = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .recall_for(Some(&a), Instant::now(), lamp_gemini::MAX_INSTRUCTION_BYTES)
+            .unwrap();
+        for room_lines in [false, true] {
+            let (thread, history) =
+                thread_and_history_summed(0, None, Some(&a), None, room_lines, false, no_summary);
+            assert_eq!(thread, expected, "room lines {room_lines}");
+            assert!(
+                history_text(&history).contains("Question 8 from A?"),
+                "room lines {room_lines}"
+            );
+        }
+        for n in 1..=8 {
+            assert!(expected.contains(&format!("Person: Question {n} from A?\n")));
+        }
+        crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` on (#6218): with the room's lines taking
+    /// six of the history's twelve, A's two oldest exchanges are told only
+    /// in the thread's text, and the six newest only as messages.
+    #[test]
+    fn history_said_once_tells_each_exchange_once() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        said_once_thread(&a);
+        let (off, _) = thread_and_history_summed(0, None, Some(&a), None, true, false, no_summary);
+        let (thread, history) =
+            thread_and_history_summed(0, None, Some(&a), None, true, true, no_summary);
+        let history = history_text(&history);
+        for n in 1..=2 {
+            let question = format!("Question {n} from A?");
+            assert!(thread.contains(&format!("Person: {question}\n")), "{n}");
+            assert!(!history.contains(&question), "{n}");
+        }
+        for n in 3..=8 {
+            let question = format!("Question {n} from A?");
+            assert!(!thread.contains(&question), "{n}");
+            assert!(history.contains(&question), "{n}");
+        }
+        assert!(
+            !thread.contains("Room question"),
+            "the room's stay the history's"
+        );
+        assert!(history.contains("Room question 14?"));
+        // The note stays the one for the newest exchange: the talk is going on.
+        assert!(thread.starts_with("\n\nA moment ago\n"));
+        eprintln!(
+            "history said once, room lines: thread text {} bytes off, {} on",
+            off.len(),
+            thread.len()
+        );
+        crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` on (#6218): every exchange of the scope is
+    /// told as a message, so no thread text is told; the running summary
+    /// still is. Twelve exchanges of a long talk's length.
+    #[test]
+    fn history_said_once_with_only_recent_exchanges_keeps_the_summary_alone() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            for n in 1..=HISTORY_EXCHANGES as u64 {
+                thread.person(
+                    &format!("Question {n}: what do you make of the third chapter, and why does the ending land the way it does?"),
+                    true,
+                    now,
+                );
+                thread.lamp_for(
+                    n,
+                    &format!("Answer {n}: the third chapter turns on a quiet choice, and the ending lands because it pays that choice back without saying so. It trusts you to notice the echo, which is why it stays with you after the last page."),
+                    now,
+                    Some(&a),
+                );
+            }
+        }
+        let summary = "\n\nEarlier in this conversation\nThey are reading a novel.\n";
+        let summed = |said_once| {
+            thread_and_history_summed(0, None, Some(&a), None, false, said_once, |_, _, _| {
+                (summary.to_owned(), None)
+            })
+        };
+        let (off, off_history) = summed(false);
+        let (on, on_history) = summed(true);
+        assert_eq!(on, summary, "no thread text, the summary kept");
+        assert!(off.starts_with(summary) && off.len() > summary.len());
+        assert_eq!(
+            history_text(&on_history),
+            history_text(&off_history),
+            "the history is the same"
+        );
+        assert_eq!(on_history.len(), HISTORY_EXCHANGES * 2);
+        eprintln!(
+            "history said once, {HISTORY_EXCHANGES} recent exchanges: system message's thread part {} bytes off, {} on ({} saved); history {} bytes either way",
+            off.len(),
+            on.len(),
+            off.len() - on.len(),
+            history_text(&on_history).len()
+        );
+        crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// `LAMP_HISTORY_SAID_ONCE` on (#6218): the owner's name withheld is
+    /// taken out of the lamp's words in what is left of the thread's text,
+    /// and of the history's, as with it off.
+    #[test]
+    fn history_said_once_still_withholds_the_name() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        said_once_thread(&a);
+        let (thread, history) =
+            thread_and_history_summed(0, None, Some(&a), Some("Minh"), true, true, no_summary);
+        let (unwithheld, _) =
+            thread_and_history_summed(0, None, Some(&a), None, true, true, no_summary);
+        assert!(unwithheld.contains("Minh"));
+        assert!(thread.contains("You: Answer 1 for you"));
+        assert!(!thread.contains("Minh"), "{thread}");
+        let history = history_text(&history);
+        assert!(history.contains("Answer 8 for you"));
+        assert!(!history.contains("Minh"), "{history}");
         crate::thread::THREAD.lock().unwrap().forget();
     }
 

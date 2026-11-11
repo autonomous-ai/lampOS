@@ -2142,6 +2142,8 @@ fn second_route_worker_environment(
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
         // The exchanges a stored running note holds told in it alone (#6218).
         crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
+        // A recent exchange told once, as history, not again (#6218).
+        crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // A one-face line read as its person's, forgets refused (#5522).
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
@@ -2392,6 +2394,7 @@ mod tests {
             crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
             crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
+            crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
@@ -3302,6 +3305,7 @@ mod tests {
                     || name == crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT
+                    || name == crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
@@ -3431,6 +3435,7 @@ mod tests {
                     "LAMP_HELD_WORDS_SEEN=on",
                     "LAMP_HISTORY_AFTER_NOTE=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
+                    "LAMP_HISTORY_SAID_ONCE=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
                     "LAMP_KEEP_QUIETLY=on",
