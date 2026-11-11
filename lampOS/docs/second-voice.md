@@ -2638,6 +2638,14 @@ When the coordinator switches (below):
   `worker::known_person_for`, from the turn's own lease: only a turn told by
   it (`LAMP_SECOND_SCOPED_CONTEXT`), never one with no lease or told by
   presence, such as an add-on's say.
+  - **Nobody known** (#5750, with the same switch): with a face in the
+    eyes' newest look (`humans/faces/tracked`) and no known file nor an
+    unsure hold of one, any turn is told "(The face at the lamp is not
+    anyone the lamp knows.)" (`worker::nobody_known_told`). So "who is
+    this?" is answered "I don't know them" with no call, and a face from a
+    photo still waiting for its yes stays unnamed. Nothing else about who
+    anyone is goes with it. A known face in its first second, before the
+    eyes decide, reads as nobody known.
   - **Why:** without it, the second route reads the known face only to
     choose whose memory to use. A name kept with `remember_my_face`, in
     the eyes, is recognised but never said back. That's Fourth's replay of
