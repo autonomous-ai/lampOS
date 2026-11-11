@@ -1,0 +1,87 @@
+name: lampOS virtual lamp
+
+# The SDKs against the virtual desktop lamp (lampOS/crates/sim, docs/simulator-lamp.md),
+# on every pull request that could change what a program sees: the real
+# lamp-control and lamp-body run unchanged on lamp-sim's simulated servos, ring
+# and voice, and the JS SDK's tour, a Python SDK round trip and every SDK
+# example (conformance/examples.js --sim) run against them, with no special
+# mode in any SDK (tools/lamp-sim-check.sh and tools/lamp-sim-conformance.sh). Release binaries:
+# the timings the conformance looks at are the body's, not a debug build's.
+# Linux only (the real lamp-body runs there only). No camera, no microphone,
+# no ffmpeg: lamp-sim opens neither unless asked.
+on:
+  pull_request:
+    branches: [lamp-voice]
+    paths:
+      - 'lampOS/crates/**'
+      - 'lampOS/Cargo.*'
+      - 'lampOS/sdk/**'
+      - 'lampOS/docs/control*'
+      - 'lampOS/docs/lamp.model.json'
+      - 'lampOS/tools/lamp-sim-check.sh'
+      - 'lampOS/tools/lamp-sim-conformance.sh'
+      - '.github/workflows/lampos-sim.yml'
+  push:
+    branches: [lamp-voice]
+    paths:
+      - 'lampOS/crates/**'
+      - 'lampOS/Cargo.*'
+      - 'lampOS/sdk/**'
+      - 'lampOS/docs/control*'
+      - 'lampOS/docs/lamp.model.json'
+      - 'lampOS/tools/lamp-sim-check.sh'
+      - 'lampOS/tools/lamp-sim-conformance.sh'
+      - '.github/workflows/lampos-sim.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lampos-sim-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/lamp-voice' }}
+
+jobs:
+  sim:
+    name: lampOS virtual lamp — SDK tour, Python round trip, every example
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: system packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev
+      - uses: actions/checkout@v4
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      # Only the crate sources' registry: the repository's 10 GB cache is tight
+      # (lampos-clippy.yml, devops007 on #1806), and a release target is large.
+      - name: restore the registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: lampos-sim-registry-${{ hashFiles('lampOS/Cargo.lock') }}
+          restore-keys: lampos-sim-registry-
+      - name: build the virtual lamp and its real parts (release)
+        working-directory: lampOS
+        run: cargo build --release --locked -p lamp-sim -p lamp-body -p lamp-control -p lamp-skills
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: the SDKs, as a developer installs them
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e lampOS/sdk/python
+          cd lampOS/sdk/js && npm install --no-audit --no-fund --omit=optional
+      - name: SDK tour and a Python round trip against the virtual lamp
+        run: bash lampOS/tools/lamp-sim-check.sh "$GITHUB_WORKSPACE/lampOS/target/release"
+      - name: every SDK example against the virtual lamp
+        run: bash lampOS/tools/lamp-sim-conformance.sh "$GITHUB_WORKSPACE/lampOS/target/release"
