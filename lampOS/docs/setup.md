@@ -1070,7 +1070,8 @@ Wi-Fi without a put-back to V1:
   gone (#3020, below), with `LAMP_WIFI_RECOVERY=on` on its
   `lamp-setup-recover.service` (Fourteen's P2 on #2977). Off, the unit says
   so and exits at once; main's adapter (#2977) doesn't wait for it. The
-  first builder signs off before the switch goes on, as for product lamps.
+  first builder signs off before the switch goes on, as for product lamps
+  (on there since #5758).
 
 **What a moved lamp keeps of V1:** prepare never touches V1's own files,
 and the product's reset plan names V2's stores only, so V1's person data
@@ -1086,8 +1087,9 @@ setup writes it. Not run on a lamp.
 
 ## When the saved network is gone (#3020)
 
-With `LAMP_WIFI_RECOVERY=on` (off unless set, a drop-in on
-`lamp-setup-recover.service`, which the product installs), a set-up lamp
+With `LAMP_WIFI_RECOVERY=on` (off unless set; on in the product since
+#5758, set in `lamp-setup-recover.service` itself, which the product
+installs; a moved lamp's unit still needs a drop-in), a set-up lamp
 whose saved network is gone (a new router, a changed password, a move)
 opens setup's own hotspot after 90 s, as V1 did (`system/network/recovery.go`
 in the parent repository), so the app's setup flow sets the new network
@@ -1141,8 +1143,8 @@ its only way back once its package carries the unit.
   line (`http::Refusals`), never the key, as an open hotspot can be asked
   many times a second and the journal is in RAM; a lamp without its key file refuses every one. Without it, someone
   in radio range could set **their own** network (the Reviewer-lead on
-  #3024). The first builder signs off before `LAMP_WIFI_RECOVERY` goes on
-  anywhere.
+  #3024). The first builder signed off on `LAMP_WIFI_RECOVERY` on in the
+  product on 11 Nov (#5758); the row on lamp-52e6 is owed.
 - **Back to the station when the hotspot closes** (#4863). `device-ap-mode`
   masks `wpa_supplicant@wlan0`, adds `denyinterfaces wlan0` to
   `/etc/dhcpcd.conf` and enables `hostapd` and `dnsmasq`, and all of it
@@ -1184,7 +1186,8 @@ its only way back once its package carries the unit.
   the round stays switched. So a lamp updated to a build with `recover`
   and its switch on watches from that round; one given only the switch
   watches from its next start or its next switching round. A build's
-  settings can't write a drop-in, so no round turns the switch on.
+  settings can't write a drop-in, but since #5758 the product unit itself
+  sets the switch on, so a round that writes that unit turns it on.
 - **Said:** the journal (`lamp-setup-recover`) says when it opens and why,
   each retry, and when recovery ends; lamp-cloud's `system.info` says
   `"recovery": true` while it runs with its switch on, so the app names the

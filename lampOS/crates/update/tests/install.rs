@@ -1441,6 +1441,18 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
     assert!(page.contains(&format!("`{condition}`")));
 }
 
+/// #5758: recovery is on in the product (the first builder's yes, 11 Nov),
+/// so a lamp whose saved network is gone opens setup's hotspot instead of
+/// needing a reset.
+#[test]
+fn the_product_turns_wifi_recovery_on() {
+    let (_, unit) = PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-setup-recover.service")
+        .unwrap();
+    assert!(section(unit, "Service").contains(&"Environment=LAMP_WIFI_RECOVERY=on"));
+}
+
 /// #2848: every start of the voice starts the waking face again, so a
 /// restart from the app, an update round or a crash opens the ring like an
 /// eye before the voice takes it, as power-on does. The face is wanted and
