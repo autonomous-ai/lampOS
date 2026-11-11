@@ -939,9 +939,8 @@ notes (`ScopeLease::reads_carried`). It needs the one-face rule's tracker
 conversation, nor, with `LAMP_CONVERSATION_CARRIES_PAST_SILENT`, its sign
 of another person (`second_provider::no_other_voice_shown`, failing closed):
 with no tracker, a carried line stays held and the room's, as with the
-switch off (Thirteen's P2 on #5842). Since 10 Nov it acts without a voice
-print for the rules (the memory owner's call; `Engine::reading_carried_where_heard`).
-It also needs the rule to
+switch off (Thirteen's P2 on #5842). It also needs the same-voice check
+running for the route (`Engine::reading_carried_where_heard`), the rule to
 have judged the line's own voice (a line it skipped is narrowed to the
 room's), and P's own face the one face in view through the line by the
 one-face count (`SpeakingFaces::one_face_in_view`): P seen only in the 5 s
