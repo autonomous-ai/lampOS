@@ -516,6 +516,50 @@ mod tests {
         assert_eq!(refused.unwrap_err()["error"], services::CANCELLED);
     }
 
+    /// A plain spoken no ("no", "don't send it", "cancel", "stop") drops it
+    /// at once, lamp-services' hold too, and the lamp says only that it
+    /// won't send it; any other line, or a no with no run's write waiting,
+    /// drops nothing.
+    #[test]
+    fn a_spoken_no_drops_the_hold_at_once() {
+        let now = Instant::now();
+        let run = run();
+        for no in [
+            "No.",
+            "Don't send it.",
+            "Cancel",
+            "Stop, please.",
+            "Không, đừng gửi.",
+        ] {
+            written_with(true, 4, &run.note(), now);
+            let mut dropped = None;
+            let told = services::run_declined_with(5, no, |kept| {
+                dropped = Some((kept.service.clone(), kept.send_id.clone()));
+            });
+            assert_eq!(told.as_deref(), Some(services::RUN_DECLINED_NOTE), "{no}");
+            assert!(services::RUN_DECLINED_NOTE.contains("Okay, I won't send it."));
+            assert_eq!(dropped, Some(("gmail".to_owned(), run.send_id.clone())));
+            assert!(services::with_pending(|pending| pending.is_none()), "{no}");
+        }
+        for not_no in [
+            "Yes.",
+            "No, send it.",
+            "No?",
+            "Send it.",
+            "What does it say?",
+        ] {
+            written_with(true, 4, &run.note(), now);
+            let told = services::run_declined_with(5, not_no, |_| panic!("dropped"));
+            assert!(told.is_none(), "{not_no}");
+            assert!(services::with_pending(|pending| pending.is_some()));
+        }
+        // In the read-back's own request, or with nothing waiting: nothing.
+        written_with(true, 4, &run.note(), now);
+        assert!(services::run_declined_with(4, "No.", |_| panic!("dropped")).is_none());
+        services::with_pending(|pending| *pending = None);
+        assert!(services::run_declined_with(5, "No.", |_| panic!("dropped")).is_none());
+    }
+
     /// The model is told "sent" only when lamp-services answered sent: a
     /// refusal (over the skills' bounds, the read-back not the one held)
     /// or no answer is told as not sent.

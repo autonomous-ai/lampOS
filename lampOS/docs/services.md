@@ -2282,22 +2282,27 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   of the read-back the lamp said (`sha256`), and this program sends a run's
   write only when it is that of the read-back it holds
   (`serve::read_back_sha256`, else `RUN_NOT_SAID`, nothing sent). A no, a
-  wait, another request answered or the hold over: nothing is sent. The
+  wait, another request answered or the hold over: nothing is sent. A
+  plain spoken no ("no", "don't send it", "cancel", "stop", "không, đừng
+  gửi", at most six words; "no, send it" is none) drops it at once
+  (`services::run_declined`): the voice's waiting write, and this program's
+  hold through its existing discard (the `send_id` with `said` other than
+  "send"), and the model is told to say only "Okay, I won't send it." The
   model is told "sent" only from this program's answer `sent: true`
   (`services::answered`); over the skills' bounds or refused, "not sent".
 - **Not yet (said so the code is not read as more):** lamp-control keeps
   no skill yes yet (#6408's `SkillYes`), so no token is minted, and no
-  product unit sets `LAMP_SKILL_TASKS`. A no does not cancel the hold here:
-  it lapses after its 2 minutes, and another run's write waits until then.
-  The coordinator does not know which route answers: on the Live route the
+  product unit sets `LAMP_SKILL_TASKS`. A no in other words than a plain
+  no drops the voice's waiting write only, and this program's hold lapses
+  after its 2 minutes. The coordinator does not know which route answers: on the Live route the
   read-back is said but its yes is "not done on this voice". Tests:
   `serve::tests::lamp_control_calls_only_with_the_switch_on`,
   `a_skill_run_reads_by_its_grant`,
   `a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent` and
   `the_voice_is_told_a_runs_held_write_and_sends_only_what_it_read_back`;
   in the voice, `run_write_yes::tests` (said with the skill's name, a plain
-  yes sends it, a no drops it, the switch off ignores it, no "sent" without
-  done); in lamp-control, `session::tests` (the switch off, no grant, the
+  yes sends it, a no drops it, a spoken no drops the hold at once, the
+  switch off ignores it, no "sent" without done); in lamp-control, `session::tests` (the switch off, no grant, the
   wrong kind, a paired computer, a granted read) and `protocol::tests`.
 
 ## Refresh
