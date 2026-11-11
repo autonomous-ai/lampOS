@@ -2092,9 +2092,17 @@ fn run_call_with_scope(
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
+        // A session of theirs, named, only for the lamp's owner, heard, as
+        // the services hold it (#6274); a look stops with the request.
         Route::Tasks(place) => (
             "the tasks part",
-            crate::agent_tasks::run(place, call, request, heard, crate::agent_tasks::DEADLINE),
+            crate::agent_tasks::run_asked(
+                place,
+                call,
+                request,
+                &crate::agent_tasks::Asker::of(heard, lease),
+                crate::agent_tasks::DEADLINE,
+            ),
         ),
         Route::MakeLocal => (
             "the lamp's own model",
