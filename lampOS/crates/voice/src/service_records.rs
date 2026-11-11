@@ -107,6 +107,10 @@ pub struct Record {
     pub send_id: Option<String>,
     /// When it was prepared, for [`expire`].
     pub prepared_at: Option<Instant>,
+    /// The records it was redone from (`LAMP_SERVICE_REDO`, [`redo`]).
+    pub links: Vec<String>,
+    /// The record redone from it, once one is ([`redo`]).
+    pub replaced_by: String,
 }
 
 impl Record {
@@ -124,6 +128,8 @@ impl Record {
             "result_id": self.result_id,
             "asked_unix_ms": self.asked_ms,
             "changed_unix_ms": self.changed_ms,
+            "links": self.links,
+            "replaced_by": self.replaced_by,
         })
     }
 }
@@ -143,6 +149,8 @@ pub struct Ledger {
     receipts: VecDeque<Receipt>,
     records: VecDeque<Record>,
     made: u64,
+    /// How many forgets ran (`forgot`, `forgot_about`).
+    forgets: u64,
 }
 
 /// The record changes waiting to be written, oldest first: one a key, the
@@ -275,10 +283,13 @@ fn write_detail(args: &Value) -> Value {
     let mut detail = Map::new();
     if let Some(args) = args.as_object() {
         for (key, value) in args {
-            if !matches!(
+            let own = matches!(
                 key.as_str(),
                 "service" | "action" | "send_id" | "said" | crate::services::ATTEMPT
-            ) {
+            );
+            // The record redone from is a link, not a detail (`LAMP_SERVICE_REDO`).
+            let redone_from = key == redo::FIELD && redo::on();
+            if !own && !redone_from {
                 detail.insert(key.clone(), value.clone());
             }
         }
@@ -526,9 +537,9 @@ pub fn prepared(owner: &str, service: &str, args: &Value, send_id: &str, now: In
         return;
     };
     let at = unix_ms();
-    let record = kept::ledger(|ledger| {
+    let (record, redone) = kept::ledger(|ledger| {
         let key = ledger.new_key(at);
-        ledger.add(Record {
+        let mut record = Record {
             key,
             person,
             service: tidy(service, 64),
@@ -541,9 +552,17 @@ pub fn prepared(owner: &str, service: &str, args: &Value, send_id: &str, now: In
             changed_ms: at,
             send_id: Some(send_id.to_owned()),
             prepared_at: Some(now),
-        })
+            links: Vec::new(),
+            replaced_by: String::new(),
+        };
+        // Redone from a record (`LAMP_SERVICE_REDO`): linked both ways.
+        let redone = redo::link(ledger, &mut record, args);
+        (ledger.add(record), redone)
     });
     save(record);
+    if let Some(redone) = redone {
+        save(redone);
+    }
 }
 
 /// The waiting write `send_id` let go, or answered: its record given
@@ -609,6 +628,8 @@ pub fn ended(
             changed_ms: at,
             send_id: None,
             prepared_at: None,
+            links: Vec::new(),
+            replaced_by: String::new(),
         })
     });
     save(record);
@@ -665,6 +686,8 @@ pub fn read(owner: &str, args: &Value, told: &Value) {
             changed_ms: at,
             send_id: None,
             prepared_at: None,
+            links: Vec::new(),
+            replaced_by: String::new(),
         })
     });
     save(record);
@@ -820,6 +843,7 @@ pub fn forgot(person: Option<&str>) {
             .map(|record| record.key.clone())
             .collect();
         ledger.records.retain(|record| !theirs(record));
+        ledger.forgets += 1;
         for receipt in &mut ledger.receipts {
             if receipt
                 .record
@@ -920,6 +944,7 @@ pub fn forgot_about(person: &str, about: &[Vec<String>]) {
             .map(|record| record.key.clone())
             .collect();
         ledger.records.retain(|record| !gone.contains(&record.key));
+        ledger.forgets += 1;
         for receipt in &mut ledger.receipts {
             if receipt
                 .record
@@ -936,6 +961,12 @@ pub fn forgot_about(person: &str, about: &[Vec<String>]) {
             .waiting
             .retain(|record| !gone.contains(&record.key) && !matches(record));
     });
+}
+
+/// How many forgets ran: the list after a start ([`told::merge`]) is
+/// dropped when one ran since it was asked.
+pub fn forgets() -> u64 {
+    kept::ledger(|ledger| ledger.forgets)
 }
 
 /// The records held now, oldest first (tests and the note of PR 1b).
@@ -1051,6 +1082,9 @@ fn start_saver() {
 
 #[cfg(test)]
 fn start_saver() {}
+
+pub mod redo;
+pub mod told;
 
 #[cfg(test)]
 mod tests;
