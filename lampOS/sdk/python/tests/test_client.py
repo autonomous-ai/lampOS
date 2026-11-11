@@ -3038,3 +3038,18 @@ def test_the_fake_holds_a_move_to_the_caps_every_shipped_lamp_has_unless_told_it
     why = run(go(False))
     assert why is not None and "joint 2 300 counts, farther than 250, this lamp's yaw reach (--reach)" in why
     assert run(go(True)) is None
+
+
+def test_a_close_the_lamp_explains_is_logged_once_with_its_reason(tmp_path, caplog):
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with caplog.at_level("WARNING", logger="lampos"):
+                    await fake.restart()
+                    await asyncio.wait_for(lamp.wait_closed(), timeout=5)
+                assert lamp.close_reason == "the lamp restarts"
+
+    run(go())
+    lines = [r.getMessage() for r in caplog.records if r.name == "lampos"]
+    assert lines == ["the lamp closed the connection: the lamp restarts"]

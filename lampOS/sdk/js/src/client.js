@@ -314,6 +314,7 @@ export class Lamp {
     this.nextId = 1;
     // The hand this connection's head follows, if any (`followHand`).
     this.following = null;
+    this.closeReason = null; // why the lamp closed the connection, when it said
     this.waiting = new Map();
     this.done = new Map();
     this.handlers = new Map();
@@ -341,7 +342,14 @@ export class Lamp {
       ws.ping();
     }, Lamp.KEEPALIVE_MS);
     this.keepalive.unref?.();
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+      // When the lamp said why it closed ("grants changed by the owner", "this computer was revoked by the
+      // owner", "the lamp restarts"), one line says it, so a developer is not left guessing.
+      const why = reason?.toString();
+      if (why) {
+        this.closeReason = why;
+        console.error(`lampos: the lamp closed the connection: ${why}`);
+      }
       clearInterval(this.keepalive);
       for (const { reject } of [...this.waiting.values(), ...this.done.values()]) {
         reject(new LampError('the connection to the lamp closed', { code: 'closed' }));

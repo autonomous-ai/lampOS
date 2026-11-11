@@ -1973,3 +1973,22 @@ test('the fake holds a move to the caps every shipped lamp has unless told it ha
     await lamp.withLease(['body'], async () => { await lamp.move(sway, 200); }, { forMs: 5000 });
   });
 });
+
+
+test('a close the lamp explains is logged once, with its reason', async () => {
+  await withPaired({ grants: ['body'] }, async (fake, keyring) => {
+    const lamp = await Lamp.connect(undefined, { keyring });
+    const lines = [];
+    const logged = console.error;
+    console.error = (line) => lines.push(String(line));
+    try {
+      fake.restart();
+      await lamp.closed();
+    } finally {
+      console.error = logged;
+    }
+    assert.deepEqual(lines, ['lampos: the lamp closed the connection: the lamp restarts']);
+    assert.equal(lamp.closeReason, 'the lamp restarts');
+    await lamp.close();
+  });
+});
