@@ -482,7 +482,7 @@ const TASKS_EDITS: [(&str, &str); 6] = [
          \x20 I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x \"$p\" ]; then I=$p; break; fi; done\n\
          \x20 [ -n \"$I\" ] || fail \"no ip: lo not up, the run has no way out\"\n\
          \x20 \"$I\" link set lo up || fail \"lo not up\"\n\
-         \x20 [ \"$(\"$I\" -o link show | cut -d: -f2 | tr -d ' ' | tr '\\n' ' ')\" = \"lo \" ] || fail \"a link besides lo: the run is not held off the network\"\n\
+         \x20 [ -z \"$(\"$I\" -o link show | cut -d: -f2 | tr -d ' ' | grep -vx lo | grep -v '@NONE$')\" ] || fail \"a link besides lo: the run is not held off the network\"\n\
          \x20 M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /opt/lampOS/tasks/current/lamp-tasks net-relay --listen 127.0.0.1:7741 --to \"$B\" &)\n\
          \x20 [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n\
          fi\n\

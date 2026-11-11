@@ -252,7 +252,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   (docs/install.md, "Hermes on the lamp"), nên không địa chỉ nào khác phân
   giải hay kết nối được. Các pane của chính Harness không bao giờ đặt biến
   này, và giữ mạng như cũ. Cả hai phía đều dừng an toàn (fail closed):
-  script kết thúc lần chạy khi namespace có bất kỳ link nào ngoài `lo`, và
+  script kết thúc lần chạy khi namespace có bất kỳ link nào ngoài `lo` (các tunnel dự phòng của
+  kernel, `@NONE`, không có thiết bị bên dưới nên được bỏ qua), và
   `HermesRunner` không khởi động gì khi wrapper đã cài thiếu các dòng mạng
   (`WRAPPER_NET_LINES`, `NOT_HELD_OFF`: `LAMP_SKILL_TASKS` của lamp-update
   đang tắt hoặc vòng của nó chưa chạy), nên một lần chạy không bao giờ được

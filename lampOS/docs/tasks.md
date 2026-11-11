@@ -2251,7 +2251,8 @@ for each run, and is answered once the run ends
   namespace of its own with only `lo` (docs/install.md, "Hermes on the
   lamp"), so no other address resolves or connects. Harness's own panes
   never set it, and keep their network. It fails closed both ways: the
-  script ends the run when the namespace has any link besides `lo`, and
+  script ends the run when the namespace has any link besides `lo` (the kernel's fallback
+  tunnels, `@NONE`, have no device under them and are let be), and
   `HermesRunner` starts nothing while the installed wrapper lacks the
   network lines (`WRAPPER_NET_LINES`, `NOT_HELD_OFF`: lamp-update's
   `LAMP_SKILL_TASKS` off or its round not run yet), so a run is never
