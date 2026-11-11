@@ -8,6 +8,7 @@
 //!                    [--camera-opens-on-demand]
 //!                    [--microphone on|off]
 //!                    [--run-socket PATH] [--run-socket-user USER]
+//!                    [--services-socket PATH]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control grants CLIENT --grants body,light [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
@@ -225,6 +226,18 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     }
     // A computer's own notes: always kept, in the state folder's `notes`.
     door = door.with_notes_folder(state.join(lamp_control::notes::NOTES_FOLDER));
+    // A skill run's linked services (#6432): only with LAMP_SKILL_TASKS=on,
+    // sent on to lamp-services' tools socket (`--services-socket`).
+    if lamp_control::services::on(
+        std::env::var(lamp_control::services::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        let socket = option(arguments, "--services-socket")
+            .unwrap_or_else(|| lamp_control::services::SOCKET.to_owned());
+        eprintln!("lamp-control: a skill run's linked services go to {socket}");
+        door = door.with_skill_services(PathBuf::from(socket));
+    }
     let actions = option(arguments, "--actions-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
         Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),

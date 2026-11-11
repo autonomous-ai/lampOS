@@ -250,11 +250,13 @@ impl From<StoredClient> for Client {
     fn from(stored: StoredClient) -> Self {
         let (mut grants, mut unknown_grants) = (BTreeSet::new(), BTreeSet::new());
         for name in stored.grants {
+            // A linked service's grant is a skill run's alone: in the file it
+            // is kept, never held.
             match serde_json::from_value::<Grant>(serde_json::Value::String(name.clone())) {
-                Ok(grant) => {
+                Ok(grant) if !grant.is_service() => {
                     grants.insert(grant);
                 }
-                Err(_) => {
+                _ => {
                     unknown_grants.insert(name);
                 }
             }

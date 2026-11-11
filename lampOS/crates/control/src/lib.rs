@@ -35,6 +35,7 @@ pub mod pushed_moves;
 pub mod rate;
 pub mod runs;
 pub mod server;
+pub mod services;
 pub mod session;
 pub mod sounds;
 pub mod task_yes;
