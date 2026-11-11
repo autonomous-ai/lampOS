@@ -508,7 +508,17 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   "Mm." or "Hm.", the next never the last one played), and is then given up
   only 3 s after that scheduled sound (`BEGIN_WITHIN_AFTER_CUE`), at 4.5 s
   from the words with the default cue time: a "hmm" followed by silence
-  is the worst of both. The sounds are said once by this route's own
+  is the worst of both.
+  A lamp the backend places in mainland China (#6414: `CN` in the region
+  file, `LAMP_REGION_FILE`, default `/var/lib/lampos-cloud/region`, which
+  lamp-cloud keeps from the ping's reply; see `cloud.md`) waits 5 s for a
+  spoken turn's first round (`CN_BEGIN_WITHIN`) and 4 s after the sound
+  (`CN_BEGIN_WITHIN_AFTER_CUE`), read once as the worker starts (journal:
+  `region CN: a first round may begin as late as …`). Empty, missing or
+  unreadable is 3 s and 3 s, as before. With region `CN` and the second
+  route configured, Gemini Live is refused: `LAMP_VOICE_ROUTE` unset or
+  `gemini` runs the second route alone (journal: `region CN: Gemini Live is
+  refused, the voice route is second`). The sounds are said once by this route's own
   voice at its first spoken turn,
   kept in memory, cut to 0.6 s with a 30 ms fade, at half the
   reply's level. They go as audio only: nothing is kept in the thread, the 120 s
@@ -3101,8 +3111,9 @@ record is written.
   never came: `Transport`, `ConnectTimeout`, `ResponseTimeout`, at any of the
   three services) checks whether the services' hosts answer at all: a bare
   TCP connection to the chat's, the speech's, speech to text's and Gemini's
-  host at once, nothing sent, any answering within 2 s enough
-  (`PROBE_WITHIN`). One answering: a service was slow or refused, and
+  host at once, nothing sent, any answering within 4 s enough
+  (`PROBE_WITHIN`; 2 s until #6414, so a host 3 s away across a slow
+  border is no outage). One answering: a service was slow or refused, and
   nothing changes (a status, 401, 429 or 5xx, never checks: the service
   answered). None: the link is Unavailable with the turn's fault, and the
   check runs every 5 s (`PROBE_EVERY_US`; it was 30 s until #1844's run
