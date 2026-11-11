@@ -2123,6 +2123,8 @@ fn second_route_worker_environment(
         crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
         // An earlier turn's calls told with its words (lamp build 9699).
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
+        // The exchanges a stored running note holds told in it alone (#6218).
+        crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // A one-face line read as its person's, forgets refused (#5522).
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
@@ -2372,6 +2374,7 @@ mod tests {
             crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
             crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
+            crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
@@ -3275,6 +3278,7 @@ mod tests {
                     || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
                     || name == crate::second_provider::CARRIED_LINES_KEEP_TALK_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
+                    || name == crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
@@ -3402,6 +3406,7 @@ mod tests {
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_HELD_WORDS_SEEN=on",
+                    "LAMP_HISTORY_AFTER_NOTE=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
