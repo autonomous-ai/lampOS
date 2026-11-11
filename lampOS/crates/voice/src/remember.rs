@@ -3260,7 +3260,7 @@ pub fn forget_which(theirs: bool) -> Value {
     };
     json!({
         "forgotten": false,
-        "note": format!("Nothing was forgotten yet: their words name nothing, and more than one thing could be meant. {ask}, and forget only the one they then name.")
+        "note": format!("Nothing was forgotten yet: their words name nothing, and more than one thing could be meant. {ask}, and forget only the one they then name. Never say there was nothing to forget or remove.")
     })
 }
 
@@ -6209,8 +6209,22 @@ fn replace_session(
         context.just_asked = None;
     }
     // What the last session's remember or recall gave is not this one's
-    // "that" (#3504, Friday's N1).
-    if context.session.as_deref() != Some(name) {
+    // "that" (#3504, Friday's N1). But each line's note read opens a new
+    // session (#2540), so a known person's own keep stays "that" in the
+    // next session for the same person, within [`HELD_FORGET_FOR`]
+    // ([`just_kept`] bounds it): on lamp-06c1 (11 Nov, builds 11450 and
+    // 11716) "Lamp, forget that." 18 s after the umbrella keep found
+    // nothing given and asked which of 9 shown. A recall's, the room's,
+    // nobody known's or another person's session lets it go.
+    let keep_stays = !context.given_by_recall
+        && person.is_some()
+        && previous_person.as_deref() == person
+        && context.last_given.as_ref().is_some_and(|(given, at)| {
+            at.elapsed() <= HELD_FORGET_FOR
+                && !given.is_empty()
+                && given.iter().all(|(whose, _)| whose.as_deref() == person)
+        });
+    if context.session.as_deref() != Some(name) && !keep_stays {
         context.last_given = None;
     }
     // A write done stays the scope's for a yes alone just after it, though
@@ -16340,6 +16354,86 @@ mod tests {
         assert_eq!(ops, ["remember", "forget", "remember"]);
         drop(client);
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// lamp-06c1, 11 Nov, builds 11450 and 11716 (C88 after #5419, seen
+    /// path): the session note showed 9 kept things, "Lamp, remember that
+    /// my umbrella is green." kept it, and "Lamp, forget that." 18 s later,
+    /// seen spoken, found nothing given just before and asked which of 9
+    /// shown: the forget's own line had read the note again, opening a new
+    /// session for the same person (#2540), which let the keep go. It is
+    /// still "that" in that session, by its id in their scope; another
+    /// person's session or nobody known's lets it go, and a recall since
+    /// ends it, as before.
+    #[test]
+    fn forget_that_after_their_keep_takes_it_though_the_next_line_opens_a_session() {
+        const OLIVIA: &str = "p-b247000000000001";
+        const MINH: &str = "p-be9688998f085098";
+        let bare = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("Lamp, forget that."),
+            Some(OLIVIA),
+            &Carry::default(),
+        )
+        .expect("a bare forget is marked");
+        let keep = call(REMEMBER, json!({"text": "my umbrella is green"}));
+        let shown: Vec<u64> = (1170..1179).collect();
+        // 0: the lamp's sequence; 1: another person's line between; 2:
+        // nobody known's; 3: a recall since.
+        for case in 0..4 {
+            let (socket, served) = memory(
+                &format!("forget-after-seen-keep-{case}"),
+                if case == 0 { 2 } else { 1 },
+                just_kept_memory,
+            );
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.replaces.store(true, Ordering::Release);
+            client.forget_just_kept.store(true, Ordering::Release);
+            let (jobs, _) = sync_channel(16);
+            let opens = |name: &str, whose: Option<&str>| {
+                let mut context = client.context.lock().unwrap();
+                let _ = replace_session(&mut context, &jobs, (name, whose), true);
+                let _ = context.include(whose, &shown);
+            };
+            let run = |call: &ToolCall| {
+                client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(OLIVIA))
+            };
+            opens("lamp-301", Some(OLIVIA));
+            assert_eq!(client.context.lock().unwrap().shown(Some(OLIVIA)).len(), 9);
+            let (kept, answered) = run(&keep);
+            assert!(answered && kept["remembered"] == true, "{case}: {kept}");
+            match case {
+                1 => opens("lamp-302", Some(MINH)),
+                2 => opens("lamp-302", None),
+                3 => {
+                    let mut context = client.context.lock().unwrap();
+                    context.last_given =
+                        Some((vec![(Some(OLIVIA.to_owned()), 1170)], Instant::now()));
+                    context.given_by_recall = true;
+                }
+                _ => {}
+            }
+            // The forget's own line reads the note: a new session.
+            opens("lamp-303", Some(OLIVIA));
+            let (told, answered) = run(&bare);
+            if case == 0 {
+                assert!(answered && told["forgotten"] == true, "{told}");
+            }
+            let read = served.join().unwrap();
+            if case == 0 {
+                assert_eq!(told["what_went"], "my umbrella is green", "{told}");
+                assert_eq!(
+                    read[1],
+                    json!({"op":"forget","id":5,"person":OLIVIA,"selective":true}),
+                    "{read:?}"
+                );
+            } else {
+                assert_eq!((told, answered), (forget_which(true), true), "{case}");
+                assert_eq!(read.len(), 1, "{case}: {read:?}");
+            }
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
     }
 
     /// C88: another person's keep, or the room's, is never "that" for a
