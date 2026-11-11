@@ -997,6 +997,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         now: false,
         one_yes: false,
         reply_named: false,
+        harness_status: false,
         sign_in: false,
         sign_in_app: false,
     };
@@ -6755,6 +6756,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         now: false,
         one_yes: false,
         reply_named: false,
+        harness_status: false,
         sign_in: false,
         sign_in_app: false,
     };
@@ -16217,6 +16219,7 @@ async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() 
                 now: false,
                 one_yes: false,
                 reply_named: false,
+                harness_status: false,
                 sign_in: false,
                 sign_in_app: false,
             }),
