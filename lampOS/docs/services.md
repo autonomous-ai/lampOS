@@ -2238,7 +2238,12 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   allow-lists. Unlike a made skill's fixed read, a run may read a whole text
   or a free-form read, as the voice's model may, since Hermes summarises
   what it reads. No identity gate: `LAMP_PRIVATE_ROOM` treats whoever speaks
-  as the owner.
+  as the owner. A run's answer line stays under 7 KiB
+  (`serve::RUN_ANSWER_MOST`, lamp-control reading at most 8 KiB): a longer
+  read, such as a long mail's text, has its longest texts cut at a
+  character's edge with "…" after each, and the result gets
+  `"cut":"the rest is longer than a run can read"` (`serve::run_read_fitted`;
+  the voice's reads are not cut so).
 - **A write** is only prepared: the same `service_write` path as the
   voice's, read back and held 2 minutes (`writes::HOLD`), one at a time.
   The run is answered `read_back`, `sent: false`, `held: true` and a `next`

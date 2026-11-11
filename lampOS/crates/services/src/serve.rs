@@ -65,6 +65,14 @@ pub const RUN_WRITE_WAITS: &str =
 pub const RUN_PAIRS: [(&str, &str); 2] = [("gmail", "gmail-app"), ("figma", "figma-api")];
 /// What a skill run's prepared write tells it: nothing went.
 pub const RUN_HELD: &str = "Nothing is sent. The lamp reads it back to the person and sends it only if they say yes; say nothing of it as sent.";
+/// The most a skill run's whole answer line may be, its line break with
+/// it: lamp-control reads at most 8 KiB of it
+/// (`lamp_control::services::ANSWER_MOST`), and 1 KiB is kept spare. A run
+/// is not the voice, so the voice's 4 KB ([`ANSWER_MOST`]) is not its
+/// bound; a longer read is cut to fit ([`run_read_fitted`]).
+pub const RUN_ANSWER_MOST: usize = 7 * 1024;
+/// What a skill run's read that was cut to fit carries as its `cut`.
+pub const RUN_CUT: &str = "the rest is longer than a run can read";
 /// What a skill's call to anything but a read is told.
 pub const SKILL_READS_ONLY: &str = "a skill may only read a linked service";
 /// What a skill's call to anything but a read or its approved write is
@@ -511,10 +519,13 @@ impl<H: Http, M: Mail> Services<H, M> {
             _ => Err(RUN_READS_AND_WRITES_ONLY.into()),
         };
         let answer = match answer {
+            Ok(result) if name == tools::READ => {
+                json!({"ok": true, "result": run_read_fitted(result)})
+            }
             Ok(result) => json!({"ok": true, "result": result}),
             Err(why) => json!({"ok": false, "error": why}),
         };
-        if answer.to_string().len() < ANSWER_MOST {
+        if answer.to_string().len() < RUN_ANSWER_MOST {
             answer
         } else {
             refused("the answer was too long to give")
@@ -1967,6 +1978,86 @@ fn link_refused(reply: &net::Reply) -> bool {
     reply.status == 401 && !writes::scope_refused(&reply.body)
 }
 
+/// A skill run's read `result`, cut so its answer line fits
+/// [`RUN_ANSWER_MOST`]: its longest texts are cut first, each at a
+/// character's edge with "…" after it, and the result says so in its `cut`
+/// ([`RUN_CUT`]); one that is no object is kept as the `quoted` of one.
+/// A result that fits is as it came. Its `source`, `about` and `cut` are
+/// never cut; a result that can't fit so is refused as too long by
+/// [`Services::run_tool`].
+pub fn run_read_fitted(result: Value) -> Value {
+    // The answer line's length: its frame and its line break.
+    let line = |result: &Value| json!({"ok": true, "result": result}).to_string().len() + 1;
+    if line(&result) < RUN_ANSWER_MOST {
+        return result;
+    }
+    let mut result = match result {
+        Value::Object(result) => Value::Object(result),
+        other => json!({"quoted": other}),
+    };
+    result["cut"] = json!(RUN_CUT);
+    loop {
+        let over = (line(&result) + 1).saturating_sub(RUN_ANSWER_MOST);
+        if over == 0 {
+            return result;
+        }
+        let mut longest = None;
+        longest_text(&result, String::new(), true, &mut longest);
+        let Some((at, _)) = longest else {
+            return result;
+        };
+        let Some(Value::String(text)) = result.pointer_mut(&at) else {
+            return result;
+        };
+        // As many bytes left out as the line is over and the "…" after it
+        // takes, in the text's own bytes: an escaped character ("\n",
+        // "\u0001") is more in the line than in the text.
+        let length = text.trim_end_matches('…').len();
+        let written = Value::String(text.clone()).to_string().len() - 2;
+        let out = ((over + 3) * length).div_ceil(written.max(1));
+        cut_text(text, length.saturating_sub(out.max(1)));
+    }
+}
+
+/// `text` kept to its first `most` bytes at a character's edge, with "…"
+/// after it.
+fn cut_text(text: &mut String, most: usize) {
+    let mut at = most.min(text.len());
+    while !text.is_char_boundary(at) {
+        at -= 1;
+    }
+    text.truncate(at);
+    text.push('…');
+}
+
+/// The JSON pointer and length of the longest text in `value` that can
+/// still be cut (more than its "…"), at the top neither `source`, `about`
+/// nor `cut`.
+fn longest_text(value: &Value, at: String, top: bool, longest: &mut Option<(String, usize)>) {
+    let pointer = |key: &str| format!("{at}/{}", key.replace('~', "~0").replace('/', "~1"));
+    match value {
+        Value::String(text) => {
+            let length = text.trim_end_matches('…').len();
+            if length > 0 && longest.as_ref().is_none_or(|(_, most)| length > *most) {
+                *longest = Some((at, length));
+            }
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                longest_text(item, pointer(&index.to_string()), false, longest);
+            }
+        }
+        Value::Object(fields) => {
+            for (key, field) in fields {
+                if !(top && ["source", "about", "cut"].contains(&key.as_str())) {
+                    longest_text(field, pointer(key), false, longest);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 /// A refused link, in the lamp's words.
 /// Where a `service_read` was refused or failed, for its journal line.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2498,6 +2589,91 @@ mod tests {
             );
         }
         assert!(services.mail.sent.lock().unwrap().is_empty());
+    }
+
+    /// The most lamp-control reads of a run's answer line, its line break
+    /// with it (`lamp_control::services::ANSWER_MOST`, less the one byte
+    /// that tells it the line is longer).
+    const CONTROL_READS: usize = 8 * 1024;
+
+    /// A run's answer line as lamp-services writes it.
+    fn run_answer_line(result: &Value) -> usize {
+        json!({"ok": true, "result": result}).to_string().len() + 1
+    }
+
+    /// A mail read with one text of `text`, as a read is quoted.
+    fn run_mail(text: &str) -> Value {
+        json!({"source": "Gmail", "about": "quoted data", "quoted": [{"subject": "Notes", "text": text}]})
+    }
+
+    /// #6432 (Heron's and SubDarren's P3 on #6436): a run's read just under
+    /// its bound comes whole, with no `cut`.
+    #[test]
+    fn a_runs_read_under_its_bound_is_whole() {
+        let frame = run_answer_line(&run_mail(""));
+        let read = run_mail(&"a".repeat(RUN_ANSWER_MOST - 1 - frame));
+        assert_eq!(run_answer_line(&read), RUN_ANSWER_MOST - 1);
+        assert_eq!(run_read_fitted(read.clone()), read);
+        let text = "mail ".repeat(100);
+        assert_eq!(run_read_fitted(run_mail(&text)), run_mail(&text));
+        const { assert!(RUN_ANSWER_MOST + 1024 <= CONTROL_READS) };
+    }
+
+    /// #6432: a run's read over its bound is cut to fit, marked as cut, and
+    /// its answer fits what lamp-control reads; its source and about are
+    /// kept whole, and a text with escapes is cut to fit too.
+    #[test]
+    fn a_runs_long_read_is_cut_and_marked() {
+        for text in [
+            "a".repeat(RUN_ANSWER_MOST),
+            "line\n\"quoted\"\t".repeat(4 * 1024),
+            "\u{1}".repeat(3 * 1024),
+        ] {
+            let read = run_read_fitted(run_mail(&text));
+            let length = run_answer_line(&read);
+            assert!(length < RUN_ANSWER_MOST, "{length}");
+            assert!(length <= CONTROL_READS, "{length}");
+            assert_eq!(read["cut"], RUN_CUT);
+            assert_eq!(read["source"], "Gmail");
+            assert_eq!(read["about"], "quoted data");
+            assert_eq!(read["quoted"][0]["subject"], "Notes");
+            let kept = read["quoted"][0]["text"].as_str().unwrap();
+            let kept = kept.strip_suffix('…').unwrap();
+            assert!(text.starts_with(kept) && !kept.is_empty());
+            // Cut no more than it needs.
+            assert!(length + 64 > RUN_ANSWER_MOST, "{length}");
+        }
+        // A result that is no object is kept as one's quoted.
+        let read = run_read_fitted(json!("b".repeat(2 * RUN_ANSWER_MOST)));
+        assert_eq!(read["cut"], RUN_CUT);
+        assert!(read["quoted"].as_str().unwrap().ends_with("b…"));
+        assert!(run_answer_line(&read) < RUN_ANSWER_MOST);
+        // Many texts: the longest are cut first.
+        let read = run_read_fitted(json!({"quoted": [
+            "c".repeat(5 * 1024), "d".repeat(5 * 1024), "short"
+        ]}));
+        assert!(run_answer_line(&read) < RUN_ANSWER_MOST);
+        assert_eq!(read["quoted"][2], "short");
+    }
+
+    /// #6432: a multibyte text is cut at a character's edge, never inside
+    /// one.
+    #[test]
+    fn a_runs_read_is_cut_at_a_characters_edge() {
+        let mut two = "日本".to_owned();
+        cut_text(&mut two, 4);
+        assert_eq!(two, "日…");
+        for (text, size) in [("é", 2), ("日", 3), ("🙂", 4)] {
+            for shift in 0..size {
+                let long = format!("{}{}", "x".repeat(shift), text.repeat(RUN_ANSWER_MOST));
+                let read = run_read_fitted(run_mail(&long));
+                assert!(run_answer_line(&read) < RUN_ANSWER_MOST);
+                let kept = read["quoted"][0]["text"].as_str().unwrap();
+                let kept = kept.strip_suffix('…').unwrap();
+                assert!(long.starts_with(kept), "{text} {shift}");
+                assert!(kept[shift..].chars().all(|c| c.to_string() == text));
+            }
+        }
     }
 
     /// #6432 (SubDarren's P2 on #6436): a run's grant names a service's two

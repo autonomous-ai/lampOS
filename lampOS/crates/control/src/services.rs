@@ -23,8 +23,9 @@ pub const SOCKET: &str = "/run/lampos-services/tools/call.sock";
 /// How long a call may take: a mail box or a web service takes seconds, as
 /// the voice's own wait for the same socket (`lamp_voice::services::DEADLINE`).
 pub const WAIT: Duration = Duration::from_secs(20);
-/// The longest answer read: lamp-services answers in one line of at most
-/// 8 KB (`lamp_services::reads::ANSWER_MOST`).
+/// The longest answer read: lamp-services answers a run in one line under
+/// 7 KiB (`lamp_services::serve::RUN_ANSWER_MOST`), a longer read cut to
+/// fit and marked `cut`, so 1 KiB of this is spare.
 pub const ANSWER_MOST: u64 = 8 * 1024 + 1;
 
 /// What a `service.read` or `service.write` is told with the switch off.

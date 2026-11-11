@@ -2334,7 +2334,12 @@ lẫn lượt chạy đều không giữ token nào.
   danh sách cho phép. Khác với lần đọc cố định của kỹ năng tự tạo, một lượt
   chạy được đọc nguyên văn bản hay một lần đọc tự do, như mô hình của giọng
   nói, vì Hermes tóm tắt những gì nó đọc. Không có cổng danh tính:
-  `LAMP_PRIVATE_ROOM` coi bất kỳ ai nói là chủ đèn.
+  `LAMP_PRIVATE_ROOM` coi bất kỳ ai nói là chủ đèn. Dòng trả lời cho lượt
+  chạy luôn dưới 7 KiB (`serve::RUN_ANSWER_MOST`, vì lamp-control chỉ đọc
+  tối đa 8 KiB): một lần đọc dài hơn, như văn bản của một thư dài, bị cắt
+  các văn bản dài nhất tại ranh giới ký tự với "…" ở cuối mỗi đoạn, và kết
+  quả có thêm `"cut":"the rest is longer than a run can read"`
+  (`serve::run_read_fitted`; các lần đọc của giọng nói không bị cắt như vậy).
 - **Một lần ghi** chỉ được chuẩn bị: cùng đường `service_write` như của
   giọng nói, đọc lại và giữ 2 phút (`writes::HOLD`), mỗi lúc một lần. Lượt
   chạy nhận `read_back`, `sent: false`, `held: true` và một `next` nói rằng
