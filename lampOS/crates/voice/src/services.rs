@@ -122,6 +122,9 @@ pub const NOT_READ_BACK: &str = "Not sent, and cancelled: the read-back was cut 
 pub const OTHER_VOICE: &str = "Not sent, and cancelled: I send only when the voice saying \"send\" is the one that asked for it. Say it was not sent.";
 /// What the model is told when such a send had no voice print to compare
 /// (a line too short): the write still waits, for one more try.
+/// What the model is told when a skill run's write is sent on anything but
+/// a plain yes ([`plain_yes`]): it is dropped, unsent (#6432).
+pub const RUN_NOT_PLAIN_YES: &str = "Not sent, and cancelled: a skill's write goes only on a plain yes, such as \"yes\" or \"send it\". Say it was not sent.";
 pub const NO_PRINT_YET: &str = "Not sent yet: I couldn't hear whose voice that was.";
 /// What the model is told to say then.
 pub const SAY_IT_LONGER: &str = "Ask them, in the conversation's language, to say \"go ahead and send it\" (in Vietnamese \"ừ, gửi đi giúp tôi\"), and nothing else. Call service_write again with the same send_id only if they agree.";
@@ -405,6 +408,19 @@ pub struct Pending {
     /// A Gmail draft (`save_draft`): saved, never sent; its read-back asks
     /// "Shall I save it?" ([`SAVE_READ_BACK_NEXT`]).
     pub draft: bool,
+    /// A skill's run prepared it, not the voice's model (#6432,
+    /// `LAMP_SKILL_TASKS`, [`crate::run_write_yes`]): the skill, and the
+    /// SHA-256 of the read-back the lamp was told to say, which its send
+    /// names so `lamp-services` sends only those very words. Its send needs
+    /// a plain yes ([`Turn::plain_yes`]).
+    pub run: Option<RunYes>,
+}
+
+/// What a skill run's write waiting here carries ([`Pending::run`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RunYes {
+    pub skill: String,
+    pub sha256: String,
 }
 
 impl Pending {
@@ -439,6 +455,7 @@ impl Pending {
             echo_tail: VecDeque::new(),
             in_place: VecDeque::new(),
             draft: false,
+            run: None,
         }
     }
 }
@@ -479,6 +496,12 @@ mod kept {
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
         READ_IN.with(|cell| f(&mut cell.borrow_mut()))
     }
+}
+
+/// Tests: `f` on this thread's waiting write.
+#[cfg(test)]
+pub fn with_pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
+    kept::pending(f)
 }
 
 /// How many requests a read is remembered in ([`after_read`]).
@@ -907,6 +930,58 @@ pub fn waiting_note_stands(note: &str) -> bool {
         || kept::pending(|pending| pending.as_ref().is_some_and(|kept| note_of(kept) == note))
 }
 
+/// A skill run's write, read back by the lamp in `request` (a written turn
+/// of its own, [`crate::run_write_yes`], #6432), waits for the person's yes
+/// as a write the model prepared does: one at a time, replacing any other;
+/// its two minutes counted from when `lamp-services` held it (`run.left`
+/// of them remain at `now`). Anyone's yes sends it, as any waiting write's
+/// (in the private room the owner's turns are everyone's); the model is
+/// told of it in their later turns ([`waiting_note`]).
+pub fn wait_for_run_yes(request: u64, run: &crate::run_write_yes::RunWrite, now: Instant) {
+    let person = owner_of(None)
+        .or_else(|| crate::person::owner_ids().into_iter().next())
+        .unwrap_or_else(|| "the-owner".to_owned());
+    let at = now
+        .checked_sub(PENDING_FOR.saturating_sub(run.left))
+        .unwrap_or(now);
+    let mut kept = Pending::new(&run.send_id, request, at, &run.read_back, &person);
+    kept.service.clone_from(&run.service);
+    kept.run = Some(RunYes {
+        skill: run.skill.clone(),
+        sha256: lamp_services::serve::read_back_sha256(&run.read_back),
+    });
+    kept::pending(|pending| {
+        if let Some(old) = pending.take() {
+            crate::service_records::settle(
+                &old.send_id,
+                Status::Cancelled,
+                "a skill's write replaced it",
+            );
+        }
+        *pending = Some(kept);
+    });
+    eprintln!(
+        "lamp-voice: request {request}: a skill run's write to {} is read back and waits for a yes (#6432)",
+        run.service
+    );
+}
+
+/// The write a skill's run prepared and `lamp-services` holds, if any
+/// (`run_write_waiting`, the voice's own call, never offered to its model,
+/// #6432): `None` when there is none or it can't be told. Blocking, at
+/// most [`LINKED_DEADLINE`].
+pub fn run_write_waiting(folder: &Path) -> Option<crate::run_write_yes::RunWrite> {
+    let told = crate::tools::exchange(
+        &folder.join(crate::tools::CALL_SOCKET),
+        &json!({"op": "call", "name": lamp_services::serve::RUN_WAITING, "args": {}}),
+        LINKED_DEADLINE,
+    )?;
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    crate::run_write_yes::RunWrite::from_waiting(told.get("result")?.get("waiting")?)
+}
+
 /// A forget (the thread's, `thread::Thread::forget`: the voice's own
 /// forget, or memory's `memory/forgot` for anyone) or a privacy change of
 /// the camera or the microphone drops the write waiting for its send, and
@@ -1273,6 +1348,22 @@ pub fn gate(
             }
             None => return other("no voice print was heard twice"),
         }
+    }
+    // A skill run's write (#6432): only on a plain yes, the person's own
+    // words, never the model's reading of them, so nothing in what the run
+    // wrote can make it send.
+    if let Some(run) = &kept.run {
+        if !turn.plain_yes {
+            eprintln!(
+                "lamp-voice: request {request}: a skill run's send cancelled: not a plain yes"
+            );
+            crate::service_records::settle(&kept.send_id, Status::Refused, "not a plain yes");
+            return Err(json!({ "error": RUN_NOT_PLAIN_YES }));
+        }
+        // Sent exactly as prepared, and only the words read back.
+        call.args = json!({ "service": kept.service, "send_id": kept.send_id, "said": "send",
+            "sha256": run.sha256 });
+        return Ok(call);
     }
     // Sent exactly as prepared, to its own service.
     call.args = json!({ "service": kept.service, "send_id": kept.send_id, "said": "send" });

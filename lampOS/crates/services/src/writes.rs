@@ -1396,6 +1396,26 @@ impl Desk {
         }
     }
 
+    /// The service, the read-back and the time left of the write `id`
+    /// names, if it is the one waiting and still within [`HOLD`] at `now`:
+    /// taken nowhere, so it still waits (a skill run's write, told to the
+    /// voice, #6432).
+    pub fn peek(&self, id: &str, now: Instant) -> Option<(&'static str, String, Duration)> {
+        let held = self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let held = held.as_ref().filter(|held| held.id == id)?;
+        let since = now.saturating_duration_since(held.made);
+        (since <= HOLD).then(|| {
+            (
+                held.pending.service,
+                held.pending.read_back.clone(),
+                HOLD - since,
+            )
+        })
+    }
+
     /// Whether a write is waiting at `now`, still within [`HOLD`].
     pub fn waiting_at(&self, now: Instant) -> bool {
         self.0
