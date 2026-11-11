@@ -31,6 +31,17 @@
 //! any forget of one of them takes it, never told at a session's start, and
 //! found only by a recall. A conversation too short to have a note keeps
 //! none: its exchanges are there to be recalled themselves.
+//!
+//! With `LAMP_HISTORY_AFTER_NOTE` too (#6218), the exchanges a stored note
+//! holds are told in it alone, not again as the thread's lines and the
+//! chat's history: each note has a lineage ([`Note::lineage`]), the same
+//! for every note made from the one before it, and only a job whose note
+//! was kept marks its own exchanges with it
+//! ([`crate::thread::Thread::folded`]). A turn leaves an exchange out only
+//! while its scope's note of that lineage is told to it
+//! ([`told_with_lineage`]); a job dropped, failed, empty or forgotten, a
+//! note gone at its age or its conversation's end, or one too long for the
+//! room, leaves every exchange told in full, as before.
 use std::{
     sync::{
         Arc, Mutex, OnceLock,
@@ -80,11 +91,18 @@ pub struct Summaries {
     notes: Vec<(Option<String>, Note)>,
     /// Bumped at each forget: a job begun before it is never kept.
     forgets: u64,
+    /// The last lineage given to a note begun from nothing ([`Note::lineage`]).
+    lineages: u64,
 }
 
 struct Note {
     text: String,
     at: Instant,
+    /// The same for a note and every note made from it as the previous
+    /// one; new for a note begun from nothing, unique across scopes. The
+    /// exchanges a kept job folded into it carry it
+    /// (`LAMP_HISTORY_AFTER_NOTE`, [`crate::thread::Thread::folded`]).
+    lineage: u64,
 }
 
 impl Summaries {
@@ -92,6 +110,7 @@ impl Summaries {
         Self {
             notes: Vec::new(),
             forgets: 0,
+            lineages: 0,
         }
     }
 
@@ -104,18 +123,43 @@ impl Summaries {
     /// The scope's note, while it is under
     /// [`crate::thread::REMEMBERED_FOR`] old.
     pub fn of(&mut self, whose: Option<&str>, now: Instant) -> Option<String> {
+        self.of_lineage(whose, now).map(|(text, _)| text)
+    }
+
+    /// [`Self::of`], with the note's lineage ([`Note::lineage`]).
+    fn of_lineage(&mut self, whose: Option<&str>, now: Instant) -> Option<(String, u64)> {
         self.notes.retain(|(_, note)| {
             now.saturating_duration_since(note.at) <= crate::thread::REMEMBERED_FOR
         });
         self.notes
             .iter()
             .find(|(scope, _)| scope.as_deref() == whose)
-            .map(|(_, note)| note.text.clone())
+            .map(|(_, note)| (note.text.clone(), note.lineage))
     }
 
-    fn keep(&mut self, whose: Option<String>, text: String, at: Instant) {
+    /// A note begun from nothing: a lineage of its own.
+    #[cfg(any(test, lamp_memory_probe))]
+    fn keep(&mut self, whose: Option<String>, text: String, at: Instant) -> u64 {
+        self.keep_from(whose, text, at, None)
+    }
+
+    /// The scope's note, made from the note of lineage `from` as its
+    /// previous one (it holds what that one held), or from nothing with
+    /// none; its lineage.
+    fn keep_from(
+        &mut self,
+        whose: Option<String>,
+        text: String,
+        at: Instant,
+        from: Option<u64>,
+    ) -> u64 {
+        let lineage = from.unwrap_or_else(|| {
+            self.lineages += 1;
+            self.lineages
+        });
         self.notes.retain(|(scope, _)| *scope != whose);
-        self.notes.push((whose, Note { text, at }));
+        self.notes.push((whose, Note { text, at, lineage }));
+        lineage
     }
 
     /// The notes of scopes still talking are as new as their talk.
@@ -328,18 +372,12 @@ pub(crate) fn put_back(notes: &[(Option<String>, String)], forgets: u64) -> bool
         return false;
     }
     let at = now();
-    summaries.notes = notes
-        .iter()
-        .map(|(scope, text)| {
-            (
-                scope.clone(),
-                Note {
-                    text: text.clone(),
-                    at,
-                },
-            )
-        })
-        .collect();
+    // Each a lineage of its own: no exchange of this thread is held by
+    // them (`LAMP_HISTORY_AFTER_NOTE`).
+    summaries.notes.clear();
+    for (scope, text) in notes {
+        summaries.keep(scope.clone(), text.clone(), at);
+    }
     true
 }
 
@@ -465,13 +503,32 @@ pub fn told_from(
     now: Instant,
     room: usize,
 ) -> String {
+    told_with_lineage_from(summaries, whose, now, room).0
+}
+
+/// [`told`], with the lineage of the note told ([`Note::lineage`]): none
+/// when no note is told, so no exchange is left out for it
+/// (`LAMP_HISTORY_AFTER_NOTE`, [`crate::thread::Thread::recall_after_note`]).
+pub fn told_with_lineage(whose: Option<&str>, now: Instant, room: usize) -> (String, Option<u64>) {
+    told_with_lineage_from(&SUMMARIES, whose, now, room)
+}
+
+/// [`told_with_lineage`] from `summaries`.
+pub fn told_with_lineage_from(
+    summaries: &Mutex<Summaries>,
+    whose: Option<&str>,
+    now: Instant,
+    room: usize,
+) -> (String, Option<u64>) {
     let note = summaries
         .lock()
         .ok()
-        .and_then(|mut summaries| summaries.of(whose, now));
+        .and_then(|mut summaries| summaries.of_lineage(whose, now));
     match note {
-        Some(note) if HEADING.len() + note.len() < room => format!("{HEADING}{note}\n"),
-        _ => String::new(),
+        Some((note, lineage)) if HEADING.len() + note.len() < room => {
+            (format!("{HEADING}{note}\n"), Some(lineage))
+        }
+        _ => (String::new(), None),
     }
 }
 
@@ -515,7 +572,11 @@ fn run(
 ) {
     for work in jobs {
         match work {
-            Work::Fold(job) => summarize(job, summarizer, summaries, now),
+            Work::Fold(job) => {
+                summarize(job, summarizer, summaries, now, |whose, held, lineage| {
+                    fold_into(thread, whose, held, lineage);
+                })
+            }
             Work::End(ended, forgets) => end(ended, forgets, summarizer, summaries, thread),
             #[cfg(any(test, lamp_memory_probe))]
             Work::Barrier(done) => {
@@ -611,14 +672,33 @@ fn end(
     }
 }
 
+/// A kept note's exchanges marked in `thread` as held by its `lineage`
+/// ([`crate::thread::Thread::folded`]).
+fn fold_into(
+    thread: &Mutex<crate::thread::Thread>,
+    whose: Option<&str>,
+    held: &Exchanges,
+    lineage: u64,
+) {
+    match thread.lock() {
+        Ok(mut thread) => thread.folded(whose, held, lineage),
+        Err(poisoned) => poisoned.into_inner().folded(whose, held, lineage),
+    }
+}
+
 /// One job: the previous note and the exchanges to the model, and its
 /// answer kept as the scope's note, bounded; a failure keeps the previous.
-/// The journal has counts and sizes only, never the words.
+/// Only once the note is kept, and with the notes' lock let go (a forget
+/// takes the thread's lock and then theirs), `folded` is given the job's
+/// scope, its exchanges and the kept note's lineage: a job dropped, failed,
+/// empty or forgotten folds nothing. The journal has counts and sizes
+/// only, never the words.
 fn summarize(
     job: Job,
     summarizer: &(dyn Fn(&str) -> Option<String> + Send + Sync),
     summaries: &Mutex<Summaries>,
     now: impl Fn() -> Instant,
+    folded: impl FnOnce(Option<&str>, &Exchanges, u64),
 ) {
     const FORGOTTEN: &str =
         "lamp-voice second: conversation summary: a forget came first; nothing kept";
@@ -630,15 +710,19 @@ fn summarize(
             eprintln!("{FORGOTTEN}");
             return;
         }
-        summaries
-            .of(job.whose.as_deref(), now())
-            .unwrap_or_default()
+        summaries.of_lineage(job.whose.as_deref(), now())
+    };
+    // The new note holds what the previous held: the same lineage.
+    let (previous, from) = match previous {
+        Some((text, lineage)) => (text, Some(lineage)),
+        None => (String::new(), None),
     };
     let started = Instant::now();
     let answer = summarizer(&input(&previous, &job.exchanges));
     let asked_ms = started.elapsed().as_millis();
-    let Ok(mut summaries) = summaries.lock() else {
-        return;
+    let mut summaries = match summaries.lock() {
+        Ok(summaries) => summaries,
+        Err(_) => return,
     };
     if summaries.forgets != job.forgets {
         eprintln!("{FORGOTTEN}");
@@ -666,7 +750,9 @@ fn summarize(
                 job.exchanges.len(),
                 text.len()
             );
-            summaries.keep(job.whose, text, now());
+            let lineage = summaries.keep_from(job.whose.clone(), text, now(), from);
+            drop(summaries);
+            folded(job.whose.as_deref(), &job.exchanges, lineage);
         }
     }
 }
@@ -800,7 +886,57 @@ pub(crate) fn summarize_now(
         exchanges,
         forgets,
     };
-    summarize(job, with, summaries, || now);
+    summarize(job, with, summaries, || now, |_, _, _| {});
+}
+
+/// [`summarize_now`], its kept note's exchanges then marked in `thread`
+/// as a running summary's thread marks them: for tests.
+#[cfg(test)]
+pub(crate) fn summarize_now_folding(
+    summaries: &Mutex<Summaries>,
+    thread: &Mutex<crate::thread::Thread>,
+    whose: Option<String>,
+    exchanges: Exchanges,
+    with: &(dyn Fn(&str) -> Option<String> + Send + Sync),
+    now: Instant,
+) {
+    let forgets = match summaries.lock() {
+        Ok(summaries) => summaries.forgets,
+        Err(_) => return,
+    };
+    let job = Job {
+        whose,
+        exchanges,
+        forgets,
+    };
+    summarize(
+        job,
+        with,
+        summaries,
+        || now,
+        |whose, held, lineage| {
+            fold_into(thread, whose, held, lineage);
+        },
+    );
+}
+
+/// [`summarize_now_folding`] on this process's notes and thread: for the
+/// worker's tests.
+#[cfg(test)]
+pub(crate) fn summarize_now_here(
+    whose: Option<String>,
+    exchanges: Exchanges,
+    with: &(dyn Fn(&str) -> Option<String> + Send + Sync),
+    now: Instant,
+) {
+    summarize_now_folding(
+        &SUMMARIES,
+        &crate::thread::THREAD,
+        whose,
+        exchanges,
+        with,
+        now,
+    );
 }
 
 #[cfg(test)]

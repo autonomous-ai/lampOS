@@ -901,6 +901,14 @@ pub const CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT: &str = "LAMP_CONVERSATION_RO
 /// `on`, and nothing else; off, the history is the words only, as before.
 pub const HISTORY_KEEPS_CALLS_ENVIRONMENT: &str = "LAMP_HISTORY_KEEPS_CALLS";
 
+/// With `LAMP_CONVERSATION_SUMMARY`, the exchanges a stored running note
+/// holds are told in it alone, not again as the thread's lines and the
+/// chat's history (#6218, `worker::HISTORY_AFTER_NOTE`,
+/// `thread::Thread::folded`): only once a job that gave them had its note
+/// kept, and only to a turn told that note. `on`, and nothing else; off,
+/// every exchange is told as before.
+pub const HISTORY_AFTER_NOTE_ENVIRONMENT: &str = "LAMP_HISTORY_AFTER_NOTE";
+
 /// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a carried line keeps the
 /// memory writer's conversation of the person it is carried for going
 /// (`remember::carried_line`, `DaysJob::Touch`): never journalled or stored
