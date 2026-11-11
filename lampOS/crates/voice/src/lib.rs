@@ -66,6 +66,7 @@ pub mod config;
 pub mod control_mute;
 pub mod control_turn;
 pub mod conversation_summary;
+pub mod cut_in_prompt_log;
 pub mod cut_in_told;
 pub mod cut_in_wordless;
 pub mod diagnostic_control;

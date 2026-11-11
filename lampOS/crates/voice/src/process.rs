@@ -1982,6 +1982,8 @@ fn second_route_worker_environment(
         crate::cut_in_wordless::ENVIRONMENT,
         // Or, in a busy room or soon after another, picks the answer up again.
         crate::cut_in_wordless::RESUMES_ENVIRONMENT,
+        // A cut-in's prompt journaled, a debug switch (#6218).
+        crate::cut_in_prompt_log::ENVIRONMENT,
         // An empty answer to the lamp's own question asked again (Queue #4710).
         crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
         // An ask cut by a line let out that only declines is answered (#5961).
@@ -2235,6 +2237,7 @@ mod tests {
             crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
             crate::cut_in_wordless::ENVIRONMENT,
             crate::cut_in_wordless::RESUMES_ENVIRONMENT,
+            crate::cut_in_prompt_log::ENVIRONMENT,
             crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
             crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
@@ -3099,6 +3102,7 @@ mod tests {
                     || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
                     || name == crate::cut_in_wordless::ENVIRONMENT
                     || name == crate::cut_in_wordless::RESUMES_ENVIRONMENT
+                    || name == crate::cut_in_prompt_log::ENVIRONMENT
                     || name == crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT
                     || name == crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
@@ -3257,6 +3261,7 @@ mod tests {
                     "LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
                     "LAMP_CONVERSATION_SUMMARY=on",
                     "LAMP_CUT_ASK_ANSWERED=on",
+                    "LAMP_CUT_IN_PROMPT_LOG=on",
                     "LAMP_CUT_IN_WORDLESS_ASKS=on",
                     "LAMP_CUT_IN_WORDLESS_RESUMES=on",
                     "LAMP_DECLINE_SILENT=on",
