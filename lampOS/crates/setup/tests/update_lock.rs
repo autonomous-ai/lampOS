@@ -596,6 +596,143 @@ fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
     let _ = fs::remove_dir_all(folder);
 }
 
+/// The accounts of a lamp, as a test has them: the group file is the rig's and
+/// the user is a flag; every make is recorded and a
+/// chosen one fails.
+struct Accts {
+    group_file: std::path::PathBuf,
+    user: bool,
+    calls: Vec<String>,
+    fail: Option<&'static str>,
+}
+
+impl change::Accounts for Accts {
+    fn has_group(&self, group: &str) -> bool {
+        fs::read_to_string(&self.group_file).is_ok_and(|text| {
+            text.lines()
+                .any(|line| line.split(':').next() == Some(group))
+        })
+    }
+    fn has_user(&self, _: &str) -> bool {
+        self.user
+    }
+    fn make_group(&mut self, group: &str) -> Result<(), String> {
+        self.calls.push(format!("group {group}"));
+        if self.fail == Some("group") {
+            return Err("groupadd: exit status: 9".into());
+        }
+        let mut text = fs::read_to_string(&self.group_file).unwrap_or_default();
+        text.push_str(&format!("{group}:x:995:\n"));
+        fs::write(&self.group_file, text).unwrap();
+        Ok(())
+    }
+    fn make_user(&mut self, user: &str, group: &str) -> Result<(), String> {
+        self.calls.push(format!("user {user} {group}"));
+        if self.fail == Some("user") {
+            return Err("useradd: exit status: 1".into());
+        }
+        self.user = true;
+        Ok(())
+    }
+    fn make_folder(&mut self, path: &std::path::Path) -> Result<(), String> {
+        self.calls.push(format!("folder {}", path.display()));
+        fs::create_dir_all(path).unwrap();
+        Ok(())
+    }
+}
+
+/// The owner's tap on a lamp the installer never reached (a channel update):
+/// the root helper makes the agent's group, user and folder from the fixed
+/// names, under lamp-update's lock, and the drop-in is then written as on any
+/// lamp. Nothing is made for another request, with developer access off, or
+/// where it is all there; a failure is said and no drop-in is written.
+#[test]
+fn the_agents_tap_makes_its_group_user_and_folder_from_the_fixed_names() {
+    let root = Root::new();
+    let config = root.config();
+    let (folder, records) = records_folder("make-agent");
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let mut accts = Accts {
+        group_file: config.agent_group_file.clone(),
+        user: false,
+        calls: Vec::new(),
+        fail: None,
+    };
+    let on = r#"{"local_agent": true}"#;
+    let make = |accts: &mut Accts, ears: &mut Script, line: &str| {
+        change::make_agent_account(line, &config, true, &records, ears, accts)
+    };
+    // Developer access off: nothing made (the refusal in words is parse's).
+    assert!(make(&mut accts, &mut ears, on).is_none() && accts.calls.is_empty());
+    answer(r#"{"control": true}"#, &config, true);
+    // Another request, or an extra key, or off: nothing made.
+    for line in [
+        r#"{"local_agent": false}"#,
+        r#"{"local_agent": true, "user": "root"}"#,
+        r#"{"control": true}"#,
+        r#"{"local_agent": "yes"}"#,
+    ] {
+        assert!(make(&mut accts, &mut ears, line).is_none(), "{line}");
+    }
+    assert!(accts.calls.is_empty());
+    // Held by an update: refused, nothing made.
+    let update = records.lock().unwrap();
+    let refused = make(&mut accts, &mut ears, on).unwrap();
+    assert_eq!(refused, json!({"refused": change::CLOSE_INSTALLING}));
+    assert!(accts.calls.is_empty());
+    drop(update);
+    // A user that cannot be made: said, and the drop-in is not written.
+    accts.fail = Some("user");
+    let refused = make(&mut accts, &mut ears, on).unwrap();
+    assert!(
+        refused["refused"]
+            .as_str()
+            .unwrap()
+            .contains("the agent's user could not be set up: useradd"),
+        "{refused}"
+    );
+    assert!(!config.agent_dropin.exists());
+    // Made: the group, the user (in that group) and the folder, from the
+    // constants alone, in that order; then the helper's answer writes the drop-in.
+    accts.fail = None;
+    accts.calls.clear();
+    assert!(make(&mut accts, &mut ears, on).is_none());
+    assert_eq!(
+        accts.calls,
+        vec![
+            "user lampagent lamp-agents".to_owned(),
+            format!("folder {}", config.agent_folder.display()),
+        ],
+        "the group the failed try made is there already"
+    );
+    let (reply, done) = answer(on, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    assert!(done.unwrap().restart_control);
+    assert!(config.agent_dropin.exists());
+    // All there: nothing more is made.
+    accts.calls.clear();
+    assert!(make(&mut accts, &mut ears, on).is_none() && accts.calls.is_empty());
+    // A lamp with nothing: the group too.
+    let (second, _) = (Root::new(), ());
+    let config2 = second.config();
+    let mut none = Accts {
+        group_file: config2.agent_group_file.clone(),
+        user: false,
+        calls: Vec::new(),
+        fail: None,
+    };
+    answer(r#"{"control": true}"#, &config2, true);
+    assert!(
+        change::make_agent_account(on, &config2, true, &records, &mut ears, &mut none).is_none()
+    );
+    assert_eq!(none.calls[0], "group lamp-agents");
+    assert_eq!(none.calls.len(), 3);
+    let _ = fs::remove_dir_all(folder);
+}
+
 /// On: answered first (the drop-in written), then lamp-update's lock, with
 /// no quiet, and reload and restart under it once an update lets it go.
 #[test]
