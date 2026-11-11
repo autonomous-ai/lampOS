@@ -322,12 +322,20 @@ and none of the skills' own (`crate::use_skill`):
   names a skill by its function, as `light_scene` for light-scenes); the
   topic is still the model's. A question with any other word ("who made
   you sad", "where can I buy milk", "do you know who made you") is the
-  model's. On build 11756 on 11 Nov (#6216's row) "Hey Lamp, who made
+  model's. The same questions asked in Vietnamese, with diacritics as
+  speech-to-text writes them ("Ai làm ra bạn?", "Ai tạo ra bạn?", "Công
+  ty nào làm ra bạn?", "Mua bạn ở đâu?", "Bạn giá bao nhiêu?" and the
+  like), are forced too, with "ơi", "đèn", "chào", "vậy", "thế", "ạ",
+  "nhỉ" or "cảm ơn" also allowed around them; "ai làm bạn buồn" (who made
+  you sad), "mua sữa ở đâu" (where to buy milk) and two questions in one
+  line stay the model's. Those Vietnamese words never let a light ask
+  through. On build 11756 on 11 Nov (#6216's row) "Hey Lamp, who made
   you?" and "Hey Lamp, where can I buy you?" called nothing, and the
   second said "autonomous.ai" without faq's /lamp page. Host tests:
   `a_plain_ask_for_a_scene_or_a_show_is_told_apart`,
   `a_plain_ask_forces_its_skill_only_when_offered`,
   `a_plain_question_about_the_lamp_asks_its_help`,
+  `a_plain_question_about_the_lamp_in_vietnamese_asks_its_help`,
   `a_plain_question_about_the_lamp_forces_its_help_only_when_offered`.
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
