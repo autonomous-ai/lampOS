@@ -136,8 +136,9 @@ test('the debug log redacts what would pair or hello as this computer', async ()
   assert.deepEqual(shown.lamp, { id: 'lamp-1', fp: '<redacted>' });
   assert.deepEqual(shown.skills, [{ sig: '<redacted>' }, { pin: '<redacted>' }]);
   // Fails closed: a field nobody decided (a newer lamp's) is hidden, at any depth.
-  assert.deepEqual(debug.redact({ ev: 'lamp.changed', token: 't0ps3cret', lamp: { id: 'lamp-1', badge: 'b4dge' } }),
-    { ev: 'lamp.changed', token: '<not shown>', lamp: { id: 'lamp-1', badge: '<not shown>' } });
+  assert.deepEqual(debug.redact({ ev: 'lamp.changed', ticket: 't0ps3cret', lamp: { id: 'lamp-1', badge: 'b4dge' } }),
+    { ev: 'lamp.changed', ticket: '<not shown>', lamp: { id: 'lamp-1', badge: '<not shown>' } });
+  assert.equal(debug.redact({ op: 'hello', token: 'T'.repeat(43) }).token, '<redacted>');
   // What a lamp sends beyond the schema's own fields is decided too.
   for (const frame of [
     { re: 3, ok: true, to: 'body', move: 'glad-lift', light: true },

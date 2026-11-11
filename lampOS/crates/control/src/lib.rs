@@ -32,6 +32,7 @@ pub mod parts;
 pub mod protocol;
 pub mod push;
 pub mod rate;
+pub mod runs;
 pub mod server;
 pub mod session;
 pub mod sounds;
