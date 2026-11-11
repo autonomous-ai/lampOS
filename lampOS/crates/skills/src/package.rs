@@ -1177,9 +1177,20 @@ pub fn install_made_at(
     // one to its own (`put_on_cap`).
     let added = added_from_file(&card("SKILL.md"));
     if added {
-        lamp_voice::made_skill::capped_added(&card("skill.toml"))
+        lamp_voice::made_skill::capped_added(&card("skill.toml")).map(|_| ())
     } else {
-        lamp_voice::made_skill::put_on_cap(&card("skill.toml"))
+        // Its code too, as it was taken (#6307): its count, sizes and
+        // endings, and its task step's file among them.
+        lamp_voice::made_skill::put_on_cap(&card("skill.toml")).and_then(|(_, uses)| {
+            lamp_voice::made_skill::put_on_scripts(
+                &card("skill.toml"),
+                &uses,
+                package
+                    .files
+                    .iter()
+                    .map(|(path, bytes)| (path.as_str(), bytes.as_slice())),
+            )
+        })
     }
     .map_err(|refused| format!("not installed: {}", refused.0))?;
     if !made_here(&card("SKILL.md")) {
@@ -3040,9 +3051,10 @@ fn task_folder(skills: &Path, dev: Option<&Path>, name: &str) -> Option<(PathBuf
 }
 
 /// The skill `name`'s `do.task` as the voice says it back (#6305,
-/// `{"task_asks": NAME}`): `{"name", "sha256", "grants", "task", "from"}`,
-/// its folder hashed now ([`crate::task::folder_sha256`]) and where its
-/// script came from. Whether the owner agreed is lamp-control's to say,
+/// `{"task_asks": NAME}`): `{"name", "sha256", "grants", "task", "from",
+/// "package"}`, its folder hashed now ([`crate::task::folder_sha256`]),
+/// where its script came from and the SHA-256 of the package it went on as
+/// ([`installed_from`], null for none). Whether the owner agreed is lamp-control's to say,
 /// never this helper's (`lamp_voice::skill_task_yes::agreed_by`).
 /// `{"task": null}` for a skill with no `do.task`, or none of that name.
 /// Refused with the switch off, or for a skill that may not carry one
@@ -3072,6 +3084,8 @@ pub fn task_asks(
     let sha256 = crate::task::folder_sha256(&folder)?;
     let from = if pushed {
         format!("your computer {}", super::pushed_by(&folder))
+    } else if crate::task::made_with_code(&folder, pushed) {
+        crate::task::FROM_MADE.to_owned()
     } else {
         "the Skills Store".to_owned()
     };
@@ -3081,6 +3095,7 @@ pub fn task_asks(
         "grants": skill.grants,
         "task": step.task,
         "from": from,
+        "package": installed_from(&folder).map(|installed| installed.sha256),
     }))
 }
 

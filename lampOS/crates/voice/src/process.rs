@@ -1270,6 +1270,10 @@ fn worker_command(
             role,
             var(crate::skill_task_yes::ENVIRONMENT).as_deref(),
         ))
+        .envs(made_scripts_worker_environment(
+            role,
+            var(crate::made_skill::SCRIPTS_ENVIRONMENT).as_deref(),
+        ))
         .envs(onboarding_worker_environment(
             role,
             var(crate::onboarding::ENVIRONMENT).as_deref(),
@@ -1349,6 +1353,17 @@ fn skill_writes_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::WRITES_ENVIRONMENT, "on"))
+}
+
+// A made skill's code (#6307), passed the same narrow way: the exact `on`,
+// to the two routes whose `make_skill` makes a skill, says its code back
+// and takes the yes to it (`made_skill::scripts_on`).
+fn made_scripts_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::SCRIPTS_ENVIRONMENT, "on"))
 }
 
 // A skill's tasks (#6305), passed the same narrow way: the exact `on`, to
@@ -2469,6 +2484,10 @@ mod tests {
             ),
             (
                 crate::skill_task_yes::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::SCRIPTS_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {
