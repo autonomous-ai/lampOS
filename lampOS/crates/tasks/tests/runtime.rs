@@ -3720,3 +3720,32 @@ fn a_look_at_a_named_session_answers_at_once_and_is_asked_again_for_what_it_foun
     );
     assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
 }
+
+/// #6274: the owner's "forget everything" (the voice's `forget_sessions`,
+/// on its route only) removes the index of the sessions the lamp started,
+/// whole, and says whether there was one; asked on the public route it is
+/// refused and the index stays.
+#[test]
+fn forget_sessions_removes_the_index_of_the_sessions_the_lamp_started() {
+    let s = Running::new(false);
+    let file = s.config.dir.join(lamp_tasks::runtime::SESSION_INDEX_FILE);
+    lamp_tasks::session_index::record(
+        &file,
+        "0123456789abcdef0123456789abcdef",
+        "11111111-1111-4111-8111-111111111111",
+        Some("Christmas dates"),
+        1_000,
+    );
+    assert!(file.exists());
+    assert_eq!(
+        s.ask(json!({"op":"forget_sessions"}))["error"],
+        "untrusted"
+    );
+    assert!(file.exists());
+    let answer = s.trusted(json!({"op":"forget_sessions"}));
+    assert_eq!((answer["ok"].clone(), answer["forgotten"].clone()), (json!(true), json!(true)), "{answer}");
+    assert!(!file.exists());
+    // Again: nothing to forget, still ok.
+    let answer = s.trusted(json!({"op":"forget_sessions"}));
+    assert_eq!((answer["ok"].clone(), answer["forgotten"].clone()), (json!(true), json!(false)), "{answer}");
+}
