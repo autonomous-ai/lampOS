@@ -329,7 +329,14 @@ links, replaced_by)`, khóa `(person, key)`, tạo `IF NOT EXISTS`,
   thái được giữ. Các trạng thái: `prepared`, `done`, `cancelled`, `refused`,
   `failed`, `timed_out`, `no_result`. `detail` là object tối đa 16 KiB.
 - `service_records {person, limit?}` liệt kê, thay đổi mới nhất trước, tối
-  đa 50.
+  đa 50. Với `about` (`LAMP_SERVICE_RECORDS_TOLD` của voice, các từ của một
+  lần recall), nó trả về các bản ghi khớp với những từ đó, bất kể cũ đến
+  đâu: khớp nhiều từ nhất trước, rồi thay đổi mới nhất. Một từ khớp một từ
+  của bản ghi (dịch vụ, hành động, lý do, id kết quả hay bất kỳ chữ nào của
+  chi tiết) theo chữ thường, bỏ dấu, số ít, hoặc, từ bốn chữ cái trở lên,
+  như phần đầu của một từ dài hơn ("octavia" tìm thấy
+  `octaviab@example.com`); "email" là "mail"; các từ nhỏ ("the", "that",
+  "did", "you") không khớp gì, nên chỉ có những từ đó thì không tìm thấy gì.
 - `service_records_forget {person, about}` xóa các bản ghi có mọi từ khóa
   của một chủ đề (chữ thường, bỏ dấu, số ít): `{ok:true,removed}`.
 - **Bản ghi được hỏi trước một lần quên bị từ chối** `forgotten`: khi

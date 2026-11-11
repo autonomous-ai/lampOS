@@ -2159,6 +2159,132 @@ the store's side in [memory-days](memory-days.md)):
 - **Off**, nothing is kept or written, and the receipts are kept exactly as
   before.
 
+### Records told (`LAMP_SERVICE_RECORDS_TOLD`, off unless set)
+
+With `LAMP_SERVICE_RECORDS_TOLD=on` too (the second route only; it acts only
+with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
+`crates/voice/src/service_records/told.rs`), the lamp knows what it did:
+
+- **The note.** Each spoken line that passes the owner check (`owner_of`,
+  as `OWNER_ONLY`; never the memory's one-face rule) is told the owner's
+  recent records beside it, one line each, the latest first:
+  `Calendar · create 'Hamburger party' · Sun 15 Nov 19:00–22:00 · cancelled:
+  the lamp answered after the read-back with no send · today 15:40`,
+  `Drive · search 'Sunday' · no result · today 15:34`. The latest 5, plus any still `prepared` or `failed` changed
+  in the last 7 days, at most 10 lines and 1,200 bytes (the oldest lines go
+  first, and how many is said). With them the rule: "Your past service
+  actions are listed with their status. Never claim something was done
+  unless its record says done; never say you can't do something a record
+  shows you did." Read from what the voice holds, never waited for; after a
+  start the owner's records are asked of the memory once beside the turns
+  (an answer asked before a forget that ran since is dropped), and a write
+  left `prepared` by the restart is `timed_out` ("no send came before the
+  lamp restarted"). A note of five calendar or mail lines is
+  about 700 bytes.
+- **Recall.** `recall`'s words search all the owner's records in the memory,
+  whatever their age (`service_records` with `about`, at most 5), and the
+  answer carries them under `service_records`: each one's line, status,
+  reason, when, and what it was asked with (a write's in full).
+- **Who hears.** In full only as a read is said in full
+  (`services::told_in_full`, the same checks as `read_in_full`): the
+  owner's face seen saying the line, the owner the one face in view, and
+  the line in the conversation's voice (the owner's enrolled print when
+  they have one) at 0.55 or over, asked once and never waited for. Any of
+  them missing or not known yet, the note and recall give each record's
+  service, status and when only, never what it was about, its reason or
+  what a read found. In the private room (`LAMP_PRIVATE_ROOM`) they are
+  always in full, as reads are.
+- **Quoted data.** What a read found is the service's data every time it is
+  shown: its first title marked «…» in the note with `DATA_NOTE`, and the
+  finds under `quoted` with `DATA_NOTE` in recall.
+- **An app forget.** Memory's forget of a person from the app drops the
+  records the voice holds of theirs, with the running summary on or off
+  (`conversation_summary::memory_forgot_waiting` as well as
+  `memory_forgot_from`), so nothing of theirs is told after it.
+- One journal line a told note or recall: counts, bytes and in full or not,
+  never content. **Off**, nothing is told and recall is as before. The rule's
+  effect on what the model says is still to be measured on the real model on
+  lamp-06c1.
+## Service contacts (`LAMP_SERVICE_CONTACTS`, off unless set)
+
+With `LAMP_SERVICE_CONTACTS=on` and `LAMP_SERVICE_RECORDS=on` (the second
+route only, with the Days memory; the connector records plan, PR 1c), the
+addresses of the owner's Gmail mails are saved as contacts, one address a
+name, kept until forgotten (`crates/voice/src/service_contacts.rs`; the
+store's side in [memory-days](memory-days.md)). On lamp-3e83 on 10 Nov a
+spelled address was read back and confirmed, and a minute later the lamp
+said it had no address for that friend.
+
+- **Saved only from a confirmed read-back.** The contacts a mail would save
+  are planned at its read-back and saved only when that write's send went
+  (`sent:true`). An address misheard and read back, then corrected,
+  cancelled or let go, is never saved; nor is a mail whose send failed.
+- **Named only by the owner.** The name comes from the owner's own lines of
+  the last ten minutes ("send it to Octavia", "email my friend Octavia",
+  "gửi mail cho Mai") or from the greeting of the draft ("Hi Octavia,",
+  "Chào chị Mai,"), never from the lamp's words or a service's read: a mail
+  someone else sent names no contact. With several addresses, a name goes
+  to the address whose own part holds it (Octavia, `octavia@…`); one
+  address takes the greeting's name, or the one name the owner said. An
+  address with no such name is not saved.
+- **Used in the mail step.** `service_write`'s `to` is told that a name
+  alone is filled in. Before the services prepare a mail, each name alone in
+  `to` or `cc` is replaced with its saved address (a lookup of at most
+  400 ms on the local socket), so the read-back says the address and the
+  send gate is unchanged. A name with none saved prepares nothing, and the
+  model is told to ask for the address, spelled (`NO_CONTACT`); the memory
+  not answering the same (`NO_CONTACTS_NOW`), never a guess.
+- **Never replaced silently.** An address for a name that has another saved
+  adds a sentence to the read-back: "For Octavia I have … saved, not ….
+  Sending this saves … for Octavia instead; if you meant …, say so." The
+  read-back check holds the whole of it. Only a confirmed send replaces the
+  saved address; anything else keeps it. With the memory not answering, an
+  address is not planned at all.
+- **Whose.** The owner's memory id alone, as the services' owner check
+  (`OWNER_ONLY`) gives it.
+- **Never slows the reply.** A save is written by a thread of its own, at
+  most three tries; the journal says how many were saved and replaced, and
+  each try's outcome, never a name or an address.
+- **Forget.** Forget everything takes the person's contacts in the memory
+  and any planned for a waiting write; "forget Octavia's address" takes
+  that contact through the forget-about path, and the answer counts it and
+  says mail already sent stays sent.
+- **Off** (or with `LAMP_SERVICE_RECORDS` off), nothing is saved, looked up
+  or filled in, and a mail is prepared exactly as before.
+### Redo or edit from a record (`LAMP_SERVICE_REDO`, off unless set)
+
+With `LAMP_SERVICE_REDO=on` beside `LAMP_SERVICE_RECORDS=on` (the second
+route only; alone it does nothing; the connector records plan, PR 1d),
+`service_write` takes `from_record`, a service record's key, so "do it
+again at 8 PM" after a cancelled event needs nothing repeated
+(`crates/voice/src/service_records/redo.rs`):
+
+- **Filled, then the change.** Inside the gate, after its heard, owner
+  (`OWNER_ONLY`) and seen checks, the voice fills in every detail the
+  owner's record saved and lays over it only the fields the call gave,
+  each whole ("add Mai too" gives the whole attendee list), keeping the
+  record's own service and action (another is refused). Then the services
+  prepare it, and the read-back and its send go on exactly as for any
+  write.
+- **Which records.** A `cancelled`, `failed`, `timed_out` or `refused`
+  write redoes. A `done` mail is never changed: a follow-up to the same
+  people is built from it (`Re:` its subject unless the call gives one, the
+  call's new text; with none, the model is told to ask for it), and its
+  answer carries `follow_up`, telling the model to say plainly that a sent
+  mail can't be changed. A `done` calendar event is refused: changing a
+  created event is a separate action. A read, any other `done` write, and
+  a record whose text was cut with no new text given are refused too.
+- **Linked.** The new record's `links` name the old one, and the old one
+  gets `replaced_by` (its final status stays), both written to the memory.
+- **Only the owner's.** Only the owner's own records are found. A record
+  made before the voice started is read from the Days memory
+  (`service_records`, at most 50, 1.5 s at most) before the gate, for the
+  owner's heard line alone.
+- **Journal.** One line a fill: the key, the old status, how many fields
+  changed and whether it is a follow-up; never a word of it.
+- **Off** (either switch), `from_record` is not offered, and a write is
+  taken exactly as asked.
+
 ## The voice is told what is linked (`LAMP_SERVICES_TOLD`, #5523, off unless set)
 
 A marketing tester linked a service in the app's Connectors on 6 Nov and
