@@ -566,7 +566,9 @@ pub fn write_here(
             say(&put_on_line(keeping, &made));
         }
         Err(made_skill::Refused(why, _)) => {
+            // The detail journaled; the app and the lamp say it plainly.
             eprintln!("lamp-voice: a written skill: not kept: {why}");
+            let why = made_skill::plain_reason(&why);
             not_kept(&keeping.directory, &from, &why);
             say(&made_skill::not_made_line(&why));
         }
@@ -1428,6 +1430,7 @@ mod tests {
             directory: dir.join("made"),
             program: dir.join("no-pack"),
             manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
         };
         fn no_model() -> Result<Chat, String> {
             Err("no model here".into())
@@ -1805,8 +1808,8 @@ mod tests {
 
     /// Kept from the app's ask with no model and put on at once, as a made
     /// one is (the owner, 10 Nov): the app told it is on and written, and
-    /// the one line said is that it's on. A name taken is told to the app,
-    /// and nothing is said.
+    /// the one line said is that it's on. A name taken gets a free one,
+    /// the app told it.
     #[test]
     fn a_written_skill_is_kept_put_on_and_told() {
         let (root, keeping) = crate::make_skill_local::tests::keeping("app-written");
@@ -1843,8 +1846,8 @@ mod tests {
         );
         assert_eq!(told["uses"]["speak"], true);
         assert_eq!(asked.join().unwrap()["install_made"], told["sha256"]);
-        // A name a skill on the lamp has: not kept, the app told why, and
-        // nothing said.
+        // A name a skill on the lamp has: kept as the first free one (no
+        // helper now, so not on).
         let (taken, _) = begin_written(
             &keeping.directory,
             &json!({"name": "taken", "when": "x", "instructions": "y", "request_id": "w2"}),
@@ -1857,17 +1860,11 @@ mod tests {
         });
         assert_eq!(
             said,
-            ["I couldn't make that: a skill called taken is already on the lamp or kept."]
+            ["I made it but couldn't put it on: the lamp's skills couldn't be reached."]
         );
         let told = status(&keeping.directory, Some("w2"), at + 3_000);
         assert_eq!(told["state"], "not_kept", "{told}");
-        assert!(
-            told["why"]
-                .as_str()
-                .unwrap()
-                .contains("already on the lamp"),
-            "{told}"
-        );
+        assert!(made_skill::kept_names(&keeping.directory).contains(&"taken-2".to_owned()));
         let _ = fs::remove_dir_all(&root);
     }
 }

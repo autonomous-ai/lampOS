@@ -344,11 +344,21 @@ sau:
      chạy một lần; `lamp-skills` từ chối "a body mood goes with its for,
      and a for with a mood"); (b) `for` hoặc `absent_for` trên trigger
      `room/stood_up` (một tin nhắn mỗi lần đứng dậy, không bao giờ kéo
-     dài), và trên mọi trigger một `for` hoặc `absent_for` bằng không
-     (`"0s"`, `"0m"`, `"0ms"`), điều `lamp-skills` đọc như không có; (c)
-     `speak = true` trong `[permissions]` khi không có bước say, không có
-     tiếng ngân (`cue`) và không đọc gì, điều giới hạn từ chối ("it asks
-     for its voice but never says anything"). Mỗi việc chỉ bỏ ra: một
+     dài), và trên mọi trigger một `for` hoặc `absent_for` bằng không (mọi
+     độ dài bằng không, `"0s"`, `"0m"`, `"0h"` hay `"0ms"` đều vậy), điều
+     `lamp-skills` đọc như không có; thời gian chờ lớn hơn không của việc
+     đứng dậy không bị bỏ im lặng: câu nói lại kết thúc bằng "It can't wait
+     10 minutes for that: it runs each time someone gets up." (P2 của App
+     Only trên #6249: "nod when I've been up 10 minutes" nếu không sẽ được
+     nói như một cái gật đầu thường); (c) một `when` mà `lamp-skills` không
+     biết (chỉ có `appears`, `present` và `changes`) trên trigger
+     `room/stood_up` hoặc `controls/pet`, mỗi lần một tin nhắn, nên bỏ đi
+     vẫn đọc như cũ (lamp-0c89, 10:35 ngày 11/11: "nod when I stand up" bị
+     từ chối vì "room/stood_up, its when"); trên topic khác nó được giữ, và
+     lần sửa được nói `its when, which is "appears", "present" or left
+     out`; (d) `speak = true` trong `[permissions]` khi không có bước say,
+     tiếng ngân (`cue`) hay `sound` và không đọc gì, điều giới hạn từ chối
+     ("it asks for its voice but never says anything"). Mỗi việc chỉ bỏ ra: một
      dòng, hoặc một mục của bảng một dòng cùng dấu phẩy của nó, chỉ nhận
      khi văn bản sau đó đọc ra đúng kỹ năng đó trừ đúng trường ấy; kỹ năng
      giữ mọi bước, trigger và quyền nó dùng và không được thêm gì. Kỹ năng
@@ -395,7 +405,9 @@ sau:
      `a_made_skills_voice_asked_with_nothing_said_is_tidied`,
      `a_body_step_is_said_only_as_lamp_skills_takes_it`,
      `a_repair_is_told_the_part_of_a_step_that_failed`,
-     `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`, và
+     `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`,
+     `a_getting_ups_unknown_when_is_tidied_and_another_topics_named`,
+     `a_getting_ups_wait_taken_out_is_said`, và
      trong `tests/it/made.rs`
      `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` và
      `a_made_nod_when_i_stand_up_is_tidied_and_packed` (`lamp-skills
@@ -785,9 +797,9 @@ sau:
      `cue = "hum"`, được nói là "hums softly" ("When someone has been at
      the desk for 5 seconds, it hums softly, at most once an hour."); bước
      âm thanh khác được nêu trong lần sửa kèm `its one sound is cue =
-     "hum"` (`made_skill::SOUND_PART`). Người dùng được nói `made_skill::UNSAID` (lời dễ hiểu, gợi ý nói
-     khi nào chạy, như 'when I come to my desk', và làm gì, như 'glow
-     green'). Lần sửa nêu phần không nói được, chỉ bằng các khóa và topic
+     "hum"` (`made_skill::SOUND_PART`). Nhật ký ghi `made_skill::UNSAID`, và nó được sửa như
+     lời từ chối của bước kiểm tra; hết lượt sửa, người dùng nghe câu dễ
+     hiểu bên dưới ("I couldn't make that one. ..."). Lần sửa nêu phần không nói được, chỉ bằng các khóa và topic
      của trigger, không bao giờ giá trị ("Can't be said plainly: trigger
      topic humans/faces/tracked, keys gap, near"), và journal ghi như vậy:
      `lamp-voice: a made skill can't be said plainly: <part>`; phần của
@@ -840,7 +852,43 @@ sau:
      kept in N ms: <lý do>` (#5977), lời của chính đèn, không bao giờ là
      lời nhờ của người dùng; với lý do `cannot:` của mô hình, có thể lặp
      lại lời của người dùng, chỉ ghi `made_skill::MODELS_CANNOT_JOURNALED`
-     (HOLD của Second trên #5985). Khi một phần của yêu cầu không làm được ("dim slowly over a
+     (HOLD của Second trên #5985).
+   - **Lần tạo thất bại được nói bằng lời thường** (chủ đèn, 11/11: tạo kỹ
+     năng thất bại hết lần này đến lần khác "với lý do không ai hiểu").
+     Người dùng, bằng giọng nói và trong `not_kept` của ứng dụng, không bao
+     giờ nghe chi tiết bên trong của bước kiểm tra (`[[do]]`, khóa toml,
+     đường dẫn topic, "plainly", "packed", "lamp-skills"): lý do của chính
+     đèn được đổi qua `made_skill::plain_reason`, chi tiết chỉ ở nhật ký
+     (`lamp-voice: a skill made here wasn't kept in N ms: <why>`). Bước kiểm
+     tra từ chối, kỹ năng không nói rõ được, hay dạng đèn không đọc được, mỗi
+     cái khi đã hết lượt sửa: "I couldn't make that one. Try asking for one
+     thing, like 'say hello when I sit down'." (`NOT_MADE_TRY`). Đèn không
+     ghi, kiểm hay giữ được: "Something went wrong keeping it. Please try
+     again." (`NOT_KEPT_TRY`). Bước đèn chưa làm được: "I can't do that yet:
+     <điều đó>." Mô hình im lặng hay bị cắt: "I couldn't make that: the
+     lamp's model didn't answer." Câu `cannot:` của chính mô hình giữ
+     nguyên. `error` và `next` trong câu trả lời `make_skill` của giọng nói
+     mang cùng câu dễ hiểu đó. Test: `a_failed_make_is_told_in_plain_words`.
+   - **Tên đã có thì lấy tên trống** (chủ đèn, 11/11: khôi phục cài đặt gốc
+     giữ lại kỹ năng của đèn, trong đó có welcome-back, bedtime-morning,
+     light-out, sip-of-water, nên kỹ năng mô hình đặt tên welcome-back lần
+     nào cũng thất bại vì "a skill called welcome back is already on the
+     lamp"). Trước khi đóng gói (`made_skill::free_name`), tên một kỹ năng
+     trên đèn đã có (đã cài, được đẩy lên, hoặc đang giữ ở đây và đã bật)
+     thành tên trống đầu tiên `NAME-2`, `NAME-3`, …, phần gốc được cắt để
+     vẫn là tên kỹ năng trong 64 byte (40 với kỹ năng viết trong ứng dụng).
+     Thẻ, câu nói lại, câu của đèn và ứng dụng đều gọi tên mới. Khi kỹ năng
+     giữ tên đó (hay một tên có số) là kỹ năng tự tạo của chính người dùng
+     với cùng `skill.toml` (đã cài với `made: here` và đúng tệp đó, hoặc
+     đang giữ và đã bật với SHA-256 của nó, `toml_sha256` trong
+     `made.json`), không tạo bản sao: "You already have that skill: <tên>.
+     It's on." (`made_skill::ALREADY_HAVE`). Kỹ năng đang giữ mà chưa bật
+     vẫn nhường cho cái mới cùng tên. Test:
+     `a_built_in_skills_name_gets_the_first_free_one`,
+     `the_persons_own_same_skill_is_already_had_and_another_gets_a_number`,
+     và trong `tests/it/made.rs`
+     `a_made_skill_named_as_the_lamps_own_gets_a_free_name_and_goes_on`.
+     Khi một phần của yêu cầu không làm được ("dim slowly over a
      minute"), mô hình làm phần còn lại và thêm một dòng ngoài các khối bắt
      đầu bằng `left out:` (`made_skill::LEFT_OUT`); đèn nói dòng đó sau câu
      kỹ năng làm gì, trong một khung cố định như ghi chú của người tạo ("The
@@ -895,7 +943,8 @@ sau:
    tới helper ("the lamp's skills couldn't be reached"), helper không trả
    lời trong 8 giây ("the lamp didn't say in time whether it is on"), một
    kỹ năng cùng tên được bật bằng cách khác ("a skill called evening dim is
-   already on the lamp"), hoặc bị từ chối vì lý do khác ("the lamp's check
+   already on the lamp"; chốt chặn riêng của helper, vì giọng nói đã cho
+   tên đã có một tên trống trước khi đóng gói, ở trên), hoặc bị từ chối vì lý do khác ("the lamp's check
    didn't let it on"). Không bao giờ chạy khi chưa bật `LAMP_MAKE_SKILL`.
    Việc gỡ một kỹ năng đã tạo (gỡ trong ứng dụng, hoặc `{"off": NAME}`) vẫn
    như cũ.
@@ -984,8 +1033,9 @@ lời "có" nói thành tiếng (#5977; nút MAKE IT của ứng dụng là lờ
   (`make_skill_local::make_kept`, `app_make::make_here`), được ghi là tạo từ
   `local:app:<ms>:1`: `making`, rồi `on`, hoặc `not_kept` kèm lý do. Không
   tạo được (hoặc kỹ năng viết trong ứng dụng không giữ được), đèn cũng nói
-  ra, `made_skill::not_made_line` ("I couldn't make that: " rồi lý do kèm
-  điều nên thử), như một note bằng ngôn ngữ của cuộc trò chuyện
+  ra, `made_skill::not_made_line` (một câu dễ hiểu riêng qua
+  `made_skill::plain_reason`, chi tiết ghi nhật ký, hoặc "I couldn't make
+  that: " rồi lý do của chính mô hình), như một note bằng ngôn ngữ của cuộc trò chuyện
   (`not_made_in_their_language`). Mọi note như vậy bắt đầu bằng
   `made_skill::ALREADY_DONE` ("đã xong, không gọi công cụ nào, nhất là
   make_skill; chỉ nói"): trên lamp-74ff, 17:43 ngày 10/11, mô hình coi note
@@ -1070,8 +1120,11 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
    điều mô hình được biết về khi nào gọi, và điều ứng dụng hiển thị),
    `made: here`, `written: app`, và phần thân là hướng dẫn nguyên văn.
 3. **Kiểm và giữ như một kỹ năng tự tạo** (`made_skill::keep_written`):
-   tên trùng một kỹ năng trên đèn (`/var/lib/lampOS/skills/NAME`, hoặc được
-   đẩy lên, `/var/lib/lampOS/skills-dev/NAME`) thì bị từ chối; một kỹ năng
+   tên trùng một kỹ năng trên đèn (`/var/lib/lampOS/skills/NAME`, được đẩy
+   lên, `/var/lib/lampOS/skills-dev/NAME`, hoặc đang giữ ở đây và đã bật)
+   thì lấy tên trống đầu tiên `NAME-2`, … trong 40 byte, tên hàm đi theo,
+   hoặc "You already have that skill" với kỹ năng của chính người dùng cùng
+   nội dung (`made_skill::free_name`, ở trên); một kỹ năng
    đang giữ cùng tên mà chưa bật được thay bằng cái mới, cùng gói và dấu bật
    của nó, nên bản sửa gửi sau đó được nhận ngay; rồi giới hạn (`written_capped`:
    đúng hình dạng đó, ghi chú đóng khung như trên và trong cùng các giới

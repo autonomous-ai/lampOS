@@ -942,7 +942,7 @@ fn made_and_journaled(
             Ok(text) if is_example(&text) => {
                 eprintln!("lamp-voice: a skill made here: the model gave back the example");
                 Err(Refused(
-                    "the lamp's model gave back its own example, not what was asked; try asking again".into(),
+                    made_skill::EXAMPLE_GIVEN_BACK_WHY.into(),
                     Some(EXAMPLE_GIVEN_BACK.into()),
                 ))
             }
@@ -950,7 +950,7 @@ fn made_and_journaled(
 
             Err(why) => {
                 eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
-                Err(Refused("the lamp's model didn't answer".into(), None))
+                Err(Refused(made_skill::MODEL_SILENT.into(), None))
             }
         }
     };
@@ -981,6 +981,15 @@ fn made_and_journaled(
         made = kept(ask(Arc::clone(&chat), repair));
     }
     let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
+    // The person hears the lamp's own reason in everyday words, the
+    // journal's line above keeping it whole (the owner, 11 Nov: reasons
+    // "nobody understands"); the model's `cannot:` sentence goes as it is.
+    let made = match made {
+        Err(Refused(why, lines)) if !models_cannot.get() => {
+            Err(Refused(made_skill::plain_reason(&why), lines))
+        }
+        made => made,
+    };
     (made, line)
 }
 
@@ -1221,6 +1230,7 @@ light = { dim = 1 }
             directory: root.join("made"),
             program,
             manage: root.join("manage.sock"),
+            installed: root.join("skills"),
         };
         (root, keeping)
     }
@@ -2686,7 +2696,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(told.get("made").is_none(), "{told}");
         assert_eq!(
             told["error"],
-            format!("the skill couldn't be made: {}", made_skill::NOT_PASSED)
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
         );
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         let _ = std::fs::remove_dir_all(&root);
@@ -2719,11 +2729,11 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(told.get("made").is_none(), "{told}");
         assert_eq!(
             told["error"],
-            format!("the skill couldn't be made: {}", made_skill::UNSAID)
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
         );
         assert_eq!(
             told["next"],
-            made_skill::not_made_in_their_language(&made_skill::not_made_line(made_skill::UNSAID))
+            made_skill::not_made_in_their_language(made_skill::NOT_MADE_TRY)
         );
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
@@ -2797,7 +2807,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             told["error"]
                 .as_str()
                 .unwrap()
-                .contains("the lamp can't read"),
+                .contains(made_skill::NOT_MADE_TRY),
             "{told}"
         );
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
@@ -2882,7 +2892,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(told.get("made").is_none(), "{told}");
         assert_eq!(
             told["error"],
-            "the skill couldn't be made: the lamp's model gave back its own example, not what was asked; try asking again",
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY),
             "{told}"
         );
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);

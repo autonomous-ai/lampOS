@@ -49,6 +49,7 @@ fn keeping(dir: &Path) -> Keeping {
         directory: dir.join("made"),
         program: env!("CARGO_BIN_EXE_lamp-skills").into(),
         manage: dir.join("manage.sock"),
+        installed: dir.join("skills"),
     }
 }
 
@@ -408,7 +409,12 @@ fn a_made_skill_past_the_cap_or_not_made_here_does_not_go_on() {
 #[test]
 fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
     let dir = tempfile::tempdir().unwrap();
-    let keeping = keeping(dir.path());
+    // The helper's own guard, behind the voice's free name: the voice
+    // looks for names elsewhere here.
+    let keeping = Keeping {
+        installed: dir.path().join("elsewhere"),
+        ..keeping(dir.path())
+    };
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     let store = dir.path().join("store").join("evening-dim");
@@ -940,14 +946,17 @@ fn a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed() {
 /// lamp-74ff, 11 Nov 09:48-09:50: "nod when I stand up", asked from the
 /// app, failed all three repairs twice: the lamp's model wrote `speak =
 /// true` with nothing said, a `for` on its `room/stood_up` trigger and a
-/// `for` beside its nod. All three are taken out before the check, and the
-/// real `lamp-skills pack` keeps it, said as a nod when someone gets up.
+/// `for` beside its nod; on lamp-0c89, 11 Nov 10:35, a `when` lamp-skills
+/// doesn't know on the trigger. All are taken out before the check, and
+/// the real `lamp-skills pack` keeps it, said as a nod when someone gets
+/// up.
 #[test]
 fn a_made_nod_when_i_stand_up_is_tidied_and_packed() {
     let dir = tempfile::tempdir().unwrap();
     let keeping = keeping(dir.path());
     let toml = made_body(
-        "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\nfor = \"5s\"\n",
+        "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\nfor = \"5s\"\n\
+         when = \"stands\"\n",
         "body = { gesture = \"nod\", for = \"2s\" }",
     )
     .replace("body = true\n", "body = true\nspeak = true\n");
@@ -971,6 +980,13 @@ fn a_made_nod_when_i_stand_up_is_tidied_and_packed() {
         made.description
     );
     assert!(made.uses.body && !made.uses.speak);
+    // Its wait taken out is said (App Only's P2 on #6249).
+    assert!(
+        made.description
+            .contains("It can't wait 5 seconds for that: it runs each time someone gets up."),
+        "{}",
+        made.description
+    );
     assert_eq!(tars(&keeping.directory).len(), 1);
     // A say beside a light of a colour the light hasn't, in one step
     // (lamp-9adf, 11 Nov 10:01, "say hello when I come back to my desk"):
@@ -1089,4 +1105,43 @@ fn a_made_face_skill_greets_once_through_a_glance_away() {
         greetings(lamp_skills::load(&unpaced).unwrap()),
         [70, 101, 200]
     );
+}
+
+/// The owner, 11 Nov: a factory reset keeps the lamp's own skills, and a
+/// skill made as welcome-back failed on its name every time. Made beside
+/// the lamp's own, it is packed and put on as welcome-back-2 by the real
+/// checker and helper; made again with the same words it is "already
+/// had"; other words of the same name get welcome-back-3.
+#[test]
+fn a_made_skill_named_as_the_lamps_own_gets_a_free_name_and_goes_on() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let store = dir.path().join("store").join("welcome-back");
+    fs::create_dir_all(&store).unwrap();
+    fs::write(store.join("skill.toml"), TOML).unwrap();
+    fs::write(store.join("SKILL.md"), card("welcome-back")).unwrap();
+    package::install(&skills, None, &store).unwrap();
+    let made = keep(&answer(TOML, "welcome-back"), false, "s1:1:1", &keeping).unwrap();
+    assert_eq!(made.name, "welcome-back-2");
+    mark(&keeping, &made.sha256);
+    let wait = std::time::Duration::from_millis(200);
+    install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap();
+    let on = skills.join("welcome-back-2");
+    assert!(
+        fs::read_to_string(on.join("SKILL.md"))
+            .unwrap()
+            .contains("name: welcome-back-2")
+    );
+    // The same words again: the person's own, on already.
+    let again = keep(&answer(TOML, "welcome-back"), false, "s1:2:1", &keeping);
+    assert_eq!(
+        again.unwrap_err().0,
+        "You already have that skill: welcome back 2. It's on."
+    );
+    // Other words: the next free name.
+    let other = TOML.replace("dim = 1", "dim = 2");
+    let made = keep(&answer(&other, "welcome-back"), false, "s1:3:1", &keeping).unwrap();
+    assert_eq!(made.name, "welcome-back-3");
 }
