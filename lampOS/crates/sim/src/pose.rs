@@ -215,10 +215,16 @@ mod tests {
     }
 
     #[test]
-    fn folded_down_the_camera_looks_far_from_the_person() {
+    fn folded_down_the_head_keeps_the_way_it_faced_standing() {
+        // The model's shoulder turns one way and its elbow the other as the arm
+        // folds (lamp-75c9, 11 Nov: the lower arm lies low over the base, the
+        // two segments close by the elbow's 43 deg of counts, and the head ends up on
+        // top), so the head comes down with its direction nearly the stand's: the
+        // two arm turns cancel to a few degrees. (With the shoulder's old sign the
+        // head tipped by about 95 deg and the shade went through the base.)
         let model = Model::shipped();
         let folded = angle_of(&relative(&model, HOME, 1.0));
-        assert!(folded > 30.0, "{folded}");
+        assert!(folded < 10.0, "{folded}");
     }
 
     #[test]
