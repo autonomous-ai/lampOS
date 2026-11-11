@@ -168,9 +168,9 @@ cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng
   `tasks_now` (đếm số việc đang làm). Cả ba đều là bộ nhớ riêng của phần tasks,
   không gọi Harness, nên trả lời ngay. lamp-tasks không đổi gì.
 - **Mô hình nhận được.** `signed_in` (`yes`, `offline`, `no` hoặc `unknown`);
-  `computers`: mỗi máy một lần (các target cùng tên riêng là một máy), chỉ
-  gọi bằng tên riêng (tối đa 40 ký tự, một dòng) khi có thêm
-  `LAMP_TASKS_MACHINE_NAMES`, không thì bằng bí danh đầu tiên của máy, kèm các trợ lý máy đó có (bỏ engine
+  `computers`: mỗi máy một lần (các target cùng tên riêng là một máy), luôn
+  gọi bằng bí danh đầu tiên của máy (`office`), không bao giờ bằng tên riêng,
+  dù có `LAMP_TASKS_MACHINE_NAMES` hay không, kèm các trợ lý máy đó có (bỏ engine
   `installed: false`), tối đa ba máy, phần còn lại đếm trong
   `more_computers`; `working`: số việc đang làm, không có lời của việc nào,
   và bỏ trống khi `tasks_now` bị từ chối; `next`: chỉ trả lời điều được hỏi,
@@ -179,9 +179,9 @@ cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng
 - **Khi lỗi.** Không có phần tasks thì nói như mọi lệnh giao việc khác. `status`
   bị từ chối thì nói nhẹ nhàng là không làm được, journal chỉ ghi mã lỗi.
 - **Tắt** thì hàm không được khai báo, các hàm khác giữ nguyên từng chữ.
-- **Ai nghe.** Bất kỳ ai hỏi đèn đều nghe máy tính và trợ lý của người dùng:
-  theo bí danh (`office`), còn tên riêng của máy, có thể là tên người, chỉ khi
-  bật cả `LAMP_TASKS_MACHINE_NAMES`, như các câu đọc lại. Vì vậy công tắc tắt trong bản product cho đến khi first builder xét
+- **Ai nghe.** Bất kỳ ai hỏi đèn đều nghe máy tính theo bí danh (`office`) và
+  trợ lý của người dùng, không bao giờ nghe tên riêng của máy (thường chứa tên
+  người). Công tắc tắt trong bản product cho đến khi first builder xét
   (TWO READS).
 - **Test** (`agent_tasks`): `harness_status_is_declared_and_run_only_with_its_switch`,
   `harness_status_says_the_sign_in_the_computers_and_the_work_as_counts`,
