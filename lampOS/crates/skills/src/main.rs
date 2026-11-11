@@ -891,6 +891,16 @@ fn serve(
     options: &Options,
 ) -> io::Result<()> {
     let tools = options.tools.as_deref();
+    // The tools' folder is kept through a restart for its holds
+    // (`RuntimeDirectoryPreserve=restart`, `lamp_skills::holds`), and with it
+    // the last run's `tools.json`: let go at once, before anything else, so
+    // a session the voice opens now is never offered a tool this run may not
+    // have (an update's dropped or renamed one). The first load writes it
+    // again, a moment on; until then the voice has none, as when the folder
+    // went with each restart.
+    if let Some(tools) = tools {
+        forget_tools(tools);
+    }
     let (skip_ask, ask_policy) = (options.ask == "skip", options.ask == "policy");
     let bus = match root {
         Some(root) => Bus::new(root)?,
@@ -3124,6 +3134,20 @@ fn write_tools(dir: &Path, engine: &Engine) {
     };
     if let Err(error) = written {
         eprintln!("lamp-skills: {} not written: {error}", path.display());
+    }
+}
+
+/// The last run's `tools.json` in `dir` removed, at the start ([`serve`]):
+/// none there is nothing to do.
+fn forget_tools(dir: &Path) {
+    let path = dir.join("tools.json");
+    match std::fs::remove_file(&path) {
+        Ok(()) => eprintln!(
+            "lamp-skills: {} from before the restart let go: written again at the first load",
+            path.display()
+        ),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => eprintln!("lamp-skills: {} not let go: {error}", path.display()),
     }
 }
 

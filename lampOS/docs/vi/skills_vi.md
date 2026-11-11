@@ -1382,7 +1382,9 @@ trong lần ngồi.
   `cooldown`) và từ lúc nào cơ hội chờ `[[while]]` (`wait`). Không có gì về
   một người. Tệp được ghi trọn bên cạnh rồi chuyển đè, khi một lần giữ bắt
   đầu, kết thúc hay đổi, và mỗi 30 s khi còn giữ (`holds::WRITE_EVERY_US`),
-  không bao giờ ở mỗi tin nhắn. Unit sản phẩm cho `--tools-dir
+  không bao giờ ở mỗi tin nhắn. Một lần ghi thất bại thì xóa tệp (cố hết
+  sức), để một lần giữ đã bỏ từ đó (hay một cơ hội đã dùng từ đó) không bao
+  giờ được lấy lại từ tệp cũ hơn. Unit sản phẩm cho `--tools-dir
   /run/lampos-skills`, tmpfs, mất khi khởi động lại máy, và
   `RuntimeDirectoryPreserve=restart`, nên thư mục còn qua một lần khởi động
   lại (`systemctl restart` của bản cập nhật, hoặc `Restart=on-failure`) và
@@ -1396,7 +1398,9 @@ trong lần ngồi.
 - **Không giữ khi lần khởi động lại sẽ quên điều đang cản kỹ năng.** Tạm
   hoãn, nghỉ sau các lời nhắc không ai để ý hay một lời nhắc còn đang được
   xét, đã tới `most_a_day` của ngày, một lần chạy của nhóm `[budget]` trong
-  giờ qua, hay một từ `stands_in_for_group` còn chờ: những thứ này chỉ ở
+  giờ qua, một từ `stands_in_for_group` còn chờ, hay một lần đọc dịch vụ
+  đã liên kết còn đang chạy hoặc đã thực hiện trong ngày địa phương này
+  (một lần mỗi ngày, #5288): những thứ này chỉ ở
   trong bộ nhớ, và lần khởi động lại quên chúng. Khi bất kỳ thứ nào đang
   cản một kỹ năng, lần giữ của nó không được ghi, và bắt đầu lại sau lần
   khởi động lại, như trước. Vậy một lần giữ được lấy lại không bao giờ làm
@@ -1414,11 +1418,23 @@ trong lần ngồi.
   máy, tệp của lần khởi động khác, hay tệp không đọc được thì không giữ gì.
   Số lần trong ngày, giờ của nhóm, `[rest]` và tạm hoãn vẫn ở trong bộ nhớ
   như trước; `off` và journal hằng ngày được giữ như cũ.
+- **Danh sách công cụ khi khởi động.** Thư mục được giữ qua lần khởi động
+  lại cũng giữ `tools.json` của lần chạy trước, thứ giọng nói đọc mỗi khi
+  mở phiên. Nên chương trình xóa nó ngay đầu tiên khi khởi động, trước khi
+  gắn `call.sock`, và lần nạp đầu tiên ghi lại nó từ những gì đã nạp, chỉ
+  một lát sau: một phiên mở trong lúc đó không có công cụ kỹ năng nào, như
+  khi thư mục mất theo mỗi lần khởi động lại, và không bao giờ được đưa một
+  công cụ mà bản cập nhật đã bỏ hay đổi tên. Còn lại: khoảnh khắc giữa lúc
+  lần chạy cũ kết thúc và lần mới bắt đầu (`RestartSec=5s` sau một lỗi).
 
 Kiểm thử (`crates/skills/tests/it/holds.rs`):
 `a_hold_kept_across_a_short_restart_comes_at_its_own_time`,
 `a_hold_begins_again_past_its_gap_on_another_boot_or_edited`,
 `a_hold_taken_back_is_dropped_by_a_first_message_that_does_not_hold`,
 `a_hold_that_ran_keeps_its_cooldown_across_a_restart`,
-`a_snoozed_skills_hold_is_not_kept`. Bản đầy đủ ở [skills.md](../skills.md),
+`a_snoozed_skills_hold_is_not_kept`,
+`a_reads_hold_is_not_kept_once_its_read_came_due_today`,
+`a_kept_folders_tools_list_is_written_again_at_the_start`; của chính tệp
+trong `src/holds.rs` (`a_failed_write_leaves_no_hold_to_take_back`). Bản
+đầy đủ ở [skills.md](../skills.md),
 "A hold kept across a restart".

@@ -155,7 +155,9 @@ impl Keeper {
 
     /// `holds` written at `now_us` when they differ from the last written
     /// but for when each was last seen holding, or, while any is kept,
-    /// [`WRITE_EVERY_US`] after the last write. The first failure is said.
+    /// [`WRITE_EVERY_US`] after the last write. A write that fails removes
+    /// the file, so a hold dropped since is never taken back; the first
+    /// failure is said.
     pub fn keep(&mut self, mut holds: Vec<Hold>, now_us: u64) {
         holds.truncate(MOST_HOLDS);
         let due = match &self.written {
@@ -180,14 +182,23 @@ impl Keeper {
         };
         match write(&self.file, &kept) {
             Ok(()) => self.faulted = false,
-            Err(error) if !self.faulted => {
-                self.faulted = true;
-                eprintln!(
-                    "lamp-skills: the holds not kept in {}: {error}",
-                    self.file.display()
-                );
+            Err(error) => {
+                // What the file kept is older than what holds now (a hold
+                // dropped since, or its chance had): removed, best effort,
+                // so a restart takes back nothing rather than that.
+                let gone = match fs::remove_file(&self.file) {
+                    Ok(()) => "removed".to_owned(),
+                    Err(why) if why.kind() == io::ErrorKind::NotFound => "none there".into(),
+                    Err(why) => format!("not removed: {why}"),
+                };
+                if !self.faulted {
+                    self.faulted = true;
+                    eprintln!(
+                        "lamp-skills: the holds not kept in {}: {error}; the file {gone}",
+                        self.file.display()
+                    );
+                }
             }
-            Err(_) => {}
         }
         // Tried again at the next change or the next cadence, not at once.
         self.written = Some((now_us, kept.holds));
@@ -268,5 +279,25 @@ mod tests {
         fs::write(&file, "not json").unwrap();
         assert!(keeper.read(42_000_000).is_err());
         assert!(!dir.path().join("holds.new").exists());
+    }
+
+    /// A write that fails (here its new file is a link, refused) removes
+    /// what the file kept: a hold dropped since is never taken back.
+    #[test]
+    fn a_failed_write_leaves_no_hold_to_take_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(FILE);
+        let mut keeper = Keeper::new(file.clone(), "boot-a".into());
+        keeper.keep(vec![hold(10, 10)], 10);
+        assert_eq!(keeper.read(11).unwrap().unwrap().holds.len(), 1);
+        std::os::unix::fs::symlink(dir.path().join("elsewhere"), dir.path().join("holds.new"))
+            .unwrap();
+        keeper.keep(Vec::new(), 20);
+        assert!(!file.exists(), "the old holds removed");
+        assert!(keeper.read(21).unwrap().is_none());
+        assert!(
+            !dir.path().join("elsewhere").exists(),
+            "never through the link"
+        );
     }
 }
