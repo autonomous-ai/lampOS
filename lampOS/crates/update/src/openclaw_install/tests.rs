@@ -589,7 +589,7 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
 fn the_namespace_script_is_hermess_for_openclaw() {
     for (from, _) in ENGINE_EDITS {
         assert!(
-            hermes_install::ns_text(true).contains(from),
+            hermes_install::ns_text(true, false).contains(from),
             "`{from}` is not in Hermes's script"
         );
     }
@@ -603,7 +603,7 @@ fn the_namespace_script_is_hermess_for_openclaw() {
             .unwrap();
         assert!(checked.status.success(), "{checked:?}");
         let ours = with_mode.replacen(NPM_CI_MODE, "", 1);
-        let hermes = hermes_install::ns_text(skills);
+        let hermes = hermes_install::ns_text(skills, false);
         assert!(!ours.to_ascii_lowercase().contains("hermes"), "{ours}");
         assert!(!ours.contains("#5978") && !ours.contains("#6128"));
         assert_eq!(ours.lines().count(), hermes.lines().count());
@@ -1034,7 +1034,7 @@ fn the_two_installs_take_turns_in_the_one_shot() {
     let held = hermes_install::after_round(
         lamp.root(),
         &lamp.records(),
-        false,
+        hermes_install::Shown::default(),
         &mut systemd,
         stuck + 1,
         Ok(crate::hermes_schedule::Window::Reached),
