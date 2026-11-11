@@ -1051,6 +1051,66 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 `app_make::tests::a_voice_make_line_is_asked_on_the_say_socket`, và
 `crates/skills/tests/it/made.rs` với `lamp-skills` thật.
 
+### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, tắt, đề xuất trên #6059)
+
+Đề xuất trên #6059 (chủ sở hữu đồng ý, 11/11), first builder đã đồng ý
+(Queue #6059, 11/11 22:44 +07). Khi bật công tắc, một lần tạo bằng giọng nói mà mô hình của đèn không tạo
+được sẽ được giao cho agent riêng của đèn, OpenClaw hoặc Hermes, như
+skill-creator của V1 từng giao cho agent của nó (`crate::make_skill_agent`).
+Chỉ người viết thay đổi; phần dọn, `lamp-skills pack`, phần nói lại, brief
+sửa và việc giữ là cùng một mã cho cả hai người viết.
+
+- **Thứ tự.** DeepSeek viết trước, như khi tắt công tắc. Khi đèn có agent
+  (target `lamp` của phần tasks, đọc bằng `{"op":"targets"}` trước khi hỏi
+  DeepSeek), DeepSeek được một lần thử và không được sửa. Nếu câu trả lời đó
+  không được giữ (phần dọn, kiểm tra, phần nói lại, `cannot:` của nó, hoặc
+  không trả lời), nó được giao ngay cho agent, với cùng system prompt và yêu
+  cầu, và agent được các lần sửa (tối đa 3, `MOST_REPAIRS`). Câu trả lời của
+  agent đi qua đúng các kiểm tra đó. Khi đèn không có agent, DeepSeek giữ 3
+  lần sửa và thất bại của nó vẫn như hôm nay.
+- **Cách tới agent.** Như giọng nói giao bất kỳ việc nào (`crate::agent_tasks`,
+  #5978, #6226): chuẩn bị cho target `lamp` trên socket request của phần
+  tasks và xác nhận ngay trên socket riêng của giọng nói (lời người dùng nói
+  là lời yêu cầu), rồi đọc từ các quan sát của task, mà `lamp-tasks serve
+  --push-wait` giữ ngay khi agent kết thúc lượt, xem mỗi 0,5 giây. Không có
+  đường truyền mới. Phần tasks nhận tối đa 2.000 byte văn bản và system prompt
+  dài hơn, nên system prompt và brief nằm trong một tệp riêng,
+  `/run/lampos-make-skill/make-<ngẫu nhiên>.md` (thư mục 0711, tệp 0644, xóa
+  khi có câu trả lời), task ghi tên tệp đó. Văn bản task bắt đầu như một brief
+  (`made_skill::is_brief`), nên câu trả lời, hay lần giao thất bại, không bao
+  giờ được kể như tin. Đọc xong, câu trả lời được đánh dấu đã kể, nên
+  `--close-told` đóng phiên của agent.
+- **Giới hạn.** Mỗi câu trả lời của agent trong 45 giây
+  (`make_skill_agent::WRITE_WITHIN`); một lần sửa chỉ bắt đầu khi thêm một câu
+  trả lời vẫn vừa 120 giây của agent (`make_skill_agent::MAKE_WITHIN`).
+  Agent không trả lời trong 45 giây, lỗi, hay không có câu trả lời đầu: thất
+  bại của DeepSeek vẫn như hôm nay. Một lần tạo khi đó có thể kéo dài tới 240
+  giây, và tuyến thứ hai chờ câu của lần tạo theo đúng mức đó
+  (`make_skill_local::longest_make`).
+- **Người dùng nghe gì.** "I'll make it now" vẫn nói ngay, không đổi. Khi
+  agent bắt đầu, đèn nói "Let me think about that a little longer." qua dịch
+  vụ nói (`app_make::say_waiting_at`, một lần, không bắt đầu sau 15 giây).
+  Câu báo đã tạo không đổi.
+- **Nhật ký.** "made by DeepSeek", "DeepSeek failed: handed to the agent
+  (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes) wasn't
+  kept", "the agent (Hermes) made none (no answer within 45 s): DeepSeek's
+  failure stands", "no agent on the lamp: DeepSeek makes it alone"; lần sửa
+  của agent ghi "by the agent".
+- **Tắt** (mặc định, không có trong unit sản phẩm nào): không có gì ở trên;
+  đường đi giữ nguyên từng byte như hôm nay. Tạo bằng cách gõ trong ứng dụng
+  vẫn do DeepSeek.
+- **Test:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
+  `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
+  `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`, và
+  `make_skill_agent::tests` (luật trong một tệp, task là một brief trong
+  2.000 byte, được xác nhận và đánh dấu đã kể; không có target `lamp` là
+  không có agent; agent im lặng thì hết giờ).
+- **Chưa thử trên đèn:** hàng kiểm tra của nó, 16 lần tạo (mười hai lần đơn
+  giản, bốn lỗi DeepSeek đã biết) trên một đèn có agent, so sánh với DeepSeek:
+  có giữ không, phần nói lại và thời gian.
+  Agent chạy dưới người dùng nào là việc của phần 1 (cài đặt); vì thế tệp
+  luật đọc được bởi mọi người dùng.
+
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)
 
 Cùng người tạo đó, từ chữ gõ trong ứng dụng; được bật như trên, ngay, không cần

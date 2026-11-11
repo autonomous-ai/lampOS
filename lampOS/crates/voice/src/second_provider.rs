@@ -3641,7 +3641,7 @@ impl Shared {
             return false;
         };
         let within =
-            (self.clock)().saturating_duration_since(at) < crate::make_skill_local::MAKE_WITHIN;
+            (self.clock)().saturating_duration_since(at) < crate::make_skill_local::longest_make();
         let quiet = by < request && within && crate::make_skill_local::pending();
         if quiet {
             eprintln!(
