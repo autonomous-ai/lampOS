@@ -108,7 +108,7 @@ once per computer".
    computer's connection.
 2. **Get a code.** The owner chooses to add a developer computer and ticks
    what it may do (the grants: `body`, `light`, `speak`, `look`, `hear`,
-   `sound`, `camera`, …). The lamp says the first 8 characters of its pin
+   `sound`, `skills`, `air`, `device`: not `camera`, `microphone` or `notes`, which the app does not offer; see the GUIDE's "Granting camera, microphone and notes today"). The lamp says the first 8 characters of its pin
    aloud, and the app shows the same 8 for the owner to confirm they match:
    that is how you know the app is talking to the lamp in front of you. Only
    after that does the app show the 8-digit code and the lamp's full pin (64

@@ -81,16 +81,16 @@ The owner's steps in our app, today:
    - `look`: can tell when someone is there, never who;
    - `hear`: can hear its own phrases, never the words around them;
    - `sound`: can hear kinds of sound, never words;
-   - `camera`: can see what the lamp's camera sees, never while it is private;
-   - `microphone`: can hear what the lamp's microphone hears, never while it is
-     private (merged, off by default: only where the owner has switched
-     the room's sound on, which the customer build does not; see "The microphones");
    - `skills`: can put skills on the lamp that run on their own;
    - `air`: can read the air sensor: particles, carbon dioxide and humidity, which
      can show when someone is in the room;
    - `device`: can read the lamp's processor, memory, disk and temperature;
-   - `notes`: can keep small notes of its own on the lamp, which stay until it
-     is let go.
+
+   `body`, `light`, `speak` and `look` are ticked by default. **The app offers no
+   `camera`, no `microphone` and no `notes` tick** (App Only, 11 Nov 2026: nine
+   grants in the app's `LampControlGrant`, "the camera and the microphone are never
+   offered from the app"; the current TestFlight, 2.5.2, is the same). See "Granting
+   camera, microphone and notes today" below.
 4. **Check it is the right lamp.** The lamp says the first 8 characters of its
    security pin aloud, and the app shows the same 8 for the owner to confirm
    they match. Only then does the app show a one-time code (8 digits, 5
@@ -99,6 +99,25 @@ The owner's steps in our app, today:
 5. **Pair** the computer with that code and pin (section 3). The lamp gives a
    small nod. The owner can take the body back, or remove the computer, from
    the app at any time; removing it closes its connections at once.
+
+### Granting camera, microphone and notes today
+
+A pairing keeps the grants it was made with, and a re-pair replaces them: there is no
+way to add one to a paired computer. For each grant:
+
+| grant | how a developer gets it | where it stops |
+|---|---|---|
+| `body`, `light`, `speak`, `look`, `hear`, `sound`, `skills`, `air`, `device` | the owner ticks it in the app (step 3) | nowhere |
+| `camera` | only a pairing code made on the lamp itself: its keeper, as root, runs `lamp-control code --grants body,camera` (the admin socket, `/run/lampos-control/admin.sock`, 0600; developer access on); then `lamp pair` as in step 5 | the app cannot make it; an owner without ssh cannot; the stream is local network only, with the ring's red dot, never while the lamp is private |
+| `microphone` | the same, with `microphone` in the list | the grant alone is not enough: the stream is off unless `lamp-control` runs `--microphone on` and the ears share their sound (`LAMP_BUS_AUDIO=on`), which the customer build does not: a stream ends "the microphone stream is off on this lamp (LAMP_CONTROL_MICROPHONE)" |
+| `notes` | the same (a code made on the lamp) | not on the app's screen either, per App Only's list of nine |
+
+Asking for one without it is refused `no_grant`: "not granted: camera (the app does not
+grant it yet: only a pairing code made on the lamp itself carries it)". Hand-editing a
+pairing's file is not a way: it skips the owner's consent. Whether the app will offer
+`camera` and `microphone` is the first builder's decision (it widens what a developer computer can
+take from the room); the proposal, with the owner's switch for the microphone, is on #6059.
+
 
 **Planned for a partner edition** (the app's four screens, words only):
 
@@ -666,7 +685,7 @@ The room's sound for a program is merged and off by default, with the owner's co
 | **Returns** | `{"stream": "on", "sample_rate": 16000, "channels": 1, "format": "s16le", "block_ms": 20, "source": "mic1"}`; then one `microphone.audio` per 20 ms block: `sequence`, `lost` (blocks lost since the last one sent), `bytes` 640, and the samples as `data` (bytes in Python, a Buffer in JS), sent as a binary WebSocket message |
 | **Limits** | off unless the lamp's owner switches it on (`--microphone on`); local network only (one hop on the lamp's own wire, never a VPN or tunnel the owner didn't set up); the ring shows a small red mark before any sound goes; never while the lamp is private; never with someone else in view; never when the room isn't seen (no fresh word from the camera in 2 s); a stream with no sound for 2 s ends |
 | **Refusals and ends, in the lamp's words** | "the microphone stream is off on this lamp (LAMP_CONTROL_MICROPHONE)"; "the lamp's microphone isn't shared here"; "someone else is here"; "the room isn't seen"; "the ring is not showing the microphone's mark"; `private` while the lamp is private; `no_grant` without the grant |
-| **STATUS** | in development: merged, off by default (10 Nov 2026), with the owner's consent; seen on a test lamp with both switches on, not on a customer build: the owner ticks `microphone` when pairing and switches the stream on (`lamp-control --microphone on`, and the ears sharing their sound, `LAMP_BUS_AUDIO=on`). Not on the customer build: there neither switch is on, the `microphone` grant exists but no sound is routed, and product lamps share only the second microphone with the lamp's bus today, so a stream would end at once with "the lamp's microphone isn't shared here" until the owner's switch is settled. On a test lamp (lamp-75c9) with both switches on (a lamp-built `lamp-control` of the patch merged as #5839, Python SDK from a paired laptop with the grants `light`, `camera` and `microphone`): the answer came in 3 ms; 47 to 52 blocks a second (50 expected), 2 lost in the first second and none after; the level followed the room (about −47 dBFS quiet, −42 dBFS while a line was said near the lamp); with the lamp's camera stopped for 6 s the stream ended at 21.9 s with `microphone.ended` "the room isn't seen" and a new stream was refused with the same words; a camera stream before it gave 11 frames each time and none after each `off`. Numbers only: no sound was kept. |
+| **STATUS** | in development: merged, off by default (10 Nov 2026), with the owner's consent; seen on a test lamp with both switches on, not on a customer build: the pairing carries `microphone` (a code made on the lamp: the app offers no such tick) and the owner switches the stream on (`lamp-control --microphone on`, and the ears sharing their sound, `LAMP_BUS_AUDIO=on`). Not on the customer build: there neither switch is on, the `microphone` grant exists but no sound is routed, and product lamps share only the second microphone with the lamp's bus today, so a stream would end at once with "the lamp's microphone isn't shared here" until the owner's switch is settled. On a test lamp (lamp-75c9) with both switches on (a lamp-built `lamp-control` of the patch merged as #5839, Python SDK from a paired laptop with the grants `light`, `camera` and `microphone`): the answer came in 3 ms; 47 to 52 blocks a second (50 expected), 2 lost in the first second and none after; the level followed the room (about −47 dBFS quiet, −42 dBFS while a line was said near the lamp); with the lamp's camera stopped for 6 s the stream ended at 21.9 s with `microphone.ended` "the room isn't seen" and a new stream was refused with the same words; a camera stream before it gave 11 frames each time and none after each `off`. Numbers only: no sound was kept. |
 
 ### The camera
 
