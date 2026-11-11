@@ -1120,7 +1120,7 @@ fn a_pinned_install_reporting_another_version_records_version() {
 /// Harness's launcher as its installer writes it without `--no-updates`.
 const UNPINNED: &str = "#!/bin/sh\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
 /// The same in Harness's pinned shape (#5493).
-const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
 const HOLD_ON: &str =
     "HOME=/var/lib/lampos-tasks PATH=/usr/local/bin:/usr/bin:/bin LAMP_HARNESS_HOLD_UPDATES=on";
 

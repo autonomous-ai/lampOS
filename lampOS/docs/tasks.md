@@ -1767,7 +1767,7 @@ releases, and every writer of the hold lifts it there instead:
 `harness-hold.env` is written without `ADAPTER_UPDATE_DISABLE=true` (said
 changed on a lamp that held before, so a running daemon is started again once
 no task is busy, and `harness start` rewrites its unit without the hold), no
-Harness command is given `ADAPTER_UPDATE_DISABLE`, and the launcher's two
+Harness command is given `ADAPTER_UPDATE_DISABLE`, and the launcher's three
 lines below are taken out, at lamp-tasks' start and after `lamp-update
 harness-install`. The journal says `tasks: Harness's own updates not held:
 this lamp follows the lamp-voice feed, …`, and the health line after each
@@ -1791,12 +1791,26 @@ installer writes with `--no-updates`:
 #!/bin/sh
 export ADAPTER_UPDATE_DISABLE=true
 export HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env
+case "${1-}" in update) echo "harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed" >&2; exit 1 ;; esac
 exec … cli.js "$@"
 ```
 
 Every `harness …` run through the launcher (or through `/usr/local/bin/harness`,
 its link) then holds the updates, whoever runs it. Harness's own updates
 rewrite only the `exec` line, so the preamble stays.
+
+**`harness update` refused (#5957).** The daemon's hold stops only its own
+self-update. `harness update`, run from a shell as the tasks user (by hand,
+or by an agent's terminal tool), installs the newest Harness whatever the
+hold says. It put lamp-c0a4 above its build's pin on 11 Nov, where
+lamp-update never moves it back down. So the launcher's third line refuses
+that one command before Harness runs: one line on stderr, exit 1, nothing
+changed. Harness takes its command from its first argument (openharness
+`cli/src/cli.ts`), so only that is read: `harness update --force` is
+refused, `harness reply <id> update` and every other command run as before.
+lamp-update moves Harness to its pin itself (`harness-install`) and never
+calls `harness update`. The line is written and taken out with the hold by
+both writers, from one text (`lamp_msgs::harness_hold::REFUSE_UPDATE`).
 
 - **Where:** lamp-tasks at its start (`hold::pin_at_start`), for lamps
   installed before this; and `lamp-update harness-install` right after it
@@ -1808,8 +1822,8 @@ rewrite only the `exec` line, so the preamble stays.
   line (`LAMP_HARNESS_HOLD_UPDATES is not on in lamp-tasks.service: …` or
   `lamp-tasks.service's environment not read (<why>): … taken as off, …`).
 - **What is written:** any `export ADAPTER_UPDATE_DISABLE=…` or `export
-  HARNESS_ENV_FILE=…` line before the first `exec` line is taken out, and
-  the two lines above are put just before it. The `exec` line and every other
+  HARNESS_ENV_FILE=…` line, and the refusing line, before the first `exec`
+  line is taken out, and the three lines above are put just before it. The `exec` line and every other
   line are kept as they are. A launcher already in that shape is not written
   (byte for byte the same, no second preamble). Otherwise it is written whole,
   through `.harness.lampos-pin` beside it, with its own mode (executable) and
