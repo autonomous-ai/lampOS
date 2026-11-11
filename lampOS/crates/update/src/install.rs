@@ -856,6 +856,15 @@ pub fn resolvconf_fixed(now: Option<&str>) -> String {
     fixed
 }
 
+/// systemd-timesyncd's drop-in (#6256): Debian's pool, then servers that
+/// answer in China. `FallbackNTP`, never `NTP=`, so a server the network
+/// gives still comes first; timesyncd moves on in seconds from one that
+/// does not answer.
+pub const TIMESYNCD_PATH: &str = "/etc/systemd/timesyncd.conf.d/lampos.conf";
+pub const TIMESYNCD: &str = "# lamp-update install (#6256): time servers that answer in China too.\n\
+[Time]\n\
+FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org ntp.aliyun.com ntp.tencent.com cn.pool.ntp.org\n";
+
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
 pub const TMPFILES_PATH: &str = "/etc/tmpfiles.d/lampos.conf";
@@ -1869,6 +1878,21 @@ pub fn install(
         );
     }
     name_servers(config, host, &mut changed, say)?;
+    // Written whole; timesyncd reads it on a restart, and one not running
+    // is left so (`try-restart`), as on a lamp whose clock is chrony's.
+    let wrote = changed.len();
+    put(
+        config,
+        TIMESYNCD_PATH,
+        TIMESYNCD.as_bytes(),
+        0o644,
+        &mut changed,
+    )?;
+    if changed.len() > wrote
+        && let Err(why) = host.refresh(&["systemctl", "try-restart", "systemd-timesyncd"])
+    {
+        say(&format!("systemctl try-restart systemd-timesyncd: {why}"));
+    }
 
     let before = state.clone();
     let build = Build {
