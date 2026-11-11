@@ -28,8 +28,10 @@
 //! in place of the code, again when it is kept alive, and then the same
 //! `confirm` and `result`. The app shows the link as a QR, which the Harness
 //! phone app scans. Only the app starts one: the voice has nothing to show
-//! it on. The link is handled as the code is: never said, journalled or put
-//! on the broker.
+//! it on. The link is the secret, as the code is: held only in the session,
+//! given in one app view per telling ([`Session::app_view_claiming`]), never
+//! said, journalled, put on the broker or in a `Debug`, and forgotten when
+//! the sign-in ends.
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
@@ -124,14 +126,18 @@ const MOST_MESSAGE_BYTES: usize = 200;
 /// no address in it and no code: no eight digits in a row once every
 /// non-digit is taken out (the privacy reader's P3 on #5236, the
 /// reviewer-lead's P2 on #5579), so a quoted code never reaches the broker;
-/// and no QR link's key (`#k=`, #5198).
+/// and no link or QR key (#5198).
 fn message(value: Option<&Value>) -> Option<String> {
     let message = value?.as_str()?.trim();
     (!message.is_empty()
         && message.len() <= MOST_MESSAGE_BYTES
         && !message.contains('@')
-        && !message.contains("#k=")
         && !has_eight_digits(message)
+        // Nor a link or its key: a QR sign-in's url is as secret as the
+        // code (#5198), and Harness's keys are `#k=hnq_…`.
+        && !message.contains("://")
+        && !message.contains("#k=")
+        && !message.contains("hnq_")
         && !message.chars().any(char::is_control))
     .then(|| message.to_owned())
 }
@@ -380,6 +386,9 @@ pub struct Session {
     /// result after the question can't quote it to the app (#5579). Never
     /// said, journaled or shown: only matched against Harness's message.
     last_code: Option<String>,
+    /// Harness gave or kept alive the QR link since the app was last given
+    /// it (#5198, [`Session::app_view_claiming`]).
+    qr_untold: bool,
 }
 
 impl Session {
@@ -401,6 +410,7 @@ impl Session {
             message: None,
             already_signed_in: false,
             relay_failed: false,
+            qr_untold: false,
         }
     }
 
@@ -442,6 +452,7 @@ impl Session {
             message: None,
             already_signed_in: false,
             relay_failed: false,
+            qr_untold: false,
         }
     }
 
@@ -519,7 +530,9 @@ impl Session {
                 Ok(Event::Code { .. }) => {}
                 // The QR's link, as the code above: only in a QR sign-in,
                 // before the question; the same link kept alive is no
-                // change to say. Its key is never journalled.
+                // change to say. Its key is never journalled. Each telling,
+                // a new link or the same kept alive, is given to the app
+                // once more, with its new `expires_at`.
                 Ok(Event::Qr { url, expires_in })
                     if self.method == Method::Qr
                         && matches!(self.state, State::Starting | State::Qr { .. }) =>
@@ -531,6 +544,7 @@ impl Session {
                         url,
                         until: now + Duration::from_secs(expires_in),
                     };
+                    self.qr_untold = true;
                     self.changes += 1;
                     self.expires_at_ms = Some(unix_ms().saturating_add(expires_in * 1000));
                 }
@@ -613,15 +627,21 @@ impl Session {
         if !matches!(self.state, State::Code { .. }) {
             self.code_given = None;
         }
+        // The same for the QR link (#5198): past it, nothing is left to give.
+        if !matches!(self.state, State::Qr { .. }) {
+            self.qr_untold = false;
+        }
         said
     }
 
+    /// Ends it: the code, the QR link and the email go with the state.
     fn finish(&mut self, done: Done) {
         self.state = State::Done(done);
         self.changes += 1;
         self.expires_at_ms = None;
         self.code_given = None;
         self.last_code = None;
+        self.qr_untold = false;
         // Dropped: the program is stopped, if it hasn't ended itself.
         self.link = None;
     }
@@ -768,9 +788,9 @@ impl Session {
                 "expires_in": until.saturating_duration_since(now).as_secs(),
                 "expires_at": self.expires_at_ms,
             }),
-            State::Qr { url, until } => json!({
+            // The link itself only through [`Session::app_view_claiming`].
+            State::Qr { until, .. } => json!({
                 "sign_in": "qr",
-                "qr_url": url,
                 "expires_in": until.saturating_duration_since(now).as_secs(),
                 "expires_at": self.expires_at_ms,
             }),
@@ -814,6 +834,25 @@ impl Session {
         view["by"] = self.by.name().into();
         view["method"] = self.method.name().into();
         view["answer_here"] = (mine && matches!(self.state, State::Asking { .. })).into();
+        view
+    }
+
+    /// [`Session::app_view`], with the QR link as `qr_url` once per
+    /// telling (#5198): the claim of the link, as [`Session::take_code`] is
+    /// the voice's of the code. Only the app's start, state and answer
+    /// reads claim it, which lamp-cloud hands to the backend over HTTPS;
+    /// its relay word does not, so a reply nobody hands on never spends it.
+    pub fn app_view_claiming(&mut self, now: Instant) -> Value {
+        let mut view = self.app_view(now);
+        if let State::Qr { url, until } = &self.state
+            && self.qr_untold
+            && self.by == By::App
+            && now < *until
+            && now < self.until
+        {
+            view["qr_url"] = url.as_str().into();
+            self.qr_untold = false;
+        }
         view
     }
 }
@@ -954,7 +993,7 @@ mod tests {
         lines.lock().unwrap().push_back(qr(QR_URL));
         let said = session.tend(now);
         assert_eq!(said, ["QR given (good for 120 s)"]);
-        let app = session.app_view(now + Duration::from_secs(1));
+        let app = session.app_view_claiming(now + Duration::from_secs(1));
         assert_eq!(app["sign_in"], "qr");
         assert_eq!(app["method"], "qr");
         assert_eq!(app["qr_url"], QR_URL);
@@ -1443,8 +1482,8 @@ mod tests {
     }
 
     /// #5198: Harness's own message and `alreadySignedIn` are kept for the
-    /// app (a message holding an address is not); the qr kind is passed
-    /// over, as any kind this part doesn't run.
+    /// app (a message holding an address is not); a kind this part doesn't
+    /// run is passed over.
     #[test]
     fn a_result_keeps_harness_message_and_already_signed_in_for_the_app() {
         assert_eq!(
@@ -1591,6 +1630,209 @@ mod tests {
         for line in &said {
             assert!(!line.contains("1234") && !line.contains('@'), "{line}");
         }
+    }
+
+    fn app_qr(now: Instant) -> (Session, Script, Arc<Mutex<Vec<bool>>>) {
+        let (session, lines, answers) = scripted(now);
+        (session.started_by(By::App, Method::Qr), lines, answers)
+    }
+
+    /// #5198: `harness login --qr --json`'s link is read strictly: https
+    /// only, no space or control in it, a time as the code's; a message
+    /// holding a link is not kept.
+    #[test]
+    fn harness_qr_lines_are_read_strictly() {
+        assert_eq!(
+            parse_line(&format!(
+                r#"{{"type":"qr","url":"{QR_URL}","expiresIn":120}}"#
+            )),
+            Ok(Some(Event::Qr {
+                url: QR_URL.into(),
+                expires_in: 120
+            }))
+        );
+        for bad in [
+            r#"{"type":"qr","url":"http://harness.autonomous.ai/signin#k=x","expiresIn":120}"#,
+            r#"{"type":"qr","url":"https://","expiresIn":120}"#,
+            r#"{"type":"qr","url":"https://a b","expiresIn":120}"#,
+            r#"{"type":"qr","url":"https://a\nb","expiresIn":120}"#,
+            r#"{"type":"qr","url":"https://a","expiresIn":0}"#,
+            r#"{"type":"qr","url":"https://a","expiresIn":601}"#,
+            r#"{"type":"qr","url":"https://a"}"#,
+            r#"{"type":"qr","expiresIn":120}"#,
+        ] {
+            assert_eq!(parse_line(bad), Err("unreadable"), "{bad}");
+        }
+        assert_eq!(
+            parse_line(
+                r#"{"type":"result","status":"error","code":"EXPIRED","message":"Scan https://x#k=y"}"#
+            ),
+            Ok(Some(Event::Result(Done::Error {
+                code: "EXPIRED".into()
+            })))
+        );
+        for quoted in ["Key hnq_secret0123 has expired.", "Link #k=abc expired."] {
+            assert_eq!(
+                parse_line(
+                    &json!({"type":"result","status":"error","code":"EXPIRED","message":quoted})
+                        .to_string()
+                ),
+                Ok(Some(Event::Result(Done::Error {
+                    code: "EXPIRED".into()
+                }))),
+                "{quoted}"
+            );
+        }
+    }
+
+    /// #5198: a QR sign-in started in the app goes from its link to the
+    /// question to the answer, as the code's does; the link's
+    /// `expires_at` counts down as the code's; the voice sees `in_app`.
+    #[test]
+    fn a_qr_sign_in_goes_from_its_link_to_the_question_to_the_answer() {
+        let now = Instant::now();
+        let (mut session, lines, answers) = app_qr(now);
+        assert_eq!(session.app_view_claiming(now)["sign_in"], "starting");
+        lines.lock().unwrap().extend([qr(QR_URL), None]);
+        assert_eq!(session.tend(now), ["QR given (good for 120 s)"]);
+        let shown = session.app_view_claiming(now + Duration::from_secs(20));
+        assert_eq!(shown["sign_in"], "qr");
+        assert_eq!(shown["method"], "qr");
+        assert_eq!(shown["by"], "app");
+        assert_eq!(shown["qr_url"], QR_URL);
+        assert_eq!(shown["expires_in"], 100);
+        assert!(shown["expires_at"].as_u64().unwrap() > 1_700_000_000_000);
+        assert!(shown.get("code").is_none());
+        assert_eq!(session.view(now), json!({"sign_in": "in_app", "id": 1}));
+        assert_eq!(
+            session.take_code(1, now),
+            json!({"claim": "not_available", "id": 1})
+        );
+        lines.lock().unwrap().extend([
+            Some(Ok(Event::Confirm {
+                email: "someone@example.com".into(),
+            })),
+            None,
+        ]);
+        assert_eq!(
+            session.tend(now),
+            ["approved in Harness: asking whether to sign in"]
+        );
+        assert_eq!(session.answer_from_app(1, true, now), Err("not_read"));
+        let asking = session.app_view_claiming(now);
+        assert_eq!(asking["sign_in"], "asking");
+        assert_eq!(asking["email"], "someone@example.com");
+        assert!(asking.get("qr_url").is_none());
+        assert_eq!(session.answer_from_app(1, true, now), Ok(()));
+        assert_eq!(*answers.lock().unwrap(), [true]);
+        lines
+            .lock()
+            .unwrap()
+            .extend([Some(Ok(Event::Result(Done::Success { email: None }))), None]);
+        assert_eq!(session.tend(now), ["signed in"]);
+        let done = session.app_view_claiming(now);
+        assert_eq!(done["result"], "success");
+        assert!(done.get("qr_url").is_none());
+
+        // Ran out of time: the app's words say the QR, not the code.
+        let (mut session, lines, _) = app_qr(now);
+        lines.lock().unwrap().extend([
+            qr(QR_URL),
+            Some(Ok(Event::Result(Done::Error {
+                code: "EXPIRED".into(),
+            }))),
+        ]);
+        session.tend(now);
+        assert_eq!(session.app_view(now)["message"], QR_EXPIRED);
+    }
+
+    /// #5198, the PM's privacy rule for the QR: the link is given in one
+    /// app view per telling (again only when Harness tells it again), never
+    /// in a plain read, a `Debug`, a journal line, the voice's view or a
+    /// refusal, and is gone once the sign-in ends.
+    #[test]
+    fn the_qr_link_is_claimed_once_and_never_printed_or_kept() {
+        let now = Instant::now();
+        let (mut session, lines, _) = app_qr(now);
+        lines.lock().unwrap().extend([qr(QR_URL), None]);
+        let mut said = session.tend(now);
+        // A plain read, as the relay word's reply, never spends the claim.
+        assert!(session.app_view(now).get("qr_url").is_none());
+        assert_eq!(session.app_view_claiming(now)["qr_url"], QR_URL);
+        assert!(session.app_view_claiming(now).get("qr_url").is_none());
+        let revision = session.revision();
+        // Kept alive: given once more, with its new countdown.
+        lines.lock().unwrap().extend([qr(QR_URL), None]);
+        said.extend(session.tend(now + Duration::from_secs(60)));
+        assert!(session.revision() > revision);
+        assert_eq!(
+            session.app_view_claiming(now + Duration::from_secs(60))["qr_url"],
+            QR_URL
+        );
+        // Untold, then past its time: not given.
+        lines.lock().unwrap().extend([qr(QR_URL), None]);
+        said.extend(session.tend(now + Duration::from_secs(61)));
+        assert!(
+            session
+                .app_view_claiming(now + Duration::from_secs(200))
+                .get("qr_url")
+                .is_none()
+        );
+        said.push(format!("{:?}", session.state()));
+        said.push(format!(
+            "{:?}",
+            Event::Qr {
+                url: QR_URL.into(),
+                expires_in: 120
+            }
+        ));
+        said.push(session.view(now).to_string());
+        said.push(format!("{:?}", session.answer_from_app(1, true, now)));
+        said.push(format!("{:?}", session.answer(true, 9, now)));
+        said.push(session.take_code(1, now).to_string());
+        lines.lock().unwrap().extend([qr(QR_URL), None]);
+        said.extend(session.tend(now + Duration::from_secs(62)));
+        lines
+            .lock()
+            .unwrap()
+            .push_back(Some(Ok(Event::Result(Done::Error {
+                code: "CANCELLED".into(),
+            }))));
+        said.extend(session.tend(now + Duration::from_secs(63)));
+        let ended = session.app_view_claiming(now + Duration::from_secs(63));
+        said.push(ended.to_string());
+        said.push(format!("{:?}", session.state()));
+        assert!(said.len() >= 10, "{said:?}");
+        for line in &said {
+            assert!(!line.contains("hnq_") && !line.contains("://"), "{line}");
+        }
+        assert!(!session.qr_untold);
+        assert_eq!(
+            session.state(),
+            &State::Done(Done::Error {
+                code: "CANCELLED".into()
+            })
+        );
+    }
+
+    /// #5198: each method takes only its own form. A code sign-in passes
+    /// over a QR line (nothing to give), and a QR one a code (the voice and
+    /// the app never see digits it didn't ask for); a voice-started
+    /// sign-in, always by code, never gives a link.
+    #[test]
+    fn each_method_takes_only_its_own_form() {
+        let now = Instant::now();
+        let (mut session, lines, _) = scripted(now);
+        lines.lock().unwrap().extend([qr(QR_URL), None]);
+        assert!(session.tend(now).is_empty());
+        assert_eq!(session.state(), &State::Starting);
+        assert!(session.app_view_claiming(now).get("qr_url").is_none());
+        let (mut session, lines, _) = app_qr(now);
+        lines.lock().unwrap().extend([code("12345678"), None]);
+        assert!(session.tend(now).is_empty());
+        let view = session.app_view_claiming(now);
+        assert_eq!(view["sign_in"], "starting");
+        assert!(view.get("code").is_none());
     }
 
     /// The reviewer's P3 on #2174: the code a start gave is kept only while

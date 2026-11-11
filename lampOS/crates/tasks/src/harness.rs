@@ -3487,7 +3487,8 @@ impl Drop for OwnedChild {
     }
 }
 
-/// A running `harness login --code --json` ([`Cli::sign_in_by_code`]): its
+/// A running `harness login --code --json` ([`Cli::sign_in_by_code`]), or
+/// `harness login --qr --json` for the QR (#5198): its
 /// lines read on a thread of their own, its answer written to its stdin,
 /// and its process group stopped when dropped.
 struct CodeSignIn {

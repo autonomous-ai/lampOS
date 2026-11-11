@@ -2271,7 +2271,11 @@ fn started_in_app() -> EngineError {
 /// back; one while the voice's is open is refused, and the app reads the
 /// voice's code with `app_sign_in_state`. The app answers only its own,
 /// once it was given the question. Journal lines name the id, the method
-/// and the state, never the code, the link or the email.
+/// and the state, never the code, the link or the email. A start may ask
+/// for Harness's QR (`"method":"qr"`, #5198); the voice's start is always
+/// by code. The start, state and answer replies claim the QR link once per
+/// telling ([`SignInSession::app_view_claiming`]); the relay word's reply
+/// never holds it.
 fn app_sign_in_operation(
     request: &Request,
     starter: &mut Starter,
@@ -2318,11 +2322,11 @@ fn app_sign_in_operation(
                     *sign_in = Some(session);
                 }
             }
-            Ok(sign_in.as_mut().expect("just set").app_view(now))
+            Ok(sign_in.as_mut().expect("just set").app_view_claiming(now))
         }
         Request::AppSignInState {} => Ok(sign_in.as_mut().map_or_else(
             || json!({"sign_in": "none", "revision": 0}),
-            |session| session.app_view(now),
+            |session| session.app_view_claiming(now),
         )),
         Request::AppSignInAnswer { id, answer } => {
             let session = sign_in.as_mut().ok_or(EngineError {
@@ -2336,7 +2340,7 @@ fn app_sign_in_operation(
                         "tasks: sign-in {}: answered {said} in the app",
                         session.id()
                     );
-                    Ok(session.app_view(now))
+                    Ok(session.app_view_claiming(now))
                 }
                 Err(code) => {
                     eprintln!(

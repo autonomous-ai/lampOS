@@ -3534,7 +3534,8 @@ product-installed lamp (updates.md), so lamps already in homes get it too.
 the owner's app's route (`/run/lampos-tasks/app.sock`, reached by
 `lamp-cloud` for the app's `harness.sign_in.*`, `docs/cloud.md`, which keeps the code and the email off the broker and hands them to the backend over HTTPS). It takes
 only `app_sign_in_start` (`{"method":"code"}`, the default, or
-`{"method":"qr"}`), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`);
+`{"method":"qr"}`; another method is `bad_request`), `app_sign_in_state` and
+`app_sign_in_answer` (`{"id","answer"}`);
 any other op there is `not_on_this_route`, and those three on the public or
 voice socket are `untrusted`. Without `--sign-in-by-code` the socket isn't
 bound. The contract the app builds on is in #5198.
@@ -3553,23 +3554,35 @@ bound. The contract the app builds on is in #5198.
   `method` (`code` or `qr`). A start from the app while the app's own is
   open gives it back, whatever its method; while a voice-started one is open
   it is `voice_sign_in_open`.
-- **The QR (#5198, `"method":"qr"`, only from the app).** lamp-tasks runs
+- **The QR (#5198, `"method":"qr"`, only from the app; the voice's
+  `sign_in_start` is always by code).** lamp-tasks runs
   `harness login --qr --json` (Harness 0.6.16, the pinned version) in place
-  of `--code`. Harness prints
+  of `--code`, on the same lane, with the same environment, `HOME`, life and
+  one-open-sign-in rule (`Cli::sign_in`). Harness prints
   `{"type":"qr","url":"https://harness.autonomous.ai/signin#k=…","expiresIn":N}`,
   again when it is kept alive, then the same `confirm` and `result` as the
   code. The link is read only when it begins with Harness's sign-in page and
   `#k=` (`sign_in::QR_PREFIX`), is at most 512 plain bytes, and is good for
   1 to 600 s; anything else ends the sign-in `unreadable`. The app's view is
-  `sign_in:"qr"` with `qr_url`, `expires_in` and `expires_at`; the app shows
-  the link as a QR, which the Harness phone app scans
-  (Settings ▸ Sign in a computer). Then the question "Sign in as …?" is the
-  app's to answer, as for the code. The voice reads it as the app's
-  (`in_app`) and never sees the link. A code line in a QR sign-in, or a link
-  in a code one, is passed over. Harness's own message is never kept when it
-  holds `#k=`. One that ran out says "The QR code ran out of time. Start again
-  for a new one." The link is journalled as "QR given (good for N s)", never
-  itself.
+  `sign_in:"qr"` with `expires_in` and `expires_at` (moved on each keepalive
+  as the code's); the app shows the link as a QR, which the Harness phone
+  app scans (Settings ▸ Sign in a computer). Then the question "Sign in as
+  …?" is the app's to answer, as for the code. The voice reads it as the
+  app's (`in_app`) and never sees the link. A code line in a QR sign-in, or
+  a link in a code one, is passed over.
+- **The QR link is as secret as the code.** It is held only in the session
+  and given as `qr_url` in one view per telling
+  (`Session::app_view_claiming`: a new link or the same kept alive is given
+  once more), only in the replies to `app_sign_in_start`,
+  `app_sign_in_state` and `app_sign_in_answer` (which lamp-cloud hands to
+  the backend, only if it is the Harness sign-in page, `docs/cloud.md`;
+  another is told back as `relay_failed`), never in the
+  `app_sign_in_relay` reply, a plain view, the voice's view, a `Debug`, a
+  journal line ("QR given (good for N s)", never the link itself) or
+  Harness's `message` (one holding `://`, `#k=` or `hnq_` is dropped), and
+  forgotten when the sign-in ends or the link's time is up. One that ran out
+  says "The QR code ran out of time. Start again for a new one." It rides
+  `LAMP_TASKS_SIGN_IN_APP`, with no switch of its own.
 - **The voice never says an app-started one.** On the voice route it is only
   `{"sign_in":"in_app","id":N}`: `sign_in_start` is `started_in_app`, its code
   claim `not_available`, `sign_in_asked` and `sign_in_answer` `started_in_app`.
@@ -3619,8 +3632,9 @@ bound. The contract the app builds on is in #5198.
   sign-in code couldn't reach the app. Try again." with a new revision;
   the sign-in goes on. `delivered:true` (a later put that worked) clears it,
   with a new revision again. The same word twice is no change.
-- The journal says `sign-in N: started from the app (code)`, `answered yes in
-  the app`, `yes from the app not taken: CODE`: never the digits or the email.
+- The journal says `sign-in N: started from the app (code)` (or `(qr)`),
+  `answered yes in the app`, `yes from the app not taken: CODE`: never the
+  digits, the QR link or the email.
 
 Tests: `sign_in::tests::a_result_keeps_harness_message_and_already_signed_in_for_the_app`,
 `protocol::tests::app_sign_in_operations_are_their_own_and_take_only_a_method_or_an_answer`,
@@ -3628,7 +3642,12 @@ and the service's `the_apps_sign_in_is_its_own_routes_and_never_the_voices`
 (each route's refusals, the app's start, state and answer, the voice's
 `in_app`, a voice-started one shown without its email and not answerable
 from the app, `revision` moved by changes and not reads, Harness's message
-passed on).
+passed on). By QR: `sign_in::tests::harness_qr_lines_are_read_strictly`,
+`a_qr_sign_in_goes_from_its_link_to_the_question_to_the_answer`,
+`the_qr_link_is_claimed_once_and_never_printed_or_kept`,
+`each_method_takes_only_its_own_form`, the CLI's
+`the_qr_sign_in_runs_login_qr_and_reads_its_link` and the service's
+`the_apps_qr_sign_in_gives_its_link_once_and_the_voice_keeps_the_code`.
 
 With the same switch in the voice, `sign_in_computer` and the news say the
 code more slowly, one digit at a time with a comma after each and a full stop

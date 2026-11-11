@@ -4180,7 +4180,13 @@ fn the_qr_sign_in_runs_login_qr_and_reads_its_link() {
             })
         ]
     );
-    assert_eq!(rig.calls()[0]["args"], json!(["login", "--qr", "--json"]));
+    let calls = rig.calls();
+    assert_eq!(calls[0]["args"], json!(["login", "--qr", "--json"]));
+    assert_eq!(calls[0]["environment"]["AI_AGENT"], "lampos");
+    assert_eq!(
+        calls[0]["environment"]["HOME"],
+        rig.root.path().to_str().unwrap()
+    );
     link.answer(true).unwrap();
     assert_eq!(
         sign_in_lines(link.as_mut(), Duration::from_secs(10), true),
