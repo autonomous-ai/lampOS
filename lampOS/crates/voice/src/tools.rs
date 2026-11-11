@@ -1035,10 +1035,14 @@ pub enum Route {
     /// a known person's "forget everything about me" forgets their face too
     /// ([`crate::remember::forget_everything_face`]); with the executive's
     /// directory when the schedule's tools are on, the reminders they set go
-    /// too ([`schedule_whose::forget_reminders`], #4527's P2).
+    /// too ([`schedule_whose::forget_reminders`], #4527's P2); with the
+    /// tasks part's directory, the owner's "forget everything" removes the
+    /// index of the sessions the lamp started too
+    /// ([`crate::agent_tasks::forget_sessions_with_everything`], #6274).
     Memory(
         PathBuf,
         Option<(PathBuf, crate::known_faces::FaceSwitches)>,
+        Option<PathBuf>,
         Option<PathBuf>,
     ),
     /// The time: answered here, at once.
@@ -1152,6 +1156,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
                 .schedule_tools
                 .then(|| settings.exec.clone())
                 .flatten(),
+            settings.tasks.as_ref().map(|place| place.directory.clone()),
         );
     }
     if settings.make_skill && name == crate::made_skill::MAKE {
@@ -1770,7 +1775,7 @@ fn run_call_with_scope(
     }
     let deadline = ASK_DEADLINE;
     let result = match route {
-        Route::Memory(socket, faces, reminders) => {
+        Route::Memory(socket, faces, reminders, tasks) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
@@ -2086,6 +2091,20 @@ fn run_call_with_scope(
                     if heard && model.name == crate::remember::FORGET_EVERYTHING =>
                 {
                     schedule_whose::forget_reminders((told, answered), directory, lease)
+                }
+                _ => (told, answered),
+            };
+            // And the index of the sessions the lamp started (#6274), on the
+            // same mark and rule: the owner's alone.
+            let (told, answered) = match (tasks, lease) {
+                (Some(directory), Some(lease))
+                    if heard && model.name == crate::remember::FORGET_EVERYTHING =>
+                {
+                    crate::agent_tasks::forget_sessions_with_everything(
+                        (told, answered),
+                        directory,
+                        lease,
+                    )
                 }
                 _ => (told, answered),
             };
@@ -2578,7 +2597,7 @@ mod tests {
             name: crate::remember::RECALL.into(),
             args: json!({}),
         };
-        let route = Route::Memory(PathBuf::from("/missing-memory.sock"), None, None);
+        let route = Route::Memory(PathBuf::from("/missing-memory.sock"), None, None, None);
         assert_eq!(
             run_call_scoped(&route, &call, 2, true, &lease),
             ("nobody", (unavailable(), false))
@@ -2791,7 +2810,7 @@ mod tests {
             onboarding: Some(file.clone()),
             ..Settings::default()
         };
-        let memory = Route::Memory(dir.join("memory.sock"), None, None);
+        let memory = Route::Memory(dir.join("memory.sock"), None, None, None);
         let mailbox =
             || std::fs::read_to_string(crate::onboarding::mailbox_of(&file)).unwrap_or_default();
         let kept = json!({"forgotten": true, "everything": false,
@@ -4213,7 +4232,7 @@ mod tests {
         for name in ["remember", "recall", "forget"] {
             assert_eq!(
                 route(&with, name),
-                Route::Memory("/run/lampos-memory/memory.sock".into(), None, None)
+                Route::Memory("/run/lampos-memory/memory.sock".into(), None, None, None)
             );
         }
         assert_eq!(route(&with, "light_on"), Route::Executive(dir.clone()));
@@ -6735,7 +6754,7 @@ mod tests {
         for (route, name) in [
             (&services, crate::services::WRITE),
             (
-                &Route::Memory(PathBuf::from("/missing-memory.sock"), None, None),
+                &Route::Memory(PathBuf::from("/missing-memory.sock"), None, None, None),
                 crate::remember::REMEMBER,
             ),
             (&Route::Executive(dir.clone()), "set_light"),

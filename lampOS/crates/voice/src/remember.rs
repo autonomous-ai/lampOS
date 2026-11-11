@@ -14571,6 +14571,7 @@ mod tests {
             memory.clone(),
             Some((eyes.clone(), crate::known_faces::FaceSwitches::default())),
             None,
+            None,
         );
         let forget = call(FORGET_EVERYTHING, json!({}));
         // Not marked: the memory is emptied, the face kept, the eyes asked
