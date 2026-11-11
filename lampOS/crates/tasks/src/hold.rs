@@ -60,6 +60,18 @@ pub const ENV_FILE: &str = "HARNESS_ENV_FILE";
 pub const FILE: &str = "harness-hold.env";
 /// What the file says.
 pub const TEXT: &str = "ADAPTER_UPDATE_DISABLE=true\n";
+/// The variable Harness's daemon takes its grid binary from (#6283). Its
+/// `ensureManagedGrid` (openharness `lib/runtimeInstall.ts`, v0.6.13_cli)
+/// never reads [`DISABLE`]: on each start and every 10 minutes it follows
+/// the grid pin at `ADAPTER_GRID_RUNTIME_METADATA_URL` (Harness's CDN), so a
+/// held lamp would still move its grid. With this variable set it returns
+/// at once, and the grid stays the one the build's pinned install laid down.
+pub const GRID_BIN: &str = "HARNESS_GRID_BIN";
+/// Where Harness's installer records the managed grid it laid down (the
+/// binary's path, one line), under Harness's home.
+pub const CURRENT_GRID: &str = ".harness/runtime/current-grid";
+/// The folder that path must be in, under Harness's home.
+const RUNTIME: &str = ".harness/runtime";
 /// `LAMP_HERMES_ON_LAMP` (#5978): the variable Harness finds Hermes'
 /// sessions by (openharness `config/env.ts`, `engines/hermes/home.ts`).
 /// With the switch it is in the file too, and given to every Harness
@@ -165,9 +177,13 @@ pub fn env_file_changed(
         openclaw_state,
         "OPENCLAW_STATE_DIR is not a plain absolute path",
     )?;
+    let grid = hold.then(|| pinned_grid(&home)).flatten();
     let mut text = String::new();
     if hold {
         text.push_str(TEXT);
+    }
+    if let Some(grid) = &grid {
+        text.push_str(&format!("{GRID_BIN}={grid}\n"));
     }
     if let Some(hermes) = hermes {
         text.push_str(&format!("{HERMES_HOME}={hermes}\n"));
@@ -186,6 +202,10 @@ pub fn env_file_changed(
     if hold {
         environment.insert(DISABLE.into(), "true".into());
     }
+    match grid {
+        Some(grid) => environment.insert(GRID_BIN.into(), grid.into()),
+        None => environment.remove(GRID_BIN),
+    };
     if let Some(hermes) = hermes {
         environment.insert(HERMES_HOME.into(), hermes.into());
     }
@@ -207,6 +227,31 @@ fn plain<'a>(path: Option<&'a Path>, why: &'static str) -> Result<Option<&'a str
             .ok_or(why)
     })
     .transpose()
+}
+
+/// The managed grid Harness's pinned install laid down (#6283): the first
+/// line of [`CURRENT_GRID`] in `home`, when it is a plain absolute path to
+/// a file named `bin/grid` inside `<home>/.harness/runtime`. `None` when
+/// there is no such record (no grid installed: then the daemon has none to
+/// follow either), or it names anything else, so nothing odd is ever
+/// written into Harness's env file.
+pub fn pinned_grid(home: &Path) -> Option<String> {
+    let record = fs::read_to_string(home.join(CURRENT_GRID)).ok()?;
+    let line = record.lines().next()?;
+    let path = Path::new(line);
+    let plain = !line.is_empty()
+        && line
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "/._-+".contains(c));
+    (plain
+        && path.is_absolute()
+        && path.starts_with(home.join(RUNTIME))
+        && path.ends_with("bin/grid")
+        && path
+            .components()
+            .all(|part| !matches!(part, std::path::Component::ParentDir))
+        && path.is_file())
+    .then(|| line.to_owned())
 }
 
 fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -1048,6 +1093,75 @@ mod tests {
         hold(environment).unwrap();
         assert_eq!(fs::read_to_string(home.join(FILE)).unwrap(), TEXT);
         environment.remove(DISABLE);
+    }
+
+    /// #6283: a held lamp gives Harness the grid its pinned install laid
+    /// down, so the daemon's grid recheck never follows Harness's CDN pin;
+    /// a lifted lamp (the canary) follows it; and a record that names
+    /// anything but a `bin/grid` file in Harness's runtime folder, or none,
+    /// adds nothing.
+    #[test]
+    fn a_held_lamp_keeps_its_pinned_grid_and_a_lifted_one_follows() {
+        let home = tempfile::tempdir().unwrap();
+        let runtime = home.path().join(RUNTIME);
+        let grid_dir = runtime.join("grid-0.3.63-linux-arm64/bin");
+        fs::create_dir_all(&grid_dir).unwrap();
+        let grid = grid_dir.join("grid");
+        fs::write(&grid, "#!/bin/sh\n").unwrap();
+        let grid = grid.to_str().unwrap().to_owned();
+        let record = home.path().join(CURRENT_GRID);
+        let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
+
+        // No record yet: the file is as before #6283.
+        let (path, _) = env_file_changed(&mut environment, true, None, None).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), TEXT);
+        assert!(!environment.contains_key(GRID_BIN));
+
+        // Held, with the installer's record: the file and Harness both have it.
+        fs::write(&record, format!("{grid}\n")).unwrap();
+        let (_, changed) = env_file_changed(&mut environment, true, None, None).unwrap();
+        assert!(changed, "the grid line is new words");
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            format!("{TEXT}{GRID_BIN}={grid}\n")
+        );
+        assert_eq!(environment[GRID_BIN], OsString::from(&grid));
+        assert!(
+            !env_file_changed(&mut environment, true, None, None)
+                .unwrap()
+                .1
+        );
+
+        // Lifted: no grid line, and the variable is taken off again.
+        let (_, changed) = env_file_for(HarnessHold::Lifted, &mut environment, None, None)
+            .unwrap()
+            .unwrap();
+        assert!(changed);
+        assert_eq!(fs::read_to_string(&path).unwrap(), "");
+        assert!(!environment.contains_key(GRID_BIN));
+
+        // A record naming anything else adds nothing.
+        let outside = home.path().join("bin/grid");
+        fs::create_dir_all(outside.parent().unwrap()).unwrap();
+        fs::write(&outside, "").unwrap();
+        for bad in [
+            outside.to_str().unwrap().to_owned(),
+            format!(
+                "{}/grid-0.3.63-linux-arm64/bin/../bin/grid",
+                runtime.display()
+            ),
+            format!("{}/missing/bin/grid", runtime.display()),
+            format!("{}/grid-0.3.63-linux-arm64/bin", runtime.display()),
+            "grid-0.3.63-linux-arm64/bin/grid".to_owned(),
+            format!("{grid} x"),
+            String::new(),
+        ] {
+            fs::write(&record, format!("{bad}\n")).unwrap();
+            assert_eq!(pinned_grid(home.path()), None, "{bad:?}");
+            env_file_changed(&mut environment, true, None, None).unwrap();
+            assert_eq!(fs::read_to_string(&path).unwrap(), TEXT, "{bad:?}");
+            assert!(!environment.contains_key(GRID_BIN), "{bad:?}");
+        }
     }
 
     /// With the switch off, no writer runs, whichever the feed.
