@@ -5305,7 +5305,12 @@ fn made_running(
 ) -> impl std::future::Future<Output = crate::tools::ToolAnswer> {
     let pending = crate::make_skill_local::Pending::begin();
     let (given, answered) = tokio::sync::oneshot::channel();
+    // Held by the turn while it waits: gone once the turn is cut, so the
+    // make says no waiting line to nobody (`LAMP_MAKE_SKILL_AGENT`).
+    let turn = std::sync::Arc::new(());
+    let watched = std::sync::Arc::downgrade(&turn);
     tokio::task::spawn_blocking(move || {
+        crate::make_skill_local::set_turn(watched);
         // Nothing an earlier call left on this thread is taken as this one's.
         let _ = crate::make_skill_local::take_said_line();
         let answer = work();
@@ -5336,6 +5341,7 @@ fn made_running(
         }
     });
     async move {
+        let _turn = turn;
         answered
             .await
             .unwrap_or_else(|_| crate::tools::ToolAnswer::plain(crate::tools::unavailable()))

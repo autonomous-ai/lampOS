@@ -1108,8 +1108,21 @@ fn made_and_journaled_by(
         );
     }
     let made = match engine {
+        // A `cannot:` the system prompt itself asks for (the brief's own
+        // refusals, [`made_skill::BRIEFS_OWN_REFUSALS`]) is said as it is,
+        // never handed over (the Reviewer-lead on #6439).
+        Some(_)
+            if models_cannot.get()
+                && matches!(&made, Err(Refused(why, _)) if made_skill::briefs_own_refusal(why)) =>
+        {
+            eprintln!(
+                "lamp-voice: a skill made here: DeepSeek's cannot is one the brief asks for: \
+                 not handed to the agent"
+            );
+            made
+        }
         Some((agent, engine)) if made.is_err() => {
-            handed_to_agent(made, request, &brief, agent, engine, &kept)
+            handed_to_agent(made, request, &brief, agent, engine, &kept, &models_cannot)
         }
         Some(_) => {
             eprintln!("lamp-voice: a skill made here: made by DeepSeek");
@@ -1177,13 +1190,22 @@ fn handed_to_agent(
     agent: &crate::make_skill_agent::Agent,
     engine: &str,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
+    models_cannot: &std::cell::Cell<bool>,
 ) -> Result<Made, Refused> {
     eprintln!("lamp-voice: a skill made here: DeepSeek failed: handed to the agent ({engine})");
-    agent.say_waiting();
     let began = std::time::Instant::now();
+    // The person's own addresses never go in the agent's rules file: each
+    // stands there as a placeholder, put back in its answer before the
+    // checks (the Reviewer-lead on #6439).
+    let hidden = placeholders(&own_accounts());
+    let system = hide(&system(), &hidden);
+    // The waiting line with the first hand-over only, and never when the
+    // turn was cut already (Twelve's P3 on #6439).
+    let waiting = std::cell::Cell::new(!turn_cut());
     let write = |brief: &str| {
         agent
-            .write(&system(), brief)
+            .write(&system, brief, waiting.replace(false))
+            .map(|text| shown(&text, &hidden))
             .map_err(|why| why.to_string())
             .and_then(|text| whole(text).map_err(|why| why.to_string()))
     };
@@ -1192,7 +1214,7 @@ fn handed_to_agent(
         Err(why) => {
             eprintln!(
                 "lamp-voice: a skill made here: the agent ({engine}) made none ({why}): \
-                 DeepSeek's failure stands"
+                 DeepSeek's one answer, given no repairs, stands as not made"
             );
             // No answer of the agent's was taken, so whether the last was a
             // `cannot:` is still DeepSeek's (`models_cannot`).
@@ -1210,7 +1232,75 @@ fn handed_to_agent(
         Ok(_) => eprintln!("lamp-voice: a skill made here: made by the agent ({engine})"),
         Err(_) => eprintln!("lamp-voice: a skill made here: the agent's ({engine}) wasn't kept"),
     }
-    made
+    // The agent's own `cannot:` is never said as it wrote it: the lamp
+    // says its own fixed line (the Reviewer-lead on #6439).
+    match made {
+        Err(Refused(_, lines)) if models_cannot.get() => Err(Refused(
+            crate::make_skill_agent::CANNOT_LINE.to_owned(),
+            lines,
+        )),
+        made => made,
+    }
+}
+
+std::thread_local! {
+    /// The voice turn waiting on this thread's make, while it waits: gone
+    /// once the turn was cut (`second_provider::worker::made_running`).
+    static TURN: std::cell::RefCell<Option<std::sync::Weak<()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Kept by the second route's worker on the thread a voice make runs on:
+/// the turn waiting for it holds `turn`'s other end.
+pub fn set_turn(turn: std::sync::Weak<()>) {
+    TURN.with(|kept| *kept.borrow_mut() = Some(turn));
+}
+
+/// Whether the voice turn waiting for this thread's make was cut; no for
+/// a make no turn waits on.
+fn turn_cut() -> bool {
+    TURN.with(|kept| {
+        kept.borrow()
+            .as_ref()
+            .is_some_and(|turn| turn.strong_count() == 0)
+    })
+}
+
+/// Each of the person's own addresses in `own` (a linked service's
+/// account), with the placeholder that stands for it in the agent's rules
+/// file, the longest first so none is replaced inside another.
+fn placeholders(own: &[(String, String)]) -> Vec<(String, String)> {
+    let mut accounts: Vec<String> = own
+        .iter()
+        .map(|(_, account)| account.clone())
+        .filter(|account| account.contains('@'))
+        .collect();
+    accounts.sort_by_key(|account| std::cmp::Reverse(account.len()));
+    accounts.dedup();
+    accounts
+        .into_iter()
+        .enumerate()
+        .map(|(n, account)| (account, format!("own{}.lamp@example.invalid", n + 1)))
+        .collect()
+}
+
+/// `text` with each own address replaced by its placeholder.
+fn hide(text: &str, hidden: &[(String, String)]) -> String {
+    hidden
+        .iter()
+        .fold(text.to_owned(), |text, (own, stand_in)| {
+            text.replace(own, stand_in)
+        })
+}
+
+/// The agent's `text` with each placeholder put back as the address it
+/// stands for.
+fn shown(text: &str, hidden: &[(String, String)]) -> String {
+    hidden
+        .iter()
+        .fold(text.to_owned(), |text, (own, stand_in)| {
+            text.replace(stand_in, own)
+        })
 }
 
 /// The journal's line for a make that took `ms`: kept, or not kept and
@@ -3196,6 +3286,105 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(silent.prepares(), 1);
         assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead on #6439: a DeepSeek `cannot:` the system prompt
+    /// asks for is said as it is and never handed to the agent; any other
+    /// goes to the agent.
+    #[test]
+    fn the_briefs_own_refusals_stay_deepseeks_and_others_go_to_the_agent() {
+        let (root, keeping) = keeping("agent-cannot");
+        let tasks = agent_answering(vec![Some(good())]);
+        let own =
+            "cannot: I can't do that yet: hearing what is said. You could ask for a glow instead.";
+        let (url, served) = service(vec![(200, own.to_owned())]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert!(
+            told["error"]
+                .as_str()
+                .unwrap()
+                .contains("hearing what is said"),
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.prepares(), 0);
+        let other = "cannot: a skill can't watch the weather.";
+        let (url, served) = service(vec![(200, other.to_owned())]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW + 1);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.prepares(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Each of the brief's own refusals is a sentence the system prompt
+    /// asks for, word for word, so the list can't drift from it.
+    #[test]
+    fn each_of_the_briefs_own_refusals_is_in_the_system_prompt() {
+        let today = ("2026-11-11".to_owned(), "+07:00".to_owned());
+        let prompts = [
+            system_with(true),
+            system_with(false),
+            services(false, false, &[], None),
+            services(true, false, &[], None),
+            services(false, true, &[], Some(&today)),
+            services(true, true, &[], None),
+        ]
+        .join("\n");
+        for refusal in made_skill::BRIEFS_OWN_REFUSALS {
+            assert!(prompts.contains(refusal), "{refusal}");
+            assert!(made_skill::briefs_own_refusal(&format!(
+                "I can't do that yet: {refusal}."
+            )));
+        }
+        assert!(made_skill::briefs_own_refusal(
+            "I can't do that yet: hearing what is said."
+        ));
+        assert!(made_skill::briefs_own_refusal(
+            "I can't do that yet: knowing who someone is."
+        ));
+        assert!(!made_skill::briefs_own_refusal(
+            "a skill can't watch the weather"
+        ));
+    }
+
+    /// The Reviewer-lead on #6439: the agent's own `cannot:` is never said
+    /// as it wrote it; the lamp says its own line.
+    #[test]
+    fn the_agents_own_cannot_is_said_as_the_lamps_line() {
+        let (root, keeping) = keeping("agent-own-cannot");
+        let tasks = agent_answering(vec![Some(
+            "cannot: AGENT-WORDS-9 can't be done by a skill.".to_owned(),
+        )]);
+        let (url, served) = service(vec![(200, faces())]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.prepares(), 1);
+        let said = told.to_string();
+        assert!(!said.contains("AGENT-WORDS-9"), "{said}");
+        assert!(
+            said.contains(crate::make_skill_agent::CANNOT_LINE),
+            "{said}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The person's own addresses never reach the agent's rules file: each
+    /// is a placeholder there, put back in its answer.
+    #[test]
+    fn own_addresses_are_placeholders_for_the_agent() {
+        let own = vec![
+            ("gmail".to_owned(), "a@b.co".to_owned()),
+            ("outlook".to_owned(), "xa@b.co".to_owned()),
+            ("slack".to_owned(), "T123".to_owned()),
+        ];
+        let hidden = placeholders(&own);
+        assert_eq!(hidden.len(), 2);
+        let text = "to a@b.co and xa@b.co";
+        let hid = hide(text, &hidden);
+        assert!(!hid.contains("a@b.co"), "{hid}");
+        assert_eq!(shown(&hid, &hidden), text);
     }
 
     /// The readers' P2 on #6054: a repair is begun only while a whole

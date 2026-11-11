@@ -3268,21 +3268,32 @@ Tests:
 ##### Handed to the lamp's agent when DeepSeek fails (`LAMP_MAKE_SKILL_AGENT=on`, off, proposal on #6059)
 
 A proposal on #6059 (the owner's OK, 11 Nov), with the first builder's
-yes (Queue #6059, 11 Nov 22:44 +07). With the switch, a voice make the lamp's own model didn't
-make goes to the lamp's own agent, OpenClaw or Hermes, as V1's
-skill-creator handed a make to its agent (`crate::make_skill_agent`). Only
-the writer changes; the tidies, `lamp-skills pack`, the say-back, the
-repairs' briefs and the keeping are the same code for both writers.
+yes (Queue #6059, 11 Nov 22:44 +07). With the switch, a voice make the
+lamp's own model didn't make goes to the lamp's own agent, OpenClaw or
+Hermes, as V1's skill-creator handed a make to its agent
+(`crate::make_skill_agent`). Only the writer changes; the tidies,
+`lamp-skills pack`, the say-back, the repairs' briefs and the keeping are
+the same code for both writers.
 
-- **The order.** DeepSeek writes first, as without the switch. With an
-  agent on the lamp (the tasks part's `lamp` target, read with
-  `{"op":"targets"}` before DeepSeek is asked), DeepSeek gets one try and
-  no repairs. If that one answer isn't kept (the tidies, the check, the
-  say-back, its own `cannot:`, or no answer at all), it goes to the agent
-  at once, with the same system prompt and request, and the agent gets
-  the repairs (up to 3, `MOST_REPAIRS`). Its answers go through the very
-  same checks. With no agent on the lamp, DeepSeek keeps its 3 repairs and
-  its failure stands, as today.
+- **The order.** DeepSeek writes first. With an agent on the lamp (the
+  tasks part's `lamp` target, read with `{"op":"targets"}` before DeepSeek
+  is asked, one local read each make), DeepSeek gets one try and no
+  repairs. If that one answer isn't kept (the tidies, the check, the
+  say-back, a `cannot:` of its own, or no answer at all), it goes to the
+  agent at once, with the same system prompt and request, and the agent
+  gets the repairs (up to 3, `MOST_REPAIRS`). Its answers go through the
+  very same checks. With no agent on the lamp, DeepSeek keeps its 3
+  repairs and its failure stands, as today.
+- **The brief's own refusals stay DeepSeek's.** A DeepSeek `cannot:` whose
+  sentence is one the system prompt asks for (hearing what is said,
+  knowing who someone is, sending a message, the reminder line, sending
+  what wasn't said word for word, an event with no day and time or with
+  the clock not set, the reads' "You can ask me for it yourself any time",
+  and the rest in `made_skill::BRIEFS_OWN_REFUSALS`, kept beside the brief
+  and held to the prompt by a test) is said as it is and never handed to
+  the agent. Any other `cannot:` goes to the agent.
+- **The agent's own `cannot:` is never said as it wrote it.** The lamp says
+  its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`).
 - **How the agent is reached.** The way the voice hands it any work
   (`crate::agent_tasks`, #5978, #6226): prepared for the `lamp` target on
   the tasks part's request socket and confirmed at once on the voice's own
@@ -3291,45 +3302,64 @@ repairs' briefs and the keeping are the same code for both writers.
   agent ends its turn, looked at every 0.5 s. No new transport. The tasks
   part takes 2,000 bytes of text and the system prompt is longer, so the
   system prompt and the brief go in a file of their own,
-  `/run/lampos-make-skill/make-<random>.md`, which the task names: the
-  folder 0750 and the file 0640, both of the local agents' group
-  `lamp-agents` (the installer makes it, with the `lampagent` user), the
-  file removed once the answer is in; with no such group, 0700 and 0600,
-  journaled. The task's
-  text begins as a brief does (`made_skill::is_brief`), so its answer, or
-  its failed hand-over, is never told as news. Once read, the answer is
-  marked told, so `--close-told` closes the agent's session. An agent that
-  doesn't answer in 45 s has its task cancelled (`cancel`); the tasks part
-  takes that only for work not yet handed to the agent and has no op that
-  ends work the agent has, so such work is left running, journaled, and
-  its news, a brief's, is never told.
+  `/run/lampos-make-skill/make-<random>.md` (16 bytes from the kernel's
+  random source), which the task names: the folder 0750 and the file 0640,
+  both of the local agents' group `lamp-agents` (the installer makes it,
+  with the `lampagent` user), the file removed once the answer is in; with
+  no such group, 0700 and 0600, journaled. The second route's worker
+  sweeps any `make-*.md` left there as it starts. The person's own
+  addresses (a write's own recipients) never go in the file: each is a
+  placeholder there (`own1.lamp@example.invalid`), put back in the agent's
+  answer before the checks. The task's text begins as a brief does
+  (`made_skill::is_brief`), so its answer, or its failed hand-over, is
+  never told as news, and neither "how is my task going" nor "what are my
+  agents doing" ever names it (`agent_tasks` `check` and `tasks_now` skip
+  it). Once read, the answer is marked told, so `--close-told` closes the
+  agent's session.
+- **A silent agent.** An agent that doesn't answer in 45 s has its task
+  sent `cancel`, its tries bounded by one 1.5 s deadline. The tasks part
+  takes a cancel only for work not yet handed to the agent and has no op
+  that ends work the agent has, so such work is left running, journaled,
+  and its news, a brief's, is never told.
 - **The agent's tools.** The agent runs with its own tools during a make:
   there is no tools-off mode yet. The switch stays off until that is
   decided.
 - **Bounds.** Each of the agent's answers within 45 s
   (`make_skill_agent::WRITE_WITHIN`); a repair is begun only while one
   more answer fits the agent's 120 s (`make_skill_agent::MAKE_WITHIN`).
-  No answer from it in 45 s, an error, or its first answer not given:
-  DeepSeek's failure stands, as today. A make can then go on up to 240 s,
-  which the second route's wait for a make's line follows
+  No answer from it in 45 s, an error, or its first answer not given: the
+  make is not made, and what is said is DeepSeek's one answer's failure,
+  which had no repairs (with an agent on the lamp DeepSeek gets none), so
+  this is not today's failure after 3 repairs. A make can go on up to
+  240 s, which the second route's wait for a make's line follows
   (`make_skill_local::longest_make`).
-- **What is heard.** "I'll make it now" is said at once, unchanged. As the
-  agent begins, the lamp says "Let me think about that a little longer."
-  through the say service (`app_make::say_waiting_at`, once, not begun
-  after 15 s). The made line is the same either way.
+- **What is heard.** "I'll make it now" is said at once, unchanged. Once
+  the agent's first hand-over is taken, the lamp says "Let me think about
+  that a little longer." through the say service
+  (`app_make::say_waiting_at`, once, not begun after 15 s); never when the
+  hand-over failed at once, nor when the turn was cut already. The made
+  line is the same either way.
 - **The journal.** "made by DeepSeek", "DeepSeek failed: handed to the
   agent (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes)
   wasn't kept", "the agent (Hermes) made none (no answer within 45 s):
-  DeepSeek's failure stands", "no agent on the lamp: DeepSeek makes it
-  alone"; an agent's repair says "by the agent".
+  DeepSeek's one answer, given no repairs, stands as not made", "DeepSeek's
+  cannot is one the brief asks for: not handed to the agent", "no agent on
+  the lamp: DeepSeek makes it alone"; an agent's repair says "by the
+  agent".
 - **Off** (unless set, in no product unit): nothing above; the path is
   byte for byte today's. The app's typed makes stay DeepSeek's.
 - **Tests:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
   `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
-  `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`, and
-  `make_skill_agent::tests` (the rules in a file, the task a brief within
-  2,000 bytes, confirmed and told; no `lamp` target is no agent; a silent
-  agent times out).
+  `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`,
+  `the_briefs_own_refusals_stay_deepseeks_and_others_go_to_the_agent`,
+  `each_of_the_briefs_own_refusals_is_in_the_system_prompt`,
+  `the_agents_own_cannot_is_said_as_the_lamps_line`,
+  `own_addresses_are_placeholders_for_the_agent`,
+  `agent_tasks::tests::a_check_after_a_make_handed_to_the_agent_tells_the_persons_task`,
+  and `make_skill_agent::tests` (the rules in a file of the agents' group,
+  the task a brief within 2,000 bytes, confirmed and told; no `lamp` target
+  is no agent; a silent agent times out and is sent `cancel`; a cancel
+  always answered busy ends in time; old rules files swept).
 - **Not yet shown on a lamp:** its row, the 16 makes (twelve simple, four
   known DeepSeek failures) on a lamp with an agent, comparing kept, the
   say-back and the time with DeepSeek's. Whether the agent's user is in
