@@ -534,7 +534,14 @@ fn through_the_products_releasing_save_the_first_update_file_still_goes() {
             },
             light: None,
         };
-        run(&status, &accepted, "VN", &mut Lamp::new(true), &mut save, || None);
+        run(
+            &status,
+            &accepted,
+            "VN",
+            &mut Lamp::new(true),
+            &mut save,
+            || None,
+        );
         assert_eq!(
             save.save.seen.last().map(String::as_str),
             Some(if fails {

@@ -586,7 +586,11 @@ While it waits, and on until the marker is written,
 (`setup_lifecycle`, the same unit and drop-in checks): a restart would cut
 the wait off, or bring the hotspot back between the wait's end and the
 marker. The file goes once the marker is written, or once setup failed
-anyway, and the next start removes a file a crash left (#5965).
+anyway, and the next start removes a file a crash left (#5965). The
+exception holds only while the old and the new `lamp-setup.service` are
+both the product's own: an update that changes that unit restarts a waiting
+setup as before, so the hotspot comes back and the person sets up again
+(the Reviewer-lead's P3 on #5965; it never leaves the lamp unusable).
 
 An app that doesn't send `update_first` (every app before it, V1's page and
 this crate's own) gets setup as before: it gives up on a setup that takes
