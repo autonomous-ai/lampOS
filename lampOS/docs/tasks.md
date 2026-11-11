@@ -2184,13 +2184,14 @@ for each run, and is answered once the run ends
 - **The answer:** `{"ok":true,"id":N}` once the run ended, or
   `{"ok":false,"error","message"}`: `off` (the switch is not `on`),
   `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
-  no one-run token) or `run_failed`.
+  no one-run token), `run_failed`, or `busy` (another skill's task is
+  running: one runs at a time).
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for
   each run lamp-tasks asks lamp-control (#6304, PR #6408) for a token on
   its admin socket, `/run/lampos-control/admin.sock` (`ControlTokens`, the
   `Tokens` trait): `{"mint":{"skill","run","expires_in_ms"}}`, the run id
-  lamp-tasks' own and new for each hand-over (`run_id`), the life 30
-  minutes (`RUN_LIFETIME`, lamp-control's most), and `{"end":{"run"}}` when
+  lamp-tasks' own and new for each hand-over (`run_id`), the life 14
+  minutes (`RUN_LIFETIME`, under lamp-control's most of 30, a minute under lamp-skills' 15-minute wait), and `{"end":{"run"}}` when
   it ends. A mint whose answer is lost (no answer in 5 s, or not JSON) is
   ended at once too, since its token may be live. lamp-control reads the owner's yes itself and names its grants; a
   run whose minted grants are not exactly the ones its line asks is refused
@@ -2209,18 +2210,53 @@ for each run, and is answered once the run ends
   run's end. The runner ends the run at `SkillRun::deadline`, the token's
   life, and holds it off the network itself (hermes-ns), never by the
   prompt's words alone.
+- **The lamp's runner** (`HermesRunner::lamp`): the lamp's Hermes started
+  as Harness starts it for target `lamp`: `/usr/local/bin/hermes chat -q`
+  and the run's words as the last argument (the wrapper runs Hermes only in
+  its namespace, `hermes-ns`: no lamp service's folder or socket, the
+  skills read-only), in the lamp's work folder
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; that folder not there
+  is `run_failed` with nothing started. Its environment is only `PATH`,
+  `HOME`, `HERMES_HOME` and `SHELL` (as lamp-tasks.service gives them) and
+  the run's `LAMP_CONTROL_SOCKET` and `LAMP_CONTROL_TOKEN`; nothing else of
+  lamp-tasks' own. The token is never an argument, and the run's output
+  goes nowhere, not into the journal. The run is its own process group,
+  killed whole at its deadline (14 minutes); exit status 0 is
+  `{"ok":true,"id":0}` (the status: there is no Harness task number), any
+  other `run_failed` naming the status.
+- **The socket** (`HandOvers`): with `LAMP_SKILL_TASKS=on` in
+  lamp-tasks' environment, `serve` binds
+  `/run/lampos-tasks/skill-task.sock` (`HAND_OVER_SOCKET`), made as its
+  other sockets are (0600 in its 0700 runtime folder); off, nothing is
+  bound. A socket that can't be bound leaves skill tasks off and the rest
+  of the part running, said in the journal. Only `lamp-skills.service` run
+  as lamp-tasks' own user is answered (read from the kernel, as the app's
+  route reads lamp-cloud); any other caller is closed with no answer. Each
+  connection is one line (its newline taken off, read within 5 s), answered
+  on a thread of its own, so the accept loop never waits on a run. One run
+  at a time: a second line while one runs is answered `busy` at once, and
+  at most 4 connections are read or answered at once, a fifth `busy` too.
+  The journal keeps each outcome's code only, never the line, the task's
+  words or the token. lamp-skills names the socket with `--tasks-socket` or
+  `LAMP_SKILLS_TASKS_SOCKET` (#6346); no unit passes it yet.
 
 **Not yet (said so the code is not read as more):** `ControlTokens` speaks
 lamp-control's admin socket (#6408, merged), but lamp-control keeps no skill
-yes yet, so every mint is refused there today. No serve flag
-binds the hand-over socket yet, and no `Runner` starts Hermes through
-Harness yet, so nothing on a lamp runs a skill's task. The run's "no other
+yes yet, so every mint is refused there today. No product unit sets
+`LAMP_SKILL_TASKS=on` for lamp-tasks, and none passes lamp-skills the
+socket, so nothing on a lamp runs a skill's task. The run's result is not yet Task news, and the
+skill's folder is named in the run's words, not in the work folder's
+`AGENTS.md`. The run's "no other
 network" (a direct outbound call refused) and the caps on
 lamp-tasks.service (`MemoryHigh`, `CPUQuota`) wait for measurements of
 Hermes's RAM and CPU running a task on lamp-52e6 (a 6 GB lamp: every
 RAM cap is sized to one) against Hermes's install floor (≥1,350 MB available), with the voice answering a line during the
 run. Tests: `skill_task::tests` (the switch, the token's life, a failed
-run, no token, every refused line).
+run, no token, every refused line; the socket answering a line, a second
+run refused `busy`, the switch off binding nothing, a caller not
+lamp-skills given no answer; a run killed at its deadline, its exit status,
+and the token in its environment, never its arguments), on any computer,
+with no Hermes.
 
 ## Devin (#1854)
 

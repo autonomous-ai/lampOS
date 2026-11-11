@@ -20,7 +20,12 @@
 //!   [`NoTokens`] refuses every run: nothing runs without a token.
 //! - **The run** ([`Runner`]): one task for target `lamp` (the lamp's own
 //!   Hermes), its words the skill's task and its script's place
-//!   ([`SkillRun::prompt`]). The runner blocks until the run ends.
+//!   ([`SkillRun::prompt`]). The runner blocks until the run ends. On a
+//!   lamp, [`HermesRunner`]: `hermes chat -q` through Hermes's own wrapper
+//!   and namespace, killed at the run's deadline.
+//! - **The socket** ([`HandOvers`]): with the switch on, `serve` binds
+//!   [`HAND_OVER_SOCKET`] for lamp-skills alone, one line a connection,
+//!   one run at a time (another is refused `busy`).
 use crate::protocol::refusal;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -51,10 +56,13 @@ pub const TOKEN_ENV: &str = "LAMP_CONTROL_TOKEN";
 pub const ADMIN_SOCKET: &str = "/run/lampos-control/admin.sock";
 /// How long one ask on [`ADMIN_SOCKET`] may take, each way.
 pub const ADMIN_WAIT: Duration = Duration::from_secs(5);
-/// A run's whole life: its token is minted for this long (lamp-control's
-/// most, `expires_in_ms`), and the [`Runner`] ends the run by then, so a
-/// run never outlives its token and a hung one is ended, never waited on.
-pub const RUN_LIFETIME: Duration = Duration::from_secs(30 * 60);
+/// A run's whole life: its token is minted for this long (`expires_in_ms`,
+/// under lamp-control's most, 30 minutes), and the [`Runner`] ends the run
+/// by then, so a run never outlives its token and a hung one is ended,
+/// never waited on. A minute under lamp-skills' 15-minute wait for the
+/// answer (`RUN_MOST`, #6346), so a run never holds the one place after
+/// nobody waits for it.
+pub const RUN_LIFETIME: Duration = Duration::from_secs(14 * 60);
 /// The folder a skill's script is in (#6305, `lamp_skills::task::SCRIPTS`).
 pub const SCRIPTS: &str = "scripts";
 /// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`).
@@ -518,6 +526,348 @@ pub fn answer(
     }
 }
 
+/// The `hermes` Harness finds on `lampos`'s `PATH`, which runs Hermes only
+/// in its namespace (`lamp_update::hermes_install::WRAPPER`, its
+/// `hermes-ns`): the one way the lamp's Hermes is ever started.
+pub const HERMES: &str = "/usr/local/bin/hermes";
+/// What Harness starts the lamp's Hermes with before its first prompt
+/// (`hermes chat -q`, `crate::harness::EngineKind::Hermes`): one turn, then
+/// its end (`terminal.oneshot_completion_wait_seconds 0` in its config).
+pub const HERMES_ARGS: [&str; 2] = ["chat", "-q"];
+/// The `PATH` a run is started with: lamp-tasks.service's own.
+pub const RUN_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
+/// How often a run is looked at for its end.
+pub const RUN_TICK: Duration = Duration::from_millis(50);
+
+/// Runs a [`SkillRun`] with the lamp's own Hermes, started as Harness
+/// starts it for target `lamp`: [`HERMES`] (its namespace: no lamp
+/// service's folder or socket but the skills, read-only, and lamp-skills'
+/// tools folder when on), `chat -q` and the run's words, in the lamp's work
+/// folder (`runtime::LAMP_PROJECT`, the one Hermes is started in there).
+///
+/// - **Its environment** is [`HermesRunner::env`] (what lamp-tasks.service
+///   gives: `PATH`, `HOME`, `HERMES_HOME`, `SHELL`) and the run's own
+///   ([`SkillRun::env`]: the socket and the token), nothing of lamp-tasks'
+///   own besides. The token is never in its arguments, and lamp-tasks
+///   never writes the environment anywhere.
+/// - **Its output** goes nowhere: not into the journal, which is
+///   lamp-tasks', so nothing the run prints (the token among it) is kept.
+/// - **Its end:** at [`SkillRun::deadline`] its whole process group is
+///   killed (the wrapper's `unshare --kill-child` takes Hermes with it).
+///   Exit status 0 is `Ok(0)`, the status, as there is no Harness task
+///   number; any other is an error naming it.
+#[derive(Debug)]
+pub struct HermesRunner {
+    pub program: PathBuf,
+    /// Before the run's words, which come last.
+    pub args: Vec<String>,
+    /// The folder the run starts in.
+    pub folder: PathBuf,
+    pub env: Vec<(String, String)>,
+    pub tick: Duration,
+}
+
+impl HermesRunner {
+    /// The lamp's: [`HERMES`] `chat -q`, in the lamp's work folder under
+    /// lamp-tasks' `home` (`runtime::LAMP_PROJECT`).
+    pub fn lamp(home: &Path) -> Self {
+        let project = crate::runtime::LAMP_PROJECT
+            .strip_prefix("~/")
+            .unwrap_or(crate::runtime::LAMP_PROJECT);
+        Self {
+            program: PathBuf::from(HERMES),
+            args: HERMES_ARGS.iter().map(|arg| (*arg).to_owned()).collect(),
+            folder: home.join(project),
+            env: vec![
+                ("PATH".into(), RUN_PATH.into()),
+                ("HOME".into(), home.to_string_lossy().into_owned()),
+                (
+                    crate::hold::HERMES_HOME.into(),
+                    crate::runtime::HERMES_HOME.into(),
+                ),
+                ("SHELL".into(), "/bin/sh".into()),
+            ],
+            tick: RUN_TICK,
+        }
+    }
+}
+
+impl Runner for HermesRunner {
+    fn run(&self, run: &SkillRun) -> Result<u64, String> {
+        use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
+        use std::os::unix::process::CommandExt;
+        use std::process::{Command, Stdio};
+        // Hermes's namespace refuses a folder it doesn't show: said here,
+        // before anything is started.
+        if !self.folder.is_dir() {
+            return Err(format!(
+                "the lamp's work folder {} is not there",
+                self.folder.display()
+            ));
+        }
+        let mut child = Command::new(&self.program)
+            .args(&self.args)
+            .arg(&run.prompt)
+            .env_clear()
+            .envs(self.env.iter().map(|(name, value)| (name, value)))
+            .envs(run.env.iter().map(|(name, value)| (name, value)))
+            .current_dir(&self.folder)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .map_err(|error| format!("the lamp's Hermes could not be started: {error}"))?;
+        let pid = Pid::from_child(&child);
+        let began = std::time::Instant::now();
+        let status = loop {
+            // NOWAIT keeps the pid, so the group signal below never reaches
+            // another process given it.
+            match waitid(
+                WaitId::Pid(pid),
+                WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+            ) {
+                Ok(Some(status)) => break Some(status.exit_status()),
+                Ok(None) => {}
+                Err(error) if error == rustix::io::Errno::INTR => {}
+                Err(_) => break None,
+            }
+            if began.elapsed() >= run.deadline {
+                break None;
+            }
+            std::thread::sleep(self.tick);
+        };
+        // Whatever the run left in its group goes with it.
+        let _ = kill_process_group(pid, Signal::KILL);
+        let _ = child.kill();
+        let _ = child.wait();
+        match status {
+            Some(Some(0)) => Ok(0),
+            Some(Some(code)) => Err(format!("the lamp's Hermes ended with status {code}")),
+            Some(None) => Err("the lamp's Hermes was ended by a signal".into()),
+            None if began.elapsed() >= run.deadline => Err(format!(
+                "the run was ended at its deadline, {} s",
+                run.deadline.as_secs()
+            )),
+            None => Err("the lamp's Hermes could not be waited for".into()),
+        }
+    }
+}
+
+/// lamp-tasks' hand-over socket, in its own runtime folder (`lampos`'s,
+/// 0700), the socket 0600 as its others: lamp-skills (run as `lampos`)
+/// names it with `--tasks-socket` or `LAMP_SKILLS_TASKS_SOCKET` (#6346).
+pub const HAND_OVER_SOCKET: &str = "/run/lampos-tasks/skill-task.sock";
+/// The one unit whose lines are taken: lamp-skills, run as lamp-tasks'
+/// own user, as the kernel names the caller.
+pub const CALLER_UNIT: &str = "lamp-skills.service";
+/// How long a connection has to send its line, and to take its answer.
+pub const LINE_WAIT: Duration = Duration::from_secs(5);
+/// The most connections read or answered at once; one more is refused
+/// `busy` at once.
+pub const MOST_CONNECTIONS: usize = 4;
+/// How often the socket is looked at while no one connects.
+const ACCEPT_TICK: Duration = Duration::from_millis(20);
+
+/// Whether `caller` is [`CALLER_UNIT`] run as `own_uid`; an unknown caller
+/// (none named, or its unit not read) is refused.
+pub fn caller_may(caller: Option<&lamp_ipc::caller::Caller>, own_uid: u32) -> bool {
+    caller
+        .is_some_and(|caller| caller.uid == own_uid && caller.unit.as_deref() == Some(CALLER_UNIT))
+}
+
+/// [`caller_may`] with this process's own uid: the check on a lamp.
+pub fn caller_is_lamp_skills(caller: Option<&lamp_ipc::caller::Caller>) -> bool {
+    caller_may(caller, rustix::process::geteuid().as_raw())
+}
+
+/// lamp-skills' hand-overs served: one line a connection, answered with
+/// [`answer`], at most one run at a time (a second is refused `busy`).
+pub struct HandOvers {
+    pub socket: PathBuf,
+    pub skills: PathBuf,
+    pub tokens: std::sync::Arc<dyn Tokens + Send + Sync>,
+    pub runner: std::sync::Arc<dyn Runner + Send + Sync>,
+    pub caller: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
+}
+
+/// What a second run is told while one runs.
+pub const BUSY: &str = "a skill's task is already running on this lamp; one runs at a time";
+
+impl HandOvers {
+    /// The lamp's: [`HAND_OVER_SOCKET`], [`SKILLS`], lamp-control's tokens
+    /// ([`ControlTokens`]), the lamp's Hermes ([`HermesRunner::lamp`]) and
+    /// lamp-skills alone as caller.
+    pub fn lamp(home: &Path) -> Self {
+        Self {
+            socket: PathBuf::from(HAND_OVER_SOCKET),
+            skills: PathBuf::from(SKILLS),
+            tokens: std::sync::Arc::new(ControlTokens::default()),
+            runner: std::sync::Arc::new(HermesRunner::lamp(home)),
+            caller: caller_is_lamp_skills,
+        }
+    }
+
+    /// With the switch `on`, the socket bound and served on a thread of its
+    /// own until `stop`, the socket removed then; off, nothing is bound and
+    /// `None`.
+    pub fn start(
+        self,
+        on: bool,
+        stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> std::io::Result<Option<std::thread::JoinHandle<()>>> {
+        if !on {
+            return Ok(None);
+        }
+        let (listener, binding) = crate::runtime::bind(&self.socket)?;
+        let served = std::thread::Builder::new()
+            .name("tasks-skill-task".into())
+            .spawn(move || {
+                let _binding = binding;
+                self.accept(&listener, &stop);
+            })?;
+        Ok(Some(served))
+    }
+
+    /// The accept loop: never waits on a line or a run, each connection
+    /// read and answered on a thread of its own.
+    fn accept(
+        self,
+        listener: &std::os::unix::net::UnixListener,
+        stop: &std::sync::atomic::AtomicBool,
+    ) {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, AtomicUsize};
+        let this = Arc::new(self);
+        let running = Arc::new(AtomicBool::new(false));
+        let open = Arc::new(AtomicUsize::new(0));
+        while !stop.load(Ordering::Acquire) {
+            let stream = match listener.accept() {
+                Ok((stream, _)) => stream,
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(ACCEPT_TICK);
+                    continue;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) => {
+                    eprintln!("[lamp-tasks] skill task: accept: {error}");
+                    std::thread::sleep(ACCEPT_TICK);
+                    continue;
+                }
+            };
+            let caller = lamp_ipc::caller::of_stream(&stream);
+            if !(this.caller)(caller.as_ref()) {
+                // Closed with no answer, as the app's route does.
+                eprintln!(
+                    "[lamp-tasks] skill task: refused a caller that is not {CALLER_UNIT} (pid {})",
+                    caller.map_or_else(|| "unknown".into(), |caller| caller.pid.to_string())
+                );
+                continue;
+            }
+            // An accepted socket may keep the listener's non-blocking mode.
+            if stream.set_nonblocking(false).is_err()
+                || stream.set_read_timeout(Some(LINE_WAIT)).is_err()
+                || stream.set_write_timeout(Some(LINE_WAIT)).is_err()
+            {
+                continue;
+            }
+            if open.fetch_add(1, Ordering::AcqRel) >= MOST_CONNECTIONS {
+                open.fetch_sub(1, Ordering::AcqRel);
+                write_answer(&stream, &refusal("busy", BUSY));
+                continue;
+            }
+            let held = Counted(open.clone());
+            let (served, running) = (this.clone(), running.clone());
+            // A thread not started drops `held`, so its place is let go.
+            let _ = std::thread::Builder::new()
+                .name("tasks-skill-task-run".into())
+                .spawn(move || {
+                    let _held = held;
+                    served.one(&stream, &running);
+                });
+        }
+    }
+
+    /// One connection: its line read, the one run's place taken or `busy`,
+    /// the answer written.
+    fn one(&self, stream: &UnixStream, running: &std::sync::atomic::AtomicBool) {
+        let line = match read_line(stream) {
+            Ok(line) => line,
+            Err(refused) => {
+                write_answer(stream, &refused);
+                return;
+            }
+        };
+        if running
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            eprintln!("[lamp-tasks] skill task: refused busy, one already runs");
+            write_answer(stream, &refusal("busy", BUSY));
+            return;
+        }
+        let place = Place(running);
+        let answered = answer(&line, true, &self.skills, &*self.tokens, &*self.runner);
+        drop(place);
+        // The outcome's code only: never the line, the task's words or the
+        // token.
+        match answered["ok"].as_bool() {
+            Some(true) => eprintln!("[lamp-tasks] skill task: the run ended"),
+            _ => eprintln!(
+                "[lamp-tasks] skill task: refused {}",
+                answered["error"].as_str().unwrap_or("?")
+            ),
+        }
+        write_answer(stream, &answered);
+    }
+}
+
+/// One of [`MOST_CONNECTIONS`] held while its thread lives.
+struct Counted(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl Drop for Counted {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// The one run's place, let go however the run ends.
+struct Place<'a>(&'a std::sync::atomic::AtomicBool);
+
+impl Drop for Place<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+/// One line, its newline taken off: at most
+/// [`crate::protocol::MAX_LINE_BYTES`] are answered, more is `too_long`; no
+/// whole line in [`LINE_WAIT`] is `bad_request`.
+fn read_line(stream: &UnixStream) -> Result<Vec<u8>, Value> {
+    let most = crate::protocol::MAX_LINE_BYTES;
+    let mut line = Vec::new();
+    BufReader::new(std::io::Read::take(stream, most as u64 + 2))
+        .read_until(b'\n', &mut line)
+        .map_err(|_| refusal("bad_request", "no line was read in time"))?;
+    if line.last() == Some(&b'\n') {
+        line.pop();
+        Ok(line)
+    } else if line.len() > most {
+        Err(refusal("too_long", "the line is too long"))
+    } else {
+        Err(refusal("bad_request", "not one whole line"))
+    }
+}
+
+/// `answer` and a newline; a caller already gone is only said.
+fn write_answer(mut stream: &UnixStream, answer: &Value) {
+    let mut out = answer.to_string();
+    out.push('\n');
+    if let Err(error) = stream.write_all(out.as_bytes()) {
+        eprintln!("[lamp-tasks] skill task: the answer was not taken: {error}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -835,7 +1185,7 @@ mod tests {
         assert_eq!(
             served.join().unwrap(),
             vec![
-                json!({"mint": {"skill": "photo-booth", "run": "task-1", "expires_in_ms": 1_800_000}}),
+                json!({"mint": {"skill": "photo-booth", "run": "task-1", "expires_in_ms": 840_000}}),
                 json!({"end": {"run": "task-1"}}),
             ]
         );
@@ -982,6 +1332,293 @@ mod tests {
         assert_eq!(listed.len(), SERVICE_GRANTS.len(), "a service listed twice");
         codes.retain(|code| !code.is_empty());
         assert_eq!(codes, listed);
+    }
+
+    /// Tokens shared across the serve loop's threads: each mint names the
+    /// line's own grants, and the ends are kept.
+    #[derive(Default)]
+    struct SharedTokens {
+        ended: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl Tokens for SharedTokens {
+        fn mint(&self, _: &str, _: &str) -> Result<Minted, String> {
+            Ok(Minted {
+                token: RunToken::new("tok-shared".into()),
+                grants: vec!["camera".into(), "light".into()],
+            })
+        }
+
+        fn end(&self, run: &str) {
+            self.ended.lock().unwrap().push(run.into());
+        }
+    }
+
+    /// A runner that says it began on `began`, then waits for `release`
+    /// (or answers at once with none).
+    struct HeldRunner {
+        began: std::sync::Mutex<std::sync::mpsc::Sender<()>>,
+        release: std::sync::Mutex<Option<std::sync::mpsc::Receiver<()>>>,
+        id: u64,
+    }
+
+    impl Runner for HeldRunner {
+        fn run(&self, _: &SkillRun) -> Result<u64, String> {
+            let _ = self.began.lock().unwrap().send(());
+            if let Some(release) = self.release.lock().unwrap().as_ref() {
+                let _ = release.recv_timeout(Duration::from_secs(10));
+            }
+            Ok(self.id)
+        }
+    }
+
+    /// A 0700 folder of this user's, as lamp-tasks' runtime folder is: the
+    /// socket's parent must be (`runtime::bind`).
+    fn private() -> tempfile::TempDir {
+        use std::os::unix::fs::PermissionsExt;
+        tempfile::Builder::new()
+            .prefix("tsk-")
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .unwrap()
+    }
+
+    fn served(
+        runner: HeldRunner,
+        caller: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
+    ) -> (
+        tempfile::TempDir,
+        PathBuf,
+        std::sync::Arc<std::sync::atomic::AtomicBool>,
+        std::sync::Arc<SharedTokens>,
+        std::thread::JoinHandle<()>,
+    ) {
+        let dir = private();
+        let socket = dir.path().join("skill-task.sock");
+        let tokens = std::sync::Arc::new(SharedTokens::default());
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let handle = HandOvers {
+            socket: socket.clone(),
+            skills: PathBuf::from(SKILLS),
+            tokens: tokens.clone(),
+            runner: std::sync::Arc::new(runner),
+            caller,
+        }
+        .start(true, stop.clone())
+        .unwrap()
+        .expect("on binds");
+        (dir, socket, stop, tokens, handle)
+    }
+
+    fn held(
+        id: u64,
+    ) -> (
+        HeldRunner,
+        std::sync::mpsc::Receiver<()>,
+        std::sync::mpsc::Sender<()>,
+    ) {
+        let (began_tx, began_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        (
+            HeldRunner {
+                began: std::sync::Mutex::new(began_tx),
+                release: std::sync::Mutex::new(Some(release_rx)),
+                id,
+            },
+            began_rx,
+            release_tx,
+        )
+    }
+
+    /// As lamp-skills' `hand_over` (#6346): one line and its newline, one
+    /// line read back.
+    fn hand(socket: &Path, line: &[u8]) -> String {
+        let mut stream = UnixStream::connect(socket).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        // A caller closed with no answer may find the line not taken.
+        let _ = stream
+            .write_all(line)
+            .and_then(|()| stream.write_all(b"\n"));
+        let mut answer = String::new();
+        let _ = BufReader::new(std::io::Read::take(stream, 8_192)).read_line(&mut answer);
+        answer
+    }
+
+    #[test]
+    fn the_serve_loop_answers_a_line_and_ends_its_token() {
+        let (runner, _began, release) = held(9);
+        drop(release);
+        let (_dir, socket, stop, tokens, handle) = served(runner, |_| true);
+        let answer: Value = serde_json::from_str(&hand(&socket, &line(|_| {}))).unwrap();
+        assert_eq!(answer, json!({"ok": true, "id": 9}));
+        assert_eq!(tokens.ended.lock().unwrap().len(), 1);
+        // A bad line is answered on the socket as `answer` refuses it.
+        let answer: Value =
+            serde_json::from_str(&hand(&socket, &line(|v| v["grants"] = json!(["skills"]))))
+                .unwrap();
+        assert_eq!(answer["error"], "bad_request");
+        let long = vec![b'x'; crate::protocol::MAX_LINE_BYTES + 10];
+        let answer: Value = serde_json::from_str(&hand(&socket, &long)).unwrap();
+        assert_eq!(answer["error"], "too_long");
+        stop.store(true, Ordering::Release);
+        handle.join().unwrap();
+        assert!(!socket.exists(), "the socket is removed at the stop");
+    }
+
+    #[test]
+    fn a_second_run_while_one_runs_is_refused_busy() {
+        let (runner, began, release) = held(3);
+        let (_dir, socket, stop, _tokens, handle) = served(runner, |_| true);
+        let first = {
+            let socket = socket.clone();
+            std::thread::spawn(move || hand(&socket, &line(|_| {})))
+        };
+        began.recv_timeout(Duration::from_secs(10)).unwrap();
+        let second: Value = serde_json::from_str(&hand(&socket, &line(|_| {}))).unwrap();
+        assert_eq!(second["ok"], false);
+        assert_eq!(second["error"], "busy");
+        release.send(()).unwrap();
+        let first: Value = serde_json::from_str(&first.join().unwrap()).unwrap();
+        assert_eq!(first, json!({"ok": true, "id": 3}));
+        // The place is let go: the next run runs.
+        release.send(()).unwrap();
+        let third: Value = serde_json::from_str(&hand(&socket, &line(|_| {}))).unwrap();
+        assert_eq!(third, json!({"ok": true, "id": 3}));
+        stop.store(true, Ordering::Release);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn the_switch_off_binds_nothing() {
+        let dir = private();
+        let socket = dir.path().join("skill-task.sock");
+        let (runner, _began, _release) = held(1);
+        let started = HandOvers {
+            socket: socket.clone(),
+            skills: PathBuf::from(SKILLS),
+            tokens: std::sync::Arc::new(SharedTokens::default()),
+            runner: std::sync::Arc::new(runner),
+            caller: |_| true,
+        }
+        .start(false, std::sync::Arc::default())
+        .unwrap();
+        assert!(started.is_none());
+        assert!(!socket.exists());
+        assert!(std::fs::read_dir(dir.path()).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn a_caller_that_is_not_lamp_skills_gets_no_answer_and_no_run() {
+        let (runner, began, _release) = held(1);
+        let (_dir, socket, stop, tokens, handle) = served(runner, |_| false);
+        assert_eq!(hand(&socket, &line(|_| {})), "");
+        assert!(began.try_recv().is_err());
+        assert!(tokens.ended.lock().unwrap().is_empty());
+        stop.store(true, Ordering::Release);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn only_lamp_skills_as_the_parts_own_user_may_hand_over() {
+        use lamp_ipc::caller::Caller;
+        let caller = |uid, unit: Option<&str>| Caller {
+            pid: 10,
+            uid,
+            unit: unit.map(str::to_owned),
+        };
+        assert!(caller_may(Some(&caller(7, Some(CALLER_UNIT))), 7));
+        assert!(!caller_may(Some(&caller(8, Some(CALLER_UNIT))), 7));
+        assert!(!caller_may(Some(&caller(7, Some("lamp-cloud.service"))), 7));
+        assert!(!caller_may(Some(&caller(7, None)), 7));
+        assert!(!caller_may(None, 7));
+    }
+
+    fn skill_run(token: &str, deadline: Duration) -> SkillRun {
+        let hand = HandOver::parse(&line(|_| {}), skills()).unwrap();
+        let mut run = SkillRun::of(&hand, &RunToken::new(token.into()));
+        run.deadline = deadline;
+        run
+    }
+
+    fn shell(script: &str, folder: &Path) -> HermesRunner {
+        HermesRunner {
+            program: PathBuf::from("/bin/sh"),
+            args: vec!["-c".into(), script.into(), "sh".into()],
+            folder: folder.into(),
+            env: vec![("PATH".into(), RUN_PATH.into())],
+            tick: Duration::from_millis(10),
+        }
+    }
+
+    #[test]
+    fn a_run_past_its_deadline_is_killed() {
+        let dir = tempfile::tempdir().unwrap();
+        let runner = shell("sleep 30", dir.path());
+        let began = std::time::Instant::now();
+        let why = runner
+            .run(&skill_run("tok", Duration::from_millis(200)))
+            .unwrap_err();
+        assert!(why.contains("deadline"), "{why}");
+        assert!(
+            began.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            began.elapsed()
+        );
+    }
+
+    #[test]
+    fn the_token_is_in_the_runs_environment_never_its_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let runner = shell(
+            "printf '%s\\n' \"$0\" \"$@\" > argv; env > environment",
+            dir.path(),
+        );
+        let secret = "secret-token-6306";
+        assert_eq!(
+            runner.run(&skill_run(secret, Duration::from_secs(10))),
+            Ok(0)
+        );
+        let argv = std::fs::read_to_string(dir.path().join("argv")).unwrap();
+        assert!(!argv.contains(secret), "{argv}");
+        assert!(argv.contains("Take a photo and send it to the app."));
+        let environment = std::fs::read_to_string(dir.path().join("environment")).unwrap();
+        assert!(environment.contains(&format!("{TOKEN_ENV}={secret}")));
+        assert!(environment.contains(&format!("{SOCKET_ENV}={CONTROL_SOCKET}")));
+        // Nothing of lamp-tasks' own environment is passed on.
+        assert!(!environment.contains("CARGO"), "{environment}");
+    }
+
+    #[test]
+    fn a_run_returns_its_exit_status() {
+        let dir = tempfile::tempdir().unwrap();
+        let why = shell("exit 3", dir.path())
+            .run(&skill_run("tok", Duration::from_secs(10)))
+            .unwrap_err();
+        assert!(why.contains("status 3"), "{why}");
+        let gone = dir.path().join("gone");
+        let why = shell("true", &gone)
+            .run(&skill_run("tok", Duration::from_secs(10)))
+            .unwrap_err();
+        assert!(why.contains("not there"), "{why}");
+    }
+
+    #[test]
+    fn the_lamps_runner_is_hermes_in_the_lamps_work_folder() {
+        let runner = HermesRunner::lamp(Path::new("/var/lib/lampos-tasks"));
+        assert_eq!(runner.program, Path::new("/usr/local/bin/hermes"));
+        assert_eq!(runner.args, vec!["chat", "-q"]);
+        assert_eq!(
+            runner.folder,
+            Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp")
+        );
+        assert!(
+            runner
+                .env
+                .iter()
+                .all(|(name, _)| name != TOKEN_ENV && name != SOCKET_ENV)
+        );
     }
 
     #[test]
