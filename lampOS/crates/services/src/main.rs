@@ -7,7 +7,7 @@
 //! child for one PDF's text (`mail::pdf`), never started by hand.
 use lamp_services::{
     CALENDAR_EDITS_ENVIRONMENT, DRAFT_EDITS_ENVIRONMENT, ENVIRONMENT, SKILL_READS_ENVIRONMENT,
-    WRITE_ENVIRONMENT,
+    SKILL_TASKS_ENVIRONMENT, WRITE_ENVIRONMENT,
     mail::{self, Gmail},
     net::Https,
     on,
@@ -99,6 +99,14 @@ fn main() -> ExitCode {
     if skill_writes {
         say("a made skill's writes on: lamp-skills may send each write the owner said yes to");
     }
+    // A skill's run on the lamp's Hermes (#6432): lamp-control may call, for
+    // a read or a write prepared, under the run's grants.
+    let skill_tasks = on(std::env::var(SKILL_TASKS_ENVIRONMENT).ok().as_deref());
+    if skill_tasks {
+        say(
+            "a skill run's services on: lamp-control may read, or prepare a write for a spoken yes",
+        );
+    }
     // Changing and cancelling a calendar event by its id, a write too.
     let calendar_edits = write_on && on(std::env::var(CALENDAR_EDITS_ENVIRONMENT).ok().as_deref());
     if calendar_edits {
@@ -113,6 +121,7 @@ fn main() -> ExitCode {
         serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
             .with_skill_reads(skill_reads)
             .with_skill_writes(skill_writes)
+            .with_skill_tasks(skill_tasks)
             .with_calendar_edits(calendar_edits)
             .with_draft_edits(draft_edits),
     );
