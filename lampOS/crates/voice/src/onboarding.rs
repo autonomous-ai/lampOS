@@ -1024,8 +1024,8 @@ pub struct Onboarding {
     /// Intro turns not heard this walk: past [`MOST_UNSAID`] the intro is
     /// kept as said anyway, so it is not repeated forever.
     opener_unsaid: u8,
-    /// The ask whose intro was just cut, waiting to learn whether the cut
-    /// was a sound with no words ([`Self::lamp_words`]).
+    /// The ask whose intro was just cut, waiting for what cut it: the
+    /// voice's wordless line or a person's words ([`Self::ask_cut_intro_again`]).
     intro_cut: Option<Option<u64>>,
     seen_us: Option<u64>,
     read_us: Option<u64>,
@@ -2500,14 +2500,15 @@ impl Onboarding {
     /// again, [`MOST_UNSAID`] times more at most. Never said, the step is
     /// asked again at once, as near and giving way offer an unsaid
     /// invitation again (jarvis's P3 on #4120): nobody heard what to do.
-    /// Cut by words, it is not: someone spoke over it or stopped it with a
-    /// touch, and the step goes on from what the eyes see, needing no line
-    /// heard, so the intro is said again only at the step's next ask. Cut
-    /// by a sound with no words, the first cut only, it is said again at
-    /// once once the voice answers that cut-in with its wordless line
-    /// ([`Self::lamp_words`]; lamp-52e6, build 11372: a wordless cut-in
-    /// after 100 ms, and nobody heard "Four quick steps"). A touch stop, a
-    /// privacy change or a person's words get no such line.
+    /// Cut, the first cut only, it is asked again fresh once what cut it
+    /// is known: the voice's wordless line ([`Self::lamp_words`];
+    /// lamp-52e6, build 11372: a wordless cut-in after 100 ms, and nobody
+    /// heard "Four quick steps") or a person's words ([`Self::heard_line`],
+    /// or already heard before the cut; #6217: a noise heard as "And you're
+    /// late." was answered and the step ended on the face). The fresh ask
+    /// waits for quiet, so the chat's answer plays first. A touch stop or a
+    /// privacy change gets neither, and the step goes on from what the eyes
+    /// see.
     fn opener_finished(&mut self, voice_boot: BootId, turn: u64, delivery: Delivery, now_us: u64) {
         if self.opener_turn != Some((voice_boot, turn)) {
             return;
@@ -2529,11 +2530,12 @@ impl Onboarding {
             .as_ref()
             .filter(|led| led.step == Step::WhereYouSit && led.asked_us.is_some())
             .map(|led| led.asked_us);
-        // The first cut waits for the voice to say what cut it
-        // ([`Self::lamp_words`]): only its wordless cut-in line asks again.
+        // The first cut waits for what cut it ([`Self::ask_cut_intro_again`]).
         self.intro_cut = (delivery == Delivery::Cut && self.opener_unsaid == 1 && !opened)
             .then_some(led_ask)
             .flatten();
+        let words_before =
+            self.intro_cut.is_some() && self.led.as_ref().is_some_and(|led| led.words);
         let again = delivery == Delivery::Unsaid && !opened && led_ask.is_some();
         if again {
             self.led = Some(Led {
@@ -2548,6 +2550,33 @@ impl Onboarding {
             self.desired.opened = true;
             self.save();
         }
+        if words_before {
+            self.ask_cut_intro_again("cut_words");
+        }
+    }
+
+    /// The intro's first cut, once what cut it is known (`why`: the voice's
+    /// wordless line or a person's words): while the step it was cut in is
+    /// still led as it was, it is led fresh, so its intro is asked again
+    /// after a face and [`START_QUIET_US`] of quiet, never a third time
+    /// (`opener_unsaid` is then 2, so a second cut sets no `intro_cut`).
+    fn ask_cut_intro_again(&mut self, why: &str) {
+        let Some(asked) = self.intro_cut.take() else {
+            return;
+        };
+        let again = self
+            .led
+            .as_ref()
+            .is_some_and(|led| led.step == Step::WhereYouSit && led.asked_us == asked);
+        if again {
+            self.led = Some(Led {
+                step: Step::WhereYouSit,
+                ..Led::default()
+            });
+        }
+        self.records
+            .push(json!({"kind":"onboarding_opener",why:true,
+            "asked_again":again,"at_us":lamp_ipc::monotonic_us()}));
     }
 
     /// A step's first note whose turn played none of it (lamp-52e6, build
@@ -3026,6 +3055,7 @@ impl Onboarding {
             && text.chars().any(char::is_alphanumeric)
         {
             led.words = true;
+            self.ask_cut_intro_again("cut_words");
         }
         let language = self.language;
         let Some(led) = self.led.as_mut().filter(|led| {
@@ -3066,26 +3096,13 @@ impl Onboarding {
     /// (`known_faces::asks_for_the_face`), so the walk never asks it again;
     /// and whether the intro just cut was cut by a sound with no words: the
     /// voice answers such a cut-in with its fixed line
-    /// (`LAMP_CUT_IN_WORDLESS_ASKS`), and the intro is asked again at once,
-    /// while the step it was cut in is still led as it was.
+    /// (`LAMP_CUT_IN_WORDLESS_ASKS`), and the intro is asked again
+    /// ([`Self::ask_cut_intro_again`]).
     pub fn lamp_words(&mut self, text: &str) {
-        if let Some(asked) = self.intro_cut
+        if self.intro_cut.is_some()
             && text.trim() == crate::language::fixed_in(self.language, crate::cut_in_wordless::LINE)
         {
-            self.intro_cut = None;
-            let again = self
-                .led
-                .as_ref()
-                .is_some_and(|led| led.step == Step::WhereYouSit && led.asked_us == asked);
-            if again {
-                self.led = Some(Led {
-                    step: Step::WhereYouSit,
-                    ..Led::default()
-                });
-            }
-            self.records
-                .push(json!({"kind":"onboarding_opener","cut_wordless":true,
-                "asked_again":again,"at_us":lamp_ipc::monotonic_us()}));
+            self.ask_cut_intro_again("cut_wordless");
         }
         if let Some(led) = self
             .led
@@ -10083,21 +10100,41 @@ mod tests {
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
     }
 
-    /// An intro cut by a sound with no words is said again at once, once
-    /// (lamp-52e6, build 11372: a wordless cut-in stopped it after 100 ms
-    /// and the step ended on the face, so nobody heard "Four quick
-    /// steps"). Known only once the voice answers the cut-in with its
-    /// wordless line; words after the cut (as a lamp hears them) or a touch
-    /// stop (no line at all) leave it said once (the Reviewer-lead's P2 on
-    /// #6043).
+    /// An intro's first cut is asked again fresh, once, after the chat's
+    /// answer, whether a sound with no words cut it (lamp-52e6, build 11372:
+    /// a wordless cut-in stopped it after 100 ms and the step ended on the
+    /// face, so nobody heard "Four quick steps") or words did, heard after
+    /// the cut or before it (#6217: a noise heard as "And you're late." was
+    /// answered and the step ended on the face). The re-said intro cut again
+    /// is never said a third time; a touch stop (no line, no words) leaves it
+    /// said once. No ask comes within [`START_QUIET_US`] of the lamp's last
+    /// words, so the answer plays first.
     #[test]
     fn an_intro_cut_with_no_words_is_said_again_once() {
-        for (case, said_once) in [("wordless", false), ("words", true), ("touch", true)] {
+        for (case, intros_said) in [
+            ("wordless", 2),
+            ("words", 2),
+            ("words-before", 2),
+            ("touch", 1),
+        ] {
             let mut room = Room::new("opener-cut-wordless");
             let mut notes = Vec::new();
-            let mut cuts = 0;
-            while room.at < 12 * S {
+            let mut cut_at = None;
+            while room.at < 16 * S {
                 room.walk.drain_storage_for_test(room.at);
+                // What cut it comes a second after the cut, and the lamp
+                // answers it then: its last words.
+                if cut_at.is_some_and(|at| room.at >= at + S) {
+                    cut_at = None;
+                    match case {
+                        "wordless" => room.walk.lamp_words(crate::cut_in_wordless::LINE),
+                        "words" => room.walk.heard_line("And you're late."),
+                        _ => {}
+                    }
+                    if case != "touch" {
+                        room.said = room.at;
+                    }
+                }
                 if let Some(note) = room.walk.tick(
                     room.at,
                     room.at - room.said,
@@ -10106,18 +10143,20 @@ mod tests {
                     Some(NEAR_MIDDLE),
                     room.still,
                 ) {
+                    // Each ask waits for quiet; the step's done line may not.
+                    assert!(
+                        note != SIT_NOTE || room.at - room.said >= START_QUIET_US,
+                        "{case}: {note:?} {} us after the lamp's last words, after {notes:?}",
+                        room.at - room.said
+                    );
                     let (boot, turn) = (BootId::new([3; 16]).unwrap(), room.at + 1);
                     if room.walk.bind_opener(boot, turn) {
+                        if case == "words-before" {
+                            room.walk.heard_line("And you're late.");
+                        }
                         room.walk
                             .invitation_finished(boot, turn, Delivery::Cut, room.at);
-                        cuts += 1;
-                        match case {
-                            "wordless" if cuts == 1 => {
-                                room.walk.lamp_words(crate::cut_in_wordless::LINE);
-                            }
-                            "words" => room.walk.heard_line("Hello? Who is this?"),
-                            _ => {}
-                        }
+                        cut_at = Some(room.at);
                     }
                     notes.push(note);
                     room.said = room.at;
@@ -10125,11 +10164,21 @@ mod tests {
                 room.at += S / 4;
             }
             let intros = notes.iter().filter(|note| *note == SIT_NOTE).count();
-            assert_eq!(intros, if said_once { 1 } else { 2 }, "{case}: {notes:?}");
-            assert!(
-                notes.iter().any(|note| note == SIT_DONE),
-                "{case}: {notes:?}"
-            );
+            assert_eq!(intros, intros_said, "{case}: {notes:?}");
+            let done = notes.iter().position(|note| note == SIT_DONE);
+            let last_intro = notes.iter().rposition(|note| note == SIT_NOTE);
+            assert!(done > last_intro, "{case}: {notes:?}");
+            if case.starts_with("words") {
+                let records = room.walk.take_records();
+                assert!(
+                    records
+                        .iter()
+                        .any(|line| line["kind"] == "onboarding_opener"
+                            && line["cut_words"] == true
+                            && line["asked_again"] == true),
+                    "{case}: {records:?}"
+                );
+            }
         }
     }
 
