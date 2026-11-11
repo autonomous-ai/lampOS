@@ -982,6 +982,8 @@ fn says_aloud(table: &toml::Table) -> bool {
 /// same text. Anything else, or a skill that can't be read, is given back
 /// as it came. Then every skill that starts itself is given the runtime's
 /// manners ([`mannered`], #6066 (a)): both the floors and the manners apply.
+/// First its trigger's own topic is put in its `[permissions] topics` when
+/// the model left it out ([`topic_granted`]).
 pub fn paced(text: &str) -> String {
     paced_asked(text, &[])
 }
@@ -989,7 +991,90 @@ pub fn paced(text: &str) -> String {
 /// [`paced`], with the times the request named ([`asked_windows`]): a
 /// `during` within one runs as said, with no quiet hours.
 pub fn paced_asked(text: &str, asked: &[(u32, u32)]) -> String {
-    mannered_asked(&say_paced(text), asked)
+    mannered_asked(&say_paced(&topic_granted(text)), asked)
+}
+
+/// A made skill's `skill.toml` with its `[trigger]`'s topic in its
+/// `[permissions] topics`, added when the model left it out (lamp-9adf, 11
+/// Nov 05:36: "dims the light at 10 pm" written on `clock/local` with no
+/// such grant, which `lamp-skills` refuses: a skill reads only the topics
+/// it is given). Its trigger reads that topic whatever the grant says, so
+/// adding it gives the skill nothing its trigger didn't already name, and
+/// the say-back names it ([`plainly`]). Added as a line in `[permissions]`,
+/// the topic written last in a one-line `topics` or as one of its own, so
+/// what is checked, said and packed is one text; a skill written otherwise
+/// (its grants inline or dotted, its topics over several lines), or one
+/// that then doesn't read as the same skill with that one topic more, is
+/// given back as it came, and the check says why.
+pub fn topic_granted(text: &str) -> String {
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return text.to_owned();
+    };
+    let Some(topic) = table
+        .get("trigger")
+        .and_then(|trigger| trigger.get("topic"))
+        .and_then(toml::Value::as_str)
+    else {
+        return text.to_owned();
+    };
+    let permissions = table.get("permissions");
+    let granted: Vec<toml::Value> = match permissions.map(|granted| granted.get("topics")) {
+        None | Some(None) => Vec::new(),
+        Some(Some(toml::Value::Array(topics))) => topics.clone(),
+        Some(Some(_)) => return text.to_owned(),
+    };
+    if granted.iter().any(|given| given.as_str() == Some(topic)) {
+        return text.to_owned();
+    }
+    let mut topics = granted;
+    topics.push(toml::Value::String(topic.to_owned()));
+    // Each a basic string, as JSON writes one: the round trip below holds
+    // the text to the same topics.
+    let Some(quoted) = topics
+        .iter()
+        .map(|topic| topic.as_str().map(|topic| Value::from(topic).to_string()))
+        .collect::<Option<Vec<_>>>()
+    else {
+        return text.to_owned();
+    };
+    let line = format!("topics = [{}]", quoted.join(", "));
+    let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();
+    match lines.iter().position(|line| line.trim() == "[permissions]") {
+        Some(head) => {
+            let end = lines[head + 1..]
+                .iter()
+                .position(|line| line.trim_start().starts_with('['))
+                .map_or(lines.len(), |at| head + 1 + at);
+            let key_of = |line: &str| line.split_once('=').map(|(key, _)| key.trim().to_owned());
+            match (head + 1..end).find(|&at| key_of(&lines[at]).as_deref() == Some("topics")) {
+                Some(at) => lines[at] = line,
+                None => lines.insert(head + 1, line),
+            }
+        }
+        None if permissions.is_none() => {
+            let Some(trigger) = lines.iter().position(|line| line.trim() == "[trigger]") else {
+                return text.to_owned();
+            };
+            lines.splice(trigger..trigger, [format!("[permissions]\n{line}\n")]);
+        }
+        None => return text.to_owned(),
+    }
+    let mut granted_text = lines.join("\n");
+    if text.ends_with('\n') {
+        granted_text.push('\n');
+    }
+    // Only the same skill with that one topic more is taken.
+    let mut expected = table.clone();
+    if let toml::Value::Table(permissions) = expected
+        .entry("permissions")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()))
+    {
+        permissions.insert("topics".to_owned(), toml::Value::Array(topics));
+    }
+    match toml::from_str::<toml::Table>(&granted_text) {
+        Ok(granted) if granted == expected => granted_text,
+        _ => text.to_owned(),
+    }
 }
 
 /// The manners a made skill that starts itself is given by the lamp, never
@@ -1880,6 +1965,9 @@ pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
 struct Unsaid {
     part: String,
     trigger: bool,
+    /// How to write the part so it is said, told the repair after the part
+    /// whole, never cut with its keys ([`LIGHT_PART`]).
+    hint: &'static str,
     /// What the lamp can't do yet, said as [`cant_yet`] and never repaired
     /// (#6066).
     cant: Option<String>,
@@ -1890,6 +1978,7 @@ impl Unsaid {
         Self {
             part: part.into(),
             trigger: false,
+            hint: "",
             cant: None,
         }
     }
@@ -1898,6 +1987,7 @@ impl Unsaid {
         Self {
             part: part.into(),
             trigger: true,
+            hint: "",
             cant: None,
         }
     }
@@ -1907,6 +1997,7 @@ impl Unsaid {
         Self {
             part: format!("can't yet: {}", named(&what)),
             trigger: false,
+            hint: "",
             cant: Some(what),
         }
     }
@@ -1922,8 +2013,9 @@ impl Unsaid {
             (false, true) => format!("{PLAIN_ONLY}{PLAIN_OR_READ}"),
         };
         format!(
-            "{UNSAID_PART}{}. {fix}",
-            cut_bytes(&self.part, MOST_UNSAID_PART_BYTES)
+            "{UNSAID_PART}{}{}. {fix}",
+            cut_bytes(&self.part, MOST_UNSAID_PART_BYTES),
+            self.hint
         )
     }
 }
@@ -1941,6 +2033,13 @@ const SAY_TEXT_PART: &str =
 
 /// What a repair is told after a sound step [`plainly`] couldn't say.
 const SOUND_PART: &str = ": its one sound is cue = \"hum\"";
+
+/// What a repair is told after a dim or `relative` light step [`plainly`]
+/// couldn't say: each as `lamp_skills::light_call` takes it (lamp-9adf, 11
+/// Nov 05:34: "dim the light a step at ten" written as a `relative` with
+/// `until` failed all three repairs on the check's own words).
+const LIGHT_PART: &str = ": relative = { dimmer = 1 }, for = \"10m\" takes only for, at most \
+                          10m; dim = 1 to 4 takes only until = \"ends\"";
 
 /// What a repair is told before the part [`plainly`] couldn't say.
 const UNSAID_PART: &str = "Can't be said plainly: ";
@@ -2029,11 +2128,23 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
             (None, Some(_)) => SOUND_PART,
             (None, None) => "",
         };
-        Unsaid::of(format!(
-            "[[do]] step {}, {}{say}",
-            index + 1,
-            step_named(step)
-        ))
+        // A step that is one dim or `relative` light, and so the light
+        // itself is what couldn't be said.
+        let light = step
+            .as_table()
+            .filter(|step| step.len() == 1)
+            .and_then(|step| step.get("light"))
+            .and_then(toml::Value::as_table);
+        let dims =
+            light.is_some_and(|light| light.contains_key("relative") || light.contains_key("dim"));
+        Unsaid {
+            hint: if dims { LIGHT_PART } else { "" },
+            ..Unsaid::of(format!(
+                "[[do]] step {}, {}{say}",
+                index + 1,
+                step_named(step)
+            ))
+        }
     };
     let too_long = || Unsaid::of("what it does, too long for one breath");
     // A skill added from a file (`crate::upload_skill`): started by its
@@ -2795,10 +2906,16 @@ pub const TRIGGER_MEANINGS: &str = concat!(
 
 /// The steps, `[ask]` and grants a made skill may have beyond the light,
 /// gesture, say and hum the brief names (#6066), for the making model's
-/// system prompt (`make_skill_local`): each one [`plainly`] says.
-pub const MORE_STEPS: &str = "A light step may also be { dim = 1, until = \"ends\" }, \
-     { out = true }, { relative = { warmer = 1, dimmer = 1 } } or a colour with \
-     pattern = { kind = \"breathe\" } (or candle, pulse). A body step may be \
+/// system prompt (`make_skill_local`): each one [`plainly`] says, a dim and
+/// a `relative` light as `lamp_skills::light_call` takes them (lamp-9adf,
+/// 11 Nov 05:34: "dim the light a step at ten" was written as a `relative`
+/// with `until`, and once with a `for` in words, and failed all three
+/// repairs).
+pub const MORE_STEPS: &str = "A light step may also be { dim = 1 } (dim = 1 to 4, beside it \
+     only until = \"ends\"), { out = true }, { relative = { dimmer = 1 }, for = \"10m\" } (a \
+     step dimmer, or warmer = 1, for a while: beside it only for, at most 10m) or a colour \
+     with pattern = { kind = \"breathe\" } (or candle, pulse). Every for is a whole number \
+     and ms, s, m or h, like \"30s\" or \"10m\", never words. A body step may be \
      look_at = \"face\", or mood = \"reading\" with for. [ask] policy is \"nudge\", or \"hello\", \"reminder\" or \"news\" as the \
      request means it. Any [permissions] a skill may have are fine as its steps use them: the \
      lamp says each back to the person before it goes on.";
@@ -3199,9 +3316,11 @@ fn light_plainly(light: &toml::Table) -> Option<String> {
         if !only(&["dim", "until"]) {
             return None;
         }
+        // `lamp_skills::light_call`'s dim: 1 to 4 steps, with only
+        // `until = "ends"` beside it.
         return match dim.as_integer()? {
             1 => Some(format!("dims the light a step{until}")),
-            steps @ 2.. => Some(format!("dims the light {steps} steps{until}")),
+            steps @ 2..=4 => Some(format!("dims the light {steps} steps{until}")),
             _ => None,
         };
     }
@@ -3216,35 +3335,7 @@ fn light_plainly(light: &toml::Table) -> Option<String> {
         return Some(format!("turns the light off{over}{until}"));
     }
     if let Some(relative) = light.get("relative").and_then(toml::Value::as_table) {
-        if !only(&["relative", "for", "until"])
-            || relative
-                .keys()
-                .any(|key| !["warmer", "dimmer", "warm_at_dimmest"].contains(&key.as_str()))
-        {
-            return None;
-        }
-        let steps = |key: &str| match relative.get(key) {
-            None => Some(0),
-            Some(steps) => steps.as_integer(),
-        };
-        let (warmer, dimmer) = (steps("warmer")?, steps("dimmer")?);
-        let mut parts = Vec::new();
-        if warmer > 0 {
-            parts.push("a shade warmer".to_owned());
-        }
-        match dimmer {
-            0 => {}
-            1 => parts.push("a step dimmer".to_owned()),
-            steps => parts.push(format!("{steps} steps dimmer")),
-        }
-        if parts.is_empty() {
-            return None;
-        }
-        let mut said = format!("makes your light {}", parts.join(" and "));
-        if let Some(lasting) = light.get("for") {
-            said.push_str(&format!(" for {}", spell(lasting.as_str()?)?));
-        }
-        return Some(format!("{said}{until}"));
+        return relative_plainly(light, relative);
     }
     if !only(&["colour", "level", "for", "pattern", "until", "no_brighter"]) {
         return None;
@@ -3272,6 +3363,95 @@ fn light_plainly(light: &toml::Table) -> Option<String> {
         said.push_str(", never brighter than your light");
     }
     Some(said)
+}
+
+/// A light step `relative` to the person's light (#6066) in plain words,
+/// only as `lamp_skills::light_call` takes it (lamp-9adf, 11 Nov 05:34: a
+/// made "dim the light a step at ten" written with `until` passed here and
+/// failed the check three times): beside it only a `for` of at most
+/// [`RELATIVE_MOST_MS`], which it needs, and a breathe pattern with no
+/// `low`; `warmer` 0 or 1 and `dimmer` 0 to 4, not both 0; and
+/// `warm_at_dimmest = true` only with `warmer = 1`. Anything else is none,
+/// so unsaid, and the repair is told how to write it ([`LIGHT_PART`]).
+fn relative_plainly(light: &toml::Table, relative: &toml::Table) -> Option<String> {
+    if light
+        .keys()
+        .any(|key| !["relative", "for", "pattern"].contains(&key.as_str()))
+        || relative
+            .keys()
+            .any(|key| !["warmer", "dimmer", "warm_at_dimmest"].contains(&key.as_str()))
+    {
+        return None;
+    }
+    let steps = |key: &str| match relative.get(key) {
+        None => Some(0),
+        Some(steps) => steps.as_integer(),
+    };
+    let (warmer, dimmer) = (steps("warmer")?, steps("dimmer")?);
+    if !(0..=1).contains(&warmer) || !(0..=4).contains(&dimmer) || warmer + dimmer == 0 {
+        return None;
+    }
+    if let Some(warm) = relative.get("warm_at_dimmest")
+        && (warm.as_bool() != Some(true) || warmer != 1)
+    {
+        return None;
+    }
+    let lasting = light.get("for")?.as_str()?;
+    if whole_ms(lasting)? > RELATIVE_MOST_MS {
+        return None;
+    }
+    let breathing = match light.get("pattern") {
+        None => "",
+        Some(pattern) => {
+            let pattern = pattern.as_table()?;
+            if pattern
+                .keys()
+                .any(|key| !["kind", "period"].contains(&key.as_str()))
+                || pattern.get("kind")?.as_str()? != "breathe"
+            {
+                return None;
+            }
+            if let Some(period) = pattern.get("period") {
+                let ms = u32::try_from(whole_ms(period.as_str()?)?).ok()?;
+                if !lamp_msgs::LightPattern::BREATHE_MS.contains(&ms) {
+                    return None;
+                }
+            }
+            ", breathing"
+        }
+    };
+    let mut parts = Vec::new();
+    if warmer > 0 {
+        parts.push("a shade warmer".to_owned());
+    }
+    match dimmer {
+        0 => {}
+        1 => parts.push("a step dimmer".to_owned()),
+        steps => parts.push(format!("{steps} steps dimmer")),
+    }
+    Some(format!(
+        "makes your light {} for {}{breathing}",
+        parts.join(" and "),
+        spell(lasting)?
+    ))
+}
+
+/// The longest a `relative` light is held: `lamp_skills::light_call`'s
+/// "a light's for is at most 10m".
+const RELATIVE_MOST_MS: u64 = 10 * 60 * 1_000;
+
+/// A skill's duration in whole milliseconds, as `lamp_skills::duration_us`
+/// reads it: a whole number of ms, s, m or h.
+fn whole_ms(text: &str) -> Option<u64> {
+    let digits = text.trim_end_matches(|letter: char| letter.is_ascii_alphabetic());
+    let per_unit: u64 = match &text[digits.len()..] {
+        "ms" => 1,
+        "s" => 1_000,
+        "m" => 60_000,
+        "h" => 3_600_000,
+        _ => return None,
+    };
+    digits.parse::<u64>().ok()?.checked_mul(per_unit)
 }
 
 /// A `body` step in plain words: a gesture by name ([`GESTURES`]), a turn
@@ -3906,6 +4086,19 @@ pub fn keep_asked(
         Some(what) => format!("{does} {}", left_out(what)),
         None => does,
     });
+    // A dim or `relative` light [`plainly`] refused is one the check
+    // refuses too, as it says them alike: its plain hint ([`LIGHT_PART`])
+    // goes to the repair first, not the check's own words (lamp-9adf, 11
+    // Nov 05:34: three repairs told only "relative takes only for and a
+    // breathe pattern" never wrote one the check took).
+    if let Err(refused) = &said
+        && refused
+            .1
+            .as_deref()
+            .is_some_and(|lines| lines.contains(LIGHT_PART))
+    {
+        return Err(refused.clone());
+    }
     let (name, marked) = card(
         &files.card,
         said.as_deref().unwrap_or_default(),
@@ -5711,7 +5904,7 @@ body = { gesture = "nod" }
         );
         refused(
             &TOML.replace("{ dim = 1 }", "{ dim = 1, for = \"1m\" }"),
-            "[[do]] step 1, light (dim, for)",
+            &format!("[[do]] step 1, light (dim, for){LIGHT_PART}"),
             false,
         );
         refused(
@@ -8049,6 +8242,180 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(
             refused(issue, "open an issue Standup saying Standup notes", &none)
                 .contains("its repo")
+        );
+    }
+
+    /// lamp-9adf, 11 Nov 05:34: "every night at ten, dim the light a step"
+    /// was written as a `relative` with `until`, which `plainly` said and
+    /// `lamp-skills` refused three times with its own words. A dim or a
+    /// `relative` light is now said only as `lamp_skills::light_call` takes
+    /// it, and refused otherwise with a plain hint for the repair.
+    #[test]
+    fn a_dim_step_is_said_only_as_lamp_skills_takes_it() {
+        let clock = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                     during = { from = \"22:00\", to = \"22:01\" }\n";
+        for step in [
+            "light = { relative = { dimmer = 1 }, until = \"ends\" }",
+            "light = { relative = { dimmer = 1 }, for = \"10m\", until = \"ends\" }",
+            // No for: a relative light is a glow, given back.
+            "light = { relative = { dimmer = 1 } }",
+            // Past the check's 10 minutes, or not a duration at all.
+            "light = { relative = { dimmer = 1 }, for = \"30m\" }",
+            "light = { relative = { dimmer = 1 }, for = \"all night\" }",
+            // Past warmer's 0 or 1 and dimmer's 0 to 4, or both 0.
+            "light = { relative = { warmer = 2 }, for = \"1m\" }",
+            "light = { relative = { dimmer = 5 }, for = \"1m\" }",
+            "light = { relative = { warmer = 0, dimmer = 0 }, for = \"1m\" }",
+            "light = { relative = { dimmer = 1, warm_at_dimmest = true }, for = \"1m\" }",
+            "light = { relative = { warmer = 1, warm_at_dimmest = false }, for = \"1m\" }",
+            // Its colour and level are the person's.
+            "light = { relative = { dimmer = 1 }, for = \"1m\", level = 2 }",
+            // Only a breath with no low, of 4 to 12 seconds.
+            "light = { relative = { dimmer = 1 }, for = \"1m\", pattern = { kind = \"candle\" } }",
+            "light = { relative = { dimmer = 1 }, for = \"1m\", pattern = { kind = \"breathe\", \
+             low = 1 } }",
+            "light = { relative = { dimmer = 1 }, for = \"1m\", pattern = { kind = \"breathe\", \
+             period = \"20s\" } }",
+            // A dim is 1 to 4 steps, with only until beside it.
+            "light = { dim = 5 }",
+            "light = { dim = 1, for = \"10m\" }",
+        ] {
+            let text = made_with(clock, step);
+            let Err(Refused(why, Some(lines))) = plainly_with(&text, false) else {
+                panic!("{step}: said");
+            };
+            assert_eq!(why, UNSAID, "{step}");
+            assert!(
+                lines.starts_with(&format!("{UNSAID_PART}[[do]] step 1, light ("))
+                    && lines.ends_with(&format!("{LIGHT_PART}. {PLAIN_ONLY}")),
+                "{step}: {lines}"
+            );
+            assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+        }
+        let Err(Refused(_, Some(lines))) = plainly_with(
+            &made_with(
+                clock,
+                "light = { relative = { dimmer = 1 }, until = \"ends\" }",
+            ),
+            false,
+        ) else {
+            panic!("said");
+        };
+        assert_eq!(
+            lines,
+            format!(
+                "{UNSAID_PART}[[do]] step 1, light (relative, until){LIGHT_PART}. {PLAIN_ONLY}"
+            )
+        );
+        // A colour's refusal is not told of dims.
+        let Err(Refused(_, Some(lines))) = plainly_with(
+            &made_with(clock, "light = { colour = \"amber\", over = \"1m\" }"),
+            false,
+        ) else {
+            panic!("said");
+        };
+        assert!(!lines.contains(LIGHT_PART), "{lines}");
+        // As the check takes them: said.
+        for (step, said) in [
+            (
+                "light = { relative = { dimmer = 1 }, for = \"10m\" }",
+                "Every day at 22:00, it makes your light a step dimmer for 10 minutes.",
+            ),
+            (
+                "light = { relative = { warmer = 1, warm_at_dimmest = true }, for = \"30s\", \
+                 pattern = { kind = \"breathe\", period = \"6s\" } }",
+                "Every day at 22:00, it makes your light a shade warmer for 30 seconds, \
+                 breathing.",
+            ),
+            (
+                "light = { dim = 4, until = \"ends\" }",
+                "Every day at 22:00, it dims the light 4 steps while that lasts.",
+            ),
+        ] {
+            let text = made_with(clock, step);
+            assert!(capped_with(&text, false).is_ok(), "{text}");
+            assert_eq!(
+                plainly_with(&text, false).unwrap(),
+                format!("{said} It starts on its own."),
+                "{step}"
+            );
+        }
+    }
+
+    /// lamp-9adf, 11 Nov 05:36: a made skill on the clock written with no
+    /// `clock/local` in its topics, which `lamp-skills` refuses: its
+    /// trigger's topic is put in its topics, in whatever form the grant
+    /// has, and a skill written otherwise is given back as it came.
+    #[test]
+    fn a_made_skills_trigger_topic_is_granted() {
+        let clock = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                     during = { from = \"22:00\", to = \"22:01\" }\n";
+        let topics = |text: &str| -> Vec<String> {
+            let table: toml::Table = toml::from_str(text).unwrap();
+            table["permissions"]["topics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|topic| topic.as_str().unwrap().to_owned())
+                .collect()
+        };
+        let made = made_with(clock, "light = { dim = 1 }");
+        // Granted already: as it came.
+        assert_eq!(topic_granted(&made), made);
+        // Left out of a one-line list: added last.
+        let left_out = made.replace(", \"clock/local\"]", "]");
+        assert_eq!(
+            topics(&topic_granted(&left_out)),
+            ["humans/faces/tracked", "room/stood_up", "clock/local"]
+        );
+        // No topics at all: a line of its own in [permissions].
+        let none = made.replace(
+            "topics = [\"humans/faces/tracked\", \"room/stood_up\", \"clock/local\"]\n",
+            "",
+        );
+        assert_eq!(topics(&topic_granted(&none)), ["clock/local"]);
+        // No [permissions]: one, before the trigger.
+        let bare = format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\n\n[trigger]\n{clock}\n[[do]]\nlight = \
+             {{ dim = 1 }}\n"
+        );
+        let granted = topic_granted(&bare);
+        assert_eq!(topics(&granted), ["clock/local"]);
+        assert!(granted.contains("[permissions]\ntopics = [\"clock/local\"]\n\n[trigger]"));
+        // Paced, and so kept and said, with it.
+        assert_eq!(
+            topics(&paced(&left_out)),
+            ["humans/faces/tracked", "room/stood_up", "clock/local"]
+        );
+        assert!(
+            capped_with(&paced(&left_out), false)
+                .unwrap()
+                .1
+                .topics
+                .contains(&"clock/local".to_owned())
+        );
+        // Grants written inline, or topics over several lines: as it came,
+        // for the check to say why.
+        let inline = made.replace(
+            "[permissions]\nlight = true\nbody = true\ntopics = [\"humans/faces/tracked\", \
+             \"room/stood_up\", \"clock/local\"]\n",
+            "permissions = { light = true }\n",
+        );
+        assert!(
+            inline.contains("permissions = { light = true }"),
+            "{inline}"
+        );
+        assert_eq!(topic_granted(&inline), inline);
+        let lines = left_out.replace(
+            "topics = [\"humans/faces/tracked\", \"room/stood_up\"]",
+            "topics = [\n  \"humans/faces/tracked\",\n  \"room/stood_up\",\n]",
+        );
+        assert_eq!(topic_granted(&lines), lines);
+        // Not a skill, or no trigger: as it came.
+        assert_eq!(topic_granted("not = toml = at all"), "not = toml = at all");
+        assert_eq!(
+            topic_granted(&TOML.replace("[trigger]", "[when]")),
+            TOML.replace("[trigger]", "[when]")
         );
     }
 }

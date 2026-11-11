@@ -278,12 +278,45 @@ sau:
      cạnh `skill.toml`. Kiểm thử: `a_made_skill_may_play_the_lamps_soft_hum`,
      `a_sound_the_lamp_doesnt_ship_is_refused`, và trong `tests/it/made.rs`
      `lamp-skills pack` thật giữ một kỹ năng như vậy.
+   - **Bước `dim` và đèn `relative` chỉ được nói khi `lamp-skills` cũng
+     nhận** (lamp-9adf, 11/11 05:34: "every night at ten, dim the light a
+     step" được viết thành `relative` có `until`, một lần có `for` bằng
+     chữ, và trượt cả ba lần sửa vì chỉ được nghe lời của bước kiểm tra).
+     `made_skill::plainly` chỉ nói `{ dim = N }` khi N từ 1 đến 4 và cạnh
+     nó chỉ có `until = "ends"`; chỉ nói `relative` khi `warmer` là 0 hoặc
+     1, `dimmer` từ 0 đến 4, không cả hai bằng 0, `warm_at_dimmest = true`
+     chỉ đi với `warmer = 1`, có `for` (bắt buộc) tối đa 10 phút, và nhiều
+     nhất một `pattern` breathe không có `low`, chu kỳ 4 đến 12 s: không
+     `until`, màu hay mức (`lamp_skills::light_call`). Một bước chỉ gồm
+     đèn như vậy mà không nói được thì bị từ chối trước bước kiểm tra, và
+     lần sửa được dặn, sau các khóa của nó, cách viết đúng
+     (`made_skill::LIGHT_PART`: `relative = { dimmer = 1 }, for = "10m"
+     takes only for, at most 10m; dim = 1 to 4 takes only until =
+     "ends"`). System prompt của mô hình tạo kỹ năng (`MORE_STEPS`) nói
+     giống vậy: `{ dim = 1 }` (1 đến 4, cạnh nó chỉ `until = "ends"`),
+     `{ relative = { dimmer = 1 }, for = "10m" }` (chỉ `for`, tối đa 10m),
+     và mọi `for` là số nguyên kèm ms, s, m hoặc h, không bao giờ bằng chữ.
+   - **Topic của trigger được cấp** (lamp-9adf, 11/11 05:36: một trigger
+     `clock/local` được viết mà không có topic đó, điều `lamp-skills` từ
+     chối). Trước khi đặt nhịp và phép tắc, `made_skill::topic_granted`
+     đưa topic của `[trigger]` vào `[permissions] topics` khi mô hình bỏ
+     sót: thêm vào cuối một `topics` viết trên một dòng, thành một dòng
+     `topics` riêng trong `[permissions]`, hoặc thành một bảng
+     `[permissions]` trước `[trigger]` khi chưa có. Trigger vẫn đọc topic
+     đó bất kể quyền ghi gì, nên kỹ năng không được thêm gì ngoài điều
+     trigger đã nêu, và câu nói lại có nêu nó. Quyền viết inline hoặc dạng
+     có dấu chấm, hay `topics` trải trên nhiều dòng, được trả lại nguyên
+     như khi đến, và bước kiểm tra nói lý do.
    - Kiểm thử cho giới hạn đã bỏ (#6066):
      `a_made_skill_may_use_whatever_a_skill_can_declare`,
      `every_kind_a_skill_can_declare_is_kept_and_said`,
-     và "can't yet" của
+     "can't yet" của
      trigger `voice/heard` trong
-     `what_it_cant_say_is_refused_with_lines_for_a_repair`.
+     `what_it_cant_say_is_refused_with_lines_for_a_repair`,
+     `a_dim_step_is_said_only_as_lamp_skills_takes_it`,
+     `a_made_skills_trigger_topic_is_granted`, và trong `tests/it/made.rs`
+     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` (`lamp-skills
+     pack` thật).
    Việc đọc một dịch vụ liên kết
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
    `lamp-skills-manage@`, bật trong các unit sản phẩm): `services` nêu một dịch vụ
