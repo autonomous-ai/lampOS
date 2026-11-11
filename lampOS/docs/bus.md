@@ -530,8 +530,8 @@ that owns it:
 | `output/caps` | `lamp-actions`, with `LAMP_OUTPUT_CAPS=on` | Voice's ring worker, with `LAMP_OUTPUT_CAPS=on` |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | the voice (the second route's policy and its holds, task news), `lamp-skills`, the add-ons |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | the voice (`body_motion.rs`), Expression, the eyes, `lamp-peek`; recorded to measure how the lamp moves |
-| `light/command` | the actions program ([actions.md](actions.md)); `lamp-cloud`, the app's Light row ([cloud.md](cloud.md)) | the voice's ring worker |
-| `light/state` | the voice's ring worker ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the actions program; `lamp-cloud` |
+| `light/command` | the actions program ([actions.md](actions.md)); `lamp-cloud`, the app's Light row ([cloud.md](cloud.md)) | the voice's ring worker; `lamp-peek`'s timeline, a change only ([peek.md](peek.md)) |
+| `light/state` | the voice's ring worker ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the actions program; `lamp-cloud`; `lamp-peek`'s overview |
 | `name/heard`, `name/rising` | `lamp-name` (the lamp's name heard in `mic*/audio`: its final word, and the first sign while it is still being said, #782) | the voice (`name/rising` for the call's wait, `name/heard` in `body_ask.rs`), the body, Expression, `lamp-mood`, the policy, `lamp-control`, and skills whose `skill.toml` names it (`night-sleep`) |
 | `stop/heard` | `lamp-name`, only with `--stop-least` (its `stop.onnx`, #828, [stop-word.md](stop-word.md)). The product's `lamp-name.service` does not pass it and no models release carries `stop.onnx`, so a product lamp's bus has no `stop/` topic: a "stop" there is heard as any talk over the reply is ([duplex-listening.md](duplex-listening.md)) | the voice, only with `LAMP_STOP_HEARD=on` (`bus_out.rs`), not set in the product: a "stop" while the reply sounds yields it |
 | `voice/remarked` | the voice, one for each remark about the lamp it holds in a busy room (`LAMP_REMARK_ABOUT_IT`) | Expression, with `LAMP_REMARK_GLANCE=on`: one glance |
@@ -681,7 +681,7 @@ holds every task, so a subscriber that starts late has them all. Without
 
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
-| `skills/events` | event, no period, no lifespan | `lamp-skills` | People and the lamp's app: what each physical skill did and why ([skills.md](skills.md)) |
+| `skills/events` | event, no period, no lifespan | `lamp-skills` | People and the lamp's app: what each physical skill did and why ([skills.md](skills.md)); `lamp-peek`'s timeline, skill and stage only ([peek.md](peek.md)) |
 
 The [`SkillEvent` message](msgs.md#the-skills-contract) says one stage of a
 run: triggered, asked, answered (with whether it was allowed) and done,
