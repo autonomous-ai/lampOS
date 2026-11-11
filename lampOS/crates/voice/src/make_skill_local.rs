@@ -363,48 +363,71 @@ pub fn again(error: &net::Error) -> bool {
         net::Error::Status(status) => *status == 404 || (500..600).contains(status),
         net::Error::Timeout(_) | net::Error::Transport(_) => true,
         // The relay's stream cut before its end (lamp-9adf, 2 Nov 17:49):
-        // a broken connection by another name.
-        net::Error::Protocol(what) => *what == CUT,
+        // a broken connection by another name. An answer the service
+        // stopped at its cap on tokens, or one with no fenced block at
+        // all, is not whole either.
+        net::Error::Protocol(what) => [CUT, AT_LENGTH, NO_BLOCK].contains(what),
         net::Error::Url => false,
     }
 }
 
 /// The model's answer to `brief`, its text whole, asked once more when
-/// [`again`] says so.
+/// [`again`] says so; each answer that ended whole, the second too, with
+/// a last fence left open at its end closed there ([`whole`]).
 pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
-    // An answer whose last fence never closed was cut short too (17:48:
-    // "its answer was cut off"): asked once more, as a broken stream.
-    let once = write_once(chat, brief).await.and_then(|text| {
-        // A `cannot:` answer is whole with no fence at all.
-        if fences_closed(&text) || text.trim_start().starts_with(made_skill::CANNOT) {
-            Ok(text)
-        } else {
-            Err(net::Error::Protocol(CUT))
-        }
-    });
-    match once {
+    match write_once(chat, brief).await.and_then(whole) {
         Err(error) if again(&error) => {
             eprintln!(
                 "lamp-voice: a skill made here: the model's answer failed ({error}); asked once more"
             );
-            write_once(chat, brief).await
+            // The second answer is not asked again: one with no fenced
+            // block goes on to be refused as not a skill's form.
+            match write_once(chat, brief).await {
+                Ok(text) => Ok(fence_closed(text)),
+                Err(error) => Err(error),
+            }
         }
         answer => answer,
     }
 }
 
+/// An answer whose stream ended whole, as the maker reads it: a `cannot:`
+/// as it is (whole with no fence at all); one with no fenced block at all
+/// asked once more ([`NO_BLOCK`]); and otherwise its last fence, left open
+/// at the end of the answer, closed there ([`fence_closed`]). A product
+/// lamp on 11798, 11 Nov: two answers that ended whole, about 250 tokens
+/// each, were taken for cut streams because the last fence was never
+/// written, and the make failed as cut off. A stream that really broke
+/// never comes here: the chat client gives it as [`CUT`].
+fn whole(text: String) -> net::Result<String> {
+    if text.trim_start().starts_with(made_skill::CANNOT) {
+        return Ok(text);
+    }
+    if !text.contains("```") && !text.contains("~~~") {
+        return Err(net::Error::Protocol(NO_BLOCK));
+    }
+    Ok(fence_closed(text))
+}
+
+/// The answer with the fence it left open at its end closed there
+/// ([`made_skill::open_fence`]), and one journal line when it was.
+fn fence_closed(text: String) -> String {
+    match made_skill::open_fence(&text) {
+        Some(fence) => {
+            eprintln!("lamp-voice: a made skill's last fence closed at the end of its answer");
+            format!("{}\n{fence}\n", text.trim_end())
+        }
+        None => text,
+    }
+}
+
 /// The chat client's word for a stream that ended before its end.
 const CUT: &str = "chat stream cut";
-
-/// Whether every fenced block the answer opened is closed: an even,
-/// non-zero count of fences.
-fn fences_closed(text: &str) -> bool {
-    let fences = text
-        .lines()
-        .filter(|line| line.trim_start().starts_with("```"))
-        .count();
-    fences > 0 && fences % 2 == 0
-}
+/// An answer the service stopped at its cap on tokens (`finish_reason`
+/// `length`): the stream whole, the answer not.
+const AT_LENGTH: &str = "chat answer stopped at its length";
+/// An answer that ended whole with no fenced block in it.
+const NO_BLOCK: &str = "chat answer with no fenced block";
 
 async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
     tokio::time::timeout(WRITE_WITHIN, async {
@@ -419,6 +442,9 @@ async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
                     return Err(net::Error::Protocol("answer length"));
                 }
             }
+        }
+        if stream.stopped_at_length() {
+            return Err(net::Error::Protocol(AT_LENGTH));
         }
         Ok(text)
     })
@@ -1304,7 +1330,16 @@ light = { dim = 1 }
         }
     }
 
+    /// A scripted reply's status for a stream that breaks: its words, then
+    /// the connection closed with no `finish_reason` and no `[DONE]`.
+    pub(crate) const BROKEN: u16 = 0;
+    /// A scripted reply's status for an answer the service stopped at its
+    /// cap on tokens: `finish_reason` `length`, then `[DONE]`.
+    pub(crate) const STOPPED_AT_LENGTH: u16 = 1;
+
     /// Only this fixture's authenticated chat requests consume scripted replies.
+    /// Status 200 is a stream that ends whole, [`BROKEN`] one cut and
+    /// [`STOPPED_AT_LENGTH`] one at the service's cap.
     /// Foreign probes have bounded readers; malformed authenticated chats fail.
     pub(crate) fn service(replies: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<usize>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1342,10 +1377,15 @@ light = { dim = 1 }
                     let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
                     assert!(body.contains(made_skill::BRIEF_HEAD), "{body}");
                     assert!(!body.contains("\"tools\""), "{body}");
-                    let reply = if status == 200 {
+                    let reply = if [200, BROKEN, STOPPED_AT_LENGTH].contains(&status) {
                         let (first, rest) = text.split_at(text.len() / 2);
                         let chunk = |words: &str| format!("data: {}\n\n", json!({"choices": [{"delta": {"content": words}}]}));
-                        format!("HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n{}{}data: [DONE]\n\n", chunk(first), chunk(rest))
+                        let end = match status {
+                            BROKEN => String::new(),
+                            STOPPED_AT_LENGTH => format!("data: {}\n\ndata: [DONE]\n\n", json!({"choices": [{"delta": {}, "finish_reason": "length"}]})),
+                            _ => "data: [DONE]\n\n".to_owned(),
+                        };
+                        format!("HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n{}{}{end}", chunk(first), chunk(rest))
                     } else {
                         format!("HTTP/1.1 {status} Nope\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
                     };
@@ -2702,20 +2742,63 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// lamp-9adf, 2 Nov 17:48: an answer cut before its last fence closed
-    /// is asked once more, as a cut stream is; the whole one is kept.
+    /// lamp-9adf, 2 Nov 17:48: a stream that broke mid-file is asked once
+    /// more; the whole one is kept. So is one the service stopped at its
+    /// cap on tokens, and one with no fenced block at all.
     #[test]
-    fn an_answer_cut_before_its_last_fence_is_asked_once_more() {
+    fn a_stream_cut_mid_file_is_asked_once_more() {
         let (root, keeping) = keeping("cut");
         let whole = good();
-        let cut = whole[..whole.rfind("```").unwrap()].to_owned();
-        assert!(!fences_closed(&cut) && fences_closed(&whole));
+        let mid_file = whole[..whole.len() - 30].to_owned();
         assert!(again(&net::Error::Protocol(CUT)));
-        let (url, served) = service(vec![(200, cut), (200, whole)]);
+        assert!(again(&net::Error::Protocol(AT_LENGTH)));
+        assert!(again(&net::Error::Protocol(NO_BLOCK)));
+        let (url, served) = service(vec![(BROKEN, mid_file.clone()), (200, whole.clone())]);
         let told = make(REQUEST, &keeping, chat_at(url), NOW);
         assert_eq!(told["made"], "evening-dim", "{told}");
         assert_eq!(served.join().unwrap(), 2);
-        let _ = std::fs::remove_dir_all(&root);
+        let (root_length, keeping) = super::tests::keeping("at-length");
+        let (url, served) = service(vec![(STOPPED_AT_LENGTH, mid_file), (200, whole.clone())]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        let (root_prose, keeping) = super::tests::keeping("no-block");
+        let prose = "Here is a skill that dims the light at ten.".to_owned();
+        let (url, served) = service(vec![(200, prose), (200, whole)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        for root in [root, root_length, root_prose] {
+            let _ = std::fs::remove_dir_all(&root);
+        }
+    }
+
+    /// A product lamp on 11798, 11 Nov: an answer that ended whole with its
+    /// last fence never written was taken for a cut stream, asked again,
+    /// and failed as cut off. Its last fence is closed at its end and it is
+    /// kept, asked once; a second answer, after a stream that broke, gets
+    /// the same.
+    #[test]
+    fn an_answer_ended_whole_with_its_last_fence_open_is_closed_and_kept() {
+        let (root, keeping) = keeping("fence-end");
+        let whole = good();
+        let open = whole[..whole.rfind("```").unwrap()].to_owned();
+        assert_eq!(made_skill::open_fence(&open).as_deref(), Some("```"));
+        assert_eq!(made_skill::open_fence(&whole), None);
+        assert_eq!(fence_closed(open.clone()).matches("```").count(), 4);
+        let (url, served) = service(vec![(200, open.clone())]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        let (root_second, keeping) = super::tests::keeping("fence-end-second");
+        let broken = whole[..whole.len() / 3].to_owned();
+        let (url, served) = service(vec![(BROKEN, broken), (200, open)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        for root in [root, root_second] {
+            let _ = std::fs::remove_dir_all(&root);
+        }
     }
 
     /// The relay's 404 is asked once more, and the second answer is kept;
