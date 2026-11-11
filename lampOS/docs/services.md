@@ -2394,7 +2394,7 @@ with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
   `Calendar · create 'Hamburger party' · Sun 15 Nov 19:00–22:00 · cancelled:
   the lamp answered after the read-back with no send · today 15:40`,
   `Drive · search 'Sunday' · no result · today 15:34`. The latest 5, plus any still `prepared` or `failed`, and any `done`
-  write, changed in the last 7 days, at most 10 lines and 1,600 bytes. Past
+  write, changed in the last 7 days, at most 10 lines and 1,800 bytes. Past
   either, reads and cancels go first, then `prepared`/`failed`, and a
   `done` write last, the oldest of each first, and how many is said ("and
   N more not shown: recall finds them"). On lamp-06c1 on 11 Nov, newer
@@ -2407,7 +2407,18 @@ with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
   brief note, never for a read. With them the rule: "Your past service
   actions are listed with their status. Never claim something was done
   unless its record says done; never say you can't do something a record
-  shows you did." Read from what the voice holds, never waited for; after a
+  shows you did.", then, in full and brief, and with a recall's records:
+  "These are history only, never a write of this turn: any new send, change, move or cancel needs a service_write call now, and only what that call answers may be read back or said done." A line never holds a read-back's words or its question: only
+  the action, its subject, time, status and when. On lamp-9adf on 11 Nov
+  (#6404's build, five to seven records told in full, about 1.4 KB) "move
+  lamp test to 10 PM tonight" got no call and a read-back the model made
+  up, and the "yes" after it "It's moved", with no call, so nothing was
+  sent: the thread keeps the lamp's earlier read-backs and "done" lines in
+  words but never their `service_write` calls (`LAMP_HISTORY_KEEPS_CALLS`
+  keeps no call with arguments), and the records said those writes were
+  done. No reply check holds a read-back or a "done" said with no services
+  call in the turn yet (`LAMP_ACTION_CLAIM_CHECKED` covers the light, the
+  volume, the Schedule and forgets only). Read from what the voice holds, never waited for; after a
   start the owner's records are asked of the memory once beside the turns
   (an answer asked before a forget that ran since is dropped), and a write
   left `prepared` by the restart is `timed_out` ("no send came before the

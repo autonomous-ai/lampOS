@@ -2469,7 +2469,7 @@ dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b
   `Drive · search 'Sunday' · no result · today 15:34`. Gồm 5
   bản mới nhất, cộng các bản còn
   `prepared` hay `failed`, và mọi lệnh ghi `done`, đổi trong 7 ngày qua, tối
-  đa 10 dòng và 1.600 byte. Vượt mức, bản đọc và bản hủy bỏ trước, rồi
+  đa 10 dòng và 1.800 byte. Vượt mức, bản đọc và bản hủy bỏ trước, rồi
   `prepared`/`failed`, lệnh ghi `done` bỏ sau cùng, mỗi loại bỏ cũ nhất
   trước, và nói bỏ bao nhiêu ("and N more not shown: recall finds them").
   Trên lamp-06c1 ngày 11/11, các lần đọc lịch mới hơn và một lần hủy thất
@@ -2481,7 +2481,19 @@ dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b
   trong ghi chú tóm tắt, không bao giờ cho bản đọc. Kèm quy tắc: "Your past
   service actions are listed with their status. Never claim something was
   done unless its record says done; never say you can't do something a
-  record shows you did." Đọc từ những gì voice giữ, không bao giờ chờ; sau
+  record shows you did.", rồi, cả khi đầy đủ lẫn tóm tắt, và kèm các bản
+  ghi của recall: "These are history only, never a write of this turn: any new send, change, move or cancel needs a service_write call now, and only what that call answers may be read back or said done." Một dòng không bao giờ chứa lời đọc lại hay
+  câu hỏi của nó: chỉ hành động, chủ đề, thời gian, trạng thái và thời
+  điểm. Trên lamp-9adf ngày 11/11 (bản dựng của #6404, năm đến bảy bản ghi
+  báo đầy đủ, khoảng 1,4 KB) "move lamp test to 10 PM tonight" không có
+  lệnh gọi nào và mô hình tự đọc lại một câu nó bịa ra, rồi câu "yes" sau
+  đó được đáp "It's moved", cũng không lệnh gọi, nên không gì được gửi:
+  luồng hội thoại giữ các câu đọc lại và câu "done" trước đó của đèn bằng
+  lời nhưng không bao giờ giữ lệnh gọi `service_write` của chúng
+  (`LAMP_HISTORY_KEEPS_CALLS` không giữ lệnh gọi có tham số), và các bản ghi
+  nói những lần ghi đó đã `done`. Chưa có kiểm tra câu trả lời nào chặn một
+  câu đọc lại hay một câu "done" nói ra khi lượt không gọi dịch vụ
+  (`LAMP_ACTION_CLAIM_CHECKED` chỉ phủ đèn, âm lượng, Schedule và quên). Đọc từ những gì voice giữ, không bao giờ chờ; sau
   khi khởi động, các bản ghi của chủ được hỏi memory một lần bên cạnh các
   lượt (câu trả lời hỏi trước một lần quên chạy sau đó bị bỏ), và một lần
   ghi còn `prepared` qua lần khởi động lại thành `timed_out` ("no send came

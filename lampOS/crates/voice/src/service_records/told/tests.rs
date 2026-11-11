@@ -691,3 +691,84 @@ fn with_redo_on_the_note_and_recall_name_each_writes_key() {
     let told = recall_told(&answer, true, NOW, ZONE, RECALL_BYTES).expect("recall");
     assert!(told["records"][0].get("key").is_none(), "{told}");
 }
+
+/// lamp-9adf, 11 Nov (#6404's build, records told in full): a done create
+/// told, "move lamp test to 10 PM tonight" got no call and a read-back the
+/// model made up, and the "yes" after it "It's moved", with no call. The
+/// note and recall say a record is history only ([`HISTORY_RULE`]), and no
+/// line holds a read-back's words or its question, in full or brief.
+#[test]
+fn a_told_record_is_history_never_a_read_back() {
+    fresh();
+    super::super::redo::on_for_test(true);
+    let mut made = write_rec(
+        "v9-1",
+        "create_event",
+        Status::Done,
+        json!({"title":"Lamp test","start":"2026-11-11T21:00:00+07:00","end":"2026-11-11T22:00:00+07:00"}),
+        NOW - MINUTE,
+    );
+    made.result_id = "8q822d3upman9ff3tcsc4u68cs".into();
+    let mut rows = the_switch_on_row(NOW - 40 * MINUTE);
+    rows.push(made);
+    hold(rows);
+    let read_back_words = [
+        "shall i",
+        "go ahead",
+        "send it?",
+        "read_back",
+        "add an event to your",
+        "change the event",
+        "delete the event",
+        "send an email from",
+        "it says:",
+        "it's moved",
+    ];
+    for in_full in [true, false] {
+        let note = note_now(Some(OWNER), in_full, NOW, ZONE).expect("the owner is told");
+        assert!(note.contains(HISTORY_RULE), "{note}");
+        assert!(note.len() <= NOTE_BYTES, "{} bytes: {note}", note.len());
+        for line in note.lines().filter(|line| line.starts_with("- ")) {
+            let lower = line.to_lowercase();
+            for words in read_back_words {
+                assert!(!lower.contains(words), "{words:?} in {line}");
+            }
+        }
+        println!("in full {in_full}, {} bytes:\n{note}", note.len());
+    }
+    // The rule the note opens with asks for a call for anything new.
+    assert!(HISTORY_RULE.contains("service_write call now"));
+    assert!(HISTORY_RULE.contains("only what that call answers may be read back or said done"));
+    let answer = json!({"ok":true,"records":[{
+        "key":"v9-1","service":"google_calendar","action":"create_event","status":"done","reason":"",
+        "detail":{"title":"Lamp test","start":"2026-11-11T21:00:00+07:00","end":"2026-11-11T22:00:00+07:00"},
+        "result_id":"8q822d3upman9ff3tcsc4u68cs","asked_unix_ms":NOW - MINUTE,"changed_unix_ms":NOW - MINUTE,"links":[],"replaced_by":"",
+    }]});
+    for in_full in [true, false] {
+        let told = recall_told(&answer, in_full, NOW, ZONE, RECALL_BYTES).expect("found");
+        assert!(
+            told["note"].as_str().unwrap().contains(HISTORY_RULE),
+            "{told}"
+        );
+        assert!(
+            !told.to_string().to_lowercase().contains("shall i"),
+            "{told}"
+        );
+    }
+    super::super::redo::on_for_test(false);
+}
+
+/// The note with [`HISTORY_RULE`] keeps every line the 11 Nov switch-on
+/// row was told before it, within [`NOTE_BYTES`].
+#[test]
+fn the_history_rule_drops_no_line_of_the_switch_on_row() {
+    fresh();
+    super::super::redo::on_for_test(true);
+    hold(the_switch_on_row(NOW - 40 * MINUTE));
+    let note = note_now(Some(OWNER), true, NOW, ZONE).expect("the owner is told");
+    let without = note.len() - HISTORY_RULE.len() - 1;
+    assert!(without <= 1_600, "{without} bytes before the rule");
+    assert!(!note.contains("more not shown"), "{note}");
+    assert!(note.len() <= NOTE_BYTES, "{} bytes: {note}", note.len());
+    super::super::redo::on_for_test(false);
+}

@@ -11,7 +11,10 @@
 //! - **The latest records.** The latest [`NOTE_SHOWN`], plus any still
 //!   `prepared` or `failed`, and any `done` write, changed within
 //!   [`OPEN_WITHIN_MS`], latest first, at most [`NOTE_BYTES`] in all, with
-//!   [`RULE`] for the model. Past [`NOTE_MOST`] or the bytes, reads and
+//!   [`RULE`] and [`HISTORY_RULE`] for the model: a record is history, and
+//!   only a `service_write` of this turn is read back or said done. A line
+//!   never holds a read-back's words, only the action, its subject, time,
+//!   status and when. Past [`NOTE_MOST`] or the bytes, reads and
 //!   cancels go first and a `done` write last ([`rank`]): on lamp-06c1 on
 //!   11 Nov newer reads and failures pushed a created event out, and the
 //!   lamp said nothing was saved. With `LAMP_SERVICE_REDO` on, each write
@@ -44,6 +47,15 @@ pub const ENVIRONMENT: &str = "LAMP_SERVICE_RECORDS_TOLD";
 
 /// The rule for the model, told with the records.
 pub const RULE: &str = "Your past service actions are listed with their status. Never claim something was done unless its record says done; never say you can't do something a record shows you did.";
+/// Told after [`RULE`], in full and brief, and with a recall's records: a
+/// record is history, never a write of this turn. On lamp-9adf on 11 Nov
+/// (#6404's build, five to seven records told in full) "move lamp test to
+/// 10 PM tonight" got no call and a read-back the model made up, and the
+/// "yes" after it "It's moved", with no call: nothing was sent. The
+/// thread keeps the lamp's earlier read-backs and "done" lines in words
+/// but never their `service_write` calls (`LAMP_HISTORY_KEEPS_CALLS` keeps
+/// no call with arguments), and the records said those writes were done.
+pub const HISTORY_RULE: &str = "These are history only, never a write of this turn: any new send, change, move or cancel needs a service_write call now, and only what that call answers may be read back or said done.";
 /// What the model is told with the records when someone else may be here.
 pub const BRIEF: &str = "Someone else may be here: say only which service it was and how it went, never what it was about.";
 /// With `LAMP_SERVICE_REDO` on, told with the records in full.
@@ -55,8 +67,9 @@ pub const NOTE_SHOWN: usize = 5;
 pub const OPEN_WITHIN_MS: u64 = 7 * 86_400_000;
 /// The most records told in one note.
 pub const NOTE_MOST: usize = 10;
-/// The most bytes of the note.
-pub const NOTE_BYTES: usize = 1_600;
+/// The most bytes of the note: 1,600 before [`HISTORY_RULE`], which takes
+/// about 200 of it.
+pub const NOTE_BYTES: usize = 1_800;
 /// The most records a recall is told.
 pub const RECALL_MOST: u64 = 5;
 /// The most bytes of the records a recall is told: a function's answer is
@@ -331,7 +344,7 @@ fn chosen(records: &[Record], person: &str, now_ms: u64) -> Vec<Record> {
     chosen
 }
 
-/// The note for `records` of `person`: [`RULE`], one line a record
+/// The note for `records` of `person`: [`RULE`] and [`HISTORY_RULE`], one line a record
 /// ([`line`]), and with a read's find shown, the services' `DATA_NOTE`;
 /// not in full, [`BRIEF`]; in full with redo on, [`REDO_RULE`]. At most
 /// [`NOTE_BYTES`]: lines go by [`to_drop`], a `done` write last, and how
@@ -348,7 +361,7 @@ pub fn note_of(
         return None;
     }
     let head = format!(
-        "(For you to know, not to answer unless asked: what you did with the owner's linked services, latest first. {RULE}{}",
+        "(For you to know, not to answer unless asked: what you did with the owner's linked services, latest first. {RULE} {HISTORY_RULE}{}",
         if !in_full {
             format!(" {BRIEF}")
         } else if super::redo::on() {
@@ -579,7 +592,7 @@ pub fn recall_told(
         })
         .collect();
     let told_of = |records: &[Value]| {
-        let mut told = json!({"records": records, "note": RULE});
+        let mut told = json!({"records": records, "note": format!("{RULE} {HISTORY_RULE}")});
         if !in_full {
             told["others_here"] = json!(BRIEF);
         }
