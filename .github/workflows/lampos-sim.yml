@@ -49,7 +49,16 @@ jobs:
     steps:
       - name: system packages
         run: |
-          sudo apt-get update
+          # The runner's mirror can stop resolving (azure.archive.ubuntu.com, #6429):
+          # then point the sources at Ubuntu's own mirror and try once more.
+          if ! sudo apt-get update; then
+            if [ "$(dpkg --print-architecture)" = amd64 ]; then u=http://archive.ubuntu.com/ubuntu; else u=http://ports.ubuntu.com/ubuntu-ports; fi
+            echo "::warning::apt-get update failed; retrying with $u"
+            for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
+              [ -f "$f" ] && sudo sed -i -E "s#mirror\+file:/etc/apt/apt-mirrors\.txt|https?://[a-z0-9.-]*(archive\.ubuntu\.com/ubuntu|ports\.ubuntu\.com/ubuntu-ports)/?#$u#g" "$f"
+            done
+            sudo apt-get update
+          fi
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev
       - uses: actions/checkout@v4
