@@ -936,7 +936,9 @@ impl<H: Http, M: Mail> Services<H, M> {
                 Err(why) => eprintln!("lamp-services: {}'s link not renewed: {why}", service.code),
             }
         } else if entry.expired(now) {
-            let why = if entry.refresh_token.is_empty() {
+            let why = if entry.refused {
+                "its service refused it"
+            } else if entry.refresh_token.is_empty() {
                 "it has no refresh token"
             } else {
                 "it is not marked to be renewed"
@@ -975,7 +977,34 @@ impl<H: Http, M: Mail> Services<H, M> {
         if event && matches!(reply.status, 404 | 410) {
             return Err(writes::EVENT_GONE.into());
         }
+        if link_refused(&reply) {
+            self.mark_refused(service, entry);
+        }
         Self::answer(service, entry, &reply, write)
+    }
+
+    /// Keep a link with no end by time marked expired once its service has
+    /// refused it ([`Entry::refused`]), unless the app linked it again since
+    /// the call began. Any other link is left as it is.
+    fn mark_refused(&self, service: &catalog::Service, entry: &Entry) {
+        if !entry.end_unknown() {
+            return;
+        }
+        let Some(mut kept) = self
+            .store
+            .load(service.code)
+            .filter(|kept| kept.link_id == entry.link_id && !kept.refused)
+        else {
+            return;
+        };
+        kept.refused = true;
+        match self.store.keep(&kept) {
+            Ok(()) => eprintln!(
+                "lamp-services: {} refused its link: kept as expired until it is linked again",
+                service.code
+            ),
+            Err(_) => eprintln!("lamp-services: {}'s refused link not kept", service.code),
+        }
     }
 
     /// A read (GET) as [`Self::call`], its answer read up to `most` bytes
@@ -990,6 +1019,9 @@ impl<H: Http, M: Mail> Services<H, M> {
         let mut call = Self::token_call(service, entry, Method::Get, url, None, false)?;
         call.most = most;
         let reply = self.http.send(call).await?;
+        if link_refused(&reply) {
+            self.mark_refused(service, entry);
+        }
         Self::answer(service, entry, &reply, false)
     }
 
@@ -1256,7 +1288,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         };
         let endpoint = Endpoint::new(service, entry)?;
         let name = service.name;
-        self.with_tools(&endpoint, async |client, tools| {
+        let read = self.with_tools(&endpoint, async |client, tools| {
             let Some((tool, arguments)) = asked else {
                 return Ok(mcp::tools_quoted(&endpoint, &tools));
             };
@@ -1269,7 +1301,11 @@ impl<H: Http, M: Mail> Services<H, M> {
             let result = client.call(&tool, &arguments).await?;
             Ok(mcp::result_quoted(&endpoint, &result))
         })
-        .await
+        .await;
+        if endpoint.refused() {
+            self.mark_refused(service, entry);
+        }
+        read
     }
 
     /// A call's arguments, a Gmail call's service `gmail` whenever that
@@ -1375,15 +1411,20 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
         let (tool, arguments) = (mcp::tool_name(args)?.to_owned(), mcp::arguments(args)?);
         let endpoint = Endpoint::new(service, entry)?;
-        self.with_tools(&endpoint, async |_, tools| {
-            writes::prepare_mcp(
-                service,
-                entry,
-                listed(&tools, &tool, service.name)?,
-                arguments,
-            )
-        })
-        .await
+        let prepared = self
+            .with_tools(&endpoint, async |_, tools| {
+                writes::prepare_mcp(
+                    service,
+                    entry,
+                    listed(&tools, &tool, service.name)?,
+                    arguments,
+                )
+            })
+            .await;
+        if endpoint.refused() {
+            self.mark_refused(service, entry);
+        }
+        prepared
     }
 
     async fn write(&self, args: &Value) -> Result<Value, String> {
@@ -1587,8 +1628,11 @@ impl<H: Http, M: Mail> Services<H, M> {
                     let mut client = Client::open(&self.http, &endpoint).await?;
                     client.call(&tool, &arguments).await
                 };
-                let result = tokio::time::timeout(mcp::WITHIN, sequence)
-                    .await
+                let result = tokio::time::timeout(mcp::WITHIN, sequence).await;
+                if endpoint.refused() {
+                    self.mark_refused(service, &entry);
+                }
+                let result = result
                     .map_err(|_| format!("{} didn't answer in time", service.name))?
                     .map_err(|why| format!("not sent: {why}"))?;
                 if result.get("isError").and_then(Value::as_bool) == Some(true) {
@@ -1610,6 +1654,13 @@ impl<H: Http, M: Mail> Services<H, M> {
 /// another account, after its read-back.
 pub const LINK_CHANGED: &str =
     "nothing was sent: the service was linked again since the read-back, so ask for it again";
+
+/// Whether a service's answer refuses the link itself: a 401 (GitHub's
+/// "Bad credentials" among them), never one that says its scopes are too
+/// few, nor a 403.
+fn link_refused(reply: &net::Reply) -> bool {
+    reply.status == 401 && !writes::scope_refused(&reply.body)
+}
 
 /// A refused link, in the lamp's words.
 fn relink(name: &str) -> String {
@@ -2353,6 +2404,100 @@ mod tests {
         let connected = run(services.tool(r#"{"op":"call","name":"services_connected"}"#));
         assert!(!connected.to_string().contains("planted"));
         assert_eq!(connected["result"]["connected"][0]["service"], "gmail");
+    }
+
+    #[test]
+    fn a_link_with_no_end_is_kept_until_its_service_refuses_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut services = services(dir.path(), "[]", false);
+        let github = json!({"auth_type":"oauth","access_token":"gho_planted"});
+        let read = read_line(json!({"service":"github","what":"issues","repo":"o/r"}));
+        let expired = |services: &Services<FakeHttp, FakeMail>| {
+            run(services.tool(r#"{"op":"call","name":"services_connected"}"#))["result"]
+                ["connected"][0]["expired"]
+                .clone()
+        };
+        let refused = |services: &Services<FakeHttp, FakeMail>| {
+            services.store.load("github").unwrap().refused
+        };
+        run(services.admin(&set_line("github", github.clone())));
+        assert_eq!(run(services.tool(&read))["ok"], true);
+        // A 403, a scope refusal or another error is not the link's end.
+        for (status, body) in [
+            (
+                403,
+                r#"{"message":"Resource not accessible by integration"}"#,
+            ),
+            (
+                401,
+                r#"{"error":{"status":"PERMISSION_DENIED","details":[{"reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}"#,
+            ),
+            (500, "{}"),
+        ] {
+            services.http.status = status;
+            services.http.body = body.into();
+            assert_eq!(run(services.tool(&read))["ok"], false);
+            assert!(!refused(&services), "{status} {body}");
+            assert_eq!(expired(&services), false);
+        }
+        // GitHub's 401 "Bad credentials": kept expired, listed so, and the
+        // next call told to link it again without asking GitHub.
+        services.http.status = 401;
+        services.http.body = r#"{"message":"Bad credentials"}"#.into();
+        let answer = run(services.tool(&read));
+        assert_eq!(
+            answer["error"],
+            "GitHub refused the lamp's link: it may need linking again in the app"
+        );
+        assert!(refused(&services));
+        assert_eq!(expired(&services), true);
+        let calls = services.http.calls.lock().unwrap().len();
+        services.http.status = 200;
+        services.http.body = "[]".into();
+        assert_eq!(
+            run(services.tool(&read))["error"],
+            "the link to GitHub has expired: link it again in the app"
+        );
+        assert_eq!(services.http.calls.lock().unwrap().len(), calls);
+        // Linked again, the mark is gone and it reads.
+        run(services.admin(&set_line("github", github)));
+        assert!(!refused(&services));
+        assert_eq!(expired(&services), false);
+        assert_eq!(run(services.tool(&read))["ok"], true);
+        // A link given its time is left to it: a 401 marks nothing.
+        let timed = json!({"auth_type":"oauth","access_token":"gho_planted","expires_in":3600});
+        run(services.admin(&set_line("github", timed)));
+        services.http.status = 401;
+        assert_eq!(run(services.tool(&read))["ok"], false);
+        assert!(!refused(&services));
+    }
+
+    #[test]
+    fn an_mcp_link_with_no_end_is_marked_expired_by_its_dead_token() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = mcp_services(dir.path(), "", false);
+        let slack = json!({"connector":"slack","auth_type":"oauth","access_token":"planted-mcp-4710",
+                           "credentials":{"mcp_url":"https://mcp.slack.com/mcp","mcp_auth_header":"bearer_access_token"}});
+        run(services.admin(&set_line("slack", slack.clone())));
+        let tools = read_line(json!({"service":"slack","what":"tools"}));
+        // Another refusal is not the link's end.
+        *services.http.refusal.lock().unwrap() =
+            Some(json!({"code":-32000,"message":"ratelimited"}));
+        assert_eq!(run(services.tool(&tools))["ok"], false);
+        assert!(!services.store.load("slack").unwrap().refused);
+        *services.http.refusal.lock().unwrap() =
+            Some(json!({"code":-32000,"message":"invalid_auth"}));
+        assert_eq!(run(services.tool(&tools))["ok"], false);
+        assert!(services.store.load("slack").unwrap().refused);
+        let connected = run(services.tool(r#"{"op":"call","name":"services_connected"}"#));
+        assert_eq!(connected["result"]["connected"][0]["expired"], true);
+        assert_eq!(
+            run(services.tool(&tools))["error"],
+            "the link to Slack has expired: link it again in the app"
+        );
+        *services.http.refusal.lock().unwrap() = None;
+        run(services.admin(&set_line("slack", slack)));
+        assert_eq!(run(services.tool(&tools))["ok"], true);
     }
 
     fn mcp_services(dir: &std::path::Path, said: &str, sse: bool) -> Services<FakeMcp, FakeMail> {
