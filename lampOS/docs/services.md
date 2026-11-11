@@ -124,7 +124,7 @@ connected apps.
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_WRITES=on` (#6066; off in every product unit) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
-| `LAMP_SKILL_TASKS=on` (#6432; off in every product unit) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, and `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket ("A skill's run on the lamp's Hermes", below) |
+| `LAMP_SKILL_TASKS=on` (#6432; off in every product unit) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -2250,17 +2250,55 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   existing send, the spoken yes through the voice's gate, and then counts
   against the skills' bounds as a made skill's write does (3 a day a skill,
   10 across every skill, `skill_writes::Ledger`): over them it is "not sent".
-- **Not yet (said so the code is not read as more):** the voice does not
-  yet read a run's held write back or take its yes, so on a lamp today a
-  run's write is held and, unanswered, dropped after 2 minutes; the voice's
-  side (telling the person a run's write waits, its read-back and the
-  send through its gate) is a follow-up. lamp-control keeps no skill yes
-  yet (#6408's `SkillYes`), so no token is minted, and no product unit sets
-  `LAMP_SKILL_TASKS`. Tests: `serve::tests::lamp_control_calls_only_with_the_switch_on`,
-  `a_skill_run_reads_by_its_grant` and
-  `a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent`; in
-  lamp-control, `session::tests` (the switch off, no grant, the wrong
-  kind, a paired computer, a granted read) and `protocol::tests`.
+- **The voice reads it back** (`crates/voice/src/run_write_yes.rs`, with
+  `LAMP_SKILL_TASKS=on` in `lamp-voice` too). The coordinator asks this
+  program for the run's held write, the voice's own call on the tools
+  socket, never offered to its model: `run_write_waiting` answers
+  `{"waiting": {"send_id","service","skill","read_back","left_ms"}}` or
+  `{"waiting": null}`, and takes nothing (`Services::run_waiting`; refused
+  with the switch off here, and to anyone but the voice's cgroup). Asked at
+  most every 3 s, off the coordinator's loop. A write with at least 30 s of
+  its hold left is said once, as the lamp's own written turn
+  (`run_write_read_back`), under task news' gates: someone at the lamp, the
+  first pause after any turn (the person mid-turn, or the lamp, is waited
+  out), nothing owed, the room not busy, and never in the lamp's quiet
+  hours (`lamp_local_time::quiet_hours`; a local time not known is quiet,
+  as for a skill). The model is told to say this program's read-back word
+  for word after the skill's name: "Your <skill> skill wants to send: ….
+  Shall I send it?", and to call nothing. A read-back too long for one note
+  (1 024 bytes) is never cut: the lamp says only that the skill wanted to
+  send something too long to read out, nothing waits, and the hold lapses.
+- **The yes.** The voice's worker reads the note back exactly and keeps the
+  write waiting for its send as a write its own model prepared
+  (`services::wait_for_run_yes`), the note's request as its read-back's,
+  its two minutes counted from this program's hold. So the voice's gate
+  holds it (`services::gate`): heard live, a later request, the read-back
+  not cut, within the hold, the echo tail's voice check, the second route
+  only, and no identity check (`LAMP_PRIVATE_ROOM`: whoever answers). On
+  top, a run's send needs a plain yes (`services::plain_yes`: "yes", "send
+  it", "ừ, gửi đi", at most six words and nothing else), so nothing the run
+  wrote can steer the model into a send; on anything else it is cancelled
+  ("a skill's write goes only on a plain yes"). The send names the SHA-256
+  of the read-back the lamp said (`sha256`), and this program sends a run's
+  write only when it is that of the read-back it holds
+  (`serve::read_back_sha256`, else `RUN_NOT_SAID`, nothing sent). A no, a
+  wait, another request answered or the hold over: nothing is sent. The
+  model is told "sent" only from this program's answer `sent: true`
+  (`services::answered`); over the skills' bounds or refused, "not sent".
+- **Not yet (said so the code is not read as more):** lamp-control keeps
+  no skill yes yet (#6408's `SkillYes`), so no token is minted, and no
+  product unit sets `LAMP_SKILL_TASKS`. A no does not cancel the hold here:
+  it lapses after its 2 minutes, and another run's write waits until then.
+  The coordinator does not know which route answers: on the Live route the
+  read-back is said but its yes is "not done on this voice". Tests:
+  `serve::tests::lamp_control_calls_only_with_the_switch_on`,
+  `a_skill_run_reads_by_its_grant`,
+  `a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent` and
+  `the_voice_is_told_a_runs_held_write_and_sends_only_what_it_read_back`;
+  in the voice, `run_write_yes::tests` (said with the skill's name, a plain
+  yes sends it, a no drops it, the switch off ignores it, no "sent" without
+  done); in lamp-control, `session::tests` (the switch off, no grant, the
+  wrong kind, a paired computer, a granted read) and `protocol::tests`.
 
 ## Refresh
 

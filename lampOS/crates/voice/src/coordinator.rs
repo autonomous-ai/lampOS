@@ -6713,6 +6713,13 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // A skill run's held write, read back for a spoken yes (#6432,
+    // `LAMP_SKILL_TASKS=on`): none with the switch off.
+    let mut run_writes = if lifetime.continuous() {
+        crate::run_write_yes::Waits::from_environment()
+    } else {
+        None
+    };
     // Told at the first pause of a second, not after 15 s with no turn
     // (#560, `LAMP_TASK_NEWS_AT_PAUSE=on`).
     let news_at_pause = crate::task_news::at_pause(
@@ -13627,6 +13634,59 @@ fn conversation_with_gate_inner(
         // and its question has a deadline. Put first before the switch is
         // looked at, so it goes ahead with the switch on too (the
         // reviewer-lead's P2 on #2642).
+        // A skill run's write held by lamp-services (#6432): read back as
+        // the lamp's own turn under news' gates, at the first pause after
+        // any turn, never in the quiet hours, once; the yes is the waiting
+        // write's (`crate::run_write_yes`).
+        if let Some(waits) = run_writes.as_mut()
+            && !reminder_waiting
+            && crate::task_news::quiet_for_news(
+                true,
+                clock,
+                last_turn_us,
+                last_spoke_us,
+                last_speech_us,
+                reminder_quiet(
+                    clock,
+                    reminder_cycle_started_us,
+                    last_speech_us,
+                    last_capture,
+                ),
+            )
+            && (presence
+                .as_ref()
+                .is_some_and(|presence| presence.present(clock))
+                || said_at_us
+                    .is_some_and(|at| clock.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US))
+            && !room.busy()
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && !admission.owns_stream()
+            && !submission_draining
+            && snapshot.listening_ready(now())
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+            && let Some(run) = waits.due(std::time::Instant::now())
+            && !crate::run_write_yes::quiet_hours_now()
+        {
+            waits.told(&run.send_id);
+            eprintln!(
+                "lamp-voice: reading back a skill run's held write to {} for a yes (#6432)",
+                run.service
+            );
+            snapshot = commit_written_turn(
+                owner,
+                reply,
+                &mut provider_queue,
+                &run.note(),
+                false,
+                crate::run_write_yes::BASIS,
+                provider_session,
+                rig.playout_start_now(),
+                trace,
+                |state| rig.publish(state),
+            )?;
+            last_publish = monotonic_us();
+        }
         // News whose turn was cut short since the last tick: with
         // `LAMP_TASK_NEWS_RETELL=on`, told once more at the next quiet
         // pause (#4342).

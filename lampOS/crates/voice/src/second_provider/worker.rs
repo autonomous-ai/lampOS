@@ -13122,6 +13122,10 @@ pub async fn run(
                 // A written request is kept for the thread as the note it
                 // is, with the answer to it (`Thread::written`).
                 sign_in_written(&command);
+                // A skill run's write read back waits for its yes (#6432).
+                if let ProviderInput::Written { request, text, .. } = &command {
+                    crate::run_write_yes::written(*request, text);
+                }
                 if let Ok(mut thread) = crate::thread::THREAD.lock() {
                     keep_written(&mut thread, &command, engine.scopes_context());
                 }

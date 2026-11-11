@@ -146,7 +146,7 @@ dịch vụ.
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
 | `LAMP_SKILL_WRITES=on` (#6066; tắt trong mọi unit sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
-| `LAMP_SKILL_TASKS=on` (#6432; tắt trong mọi unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, và `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
+| `LAMP_SKILL_TASKS=on` (#6432; tắt trong mọi unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -2347,18 +2347,60 @@ lẫn lượt chạy đều không giữ token nào.
   cổng của giọng nói, và khi đó tính vào giới hạn của kỹ năng như lần ghi
   của kỹ năng tự tạo (3 lần một ngày mỗi kỹ năng, 10 lần cho mọi kỹ năng,
   `skill_writes::Ledger`): vượt quá thì "not sent".
-- **Chưa làm (nói ra để không ai đọc code thành nhiều hơn):** giọng nói
-  chưa đọc lại lần ghi đang giữ của một lượt chạy hay nhận lời đồng ý cho
-  nó, nên trên đèn hôm nay lần ghi của lượt chạy được giữ và, không ai trả
-  lời, bị bỏ sau 2 phút; phía giọng nói (báo người dùng rằng có lần ghi của
-  lượt chạy đang chờ, đọc lại nó và gửi qua cổng của nó) là việc tiếp theo.
-  lamp-control chưa giữ lời đồng ý cho kỹ năng nào (`SkillYes` của #6408),
-  nên chưa token nào được tạo, và chưa unit sản phẩm nào đặt
-  `LAMP_SKILL_TASKS`. Test: `serve::tests::lamp_control_calls_only_with_the_switch_on`,
-  `a_skill_run_reads_by_its_grant` và
-  `a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent`; trong
-  lamp-control, `session::tests` (công tắc tắt, không có quyền, sai loại,
-  một máy tính đã ghép đôi, một lần đọc được cấp quyền) và `protocol::tests`.
+- **Giọng nói đọc lại nó** (`crates/voice/src/run_write_yes.rs`, với
+  `LAMP_SKILL_TASKS=on` cả trong `lamp-voice`). Bộ điều phối hỏi chương
+  trình này lần ghi đang giữ của lượt chạy, bằng lệnh riêng của giọng nói
+  trên socket tools, không bao giờ đưa cho mô hình: `run_write_waiting` trả
+  lời `{"waiting": {"send_id","service","skill","read_back","left_ms"}}`
+  hoặc `{"waiting": null}`, và không lấy đi gì (`Services::run_waiting`; bị
+  từ chối khi công tắc ở đây tắt, và với bất kỳ ai ngoài cgroup của giọng
+  nói). Hỏi nhiều nhất mỗi 3 giây, ngoài vòng lặp của bộ điều phối. Một lần
+  ghi còn ít nhất 30 giây giữ được nói một lần, như lượt viết của chính đèn
+  (`run_write_read_back`), dưới các cổng của tin công việc: có người ở đèn,
+  khoảng lặng đầu tiên sau bất kỳ lượt nào (người đang nói dở, hay đèn, thì
+  được chờ cho xong), không nợ câu trả lời nào, phòng không bận, và không
+  bao giờ trong giờ yên lặng của đèn (`lamp_local_time::quiet_hours`; giờ
+  địa phương không biết thì coi là yên lặng, như với kỹ năng). Mô hình được
+  bảo nói nguyên văn lời đọc lại của chương trình này sau tên kỹ năng:
+  "Your <skill> skill wants to send: …. Shall I send it?", và không gọi gì.
+  Một lời đọc lại quá dài cho một ghi chú (1 024 byte) không bao giờ bị cắt:
+  đèn chỉ nói rằng kỹ năng muốn gửi một thứ quá dài để đọc ra, không gì chờ,
+  và việc giữ tự hết hạn.
+- **Lời đồng ý.** Worker của giọng nói đọc lại chính xác ghi chú đó và giữ
+  lần ghi chờ được gửi như một lần ghi do chính mô hình của nó chuẩn bị
+  (`services::wait_for_run_yes`), request của ghi chú là request đọc lại,
+  hai phút của nó tính từ lúc chương trình này giữ. Vì vậy cổng của giọng
+  nói giữ nó (`services::gate`): nghe trực tiếp, một request sau, lời đọc
+  lại không bị cắt, trong thời gian giữ, kiểm tra giọng ở đuôi tiếng vọng,
+  chỉ tuyến thứ hai, và không kiểm tra danh tính (`LAMP_PRIVATE_ROOM`: ai
+  trả lời cũng được). Thêm vào đó, lần gửi của lượt chạy cần một lời đồng ý
+  đơn giản (`services::plain_yes`: "yes", "send it", "ừ, gửi đi", nhiều nhất
+  sáu từ và không gì khác), để không gì lượt chạy viết ra lái được mô hình
+  gửi đi; với bất kỳ câu nào khác nó bị huỷ ("a skill's write goes only on a
+  plain yes"). Lần gửi nêu SHA-256 của lời đọc lại mà đèn đã nói (`sha256`),
+  và chương trình này chỉ gửi lần ghi của lượt chạy khi đó là SHA của lời
+  đọc lại nó đang giữ (`serve::read_back_sha256`, nếu không thì
+  `RUN_NOT_SAID`, không gì được gửi). Một lời từ chối, một lời chờ, một
+  request khác được trả lời hay hết thời gian giữ: không gì được gửi. Mô
+  hình chỉ được báo "đã gửi" từ câu trả lời `sent: true` của chương trình
+  này (`services::answered`); vượt giới hạn của kỹ năng hay bị từ chối thì
+  "chưa gửi".
+- **Chưa làm (nói ra để không ai đọc code thành nhiều hơn):** lamp-control
+  chưa giữ lời đồng ý cho kỹ năng nào (`SkillYes` của #6408), nên chưa token
+  nào được tạo, và chưa unit sản phẩm nào đặt `LAMP_SKILL_TASKS`. Một lời từ
+  chối không huỷ việc giữ ở đây: nó hết hạn sau 2 phút, và lần ghi của lượt
+  chạy khác phải chờ đến lúc đó. Bộ điều phối không biết tuyến nào trả lời:
+  trên tuyến Live lời đọc lại vẫn được nói nhưng lời đồng ý của nó là "không
+  làm trên giọng này". Test:
+  `serve::tests::lamp_control_calls_only_with_the_switch_on`,
+  `a_skill_run_reads_by_its_grant`,
+  `a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent` và
+  `the_voice_is_told_a_runs_held_write_and_sends_only_what_it_read_back`;
+  trong giọng nói, `run_write_yes::tests` (nói kèm tên kỹ năng, một lời đồng
+  ý đơn giản gửi nó, một lời từ chối bỏ nó, công tắc tắt thì bỏ qua, không
+  nói "đã gửi" khi chưa xong); trong lamp-control, `session::tests` (công tắc
+  tắt, không có quyền, sai loại, một máy tính đã ghép đôi, một lần đọc được
+  cấp quyền) và `protocol::tests`.
 
 ## Làm mới
 
