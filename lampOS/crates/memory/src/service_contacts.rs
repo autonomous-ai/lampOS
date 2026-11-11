@@ -189,6 +189,16 @@ impl Days {
     /// (each a subject's words, as the voice's forget gives them), compared
     /// lower case and without accents, removed: how many. A one-letter
     /// word ("Octavia's" gives an "s") is passed over.
+    /// Every mail contact of `person` removed (`service_contacts_forget`
+    /// with `all`), as forget everything removes them.
+    pub fn service_contacts_forget_all(&mut self, person: &Person) -> Result<u64> {
+        owner_only(person)?;
+        let tx = self.db.transaction()?;
+        let removed = empty(&tx, Some(person))?;
+        tx.commit()?;
+        Ok(removed)
+    }
+
     pub fn service_contacts_forget(
         &mut self,
         person: &Person,
@@ -434,6 +444,23 @@ mod tests {
         let gone = send(&mut store, json!({"op":"forget_person","person":OTHER}));
         assert_eq!(gone["ok"], true, "{gone}");
         assert!(contacts(&mut store, OTHER).is_empty());
+    }
+
+    /// `service_contacts_forget` with `all` takes every contact of that
+    /// person and no one else's (the switch-on row on lamp-06c1, 11 Nov).
+    #[test]
+    fn a_contacts_forget_with_all_takes_every_contact_of_that_person() {
+        let (_scratch, mut store) = Scratch::new("forget-contacts-all");
+        put(&mut store, OWNER, "Octavia", "octavia@example.com");
+        put(&mut store, OWNER, "Lan", "lan@example.com");
+        put(&mut store, OTHER, "Mai", "mai@example.com");
+        let forgot = send(
+            &mut store,
+            json!({"op":"service_contacts_forget","person":OWNER,"all":true}),
+        );
+        assert_eq!(forgot, json!({"ok":true,"removed":2}));
+        assert!(contacts(&mut store, OWNER).is_empty());
+        assert_eq!(contacts(&mut store, OTHER).len(), 1);
     }
 
     /// A save stamped before a forget everything is refused and leaves no

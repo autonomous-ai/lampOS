@@ -313,7 +313,11 @@ enum Extra {
     ServiceRecordsForget {
         #[serde(default)]
         person: Who,
+        #[serde(default)]
         about: Vec<Vec<String>>,
+        /// Every row of `person`, whatever `about` says.
+        #[serde(default)]
+        all: bool,
     },
     /// The voice's `LAMP_SERVICE_CONTACTS` (connector records, PR 1c): a
     /// known person's mail contact saved, new or replacing the address
@@ -338,7 +342,11 @@ enum Extra {
     ServiceContactsForget {
         #[serde(default)]
         person: Who,
+        #[serde(default)]
         about: Vec<Vec<String>>,
+        /// Every row of `person`, whatever `about` says.
+        #[serde(default)]
+        all: bool,
     },
     /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
     Adopt {
@@ -1152,11 +1160,23 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
         Extra::ServiceContacts { person, name } => {
             json!({"ok":true,"contacts":store.service_contacts(&one(person)?, name.as_deref())?})
         }
-        Extra::ServiceContactsForget { person, about } => {
-            json!({"ok":true,"removed":store.service_contacts_forget(&one(person)?, &about)?})
+        Extra::ServiceContactsForget { person, about, all } => {
+            let person = one(person)?;
+            let removed = if all {
+                store.service_contacts_forget_all(&person)?
+            } else {
+                store.service_contacts_forget(&person, &about)?
+            };
+            json!({"ok":true,"removed":removed})
         }
-        Extra::ServiceRecordsForget { person, about } => {
-            json!({"ok":true,"removed":store.service_records_forget(&one(person)?, &about)?})
+        Extra::ServiceRecordsForget { person, about, all } => {
+            let person = one(person)?;
+            let removed = if all {
+                store.service_records_forget_all(&person)?
+            } else {
+                store.service_records_forget(&person, &about)?
+            };
+            json!({"ok":true,"removed":removed})
         }
         Extra::Adopt { person, to, ids } => {
             let to = one(Who::Id(to))?;

@@ -677,7 +677,11 @@ unchanged.
 - `service_records_forget {person, about}` removes the records with every
   key word of any subject of `about` (lists of words), compared lower case,
   without accents and as singulars, in the service, action, reason, result
-  id and every text of the detail: `{ok:true,removed}`.
+  id and every text of the detail: `{ok:true,removed}`. With `all: true`
+  it removes every record of `person` instead, `about` not read, and a put
+  asked before it is refused as after a `forget_all`: the voice's forget
+  everything sends it for the services' owner id when that is not the
+  speaker's own (the private room).
 - **A put asked before a forget is refused** `forgotten`: one whose
   `asked_unix_ms` is before the person's latest `forget_all` or
   `forget_person` (or everyone's `forget_all`), kept in
@@ -718,7 +722,8 @@ Created `IF NOT EXISTS`, `user_version` unchanged.
   key word of any subject of `about` in their name, their address or the
   words "contact", "address", "email" and "mail", compared as the records'
   forget compares them; one-letter words ("Octavia's" gives an "s") are
-  passed over: `{ok:true,removed}`.
+  passed over: `{ok:true,removed}`. With `all: true` it removes every
+  contact of `person` instead, as the records' forget does.
 
 Only a known person (`p-` id) has contacts (`bad_person` otherwise). Kept
 until forgotten: no expiry, tidy or nightly pass reads this table;
