@@ -165,18 +165,24 @@ fn play(path: &str, cancelled: &AtomicBool) {
     }
 }
 
+/// The host's speech engines, in the order tried, each with the arguments that
+/// make it read its standard input and (for `spd-say`) wait until it has spoken.
+/// `spd-say` is last: speech-dispatcher (Ubuntu and most Linux desktops have it,
+/// and often no other engine) hands the line to its own synthesizer.
+const ENGINES: &[(&str, &[&str])] = &[
+    ("say", &["-f", "-"]),
+    ("espeak-ng", &["--stdin"]),
+    ("espeak", &["--stdin"]),
+    ("spd-say", &["--wait", "--pipe-mode"]),
+];
+
 /// Speaks `text` on the host and returns when done: the host's own engine
 /// where there is one, else a silent wait as long as the line. The text goes
 /// to the engine on its standard input, never as an argument, so a line that
 /// starts with `-` is words, not an option (`say -f FILE` would read a file
 /// aloud).
 fn speak(text: &str, cancelled: &AtomicBool) {
-    let engines: &[(&str, &[&str])] = &[
-        ("say", &["-f", "-"]),
-        ("espeak-ng", &["--stdin"]),
-        ("espeak", &["--stdin"]),
-    ];
-    if !speak_with(engines, text, cancelled) {
+    if !speak_with(ENGINES, text, cancelled) {
         wait(
             Duration::from_millis(60 * text.chars().count() as u64).min(SILENT_MAX),
             cancelled,
@@ -207,6 +213,7 @@ fn speak_with(engines: &[(&str, &[&str])], text: &str, cancelled: &AtomicBool) -
             if cancelled.load(Ordering::SeqCst) {
                 let _ = child.kill();
                 let _ = child.wait();
+                cut_off(program);
                 break;
             }
             thread::sleep(Duration::from_millis(20));
@@ -214,6 +221,23 @@ fn speak_with(engines: &[(&str, &[&str])], text: &str, cancelled: &AtomicBool) -
         return true;
     }
     false
+}
+
+/// Cuts off what an engine has already handed on, when its client is killed:
+/// speech-dispatcher goes on speaking a queued line after `spd-say` is gone, so
+/// `spd-say --cancel` stops it. The other engines speak only as long as they run.
+fn cut_off(program: &str) {
+    if Path::new(program)
+        .file_name()
+        .is_some_and(|name| name == "spd-say")
+    {
+        let _ = Command::new(program)
+            .arg("--cancel")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
 }
 
 /// Serves lamp-actions' call socket at `path`, forever: `volume_to` only.
@@ -409,6 +433,58 @@ mod tests {
             }
         );
         assert!(heard.recv(Duration::from_millis(300)).unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn spd_say_is_an_engine_that_reads_stdin_and_waits_and_is_cancelled_by_its_cancel() {
+        let _one_at_a_time = crate::FAKE_PROGRAM
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        // Listed, with the text on stdin (never an argument), after the engines that were.
+        assert_eq!(
+            ENGINES.last(),
+            Some(&("spd-say", &["--wait", "--pipe-mode"][..]))
+        );
+        assert_eq!(ENGINES.len(), 4);
+        // A fake `spd-say` that logs how it was called and speaks "for ever".
+        let dir = scratch("spd");
+        std::fs::create_dir_all(&dir).unwrap();
+        let engine = dir.join("spd-say");
+        let log = dir.join("calls");
+        std::fs::write(
+            &engine,
+            format!(
+                "#!/bin/sh\necho \"$@\" >> {}\n[ \"$1\" = --cancel ] && exit 0\ncat > /dev/null\nsleep 30\n",
+                log.display()
+            ),
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&engine, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let program = engine.to_str().unwrap();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&cancelled);
+        let late = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(400));
+            flag.store(true, Ordering::SeqCst);
+        });
+        let began = std::time::Instant::now();
+        assert!(speak_with(
+            &[(program, &["--wait", "--pipe-mode"])],
+            "hello",
+            &cancelled
+        ));
+        late.join().unwrap();
+        // Cut off at the cancel (not after the fake's 30 s), and the client told
+        // speech-dispatcher to stop what it had queued.
+        assert!(began.elapsed() < Duration::from_secs(10));
+        assert_eq!(
+            std::fs::read_to_string(&log).unwrap(),
+            "--wait --pipe-mode\n--cancel\n"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
