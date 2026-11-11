@@ -270,9 +270,10 @@ refusal), and nothing is started new in any case:
 - **The voice's side** (off unless `LAMP_TASKS_REPLY_NAMED=on`, the
   provider worker's `--tasks-reply-named`, last of the tasks flags; it
   needs only the tasks part): `start_agent_task` takes an optional
-  `session`, described as "Only if the person means earlier work, not a
-  new session: how they said it, its name or what it worked on ("the book
-  program one"). Never guessed." It is trimmed and sent as `prepare`'s
+  `session`, described as "Only for earlier work, not new: as said, its
+  name or what it worked on ("the book program one"). A change to work
+  handed over in this talk is that work. Sent with no task, it opens it.
+  Never guessed." (the last sentence since #6274, below). It is trimmed and sent as `prepare`'s
   `session`; blank is none, and words over 128 bytes or with a control
   character prepare nothing and the model is told to ask which session.
   The answer's `where`, which the read-back says, is "<who>, in the
@@ -312,6 +313,77 @@ refusal), and nothing is started new in any case:
   `task_news::tests::a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure`,
   `task_news::tests::a_closed_named_session_is_told_how_to_open_it_again`,
   `task_news::tests::work_that_joined_an_earlier_session_names_that_session_once`.
+- **A name said nearly right** (#6274): when nothing fits by name, folder
+  or work, a speech-to-text slip or a misspelt word still finds the session
+  (`near_name`). Each word said must still match a word of the name or
+  folder, in order, either as the start of that word (as above) or as the
+  whole word with a slip or two: a letter left out, added or changed, or
+  two side by side swapped (optimal string alignment distance). At most 1
+  slip for a word of 4–7 letters and 2 for one of 8 or more; a word under 4
+  letters, said or in the name, takes none (`SHORTEST_NEAR`). At least one
+  slip must be there, since with none the begins step would have found it.
+  So "costumer survey", "survay" and "Customer Srvey" find "Customer
+  Survey", while "svrvay" (two slips in six letters), "dox" for "docs" and
+  "api" for "rapid-prototype" find nothing. The session with the fewest
+  slips in all is the one. Two as close are `session_ambiguous`, live or
+  stopped, never a guess. It is tried only after a live row's work has
+  failed to fit, and before the stopped rows' last asks are read. Test:
+  `tests/harness.rs` `a_name_said_nearly_right_finds_the_one_closest_session`.
+- **Opened or asked about by name, with no work** (#6274): the person says
+  "open the customer survey one" or "how far has the customer survey one
+  got", and nothing is to be typed. On lamp-c0a4 the model called nothing
+  (`calls=none`): `start_agent_task` needed a `task`, and
+  `check_agent_task` knew only work the lamp had handed over. With both
+  switches on, the voice now asks lamp-tasks to look on the voice's own
+  socket: `{"op":"session","look":"voice-<request>-look-<n>","target":"<alias>","session":"<words>","join":true|false}`.
+  The `target` is chosen as for a hand-over: the lamp's own target when the
+  work would be done there, else the agent named, else the default. The
+  request answers at once, `{"ok":true,"look":…,"done":false}`, because
+  every request must answer within 1.1 s and listing the person's
+  sessions takes seconds. The look runs on a lane of its own
+  (`SessionLane`, `Cli::session_lane`, beside the hand-over lane), at most
+  4 at a time, each answer kept 60 s. The voice asks again with the same
+  `look` every 250 ms, for up to 16 s (`LOOK_WAIT`; lamp-tasks' own bound is
+  `LOOK_BOUND`, 15 s). Done, the answer is `"found"` (`state`, `name`,
+  `ask`, `about` cut at a word to 160 characters and marked untrusted for
+  the model, `last_active_unix_ms`, `resumed`, `on`) or `"code"`.
+  `Cli::look_session` finds the session as a named hand-over does
+  (`find_named`: the lamp's own target looks among the computers too, and
+  offline ones are left out), types nothing, routes nothing and starts
+  nothing.
+  - `join` (`start_agent_task` with `session` and no `task`, only from
+    words the person said): one idle live session is open as it is; one
+    busy is said busy; one stopped is reopened with `harness resume` under
+    `LAMP_TASKS_RESUME_CLOSED` (else `session_stopped`). The model is told
+    `{"open":true,"session":…,"where":…,"next":…}`. Its `next` says the
+    session is open (or reopened), to ask what it should do, and that what
+    they ask of it next goes in with `start_agent_task` and that session.
+    That task is then said back and waits for a yes, as any named
+    hand-over does. Nothing is prepared or typed by the open itself.
+  - Not `join` (`check_agent_task` with `session`): whatever fits is said
+    as it stands, stopped too, nothing reopened. This includes a session
+    the lamp never handed anything, or one handed over in an earlier talk.
+    The model is told `session`, `where`, `state` in plain words, `doing`
+    (`{"untrusted": …}`, paths put as "a file") and `last_active`.
+  - None fitting is said plainly ("No session of theirs fits …"), more
+    than one is asked about, never a guess. Closed, busy, an offline
+    computer and a list that can't be read each have their own few words.
+  - In the schemas, with the switch, `start_agent_task` has no `required`
+    (a session alone is enough; with neither, "Say what the work is."), and
+    `session`'s description says "Sent with no task, it opens it." `check_agent_task` gains `session` ("Only when they ask how
+    an earlier session of theirs is going: … even one you never handed
+    over.") and one sentence. Without the switch, both are word for word
+    as before, `required: ["task"]` too.
+  - Tests: `tests/harness.rs`
+    `a_named_session_is_looked_at_to_open_or_say_how_it_is_with_nothing_typed`;
+    `tests/runtime.rs`
+    `a_look_at_a_named_session_answers_at_once_and_is_asked_again_for_what_it_found`;
+    `agent_tasks::tests::with_reply_named_a_session_alone_opens_it_and_needs_no_task`,
+    `agent_tasks::tests::with_reply_named_a_check_names_a_session_and_is_told_its_own_state`.
+  - Not yet shown on a lamp: the whole path with a voice played from the
+    Mac, and how long the person waits while the sessions are listed. A
+    hand-over's lookup took 15.2 s on lamp-c0a4 on 10 Nov with two
+    computers offline; a look is the same lists.
 
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads
 how each task handed over is going with one `harness ps` a machine and puts
@@ -431,6 +503,7 @@ inspection evidence, not a playback grant.
 | `get_progress` | `id` | With `serve --progress` only: the agent's progress line as last read, and what was read with it (["Progress on the bus"](#progress-on-the-bus-serve---progress-732)) |
 | `tasks_now` | none | With `serve --progress` only: every task being worked on or lately settled, newest first, with its last step in the agent's words marked untrusted, in under 2 KiB (["Tasks now"](#tasks-now-4342-serve---progress)) |
 | `prepare` | `guard`, `text`, `target` alias | Immutable proposal; no CLI call |
+| `session` | `look` (the voice's id for it), `target` alias, `session` (the person's words), optional `join` | Trusted, with `serve --reply-named` only (else `reply_named_off`, #6274): a look at a named session, to open it (`join`) or to say how it is. Answers at once, `done:false`, while the look runs on its own lane; asked again with the same `look`, `done:true` with `found` or `code`. Never types, routes or starts anything |
 | `confirm` | `guard`, `id`, `prepared_digest`, `session_id` | Trusted person's spoken confirmation |
 | `cancel` | `guard`, `id` | Only before dispatch attempt |
 | `observe` | `guard`, `id` | Explicit `show` of the bound accepted agent |
