@@ -44,10 +44,14 @@ pub const WRITE_WITHIN: Duration = Duration::from_secs(45);
 /// ends within it.
 pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
 /// Where the system prompt and the brief are put for the agent to read:
-/// the folder may be passed through by anyone and listed by no one but
-/// root, and each file has a name nobody can guess and is removed once the
-/// answer is in.
+/// the folder 0750 and each file 0640, both of the local agents' group
+/// ([`lamp_msgs::local_agent::GROUP`], made by the installer with the
+/// `lampagent` user), each file with a name nobody can guess, removed once
+/// the answer is in. With no such group, the folder 0700 and the file 0600,
+/// journaled.
 pub const RULES_DIR: &str = "/run/lampos-make-skill";
+/// Where the group is read.
+pub const GROUP_FILE: &str = "/etc/group";
 /// What the lamp says, through the say service, as the agent begins, so
 /// the person isn't left in silence.
 pub const WAITING_LINE: &str = "Let me think about that a little longer.";
@@ -84,6 +88,8 @@ pub struct Agent {
     pub tasks: PathBuf,
     /// Where the rules file is put ([`RULES_DIR`]).
     pub rules: PathBuf,
+    /// Where the agents' group is read ([`GROUP_FILE`]).
+    pub groups: PathBuf,
     /// The say socket the waiting line goes to; none says nothing.
     pub say: Option<PathBuf>,
     /// [`WRITE_WITHIN`], or a test's own.
@@ -124,6 +130,7 @@ impl Agent {
         Some(Self {
             tasks,
             rules: PathBuf::from(RULES_DIR),
+            groups: PathBuf::from(GROUP_FILE),
             say: Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
             within: WRITE_WITHIN,
             make_within: MAKE_WITHIN,
@@ -158,11 +165,25 @@ impl Agent {
     pub fn write(&self, system: &str, brief: &str) -> Result<String, NotWritten> {
         let began = Instant::now();
         let left = || self.within.saturating_sub(began.elapsed());
-        let rules = Rules::put(&self.rules, system, brief)
+        let group = agents_group(&self.groups);
+        if group.is_none() {
+            eprintln!(
+                "lamp-voice: a skill made here: no {} group: the agent's rules are kept 0600",
+                lamp_msgs::local_agent::GROUP
+            );
+        }
+        let rules = Rules::put(&self.rules, group, system, brief)
             .map_err(|error| NotWritten::Failed(format!("its rules not written: {error}")))?;
         let text = task_text(&rules.path);
         let (store, session, id) = self.hand_over(&text, &left)?;
-        let answer = self.answered(id, &left)?;
+        let answer = match self.answered(id, &left) {
+            Ok(answer) => answer,
+            Err(NotWritten::Timeout) => {
+                self.cancel(id);
+                return Err(NotWritten::Timeout);
+            }
+            Err(why) => return Err(why),
+        };
         self.told(&store, &session, id, answer.observation, &left);
         if answer.truncated || answer.text.len() > MOST_ANSWER_BYTES {
             return Err(NotWritten::Failed("its answer was cut".into()));
@@ -271,6 +292,36 @@ impl Agent {
         }
     }
 
+    /// Task `id`, whose agent didn't answer in time, ended where the tasks
+    /// part can end it: `cancel`, which it takes only for work not yet
+    /// handed to the agent. It has no op that ends work the agent has, so
+    /// that is left running, journaled; its news is a brief's, never told.
+    fn cancel(&self, id: u64) {
+        let request = self.tasks.join("request.sock");
+        let within = Duration::from_millis(1_500);
+        let answer = agent_tasks::ask(&request, &json!({"op":"status"}), within)
+            .and_then(|status| {
+                agent_tasks::guard(&status, format!("make-{}", agent_tasks::nonce()))
+            })
+            .and_then(|guard| {
+                agent_tasks::ask_until_sure(
+                    &request,
+                    &json!({"op":"cancel","guard":guard,"id":id}),
+                    || within,
+                )
+            });
+        match answer {
+            Some(answer) if answer.get("ok") == Some(&json!(true)) => {
+                eprintln!("lamp-voice: a skill made here: the agent's task {id} was ended");
+            }
+            answer => eprintln!(
+                "lamp-voice: a skill made here: the agent's task {id} couldn't be ended ({}): \
+                 left running",
+                answer.as_ref().map_or_else(|| "no answer".to_owned(), code)
+            ),
+        }
+    }
+
     /// Task `id`'s answer marked told on the voice's socket, so the tasks
     /// part closes the agent's session (`--close-told`). Best effort.
     fn told(
@@ -336,19 +387,46 @@ struct Rules {
 }
 
 impl Rules {
-    fn put(directory: &Path, system: &str, brief: &str) -> std::io::Result<Self> {
+    /// The file in `directory`, shared with `group` (the agents') when
+    /// there is one, else with no one.
+    fn put(
+        directory: &Path,
+        group: Option<u32>,
+        system: &str,
+        brief: &str,
+    ) -> std::io::Result<Self> {
+        let (folder, file_mode) = if group.is_some() {
+            (0o750, 0o640)
+        } else {
+            (0o700, 0o600)
+        };
         std::fs::create_dir_all(directory)?;
-        std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o711))?;
+        std::os::unix::fs::chown(directory, None, group)?;
+        std::fs::set_permissions(directory, std::fs::Permissions::from_mode(folder))?;
         let path = directory.join(format!("make-{:032x}.md", agent_tasks::nonce()));
+        // Made 0600 and given its group and mode before a byte is written.
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .mode(0o644)
+            .mode(0o600)
             .open(&path)?;
         let rules = Self { path };
+        std::os::unix::fs::fchown(&file, None, group)?;
+        file.set_permissions(std::fs::Permissions::from_mode(file_mode))?;
         file.write_all(format!("{system}\n\n{brief}\n").as_bytes())?;
         Ok(rules)
     }
+}
+
+/// The local agents' group's id in the `group` file at `path`
+/// (`name:x:gid:members`); none when it isn't there.
+fn agents_group(path: &Path) -> Option<u32> {
+    let text = std::fs::read_to_string(path).ok()?;
+    text.lines().find_map(|line| {
+        let mut fields = line.split(':');
+        (fields.next()? == lamp_msgs::local_agent::GROUP).then_some(())?;
+        fields.nth(1)?.parse().ok()
+    })
 }
 
 impl Drop for Rules {
@@ -394,6 +472,7 @@ pub(crate) mod tests {
             Agent {
                 tasks: self.dir.path().to_path_buf(),
                 rules: self.dir.path().join("rules"),
+                groups: self.dir.path().join("no-group"),
                 say: None,
                 within: Duration::from_millis(1_500),
                 make_within: Duration::from_secs(10),
@@ -451,6 +530,8 @@ pub(crate) mod tests {
                             json!({"ok":true,"id":tasks.len(),"prepared_digest":"d"})
                         }
                         "confirm" | "told" => json!({"ok":true}),
+                        // Work its agent has can't be cancelled.
+                        "cancel" => json!({"ok":false,"error":"already_attempted"}),
                         "get_task" => {
                             let id = asked["id"].as_u64().unwrap() as usize;
                             let mut tasks = tasks.lock().unwrap();
@@ -529,7 +610,53 @@ pub(crate) mod tests {
         let silent = stub(Some("openclaw"), Arc::new(|_: &str| None));
         let began = Instant::now();
         assert_eq!(silent.agent().write("S", "B"), Err(NotWritten::Timeout));
-        assert!(began.elapsed() < Duration::from_secs(3));
+        assert!(began.elapsed() < Duration::from_secs(4));
+        // Its task is asked to end, and its rules are gone.
+        let sent = silent.sent.lock().unwrap().clone();
+        let cancel = sent.iter().find(|line| line["op"] == "cancel").unwrap();
+        assert_eq!(cancel["id"], 1);
+        assert_eq!(
+            std::fs::read_dir(silent.dir.path().join("rules"))
+                .unwrap()
+                .count(),
+            0
+        );
+    }
+
+    /// The rules are shared with the local agents' group only: the file
+    /// 0640 and the folder 0750 of that group; with no such group, 0600 and
+    /// 0700.
+    #[test]
+    fn the_rules_are_for_the_agents_group_alone() {
+        use std::os::unix::fs::MetadataExt;
+        let tasks = stub(None, Arc::new(|_: &str| None));
+        let folder = tasks.dir.path().join("rules");
+        // A group this test's user is in: the folder's own.
+        let own = std::fs::metadata(tasks.dir.path()).unwrap().gid();
+        let groups = tasks.dir.path().join("group");
+        std::fs::write(
+            &groups,
+            format!(
+                "root:x:0:\n{}:x:{own}:lampagent\n",
+                lamp_msgs::local_agent::GROUP
+            ),
+        )
+        .unwrap();
+        assert_eq!(agents_group(&groups), Some(own));
+        assert_eq!(agents_group(&tasks.dir.path().join("none")), None);
+        let shared = Rules::put(&folder, Some(own), "S", "B").unwrap();
+        let file = std::fs::metadata(&shared.path).unwrap();
+        assert_eq!((file.mode() & 0o777, file.gid()), (0o640, own));
+        let dir = std::fs::metadata(&folder).unwrap();
+        assert_eq!((dir.mode() & 0o777, dir.gid()), (0o750, own));
+        drop(shared);
+        let alone = Rules::put(&folder, None, "S", "B").unwrap();
+        assert_eq!(
+            std::fs::metadata(&alone.path).unwrap().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(std::fs::metadata(&folder).unwrap().mode() & 0o777, 0o700);
+        assert_eq!(std::fs::read_to_string(&alone.path).unwrap(), "S\n\nB\n");
     }
 
     #[test]

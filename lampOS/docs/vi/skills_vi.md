@@ -1075,11 +1075,20 @@ sửa và việc giữ là cùng một mã cho cả hai người viết.
   --push-wait` giữ ngay khi agent kết thúc lượt, xem mỗi 0,5 giây. Không có
   đường truyền mới. Phần tasks nhận tối đa 2.000 byte văn bản và system prompt
   dài hơn, nên system prompt và brief nằm trong một tệp riêng,
-  `/run/lampos-make-skill/make-<ngẫu nhiên>.md` (thư mục 0711, tệp 0644, xóa
-  khi có câu trả lời), task ghi tên tệp đó. Văn bản task bắt đầu như một brief
+  `/run/lampos-make-skill/make-<ngẫu nhiên>.md`, task ghi tên tệp đó: thư
+  mục 0750 và tệp 0640, cùng thuộc nhóm `lamp-agents` của các agent cục bộ
+  (trình cài đặt tạo nhóm này, cùng người dùng `lampagent`), tệp được xóa
+  khi có câu trả lời; nếu không có nhóm đó thì 0700 và 0600, có ghi nhật ký. Văn bản task bắt đầu như một brief
   (`made_skill::is_brief`), nên câu trả lời, hay lần giao thất bại, không bao
   giờ được kể như tin. Đọc xong, câu trả lời được đánh dấu đã kể, nên
-  `--close-told` đóng phiên của agent.
+  `--close-told` đóng phiên của agent. Agent không trả lời trong 45 giây
+  thì task bị hủy (`cancel`); phần tasks chỉ nhận lệnh này cho việc chưa
+  giao cho agent và không có lệnh nào kết thúc việc agent đang làm, nên việc
+  đó tiếp tục chạy, có ghi nhật ký, và tin của nó, là một brief, không bao
+  giờ được kể.
+- **Công cụ của agent.** Agent chạy với công cụ riêng của nó trong lúc tạo:
+  chưa có chế độ tắt công cụ. Công tắc vẫn tắt cho tới khi điều đó được
+  quyết định.
 - **Giới hạn.** Mỗi câu trả lời của agent trong 45 giây
   (`make_skill_agent::WRITE_WITHIN`); một lần sửa chỉ bắt đầu khi thêm một câu
   trả lời vẫn vừa 120 giây của agent (`make_skill_agent::MAKE_WITHIN`).
@@ -1108,8 +1117,7 @@ sửa và việc giữ là cùng một mã cho cả hai người viết.
 - **Chưa thử trên đèn:** hàng kiểm tra của nó, 16 lần tạo (mười hai lần đơn
   giản, bốn lỗi DeepSeek đã biết) trên một đèn có agent, so sánh với DeepSeek:
   có giữ không, phần nói lại và thời gian.
-  Agent chạy dưới người dùng nào là việc của phần 1 (cài đặt); vì thế tệp
-  luật đọc được bởi mọi người dùng.
+  Người dùng của agent có thuộc nhóm `lamp-agents` trên đèn hay không.
 
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)
 
