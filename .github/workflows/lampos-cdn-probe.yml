@@ -1,0 +1,55 @@
+name: lampOS CDN probe
+
+# By hand only, on lamp-voice: writes one small file under lampos/_probe/,
+# reads it back with gcloud and through the CDN, then deletes it. Shows that
+# the CI identity can write where the mirror needs to, and that the CDN serves
+# what is written there.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: lampOS — write, read back and delete a probe file
+    if: ${{ github.repository == 'autonomous-ai/lampOS' }}
+    environment: lampos-update-publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: lampos-cdn-probe
+      cancel-in-progress: false
+    steps:
+      - name: only lamp-voice
+        run: |
+          test "$GITHUB_REF" = refs/heads/lamp-voice || { echo "::error::the probe runs from lamp-voice only"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      # Logs of this repository are public: the three values stay out of them.
+      - name: keep the mirror's values out of the logs
+        env:
+          WIF_PROVIDER: ${{ vars.LAMPOS_MIRROR_WIF_PROVIDER }}
+          MIRROR_SA: ${{ vars.LAMPOS_MIRROR_SA }}
+          MIRROR_BUCKET: ${{ vars.LAMPOS_MIRROR_BUCKET }}
+        run: |
+          for value in "$WIF_PROVIDER" "$MIRROR_SA" "$MIRROR_BUCKET"; do
+            test -n "$value" || { echo "::error::a mirror variable is not set"; exit 1; }
+            echo "::add-mask::$value"
+          done
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.LAMPOS_MIRROR_WIF_PROVIDER }}
+          service_account: ${{ vars.LAMPOS_MIRROR_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: probe
+        env:
+          LAMPOS_MIRROR_BUCKET: ${{ vars.LAMPOS_MIRROR_BUCKET }}
+        run: python3 -I .github/scripts/lampos-mirror.py probe
