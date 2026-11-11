@@ -21,13 +21,22 @@ fn the_index_holds_only_id_name_and_last_use() {
     session_index::record(&file, MACHINE, &id(1), Some("Christmas dates"), 1_000);
     session_index::record(&file, LAPTOP, &id(2), None, 2_000);
     let kept: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
-    let mut top: Vec<&str> = kept.as_object().unwrap().keys().map(String::as_str).collect();
+    let mut top: Vec<&str> = kept
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     top.sort_unstable();
     assert_eq!(top, ["machines", "version"]);
     for (machine, entries) in kept["machines"].as_object().unwrap() {
         for entry in entries.as_array().unwrap() {
-            let mut keys: Vec<&str> =
-                entry.as_object().unwrap().keys().map(String::as_str).collect();
+            let mut keys: Vec<&str> = entry
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect();
             keys.sort_unstable();
             assert_eq!(keys, ["id", "last_used", "name"], "{machine}");
         }

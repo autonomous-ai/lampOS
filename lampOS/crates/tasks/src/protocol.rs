@@ -74,6 +74,11 @@ pub enum Request {
         #[serde(default)]
         join: bool,
     },
+    /// The owner's "forget everything" (#6274), on the voice's route only:
+    /// the index of the sessions the lamp started
+    /// ([`crate::session_index`]) removed whole. Answered with whether
+    /// there was one (`forgotten`).
+    ForgetSessions {},
     Cancel {
         guard: Guard,
         id: u64,
@@ -197,6 +202,7 @@ impl Request {
             self,
             Self::Confirm { .. }
                 | Self::Session { .. }
+                | Self::ForgetSessions {}
                 | Self::ClaimSpeech { .. }
                 | Self::AckSpeech { .. }
                 | Self::Told { .. }
@@ -242,6 +248,7 @@ impl Request {
             Self::Prepare { .. } => "prepare",
             Self::Confirm { .. } => "confirm",
             Self::Session { .. } => "session",
+            Self::ForgetSessions {} => "forget_sessions",
             Self::Cancel { .. } => "cancel",
             Self::Observe { .. } => "observe",
             Self::ClaimSpeech { .. } => "claim_speech",

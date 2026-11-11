@@ -1344,7 +1344,8 @@ fn owner<C: Clock>(
     (jobs, outcomes): (SyncSender<Job>, Receiver<Outcome>),
     current: Arc<Mutex<Report>>,
     // When to stop, and the file keeping the newest sign-in id (#5198).
-    (stop, sign_in_ids): (Arc<AtomicBool>, PathBuf),
+    // And the index of the sessions the lamp started (#6274).
+    (stop, sign_in_ids, session_index): (Arc<AtomicBool>, PathBuf, PathBuf),
     (
         watch,
         progress,
@@ -1839,6 +1840,38 @@ fn owner<C: Clock>(
                 {
                     record.refresh(&engine.recent(&clock.sample()?), tracker, unix_ms());
                     let answer = engine.identified(record.body(unix_ms()));
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
+                } else if let Request::ForgetSessions {} = &work.request {
+                    // On the voice's route only: the owner's "forget
+                    // everything" (#6274).
+                    let answer = if work.route == Route::Voice {
+                        match crate::session_index::forget(&session_index) {
+                            Ok(forgotten) => {
+                                if forgotten {
+                                    eprintln!(
+                                        "tasks: the sessions the lamp started were forgotten"
+                                    );
+                                }
+                                engine.identified(json!({"forgotten":forgotten}))
+                            }
+                            Err(error) => {
+                                eprintln!(
+                                    "tasks: the sessions the lamp started could not be forgotten: {}",
+                                    error.kind()
+                                );
+                                Err(EngineError {
+                                    code: "forget_failed",
+                                    message: "The sessions the lamp started could not be forgotten.",
+                                })
+                            }
+                        }
+                    } else {
+                        Err(EngineError {
+                            code: "untrusted",
+                            message: "This operation requires the trusted Voice route.",
+                        })
+                    };
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                 } else if let Request::Session {
@@ -3566,6 +3599,13 @@ pub struct HarnessSwitches {
 /// `~/harnesses/<name>` folders seen on each computer.
 pub const NEW_FOLDER_FILE: &str = "folders-seen.json";
 
+/// The file in the tasks folder where `serve --reply-named` keeps the
+/// sessions the lamp itself started or handed work to, by id, name and last
+/// use only ([`crate::session_index`], #6274). The lamp's reset wipes it
+/// with the folder; the owner's "forget everything" removes it
+/// (`forget_sessions`).
+pub const SESSION_INDEX_FILE: &str = "sessions-started.json";
+
 impl HarnessSwitches {
     /// Set `cli` as `serve` does: each switch its field, and the folders
     /// seen kept in [`NEW_FOLDER_FILE`] of the tasks folder `dir`.
@@ -3583,6 +3623,8 @@ impl HarnessSwitches {
         cli.absolute_folder = self.absolute_folder;
         cli.new_folder = (self.new_folder || from_machines).then(|| dir.join(NEW_FOLDER_FILE));
         cli.new_folder_only = (!self.new_folder && from_machines).then(|| MACHINES_PROJECT.into());
+        // Only a lamp that finds sessions by name keeps the ones it started.
+        cli.session_index = self.reply_named.then(|| dir.join(SESSION_INDEX_FILE));
     }
 }
 
@@ -3946,6 +3988,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         .parent()
         .unwrap_or(&config.dir)
         .join(SIGN_IN_ID_FILE);
+    let session_index = config.dir.join(SESSION_INDEX_FILE);
     let owner = thread::Builder::new()
         .name("tasks-store".into())
         .spawn(move || {
@@ -3955,7 +3998,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 owner_rx,
                 (jobs_tx, outcomes_rx),
                 report,
-                (owner_stop, sign_in_ids),
+                (owner_stop, sign_in_ids, session_index),
                 (
                     switches.0,
                     switches.1,

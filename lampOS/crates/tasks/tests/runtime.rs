@@ -3737,15 +3737,20 @@ fn forget_sessions_removes_the_index_of_the_sessions_the_lamp_started() {
         1_000,
     );
     assert!(file.exists());
-    assert_eq!(
-        s.ask(json!({"op":"forget_sessions"}))["error"],
-        "untrusted"
-    );
+    assert_eq!(s.ask(json!({"op":"forget_sessions"}))["error"], "untrusted");
     assert!(file.exists());
     let answer = s.trusted(json!({"op":"forget_sessions"}));
-    assert_eq!((answer["ok"].clone(), answer["forgotten"].clone()), (json!(true), json!(true)), "{answer}");
+    assert_eq!(
+        (answer["ok"].clone(), answer["forgotten"].clone()),
+        (json!(true), json!(true)),
+        "{answer}"
+    );
     assert!(!file.exists());
     // Again: nothing to forget, still ok.
     let answer = s.trusted(json!({"op":"forget_sessions"}));
-    assert_eq!((answer["ok"].clone(), answer["forgotten"].clone()), (json!(true), json!(false)), "{answer}");
+    assert_eq!(
+        (answer["ok"].clone(), answer["forgotten"].clone()),
+        (json!(true), json!(false)),
+        "{answer}"
+    );
 }

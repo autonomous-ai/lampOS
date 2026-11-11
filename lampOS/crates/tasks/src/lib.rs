@@ -14,6 +14,7 @@ pub mod progress;
 pub mod protocol;
 pub mod readiness;
 pub mod runtime;
+pub mod session_index;
 pub mod sign_in;
 pub mod skill_call;
 pub mod skill_task;
