@@ -2163,9 +2163,16 @@ for each run, and is answered once the run ends
   `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
   no one-run token) or `run_failed`.
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for
-  each run lamp-tasks asks lamp-control (#6304) for a token minted from the
-  owner's yes for exactly this skill, its folder's SHA-256 and its grants
-  (the `Tokens` trait). The run is given it as `LAMP_CONTROL_TOKEN`, beside
+  each run lamp-tasks asks lamp-control (#6304, PR #6408) for a token on
+  its admin socket, `/run/lampos-control/admin.sock` (`ControlTokens`, the
+  `Tokens` trait): `{"mint":{"skill","run"}}`, the run id lamp-tasks' own
+  and new for each hand-over (`run_id`), and `{"end":{"run"}}` when it
+  ends. lamp-control reads the owner's yes itself and names its grants; a
+  run whose minted grants are not exactly the ones its line asks is refused
+  `no_token` and its token ended, so a run never gets grants its skill did
+  not ask. lamp-control's own refusal (no yes, skill runs off, not
+  reachable within 5 s) is the `no_token` message. The run is given the
+  token as `LAMP_CONTROL_TOKEN`, beside
   `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`, and nothing else
   of the environment is added. The token is ended when the run ends, a
   failed run too. It is never in the task's words, the journal or a debug
@@ -2175,9 +2182,9 @@ for each run, and is answered once the run ends
   lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
   run's end.
 
-**Not yet (said so the code is not read as more):** #6304 has not landed,
-so the only token source is `NoTokens`, which refuses every run
-(`no_token`); its `control.sock` adapter plugs into `Tokens`. No serve flag
+**Not yet (said so the code is not read as more):** `ControlTokens` speaks
+#6408's admin socket, which is not merged yet, and lamp-control keeps no
+skill yes yet, so every mint is refused there. No serve flag
 binds the hand-over socket yet, and no `Runner` starts Hermes through
 Harness yet, so nothing on a lamp runs a skill's task. The run's "no other
 network" (a direct outbound call refused) and the caps on
