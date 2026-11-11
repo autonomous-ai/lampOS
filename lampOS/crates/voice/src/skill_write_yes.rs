@@ -239,14 +239,17 @@ pub fn then_wait(id: &str) -> String {
     )
 }
 
-/// What the model is told when an approval is not taken.
-pub const NOT_APPROVED: &str = "Not approved: nothing waits for a yes now, or that was not the person's own answer. Say nothing is sent, and that they can say yes in the app.";
+/// What the model is told when an approval is not taken: the way to a
+/// yes is the read-back (`make_skill_local::read_back`), never the app,
+/// which has none (Thirteen's HOLD on #6223: lamp-cloud has no kind for
+/// `skill_write_approve`).
+pub const NOT_APPROVED: &str = "Not approved: nothing waits for a yes now, or that was not the person's own answer. Say nothing is sent, and that they can ask me what that skill sends (\"what does my … skill send?\") to hear it again and say yes then.";
 /// What the model is told when the yes came before the say-back was
 /// heard whole (it waits on).
 pub const NOT_SAID_WHOLE: &str =
     "Not approved yet: what it sends was not said in full, or it was cut. Nothing is sent.";
 /// What the model is told when the yes came on the Live route.
-pub const NOT_HERE: &str = "Not approved: on this voice I can't take that yes. Say nothing is sent yet, and that they can say yes in the app.";
+pub const NOT_HERE: &str = "Not approved: on this voice I can't take that yes. Say nothing is sent yet, and that they can ask me what that skill sends (\"what does my … skill send?\") to hear it again and say yes then.";
 /// What the model is told once approved.
 pub const APPROVED_NEXT: &str =
     "Say only, in the conversation's language, that it will now send as it said.";
@@ -518,5 +521,68 @@ mod tests {
         let _changed = said_back("leaving-mail-2", &[mail()], 5, now);
         let told = approve(&old, 6, true, true, now, never);
         assert_eq!(told["error"], NOT_APPROVED);
+    }
+
+    /// Thirteen's HOLD on #6223 (App Only confirming): the app has no yes
+    /// for a made skill's writes (lamp-cloud has no kind for
+    /// `skill_write_approve`, the app nothing), so no line the voice's
+    /// model is told of a skill's writes, here, in the made-skill lines or
+    /// in the read-back's, names the app; and no line outside the tests
+    /// of those files sends the person to the app for the yes.
+    #[test]
+    fn no_line_sends_the_person_to_the_app_for_a_yes() {
+        let lines = [
+            NOT_APPROVED.to_owned(),
+            NOT_SAID_WHOLE.to_owned(),
+            NOT_HERE.to_owned(),
+            APPROVED_NEXT.to_owned(),
+            then_wait("ab12"),
+            say_whole("I made leaving mail."),
+            crate::made_skill::WAITS_FOR_YES.to_owned(),
+            crate::made_skill::APPROVED_ALREADY.to_owned(),
+            crate::made_skill::CUT_WRITE_UNSAID.to_owned(),
+            crate::make_skill_local::READ_BACK_TOLD.to_owned(),
+            crate::make_skill_local::READ_BACK_NOT_ASKED.to_owned(),
+            crate::make_skill_local::sends_unsaid("leaving mail"),
+            crate::make_skill_local::yes_not_here("leaving mail"),
+            crate::make_skill_local::changed_since_made("leaving mail"),
+        ];
+        for line in &lines {
+            let words: Vec<String> = line
+                .split(|c: char| !c.is_alphanumeric() && c != '\'')
+                .map(str::to_lowercase)
+                .collect();
+            assert!(
+                !words.iter().any(|word| word == "app" || word == "app's"),
+                "{line}"
+            );
+        }
+        // The way to a yes now: asking what the skill sends.
+        for line in [NOT_APPROVED, NOT_HERE] {
+            assert!(line.contains("what does my … skill send?"), "{line}");
+        }
+        let app_yes = [
+            "yes in the app",
+            "app's yes",
+            "yes from the app",
+            "agree in the app",
+            "approve in the app",
+            "approve it in the app",
+        ];
+        for (file, source) in [
+            ("skill_write_yes.rs", include_str!("skill_write_yes.rs")),
+            ("made_skill.rs", include_str!("made_skill.rs")),
+            ("make_skill_local.rs", include_str!("make_skill_local.rs")),
+        ] {
+            let code = source.split("mod tests {").next().unwrap();
+            for (number, line) in code.lines().enumerate() {
+                let line = line.to_lowercase();
+                assert!(
+                    !app_yes.iter().any(|said| line.contains(said)),
+                    "{file}:{}: {line}",
+                    number + 1
+                );
+            }
+        }
     }
 }

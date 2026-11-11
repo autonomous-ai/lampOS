@@ -424,16 +424,39 @@ sau:
      ý. Đã được đồng ý rồi thì câu đọc lại kết thúc bằng "You agreed to it,
      so it sends as it says." (`made_skill::approved_line`), và không hỏi
      hay chờ gì. Một kỹ năng không gửi gì thì được nói vậy ("… doesn't send
-     or write anything"); không có kỹ năng nào tên đó trên đèn, hoặc một
-     package khác của nó đang được cài, thì được nói vậy, kèm tên các kỹ
-     năng đang bật. Kiểm thử:
+     or write anything"); không có kỹ năng nào tên đó trên đèn thì được nói
+     vậy, kèm tên các kỹ năng đang bật. Một package khác với package đã
+     tạo đang được cài thì được nói là kỹ năng đã đổi từ khi được tạo, hãy
+     hỏi lại sau ít phút (`make_skill_local::changed_since_made`).
+     **Ai được nghe** (P2 của App Only trên #6230): một kỹ năng gửi hay ghi
+     chỉ được đọc lại đầy đủ, người nhận và lời, trong phòng riêng hoặc cho
+     chủ đèn được thấy đang nói dòng đó (`services::owner_hears`, đúng chốt
+     chặn của một lần đọc đầy đủ của services:
+     `services::owner_seen_saying`). Với người khác chỉ có tên và việc nó
+     gửi ("leaving mail sends something on its own; only its owner can
+     hear what.", `make_skill_local::sends_unsaid`): không hỏi
+     `lamp-services` gì và không bắt đầu chờ. **Ở đâu** (P3 của App Only):
+     trên route không nhận được lời đồng ý (`services::sends_here` là
+     false, route Live), một kỹ năng đang chờ được nói là nó chờ lời đồng
+     ý và giọng nói này không nhận được lời đó
+     (`make_skill_local::yes_not_here`); không bắt đầu chờ, và cơ chế chờ
+     của một lần tạo đang treo được giữ nguyên.
+     **Không có lời đồng ý trong ứng dụng** (HOLD của Thirteen trên #6223):
+     ứng dụng không có (`lamp-cloud` không có kind cho
+     `skill_write_approve`), nên một lời đồng ý bị từ chối (`NOT_APPROVED`,
+     `NOT_HERE`) được bảo nói rằng họ có thể hỏi đèn kỹ năng đó gửi gì
+     ("what does my … skill send?") để nghe lại và đồng ý khi đó, không bao
+     giờ bảo vào ứng dụng. Kiểm thử:
      `a_waiting_write_skill_read_back_is_said_whole_and_a_later_yes_approves`,
      `a_cut_or_echoed_read_back_approves_nothing`,
      `a_read_back_declined_or_unanswered_stays_unapproved`,
      `an_approved_write_skill_read_back_is_said_and_asks_nothing`,
      `a_read_back_of_no_write_skill_or_none_says_so_plainly`,
-     `the_read_back_is_offered_with_writes_alone_within_the_bounds`, và của
-     `lamp-services`
+     `the_read_back_is_offered_with_writes_alone_within_the_bounds`,
+     `a_read_back_is_said_whole_only_in_the_private_room_or_to_the_owner_seen`,
+     `a_read_back_on_a_route_with_no_yes_starts_no_wait`,
+     `skill_write_yes::tests::no_line_sends_the_person_to_the_app_for_a_yes`,
+     và của `lamp-services`
      `whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`.
    - **"I sent …"** (`crate::skill_writes_told`): route thứ hai hỏi
      `skill_writes_sent` ngoài đường đi của dòng, tối đa 5 s một lần, khi
@@ -487,8 +510,8 @@ sau:
    tắc tắt, kỹ năng không được nạp. `lamp-skills` gửi đúng nội dung của bước
    cùng tên kỹ năng trên socket tools của `lamp-services` (`skill_write`),
    nơi chỉ gửi nếu chủ đèn đã đồng ý đúng nội dung đó cho kỹ năng đó như đã cài (gói của nó: kỹ năng được cập nhật hay bị gỡ thì chờ lời đồng ý mới) dưới
-   cùng liên kết (do đường đồng ý của giọng nói hay ứng dụng, không bao giờ
-   do cài đặt: "not sent: waiting for the owner's yes"), không đã đăng xuất,
+   cùng liên kết (chỉ do đường đồng ý của giọng nói, không bao giờ do cài đặt, và không
+   bao giờ trong ứng dụng, nơi không có lời đồng ý nào cho nó: "not sent: waiting for the owner's yes"), không đã đăng xuất,
    tối đa 3 lần mỗi kỹ năng và
    10 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào. Liên kết mất hoặc thuộc
    tài khoản khác thì dừng các lần ghi của kỹ năng cho đến khi `lamp-skills`

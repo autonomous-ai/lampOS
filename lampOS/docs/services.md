@@ -185,7 +185,7 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
-  | `{"op":"skill_write_approve","skill":"<name>","writes":[...],"sha256"?}`, the app's yes to a made skill's writes (with `LAMP_SKILL_WRITES=on`; `sha256`, optional, the package the yes was said to, refused unless it is the one installed; "A made skill's write", below) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
+  | `{"op":"skill_write_approve","skill":"<name>","writes":[...],"sha256"?}`, kept for an app's yes to a made skill's writes, which nothing sends yet: `lamp-cloud` has no such kind and the app no yes (with `LAMP_SKILL_WRITES=on`; `sha256`, optional, the package the yes was said to, refused unless it is the one installed; "A made skill's write", below) | `{"ok":true,"result":{"approved":N,"public":["owner/name"]}}` |
 
   A line with a field its op doesn't take, or a code the catalogue doesn't
   know, is refused without repeating it.
@@ -1784,12 +1784,13 @@ table. With the switch off in `lamp-skills`, such a skill does not load.
 yes, each run is refused with "not sent: waiting for the owner's yes".
 
 **The owner's yes** (`skill_write_approve`). It comes from the voice's
-yes path or from the app, never from `lamp-skills`. On the tools socket
+yes path only, never from `lamp-skills`; the app has no yes for it
+("Not done yet", below). On the tools socket
 only `lamp-voice.service`'s cgroup reaches it. It is not in `tools.json`
 and not among the three functions the voice offers its model
 (`services::NAMES`), so the model can never call it. On the admin socket it
 is `lamp-cloud`'s op `{"op": "skill_write_approve", "skill", "writes"}`,
-for the app. Who said yes is not checked (the owner, 10 Nov: no face,
+kept for an app's yes that `lamp-cloud` does not send yet. Who said yes is not checked (the owner, 10 Nov: no face,
 voice-print or owner check; under the private room whoever is at the lamp
 is its owner). The voice's line is
 `{"skill": "<name>", "writes": [<content>, ...]}`, each content the step's
@@ -1901,7 +1902,11 @@ content is approved for it and its service is linked now under the link
 approved, as a send holds it. It approves nothing (a changed package's
 approvals are dropped, as at a send); `lamp-skills` is refused it
 (`SKILL_READS_AND_WRITES_ONLY`), and with the switch off it is refused. Test
-`whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`.
+`whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`. The
+voice asks it only for a read-back said whole: in the private room or to
+the owner seen saying the line (`services::owner_hears`, the gate a read
+in full is held to); to anyone else the skill's name and that it sends,
+nothing asked ([skills.md](skills.md), "Read back, and agreed to then").
 
 **The voice's side** ([skills.md](skills.md), "Made by voice", for the
 whole):
@@ -1946,7 +1951,11 @@ whole):
 **Not done yet:**
 
 - The app's yes: `lamp-cloud` has no kind for `skill_write_approve` yet,
-  and the app's list shows a made skill's `uses.sends_to` ("sends to …")
+  and the app has no yes. So the voice never sends anyone to the app for
+  it: a yes refused is told to ask the lamp what the skill sends ("what
+  does my … skill send?") to hear it again and say yes then
+  (`skill_write_yes::NOT_APPROVED`, `NOT_HERE`; Thirteen's HOLD on
+  #6223). The app's list shows a made skill's `uses.sends_to` ("sends to …")
   only once the app does (its text lives in the app).
 - A contact named without an address: the lamp keeps no contact book, so
   the making model asks for the address.
