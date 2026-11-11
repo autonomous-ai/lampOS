@@ -3018,9 +3018,27 @@ gone ([switches.md](switches.md)). What happens:
      photo booth: …", never "it's on"; the app's `uses` carry `code` and
      `grants`.
    - **Never on at once.** `made_skill::put_on` refuses it and keeps why
-     (`made_skill::CODE_BY_VOICE`), so the app's MAKE IT keeps it off and
-     says "I made it but couldn't put it on: a skill that runs its own code
-     goes on only once you agree to it out loud; ask me for it by voice."
+     (`made_skill::CODE_BY_VOICE`), so the app's `made` answer stays
+     `not_kept`, why "it couldn't be put on: a skill that runs its own code
+     goes on only once you agree to it out loud at the lamp, after it says
+     what that code may use".
+   - **Made from the app, said back at the lamp.** The app's MAKE IT
+     (`app_make::put_on_line`) then keeps it as asked
+     (`made_skill::code_asked`, `code_asked_at_unix_ms`) and has the lamp
+     say the voice make's own line ("I made photo booth: …"), told to the
+     voice word for word as a voice make's say-back is (`app_make`'s
+     `say_note`: `made_skill::ALREADY_DONE` and
+     `skill_write_yes::say_whole`), at the app's line priority. When the
+     second route is given that line as a written turn (never an add-on's
+     quoted one) within the say service's longest wait of the ask
+     (`make_skill_local::app_code_asked`), the skill's yes waits there
+     through the voice make's very wait (`skill_write_yes::wait_for_yes_noted`)
+     from that request on, the turn ending as a voice make's does
+     (`skill_write_yes::then_wait`); as the history keeps no call's
+     answer, each later heard line is told its `approve_id` in a note
+     (`skill_write_yes::waiting_note`). The yes is then taken exactly as
+     a voice make's, below. Said only on the Live route, or never said,
+     nothing waits and it stays off.
      By voice, the make waits for the yes through the write's very wait
      (`crate::skill_write_yes`, `Asks::code`), with every guard of it: said
      whole first (the code sentence is what must be heard), only a later

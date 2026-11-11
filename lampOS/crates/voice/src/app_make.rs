@@ -38,7 +38,10 @@
 //!   it makes, `made_skill::going_on`). The lamp then says one short line
 //!   through the say service, at a good moment: `made_skill::on_line` ("I
 //!   made evening dim, and it's on."), or `made_skill::not_on_line` with
-//!   why it isn't on. No ask is said and no yes is waited for.
+//!   why it isn't on. No ask is said and no yes is waited for, but for a
+//!   skill with code of its own (#6307, `LAMP_MADE_SCRIPTS`): left off,
+//!   said back as a voice make's is and kept as asked, its yes then taken
+//!   on the second route as a voice make's (`put_on_line`).
 //! - **Kept** beside the made skills, in their root-only folder: the app's
 //!   asks, at most [`MOST_ASKS`] ([`APP_INDEX`]), each its request id,
 //!   when, the task it became, and why it wasn't kept if it wasn't. Never
@@ -527,10 +530,19 @@ pub fn make_here_with(
 }
 
 /// The kept skill `made` put on at once ([`made_skill::put_on`]), and the
-/// one short line the lamp says of it: on, or why not.
+/// one short line the lamp says of it: on, or why not. One with code of
+/// its own (#6307, `LAMP_MADE_SCRIPTS`) is left off, and said back as a
+/// voice make says it ([`made_skill::on_line`]: what its code is for, its
+/// grants and its wait), kept as asked ([`made_skill::code_asked`]), so
+/// the person's later spoken yes to it is taken as a voice make's is
+/// (`make_skill_local::app_code_asked`).
 fn put_on_line(keeping: &made_skill::Keeping, made: &made_skill::Made) -> String {
     match made_skill::put_on(keeping, made) {
         Ok(()) => made_skill::on_line(made),
+        Err(_) if made.uses.code && made_skill::scripts_on() => {
+            made_skill::code_asked(&keeping.directory, &made.sha256, now_unix_ms());
+            made_skill::on_line(made)
+        }
         Err(why) => made_skill::not_on_line(&why),
     }
 }
@@ -730,10 +742,20 @@ fn said(
 /// ([`made_skill::in_their_language`], or for a skill not made
 /// [`made_skill::not_made_in_their_language`]); none when it would pass
 /// the say service's bound ([`crate::say::MOST_WORDS_BYTES`]), and the
-/// line is then asked as written rather than refused unsaid.
+/// line is then asked as written rather than refused unsaid. A skill with
+/// code of its own made from the app (#6307), its line ending on
+/// [`made_skill::RUNS_AFTER_YES`], is told as a voice make's say-back is,
+/// word for word ([`crate::skill_write_yes::say_whole`]), as its yes
+/// needs it heard whole.
 fn say_note(line: &str) -> Option<String> {
     let note = if line.starts_with(made_skill::NOT_MADE_HEAD) {
         made_skill::not_made_in_their_language(line)
+    } else if line.ends_with(made_skill::RUNS_AFTER_YES.trim_start()) {
+        format!(
+            "{}{}",
+            made_skill::ALREADY_DONE,
+            crate::skill_write_yes::say_whole(line)
+        )
     } else {
         made_skill::in_their_language(line)
     };
@@ -1619,6 +1641,124 @@ mod tests {
             "{told}"
         );
         assert_ne!(made_skill::entries(&keeping.directory)[0]["on"], true);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #6307, `LAMP_MADE_SCRIPTS` on: an app's make with code of its own is
+    /// left off, said back as a voice make's is (its code, its grants, the
+    /// lamp's model, its wait) and kept as asked; the app is told it waits
+    /// for the spoken yes. Said on the second route, its yes is awaited
+    /// there with every guard of a voice make's, and a later spoken yes puts
+    /// on exactly that package, by its SHA-256. Off, or another written
+    /// line, nothing waits.
+    #[test]
+    fn an_app_make_with_code_is_said_back_and_a_later_yes_puts_it_on() {
+        use crate::make_skill_local::tests::{
+            CODE_CARD, CODE_TOML, chat_at, keeping, manage_helper, service, task_asks,
+        };
+        use crate::skill_write_yes as yes;
+        made_skill::set_scripts_here(Some(true));
+        let (root, keeping) = keeping("app-code");
+        let at = now_unix_ms();
+        let brief = begin(&keeping.directory, "make me a photo booth", "r1", at).unwrap();
+        let answer = format!(
+            "```skill.toml\n{CODE_TOML}```\n\n```SKILL.md\n{CODE_CARD}```\n\n\
+             ```scripts/main.py\nprint('photo')\n```\n"
+        );
+        let (url, served) = service(vec![(200, answer)]);
+        let mut said = Vec::new();
+        make_here(&keeping, &brief, "r1", at, chat_at(url), |line| {
+            said.push(line.to_owned())
+        });
+        assert_eq!(served.join().unwrap(), 1);
+        let [line] = said.as_slice() else {
+            panic!("{said:?}")
+        };
+        let entry = &made_skill::entries(&keeping.directory)[0];
+        assert_ne!(entry["on"], true, "{entry}");
+        assert!(entry["code_asked_at_unix_ms"].as_u64().is_some(), "{entry}");
+        let sha256 = entry["sha256"].as_str().unwrap().to_owned();
+        for part in [
+            "I made photo booth: ",
+            "runs its own code to “take a photo”",
+            made_skill::code_said(&["camera".to_owned()]).trim(),
+        ] {
+            assert!(line.contains(part), "{part}: {line}");
+        }
+        assert!(!line.contains("it's on"), "{line}");
+        // Told to the voice word for word, as a voice make's say-back is.
+        let note = say_note(line).unwrap();
+        assert_eq!(
+            note,
+            format!("{}{}", made_skill::ALREADY_DONE, yes::say_whole(line))
+        );
+        let told = status(&keeping.directory, Some("r1"), at);
+        assert_eq!(told["state"], "not_kept", "{told}");
+        assert_eq!(
+            told["why"],
+            format!("it couldn't be put on: {}", made_skill::CODE_BY_VOICE)
+        );
+        // Another written line, or the switch off: nothing waits.
+        let now = std::time::Instant::now();
+        let dir = &keeping.directory;
+        let other = "Say good evening.".to_owned();
+        let left =
+            crate::make_skill_local::app_code_asked(dir, 4, other.clone(), now_unix_ms(), now);
+        assert_eq!(left, other);
+        made_skill::set_scripts_here(Some(false));
+        let off = crate::make_skill_local::app_code_asked(dir, 4, note.clone(), now_unix_ms(), now);
+        assert_eq!(off, note);
+        assert!(!yes::awaited(now));
+        made_skill::set_scripts_here(Some(true));
+        // Said on the second route in request 5: its yes awaited, the
+        // model told how to take it, and each later heard line its id.
+        let turn =
+            crate::make_skill_local::app_code_asked(dir, 5, note.clone(), now_unix_ms(), now);
+        let (head, wait) = turn.split_at(note.len());
+        assert_eq!(head, note);
+        let id = wait.split('"').nth(1).unwrap().to_owned();
+        assert_eq!(wait.trim(), yes::then_wait(&id));
+        assert!(yes::waiting_note(5, now).is_none());
+        let told_next = yes::waiting_note(6, now).unwrap();
+        assert!(
+            told_next.contains(&format!("approve_id \"{id}\"")),
+            "{told_next}"
+        );
+        let never = |_: &yes::Asks| -> Result<Value, String> { panic!("on unsaid") };
+        // Its own request, or before the say-back was heard whole: no.
+        assert_eq!(
+            yes::approve(&id, 5, true, true, now, never)["error"],
+            yes::NOT_APPROVED
+        );
+        let turn =
+            crate::make_skill_local::app_code_asked(dir, 5, note.clone(), now_unix_ms(), now);
+        let id = turn.rsplit('"').nth(1).unwrap().to_owned();
+        let early = yes::approve(&id, 6, true, true, now, never);
+        assert_eq!(early["error"], yes::NOT_SAID_WHOLE, "{early}");
+        yes::lamp_said(6, line);
+        // A later spoken yes: exactly that package on, its task kept.
+        let asked = manage_helper(&keeping.manage);
+        crate::skill_task_yes::set_on_here(Some(true));
+        let folder = "cd".repeat(32);
+        let agreed = yes::approve(&id, 7, true, true, now, |asks| {
+            assert!(asks.code, "{asks:?}");
+            crate::make_skill_local::code_approve(
+                &keeping,
+                asks,
+                |name| Ok(Some(task_asks(name, &folder, &sha256, &["camera"]))),
+                |_| Ok(json!({ "approved": 1 })),
+            )
+        });
+        assert_eq!(agreed["approved"], true, "{agreed}");
+        assert_eq!(agreed["task"], true, "{agreed}");
+        assert_eq!(asked.join().unwrap()["install_made"], sha256.as_str());
+        assert_eq!(status(&keeping.directory, Some("r1"), at)["state"], "on");
+        // On: said again, nothing more waits.
+        let again =
+            crate::make_skill_local::app_code_asked(dir, 8, note.clone(), now_unix_ms(), now);
+        assert_eq!(again, note);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_scripts_here(None);
         let _ = fs::remove_dir_all(&root);
     }
 

@@ -7069,6 +7069,14 @@ impl Engine {
                 if !self.begin(request, session) {
                     return;
                 }
+                // A skill with code of its own made from the app, said back
+                // here (#6307): its yes awaited from this request on, as a
+                // voice make's is. Never an add-on's quoted line.
+                let text = if quoted {
+                    text
+                } else {
+                    crate::make_skill_local::app_code_asked_here(request, text)
+                };
                 // A search's own turn: the search a push may end goes on
                 // from now, the walk's looks included (#2904).
                 if search {
@@ -10090,6 +10098,13 @@ async fn spoken(
         .chain(linked)
         // A made skill's sends since the last told (#6066), once each.
         .chain(crate::skill_writes_told::note_for(request))
+        // A made skill with code of its own said back from the app's make,
+        // waiting for its yes (#6307): its id, as no call of this route's
+        // told it.
+        .chain(crate::skill_write_yes::waiting_note(
+            request,
+            Instant::now(),
+        ))
         .chain(records)
         .chain(remembered)
         .chain(named)
