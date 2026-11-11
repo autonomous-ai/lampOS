@@ -450,6 +450,10 @@ const MADE_NOT_ON: &str = "it but couldn't put it on";
 /// made leaving mail. It waits for you to agree …").
 const MADE_AFTER_NAME: [&str; 2] = [", and it's on", ". it waits for you to agree"];
 
+/// How a write's made line ends (`made_skill::WAITS_FOR_YES`), which the
+/// ':' form needs.
+const MADE_WAITS: &str = "it waits for you to agree";
+
 /// The most words a made skill's name is read for before its line's mark.
 const MADE_NAME_WORDS: usize = 8;
 
@@ -457,9 +461,9 @@ const MADE_NAME_WORDS: usize = 8;
 /// own line (C-make, Fourteen on lamp-9adf, 11 Nov 21:28: "I made lamp test
 /// event … It waits for you to agree" with `calls=none`, a line begun
 /// inside the lamp's own answer): "I made", a name of at most
-/// [`MADE_NAME_WORDS`] words, then a ':' (a line that says what it does),
-/// one of [`MADE_AFTER_NAME`], or [`MADE_NOT_ON`]. "I made a mistake." and
-/// "I made it warmer." are not one. `Some(true)`, it is; `None`, not known
+/// [`MADE_NAME_WORDS`] words, then a ':' with [`MADE_WAITS`] later (a
+/// write's line), one of [`MADE_AFTER_NAME`], or [`MADE_NOT_ON`]. "I made a
+/// mistake." and "I made it warmer: it's at 3000 K now." are not one. `Some(true)`, it is; `None`, not known
 /// from the text so far.
 fn made_claim(text: &str, ended: bool) -> Option<bool> {
     let open = |part: &str, whole: &str| -> Option<bool> {
@@ -495,8 +499,17 @@ fn made_claim(text: &str, ended: bool) -> Option<bool> {
         return Some(false);
     }
     let after = &rest[at..];
+    // The ':' form is a write's line, which ends on its wait
+    // (`made_skill::WAITS_FOR_YES`): "I made a mistake: the meeting is at
+    // three." is no claim (the Reviewer-lead's P3 on #6434).
     if after.starts_with(':') {
-        return Some(true);
+        return if after.contains(MADE_WAITS) {
+            Some(true)
+        } else if ended {
+            Some(false)
+        } else {
+            None
+        };
     }
     any_of(MADE_AFTER_NAME.iter().map(|whole| open(after, whole)))
 }
@@ -1834,11 +1847,14 @@ pub(crate) mod tests {
         assert_eq!(claim("I ma", false), None);
         assert_eq!(claim("I made lamp test", false), None);
         assert_eq!(claim("I made x, and it", false), None);
+        assert_eq!(claim("I made lamp test event: adds lamp test", false), None);
         // Not one: a mistake, a light made warmer, a refusal, a question,
         // a long sentence, or "made" later in the reply.
         for reply in [
             "I made a mistake.",
             "I made a mistake, sorry.",
+            "I made a mistake: the meeting is at three, not two.",
+            "I made it warmer: it's at 3000 K now.",
             "I couldn't make that: a skill can't hear what is said.",
             "I made x?",
             "I made sure the light stays on whenever you come home in the evening: nothing changed.",
