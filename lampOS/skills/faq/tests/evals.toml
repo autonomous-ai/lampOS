@@ -233,3 +233,14 @@ holds = ["let's redo the setup"]
 said = "How do I connect you to a new Wi-Fi?"
 topic = "setup"
 holds = ["Add Lamp", "Changing my Wi-Fi from the app isn't there yet"]
+
+[[ask]]
+said = "Which website sells you?"
+topic = "about"
+holds = ["autonomous.ai/lamp", "Autonomous"]
+never = ["$"]
+
+[[ask]]
+said = "Who made you?"
+topic = "about"
+holds = ["made by Autonomous"]
