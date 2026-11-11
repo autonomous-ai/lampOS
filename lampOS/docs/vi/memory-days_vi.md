@@ -316,7 +316,7 @@ chối trường này (`deny_unknown_fields`).
 
 ## Bản ghi dịch vụ (`service_record`, `LAMP_SERVICE_RECORDS` của voice)
 
-Công tắc `LAMP_SERVICE_RECORDS` của voice (mặc định tắt; kế hoạch bản ghi
+Công tắc `LAMP_SERVICE_RECORDS` của voice (mặc định tắt, bật trong sản phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064; kế hoạch bản ghi
 connector, PR 1a, 10/11) giữ một bản ghi cho mỗi việc một người đã biết nhờ
 một dịch vụ liên kết làm, trong bảng `service_records(person, key, service,
 action, status, reason, detail, result_id, asked_unix_ms, changed_unix_ms,
@@ -358,6 +358,37 @@ Chỉ người đã biết (id `p-`) có bản ghi; còn lại bị từ chối 
 Giữ đến khi bị quên: hết hạn theo ngày, hết hạn khi không dùng, tidy và
 nightly không đọc bảng này. `forget_all` và `forget_person` xóa chúng. Tối đa
 10.000 bản ghi một người. Memory cũ trả `unknown_op`.
+
+## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
+
+Công tắc `LAMP_SERVICE_CONTACTS` của voice (mặc định tắt, bật trong sản
+phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, cùng với
+`LAMP_SERVICE_RECORDS`; kế hoạch bản ghi connector, PR 1c) giữ danh bạ thư
+của chủ đèn trong `service_contacts(person, name_key, name, address,
+saved_unix_ms, changed_unix_ms)`, khóa `(person, name_key)`, với `name_key`
+là tên viết thường, bỏ dấu, các từ nối bằng một dấu cách. Tạo bằng `IF NOT
+EXISTS`, `user_version` không đổi.
+
+- `service_contact {person, name, address, at_unix_ms}` lưu một liên hệ:
+  `{ok:true,kept}` với `new`, `same` (địa chỉ đó đã được giữ), hoặc
+  `replaced` (một địa chỉ khác đã được giữ cho tên đó, và giờ không còn).
+  `name` dài 1 đến 64 byte gồm chữ cái, dấu cách, gạch nối và dấu nháy
+  (`bad_name`); `address` là một địa chỉ thư, giữ chữ thường
+  (`bad_address`). Voice chỉ gửi nó sau khi chủ đèn xác nhận một lần đọc lại
+  nêu địa chỉ đó.
+- `service_contacts {person, name?}` liệt kê chúng theo tên, hoặc liên hệ
+  của `name` (không có, hoặc một).
+- `service_contacts_forget {person, about}` xóa các liên hệ có mọi từ khóa
+  của một chủ đề bất kỳ của `about` trong tên, địa chỉ của chúng hoặc các từ
+  "contact", "address", "email" và "mail", so như lần quên của bản ghi so
+  chúng; các từ một chữ cái ("Octavia's" cho ra một "s") bị bỏ qua:
+  `{ok:true,removed}`.
+
+Chỉ người đã biết (id `p-`) có danh bạ (còn lại `bad_person`). Giữ đến khi
+bị quên: không hết hạn, tidy hay nightly không đọc bảng này; `forget_all` và
+`forget_person` xóa chúng (đếm trong `removed`). Tối đa 2.000 liên hệ một
+người, liên hệ thay đổi lâu nhất bị bỏ trước khi vượt quá. Memory cũ trả
+`unknown_op`, nên voice chỉ gửi chúng khi công tắc của nó bật.
 
 ## Vai được giao (`role`, `LAMP_MEMORY_ROLE`)
 

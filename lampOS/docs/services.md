@@ -2141,7 +2141,7 @@ of the room for a calendar read (lamp-9adf, 4 Nov 21:45: "Let me look.",
 `service_read`, then "I see a laptop screen…" unasked). A skill's look in
 the same turn stands.
 
-## Service records (`LAMP_SERVICE_RECORDS`, off unless set)
+## Service records (`LAMP_SERVICE_RECORDS`, off unless set; on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
 
 With `LAMP_SERVICE_RECORDS=on` (the second route only, with the Days
 memory; the connector records plan, PR 1a), every outcome of a
@@ -2202,10 +2202,24 @@ the store's side in [memory-days](memory-days.md)):
   refuses a change asked before the forget that reaches it after
   (`forgotten`, in `memory-days.md`). Forgetting never undoes anything at
   the service, and the answer says so.
+- **Known gaps (on in the product, 11 Nov; the owner's call, forgets
+  later).** Seen on lamp-06c1
+  (https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064):
+  - Forget everything and forget person empty only the speaker's own
+    memory id. Records and contacts are kept under the services owner's id
+    (`owner_of`), so when the two differ (the private room) they stay. The
+    fix is #6334.
+  - "Forget X's address" removes the contact, but a `done` send record
+    that holds the address and does not match the forget's words is kept.
+    With `LAMP_SERVICE_RECORDS_TOLD` it is told to the model, which can read
+    the address back again (step 5d; nothing was sent).
+  - A forget about a thing removes its service records, but not the talk
+    memory's exchanges about it, which recall can still bring back
+    (step 6).
 - **Off**, nothing is kept or written, and the receipts are kept exactly as
   before.
 
-### Records told (`LAMP_SERVICE_RECORDS_TOLD`, off unless set)
+### Records told (`LAMP_SERVICE_RECORDS_TOLD`, off unless set; on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
 
 With `LAMP_SERVICE_RECORDS_TOLD=on` too (the second route only; it acts only
 with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
@@ -2260,7 +2274,7 @@ with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
   never content. **Off**, nothing is told and recall is as before. The rule's
   effect on what the model says is still to be measured on the real model on
   lamp-06c1.
-## Service contacts (`LAMP_SERVICE_CONTACTS`, off unless set)
+## Service contacts (`LAMP_SERVICE_CONTACTS`, off unless set; on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
 
 With `LAMP_SERVICE_CONTACTS=on` and `LAMP_SERVICE_RECORDS=on` (the second
 route only, with the Days memory; the connector records plan, PR 1c), the
@@ -2304,9 +2318,15 @@ said it had no address for that friend.
   and any planned for a waiting write; "forget Octavia's address" takes
   that contact through the forget-about path, and the answer counts it and
   says mail already sent stays sent.
+  Known gap: a `done` send record that holds the address stays, and with
+  `LAMP_SERVICE_RECORDS_TOLD` the model can read the address back from it
+  (lamp-06c1, 11 Nov, step 5d); forget everything in the private room
+  leaves the owner id's contacts until #6334. On the same row, "mail them
+  again" with the contact kept read back the right address but prepared
+  nothing (step 5b, partial).
 - **Off** (or with `LAMP_SERVICE_RECORDS` off), nothing is saved, looked up
   or filled in, and a mail is prepared exactly as before.
-### Redo or edit from a record (`LAMP_SERVICE_REDO`, off unless set)
+### Redo or edit from a record (`LAMP_SERVICE_REDO`, off unless set; on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
 
 With `LAMP_SERVICE_REDO=on` beside `LAMP_SERVICE_RECORDS=on` (the second
 route only; alone it does nothing; the connector records plan, PR 1d),
