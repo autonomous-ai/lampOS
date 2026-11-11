@@ -342,7 +342,11 @@ links, replaced_by)`, khóa `(person, key)`, tạo `IF NOT EXISTS`,
   `all: true` nó xóa mọi bản ghi của `person`, không đọc `about`, và một
   bản ghi được hỏi trước đó bị từ chối như sau `forget_all`; voice gửi nó
   khi quên tất cả cho id chủ của dịch vụ nếu đó không phải id của người nói
-  (phòng riêng). `service_contacts_forget` với `all: true` xóa mọi liên hệ
+  (phòng riêng), chỉ khi người nói là chủ dưới một id khác của chủ
+  (`person::owner_ids`). Một người quen không phải chủ không gửi lệnh nào
+  cho id của chủ (quyết định của chủ ngày 11/11, sau khi lệnh quên tất cả
+  của một khách trên lamp-06c1 xóa hết bản ghi và liên hệ của chủ).
+  `service_contacts_forget` với `all: true` xóa mọi liên hệ
   thư của `person` như vậy.
 - **Bản ghi được hỏi trước một lần quên bị từ chối** `forgotten`: khi
   `asked_unix_ms` trước lần `forget_all` hay `forget_person` mới nhất của
