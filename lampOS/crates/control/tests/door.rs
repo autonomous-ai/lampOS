@@ -2512,3 +2512,406 @@ async fn a_revoke_leaves_the_local_agent_nothing_and_a_restart_does_not_give_it_
     assert_eq!((again_id.clone(), made), (client, false));
     assert!(restarted.get(&again_id).unwrap().grants.is_empty());
 }
+
+// --- The run socket (#6071, PR 1): one-run tokens minted from the owner's yes ---
+
+/// The owner's yes for each skill, as the test has it: its grants, or the
+/// words a mint is refused in.
+struct FakeYes(
+    std::collections::BTreeMap<
+        &'static str,
+        Result<Vec<lamp_control::protocol::Grant>, &'static str>,
+    >,
+);
+
+impl lamp_control::runs::SkillYes for FakeYes {
+    fn grants(
+        &self,
+        skill: &str,
+    ) -> Result<std::collections::BTreeSet<lamp_control::protocol::Grant>, String> {
+        match self.0.get(skill) {
+            Some(Ok(grants)) => Ok(grants.iter().copied().collect()),
+            Some(Err(why)) => Err((*why).to_owned()),
+            None => Err("no such skill".to_owned()),
+        }
+    }
+}
+
+fn the_owners_yes() -> Arc<FakeYes> {
+    Arc::new(FakeYes(
+        [
+            ("booth", Ok(vec![lamp_control::protocol::Grant::Light])),
+            (
+                "changed",
+                Err("the skill changed since the owner said yes: ask again"),
+            ),
+            ("empty", Ok(vec![])),
+        ]
+        .into(),
+    ))
+}
+
+/// The run socket for the lamp, taking `named_uid`, with the owner's yes.
+async fn run_socket(lamp: &Lamp, named_uid: u32) -> std::path::PathBuf {
+    let path = lamp.dir.join("control.sock");
+    let listener = tokio::net::UnixListener::bind(&path).unwrap();
+    lamp.shared.set_skill_yes(the_owners_yes());
+    tokio::spawn(server::serve_run(
+        listener,
+        named_uid,
+        "lampos".to_owned(),
+        lamp.shared.clone(),
+    ));
+    path
+}
+
+/// Hello on the run socket, with `token` (or none).
+async fn run_hello(socket: &mut AgentSocket, token: Option<&str>) -> Value {
+    let welcome = agent_next(socket).await.expect("a welcome");
+    assert_eq!(welcome["ev"], "welcome");
+    let mut hello =
+        json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
+    if let Some(token) = token {
+        hello["token"] = json!(token);
+    }
+    socket.send(Message::text(hello.to_string())).await.unwrap();
+    agent_next(socket).await.expect("hello's answer")
+}
+
+async fn mint(lamp: &Lamp, skill: &str, run: &str) -> Value {
+    admin(lamp, json!({"mint": {"skill": skill, "run": run}})).await
+}
+
+#[tokio::test]
+async fn a_token_with_light_sets_the_light_and_is_refused_the_camera() {
+    let lamp = lamp("run-light").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = mint(&lamp, "booth", "r1").await;
+    assert_eq!(minted["grants"], json!(["light"]), "{minted}");
+    let token = minted["token"].as_str().unwrap().to_owned();
+    assert_eq!(token.len(), 43, "{token}");
+    let mut socket = agent_connect(&path).await.unwrap();
+    let hello = run_hello(&mut socket, Some(&token)).await;
+    assert_eq!(hello["ok"], true, "{hello}");
+    assert_eq!(hello["grants"], json!(["light"]), "{hello}");
+    assert_eq!(hello["run"], "r1", "{hello}");
+    // The light is its grant: the lamp's own part answers (here, not routed),
+    // not the door's refusal.
+    socket
+        .send(Message::text(
+            json!({"id": 2, "op": "light", "colour": "warm", "level": 2, "for_ms": 1000})
+                .to_string(),
+        ))
+        .await
+        .unwrap();
+    let light = agent_next(&mut socket).await.unwrap();
+    assert_ne!(light["error"]["code"], "no_grant", "{light}");
+    // The camera is not.
+    socket
+        .send(Message::text(
+            json!({"id": 3, "op": "camera.snapshot"}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let camera = agent_next(&mut socket).await.unwrap();
+    assert_eq!(camera["error"]["code"], "no_grant", "{camera}");
+    // It is no paired computer: not in the app's list, nor in the file.
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    assert!(listed["clients"].as_array().unwrap().is_empty(), "{listed}");
+    assert!(!lamp.dir.join("clients.json").exists());
+}
+
+#[tokio::test]
+async fn no_token_a_wrong_one_and_an_ended_one_are_refused() {
+    let lamp = lamp("run-none").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    // No token at all, and one that is no run's.
+    for token in [None, Some("A".repeat(43))] {
+        let mut socket = agent_connect(&path).await.unwrap();
+        let hello = run_hello(&mut socket, token.as_deref()).await;
+        assert_eq!(hello["error"]["code"], "no_grant", "{hello}");
+        assert_eq!(hello["error"]["why"], "no token for this run", "{hello}");
+        assert!(
+            agent_next(&mut socket).await.is_none(),
+            "the connection closed"
+        );
+    }
+    // A token that is not the right shape is a bad request, before any lookup.
+    let mut socket = agent_connect(&path).await.unwrap();
+    let hello = run_hello(&mut socket, Some("short")).await;
+    assert_eq!(hello["ok"], false, "{hello}");
+    // An ended run's token: refused, and its open connection closes at once.
+    let minted = mint(&lamp, "booth", "r2").await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut open = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut open, Some(&token)).await["ok"], true);
+    let ended = admin(&lamp, json!({"end": {"run": "r2"}})).await;
+    assert_eq!(ended["ended"], true, "{ended}");
+    assert!(
+        agent_next(&mut open).await.is_none(),
+        "the run's connection closed with it"
+    );
+    let mut late = agent_connect(&path).await.unwrap();
+    let hello = run_hello(&mut late, Some(&token)).await;
+    assert_eq!(hello["error"]["code"], "no_grant", "{hello}");
+    assert_eq!(
+        admin(&lamp, json!({"end": {"run": "r2"}})).await["ended"],
+        false
+    );
+}
+
+#[tokio::test]
+async fn a_token_is_minted_only_from_the_owners_yes() {
+    let lamp = lamp("run-yes").await;
+    // Before the run socket is on: off.
+    let off = mint(&lamp, "booth", "r1").await;
+    assert_eq!(off["error"], "skill runs are off on this lamp", "{off}");
+    let _path = run_socket(&lamp, my_uid(&lamp)).await;
+    // A skill whose folder changed since the yes: the yes's own words.
+    let changed = mint(&lamp, "changed", "r1").await;
+    assert!(
+        changed["error"].as_str().unwrap().contains("ask again"),
+        "{changed}"
+    );
+    let none = mint(&lamp, "nothing", "r1").await;
+    assert_eq!(none["error"], "no such skill", "{none}");
+    let empty = mint(&lamp, "empty", "r1").await;
+    assert!(
+        empty["error"].as_str().unwrap().contains("no grant"),
+        "{empty}"
+    );
+    // Names that could carry a path or a space are refused.
+    for (skill, run) in [("../x", "r"), ("booth", "a b"), ("booth", "")] {
+        let bad = mint(&lamp, skill, run).await;
+        assert!(bad["error"].as_str().unwrap().starts_with("mint:"), "{bad}");
+    }
+    // What lamp-tasks says of the grants is no part of it: the yes decides.
+    let said = admin(
+        &lamp,
+        json!({"mint": {"skill": "booth", "run": "r9", "grants": ["camera"]}}),
+    )
+    .await;
+    assert_eq!(said["grants"], json!(["light"]), "{said}");
+}
+
+#[tokio::test]
+async fn the_run_socket_is_not_for_pairing_and_the_other_doors_take_no_token() {
+    let lamp = lamp("run-pair").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = mint(&lamp, "booth", "r1").await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut socket, Some(&token)).await["ok"], true);
+    socket
+        .send(Message::text(
+            json!({"id": 2, "op": "pair", "name": "x", "key": STANDARD.encode([1u8; 32]), "proof": STANDARD.encode([2u8; 32])}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let pair = agent_next(&mut socket).await.unwrap();
+    assert!(
+        pair["error"]["why"]
+            .as_str()
+            .unwrap()
+            .contains("not for pairing"),
+        "{pair}"
+    );
+    // The TLS door takes no token: a hello with one is refused, never read.
+    let mut wss = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut wss).await;
+    let hello = send(
+        &mut wss,
+        json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64]), "token": token}),
+    )
+    .await;
+    assert_eq!(hello["ok"], false, "{hello}");
+    assert!(
+        hello["error"]["why"]
+            .as_str()
+            .unwrap()
+            .contains("only on a skill run's socket"),
+        "{hello}"
+    );
+    // Nor the local agent's socket.
+    let (agent_path, _client) = agent_socket(&lamp, "agent", my_uid(&lamp)).await;
+    let mut agent = agent_connect(&agent_path).await.unwrap();
+    let _welcome = agent_next(&mut agent).await;
+    agent
+        .send(Message::text(
+            json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64]), "token": token}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let refused = agent_next(&mut agent).await.unwrap();
+    assert!(
+        refused["error"]["why"]
+            .as_str()
+            .unwrap()
+            .contains("only on a skill run's socket"),
+        "{refused}"
+    );
+}
+
+/// The hello an SDK sends on the run socket (client c_0, a zero sig, the
+/// token) is the run socket's alone: the TLS door and the agent socket refuse
+/// the same frame, and the run socket refuses a real client's id or
+/// signature beside a valid token.
+#[tokio::test]
+async fn the_run_hello_is_accepted_only_on_the_run_socket() {
+    let lamp = lamp("run-only").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = mint(&lamp, "booth", "r1").await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let frame = json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64]), "token": token});
+    // The TLS door: refused.
+    let mut wss = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut wss).await;
+    let refused = send(&mut wss, frame.clone()).await;
+    assert_eq!(refused["ok"], false, "{refused}");
+    // The same frame without a token on the TLS door: unpaired, as ever.
+    let mut bare = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut bare).await;
+    let mut no_token = frame.clone();
+    no_token.as_object_mut().unwrap().remove("token");
+    let unpaired = send(&mut bare, no_token).await;
+    assert_eq!(unpaired["error"]["code"], "unpaired", "{unpaired}");
+    // The agent socket: refused (with the local agent on).
+    let (agent_path, _client) = agent_socket(&lamp, "agent", my_uid(&lamp)).await;
+    let mut agent = agent_connect(&agent_path).await.unwrap();
+    let _welcome = agent_next(&mut agent).await;
+    agent.send(Message::text(frame.to_string())).await.unwrap();
+    let refused = agent_next(&mut agent).await.unwrap();
+    assert_eq!(refused["ok"], false, "{refused}");
+    // The run socket: accepted.
+    let mut run = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut run, Some(&token)).await["ok"], true);
+    // A real client's id, or a real-looking signature, beside the token: refused.
+    for (client, sig) in [
+        ("c_1234abcd", STANDARD.encode([0u8; 64])),
+        ("c_0", STANDARD.encode([7u8; 64])),
+    ] {
+        let mut socket = agent_connect(&path).await.unwrap();
+        let _welcome = agent_next(&mut socket).await;
+        socket
+            .send(Message::text(
+                json!({"id": 1, "op": "hello", "client": client, "sig": sig, "token": token})
+                    .to_string(),
+            ))
+            .await
+            .unwrap();
+        let refused = agent_next(&mut socket).await.unwrap();
+        assert_eq!(refused["ok"], false, "{refused}");
+        assert_eq!(refused["error"]["code"], "bad_request", "{refused}");
+        assert!(agent_next(&mut socket).await.is_none(), "closed");
+    }
+}
+
+#[tokio::test]
+async fn a_second_mint_for_a_run_closes_the_first_and_its_token_is_dead() {
+    let lamp = lamp("run-twice").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let first = mint(&lamp, "booth", "r1").await["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut open = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut open, Some(&first)).await["ok"], true);
+    let second = mint(&lamp, "booth", "r1").await["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_ne!(first, second);
+    assert!(
+        agent_next(&mut open).await.is_none(),
+        "the first token's connection closed"
+    );
+    let mut old = agent_connect(&path).await.unwrap();
+    assert_eq!(
+        run_hello(&mut old, Some(&first)).await["error"]["code"],
+        "no_grant"
+    );
+    let mut new = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut new, Some(&second)).await["ok"], true);
+}
+
+#[tokio::test]
+async fn a_run_ends_at_its_time_and_a_peer_with_another_uid_never_reaches_the_door() {
+    let lamp = lamp("run-time").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = admin(
+        &lamp,
+        json!({"mint": {"skill": "booth", "run": "r1", "expires_in_ms": 1000}}),
+    )
+    .await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut open = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut open, Some(&token)).await["ok"], true);
+    // Its time passes on the door's clock: the sweep ends the run and its
+    // connection, and the token is no token.
+    lamp.shared.move_clock_on(Duration::from_secs(2));
+    assert!(
+        agent_next(&mut open).await.is_none(),
+        "closed when its time was up"
+    );
+    let mut late = agent_connect(&path).await.unwrap();
+    assert_eq!(
+        run_hello(&mut late, Some(&token)).await["error"]["code"],
+        "no_grant"
+    );
+    // The lamp names a uid that is not this process's: closed before a byte.
+    let other = lamp_run_other_uid().await;
+    assert!(other, "a peer with another uid reached the door");
+}
+
+/// A run socket taking another uid than this process's refuses its peer
+/// before any byte is read.
+async fn lamp_run_other_uid() -> bool {
+    let lamp = lamp("run-uid").await;
+    let path = run_socket(&lamp, my_uid(&lamp) + 1).await;
+    tokio::time::timeout(Duration::from_secs(3), agent_connect(&path))
+        .await
+        .expect("closed in time")
+        .is_err()
+}
+
+/// A run's connection says why it closed, as a revoke's does: the run ended
+/// (`end`), and a newer token for the same run (its old one's connection).
+#[tokio::test]
+async fn a_runs_connection_says_why_it_closed() {
+    let lamp = lamp("run-close").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let closed = |mut socket: AgentSocket| async move {
+        tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                match socket.next().await {
+                    Some(Ok(Message::Close(Some(frame)))) => return Some(frame.reason.to_string()),
+                    None | Some(Err(_) | Ok(Message::Close(None))) => return None,
+                    Some(Ok(_)) => continue,
+                }
+            }
+        })
+        .await
+        .expect("the connection closes")
+    };
+    let first = mint(&lamp, "booth", "r1").await["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut one = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut one, Some(&first)).await["ok"], true);
+    let second = mint(&lamp, "booth", "r1").await["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        closed(one).await.as_deref(),
+        Some(lamp_control::runs::CLOSED_AGAIN)
+    );
+    let mut two = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut two, Some(&second)).await["ok"], true);
+    admin(&lamp, json!({"end": {"run": "r1"}})).await;
+    assert_eq!(
+        closed(two).await.as_deref(),
+        Some(lamp_control::runs::CLOSED_ENDED)
+    );
+}

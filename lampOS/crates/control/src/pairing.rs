@@ -294,6 +294,11 @@ impl From<Client> for StoredClient {
 #[serde(deny_unknown_fields)]
 pub struct Clients {
     pub clients: Vec<Client>,
+    /// The clients of the skill runs now going (`crate::runs`): kept in
+    /// memory only, never in the file, never listed to the app, and never
+    /// changed by `set_grants` or a revoke: a run's token ends them.
+    #[serde(skip)]
+    pub runs: Vec<Client>,
 }
 
 impl Clients {
@@ -332,7 +337,32 @@ impl Clients {
 
     /// The client with `id`.
     pub fn get(&self, id: &str) -> Option<&Client> {
-        self.clients.iter().find(|client| client.id == id)
+        self.clients
+            .iter()
+            .chain(self.runs.iter())
+            .find(|client| client.id == id)
+    }
+
+    /// The client of one skill run, with no key (no signature or pairing
+    /// code reaches it) and the grants its token names; a second mint for the
+    /// same run replaces it.
+    pub fn add_run(&mut self, id: &str, skill: &str, grants: BTreeSet<Grant>, at: u64) {
+        self.runs.retain(|client| client.id != id);
+        self.runs.push(Client {
+            id: id.to_owned(),
+            name: format!("skill {skill}"),
+            key: String::new(),
+            grants,
+            unknown_grants: BTreeSet::new(),
+            paired_at: at,
+        });
+    }
+
+    /// Ends one run's client: whether it was there.
+    pub fn end_run(&mut self, id: &str) -> bool {
+        let before = self.runs.len();
+        self.runs.retain(|client| client.id != id);
+        self.runs.len() != before
     }
 
     /// Whether `key` could be added: paired already, or room for one more.

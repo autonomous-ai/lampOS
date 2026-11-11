@@ -7,6 +7,7 @@
 //!                    [--sight-file PATH|off] [--frames-socket PATH|off] [--remote on|off]
 //!                    [--camera-opens-on-demand]
 //!                    [--microphone on|off]
+//!                    [--run-socket PATH] [--run-socket-user USER]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control grants CLIENT --grants body,light [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
@@ -453,6 +454,16 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     );
     let agent_group =
         option(arguments, "--agent-group").unwrap_or_else(|| lamp_control::agent::GROUP.to_owned());
+    // The run socket (one-run tokens for a skill's run): only when a user is
+    // named (the flag, or LAMP_CONTROL_RUN_SOCKET_USER; the flag wins; `off`
+    // is off). Nothing mints a token until the skills' part keeps the owner's
+    // yes (`runs::SkillYes`).
+    let run_user = option(arguments, "--run-socket-user")
+        .or_else(|| std::env::var("LAMP_CONTROL_RUN_SOCKET_USER").ok())
+        .filter(|user| !user.is_empty() && user != "off");
+    let run_socket = PathBuf::from(
+        option(arguments, "--run-socket").unwrap_or_else(|| lamp_control::runs::SOCKET.to_owned()),
+    );
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -495,6 +506,19 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                 Err(why) => eprintln!("lamp-control: the local agent {user}: off: {why}"),
             }
         }
+        if let Some(user) = run_user {
+            match start_run_socket(&user, &run_socket) {
+                Ok((listener, uid)) => {
+                    eprintln!(
+                        "lamp-control: skill runs (uid {uid}, {user}) may use {} with a one-run token",
+                        run_socket.display()
+                    );
+                    shared.set_skill_yes(Arc::new(lamp_control::runs::NoYes));
+                    tokio::spawn(server::serve_run(listener, uid, user, shared.clone()));
+                }
+                Err(why) => eprintln!("lamp-control: the run socket for {user}: off: {why}"),
+            }
+        }
         if let Some(bus) = &bus {
             server::watch_bus(bus, watch, shared.clone())
                 .map_err(|e| format!("bus topics: {e}"))?;
@@ -516,6 +540,23 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
         Ok::<(), String>(())
     })
+}
+
+/// The run socket's user's uid, and the socket. Any failure is the whole
+/// answer: no socket.
+fn start_run_socket(
+    user: &str,
+    path: &std::path::Path,
+) -> Result<(tokio::net::UnixListener, u32), String> {
+    use lamp_control::agent;
+    if !agent::user_name_ok(user) {
+        return Err("not a user name".to_owned());
+    }
+    let passwd = std::fs::read_to_string("/etc/passwd").map_err(|e| format!("/etc/passwd: {e}"))?;
+    let uid = agent::uid_of(user, &passwd).ok_or_else(|| "no such user".to_owned())?;
+    let listener =
+        lamp_control::runs::bind(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok((listener, uid))
 }
 
 /// The local agent `user`'s socket: its uid and its record, made if the lamp

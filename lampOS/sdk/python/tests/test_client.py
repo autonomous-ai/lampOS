@@ -168,8 +168,10 @@ def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
     assert shown["lamp"] == {"id": "lamp-1", "fp": "<redacted>"}
     assert shown["skills"] == [{"sig": "<redacted>"}, {"pin": "<redacted>"}]
     # Fails closed: a field nobody decided (a newer lamp's) is hidden, at any depth.
-    unknown = debug.redact({"ev": "lamp.changed", "token": "t0ps3cret", "lamp": {"id": "lamp-1", "badge": "b4dge"}})
-    assert unknown == {"ev": "lamp.changed", "token": "<not shown>", "lamp": {"id": "lamp-1", "badge": "<not shown>"}}
+    unknown = debug.redact({"ev": "lamp.changed", "ticket": "t0ps3cret", "lamp": {"id": "lamp-1", "badge": "b4dge"}})
+    assert unknown == {"ev": "lamp.changed", "ticket": "<not shown>", "lamp": {"id": "lamp-1", "badge": "<not shown>"}}
+    # A control-socket hello's one-run token is a secret too.
+    assert debug.redact({"op": "hello", "token": "T" * 43})["token"] == "<redacted>"
     # What a lamp sends beyond the schema's own fields is decided too.
     for sample in ({"re": 3, "ok": True, "to": "body", "move": "glad-lift", "light": True},
                   {"re": 1, "ok": True, "limits": {"rates": "off", "refused": [{"most": 20, "within_ms": 1_000}], "phrases": [{"most": 6, "within_ms": 60_000}]}},
