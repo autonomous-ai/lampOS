@@ -408,8 +408,13 @@ pub fn not_made_line(why: &str) -> String {
 pub const NOT_MADE_HEAD: &str = "I couldn't make that:";
 
 /// The two files of the model's answer: exactly one fenced block named
-/// `skill.toml` and one named `SKILL.md` (its info string's last word),
-/// and no other fenced block; each at most [`MOST_FILE_BYTES`].
+/// `skill.toml` and one named `SKILL.md` (its info string's last word, in
+/// any case, or its language, `toml` or `md`; a bare fence by what it
+/// holds, [`fenced`]), and no other fenced block; each at most
+/// [`MOST_FILE_BYTES`]. A block left open is the model cut off
+/// ([`MODEL_CUT_OFF`]): the lamp's own maker closes one left open at the
+/// end of an answer that ended whole before it comes here
+/// ([`open_fence`]).
 pub fn files(answer: &str) -> Result<Files, Refused> {
     // The model's word that no made skill can do what was asked (it can't
     // hear words said, say anything, or keep time by itself): its reason,
@@ -427,46 +432,27 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
     }
     let mut toml = None;
     let mut card = None;
-    let mut left_out = None;
-    let mut lines = answer.lines();
-    while let Some(line) = lines.next() {
-        let Some(info) = line.trim_start().strip_prefix("```") else {
-            if let Some(what) = after_word(line.trim_start(), LEFT_OUT)
-                && !what.trim().is_empty()
-            {
-                left_out = Some(cut_chars(what, MOST_CANNOT_CHARS));
-            }
-            continue;
-        };
-        let name = info.split_whitespace().last().unwrap_or_default();
-        let mut body = String::new();
-        let mut closed = false;
-        for line in lines.by_ref() {
-            if line.trim_start().starts_with("```") {
-                closed = true;
-                break;
-            }
-            body.push_str(line);
-            body.push('\n');
-        }
-        if !closed {
+    let fenced = fenced(answer);
+    for block in fenced.blocks {
+        if block.open {
             return Err(Refused::new(MODEL_CUT_OFF));
         }
-        if body.len() > MOST_FILE_BYTES {
+        if block.body.len() > MOST_FILE_BYTES {
             return Err(Refused::new(
                 "the lamp's model wrote more than a skill can hold; try asking for something \
                  simpler",
             ));
         }
-        let slot = match name {
-            "skill.toml" => &mut toml,
-            "SKILL.md" => &mut card,
-            _ => return Err(not_a_skills_form("a file a made skill can't have")),
+        let slot = match block.part() {
+            Some(Part::Toml) => &mut toml,
+            Some(Part::Card) => &mut card,
+            None => return Err(not_a_skills_form("a file a made skill can't have")),
         };
-        if slot.replace(body).is_some() {
+        if slot.replace(block.body).is_some() {
             return Err(not_a_skills_form("one of its files twice"));
         }
     }
+    let left_out = fenced.left_out;
     match (toml, card) {
         (Some(toml), Some(card)) => Ok(Files {
             toml,
@@ -482,6 +468,192 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
 fn not_a_skills_form(how: &str) -> Refused {
     eprintln!("lamp-voice: a made skill's answer isn't a skill's form: {how}");
     Refused::new(NOT_A_SKILLS_FORM)
+}
+
+/// The fence that closes what the answer left open at its end, a line of
+/// its own for each block still open; none when every block it opened is
+/// closed (a product lamp on 11798, 11 Nov: an answer that ended whole,
+/// its last fence never written, was taken for a cut stream).
+pub fn open_fence(answer: &str) -> Option<String> {
+    fenced(answer).closing
+}
+
+/// Which of a made skill's two files a fenced block is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Part {
+    Toml,
+    Card,
+}
+
+/// A fence's name, from its info string: one of the two files, none, or
+/// another.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Named {
+    Part(Part),
+    Bare,
+    Other,
+}
+
+/// A fenced block of the model's answer, as it was written.
+struct Block {
+    named: Named,
+    body: String,
+    /// The answer ended before its fence closed.
+    open: bool,
+}
+
+impl Block {
+    /// The file it is: as named, or for a fence with no name, `SKILL.md`
+    /// when it begins with front matter and `skill.toml` otherwise.
+    fn part(&self) -> Option<Part> {
+        match self.named {
+            Named::Part(part) => Some(part),
+            Named::Bare if self.body.trim_start().starts_with("---") => Some(Part::Card),
+            Named::Bare => Some(Part::Toml),
+            Named::Other => None,
+        }
+    }
+}
+
+/// The answer's fenced blocks, in order, its `left out:` line, and the
+/// fence that closes what it left open ([`open_fence`]).
+struct Fenced {
+    blocks: Vec<Block>,
+    left_out: Option<String>,
+    closing: Option<String>,
+}
+
+/// A fence line, indented or not: its mark (a backtick or a tilde), how
+/// many (three or more), and its info string, trimmed.
+fn fence(line: &str) -> Option<(u8, usize, &str)> {
+    let line = line.trim();
+    let mark = *line.as_bytes().first()?;
+    if mark != b'`' && mark != b'~' {
+        return None;
+    }
+    let run = line.bytes().take_while(|&b| b == mark).count();
+    (run >= 3).then(|| (mark, run, line[run..].trim()))
+}
+
+/// A fence's name and whether it names a file whole (`skill.toml`,
+/// `SKILL.md`) rather than its language (`toml`, `md`, `markdown`): its
+/// info string's last word, in any case, a `title=` or quotes and a
+/// trailing colon taken off.
+fn fence_named(info: &str) -> (Named, bool) {
+    let word = info.split_whitespace().last().unwrap_or_default();
+    let word = word.rsplit_once('=').map_or(word, |(_, value)| value);
+    let word = word
+        .trim_matches(|c| matches!(c, '"' | '\'' | '*' | '`'))
+        .trim_end_matches(':')
+        .to_ascii_lowercase();
+    match word.as_str() {
+        "" => (Named::Bare, false),
+        "skill.toml" => (Named::Part(Part::Toml), true),
+        "skill.md" => (Named::Part(Part::Card), true),
+        "toml" => (Named::Part(Part::Toml), false),
+        "md" | "markdown" => (Named::Part(Part::Card), false),
+        _ => (Named::Other, false),
+    }
+}
+
+/// The answer read as fenced blocks. A block closes on a fence of its own
+/// mark, at least as long, with no info string, or on one at the end of
+/// its last line (`At ten it dims.```"`). A fence naming the other file
+/// whole (`SKILL.md` in `skill.toml`), or any named fence in `skill.toml`,
+/// closes it and opens that one; in `SKILL.md` another named fence opens a
+/// block within it, closed by the next bare fence, kept as its words.
+fn fenced(answer: &str) -> Fenced {
+    let mut blocks = Vec::new();
+    let mut left_out = None;
+    // The block open now: its mark, its run, and how many blocks within
+    // it are open.
+    let mut open: Option<(Block, u8, usize, usize)> = None;
+    let mut lines = answer.lines();
+    let mut again = None;
+    while let Some(line) = again.take().or_else(|| lines.next()) {
+        let Some((mut block, mark, run, mut depth)) = open.take() else {
+            match fence(line) {
+                Some((mark, run, info)) => {
+                    let block = Block {
+                        named: fence_named(info).0,
+                        body: String::new(),
+                        open: true,
+                    };
+                    open = Some((block, mark, run, 0));
+                }
+                None => {
+                    if let Some(what) = after_word(line.trim_start(), LEFT_OUT)
+                        && !what.trim().is_empty()
+                    {
+                        left_out = Some(cut_chars(what, MOST_CANNOT_CHARS));
+                    }
+                }
+            }
+            continue;
+        };
+        let mut closed = false;
+        match fence(line) {
+            Some((_, _, "")) if depth > 0 => {
+                depth -= 1;
+                block.body.push_str(line);
+                block.body.push('\n');
+            }
+            Some((this, length, "")) if this == mark && length >= run => closed = true,
+            Some((_, _, info)) if !info.is_empty() && depth == 0 => {
+                let (name, whole) = fence_named(info);
+                let other_file = whole && matches!(name, Named::Part(_)) && name != block.named;
+                if other_file || block.named == Named::Part(Part::Toml) {
+                    closed = true;
+                    again = Some(line);
+                } else {
+                    depth += 1;
+                    block.body.push_str(line);
+                    block.body.push('\n');
+                }
+            }
+            Some((_, _, info)) if !info.is_empty() => {
+                depth += 1;
+                block.body.push_str(line);
+                block.body.push('\n');
+            }
+            _ => {
+                let end = String::from_utf8(vec![mark; run]).unwrap_or_default();
+                match line.trim_end().strip_suffix(end.as_str()) {
+                    Some(before) if depth == 0 && !before.trim().is_empty() => {
+                        block.body.push_str(before);
+                        block.body.push('\n');
+                        closed = true;
+                    }
+                    _ => {
+                        block.body.push_str(line);
+                        block.body.push('\n');
+                    }
+                }
+            }
+        }
+        if closed {
+            block.open = false;
+            blocks.push(block);
+        } else {
+            open = Some((block, mark, run, depth));
+        }
+    }
+    let closing = match open {
+        // A bare fence alone at the very end (a closing fence written
+        // twice) opens nothing.
+        Some((block, ..)) if block.named == Named::Bare && block.body.trim().is_empty() => None,
+        Some((block, mark, run, depth)) => {
+            blocks.push(block);
+            let end = String::from_utf8(vec![mark; run]).unwrap_or_default();
+            Some(vec![end; depth + 1].join("\n"))
+        }
+        None => None,
+    };
+    Fenced {
+        blocks,
+        left_out,
+        closing,
+    }
 }
 
 /// What a made skill asks to use: within [`capped`]'s bounds.
@@ -5688,6 +5860,60 @@ light = { dim = 1 }
 
     fn files_err(answer: &str) -> String {
         files(answer).unwrap_err().0
+    }
+
+    /// The fences the model writes (a product lamp on 11798, 11 Nov): its
+    /// language for a name, any case, a space, a title, trailing spaces,
+    /// tildes, longer runs, indented, bare, a closing fence at the end of
+    /// a line, SKILL.md opened before skill.toml closed, a block within
+    /// SKILL.md, a closing fence written twice: each read as the two files.
+    #[test]
+    fn the_fences_the_model_writes_give_the_two_files() {
+        let two = |open_toml: &str, close_toml: &str, open_card: &str, close_card: &str| {
+            format!("{open_toml}\n{TOML}{close_toml}\n\n{open_card}\n{CARD}{close_card}\n")
+        };
+        for answer in [
+            two("```toml", "```", "```md", "```"),
+            two("``` toml", "```", "``` markdown", "```"),
+            two("```Skill.TOML  ", "```  ", "```skill.md", "```"),
+            two("```toml title=\"skill.toml\"", "```", "```SKILL.md:", "```"),
+            two("~~~toml", "~~~", "~~~SKILL.md", "~~~"),
+            two("````skill.toml", "````", "````SKILL.md", "````"),
+            two("  ```skill.toml", "  ```", "  ```SKILL.md", "  ```"),
+            two("```", "```", "```", "```"),
+            format!("```skill.toml\n{TOML}\n```SKILL.md\n{CARD}```\n"),
+            format!("```skill.toml\n{TOML}```\n```SKILL.md\n{CARD}```\n```\n"),
+        ] {
+            let files = files(&answer).unwrap_or_else(|why| panic!("{why:?}\n{answer}"));
+            assert_eq!(files.toml.trim_end(), TOML.trim_end(), "{answer}");
+            assert_eq!(files.card.trim_end(), CARD.trim_end(), "{answer}");
+            assert_eq!(open_fence(&answer), None, "{answer}");
+        }
+        // A closing fence at the end of the last line.
+        let inline = format!(
+            "```skill.toml\n{TOML}```\n```SKILL.md\n{}```\n",
+            CARD.trim_end()
+        );
+        let got = files(&inline).unwrap();
+        assert_eq!(got.card.trim_end(), CARD.trim_end());
+        // A block within SKILL.md is its words.
+        let card = format!("{CARD}\n```bash\necho hi\n```\n");
+        let nested = format!("```skill.toml\n{TOML}```\n```SKILL.md\n{card}```\n");
+        let got = files(&nested).unwrap();
+        assert_eq!(got.card, card);
+        assert_eq!(open_fence(&nested), None);
+        // Left open at the end: the fence that closes it, of its own mark
+        // and run, a line for each block open.
+        let open = format!("```skill.toml\n{TOML}```\n~~~~SKILL.md\n{CARD}");
+        assert_eq!(open_fence(&open).as_deref(), Some("~~~~"));
+        assert_eq!(files_err(&open), MODEL_CUT_OFF);
+        let closed = format!("{}\n~~~~\n", open.trim_end());
+        assert_eq!(files(&closed).unwrap().card.trim_end(), CARD.trim_end());
+        let within = format!("```skill.toml\n{TOML}```\n```SKILL.md\n{CARD}```bash\necho hi\n");
+        assert_eq!(open_fence(&within).as_deref(), Some("```\n```"));
+        // Another file still refuses it.
+        let json = format!("{}```json\n{{}}\n```\n", answer(TOML, CARD));
+        assert_eq!(files_err(&json), NOT_A_SKILLS_FORM);
     }
 
     /// A skill.toml that isn't TOML is refused with the parser's words for

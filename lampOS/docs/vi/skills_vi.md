@@ -49,9 +49,20 @@ sau:
    hai (`llm_*`, relay hoặc DeepSeek riêng của người dùng), không có hàm,
    dạng stream, trên luồng và runtime riêng, tối đa 30 giây
    (`WRITE_WITHIN`) và 20 KiB. Lỗi 404 (của relay, khoảng một phần mười
-   ngày 2/11), 5xx, quá giờ, mất kết nối hoặc câu trả lời bị cắt trước khi
-   khối cuối đóng thì được hỏi lại một lần (`make_skill_local::again`); lỗi
-   khác thì không. Mô hình được xem một kỹ năng hoàn chỉnh mà bước kiểm tra
+   ngày 2/11), 5xx, quá giờ, mất kết nối, stream kết thúc mà không có dấu
+   kết thúc của dịch vụ (`chat stream cut`), câu trả lời bị dịch vụ dừng ở
+   giới hạn token (`finish_reason` `length`) hoặc không có khối fenced nào
+   thì được hỏi lại một lần (`make_skill_local::again`); lỗi khác thì
+   không. Câu trả lời có stream kết thúc trọn vẹn nhưng thiếu fence đóng
+   cuối cùng (một đèn sản phẩm trên 11798, 11/11: hai câu trả lời khoảng
+   250 token bị coi là stream bị cắt, việc tạo thất bại vì "bị cắt") được
+   đóng fence đó ở cuối rồi kiểm tra tiếp, journal ghi "a made skill's last
+   fence closed at the end of its answer" (`made_skill::open_fence`); câu
+   trả lời lần hai cũng vậy. Fence được đọc như mô hình viết: tên viết hoa
+   hay thường hoặc ngôn ngữ (`toml`, `md`, `markdown`), backtick hoặc dấu
+   ngã, ba hoặc nhiều hơn, thụt lề, fence trống (`SKILL.md` nhận theo front
+   matter), fence đóng ở cuối dòng, `SKILL.md` mở trước khi `skill.toml`
+   đóng, và khối lồng trong `SKILL.md` được giữ như nội dung. Mô hình được xem một kỹ năng hoàn chỉnh mà bước kiểm tra
    chấp nhận (`make_skill_local::EXAMPLE`, `example-only`: màu cyan mức 2
    trong 25 giây khi có người ở đó, được gọi rõ là ví dụ về hình thức,
    "never answer with it") và được dặn rằng lời nhắc vào một giờ hay cứ
