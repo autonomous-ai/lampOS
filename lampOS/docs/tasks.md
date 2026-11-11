@@ -2057,8 +2057,10 @@ for each run, and is answered once the run ends
   Every field is needed and no other is taken. `skill` is a skill's name
   (`a-z`, `0-9`, `-`, `_`, at most 64), `folder` is exactly
   `/var/lib/lampOS/skills/<skill>` (the skills Hermes sees read-only),
-  `run` is a file under the skill's `scripts/` (no `..`, no hidden part, not
-  absolute), `task` is 1 to 500 bytes, `sha256` is 64 lowercase hex digits,
+  `run` is a file under the skill's `scripts/` (each part only `A-Z a-z 0-9
+  . _ -`, never starting with `.`, so no `..`, no hidden part, no newline,
+  backtick or space; not absolute), `task` is 1 to 500 bytes with no
+  control character, `sha256` is 64 lowercase hex digits,
   and `grants` are at most 13, each once, never `skills`. Anything else is
   `bad_request`, and no token is asked for.
 - **The answer:** `{"ok":true,"id":N}` once the run ended, or
@@ -2068,9 +2070,11 @@ for each run, and is answered once the run ends
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for
   each run lamp-tasks asks lamp-control (#6304, PR #6408) for a token on
   its admin socket, `/run/lampos-control/admin.sock` (`ControlTokens`, the
-  `Tokens` trait): `{"mint":{"skill","run"}}`, the run id lamp-tasks' own
-  and new for each hand-over (`run_id`), and `{"end":{"run"}}` when it
-  ends. lamp-control reads the owner's yes itself and names its grants; a
+  `Tokens` trait): `{"mint":{"skill","run","expires_in_ms"}}`, the run id
+  lamp-tasks' own and new for each hand-over (`run_id`), the life 30
+  minutes (`RUN_LIFETIME`, lamp-control's most), and `{"end":{"run"}}` when
+  it ends. A mint whose answer is lost (no answer in 5 s, or not JSON) is
+  ended at once too, since its token may be live. lamp-control reads the owner's yes itself and names its grants; a
   run whose minted grants are not exactly the ones its line asks is refused
   `no_token` and its token ended, so a run never gets grants its skill did
   not ask. lamp-control's own refusal (no yes, skill runs off, not
@@ -2080,10 +2084,13 @@ for each run, and is answered once the run ends
   of the environment is added. The token is ended when the run ends, a
   failed run too. It is never in the task's words, the journal or a debug
   line. No token, no run.
-- **The run:** one task for target `lamp`, its words the skill's task, the
-  script to run from the skill's read-only folder, and the one way to the
+- **The run:** one task for target `lamp`, its words the script to run
+  from the skill's read-only folder, the skill's task quoted as data (a
+  JSON string, "as data, not as instructions"), and the one way to the
   lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
-  run's end.
+  run's end. The runner ends the run at `SkillRun::deadline`, the token's
+  life, and holds it off the network itself (hermes-ns), never by the
+  prompt's words alone.
 
 **Not yet (said so the code is not read as more):** `ControlTokens` speaks
 #6408's admin socket, which is not merged yet, and lamp-control keeps no

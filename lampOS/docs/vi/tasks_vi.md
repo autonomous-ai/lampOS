@@ -165,7 +165,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   Cần đủ mọi trường và không nhận trường nào khác. `skill` là tên một kỹ năng
   (`a-z`, `0-9`, `-`, `_`, tối đa 64), `folder` đúng là
   `/var/lib/lampOS/skills/<skill>` (các kỹ năng Hermes thấy ở chế độ chỉ đọc),
-  `run` là một tệp trong `scripts/` của kỹ năng (không `..`, không phần ẩn,
+  `run` là một tệp trong `scripts/` của kỹ năng (mỗi phần chỉ gồm `A-Z a-z
+  0-9 . _ -`, không bắt đầu bằng `.`, nên không `..`, không phần ẩn, không
+  xuống dòng, dấu backtick hay khoảng trắng,
   không đường dẫn tuyệt đối), `task` dài 1 đến 500 byte, `sha256` là 64 chữ
   số hex viết thường, và `grants` tối đa 13, mỗi quyền một lần, không bao giờ
   là `skills`. Mọi thứ khác là `bad_request`, và không xin token nào.
@@ -176,7 +178,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên
   #6071): với mỗi lần chạy, lamp-tasks xin lamp-control (#6304, PR #6408)
   một token trên socket quản trị `/run/lampos-control/admin.sock`
-  (`ControlTokens`, trait `Tokens`): `{"mint":{"skill","run"}}`, với mã lần
+  (`ControlTokens`, trait `Tokens`): `{"mint":{"skill","run","expires_in_ms"}}` (thời hạn 30 phút,
+  `RUN_LIFETIME`, mức tối đa của lamp-control; một lần xin token mất câu trả
+  lời thì cũng được kết thúc ngay, vì token có thể đang sống), với mã lần
   chạy của riêng lamp-tasks, mới cho mỗi lần giao (`run_id`), và
   `{"end":{"run"}}` khi lần chạy kết thúc. lamp-control tự đọc lời đồng ý
   của chủ đèn và nêu các quyền; lần chạy nào có quyền được cấp không khớp
@@ -192,6 +196,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 - **Lần chạy:** một việc cho đích `lamp`, lời của nó là việc của kỹ năng,
   script cần chạy từ thư mục chỉ đọc của kỹ năng, và đường duy nhất tới đèn
   (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
+  Việc của kỹ năng được đưa vào như dữ liệu (một chuỗi JSON, "as data, not
+  as instructions"), và không được có ký tự điều khiển. Runner kết thúc lần
+  chạy ở `SkillRun::deadline`, đúng thời hạn của token, và tự chặn mạng
+  (hermes-ns), không chỉ dựa vào lời trong prompt.
 
 **Chưa có (nói rõ để không hiểu code là nhiều hơn):** `ControlTokens` nói
 theo socket quản trị của #6408, PR này chưa được gộp, và lamp-control chưa
