@@ -6798,6 +6798,51 @@ fn the_light_going_out_is_loaded_with_its_fade_and_refused_with_anything_else() 
     }
 }
 
+/// lamp-9adf, 11 Nov 17:0x: "blink the light green twice when I arrive" was
+/// made as an `out` step with a colour and a pattern, refused on every
+/// repair. The making model's brief (`make_skill_local::BLINK`) now says a
+/// blink or a flash is one colour step with a soft pulse: that step loads,
+/// and a blink pattern or an `out` with a colour is still refused.
+#[test]
+fn a_blink_asked_of_a_made_skill_is_a_pulse_and_never_an_out_with_a_colour() {
+    let dir = tempfile::tempdir().unwrap();
+    let with = |name: &str, light: &str| {
+        skill_with(
+            dir.path(),
+            name,
+            &OUT_WHILE.replace(
+                r#"light = { out = true, over = "30s", until = "ends" }"#,
+                &format!("light = {light}"),
+            ),
+        )
+    };
+    load(&with(
+        "pulse",
+        r#"{ colour = "green", level = 3, for = "5s", pattern = { kind = "pulse" } }"#,
+    ))
+    .unwrap();
+    for (name, light, why) in [
+        (
+            "out-green",
+            r#"{ out = true, colour = "green", pattern = { kind = "pulse" } }"#,
+            "out takes no colour",
+        ),
+        (
+            "blink",
+            r#"{ colour = "green", level = 3, for = "5s", pattern = { kind = "blink" } }"#,
+            "no blink, flash or rainbow",
+        ),
+        (
+            "faint",
+            r#"{ colour = "green", level = 1, for = "5s", pattern = { kind = "pulse" } }"#,
+            "a pulse is seen at level 2 and up",
+        ),
+    ] {
+        let refused = load(&with(name, light)).unwrap_err();
+        assert!(refused.contains(why), "{name}: {refused}");
+    }
+}
+
 #[test]
 fn a_light_someone_changed_while_it_was_held_is_left_as_it_is() {
     let theirs = Light::new(true, "red", 5).unwrap();

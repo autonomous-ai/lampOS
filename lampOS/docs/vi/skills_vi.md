@@ -85,7 +85,7 @@ sau:
    mỗi khoảng thời gian là bộ hẹn giờ của đèn, không phải kỹ năng, còn kỹ
    năng chỉ chạy vào một giờ mỗi ngày hoặc vào những ngày trong tuần được
    nêu tên, bằng trigger đồng hồ; được nêu từng
-   trigger và từng cử chỉ theo tên; và cách nó nói (dưới đây, #6055, #6062: `speak = true`, cooldown từ một giờ trở lên, và một `say = { text = "Welcome back!" }` đúng nguyên văn, bằng ngôn ngữ người dùng đã hỏi). Câu trả lời phải đúng hai khối có rào,
+   trigger và từng cử chỉ theo tên; và cách nó nói (dưới đây, #6055, #6062: `speak = true`, cooldown từ một giờ trở lên, và một `say = { text = "Welcome back!" }` đúng nguyên văn, bằng ngôn ngữ người dùng đã hỏi); và rằng đèn không bao giờ nháy hay chớp (`make_skill_local::BLINK`): một lần nháy hay chớp được viết thành một bước màu với một nhịp sáng nhẹ, `light = { colour = "green", level = 3, for = "5s", pattern = { kind = "pulse" } }` (mức 2 đến 5, phát một lần), phần nháy được nói là bị bỏ ra, còn `{ out = true }` chỉ tắt đèn và chỉ nhận `over` và `until` (trên lamp-9adf, 11/11, "blink the light green twice when I arrive" được viết thành một bước `out` có màu và pattern, và bị từ chối ở mọi lần sửa: "out takes no colour, dim, level, for, pattern or no_brighter: only over and until"). Câu trả lời phải đúng hai khối có rào,
    `skill.toml` và `SKILL.md`, mỗi khối tối đa 8 KiB.
 4. **Giới hạn những gì kỹ năng tạo ra được dùng: đã bỏ giới hạn** (#6066).
    Đây là giới hạn của người xây dựng đầu tiên ngày 19/10, được bỏ ngày

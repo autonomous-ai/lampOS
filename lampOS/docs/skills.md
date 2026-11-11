@@ -2269,7 +2269,7 @@ gone ([switches.md](switches.md)). What happens:
    with it") and told
    that a reminder at a time or every so often is the lamp's own timer,
    not a skill, while a skill runs at a time only each day or on named
-   days of the week, by the clock trigger; each trigger it may have and each gesture by name; and how it speaks (below, #6055, #6062: `speak = true`, a cooldown of an hour or more, and one `say = { text = "Welcome back!" }` of the exact words in the language the person asked in): on lamp-9adf on 2 Nov, before
+   days of the week, by the clock trigger; each trigger it may have and each gesture by name; and how it speaks (below, #6055, #6062: `speak = true`, a cooldown of an hour or more, and one `say = { text = "Welcome back!" }` of the exact words in the language the person asked in); and that a light never blinks or flashes (`make_skill_local::BLINK`): a blink or a flash is one colour step with a soft pulse, `light = { colour = "green", level = 3, for = "5s", pattern = { kind = "pulse" } }` (level 2 to 5, played once), the blinking said as left out, while `{ out = true }` only turns the light off and takes nothing but `over` and `until` (on lamp-9adf, 11 Nov, "blink the light green twice when I arrive" was written as an `out` step with a colour and a pattern and refused on every repair: "out takes no colour, dim, level, for, pattern or no_brighter: only over and until"): on lamp-9adf on 2 Nov, before
    both, its first two skills were refused for a trigger field and a light
    step the check didn't know. Its answer must be exactly two fenced
    blocks, `skill.toml` and `SKILL.md`, at most 8 KiB each.
