@@ -1027,6 +1027,14 @@ lời "có" nói thành tiếng (#5977; nút MAKE IT của ứng dụng là lờ
 `LAMP_MAKE_SKILL=on` và dịch vụ nói (`LAMP_SAY=on`) để nói thành tiếng điều nó
 đã tạo; thiếu một trong hai thì socket của ứng dụng không chạy
 (`crate::app_make`). Không hỏi phần tasks nào, và không cần phần tasks.
+Socket được mở một lần khi giọng nói khởi động, cạnh dịch vụ nói
+(`app_make::start_from_environment` trong `run_source`, với
+`Says::parked_asks`), trước khi chờ công tắc riêng tư, như dịch vụ nói
+(#3697): tạo kỹ năng không cần micro, nên socket trả lời dù công tắc đóng,
+không đọc được hay mở. Trên đèn của một người thử ngày 11/11, socket chỉ
+được mở sau lúc chờ, và `ready` của `lamp-cloud` bị từ chối suốt ba giờ khi
+công tắc không đọc được. Câu của kỹ năng vừa tạo, nếu hỏi lúc micro đóng, bị
+từ chối ngay như mọi câu nói, và kỹ năng vẫn bật.
 
 - `{"make": {"words", "request_id"}}`: chữ thành cùng bản hướng dẫn (tối đa
   480 byte) và được mô hình của đèn tạo ngay trên một luồng riêng

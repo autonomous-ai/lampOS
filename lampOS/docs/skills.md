@@ -3231,6 +3231,17 @@ to say aloud what it made; without either the app socket isn't started
    (`app_make::app_caller_may`; App Only's P2 on #5985: with no spoken yes,
    no other part in the group may put a skill on). One JSON line in, one
    out. A group not known starts nothing (`app_make::group_named`).
+   It is bound once as the voice starts, beside the say service
+   (`app_make::start_from_environment` in `run_source`, with
+   `Says::parked_asks`), before the privacy wait, as the say service is
+   (#3697): making a skill needs no microphone, so the socket answers
+   whatever the switch reads, closed, unreadable or open. On a tester's
+   lamp on 11 Nov it was bound only by a run, after the wait, and
+   `lamp-cloud`'s `ready` was refused for three hours while the switch
+   was unreadable. A made skill's line asked while the microphones are
+   closed is refused at once, as any say is, and the skill stays on.
+   Tests: `coordinator::service::tests::the_app_make_socket_answers_through_a_closed_and_an_unreadable_switch`,
+   `say::tests::bound_at_start_the_say_socket_answers_through_the_privacy_wait`.
 2. `{"make": {"words", "request_id"}}`: the words become the same brief
    (`made_skill::brief`, at most 480 bytes) and are made at once on a
    thread of their own by the lamp's own model, the same example, check

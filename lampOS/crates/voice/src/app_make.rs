@@ -818,7 +818,11 @@ pub fn answer(
 /// [`ENVIRONMENT`] `on`, [`made_skill::WRITTEN_ENVIRONMENT`] `on` or both,
 /// each answering only its own asks ([`On`]), and always with
 /// `LAMP_MAKE_SKILL` `on` and the say service's own `asks`, to say aloud what it made.
-/// Logged either way, never the words.
+/// Logged either way, never the words. Started once, at the voice's start
+/// and before the privacy wait, as the say service is (#3697), so it
+/// answers whatever the switch reads, closed, unreadable or open (a
+/// tester's lamp, 11 Nov: it waited 70 minutes on an unreadable switch,
+/// and the app couldn't make a skill): making one needs no microphone.
 pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
     let switch = |name: &str| std::env::var(name).ok().as_deref() == Some("on");
     let on = On {

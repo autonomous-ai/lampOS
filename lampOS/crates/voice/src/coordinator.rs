@@ -3345,6 +3345,19 @@ fn run_source(
     if lifetime.continuous() {
         crate::say::Says::start(notices.recordings());
     }
+    // A skill typed in the app, handed over and told aloud as the voice's
+    // own (#2813, `LAMP_APP_MAKE_SKILL=on`): a socket for lamp-cloud, made
+    // by the lamp's own model (#4914). Bound once here, before the wait,
+    // as the say service is (#3697): making a skill needs no microphone,
+    // so it answers whatever the privacy switch reads, closed, unreadable
+    // or open (a tester's lamp, 11 Nov: refused for three hours while the
+    // switch was unreadable, the socket bound only by a run). Its line is
+    // asked through the say service's own asks, refused at once while the
+    // microphones are closed, as any say is.
+    #[cfg(not(test))]
+    if lifetime.continuous() {
+        crate::app_make::start_from_environment(crate::say::Says::parked_asks());
+    }
     let mut motor_rearm = true;
     record(
         &mut trace,
@@ -6717,13 +6730,11 @@ fn conversation_with_gate_inner(
         // A language changed since the last start, said once (#4473).
         crate::language::announce(says.own_asks());
     }
-    // A skill typed in the app, handed over and told aloud as the voice's
-    // own (#2813, `LAMP_APP_MAKE_SKILL=on`): a socket for lamp-cloud. Made
-    // by the lamp's own model (#4914), its ask is said through the say
-    // service's own asks.
+    // A skill typed in the app (`LAMP_APP_MAKE_SKILL=on`) is answered by
+    // a socket bound once at the voice's start, before the privacy wait
+    // (`run_source`), not here.
     #[cfg(not(test))]
     if lifetime.continuous() {
-        crate::app_make::start_from_environment(says.as_ref().map(|says| says.own_asks()));
         // The memory's nightly pass through the relay, with
         // LAMP_MEMORY_NIGHTLY=on (`nightly`): idle, at night, with the slide
         // open; never said.

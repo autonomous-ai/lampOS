@@ -655,8 +655,13 @@ names `skills.make` and `skills.made` only while the newest answer is
 the switches alone once lamp-voice's socket answers. `system.info` never
 waits on it. A make asked while it isn't ready is still taken on the
 switch alone, so an app that asks anyway gets the voice's own reason. The
-journal says each change ("making a skill is ready" or "not ready"),
-never more.
+journal says each change, never more (`make_skill::ready_line`): "making
+a skill is ready: the lamp's maker answers", or "making a skill is not
+ready:" and the voice's own `why`, or "lamp-voice's maker isn't
+answering yet" when its socket doesn't answer (`make_skill::readiness`).
+No computer or Harness is part of it. lamp-voice binds the socket as it
+starts, before its privacy wait, so it answers whatever the privacy
+switch reads ([skills.md](skills.md), "Asked for in the app").
 
 `skills.made` goes through these states: `making` while the model
 writes and while the kept skill is put on, then `on` once it is on, with
