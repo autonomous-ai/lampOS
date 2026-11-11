@@ -96,6 +96,16 @@ pub const SCRIPT: &[Scripted] = &[
         expects: Some(crate::agent_tasks::CHECK),
         lines: &["How is the work you gave Claude Code going?"],
     },
+    // A cut-in mid-story as speech-to-text heard it on lamp-52e6, build
+    // 12104 (#6456): "a little warm" is a step warmer, not the colour warm.
+    Scripted {
+        label: "light_a_little_warm",
+        expects: Some("light_warmer"),
+        lines: &[
+            "Tell me a short story about a fox.",
+            "Hold on. Hey, Lamp. Make the light a little warm.",
+        ],
+    },
 ];
 
 const STORY_ASKED: &str = "Hey Lamp, can you ask Claude Code to write a short story about a lamp who learns to sing, in five chapters, and to read each chapter over before starting the next one?";
@@ -633,14 +643,18 @@ mod tests {
             sign_in: false,
             sign_in_app: false,
         };
+        // The light functions are the actions part's own (#6456).
         let declared: Vec<String> = crate::agent_tasks::tools(&place)
             .into_iter()
             .map(|tool| tool.name)
+            .chain(
+                lamp_actions::catalog(false, true)
+                    .into_iter()
+                    .map(|function| function.name.to_owned()),
+            )
             .collect();
         for scripted in SCRIPT {
-            if let Some(name) = scripted.expects
-                && name != "light_colour"
-            {
+            if let Some(name) = scripted.expects {
                 assert!(declared.iter().any(|tool| tool == name), "{name}");
             }
         }
