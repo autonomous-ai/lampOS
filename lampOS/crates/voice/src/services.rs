@@ -498,6 +498,12 @@ mod kept {
     }
 }
 
+/// Tests: the SHA-256 a run's send names for `read_back`.
+#[cfg(test)]
+pub fn read_back_sha256_for_test(read_back: &str) -> String {
+    lamp_services::serve::read_back_sha256(read_back)
+}
+
 /// Tests: `f` on this thread's waiting write.
 #[cfg(test)]
 pub fn with_pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
@@ -1136,6 +1142,11 @@ pub struct Turn<'a> {
     /// The person's line is a plain yes ([`plain_yes`]): only then does a
     /// read in a later request than the waiting write's keep it ([`gate`]).
     pub plain_yes: bool,
+    /// How like the owner's voice this line is ([`owner_likeness`]), asked
+    /// only for the send of a skill run's write outside the private room by
+    /// a line the owner was not seen saying: there only the owner's yes
+    /// sends it ([`gate`], #6432).
+    pub run_owner_likeness: Option<f32>,
 }
 
 /// The non-empty `send_id` the model gave a write, if any.
@@ -1458,6 +1469,20 @@ pub fn gate(
     // words, never the model's reading of them, so nothing in what the run
     // wrote can make it send.
     if let Some(run) = &kept.run {
+        // Outside the private room only the owner's yes: their face seen
+        // saying it, or their voice; in it, any heard line is theirs
+        // (`seen_owner`, [`owner_seen_saying`]), as a write they prepare.
+        if !turn.seen_owner
+            && !turn
+                .run_owner_likeness
+                .is_some_and(|alike| alike >= crate::same_voice::SERVICES_SAME_FROM)
+        {
+            eprintln!(
+                "lamp-voice: request {request}: a skill run's send cancelled: not the owner's yes"
+            );
+            crate::service_records::settle(&kept.send_id, Status::Refused, "not the owner's yes");
+            return Err(json!({ "error": OTHER_VOICE }));
+        }
         if !turn.plain_yes {
             eprintln!(
                 "lamp-voice: request {request}: a skill run's send cancelled: not a plain yes"
@@ -2085,6 +2110,16 @@ pub fn run(
     // Asked only while a write from an earlier request waits.
     let plain_yes =
         heard && prepared.is_some_and(|prepared| prepared < request) && said_plain_yes(request);
+    // A skill run's write waiting, sent by a line the owner was not seen
+    // saying outside the private room: how like the owner it sounds.
+    let run_owner_likeness = kept::pending(|pending| {
+        pending
+            .as_ref()
+            .filter(|kept| kept.run.is_some())
+            .map(|kept| kept.person.clone())
+    })
+    .filter(|_| send_id && heard && !seen_owner && !private_room)
+    .and_then(|person| owner_likeness(judge.as_ref(), request, Some(&person)));
     let turn = Turn {
         heard,
         owner: owner.as_deref(),
@@ -2095,6 +2130,7 @@ pub fn run(
         other_seen,
         asker_seen,
         plain_yes,
+        run_owner_likeness,
     };
     let gated = kept::pending(|pending| gate(pending, call, request, &turn, now));
     let mut call = match gated {

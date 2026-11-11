@@ -2261,11 +2261,22 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   its hold left is said once, as the lamp's own written turn
   (`run_write_read_back`), under task news' gates: someone at the lamp, the
   first pause after any turn (the person mid-turn, or the lamp, is waited
-  out), nothing owed, the room not busy, and never in the lamp's quiet
+  out), nothing owed, the room not busy, and, with `LAMP_PRIVATE_ROOM`
+  off, only to the owner seen alone (the eyes' known face one of the
+  owner's, the one face in view, `services::owner_sees_alone`, as a read in
+  full is held; otherwise it is not said and the hold lapses quietly); never
+  in the lamp's quiet
   hours (`lamp_local_time::quiet_hours`; a local time not known is quiet,
   as for a skill). The model is told to say this program's read-back word
   for word after the skill's name: "Your <skill> skill wants to send: ….
-  Shall I send it?", and to call nothing. A read-back too long for one note
+  Shall I send it?", and to call nothing. The line goes in the note as one
+  JSON string after a header the worker reads first, so nothing the run
+  wrote (a `")`, a newline, a header of its own) can close it or begin
+  another note. A write whose hold ends untold (nobody there, the quiet
+  hours, or under 30 s left when seen) is told once later, when the lamp
+  may speak: "Your <skill> skill wanted to send a mail, but nobody was here
+  to say yes, so nothing was sent." Kept in memory only: a restart never
+  tells it. A read-back too long for one note
   (1 024 bytes) is never cut: the lamp says only that the skill wanted to
   send something too long to read out, nothing waits, and the hold lapses.
 - **The yes.** The voice's worker reads the note back exactly and keeps the
@@ -2274,7 +2285,11 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   its two minutes counted from this program's hold. So the voice's gate
   holds it (`services::gate`): heard live, a later request, the read-back
   not cut, within the hold, the echo tail's voice check, the second route
-  only, and no identity check (`LAMP_PRIVATE_ROOM`: whoever answers). On
+  only. It follows `LAMP_PRIVATE_ROOM` as a write the person prepares
+  does: on, whoever answers (any heard line is the owner's,
+  `owner_seen_saying`); off, only the owner's yes, their face seen saying
+  it or their voice at `same_voice::SERVICES_SAME_FROM` (0.55) or over to
+  their print, anyone else cancelled with `OTHER_VOICE`. On
   top, a run's send needs a plain yes (`services::plain_yes`: "yes", "send
   it", "ừ, gửi đi", at most six words and nothing else), so nothing the run
   wrote can steer the model into a send; on anything else it is cancelled
