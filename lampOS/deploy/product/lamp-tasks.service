@@ -29,6 +29,8 @@ Environment=LAMP_HARNESS_HOLD_UPDATES=on
 # docs/tasks.md); lamp-update installs it in a quiet window, on by default on a product lamp. It needs
 # --engines-from-machines above: that look is how the lamp's own machine is seen to have Hermes.
 Environment=LAMP_HERMES_ON_LAMP=on
+# --reply-named (#5535) types the work into the session the person names (lamp-voice.service's LAMP_TASKS_REPLY_NAMED),
+# never a new one.
 # A follow-up for a session --close-told already closed (#5978): it is found by its last ask with `harness show`
 # and reopened with `harness resume`, then the work is typed in, never a new session.
 Environment=LAMP_TASKS_RESUME_CLOSED=on
@@ -48,7 +50,7 @@ StateDirectoryMode=0700
 # #5198, docs/tasks.md). The socket is lampos's, so any unit run as lampos can connect to it; lamp-tasks
 # reads each caller from the kernel (SO_PEERCRED and its cgroup) and closes any that is not
 # lamp-cloud.service run as lampos (#5379).
-ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --engines-from-machines --folder-missing --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
+ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --reply-named --harness-as-person --set-up-later --targets-from-machines claude --engines-from-machines --folder-missing --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
