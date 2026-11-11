@@ -2532,7 +2532,10 @@ mod tests {
             use_skill: true,
             ..Default::default()
         };
-        let section = crate::use_skill::section(&crate::tools::skill_tools(&settings));
+        let section = crate::use_skill::section(
+            &crate::tools::skill_tools(&settings),
+            &crate::tools::core_skills(&settings),
+        );
         assert!(
             section.contains("- dance: When asked to dance."),
             "{section}"

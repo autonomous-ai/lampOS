@@ -9038,7 +9038,11 @@ fn calls(
 /// not of each tool, which the voice's function declarations refuse.
 /// `core` names the tools of core skills ([`SkillKind::Core`]), when any:
 /// at a session's bound of functions the voice never cuts one of them, and
-/// cuts others first (the owner's rule, on #2614).
+/// cuts others first (the owner's rule, on #2614). A core skill's `[stop]`
+/// function is named too (the wellbeing skills' `wellbeing_nudges`, shared
+/// with an installable skill or not), and `stay_plugged_in` with a core
+/// unplug skill, so `use_skill`'s lines keep every core skill's function
+/// whole past their bound (`lamp_voice::use_skill::section`).
 /// `searches` gives, by tool, a search's note and walk, when any says them
 /// (`[search]`'s `note`, `walk` and `looked`, and its choice's `default`):
 /// the second voice route's note and walk read them (docs/second-voice.md).
@@ -9163,6 +9167,18 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
                     }),
                 );
             }
+            // A core skill's: one of an enabled core skill sharing it (Meal
+            // check, installable, shares the core wellbeing skills').
+            if skills.iter().any(|other| {
+                other.enabled
+                    && other.kind == SkillKind::Core
+                    && other
+                        .stop
+                        .as_ref()
+                        .is_some_and(|theirs| theirs.tool == stop.tool)
+            }) {
+                core.push(&stop.tool);
+            }
             tools.push(json!({
                 "name": stop.tool,
                 "description": stop.about,
@@ -9178,6 +9194,12 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
     {
         tools.push(unplug::stay_tool());
         moving.push(unplug::STAY_TOOL);
+        if skills
+            .iter()
+            .any(|skill| skill.prepares_unplug() && skill.kind == SkillKind::Core)
+        {
+            core.push(unplug::STAY_TOOL);
+        }
     }
     // In the tools' names' order, whatever order the skills came in: the
     // product's install and the program's load gave one file two orders

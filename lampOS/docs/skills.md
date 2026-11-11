@@ -734,7 +734,10 @@ the voice's own and the actions part's: a product lamp's are 31
 (`crates/update/tests/functions.rs`). Past 32 a core skill's function is
 never the one cut (the owner's rule, on #2614): the tools file names core
 skills' tools in `core` beside `tools` (`lamp_skills::tools_file`, each
-list in the tools' names' order whatever order the skills load in), and
+list in the tools' names' order whatever order the skills load in; a core
+skill's `[stop]` function, `wellbeing_nudges`, and `stay_plugged_in` with
+the unplug skill are named there too, which `use_skill`'s lines keep whole
+first, [tools.md](tools.md)), and
 the voice cuts the other skills' functions, the last first, after the
 second route's fetch and time elsewhere and `reports_state` (with
 `LAMP_REPORTS=on`) and before its weather and its search (`tools::uncut`,
@@ -3671,9 +3674,10 @@ model's own guess. Its description and its choice's `about` are kept short:
 `use_skill`'s section of every skill's line is bounded at 4,096 bytes
 (`use_skill::SECTION_MOST_BYTES`), and with the FAQ's line a product lamp's
 is about 2,299 while #5804 keeps the three light skills installed off (2,234
-before the `about` asks' 65 bytes); with them on again about 4,029, so one
-more skill's line there would cut
-`wellbeing_nudges` to its name alone (held by the test below).
+before the `about` asks' 65 bytes); with them on again about 4,029. Past
+the bound a core skill's line is kept whole first and the other skills'
+are shortened ([tools.md](tools.md), "Many skills"), so a Store skill's
+line no longer cuts `wellbeing_nudges` or `set_pose` to its name alone.
 
 - **One file of facts.** `skills/faq/knowledge.md`, written from these
   docs and the owner's guide (`onboarding-guide.html`, for the app's own
