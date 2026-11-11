@@ -100,10 +100,11 @@ impl Camera {
             ("v4l2", "/dev/video0")
         };
         let device = std::env::var("LAMP_SIM_CAMERA").unwrap_or_else(|_| default.to_owned());
+        let (format, device, rate) = input_of(format, &device);
         // ffmpeg under a shell that watches lamp-sim: when lamp-sim goes (even
         // killed), the camera closes with it. Its frames, JPEG after JPEG, go to
         // the standard output.
-        let script = "ffmpeg -loglevel error -nostdin -f \"$FORMAT\" -framerate 15 -i \"$DEVICE\" \
+        let script = "ffmpeg -loglevel error -nostdin -f \"$FORMAT\" $RATE -i \"$DEVICE\" \
              -vf fps=6,scale=320:-1 -q:v 5 -f mjpeg - & F=$!; \
              while kill -0 \"$OWNER\" 2>/dev/null && kill -0 $F 2>/dev/null; do sleep 1; done; \
              kill $F 2>/dev/null; rm -f \"$SIGHT\"";
@@ -111,6 +112,7 @@ impl Camera {
             .args(["-c", script])
             .env("FORMAT", format)
             .env("DEVICE", &device)
+            .env("RATE", rate)
             .env("SIGHT", &self.sight)
             .env("OWNER", std::process::id().to_string())
             .process_group(0)
@@ -222,6 +224,19 @@ pub fn frame(bytes: &[u8]) -> Option<(usize, usize)> {
     Some((start, end))
 }
 
+/// The input `ffmpeg` is given for `LAMP_SIM_CAMERA`: the host's camera (`format`, the
+/// device, 15 frames a second asked of it), or, when the value starts with `lavfi:`, a
+/// picture ffmpeg makes itself (`lavfi:testsrc2=size=320x180:rate=15`, a test pattern in
+/// place of the camera: the room's picture of a test, or of a machine with no webcam;
+/// its own rate, no host device opened). A lavfi source can read local files (`movie=...`):
+/// fine, because only the developer's own environment sets `LAMP_SIM_CAMERA`, never a request.
+fn input_of<'a>(format: &'a str, device: &'a str) -> (&'a str, String, &'static str) {
+    match device.strip_prefix("lavfi:") {
+        Some(source) => ("lavfi", source.to_owned(), ""),
+        None => (format, device.to_owned(), "-framerate 15"),
+    }
+}
+
 /// `jpeg` as the camera would see it at the head's pose now, as a JPEG.
 fn warped(jpeg: &[u8], model: &Model, warp: &Warp) -> Option<Vec<u8>> {
     use zune_jpeg::{
@@ -257,5 +272,21 @@ mod tests {
         assert_eq!(frame(&bytes), Some((2, 9)));
         assert_eq!(frame(&bytes[9..]), None);
         assert_eq!(frame(&[0xff, 0xd8, 1, 2]), None);
+    }
+
+    #[test]
+    fn a_lavfi_value_is_a_test_pattern_and_anything_else_is_the_hosts_camera() {
+        assert_eq!(
+            input_of("v4l2", "lavfi:testsrc2=size=320x180:rate=15"),
+            ("lavfi", "testsrc2=size=320x180:rate=15".to_owned(), "")
+        );
+        assert_eq!(
+            input_of("v4l2", "/dev/video2"),
+            ("v4l2", "/dev/video2".to_owned(), "-framerate 15")
+        );
+        assert_eq!(
+            input_of("avfoundation", "0"),
+            ("avfoundation", "0".to_owned(), "-framerate 15")
+        );
     }
 }

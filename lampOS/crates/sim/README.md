@@ -49,7 +49,7 @@ starts, and, if the body still ends at start, prints its reason (the last line o
 
 Camera and microphone are off unless asked for. `LAMP_SIM_CAMERA` and
 `LAMP_SIM_MIC` name a device other than the default (`/dev/video0` or camera
-`0`; `default` PulseAudio source or `:0` on macOS). A paired program sees the
+`0`; `default` PulseAudio source or `:0` on macOS). `LAMP_SIM_CAMERA=lavfi:SOURCE` gives a picture ffmpeg makes itself (a test pattern, e.g. `lavfi:testsrc2=size=320x180:rate=15`) in place of the camera: a machine with no webcam, or a test that must see the same picture every time (a lavfi source can read local files, so `LAMP_SIM_CAMERA` is the developer's own setting, never taken from a request). A paired program sees the
 pictures and sound only as on a real lamp: never while the lamp is private,
 never with more than one person in view, only while the ring shows the mark.
 
