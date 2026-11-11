@@ -1827,6 +1827,31 @@ pub fn skill_write_approve(
     }
 }
 
+/// Whether a made skill's writes, as `asks` has them, are approved for the
+/// package said back, asked of `lamp-services` (`skill_writes_approved`,
+/// the voice's own call, never offered to its model) to read a waiting
+/// skill back: `Some((on, approved))`, `on` when that package is the one
+/// installed. `None` when it can't be told. Blocking; it approves nothing.
+pub fn skill_writes_approved(
+    folder: &Path,
+    asks: &crate::skill_write_yes::Asks,
+) -> Option<(bool, bool)> {
+    let told = crate::tools::exchange(
+        &folder.join(crate::tools::CALL_SOCKET),
+        &json!({"op": "call", "name": lamp_services::skill_writes::APPROVED,
+                "args": {"skill": asks.skill, "writes": asks.writes, "sha256": asks.sha256}}),
+        LINKED_DEADLINE,
+    )?;
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    let result = told.get("result")?;
+    Some((
+        result.get("on")?.as_bool()?,
+        result.get("approved")?.as_bool()?,
+    ))
+}
+
 /// The owner's sent-log of made skills' writes (#6066), the voice's own
 /// call: `skill_writes_sent`'s list, each `{"skill", "service", "at",
 /// "to"}`, `to` a recipient's local part or a place, never a text. `None`

@@ -4503,17 +4503,67 @@ fn kept(directory: &Path, from: &str) -> Option<Made> {
     index(directory)
         .into_iter()
         .find(|entry| entry["from"] == from)
-        .and_then(|entry| {
-            let package = directory.join(entry["package"].as_str()?);
-            package.is_file().then(|| Made {
-                name: entry["name"].as_str().unwrap_or_default().to_owned(),
-                version: entry["version"].as_str().unwrap_or_default().to_owned(),
-                sha256: entry["sha256"].as_str().unwrap_or_default().to_owned(),
-                description: entry["description"].as_str().unwrap_or_default().to_owned(),
-                uses: Uses::of_json(&entry["uses"]),
-                package,
-            })
-        })
+        .and_then(|entry| made_of(directory, &entry))
+}
+
+/// An index entry as the [`Made`] it keeps, its package still there.
+fn made_of(directory: &Path, entry: &Value) -> Option<Made> {
+    let package = directory.join(entry["package"].as_str()?);
+    package.is_file().then(|| Made {
+        name: entry["name"].as_str().unwrap_or_default().to_owned(),
+        version: entry["version"].as_str().unwrap_or_default().to_owned(),
+        sha256: entry["sha256"].as_str().unwrap_or_default().to_owned(),
+        description: entry["description"].as_str().unwrap_or_default().to_owned(),
+        uses: Uses::of_json(&entry["uses"]),
+        package,
+    })
+}
+
+/// The kept skill on the lamp whose name is `asked` ([`name_asked`]), to
+/// read it back (`make_skill_local::read_back`); none when no skill kept
+/// here and put on has that name.
+pub fn kept_on_named(directory: &Path, asked: &str) -> Option<Made> {
+    let asked = name_asked(asked);
+    index(directory)
+        .into_iter()
+        .filter(|entry| entry["on"] == true)
+        .find(|entry| entry["name"].as_str() == Some(asked.as_str()))
+        .and_then(|entry| made_of(directory, &entry))
+}
+
+/// The names of the kept skills on the lamp.
+pub fn kept_on_names(directory: &Path) -> Vec<String> {
+    index(directory)
+        .iter()
+        .filter(|entry| entry["on"] == true)
+        .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// A skill's name as the person or the model gives it, as a kept skill's
+/// name is written: lower case, each run of anything but a letter or a
+/// digit one dash, no "my" before it or "skill" after it ("my Leaving
+/// mail skill" is `leaving-mail`).
+pub fn name_asked(asked: &str) -> String {
+    let words: Vec<String> = asked
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let mut words = words.as_slice();
+    if let [first, rest @ ..] = words
+        && first == "my"
+        && !rest.is_empty()
+    {
+        words = rest;
+    }
+    if let [rest @ .., last] = words
+        && last == "skill"
+        && !rest.is_empty()
+    {
+        words = rest;
+    }
+    words.join("-")
 }
 
 /// Keep `made` in the index, as made from `from`, and let the oldest
@@ -4734,6 +4784,24 @@ pub fn on_line(made: &Made) -> String {
         None => format!("I made {name}, and it's on: {does}{using}."),
     }
 }
+
+/// What the lamp says when a made skill that sends or writes, already
+/// approved for what it sends, is read back by voice
+/// (`make_skill_local::read_back`): its say-back as [`on_line`] has it,
+/// not ending on [`WAITS_FOR_YES`], then [`APPROVED_ALREADY`]. Nothing is
+/// asked.
+pub fn approved_line(made: &Made) -> String {
+    let line = on_line(made);
+    let line = line
+        .strip_suffix(WAITS_FOR_YES.trim_start())
+        .unwrap_or(&line)
+        .trim_end();
+    let line = line.strip_prefix("I made ").unwrap_or(line);
+    format!("Your {line} {APPROVED_ALREADY}")
+}
+
+/// How [`approved_line`] ends.
+pub const APPROVED_ALREADY: &str = "You agreed to it, so it sends as it says.";
 
 /// What the lamp says of a made skill that sends or writes when the turn
 /// it was made in was cut (App Only's P2 on #6142): said through the say
