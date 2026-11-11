@@ -1927,10 +1927,12 @@ approved, as a send holds it. It approves nothing (a changed package's
 approvals are dropped, as at a send); `lamp-skills` is refused it
 (`SKILL_READS_AND_WRITES_ONLY`), and with the switch off it is refused. Test
 `whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`. The
-voice asks it only for a read-back said whole: in the private room or to
-the owner seen saying the line (`services::owner_hears`, the gate a read
-in full is held to); to anyone else the skill's name and that it sends,
-nothing asked ([skills.md](skills.md), "Read back, and agreed to then").
+voice asks it only for a read-back said whole: in the private room, or,
+outside it, to the owner seen saying the line, the one face in view and in
+their voice at 0.55 or more on the judge route (`services::owner_hears`,
+through `services::said_whole`, the one rule a read in full is held to too);
+to anyone else the skill's name and that it sends, nothing asked
+([skills.md](skills.md), "Read back, and agreed to then").
 
 **The voice's side** ([skills.md](skills.md), "Made by voice", for the
 whole):
@@ -1978,8 +1980,10 @@ whole):
   and the app has no yes. So the voice never sends anyone to the app for
   it: a yes refused is told to ask the lamp what the skill sends ("what
   does my … skill send?") to hear it again and say yes then
-  (`skill_write_yes::NOT_APPROVED`, `NOT_HERE`; Thirteen's HOLD on
-  #6223). The app's list shows a made skill's `uses.sends_to` ("sends to …")
+  (`skill_write_yes::NOT_APPROVED`; Thirteen's HOLD on #6223), and one on
+  the Live route, which takes no yes, that nothing was sent and the yes is
+  taken on the lamp's other voice, in a normal conversation with it, not
+  this live one (`NOT_HERE`; App Only's P3 on #6250). The app's list shows a made skill's `uses.sends_to` ("sends to …")
   only once the app does (its text lives in the app).
 - A contact named without an address: the lamp keeps no contact book, so
   the making model asks for the address.

@@ -514,14 +514,20 @@ sau:
      so it sends as it says." (`made_skill::approved_line`), và không hỏi
      hay chờ gì. Một kỹ năng không gửi gì thì được nói vậy ("… doesn't send
      or write anything"); không có kỹ năng nào tên đó trên đèn thì được nói
-     vậy, kèm tên các kỹ năng đang bật. Một package khác với package đã
+     vậy, kèm tên các kỹ năng đang bật chỉ với một dòng mà chủ đèn được
+     nghe (bên dưới); với người khác là `"on": []` và chỉ nói không có kỹ
+     năng nào tên đó, vì tên một kỹ năng tự tạo có thể mang tên một người
+     (P3 của Thirteen trên #6250). Một package khác với package đã
      tạo đang được cài thì được nói là kỹ năng đã đổi từ khi được tạo, hãy
      hỏi lại sau ít phút (`make_skill_local::changed_since_made`).
-     **Ai được nghe** (P2 của App Only trên #6230): một kỹ năng gửi hay ghi
-     chỉ được đọc lại đầy đủ, người nhận và lời, trong phòng riêng hoặc cho
-     chủ đèn được thấy đang nói dòng đó (`services::owner_hears`, đúng chốt
-     chặn của một lần đọc đầy đủ của services:
-     `services::owner_seen_saying`). Với người khác chỉ có tên và việc nó
+     **Ai được nghe** (P2 của App Only trên #6230 và #6250): một kỹ năng gửi
+     hay ghi chỉ được đọc lại đầy đủ, người nhận và lời, trong phòng riêng
+     hoặc, ngoài phòng riêng, cho chủ đèn được thấy đang nói dòng đó, là
+     khuôn mặt duy nhất trong tầm nhìn và đúng giọng của họ từ 0.55 trở lên
+     trên route có bộ phán giọng (`services::owner_hears`, qua
+     `services::said_whole`, đúng quy tắc của một lần đọc đầy đủ của
+     services). Một vị khách im lặng trong tầm nhìn, một giọng dưới ngưỡng,
+     hay route Live, nơi không có bộ phán giọng, đều không đủ. Với người khác chỉ có tên và việc nó
      gửi ("leaving mail sends something on its own; only its owner can
      hear what.", `make_skill_local::sends_unsaid`): không hỏi
      `lamp-services` gì và không bắt đầu chờ. **Ở đâu** (P3 của App Only):
@@ -532,17 +538,21 @@ sau:
      của một lần tạo đang treo được giữ nguyên.
      **Không có lời đồng ý trong ứng dụng** (HOLD của Thirteen trên #6223):
      ứng dụng không có (`lamp-cloud` không có kind cho
-     `skill_write_approve`), nên một lời đồng ý bị từ chối (`NOT_APPROVED`,
-     `NOT_HERE`) được bảo nói rằng họ có thể hỏi đèn kỹ năng đó gửi gì
-     ("what does my … skill send?") để nghe lại và đồng ý khi đó, không bao
-     giờ bảo vào ứng dụng. Kiểm thử:
+     `skill_write_approve`), nên một lời đồng ý bị từ chối (`NOT_APPROVED`)
+     được bảo nói rằng họ có thể hỏi đèn kỹ năng đó gửi gì ("what does my …
+     skill send?") để nghe lại và đồng ý khi đó, không bao giờ bảo vào ứng
+     dụng. Một lời đồng ý trên route Live (`NOT_HERE`; P3 của App Only trên
+     #6250) được bảo nói rằng chưa gửi gì và đèn chỉ nhận lời đồng ý đó ở
+     giọng kia của mình, trong một cuộc trò chuyện bình thường với đèn,
+     không phải cuộc live này. Kiểm thử:
      `a_waiting_write_skill_read_back_is_said_whole_and_a_later_yes_approves`,
      `a_cut_or_echoed_read_back_approves_nothing`,
      `a_read_back_declined_or_unanswered_stays_unapproved`,
      `an_approved_write_skill_read_back_is_said_and_asks_nothing`,
      `a_read_back_of_no_write_skill_or_none_says_so_plainly`,
      `the_read_back_is_offered_with_writes_alone_within_the_bounds`,
-     `a_read_back_is_said_whole_only_in_the_private_room_or_to_the_owner_seen`,
+     `a_read_back_is_said_whole_only_in_the_private_room_or_to_the_owner_alone_and_heard`,
+     `services::tests::said_whole_is_a_read_in_full_and_always_in_the_private_room`,
      `a_read_back_on_a_route_with_no_yes_starts_no_wait`,
      `skill_write_yes::tests::no_line_sends_the_person_to_the_app_for_a_yes`,
      và của `lamp-services`
