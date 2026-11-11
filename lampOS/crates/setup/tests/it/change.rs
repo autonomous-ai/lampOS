@@ -174,6 +174,101 @@ fn the_owners_place_is_kept_rounded_beside_the_name_and_null_clears_it() {
     assert!(!place.exists());
 }
 
+/// The owner's local agent switch (`control.set_agent`): on writes lamp-control's
+/// second drop-in with FIXED text (the user is a constant, no request names
+/// one), only while developer access is on; off removes it; only a change asks
+/// for lamp-control's restart.
+#[test]
+fn the_local_agent_switch_writes_a_fixed_drop_in_only_while_developer_access_is_on() {
+    let root = Root::new();
+    let config = root.config();
+    let agent = &config.agent_dropin;
+    // On with developer access off: refused in words, nothing written.
+    let (reply, done) = answer(r#"{"local_agent": true}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"refused": "turn developer access on first: the local agent's socket is the developer door's"})
+    );
+    assert!(done.is_none() && !agent.exists());
+    // Off with nothing there: no error, nothing to restart.
+    let (reply, done) = answer(r#"{"local_agent": false}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": false}}));
+    let done = done.unwrap();
+    assert!(!done.restart_control);
+    assert_eq!(done.said, "the local agent is off already");
+    // Developer access on, then the agent.
+    answer(r#"{"control": true}"#, &config, true);
+    let (reply, done) = answer(r#"{"local_agent": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    let done = done.unwrap();
+    assert!(done.restart_control);
+    assert_eq!(done.said, "the local agent is on");
+    let text = fs::read_to_string(agent).unwrap();
+    assert_eq!(text, lamp_msgs::local_agent::DROPIN_TEXT);
+    // Fixed: the user, the group and the folder are the constants, nothing else.
+    assert_eq!(
+        text,
+        "[Service]\nEnvironment=LAMP_CONTROL_LOCAL_AGENT=lampagent\nSupplementaryGroups=lamp-agents\nReadWritePaths=/run/lampos-agent\n"
+    );
+    assert_eq!(mode(agent), 0o644);
+    assert_eq!(fs::read_dir(agent.parent().unwrap()).unwrap().count(), 2);
+    // On again: nothing changed, nothing to restart. A drop-in that says
+    // something else is written over.
+    let (_, done) = answer(r#"{"local_agent": true}"#, &config, true);
+    assert!(!done.unwrap().restart_control);
+    fs::write(
+        agent,
+        "[Service]\nEnvironment=LAMP_CONTROL_LOCAL_AGENT=root\n",
+    )
+    .unwrap();
+    let (_, done) = answer(r#"{"local_agent": true}"#, &config, true);
+    assert!(done.unwrap().restart_control);
+    assert_eq!(
+        fs::read_to_string(agent).unwrap(),
+        lamp_msgs::local_agent::DROPIN_TEXT
+    );
+    // A user named in the request is no change this lamp makes.
+    for line in [
+        r#"{"local_agent": "lampagent"}"#,
+        r#"{"local_agent": {"user": "root"}}"#,
+        r#"{"local_agent": true, "user": "root"}"#,
+    ] {
+        let (reply, done) = answer(line, &config, true);
+        assert!(reply.get("refused").is_some(), "{line}: {reply}");
+        assert!(done.is_none());
+    }
+    // Off: removed, lamp-control restarted to close the socket; the developer
+    // drop-in stays (the agent's switch is its own).
+    let (reply, done) = answer(r#"{"local_agent": false}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": false}}));
+    assert!(done.unwrap().restart_control);
+    assert!(!agent.exists() && config.control_dropin.exists());
+    // Off, refused as every change is.
+    let (reply, _) = answer(r#"{"local_agent": true}"#, &config, false);
+    assert_eq!(reply, json!({"refused": "changes after setup are off"}));
+    // The product's path.
+    let own: Config =
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        own.agent_dropin,
+        std::path::Path::new("/etc/systemd/system/lamp-control.service.d/agent.conf")
+    );
+    // The reset forgets the switch, as it forgets the developer setting.
+    for plan in [
+        include_str!("../../fixtures/reset-plan-product.json"),
+        include_str!("../../fixtures/reset-plan-example.json"),
+    ] {
+        let plan: Value = serde_json::from_str(plan).unwrap();
+        assert!(
+            plan["wipe"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|path| path == "/etc/systemd/system/lamp-control.service.d/agent.conf")
+        );
+    }
+}
+
 /// The owner's developer setting (`control.set`): on writes lamp-control's
 /// drop-in, folder and all, 0644; off removes it; only a change asks for
 /// lamp-control's restart, and an off with none there is no error.

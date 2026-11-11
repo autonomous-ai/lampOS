@@ -271,7 +271,7 @@ impl change::Systemd for Units<'_> {
     fn systemctl(&mut self, args: &[&str]) -> Result<(), String> {
         let held = self.records.lock().is_err();
         self.calls.push((args.join(" "), held));
-        if self.stop_fails && args[0] == "stop" {
+        if self.stop_fails && (args[0] == "stop" || args[0] == "restart") {
             return Err("exit status: 1".into());
         }
         Ok(())
@@ -426,6 +426,118 @@ fn off_while_an_update_holds_the_lock_refuses_and_keeps_the_drop_in() {
         change::CONTROL_DROPIN_TEXT
     );
     drop(update);
+    let _ = fs::remove_dir_all(folder);
+}
+
+/// The local agent off: closed before the answer too, as developer access
+/// is. The lock first, then the agent's drop-in removed, reload and a
+/// restart (the developer door stays, so the unit runs on) under it, and
+/// only then the reply; a restart that fails is said, never claimed closed;
+/// an update holding the lock refuses it and keeps the drop-in; with
+/// developer access off as well the unit is stopped. Developer access off
+/// takes the agent's drop-in with it.
+#[test]
+fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
+    let root = Root::new();
+    let config = root.config();
+    let (folder, records) = records_folder("agent-off");
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let off = r#"{"local_agent": false}"#;
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    // None there: not this path. On is not this path.
+    assert!(
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).is_none()
+    );
+    answer(r#"{"control": true}"#, &config, true);
+    answer(r#"{"local_agent": true}"#, &config, true);
+    assert!(config.agent_dropin.exists());
+    assert!(
+        change::close_before_answer(
+            r#"{"local_agent": true}"#,
+            &config,
+            true,
+            &records,
+            &mut ears,
+            &mut units
+        )
+        .is_none()
+    );
+    // Held by an update: refused, kept, systemd not asked.
+    let update = records.lock().unwrap();
+    let (reply, done) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    assert_eq!(reply, json!({"refused": change::CLOSE_INSTALLING}));
+    assert!(done.is_none() && units.calls.is_empty());
+    assert!(config.agent_dropin.exists());
+    drop(update);
+    // Taken: the file gone, reload and restart under the lock, then the reply.
+    let (reply, done) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    assert_eq!(
+        units.calls,
+        vec![
+            ("daemon-reload".to_owned(), true),
+            ("restart lamp-control.service".to_owned(), true)
+        ]
+    );
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    let done = done.unwrap();
+    assert!(!done.restart_control && !done.restart_schedule);
+    assert!(!config.agent_dropin.exists());
+    assert!(config.control_dropin.exists(), "the developer door stays");
+    drop(records.lock().unwrap());
+    // A restart that fails is not claimed closed.
+    answer(r#"{"local_agent": true}"#, &config, true);
+    let mut failing = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: true,
+    };
+    let (reply, _) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut failing).unwrap();
+    assert_eq!(
+        reply["done"]["closed"],
+        json!(false),
+        "a failed restart is said"
+    );
+    assert!(!config.agent_dropin.exists());
+    // Developer access off takes the agent's drop-in with it, and stops.
+    answer(r#"{"local_agent": true}"#, &config, true);
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    let (reply, _) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut units,
+    )
+    .unwrap();
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    assert!(!config.control_dropin.exists() && !config.agent_dropin.exists());
+    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    // A leftover agent drop-in with developer access off: off stops, never restarts.
+    fs::write(&config.agent_dropin, "x").unwrap();
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    drop(records.lock().ok());
+    change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    assert!(!config.agent_dropin.exists());
     let _ = fs::remove_dir_all(folder);
 }
 
