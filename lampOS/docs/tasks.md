@@ -1617,12 +1617,12 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     own namespace.
 - **The lamp itself, with OpenClaw** (`LAMP_OPENCLAW_ON_LAMP=on`, only
   with `--engines-from-machines`; off unless set, #6226). OpenClaw is the
-  lamp's default engine: it takes Hermes's place as the lamp's own target
+  lamp's default engine (once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226)): it takes Hermes's place as the lamp's own target
   in exactly Hermes's role (above), and Hermes stays selectable. The
   lamp-tasks side is another coder's part of #6226; the voice's side is
   described here.
   - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
-    `openclaw`. The lamp's target is still `lamp`, with that engine; when
+    `openclaw`, the default once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226). The lamp's target is still `lamp`, with that engine; when
     the one chosen is not installed but the other is, the other.
   - **Started** as Harness starts OpenClaw:
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
@@ -1632,7 +1632,8 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
     say "OpenClaw here on the lamp"; with `hermes` there, "Hermes" as
-    before. Until the targets are read it says OpenClaw, the default.
+    before. Until the targets are read it says OpenClaw, the default
+    (once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226)).
     `who` "OpenClaw" or "Hermes", while the lamp has its target, is the
     lamp's own, never a computer's. OpenClaw is also one of the agents the
     voice can name on a computer, heard as "OpenClaw", "open claw", "open
