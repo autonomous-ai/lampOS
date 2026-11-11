@@ -575,6 +575,28 @@ pub struct HermesRunner {
     pub folder: PathBuf,
     pub env: Vec<(String, String)>,
     pub tick: Duration,
+    /// The wrapper that must carry [`WRAPPER_NET_LINES`] before a run
+    /// starts: the lamp's [`HERMES`]. `None` only in tests with no wrapper.
+    pub held_by: Option<PathBuf>,
+}
+
+/// The lines lamp-update's wrapper carries with its own `LAMP_SKILL_TASKS`
+/// on (`lamp_update::hermes_install::WRAPPER_TASKS_EDITS`): only with them
+/// does [`NET_ENV`] give the run a network namespace of its own. A wrapper
+/// without them (lamp-update's switch off, or its round not yet run) would
+/// start the run on the lamp's network, so no run starts (Heron's P2 on
+/// #6443).
+pub const WRAPPER_NET_LINES: [&str; 2] = [
+    "if [ \"${LAMP_NS_NET-}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n",
+    "exec /usr/bin/unshare --map-root-user $N --mount ",
+];
+
+/// Said when the wrapper lacks [`WRAPPER_NET_LINES`]: nothing is started.
+pub const NOT_HELD_OFF: &str = "the lamp's Hermes can't be held off the network yet (its wrapper has no skill-task network line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
+
+/// Whether `wrapper` (a wrapper's text) carries [`WRAPPER_NET_LINES`].
+pub fn holds_off_network(wrapper: &str) -> bool {
+    WRAPPER_NET_LINES.iter().all(|line| wrapper.contains(line))
 }
 
 impl HermesRunner {
@@ -599,6 +621,7 @@ impl HermesRunner {
                 (NET_ENV.into(), NET_RUN.into()),
             ],
             tick: RUN_TICK,
+            held_by: Some(PathBuf::from(HERMES)),
         }
     }
 }
@@ -608,6 +631,13 @@ impl Runner for HermesRunner {
         use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
         use std::os::unix::process::CommandExt;
         use std::process::{Command, Stdio};
+        // No network namespace, no run (Heron's P2 on #6443): the wrapper
+        // must carry the lines that act on NET_ENV.
+        if let Some(wrapper) = &self.held_by
+            && !std::fs::read_to_string(wrapper).is_ok_and(|text| holds_off_network(&text))
+        {
+            return Err(NOT_HELD_OFF.into());
+        }
         // Hermes's namespace refuses a folder it doesn't show: said here,
         // before anything is started.
         if !self.folder.is_dir() {
@@ -1560,6 +1590,52 @@ mod tests {
             folder: folder.into(),
             env: vec![("PATH".into(), RUN_PATH.into())],
             tick: Duration::from_millis(10),
+            held_by: None,
+        }
+    }
+
+    /// Heron's P2 on #6443: a wrapper without the network lines (an old
+    /// one, or lamp-update's switch off) starts no run, said in words; one
+    /// with them does. The lines are lamp-update's own, held to its source.
+    #[test]
+    fn a_wrapper_without_the_network_lines_starts_no_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let ran = dir.path().join("ran");
+        let wrapper = dir.path().join("hermes");
+        let mut runner = shell(&format!("touch {}", ran.display()), dir.path());
+        runner.held_by = Some(wrapper.clone());
+        let old = "#!/bin/sh\nunset T\nexec /usr/bin/unshare --map-root-user --mount --pid hermes-ns \"$@\"\n";
+        for text in [None, Some(old.to_owned())] {
+            if let Some(text) = &text {
+                std::fs::write(&wrapper, text).unwrap();
+            }
+            let why = runner
+                .run(&skill_run("tok", Duration::from_secs(5)))
+                .unwrap_err();
+            assert_eq!(why, NOT_HELD_OFF);
+            assert!(!ran.exists(), "nothing started");
+        }
+        std::fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\nunset T\n{}{}--pid hermes-ns \"$@\"\n",
+                WRAPPER_NET_LINES[0], WRAPPER_NET_LINES[1]
+            ),
+        )
+        .unwrap();
+        assert_eq!(runner.run(&skill_run("tok", Duration::from_secs(5))), Ok(0));
+        assert!(ran.exists());
+        assert_eq!(
+            HermesRunner::lamp(dir.path()).held_by.as_deref(),
+            Some(Path::new(HERMES))
+        );
+        let source = include_str!("../../update/src/hermes_install.rs").replace("\\\"", "\"");
+        for line in WRAPPER_NET_LINES {
+            let line = line.replace('\n', "\\n");
+            assert!(
+                source.contains(&line),
+                "lamp-update's wrapper edit has {line:?}"
+            );
         }
     }
 

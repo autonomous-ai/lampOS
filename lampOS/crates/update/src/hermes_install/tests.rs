@@ -929,7 +929,9 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
                 if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
                 case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; readlink) echo \"$RESOLV\";; \
-                unshare) case \"$*\" in *net-relay*) echo ready;; *) echo \"HOME=$HOME\";; esac;; esac\n";
+                unshare) case \"$*\" in *net-relay*) echo ready;; *) echo \"HOME=$HOME\";; esac;; \
+                ip) if [ \"$*\" = \"-o link show\" ]; then echo \"1: lo: <LOOPBACK,UP> mtu 65536\"; \
+                [ ! -f \"$LOG.link\" ] || echo \"2: $(cat \"$LOG.link\"): <BROADCAST> mtu 1500\"; fi;; esac\n";
     for name in [
         "mount", "findmnt", "mkdir", "rmdir", "rm", "touch", "readlink", "unshare", "ip",
     ] {
@@ -1213,6 +1215,15 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         );
     }
     if netted {
+        // Fail closed: a link besides `lo` in the run's namespace (the
+        // network not held off), and Hermes never runs.
+        let more = format!("{}.link", log.display());
+        fs::write(&more, "eth0").unwrap();
+        let (out, lines) = run("");
+        fs::remove_file(&more).unwrap();
+        assert!(!out.status.success(), "{lines:#?}");
+        assert!(String::from_utf8_lossy(&out.stderr).contains("a link besides lo"));
+        assert!(!lines.iter().any(|line| line.ends_with(" chat -q a b")));
         // Fail closed: no `ip` to bring `lo` up, or no bridge socket (the
         // switch off in lamp-tasks), and Hermes never runs.
         let ip = stubs.join("ip");
