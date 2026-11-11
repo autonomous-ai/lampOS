@@ -2240,7 +2240,8 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   đang bật hay tắt, nên bản ghi giữ lúc còn bật không bị bỏ lại; không hoàn
   tác gì ở dịch vụ. Quên về một việc xóa bản ghi và liên hệ thư dưới cùng
   id chủ đã dùng khi lưu (`services::owner_of`; trong phòng riêng là id chủ
-  đầu tiên, không phải id của người nói).
+  đầu tiên, không phải id của người nói). Quên tất cả cũng xóa mọi bản ghi
+  và liên hệ của id chủ đó khi nó không phải id của người nói.
   Mỗi lần quên, các thay đổi còn chờ đều bị bỏ: của người đó (hoặc khớp với
   việc đó) rời hàng đợi trước khi lệnh quên được gửi, nên luồng ghi đang chờ
   thử lại không bao giờ ghi chúng sau lần quên, và bản sao trong voice bị xóa
