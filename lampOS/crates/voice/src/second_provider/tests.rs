@@ -18468,14 +18468,14 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
 
 /// A waiting read-back's own words returned by the room never send it (App
 /// Only's and Thirteen's P1s on #6009). The read-back ends by asking, "Shall
-/// I send it?", so a line begun after it is an answer to the lamp's question
-/// and reaches the model whole: the person's "Yes, send it.", or the lamp's
-/// own "Shall I send it?" or "Send it." heard back. Begun in the tail with
-/// the lamp's words ("send it" is in both), it is marked (Thirteen's option
-/// 1), and the model's send on it goes only in the asker's voice: the
-/// lamp's own, or no print twice, never sends. A "Yes." or a line past the
-/// tail, with none of the lamp's words, is anyone's agreement, as the owner
-/// settled.
+/// I send it?", so a line with a word of the person's begun after it is an
+/// answer to the lamp's question and reaches the model whole: "Yes, send
+/// it.", "Um, yes, send it.". (Nothing but the lamp's own words there is
+/// held: [`a_read_backs_own_words_in_its_tail_are_held_and_never_sent`].)
+/// Begun in the tail with the lamp's words ("send it" is in both), it is
+/// marked (Thirteen's option 1), and the model's send on it goes only in the
+/// asker's voice: the lamp's own, or no print twice, never sends. A "Yes."
+/// or a line past the tail is anyone's agreement, as the owner settled.
 #[tokio::test(start_paused = true)]
 async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
     const READ_BACK: &str = "Send an email to Bob saying hi. Shall I send it?";
@@ -18485,8 +18485,6 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
         ("Okay, yes, send it.", false, true),
         ("Um, yes, send it.", false, true),
         ("Yes, send it.", false, true),
-        ("Shall I send it?", false, true),
-        ("Send it.", false, true),
         ("Yes.", false, false),
         ("Yes, send it.", true, false),
         ("Send it.", true, false),
@@ -18611,6 +18609,110 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
             assert_eq!(left, None, "{why}: sent once");
         }
     }
+}
+
+/// App Only's and Thirteen's P1s on #6206, in the private room, where a
+/// send's voice is never judged (`alike` 1.0): a read-back ends on a
+/// question, and a late piece of its tail heard back reads as a yes ("send
+/// it.", "go ahead.", "Gửi nhé."). Begun in its tail, a line of nothing but
+/// its words is held as its echo: the model never hears it, so nothing is
+/// sent, and the write still waits for the person's own yes. "Yes, send it."
+/// there, with a word of the person's, still reaches the model, marked as in
+/// the tail with the lamp's words.
+#[tokio::test(start_paused = true)]
+async fn a_read_backs_own_words_in_its_tail_are_held_and_never_sent() {
+    // The line's first sound read at 100 s on the monotonic clock, 0.3 s
+    // after the read-back would have played to its end.
+    const BEGAN_US: u64 = 100_000_000;
+    crate::person::set_private_room_for_test(Some(true));
+    for (read_back, heard, held) in [
+        (
+            "Send an email to Bob saying hi. Shall I send it?",
+            "send it.",
+            true,
+        ),
+        (
+            "Send an email to Bob saying hi. Shall I send it?",
+            "Shall I send it?",
+            true,
+        ),
+        (
+            "Add Dentist at six to your calendar. Shall I go ahead?",
+            "go ahead.",
+            true,
+        ),
+        ("Gửi thư cho Bob: chào bạn. Gửi nhé?", "Gửi nhé.", true),
+        ("Gửi thư cho Bob: chào bạn. Gửi không?", "Gửi không.", true),
+        (
+            "Send an email to Bob saying hi. Shall I send it?",
+            "Yes, send it.",
+            false,
+        ),
+    ] {
+        let why = format!("{heard} after {read_back}");
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Email Bob hi.".to_owned()), Ok(heard.to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![text(read_back), Ok(ChatEvent::Done)],
+                    vec![text("Sent."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.holding_own_echo(true);
+        spoken_turn(&mut engine);
+        turn(&mut engine).await;
+        let mut kept = crate::services::Pending::new(
+            "s1",
+            1,
+            std::time::Instant::now(),
+            "Send an email to Bob saying hi.",
+            "ann",
+        );
+        kept.service = "gmail".to_owned();
+        kept.spoken_from = Some(std::time::Instant::now() - Duration::from_secs(60));
+        crate::services::pending_for_test(Some(kept));
+        engine
+            .shared
+            .said_until_us
+            .store(BEGAN_US - 300_000, Ordering::Relaxed);
+        engine.submit(start(2));
+        engine.submit(ProviderInput::Audio {
+            request: 2,
+            privacy_generation: 1,
+            sequence: 1,
+            read_completed_at_us: BEGAN_US,
+            samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+        });
+        engine.submit(end(2));
+        let labels = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        let pending = crate::services::pending_for_test_take();
+        if held {
+            // The model never hears it: no send is called on it, and the
+            // write still waits, the line not counted as the person's.
+            assert_eq!(asked, 1, "{why}: {labels:?}");
+            assert!(
+                !labels.contains(&"said:Sent.".to_owned()),
+                "{why}: {labels:?}"
+            );
+            let kept = pending.expect(&why);
+            assert!(!kept.in_echo_tail(2), "{why}");
+            assert_eq!(kept.echoes, 1, "{why}");
+            continue;
+        }
+        assert_eq!(asked, 2, "{why}: {labels:?}");
+        let last = format!("{:?}", script.asked.lock().unwrap()[1].last());
+        assert!(last.contains(heard), "{why}: {last}");
+        assert!(
+            pending.expect(&why).in_echo_tail(2),
+            "{why}: marked in the tail with the lamp's words"
+        );
+    }
+    crate::person::set_private_room_for_test(None);
 }
 
 /// #4004 (the Reviewer-lead's P2): the lamp's own "Stop it!" heard back over

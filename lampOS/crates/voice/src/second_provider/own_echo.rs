@@ -32,7 +32,11 @@
 //! answers an offer in the answer ([`OFFERS`]): begun after the lamp's
 //! words, or over its voice with a word the lamp did not say. Only a line
 //! heard over the lamp's voice that is nothing but the offer's own words is
-//! still held. The journal says counts only, never words.
+//! still held. A waiting write's read-back is the exception
+//! ([`Said::read_back`]): a line of nothing but its words, however short,
+//! begun over its voice or in its tail is held, question or offer or not,
+//! since its tail ("send it.") reads as a yes. The journal says counts
+//! only, never words.
 
 /// How long after the lamp's words would have played to their end a line
 /// may begin and still be judged as its echo: 1.5 s. The end is when the
@@ -92,6 +96,10 @@ pub(super) struct Said<'a> {
     pub request: u64,
     pub words: &'a str,
     pub until_us: u64,
+    /// Its words read back a service write waiting now for its yes, or ask
+    /// once more for it (`services::reads_back_in`): its own words heard
+    /// back in its tail are held even after its question ([`judge`]).
+    pub read_back: bool,
 }
 
 /// What becomes of a heard line.
@@ -275,8 +283,10 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
     let answer = keys(said.words);
     let own = own_in_order(&words, &answer);
     let m = own.iter().filter(|own| **own).count();
-    // Held: nothing the lamp did not say. Cut: one own run at an end.
-    let echo = m == n && n >= HELD_LEAST;
+    // Held: nothing the lamp did not say. Cut: one own run at an end. A
+    // read-back's own words are held however short: its tail ("send it.",
+    // "go ahead.", "Gửi nhé.") reads as a yes.
+    let echo = m == n && (n >= HELD_LEAST || said.read_back);
     let leading = own.iter().take_while(|own| **own).count();
     let trailing = own.iter().rev().take_while(|own| **own).count();
     let cut = if m == 0 || m == n {
@@ -296,6 +306,17 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
         Some("it began after the lamp's words and their 1.5 s tail")
     } else if line.called || crate::attention::called_by_name_on(line.heard, true) {
         Some("it has the lamp's name")
+    } else if said.read_back && m == n {
+        // A waiting write's read-back ends by asking ("Shall I send it?"),
+        // and since any yes sends it, a line of only its own words begun in
+        // its tail is held as its echo even after its question, as before
+        // it asked (#6009): a late piece of its tail ("send it.", "go
+        // ahead.", "Gửi nhé.") would read to the model as the person's yes,
+        // and in the private room no voice is judged for it (App Only's and
+        // Thirteen's P1s on #6206). Only a read-back: an ordinary question's
+        // echo is judged as before. The person's own yes comes as the next
+        // line; one with a word of theirs ("Yes, send it.") goes on below.
+        None
     } else if (m < n || !line.over_the_lamps_voice) && crate::remarks::questions(line.heard) {
         // A question that adds a word, or one begun after the lamp's voice
         // even if it only repeats it ("Did you say five o'clock?"), is the
@@ -356,6 +377,7 @@ mod yes_tests {
             request: 3,
             words: SAY_BACK,
             until_us: UNTIL_US,
+            read_back: false,
         }
     }
 
@@ -430,6 +452,7 @@ mod tests {
             request: 3,
             words: ANSWER,
             until_us: UNTIL_US,
+            read_back: false,
         }
     }
 
@@ -835,16 +858,18 @@ mod tests {
     /// A read-back waiting for its answer is judged as any line of the
     /// lamp's (App Only's and Thirteen's P1s on #6009). Since any yes sends
     /// it, the read-back ends by asking, "Shall I send it?", which a
-    /// person's "Yes, send it." shares "send it" with. Its own question
-    /// returned by the room over its voice is held; begun after it, a line
-    /// is the person's answer to the lamp's question and reaches the model
-    /// whole (its send then needs the asker's voice, as the line is marked:
-    /// [`in_tail_with_its_words`]). After the tail it is the person's, as
-    /// any line is.
+    /// person's "Yes, send it." shares "send it" with. A line of nothing but
+    /// its words, over its voice or begun in its tail, is held even after
+    /// its question (App Only's and Thirteen's P1s on #6206); one with a
+    /// word of the person's, begun after it, is their answer to the lamp's
+    /// question and reaches the model whole (its send then needs the
+    /// asker's voice, as the line is marked: [`in_tail_with_its_words`]).
+    /// After the tail it is the person's, as any line is.
     #[test]
     fn a_read_back_asking_holds_its_own_question_and_hears_the_answer() {
         let read_back = Said {
             words: "Send an email to Bob saying hi. Shall I send it?",
+            read_back: true,
             ..said()
         };
         let at = |heard, began_us| line(heard, began_us, false);
@@ -859,12 +884,22 @@ mod tests {
             ),
             Echo::Held(_)
         ));
-        for heard in ["Yes, send it.", "Um, yes, send it.", "Shall I send it?"] {
+        for heard in ["Yes, send it.", "Um, yes, send it."] {
             assert!(
                 matches!(
                     judge(&at(heard, UNTIL_US + 300_000), Some(&read_back)),
-                    Echo::Answered(Some(journal)) if journal.contains("of its own")
-                        || journal.contains("after the lamp's question")
+                    Echo::Answered(Some(journal)) if journal.contains("after the lamp's question")
+                ),
+                "{heard}"
+            );
+        }
+        // Its own question, or a late piece of it, begun in the tail: held,
+        // though it ends on a question and offers ("shall I").
+        for heard in ["Shall I send it?", "send it.", "I send it."] {
+            assert!(
+                matches!(
+                    judge(&at(heard, UNTIL_US + 300_000), Some(&read_back)),
+                    Echo::Held(journal) if journal.contains("within 1.5 s of the lamp's words")
                 ),
                 "{heard}"
             );
@@ -875,6 +910,101 @@ mod tests {
                 Some(&read_back)
             ),
             Echo::Answered(Some(_))
+        ));
+    }
+
+    /// App Only's and Thirteen's P1s on #6206: each read-back's ask, in
+    /// English or Vietnamese, heard back in its tail as a piece that reads
+    /// as a yes ("send it.", "go ahead.", "save it.", "Gửi nhé.") is held;
+    /// the same words after an ordinary question of the lamp's, which no
+    /// write waits on, are the person's answer as before, and past the tail
+    /// or with the lamp's name a read-back's are too.
+    #[test]
+    fn a_read_backs_own_words_in_its_tail_are_held_even_after_its_question() {
+        for (words, heard) in [
+            (
+                "Send an email to Bob saying hi. Shall I send it?",
+                "send it.",
+            ),
+            (
+                "Add Dentist at six to your calendar. Shall I go ahead?",
+                "go ahead.",
+            ),
+            (
+                "Save a draft to Bob saying hi. Shall I save it?",
+                "save it.",
+            ),
+            ("Gửi thư cho Bob: chào bạn. Gửi nhé?", "Gửi nhé."),
+            ("Gửi thư cho Bob: chào bạn. Gửi không?", "Gửi không."),
+            ("Thêm lịch hẹn nha sĩ lúc sáu giờ. Làm không?", "làm không"),
+        ] {
+            let read_back = Said {
+                words,
+                read_back: true,
+                ..said()
+            };
+            let asked = Said {
+                read_back: false,
+                ..read_back
+            };
+            let at = |began_us| line(heard, began_us, false);
+            assert!(
+                matches!(
+                    judge(&at(UNTIL_US + 300_000), Some(&read_back)),
+                    Echo::Held(_)
+                ),
+                "{heard}"
+            );
+            assert!(
+                matches!(
+                    judge(&line(heard, 9_000_000, true), Some(&read_back)),
+                    Echo::Held(_)
+                ),
+                "{heard} over its voice"
+            );
+            // An ordinary question's: too short to hold, as before.
+            assert_eq!(
+                judge(&at(UNTIL_US + 300_000), Some(&asked)),
+                Echo::Answered(None),
+                "{heard} after a question no write waits on"
+            );
+            assert!(
+                matches!(
+                    judge(&at(UNTIL_US + TAIL_US + 100_000), Some(&read_back)),
+                    Echo::Answered(Some(journal)) if journal.contains("1.5 s tail")
+                ),
+                "{heard} past the tail"
+            );
+        }
+        let read_back = Said {
+            words: "Send an email to Bob saying hi. Shall I send it?",
+            read_back: true,
+            ..said()
+        };
+        // An ordinary question's echo of 3 words or more, begun after it,
+        // is still answered as the person's (a question, or after one).
+        let asked = Said {
+            read_back: false,
+            ..read_back
+        };
+        assert!(matches!(
+            judge(&line("shall I send it", UNTIL_US + 300_000, false), Some(&asked)),
+            Echo::Answered(Some(journal)) if journal.contains("question")
+        ));
+        // A word the read-back did not say, or the lamp's name: answered.
+        assert!(matches!(
+            judge(
+                &line("Yes, send it.", UNTIL_US + 300_000, false),
+                Some(&read_back)
+            ),
+            Echo::Answered(Some(_))
+        ));
+        assert!(matches!(
+            judge(
+                &line("Lamp, send it.", UNTIL_US + 300_000, false),
+                Some(&read_back)
+            ),
+            Echo::Answered(_)
         ));
     }
 

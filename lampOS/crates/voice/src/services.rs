@@ -93,7 +93,7 @@ const WRITE_RULE: &str = "Only when the person asks you, now, to send or post so
                           if refused, say what the call said. \
                           Call it first without send_id: it sends nothing and gives a read_back. \
                           Say it in full, word for word, then ask \"Shall I send it?\" \
-                          (Vietnamese \"Gửi nhé?\"; a draft: \"Shall I save it?\"). If they \
+                          (Vietnamese \"Gửi không?\"; a draft: \"Shall I save it?\"). If they \
                           agree, in any words, call it \
                           again with its send_id; if they cancel or wait, don't send and say \
                           it's cancelled. Never say a read-back no call \
@@ -143,10 +143,10 @@ pub const AFTER_READ: &str = "Not done: after reading from a linked service, I d
 /// alone ([`brief`]).
 pub const BRIEF_NOTE: &str = "Someone else may be here: say only how many there are, who they are from and what they are about, never what they say.";
 /// What the model is told after a write is prepared.
-const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I send it?\" (in Vietnamese \"Gửi nhé?\"); for an event or a file, \"Shall I go ahead?\" (in Vietnamese \"Làm nhé?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't send: say it's cancelled, or prepare the changed one anew.";
+const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I send it?\" (in Vietnamese \"Gửi không?\"); for an event or a file, \"Shall I go ahead?\" (in Vietnamese \"Làm không?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't send: say it's cancelled, or prepare the changed one anew.";
 /// What the model is told after a Gmail draft is prepared (`save_draft`):
 /// it is saved, never sent, so the lamp asks "Shall I save it?".
-pub const SAVE_READ_BACK_NEXT: &str = "Nothing is saved yet, and nothing is ever sent. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I save it?\" (in Vietnamese \"Lưu nhé?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't save: say it's cancelled, or prepare the changed one anew.";
+pub const SAVE_READ_BACK_NEXT: &str = "Nothing is saved yet, and nothing is ever sent. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I save it?\" (in Vietnamese \"Lưu không?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't save: say it's cancelled, or prepare the changed one anew.";
 /// What the model is told to say once a write was sent.
 pub const SENT_NEXT: &str = "Say only that it was sent, in the conversation's language.";
 /// What the model is told to say once a draft was saved: a draft is never
@@ -545,6 +545,22 @@ const IDS_KEPT: usize = 8;
 /// asker's voice ([`Turn::in_echo_tail`], Thirteen's option 1 on #6009).
 pub fn line_in_echo_tail(request: u64) {
     kept::pending(|pending| echo_tail_in(pending, request));
+}
+
+/// Whether the lamp's words in `request` read back a write waiting now: it
+/// was prepared in `request`, or the lamp asked once more for its yes there
+/// ([`Pending::asked_again`]). The second route's own-echo judgement holds
+/// a line of only those words begun in their tail even after the read-back's
+/// question (`own_echo::judge`, App Only's and Thirteen's P1s on #6206): the
+/// waiting write is what makes them a read-back, so the lamp's words need no
+/// mark of their own, and an ordinary question's echo is judged as before.
+pub fn reads_back_in(request: u64) -> bool {
+    request != 0
+        && kept::pending(|pending| {
+            pending
+                .as_ref()
+                .is_some_and(|kept| kept.request == request || kept.asked_again == Some(request))
+        })
 }
 
 /// [`line_in_echo_tail`] on `pending`: a line after the one that prepared
@@ -2102,7 +2118,7 @@ mod tests {
         for said in [
             "an ask to draft, write or reply to a mail or message is one, never a remember.",
             "A mail draft: gmail's action save_draft; if refused, say what the call said.",
-            "(Vietnamese \"Gửi nhé?\"; a draft: \"Shall I save it?\").",
+            "(Vietnamese \"Gửi không?\"; a draft: \"Shall I save it?\").",
             "Never say you can't use their services: refuse only for a reason a call gave.",
             "Only when the person asks you, now, to send or post something",
             "Call it first without send_id: it sends nothing and gives a read_back.",
@@ -2379,7 +2395,9 @@ mod tests {
         assert!(!WRITE_RULE.contains("No draft yet"));
         assert!(READ_BACK_NEXT.contains("\"Shall I send it?\""));
         assert!(!READ_BACK_NEXT.contains("save"));
-        assert!(SAVE_READ_BACK_NEXT.contains("\"Shall I save it?\" (in Vietnamese \"Lưu nhé?\")"));
+        assert!(
+            SAVE_READ_BACK_NEXT.contains("\"Shall I save it?\" (in Vietnamese \"Lưu không?\")")
+        );
         assert!(SAVE_READ_BACK_NEXT.contains("nothing is ever sent"));
     }
 
@@ -2440,7 +2458,7 @@ mod tests {
     /// #5962 (d): a mail is never a remember. The owner, 10 Nov: after a
     /// read-back the lamp asks, short, and the model judges any answer; the
     /// waiting note gives it the write's send_id. Since any yes sends it
-    /// (#6009), the lamp asks "Shall I send it?" ("Gửi nhé?"; a draft "Shall
+    /// (#6009), the lamp asks "Shall I send it?" ("Gửi không?"; a draft "Shall
     /// I save it?", an event or a file "Shall I go ahead?"), never names
     /// words to say: on lamp-9adf on 11 Nov it said "Say 'yes, send it' to
     /// send it." and "Sure. Do it." sent it.
@@ -2458,11 +2476,11 @@ mod tests {
         }
         for told in [WRITE_RULE, READ_BACK_NEXT] {
             assert!(told.contains("\"Shall I send it?\""), "{told}");
-            assert!(told.contains("\"Gửi nhé?\""), "{told}");
+            assert!(told.contains("\"Gửi không?\""), "{told}");
         }
         // An event or a file is told when it is prepared: the description
         // has no room for it.
-        assert!(READ_BACK_NEXT.contains("\"Shall I go ahead?\" (in Vietnamese \"Làm nhé?\")"));
+        assert!(READ_BACK_NEXT.contains("\"Shall I go ahead?\" (in Vietnamese \"Làm không?\")"));
         assert!(SAVE_READ_BACK_NEXT.contains("\"Shall I save it?\""));
         assert!(note.contains("send_id \"s1\""), "{note}");
         assert!(note.contains("in any words"), "{note}");
