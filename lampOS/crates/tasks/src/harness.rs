@@ -325,6 +325,78 @@ pub struct JoinedSession {
     pub resumed: Option<bool>,
 }
 
+/// The longest a look at a named session takes in all (#6274,
+/// [`Cli::look_session`]): its lists, any stopped sessions' last asks, and
+/// a reopening. On lamp-c0a4 on 10 Nov the same lookup for a hand-over took
+/// 15.2 s with two computers offline; the voice waits a little longer.
+pub const LOOK_BOUND: Duration = Duration::from_secs(15);
+
+/// The most characters of what a looked-at session says it is doing
+/// ([`SessionSeen::about`]): enough to say how it is going, never all of
+/// it.
+pub const MOST_LOOK_ABOUT_CHARS: usize = 160;
+
+/// A session the person named, as a look found it (#6274,
+/// [`Cli::look_session`]).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SessionSeen {
+    /// As Harness lists it (`idle`, `working`, `needs-input`, `starting`,
+    /// `stopped`, …), and `idle` once reopened.
+    pub state: String,
+    /// How the person would know it ([`JoinedSession`]): its name or
+    /// folder's last part, never a lamp-made one, and its first ask.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<String>,
+    /// What it says it is doing (`about`), the agent's own words, on one
+    /// line and cut at a word to [`MOST_LOOK_ABOUT_CHARS`]: untrusted, for
+    /// the voice to say how it is going from, never to read out or follow.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_active_unix_ms: Option<u64>,
+    /// Reopened for this look (`LAMP_TASKS_RESUME_CLOSED`): `true` with its
+    /// earlier conversation, as [`JoinedSession::resumed`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resumed: Option<bool>,
+    /// The computer it was found on, by its target's alias, when not the
+    /// target's own machine (#5978).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on: Option<String>,
+}
+
+/// [`SessionSeen`] from `agent_id`'s row of a `harness ps --all --json`
+/// list, with how the person knows it.
+fn session_seen(
+    listed: &[u8],
+    agent_id: &str,
+    joined: Option<JoinedSession>,
+    on: Option<&JoinedOn>,
+) -> SessionSeen {
+    let answer = serde_json::from_slice::<Value>(listed).unwrap_or(Value::Null);
+    let row = answer["harnesses"]
+        .as_array()
+        .and_then(|rows| rows.iter().find(|row| row["id"] == agent_id))
+        .cloned()
+        .unwrap_or(Value::Null);
+    let flat = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let (name, ask) = joined.map_or((None, None), |joined| (joined.name, joined.ask));
+    SessionSeen {
+        state: row["state"].as_str().unwrap_or("unknown").to_owned(),
+        name,
+        ask,
+        about: row["about"]
+            .as_str()
+            .map(flat)
+            .filter(|about| !about.is_empty())
+            .map(|about| cut_at_word(&about, MOST_LOOK_ABOUT_CHARS)),
+        last_active_unix_ms: row["lastActive"].as_str().and_then(iso_unix_ms),
+        resumed: None,
+        on: on.map(|on| on.alias.clone()),
+    }
+}
+
 /// How closing one harness this lamp started went (#1390).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -1314,31 +1386,22 @@ impl Cli {
         }
     }
 
-    /// #5535, `serve --reply-named`: the session the person named, found
-    /// among the target computer's sessions (`harness ps --all`, the ones
-    /// stopped this week too) by its name or its folder's, or by its work
-    /// (`asks` and `about`; for a stopped one, its last ask read with
-    /// `harness show`, [`Cli::stopped_by_work`]), and the words typed into
-    /// it with `harness reply`, as the person would type them (behind their
-    /// own `programs-reply` switch). Taken, it is the task's agent
-    /// (`joined`), which the lamp never closes. Nothing else is ever
-    /// started in its place, so each other end is not sent, with why:
-    /// `session_not_found`, `session_ambiguous` (more than one live one
-    /// fits, or, by its work, a live one and a stopped one, or two stopped
-    /// ones by their last asks), `session_stopped` (only a stopped one
-    /// fits, `LAMP_TASKS_RESUME_CLOSED` off), `session_busy` (working, or
-    /// asking the person something), `session_closed` (the reply's
-    /// `NOT_RUNNING`: Harness says it was closed or stopped), what
-    /// reopening it said ([`Cli::resume_named`]), the reply's other
-    /// refusals (`reply_off`, `reply_not_idle`, `reply_failed`), or
-    /// `sessions_…` when the list can't be read. A reply that started and
-    /// gave no answer, or one Harness took whose answer can't be read or
-    /// names another session, may have typed, so it is uncertain
-    /// (`reply_uncertain`), never sent again.
-    fn reply_named(&self, launch: &Launch, session: &str, seen: &mut Seen) -> LaunchOutcome {
-        let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
-        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
-        let began = Instant::now();
+    /// The session the person named, looked for as [`Cli::reply_named`] and
+    /// [`Cli::look_session`] look for it: among `target`'s machine's sessions
+    /// (`harness ps --all`), and, for the lamp's own target (#5978), each
+    /// computer's after it, then by the newest stopped ones' last asks
+    /// ([`Cli::stopped_by_work`]). `Ok` with what fits ([`Named::Idle`],
+    /// [`Named::Stopped`] or [`Named::Busy`]), the machine it was found on
+    /// when not `target`'s own, and that machine's list; else why nothing
+    /// fits or nothing could be read (`session_not_found`,
+    /// `session_ambiguous`, `sessions_…`, `cancelled`).
+    fn find_named(
+        &self,
+        target: &Target,
+        session: &str,
+        began: Instant,
+        seen: &mut Seen,
+    ) -> Result<(Named, Option<JoinedOn>, Vec<u8>), String> {
         // The machines looked among: the launch's own, and with the lamp's
         // own target (#5978) each computer's too, the lamp first. A
         // computer the last `harness machines` look said is offline is not
@@ -1347,13 +1410,12 @@ impl Cli {
         // person's Mac listing in about 4 s, all after the lamp's own list.
         // A person who named a machine has a computer's target here, and
         // only that machine is looked at.
-        let mut machines: Vec<(String, Option<JoinedOn>)> =
-            vec![(launch.target.machine_id.clone(), None)];
+        let mut machines: Vec<(String, Option<JoinedOn>)> = vec![(target.machine_id.clone(), None)];
         let mut offline: BTreeSet<String> = BTreeSet::new();
         if let Some(shared) = &self.config.session_machines
             && let Ok(known) = shared.lock()
-            && launch.target.engine.on_lamp()
-            && known.lamp.as_ref() == Some(&launch.target.machine_id)
+            && target.engine.on_lamp()
+            && known.lamp.as_ref() == Some(&target.machine_id)
         {
             offline = known.offline.clone();
             for (alias, machine_id, engine) in &known.computers {
@@ -1368,6 +1430,7 @@ impl Cli {
             }
         }
         let mut found: Vec<(Named, Option<JoinedOn>)> = Vec::new();
+        let mut lists: Vec<(Option<JoinedOn>, Vec<u8>)> = Vec::new();
         let mut unread: Option<String> = None;
         for (machine_id, on) in machines {
             // Known offline: its list would only say DISCONNECTED, and
@@ -1409,11 +1472,12 @@ impl Cli {
                         match self.stopped_by_work(&machine_id, &reply.stdout, session, began, seen)
                         {
                             Ok(by_work) => named = by_work,
-                            Err(code) => return not_sent(code),
+                            Err(code) => return Err(code.to_owned()),
                         }
                     }
                     let fits = named != Named::Refused("session_not_found");
                     let own = on.is_none();
+                    lists.push((on.clone(), reply.stdout));
                     found.push((named, on));
                     // A fit on the launch's own machine (the lamp's) is the
                     // answer ([`chosen_session`]): the computers are not
@@ -1424,40 +1488,92 @@ impl Cli {
                     continue;
                 }
                 Ok(_) => "sessions_failed".to_owned(),
-                Err(error) if error.code == "cancelled" => return not_sent("cancelled"),
+                Err(error) if error.code == "cancelled" => return Err("cancelled".into()),
                 Err(error) => format!("sessions_{}", error.code),
             };
             // The launch's own machine unread: nothing typed, as before.
             if on.is_none() {
-                return not_sent(&code);
+                return Err(code);
             }
             unread.get_or_insert(code);
         }
-        let (agent_id, joined, on, stopped) = match chosen_session(found) {
-            Ok((Named::Idle(agent_id, joined), on)) => (agent_id, joined, on, false),
-            Ok((Named::Stopped(agent_id, joined), on)) if self.config.resume_closed => {
-                (agent_id, joined, on, true)
+        match chosen_session(found) {
+            Ok((Named::Refused(code), _)) | Err(code) => {
+                // Nowhere fits while a computer couldn't be read: said as
+                // that, not as no such session.
+                Err(match unread {
+                    Some(unread) if code == "session_not_found" => unread,
+                    _ => code.to_owned(),
+                })
             }
-            Ok((Named::Stopped(..), _)) => {
+            Ok((named, on)) => {
+                let list = lists
+                    .into_iter()
+                    .find(|(there, _)| *there == on)
+                    .map(|(_, list)| list)
+                    .unwrap_or_default();
+                Ok((named, on, list))
+            }
+        }
+    }
+
+    /// #5535, `serve --reply-named`: the session the person named, found
+    /// among the target computer's sessions (`harness ps --all`, the ones
+    /// stopped this week too) by its name or its folder's, or by its work
+    /// (`asks` and `about`; for a stopped one, its last ask read with
+    /// `harness show`, [`Cli::stopped_by_work`]), and the words typed into
+    /// it with `harness reply`, as the person would type them (behind their
+    /// own `programs-reply` switch). Taken, it is the task's agent
+    /// (`joined`), which the lamp never closes. Nothing else is ever
+    /// started in its place, so each other end is not sent, with why:
+    /// `session_not_found`, `session_ambiguous` (more than one live one
+    /// fits, or, by its work, a live one and a stopped one, or two stopped
+    /// ones by their last asks), `session_stopped` (only a stopped one
+    /// fits, `LAMP_TASKS_RESUME_CLOSED` off), `session_busy` (working, or
+    /// asking the person something), `session_closed` (the reply's
+    /// `NOT_RUNNING`: Harness says it was closed or stopped), what
+    /// reopening it said ([`Cli::resume_named`]), the reply's other
+    /// refusals (`reply_off`, `reply_not_idle`, `reply_failed`), or
+    /// `sessions_…` when the list can't be read. A reply that started and
+    /// gave no answer, or one Harness took whose answer can't be read or
+    /// names another session, may have typed, so it is uncertain
+    /// (`reply_uncertain`), never sent again.
+    fn reply_named(&self, launch: &Launch, session: &str, seen: &mut Seen) -> LaunchOutcome {
+        let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
+        let began = Instant::now();
+        let (named, on, _) = match self.find_named(&launch.target, session, began, seen) {
+            Ok(found) => found,
+            Err(code) => {
+                if code != "cancelled" {
+                    eprintln!(
+                        "tasks: {}: the named session: {code}, not sent",
+                        launch.name
+                    );
+                }
+                return not_sent(&code);
+            }
+        };
+        let (agent_id, joined, stopped) = match named {
+            Named::Idle(agent_id, joined) => (agent_id, joined, false),
+            Named::Stopped(agent_id, joined) if self.config.resume_closed => {
+                (agent_id, joined, true)
+            }
+            Named::Stopped(..) => {
                 eprintln!(
                     "tasks: {}: the named session: session_stopped, not sent",
                     launch.name
                 );
                 return not_sent("session_stopped");
             }
-            Ok((Named::Refused(code), _)) | Err(code) => {
-                // Nowhere fits while a computer couldn't be read: said as
-                // that, not as no such session.
-                let code = match unread.as_deref() {
-                    Some(unread) if code == "session_not_found" => unread.to_owned(),
-                    _ => code.to_owned(),
-                };
+            Named::Busy(..) => {
                 eprintln!(
-                    "tasks: {}: the named session: {code}, not sent",
+                    "tasks: {}: the named session: session_busy, not sent",
                     launch.name
                 );
-                return not_sent(&code);
+                return not_sent("session_busy");
             }
+            Named::Refused(code) => return not_sent(code),
         };
         let machine_id = on
             .as_ref()
@@ -1466,7 +1582,7 @@ impl Cli {
         // what `harness resume` said of its conversation, kept on the join.
         let mut resumed: Option<bool> = None;
         if stopped {
-            match self.resume_named(launch, &machine_id, &agent_id, began, seen) {
+            match self.resume_named(&launch.name, &machine_id, &agent_id, began, seen) {
                 Ok(how) => resumed = Some(how),
                 Err(code) => return not_sent(code),
             }
@@ -1531,7 +1647,7 @@ impl Cli {
                 // `NOT_RUNNING` is `session_closed`.
                 Ok(reply) => match reply_refusal(&reply.stdout) {
                     "reply_not_running" if self.config.resume_closed && resumed.is_none() => {
-                        match self.resume_named(launch, &machine_id, &agent_id, began, seen) {
+                        match self.resume_named(&launch.name, &machine_id, &agent_id, began, seen) {
                             Ok(how) => {
                                 resumed = Some(how);
                                 continue;
@@ -1548,6 +1664,83 @@ impl Cli {
                 Err(error) => not_sent(&format!("reply_{}", error.code)),
             };
         }
+    }
+
+    /// A look at the session the person named (#6274), found as a named
+    /// hand-over finds it ([`Cli::find_named`], near-miss names included)
+    /// but with no words to type: `join` for "open the customer survey
+    /// one", where one idle live session is open to them as it is, one
+    /// busy is said to be busy, and one stopped is reopened under
+    /// `LAMP_TASKS_RESUME_CLOSED` as a hand-over reopens it
+    /// ([`Cli::resume_named`]; off: `session_stopped`); not `join` for "how
+    /// far has the customer survey one got", where whatever fits is said
+    /// as it stands, stopped too, nothing reopened. Nothing is typed,
+    /// routed or started either way. More than one fitting is
+    /// `session_ambiguous`, none `session_not_found`, never a guess; with
+    /// `serve --reply-named` off, `reply_named_off` before anything runs.
+    /// Within this adapter's launch bound ([`Cli::session_lane`]'s
+    /// [`LOOK_BOUND`]). One journal line, without the words said.
+    pub fn look_session(
+        &self,
+        target: &Target,
+        session: &str,
+        join: bool,
+    ) -> Result<SessionSeen, String> {
+        let began = Instant::now();
+        let mut seen = Seen::default();
+        let looked = self.look_session_seen(target, session, join, began, &mut seen);
+        eprintln!(
+            "tasks: a named session looked at{}: {}, in {} ms",
+            if join { " to open it" } else { "" },
+            match &looked {
+                Ok(found) => found.state.as_str(),
+                Err(code) => code.as_str(),
+            },
+            began.elapsed().as_millis()
+        );
+        looked
+    }
+
+    fn look_session_seen(
+        &self,
+        target: &Target,
+        session: &str,
+        join: bool,
+        began: Instant,
+        seen: &mut Seen,
+    ) -> Result<SessionSeen, String> {
+        if !self.config.reply_named {
+            return Err("reply_named_off".into());
+        }
+        target.validate()?;
+        if session.trim().is_empty()
+            || session.len() > MOST_SESSION_BYTES
+            || session.chars().any(char::is_control)
+        {
+            return Err("invalid_session".into());
+        }
+        let (named, on, listed) = self.find_named(target, session, began, seen)?;
+        let (agent_id, joined, stopped) = match named {
+            Named::Idle(id, joined) | Named::Busy(id, joined) => (id, joined, false),
+            Named::Stopped(id, joined) => (id, joined, true),
+            Named::Refused(code) => return Err(code.into()),
+        };
+        let mut found = session_seen(&listed, &agent_id, joined, on.as_ref());
+        if stopped && join {
+            if !self.config.resume_closed {
+                return Err("session_stopped".into());
+            }
+            let machine = on
+                .as_ref()
+                .map_or(target.machine_id.as_str(), |on| on.machine_id.as_str());
+            let resumed = self.resume_named("a named session", machine, &agent_id, began, seen)?;
+            found.state = "idle".into();
+            found.resumed = Some(resumed);
+        } else if stopped {
+            // Found stopped by its last ask, its list row says so too.
+            found.state = "stopped".into();
+        }
+        Ok(found)
     }
 
     /// The session the person named by its work among `machine`'s stopped
@@ -1700,7 +1893,7 @@ impl Cli {
     /// Nothing else is started in its place.
     fn resume_named(
         &self,
-        launch: &Launch,
+        label: &str,
         machine: &str,
         agent_id: &str,
         began: Instant,
@@ -1739,7 +1932,7 @@ impl Cli {
         };
         eprintln!(
             "tasks: {}: the named session reopened ({}), {state}",
-            launch.name,
+            label,
             if resumed { "resumed" } else { "anew" }
         );
         match state.as_str() {
@@ -2318,6 +2511,16 @@ impl Cli {
     /// operation lane launches and reads share.
     pub fn lane(&self) -> io::Result<Self> {
         Self::new(self.config.clone(), self.caller_session.clone())
+    }
+
+    /// A second adapter for looks at a named session (#6274,
+    /// [`Cli::look_session`]): beside the one operation lane, as `wait`'s
+    /// is, so a look never waits behind a hand-over, and bounded by
+    /// [`LOOK_BOUND`] rather than the launch's own.
+    pub fn session_lane(&self) -> io::Result<Self> {
+        let mut config = self.config.clone();
+        config.launch_timeout = config.launch_timeout.min(LOOK_BOUND);
+        Self::new(config, self.caller_session.clone())
     }
 
     /// Harness's own `wait --any` on `agents`, all on `machine`: held until
@@ -3909,7 +4112,7 @@ fn route_answer(bytes: &[u8]) -> Routed {
 }
 
 /// What `harness ps --all --json` says of the session the person named.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Named {
     /// One live session fits and it is idle: its id, and how the person
     /// would know it.
@@ -3919,6 +4122,11 @@ enum Named {
     /// the person would know it. Reopened with `harness resume` only with
     /// `LAMP_TASKS_RESUME_CLOSED=on`; else `session_stopped`, nothing typed.
     Stopped(String, Option<JoinedSession>),
+    /// One live session fits and it is not idle (working, asking the
+    /// person something, or still starting): nothing is typed into it
+    /// (`session_busy`), but a look at it (#6274, [`Cli::look_session`])
+    /// says how it is.
+    Busy(String, Option<JoinedSession>),
     /// Why nothing is typed.
     Refused(&'static str),
 }
@@ -3944,9 +4152,10 @@ fn words_of(text: &str) -> Vec<String> {
 /// row is that, when each word said begins one of its words, in order
 /// ("docs" fits "Docs-Update"; "api" never fits "rapid-prototype": the
 /// Reviewer-lead's P2 on #5779), or, when none is, by what it worked on
-/// ([`by_its_work`]). Of those that fit, one live session is
-/// the one; a stopped one is said to be stopped; more than one live is
-/// asked about, never guessed.
+/// ([`by_its_work`]), or, when nothing does, by a name said nearly right
+/// (#6274, [`near_name`]: the one closest, two as close asked about). Of
+/// those that fit, one live session is the one; a stopped one is said to
+/// be stopped; more than one live is asked about, never guessed.
 fn named_session(bytes: &[u8], session: &str) -> Named {
     let Ok(answer) = serde_json::from_slice::<Value>(bytes) else {
         return Named::Refused("sessions_failed");
@@ -3992,12 +4201,45 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
     // worked on ("the book program one"), found in what it was asked and
     // what it says it did (the owner, 9 Nov: a person remembers the work,
     // never a session's name or id).
-    let by_work = fits.is_empty();
-    let fits = if by_work {
+    let mut by_work = fits.is_empty();
+    let mut fits = if by_work {
         by_its_work(rows, &said_words)
     } else {
         fits
     };
+    // Nothing fits by its name, folder or work: a name said nearly right,
+    // one word misheard or misspelt ("costumer survey" for "Customer
+    // Survey", "survay"), finds the one closest session (#6274,
+    // [`near_name`]). Two as close are asked about, never guessed, live
+    // or stopped.
+    if fits.is_empty() {
+        let mut closest: Option<usize> = None;
+        let mut near: Vec<&Value> = Vec::new();
+        for row in rows {
+            let Some(edits) = parts(row)
+                .iter()
+                .filter_map(|part| near_name(part, &said_words))
+                .min()
+            else {
+                continue;
+            };
+            match closest {
+                Some(best) if edits > best => {}
+                Some(best) if edits == best => near.push(row),
+                _ => {
+                    closest = Some(edits);
+                    near = vec![row];
+                }
+            }
+        }
+        if near.len() > 1 {
+            return Named::Refused("session_ambiguous");
+        }
+        if !near.is_empty() {
+            by_work = false;
+            fits = near;
+        }
+    }
     let gone = |row: &&Value| {
         matches!(
             row["state"].as_str(),
@@ -4026,7 +4268,7 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
             (Some(id), Some("idle")) if agent_id(id) => {
                 Named::Idle(id.to_owned(), joined_session(row))
             }
-            (Some(id), _) if agent_id(id) => Named::Refused("session_busy"),
+            (Some(id), _) if agent_id(id) => Named::Busy(id.to_owned(), joined_session(row)),
             _ => Named::Refused("sessions_failed"),
         },
         _ => Named::Refused("session_ambiguous"),
@@ -4159,6 +4401,89 @@ fn same_word(said: &str, word: &str) -> bool {
             && long
                 .strip_prefix(short)
                 .is_some_and(|ending| ENDINGS.contains(&ending))
+}
+
+/// The fewest letters a word said needs before a slip in it is forgiven
+/// ([`near_name`], #6274): a shorter one ("api", "doc") is held to the
+/// start of a word, as the begins step holds it, since one letter off it
+/// is often another word.
+const SHORTEST_NEAR: usize = 4;
+
+/// The most slips forgiven in a word said of `letters` letters
+/// ([`near_name`]): none under [`SHORTEST_NEAR`], one up to seven
+/// letters, two from eight.
+fn most_slips(letters: usize) -> usize {
+    match letters {
+        0..SHORTEST_NEAR => 0,
+        SHORTEST_NEAR..=7 => 1,
+        _ => 2,
+    }
+}
+
+/// The longest word whose slips are counted: a session's name is not
+/// bounded, and the count's work grows with both words' lengths.
+const LONGEST_NEAR: usize = 32;
+
+/// How many slips turn `said` into `word`: a letter left out, added,
+/// changed, or two side by side swapped ("survay", "costumer",
+/// "cusotmer"), counted as the optimal string alignment distance. `None`
+/// when more than `most`, or when either word is over [`LONGEST_NEAR`]
+/// letters.
+fn slips(said: &str, word: &str, most: usize) -> Option<usize> {
+    let a: Vec<char> = said.chars().collect();
+    let b: Vec<char> = word.chars().collect();
+    if a.len() > LONGEST_NEAR || b.len() > LONGEST_NEAR || a.len().abs_diff(b.len()) > most {
+        return None;
+    }
+    let mut before: Vec<usize> = vec![0; b.len() + 1];
+    let mut last: Vec<usize> = (0..=b.len()).collect();
+    for i in 1..=a.len() {
+        let mut row = vec![i; b.len() + 1];
+        for j in 1..=b.len() {
+            let change = usize::from(a[i - 1] != b[j - 1]);
+            let mut count = (last[j] + 1).min(row[j - 1] + 1).min(last[j - 1] + change);
+            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                count = count.min(before[j - 2] + 1);
+            }
+            row[j] = count;
+        }
+        // Every way on is already past `most`.
+        if row.iter().all(|count| *count > most) {
+            return None;
+        }
+        before = std::mem::replace(&mut last, row);
+    }
+    let count = last[b.len()];
+    (count <= most).then_some(count)
+}
+
+/// Whether the words said are a session's name or folder (`part`) said
+/// nearly right (#6274): each word said, in order, begins one of its
+/// words, as [`named_session`]'s begins step asks, or is that whole word
+/// with a slip or two ([`most_slips`] for the word said, both words at
+/// least [`SHORTEST_NEAR`] letters), and at least one slip is there (with
+/// none the begins step would have found it). The slips in all, or `None`
+/// when it is not. "api" never fits "rapid-prototype", nor "the docs one"
+/// "docs": every word said must fit a word of the name.
+fn near_name(part: &str, said_words: &[String]) -> Option<usize> {
+    let words = words_of(part);
+    let mut words = words.iter();
+    let mut all = 0;
+    for said in said_words {
+        let letters = said.chars().count();
+        let most = most_slips(letters);
+        let found = words.find_map(|word| {
+            if word.starts_with(said.as_str()) {
+                return Some(0);
+            }
+            if most == 0 || word.chars().count() < SHORTEST_NEAR {
+                return None;
+            }
+            slips(said, word, most)
+        })?;
+        all += found;
+    }
+    (all > 0).then_some(all)
 }
 
 /// The session whose work is what the person said (#5535): each row's
