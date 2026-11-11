@@ -1844,26 +1844,289 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
     }
 }
 
-/// `humans/seems` as the eyes say it, read every second while the voice runs
-/// (`LAMP_SECOND_SEEMS=on`): a fresh read (within `HumanSeems::LASTS`)
-/// with the time it was said; a FER+ read in `latest`, while both readers
-/// run, breaks the run of Blendshape V2's (`crate::seems_told`).
-/// Memory's forgets (`memory/forgot`, from the app or by voice) reach the
-/// conversation's thread and running summary
-/// ([`crate::conversation_summary::memory_forgot`]), looked at every half
-/// second, off any turn's path (the reviewer-lead's P2 on #4479). With the
-/// summary off (`summary` false) they still drop a write waiting for its
-/// send (`conversation_summary::memory_forgot_waiting`, #5968).
-async fn forgot_task(mut forgot: crate::bus_out::ForgotIn, summary: bool) {
+/// Drain at most eight validated messages once. Pending writes for the whole
+/// batch retire before any summary or confirmation lock can delay cleanup.
+fn forget_pending(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> Vec<Option<String>> {
+    let forgotten = forgot.forgotten(now_us);
+    crate::conversation_summary::memory_forgotten_waiting(&forgotten);
+    forgotten
+}
+
+fn forget_cleanup(
+    forgotten: &[Option<String>],
+    owner: Option<&crate::same_voice::OwnerVoice>,
+    summaries: bool,
+) {
+    if summaries {
+        crate::conversation_summary::memory_forgotten(forgotten);
+    }
+    if let Some(owner) = owner {
+        for person in forgotten {
+            match person.as_deref() {
+                None => owner.forget_all(),
+                Some(person) if lamp_msgs::known::is_person_id(person) => {
+                    owner.forget_person(person)
+                }
+                Some(_) => {}
+            }
+        }
+    }
+}
+
+/// Existing synchronous tests exercise the same drain and cleanup functions.
+#[cfg(test)]
+fn forget_received(
+    forgot: &mut crate::bus_out::ForgotIn,
+    now_us: u64,
+    owner: Option<&crate::same_voice::OwnerVoice>,
+    summaries: bool,
+) {
+    let forgotten = forget_pending(forgot, now_us);
+    forget_cleanup(&forgotten, owner, summaries);
+}
+
+/// With no owner voice (`LAMP_SAME_VOICE_CONFIRMS` off, as in the product)
+/// the forget is lamp-voice's inline one, unchanged: drained and applied on
+/// the reactor, the thread and notes with the summary on, the waiting write
+/// alone with it off (Jarvis's finding on #6397 at `00a3aebe7e`).
+fn forget_inline(forgot: &mut crate::bus_out::ForgotIn, now_us: u64, summary: bool) -> usize {
+    if summary {
+        crate::conversation_summary::memory_forgot(forgot, now_us)
+    } else {
+        crate::conversation_summary::memory_forgot_waiting(forgot, now_us)
+    }
+}
+
+/// Only with the owner voice: keep one subscriber and await at most one
+/// cleanup job. Summary and owner locks stay off the current-thread reactor;
+/// later batches wait for this one.
+async fn forget_batch(
+    mut forgot: crate::bus_out::ForgotIn,
+    now_us: u64,
+    owner: Arc<crate::same_voice::OwnerVoice>,
+    summaries: bool,
+) -> Option<crate::bus_out::ForgotIn> {
+    let forgotten = forget_pending(&mut forgot, now_us);
+    if !forgotten.is_empty() {
+        match tokio::task::spawn_blocking(move || {
+            forget_cleanup(&forgotten, Some(&owner), summaries);
+            forgot
+        })
+        .await
+        {
+            Ok(reader) => Some(reader),
+            Err(_) => {
+                eprintln!(
+                    "lamp-voice second: memory forget cleanup stopped: its blocking worker did not finish"
+                );
+                None
+            }
+        }
+    } else {
+        Some(forgot)
+    }
+}
+
+async fn forgot_task(
+    mut forgot: crate::bus_out::ForgotIn,
+    owner: Option<Arc<crate::same_voice::OwnerVoice>>,
+    summaries: bool,
+) {
     let mut every = tokio::time::interval(Duration::from_millis(500));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let Some(owner) = owner else {
+        loop {
+            every.tick().await;
+            forget_inline(&mut forgot, monotonic_us(), summaries);
+        }
+    };
     loop {
         every.tick().await;
-        if summary {
-            crate::conversation_summary::memory_forgot(&mut forgot, monotonic_us());
-        } else {
-            crate::conversation_summary::memory_forgot_waiting(&mut forgot, monotonic_us());
+        let Some(reader) = forget_batch(forgot, monotonic_us(), owner.clone(), summaries).await
+        else {
+            return;
+        };
+        forgot = reader;
+    }
+}
+
+#[cfg(test)]
+mod forget_fanout_tests {
+    use super::*;
+
+    /// Unloaded host measurement of the actual synchronous boundary: bus drain
+    /// plus pending retirement, including logging. Test pending state uses TLS,
+    /// so this excludes production mutex contention. Publish and fixture setup
+    /// are outside the interval; no polling or storage claim.
+    #[tokio::test(flavor = "current_thread")]
+    async fn measure_forget_pending_host_boundary() {
+        let dir = crate::process::SessionDirectory::create().unwrap();
+        let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+        let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        let person = lamp_msgs::known::person_id("Synthetic latency owner");
+        let event = lamp_msgs::MemoryForgot {
+            person: Some(person.clone()),
+        };
+        let mut repeated = Vec::with_capacity(200);
+        let mut first_us = 0.0;
+        for sample in 0..=200u64 {
+            crate::services::pending_for_test(Some(crate::services::Pending::new(
+                "synthetic",
+                sample,
+                Instant::now(),
+                "Synthetic draft",
+                &person,
+            )));
+            memory.publish_json(sample + 1, &event).unwrap();
+            // Synthetic monotonic time admits the next drain without sleeping;
+            // this intentionally does not measure the 500 ms production poll.
+            let now_us = 1_000_000 + sample * 500_000;
+            let began = Instant::now();
+            let forgotten = forget_pending(&mut forgot, now_us);
+            let elapsed_us = began.elapsed().as_secs_f64() * 1_000_000.0;
+            assert_eq!(forgotten, [Some(person.clone())]);
+            assert!(!crate::services::pending_for_test_is_some());
+            if sample == 0 {
+                first_us = elapsed_us;
+            } else {
+                repeated.push(elapsed_us);
+            }
         }
+        repeated.sort_by(f64::total_cmp);
+        // Nearest-rank percentiles over the 200 repeated samples, excluding
+        // first use. The 1 ms target is evaluated from evidence, not asserted.
+        eprintln!(
+            "forget_pending host: first_us={first_us:.3} repeated=200 p50_us={:.3} p95_us={:.3} max_us={:.3}",
+            repeated[99], repeated[189], repeated[199],
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn forget_batches_keep_the_eight_message_bound_and_subscriber() {
+        let dir = crate::process::SessionDirectory::create().unwrap();
+        let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+        let forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        crate::services::pending_for_test(Some(crate::services::Pending::new(
+            "synthetic",
+            1,
+            Instant::now(),
+            "Synthetic draft",
+            "person_test",
+        )));
+        for seq in 1..=8 {
+            memory
+                .publish_json(seq, &serde_json::json!({"person": 42}))
+                .unwrap();
+        }
+        memory
+            .publish_json(9, &serde_json::json!({"person": null}))
+            .unwrap();
+        let mut forgot = forgot;
+        assert_eq!(forget_inline(&mut forgot, 1_000_000, false), 0);
+        assert!(
+            crate::services::pending_for_test_is_some(),
+            "the ninth message belongs to the next batch"
+        );
+        assert_eq!(forget_inline(&mut forgot, 1_500_000, false), 1);
+        assert!(!crate::services::pending_for_test_is_some());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn pending_writes_retire_with_all_optional_consumers_off() {
+        let person = lamp_msgs::known::person_id("Synthetic pending owner");
+        for (payload, retires) in [
+            (serde_json::json!({"person": person}), true),
+            (serde_json::json!({"person": "everyone"}), true),
+            (serde_json::json!({"person": null}), true),
+            (serde_json::json!({"person": "r-example"}), false),
+            (serde_json::json!({"person": 42}), false),
+        ] {
+            let dir = crate::process::SessionDirectory::create().unwrap();
+            let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+            let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+            let mut memory = bus
+                .publisher_declared(
+                    lamp_msgs::MemoryForgot::TOPIC,
+                    &lamp_msgs::MemoryForgot::declaration(),
+                    "memory",
+                )
+                .unwrap();
+            crate::services::pending_for_test(Some(crate::services::Pending::new(
+                "synthetic",
+                1,
+                Instant::now(),
+                "Synthetic draft",
+                &person,
+            )));
+            memory.publish_json(1, &payload).unwrap();
+            forget_inline(&mut forgot, 1_000_000, false);
+            assert_eq!(
+                !crate::services::pending_for_test_is_some(),
+                retires,
+                "{payload}"
+            );
+            crate::services::pending_for_test(None);
+        }
+    }
+
+    /// The product's off path (no owner voice, the summary on): the task
+    /// clears the thread inline on the reactor, as lamp-voice does, and keeps
+    /// reading. The waiting write is this thread's own (TLS), so it retires
+    /// only if the forget ran here and not on a blocking worker.
+    #[tokio::test(flavor = "current_thread")]
+    async fn no_owner_forgets_inline_on_the_reactor_and_keeps_reading() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let dir = crate::process::SessionDirectory::create().unwrap();
+        let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+        let forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        let person = lamp_msgs::known::person_id("Synthetic inline owner");
+        crate::remember::role::hold(&person, Some("Synthetic role".into()));
+        crate::services::pending_for_test(Some(crate::services::Pending::new(
+            "synthetic",
+            1,
+            Instant::now(),
+            "Synthetic draft",
+            &person,
+        )));
+        memory
+            .publish_json(
+                1,
+                &lamp_msgs::MemoryForgot {
+                    person: Some(person.clone()),
+                },
+            )
+            .unwrap();
+        let task = tokio::spawn(forgot_task(forgot, None, true));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(
+            !crate::services::pending_for_test_is_some(),
+            "the thread's forget ran inline on this thread"
+        );
+        assert_eq!(crate::remember::role::cached(&person), None);
+        assert!(!task.is_finished(), "no cleanup stop on the off path");
+        task.abort();
+        crate::services::pending_for_test(None);
     }
 }
 
@@ -4099,14 +4362,19 @@ pub fn serve(
         }
         // The services' prints only while one is linked (the reader's P3
         // on #5293), known from `lamp-services` itself.
+        // With `LAMP_SAME_VOICE_CONFIRMS` too, every line is printed, linked
+        // or not: the confirm reads the same prints (`services_prints_while`).
+        let confirms = confirming_where(printing, files.same_voice_confirms);
         if printing == Printing::ForServices
             && let Some(folder) = services_folder
             && let Ok(mut heeding) = heeding.lock()
         {
-            heeding.printing_only_while_linked(
+            services_prints_while(
+                &mut heeding,
                 linked_told
                     .clone()
                     .unwrap_or_else(|| crate::services::Linked::new(folder)),
+                confirms.is_some(),
             );
         }
         // What is linked, told to the owner's line, asked again as each line
@@ -4121,10 +4389,14 @@ pub fn serve(
         let hears = printing == Printing::ForEverything;
         // One way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
         // decision of 4 Nov): no rule judges by voice, and the known
-        // person's own voice only confirms their line.
-        if let Some(bar) = files.same_voice_confirms.filter(|_| hears) {
+        // person's own voice only confirms their line, from the prints for
+        // every rule or the services' alone (`confirming_where`).
+        if let Some(bar) = confirms {
             engine = confirming_by_voice(engine, &heeding, bar);
         }
+        // Whether a voice can show another person to the carry's rules:
+        // never while it only confirms (`voice_shows_another`).
+        let shows_another = voice_shows_another(printing, files.same_voice_confirms);
         // The name heard only in the room's sound opens nothing alone
         // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
         // #1722).
@@ -4835,14 +5107,14 @@ pub fn serve(
             let another = another_voice.clone();
             engine = engine.carrying_past_silent_where_heard(
                 keeps,
-                hears,
+                shows_another,
                 Arc::new(move || another.load(std::sync::atomic::Ordering::Acquire)),
             );
         }
         // A carried line read as its person's only where the same-voice
         // check runs (`LAMP_CONVERSATION_CARRIED_MEMORY`, Jarvis's P2 on
         // #5842): without it no other voice could ever show.
-        engine = engine.reading_carried_where_heard(hears);
+        engine = engine.reading_carried_where_heard(shows_another);
         remarked_by = Some(heeding.clone());
         // A line begun in a computer's turn is a call, as on the Live route.
         let opening = heeding.clone();
@@ -4938,17 +5210,22 @@ pub fn serve(
         );
         runtime.spawn(seems_task(bus, told));
     }
-    // Memory's forgets, with the bus: with the running summary on, a forget
-    // from the app drops the conversation's notes as one by voice does; on
-    // or off, it drops a write waiting for its send (Reviewer-two's HOLD on
-    // #5968 at `8c1cbd4268`).
+    // One bus reader fans out each forget to notes and the exact cache used
+    // by this Engine. Confirmation cleanup does not depend on summaries.
+    let confirmation_owner = engine
+        .shared
+        .voice_confirms
+        .as_ref()
+        .map(|confirms| confirms.owner.clone());
+    let summaries = crate::conversation_summary::on();
+    // #5968: even with both optional consumers off, pending writes must forget.
     if let Some(forgot) = files
         .bus_root
         .as_deref()
         .and_then(|root| lamp_bus::Bus::new(root).ok())
         .and_then(|bus| crate::bus_out::ForgotIn::on(&bus).ok())
     {
-        runtime.spawn(forgot_task(forgot, crate::conversation_summary::on()));
+        runtime.spawn(forgot_task(forgot, confirmation_owner, summaries));
     }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
@@ -6991,6 +7268,56 @@ enum Printing {
     ForServices,
 }
 
+/// The bar `LAMP_SAME_VOICE_CONFIRMS` (`confirms`) confirms at on this
+/// route, given what is printed: from the prints for every rule, or from
+/// the services' alone (`LAMP_SAME_VOICE_FOR=services`, as the product sets
+/// both: the memory owner's switch-on, 10 Nov); none with no print. Before,
+/// only the first, so beside the services the confirm never ran.
+fn confirming_where(printing: Printing, confirms: Option<f32>) -> Option<f32> {
+    confirms.filter(|_| printing != Printing::None)
+}
+
+/// Whether a voice can ever show another person in the conversation here,
+/// for the carry past a silent face (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`)
+/// and a carried line read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`):
+/// only the prints for every rule, and never while the voice only confirms
+/// (`Voices::confirming_only` judges nothing, so no other voice is ever
+/// recorded and "no other voice" would always hold).
+fn voice_shows_another(printing: Printing, confirms: Option<f32>) -> bool {
+    printing == Printing::ForEverything && confirms.is_none()
+}
+
+/// The services' prints on `heeding`, made only while `linked` says a
+/// service is linked (the reader's P3 on #5293). With the confirm reading
+/// them (`confirming`), every heard line is printed, linked or not, as the
+/// known person's own voice must be learnt from their lines; what is linked
+/// is still asked as each line begins (`Heeding::asking_what_is_linked`).
+fn services_prints_while(
+    heeding: &mut Heeding,
+    linked: Arc<crate::services::Linked>,
+    confirming: bool,
+) {
+    if confirming {
+        heeding.asking_what_is_linked(linked);
+    } else {
+        heeding.printing_only_while_linked(linked);
+    }
+}
+
+/// Where the confirm reads a line's print on `heeding`: the voices kept for
+/// every rule, or the services' alone ([`Heeding::kept_voices`]), whatever
+/// `Voices::confirming_only` says.
+fn confirm_print_of(heeding: &Arc<Mutex<Heeding>>) -> crate::second_provider::PrintOf {
+    let heeding = heeding.clone();
+    Arc::new(move |request| {
+        heeding
+            .lock()
+            .ok()?
+            .kept_voices()?
+            .print_to_confirm(request)
+    })
+}
+
 /// `LAMP_SAME_VOICE_CONFIRMS` on `engine` and `heeding`, the check's
 /// printer already started: `heeding`'s voices judge nothing
 /// (`same_voice::Voices::confirming_only`), and the engine reads each
@@ -7006,17 +7333,9 @@ fn confirming_by_voice(engine: Engine, heeding: &Arc<Mutex<Heeding>>, bar: f32) 
     eprintln!(
         "lamp-voice second: the voice only confirms: a known person's line no face was seen speaking, their face the one face in view, is theirs at cosine {bar:.2} or over against their own voice; nothing ends, holds or splits a conversation by voice (LAMP_SAME_VOICE_CONFIRMS)"
     );
-    let heeding = heeding.clone();
     engine.confirming_by_voice(crate::second_provider::VoiceConfirms {
         owner: Arc::new(crate::same_voice::OwnerVoice::new(bar)),
-        print_of: Arc::new(move |request| {
-            heeding
-                .lock()
-                .ok()?
-                .voices
-                .as_mut()?
-                .print_to_confirm(request)
-        }),
+        print_of: confirm_print_of(heeding),
     })
 }
 
@@ -13534,6 +13853,202 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    /// Exercise optional confirmation and summaries independently through the
+    /// production async batch; pending TLS stays on this current-thread reactor.
+    #[tokio::test(flavor = "current_thread")]
+    async fn pending_owner_and_summary_consumers_follow_the_engine_matrix() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for summaries in [false, true] {
+            for confirming in [false, true] {
+                let dir = crate::process::SessionDirectory::create().unwrap();
+                let bus = lamp_bus::Bus::new(&dir.path).unwrap();
+                let forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+                let mut memory = bus
+                    .publisher_declared(
+                        lamp_msgs::MemoryForgot::TOPIC,
+                        &lamp_msgs::MemoryForgot::declaration(),
+                        "memory",
+                    )
+                    .unwrap();
+                let person = lamp_msgs::known::person_id("Synthetic matrix owner");
+                let owner = Arc::new(crate::same_voice::OwnerVoice::new(0.45));
+                for request in 1..=3 {
+                    assert!(owner.learn(&person, request, vec![1.0, 0.0]));
+                }
+                let before = owner.generation();
+                let mut engine = Engine::new(
+                    Arc::new(Silent),
+                    Told::default,
+                    Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+                );
+                if confirming {
+                    engine = engine.confirming_by_voice(crate::second_provider::VoiceConfirms {
+                        owner: owner.clone(),
+                        print_of: Arc::new(|_| None),
+                    });
+                }
+                let actual_owner = engine
+                    .shared
+                    .voice_confirms
+                    .as_ref()
+                    .map(|confirms| confirms.owner.clone());
+                crate::services::pending_for_test(Some(crate::services::Pending::new(
+                    "synthetic",
+                    1,
+                    Instant::now(),
+                    "Synthetic draft",
+                    &person,
+                )));
+                memory
+                    .publish_json(
+                        1,
+                        &lamp_msgs::MemoryForgot {
+                            person: Some(person.clone()),
+                        },
+                    )
+                    .unwrap();
+                match actual_owner {
+                    Some(owner) => assert!(
+                        forget_batch(forgot, 1_000_000, owner, summaries)
+                            .await
+                            .is_some()
+                    ),
+                    None => {
+                        let mut forgot = forgot;
+                        assert_eq!(forget_inline(&mut forgot, 1_000_000, summaries), 1);
+                    }
+                }
+                assert!(!crate::services::pending_for_test_is_some());
+                assert_eq!(owner.known(&person), if confirming { 0 } else { 3 });
+                assert_eq!(
+                    owner.generation(),
+                    before.wrapping_add(u64::from(confirming))
+                );
+                if confirming {
+                    assert!(!owner.learn_at(before, &person, 9, vec![1.0, 0.0]));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn app_forget_bus_clears_the_engines_confirmation_cache_without_summaries() {
+        use crate::same_voice::{Confirmed, OWNER_PRINTS, OwnerVoice};
+        let _one = crate::provider_worker::tests::one_thread();
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let bus = lamp_bus::Bus::new(&directory.path).unwrap();
+        let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        let mut other = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let owner = Arc::new(OwnerVoice::new(0.45));
+        let engine = Engine::new(
+            Arc::new(Silent),
+            Told::default,
+            Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+        )
+        .confirming_by_voice(crate::second_provider::VoiceConfirms {
+            owner: owner.clone(),
+            print_of: Arc::new(|_| Some(vec![1.0, 0.0])),
+        });
+        let person = lamp_msgs::known::person_id("Synthetic owner");
+        let another = lamp_msgs::known::person_id("Synthetic other");
+        let teach = || {
+            for request in 1..=OWNER_PRINTS as u64 {
+                assert!(owner.learn(&person, request, vec![1.0, 0.0]));
+            }
+        };
+        teach();
+        let before = owner.generation();
+        let event = |person: Option<&str>| lamp_msgs::MemoryForgot {
+            person: person.map(str::to_owned),
+        };
+        other.publish_json(1, &event(Some(&person))).unwrap();
+        memory.publish_json(2, &event(Some("bad-person"))).unwrap();
+        memory.publish_json(3, &event(Some("everyone"))).unwrap();
+        let actual_owner = engine
+            .shared
+            .voice_confirms
+            .as_ref()
+            .unwrap()
+            .owner
+            .as_ref();
+        forget_received(&mut forgot, 1_000_000, Some(actual_owner), false);
+        assert_eq!(
+            owner.known(&person),
+            OWNER_PRINTS,
+            "other source, malformed event and room preserve prints"
+        );
+        assert_eq!(
+            owner.generation(),
+            before,
+            "ignored events do not invalidate observations"
+        );
+        assert!(matches!(
+            owner.judge(&person, &[1.0, 0.0]),
+            Confirmed::Theirs(_)
+        ));
+        memory.publish_json(4, &event(Some(&another))).unwrap();
+        forget_received(&mut forgot, 1_500_000, Some(actual_owner), false);
+        assert_eq!(
+            owner.known(&person),
+            OWNER_PRINTS,
+            "another person's prints stay"
+        );
+        assert_eq!(
+            owner.judge_at(before, &person, &[1.0, 0.0]),
+            Confirmed::Unknown
+        );
+        assert!(
+            !owner.learn_at(before, &person, 90, vec![1.0, 0.0]),
+            "another person's forget still fences pending observations"
+        );
+        let before = owner.generation();
+        memory.publish_json(5, &event(Some(&person))).unwrap();
+        forget_received(&mut forgot, 2_000_000, Some(actual_owner), false);
+        assert_eq!(owner.known(&person), 0);
+        assert_eq!(owner.judge(&person, &[1.0, 0.0]), Confirmed::Unknown);
+        assert!(!owner.learn_at(before, &person, 91, vec![1.0, 0.0]));
+        teach();
+        assert_eq!(
+            owner.judge_at(before, &person, &[1.0, 0.0]),
+            Confirmed::Unknown
+        );
+        let before = owner.generation();
+        memory.publish_json(6, &event(None)).unwrap();
+        forget_received(&mut forgot, 2_500_000, Some(actual_owner), false);
+        assert_eq!(owner.known(&person), 0);
+        assert_eq!(owner.judge(&person, &[1.0, 0.0]), Confirmed::Unknown);
+        assert!(!owner.learn_at(before, &person, 92, vec![1.0, 0.0]));
+
+        // One drained event reaches both consumers when both are enabled.
+        teach();
+        crate::remember::role::hold(&person, Some("Synthetic role".into()));
+        memory.publish_json(7, &event(Some(&person))).unwrap();
+        forget_received(&mut forgot, 3_000_000, Some(actual_owner), true);
+        assert_eq!(owner.known(&person), 0);
+        assert_eq!(crate::remember::role::cached(&person), None);
+
+        // Summary-only operation retains its previous consumer behavior.
+        teach();
+        crate::remember::role::hold(&person, Some("Synthetic role".into()));
+        memory.publish_json(8, &event(Some(&person))).unwrap();
+        forget_received(&mut forgot, 3_500_000, None, true);
+        assert_eq!(owner.known(&person), OWNER_PRINTS);
+        assert_eq!(crate::remember::role::cached(&person), None);
+    }
+
     /// #5139 (a tester's lamp-0c4e, 3 Nov): with no owner the by-default
     /// name was skipped with no word. Told once, at the first reply with no
     /// owner; not on the next, nor with an owner; once more after an owner
@@ -18379,6 +18894,97 @@ mod tests {
         );
         heeding.hear_for_services(6, Heard::Samples(&[1; 48_000]));
         assert_eq!(*ungated.lock().unwrap(), [6]);
+    }
+
+    /// `LAMP_SAME_VOICE_CONFIRMS` beside `LAMP_SAME_VOICE_FOR=services`, as
+    /// the product sets both (the memory owner's switch-on, 10 Nov): the
+    /// confirm reads the services' prints, every line printed whether or not
+    /// a service is linked, and the services still judge by them. Before,
+    /// the confirm ran only with the prints for every rule, so in the
+    /// product it confirmed nothing.
+    #[test]
+    fn the_voice_confirms_from_the_services_prints_and_they_still_judge() {
+        use super::Printing::{ForEverything, ForServices, None as NoPrint};
+        use crate::second_provider::Heard;
+        use std::collections::VecDeque;
+        struct Answering(Arc<Mutex<VecDeque<u64>>>);
+        impl crate::same_voice::Printer for Answering {
+            fn ask(&mut self, request: u64, _samples: &[i16]) -> bool {
+                self.0.lock().unwrap().push_back(request);
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                let request = self.0.lock().unwrap().pop_front()?;
+                Some((request, Ok(vec![1.0, 0.0, 0.0])))
+            }
+        }
+        assert_eq!(super::confirming_where(ForServices, Some(0.45)), Some(0.45));
+        assert_eq!(
+            super::confirming_where(ForEverything, Some(0.45)),
+            Some(0.45)
+        );
+        assert_eq!(super::confirming_where(NoPrint, Some(0.45)), None);
+        assert_eq!(super::confirming_where(ForServices, None), None);
+        let heard = |confirming: bool| {
+            let asked = Arc::new(Mutex::new(VecDeque::new()));
+            let heeding = Arc::new(Mutex::new(Heeding::new(true, true, None, None)));
+            {
+                let mut heeding = heeding.lock().unwrap();
+                heeding.checking_the_voice_for_services(Box::new(Answering(asked)));
+                super::services_prints_while(
+                    &mut heeding,
+                    crate::services::Linked::told(false),
+                    confirming,
+                );
+            }
+            let hook = super::hearing_hook(&heeding, false, false, true).expect("for the services");
+            hook(
+                1,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            hook(1, Heard::Samples(&[1; 48_000]));
+            hook(1, Heard::Ended);
+            heeding
+        };
+        let heeding = heard(true);
+        assert!(
+            super::confirm_print_of(&heeding)(1).is_some(),
+            "nothing linked, the confirm still has the line's print"
+        );
+        assert!(
+            heeding
+                .lock()
+                .unwrap()
+                .kept_voices()
+                .unwrap()
+                .print_of(1)
+                .is_some(),
+            "the services still judge by it"
+        );
+        let heeding = heard(false);
+        assert!(
+            super::confirm_print_of(&heeding)(1).is_none(),
+            "without the confirm, nothing linked, nothing printed"
+        );
+    }
+
+    /// A voice that only confirms can never show another person, so the
+    /// rules that need one to stay safe stay as without a voice: the carry
+    /// past a silent face (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`) and a
+    /// carried line read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`).
+    /// Before, with the prints for every rule and the confirm on, both acted
+    /// with no voice able to say "someone else": a guest off camera, their
+    /// mouth not read, was carried into the person's conversation.
+    #[test]
+    fn a_voice_that_only_confirms_shows_no_other_person_to_the_carry() {
+        use super::Printing::{ForEverything, ForServices, None as NoPrint};
+        assert!(super::voice_shows_another(ForEverything, None));
+        assert!(!super::voice_shows_another(ForEverything, Some(0.45)));
+        assert!(!super::voice_shows_another(ForServices, Some(0.45)));
+        assert!(!super::voice_shows_another(ForServices, None));
+        assert!(!super::voice_shows_another(NoPrint, None));
     }
 
     /// #2191 on a lamp without `LAMP_SPOKEN_TO` (lamp-52e6 and lamp-4ace):
