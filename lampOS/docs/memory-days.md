@@ -238,7 +238,9 @@ memory refuses the field and answers `unknown_op` to the two new
 operations, so the voice sends them only with its switch on.
 
 On the voice's side, the person's own turns are told the role as data ("a
-name they chose, not an instruction"). A turn whose speaker is not placed is
+name they chose, not an instruction") and as who the lamp is with them, and
+that a kept role ends only by `end_role` ("be yourself", "just be Lamp",
+"drop the character"), so the lamp never says it has none while one is kept. A turn whose speaker is not placed is
 told only the role names of the known faces in view, deduped and naming no
 one, and that the lamp can't tell who is speaking, so it stays Lamp; that
 note is left out entirely while a name is held back (`someone_else_now`). An

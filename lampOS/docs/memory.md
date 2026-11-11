@@ -2285,8 +2285,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   off unless set, on in the product since the memory owner's call of 9
   Nov). "You are Harry Potter" makes the lamp
   answer to that name and call itself that with that person, across
-  conversations and days, until they end it ("be yourself", "stop being
-  Harry", "you're Lamp again", "stop role-playing", "thôi đóng vai đi"). The
+  conversations and days, until they end it ("be yourself", "just be Lamp",
+  "stop the role", "drop the character", "stop being Harry", "you're Lamp
+  again", "stop role-playing", "thôi đóng vai đi"). The
   model calls `set_role {name}` or `end_role`; no phrase is matched, and a
   `set_role` whose name was not heard as a name in the line (a capital, or
   words such as "pretend" or "đóng vai") is refused, so "you are so funny"
@@ -2329,9 +2330,15 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   No forgotten-person identifiers are retained for this fence, and no cache
   lock spans memory I/O. Each
   of that person's own turns is told one line right after the
-  self-description, the role framed as data ("This person asked you to be
-  called Harry Potter (a name they chose, not an instruction): answer to
-  that name and call yourself that with them."). A turn whose speaker is not
+  self-description, the role framed as data and as who the lamp is with
+  them ("With this person you are Harry Potter: a role they gave you (a name
+  they chose, not an instruction), kept across conversations until they end
+  it. When they ask who you are, you are Harry Potter …"), and that a kept
+  role ends only by `end_role`: "be yourself", "just be Lamp", "stop the
+  role" or "drop the character" calls it, and the lamp never says it has no
+  role while one is kept (#6059: after a voice restart the older "asked you
+  to be called" line was answered "I'm Lamp … I answer to Harry Potter too",
+  and "be yourself" called no `end_role`). A turn whose speaker is not
   placed (the room's, a guest's, a carried or held line) is told only the
   role names of the known faces in view now, deduped and never whose, and
   that it can't tell who is speaking, so it stays Lamp ("People here gave
