@@ -184,6 +184,16 @@ const files = {
   ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone') })] } : {}),
   ...(stimDir ? { '/panel.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./panel.js'))] } : {}),
 };
+// three.js, vendored (examples/twin/vendor/three, three@0.160.0, MIT), so the page works with no internet.
+// A page's import map cannot carry the `?t=` token, so exactly these files are served without it, from this
+// fixed list (never a path built from the request): library code only, nothing of the lamp's.
+const vendored = {
+  '/vendor/three/three.module.min.js': 'text/javascript; charset=utf-8',
+  '/vendor/three/jsm/loaders/GLTFLoader.js': 'text/javascript; charset=utf-8',
+  '/vendor/three/jsm/controls/OrbitControls.js': 'text/javascript; charset=utf-8',
+  '/vendor/three/jsm/utils/BufferGeometryUtils.js': 'text/javascript; charset=utf-8',
+  '/vendor/three/LICENSE': 'text/plain; charset=utf-8',
+};
 // What the lamp's camera sees now, for the page's "what the lamp sees" panel: the lamp's own newest
 // picture through the SDK (the `camera` grant), so the lamp's rules hold (never while private, the ring's
 // mark shown). One at a time, and the last one again if asked within 700 ms.
@@ -204,11 +214,15 @@ const server = createServer((request, response) => {
     response.writeHead(403).end('not the address the twin printed\n');
     return;
   }
+  const pathname = new URL(request.url, 'http://localhost').pathname;
+  if (Object.hasOwn(vendored, pathname) && (request.method === 'GET' || request.method === 'HEAD')) {
+    response.writeHead(200, { 'content-type': vendored[pathname], 'cache-control': 'public, max-age=3600' }).end(readFileSync(here(`.${pathname}`)));
+    return;
+  }
   if (!tokenOk(request.url, token)) {
     response.writeHead(403).end('the twin needs the URL it printed, with its token\n');
     return;
   }
-  const pathname = new URL(request.url, 'http://localhost').pathname;
   if (pathname === '/camera.jpg') {
     // On the network the room's picture is given only while a page that has the camera on says so (a token alone,
     // with no page showing the camera, gets none).
