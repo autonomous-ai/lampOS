@@ -1,0 +1,1049 @@
+use super::*;
+use crate::{hermes_install::Carried, judge::UnitState};
+use std::{cell::RefCell, os::unix::fs::symlink, rc::Rc};
+
+/// What a round asked systemd, in order.
+#[derive(Default)]
+struct Fake {
+    asked: Vec<&'static str>,
+    /// Harness's one-shot's `ActiveState`, for the watch's acts.
+    active: Option<&'static str>,
+}
+
+impl Systemd for Fake {
+    fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
+        let active = self.active.expect("only the watch asks a unit's state");
+        assert_eq!(units, [harness_install::UNIT]);
+        self.asked.push("state");
+        Ok(vec![UnitState {
+            unit: harness_install::UNIT.to_owned(),
+            active: active.to_owned(),
+            ..UnitState::default()
+        }])
+    }
+    fn freeze_harness_unit(&mut self) -> Result<(), String> {
+        self.asked.push("freeze");
+        Ok(())
+    }
+    fn thaw_harness_unit(&mut self) -> Result<(), String> {
+        self.asked.push("thaw");
+        Ok(())
+    }
+    fn stop(&mut self, unit: &str) -> Result<(), String> {
+        if unit == UNIT {
+            self.asked.push("stop-gateway");
+        } else {
+            assert_eq!(unit, harness_install::UNIT);
+            self.asked.push("stop");
+        }
+        Ok(())
+    }
+    fn start_unit(&mut self, unit: &str) -> Result<(), String> {
+        assert_eq!(unit, UNIT, "a round starts only the gateway");
+        self.asked.push("start-gateway");
+        Ok(())
+    }
+    fn self_recovery_ready(&mut self) -> Result<(), String> {
+        unreachable!()
+    }
+    fn reload(&mut self) -> Result<(), String> {
+        self.asked.push("reload");
+        Ok(())
+    }
+    fn restart(&mut self, _: &str) -> Result<(), String> {
+        unreachable!("a round restarts nothing of OpenClaw's")
+    }
+    fn last_line(&mut self, _: &str) -> Option<String> {
+        unreachable!()
+    }
+    fn harness_unit_properties(&mut self) -> Result<String, String> {
+        self.asked.push("show");
+        Ok("Id=lamp-update-harness.service\n\
+            LoadState=loaded\n\
+            FragmentPath=/etc/systemd/system/lamp-update-harness.service\n\
+            DropInPaths=\n\
+            UnitFileState=static\n"
+            .to_owned())
+    }
+    fn start_harness_unit(&mut self) -> Result<(), String> {
+        self.asked.push("start");
+        Ok(())
+    }
+    fn start_writer_unit(&mut self) -> Result<(), String> {
+        unreachable!("never the writer's")
+    }
+}
+
+struct Lamp {
+    root: tempfile::TempDir,
+}
+
+impl Lamp {
+    fn new() -> Self {
+        let root = tempfile::tempdir().unwrap();
+        for folder in [
+            "etc/systemd/system",
+            "usr/local/bin",
+            "usr/local/lib/lampos",
+            "var/lib/lampos-update",
+            "proc",
+        ] {
+            fs::create_dir_all(root.path().join(folder)).unwrap();
+        }
+        let lamp = Self { root };
+        fs::write(
+            lamp.at(hermes_install::MEMINFO),
+            format!("MemAvailable:   {} kB\n", 4 * NEEDS_AVAILABLE_KB),
+        )
+        .unwrap();
+        lamp
+    }
+    fn root(&self) -> &Path {
+        self.root.path()
+    }
+    fn records(&self) -> PathBuf {
+        self.root.path().join("var/lib/lampos-update")
+    }
+    fn at(&self, path: &str) -> PathBuf {
+        on(self.root(), path)
+    }
+    fn harness_there(&self) {
+        let bin = self.at("/var/lib/lampos-tasks/.local/bin");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(bin.join("harness"), "").unwrap();
+        symlink(
+            "/var/lib/lampos-tasks/.local/bin/harness",
+            self.at("/usr/local/bin/harness"),
+        )
+        .unwrap();
+    }
+    fn said(&self) -> Option<OpenclawInstall> {
+        record(&self.records())
+    }
+    fn asked(&self) -> Option<Ask> {
+        serde_json::from_slice(&fs::read(self.records().join(ASK)).ok()?).ok()
+    }
+    fn ask(&self) {
+        fs::write(self.records().join(ASK), "{\"version\":1}").unwrap();
+    }
+    fn unit(&self) -> PathBuf {
+        unit_path(self.root())
+    }
+}
+
+const NODE_BYTES: &[u8] = b"a stand-in for node-v24.22.2-linux-arm64.tar.gz";
+const PACKAGE_BYTES: &[u8] = b"a stand-in for openclaw-2026.11.2.tgz";
+
+fn leak(text: String) -> &'static str {
+    Box::leak(text.into_boxed_str())
+}
+
+/// This build's pins, over the stand-in bytes the runner fetches.
+fn kit() -> Kit {
+    Kit {
+        node_sha256: leak(crate::manifest::sha256_hex(NODE_BYTES)),
+        package_integrity: leak(integrity_of(PACKAGE_BYTES)),
+        ..Kit::BUILT
+    }
+}
+
+fn own_ids() -> (String, String) {
+    let mine = tempfile::tempfile().unwrap().metadata().unwrap();
+    (mine.uid().to_string(), mine.gid().to_string())
+}
+
+/// A runner that logs each command and answers it: `id` with the test's
+/// own ids, `curl -o` by writing the stand-in bytes, `tar` by putting a
+/// Node of `node` there, npm by putting the package at `package`,
+/// `install -d` by making the folder; `fail_on` makes the first command
+/// holding it fail; the rest with nothing.
+struct Runs {
+    root: PathBuf,
+    log: Rc<RefCell<Vec<String>>>,
+    node: &'static str,
+    package: &'static str,
+    fail_on: Option<&'static str>,
+    /// What the failing command answers.
+    error: &'static str,
+}
+
+impl Runs {
+    fn new(lamp: &Lamp) -> Self {
+        Self {
+            root: lamp.root().to_owned(),
+            log: Rc::default(),
+            node: NODE_VERSION,
+            package: VERSION,
+            fail_on: None,
+            error: "refused",
+        }
+    }
+    fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
+        move |argv: &[String]| {
+            let line = argv.join(" ");
+            self.log.borrow_mut().push(line.clone());
+            if self.fail_on.is_some_and(|wanted| line.contains(wanted)) {
+                return Err(self.error.to_owned());
+            }
+            let (uid, gid) = own_ids();
+            if line == "id -g lampos" {
+                Ok(format!("{gid}\n"))
+            } else if argv[0] == "id" {
+                Ok(format!("{uid}\n"))
+            } else if argv[0] == "df" {
+                Ok(
+                    "Filesystem 1024-blocks Used Available Capacity Mounted on\n\
+                    /dev/mmcblk0p2 60000000 1000 20000000 3% /\n"
+                        .to_owned(),
+                )
+            } else if argv[0] == "install" && argv[1] == "-d" {
+                fs::create_dir_all(on(&self.root, argv.last().unwrap())).unwrap();
+                Ok(String::new())
+            } else if argv[0] == "curl" {
+                let out = argv.iter().position(|arg| arg == "-o").unwrap() + 1;
+                let bytes = if argv.last().unwrap() == NODE_URL {
+                    NODE_BYTES
+                } else {
+                    PACKAGE_BYTES
+                };
+                fs::write(&argv[out], bytes).unwrap();
+                Ok(String::new())
+            } else if line.contains(" tar -xzf ") {
+                put_node(&self.root, self.node);
+                Ok(String::new())
+            } else if line.contains(&format!("{NPM} install ")) {
+                put_package(&self.root, self.package);
+                Ok(String::new())
+            } else if line.ends_with(" --version") {
+                Ok("OpenClaw 2026.11.2\n".into())
+            } else {
+                Ok(String::new())
+            }
+        }
+    }
+    fn lines(&self) -> Vec<String> {
+        self.log.borrow().clone()
+    }
+    fn position(&self, wanted: &str) -> usize {
+        let lines = self.lines();
+        lines
+            .iter()
+            .position(|line| line.contains(wanted))
+            .unwrap_or_else(|| panic!("no `{wanted}` in {lines:#?}"))
+    }
+}
+
+fn put_node(root: &Path, version: &str) {
+    let header = on(root, NODE_VERSION_H);
+    fs::create_dir_all(header.parent().unwrap()).unwrap();
+    let mut parts = version.split('.');
+    fs::write(
+        header,
+        format!(
+            "#ifndef SRC_NODE_VERSION_H_\n#define NODE_MAJOR_VERSION {}\n#define NODE_MINOR_VERSION {}\n#define NODE_PATCH_VERSION {}\n",
+            parts.next().unwrap(),
+            parts.next().unwrap(),
+            parts.next().unwrap()
+        ),
+    )
+    .unwrap();
+    fs::create_dir_all(on(root, NODE_BIN)).unwrap();
+    fs::write(on(root, NODE), "").unwrap();
+}
+
+fn put_package(root: &Path, version: &str) {
+    let package = on(root, PACKAGE_JSON);
+    fs::create_dir_all(package.parent().unwrap()).unwrap();
+    fs::write(
+        package,
+        format!("{{\"name\":\"openclaw\",\"version\":\"{version}\"}}"),
+    )
+    .unwrap();
+    let bin = on(root, OPENCLAW);
+    fs::create_dir_all(bin.parent().unwrap()).unwrap();
+    fs::write(bin, "").unwrap();
+}
+
+fn quiet() -> impl FnMut(&str) {
+    |_: &str| {}
+}
+
+fn install(lamp: &Lamp, runs: &Runs, at: u64) -> Option<OpenclawInstall> {
+    let mut run = runs.runner();
+    install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || at,
+        &mut quiet(),
+        &kit(),
+    )
+    .unwrap()
+}
+
+fn round(lamp: &Lamp, systemd: &mut Fake, skills: bool, at: u64) -> Option<OpenclawInstall> {
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        skills,
+        systemd,
+        at,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut quiet(),
+    )
+}
+
+fn mode(path: &Path) -> u32 {
+    fs::metadata(path).unwrap().mode() & 0o7777
+}
+
+const AS_LAMPOS: &str = "runuser -u lampos -- env HOME=/var/lib/lampos-openclaw \
+     OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state \
+     PATH=/var/lib/lampos-openclaw/node/bin:/usr/bin:/bin SHELL=/bin/sh ";
+
+/// On by default on a product lamp, as Hermes, with the names the contract
+/// fixes; the skills switch the same. `serve` with it off takes an earlier
+/// record and ask away; no ask, nothing runs.
+#[test]
+fn the_switches_are_on_by_default_on_a_product_lamp_only() {
+    const { assert!(PRODUCT_DEFAULT && SKILLS_PRODUCT_DEFAULT) };
+    assert_eq!(SWITCH, "LAMP_OPENCLAW_ON_LAMP");
+    assert_eq!(SKILLS_SWITCH, "LAMP_OPENCLAW_SKILLS");
+    for default in [PRODUCT_DEFAULT, SKILLS_PRODUCT_DEFAULT] {
+        assert!(wanted(None, true, default));
+        assert!(!wanted(None, false, default));
+        assert!(!wanted(Some("off"), true, default));
+        assert!(wanted(Some("on"), false, default));
+    }
+    let lamp = Lamp::new();
+    at_start(lamp.root(), &lamp.records(), true, true, 1);
+    assert_eq!(lamp.said().unwrap().install, "absent");
+    lamp.ask();
+    at_start(lamp.root(), &lamp.records(), false, true, 2);
+    assert_eq!(lamp.said(), None);
+    assert_eq!(lamp.asked(), None);
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 3), None);
+    assert!(runs.lines().is_empty());
+}
+
+/// With Harness there, a round writes the gateway's unit (reloading
+/// systemd), asks and starts Harness's one-shot, `installing`. The one-shot
+/// fetches the pinned Node and package as root, checks them, unpacks and
+/// installs them as `lampos`, makes the gateway's token once and the
+/// config's gateway block, writes the namespace script and the wrapper,
+/// root's 0755, and restarts the gateway only if it runs (never enables or
+/// starts it): `installed`.
+#[test]
+fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    let said = round(&lamp, &mut systemd, true, 10).unwrap();
+    assert_eq!(said.install, "installing");
+    assert_eq!(systemd.asked, ["reload", "reload", "show", "start"]);
+    assert_eq!(fs::read_to_string(lamp.unit()).unwrap(), UNIT_TEXT);
+    assert_eq!(
+        lamp.asked(),
+        Some(Ask {
+            version: 1,
+            remove: false,
+            skills: true
+        })
+    );
+    assert_eq!(round(&lamp, &mut systemd, true, 11), None, "one at a time");
+
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 20).unwrap();
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    assert_eq!(said.version.as_deref(), Some(VERSION));
+    assert_eq!(said.node.as_deref(), Some(NODE_VERSION));
+    assert_eq!(lamp.asked(), None, "answered");
+    let lines = runs.lines();
+    for url in [NODE_URL, PACKAGE_URL] {
+        assert!(
+            lines.iter().any(|line| line.starts_with(&format!(
+                "curl -fsSL --proto =https --tlsv1.2 --max-filesize {MOST_BYTES} -o /"
+            )) && line.contains(&format!("/{DOWNLOADS}"))
+                && line.ends_with(&format!(" {url}"))),
+            "{lines:#?}"
+        );
+    }
+    for wanted in [
+        format!("{AS_LAMPOS}tar -xzf "),
+        format!(
+            "{AS_LAMPOS}{NPM} install --global --prefix {PREFIX} --omit=dev --no-audit --no-fund --no-update-notifier "
+        ),
+        format!("{AS_LAMPOS}{NODE} {OPENCLAW} --version"),
+        format!("install -d -o lampos -g lampos -m 0700 {PLACE}"),
+        format!("install -d -o lampos -g lampos -m 0700 {STATE}"),
+        format!("chown -h lampos:lampos {GATEWAY_TOKEN}"),
+        format!("chown -h lampos:lampos {CONFIG}"),
+        format!("systemctl restart {UNIT}"),
+        "systemctl try-restart lamp-tasks.service".to_owned(),
+    ] {
+        runs.position(&wanted);
+    }
+    assert!(
+        runs.position(NODE_URL) < runs.position(" tar -xzf ")
+            && runs.position(" tar -xzf ") < runs.position(PACKAGE_URL)
+            && runs.position(PACKAGE_URL) < runs.position(&format!("{NPM} install"))
+            && runs.position(&format!("{NPM} install"))
+                < runs.position(&format!("systemctl restart {UNIT}")),
+        "{lines:#?}"
+    );
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.starts_with("curl") && line.contains("runuser")),
+        "fetched as root, into a root's folder"
+    );
+    for (path, text) in [(WRAPPER, WRAPPER_TEXT.to_owned()), (NS, ns_text(true))] {
+        assert_eq!(fs::read_to_string(lamp.at(path)).unwrap(), text);
+        assert_eq!(mode(&lamp.at(path)), 0o755);
+    }
+    let token = fs::read_to_string(lamp.at(GATEWAY_TOKEN)).unwrap();
+    let token = token.trim();
+    assert_eq!(token.len(), 64);
+    assert!(token.bytes().all(|b| b.is_ascii_hexdigit()));
+    assert_eq!(mode(&lamp.at(GATEWAY_TOKEN)), 0o600);
+    let config: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
+    assert_eq!(
+        config,
+        serde_json::json!({"gateway": {
+            "mode": "local",
+            "bind": "loopback",
+            "port": 18789,
+            "auth": {"mode": "token", "token": token},
+        }}),
+        "the gateway block only"
+    );
+    assert_eq!(mode(&lamp.at(CONFIG)), 0o600);
+    assert!(present(lamp.root(), true));
+    assert!(!present(lamp.root(), false), "the other skills text");
+
+    // Again: the token is made once, the config's other keys kept, nothing
+    // fetched.
+    fs::write(
+        lamp.at(CONFIG),
+        serde_json::to_vec(&serde_json::json!({
+            "gateway": config["gateway"],
+            "models": {"mode": "merge"},
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    fs::remove_file(lamp.at(NS)).unwrap();
+    lamp.ask();
+    let again = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &again, 30).unwrap().install, "installed");
+    assert!(!again.lines().iter().any(|line| line.starts_with("curl")));
+    assert_eq!(
+        fs::read_to_string(lamp.at(GATEWAY_TOKEN)).unwrap().trim(),
+        token
+    );
+    let kept: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
+    assert_eq!(kept["models"]["mode"], "merge");
+    assert!(
+        !again
+            .lines()
+            .iter()
+            .any(|line| line.contains("try-restart lamp-tasks")),
+        "lamp-tasks is started again only after a new install"
+    );
+}
+
+/// The wrapper is Hermes's: the forwarder token or nothing, then only the
+/// namespace script in a new user, mount and PID namespace; OpenClaw's
+/// state folder and the pinned Node's `bin` given.
+#[test]
+fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
+    assert!(WRAPPER_TEXT.starts_with("#!/bin/sh\n"));
+    assert!(WRAPPER_TEXT.contains(&format!("$(cat {TOKEN} 2>/dev/null)")));
+    assert!(WRAPPER_TEXT.contains(&format!(
+        "export {TOKEN_ENV}=\"$T\" {STATE_ENV}={STATE} PATH=\"{NODE_BIN}:$PATH\" "
+    )));
+    assert!(WRAPPER_TEXT.ends_with(&format!(
+        "exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc \
+         --propagation private {NS} \"$@\"\n"
+    )));
+    assert_eq!(WRAPPER_TEXT.matches("exec ").count(), 1);
+    assert!(!WRAPPER_TEXT.contains(OPENCLAW), "never OpenClaw itself");
+    let folder = tempfile::tempdir().unwrap();
+    let printer = folder.path().join("unshare");
+    fs::write(
+        &printer,
+        "#!/bin/sh\necho \"token=$LAMP_HERMES_TOKEN state=$OPENCLAW_STATE_DIR path=$PATH\"\necho \"args: $*\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
+    let token = folder.path().join("hermes-token");
+    let wrapper = folder.path().join("openclaw");
+    fs::write(
+        &wrapper,
+        WRAPPER_TEXT
+            .replace(TOKEN, &token.to_string_lossy())
+            .replace("/usr/bin/unshare", &printer.to_string_lossy()),
+    )
+    .unwrap();
+    let ran = || {
+        std::process::Command::new("/bin/sh")
+            .arg(&wrapper)
+            .args(["gateway", "run"])
+            .env("PATH", "/usr/bin:/bin")
+            .output()
+            .unwrap()
+    };
+    let refused = ran();
+    assert!(!refused.status.success());
+    assert!(refused.stdout.is_empty(), "nothing run");
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("no forwarder token"));
+    fs::write(&token, "tok_0123456789abcdef\n").unwrap();
+    let good = ran();
+    assert!(good.status.success(), "{good:?}");
+    let out = String::from_utf8_lossy(&good.stdout);
+    assert!(out.contains(&format!(
+        "token=tok_0123456789abcdef state={STATE} path={NODE_BIN}:/usr/bin:/bin\n"
+    )));
+    assert!(out.contains(&format!(
+        "args: --map-root-user --mount --pid --kill-child --mount-proc --propagation private \
+         {NS} gateway run\n"
+    )));
+}
+
+/// The namespace script is Hermes's, line for line, but for OpenClaw's
+/// folder, command and names: the same allow-list and the same steps, with
+/// the skills' socket only with the switch on. No Hermes is left in it.
+#[test]
+fn the_namespace_script_is_hermess_for_openclaw() {
+    for (from, _) in ENGINE_EDITS {
+        assert!(
+            hermes_install::ns_text(true).contains(from),
+            "`{from}` is not in Hermes's script"
+        );
+    }
+    for skills in [false, true] {
+        let ours = ns_text(skills);
+        let hermes = hermes_install::ns_text(skills);
+        assert!(!ours.to_ascii_lowercase().contains("hermes"), "{ours}");
+        assert!(!ours.contains("#5978") && !ours.contains("#6128"));
+        assert_eq!(ours.lines().count(), hermes.lines().count());
+        for (mine, theirs) in ours.lines().zip(hermes.lines()) {
+            if !theirs.to_ascii_lowercase().contains("hermes") && !theirs.contains("#5978") {
+                assert_eq!(mine, theirs);
+            }
+        }
+        assert!(ours.contains(&format!(
+            "H={PLACE} W={WORK} K={SKILLS}{} S=/tmp/.lampos-ns\n",
+            if skills {
+                format!(" C={SKILLS_SOCKET}")
+            } else {
+                String::new()
+            }
+        )));
+        assert!(ours.ends_with(&format!(
+            "exec /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" {OPENCLAW} \"$@\"\n"
+        )));
+        assert!(ours.contains(&format!("only inside the namespace {WRAPPER} makes")));
+        assert_eq!(ours.contains(SKILLS_SOCKET), skills);
+    }
+    assert!(ns_text(true).contains("# LAMP_OPENCLAW_SKILLS=on (#6226)"));
+    assert_eq!(ALLOWED, [PLACE, WORK, SKILLS]);
+}
+
+/// The pins: Node 24 at or past 24.16 (OpenClaw's floor), nodejs.org's
+/// linux-arm64 tarball by its SHA-256; the package Harness measured, the
+/// registry's tarball by its sha512 integrity.
+#[test]
+fn the_pins_are_node_24_and_the_measured_package() {
+    let parts: Vec<u32> = NODE_VERSION
+        .split('.')
+        .map(|part| part.parse().unwrap())
+        .collect();
+    assert!(parts[0] == 24 && parts[1] >= 16, "{NODE_VERSION}");
+    for url in [NODE_URL, NODE_ORIGIN] {
+        assert!(
+            url.starts_with("https://")
+                && url.ends_with(&format!(
+                    "/v{NODE_VERSION}/node-v{NODE_VERSION}-linux-arm64.tar.gz"
+                )),
+            "{url}"
+        );
+    }
+    assert!(NODE_URL.starts_with(
+        "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/"
+    ));
+    assert!(NODE_SHA256.len() == 64 && NODE_SHA256.bytes().all(|b| b.is_ascii_hexdigit()));
+    assert_eq!(VERSION, "2026.11.2");
+    assert_eq!(
+        PACKAGE_URL,
+        format!("https://registry.npmjs.org/openclaw/-/openclaw-{VERSION}.tgz")
+    );
+    assert!(PACKAGE_INTEGRITY.starts_with("sha512-") && PACKAGE_INTEGRITY.len() == 95);
+    assert_eq!(PACKAGE_SHASUM.len(), 40);
+    assert_eq!(
+        integrity_of(b""),
+        "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="
+    );
+}
+
+/// A Node or package whose bytes are not the pinned ones is
+/// `pin_mismatch`: nothing unpacked or installed, no entry point, the
+/// gateway disabled.
+#[test]
+fn bytes_not_the_pinned_ones_are_refused() {
+    let lamp = Lamp::new();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let mut run = runs.runner();
+    let said = install_now(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || 5,
+        &mut quiet(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(said.error.as_deref(), Some("pin_mismatch"));
+    assert!(!runs.lines().iter().any(|line| line.contains(" tar ")));
+    assert!(!lamp.at(WRAPPER).exists() && !lamp.at(NS).exists());
+}
+
+/// A failure at any later step takes the entry points out and stops and
+/// a running gateway; its state stays.
+#[test]
+fn a_failed_install_takes_the_entry_points_out_and_stops_the_gateway() {
+    for (fail_on, error) in [
+        (NODE_URL, "fetch"),
+        (" tar -xzf ", "installer"),
+        ("npm install", "installer"),
+        ("systemctl restart lamp-openclaw", "gateway"),
+        ("--map-root-user", "no_userns"),
+        ("command -v tar", "no_tools"),
+    ] {
+        let lamp = Lamp::new();
+        fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+        fs::write(lamp.at(WRAPPER), "old").unwrap();
+        fs::write(lamp.at(NS), "old").unwrap();
+        lamp.ask();
+        let runs = Runs {
+            fail_on: Some(fail_on),
+            ..Runs::new(&lamp)
+        };
+        let said = install(&lamp, &runs, 7).unwrap();
+        assert_eq!(said.error.as_deref(), Some(error), "{fail_on}");
+        assert!(
+            !lamp.at(WRAPPER).exists() && !lamp.at(NS).exists(),
+            "{fail_on}"
+        );
+        runs.position(&format!("systemctl stop {UNIT}"));
+    }
+    // A Node or package not at the pin after its step: version.
+    for (node, package) in [("24.22.1", VERSION), (NODE_VERSION, "2026.11.1")] {
+        let lamp = Lamp::new();
+        lamp.ask();
+        let runs = Runs {
+            node,
+            package,
+            ..Runs::new(&lamp)
+        };
+        assert_eq!(
+            install(&lamp, &runs, 8).unwrap().error.as_deref(),
+            Some("version")
+        );
+    }
+}
+
+/// Off: a round asks the one-shot to stop the gateway and take the entry
+/// points out; once they are gone, the round takes the unit out itself.
+#[test]
+fn the_switch_off_stops_the_gateway_and_takes_everything_out() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    fs::write(lamp.at(WRAPPER), WRAPPER_TEXT).unwrap();
+    fs::write(lamp.at(NS), ns_text(true)).unwrap();
+    let mut systemd = Fake::default();
+    assert!(after_round_off(
+        lamp.root(),
+        &lamp.records(),
+        &mut systemd,
+        &mut quiet()
+    ));
+    assert!(lamp.asked().unwrap().remove);
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 9), None);
+    assert_eq!(
+        runs.lines()[0],
+        format!("systemctl stop {UNIT}"),
+        "the gateway stopped first"
+    );
+    assert!(!lamp.at(WRAPPER).exists() && !lamp.at(NS).exists());
+    assert!(lamp.unit().exists(), "the round's to take out");
+    let mut systemd = Fake::default();
+    assert!(!after_round_off(
+        lamp.root(),
+        &lamp.records(),
+        &mut systemd,
+        &mut quiet()
+    ));
+    assert!(!lamp.unit().exists());
+    assert_eq!(systemd.asked, ["stop-gateway", "reload"]);
+}
+
+/// The gateway's unit: through the wrapper as `lampos`, from OpenClaw's
+/// state, started again on failure, below the lamp's services with caps.
+#[test]
+fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
+    let lines: Vec<&str> = UNIT_TEXT.lines().collect();
+    for wanted in [
+        "User=lampos",
+        "Group=lampos",
+        "ExecStart=/usr/local/bin/openclaw gateway run",
+        "WorkingDirectory=/var/lib/lampos-openclaw/state",
+        "Restart=on-failure",
+        "Nice=10",
+        "CPUQuota=100%",
+        "Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state",
+        "MemoryMax=2500M",
+        "[Install]",
+        "WantedBy=multi-user.target",
+        "NoNewPrivileges=yes",
+    ] {
+        assert!(lines.contains(&wanted), "{wanted} missing");
+    }
+    // (#6226: RAM floor) Node's heap limit left as it is.
+    assert!(!UNIT_TEXT.contains("NODE_OPTIONS") && UNIT_TEXT.contains("(#6226: RAM floor)"));
+    // (the owner on #6226) always on: no memory throttle, only the guard.
+    assert!(!UNIT_TEXT.contains("MemoryHigh"));
+    assert_eq!(
+        WANTS,
+        format!("/etc/systemd/system/multi-user.target.wants/{UNIT}")
+    );
+    assert_eq!(UNIT, "lamp-openclaw-gateway.service");
+    assert!(UNIT_TEXT.contains(&format!("port {PORT}")));
+}
+
+/// (#6226) npm hung 38 min at its extract on lamp-c0a4 with no output
+/// flags: it runs with `--foreground-scripts --loglevel=http`, and each
+/// long step under a hard 20 min bound. One that runs past it ends
+/// `failed` with `timeout`, never `installing` for good.
+#[test]
+fn npm_runs_with_output_and_a_long_step_past_its_bound_is_timeout() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 1).unwrap().install, "installed");
+    let npm = &runs.lines()[runs.position(&format!("{NPM} install"))];
+    assert!(
+        npm.contains(" --foreground-scripts --loglevel=http /"),
+        "{npm}"
+    );
+    for step in [NODE_URL, " tar -xzf ", "npm install", PACKAGE_URL] {
+        let lamp = Lamp::new();
+        lamp.ask();
+        let runs = Runs {
+            fail_on: Some(step),
+            error: "runuser ... did not end within 1200 s: stopped",
+            ..Runs::new(&lamp)
+        };
+        let said = install(&lamp, &runs, 2).unwrap();
+        assert_eq!(
+            (said.install.as_str(), said.error.as_deref()),
+            ("failed", Some("timeout")),
+            "{step}"
+        );
+        assert_eq!(lamp.said(), Some(said));
+    }
+    assert_eq!(STEP_WITHIN, Duration::from_secs(20 * 60));
+}
+
+/// (#6226) OpenClaw needs Node >=24.16 (<25) or >=26.1: the lamp's own
+/// pinned Node is one, and a Node below it found after the unpacking is
+/// refused as `old_node`, named, with nothing put in reach of `lampos`.
+#[test]
+fn a_node_below_what_openclaw_runs_on_is_old_node() {
+    assert!(node_supported(NODE_VERSION));
+    for good in ["24.16.0", "24.22.2", "26.1.0", "27.0.0"] {
+        assert!(node_supported(good), "{good}");
+    }
+    for bad in ["24.15.9", "22.12.0", "25.0.0", "26.0.0", "24", "x.y.z"] {
+        assert!(!node_supported(bad), "{bad}");
+    }
+    let lamp = Lamp::new();
+    lamp.ask();
+    let runs = Runs {
+        node: "24.15.0",
+        ..Runs::new(&lamp)
+    };
+    let mut lines = Vec::new();
+    let said = install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut runs.runner(),
+        &mut || 3,
+        &mut |line: &str| lines.push(line.to_owned()),
+        &kit(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(said.error.as_deref(), Some("old_node"));
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("24.15.0, below what OpenClaw runs on")),
+        "{lines:?}"
+    );
+    assert!(!runs.lines().iter().any(|line| line.contains("npm install")));
+    assert!(!lamp.at(WRAPPER).exists());
+}
+
+/// (#6226) The wrapper the lamp runs, as written by hand on lamp-c0a4:
+/// the pinned Node first on `PATH`, OpenClaw's state folder, the forwarder
+/// token from its file, root's 0755, and ending in `exec`, so no shell of
+/// the wrapper stays above OpenClaw.
+#[test]
+fn the_wrapper_puts_the_lamps_node_first_and_ends_in_exec() {
+    assert!(WRAPPER_TEXT.contains(&format!("PATH=\"{NODE_BIN}:$PATH\"")));
+    assert_eq!(NODE_BIN, "/var/lib/lampos-openclaw/node/bin");
+    assert!(WRAPPER_TEXT.contains(&format!("{STATE_ENV}={STATE}")));
+    assert!(WRAPPER_TEXT.contains(&format!("{TOKEN_ENV}=\"$T\"")));
+    let last = WRAPPER_TEXT.lines().last().unwrap();
+    assert!(last.starts_with("exec "), "{last}");
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    install(&lamp, &runs, 4).unwrap();
+    assert_eq!(fs::read_to_string(lamp.at(WRAPPER)).unwrap(), WRAPPER_TEXT);
+    assert_eq!(mode(&lamp.at(WRAPPER)), 0o755);
+}
+
+/// Each fetch, the unpacking and npm's install get [`STEP_WITHIN`];
+/// OpenClaw's other steps the plain bound.
+#[test]
+fn openclaw_s_long_steps_get_the_long_bound() {
+    let downloads = Downloads::make().unwrap();
+    let file = downloads
+        .file("openclaw.tgz")
+        .to_string_lossy()
+        .into_owned();
+    let npm = as_lampos(&[NPM, "install", "--global", file.as_str()]);
+    assert!(runs_long_step(&npm));
+    assert_eq!(install::bound_of(&npm), STEP_WITHIN);
+    let version = as_lampos(&[NODE, OPENCLAW, "--version"]);
+    assert!(!runs_long_step(&version));
+    assert_eq!(install::bound_of(&version), crate::world::RESTART_WITHIN);
+}
+
+/// The one-shot installs OpenClaw after Hermes, whatever Hermes's did.
+#[test]
+fn the_one_shot_installs_openclaw_after_hermes() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    fs::write(lamp.records().join(hermes_install::ASK), "{\"version\":1}").unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let mut run = runs.runner();
+    hermes_install::one_shot(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || 3,
+        &mut quiet(),
+    )
+    .unwrap();
+    let hermes = runs.position(hermes_install::INSTALLER_FILE);
+    let openclaw = runs.position(NODE_URL);
+    assert!(hermes < openclaw, "{:#?}", runs.lines());
+    assert!(hermes_install::record(&lamp.records()).is_some());
+    assert!(lamp.said().is_some());
+}
+
+/// Turns: Hermes's install under way holds OpenClaw's ask to a later round,
+/// and OpenClaw's holds Hermes's; one stuck past its bound holds nothing.
+#[test]
+fn the_two_installs_take_turns_in_the_one_shot() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let hermes = serde_json::json!({"install": "installing", "revision": 1, "at_unix_ms": 100});
+    fs::write(
+        lamp.records().join(hermes_install::RECORD),
+        hermes.to_string(),
+    )
+    .unwrap();
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, false, 200), None);
+    assert_eq!(lamp.asked(), None, "no ask while Hermes's runs");
+    assert!(!systemd.asked.contains(&"start"));
+    let stuck = 100 + hermes_install::STUCK_AFTER.as_millis() as u64;
+    assert_eq!(
+        round(&lamp, &mut systemd, false, stuck).unwrap().install,
+        "installing"
+    );
+    assert!(lamp.asked().is_some());
+
+    // And the other way: OpenClaw's under way holds Hermes's.
+    fs::remove_file(lamp.records().join(hermes_install::RECORD)).unwrap();
+    let held = hermes_install::after_round(
+        lamp.root(),
+        &lamp.records(),
+        false,
+        &mut systemd,
+        stuck + 1,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut quiet(),
+    );
+    assert_eq!(held, None);
+    assert!(!lamp.records().join(hermes_install::ASK).exists());
+}
+
+/// One watch for both: a freeze with OpenClaw's install alone under way is
+/// said as OpenClaw's; a stop with both under way records both stopped.
+#[test]
+fn the_watch_freezes_and_stops_either_install() {
+    use crate::hermes_schedule::{Act, carry_out_turns};
+    let lamp = Lamp::new();
+    let records = lamp.records();
+    let installing = |at: u64| {
+        serde_json::json!({"install": "installing", "revision": 1, "at_unix_ms": at}).to_string()
+    };
+    fs::write(records.join(RECORD), installing(1)).unwrap();
+    let mut systemd = Fake {
+        active: Some("activating"),
+        ..Fake::default()
+    };
+    let mut lines = Vec::new();
+    let mut say = |line: &str| lines.push(line.to_owned());
+    let freeze = Act::Freeze("someone speaks".into());
+    assert_eq!(
+        carry_out_turns(&freeze, &records, &mut systemd, 2, &mut say),
+        Carried::Done
+    );
+    fs::write(records.join(hermes_install::RECORD), installing(1)).unwrap();
+    let stop = Act::Stop {
+        error: "privacy_lost",
+        why: "the lease is gone".into(),
+    };
+    assert_eq!(
+        carry_out_turns(&stop, &records, &mut systemd, 3, &mut say),
+        Carried::Stopped
+    );
+    assert_eq!(systemd.asked, ["state", "freeze", "state", "thaw", "stop"]);
+    assert_eq!(lamp.said().unwrap().error.as_deref(), Some("privacy_lost"));
+    assert_eq!(
+        hermes_install::record(&records).unwrap().error.as_deref(),
+        Some("privacy_lost")
+    );
+    assert!(
+        lines[0].starts_with("OpenClaw's install is frozen"),
+        "{lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("Hermes's install is stopped"))
+    );
+    assert!(
+        lines.iter().any(
+            |line| line.starts_with("OpenClaw's install, in the same one-shot, is stopped too")
+        )
+    );
+}
+
+/// (#6226) OpenClaw's config, written by hand on lamp-c0a4: the install
+/// sets only its `gateway` block (local, loopback, 18789, the token made
+/// once) and keeps every key lamp-tasks merged in; a token already there
+/// is kept; a config not read as a JSON object is left as it is.
+#[test]
+fn the_gateway_block_is_set_in_a_config_that_lacks_it_and_other_keys_are_kept() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(STATE)).unwrap();
+    let theirs = serde_json::json!({
+        "models": {"mode": "merge", "providers": {"lampos": {
+            "baseUrl": "http://127.0.0.1:7741/v1/deepseek",
+            "apiKey": "${LAMP_HERMES_TOKEN}",
+            "api": "openai-completions",
+        }}},
+        "agents": {"defaults": {"model": {"primary": "lampos/deepseek-flash"}}},
+        "plugins": {"allow": ["openai", "memory-core"]},
+        "unknown": [1, 2],
+    });
+    fs::write(lamp.at(CONFIG), theirs.to_string()).unwrap();
+    fs::write(lamp.at(GATEWAY_TOKEN), "kept0123\n").unwrap();
+    let runs = Runs::new(&lamp);
+    gateway_config(lamp.root(), &mut runs.runner(), &mut quiet()).unwrap();
+    let config: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
+    for key in ["models", "agents", "plugins", "unknown"] {
+        assert_eq!(config[key], theirs[key], "{key} kept");
+    }
+    assert_eq!(
+        config["gateway"],
+        serde_json::json!({
+            "mode": "local",
+            "bind": "loopback",
+            "port": 18789,
+            "auth": {"mode": "token", "token": "kept0123"},
+        })
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.at(GATEWAY_TOKEN)).unwrap(),
+        "kept0123\n",
+        "the token is made once"
+    );
+    assert!(
+        !runs.lines().iter().any(|line| line.contains(GATEWAY_TOKEN)),
+        "a kept token is not given again"
+    );
+    runs.position(&format!("chown -h lampos:lampos {CONFIG}"));
+
+    // A config lamp-update cannot read as an object: left as it is.
+    fs::write(lamp.at(CONFIG), "{ json5: 'not json', }").unwrap();
+    gateway_config(lamp.root(), &mut runs.runner(), &mut quiet()).unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.at(CONFIG)).unwrap(),
+        "{ json5: 'not json', }"
+    );
+}
+
+/// (the owner on #6226: every lamp has 6 GB) The gateway is always on with
+/// the switch on: once OpenClaw is there the round enables it (the
+/// `multi-user.target.wants` link `systemctl enable` makes) and starts it,
+/// each round after only starts it (a no-op when it runs); the switch off
+/// disables and stops it.
+#[test]
+fn the_switch_on_enables_and_starts_the_gateway_and_off_disables_and_stops_it() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 1);
+    assert!(
+        fs::symlink_metadata(lamp.at(WANTS)).is_err(),
+        "not enabled before OpenClaw is there"
+    );
+    assert!(!systemd.asked.contains(&"start-gateway"));
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 2).unwrap().install, "installed");
+    runs.position(&format!("systemctl restart {UNIT}"));
+
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 3);
+    assert_eq!(
+        fs::read_link(lamp.at(WANTS)).unwrap(),
+        Path::new("/etc/systemd/system/lamp-openclaw-gateway.service")
+    );
+    assert_eq!(systemd.asked, ["reload", "start-gateway"]);
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 4);
+    assert_eq!(systemd.asked, ["start-gateway"], "enabled once");
+
+    let mut systemd = Fake::default();
+    after_round_off(lamp.root(), &lamp.records(), &mut systemd, &mut quiet());
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err(), "disabled");
+    assert_eq!(systemd.asked[..2], ["reload", "stop-gateway"]);
+}
