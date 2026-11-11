@@ -334,11 +334,31 @@ impl Clients {
         Ok((id, before))
     }
 
-    /// Replaces the grants of the computer `id` (its unknown grants stay as
-    /// they were): the grants it had, or `None` when no such computer.
-    pub fn set_grants(&mut self, id: &str, grants: BTreeSet<Grant>) -> Option<BTreeSet<Grant>> {
+    /// Replaces the grants of the computer `id` with exactly `grants` (the whole list: a grant this build does not
+    /// know, kept from a newer lamp-control's file, is cleared too, so it cannot come back with an update the owner
+    /// never said yes to): the grants and the unknown ones it had, or `None` when no such computer.
+    pub fn set_grants(
+        &mut self,
+        id: &str,
+        grants: BTreeSet<Grant>,
+    ) -> Option<(BTreeSet<Grant>, BTreeSet<String>)> {
         let client = self.clients.iter_mut().find(|client| client.id == id)?;
-        Some(std::mem::replace(&mut client.grants, grants))
+        Some((
+            std::mem::replace(&mut client.grants, grants),
+            std::mem::take(&mut client.unknown_grants),
+        ))
+    }
+
+    /// Puts back what [`Clients::set_grants`] took, when keeping the change failed.
+    pub fn restore_grants(
+        &mut self,
+        id: &str,
+        (grants, unknown): (BTreeSet<Grant>, BTreeSet<String>),
+    ) {
+        if let Some(client) = self.clients.iter_mut().find(|client| client.id == id) {
+            client.grants = grants;
+            client.unknown_grants = unknown;
+        }
     }
 
     /// Puts back what an [`Clients::add`] replaced (or removes what it added),
