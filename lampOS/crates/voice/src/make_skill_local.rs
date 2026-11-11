@@ -188,6 +188,20 @@ fn system_with(reads: bool) -> String {
             "sending a message",
         )
     };
+    // A made skill loosened (`made_skill::LOOSE_ENVIRONMENT`): a say as
+    // often as asked, at least a minute apart, and no limits the request
+    // didn't ask for. Off, an hour apart, and the lamp sets the limits.
+    let (cooldown, limits) = if made_skill::loose_on() {
+        (
+            "a cooldown of \"1m\" or longer, as often as the request asks",
+            "for limits in its own words.",
+        )
+    } else {
+        (
+            "cooldown = \"1h\" or longer",
+            "for more in its own words: the lamp sets them.",
+        )
+    };
     let triggers = made_skill::TRIGGER_MEANINGS;
     let gestures = made_skill::gesture_names();
     let (more, cant_yet) = (made_skill::MORE_STEPS, made_skill::CANT_YET);
@@ -210,15 +224,14 @@ fn system_with(reads: bool) -> String {
          days of the week, by the clock trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
          the request asks with the light, the head, a few exact words it says, its hum, or \
          {may_also}, on one of the triggers below. {more} {BLINK} To speak, a skill has speak = \
-         true in [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
+         true in [permissions], {cooldown}, and one [[do]] step say = {{ text = \
          \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
          language the person asked in, said as written. Its one sound is a soft hum: a [[do]] \
          step cue = \"hum\", paced as a say, in place of a say; it has no other sound and no \
          sound file. When it runs is one \
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
          faces): {triggers} A body step is one gesture, one of: {gestures}. Set none of \
-         most_a_day, [quiet], [budget] or [rest] unless the request asks for more in its own \
-         words: the lamp sets them. A skill can't yet \
+         most_a_day, [quiet], [budget] or [rest] unless the request asks {limits} A skill can't yet \
          hear what is said, know who someone is, {cant_send}: a \
          request that needs one, or anything else no step or trigger here or below does, is \
          answered with one line and no blocks: {cannot} then one short sentence said to the \

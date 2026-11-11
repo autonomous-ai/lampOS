@@ -157,6 +157,60 @@ pub(crate) fn set_writes_here(on: Option<bool>) {
     WRITES_HERE.with(|here| here.set(on));
 }
 
+/// The switch that loosens a skill made here (the owner's ask on the Queue,
+/// #6059, 11 Nov: a made skill is the person's own): here, in `lamp-skills`'
+/// manage helper (which holds it again to [`capped`]) and in
+/// `lamp-services` (no per-skill send bound). `on` only; off unless set, in
+/// no product unit. On, for a skill made here alone (never one added from a
+/// file, from the Store or installed):
+///
+/// - a `[[do]]` step or a step's or the trigger's key `lamp-skills pack`
+///   refuses is left out, not refused, and told ([`loosened`]);
+/// - no `most_a_day`, `[budget]` or `[rest]` is added unless the request
+///   asks for limits ([`limits_asked`]), and `[quiet]` only for a skill that
+///   says something or hums ([`mannered_with`]);
+/// - a say's cooldown is at least [`LEAST_LOOSE_SAY_COOLDOWN_SECS`], not an
+///   hour;
+/// - a step [`plainly`] can't say is said in general words.
+///
+/// A write's read-back and yes, the sends across all skills, privacy
+/// refusals and the code grants stay as they are.
+pub const LOOSE_ENVIRONMENT: &str = lamp_services::skill_writes::LOOSE_ENVIRONMENT;
+
+thread_local! {
+    /// [`LOOSE_ENVIRONMENT`] as a test of this thread sets it.
+    static LOOSE_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill's checks are loosened in this process.
+pub fn loose_on() -> bool {
+    if let Some(on) = LOOSE_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    lamp_services::skill_writes::loose_on()
+}
+
+/// [`loose_on`] for the calling thread alone, for tests (this crate's and
+/// `lamp-skills`' own against the real check); `None` reads the
+/// environment again. The product never calls it.
+#[doc(hidden)]
+pub fn set_loose_here(on: Option<bool>) {
+    LOOSE_HERE.with(|here| here.set(on));
+}
+
+/// The least cooldown of a made skill that speaks with [`LOOSE_ENVIRONMENT`]
+/// on: a minute, as often as the person asked, never every moment.
+pub const LEAST_LOOSE_SAY_COOLDOWN_SECS: u64 = 60;
+
+/// The least cooldown of a made skill that speaks, as [`loose_on`] has it.
+fn least_say_cooldown_secs() -> u64 {
+    if loose_on() {
+        LEAST_LOOSE_SAY_COOLDOWN_SECS
+    } else {
+        LEAST_SAY_COOLDOWN_SECS
+    }
+}
+
 /// What the lamp can't do yet with [`WRITES_ENVIRONMENT`] off, said as
 /// [`cant_yet`]: "I can't do that yet: sending or writing on its own".
 pub const SENDS_ON_ITS_OWN: &str = "sending or writing on its own";
@@ -1464,7 +1518,43 @@ pub fn paced(text: &str) -> String {
 /// [`paced`], with the times the request named ([`asked_windows`]): a
 /// `during` within one runs as said, with no quiet hours.
 pub fn paced_asked(text: &str, asked: &[(u32, u32)]) -> String {
-    mannered_asked(&say_paced(&topic_granted(&tidied(text))), asked)
+    paced_with(text, asked, false)
+}
+
+/// [`paced_asked`], with whether the request asked for limits in its own
+/// words ([`limits_asked`]), which [`mannered_with`] reads with
+/// [`LOOSE_ENVIRONMENT`] on.
+pub fn paced_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
+    mannered_with(&say_paced(&topic_granted(&tidied(text))), asked, limits)
+}
+
+/// Whether a request asks, in its own words, for a limit on how often a
+/// skill runs or when it keeps quiet ("at most twice a day", "not after
+/// 10 pm", "no more than once an hour"): with [`LOOSE_ENVIRONMENT`] on, only
+/// then are the lamp's manners set ([`mannered_with`]).
+pub fn limits_asked(request: &str) -> bool {
+    let request = format!(" {} ", request.to_lowercase());
+    const LIMITS: [&str; 18] = [
+        "at most",
+        "no more than",
+        "not more than",
+        "only once",
+        " limit",
+        "maximum",
+        " max ",
+        "times a day",
+        "times per day",
+        "once a day",
+        "twice a day",
+        "a day at most",
+        "per hour",
+        "per day",
+        "quiet hours",
+        "not too often",
+        "don't bother me",
+        "rest if",
+    ];
+    LIMITS.iter().any(|limit| request.contains(limit))
 }
 
 /// A made skill's `skill.toml` with the fields that can't apply taken out,
@@ -1687,7 +1777,8 @@ fn blink_gapped(text: &str) -> bool {
 /// `text` with its `index`th `[[do]]` step taken out, and the table it then
 /// reads as, if that step is written under a `[[do]]` header of its own:
 /// the header and every line to the next header but its own `[do.…]`
-/// tables, or to the end ([`tidied`]). Any other form, or a cut that reads
+/// tables, or to the end ([`tidied`]'s blink gap, and a whole step
+/// [`loosened`] leaves out). Any other form, or a cut that reads
 /// as anything else, is `None`.
 fn step_taken_out(text: &str, table: &toml::Table, index: usize) -> Option<(String, toml::Table)> {
     let mut expected = table.clone();
@@ -1944,6 +2035,19 @@ pub fn mannered(text: &str) -> String {
 
 /// [`mannered`], with the times the request named ([`keeps_quiet`]).
 pub fn mannered_asked(text: &str, asked: &[(u32, u32)]) -> String {
+    mannered_with(text, asked, false)
+}
+
+/// [`mannered_asked`], with whether the request asked for limits
+/// ([`limits_asked`]). With [`LOOSE_ENVIRONMENT`] on and no limit asked, a
+/// made skill is given none the person didn't ask for: no `most_a_day` or
+/// shared `[budget]` (any the model wrote alone taken out), and `[quiet]`
+/// only when it says something or hums ([`says_aloud`]), as
+/// [`keeps_quiet`] holds it; its `[rest]` stays, so a skill ignored twice
+/// rests (the first builder's yes on #6059, 22:44). Asked for, or off, the
+/// manners are set as before.
+pub fn mannered_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
+    let set_limits = limits || !loose_on();
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
     };
@@ -1973,7 +2077,9 @@ pub fn mannered_asked(text: &str, asked: &[(u32, u32)]) -> String {
         .clamp(1, MANNERS_RESTS_AFTER_AT_MOST.into());
     // The night stays quiet unless the skill runs only within the day, or
     // at a time the person asked for ([`within_day`]).
-    let quiet = keeps_quiet(trigger, asked);
+    // Loosened with no limit asked, only a skill that speaks keeps the
+    // night quiet ([`LOOSE_ENVIRONMENT`]).
+    let quiet = keeps_quiet(trigger, asked) && (set_limits || says_aloud(&table));
     // A grant no step uses is dropped (App Only's P2 on #6103): no step of
     // a made skill sends a message or takes the camera's picture, so
     // neither is kept, and the say-back names only what a step does.
@@ -2026,22 +2132,45 @@ pub fn mannered_asked(text: &str, asked: &[(u32, u32)]) -> String {
             kept.push(line);
         }
     }
-    let mut mannered = format!(
-        "most_a_day = {most_a_day}\n{}\n",
-        kept.join("\n").trim_end()
-    );
+    let mut mannered = if set_limits {
+        format!(
+            "most_a_day = {most_a_day}\n{}\n",
+            kept.join("\n").trim_end()
+        )
+    } else {
+        format!("{}\n", kept.join("\n").trim_end())
+    };
     if quiet {
         let (from, to) = MANNERS_QUIET;
         mannered.push_str(&format!("\n[quiet]\nfrom = \"{from}\"\nto = \"{to}\"\n"));
     }
-    mannered.push_str(&format!(
-        "\n[budget]\ngroup = \"{MANNERS_GROUP}\"\nper_hour = {per_hour}\n\n[rest]\nafter_ignored = {after_ignored}\n"
-    ));
+    if set_limits {
+        mannered.push_str(&format!(
+            "\n[budget]\ngroup = \"{MANNERS_GROUP}\"\nper_hour = {per_hour}\n"
+        ));
+    }
+    // A skill ignored twice rests till morning, loosened too (the first
+    // builder's yes on #6059, 22:44: `[rest]` stays).
+    mannered.push_str(&format!("\n[rest]\nafter_ignored = {after_ignored}\n"));
     // Taken when it reads as the same skill with its manners as set; a
     // skill written otherwise (a manner inline) is given back as it came,
     // and a manner past its bound is then unsaid ([`manners_plainly`]), so
     // the repair writes it plainly.
+    let unasked = |set: &toml::Table| {
+        !["most_a_day", "budget"]
+            .iter()
+            .any(|key| set.contains_key(*key))
+    };
     let as_set = |set: &toml::Table| {
+        if !set_limits {
+            return unasked(set)
+                && integer("after_ignored", set.get("rest")) == Some(after_ignored)
+                && set.contains_key("quiet") == quiet
+                && !set
+                    .get("permissions")
+                    .and_then(toml::Value::as_table)
+                    .is_some_and(|granted| unused.iter().any(|key| granted.contains_key(*key)));
+        }
         set.get("most_a_day").and_then(toml::Value::as_integer) == Some(most_a_day)
             && integer("per_hour", set.get("budget")) == Some(per_hour)
             && set
@@ -2134,7 +2263,9 @@ fn manners_kept(table: &toml::Table, asked: &[(u32, u32)]) -> bool {
 /// the repair writes it plainly.
 fn said_mannered(text: &str, asked: &[(u32, u32)]) -> Result<String, Refused> {
     let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
-    if !manners_kept(&table, asked) {
+    // Loosened, the manners are the person's ([`mannered_with`]): whatever
+    // it carries is said, never refused ([`LOOSE_ENVIRONMENT`]).
+    if !loose_on() && !manners_kept(&table, asked) {
         let unsaid = Unsaid::of("parts manners".to_owned());
         eprintln!(
             "lamp-voice: a made skill can't be said plainly: {}",
@@ -2142,7 +2273,7 @@ fn said_mannered(text: &str, asked: &[(u32, u32)]) -> Result<String, Refused> {
         );
         return Err(Refused(UNSAID.into(), Some(unsaid.repair(reads_on()))));
     }
-    plainly(text)
+    plainly_as(text, reads_on(), loose_on())
 }
 
 /// The most runs a day a made skill may ask for (Thirteen's bound on #6103).
@@ -2333,7 +2464,12 @@ fn say_paced(text: &str) -> String {
     let topic = trigger.get("topic").and_then(|topic| topic.as_str());
     let says = says_aloud(&table);
     let mut set: Vec<(&str, String)> = Vec::new();
-    let least = if says {
+    // The air keeps its hour whatever it does: its level hovers about its
+    // line. A say elsewhere, with [`LOOSE_ENVIRONMENT`] on, as often as
+    // asked, at most once a minute.
+    let least = if says && loose_on() && topic != Some(AIR_TOPIC) {
+        Some((LEAST_LOOSE_SAY_COOLDOWN_SECS, "1m"))
+    } else if says {
         Some((LEAST_SAY_COOLDOWN_SECS, "1h"))
     } else if topic == Some(AIR_TOPIC) {
         Some((LEAST_AIR_COOLDOWN_SECS, "1h"))
@@ -2737,11 +2873,16 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         if (!says.is_empty() || !cues.is_empty())
             && let Some(trigger) = trigger
         {
-            if cooldown_secs(trigger).is_none_or(|secs| secs < LEAST_SAY_COOLDOWN_SECS) {
-                return Err(Refused::new(
+            // A minute with [`LOOSE_ENVIRONMENT`] on: as often as asked.
+            let least = least_say_cooldown_secs();
+            if cooldown_secs(trigger).is_none_or(|secs| secs < least) {
+                return Err(Refused::new(if least < LEAST_SAY_COOLDOWN_SECS {
+                    "it would speak more than once a minute; a made skill that speaks has \
+                     cooldown = \"1m\" or longer"
+                } else {
                     "it would speak more than once an hour; a made skill that speaks has \
-                     cooldown = \"1h\" or longer",
-                ));
+                     cooldown = \"1h\" or longer"
+                }));
             }
             let resting =
                 trigger.get("topic").and_then(|topic| topic.as_str()) == Some("voice/state");
@@ -2974,8 +3115,16 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
 /// you're alone with the lamp, it reads you tomorrow's Google Calendar: …"
 /// (the first builder's ruling on #5288). Off, such a step is unsaid.
 pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
+    plainly_as(text, reads, false)
+}
+
+/// [`plainly_with`] for a skill made here, `general` with
+/// [`LOOSE_ENVIRONMENT`] on: a part it can't say plainly is said in general
+/// words ("changes the light", "moves its head", "says something"), never
+/// refused; what the lamp can't do yet, and a read or a write, still are.
+pub fn plainly_as(text: &str, reads: bool, general: bool) -> Result<String, Refused> {
     let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
-    said_plainly(&table, reads).map_err(|unsaid| {
+    said_plainly(&table, reads, general).map_err(|unsaid| {
         // The part's keys and topic, never a value nor the model's words.
         eprintln!(
             "lamp-voice: a made skill can't be said plainly: {}",
@@ -3222,8 +3371,114 @@ fn step_named(step: &toml::Value) -> String {
         .join(", ")
 }
 
-/// [`plainly_with`]'s words, or the part it couldn't say.
-fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
+/// How a made skill's trigger is said when it can't be said plainly, with
+/// [`LOOSE_ENVIRONMENT`] on ([`plainly_as`]).
+const GENERAL_TRIGGER: &str = "When its moment comes";
+
+/// What is said, loosened, of a made skill's parts beside its trigger and
+/// steps that can't be said plainly (a `[[while]]`).
+const GENERAL_CONDITIONS: &str = ", under conditions of its own";
+
+/// The keys of a part that sends or writes, or uses the camera or the
+/// microphone: never said in general words, even loosened (the first
+/// builder's yes on #6059, 22:44); one that can't be said exactly is
+/// refused as before ([`named_exactly`]).
+const EXACT_KEYS: [&str; 20] = [
+    "write",
+    "read",
+    "text",
+    "message",
+    "messages",
+    "send",
+    "mail",
+    "email",
+    "post",
+    "notify",
+    "look",
+    "look_at",
+    "camera",
+    "photo",
+    "picture",
+    "listen",
+    "hear",
+    "heard",
+    "record",
+    "microphone",
+];
+
+/// Whether a part of a made skill must be named exactly, never in general
+/// words ([`EXACT_KEYS`]): a send or a write, the camera or the
+/// microphone, by its keys at any depth (a say's own `text` aside) or a
+/// topic the eyes or the ears give (`humans/…`, `room/…`, `…/heard`).
+fn named_exactly(part: &toml::Value) -> bool {
+    match part {
+        toml::Value::Table(table) => table.iter().any(|(key, value)| {
+            let say_text = key == "text" && value.is_str();
+            (!say_text && EXACT_KEYS.contains(&key.as_str())) || named_exactly(value)
+        }),
+        toml::Value::Array(items) => items.iter().any(named_exactly),
+        toml::Value::String(text) => {
+            text.starts_with("humans/")
+                || text.starts_with("room/")
+                || text.ends_with("/heard")
+                || text.starts_with("speech")
+        }
+        _ => false,
+    }
+}
+
+/// A `[[do]]` step in general words, with [`LOOSE_ENVIRONMENT`] on, by what
+/// it uses: "changes the light", "moves its head", "says something"; a step
+/// of more than one, each joined. Never a send or a write, the camera or
+/// the microphone ([`named_exactly`]), which are said exactly or refused;
+/// none for those.
+fn general_step(step: &toml::Value) -> Option<String> {
+    if named_exactly(step) {
+        return None;
+    }
+    let step = step.as_table()?;
+    let mut words: Vec<&str> = Vec::new();
+    for (keys, said) in [
+        (&["light"][..], "changes the light"),
+        (&["body", "stand"][..], "moves its head"),
+        (&["say"][..], "says something"),
+        (&["cue", "sound"][..], "plays a sound"),
+    ] {
+        if keys.iter().any(|key| step.contains_key(*key)) {
+            words.push(said);
+        }
+    }
+    Some(match words.as_slice() {
+        [] => "does something".to_owned(),
+        words => words.join(" and "),
+    })
+}
+
+/// A made skill's say-back in general words alone, with
+/// [`LOOSE_ENVIRONMENT`] on, when it was too long said plainly: its trigger
+/// as said (or [`GENERAL_TRIGGER`]), each step by [`general_step`], what it
+/// may use.
+fn general_said(table: &toml::Table, steps: &[toml::Value]) -> String {
+    let trigger = trigger_plainly(table.get("trigger"))
+        .map(|(said, _)| said)
+        .unwrap_or_else(|_| GENERAL_TRIGGER.to_owned());
+    let mut does: Vec<String> = Vec::new();
+    for words in steps.iter().filter_map(general_step) {
+        if does.last() != Some(&words) {
+            does.push(words);
+        }
+    }
+    format!(
+        "{trigger}, it {}{}.",
+        does.join(", then "),
+        reaches_plainly(table)
+    )
+}
+
+/// [`plainly_with`]'s words, or the part it couldn't say; `general`, with
+/// [`LOOSE_ENVIRONMENT`] on, says in general words what it can't say
+/// plainly ([`plainly_as`]).
+fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<String, Unsaid> {
     // A skill written in the app ([`Written`]): a function whose answer is
     // the person's own instructions, said as that and nothing more. Only its
     // exact shape; another with a function, added from a file, is said below
@@ -3334,8 +3589,22 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
     // The trigger first, any part beside it named with it: a skill shaped
     // like a built-in one (a [[trigger]] on the faces, a [[while]]) is told
     // both in its one repair.
+    // Loosened ([`LOOSE_ENVIRONMENT`]), a trigger it can't say is said in
+    // general words, its own table kept for its cooldown.
+    let no_trigger = toml::Table::new();
     let (mut said, trigger) = match trigger_plainly(table.get("trigger")) {
         Ok(said) => said,
+        // Never one on the camera or the microphone ([`named_exactly`]).
+        Err(part) if general && !table.get("trigger").is_some_and(named_exactly) => {
+            eprintln!("lamp-voice: a made skill said in general words: {part}");
+            (
+                GENERAL_TRIGGER.to_owned(),
+                table
+                    .get("trigger")
+                    .and_then(toml::Value::as_table)
+                    .unwrap_or(&no_trigger),
+            )
+        }
         Err(part) => {
             return Err(Unsaid::trigger(match extras {
                 Some(extras) => format!("{part}; {extras}"),
@@ -3343,8 +3612,19 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
             }));
         }
     };
+    // Loosened, parts beside it are named as conditions of its own.
+    let mut conditions = "";
     if let Some(extras) = extras {
-        return Err(Unsaid::of(extras));
+        // Never a part on the camera or the microphone ([`named_exactly`]).
+        let exact = table
+            .iter()
+            .filter(|(key, _)| !parts.contains(&key.as_str()))
+            .any(|(_, part)| named_exactly(part));
+        if !general || exact {
+            return Err(Unsaid::of(extras));
+        }
+        eprintln!("lamp-voice: a made skill said in general words: {extras}");
+        conditions = GENERAL_CONDITIONS;
     }
     let steps = steps_of(table)?;
     // A write to a linked service (#6066): its skill's one step, said
@@ -3352,9 +3632,11 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
     let mut writes = false;
     // A read of a linked service (#5288): its skill's one step, said with
     // the gate it waits for.
+    let mut reading = false;
     if let [step] = steps.as_slice()
         && let Some(read) = read_plainly(step).filter(|_| reads)
     {
+        reading = true;
         said.push_str(&format!(", when you're alone with the lamp, it {read}"));
     } else if let [step] = steps.as_slice()
         && let Some(write) = write_plainly(step).filter(|_| writes_on())
@@ -3366,27 +3648,52 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
             .iter()
             .enumerate()
             .map(|(index, step)| {
-                step_plainly(step)
-                    .or_else(|| task_plainly(step).filter(|_| code))
-                    .ok_or_else(|| match step_cant_yet(step) {
-                        Some(what) => Unsaid::cant(what),
-                        None => unsaid_step(index, step),
-                    })
+                match step_plainly(step).or_else(|| task_plainly(step).filter(|_| code)) {
+                    Some(words) => Ok(words),
+                    None => match step_cant_yet(step) {
+                        Some(what) => Err(Unsaid::cant(what)),
+                        // Loosened, a step it can't say in its own words is
+                        // said in general ones (never a read or a write:
+                        // [`general_step`]).
+                        None if general => {
+                            let unsaid = unsaid_step(index, step);
+                            let words =
+                                general_step(step).ok_or_else(|| unsaid_step(index, step))?;
+                            eprintln!(
+                                "lamp-voice: a made skill said in general words: {}",
+                                unsaid.part
+                            );
+                            Ok(words)
+                        }
+                        None => Err(unsaid_step(index, step)),
+                    },
+                }
             })
             .collect::<Result<Vec<_>, _>>()?;
         said.push_str(&format!(", it {}", steps.join(", then ")));
     }
+    said.push_str(conditions);
     if let Some(cooldown) = trigger.get("cooldown") {
-        let (count, unit) = cooldown
-            .as_str()
-            .and_then(duration)
-            .ok_or_else(|| Unsaid::trigger(format!("{}, its cooldown", trigger_named(trigger))))?;
-        said.push_str(&match count {
-            1 => format!(", at most once {}", one(unit)),
-            _ => format!(", at most once every {count} {unit}s"),
-        });
+        match cooldown.as_str().and_then(duration) {
+            Some((1, unit)) => said.push_str(&format!(", at most once {}", one(unit))),
+            Some((count, unit)) => {
+                said.push_str(&format!(", at most once every {count} {unit}s"));
+            }
+            // Loosened, a cooldown it can't say is left to the check.
+            None if general => {}
+            None => {
+                return Err(Unsaid::trigger(format!(
+                    "{}, its cooldown",
+                    trigger_named(trigger)
+                )));
+            }
+        }
     }
-    said.push_str(ask_plainly(table)?);
+    match ask_plainly(table) {
+        Ok(ask) => said.push_str(ask),
+        Err(_) if general => {}
+        Err(unsaid) => return Err(unsaid),
+    }
     // The camera named once: a look step already says it.
     let reach = reaches_plainly(table);
     match said.contains("with the camera") {
@@ -3399,17 +3706,28 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
     let runs_code = code && has_task;
     // Said whole or not at all: never cut before a step or the cooldown. A
     // write's words are the request's own, so at most its length again.
+    // Loosened, one too long is said in general words, every step one
+    // ([`general_said`]), and is cut where a description is, never refused.
     let most = if writes || runs_code {
         MOST_WRITE_PLAIN_CHARS
     } else {
         MOST_PLAIN_CHARS
     };
     if said.chars().count() > most {
-        return Err(too_long());
+        if !general || writes || reading || runs_code || steps.iter().any(named_exactly) {
+            return Err(too_long());
+        }
+        eprintln!("lamp-voice: a made skill said in general words: what it does, too long");
+        said = general_said(table, &steps);
     }
     // That it starts on its own, and how often (#6066 (a)): a sentence of
     // its own, at most [`MOST_MANNERS_CHARS`], beside what it does.
-    said.push_str(&manners_plainly(table)?);
+    // Loosened, manners in a shape it can't say are told generally.
+    said.push_str(&match manners_plainly(table) {
+        Ok(manners) => manners,
+        Err(_) if general => format!("{MANNERS_BEGIN}, within limits of its own."),
+        Err(unsaid) => return Err(unsaid),
+    });
     // And that it sends nothing until the person's yes, ending on no word
     // for them to repeat (#6066).
     if writes {
@@ -5369,7 +5687,7 @@ pub fn keep_asked(
     let blinked = blink_gapped(&files.toml);
     // A say's pace set, never refused (#6062): the text checked, said and
     // packed is the paced one.
-    files.toml = paced_asked(&files.toml, asked);
+    files.toml = paced_with(&files.toml, asked, limits_asked(request.request));
     let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
     // A blink's gap, which [`tidied`] takes out: the blinking said as left
     // out, with whatever else the model left out.
@@ -5385,7 +5703,7 @@ pub fn keep_asked(
             None => "blinking".to_owned(),
         });
     }
-    let (version, uses) = capped(&files.toml)?;
+    let (_, uses) = capped(&files.toml)?;
     // Its code only with a task step to run it, and that step's file one
     // it wrote (#6307).
     code_matches(&files, &uses)?;
@@ -5395,65 +5713,452 @@ pub fn keep_asked(
         let words = request.heard.unwrap_or(request.request);
         write_from_request(&files.toml, words, &request.own)?;
     }
-    // Said only once the check has passed: its lines, which name the
-    // field, go to a repair before these do.
-    let said = said_mannered(&files.toml, asked).map(|does| {
-        let does = match &waited {
-            Some(wait) => format!("{does} {}", cant_wait(wait)),
-            None => does,
+    let ending = Ending {
+        files: &files,
+        waited: waited.as_deref(),
+        asked,
+        from,
+        keeping,
+    };
+    let made = ending.checked_and_kept(&files.toml, &[]);
+    // Loosened ([`LOOSE_ENVIRONMENT`]): what the check refused is left out
+    // and told, before any repair, and refused only when nothing is left.
+    // Never a skill that writes: its content is said whole for its yes.
+    match &made {
+        Err(Refused(why, Some(_)))
+            if why == NOT_PASSED
+                && loose_on()
+                && uses.writes.is_empty()
+                && files.scripts.is_empty() =>
+        {
+            match loosened(&files.toml, &files.card, from, keeping) {
+                Some((toml, out)) => ending.checked_and_kept(&toml, &out),
+                None => made,
+            }
+        }
+        _ => made,
+    }
+}
+
+/// What [`keep_asked`] ends with, for the answer's `skill.toml` or the one
+/// [`loosened`] gives.
+struct Ending<'a> {
+    files: &'a Files,
+    waited: Option<&'a str>,
+    asked: &'a [(u32, u32)],
+    from: &'a str,
+    keeping: &'a Keeping,
+}
+
+impl Ending<'_> {
+    /// `toml` held to the cap, said plainly with what was `left` out
+    /// ([`left_out_said`]), checked, packed and kept.
+    fn checked_and_kept(&self, toml: &str, left: &[String]) -> Result<Made, Refused> {
+        let Self {
+            files,
+            waited,
+            asked,
+            from,
+            keeping,
+        } = *self;
+        let (version, uses) = capped(toml)?;
+        // Said only once the check has passed: its lines, which name the
+        // field, go to a repair before these do.
+        let said = said_mannered(toml, asked).map(|does| {
+            let does = match waited {
+                Some(wait) => format!("{does} {}", cant_wait(wait)),
+                None => does,
+            };
+            let does = match &files.left_out {
+                Some(what) => format!("{does} {}", left_out(what)),
+                None => does,
+            };
+            match left {
+                [] => does,
+                left => format!("{does} {}", left_out_said(left)),
+            }
+        });
+        // A dim or `relative` light [`plainly`] refused is one the check
+        // refuses too, as it says them alike: its plain hint ([`LIGHT_PART`])
+        // goes to the repair first, not the check's own words (lamp-9adf, 11
+        // Nov 05:34: three repairs told only "relative takes only for and a
+        // breathe pattern" never wrote one the check took).
+        // A body step's alike (`BODY_PART`, lamp-74ff, 11 Nov 09:48), a
+        // colour's and a step with more than one kind (lamp-9adf, 11 Nov
+        // 10:01): [`hinted_first`].
+        if let Err(refused) = &said
+            && refused.1.as_deref().is_some_and(hinted_first)
+        {
+            return Err(refused.clone());
+        }
+        let (name, marked) = card(
+            &files.card,
+            said.as_deref().unwrap_or_default(),
+            Maker::of(from),
+        )?;
+        // A name a skill on the lamp has already (a factory reset keeps the
+        // lamp's own, welcome-back among them): the first free one, or "you
+        // already have that skill" for the person's own of the same words.
+        let free = free_name(
+            keeping,
+            &keeping.installed,
+            &name,
+            &made_words(toml, &files.scripts),
+            MOST_NAME_BYTES,
+        )?;
+        let marked = if free == name {
+            marked
+        } else {
+            renamed_card(&marked, &free)
         };
-        match &files.left_out {
-            Some(what) => format!("{does} {}", left_out(what)),
-            None => does,
+        packed_and_kept(
+            keeping,
+            from,
+            Card {
+                toml,
+                name: free,
+                marked,
+                version,
+                uses,
+                scripts: &files.scripts,
+            },
+            said,
+            false,
+        )
+    }
+}
+
+/// The most checks [`loosened`] runs for one skill.
+const MOST_LOOSE_TRIALS: usize = 32;
+/// The most time [`loosened`] takes, its checks together: well within a
+/// make's, and far shorter than one repair by the model.
+const LOOSE_WITHIN: Duration = Duration::from_secs(6);
+/// How often [`loosened`] looks whether a check has ended.
+const LOOSE_POLL: Duration = Duration::from_millis(5);
+
+/// One part [`loosened`] may leave out of a made skill: never its trigger's
+/// topic, its last step, a read or a write.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Loose {
+    /// A key of a step's kind: `light = { out = true, for = "1s" }`'s `for`.
+    KindKey {
+        step: usize,
+        kind: String,
+        key: String,
+    },
+    /// One kind of a step with more than one: `{ light = …, body = … }`'s
+    /// `body`.
+    StepKind { step: usize, kind: String },
+    /// A key of the trigger.
+    TriggerKey(String),
+    /// A whole `[[do]]` step.
+    Step(usize),
+}
+
+impl Loose {
+    /// Every part of `table` that may be left out, keys first, then whole
+    /// steps.
+    fn of(table: &toml::Table) -> Vec<Self> {
+        let steps: &[toml::Value] = table
+            .get("do")
+            .and_then(toml::Value::as_array)
+            .map_or(&[], Vec::as_slice);
+        let open = |step: &toml::Value| {
+            step.as_table()
+                .filter(|step| !step.contains_key("write") && !step.contains_key("read"))
+                .cloned()
+        };
+        let mut parts = Vec::new();
+        for (index, step) in steps.iter().enumerate() {
+            let Some(step) = open(step) else {
+                continue;
+            };
+            for (kind, value) in &step {
+                for key in value.as_table().into_iter().flat_map(toml::Table::keys) {
+                    parts.push(Self::KindKey {
+                        step: index,
+                        kind: kind.clone(),
+                        key: key.clone(),
+                    });
+                }
+            }
+            if step.len() > 1 {
+                for kind in step.keys() {
+                    parts.push(Self::StepKind {
+                        step: index,
+                        kind: kind.clone(),
+                    });
+                }
+            }
+        }
+        if let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table) {
+            for key in trigger.keys().filter(|key| *key != "topic") {
+                parts.push(Self::TriggerKey(key.clone()));
+            }
+        }
+        if steps.len() > 1 {
+            for (index, step) in steps.iter().enumerate() {
+                if open(step).is_some() {
+                    parts.push(Self::Step(index));
+                }
+            }
+        }
+        parts
+    }
+
+    /// Whether the check's `words` name this part: its key, or for a whole
+    /// step one of its kinds.
+    fn named_in(&self, words: &str, table: &toml::Table) -> bool {
+        match self {
+            Self::KindKey { key, .. } | Self::TriggerKey(key) => word_in(words, key),
+            Self::StepKind { kind, .. } => word_in(words, kind),
+            Self::Step(index) => step_at(table, *index)
+                .and_then(toml::Value::as_table)
+                .is_some_and(|step| step.keys().any(|kind| word_in(words, kind))),
+        }
+    }
+
+    /// `text` with this part taken out, and the table it then reads as.
+    fn taken_out(&self, text: &str, table: &toml::Table) -> Option<(String, toml::Table)> {
+        match self {
+            Self::KindKey { step, kind, key } => field_taken_out(
+                text,
+                table,
+                &|table| {
+                    table
+                        .get_mut("do")?
+                        .as_array_mut()?
+                        .get_mut(*step)?
+                        .get_mut(kind.as_str())?
+                        .as_table_mut()
+                },
+                key,
+            ),
+            Self::StepKind { step, kind } => field_taken_out(
+                text,
+                table,
+                &|table| {
+                    table
+                        .get_mut("do")?
+                        .as_array_mut()?
+                        .get_mut(*step)?
+                        .as_table_mut()
+                },
+                kind,
+            ),
+            Self::TriggerKey(key) => field_taken_out(
+                text,
+                table,
+                &|table| table.get_mut("trigger")?.as_table_mut(),
+                key,
+            ),
+            Self::Step(step) => step_taken_out(text, table, *step),
+        }
+    }
+
+    /// The part for the journal: its keys and place, never a value.
+    fn journaled(&self) -> String {
+        match self {
+            Self::KindKey { step, kind, key } => {
+                format!("[[do]] step {}, its {kind}'s {key}", step + 1)
+            }
+            Self::StepKind { step, kind } => format!("[[do]] step {}, its {kind}", step + 1),
+            Self::TriggerKey(key) => format!("[trigger] {key}"),
+            Self::Step(step) => format!("[[do]] step {}", step + 1),
+        }
+    }
+
+    /// The part in plain words, for "Left out: …" ([`left_out_said`]),
+    /// from `table` as it was before it was taken out.
+    fn said(&self, table: &toml::Table) -> String {
+        // General words, or its own for a send, the camera or the
+        // microphone ([`named_exactly`]).
+        let does = |step: Option<&toml::Value>| {
+            step.and_then(|step| general_step(step).or_else(|| step_plainly(step)))
+                .unwrap_or_else(|| "does something".to_owned())
+        };
+        match self {
+            Self::KindKey { step, key, .. } => format!(
+                "{} in a step that {}",
+                key_said(key),
+                does(step_at(table, *step))
+            ),
+            Self::StepKind { step, kind } => {
+                let kind_alone = step_at(table, *step)
+                    .and_then(|step| step.get(kind.as_str()))
+                    .map(|value| {
+                        let mut alone = toml::Table::new();
+                        alone.insert(kind.clone(), value.clone());
+                        toml::Value::Table(alone)
+                    });
+                format!("that one step also {}", does(kind_alone.as_ref()))
+            }
+            Self::TriggerKey(key) => match key.as_str() {
+                "cooldown" => "the pause between its runs".to_owned(),
+                "during" => "the hours it runs in".to_owned(),
+                "for" | "absent_for" => "how long it waits before it runs".to_owned(),
+                "when" => "the moment it runs".to_owned(),
+                key => format!("its {} when it starts", key.replace('_', " ")),
+            },
+            Self::Step(step) => format!("a step that {}", does(step_at(table, *step))),
+        }
+    }
+}
+
+/// A step's key in plain words, for [`Loose::said`].
+fn key_said(key: &str) -> String {
+    match key {
+        "for" => "how long it lasts".to_owned(),
+        "over" => "how slowly it changes".to_owned(),
+        "until" => "when it ends".to_owned(),
+        "level" => "its brightness".to_owned(),
+        "dim" => "its dimming".to_owned(),
+        "out" => "turning the light off".to_owned(),
+        key => format!("its {}", key.replace('_', " ")),
+    }
+}
+
+/// The `index`th `[[do]]` step of `table`.
+fn step_at(table: &toml::Table, index: usize) -> Option<&toml::Value> {
+    table.get("do")?.as_array()?.get(index)
+}
+
+/// Whether `words` name `key` as a word of its own: "for" in "out takes no
+/// colour, dim, level, for, pattern", never in "before".
+fn word_in(words: &str, key: &str) -> bool {
+    let inside = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+    words.match_indices(key).any(|(at, _)| {
+        !inside(words[..at].chars().next_back()) && !inside(words[at + key.len()..].chars().next())
+    })
+}
+
+/// What [`keep_asked`] adds to the say-back of a skill [`loosened`]: "Left
+/// out: how long it lasts in a step that changes the light."
+fn left_out_said(left: &[String]) -> String {
+    format!("Left out: {}.", and_list(left))
+}
+
+/// The check's words, comparable from one trial to the next: the folder
+/// replaced, a TOML error's quoted source and every digit (its line and
+/// column) left out.
+fn check_words(words: &str, folder: &Path) -> String {
+    words
+        .replace(&*folder.to_string_lossy(), "<folder>")
+        .lines()
+        .map(str::trim)
+        .filter(|line| {
+            !line.is_empty()
+                && !line.starts_with('|')
+                && !line.starts_with(|c: char| c.is_ascii_digit())
+        })
+        .map(|line| {
+            line.chars()
+                .filter(|c| !c.is_ascii_digit())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join(" / ")
+}
+
+/// A made skill's `skill.toml` the check refused, with what it refuses left
+/// out (the owner's ask on the Queue, #6059, with [`LOOSE_ENVIRONMENT`]
+/// on): driven by `lamp-skills pack`'s own refusal, as #6425 takes out a
+/// blink's gap. Each part that may go ([`Loose::of`]: a key of a step or of
+/// the trigger, then a whole step) is tried out of the skill, those the
+/// check's words name first. One the check then passes is taken, and the
+/// skill with it; one the check's words name whose taking changes its
+/// refusal is taken and the next refusal followed. Each is told in plain
+/// words, and journaled by its keys alone. None when nothing that may go
+/// lets it pass, within [`MOST_LOOSE_TRIALS`] and [`LOOSE_WITHIN`]: the
+/// refusal stands, for a repair. The cap ([`capped`]) holds each try.
+fn loosened(
+    toml: &str,
+    card_text: &str,
+    from: &str,
+    keeping: &Keeping,
+) -> Option<(String, Vec<String>)> {
+    let began = Instant::now();
+    let (name, marked) = card(card_text, "A skill made here.", Maker::of(from)).ok()?;
+    static LOOSENING: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let work = keeping.directory.join(format!(
+        ".loosening-{}-{}",
+        std::process::id(),
+        LOOSENING.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let _ = fs::remove_dir_all(&work);
+    let folder = work.join("skill").join(&name);
+    let out = work.join("out");
+    let ready =
+        fs::create_dir_all(&folder).and_then(|()| fs::write(folder.join("SKILL.md"), &marked));
+    // Some(None): passed; Some(Some(words)): refused with them; None: not
+    // checked.
+    let trial = |text: &str| -> Option<Option<String>> {
+        fs::write(folder.join("skill.toml"), text).ok()?;
+        let _ = fs::remove_dir_all(&out);
+        fs::create_dir_all(&out).ok()?;
+        match run_pack(&keeping.program, &folder, &out, LOOSE_POLL) {
+            Ok(None) => Some(None),
+            Ok(Some((_, words))) => Some(Some(check_words(&words, &folder))),
+            Err(_) => None,
+        }
+    };
+    let loosened = ready.ok().and_then(|()| {
+        let mut text = toml.to_owned();
+        let mut table: toml::Table = toml::from_str(toml).ok()?;
+        let mut words = trial(&text)??;
+        let mut trials = 1;
+        let mut left = Vec::new();
+        loop {
+            let parts = Loose::of(&table);
+            let (named, others): (Vec<Loose>, Vec<Loose>) = parts
+                .into_iter()
+                .partition(|part| part.named_in(&words, &table));
+            let mut moved = false;
+            for (part, named) in named
+                .into_iter()
+                .map(|part| (part, true))
+                .chain(others.into_iter().map(|part| (part, false)))
+            {
+                if trials >= MOST_LOOSE_TRIALS || began.elapsed() > LOOSE_WITHIN {
+                    return None;
+                }
+                let Some((cut, _)) = part.taken_out(&text, &table) else {
+                    continue;
+                };
+                // Its voice asked with nothing left to say is taken out
+                // too ([`tidied`]), as the cap holds it.
+                let cut = tidied(&cut);
+                let Ok(cut_table) = toml::from_str::<toml::Table>(&cut) else {
+                    continue;
+                };
+                if capped(&cut).is_err() {
+                    continue;
+                }
+                trials += 1;
+                let next = trial(&cut)?;
+                if next.as_ref().is_some_and(|next| !named || *next == words) {
+                    continue;
+                }
+                eprintln!(
+                    "lamp-voice: a made skill loosened: left out {}",
+                    part.journaled()
+                );
+                left.push(part.said(&table));
+                (text, table) = (cut, cut_table);
+                match next {
+                    None => return Some((text, left)),
+                    Some(next) => words = next,
+                }
+                moved = true;
+                break;
+            }
+            if !moved {
+                return None;
+            }
         }
     });
-    // A dim or `relative` light [`plainly`] refused is one the check
-    // refuses too, as it says them alike: its plain hint ([`LIGHT_PART`])
-    // goes to the repair first, not the check's own words (lamp-9adf, 11
-    // Nov 05:34: three repairs told only "relative takes only for and a
-    // breathe pattern" never wrote one the check took).
-    // A body step's alike (`BODY_PART`, lamp-74ff, 11 Nov 09:48), a
-    // colour's and a step with more than one kind (lamp-9adf, 11 Nov
-    // 10:01): [`hinted_first`].
-    if let Err(refused) = &said
-        && refused.1.as_deref().is_some_and(hinted_first)
-    {
-        return Err(refused.clone());
-    }
-    let (name, marked) = card(
-        &files.card,
-        said.as_deref().unwrap_or_default(),
-        Maker::of(from),
-    )?;
-    // A name a skill on the lamp has already (a factory reset keeps the
-    // lamp's own, welcome-back among them): the first free one, or "you
-    // already have that skill" for the person's own of the same words.
-    let free = free_name(
-        keeping,
-        &keeping.installed,
-        &name,
-        &made_words(&files.toml, &files.scripts),
-        MOST_NAME_BYTES,
-    )?;
-    let marked = if free == name {
-        marked
-    } else {
-        renamed_card(&marked, &free)
-    };
-    packed_and_kept(
-        keeping,
-        from,
-        Card {
-            toml: &files.toml,
-            name: free,
-            marked,
-            version,
-            uses,
-            scripts: &files.scripts,
-        },
-        said,
-        false,
-    )
+    let _ = fs::remove_dir_all(&work);
+    loosened
 }
 
 /// The most of a made skill's name, as `lamp-skills` holds a skill's.
@@ -5785,6 +6490,28 @@ fn packed_and_kept(
 /// Its words go to a file beside OUT, in the private folder, so a long
 /// answer never blocks it.
 fn pack(program: &Path, folder: &Path, out: &Path, name: &str) -> Result<(), Refused> {
+    let Some((code, words)) = run_pack(program, folder, out, Duration::from_millis(50))? else {
+        return Ok(());
+    };
+    eprintln!(
+        "lamp-voice: a made skill did not pass lamp-skills' check (exit {}): {}",
+        code.map_or("none".to_owned(), |code| code.to_string()),
+        check_reason(&words, folder, name)
+    );
+    Err(Refused(
+        NOT_PASSED.into(),
+        Some(check_lines(&words, folder)),
+    ))
+}
+
+/// [`pack`]'s run, journaling nothing, looked at every `poll`: none when it
+/// passed, else its exit code and its words, at most [`MOST_CHECK_BYTES`].
+fn run_pack(
+    program: &Path,
+    folder: &Path,
+    out: &Path,
+    poll: Duration,
+) -> Result<Option<(Option<i32>, String)>, Refused> {
     let said = out.with_file_name("check.err");
     let stderr = fs::File::create(&said).map_err(|why| {
         eprintln!("lamp-voice: a made skill was not checked: {why}");
@@ -5808,7 +6535,7 @@ fn pack(program: &Path, folder: &Path, out: &Path, name: &str) -> Result<(), Ref
         match child.try_wait() {
             Ok(Some(status)) => break status,
             Ok(None) if began.elapsed() < PACK_WITHIN => {
-                std::thread::sleep(Duration::from_millis(50));
+                std::thread::sleep(poll);
             }
             _ => {
                 let _ = child.kill();
@@ -5818,23 +6545,16 @@ fn pack(program: &Path, folder: &Path, out: &Path, name: &str) -> Result<(), Ref
         }
     };
     if status.success() {
-        return Ok(());
+        return Ok(None);
     }
     let mut words = Vec::new();
     if let Ok(file) = fs::File::open(&said) {
         let _ = file.take(MOST_CHECK_BYTES).read_to_end(&mut words);
     }
-    eprintln!(
-        "lamp-voice: a made skill did not pass lamp-skills' check (exit {}): {}",
-        status
-            .code()
-            .map_or("none".to_owned(), |code| code.to_string()),
-        check_reason(&String::from_utf8_lossy(&words), folder, name)
-    );
-    Err(Refused(
-        NOT_PASSED.into(),
-        Some(check_lines(&String::from_utf8_lossy(&words), folder)),
-    ))
+    Ok(Some((
+        status.code(),
+        String::from_utf8_lossy(&words).into_owned(),
+    )))
 }
 
 /// The check's `said` for a repair's brief: every line, trimmed and joined
@@ -11196,5 +11916,223 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         assert_eq!(unwritten.0, SCRIPTS_NOT_HELD);
         set_scripts_here(None);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The loosened switch for this test's thread, put back as it ends.
+    struct LooseHere;
+
+    impl LooseHere {
+        fn set(on: bool) -> Self {
+            set_loose_here(Some(on));
+            Self
+        }
+    }
+
+    impl Drop for LooseHere {
+        fn drop(&mut self) {
+            set_loose_here(None);
+        }
+    }
+
+    /// #6059 (2): loosened, a made skill gets no limits the request didn't
+    /// ask for, and `[quiet]` only when it speaks; asked for, or off, the
+    /// lamp's manners are set as before.
+    #[test]
+    fn loosened_a_made_skill_gets_no_limits_it_didnt_ask_for() {
+        let glow = made_with(
+            "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\ncooldown = \"1m\"\n",
+            "light = { colour = \"green\", level = 3, for = \"5s\" }",
+        );
+        let manners = ["most_a_day", "[budget]", "[rest]", "[quiet]"];
+        let has = |text: &str, part: &str| text.contains(part);
+        {
+            let _off = LooseHere::set(false);
+            let set = mannered_with(&glow, &[], false);
+            assert!(manners.iter().all(|part| has(&set, part)), "{set}");
+        }
+        let _on = LooseHere::set(true);
+        let bare = mannered_with(&glow, &[], false);
+        // Its rest stays: a skill ignored twice rests (the first builder's
+        // yes, 22:44).
+        assert!(has(&bare, "[rest]\nafter_ignored = 2"), "{bare}");
+        assert!(
+            !["most_a_day", "[budget]", "[quiet]"]
+                .iter()
+                .any(|part| has(&bare, part)),
+            "{bare}"
+        );
+        // The model's own limits, not asked for, are taken out too.
+        let own = mannered_with(
+            &glow.replace("version", "most_a_day = 5\nversion"),
+            &[],
+            false,
+        );
+        assert!(!has(&own, "most_a_day"), "{own}");
+        // Asked for in the request's words: set as before.
+        assert!(limits_asked(
+            "glow green at most twice a day when I stand up"
+        ));
+        assert!(!limits_asked("glow green when I stand up"));
+        let asked = mannered_with(&glow, &[], true);
+        assert!(manners.iter().all(|part| has(&asked, part)), "{asked}");
+        // A skill that speaks keeps the night quiet, and its rest.
+        let hello = mannered_with(HELLO, &[], false);
+        assert!(has(&hello, "[quiet]") && has(&hello, "[rest]"), "{hello}");
+        assert!(
+            !["most_a_day", "[budget]"]
+                .iter()
+                .any(|part| has(&hello, part))
+        );
+        // Said back and kept as it is, never refused for its manners.
+        let said = said_mannered(&bare, &[]).unwrap();
+        assert!(
+            said.ends_with(" It starts on its own, rests till morning if ignored twice."),
+            "{said}"
+        );
+        assert!(
+            said_mannered(&hello, &[])
+                .unwrap()
+                .contains("never from 22:00 to 08:00")
+        );
+    }
+
+    /// #6059 (3): loosened, a made skill's say may run as often as asked,
+    /// at least a minute apart; off, at least an hour.
+    #[test]
+    fn loosened_a_says_cooldown_is_as_asked_from_a_minute() {
+        let five = HELLO.replace("cooldown = \"1h\"", "cooldown = \"5m\"");
+        let ten_seconds = HELLO.replace("cooldown = \"1h\"", "cooldown = \"10s\"");
+        let cooldown = |text: &str| {
+            toml::from_str::<toml::Table>(text).unwrap()["trigger"]["cooldown"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        {
+            let _off = LooseHere::set(false);
+            assert_eq!(cooldown(&paced(&five)), "1h");
+            assert!(capped(&five).unwrap_err().0.contains("cooldown = \"1h\""));
+        }
+        let _on = LooseHere::set(true);
+        assert_eq!(cooldown(&paced(&five)), "5m");
+        assert_eq!(cooldown(&paced(&ten_seconds)), "1m");
+        assert!(capped(&five).is_ok());
+        assert!(
+            capped(&ten_seconds)
+                .unwrap_err()
+                .0
+                .contains("cooldown = \"1m\"")
+        );
+        // A skill added from a file keeps its own cap.
+        assert!(capped_added(&five).is_err());
+    }
+
+    /// #6059 (4): loosened, a made skill's step that can't be said plainly
+    /// is said in general words; off, it is refused for a repair. What the
+    /// lamp can't do yet is refused either way.
+    #[test]
+    fn loosened_the_say_back_says_in_general_words_what_it_cant_say_plainly() {
+        let dim_for = TOML.replace("{ dim = 1 }", "{ dim = 1, for = \"1m\" }");
+        let while_part = format!(
+            "{TOML}\n[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n"
+        );
+        // A part on the camera or the microphone is never said in general
+        // words (the first builder's yes, 22:44): refused as before.
+        let camera_while = while_part.replace(
+            "topic = \"voice/state\"\nfield = \"state\"",
+            "topic = \"room/presence\"\nfield = \"someone\"",
+        );
+        let look = TOML.replace("light = { dim = 1 }", "look = \"now\"");
+        let face = TOML.replace(
+            "light = { dim = 1 }",
+            "body = { look_at = \"face\", for = \"1m\" }",
+        );
+        {
+            let _off = LooseHere::set(false);
+            assert_eq!(said_mannered(&dim_for, &[]).unwrap_err().0, UNSAID);
+        }
+        let _on = LooseHere::set(true);
+        let said = said_mannered(&dim_for, &[]).unwrap();
+        assert!(
+            said.contains(", it changes the light, at most once every 12 hours"),
+            "{said}"
+        );
+        let said = plainly_as(&while_part, false, true).unwrap();
+        assert!(said.contains("under conditions of its own"), "{said}");
+        let odd_trigger = TOML.replace("equals = \"resting\"", "equals = \"talking\"");
+        let said = plainly_as(&odd_trigger, false, true).unwrap();
+        assert!(said.starts_with("When its moment comes, it dims"), "{said}");
+        for exact in [&camera_while, &look, &face] {
+            assert_eq!(
+                plainly_as(exact, false, true).unwrap_err().0,
+                UNSAID,
+                "{exact}"
+            );
+        }
+        let on_faces = odd_trigger.replace("voice/state", "humans/faces/tracked");
+        assert!(plainly_as(&on_faces, false, true).is_err());
+        // Never for a skill not made here, nor what it can't do yet.
+        assert!(plainly(&dim_for).is_err());
+        assert_eq!(
+            plainly_as(
+                &TOML.replace("voice/state\"\nfield", "voice/heard\"\nfield"),
+                false,
+                true
+            )
+            .unwrap_err(),
+            Refused(cant_yet("starting on words it hears"), None)
+        );
+        assert_eq!(
+            general_step(&toml::Value::Table(toml::Table::new())).unwrap(),
+            "does something"
+        );
+    }
+
+    /// #6059 (1): the parts [`loosened`] may leave out, and how each is
+    /// taken out and told.
+    #[test]
+    fn loosened_parts_are_taken_out_whole_and_told_plainly() {
+        let blink = made_with(
+            "topic = \"room/stood_up\"\ncooldown = \"1m\"\n",
+            "light = { colour = \"green\", level = 3, for = \"2s\" }\n\n[[do]]\n\
+             light = { out = true, for = \"500ms\" }",
+        );
+        let table: toml::Table = toml::from_str(&blink).unwrap();
+        let parts = Loose::of(&table);
+        let gap_for = Loose::KindKey {
+            step: 1,
+            kind: "light".into(),
+            key: "for".into(),
+        };
+        assert!(parts.contains(&gap_for), "{parts:?}");
+        assert!(parts.contains(&Loose::Step(1)));
+        assert!(!parts.contains(&Loose::TriggerKey("topic".into())));
+        let words = "not packed: out takes no colour, dim, level, for, pattern or no_brighter";
+        assert!(gap_for.named_in(words, &table));
+        assert!(!Loose::TriggerKey("cooldown".into()).named_in(words, &table));
+        let (cut, cut_table) = gap_for.taken_out(&blink, &table).unwrap();
+        assert!(cut.contains("light = { out = true }"), "{cut}");
+        assert_eq!(cut_table["do"][1]["light"].as_table().unwrap().len(), 1);
+        assert_eq!(
+            gap_for.said(&table),
+            "how long it lasts in a step that changes the light"
+        );
+        let (cut, cut_table) = Loose::Step(1).taken_out(&blink, &table).unwrap();
+        assert_eq!(cut_table["do"].as_array().unwrap().len(), 1, "{cut}");
+        assert_eq!(Loose::Step(1).said(&table), "a step that changes the light");
+        assert_eq!(
+            left_out_said(&["a".into(), "b".into()]),
+            "Left out: a and b."
+        );
+        // A write's step is never a part to leave out.
+        let write: toml::Table = toml::from_str(
+            "[[do]]\nwrite = { service = \"gmail\" }\n\n[[do]]\nlight = { dim = 1 }\n",
+        )
+        .unwrap();
+        assert!(
+            !Loose::of(&write)
+                .iter()
+                .any(|part| matches!(part, Loose::Step(0) | Loose::KindKey { step: 0, .. }))
+        );
     }
 }
