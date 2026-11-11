@@ -511,8 +511,8 @@ one (the night cap's lift at 06:00, by removal or expiry) gives the Speaker
 back the level the cap lowered at entry, but only while the mixer still
 reads what the cap wrote: any volume change in the night, the app slider,
 up, down, mute or unmute, stands, and a muted Speaker stays muted (#5753).
-That level is kept in Actions' memory only, so an Actions restart during
-the night leaves the lowered level in place after the lift.
+That level is kept in Actions' caps store, so an Actions restart or a
+reboot during the night still gives it back at the lift (#6479).
 
 Actions stores at most eight stable source identities, including their
 terminal records, in a bounded 16 KiB state. A cap contains `source`,
