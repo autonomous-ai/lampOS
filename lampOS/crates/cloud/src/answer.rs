@@ -271,6 +271,21 @@ pub trait Lamp {
         Err(not_here("update.check"))
     }
 
+    /// Whether the app may see and install the lamp's agents
+    /// (`LAMP_APP_ENGINES=on` with `LAMP_APP_UPDATE=on`, #6240,
+    /// `crate::update`).
+    fn engines_page(&self) -> bool {
+        false
+    }
+
+    /// Asks `lamp-update serve` to install `engine` at its next round
+    /// (`engines.install`, #6240, `crate::update::Checks::ask_install`), at
+    /// `now`: at most once a minute, and only when a running lamp-update
+    /// reads it.
+    fn install_engine(&mut self, _engine: &str, _now: std::time::Instant) -> Result<(), String> {
+        Err(not_here("engines.install"))
+    }
+
     /// Asks setup's change helper to restart the lamp (`system.reboot`, #2193): its
     /// answer, given before the lamp goes down, or why not. Only with
     /// `LAMP_APP_RESTART=on`.
@@ -313,7 +328,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 66] = [
+pub const KINDS: [(&str, Switch); 67] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -372,6 +387,8 @@ pub const KINDS: [(&str, Switch); 66] = [
     (crate::upload::KIND, |lamp| lamp.upload().is_some()),
     ("update.status", |lamp| lamp.update_page()),
     ("update.check", |lamp| lamp.update_page()),
+    // The lamp's agents (#6240): a missing one installed from the app.
+    ("engines.install", |lamp| lamp.engines_page()),
     ("system.reboot", |lamp| lamp.restarts()),
     ("system.shutdown", |lamp| lamp.shuts_down()),
     // The person's own services (Queue #4710): `services` says
@@ -764,15 +781,30 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // The lamp's software update, for the app's Lamp 2 page (#2194):
         // only with `LAMP_APP_UPDATE=on`.
-        "update.status" if on(lamp, kind) => crate::update::status(lamp.update_status()),
+        "update.status" if on(lamp, kind) => {
+            crate::update::status(lamp.update_status(), lamp.engines_page())
+        }
         // The app's Check for update (#4153): `serve`'s next round now, not
         // after its wait. Refused while a round runs and within a minute of
         // the last; the round keeps its own lock and quiet moment.
         "update.check" if on(lamp, kind) => {
-            let status = crate::update::status(lamp.update_status())?.unwrap_or_default();
+            let status = crate::update::status(lamp.update_status(), lamp.engines_page())?
+                .unwrap_or_default();
             crate::update::idle(&status)?;
             lamp.check_update(std::time::Instant::now())?;
             some(crate::update::started(status))
+        }
+        // The app's install of a missing agent (#6240): only one lamp-update
+        // says is missing or failed, at most once a minute; the install
+        // waits for lamp-update's next round and keeps its own rules.
+        "engines.install" if on(lamp, kind) => {
+            let engine = data["engine"]
+                .as_str()
+                .ok_or("engine must be the agent's name")?;
+            let status = crate::update::status(lamp.update_status(), true)?.unwrap_or_default();
+            crate::update::installable(&status, engine)?;
+            lamp.install_engine(engine, std::time::Instant::now())?;
+            some(crate::update::install_started())
         }
         // A restart from the app (#2193): asked of setup's change helper,
         // never done here; it answers first and refuses under an update.
@@ -1020,6 +1052,13 @@ pub mod tests {
         }
         fn check_update(&mut self, now: std::time::Instant) -> Result<(), String> {
             self.update_checks.ask(self.update_bus.as_ref(), now)
+        }
+        fn engines_page(&self) -> bool {
+            self.update_page && self.update_checks.engines()
+        }
+        fn install_engine(&mut self, engine: &str, now: std::time::Instant) -> Result<(), String> {
+            self.update_checks
+                .ask_install(self.update_bus.as_ref(), engine, now)
         }
         fn restarts(&self) -> bool {
             self.restart
@@ -1803,6 +1842,15 @@ pub mod tests {
                 &["update.status", "update.check"],
             ),
             (
+                // The lamp's agents (#6240): with the update page's switch.
+                "engines",
+                |f| {
+                    f.update_page = true;
+                    f.update_checks = crate::update::Checks::with_engines(true);
+                },
+                &["update.status", "update.check", "engines.install"],
+            ),
+            (
                 "harness sign-in",
                 |f| {
                     f.harness_sign_in = Some(crate::harness_sign_in::tests::place(
@@ -1951,6 +1999,7 @@ pub mod tests {
                 last: None,
                 harness: None,
                 round: None,
+                engines: None,
             },
         )
         .unwrap();
@@ -1970,6 +2019,108 @@ pub mod tests {
         assert_eq!(
             answer(&mut lamp, "update.check", &json!({})),
             Err(not_here("update.check"))
+        );
+    }
+
+    /// #6240: `engines.install` is answered only with both switches, for
+    /// an agent lamp-update says is missing or failed; refused otherwise,
+    /// within a minute of the last, and when no lamp-update reads it.
+    #[test]
+    fn the_app_installs_a_missing_agent_only_when_lamp_update_says_it_is_missing() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            ..lamp()
+        };
+        let hermes = json!({"engine": "hermes"});
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(not_here("engines.install"))
+        );
+        lamp.update_checks = crate::update::Checks::with_engines(true);
+        // lamp-update has said nothing: no such agent.
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(crate::update::NO_ENGINE.to_owned())
+        );
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        let with = |state: &str| lamp_msgs::UpdateStatus {
+            running: None,
+            now: "idle".into(),
+            last: None,
+            harness: None,
+            round: None,
+            engines: Some(std::collections::BTreeMap::from([(
+                "hermes".to_owned(),
+                lamp_msgs::EngineInstall {
+                    state: state.into(),
+                    version: None,
+                    reason: (state == "failed").then(|| "no_space".into()),
+                    at_unix_ms: Some(3),
+                },
+            )])),
+        };
+        for state in ["off", "waiting", "installing", "frozen"] {
+            says.publish_json(0, &with(state)).unwrap();
+            assert_eq!(
+                answer(&mut lamp, "engines.install", &hermes),
+                Err(crate::update::NOT_MISSING.to_owned()),
+                "{state}"
+            );
+        }
+        says.publish_json(0, &with("not_installed")).unwrap();
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(status["engines"]["hermes"]["state"], "not_installed");
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &json!({"engine": "openclaw"})),
+            Err(crate::update::NO_ENGINE.to_owned())
+        );
+        assert!(answer(&mut lamp, "engines.install", &json!({})).is_err());
+        // No lamp-update reads asks: said, and not counted.
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(crate::update::NOT_LISTENING.to_owned())
+        );
+        let mut update = bus
+            .subscribe_typed(
+                lamp_msgs::EngineInstallAsk::TOPIC,
+                "update",
+                lamp_msgs::EngineInstallAsk::TYPE,
+            )
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Ok(Some(json!({"install": "started"})))
+        );
+        let heard = update
+            .recv(std::time::Duration::from_secs(1))
+            .unwrap()
+            .expect("one ask on the bus");
+        assert_eq!(
+            heard.parse::<lamp_msgs::EngineInstallAsk>().unwrap().engine,
+            "hermes"
+        );
+        says.publish_json(0, &with("failed")).unwrap();
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(crate::update::TOO_SOON.to_owned())
+        );
+        // The update page's switch off: neither is here.
+        lamp.update_page = false;
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &hermes),
+            Err(not_here("engines.install"))
         );
     }
 
