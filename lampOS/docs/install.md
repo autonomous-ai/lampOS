@@ -517,7 +517,13 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   home; `/var/lib/lampOS/voice/sessions` (root, 0700), which the voice's
   unit names and nothing else makes; and `/var/lib/lampOS/consent`
   (root:lampos, 0750), where the voice keeps the room sounds yes for
-  lamp-ears (#1722 item 1). Both were found on lamp-06c1 on
+  lamp-ears (#1722 item 1). The local agent's socket folder `/run/lampos-agent`
+  (0755, `lampos`'s) is made here too; the install step creates the group
+  `lamp-agents` and the user `lampagent` in it when the lamp has none (a
+  round carries the tmpfiles line but never makes a user or a group, so a
+  lamp already in a home gets them from `lamp-update install` run again),
+  and the owner's switch in the app only turns the door on (setup.md,
+  `local_agent`). Both were found on lamp-06c1 on
   2026-10-16: with the locks 0775 the body never opened the servo port, and
   without the sessions folder the voice could not start.
   It also makes `/run/lampos-photos` (`lampos`'s, 0700), the app's photos

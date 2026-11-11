@@ -3106,6 +3106,14 @@ impl lamp_update::install::Host for InstallHost {
         Ok(())
     }
 
+    fn add_agent_user(&mut self, user: &str, _: &str) -> Result<(), String> {
+        let passwd = self.0.join("etc/passwd");
+        let mut text = fs::read_to_string(&passwd).unwrap_or_default();
+        text.push_str(&format!("{user}:x:998:998::/home/{user}:/bin/bash\n"));
+        fs::write(passwd, text).unwrap();
+        Ok(())
+    }
+
     fn enable(&mut self, _: &[String]) -> Result<(), String> {
         Ok(())
     }

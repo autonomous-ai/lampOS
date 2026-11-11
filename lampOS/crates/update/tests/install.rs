@@ -83,6 +83,24 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn add_agent_user(&mut self, user: &str, group: &str) -> Result<(), String> {
+        let passwd = self.root.join("etc/passwd");
+        let mut text = fs::read_to_string(&passwd).unwrap_or_default();
+        text.push_str(&format!("{user}:x:998:998::/home/{user}:/bin/bash\n"));
+        fs::write(passwd, text).unwrap();
+        let groups = self.root.join("etc/group");
+        let mut text = fs::read_to_string(&groups).unwrap_or_default();
+        if !text
+            .lines()
+            .any(|line| line.split(':').next() == Some(group))
+        {
+            text.push_str(&format!("{group}:x:997:{user}\n"));
+            fs::write(groups, text).unwrap();
+        }
+        self.calls.push(format!("agentuser {user} {group}"));
+        Ok(())
+    }
+
     fn enable(&mut self, units: &[String]) -> Result<(), String> {
         self.calls.push(format!("enable {}", units.join(" ")));
         if self.failing_enables > 0 {
@@ -449,6 +467,23 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
         "{calls}"
     );
     assert!(calls.contains("useradd lampos-memory lampos"), "{calls}");
+    // The local agent's user in its group, made once and never `lampos`; its
+    // socket's folder is in the tmpfiles the install writes.
+    assert!(calls.contains("agentuser lampagent lamp-agents"), "{calls}");
+    assert_eq!(calls.matches("agentuser").count(), 1, "{calls}");
+    // Said when made, not only listed: a hand-over by `exec` drops the list.
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line == "made the user lampagent in the group lamp-agents"),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        fs::read_to_string(lamp.on("/etc/tmpfiles.d/lampos.conf"))
+            .unwrap()
+            .contains("\nd /run/lampos-agent 0755 lampos lampos -\n")
+    );
     assert!(
         calls.contains("tmpfiles /etc/tmpfiles.d/lampos.conf"),
         "{calls}"
