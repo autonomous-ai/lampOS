@@ -3299,7 +3299,10 @@ Harness is not in use, and puts the older one back if the move fails
 (#5957; `docs/install.md`, "A newer pin moves an older Harness"); the unit
 runs Harness's part whenever a round's ask is there, also when started for
 Hermes, so a move's record never stays `installing`, and a move answered
-spends its ask (#6275).
+spends its ask (#6275). A moved Harness ends on the pin's own Node: the
+move takes away the kept `current-node`, which Harness's installer would
+otherwise reuse, so the installer takes the pinned runtime manifest's Node,
+checked by its sha256 (#6302).
 
 ### A fixed copy, checked (#3689)
 
