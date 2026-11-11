@@ -1095,7 +1095,7 @@ enum Outcome {
     StartDaemon(Result<(), String>),
     RestartDaemon(Result<(), String>),
 }
-struct Binding {
+pub(crate) struct Binding {
     path: PathBuf,
     dev: u64,
     ino: u64,
@@ -1119,7 +1119,7 @@ impl Drop for Binding {
     }
 }
 
-fn bind(path: &Path) -> io::Result<(UnixListener, Binding)> {
+pub(crate) fn bind(path: &Path) -> io::Result<(UnixListener, Binding)> {
     if !path.is_absolute() || path.as_os_str().len() > lamp_bus::MOST_SOCKET_PATH_BYTES {
         return Err(invalid(
             "socket path must be absolute and at most 103 bytes",
@@ -3596,6 +3596,24 @@ pub fn serve<C: Clock>(
     stop: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let cancelled = stop.clone();
+    // A skill's `do.task` (#6306), off unless `LAMP_SKILL_TASKS=on`: off,
+    // nothing is bound. A socket that can't be bound or no home leaves
+    // skill tasks off and the rest of the part as it is.
+    let skill_tasks =
+        crate::skill_task::on(std::env::var(crate::skill_task::SWITCH).ok().as_deref());
+    match std::env::var_os("HOME").map(PathBuf::from) {
+        Some(home) if skill_tasks => {
+            match crate::skill_task::HandOvers::lamp(&home).start(true, stop.clone()) {
+                Ok(_) => eprintln!(
+                    "tasks: a skill's tasks are taken on {}",
+                    crate::skill_task::HAND_OVER_SOCKET
+                ),
+                Err(error) => eprintln!("tasks: a skill's tasks stay off: {error}"),
+            }
+        }
+        None if skill_tasks => eprintln!("tasks: a skill's tasks stay off: no HOME"),
+        _ => {}
+    }
     let dir = config.dir.clone();
     let from_machines = config
         .set_up_later
