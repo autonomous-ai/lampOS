@@ -1,0 +1,36 @@
+# row	kind	how	clip	line
+# kind: feel = a feeling or the person's own day under the words; plain = a plain ask (a door there is a nag);
+#       cmd / stop / busy = zero-lines (bar: 0 doors with the switch on).
+# how: plain = play the clip, read the reply; stop = play the S?pre clip, and 4 s into the lamp's speaking play the clip;
+#      busy = start talk.aiff (room talk, two voices) quietly, 30 s later play the clip over it.
+E01	feel	plain	E01	Lamp, I just got home from work and I'm completely wiped out. What's a quick dinner I could make?
+E02	feel	plain	E02	Lamp, it's my friend's birthday on Saturday and I still don't have a present. Any ideas?
+E03	feel	plain	E03	Lamp, I have a really hard exam tomorrow morning. How long should I study tonight?
+E04	plain	plain	E04	Lamp, what's the weather going to be like tomorrow?
+E05	plain	plain	E05	Lamp, how many cups are in a litre?
+E06	feel	plain	E06	Lamp, my sister had her baby this morning! What's a nice thing to write in a card?
+E07	feel	plain	E07	Lamp, I couldn't sleep at all last night. Is coffee a bad idea this late?
+E08	plain	plain	E08	Lamp, what's a good movie to watch tonight?
+E09	feel	plain	E09	Lamp, my boss yelled at me in front of everyone today. How do I not let it get to me?
+E10	plain	plain	E10	Lamp, how do you say thank you in Japanese?
+E11	feel	plain	E11	Lamp, I finally finished painting the spare room. What colour goes with light green curtains?
+E12	feel	plain	E12	Lamp, I'm going for my first run in years tomorrow. How far should I go?
+E13	plain	plain	E13	Lamp, what's the capital of Canada?
+E14	feel	plain	E14	Lamp, my dog has been sick all week and I'm worried about her. What should I feed her?
+E15	feel	plain	E15	Lamp, I have a job interview on Monday. What should I wear?
+E16	plain	plain	E16	Lamp, tell me something interesting about octopuses.
+E17	feel	plain	E17	Lamp, I miss my mum, she lives so far away. What time is it in Sydney right now?
+E18	feel	plain	E18	Lamp, I'm cooking for six people tonight and I'm a bit nervous. How long do I roast a chicken?
+E19	plain	plain	E19	Lamp, why is the sky blue?
+E20	feel	plain	E20	Lamp, it's been raining for a week and I'm feeling a bit low. What's something cosy to do this evening?
+C1	cmd	plain	C1	Lamp, set a timer for five minutes.
+C2	cmd	plain	C2	Lamp, cancel the timer.
+C3	cmd	plain	C3	Lamp, lights off.
+C4	cmd	plain	C4	Lamp, turn the light back on.
+S1	stop	stop	S1	Lamp, stop.
+S2	stop	stop	S2	Stop, Lamp.
+B1	busy	busy	B1	Lamp, what's the capital of Japan?
+B2	busy	busy	B2	Lamp, I'm so tired after today. What time is it?
+# the stop rows' long asks (not counted rows; played before S1 / S2)
+S1pre	pre	-	S1pre	Lamp, tell me a long story about a lighthouse keeper.
+S2pre	pre	-	S2pre	Lamp, tell me all about the history of tea, from the very beginning.
