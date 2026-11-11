@@ -2304,7 +2304,10 @@ lẫn lượt chạy đều không giữ token nào.
   năng tự tạo và các lời gọi đồng ý của chủ đèn đều bị từ chối, "a skill's
   run may only read a linked service or prepare a write to it"). Lời gọi
   phải nêu một kỹ năng (`a-z 0-9 -`, như lamp-skills đặt tên) và dịch vụ
-  bằng đúng mã của nó (một tên như "Gmail" bị từ chối). lamp-control chỉ
+  bằng đúng mã của nó (một tên như "Gmail" bị từ chối). Một mã thuộc một cặp
+  (`gmail` và `gmail-app`, `figma` và `figma-api`, mỗi cặp một quyền) đi đến
+  mã nào trong cặp đang được liên kết, ưu tiên mã trùng tên đã gộp (`gmail`,
+  `figma`) khi cả hai đều được liên kết (`Services::run_code`). lamp-control chỉ
   gửi các lời gọi này khi có `LAMP_SKILL_TASKS=on` trong môi trường của
   chính nó (`--services-socket` dời socket khỏi
   `/run/lampos-services/tools/call.sock`); tắt ở đó, chúng là `off`, "a
