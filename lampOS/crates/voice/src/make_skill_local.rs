@@ -152,7 +152,8 @@ fn system_with(reads: bool) -> String {
     let (may_also, cant_send, cant_example) = if writes {
         (
             "a read or a write to a linked service as below",
-            "or send a message to a phone",
+            "or send a message to a phone (a mail or a calendar event is no message to a \
+             phone: it is a write, allowed below)",
             "hearing what is said",
         )
     } else {
@@ -248,7 +249,10 @@ fn services(
     let unreadable = made_skill::unreadable_names().join(", ");
     // With writes on, a mail sent or an event added is a write, never a
     // change of what is there: read as one, every write is refused.
-    let (only, asks_more) = if writes {
+    // On lamp-9adf, 11 Nov, writes on, "email test@example.com ... when I
+    // come back to my desk" was refused with this clause's ending: told
+    // plainly a write is never it.
+    let (only, asks_more, not_this) = if writes {
         (
             "A skill may read at most one of the person's linked services, and a read only \
              reads it: it never deletes or changes anything already in a service. Sending a \
@@ -256,6 +260,8 @@ fn services(
              a write, made as the write rules at the end say",
             "A request to delete or change anything already in a service (a mail or an event \
              already there)",
+            " Sending a mail or adding an event, an issue, a task or a comment is never answered \
+             so: it is a write, made as below.",
         )
     } else {
         (
@@ -263,6 +269,7 @@ fn services(
              never sends, writes, posts, books, schedules, deletes or changes anything in a \
              service",
             "A request to send, write or change anything in a service",
+            "",
         )
     };
     format!(
@@ -273,8 +280,8 @@ fn services(
          {asks_more}, to read two or more \
          services, or to read one not listed here ({unreadable}, or any other) is answered \
          with one line and no blocks: {cannot} then one short sentence saying what a skill \
-         can do instead (read one linked service), ending \"{ask_me}\" Never tell them to \
-         link a service.\n{write}"
+         can do instead (read one linked service), ending \"{ask_me}\"{not_this} Never tell \
+         them to link a service.\n{write}"
     )
 }
 
@@ -297,6 +304,10 @@ fn write_rules(own: &[(String, String)], today: Option<&(String, String)>) -> St
         .filter(|(_, account)| account.contains('@'))
         .map(|(code, account)| format!("{account} ({code})"))
         .collect();
+    let me = own
+        .iter()
+        .find(|(code, account)| code.starts_with("gmail") && account.contains('@'))
+        .map_or("you@example.com", |(_, account)| account.as_str());
     let mine = match mine.as_slice() {
         [] => "none linked".to_owned(),
         mine => mine.join(", "),
@@ -310,13 +321,34 @@ fn write_rules(own: &[(String, String)], today: Option<&(String, String)>) -> St
          Every subject, text and title is the person's own words in the request, copied \
          exactly (a quoted part as it is): never write, add, translate or fill in words of your \
          own, and never take them from a read, the web or memory. Every to, cc and attendee is \
-         an email address the request says, or the person's own: {mine}. A repo, team, project \
+         an email address the request says, or the person's own: {mine}; me, myself or my \
+         email is the person's own. A repo, team, project \
          or file is only one the request names. A request whose words to send, or whose \
          recipient's address, it doesn't say (\"mail Mai that I left\") is answered with one \
          line and no blocks: {cannot} {cant_yet} sending what you didn't say word for word, or \
-         to an address you didn't say; say the exact words and the address.\n{}",
+         to an address you didn't say; say the exact words and the address. A whole write \
+         skill, for \"{WRITE_EXAMPLE_ASKED}\":\n\n{}\n{}",
         kinds.join("\n- "),
+        write_example(me),
         event_times(today)
+    )
+}
+
+/// The request [`write_example`] is made for.
+const WRITE_EXAMPLE_ASKED: &str =
+    "when I come back to my desk, email me with the subject Back saying I am back";
+
+/// One whole write skill, shown the model with [`write_rules`], `me` the
+/// person's own linked mail address: on lamp-9adf, 11 Nov, with the rules
+/// alone, every mail make came back `cannot:`.
+fn write_example(me: &str) -> String {
+    format!(
+        "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n\
+         topics = [\"room/presence\"]\nservices = {{ gmail = \"write\" }}\n\n[trigger]\n\
+         topic = \"room/presence\"\nfield = \"someone\"\nequals = true\ncooldown = \"1h\"\n\
+         rearm = \"ends\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\nwrite = {{ service = \
+         \"gmail\", action = \"send_mail\", to = [\"{me}\"], subject = \"Back\", text = \
+         \"I am back\" }}\n```"
     )
 }
 
@@ -2536,6 +2568,51 @@ light = { dim = 1 }
         }
         assert!(parameters(true)["properties"]["approve_id"].is_object());
         made_skill::set_writes_here(None);
+    }
+
+    /// Lamp-9adf, 11 Nov, writes on: "email me ..." and "email
+    /// test@example.com ..." were refused `cannot:`, the second with the
+    /// reads' ending. With writes on, the reads' refusal and the can't-yet
+    /// say a mail or an event is a write, and the rules show one whole write
+    /// skill to the person's own address, which the lamp's check keeps.
+    #[test]
+    fn with_writes_on_the_instructions_show_a_whole_write_the_check_keeps() {
+        made_skill::set_writes_here(Some(true));
+        let on = system_with(true);
+        for rule in [
+            "is never answered so: it is a write, made as below.",
+            "a mail or a calendar event is no message to a phone: it is a write, allowed below",
+            "me, myself or my email is the person's own",
+            &format!("A whole write skill, for \"{WRITE_EXAMPLE_ASKED}\":\n\n```skill.toml\n"),
+            "write = { service = \"gmail\", action = \"send_mail\", to = [",
+        ] {
+            assert!(on.contains(rule), "{rule}: {on}");
+        }
+        let own = vec![
+            ("gmail".to_owned(), "me@example.test".to_owned()),
+            ("google_calendar".to_owned(), "me@example.test".to_owned()),
+        ];
+        let rules = write_rules(&own, None);
+        let example = write_example("me@example.test");
+        assert!(rules.contains(&example), "{rules}");
+        assert!(example.contains("to = [\"me@example.test\"]"), "{example}");
+        let (root, keeping) = keeping("write-example");
+        let card = "---\nname: back-mail\ndescription: Mails me when I come back to my desk.\n\
+                    ---\n\n# Back mail\n";
+        let answer = format!("{example}\n\n```SKILL.md\n{card}```\n");
+        let asked = made_skill::Asked {
+            request: WRITE_EXAMPLE_ASKED,
+            own,
+            heard: Some(WRITE_EXAMPLE_ASKED),
+        };
+        let made = made_skill::keep_asked(&answer, false, FROM, &keeping, &asked).unwrap();
+        assert_eq!(made.uses.writes, ["gmail"]);
+        assert_eq!(made.uses.sends_to, ["me@example.test"]);
+        made_skill::set_writes_here(Some(false));
+        let off = system_with(true);
+        assert!(!off.contains("A whole write skill") && !off.contains("is never answered so"));
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Lamp-9adf, 11 Nov, writes on: a mail or a calendar event made by
