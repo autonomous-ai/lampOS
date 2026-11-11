@@ -1823,8 +1823,24 @@ fn real_worker_session_records_verdict_provenance() {
 /// runs them. The four audio/provider fixtures stop cleanly, so only the
 /// endpoint worker's teardown can fail the cleanup.
 fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
+    run_with_endpoint(endpoint, &Termination::inactive())
+}
+
+/// A stop systemd asked for (SIGTERM, a requested restart) during an active
+/// reply, as [`mute_with_endpoint`] runs it, with no mute.
+fn requested_stop_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
+    run_with_endpoint(endpoint, &Termination::signaled())
+}
+
+/// With `termination` inactive the privacy fixture reports a physical mute;
+/// signalled, it reports none and the stop's signal ends the run.
+fn run_with_endpoint(
+    endpoint: EndpointRig,
+    termination: &Termination,
+) -> (Result<()>, SessionState) {
     use crate::service_privacy::PhysicalMute;
     require_real_process_clock();
+    let mute = termination.signal_name().is_none();
     let directory = SessionDirectory::create().unwrap();
     let (mut speaker, speaker_peer, speaker_input) =
         Worker::cooperative_fixture(&directory.path, "speaker");
@@ -1842,7 +1858,7 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
         (speaker_peer, false),
         (capture_peer, false),
         (provider_peer, false),
-        (privacy_peer, true),
+        (privacy_peer, mute),
     ]
     .map(|(mut channels, privacy)| {
         thread::spawn(move || {
@@ -1915,15 +1931,16 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
         StartupEvents::default(),
         &mut reply,
         &mut None,
-        &Termination::inactive(),
+        termination,
         &FailureNotices::none(),
     );
-    assert!(
+    assert_eq!(
         result
             .as_ref()
-            .unwrap_err()
-            .downcast_ref::<PhysicalMute>()
-            .is_some()
+            .err()
+            .is_some_and(|error| error.downcast_ref::<PhysicalMute>().is_some()),
+        mute,
+        "{result:?}"
     );
     let result = finish_active_run(
         &mut rig,
@@ -1952,10 +1969,10 @@ fn final_record(trace: &SessionState) -> Value {
 #[test]
 fn unconfirmed_endpoint_exit_fails_mute_cleanup_and_never_reopens_service() {
     use crate::service_privacy::{PhysicalMute, WaitOutcome};
-    // A worker that ignores its closed input and is only killed after 1.5 s:
-    // teardown's 500 ms bound passes with its process still alive.
+    // A worker that ignores its closed input and is only killed after 30 s:
+    // teardown's 1.5 s wait (#6406) passes with its process still alive.
     let limits = Limits {
-        grace: Duration::from_millis(1_500),
+        grace: Duration::from_secs(30),
         ..Limits::default()
     };
     let endpoint = scripted_process(&[ready()], "exec sleep 60", limits);
@@ -1994,7 +2011,7 @@ fn unconfirmed_endpoint_exit_fails_mute_cleanup_and_never_reopens_service() {
     );
     assert!(restarted.is_err());
     assert_eq!(waits.get(), 1);
-    // What was checked is done: the worker ended now, not at its 1.5 s
+    // What was checked is done: the worker ended now, not at its 30 s
     // grace (#1806). The supervisor alone reaps it, so the PID is the
     // worker's until then; on a host slow enough to reach the grace first,
     // it is gone already and the kill finds nothing.
@@ -2017,6 +2034,37 @@ fn confirmed_endpoint_exit_keeps_the_restartable_mute() {
     let record = final_record(&trace);
     assert_eq!(record["reaped"], true, "{record}");
     assert_eq!(record["teardown"], "Reaped");
+}
+
+/// #6406, lamp-52e6 at 19:36 on 11 Nov: a requested restart logged
+/// "verified cleanup failed: endpoint worker exit not confirmed within
+/// 500 ms" and exited `status=1/FAILURE`, so the mute was kept as it was and
+/// a running Hermes install lost the privacy lease. A worker that ignores
+/// its closed input and is killed only after 900 ms, its exit confirmed
+/// then, well inside the unit's 5 s `TimeoutStopSec`, is a clean stop.
+#[test]
+fn a_late_but_confirmed_endpoint_exit_is_a_clean_requested_stop() {
+    let limits = Limits {
+        grace: Duration::from_millis(900),
+        ..Limits::default()
+    };
+    let endpoint = scripted_process(&[ready()], "exec sleep 60", limits);
+    let mut cleanup = EndpointCleanup::new(endpoint);
+    let (result, trace) = requested_stop_with_endpoint(cleanup.take());
+    if let Err(error) = &result {
+        let interrupted = error
+            .downcast_ref::<io::Error>()
+            .is_some_and(|error| error.kind() == io::ErrorKind::Interrupted);
+        assert!(
+            interrupted,
+            "the requested stop failed its cleanup: {error}"
+        );
+    }
+    let record = final_record(&trace);
+    assert_eq!(record["reaped"], true, "{record}");
+    assert_eq!(record["teardown"], "Reaped");
+    assert_eq!(record["report"]["kills"], 1, "{record}");
+    drop(cleanup);
 }
 
 // Pilot stress: the conservative `smart-turn` path through the real loop.
