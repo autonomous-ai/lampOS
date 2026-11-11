@@ -2233,12 +2233,6 @@ the store's side in [memory-days](memory-days.md)):
   refuses a change asked before the forget that reaches it after
   (`forgotten`, in `memory-days.md`). Forgetting never undoes anything at
   the service, and the answer says so.
-- **Known gaps (on in the product, 11 Nov; the owner's call, forgets
-  later).** Seen on lamp-06c1
-  (https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064):
-  - A forget about a thing removes its service records, but not the talk
-    memory's exchanges about it, which recall can still bring back
-    (step 6).
 - **Off**, nothing is kept or written, and the receipts are kept exactly as
   before.
 

@@ -319,6 +319,13 @@ enum Extra {
         #[serde(default)]
         all: bool,
     },
+    /// A forget about a thing's subjects: a known person's own exchanges
+    /// that have them forgotten (`Days::exchanges_forget`).
+    ExchangesForget {
+        #[serde(default)]
+        person: Who,
+        about: Vec<Vec<String>>,
+    },
     /// The voice's `LAMP_SERVICE_CONTACTS` (connector records, PR 1c): a
     /// known person's mail contact saved, new or replacing the address
     /// kept for that name (`Days::service_contact_put`).
@@ -1169,6 +1176,9 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                 json!({"ok":true,"removed":forgot.removed,"records":forgot.records,"addresses":forgot.addresses})
             }
         }
+        Extra::ExchangesForget { person, about } => {
+            json!({"ok":true,"removed":store.exchanges_forget(&one(person)?, &about)?})
+        }
         Extra::ServiceRecordsForget { person, about, all } => {
             let person = one(person)?;
             let removed = if all {
@@ -1228,6 +1238,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_contact",
             "service_contacts",
             "service_contacts_forget",
+            "exchanges_forget",
         ];
         const OLD: &[&str] = &[
             "append",

@@ -1403,10 +1403,32 @@ expired items are history and not counted).
 An exchange said before a forget mark of its day (below) is dropped
 `forgotten` too. Days keeps no other forget fingerprints.
 
-**Forget marks** (El's option 2 on #5333). A topic forget (`forget
-{about}`) matches kept things and observations only, so an exchange said
-and never kept has nothing to match and stays active for its 30 days; the
-night would read it and keep it with a quote. So every forget a known
+**Talk about a forgotten thing** (lamp-06c1, 11 Nov). A topic forget
+(`forget {about}`) used to match kept things and observations only, so an
+exchange said and never kept stayed, and `recall` found it: "forget the
+recheck party", then "what happened with the recheck party?" was answered
+from the talk about it. After the kept things, the voice now sends
+`exchanges_forget {person, about}` (the same subjects as
+`service_records_forget`): each of that known person's own exchanges whose
+heard and said words have every key word of a subject (lower case, without
+accents, as singulars) is forgotten as a `forget {id}` of an exchange is,
+with what derives from it (its talk notes), never a kept thing (#3113):
+`{ok:true,removed}`, the count of exchanges. The room's exchanges are
+everyone's in the house and are never reached (the room, a rules scope or
+any other id is refused `bad_person`); an older memory answers
+`unknown_op` and the voice goes on. It is not sent when the kept things
+were not settled: the memory lost or refusing the listing, too much to look
+through, or more than eight matching (the model asks which one). Some removed, the answer says how many
+(`exchanges`, never their words) and the conversation stops being
+journalled, as after a forgotten kept thing. One more local request inside
+the call's 1.5 s.
+
+**Forget marks** (El's option 2 on #5333). Before the above, a topic
+forget matched kept things and observations only, so an exchange said
+and never kept had nothing to match and stayed active for its 30 days; the
+night would read it and keep it with a quote. The marks stay: an exchange
+whose words differ from the forget's (a paraphrase) still has nothing to
+match. So every forget a known
 person asks marks the day: `forget`, `forget_last` (found or not), and the
 voice's `forget_mark {person}` after a `forget {about}`, found or not
 (`{ok:true}`; the room or a rules scope marks nothing; an older memory

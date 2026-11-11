@@ -2300,12 +2300,6 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   mỗi khi memory trả lời ok, dù có xóa được gì hay không. Memory từ chối một
   thay đổi được hỏi trước lần quên mà đến sau nó (`forgotten`, xem
   `memory-days_vi.md`).
-- **Lỗ hổng đã biết (bật trong sản phẩm, 11/11; theo quyết định của chủ đèn,
-  phần quên làm sau).** Thấy trên lamp-06c1
-  (https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064):
-  - Quên về một việc xóa các bản ghi dịch vụ của nó, nhưng không xóa các
-    đoạn trò chuyện về việc đó trong bộ nhớ trò chuyện, nên recall vẫn có
-    thể nhắc lại (bước 6).
 - Tắt: không giữ, không ghi gì.
 
 ### Báo lại các bản ghi (`LAMP_SERVICE_RECORDS_TOLD`, tắt trừ khi bật; bật trong sản phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)

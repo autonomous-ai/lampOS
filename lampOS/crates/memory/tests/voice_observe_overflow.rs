@@ -188,7 +188,10 @@ fn talk(
                 &ToolCall {
                     id: "f".into(),
                     name: FORGET.into(),
-                    args: json!({"about":"Tokyo"}),
+                    // Not every word of it is in the line, so the line
+                    // stays and journalling goes on; "Tokyo" alone takes
+                    // the line (`exchanges_forget`, lamp-06c1, 11 Nov).
+                    args: json!({"about":"Tokyo trip"}),
                 },
                 BUDGET,
                 Some(person),
