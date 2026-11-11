@@ -4867,6 +4867,207 @@ pub(crate) mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
+    /// #6274: with the switch, `start_agent_task` with a session and no
+    /// work opens that session: the tasks part is asked to look on its own
+    /// socket for the voice, and asked again until the look is done; the
+    /// model is told it is open and that what they ask of it next goes
+    /// into it. More than one fitting is asked about, none is said, never a
+    /// guess. Without the switch the task is required as always, and a
+    /// line the lamp wrote itself opens nothing.
+    #[test]
+    fn with_reply_named_a_session_alone_opens_it_and_needs_no_task() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-open-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("voice.sock", json!({"ok":true,"look":"x","done":false})),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"look":"x","done":true,"found":{"state":"idle","name":"Customer Survey","ask":"Summarise the survey"}}),
+                ),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"look":"y","done":true,"code":"session_ambiguous"}),
+                ),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"look":"z","done":true,"code":"session_not_found"}),
+                ),
+            ],
+        );
+        let mut on = place(&directory, false);
+        on.reply_named = true;
+        let off = place(&directory, false);
+        let start = |place: &Place| {
+            declared(place, &[])
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .unwrap()
+                .parameters
+                .unwrap()
+        };
+        assert_eq!(start(&off)["required"], json!(["task"]));
+        assert!(start(&on).get("required").is_none(), "{}", start(&on));
+        assert!(SESSION.contains("with no task"), "{SESSION}");
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args,
+        };
+        let (told, answered) = run(
+            &on,
+            &call(json!({"session":"costumer survey"})),
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert!(answered && told["open"] == json!(true), "{told}");
+        assert_eq!(told["session"], "Customer Survey", "{told}");
+        assert!(
+            told["next"]
+                .as_str()
+                .unwrap()
+                .contains("call start_agent_task with that task and session \"Customer Survey\""),
+            "{told}"
+        );
+        let asked = seen.recv_timeout(PEER_WAIT).unwrap();
+        assert_eq!(asked["op"], "session");
+        assert_eq!(asked["join"], true);
+        assert_eq!(asked["session"], "costumer survey");
+        assert_eq!(asked["target"], "office");
+        let again = seen.recv_timeout(PEER_WAIT).unwrap();
+        assert_eq!(again["look"], asked["look"]);
+        assert!(PENDING.lock().unwrap().is_none(), "nothing is prepared");
+        let (told, _) = run(&on, &call(json!({"session":"survey"})), 4, true, PEER_WAIT);
+        assert!(
+            told["error"]
+                .as_str()
+                .unwrap()
+                .contains("ask which one they mean"),
+            "{told}"
+        );
+        let (told, _) = run(&on, &call(json!({"session":"billing"})), 5, true, PEER_WAIT);
+        assert!(
+            told["error"]
+                .as_str()
+                .unwrap()
+                .contains("No session of theirs fits \"billing\""),
+            "{told}"
+        );
+        assert_eq!(seen.recv_timeout(PEER_WAIT).unwrap()["session"], "survey");
+        assert_eq!(seen.recv_timeout(PEER_WAIT).unwrap()["session"], "billing");
+        // Off, or a line the lamp wrote itself: nothing asked of the part.
+        let (told, _) = run(
+            &off,
+            &call(json!({"session":"customer survey"})),
+            6,
+            true,
+            PEER_WAIT,
+        );
+        assert_eq!(told["error"], "Say what the work is.");
+        let (told, _) = run(
+            &on,
+            &call(json!({"session":"customer survey"})),
+            7,
+            false,
+            PEER_WAIT,
+        );
+        assert!(told.get("error").is_some(), "{told}");
+        assert!(seen.try_recv().is_err());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #6274: with the switch, `check_agent_task` takes a session, and is
+    /// answered from that session's own state as the tasks part looks at
+    /// it now, a session the lamp never handed anything included: what it
+    /// says it is doing comes marked untrusted, without paths. None fitting
+    /// is said, never a guess. Without the switch it takes none.
+    #[test]
+    fn with_reply_named_a_check_names_a_session_and_is_told_its_own_state() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-check-named-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![
+                (
+                    "voice.sock",
+                    json!({"ok":true,"look":"x","done":true,"found":{"state":"working","name":"Customer Survey","about":"Editing /Users/someone/survey.csv for week two"}}),
+                ),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"look":"y","done":true,"code":"session_not_found"}),
+                ),
+            ],
+        );
+        let mut on = place(&directory, false);
+        on.reply_named = true;
+        let off = place(&directory, false);
+        let check = |place: &Place| {
+            declared(place, &[])
+                .into_iter()
+                .find(|tool| tool.name == CHECK)
+                .unwrap()
+        };
+        assert!(check(&off).parameters.is_none());
+        let declared_on = check(&on);
+        assert_eq!(
+            declared_on.parameters.as_ref().unwrap()["properties"]["session"]["type"],
+            "string"
+        );
+        assert!(
+            declared_on.description.contains("with session"),
+            "{}",
+            declared_on.description
+        );
+        let call = |args: Value| ToolCall {
+            id: "c".into(),
+            name: CHECK.into(),
+            args,
+        };
+        let (told, answered) = run(
+            &on,
+            &call(json!({"session":"the customer survey one"})),
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert!(answered, "{told}");
+        assert_eq!(told["session"], "Customer Survey", "{told}");
+        assert_eq!(told["state"], "still working", "{told}");
+        assert_eq!(
+            told["doing"]["untrusted"], "Editing a file for week two",
+            "{told}"
+        );
+        let asked = seen.recv_timeout(PEER_WAIT).unwrap();
+        assert_eq!(
+            (asked["op"].clone(), asked["join"].clone()),
+            (json!("session"), json!(false))
+        );
+        let (told, _) = run(&on, &call(json!({"session":"billing"})), 4, true, PEER_WAIT);
+        assert!(
+            told["error"]
+                .as_str()
+                .unwrap()
+                .contains("No session of theirs fits \"billing\""),
+            "{told}"
+        );
+        assert_eq!(seen.recv_timeout(PEER_WAIT).unwrap()["session"], "billing");
+        assert!(seen.try_recv().is_err());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn the_switch_is_an_absolute_directory_and_an_alias_and_is_taken_from_the_front() {
         assert!(arguments(None, None, None, None, None, None, None, None, None).is_empty());
