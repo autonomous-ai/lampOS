@@ -346,9 +346,11 @@ async function fakeBody() {
     }
     // A new colour every 4 s, as a skill's light might.
     const colour = colours[Math.floor(tick++ / 100) % colours.length];
+    // A computer's own pixels, while the fake lamp holds them, as the real body.state carries them.
+    const shows = fakeLamp.lightState()?.shows;
     fakeLamp.emit('body.state', {
       joints,
-      lamp: { light: { on: true, colour, level: 3 }, talking: false, private: false },
+      lamp: { light: { on: true, colour, level: 3, ...(shows?.pixels ? { shows } : {}) }, talking: false, private: false },
     });
   }, 40);
   return { lamp, sim, fakeLamp };

@@ -193,6 +193,29 @@ export const LIGHT_FADE_MS = Object.freeze([1_000, 60_000]);
 export const LIGHT_FOR_MS = Object.freeze([1, 30_000]);
 export const LIGHT_LEVELS = Object.freeze([1, 5]);
 export const RING_PIXELS = 32;
+// lamp_msgs::Light::TINTS: the ten colours' tints, to name the light nearest a computer's own pixels.
+const TINTS = [
+  ['yellow', [1, 0.8, 0]], ['red', [1, 0, 0]], ['green', [0, 1, 0.12]], ['blue', [0, 0.22, 1]], ['cyan', [0, 0.9, 1]],
+  ['purple', [0.62, 0, 1]], ['orange', [1, 0.34, 0]], ['pink', [1, 0.22, 0.42]], ['white', [1, 0.88, 0.72]], ['warm', [1, 0.55, 0]],
+];
+const rgbOf = (text) => [1, 3, 5].map((at) => parseInt(text.slice(at, at + 2), 16));
+// Each pixel at `brightness` (0 to 100, 100 when none), as lamp-control asks the ring for them (parts.rs `own_light`).
+const drawnPixels = (given, brightness) => {
+  const share = Math.min(brightness ?? 100, 100) / 100;
+  return given.map((pixel) => rgbOf(pixel).map((channel) => Math.round(channel * share)));
+};
+// The named light nearest a computer's own pixels (parts.rs `nearest_light`): the tint of the mean of the lit ones.
+const nearestLight = (pixels) => {
+  const brightest = Math.max(0, ...pixels.flat());
+  if (brightest === 0) return { on: false, colour: 'warm', level: 1 };
+  const lit = pixels.filter((pixel) => pixel.some((channel) => channel > 0));
+  const mean = [0, 1, 2].map((at) => lit.reduce((sum, pixel) => sum + pixel[at], 0) / lit.length);
+  const top = Math.max(...mean, 1);
+  const tint = mean.map((channel) => channel / top);
+  const far = (named) => [0, 1, 2].reduce((sum, at) => sum + (named[1][at] - tint[at]) ** 2, 0);
+  const colour = TINTS.reduce((best, named) => (far(named) < far(best) ? named : best))[0];
+  return { on: true, colour, level: Math.min(Math.max(Math.round((brightest / 255) * 5), 1), 5) };
+};
 const hexRgb = (text) => typeof text === 'string' && /^#[0-9a-fA-F]{6}$/.test(text);
 
 // lamp-control's refusal of a computer's `light` (protocol.rs), in its words, as
@@ -513,9 +536,16 @@ export class FakeLamp {
     for (const ws of this.wss.clients) ws.close(1012, 'the lamp restarts');
   }
 
-  // The ring shows a computer's light while it lasts.
-  show(request) {
-    this.shown = { light: { on: true, colour: request.colour, level: request.level }, until: this.clock() + request.for_ms };
+  // The ring shows a computer's light while it lasts; with `pixels`, a computer's own colours (each `#rrggbb`,
+  // as asked of the ring): the nearest named light beside them, and `shows.pixels` while it lasts (docs/control.md).
+  show(request, pixels = undefined) {
+    if (pixels === undefined) {
+      this.shown = { light: { on: true, colour: request.colour, level: request.level }, until: this.clock() + request.for_ms };
+      return;
+    }
+    const drawn = drawnPixels(pixels, request.brightness);
+    this.shownPixels = pixels;
+    this.shown = { light: nearestLight(drawn), until: this.clock() + (request.for_ms ?? 30_000), pixels: drawn.map(([r, g, b]) => `#${[r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('')}`) };
   }
 
   // The person changes the volume (by voice or in the app), or a `volume`
@@ -537,7 +567,7 @@ export class FakeLamp {
   // as the ring publishes both when it draws the person's light.
   lightState() {
     const own = { ...(this.state.light ?? {}) };
-    if (this.shown && this.shown.until > this.clock()) own.shows = { ...this.shown.light };
+    if (this.shown && this.shown.until > this.clock()) own.shows = { ...this.shown.light, ...(this.shown.pixels ? { pixels: [...this.shown.pixels] } : {}) };
     else if (['on', 'colour', 'level'].some((key) => key in own)) {
       own.shows = Object.fromEntries(['on', 'colour', 'level'].filter((key) => key in own).map((key) => [key, own[key]]));
     }
@@ -949,7 +979,7 @@ export class FakeLamp {
             this.requests.pop();
             return this.refuse(ws, id, 'bad_request', 'pixels: 32 of them, one per pixel of the ring');
           }
-          this.shownPixels = given;
+          this.show(request, given);
           return this.ok(ws, id, { to: 'ring', pixels: given.length });
         }
         // As lamp-control's parts.rs: the pattern checked first, then to the
