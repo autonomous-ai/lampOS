@@ -7,8 +7,9 @@ publish.workspace = true
 
 # A read-only page on an office lamp (#2141, docs/peek.md): the eyes' faces
 # as boxes, never pictures, the bus's counts and states, never words, and
-# the units. Off unless `LAMP_PEEK=on`, on 127.0.0.1 unless given a token,
-# and never in deploy/product.
+# the units. Off unless `LAMP_PEEK=on`, on 127.0.0.1 unless given a token.
+# deploy/product/lamp-peek.service runs it only in the owner's monitor mode
+# (`LAMP_PEEK=monitor`, #5883), written by the app's switch.
 [[bin]]
 name = "lamp-peek"
 path = "src/main.rs"

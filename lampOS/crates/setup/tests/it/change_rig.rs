@@ -65,6 +65,7 @@ impl Root {
             "agent_dropin": self.0.join("etc/systemd/system/lamp-control.service.d/agent.conf"),
             "agent_group_file": self.0.join("etc/group"),
             "agent_folder": self.0.join("run/lampos-agent"),
+            "monitor_dropin": self.0.join("etc/systemd/system/lamp-peek.service.d/monitor.conf"),
             "consent": self.0.join("var/lib/lampOS/consent"),
         }))
         .unwrap()

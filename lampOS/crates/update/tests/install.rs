@@ -1477,6 +1477,12 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             // marker, setup itself serves.
             assert!(unit.contains(&condition.as_str()), "{name}");
             assert!(section(text, "Install").contains(&"WantedBy=multi-user.target"));
+        } else if *name == "lamp-peek.service" {
+            // The owner's dev monitor (#5883): a set-up lamp only, since
+            // setup's page has port 80 before the marker; outside the target
+            // so a reset in place never starts it again.
+            assert!(unit.contains(&condition.as_str()), "{name}");
+            assert!(section(text, "Install").contains(&"WantedBy=multi-user.target"));
         } else if *name == "lampos-setup-done.path" {
             // And this starts the lamp once it is there.
             let path = section(text, "Path");

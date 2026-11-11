@@ -134,6 +134,9 @@ pub struct Real {
     /// The owner's face expressions and room sounds yeses from the app,
     /// with `LAMP_APP_CONSENT=on` (#5500, `crate::consent`).
     pub consent: Option<crate::consent::Place>,
+    /// The owner's dev monitor, with `LAMP_APP_MONITOR=on` (#5883,
+    /// `crate::monitor`).
+    pub monitor: Option<crate::monitor::Place>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -876,6 +879,10 @@ impl Lamp for Real {
         self.consent.clone()
     }
 
+    fn monitor(&self) -> Option<crate::monitor::Place> {
+        self.monitor.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -1119,6 +1126,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            monitor: None,
             upload: None,
             shutdown: None,
         };
@@ -1204,6 +1212,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            monitor: None,
             upload: None,
             shutdown: None,
         };
@@ -1298,6 +1307,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            monitor: None,
             upload: None,
             shutdown: None,
         };
@@ -1405,6 +1415,7 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            monitor: None,
             upload: None,
             shutdown: None,
         };

@@ -343,6 +343,12 @@ pub trait Lamp {
     fn control(&self) -> Option<crate::control::Door> {
         None
     }
+
+    /// The owner's dev monitor (`LAMP_APP_MONITOR=on`, #5883,
+    /// `crate::monitor`): there only with the switch.
+    fn monitor(&self) -> Option<crate::monitor::Place> {
+        None
+    }
 }
 
 /// Whether a kind is answered on `lamp` now: its switch, read without
@@ -353,7 +359,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 69] = [
+pub const KINDS: [(&str, Switch); 72] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -439,6 +445,11 @@ pub const KINDS: [(&str, Switch); 69] = [
     (crate::control::KINDS[3], CONTROL),
     (crate::control::KINDS[4], CONTROL),
     (crate::control::KINDS[5], CONTROL),
+    // The owner's dev monitor (#5883): its switch, and root's helper that
+    // `monitor.set` goes to.
+    (crate::monitor::KINDS[0], MONITOR),
+    (crate::monitor::KINDS[1], MONITOR),
+    (crate::monitor::KINDS[2], MONITOR),
 ];
 
 const CONSENT: Switch = |lamp| lamp.consent().is_some();
@@ -460,6 +471,8 @@ const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
 const VOICE: Switch = |lamp| lamp.changes().is_some_and(|c| c.voice_on());
 /// The switch, and lamp-services there to ask.
 const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
+/// The switch, and root's change helper for `monitor.set`.
+const MONITOR: Switch = |lamp| lamp.monitor().is_some() && lamp.changes().is_some();
 /// The socket given, and lamp-control there to ask.
 const CONTROL: Switch = |lamp| lamp.control().is_some_and(|door| door.here());
 
@@ -900,6 +913,24 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::control::KINDS.contains(&kind) && lamp.control().is_some() => {
             let door = lamp.control().ok_or_else(|| not_here(kind))?;
             crate::control::answer(&door, kind, data)
+        }
+        // The owner's dev monitor (#5883): on and off through root's
+        // helper, answered `starting` and then its result, as `control.set`;
+        // read where the helper writes it; and a one-time link sealed to the
+        // app's own key.
+        crate::monitor::SET_KIND if on(lamp, kind) => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            changes.start(kind, crate::monitor::line(data)?);
+            Ok(None)
+        }
+        kind if crate::monitor::KINDS.contains(&kind) && on(lamp, kind) => {
+            let place = lamp.monitor().ok_or_else(|| not_here(kind))?;
+            if kind == crate::monitor::LINK_KIND {
+                let host = lamp.host()["hostname"].as_str().unwrap_or("").to_owned();
+                crate::monitor::link(&place, &host, data).map(Some)
+            } else {
+                some(crate::monitor::get(&place))
+            }
         }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
