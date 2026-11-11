@@ -242,7 +242,11 @@ fn speak_with(engines: &[(&str, &[&str])], text: &str, cancelled: &AtomicBool) -
 
 /// Cuts off what an engine has already handed on, when its client is killed:
 /// speech-dispatcher goes on speaking a queued line after `spd-say` is gone, so
-/// `spd-say --cancel` stops it. The other engines speak only as long as they run.
+/// `spd-say --cancel` stops it (measured: a killed client's line ran to its end,
+/// and was silent within half a second of the cancel). The other engines speak
+/// only as long as they run. Known limit: `--cancel` is "CANCEL ALL", so it also
+/// cuts any other speech of the same user's speech-dispatcher (a screen reader);
+/// speech-dispatcher's own socket has a per-client `CANCEL SELF`, not used here.
 fn cut_off(program: &str) {
     if Path::new(program)
         .file_name()
