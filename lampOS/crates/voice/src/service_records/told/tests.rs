@@ -69,12 +69,13 @@ fn drive(key: &str, status: Status, found: Value, changed: u64) -> Record {
     }
 }
 
-/// The note: the latest five, plus anything still `prepared` or `failed`
-/// changed in the last seven days, latest first; nothing older, no
-/// sixth done one; within its bytes.
+/// The note: the latest five, plus anything still `prepared` or `failed`,
+/// and every `done` write (not a read), changed in the last seven days, latest first;
+/// nothing older; within its bytes.
 #[test]
 fn the_note_shows_the_latest_five_and_open_ones_of_seven_days() {
     fresh();
+    super::super::redo::on_for_test(false);
     let mut records = vec![
         record("failed-8d", Status::Failed, NOW - 8 * DAY),
         record("failed-3d", Status::Failed, NOW - 3 * DAY),
@@ -90,17 +91,17 @@ fn the_note_shows_the_latest_five_and_open_ones_of_seven_days() {
     hold(records);
     let note = note_now(Some(OWNER), true, NOW, ZONE).expect("the owner is told");
     let lines: Vec<&str> = note.lines().filter(|line| line.starts_with("- ")).collect();
-    assert_eq!(lines.len(), 7, "{note}");
+    assert_eq!(lines.len(), 9, "{note}");
     assert!(
-        lines[..5].iter().all(|line| line.contains(" · done · ")),
+        lines[..7].iter().all(|line| line.contains(" · done · ")),
         "{note}"
     );
     assert!(
-        lines[5].contains("failed") && lines[5].contains("Sat 7 Nov"),
+        lines[7].contains("failed") && lines[7].contains("Sat 7 Nov"),
         "{note}"
     );
     assert!(
-        lines[6].contains("waiting for a send") && lines[6].contains("Wed 4 Nov"),
+        lines[8].contains("waiting for a send") && lines[8].contains("Wed 4 Nov"),
         "{note}"
     );
     assert!(
@@ -490,4 +491,203 @@ fn a_forget_during_the_list_after_a_start_drops_its_answer() {
     assert!(held().is_empty(), "{:?}", held().len());
     merge(OWNER, &sent_mail_found(), NOW, super::super::forgets());
     assert_eq!(held().len(), 2);
+}
+
+fn write_rec(key: &str, action: &str, status: Status, detail: Value, changed: u64) -> Record {
+    let service = if action == "send_mail" {
+        "gmail"
+    } else {
+        "google_calendar"
+    };
+    Record {
+        key: key.into(),
+        service: service.into(),
+        action: action.into(),
+        reason: match status {
+            Status::Cancelled => "the lamp answered after the read-back with no send".into(),
+            Status::Failed => "writes: create_event, the calendar tool can't do this".into(),
+            _ => String::new(),
+        },
+        detail,
+        ..record(key, status, changed)
+    }
+}
+
+fn events_read(key: &str, status: Status, changed: u64) -> Record {
+    Record {
+        key: key.into(),
+        action: "events".into(),
+        reason: if status == Status::Failed {
+            "the service did not answer in time".into()
+        } else {
+            String::new()
+        },
+        detail: json!({"what":"events","count":1,"found":[{"title":"Friday test party","start":"2026-11-14T19:00:00+07:00"}]}),
+        ..record(key, status, changed)
+    }
+}
+
+/// lamp-06c1, 11 Nov (the connector switch-on row, steps 1–7): the owner's
+/// party was created (`done`), then calendar reads, a failed cancel, mails
+/// sent and declined, and two declined redos came after it. The note held
+/// the latest five and the open ones, so the `done` create fell out, and
+/// "what happened with the party?" was answered "nothing was saved".
+fn the_switch_on_row(start: u64) -> Vec<Record> {
+    let party = |title: &str, day: u8, hour: u8| json!({"title": title, "start": format!("2026-11-{day}T{hour}:00:00+07:00"), "end": format!("2026-11-{day}T{}:00:00+07:00", hour + 1)});
+    let mail = || json!({"to": ["friend@home.test"], "subject": "Lamp test", "text": "A test from the lamp."});
+    let at = |n: u64| start + n * MINUTE;
+    vec![
+        write_rec(
+            "v1-1",
+            "create_event",
+            Status::Cancelled,
+            party("Party", 14, 7),
+            at(0),
+        ),
+        write_rec(
+            "v1-2",
+            "create_event",
+            Status::Done,
+            party("Friday test party", 14, 19),
+            at(2),
+        ),
+        events_read("v1-3", Status::Done, at(3)),
+        events_read("v1-4", Status::Done, at(4)),
+        write_rec(
+            "v1-5",
+            "cancel_event",
+            Status::Failed,
+            party("Friday test party", 14, 19),
+            at(5),
+        ),
+        events_read("v1-6", Status::Failed, at(6)),
+        events_read("v1-7", Status::Done, at(7)),
+        write_rec("v2-1", "send_mail", Status::Done, mail(), at(10)),
+        write_rec("v2-2", "send_mail", Status::Cancelled, mail(), at(12)),
+        write_rec(
+            "v2-3",
+            "create_event",
+            Status::Cancelled,
+            party("Friday test party", 15, 19),
+            at(20),
+        ),
+        write_rec(
+            "v2-4",
+            "create_event",
+            Status::Cancelled,
+            party("Friday test party", 14, 20),
+            at(22),
+        ),
+        write_rec("v2-5", "send_mail", Status::Done, mail(), at(24)),
+        write_rec("v2-6", "send_mail", Status::Cancelled, mail(), at(26)),
+    ]
+}
+
+/// A `done` write of the owner's is never dropped for newer reads,
+/// cancels or failures: the 11 Nov row's created party is still told
+/// after twelve newer records, within the note's bytes.
+#[test]
+fn a_done_write_is_never_dropped_for_newer_reads_or_failures() {
+    fresh();
+    super::super::redo::on_for_test(false);
+    hold(the_switch_on_row(NOW - 40 * MINUTE));
+    let note = note_now(Some(OWNER), true, NOW, ZONE).expect("the owner is told");
+    assert!(
+        note.lines()
+            .any(|line| line.contains("create 'Friday test party' · Sat 14 Nov 19:00–20:00 · done")),
+        "the created party: {note}"
+    );
+    assert!(note.len() <= NOTE_BYTES, "{} bytes: {note}", note.len());
+    println!("note, {} bytes:\n{note}", note.len());
+}
+
+/// With too many lines or bytes, reads go first, then failures, and a
+/// `done` write stays, however old within the seven days.
+#[test]
+fn the_byte_cut_drops_reads_and_cancels_before_a_done_write() {
+    fresh();
+    super::super::redo::on_for_test(true);
+    let long = "a long title the owner gave this event, said in full words";
+    let mut records = vec![write_rec(
+        "done-old",
+        "create_event",
+        Status::Done,
+        json!({"title":"Friday test party","start":"2026-11-14T19:00:00+07:00"}),
+        NOW - 3 * DAY,
+    )];
+    for n in 0..12u64 {
+        records.push(if n >= 9 {
+            events_read(&format!("read{n}"), Status::Done, NOW - (20 - n) * MINUTE)
+        } else {
+            write_rec(
+                &format!("failed{n}"),
+                "create_event",
+                Status::Failed,
+                json!({"title": format!("{long} {n}"),"start":"2026-11-15T19:00:00+07:00","end":"2026-11-15T22:00:00+07:00"}),
+                NOW - (20 - n) * MINUTE,
+            )
+        });
+    }
+    hold(records);
+    let note = note_now(Some(OWNER), true, NOW, ZONE).expect("the owner is told");
+    assert!(note.len() <= NOTE_BYTES, "{} bytes: {note}", note.len());
+    assert!(
+        note.contains("create 'Friday test party' · Sat 14 Nov 19:00 · done"),
+        "the done write: {note}"
+    );
+    assert!(note.contains("not shown"), "the cut is said: {note}");
+    assert!(
+        !note.contains("search") && !note.contains("read events"),
+        "reads go first: {note}"
+    );
+    super::super::redo::on_for_test(false);
+    println!("note, {} bytes:\n{note}", note.len());
+}
+
+/// With `LAMP_SERVICE_REDO` on, each write the note tells carries its
+/// record key and the note says to give it as `from_record`, so "do it
+/// again at 8 PM" can name the record; a read carries none (a read is not
+/// redone), nor does the brief note. Recall gives a write's key too. Off,
+/// the note is as before.
+#[test]
+fn with_redo_on_the_note_and_recall_name_each_writes_key() {
+    fresh();
+    super::super::redo::on_for_test(true);
+    hold(vec![
+        record("v9-1", Status::Cancelled, NOW - 5 * MINUTE),
+        drive(
+            "v9-2",
+            Status::Done,
+            json!([{"title":"Sunday plan"}]),
+            NOW - 2 * MINUTE,
+        ),
+    ]);
+    let note = note_now(Some(OWNER), true, NOW, ZONE).expect("told");
+    let party = note
+        .lines()
+        .find(|line| line.contains("Hamburger party"))
+        .expect("the party");
+    assert!(party.contains("key v9-1"), "{note}");
+    let read = note
+        .lines()
+        .find(|line| line.contains("Drive"))
+        .expect("the read");
+    assert!(!read.contains("key "), "{note}");
+    assert!(note.contains(super::super::redo::FIELD), "{note}");
+    let brief = note_now(Some(OWNER), false, NOW, ZONE).expect("told brief");
+    assert!(
+        !brief.contains("v9-1") && !brief.contains(super::super::redo::FIELD),
+        "{brief}"
+    );
+    let answer = json!({"ok":true,"records":[{"key":"v9-1","service":"google_calendar","action":"create_event","status":"cancelled","reason":"","detail":{"title":"Hamburger party"},"asked_unix_ms":NOW,"changed_unix_ms":NOW}]});
+    let told = recall_told(&answer, true, NOW, ZONE, RECALL_BYTES).expect("recall");
+    assert_eq!(told["records"][0]["key"], "v9-1", "{told}");
+    super::super::redo::on_for_test(false);
+    let off = note_now(Some(OWNER), true, NOW, ZONE).expect("told");
+    assert!(
+        !off.contains("v9-1") && !off.contains(super::super::redo::FIELD),
+        "{off}"
+    );
+    let told = recall_told(&answer, true, NOW, ZONE, RECALL_BYTES).expect("recall");
+    assert!(told["records"][0].get("key").is_none(), "{told}");
 }

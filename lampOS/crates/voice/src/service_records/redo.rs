@@ -37,7 +37,7 @@ pub const ENVIRONMENT: &str = "LAMP_SERVICE_REDO";
 pub const FIELD: &str = "from_record";
 
 /// What the model is told of [`FIELD`].
-pub const DESCRIPTION: &str = "To redo or change a past service write of theirs (cancelled, failed, timed out or refused; or a follow-up to a sent mail): its record key. Give only what the person changed, each field whole; every other detail comes from the record. Read back and send as always.";
+pub const DESCRIPTION: &str = "To redo or change a past service write of theirs (cancelled, failed, timed out or refused; or a follow-up to a sent mail), such as \"do it again\" or \"redo it for Sunday\": its record key, the `key` shown with it in their past service actions or in what recall found. Give only what the person changed, each field whole; every other detail comes from the record. Read back and send as always.";
 
 pub const NO_RECORD: &str = "Not done: no service action of theirs has that record key. Use a key from their past service actions, or ask for the whole write again.";
 pub const A_READ: &str = "Not done: a search or read is not redone from a record. Call service_read again if they want it.";

@@ -2262,8 +2262,17 @@ dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b
   the lamp answered after the read-back with no send · today 15:40`,
   `Drive · search 'Sunday' · no result · today 15:34`. Gồm 5
   bản mới nhất, cộng các bản còn
-  `prepared` hay `failed` đổi trong 7 ngày qua, tối đa 10 dòng và 1.200 byte
-  (dòng cũ nhất bỏ trước, và nói bỏ bao nhiêu). Kèm quy tắc: "Your past
+  `prepared` hay `failed`, và mọi lệnh ghi `done`, đổi trong 7 ngày qua, tối
+  đa 10 dòng và 1.600 byte. Vượt mức, bản đọc và bản hủy bỏ trước, rồi
+  `prepared`/`failed`, lệnh ghi `done` bỏ sau cùng, mỗi loại bỏ cũ nhất
+  trước, và nói bỏ bao nhiêu ("and N more not shown: recall finds them").
+  Trên lamp-06c1 ngày 11/11, các lần đọc lịch mới hơn và một lần hủy thất
+  bại đẩy sự kiện đã tạo ra khỏi 5 bản mới nhất, nên đèn nói không có gì
+  được lưu. Khi bật `LAMP_SERVICE_REDO`, dòng của mỗi lệnh ghi kết thúc bằng
+  khóa bản ghi (`· key v1794373881497-2`), recall trả nó ở `key`, và ghi chú
+  thêm "To redo or change a write listed here, call service_write with
+  from_record set to its key, giving only what changed."; không bao giờ
+  trong ghi chú tóm tắt, không bao giờ cho bản đọc. Kèm quy tắc: "Your past
   service actions are listed with their status. Never claim something was
   done unless its record says done; never say you can't do something a
   record shows you did." Đọc từ những gì voice giữ, không bao giờ chờ; sau
@@ -2300,7 +2309,8 @@ dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b
 
 Với `LAMP_SERVICE_REDO=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ tuyến thứ
 hai; riêng nó thì không làm gì; kế hoạch bản ghi connector, PR 1d),
-`service_write` nhận `from_record`, khóa của một bản ghi dịch vụ, nên câu
+`service_write` nhận `from_record`, khóa của một bản ghi dịch vụ (`key`
+mà ghi chú bản ghi và recall hiện kèm mỗi lệnh ghi), nên câu
 "làm lại lúc 8 giờ tối" sau một sự kiện đã hủy không cần nói lại gì
 (`crates/voice/src/service_records/redo.rs`):
 
