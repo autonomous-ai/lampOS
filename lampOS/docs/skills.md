@@ -3291,11 +3291,21 @@ repairs' briefs and the keeping are the same code for both writers.
   agent ends its turn, looked at every 0.5 s. No new transport. The tasks
   part takes 2,000 bytes of text and the system prompt is longer, so the
   system prompt and the brief go in a file of their own,
-  `/run/lampos-make-skill/make-<random>.md` (the folder 0711, the file
-  0644, removed once the answer is in), which the task names. The task's
+  `/run/lampos-make-skill/make-<random>.md`, which the task names: the
+  folder 0750 and the file 0640, both of the local agents' group
+  `lamp-agents` (the installer makes it, with the `lampagent` user), the
+  file removed once the answer is in; with no such group, 0700 and 0600,
+  journaled. The task's
   text begins as a brief does (`made_skill::is_brief`), so its answer, or
   its failed hand-over, is never told as news. Once read, the answer is
-  marked told, so `--close-told` closes the agent's session.
+  marked told, so `--close-told` closes the agent's session. An agent that
+  doesn't answer in 45 s has its task cancelled (`cancel`); the tasks part
+  takes that only for work not yet handed to the agent and has no op that
+  ends work the agent has, so such work is left running, journaled, and
+  its news, a brief's, is never told.
+- **The agent's tools.** The agent runs with its own tools during a make:
+  there is no tools-off mode yet. The switch stays off until that is
+  decided.
 - **Bounds.** Each of the agent's answers within 45 s
   (`make_skill_agent::WRITE_WITHIN`); a repair is begun only while one
   more answer fits the agent's 120 s (`make_skill_agent::MAKE_WITHIN`).
@@ -3322,8 +3332,8 @@ repairs' briefs and the keeping are the same code for both writers.
   agent times out).
 - **Not yet shown on a lamp:** its row, the 16 makes (twelve simple, four
   known DeepSeek failures) on a lamp with an agent, comparing kept, the
-  say-back and the time with DeepSeek's. Which user the agent runs as is part 1's (install); the
-  rules file is readable by any user for that reason.
+  say-back and the time with DeepSeek's. Whether the agent's user is in
+  `lamp-agents` on a lamp.
 
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
