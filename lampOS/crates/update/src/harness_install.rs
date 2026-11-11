@@ -872,7 +872,12 @@ fn install_with(
 /// copy, or a folder above one of them, is refused, so neither script can
 /// remove the sign-in. A kept copy already there (a put-back that failed)
 /// is the only good one: KEEP refuses it, and makes its own copy at
-/// `<kept>.new`, renamed only once whole.
+/// `<kept>.new`, renamed only once whole. Once kept, `current-node` is
+/// taken away (#6302): Harness's installer reuses the Node it names, so a
+/// moved Harness would stay on the older Node (22) while a fresh install
+/// gets the pin's; without it, the installer takes the Node the pinned
+/// runtime manifest names, checked by its sha256, and [`PUT_BACK`] puts
+/// the kept one back when the move fails.
 const KEEP: &str = r#"set -eu
 k="$HOME/.harness/lampos-upgrade-from"
 l="$HOME/.local/bin/harness"
@@ -896,6 +901,7 @@ for f in current-node current-tmux current-grid; do
 done
 if [ -L "$HOME/.local/bin/tmux" ]; then cp -P "$HOME/.local/bin/tmux" "$n/tmux"; fi
 mv "$n" "$k"
+rm -f "$HOME/.harness/runtime/current-node"
 "#;
 /// What [`KEEP`] kept, put back in place, as `lampos`. The folder it names
 /// is checked again, by its real path, before anything is removed.
