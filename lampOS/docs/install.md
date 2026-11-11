@@ -1059,6 +1059,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    same line, a test holding the two equal. A failed `resolvconf -u` is
    said; the next lease lists them. Only install writes it, not a round:
    a lamp already in a home gets it from its next `lamp-update install`.
+   **Time servers** (#6256): it writes
+   `/etc/systemd/timesyncd.conf.d/lampos.conf`, `[Time]` with
+   `FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org ntp.aliyun.com
+   ntp.tencent.com cn.pool.ntp.org`, then `systemctl try-restart
+   systemd-timesyncd`; a file already so is left, nothing run. Fallbacks
+   only, so a server the network gives still comes first; timesyncd moves
+   on in seconds from one that does not answer, so a lamp in China whose
+   Debian pool is dropped still sets its clock. `try-restart` leaves a
+   timesyncd that is not running so: on a lamp whose clock is chrony's
+   (lamp-75c9's image), the file is read by nothing. Install's alone, as the
+   name servers.
 7. Records the build and the folders it made in
    `/var/lib/lampos-update/state.json`, as a round does, under the same
    lock, before systemd is asked anything. It reads them as a round does
