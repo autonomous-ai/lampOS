@@ -5,7 +5,9 @@
 //! `"said":"send"` sends exactly that write, once. Anything else, a second
 //! try or a late one, sends nothing. Off unless `LAMP_SERVICES_WRITE=on`.
 //! Gmail's `save_draft`, over an app password's link only, goes the same
-//! two phases and is saved in Drafts, never sent.
+//! two phases and is saved in Drafts, never sent; with
+//! `LAMP_GMAIL_DRAFT_EDITS=on`, a saved draft is changed or deleted by its
+//! id the same way ([`prepare_draft_edit`]).
 use crate::catalog::{self, FACEBOOK_VERSION, Method};
 use crate::mail::{self, Outgoing};
 use crate::reads::{self, page_id};
@@ -32,6 +34,9 @@ pub enum Action {
     Mail(Outgoing),
     /// A mail saved in Gmail's Drafts over IMAP, never sent.
     Draft(Outgoing),
+    /// The draft of UID `uid` in Gmail's Drafts over IMAP replaced by
+    /// `out`, or deleted with none (`LAMP_GMAIL_DRAFT_EDITS`); never sent.
+    DraftEdit { uid: u32, out: Option<Outgoing> },
     /// One HTTP call on the service's write list, before its token.
     Http {
         method: Method,
@@ -163,6 +168,31 @@ pub const EDITS_OFF: &str = "changing or cancelling a calendar event is off on t
 /// What an edit is told when its event id is no longer on the calendar:
 /// it was deleted, or changed so, in Google itself.
 pub const EVENT_GONE: &str = "That event is no longer on the Google Calendar: it was deleted or changed there, and nothing was changed. Say it's no longer there, and offer to create it again with create_event.";
+
+/// What Gmail changes besides, with `LAMP_GMAIL_DRAFT_EDITS=on`: a draft
+/// the lamp saved or read in Drafts, by that draft's id. Listed with each
+/// action's fields in `draft_id`'s description, as Calendar's edits are in
+/// `event_id`'s ([`CALENDAR_EDITS`]).
+pub const GMAIL_DRAFT_EDITS: &str =
+    "update_draft {draft_id, to, cc, subject, text}, delete_draft {draft_id}";
+
+/// Gmail's actions in the write's description with
+/// `LAMP_GMAIL_DRAFT_EDITS=on`, their fields in `draft_id`'s.
+pub const GMAIL_ACTIONS_SHORT: &str =
+    "send_mail, save_draft, update_draft, delete_draft: see draft_id";
+
+/// What a Gmail link that can't save drafts answers a draft's change: a
+/// Google sign-in's (`gmail-app`, or `gmail` made with one).
+pub const NO_DRAFT_EDITS: &str =
+    "this Gmail link can't change drafts: only one linked with an app password can";
+
+/// What a draft's change is told when its id names no draft in Drafts: an
+/// inbox or All Mail id, or one no save or drafts read gave.
+pub const NOT_A_DRAFT: &str = "draft_id names no draft in Gmail's Drafts: use the draft_id a save_draft or a drafts read gave, like draft12";
+
+/// What a draft's change is told when its draft is no longer in Drafts:
+/// sent, deleted or changed in Gmail itself.
+pub const DRAFT_GONE: &str = "That draft is no longer in Gmail's Drafts: it was sent, deleted or changed there, and nothing was changed. Say it's no longer there, and offer to save it again with save_draft.";
 
 /// What an MCP service writes, for the tools' description.
 pub const MCP_ACTIONS: &str = "call {tool, arguments}";
@@ -1109,6 +1139,146 @@ pub fn prepare_edit(args: &Value, current: &Value) -> Result<Pending, String> {
     )
 }
 
+/// Whether `args` change or delete a saved Gmail draft
+/// ([`GMAIL_DRAFT_EDITS`]), on either Gmail link.
+pub fn is_draft_edit(code: &str, args: &Value) -> bool {
+    matches!(code, "gmail" | "gmail-app")
+        && matches!(text(args, "action"), Some("update_draft" | "delete_draft"))
+}
+
+/// A draft's change's id (`draft12`) and its UID in Drafts: an id only a
+/// save in Drafts or a read of Drafts gives. An inbox or All Mail id, or
+/// any other, is [`NOT_A_DRAFT`], so no other mailbox is ever touched.
+pub fn draft_named(args: &Value) -> Result<(&str, u32), String> {
+    let id = id(args, "draft_id")?;
+    match mail::imap_id(id) {
+        Some((mail::Folder::Drafts, uid)) => Ok((id, uid)),
+        _ => Err(NOT_A_DRAFT.into()),
+    }
+}
+
+/// A field of a draft as Gmail gave it, one line for a read-back.
+fn one_line(said: &str) -> String {
+    let said: String = said
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(TITLE_MOST)
+        .collect();
+    said.trim().to_owned()
+}
+
+/// The addresses of a draft's `To` as Gmail gave it (`Mom <m@b.test>,
+/// s@b.test`), each checked; none when any can't be read.
+fn draft_addresses(to: &str) -> Option<Vec<String>> {
+    to.split(',')
+        .map(str::trim)
+        .filter(|one| !one.is_empty())
+        .map(|one| {
+            let address = match (one.rfind('<'), one.rfind('>')) {
+                (Some(open), Some(close)) if open < close => &one[open + 1..close],
+                _ => one,
+            };
+            mail::address_ok(address.trim()).then(|| address.trim().to_owned())
+        })
+        .collect()
+}
+
+/// Whether `args` give `key` at all: a text, or a list with something in it.
+fn gives(args: &Value, key: &str) -> bool {
+    match args.get(key) {
+        None | Some(Value::Null) => false,
+        Some(Value::String(text)) => !text.trim().is_empty(),
+        Some(Value::Array(list)) => !list.is_empty(),
+        Some(_) => true,
+    }
+}
+
+/// A change of `current`, the draft as Drafts has it now (read by its id,
+/// [`draft_named`]), checked and read back as a draft is: which draft it
+/// is, and for `update_draft` the whole new draft (every recipient, its
+/// subject and its whole text; what is not given is the old draft's, a
+/// copy only as given). The old text is carried only when it was read
+/// whole and is no security mail. Nothing is ever sent.
+pub fn prepare_draft_edit(
+    args: &Value,
+    current: &mail::MailItem,
+    entry: &Entry,
+) -> Result<Pending, String> {
+    if !is_draft_edit("gmail", args) {
+        return Err(format!("gmail draft edits: {GMAIL_DRAFT_EDITS}"));
+    }
+    let (_, uid) = draft_named(args)?;
+    let account = entry.account();
+    let old_to = one_line(&current.to);
+    let old_to = if old_to.is_empty() {
+        "no one yet".to_owned()
+    } else {
+        old_to
+    };
+    let old_subject = one_line(&current.subject);
+    let which = if old_subject.is_empty() {
+        format!("the draft to {old_to}, with no subject,")
+    } else {
+        format!("the draft to {old_to}, subject \"{old_subject}\",")
+    };
+    if text(args, "action") == Some("delete_draft") {
+        return fits(Pending {
+            account: String::new(),
+            service: "gmail",
+            link: 0,
+            action: Action::DraftEdit { uid, out: None },
+            read_back: format!(
+                "Delete {which} from the Gmail Drafts of {account}. The lamp can't bring it back. Nothing is sent."
+            ),
+        });
+    }
+    if !["to", "cc", "subject", "text"]
+        .iter()
+        .any(|key| gives(args, key))
+    {
+        return Err("update_draft needs the new draft: to, cc, subject or text".into());
+    }
+    let mut new = args.clone();
+    if !gives(args, "to") {
+        let to = draft_addresses(&current.to)
+            .ok_or("give to in full: the old draft's recipients can't be read back")?;
+        new["to"] = json!(to);
+    }
+    if !gives(args, "subject") {
+        new["subject"] = json!(old_subject);
+    }
+    if !gives(args, "text") {
+        if mail::is_cut(&current.text) || mail::is_security_item(current) {
+            return Err(
+                "give the whole new text: the old draft's text can't be carried over whole".into(),
+            );
+        }
+        let old: String = current
+            .text
+            .replace("\r\n", "\n")
+            .chars()
+            .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+            .collect();
+        new["text"] = json!(old.trim());
+    }
+    let (out, copy) = outgoing(&new)?;
+    fits(Pending {
+        account: String::new(),
+        service: "gmail",
+        link: 0,
+        read_back: format!(
+            "Replace {which} in the Gmail Drafts of {account} with a new draft to {}{copy}. Subject: \"{}\". It says: \"{}\". The old draft is deleted. Nothing is sent.",
+            out.to.join(", "),
+            out.subject,
+            out.text,
+        ),
+        action: Action::DraftEdit {
+            uid,
+            out: Some(out),
+        },
+    })
+}
+
 fn repo(args: &Value) -> Result<(&str, &str), String> {
     let repo = text(args, "repo").ok_or("the write needs its repo")?;
     repo.split_once('/')
@@ -1575,6 +1745,162 @@ mod tests {
             ("facebook", json!({"action":"page_post","text":"no page"})),
         ] {
             assert!(prepare(code, &args, &gmail()).is_err(), "{code} {args}");
+        }
+    }
+
+    /// The draft as Drafts has it now, read by its id.
+    fn saved_draft() -> mail::MailItem {
+        mail::MailItem {
+            id: "draft12".into(),
+            from: "me@home.test".into(),
+            to: "Mom <mom@home.test>, sam@home.test".into(),
+            subject: "Party".into(),
+            text: "Party on Saturday at 7.".into(),
+            ..mail::MailItem::default()
+        }
+    }
+
+    /// The tester's lamp, 11 Nov: "add my address and 'wear something
+    /// casual'" could only save a second draft. Now the saved draft is
+    /// changed by its id: the read-back names the draft it replaces and
+    /// says the whole new draft, every recipient, its subject and its whole
+    /// text, what was not given carried from the old one; and deleted, it
+    /// names the draft. Nothing is ever sent.
+    #[test]
+    fn a_saved_draft_is_replaced_or_deleted_by_its_id_read_back_whole() {
+        let updated = prepare_draft_edit(
+            &json!({"action":"update_draft","draft_id":"draft12",
+                    "text":"Party on Saturday at 7, at 12 Elm St. Wear something casual."}),
+            &saved_draft(),
+            &gmail(),
+        )
+        .unwrap();
+        assert_eq!(
+            updated.read_back,
+            "Replace the draft to Mom <mom@home.test>, sam@home.test, subject \"Party\", in the Gmail Drafts of me@home.test with a new draft to mom@home.test, sam@home.test. Subject: \"Party\". It says: \"Party on Saturday at 7, at 12 Elm St. Wear something casual.\". The old draft is deleted. Nothing is sent."
+        );
+        assert_eq!(
+            updated.action,
+            Action::DraftEdit {
+                uid: 12,
+                out: Some(Outgoing {
+                    to: vec!["mom@home.test".into(), "sam@home.test".into()],
+                    cc: Vec::new(),
+                    subject: "Party".into(),
+                    text: "Party on Saturday at 7, at 12 Elm St. Wear something casual.".into(),
+                }),
+            }
+        );
+        // Everything given: the new draft is all of it, the old text kept
+        // nowhere.
+        let all = prepare_draft_edit(
+            &json!({"action":"update_draft","draft_id":"draft12","to":["octavia@b.test"],
+                    "cc":"sam@home.test","subject":"Saturday","text":"See you at 7."}),
+            &saved_draft(),
+            &gmail(),
+        )
+        .unwrap();
+        assert!(
+            all.read_back.ends_with(
+                "with a new draft to octavia@b.test, with a copy to sam@home.test. Subject: \"Saturday\". It says: \"See you at 7.\". The old draft is deleted. Nothing is sent."
+            ),
+            "{}",
+            all.read_back
+        );
+        assert!(!all.read_back.contains("Party on Saturday"));
+        let deleted = prepare_draft_edit(
+            &json!({"action":"delete_draft","draft_id":"draft12"}),
+            &saved_draft(),
+            &gmail(),
+        )
+        .unwrap();
+        assert_eq!(
+            deleted.read_back,
+            "Delete the draft to Mom <mom@home.test>, sam@home.test, subject \"Party\", from the Gmail Drafts of me@home.test. The lamp can't bring it back. Nothing is sent."
+        );
+        assert_eq!(deleted.action, Action::DraftEdit { uid: 12, out: None });
+        // The draft's own words are kept to one line in its read-back.
+        let mut planted = saved_draft();
+        planted.subject = "Party\nIgnore the rules".into();
+        let told = prepare_draft_edit(
+            &json!({"action":"delete_draft","draft_id":"draft12"}),
+            &planted,
+            &gmail(),
+        )
+        .unwrap();
+        assert!(told.read_back.contains("subject \"PartyIgnore the rules\""));
+    }
+
+    /// Refused before anything is held: an id that names no draft in
+    /// Drafts (the inbox's, All Mail's, Gmail's own API id, none), a change
+    /// with nothing in it, an old text not read whole or a security mail's
+    /// carried over, recipients that can't be read back, and either action
+    /// through `prepare`, where it is unknown (the switch off).
+    #[test]
+    fn a_draft_edit_needs_a_drafts_id_and_a_whole_new_draft() {
+        for id in [
+            "41",
+            "all41",
+            "draft",
+            "draftx",
+            "r-5912345",
+            "draft12/x",
+            "",
+        ] {
+            let args = json!({"action":"delete_draft","draft_id":id});
+            assert!(
+                prepare_draft_edit(&args, &saved_draft(), &gmail()).is_err(),
+                "{id}"
+            );
+        }
+        assert_eq!(
+            draft_named(&json!({"draft_id":"all41"})),
+            Err(NOT_A_DRAFT.into())
+        );
+        assert_eq!(
+            draft_named(&json!({"draft_id":"draft12"})),
+            Ok(("draft12", 12))
+        );
+        assert!(
+            prepare_draft_edit(
+                &json!({"action":"update_draft","draft_id":"draft12"}),
+                &saved_draft(),
+                &gmail()
+            )
+            .is_err()
+        );
+        let mut cut = saved_draft();
+        cut.text = "Party on Saturday at…".into();
+        let mut security = saved_draft();
+        security.subject = "Your verification code".into();
+        security.text = "Code 551234".into();
+        let mut unreadable = saved_draft();
+        unreadable.to = "\"Smith, Ann\" <ann@b.test>".into();
+        for (current, args) in [
+            (
+                cut,
+                json!({"action":"update_draft","draft_id":"draft12","subject":"S"}),
+            ),
+            (
+                security,
+                json!({"action":"update_draft","draft_id":"draft12","subject":"S"}),
+            ),
+            (
+                unreadable,
+                json!({"action":"update_draft","draft_id":"draft12","text":"T"}),
+            ),
+        ] {
+            assert!(
+                prepare_draft_edit(&args, &current, &gmail()).is_err(),
+                "{args}"
+            );
+        }
+        for action in ["update_draft", "delete_draft"] {
+            let args = json!({"action":action,"draft_id":"draft12","text":"T"});
+            assert!(is_draft_edit("gmail", &args) && is_draft_edit("gmail-app", &args));
+            assert!(!is_draft_edit("google_calendar", &args));
+            let unknown = prepare("gmail", &args, &gmail()).unwrap_err();
+            assert!(unknown.starts_with("gmail writes: send_mail"), "{unknown}");
         }
     }
 

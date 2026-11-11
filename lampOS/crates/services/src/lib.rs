@@ -41,6 +41,10 @@ pub const SKILL_READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
 /// id (`update_event`, `delete_event`), read by this program: off unless
 /// `on`, and only with [`WRITE_ENVIRONMENT`] on too.
 pub const CALENDAR_EDITS_ENVIRONMENT: &str = "LAMP_CALENDAR_EDITS";
+/// The switch for changing and deleting a saved Gmail draft by its id
+/// (`update_draft`, `delete_draft`), read by this program: off unless
+/// `on`, and only with [`WRITE_ENVIRONMENT`] on too.
+pub const DRAFT_EDITS_ENVIRONMENT: &str = "LAMP_GMAIL_DRAFT_EDITS";
 
 /// Whether a switch is on, as `var` gives it.
 pub fn on(var: Option<&str>) -> bool {

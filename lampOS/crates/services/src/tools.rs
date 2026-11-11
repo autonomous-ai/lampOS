@@ -66,20 +66,31 @@ fn offset(minutes: i32) -> String {
     format!("{sign}{:02}:{:02}", minutes / 60, minutes % 60)
 }
 
+/// Which edits `tools.json` lists besides the writes every lamp has.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Edits {
+    /// Google Calendar's `update_event` and `delete_event`
+    /// (`LAMP_CALENDAR_EDITS=on`).
+    pub calendar: bool,
+    /// Gmail's `update_draft` and `delete_draft`
+    /// (`LAMP_GMAIL_DRAFT_EDITS=on`).
+    pub drafts: bool,
+}
+
 /// The three functions, with the lamp's own offset now.
 pub fn catalog() -> Value {
-    catalog_for(offset_here(), false)
+    catalog_for(offset_here(), Edits::default())
 }
 
 /// The three functions, the time fields' example at `offset_minutes`.
 #[cfg(test)]
 fn catalog_at(offset_minutes: Option<i32>) -> Value {
-    catalog_for(offset_minutes, false)
+    catalog_for(offset_minutes, Edits::default())
 }
 
-/// The three functions, Google Calendar's edits listed when `edits`
-/// (`LAMP_CALENDAR_EDITS=on`).
-fn catalog_for(offset_minutes: Option<i32>, edits: bool) -> Value {
+/// The three functions, Google Calendar's and Gmail's edits listed as
+/// `edits` says.
+fn catalog_for(offset_minutes: Option<i32>, edits: Edits) -> Value {
     // The MCP services read and write alike: named once, together.
     let mcp = catalog::SERVICES
         .iter()
@@ -95,9 +106,10 @@ fn catalog_for(offset_minutes: Option<i32>, edits: bool) -> Value {
     let mut actions: Vec<String> = writes::ACTIONS
         .iter()
         .map(|(code, actions)| match *code {
-            "google_calendar" if edits => {
+            "google_calendar" if edits.calendar => {
                 format!("{code}: {}", writes::CALENDAR_ACTIONS_SHORT)
             }
+            "gmail" if edits.drafts => format!("{code}: {}", writes::GMAIL_ACTIONS_SHORT),
             _ => format!("{code}: {actions}"),
         })
         .collect();
@@ -185,7 +197,18 @@ fn catalog_for(offset_minutes: Option<i32>, edits: bool) -> Value {
             },
         },
     ]});
-    if edits {
+    if edits.drafts {
+        // Gmail's actions with their fields, as the calendar's below.
+        let gmail = writes::ACTIONS
+            .iter()
+            .find(|(code, _)| *code == "gmail")
+            .map_or("", |(_, actions)| actions);
+        tools["tools"][2]["parameters"]["properties"]["draft_id"] = string(&format!(
+            "A Gmail draft's id, like draft12, as a save_draft or a drafts read gave it. gmail actions: {gmail}, {} (app password link only).",
+            writes::GMAIL_DRAFT_EDITS
+        ));
+    }
+    if edits.calendar {
         // The calendar's actions with their fields: the write's description
         // has no room for them (1,024 bytes).
         let calendar = writes::ACTIONS
@@ -203,11 +226,11 @@ fn catalog_for(offset_minutes: Option<i32>, edits: bool) -> Value {
 /// Write `tools.json` in `dir` whole (beside, then renamed), readable by
 /// the voice.
 pub fn write(dir: &Path) -> io::Result<()> {
-    write_for(dir, false)
+    write_for(dir, Edits::default())
 }
 
-/// [`write`], Google Calendar's edits listed when `edits`.
-pub fn write_for(dir: &Path, edits: bool) -> io::Result<()> {
+/// [`write`], Google Calendar's and Gmail's edits listed as `edits` says.
+pub fn write_for(dir: &Path, edits: Edits) -> io::Result<()> {
     let fresh = dir.join(".tools.json");
     fs::write(&fresh, catalog_for(offset_here(), edits).to_string())?;
     fs::set_permissions(&fresh, fs::Permissions::from_mode(0o644))?;
@@ -328,11 +351,17 @@ mod tests {
     /// with the event's id to name, and still fit what the voice takes.
     #[test]
     fn calendar_edits_are_offered_only_with_their_switch() {
-        let off = catalog_for(Some(420), false);
+        let off = catalog_for(Some(420), Edits::default());
         assert!(!off.to_string().contains("update_event"));
         assert!(!off.to_string().contains("event_id"));
         assert!(!off.to_string().contains("delete_event"));
-        let on = catalog_for(Some(420), true);
+        let on = catalog_for(
+            Some(420),
+            Edits {
+                calendar: true,
+                drafts: false,
+            },
+        );
         let write = &on["tools"][2];
         let description = write["description"].as_str().unwrap();
         assert!(
@@ -354,8 +383,61 @@ mod tests {
         assert!(description.len() <= 1_024, "{}", description.len());
         assert!(write["parameters"].to_string().len() <= 4_096);
         let dir = tempfile::tempdir().unwrap();
-        write_for(dir.path(), true).unwrap();
+        write_for(
+            dir.path(),
+            Edits {
+                calendar: true,
+                drafts: false,
+            },
+        )
+        .unwrap();
         let read = fs::read_to_string(dir.path().join(CATALOG_FILE)).unwrap();
         assert!(read.contains("delete_event {event_id, calendar}"));
+    }
+
+    /// Gmail's draft edits are offered only with `LAMP_GMAIL_DRAFT_EDITS`
+    /// on, with the draft's id to name, and, with Calendar's too, still fit
+    /// what the voice takes.
+    #[test]
+    fn draft_edits_are_offered_only_with_their_switch() {
+        let off = catalog_for(Some(420), Edits::default()).to_string();
+        for never in ["update_draft", "delete_draft", "draft_id"] {
+            assert!(!off.contains(never), "{never}");
+        }
+        let calendar_only = catalog_for(
+            Some(420),
+            Edits {
+                calendar: true,
+                drafts: false,
+            },
+        )
+        .to_string();
+        assert!(!calendar_only.contains("update_draft"));
+        let on = catalog_for(
+            Some(420),
+            Edits {
+                calendar: true,
+                drafts: true,
+            },
+        );
+        let write = &on["tools"][2];
+        let description = write["description"].as_str().unwrap();
+        assert!(
+            description
+                .contains("gmail: send_mail, save_draft, update_draft, delete_draft: see draft_id"),
+            "{description}"
+        );
+        let draft_id = write["parameters"]["properties"]["draft_id"]["description"]
+            .as_str()
+            .unwrap();
+        assert!(
+            draft_id.contains(
+                "gmail actions: send_mail {to, cc, subject, text}, save_draft {to, cc, subject, text} (app password link only), update_draft {draft_id, to, cc, subject, text}, delete_draft {draft_id} (app password link only)."
+            ),
+            "{draft_id}"
+        );
+        assert!(write["parameters"]["properties"]["event_id"].is_object());
+        assert!(description.len() <= 1_024, "{}", description.len());
+        assert!(write["parameters"].to_string().len() <= 4_096);
     }
 }

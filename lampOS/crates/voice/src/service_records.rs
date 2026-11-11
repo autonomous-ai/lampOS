@@ -755,11 +755,18 @@ pub fn keep_send(attempt: Option<u64>, send_id: Option<&str>, got: Got<'_>) {
         match got {
             Got::Asked | Got::Refused(_) => None,
             Got::Answered(told) if crate::services::went(told) => {
-                let id = first_text(told, &["id", "link", "url", "message_id", "event_id"])
-                    .unwrap_or_default();
-                // A Gmail draft is saved, never sent.
+                // A saved Gmail draft's id (`draft12`) is its result id, so a
+                // later change finds it from the record (`update_draft`).
+                let id = first_text(
+                    told,
+                    &["id", "link", "url", "message_id", "event_id", "draft_id"],
+                )
+                .unwrap_or_default();
+                // A Gmail draft is saved or deleted, never sent.
                 let how = if told["sent"] == true {
                     "sent"
+                } else if told["deleted"] == true {
+                    "deleted from Drafts"
                 } else {
                     "saved as a draft"
                 };

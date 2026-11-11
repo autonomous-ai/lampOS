@@ -120,6 +120,7 @@ connected apps.
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 | `LAMP_CALENDAR_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_event` and `delete_event` answer "changing or cancelling a calendar event is off on this lamp" before anything is read, held or sent, and `tools.json` lists only `create_event` for Google Calendar ("Changing or cancelling a calendar event", below) |
+| `LAMP_GMAIL_DRAFT_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_draft` and `delete_draft` are unknown actions, answered with Gmail's list of writes as any other ("gmail writes: send_mail …, save_draft …") before anything is read, held or saved, and `tools.json` lists only `send_mail` and `save_draft` for Gmail ("Changing or deleting a saved Gmail draft", below) |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_WRITES=on` (#6066; off in every product unit) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
@@ -276,7 +277,7 @@ refresh goes to the lamp's backend, never to Google).
 
 | Code | Name | Hosts | Reads (`what`) | Writes (`action`) |
 |---|---|---|---|---|
-| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `drafts {count}` (an app password only), `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}`, `save_draft {to, cc, subject, text}` (an app password only) |
+| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `drafts {count}` (an app password only), `message {id}`, `attachment {id, name \| index}` | `send_mail {to, cc, subject, text}`, `save_draft {to, cc, subject, text}` (an app password only); with `LAMP_GMAIL_DRAFT_EDITS=on`, `update_draft {draft_id, to, cc, subject, text}` and `delete_draft {draft_id}` (an app password only) |
 | `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | none: it only sends | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | `create_doc {title, text}`, `create_sheet {title, rows}`, `create_file {title, text}`: one new file in My Drive |
@@ -416,8 +417,12 @@ heard line only, nothing kept.
   `LOGOUT` runs after the answer, apart, at most 2 s, its answer or none
   never delaying or undoing the save (RFC 3501 6.3.11). No SMTP is
   spoken and no mailbox is opened. The answer is
-  `{"sent": false, "saved": true, "service": "Gmail"}`; a refused `APPEND`
-  is "not saved: Gmail couldn't be reached". The prepare's `next` says
+  `{"sent": false, "saved": true, "service": "Gmail", "draft_id": "draft12"}`,
+  `draft_id` the new draft's id in Drafts from `APPEND`'s
+  `[APPENDUID <validity> <uid>]` (UIDPLUS, RFC 4315; left out when the
+  server names none), so the draft can be changed or deleted later
+  (`LAMP_GMAIL_DRAFT_EDITS`) and its service record keeps it as its result
+  id; a refused `APPEND` is "not saved: Gmail couldn't be reached". The prepare's `next` says
   "Nothing is saved yet. Read read_back to the person in full; save the
   draft only if they agree, in any words."
 - The password is only in the `LOGIN` and `AUTH` lines. A failure is said as
@@ -1195,6 +1200,89 @@ them within the 1,024 bytes its link takes.
   no longer on the Google Calendar: it was deleted or changed there, and
   nothing was changed. Say it's no longer there, and offer to create it
   again with create_event." (after "not sent: " on a send). Nothing is held.
+
+### Changing or deleting a saved Gmail draft (`LAMP_GMAIL_DRAFT_EDITS`)
+
+On a tester's lamp on 11 Nov, "add my address and 'wear something casual'"
+to a draft the lamp had saved could only prepare a second draft, which left
+the old one in Drafts. Off unless `LAMP_GMAIL_DRAFT_EDITS=on` and
+`LAMP_SERVICES_WRITE=on` in `lamp-services` (off in the product until its
+lamp check). On, Gmail's actions in `tools.json` add `update_draft
+{draft_id, to, cc, subject, text}` and `delete_draft {draft_id}`
+(`writes::GMAIL_DRAFT_EDITS`), and `service_write` takes a `draft_id`. The
+write's description lists Gmail as `send_mail, save_draft, update_draft,
+delete_draft: see draft_id` (`writes::GMAIL_ACTIONS_SHORT`), and
+`draft_id`'s own description gives the four with their fields, as
+Calendar's edits are given in `event_id`'s.
+
+- **Which draft: its id in Drafts.** A `draft_id` is `draft<UID>`, an id
+  only a lamp's own save (its answer's `draft_id`, from `APPENDUID`) or a
+  `drafts` read gives. The model has it from the save's answer, from the
+  drafts read, or from the save's service record, which keeps it as its
+  result id (`LAMP_SERVICE_RECORDS_TOLD` tells it with the record, as a
+  created event's `event_id`). Any other id (the inbox's `41`, All Mail's
+  `all41`, Gmail's own API id) is refused before anything is read or held,
+  `writes::NOT_A_DRAFT`: "draft_id names no draft in Gmail's Drafts: use the
+  draft_id a save_draft or a drafts read gave, like draft12", so no other
+  mailbox is ever touched. A redo of a saved draft from its record
+  (`LAMP_SERVICE_REDO`) is refused with the way to change it
+  (`redo::DRAFT_DONE`), never saved again beside it.
+- **Read back from the draft as it is now.** Without `send_id`, the lamp
+  first reads that one draft by its id (`EXAMINE` of Drafts and its UID,
+  read-only, as `message {id}`). None there (sent, deleted or changed in
+  Gmail, or never one the lamp saved or read there) is `writes::DRAFT_GONE`:
+  "That draft is no longer in Gmail's Drafts: it was sent, deleted or
+  changed there, and nothing was changed. Say it's no longer there, and
+  offer to save it again with save_draft." Nothing is held. An
+  `update_draft` takes the whole new draft and is read back in full, as a
+  draft is: "Replace the draft to <old to>, subject "<old subject>", in the
+  Gmail Drafts of <account> with a new draft to <to>[, with a copy to
+  <cc>]. Subject: "<subject>". It says: "<text>". The old draft is deleted.
+  Nothing is sent." Whatever of `to`, `subject` and `text` the call leaves
+  out is the old draft's (a copy only as given); the old text only when it
+  was read whole and is no security mail, and old recipients only when each
+  reads as an address, else the call is told to give it. It needs at least
+  one of the four, and is checked as `save_draft` is. A `delete_draft`
+  reads back which draft: "Delete the draft to <to>, subject "<subject>",
+  from the Gmail Drafts of <account>. The lamp can't bring it back. Nothing
+  is sent." The draft's own words are kept to one line of at most 200
+  characters. The prepare's `next` says "Nothing is changed yet, and nothing
+  is ever sent. Read read_back to the person in full; change the draft only
+  if they agree, in any words."
+- **Then done as any write**: held 120 s, done once on `"said":"send"`,
+  through the voice's same gate. The voice asks an `update_draft` as a
+  draft's save ("Shall I save it?", `SAVE_READ_BACK_NEXT`) and a
+  `delete_draft` "Shall I delete it?" ("Xoá không?",
+  `DELETE_READ_BACK_NEXT`), and tells its answer as "saved as a draft"
+  (`SAVED_NEXT`) or "Say only that the draft was deleted from their Gmail
+  Drafts, not sent, in the conversation's language." (`DELETED_NEXT`),
+  never "sent"; both are writes done (`services::went`), and the record
+  says "deleted from Drafts" for a delete.
+- **Over IMAP, Drafts alone** (`mail::edit_draft_over`, one 15 s budget as
+  a save's): `LOGIN`, `CAPABILITY`, `LIST "" "*"` for the mailbox flagged
+  `\Drafts` (else `[Gmail]/Drafts`), `SELECT` of it (the one mailbox ever
+  opened to be changed), `UID SEARCH UID <uid>` (not there:
+  `writes::DRAFT_GONE` after "not saved: " or "not deleted: ", nothing
+  changed). An update then `APPEND`s the whole new draft to Drafts as
+  `save_draft` does; then the old UID alone is marked `UID STORE <uid>
+  +FLAGS.SILENT (\Deleted)` and expunged with `UID EXPUNGE <uid>` when the
+  server offers UIDPLUS; without it, a plain `EXPUNGE`, and only when `UID
+  SEARCH DELETED` found nothing else marked before anything was changed
+  (else nothing is changed, "Gmail couldn't be reached"). A delete is the
+  same without the `APPEND`. `LOGOUT` after, apart. The answer is
+  `{"sent": false, "saved": true, "service": "Gmail", "draft_id": "draft13"}`
+  (the new draft's id) or `{"sent": false, "deleted": true, "service":
+  "Gmail"}`. An update whose new draft was saved but whose old one could not
+  be removed says so: "not saved: the new draft was saved, but the old one
+  is still in Gmail's Drafts".
+- **An app password's link only.** Gmail's REST API path (a Google sign-in,
+  `gmail-app` or `gmail` made with one) saves no drafts and changes none:
+  either action is refused before anything is held, `writes::NO_DRAFT_EDITS`,
+  "this Gmail link can't change drafts: only one linked with an app password
+  can".
+- **Off**, `update_draft` and `delete_draft` are unknown actions, answered
+  as any other with Gmail's list of writes, and `tools.json` lists only
+  `send_mail` and `save_draft`.
 
 The model is told of `service_write`, first in its description
 (`WRITE_RULE`, then the rule every services function has, below):
@@ -2424,7 +2512,12 @@ after a cancelled event needs nothing repeated
   call's new text; with none, the model is told to ask for it), and its
   answer carries `follow_up`, telling the model to say plainly that a sent
   mail can't be changed. A `done` calendar event is refused: changing a
-  created event is a separate action. A read, any other `done` write, and
+  created event is a separate action. A `done` Gmail draft (`save_draft`
+  or `update_draft`) is refused with the way to change it,
+  `redo::DRAFT_DONE`: `update_draft` or `delete_draft` with its
+  `draft_id`, the record's result id, when listed
+  (`LAMP_GMAIL_DRAFT_EDITS`), never saved again beside the old one. A read,
+  any other `done` write, and
   a record whose text was cut with no new text given are refused too.
 - **Linked.** The new record's `links` name the old one, and the old one
   gets `replaced_by` (its final status stays), both written to the memory.

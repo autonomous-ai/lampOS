@@ -10358,6 +10358,9 @@ fn send_outcome_only(told: &Value) -> Value {
         // (Reviewer-two's HOLD on #5982 at `447e218c55`).
         if told["sent"] != true && told["saved"] == true {
             serde_json::json!({"sent": false, "saved": true})
+        } else if told["sent"] != true && told["deleted"] == true {
+            // A saved draft deleted (`delete_draft`): done, never "sent".
+            serde_json::json!({"sent": false, "deleted": true})
         } else {
             serde_json::json!({"sent": told["sent"] == true})
         }
@@ -10372,7 +10375,7 @@ struct SendAttempt {
 
 const SENT_REDACTED_NOTE: &str = "(For you to know: their earlier write was already sent. Its details were forgotten. Confirm only that it was sent; do not reconstruct its contents or call service_write again for it.)";
 /// [`SENT_REDACTED_NOTE`] for a draft that was saved, never called sent.
-const SAVED_REDACTED_NOTE: &str = "(For you to know: their earlier draft was already saved, not sent. Its details were forgotten. Confirm only that it was saved as a draft; do not reconstruct its contents or call service_write again for it.)";
+const SAVED_REDACTED_NOTE: &str = "(For you to know: their earlier draft was already saved (or, if they asked, deleted), not sent. Its details were forgotten. Confirm only that it was done in their Gmail Drafts; do not reconstruct its contents or call service_write again for it.)";
 const SEND_REDACTED_REFUSED_NOTE: &str = "(For you to know: the earlier write was not sent. Its details were forgotten; do not reconstruct or describe them.)";
 
 /// Told the model answering words again whose own write their go-ahead
