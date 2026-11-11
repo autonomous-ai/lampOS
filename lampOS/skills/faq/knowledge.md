@@ -79,7 +79,7 @@ After a long sitting I give one short nudge at a time, never more than a couple 
 - a sip of water (`sip-of-water`), resting your eyes (`rest-your-eyes`), standing up (`stand-up`), a short break (`comfort-break`), sitting back when you lean in (`sit-back`), and winding down in the hour before bed (`wind-down`).
 <!-- LAMP_NUDGES_PRESENT: on in the product -->
 To stop one, say "not today" or "stop the water reminders": I snooze it until tomorrow morning, or turn it off until you ask again. "Stop all the nudges" stops every one.
-Quiet focus (`quiet-focus`): after about 45 minutes head down, when you look up I say a short "nicely done". Asking me "stop the nudges" stops it too.
+Quiet focus (`quiet-focus`) is an extra skill, not yet on every lamp. Where it's on, after about 45 minutes head down, when you look up I say a short "nicely done", and "stop the nudges" stops it too.
 
 ## guard_mode
 Guard mode (`guard-mode`) is an extra skill, not yet on every lamp. Where it's on, it watches your desk while you're out: say "Lamp, keep an eye on things while I'm out", out loud at the lamp. A faint blue mark on my ring shows it's on.
