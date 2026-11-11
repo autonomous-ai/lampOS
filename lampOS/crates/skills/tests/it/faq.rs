@@ -146,7 +146,7 @@ fn each_topic_is_told_its_section_within_the_link() {
         }
         topics += 1;
     }
-    assert_eq!(topics, 12);
+    assert_eq!(topics, 13);
     let none = told_of(Value::Null, &[], &[]);
     assert!(
         none["next"]
@@ -647,4 +647,25 @@ fn the_setup_section_tells_the_walks_steps_in_its_order() {
         .map(|at| [4, 3, 5, 2][at]);
     assert_eq!(count, Some(order.len()), "{setup}");
     assert!(!setup.contains("privacy switch"), "{setup}");
+}
+
+/// A tester's "which website are you sold on?" (#6059): the about section
+/// names the maker and the product page the READMEs link
+/// (`robots/lamp/README.md`), and no price, which can change: the page
+/// tells it.
+#[test]
+fn the_about_section_names_the_product_page_and_no_price() {
+    let readme = std::fs::read_to_string(root().join("../robots/lamp/README.md")).unwrap();
+    assert!(readme.contains("www.autonomous.ai/lamp"));
+    let skill = faq();
+    let about = &skill
+        .knowledge
+        .as_ref()
+        .unwrap()
+        .section("about")
+        .unwrap()
+        .text;
+    assert!(about.contains("made by Autonomous"), "{about}");
+    assert!(about.contains("autonomous.ai/lamp"), "{about}");
+    assert!(!about.contains('$'), "{about}");
 }
