@@ -4113,6 +4113,70 @@ pub(crate) fn guard(status: &Value, request_id: String) -> Option<Value> {
     Some(json!({"store_id": store, "revision": revision, "request_id": request_id}))
 }
 
+/// How long the owner's "forget everything" waits on the tasks part to
+/// remove the sessions the lamp started (#6274): one local exchange, which
+/// it answers within its own 1.1 s.
+const FORGET_SESSIONS_DEADLINE: Duration = Duration::from_millis(1_500);
+
+/// The owner's "forget everything about me", marked by the second route's
+/// guard (#6274): the tasks part in `directory` removes the index of the
+/// sessions the lamp started (their ids, names and last use,
+/// `{"op":"forget_sessions"}` on its voice socket), as the kept journal
+/// goes (`crate::setup_journal`). Another person's forget, the room's, an
+/// unmarked one, or one whose memory was not emptied, leaves it.
+pub fn forget_sessions_with_everything(
+    told: (Value, bool),
+    directory: &Path,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    if !lease.everything_marked() {
+        return told;
+    }
+    forget_sessions_if(
+        directory,
+        told,
+        lease.admitted_person(),
+        &crate::person::owner_ids(),
+    )
+}
+
+/// [`forget_sessions_with_everything`] once its mark is judged: asked of
+/// the tasks part when `admitted`, the line's person, is one of `owners`
+/// and `told` says their memory was emptied. The answer is as it was
+/// either way: what the lamp started is not the person's memory, and a
+/// tasks part that is not there, or older and without the ask, keeps
+/// nothing new; one line says so.
+pub(crate) fn forget_sessions_if(
+    directory: &Path,
+    told: (Value, bool),
+    admitted: Option<&str>,
+    owners: &[String],
+) -> (Value, bool) {
+    let emptied =
+        told.0["forgotten"] == true || told.0["note"] == json!("I was keeping nothing of them.");
+    let theirs = admitted.is_some_and(|admitted| owners.iter().any(|owner| owner == admitted));
+    if !emptied || !theirs {
+        return told;
+    }
+    match ask(
+        &directory.join("voice.sock"),
+        &json!({"op":"forget_sessions"}),
+        FORGET_SESSIONS_DEADLINE,
+    ) {
+        Some(answer) if answer["ok"] == true => {
+            if answer["forgotten"] == true {
+                eprintln!(
+                    "lamp-voice: the sessions the lamp started were forgotten with everything about them"
+                );
+            }
+        }
+        _ => eprintln!(
+            "lamp-voice: the sessions the lamp started could not be forgotten with everything about them"
+        ),
+    }
+    told
+}
+
 pub(crate) fn ask(socket: &Path, line: &Value, deadline: Duration) -> Option<Value> {
     if deadline.is_zero() {
         return None;
@@ -5751,6 +5815,42 @@ pub(crate) mod tests {
             });
         }
         seen
+    }
+
+    /// #6274: the owner's "forget everything", their memory emptied, asks
+    /// the tasks part to forget the sessions the lamp started; anyone
+    /// else's, or a forget that emptied nothing, asks nothing.
+    #[test]
+    fn the_owners_forget_everything_forgets_the_sessions_the_lamp_started() {
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-forget-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![("voice.sock", json!({"ok":true,"forgotten":true}))],
+        );
+        let owners = ["p-owner".to_owned()];
+        let emptied = || (json!({"forgotten":true}), true);
+        // Another person's, or nothing emptied: nothing asked.
+        let told = forget_sessions_if(&directory, emptied(), Some("p-guest"), &owners);
+        assert_eq!(told, emptied());
+        let told = forget_sessions_if(
+            &directory,
+            (json!({"forgotten":false}), true),
+            Some("p-owner"),
+            &owners,
+        );
+        assert_eq!(told.0["forgotten"], false);
+        assert!(seen.try_recv().is_err());
+        // The owner's: asked, and the answer as it was.
+        let told = forget_sessions_if(&directory, emptied(), Some("p-owner"), &owners);
+        assert_eq!(told, emptied());
+        assert_eq!(
+            seen.recv_timeout(Duration::from_secs(2)).unwrap(),
+            json!({"op":"forget_sessions"})
+        );
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// The worker's flags for a tasks folder and the sign-in's switch
