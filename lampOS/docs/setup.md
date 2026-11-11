@@ -705,7 +705,12 @@ a `lampos` process connect, and the helper then takes its peer's credentials
 (`SO_PEERCRED`) and refuses any peer outside `lamp-cloud.service`'s cgroup,
 before its line is read, with `{"refused": "only the app's link may change the
 lamp's settings"}` and nothing changed (`keys::socket_peer_refused`, as the keys
-helper does). Run by hand, its standard input not a socket, it takes the line
+helper does). The one other peer is `lamp-skills.service`, by its cgroup
+(`keys::TURN_OFF_CGROUP`), for the unplug's turn-off alone (#5747,
+unplug.md step 7): its line is read, and only exactly `{"shutdown":"lamp"}`
+is taken (`change::turn_off_asker_may`); any other line from it, a restart
+or a setting included, gets the same refusal with nothing changed. Run by
+hand, its standard input not a socket, it takes the line
 as before. `LAMP_SETTINGS_CHANGE` decides whether `lamp-cloud` asks. A
 refusal never holds the value asked, and the
 journal says what changed, never a name ("the person's name was changed (8

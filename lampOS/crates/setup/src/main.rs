@@ -590,9 +590,11 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         return Err("change takes --config, --bus-root and --enable".into());
     }
     let config = serve_config(&config_path)?;
-    // Only lamp-cloud may ask on the socket, as for the keys: any other
-    // peer is refused before its line is read.
-    if lamp_setup::keys::socket_peer_refused() {
+    // Only lamp-cloud may ask on the socket, as for the keys, and
+    // lamp-skills for the unplug's turn-off alone (#5747): any other peer is
+    // refused before its line is read.
+    let turn_off_only = lamp_setup::keys::socket_peer_refused();
+    if turn_off_only && !lamp_setup::keys::peer_is_turn_off_asker() {
         let mut out = io::stdout().lock();
         writeln!(out, "{}", serde_json::json!({"refused": NOT_THE_CLOUD}))?;
         out.flush()?;
@@ -607,6 +609,16 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         .lock()
         .take(change::LINE_MOST as u64 + 1)
         .read_line(&mut line)?;
+    if turn_off_only && !change::turn_off_asker_may(&line) {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", serde_json::json!({"refused": NOT_THE_CLOUD}))?;
+        out.flush()?;
+        eprintln!(
+            "lamp-setup: change refused: {} may ask the turn-off only",
+            lamp_setup::keys::TURN_OFF_UNIT
+        );
+        return Ok(true);
+    }
     let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
     if let Some((power, reply, lock)) = change::power(&line, enabled, &records) {
         {

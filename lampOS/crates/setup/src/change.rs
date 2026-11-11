@@ -609,6 +609,13 @@ pub use lamp_keeper::restart::Power;
 /// turns before it restarts all the same: the keeper's own bound.
 pub const REST_MOST: Duration = QUIET;
 
+/// What `lamp-skills` (`keys::TURN_OFF_UNIT`) may ask the helper: the
+/// turn-off its unplug sends after a confirmed fold and a spoken yes
+/// (#5747), exactly the app's shutdown request, and nothing else.
+pub fn turn_off_asker_may(line: &str) -> bool {
+    Power::of(line) == Some(Power::Shutdown)
+}
+
 /// The reply to a restart or shutdown that `line` asks, read against
 /// lamp-update's lock in `records`, and the lock to hold while acting when
 /// it is to act; `None` when `line` asks neither. Off (no `--enable`),

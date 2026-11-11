@@ -156,7 +156,8 @@ button's request is not heard.
 3. **"I'm unplugging you"** (#5763): with `LAMP_UNPLUG=on` and
    `LAMP_UNPLUG_OFF_SOCKET` set (both in the product), the prepare-unplug
    skill's confirmed fold asks the change helper the same
-   `{"shutdown":"lamp"}` as the app, so the person hears this runner's line,
+   `{"shutdown":"lamp"}` as the app (the helper takes that one request from
+   `lamp-skills.service` and no other, #5747), so the person hears this runner's line,
    not "You can unplug me now" from a running lamp (unplug.md, step 7).
 
 Still to come:
