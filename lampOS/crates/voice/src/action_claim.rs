@@ -30,6 +30,12 @@
 //!   "Snoozing it …", "Snoozed.", "I've snoozed it …", bare or after a
 //!   lead-in such as "Okay,", never a sentence ending in '?'. Only a
 //!   `snooze_reminder` makes it ([`Claim::Snoozed`]).
+//! - a light, volume or timer change promised for now ([`PROMISED`], 12104's
+//!   core w2: on lamp-52e6, 12 Nov, "I'll warm it up a touch." with
+//!   `calls=none`): "I'll", "I will" or "Let me" with the change, closing at
+//!   the sentence's end bare or after "now", "a touch", "a bit", "a little"
+//!   or "for you". An offer, a condition, a question, "I'll tell you when
+//!   …" and "I'll remember that." are none.
 //!
 //! Such a claim stands when its turn made a call of its kind
 //! ([`Claim::made_by`]); otherwise it is held, the model is asked once more
@@ -430,6 +436,13 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
         return Some(Some(kind));
     }
     match runs_claim(&SNOOZED, &text, ended, true, false) {
+        Some(Some(kind)) => return Some(Some(kind)),
+        None => undecided = true,
+        Some(None) => {}
+    }
+    // As SNOOZED: a lead-in is read once the first word is whole, so a
+    // reply still streaming "The" is decided no claim.
+    match runs_claim(&PROMISED, &text, ended, true, true) {
         Some(Some(kind)) => return Some(Some(kind)),
         None => undecided = true,
         Some(None) => {}
@@ -1420,6 +1433,367 @@ const WORDED: [(&str, Claim); 74] = [
     ),
 ];
 
+/// A light, volume or timer change promised for now in the model's own words
+/// (`LAMP_ACTION_CLAIM_CHECKED`, read as [`WORDED`]'s runs are): "I'll warm it
+/// up a touch.", "Let me dim the light.", "I'll set a timer for ten
+/// minutes." On lamp-52e6 at 12104 (12 Nov 01:5x, core w2) "I'll warm it up a
+/// touch." came with `calls=none` and was said: the strict and worded runs
+/// read only what was done. Such a promise needs a call of its kind, as a
+/// strict claim does (the first builder on #6059, 12 Nov 02:44). Each closes at the sentence's end, bare or after
+/// "now", "a touch", "a bit", "a little" or "for you", so an offer or a
+/// condition ("I'll turn it off if it freezes.", "I'll dim the light when
+/// you go to bed.") and a question are none.
+const PROMISED: [(&str, Claim); 87] = [
+    (
+        "i'll warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten it|that $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten it|that now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten it|that a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten it|that for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch the|your|my light|lights|volume|sound up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch the|your|my light|lights|volume|sound up|down|on|off now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch the|your|my light|lights|volume|sound up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll turn|switch the|your|my light|lights|volume|sound up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i'll set|start a|an|your|the timer|reminder|alarm $",
+        Claim::Schedule,
+    ),
+    (
+        "i'll set|start a|an|your|the timer|reminder|alarm now $",
+        Claim::Schedule,
+    ),
+    (
+        "i'll set|start a|an|your|the timer|reminder|alarm for # $",
+        Claim::Schedule,
+    ),
+    (
+        "i'll set|start a|an|your|the timer|reminder|alarm for # second|seconds|minute|minutes|hour|hours|am|pm $",
+        Claim::Schedule,
+    ),
+    (
+        "i'll set|start a|an|your|the timer|reminder|alarm for # a|an minute|hour $",
+        Claim::Schedule,
+    ),
+    (
+        "i will warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten it|that $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten it|that now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten it|that a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten it|that for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch the|your|my light|lights|volume|sound up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch the|your|my light|lights|volume|sound up|down|on|off now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch the|your|my light|lights|volume|sound up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will turn|switch the|your|my light|lights|volume|sound up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "i will set|start a|an|your|the timer|reminder|alarm $",
+        Claim::Schedule,
+    ),
+    (
+        "i will set|start a|an|your|the timer|reminder|alarm now $",
+        Claim::Schedule,
+    ),
+    (
+        "i will set|start a|an|your|the timer|reminder|alarm for # $",
+        Claim::Schedule,
+    ),
+    (
+        "i will set|start a|an|your|the timer|reminder|alarm for # second|seconds|minute|minutes|hour|hours|am|pm $",
+        Claim::Schedule,
+    ),
+    (
+        "i will set|start a|an|your|the timer|reminder|alarm for # a|an minute|hour $",
+        Claim::Schedule,
+    ),
+    (
+        "let me warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten|turn|switch it|that|things up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten it|that $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten it|that now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten it|that a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten it|that for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me warm|cool|dim|brighten|turn|switch|raise|lower the|your|my light|lights|volume|sound for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch the|your|my light|lights|volume|sound up|down|on|off $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch the|your|my light|lights|volume|sound up|down|on|off now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch the|your|my light|lights|volume|sound up|down|on|off a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me turn|switch the|your|my light|lights|volume|sound up|down|on|off for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me make it|that warmer|cooler|brighter|dimmer|louder|quieter|softer for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer now $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer a touch|bit|little $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me make it|that a touch|bit|little warmer|cooler|brighter|dimmer|louder|quieter|softer for you $",
+        Claim::LightOrVolume,
+    ),
+    (
+        "let me set|start a|an|your|the timer|reminder|alarm $",
+        Claim::Schedule,
+    ),
+    (
+        "let me set|start a|an|your|the timer|reminder|alarm now $",
+        Claim::Schedule,
+    ),
+    (
+        "let me set|start a|an|your|the timer|reminder|alarm for # $",
+        Claim::Schedule,
+    ),
+    (
+        "let me set|start a|an|your|the timer|reminder|alarm for # second|seconds|minute|minutes|hour|hours|am|pm $",
+        Claim::Schedule,
+    ),
+    (
+        "let me set|start a|an|your|the timer|reminder|alarm for # a|an minute|hour $",
+        Claim::Schedule,
+    ),
+];
+
 /// A reminder said as snoozed (C68), read as [`WORDED`]'s runs are, bare or
 /// after one of [`LEAD_INS`], with the strict lines under
 /// [`ENVIRONMENT`] alone: "Snoozing it for five minutes.", "Okay, snoozed.",
@@ -2258,6 +2632,59 @@ pub(crate) mod tests {
         ] {
             assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
         }
+    }
+
+    /// 12104's core w2 (lamp-52e6, 12 Nov): a change promised for now with
+    /// no call is a claim, the switch's own (the first builder on #6059);
+    /// an offer, a condition, a question or other talk is not.
+    #[test]
+    fn a_change_promised_for_now_is_a_claim() {
+        for (reply, kind) in [
+            ("I'll warm it up a touch.", Claim::LightOrVolume),
+            ("Okay, I'll warm it up a touch.", Claim::LightOrVolume),
+            ("I'll dim it.", Claim::LightOrVolume),
+            ("Let me dim the light a bit.", Claim::LightOrVolume),
+            ("I will turn the volume down.", Claim::LightOrVolume),
+            ("I'll make it a little warmer.", Claim::LightOrVolume),
+            ("I'll turn it off now.", Claim::LightOrVolume),
+            ("I'll set a timer for ten minutes.", Claim::Schedule),
+            ("Sure, I'll start a timer.", Claim::Schedule),
+        ] {
+            assert_eq!(claim(reply, true), Some(Some(kind)), "{reply:?}");
+            assert_eq!(claim_as(reply, true, true), Some(Some(kind)), "{reply:?}");
+            assert!(!stands(kind, reply, false, []), "{reply:?}");
+        }
+        let none = serde_json::json!({});
+        assert!(stands(
+            Claim::LightOrVolume,
+            "I'll warm it up a touch.",
+            false,
+            [("light_warmer", &none)]
+        ));
+        assert!(!stands(
+            Claim::LightOrVolume,
+            "I'll warm it up a touch.",
+            false,
+            [("set_timer", &none)]
+        ));
+        for reply in [
+            "I'll warm it up?",
+            "I'll turn it off if it freezes.",
+            "I'll dim the light when you go to bed.",
+            "I'll make it warmer if you want.",
+            "I'll set a reminder if you tell me the time.",
+            "I'll tell you when it's done.",
+            "I'll tell you when the timer rings.",
+            "I'll remember that.",
+            "I'll let you know.",
+            "Let me check.",
+            "I'll keep that in mind.",
+        ] {
+            assert_eq!(claim(reply, true), Some(None), "{reply:?}");
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+        }
+        // Undecided while it streams, until the sentence ends.
+        assert_eq!(claim("I'll warm it up", false), None);
     }
 
     /// Ordinary talk with the same words, questions and status answers are
