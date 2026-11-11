@@ -5166,6 +5166,15 @@ pub(crate) mod tests {
     /// line the lamp wrote itself opens nothing.
     #[test]
     fn with_reply_named_a_session_alone_opens_it_and_needs_no_task() {
+        // The lamp's owner, heard (the Reviewer-lead's P1 on #6422).
+        let run = |place: &Place, call: &ToolCall, request: u64, heard: bool, wait: Duration| {
+            let asker = Asker {
+                heard,
+                owner: heard,
+                lease: None,
+            };
+            run_asked(place, call, request, &asker, wait)
+        };
         let _one = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -5281,6 +5290,15 @@ pub(crate) mod tests {
     /// is said, never a guess. Without the switch it takes none.
     #[test]
     fn with_reply_named_a_check_names_a_session_and_is_told_its_own_state() {
+        // The lamp's owner, heard (the Reviewer-lead's P1 on #6422).
+        let run = |place: &Place, call: &ToolCall, request: u64, heard: bool, wait: Duration| {
+            let asker = Asker {
+                heard,
+                owner: heard,
+                lease: None,
+            };
+            run_asked(place, call, request, &asker, wait)
+        };
         let _one = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -5355,6 +5373,99 @@ pub(crate) mod tests {
         );
         assert_eq!(seen.recv_timeout(PEER_WAIT).unwrap()["session"], "billing");
         assert!(seen.try_recv().is_err());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #6274, the Reviewer-lead's P1 on #6422: a named session is opened or
+    /// told only to the lamp's owner, heard, as the services hold a read
+    /// (`services::owner_of`). Anyone else in the room, or the model alone
+    /// (a line nobody said), is refused with a few words, and nothing is
+    /// asked of the tasks part: no name, state or work of any session.
+    #[test]
+    fn a_named_session_is_opened_or_told_only_to_the_lamps_owner() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-named-owner-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![(
+                "voice.sock",
+                json!({"ok":true,"look":"x","done":true,"found":{"state":"working","name":"Customer Survey"}}),
+            )],
+        );
+        let mut on = place(&directory, false);
+        on.reply_named = true;
+        for name in [START, CHECK] {
+            let call = ToolCall {
+                id: "c".into(),
+                name: name.into(),
+                args: json!({"session":"customer survey"}),
+            };
+            let guest = Asker {
+                heard: true,
+                owner: false,
+                lease: None,
+            };
+            let (told, answered) = run_asked(&on, &call, 3, &guest, PEER_WAIT);
+            assert!(answered, "{told}");
+            let said = told["error"].as_str().unwrap_or_default();
+            assert!(said.contains("only the lamp's owner"), "{name}: {told}");
+            assert!(!told.to_string().contains("Customer Survey"), "{told}");
+            let nobody = Asker {
+                heard: false,
+                owner: false,
+                lease: None,
+            };
+            let (told, _) = run_asked(&on, &call, 4, &nobody, PEER_WAIT);
+            let said = told["error"].as_str().unwrap_or_default();
+            assert!(said.contains("out loud"), "{name}: {told}");
+        }
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(seen.try_recv().is_err(), "the tasks part was asked");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #6274, the Reviewer-lead's P3 on #6422: a look asked again while it
+    /// runs stops once its turn is over (the request's scope revoked at its
+    /// end or by a cut-in), not after [`LOOK_WAIT`].
+    #[test]
+    fn a_look_stops_asking_again_once_its_turn_is_over() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-look-over-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("voice.sock", json!({"ok":true,"look":"x","done":false})),
+                ("voice.sock", json!({"ok":true,"look":"x","done":false})),
+                ("voice.sock", json!({"ok":true,"look":"x","done":false})),
+            ],
+        );
+        let mut on = place(&directory, false);
+        on.reply_named = true;
+        let asked = std::cell::Cell::new(0);
+        let still = || {
+            asked.set(asked.get() + 1);
+            asked.get() < 2
+        };
+        let started = Instant::now();
+        let looked = look_at(&on, "office", "customer survey", false, 3, PEER_WAIT, &still);
+        assert!(
+            matches!(&looked, Looked::Not(code) if code == "cancelled"),
+            "not cancelled"
+        );
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert_eq!(seen.recv_timeout(PEER_WAIT).unwrap()["op"], "session");
+        std::thread::sleep(Duration::from_millis(400));
+        assert!(seen.try_recv().is_err(), "asked again after its turn");
         std::fs::remove_dir_all(directory).unwrap();
     }
 
