@@ -350,10 +350,30 @@ pub(crate) fn without_kept_calls(history: &[Message]) -> Option<(Vec<Message>, u
 /// lamp-52e6 at 9928 (4 Nov 09:30), a timer set earlier was told in words
 /// alone, and "Lamp, set a timer to one minute." was answered "Timer set.
 /// It rings at 9:39 am." with no call, and no timer existed.
+///
+/// A service write ([`crate::services::WRITE`]) is kept with only its
+/// fields that are no one's words, [`WRITE_KEPT_FIELDS`]: which service,
+/// which action and the send's id, never a recipient, a subject, a body, a
+/// title, an event's id or the person's "said" (lamp-06c1 at 11913, 11 Nov:
+/// each earlier write was told as words alone, its read-back and its
+/// "Added", and the second write of a kind in the conversation was read
+/// back by the model itself, no call, three rows of three).
 pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_json::Value> {
     let bare = || serde_json::Value::Object(serde_json::Map::new());
     if args.as_object().is_none_or(serde_json::Map::is_empty) {
         return Some(bare());
+    }
+    if name == crate::services::WRITE {
+        let kept: serde_json::Map<String, serde_json::Value> = args
+            .as_object()?
+            .iter()
+            .filter(|(field, value)| {
+                WRITE_KEPT_FIELDS.contains(&field.as_str()) && value.is_string()
+            })
+            .map(|(field, value)| (field.clone(), value.clone()))
+            .collect();
+        let kept = serde_json::Value::Object(kept);
+        return (kept.to_string().len() <= crate::thread::KEPT_ARGS_BYTES).then_some(kept);
     }
     if !crate::tools::is_light_or_volume(name) && !crate::tools::SCHEDULE_NAMES.contains(&name) {
         return None;
@@ -364,6 +384,44 @@ pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_js
     crate::tools::LIGHT_OR_VOLUME_BARE
         .contains(&name)
         .then(bare)
+}
+
+/// The only fields a kept service write keeps ([`kept_args`]): none is
+/// anyone's words. An event's id is left out too: a later write copying an
+/// earlier one's would name an event that may be gone.
+pub(crate) const WRITE_KEPT_FIELDS: [&str; 3] = ["service", "action", "send_id"];
+
+/// A kept service write's result, as told in a later turn's history
+/// ([`kept_result`]): its status only, never its read-back.
+pub(crate) const WRITE_PREPARED: &str = "(done earlier: prepared, nothing sent; the read_back the lamp said next came from this call, and waited for a yes. The rest of its result was not kept. A new write needs its own call.)";
+pub(crate) const WRITE_DONE: &str = "(done earlier: done by the service. The rest of its result was not kept. A new write needs its own call.)";
+pub(crate) const WRITE_NOT_DONE: &str = "(done earlier: not done. The rest of its result was not kept. A new write needs its own call.)";
+
+/// What a kept call's result is told as in a later turn's history
+/// (`LAMP_HISTORY_KEEPS_CALLS`, [`crate::thread::KeptCall::result`]): a
+/// service write's status by its answer `told`, prepared
+/// ([`WRITE_PREPARED`]), done ([`WRITE_DONE`], [`crate::services::went`])
+/// or neither ([`WRITE_NOT_DONE`]); `None` for any other call, told the
+/// plain kept result.
+pub(crate) fn kept_result(name: &str, told: &serde_json::Value) -> Option<&'static str> {
+    if name != crate::services::WRITE {
+        return None;
+    }
+    Some(if crate::services::went(told) {
+        WRITE_DONE
+    } else if told
+        .get("read_back")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|read_back| !read_back.trim().is_empty())
+        && told
+            .get("send_id")
+            .and_then(serde_json::Value::as_str)
+            .is_some()
+    {
+        WRITE_PREPARED
+    } else {
+        WRITE_NOT_DONE
+    })
 }
 
 /// Told before a round asked again after a reply that was only a step's
@@ -2031,9 +2089,10 @@ pub(crate) type AnotherVoice = Arc<dyn Fn() -> bool + Send + Sync>;
 pub(crate) type GoingOnWith = Arc<dyn Fn(u64) -> Option<(String, bool)> + Send + Sync>;
 
 /// [`Shared::keeps_calls`]: request `request`'s turn ran function `name`
-/// with the arguments it is told with ([`kept_args`],
-/// [`crate::thread::Thread::called`]).
-pub(crate) type CallsKept = Arc<dyn Fn(u64, &str, &serde_json::Value) + Send + Sync>;
+/// with the arguments it is told with ([`kept_args`]), its result told as
+/// [`kept_result`] gives it ([`crate::thread::Thread::called_told`]).
+pub(crate) type CallsKept =
+    Arc<dyn Fn(u64, &str, &serde_json::Value, Option<&'static str>) + Send + Sync>;
 
 /// A carry's sign that nobody else is in the talk, beside no face seen
 /// speaking the line (#4339): with [`Shared::past_silent`]
@@ -4927,11 +4986,16 @@ impl Engine {
     /// quoted line, which are never run.
     pub fn keeping_calls(self, on: bool) -> Self {
         self.keeping_calls_by(on.then(|| -> CallsKept {
-            Arc::new(|request: u64, name: &str, args: &serde_json::Value| {
-                if let Ok(mut thread) = crate::thread::THREAD.lock() {
-                    thread.called(request, name, args);
-                }
-            })
+            Arc::new(
+                |request: u64,
+                 name: &str,
+                 args: &serde_json::Value,
+                 result: Option<&'static str>| {
+                    if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                        thread.called_told(request, name, args, result);
+                    }
+                },
+            )
         }))
     }
 
@@ -16588,13 +16652,20 @@ async fn answer(
                 // keeps it: bare, or a light's, volume's or Schedule's call
                 // with its own arguments (#5045(a): colour turns told as
                 // words alone were copied as "Done." with no call, and a
-                // timer turn as "Timer set." with none).
+                // timer turn as "Timer set." with none), or a service
+                // write's with its service, action and send id, told its
+                // status ([`kept_result`]).
                 if did
                     && call.name != worker::MORE
                     && let Some(keep) = &shared.keeps_calls
                     && let Some(args) = kept_args(&call.name, &call.args)
                 {
-                    keep(request, &call.name, &args);
+                    keep(
+                        request,
+                        &call.name,
+                        &args,
+                        kept_result(&call.name, &answer.told),
+                    );
                 }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {

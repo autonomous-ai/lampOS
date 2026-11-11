@@ -2120,8 +2120,20 @@ order is kept. A written turn is the same from the chat on.
   bare it would teach calling it bare (Fourteen's P3 on #5018). A light's,
   volume's or Schedule's call whose arguments pass 256 bytes is kept bare
   if its function takes none, else not at all (every Schedule function
-  takes some, so a reminder with a long text is not kept). At most 8 calls an exchange, each
-  name with the same arguments once. With
+  takes some, so a reminder with a long text is not kept). A service
+  write (`service_write`) is kept with only its fields that are no one's
+  words, `service`, `action` and `send_id` (`WRITE_KEPT_FIELDS`), never a
+  recipient, a subject, a body, a title, an event's id or the person's
+  `said`, and its `tool` message tells its status in place of `(done
+  earlier; its result was not kept)`: prepared, the read-back the lamp
+  said next came from the call and waited for a yes (`WRITE_PREPARED`);
+  done by the service (`WRITE_DONE`, `services::went`); or not done
+  (`WRITE_NOT_DONE`) (`kept_result`, `KeptCall::result`). On lamp-06c1
+  at 11913 on 11 Nov, with each earlier write told as words alone, its
+  read-back and its "Added", the second create, move and mail of one
+  conversation were read back by the model itself with no call, the mail
+  word for word as the services' own. At most 8 calls an exchange, each
+  name with the same arguments and status once. With
   `LAMP_CONVERSATION_ROOM_LINES_TOLD` on, a room exchange's calls reach a
   person's history with its words. A chat that refuses round 1 (a status
   not 429 or 5xx) with kept calls in the history is asked once more
