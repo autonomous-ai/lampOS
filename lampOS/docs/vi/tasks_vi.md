@@ -251,7 +251,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   Hermes khi đó cho nó một network namespace riêng chỉ có `lo`
   (docs/install.md, "Hermes on the lamp"), nên không địa chỉ nào khác phân
   giải hay kết nối được. Các pane của chính Harness không bao giờ đặt biến
-  này, và giữ mạng như cũ. Hai đường ra là các tệp được cho thấy ở chế độ
+  này, và giữ mạng như cũ. Cả hai phía đều dừng an toàn (fail closed):
+  script kết thúc lần chạy khi namespace có bất kỳ link nào ngoài `lo`, và
+  `HermesRunner` không khởi động gì khi wrapper đã cài thiếu các dòng mạng
+  (`WRAPPER_NET_LINES`, `NOT_HELD_OFF`: `LAMP_SKILL_TASKS` của lamp-update
+  đang tắt hoặc vòng của nó chưa chạy), nên một lần chạy không bao giờ được
+  khởi động với mạng của chính đèn (P2 của Heron và Fourteen trên #6443).
+  Hai đường ra là các tệp được cho thấy ở chế độ
   chỉ đọc trong đó: `control.sock` của lamp-control (ở trên), và cầu nối
   của lamp-tasks tới bộ chuyển tiếp model của lamp-cloud (`net_bridge`):
   - **Cầu nối** (`Bridge`): với `LAMP_SKILL_TASKS=on`, `serve` mở

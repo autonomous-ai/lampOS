@@ -2250,7 +2250,13 @@ for each run, and is answered once the run ends
   lamp-update's own unit, Hermes's wrapper then gives it a network
   namespace of its own with only `lo` (docs/install.md, "Hermes on the
   lamp"), so no other address resolves or connects. Harness's own panes
-  never set it, and keep their network. Its two ways out are files shown
+  never set it, and keep their network. It fails closed both ways: the
+  script ends the run when the namespace has any link besides `lo`, and
+  `HermesRunner` starts nothing while the installed wrapper lacks the
+  network lines (`WRAPPER_NET_LINES`, `NOT_HELD_OFF`: lamp-update's
+  `LAMP_SKILL_TASKS` off or its round not run yet), so a run is never
+  started with the lamp's own network (Heron's and Fourteen's P2 on
+  #6443). Its two ways out are files shown
   read-only in it: lamp-control's `control.sock` (above), and lamp-tasks'
   bridge to lamp-cloud's model forwarder (`net_bridge`):
   - **The bridge** (`Bridge`): with `LAMP_SKILL_TASKS=on`, `serve` binds

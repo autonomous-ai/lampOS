@@ -1791,6 +1791,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x "$p" ]; then I=$p; break; fi; done
        [ -n "$I" ] || fail "no ip: lo not up, the run has no way out"
        "$I" link set lo up || fail "lo not up"
+       [ "$("$I" -o link show | cut -d: -f2 | tr -d ' ' | tr '\n' ' ')" = "lo " ] || fail "a link besides lo: the run is not held off the network"
        M=$(/usr/bin/unshare --user --map-user="$U" --map-group="$G" /opt/lampOS/tasks/current/lamp-tasks net-relay --listen 127.0.0.1:7741 --to "$B" &)
        [ "$M" = ready ] || fail "no model relay on 127.0.0.1:7741"
      fi
@@ -1800,7 +1801,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      It shows lamp-tasks' bridge socket `/run/lampos-tasks/model.sock`, the
      file alone, read-only, as the control socket is (missing, the run
      ends: the bridge is served only with the switch on); brings `lo` up
-     (no `ip`, the run ends); and starts `lamp-tasks net-relay` (lamp-tasks'
+     (no `ip`, the run ends) and checks `lo` is its only link (any other,
+     the run ends: it is not held off the network); and starts `lamp-tasks net-relay` (lamp-tasks'
      own program, under `/opt`, which is not hidden) in the background,
      waiting for its `ready` line (none, the run ends). The relay runs as
      the caller's own ids in a nested user namespace of its own, as Hermes
