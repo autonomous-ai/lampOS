@@ -3,7 +3,11 @@
 //! the outcome `spoken`, as lamp-control reads them (`parts.rs`). One line at
 //! a time: a second `say` waits for the first. A computer's `stop` writes
 //! `{"cancel":true}` on its say's connection and the speech ends at once,
-//! answered `dropped`.
+//! answered `dropped`. A computer's word-for-word `say` is also told on
+//! `voice/line` as it begins, as the real voice does, so `lamp.said` reaches
+//! a computer holding `speech`.
+use lamp_bus::{Bus, Publisher};
+use lamp_msgs::{LineBy, LineSource, SaidLine};
 use serde_json::{Value, json};
 use std::{
     io::{BufRead, BufReader, Write},
@@ -21,22 +25,60 @@ use std::{
 /// The most a line is spoken for when the host has no speech engine.
 const SILENT_MAX: Duration = Duration::from_secs(4);
 
-/// Serves the say socket at `path`, forever.
-pub fn serve_say(path: &Path) -> std::io::Result<()> {
+/// Serves the say socket at `path`, forever, telling each line on `bus`'s
+/// `voice/line`. The topic is declared before the socket exists, so a socket
+/// that is there means a subscriber can already find the topic.
+pub fn serve_say(path: &Path, bus: &Bus) -> std::io::Result<()> {
+    let lines = Arc::new(Mutex::new(bus.publisher_declared(
+        SaidLine::TOPIC,
+        &SaidLine::declaration(),
+        "voice",
+    )?));
     let _ = std::fs::remove_file(path);
     let listener = UnixListener::bind(path)?;
     for stream in listener.incoming().flatten() {
+        let lines = Arc::clone(&lines);
         thread::spawn(move || {
-            let _ = say(stream);
+            let _ = say(stream, &lines);
         });
     }
     Ok(())
 }
 
+/// Tells a computer's word-for-word line on `voice/line`, as the real voice
+/// does when it begins to play (`SaidLine`, docs/msgs.md): the words, `by`
+/// `computer`, `source` `exact`, and the computer's id as `app`. Nothing else
+/// is told: a line without `by` is a written turn for the model (there is
+/// none here), a skill's or a cue's has no words to tell, and an empty one is none.
+fn tell(lines: &Mutex<Publisher>, asked: &Value) {
+    if asked["skill"] != "control" || asked["exact"] != true {
+        return;
+    }
+    let (Some(text), Some(by)) = (asked["text"].as_str(), asked["by"].as_str()) else {
+        return;
+    };
+    let text = text.trim();
+    if text.is_empty() {
+        return;
+    }
+    let line = SaidLine {
+        text: text.to_owned(),
+        by: LineBy::Computer,
+        source: LineSource::Exact,
+        app: Some(by.to_owned()),
+        request: None,
+        cut: false,
+    };
+    let mut lines = lines
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _ = lines.publish_json(lamp_ipc::monotonic_us(), &line);
+}
+
 /// One line is spoken at a time.
 static SPEAKING: Mutex<()> = Mutex::new(());
 
-fn say(mut stream: UnixStream) -> std::io::Result<()> {
+fn say(mut stream: UnixStream, lines: &Mutex<Publisher>) -> std::io::Result<()> {
     let mut line = String::new();
     BufReader::new(stream.try_clone()?).read_line(&mut line)?;
     let Ok(asked) = serde_json::from_str::<Value>(&line) else {
@@ -78,6 +120,7 @@ fn say(mut stream: UnixStream) -> std::io::Result<()> {
         "{}",
         json!({"event": "begun", "at_us": lamp_ipc::monotonic_us(), "id": 1})
     )?;
+    tell(lines, &asked);
     match (asked["text"].as_str(), asked["clip"].as_str()) {
         (Some(text), _) => speak(text, &cancelled),
         // A computer's clip, played by the host: the door gives the path of a clip it checked.
@@ -317,6 +360,55 @@ mod tests {
             std::fs::read_to_string(&args).unwrap().trim(),
             "-q /clips/a.wav"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_computers_exact_line_is_told_on_voice_line_and_nothing_else_is() {
+        let dir = std::env::temp_dir().join(format!("lsv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let bus = Bus::new(dir.join("bus")).unwrap();
+        let lines = Mutex::new(
+            bus.publisher_declared(SaidLine::TOPIC, &SaidLine::declaration(), "voice")
+                .unwrap(),
+        );
+        let mut heard = bus
+            .subscribe_typed(SaidLine::TOPIC, "test", SaidLine::TYPE)
+            .unwrap();
+        // Told: a computer's word-for-word say, as lamp-control sends it.
+        tell(
+            &lines,
+            &json!({"skill": "control", "text": " Hello there. ", "exact": true, "by": "c_7"}),
+        );
+        // Not told: a written turn for the model (no `by`), a skill's line, a cue, an empty one.
+        tell(&lines, &json!({"skill": "control", "text": "no by"}));
+        tell(
+            &lines,
+            &json!({"skill": "control", "text": "no by", "exact": true}),
+        );
+        tell(
+            &lines,
+            &json!({"skill": "timer", "text": "skill", "exact": true, "by": "c_7"}),
+        );
+        tell(&lines, &json!({"skill": "control", "cue": "hum"}));
+        tell(
+            &lines,
+            &json!({"skill": "control", "text": "  ", "exact": true, "by": "c_7"}),
+        );
+        let message = heard.recv(Duration::from_secs(2)).unwrap().unwrap();
+        let line: SaidLine = message.parse().unwrap();
+        assert_eq!(
+            line,
+            SaidLine {
+                text: "Hello there.".to_owned(),
+                by: LineBy::Computer,
+                source: LineSource::Exact,
+                app: Some("c_7".to_owned()),
+                request: None,
+                cut: false,
+            }
+        );
+        assert!(heard.recv(Duration::from_millis(300)).unwrap().is_none());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
