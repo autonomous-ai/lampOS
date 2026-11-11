@@ -503,17 +503,42 @@ async fn the_admin_socket_changes_a_computers_grants() {
     );
     let listed = admin(&lamp, json!({"clients": true})).await;
     assert_eq!(listed["clients"][0]["grants"], json!(["light", "camera"]));
-    // Its connection is closed, so it reads the new grants at its next hello.
-    let ended = tokio::time::timeout(Duration::from_secs(3), async {
+    // Its connection is closed, saying why, so it reads the new grants at its next hello.
+    let reason = tokio::time::timeout(Duration::from_secs(3), async {
         loop {
             match socket.next().await {
-                None | Some(Err(_) | Ok(Message::Close(_))) => return,
+                Some(Ok(Message::Close(Some(frame)))) => return Some(frame.reason.to_string()),
+                None | Some(Err(_) | Ok(Message::Close(None))) => return None,
                 Some(Ok(_)) => continue,
             }
         }
     })
-    .await;
-    assert!(ended.is_ok(), "the computer's connection closed");
+    .await
+    .expect("the computer's connection closed");
+    assert_eq!(reason.as_deref(), Some(server::CLOSED_GRANTS));
+}
+
+/// A revoke closes the computer's connection and says why in the close
+/// frame, so its SDK can log one line instead of leaving a developer guessing.
+#[tokio::test]
+async fn a_revoke_says_why_in_the_close_frame() {
+    let lamp = lamp("close-reason").await;
+    let mut socket = paired(&lamp, json!(["light"]), 14).await;
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    let client = listed["clients"][0]["id"].as_str().unwrap().to_owned();
+    admin(&lamp, json!({"revoke": client})).await;
+    let reason = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            match socket.next().await {
+                Some(Ok(Message::Close(Some(frame)))) => return Some(frame.reason.to_string()),
+                None | Some(Err(_) | Ok(Message::Close(None))) => return None,
+                Some(Ok(_)) => continue,
+            }
+        }
+    })
+    .await
+    .expect("the connection closes");
+    assert_eq!(reason.as_deref(), Some(server::CLOSED_REVOKED));
 }
 
 /// Fourteen's P3 on #3778: frames before `hello` don't move its deadline;
