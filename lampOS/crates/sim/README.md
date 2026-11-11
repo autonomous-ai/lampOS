@@ -56,7 +56,12 @@ never with more than one person in view, only while the ring shows the mark.
 `tools/lamp-sim-check.sh BIN_DIR` starts it, pairs the Python SDK's CLI and the
 JS SDK, runs the JS SDK's tour unchanged and a Python round trip, ends the lamp
 and checks that nothing is left running: the SDKs against the virtual lamp with
-no special mode.
+no special mode. `tools/lamp-sim-conformance.sh BIN_DIR` does the same with
+every SDK example (`sdk/js/conformance/examples.js --sim`, paired with every
+grant): each runs as a program of its own and the lamp must show what it is for.
+Both run in CI on every pull request that can change what a program sees
+(`.github/workflows/lampos-sim.yml`, Linux, release binaries, no camera or
+microphone).
 
 ## What is real and what stands in
 
