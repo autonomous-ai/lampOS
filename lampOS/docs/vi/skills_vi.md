@@ -996,6 +996,18 @@ sau:
     của câu sau không bao giờ được đáp "Um, excuse me, did anyone say
     something?" (`Shared::quiet_for_a_make`).
 
+Một câu "đã tạo" mà không có lần tạo nào đứng sau thì không bao giờ được nói
+(`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): câu trả lời mở đầu
+bằng "I made", một cái tên tối đa 8 từ, rồi dấu ':', ", and it's on",
+". It waits for you to agree", hoặc "I made it but couldn't put it on", trong
+một lượt không có lời gọi `make_skill`, bị giữ lại như mọi hành động được nói
+là đã làm. Mô hình được hỏi lại một lần, và lần thứ hai vẫn vậy thì đèn nói
+"Sorry, I didn't do that. Could you ask me again?". Trên lamp-9adf (11/11
+21:28) một câu bắt đầu ngay trong câu trả lời của chính đèn nhận được "I made
+lamp test event … It waits for you to agree" với `calls=none`, và không kỹ
+năng nào được tạo. "I made a mistake." không phải một lời nói đã làm. Kiểm
+thử: `action_claim::tests::a_skill_said_made_is_a_claim_only_a_make_backs`.
+
 Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến sau.
 
 Kiểm thử: `make_skill_local::tests` (kể cả
