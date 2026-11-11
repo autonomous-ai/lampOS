@@ -37,17 +37,24 @@ pub mod reg {
 
 /// The STS3215's model number.
 const MODEL_NUMBER: u16 = 777;
-/// Gravity load the arm holds at its worst, in 0.1% of the drive, for the shoulder
-/// and the elbow (uncalibrated: the 75c9 readings are to come), and the load a
-/// joint shows for every 1,000 counts a second squared it speeds up at and for every
-/// 1,000 counts a second it moves at.
-const GRAVITY: [f64; 5] = [0.0, 300.0, 150.0, 0.0, 0.0];
+/// Gravity load the arm holds when its link is level, in 0.1% of the drive, for the
+/// shoulder and the elbow, and the load a joint shows for every 1,000 counts a
+/// second squared it speeds up at and for every 1,000 counts a second it moves at.
+/// Gravity is calibrated on lamp-75c9 (stable 11756, 11 Nov, 180 s at rest in its
+/// standing pose, `body.state`, about 12 a second): the shoulder at 47.8 deg showed
+/// 0.09 to 0.10 and the elbow at 43 deg 0.16, the base, roll and pitch 0; against the
+/// model's turn from the folded pose there (51.9 and 54.8 deg, sine 0.79 and 0.82)
+/// that is 120 and 196. Speed and acceleration are still guesses (no moves read).
+const GRAVITY: [f64; 5] = [0.0, 120.0, 196.0, 0.0, 0.0];
 const LOAD_PER_ACCEL: f64 = 5.0;
 const LOAD_PER_SPEED: f64 = 30.0;
-/// The temperature a servo rests at, degrees, how fast it heats with its load
-/// (degrees a second at a full load) and how fast it cools (a fraction a second).
-const AMBIENT: f64 = 28.0;
-const HEAT: f64 = 0.4;
+/// The temperature a servo rests at in the lamp's base, degrees (the unloaded base,
+/// roll and pitch read 51, 43 and 42 at lamp-75c9 on 11 Nov), how fast it heats with
+/// its load (degrees a second at a full load: the shoulder at 0.095 read 48 to 49 and
+/// the elbow at 0.16 read 52 to 55) and how fast it cools (a fraction a second: not
+/// measured, a guess).
+const AMBIENT: f64 = 43.0;
+const HEAT: f64 = 0.5;
 const COOL: f64 = 1.0 / 120.0;
 /// The longest a single step moves and warms the servos, in seconds.
 const MOST_STEP: f64 = 0.25;
@@ -194,12 +201,12 @@ impl Servo {
         };
         self.put(reg::VELOCITY, &signed.to_le_bytes());
         self.regs[reg::MOVING] = u8::from(moving);
-        // What a servo shows: gravity on the arm, the push of speeding up, a little
-        // for moving, and the little a held one shows (0.1% units).
+        // What a servo shows: gravity on the arm, the push of speeding up and a
+        // little for moving (0.1% units); a joint held at rest with no arm to hold
+        // shows none (the base, roll and pitch of lamp-75c9 read 0).
         let index = usize::from(self.id.saturating_sub(1)).min(4);
         let load: u16 = if self.torque() {
-            (40.0
-                + self.gravity(index)
+            (self.gravity(index)
                 + accelerating.abs() / 1_000.0 * LOAD_PER_ACCEL
                 + velocity.abs() / 1_000.0 * LOAD_PER_SPEED)
                 .min(1_000.0) as u16
@@ -379,6 +386,11 @@ mod tests {
         Bus::new([2000, 2100, 2200, 2048, 2048], [(0, 4095); 5])
     }
 
+    /// A bus whose servos were found at `found` (lamp-sim's own `found_bus`).
+    fn bus_from(found: [u16; 5]) -> Bus {
+        Bus::new(found, [(0, 4095); 5])
+    }
+
     #[test]
     fn a_sync_read_answers_one_status_packet_for_each_servo() {
         let mut bus = bus();
@@ -485,7 +497,11 @@ mod tests {
         let mut servo = Servo::new(1, 2000, 0, 4095);
         servo.heat = 80.0;
         servo.step(3_600.0);
-        assert!(servo.heat < 40.0 && servo.heat >= AMBIENT, "{}", servo.heat);
+        assert!(
+            servo.heat < AMBIENT + 1.0 && servo.heat >= AMBIENT,
+            "{}",
+            servo.heat
+        );
     }
 
     #[test]
@@ -502,5 +518,38 @@ mod tests {
         bus.step(3_600.0);
         let moved = f64::from(bus.servos()[0].position()) - before;
         assert!(moved > 0.0 && moved <= 1_000.0 * MOST_STEP + 1.0, "{moved}");
+    }
+
+    #[test]
+    fn at_lamp_75c9s_standing_pose_the_arm_reads_what_the_lamp_read() {
+        // Stand 2639 / 2570 counts for the shoulder and elbow, torque on, still:
+        // lamp-75c9 (11756) read 0.09 to 0.10 and 0.16, the others 0.
+        let mut bus = bus_from([2028, 2048, 1946, 2085, 1817]);
+        for id in 1u8..=5 {
+            bus.feed(&request(id, WRITE, &[reg::TORQUE as u8, 1]));
+        }
+        bus.feed(&request(2, WRITE, &[reg::GOAL as u8, 0x4f, 0x0a]));
+        bus.feed(&request(3, WRITE, &[reg::GOAL as u8, 0x0a, 0x0a]));
+        for _ in 0..400 {
+            bus.step(0.05);
+        }
+        let load = |at: usize| {
+            let servo = &bus.servos()[at];
+            f64::from(u16::from_le_bytes([
+                servo.regs[reg::LOAD],
+                servo.regs[reg::LOAD + 1],
+            ])) / 1_000.0
+        };
+        assert!((0.09..=0.10).contains(&load(1)), "shoulder {}", load(1));
+        assert!((0.15..=0.17).contains(&load(2)), "elbow {}", load(2));
+        assert_eq!((load(0), load(3), load(4)), (0.0, 0.0, 0.0));
+        // And it has warmed to where the lamp read (shoulder 48 to 49, elbow 52 to 55).
+        for _ in 0..4_000 {
+            bus.step(0.25);
+        }
+        let heat = |at: usize| f64::from(bus.servos()[at].regs[reg::TEMPERATURE]);
+        assert!((47.0..=50.0).contains(&heat(1)), "shoulder {}", heat(1));
+        assert!((51.0..=55.0).contains(&heat(2)), "elbow {}", heat(2));
+        assert_eq!(heat(0), AMBIENT);
     }
 }
