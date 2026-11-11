@@ -4,8 +4,8 @@ use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
     EngineRow, JoinedOn, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
     PS_STDOUT_LIMIT, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent,
-    WatchLine, iso_unix_ms, parse_auth_status, parse_engines, parse_machines, parse_ps, parse_wait,
-    parse_watch_line,
+    WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_engines, parse_machines,
+    parse_ps, parse_wait, parse_watch_line, this_computer,
 };
 use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, targets_from_machines};
 use serde_json::{Value, json};
@@ -26,6 +26,9 @@ use std::{
 const MACHINE: &str = "0123456789abcdef0123456789abcdef";
 const AGENT: &str = "11111111-1111-4111-8111-111111111111";
 const CREATION: &str = "22222222-2222-4222-8222-222222222222";
+/// This computer's own id, as Harness keeps it while no account is signed
+/// in (openharness `computerId()`, a UUID): never an account machine's.
+const COMPUTER: &str = "9d14f36b-e73a-4acb-9922-0bbb39cbc22e";
 
 /// One test with processes at a time (#1569 row 18). On macOS a child that
 /// another test thread spawns while this one makes a child's pipes can take
@@ -4144,6 +4147,97 @@ fn sign_in_is_one_auth_status_read_as_harness_gives_it() {
         rig.plan(json!({"auth":step}));
         assert_eq!(rig.cli().signed_in(), Err(code.into()));
     }
+}
+
+/// #6407: signed out, `auth status --json` names this computer's own id
+/// (`computerId`), the one Harness starts work under then. It is kept only
+/// as Harness mints it, a UUID; anything else is none, and the sign-in is
+/// read as before.
+#[test]
+fn signed_out_the_computers_own_id_is_read_with_the_sign_in() {
+    let rig = Rig::new();
+    rig.plan(json!({"auth":step(json!({"loggedIn":false,"computerId":COMPUTER}))}));
+    assert_eq!(
+        rig.cli().signed_in_here(),
+        Ok((SignIn::Out, Some(COMPUTER.to_owned())))
+    );
+    assert_eq!(rig.calls().len(), 1);
+    for (reply, read) in [
+        (json!({"loggedIn":false,"computerId":"c"}), (SignIn::Out, None)),
+        (json!({"loggedIn":false}), (SignIn::Out, None)),
+        (
+            json!({"loggedIn":false,"computerId":COMPUTER.to_uppercase()}),
+            (SignIn::Out, None),
+        ),
+        (
+            json!({"loggedIn":true,"computerId":COMPUTER,"machineId":MACHINE}),
+            (SignIn::In, Some(COMPUTER.to_owned())),
+        ),
+    ] {
+        assert_eq!(parse_auth_here(reply.to_string().as_bytes()), Ok(read));
+    }
+    assert!(this_computer(COMPUTER));
+    assert!(!this_computer(MACHINE));
+    assert!(!this_computer("lamp"));
+}
+
+/// #6407, a product lamp never signed in: Harness 0.6 refuses `machines`
+/// and every `--machine` then, and `new` with none starts the work on this
+/// computer under its own id. The lamp's own target named by that id is
+/// started with no machines look and no `--machine`, and read, listed and
+/// closed the same way; an account machine's target keeps both.
+#[test]
+fn the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines": {"exit": 1, "stdout": "{\"error\":\"NOT_SIGNED_IN\"}\n"},
+        "new": step(json!({"ok":true,"machineId":COMPUTER,"agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":null,"bypassPermission":false}})),
+        "show": step(json!({"id":AGENT,"state":"idle","ask":"Inspect the authored fixture","answer":"Observed answer","truncated":false,"tools":2})),
+        "ps": step(json!({"harnesses":[{"id":AGENT,"state":"idle","lastActive":null}]})),
+        "close": {"exit": 0},
+    }));
+    let mut request = launch();
+    request.target = Target {
+        machine_id: COMPUTER.into(),
+        project: "~/harnesses/lamp-tasks/lamp".into(),
+        engine: EngineKind::Hermes,
+    };
+    assert_eq!(request.target.validate(), Ok(()));
+    let cli = rig.cli();
+    assert_eq!(
+        cli.launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    assert!(cli.observe(COMPUTER, AGENT).is_ok());
+    assert_eq!(cli.status(COMPUTER).map(|listed| listed.len()), Ok(1));
+    assert_eq!(cli.close(COMPUTER, AGENT), Ok(Closed::Closed));
+    let calls: Vec<Value> = rig.calls().into_iter().map(|call| call["args"].clone()).collect();
+    assert_eq!(
+        calls,
+        [
+            json!([
+                "new",
+                "hermes",
+                "~/harnesses/lamp-tasks/lamp",
+                "--name",
+                "lamp-task-001",
+                "--json",
+                "--task",
+                "Inspect the authored fixture"
+            ]),
+            json!(["show", AGENT, "--chars", "4000", "--json"]),
+            json!(["ps", "--json"]),
+            json!(["close", AGENT, "--json"]),
+        ]
+    );
+    // Work started under an account machine still names it, after the
+    // machines look: signed out, that is refused, as before.
+    let rig = Rig::new();
+    rig.plan(json!({"machines": {"exit": 1, "stdout": "{\"error\":\"NOT_SIGNED_IN\"}\n"}}));
+    assert_eq!(rig.cli().launch(&launch()), not_sent("preflight_failed"));
+    assert_eq!(rig.calls()[0]["args"], json!(["machines", "--json"]));
 }
 
 /// #1676: the machines as `harness machines --json` lists them (openharness
