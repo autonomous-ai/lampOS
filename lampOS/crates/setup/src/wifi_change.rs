@@ -62,8 +62,9 @@ pub const ONLINE_WAIT: Duration = Duration::from_secs(60);
 /// reach the helper: the line crossing the local socket. `lamp-cloud` takes
 /// none after the window's end, so a confirmation is answered once.
 pub const CONFIRM_SLACK: Duration = Duration::from_millis(500);
-/// The broker's TCP connection, name lookup included.
-pub const BROKER_TIMEOUT: Duration = Duration::from_secs(3);
+/// The broker's TCP connection, name lookup included: 5 s, as setup's
+/// [`wifi::REACH_TIMEOUT`], for a slow first lookup or a far broker (#6256).
+pub const BROKER_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// One change asked, checked. The password is never shown.
 #[derive(Clone, PartialEq, Eq)]
