@@ -874,6 +874,60 @@ fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
     }
 }
 
+/// A written turn `request`'s `text` on the second route, at `now_unix_ms`
+/// and `now`: when it says back a skill with code of its own made from the
+/// app (#6307, kept as asked by `app_make`, [`made_skill::code_asked_in`]
+/// within the say service's longest wait, `app_make::LINE_WAITS_MS`), that
+/// skill's yes is awaited from this request on through the very wait a
+/// voice make starts ([`code_asks`], every guard of it: said whole in this
+/// answer or a later one, a later heard line, the echo hold, this route),
+/// its id told to each later heard line
+/// ([`crate::skill_write_yes::waiting_note`]), and the turn ends as a voice
+/// make's does ([`crate::skill_write_yes::then_wait`]). With
+/// `LAMP_MADE_SCRIPTS` off, or any other text, the text as it is.
+pub fn app_code_asked(
+    directory: &std::path::Path,
+    request: u64,
+    text: String,
+    now_unix_ms: u64,
+    now: std::time::Instant,
+) -> String {
+    if !made_skill::scripts_on() {
+        return text;
+    }
+    let Some(made) =
+        made_skill::code_asked_in(directory, now_unix_ms, crate::app_make::LINE_WAITS_MS)
+    else {
+        return text;
+    };
+    if !text.contains(&made_skill::on_line(&made)) {
+        return text;
+    }
+    let id = crate::skill_write_yes::wait_for_yes_noted(code_asks(&made), request, now);
+    eprintln!(
+        "lamp-voice: request {request}: a skill with code of its own made from the app is said back; its yes is awaited (#6307)"
+    );
+    format!("{text} {}", crate::skill_write_yes::then_wait(&id))
+}
+
+/// [`app_code_asked`] on the lamp: the made skills' own folder, with
+/// `LAMP_MAKE_SKILL` on in this process's environment.
+pub fn app_code_asked_here(request: u64, text: String) -> String {
+    if !made_skill::scripts_on() {
+        return text;
+    }
+    let Some(keeping) = Keeping::from_environment() else {
+        return text;
+    };
+    app_code_asked(
+        &keeping.directory,
+        request,
+        text,
+        crate::app_make::now_unix_ms(),
+        std::time::Instant::now(),
+    )
+}
+
 /// The person's yes to a made skill with code of its own (#6307), once its
 /// say-back was heard whole: its package put on by the SHA-256 said back
 /// ([`made_skill::put_on_agreed`]), then, with a skill's tasks on (#6305),
@@ -4153,12 +4207,12 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     }
 
     /// A made photo booth with code of its own (#6307).
-    const CODE_TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+    pub(crate) const CODE_TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
         grants = [\"camera\"]\n[permissions]\ntopics = [\"room/presence\"]\n\
         [trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
         for = \"5s\"\ncooldown = \"1h\"\nrearm = \"ends\"\n[ask]\npolicy = \"nudge\"\n[[do]]\n\
         task = { task = \"take a photo\", run = \"scripts/main.py\" }\n";
-    const CODE_CARD: &str =
+    pub(crate) const CODE_CARD: &str =
         "---\nname: photo-booth\ndescription: Takes a photo.\n---\n\n# Photo booth\n";
     const CODE_REQUEST: &str = "make me a photo booth that takes a photo when I sit down";
 
@@ -4283,7 +4337,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    fn task_asks(
+    pub(crate) fn task_asks(
         name: &str,
         sha256: &str,
         package: &str,

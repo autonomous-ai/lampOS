@@ -6322,8 +6322,42 @@ pub const CUT_CODE_UNSAID: &str =
 
 /// Why a skill with code of its own is never put on at once ([`put_on`],
 /// #6307): the app's MAKE IT comes before its grants are said, and its yes
-/// is taken by voice only, after its say-back ([`put_on_agreed`]).
-pub const CODE_BY_VOICE: &str = "a skill that runs its own code goes on only once you agree to it out loud; ask me for it by voice";
+/// is taken by voice only, after its say-back ([`put_on_agreed`]), which
+/// the lamp says of an app's make too ([`code_asked`]).
+pub const CODE_BY_VOICE: &str = "a skill that runs its own code goes on only once you agree to it out loud at the lamp, after it says what that code may use";
+
+/// The kept skill `sha256`, with code of its own and made from the app,
+/// said back aloud at `now_unix_ms` (#6307, `crate::app_make`): kept as
+/// asked, `code_asked_at_unix_ms`, so the voice's second route takes its
+/// yes once that say-back is said ([`code_asked_in`]).
+pub fn code_asked(directory: &Path, sha256: &str, now_unix_ms: u64) {
+    let mut entries = index(directory);
+    let mut found = false;
+    for entry in &mut entries {
+        if entry["sha256"] == sha256 && entry["on"] != true && entry["uses"]["code"] == true {
+            entry["code_asked_at_unix_ms"] = json!(now_unix_ms);
+            found = true;
+        }
+    }
+    if found && let Err(error) = write_index(directory, &entries) {
+        eprintln!("lamp-voice: a made skill with code of its own: its ask not kept: {error}");
+    }
+}
+
+/// The newest kept skill with code of its own asked about from the app
+/// ([`code_asked`]) within `within_ms` before `now_unix_ms` and not on:
+/// whose say-back, once said, waits for the person's yes.
+pub fn code_asked_in(directory: &Path, now_unix_ms: u64, within_ms: u64) -> Option<Made> {
+    index(directory)
+        .into_iter()
+        .filter(|entry| entry["on"] != true && entry["uses"]["code"] == true)
+        .filter_map(|entry| {
+            let at = entry["code_asked_at_unix_ms"].as_u64()?;
+            (at <= now_unix_ms && now_unix_ms - at <= within_ms).then_some((at, entry))
+        })
+        .max_by_key(|(at, _)| *at)
+        .and_then(|(_, entry)| made_of(directory, &entry))
+}
 
 /// Put the kept skill with code of its own whose SHA-256 is `sha256` on the
 /// lamp, on the person's yes to its say-back (#6307,
