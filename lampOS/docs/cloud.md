@@ -640,7 +640,7 @@ look starts none, and the app sees it on `update.status` (`now` stays
 
 ### The lamp's agents (#6240, `engines`)
 
-With `LAMP_APP_ENGINES=on` (exactly) in lamp-update's own unit, the
+With `LAMP_APP_ENGINES=on` (exactly; set in the product units since #6240) in lamp-update's own unit, the
 status carries `engines` (`lamp_msgs::EngineInstall` by name): the agents
 the lamp's Harness has, for the app's agents screen: `hermes` always, and
 `openclaw` beside it (below). Each is `{"state", "version"?, "reason"?,

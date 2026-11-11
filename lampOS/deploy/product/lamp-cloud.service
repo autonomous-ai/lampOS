@@ -76,6 +76,9 @@ Environment=LAMP_SKILL_MESSAGES=on
 # and handed to lamp-voice's app-make socket, the same line there.
 Environment=LAMP_SKILL_UPLOAD=on
 Environment=LAMP_APP_UPDATE=on
+# The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
+# on in the product by the owner's rule of 11 Nov; `off` here takes it away.
+Environment=LAMP_APP_ENGINES=on
 # The app's connectors (Queue #4710): a link set or removed through lamp-services' admin socket. Reads, and
 # sends, which lamp-services.service sets on (LAMP_SERVICES_WRITE=on); the same line there and in lamp-voice.service.
 Environment=LAMP_SERVICES=on
