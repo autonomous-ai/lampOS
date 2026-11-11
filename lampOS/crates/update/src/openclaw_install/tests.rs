@@ -476,7 +476,7 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(WRAPPER_TEXT.starts_with("#!/bin/sh\n"));
     assert!(WRAPPER_TEXT.contains(&format!("$(cat {TOKEN} 2>/dev/null)")));
     assert!(WRAPPER_TEXT.contains(&format!(
-        "export {TOKEN_ENV}=\"$T\" {STATE_ENV}={STATE} PATH=\"{NODE_BIN}:$PATH\" "
+        "export {TOKEN_ENV}=\"$T\" {STATE_ENV}={STATE} OPENCLAW_NO_AUTO_UPDATE=1 PATH=\"{NODE_BIN}:$PATH\" "
     )));
     assert_eq!(
         NS_FLAGS.join(" "),
@@ -494,6 +494,11 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(WRAPPER_TEXT.contains(&format!(
         "P=$(/usr/bin/systemctl show -p MainPID --value {UNIT} 2>/dev/null) || P=\n"
     )));
+    // A pid reused after the gateway stopped is not taken: it must still be
+    // in the unit's cgroup.
+    assert!(
+        WRAPPER_TEXT.contains("! grep -q '/lamp-openclaw-gateway\\.service$' \"/proc/$P/cgroup\"")
+    );
     assert!(WRAPPER_TEXT.ends_with(&format!(
         "exec /usr/bin/nsenter --user=\"/proc/$P/ns/user\" --mount=\"/proc/$P/ns/mnt\" --pid=\"/proc/$P/ns/pid_for_children\" --preserve-credentials --wd=\"$PWD\" -- /usr/bin/unshare --user --map-user=\"$LAMP_NS_UID\" --map-group=\"$LAMP_NS_GID\" {OPENCLAW} \"$@\"\n"
     )));
