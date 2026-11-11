@@ -616,6 +616,13 @@ sau:
    `needs_link: [{"code", "name"}]` trong `skills.made`. Khi `lamp-services`
    không trả lời thì không có cả hai, và việc tạo vẫn thành
    ([services_vi.md](services_vi.md), "Chưa liên kết lúc tạo").
+   Với `LAMP_SKILL_LINK_APP=on` trong `lamp-cloud` (bật trong sản phẩm), ứng
+   dụng còn nhận `skills.needs_link` một lần cho mỗi lần tạo, `why: "made"`,
+   và mỗi dòng của `skills.list`, cả kỹ năng đã cài, mang `needs_link` khi
+   một dịch vụ nó dùng chưa được liên kết, để ứng dụng mở Connect của dịch
+   vụ đó (`cloud.md`, "The skills page"). Một `skills.install` đưa lên kỹ
+   năng như vậy gửi cùng sự kiện đó, `why: "installed"`:
+   `{"skill", "title", "needs": [{"code", "name"}], "why"}`, chỉ mã và tên.
 
    Bước `read = { service, what, ... }` (`lamp-skills`, `service_read`): mọi
    dịch vụ có việc đọc cố định (không phải `gmail-app` chỉ gửi, các dịch vụ

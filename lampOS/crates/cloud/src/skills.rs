@@ -21,10 +21,11 @@
 use lamp_skills::{Permissions, SkillKind};
 use serde::Serialize;
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 /// `on` answers `skills.list`, `skills.remove`, `skills.off` and `skills.on`, with `LAMP_CLOUD=on`. Anything else: the
 /// kind is one this lamp lacks.
@@ -127,6 +128,10 @@ pub struct Places {
     /// page reads the same switch from its own (`docs/addons.md`), and says
     /// an add-on is off rather than show it working.
     pub addons: bool,
+    /// `lamp-services`' admin socket, asked once a list which services are
+    /// linked, for each row's `needs_link` and the [`NEEDS_LINK_KIND`]
+    /// event, with [`LINK_ENVIRONMENT`] on; none without it.
+    pub link: Option<PathBuf>,
 }
 
 impl Places {
@@ -140,8 +145,133 @@ impl Places {
             off: "/var/lib/lampos-skills-state/off".into(),
             manage: lamp_skills::package::MANAGE_SOCKET.into(),
             addons: std::env::var(lamp_skills::ADDONS_ENVIRONMENT).is_ok_and(|value| value == "on"),
+            link: link_on_from(std::env::var(LINK_ENVIRONMENT).ok().as_deref())
+                .then(|| crate::services::ADMIN_SOCKET.into()),
         }
     }
+}
+
+/// `on` tells the app a skill that needs a connector not linked (App
+/// Only's proposal on #6059): `skills.list` rows carry `needs_link`, and an
+/// install or an app make that lands one sends [`NEEDS_LINK_KIND`]. Off
+/// unless set.
+pub const LINK_ENVIRONMENT: &str = "LAMP_SKILL_LINK_APP";
+
+/// Whether `value`, [`LINK_ENVIRONMENT`] as set or not, is on: `on` only.
+pub fn link_on_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// The unasked event on the lamp's account channel: `{"skill", "title",
+/// "needs": [{"code", "name"}], "why": "installed" | "made"}`, codes and
+/// names only.
+pub const NEEDS_LINK_KIND: &str = "skills.needs_link";
+
+/// How long a list waits for `lamp-services` to say what is linked: it
+/// answers from memory, and the broker's loop waits on it.
+pub const LINK_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The most events kept waiting for the broker; the oldest go first.
+const TOLD_MOST: usize = 8;
+/// The most app makes remembered as told, so a polled `skills.made` is
+/// told once.
+const MADE_TOLD_MOST: usize = 32;
+
+/// Events waiting for the broker's loop ([`take_told`]).
+static TOLD: Mutex<VecDeque<Value>> = Mutex::new(VecDeque::new());
+/// The app makes already told, by request id.
+static MADE_TOLD: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+
+/// The codes linked now, from `lamp-services`' admin `list` at `socket`;
+/// none when it can't be told (not running, no answer in [`LINK_WAIT`]).
+/// An expired link is still linked: a read renews it.
+pub fn linked_codes(socket: &Path) -> Option<Vec<String>> {
+    let reply = crate::services::ask(socket, &json!({"op": "list"}), LINK_WAIT).ok()?;
+    Some(
+        reply
+            .get("connected")?
+            .as_array()?
+            .iter()
+            .filter_map(|entry| entry.get("code")?.as_str().map(str::to_owned))
+            .collect(),
+    )
+}
+
+/// The services of `services` not in `linked`, `[{"code", "name"}]`, as
+/// `lamp_voice::made_skill::needs_link` tells them: either Gmail code is
+/// linked by the other, as `lamp-services` reads it.
+pub fn needs_of(services: &[String], linked: &[String]) -> Vec<Value> {
+    services
+        .iter()
+        .filter(|code| {
+            !linked.iter().any(|linked| {
+                linked == *code
+                    || matches!(
+                        (code.as_str(), linked.as_str()),
+                        ("gmail", "gmail-app") | ("gmail-app", "gmail")
+                    )
+            })
+        })
+        .map(|code| json!({"code": code, "name": lamp_services::spoken::name(code)}))
+        .collect()
+}
+
+/// [`NEEDS_LINK_KIND`]'s data, kept for the broker's loop.
+fn tell(skill: &str, title: &str, needs: &Value, why: &str) {
+    if let Ok(mut told) = TOLD.lock() {
+        if told.len() >= TOLD_MOST {
+            told.pop_front();
+        }
+        told.push_back(json!({"skill": skill, "title": title, "needs": needs, "why": why}));
+    }
+}
+
+/// The events waiting, oldest first, for the broker's loop to send.
+pub fn take_told() -> Vec<Value> {
+    TOLD.lock()
+        .map(|mut told| told.drain(..).collect())
+        .unwrap_or_default()
+}
+
+/// An installed skill's row in `page` (an install's answer): told once,
+/// `why: "installed"`, when it carries `needs_link`.
+fn note_installed(page: &Value, name: &str) {
+    let row = page["skills"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|row| row["name"] == name);
+    if let Some(row) = row
+        && row["needs_link"]
+            .as_array()
+            .is_some_and(|needs| !needs.is_empty())
+    {
+        let title = row["title"].as_str().unwrap_or(name);
+        tell(name, title, &row["needs_link"], "installed");
+    }
+}
+
+/// `skills.made`'s answer, `told`: a made skill that needs a service not
+/// linked is told once a make, `why: "made"`, however often the app asks.
+pub fn note_made(told: &Value) {
+    let (Some(name), Some(id)) = (told["name"].as_str(), told["request_id"].as_str()) else {
+        return;
+    };
+    if told["state"] == "not_kept" || told["needs_link"].as_array().is_none_or(Vec::is_empty) {
+        return;
+    }
+    let Ok(mut made) = MADE_TOLD.lock() else {
+        return;
+    };
+    if made.iter().any(|told| told == id) {
+        return;
+    }
+    if made.len() >= MADE_TOLD_MOST {
+        made.pop_front();
+    }
+    made.push_back(id.to_owned());
+    drop(made);
+    tell(name, name, &told["needs_link"], "made");
 }
 
 /// What the page says of an add-on while add-ons are off on this lamp.
@@ -375,6 +505,15 @@ pub struct Listed {
     /// the "Made on this lamp" group; left out otherwise.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub written: bool,
+    /// The linked services its `[permissions] services` names, by code;
+    /// not said itself.
+    #[serde(skip)]
+    pub services: Vec<String>,
+    /// Those not linked now, `[{"code", "name"}]`, with
+    /// [`LINK_ENVIRONMENT`] on: the app opens that connector's Connect.
+    /// Left out when all are linked, or when `lamp-services` can't say.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub needs_link: Option<Vec<Value>>,
 }
 
 /// `skills.list`'s reply: `{"version", "skills", "left_out"}`, the skills
@@ -410,6 +549,17 @@ pub fn list(places: &Places) -> Result<Value, String> {
     rows.sort_by(|a, b| (a.group, &a.name).cmp(&(b.group, &b.name)));
     let left_out = rows.len().saturating_sub(MOST_SKILLS);
     rows.truncate(MOST_SKILLS);
+    // What is linked, asked once a list and only when a row names a
+    // service; `lamp-services` not telling leaves every `needs_link` out.
+    if let Some(socket) = &places.link
+        && rows.iter().any(|row| !row.services.is_empty())
+        && let Some(linked) = linked_codes(socket)
+    {
+        for row in &mut rows {
+            let needs = needs_of(&row.services, &linked);
+            row.needs_link = (!needs.is_empty()).then_some(needs);
+        }
+    }
     Ok(json!({"version": VERSION, "skills": rows, "left_out": left_out}))
 }
 
@@ -553,8 +703,21 @@ fn changed(
     request: &Value,
     within: std::time::Duration,
 ) -> Result<Value, String> {
-    match ask_helper(&places.manage, request, within) {
-        Ok(said) => eprintln!("lamp-cloud: {kind} from the app: {said}"),
+    changed_said(places, kind, request, within).map(|(_, page)| page)
+}
+
+/// [`changed`], with what the helper said it did.
+fn changed_said(
+    places: &Places,
+    kind: &str,
+    request: &Value,
+    within: std::time::Duration,
+) -> Result<(String, Value), String> {
+    let said = match ask_helper(&places.manage, request, within) {
+        Ok(said) => {
+            eprintln!("lamp-cloud: {kind} from the app: {said}");
+            said
+        }
         Err(Asked::Refused(why)) => {
             eprintln!("lamp-cloud: {kind} from the app refused: {why}");
             return Err(cut(&one_line(&why), WHY_MOST));
@@ -563,8 +726,8 @@ fn changed(
             eprintln!("lamp-cloud: {kind}: the manage helper did not answer: {error}");
             return Err(NOT_CHANGED.to_owned());
         }
-    }
-    list(places)
+    };
+    list(places).map(|page| (said, page))
 }
 
 /// What the app is told when the manage helper can't be reached or does
@@ -631,7 +794,20 @@ pub fn install(places: &Places, data: &Value) -> Result<Value, String> {
     if let Some(why) = asked.refused() {
         return Err(why.to_owned());
     }
-    changed(places, "skills.install", &asked.request(), INSTALL_TIMEOUT)
+    let (said, page) = changed_said(places, "skills.install", &asked.request(), INSTALL_TIMEOUT)?;
+    // The skill put on, by the entry's name or the helper's "installed
+    // NAME" / "replaced NAME": told to the app when it needs a connector.
+    if places.link.is_some()
+        && let Some(name) = asked.name.map(str::to_owned).or_else(|| {
+            let mut words = said.split_whitespace();
+            matches!(words.next(), Some("installed" | "replaced"))
+                .then(|| words.next().map(str::to_owned))
+                .flatten()
+        })
+    {
+        note_installed(&page, &name);
+    }
+    Ok(page)
 }
 
 /// Why the manage helper did not remove or install a skill.
@@ -771,6 +947,8 @@ fn row(
         may_use: may_use(&permissions),
         uploaded,
         written,
+        services: permissions.services.keys().cloned().collect(),
+        needs_link: None,
         name,
     }
 }
@@ -877,6 +1055,7 @@ pub mod tests {
             manage: root.join("m.sock"),
             store: true,
             addons: false,
+            link: None,
         }
     }
 
@@ -1914,6 +2093,15 @@ pub mod tests {
 
     /// A Desk tutor of `places`' own packed, signed with `key` or not.
     fn tutor_package(places: &Places, key: Option<&ring::signature::Ed25519KeyPair>) -> Vec<u8> {
+        tutor_package_with(places, key, "body = true")
+    }
+
+    /// [`tutor_package`] with `permissions` as its `[permissions]`.
+    fn tutor_package_with(
+        places: &Places,
+        key: Option<&ring::signature::Ed25519KeyPair>,
+        permissions: &str,
+    ) -> Vec<u8> {
         let source = places.folder.with_file_name("source").join("desk-tutor");
         skill(
             &Places {
@@ -1923,7 +2111,7 @@ pub mod tests {
             "desk-tutor",
             "Desk tutor",
             "",
-            "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nbody = true",
+            &format!("kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\n{permissions}"),
         );
         let out = places
             .folder
@@ -2054,6 +2242,154 @@ pub mod tests {
                 !store_gates(cloud, page, store),
                 "{cloud:?} {page:?} {store:?}"
             );
+        }
+    }
+
+    /// The [`NEEDS_LINK_KIND`] events waiting for `skill`, taken; the
+    /// others' left for their own tests.
+    fn told_of(skill: &str) -> Vec<Value> {
+        let mut told = TOLD.lock().unwrap();
+        let (mine, others): (Vec<Value>, Vec<Value>) =
+            told.drain(..).partition(|event| event["skill"] == skill);
+        told.extend(others);
+        mine
+    }
+
+    fn needs_link_of<'a>(reply: &'a Value, name: &str) -> Option<&'a Value> {
+        reply["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["name"] == name)
+            .unwrap()
+            .get("needs_link")
+    }
+
+    /// #6059: a row whose `[permissions] services` names a service not
+    /// linked carries `needs_link`, as the app's made skill's; one with
+    /// all linked (either Gmail code links the other), none named, the
+    /// switch off or `lamp-services` not there carries none, and the list
+    /// is answered all the same.
+    #[test]
+    fn a_row_needing_a_service_not_linked_says_so_and_the_list_never_fails() {
+        use crate::services::tests::admin;
+        let mut places = places("link-list");
+        skill(
+            &places,
+            "dance",
+            "Dance",
+            "",
+            "kind = \"core\"\n[permissions]\nbody = true",
+        );
+        skill(
+            &places,
+            "mail-morning",
+            "Mail morning",
+            "",
+            "kind = \"installable\"\n[permissions]\nspeak = true\n\
+             services = { gmail = \"read\", google_calendar = \"read\" }",
+        );
+        let calendar =
+            admin(r#"{"ok":true,"connected":[{"code":"google_calendar","account":"a@b.c"}]}"#);
+        places.link = Some(calendar.socket());
+        let reply = list(&places).unwrap();
+        assert_eq!(
+            needs_link_of(&reply, "mail-morning"),
+            Some(&json!([{"code": "gmail", "name": "Gmail"}])),
+            "{reply}"
+        );
+        assert_eq!(needs_link_of(&reply, "dance"), None, "{reply}");
+        assert_eq!(calendar.lines.lock().unwrap().len(), 1, "asked once a list");
+        let both =
+            admin(r#"{"ok":true,"connected":[{"code":"gmail-app"},{"code":"google_calendar"}]}"#);
+        places.link = Some(both.socket());
+        assert_eq!(needs_link_of(&list(&places).unwrap(), "mail-morning"), None);
+        let reply_off = {
+            places.link = None;
+            list(&places).unwrap()
+        };
+        places.link = Some(places.folder.with_file_name("no-services.sock"));
+        let gone = list(&places).unwrap();
+        assert_eq!(needs_link_of(&gone, "mail-morning"), None);
+        assert_eq!(
+            gone, reply_off,
+            "lamp-services away: the page as with the switch off"
+        );
+        assert_eq!(names(&gone), ["dance", "mail-morning"]);
+    }
+
+    /// #6059: an install of a skill that reads Gmail, Gmail not linked,
+    /// tells the app once, `why: "installed"`; with Gmail linked, nothing.
+    #[test]
+    fn an_install_needing_a_service_not_linked_tells_the_app_once() {
+        use crate::services::tests::admin;
+        for (name, linked, told) in [
+            ("link-install", r#"{"ok":true,"connected":[]}"#, 1),
+            (
+                "link-install-linked",
+                r#"{"ok":true,"connected":[{"code":"gmail"}]}"#,
+                0,
+            ),
+        ] {
+            let mut places = places(name);
+            let services = admin(linked);
+            places.link = Some(services.socket());
+            let probe = Places {
+                folder: places.folder.with_file_name("probe"),
+                ..places.clone()
+            };
+            fs::create_dir_all(&probe.folder).unwrap();
+            let key = ring::signature::Ed25519KeyPair::from_seed_unchecked(&[7; 32]).unwrap();
+            let bytes = tutor_package_with(
+                &probe,
+                Some(&key),
+                "body = true\nservices = { gmail = \"read\" }",
+            );
+            store(&places, vec![ok(&bytes)]);
+            let reply = install(&places, &json!({"url": URL})).unwrap();
+            assert_eq!(names(&reply), ["desk-tutor"], "{name}");
+            let events = told_of("desk-tutor");
+            assert_eq!(events.len(), told, "{name}: {events:?}");
+            if told == 1 {
+                assert_eq!(
+                    events[0],
+                    json!({"skill": "desk-tutor", "title": "Desk tutor",
+                        "needs": [{"code": "gmail", "name": "Gmail"}], "why": "installed"})
+                );
+            }
+        }
+    }
+
+    /// #6059: an app make that needs a service not linked is told once a
+    /// make, however often the app asks `skills.made`; one not kept, or
+    /// needing nothing, is never told.
+    #[test]
+    fn an_app_make_needing_a_service_is_told_once() {
+        let made = json!({"request_id": "r-link-1", "state": "on", "name": "inbox-peek",
+            "needs_link": [{"code": "gmail", "name": "Gmail"}]});
+        note_made(&made);
+        note_made(&made);
+        assert_eq!(
+            told_of("inbox-peek"),
+            [json!({"skill": "inbox-peek", "title": "inbox-peek",
+                "needs": [{"code": "gmail", "name": "Gmail"}], "why": "made"})]
+        );
+        for told in [
+            json!({"request_id": "r-link-2", "state": "not_kept", "name": "inbox-peek",
+                "needs_link": [{"code": "gmail", "name": "Gmail"}]}),
+            json!({"request_id": "r-link-3", "state": "on", "name": "inbox-peek", "needs_link": []}),
+            json!({"request_id": "r-link-4", "state": "on", "name": "inbox-peek"}),
+        ] {
+            note_made(&told);
+        }
+        assert!(told_of("inbox-peek").is_empty());
+    }
+
+    #[test]
+    fn the_link_switch_is_on_only_with_on() {
+        assert!(link_on_from(Some("on")));
+        for value in [None, Some("off"), Some("ON"), Some("")] {
+            assert!(!link_on_from(value), "{value:?}");
         }
     }
 }

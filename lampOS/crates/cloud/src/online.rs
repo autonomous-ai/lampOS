@@ -585,6 +585,9 @@ async fn session(
     let mut onboarding_step = lamp
         .onboarding_done()
         .map(crate::onboarding_step::Steps::new);
+    // A skill that needs a connector not linked, told to the app
+    // (`crate::skills::NEEDS_LINK_KIND`), with its switch.
+    let skill_link = lamp.skills().is_some_and(|places| places.link.is_some());
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // What was last said, so a state is said once.
     let mut said = String::new();
@@ -625,8 +628,20 @@ async fn session(
                             break None;
                         }
                     }
-                    _ = tick.tick(), if skill_lines || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() => {
+                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() => {
                         let me = identity.borrow().clone();
+                        // A skill installed or made that needs a connector
+                        // not linked (#6059): only while connected, best
+                        // effort, codes and names only.
+                        if connected && skill_link {
+                            for data in crate::skills::take_told() {
+                                let event = me
+                                    .data(&now(), crate::skills::NEEDS_LINK_KIND, &Ok(Some(data)))
+                                    .to_string();
+                                let took = handed.publish(&client, account.fd_channel.as_str(), event, None);
+                                say.line(&format!("{}: {}", crate::skills::NEEDS_LINK_KIND, if took { "handed to the client" } else { "not handed to the client, not tried again" }));
+                            }
+                        }
                         // Only while connected: the app asks `state` on its
                         // screen's open for what it missed.
                         if connected
