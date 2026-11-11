@@ -5907,7 +5907,8 @@ pub struct Engine {
     /// Each resting skill's last nudge and how many in a row went unnoticed.
     nudges: HashMap<String, Nudge>,
     /// Until when each snoozed skill starts nothing itself, by skill: in
-    /// memory only, so a restart forgets it (#1685).
+    /// memory, kept through a short restart beside the holds
+    /// ([`holds::Limits`]); a reboot forgets it (#1685).
     snoozed: HashMap<String, u64>,
     /// The skills turned off, by name, until they are asked for again.
     off: BTreeSet<String>,
@@ -5963,8 +5964,10 @@ pub struct Engine {
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
-/// it within its while, and the unnoticed runs in a row before it.
-#[derive(Clone, Copy, Debug, Default)]
+/// it within its while, and the unnoticed runs in a row before it. Kept
+/// across a short restart with the holds ([`holds::Limits`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, serde::Serialize)]
+#[serde(default)]
 struct Nudge {
     at_us: u64,
     within_us: u64,
@@ -6181,8 +6184,10 @@ impl Engine {
     /// The long holds kept in `file` across a short restart of the program
     /// ([`holds`], `docs/skills.md`, "A hold kept across a restart"), on the
     /// boot `boot`: what the file keeps of this boot is read now, and taken
-    /// back at the first load of skills; from then on [`Engine::keep_holds`]
-    /// writes them. How many holds were read is returned.
+    /// back at the first load of skills; the nudges' limits kept with them
+    /// ([`holds::Limits`]) are taken back now. From then on
+    /// [`Engine::keep_holds`] writes both. How many holds were read is
+    /// returned.
     pub fn keep_holds_in(
         &mut self,
         file: PathBuf,
@@ -6192,55 +6197,156 @@ impl Engine {
         let keeper = holds::Keeper::new(file, boot);
         let read = keeper.read(now_us);
         self.holds = Some(keeper);
-        let read = read.map_err(|error| error.to_string())?;
+        let mut read = read.map_err(|error| error.to_string())?;
         let count = read.as_ref().map_or(0, |read| read.holds.len());
+        if let Some(read) = &mut read {
+            self.restore_limits(std::mem::take(&mut read.limits), now_us);
+        }
         self.restoring = read;
         self.restore_holds();
         Ok(count)
     }
 
-    /// The long holds written where they are kept ([`Engine::keep_holds_in`]),
-    /// when they changed, or every [`holds::WRITE_EVERY_US`] while any is
-    /// kept. The program calls it at each turn of its loop.
+    /// The long holds and the nudges' limits written where they are kept
+    /// ([`Engine::keep_holds_in`]), when they changed, or every
+    /// [`holds::WRITE_EVERY_US`] while any hold is kept. The program calls
+    /// it at each turn of its loop.
     pub fn keep_holds(&mut self, now_us: u64) {
         if self.holds.is_none() {
             return;
         }
         let now = self.holds_now(now_us);
+        let limits = self.limits_now(now_us);
         if let Some(keeper) = &mut self.holds {
-            keeper.keep(now, now_us);
+            keeper.keep(now, limits, now_us);
+        }
+    }
+
+    /// The nudges' limits that live in memory only, as they stand at
+    /// `now_us`, to keep beside the holds: each skill's runs today (for its
+    /// `most_a_day`), its last run in its group, its snooze still to end and
+    /// its `[rest]` (a nudge still being judged, runs nobody noticed, or a
+    /// rest still to end), and each group's runs within the hour and members
+    /// still waiting for it. What no longer holds anything back is left out.
+    fn limits_now(&self, now_us: u64) -> holds::Limits {
+        let day = day_of(self.clock, now_us);
+        let mut limits = holds::Limits::default();
+        for (name, (on, count)) in &self.day_runs {
+            if *on == day {
+                limits.skills.entry(name.clone()).or_default().day = Some((*on, *count));
+            }
+        }
+        for (name, at) in &self.group_ran {
+            limits.skills.entry(name.clone()).or_default().ran_us = Some(*at);
+        }
+        for (name, until) in &self.snoozed {
+            if now_us < *until {
+                limits
+                    .skills
+                    .entry(name.clone())
+                    .or_default()
+                    .snoozed_until_us = Some(*until);
+            }
+        }
+        for (name, nudge) in &self.nudges {
+            if !nudge.judged || nudge.ignored > 0 || now_us < nudge.resting_until_us {
+                limits.skills.entry(name.clone()).or_default().rest = Some(*nudge);
+            }
+        }
+        for (group, began) in &self.group_runs {
+            let began: Vec<u64> = began
+                .iter()
+                .copied()
+                .filter(|at| now_us.saturating_sub(*at) < HOUR_US)
+                .collect();
+            if !began.is_empty() {
+                limits.groups.entry(group.clone()).or_default().began_us = began;
+            }
+        }
+        for (group, waits) in &self.budget_waits {
+            let waits: BTreeMap<String, (u64, u64)> = waits
+                .iter()
+                .filter(|(_, (_, last))| now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US)
+                .map(|(name, wait)| (name.clone(), *wait))
+                .collect();
+            if !waits.is_empty() {
+                limits.groups.entry(group.clone()).or_default().waits = waits;
+            }
+        }
+        limits
+    }
+
+    /// The nudges' limits read at the start taken back ([`holds::Limits`]):
+    /// each only adds to what the engine holds already, never takes from it
+    /// (the later snooze or rest, every group run), so a restart never
+    /// brings a nudge sooner. A day's count of another day than today's is
+    /// never counted ([`day_of`]), and is not written again. A member
+    /// waiting for its group's hour waits from when it began to: when it was
+    /// last held back is written on the cadence only, so it is taken as
+    /// `now_us`, and the wait is live until its next message says.
+    fn restore_limits(&mut self, limits: holds::Limits, now_us: u64) {
+        let (skills, groups) = (limits.skills.len(), limits.groups.len());
+        for (name, kept) in limits.skills {
+            if let Some((on, count)) = kept.day {
+                let now = self.day_runs.entry(name.clone()).or_insert((on, 0));
+                if now.0 == on {
+                    now.1 = now.1.max(count);
+                }
+            }
+            if let Some(at) = kept.ran_us {
+                let now = self.group_ran.entry(name.clone()).or_insert(at);
+                *now = (*now).max(at);
+            }
+            if let Some(until) = kept.snoozed_until_us {
+                let now = self.snoozed.entry(name.clone()).or_insert(until);
+                *now = (*now).max(until);
+            }
+            if let Some(rest) = kept.rest {
+                self.nudges.entry(name).or_insert(rest);
+            }
+        }
+        for (group, kept) in limits.groups {
+            if !kept.began_us.is_empty() {
+                let began = self.group_runs.entry(group.clone()).or_default();
+                began.extend(kept.began_us);
+                began.make_contiguous().sort_unstable();
+                let mut seen = std::collections::VecDeque::with_capacity(began.len());
+                for at in began.drain(..) {
+                    if seen.back() != Some(&at) {
+                        seen.push_back(at);
+                    }
+                }
+                *began = seen;
+            }
+            if !kept.waits.is_empty() {
+                let waits = self.budget_waits.entry(group).or_default();
+                for (name, (first, _)) in kept.waits {
+                    waits.entry(name).or_insert((first, now_us));
+                }
+            }
+        }
+        if skills + groups > 0 {
+            eprintln!(
+                "lamp-skills: the nudges' limits taken back from before the restart: {skills} skills, {groups} groups"
+            );
         }
     }
 
     /// The holds to keep at `now_us`: each [`kept_hold`] trigger that holds,
-    /// of a skill nothing a restart forgets holds back now (a snooze, a rest
-    /// or a nudge still being judged, its day's most, a run of its group
-    /// within the hour, a word that stands in for its group still to come,
-    /// a read of a service under way or made today: [`read_spent`]).
-    /// Such a hold is not kept, and begins again after a restart, as before:
-    /// a hold taken back never brings a nudge sooner than a lamp that never
-    /// restarted.
+    /// of a skill nothing a restart forgets holds back now (a word that
+    /// stands in for its group still to come, a read of a service under way
+    /// or made today: [`read_spent`]). Such a hold is not kept, and begins
+    /// again after a restart, as before. A skill its nudges' limits hold
+    /// back (a snooze, a rest or a nudge still being judged, its day's most,
+    /// its group's hour or gap) keeps its hold: the limits are kept with it
+    /// ([`Engine::limits_now`]) and hold it back after the restart as
+    /// before, so a hold taken back never brings a nudge sooner than a lamp
+    /// that never restarted.
     fn holds_now(&self, now_us: u64) -> Vec<holds::Hold> {
-        let day = day_of(self.clock, now_us);
         let mut kept = Vec::new();
         for skill in &self.skills {
             let name = &skill.name;
-            let held_back = self.snoozed.get(name).is_some_and(|until| now_us < *until)
-                || self
-                    .nudges
-                    .get(name)
-                    .is_some_and(|nudge| !nudge.judged || now_us < nudge.resting_until_us)
-                || skill.most_a_day.is_some_and(|most| {
-                    self.day_runs
-                        .get(name)
-                        .is_some_and(|(on, count)| *on == day && *count >= most)
-                })
-                || skill.budget.as_ref().is_some_and(|(group, _)| {
-                    self.group_runs.get(group).is_some_and(|began| {
-                        began.iter().any(|at| now_us.saturating_sub(*at) < HOUR_US)
-                    })
-                })
-                || self.stood_in_by(name, now_us).is_some()
+            let held_back = self.stood_in_by(name, now_us).is_some()
                 || read_spent(&self.reads, self.clock, name, now_us).is_some();
             if held_back {
                 continue;

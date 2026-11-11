@@ -1395,16 +1395,44 @@ trong lần ngồi.
   trigger khác (`follows`, `instead_of`, `yields_to`,
   `stands_in_for_group`): các lời nhắc sức khỏe (A sip of water, Rest your
   eyes, Stand up, Stretch break, Wind down, Comfort break) và tương tự.
-- **Không giữ khi lần khởi động lại sẽ quên điều đang cản kỹ năng.** Tạm
-  hoãn, nghỉ sau các lời nhắc không ai để ý hay một lời nhắc còn đang được
-  xét, đã tới `most_a_day` của ngày, một lần chạy của nhóm `[budget]` trong
-  giờ qua, một từ `stands_in_for_group` còn chờ, hay một lần đọc dịch vụ
-  đã liên kết còn đang chạy hoặc đã thực hiện trong ngày địa phương này
-  (một lần mỗi ngày, #5288): những thứ này chỉ ở
-  trong bộ nhớ, và lần khởi động lại quên chúng. Khi bất kỳ thứ nào đang
-  cản một kỹ năng, lần giữ của nó không được ghi, và bắt đầu lại sau lần
-  khởi động lại, như trước. Vậy một lần giữ được lấy lại không bao giờ làm
-  lời nhắc tới sớm hơn một đèn chưa từng khởi động lại.
+- **Giữ cả các giới hạn của lời nhắc.** Những gì cản một lời nhắc nằm
+  trong bộ nhớ, nên cùng tệp giữ chúng bên cạnh các lần giữ (`limits`,
+  phiên bản 2 của tệp): theo kỹ năng, số lần chạy trong ngày địa phương này
+  cho `most_a_day` (kèm ngày đó), lần chạy cuối như một thành viên của nhóm
+  (thứ một lệnh dừng không có `all` dừng), tạm hoãn còn chưa hết, và
+  `[rest]` (lời nhắc cuối, còn đang được xét hay không và những gì đã thấy
+  người ta để ý tới lúc đó, số lời nhắc liên tiếp không ai để ý, và nghỉ tới
+  lúc nào); theo nhóm `[budget]`, các lần chạy trong giờ qua và các thành
+  viên còn chờ tới lượt (ai tới trước được trước). Mọi thời điểm trong đó
+  theo đồng hồ đơn điệu, nên vẫn đúng sau lần khởi động lại. Ghi ngay khi
+  bất kỳ thứ nào đổi, trừ lúc một thành viên đang chờ bị cản lần cuối: thứ
+  đó đổi ở mỗi tin nhắn nó chờ, nên chỉ được ghi cùng phần còn lại (mỗi 30 s
+  khi còn giữ một lần giữ), và một lượt chờ được lấy lại tính như bị cản
+  lúc khởi động lại (test
+  `a_member_waiting_out_the_group_gap_is_written_on_the_cadence`); thứ không
+  còn cản gì (tạm hoãn hay nghỉ đã hết, lần
+  chạy của nhóm đã quá một giờ, số lần của ngày khác) bị bỏ ra. `daily.json`
+  chỉ giữ các cơ hội hằng ngày nào đã dùng, không có những thứ này, nên
+  không giữ trùng. Các giới hạn được lấy lại khi khởi động chỉ trong cùng
+  lần khởi động máy, mỗi thứ chỉ thêm vào những gì engine đang có (tạm hoãn
+  hay nghỉ muộn hơn, mọi lần chạy của nhóm); số lần của một ngày khác hôm
+  nay không bao giờ được tính, và không được ghi lại. Khoảng xét của một
+  lời nhắc bị lỡ trong lần khởi động lại chỉ có thể lỡ một dấu hiệu người ta
+  để ý, nên nó nghỉ không muộn hơn. Chỗ trả lại của `[budget]
+  give_back_unsaid` không được giữ: một câu nói kết thúc mà không ai nghe
+  sau lần khởi động lại không trả lại gì, muộn hơn, không bao giờ sớm hơn.
+- **Kỹ năng đang bị cản vẫn giữ lần giữ.** Vậy một kỹ năng đang bị tạm
+  hoãn, nghỉ hay một lời nhắc còn đang được xét, `most_a_day` của ngày, hay
+  giờ hoặc khoảng cách của nhóm cản cũng giữ lần giữ của nó, và các giới
+  hạn đã giữ cản nó sau lần khởi động lại đúng như trước: sau khi Rest your
+  eyes chạy (45 phút), lần giữ của sip, Stretch break, Stand up và Comfort
+  break được giữ qua một bản cập nhật trong khoảng cách 30 phút của nhóm, và
+  mỗi cái vẫn chờ hết khoảng cách đó. Chỉ một từ `stands_in_for_group` còn
+  chờ, hay một lần đọc dịch vụ đã liên kết còn đang chạy hoặc đã thực hiện
+  trong ngày địa phương này (một lần mỗi ngày, #5288), vẫn khiến lần giữ
+  của kỹ năng không được ghi, vì chúng không được giữ; nó bắt đầu lại sau
+  lần khởi động lại, như trước. Vậy một lần giữ được lấy lại không bao giờ
+  làm lời nhắc tới sớm hơn một đèn chưa từng khởi động lại.
 - **Lấy lại khi khởi động.** Đọc lúc khởi động, lấy lại ở lần nạp kỹ năng
   đầu tiên, chỉ từ tệp của cùng lần khởi động máy, ghi không muộn hơn bây
   giờ, cho một kỹ năng đã nạp mà trigger ở vị trí đó vẫn thuộc loại được
@@ -1414,10 +1442,14 @@ trong lần ngồi.
   động lại). Journal nói `<skill>: its hold taken back from before the
   restart, held N s`. Tin nhắn kế tiếp của topic trigger phải giữ, không thì
   lần giữ bị bỏ ngay, bất kể `gap`, và bắt đầu lại từ tin nhắn kế tiếp có
-  giữ; một tin nhắn có giữ thì đi tiếp từ lúc bắt đầu đã giữ. Khởi động lại
-  máy, tệp của lần khởi động khác, hay tệp không đọc được thì không giữ gì.
-  Số lần trong ngày, giờ của nhóm, `[rest]` và tạm hoãn vẫn ở trong bộ nhớ
-  như trước; `off` và journal hằng ngày được giữ như cũ.
+  giữ; một tin nhắn có giữ thì đi tiếp từ lúc bắt đầu đã giữ. Journal nói
+  `the nudges' limits taken back from before the restart: N skills, M
+  groups` khi có lấy lại. Khởi động lại máy, tệp của lần khởi động khác,
+  hay tệp không đọc được thì không giữ gì, cả lần giữ lẫn giới hạn. Một
+  chương trình từ trước khi có giới hạn từ chối tệp phiên bản 2, nên lần
+  giữ của một kỹ năng đang bị cản không bao giờ được lấy lại mà thiếu
+  chúng; tệp phiên bản 1 được đọc mà không có giới hạn nào. `off` và journal
+  hằng ngày được giữ như cũ.
 - **Danh sách công cụ khi khởi động.** Thư mục được giữ qua lần khởi động
   lại cũng giữ `tools.json` của lần chạy trước, thứ giọng nói đọc mỗi khi
   mở phiên. Nên chương trình xóa nó ngay đầu tiên khi khởi động, trước khi
@@ -1432,9 +1464,13 @@ Kiểm thử (`crates/skills/tests/it/holds.rs`):
 `a_hold_begins_again_past_its_gap_on_another_boot_or_edited`,
 `a_hold_taken_back_is_dropped_by_a_first_message_that_does_not_hold`,
 `a_hold_that_ran_keeps_its_cooldown_across_a_restart`,
-`a_snoozed_skills_hold_is_not_kept`,
+`a_snoozed_skill_stays_snoozed_across_a_restart`,
+`after_rest_your_eyes_ran_the_sips_hold_is_kept_and_waits_the_group_gap`,
+`a_skill_at_its_days_most_stays_at_its_most_after_a_restart`,
+`another_boot_restores_nothing`, `another_days_count_is_dropped`,
 `a_reads_hold_is_not_kept_once_its_read_came_due_today`,
 `a_kept_folders_tools_list_is_written_again_at_the_start`; của chính tệp
-trong `src/holds.rs` (`a_failed_write_leaves_no_hold_to_take_back`). Bản
+trong `src/holds.rs` (`a_failed_write_leaves_no_hold_to_take_back`,
+`limits_written_at_a_change_and_an_older_file_read_without_them`). Bản
 đầy đủ ở [skills.md](../skills.md),
 "A hold kept across a restart".

@@ -10663,8 +10663,11 @@ fn the_program_keeps_a_skill_off_across_a_restart() {
     assert_eq!(fs::read_to_string(root.join("state/off")).unwrap(), "");
 }
 
-/// #1685, the program: a snooze is in memory only, so after a restart the
-/// skill nudges again, and nothing was written.
+/// #1685, the program: a snooze is kept only beside the holds in the
+/// runtime folder, through a short restart on the same boot ("A hold kept
+/// across a restart"); a start with another runtime folder, as after a
+/// reboot, forgets it, and the skill nudges again. Nothing was written to
+/// state.
 #[test]
 fn the_program_forgets_a_snooze_at_a_restart() {
     // Short: a socket's whole path has to fit in 103 bytes.
