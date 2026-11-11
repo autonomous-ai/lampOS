@@ -2127,6 +2127,22 @@ order is kept. A written turn is the same from the chat on.
   not 429 or 5xx) with kept calls in the history is asked once more
   without them, in words only (`without_kept_calls`, the Reviewer-lead's
   P2 on #5018). Off, the history is as before, byte for byte.
+  The system message also carries the scope's thread text, its exchanges
+  of the last ten minutes as "Person: …"/"You: …" lines after a note
+  ("A moment ago…", `Thread::recall_for`), so without more each exchange
+  in the history is told twice (#6218: a long talk's prompt near 14k
+  tokens). With `LAMP_HISTORY_SAID_ONCE=on` (off unless set) the thread
+  text leaves out every exchange the history of the same request tells,
+  matched by its place in the thread as the history picked it
+  (`Thread::recent_picks_for`, `Thread::recent_picks_with_room_lines`,
+  `Thread::recall_for_leaving_out`): only the scope's exchanges the
+  history did not take stay, after the note for its newest exchange, and
+  with none left there is no thread text; the running summary is still
+  told. A scope keeps twelve exchanges, as many as the history takes, so
+  the thread text is left only when the room's lines
+  (`LAMP_CONVERSATION_ROOM_LINES_TOLD`) take some of the history's
+  places. Scopes, the withheld name and the byte budget are as with it
+  off; off, the thread text is told whole, byte for byte as before.
 - **A tool call knows whether it was heard.** The engine passes `heard`
   to the tool runner: true in a spoken turn, false in a written one, as the
   Live route does, so a yes to prepared work cannot come in a turn the lamp
