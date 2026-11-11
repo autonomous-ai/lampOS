@@ -2256,7 +2256,9 @@ skill) go on by themselves, and the lamp says each one done. Behind
 
 - **The app tells the page.** `onboarding.page` `{"page": "try" | "add" |
   "create" | null, "added"?: [name], "walk_id"?}`, answered `{}`; `null`
-  closes it; any other page is refused. One page open at a time.
+  closes it; any other page is refused. One page open at a time. A page
+  not done within 10 minutes is let go (an app killed before it sent
+  `null`), and nothing is read from the bus while no page is open.
 - **try.** Done by the first Try line run after the page opened: the light
   turned on or to another colour (`light/state`; `how: "turn_blue"` for
   blue, else `"light"`), or a `dance` run done (`skills/events`, a run not
