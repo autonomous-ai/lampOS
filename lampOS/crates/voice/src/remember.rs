@@ -10287,7 +10287,17 @@ impl DaysClient {
         let owner = crate::services::owner_of(lease);
         let theirs = owner.as_deref().or(person);
         let records = self.forget_records_about(about, theirs, until);
-        let contacts = self.forget_contacts_about(about, theirs, until);
+        let (contacts, sent_to) = self
+            .forget_contacts_about(about, theirs, until)
+            .map_or((None, None), |(contacts, sent_to)| {
+                (Some(contacts), Some(sent_to))
+            });
+        // The records sent to a forgotten contact's address went with it
+        // (step 5d on lamp-06c1, 11 Nov): counted with the records.
+        let records = match (records, sent_to) {
+            (Some(records), Some(sent_to)) => Some(records + sent_to),
+            (records, sent_to) => records.or(sent_to),
+        };
         let told = self.forget_kept_about(about, person, until, lease, named);
         contacts_forgotten(records_forgotten(told, records), contacts)
     }
@@ -10327,15 +10337,17 @@ impl DaysClient {
 
     /// `LAMP_SERVICE_CONTACTS`: a known person's mail contacts about
     /// `about` removed in the memory (`service_contacts_forget`), with the
-    /// switch on or off: how many went, `None` with no known person or no
-    /// answer.
-    /// The contacts the voice planned for their waiting writes go too.
+    /// switch on or off: how many went, and how many service records sent
+    /// to a removed address went with them (the memory removes those in the
+    /// same forget); `None` with no known person or no answer.
+    /// The contacts the voice planned for their waiting writes go too, and
+    /// the records it holds sent to a removed address.
     fn forget_contacts_about(
         &self,
         about: &Value,
         person: Option<&str>,
         until: Instant,
-    ) -> Option<u64> {
+    ) -> Option<(u64, u64)> {
         // Asked with the switch off too: contacts saved while it was on stay
         // in the memory until forgotten (Thirteen's P2 on #6122). An older
         // memory answers `unknown_op`, and none are said removed.
@@ -10361,10 +10373,23 @@ impl DaysClient {
         if removed > 0 {
             crate::service_contacts::forgot_about(person);
         }
+        // An older memory names no addresses and removes no records.
+        let addresses: Vec<String> = answer["addresses"]
+            .as_array()
+            .map(|addresses| {
+                addresses
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_lowercase)
+                    .collect()
+            })
+            .unwrap_or_default();
+        crate::service_records::forgot_sent_to(person, &addresses);
+        let sent_to = answer["records"].as_u64().unwrap_or(0);
         eprintln!(
-            "lamp-voice provider: a forget about removed {removed} mail contacts (LAMP_SERVICE_CONTACTS)"
+            "lamp-voice provider: a forget about removed {removed} mail contacts and {sent_to} service records sent to them (LAMP_SERVICE_CONTACTS)"
         );
-        Some(removed)
+        Some((removed, sent_to))
     }
 
     /// `LAMP_SERVICE_RECORDS`: a known person's service records about
@@ -18046,6 +18071,76 @@ mod tests {
         served.join().unwrap();
         // The removed count is the memory's answer to the contacts forget.
         assert_eq!(told["contacts"], 1, "{told}");
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// Step 5d on lamp-06c1 (11 Nov): a contact and a `done` mail sent to
+    /// its address, the mail's words not the forget's. "Forget Tom's
+    /// address" removes the contact, the memory removes the records sent
+    /// to it in the same forget and names the address, and the voice drops
+    /// the copies it holds, so none is told to the model again; a mail to
+    /// another address stays.
+    #[test]
+    fn a_forget_about_a_contact_drops_the_records_sent_to_its_address() {
+        use crate::service_records as records;
+        const OWNER: &str = "p-0123456789abcdef";
+        records::on_for_test(true);
+        records::forgot(None);
+        let mail = |send_id: &str, to: &str| {
+            records::prepared(
+                OWNER,
+                "gmail",
+                &json!({"service":"gmail","action":"send_mail","to":[to],"subject":"Lunch","text":"See you at noon"}),
+                send_id,
+                Instant::now(),
+            );
+            records::settle(send_id, records::Status::Done, "");
+        };
+        mail("send-tom", "tom@example.com");
+        mail("send-other", "other@example.com");
+        assert_eq!(records::held().len(), 2);
+        let (socket, served) = memory("contacts-forget-sent-to", 3, |request| match request["op"]
+            .as_str()
+        {
+            Some("service_records_forget") => json!({"ok":true,"removed":0}),
+            Some("service_contacts_forget") => json!({
+                "ok":true,"removed":1,"records":1,"addresses":["tom@example.com"]
+            }),
+            Some("forget_mark") => json!({"ok":true}),
+            Some("kept") => json!({"ok":true,"entries":[]}),
+            _ => json!({"ok":false}),
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about":"Tom's address"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(OWNER),
+        );
+        assert!(answered, "{told}");
+        served.join().unwrap();
+        let held = records::held();
+        assert!(
+            !held
+                .iter()
+                .any(|record| record.detail.to_string().contains("tom@example.com")),
+            "{held:?}"
+        );
+        assert_eq!(held.len(), 1, "{held:?}");
+        assert!(
+            !records::waiting()
+                .iter()
+                .any(|record| record.detail.to_string().contains("tom@example.com")),
+            "{:?}",
+            records::waiting()
+        );
+        assert_eq!(told["contacts"], 1, "{told}");
+        assert_eq!(told["records"], 1, "{told}");
+        records::on_for_test(false);
+        records::forgot(None);
         drop(client);
         let _ = std::fs::remove_file(&socket);
     }

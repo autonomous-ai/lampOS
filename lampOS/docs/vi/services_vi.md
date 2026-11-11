@@ -2255,6 +2255,11 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   id chủ đã dùng khi lưu (`services::owner_of`; trong phòng riêng là id chủ
   đầu tiên, không phải id của người nói). Quên tất cả cũng xóa mọi bản ghi
   và liên hệ của id chủ đó khi nó không phải id của người nói.
+  Quên một liên hệ thư ("forget Octavia's address") cũng xóa, trong cùng lần
+  quên, mọi bản ghi gửi tới địa chỉ đó (`to`, `cc` hay `bcc`), dù chữ của
+  bản ghi là gì, ở memory và bản sao trong voice, nên một thư `done` được kể
+  cho mô hình (`LAMP_SERVICE_RECORDS_TOLD`) không đưa địa chỉ trở lại; bản
+  ghi đang gửi từ trước bị từ chối. Chúng được đếm cùng các bản ghi đã quên.
   Mỗi lần quên, các thay đổi còn chờ đều bị bỏ: của người đó (hoặc khớp với
   việc đó) rời hàng đợi trước khi lệnh quên được gửi, nên luồng ghi đang chờ
   thử lại không bao giờ ghi chúng sau lần quên, và bản sao trong voice bị xóa
@@ -2264,13 +2269,6 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
 - **Lỗ hổng đã biết (bật trong sản phẩm, 11/11; theo quyết định của chủ đèn,
   phần quên làm sau).** Thấy trên lamp-06c1
   (https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064):
-  - Quên tất cả và quên một người chỉ xóa id bộ nhớ của người nói. Bản ghi
-    và liên hệ được giữ dưới id chủ dịch vụ (`owner_of`), nên khi hai id
-    khác nhau (phòng riêng) chúng vẫn còn. Bản sửa là #6334.
-  - "Quên địa chỉ của X" xóa liên hệ, nhưng một bản ghi gửi thư `done` có
-    chứa địa chỉ đó mà không khớp với lời quên thì vẫn được giữ. Khi bật
-    `LAMP_SERVICE_RECORDS_TOLD`, bản ghi này được báo cho mô hình, và mô hình
-    có thể đọc lại địa chỉ (bước 5d; không có thư nào được gửi).
   - Quên về một việc xóa các bản ghi dịch vụ của nó, nhưng không xóa các
     đoạn trò chuyện về việc đó trong bộ nhớ trò chuyện, nên recall vẫn có
     thể nhắc lại (bước 6).
@@ -2378,12 +2376,10 @@ có địa chỉ nào cho người bạn ấy.
   hệ đã lên kế hoạch cho một lệnh ghi đang chờ; "forget Octavia's address"
   xóa liên hệ đó qua đường quên về một việc, và câu trả lời đếm nó và nói
   thư đã gửi thì vẫn đã gửi.
-  Lỗ hổng đã biết: một bản ghi gửi thư `done` có chứa địa chỉ vẫn còn, và khi
-  bật `LAMP_SERVICE_RECORDS_TOLD` mô hình có thể đọc lại địa chỉ từ đó
-  (lamp-06c1, 11/11, bước 5d); trong phòng riêng, quên tất cả để lại các liên
-  hệ của id chủ cho đến #6334. Cũng trong lần chạy đó, "gửi lại cho họ" khi
-  liên hệ còn giữ thì đọc lại đúng địa chỉ nhưng không chuẩn bị gì (bước 5b,
-  một phần).
+  Bản ghi gửi tới địa chỉ đã quên cũng bị xóa trong cùng lần quên (xem phần
+  bản ghi ở trên). Lỗ hổng đã biết: trên lamp-06c1 (11/11), "gửi lại cho họ"
+  khi liên hệ còn giữ thì đọc lại đúng địa chỉ nhưng không chuẩn bị gì (bước
+  5b, một phần).
 - **Tắt** (hoặc khi `LAMP_SERVICE_RECORDS` tắt), không có gì được lưu, tra
   hay điền vào, và một thư được chuẩn bị đúng như trước.
 
