@@ -222,7 +222,7 @@ owner: "everything is a skill"). Install puts every product skill in
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
 equal, Laugh glance parked out of both): thirty-one folders are installed,
-twenty-two enabled (Bedtime and Morning since #5753; Comfort break is off by its own file, the eight of `PRODUCT_SKILLS_OFF` by install), one of them hidden unless `LAMP_UNPLUG=on`, which the product sets (#5747). Welcome back, Reminders, Task news, Onboarding, Stretch
+twenty-five enabled (Bedtime and Morning since #5753; Comfort break is off by its own file, the five of `PRODUCT_SKILLS_OFF` by install), one of them hidden unless `LAMP_UNPLUG=on`, which the product sets (#5747). Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is on: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's
@@ -244,13 +244,16 @@ the eyes' `LAMP_ACTIVITY=place`: the sitter followed
 by place only, never by a face print. With `room/activity` said, Stretch
 break, already on, also waits while a head is down (reading, writing) and
 lets that sitting's stretch go if they don't look up within its ten minutes.
-Eight core skills waiting for their lamp checks are
+Light show (#1679), a show of slow-changing colours a person asks for,
+comes with the product since #5745, its `light_show` reached through
+`use_skill`. Light scenes and Point the light (#1679) come with the
+product since #5744, asked for by a person only and reached through
+`use_skill` too. Five core skills waiting for their lamp checks are
 installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Music
 sway (#1669), which reads the ears' sound classes, off in the product until
 YAMNet's weights may be shipped (sound-events.md), Light out
 when you leave (#1677, [presence.md](presence.md), which must never take the
-light of someone reading face down), Light scenes, Point the light and Light
-show (#1679),
+light of someone reading face down),
 Smoky air and Dusty air
 (#1684), until they are measured for false alarms on real traces, and
 Feelings (#3691), which needs Mood on (`LAMP_MOOD=on`, trial-only). Install

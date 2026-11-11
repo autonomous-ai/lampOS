@@ -563,6 +563,11 @@ pub const FOUND_BEFORE_A_LOOK: &str =
 pub const CAMERA_NOT_ALLOWED: &str =
     "The owner hasn't allowed this skill's camera; they can allow it in the app.";
 
+/// What the model is told of a call that turns the reading pose toward a
+/// place while the body has no measured gaze (#5766's P2: a factory lamp's
+/// body runs without `--gaze`, and would not turn, saying nothing).
+pub const CANNOT_TURN: &str = "I can't turn toward it: my turn isn't measured yet. Say so in a few words and ask them to move it in front of you; never search for it.";
+
 /// The most looks a search may say it takes: a living thing looks at a few
 /// places and lets it go (CLAUDE.md's rule 8).
 pub const SEARCH_LOOKS_AT_MOST: u32 = 8;
