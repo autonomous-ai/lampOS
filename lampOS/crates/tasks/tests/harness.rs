@@ -7,7 +7,9 @@ use lamp_tasks::harness::{
     WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_engines, parse_machines,
     parse_ps, parse_wait, parse_watch_line, this_computer,
 };
-use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, SESSION_INDEX_FILE, targets_from_machines};
+use lamp_tasks::runtime::{
+    HarnessSwitches, NEW_FOLDER_FILE, SESSION_INDEX_FILE, targets_from_machines,
+};
 use lamp_tasks::session_index;
 use serde_json::{Value, json};
 use std::{
@@ -6099,9 +6101,11 @@ fn indexed(rig: &mut Rig) -> PathBuf {
 /// What `harness show --json` gives of a session by its id, as Harness
 /// 0.6.12 answers it: its name and state among the rest.
 fn shown_as(id: &str, name: &str, state: &str) -> Value {
-    step(json!({"name":name,"id":id,"agent":"Hermes","machine":"lamp","state":state,
+    step(
+        json!({"name":name,"id":id,"agent":"Hermes","machine":"lamp","state":state,
         "startedBy":"you","folder":"/var/lib/lampos-hermes/lamp-tasks","branch":null,
-        "ask":"Find the Christmas dates","answer":"Done.","truncated":false,"tools":1,"next":[]}))
+        "ask":"Find the Christmas dates","answer":"Done.","truncated":false,"tools":1,"next":[]}),
+    )
 }
 
 /// The verbs called, in turn, each with the id it named if any.
@@ -6111,7 +6115,11 @@ fn verbs_named(rig: &Rig) -> Vec<String> {
         .map(|call| {
             let args = call["args"].as_array().unwrap();
             let verb = args[0].as_str().unwrap().to_owned();
-            match args.iter().filter_map(Value::as_str).find(|arg| *arg == AGENT || *arg == OTHER) {
+            match args
+                .iter()
+                .filter_map(Value::as_str)
+                .find(|arg| *arg == AGENT || *arg == OTHER)
+            {
                 Some(id) => format!("{verb} {}", &id[..8]),
                 None => verb,
             }
@@ -6148,10 +6156,15 @@ fn an_older_session_not_listed_is_found_by_its_name_through_the_index() {
     let file = lamp_side(&mut rig, shown_as(AGENT, "Christmas dates", "stopped"));
     let seen = rig
         .cli()
-        .look_session(&launch().target, "the christmas dates one", true)
+        .look_session(&launch().target, "christmas dates", true)
         .unwrap();
     assert_eq!(
-        (seen.state.as_str(), seen.resumed, seen.near, seen.name.as_deref()),
+        (
+            seen.state.as_str(),
+            seen.resumed,
+            seen.near,
+            seen.name.as_deref()
+        ),
         ("idle", Some(true), false, Some("Christmas dates"))
     );
     assert_eq!(
@@ -6160,7 +6173,10 @@ fn an_older_session_not_listed_is_found_by_its_name_through_the_index() {
     );
     // Opened, so used now: later than the 1 000 it was kept with.
     let kept = session_index::read(&file);
-    let entry = kept[MACHINE].iter().find(|entry| entry.id == AGENT).unwrap();
+    let entry = kept[MACHINE]
+        .iter()
+        .find(|entry| entry.id == AGENT)
+        .unwrap();
     assert!(entry.last_used > 1_000, "{entry:?}");
     // Idle: open as it is, nothing reopened.
     let mut rig = Rig::new();
@@ -6184,7 +6200,14 @@ fn an_older_session_not_listed_is_found_by_its_name_through_the_index() {
     );
     assert_eq!(
         verbs_named(&rig),
-        ["machines", "ps", "show 11111111", "--help", "resume 11111111", "reply 11111111"]
+        [
+            "machines",
+            "ps",
+            "show 11111111",
+            "--help",
+            "resume 11111111",
+            "reply 11111111"
+        ]
     );
     // Without the switch: said stopped, nothing reopened or typed.
     let mut rig = Rig::new();
@@ -6260,7 +6283,10 @@ fn an_indexed_session_that_is_gone_is_dropped() {
             "{code}"
         );
         let kept = session_index::read(&file);
-        let ids: Vec<&str> = kept[MACHINE].iter().map(|entry| entry.id.as_str()).collect();
+        let ids: Vec<&str> = kept[MACHINE]
+            .iter()
+            .map(|entry| entry.id.as_str())
+            .collect();
         assert_eq!(ids, [OTHER], "{code}");
         // A show that only failed (a timeout, a computer away) drops nothing.
         let mut rig = Rig::new();
@@ -6312,10 +6338,7 @@ fn an_ambiguous_index_match_is_asked_about() {
         (Err("session_ambiguous".to_owned()), false)
     );
     let gone = json!({"stdout":format!("{}\n", json!({"error":"UNKNOWN_HARNESS"})),"exit":1});
-    assert_eq!(
-        looked(gone),
-        (Ok(Some("Christmas dates".to_owned())), true)
-    );
+    assert_eq!(looked(gone), (Ok(Some("Christmas dates".to_owned())), true));
 }
 
 /// #6274, the Reviewer-lead's P2 on #6422 held for the index too: a name

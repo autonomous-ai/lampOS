@@ -1650,6 +1650,14 @@ impl<P: Persistence> Engine<P> {
                     "Looks at a named session are held by the service.",
                 ));
             }
+            // The index of the sessions the lamp started is the service's
+            // too (#6274).
+            Request::ForgetSessions {} => {
+                return Err(err(
+                    "unsupported",
+                    "The sessions the lamp started are kept by the service.",
+                ));
+            }
             // The sign-in, too, is held by the service, and only with
             // `--sign-in-by-code` (#1676).
             Request::SignInStart {}

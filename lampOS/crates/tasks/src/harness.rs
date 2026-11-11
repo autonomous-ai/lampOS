@@ -793,6 +793,13 @@ pub struct CliConfig {
     /// a target it wrote always gets its folder (#5541) and a hand-written
     /// one goes as before.
     pub new_folder_only: Option<String>,
+    /// `serve --reply-named` (#6274): the file in the tasks folder where
+    /// the sessions the lamp itself started or handed work to are kept, by
+    /// id, name and last use only ([`crate::session_index`]), so a named
+    /// one `harness ps --all` no longer lists (stopped more than seven days
+    /// ago) is still found, by its id ([`Cli::find_named`]). `None`: none
+    /// kept, nothing looked for there.
+    pub session_index: Option<PathBuf>,
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -875,6 +882,7 @@ impl CliConfig {
             absolute_folder: false,
             new_folder: None,
             new_folder_only: None,
+            session_index: None,
             journal: None,
             calls: None,
             session_machines: None,
@@ -1086,6 +1094,7 @@ impl Cli {
         let began = Instant::now();
         let mut seen = Seen::default();
         let outcome = self.launch_seen(launch, &mut seen);
+        self.index_launched(launch, &outcome);
         let line = dispatch_line(launch, &outcome, &seen, began.elapsed());
         eprintln!("{line}");
         if let Some(journal) = &self.config.journal {
@@ -1479,6 +1488,8 @@ impl Cli {
             seen.took(&listed);
             let code = match listed {
                 Ok(reply) if reply.success => {
+                    // The names it lists for sessions the lamp keeps (#6274).
+                    self.index_names(&machine_id, &reply.stdout);
                     let mut named = named_session(&reply.stdout, session);
                     // No row fits by name, folder or work: a stopped one is
                     // listed without its work, so the newest stopped ones'
@@ -1526,9 +1537,34 @@ impl Cli {
                 return Ok((named, on, list, false));
             }
         };
-        // Nothing fits by name, folder or work on any machine read: a name
-        // said nearly right, for a look only, the closest among them all.
+        // Nothing listed fits by name, folder or work: the sessions the lamp
+        // itself started or handed work to that no list read shows (#6274,
+        // stopped more than seven days ago), by their names as said, under
+        // the same name rules, and reached by their ids.
+        let mut kept = if code == "session_not_found" {
+            self.indexed_unlisted(target, &lists)
+        } else {
+            Vec::new()
+        };
+        if code == "session_not_found" {
+            let rows: Vec<Value> = kept.iter().map(|(_, row)| row.clone()).collect();
+            let picks = picked(&kept, &by_name(&rows, session));
+            if let Some((named, on, list)) =
+                self.by_index(target, picks, began, seen, &mut unread, &mut kept)?
+            {
+                if let Named::Refused(code) = named {
+                    return Err(code.to_owned());
+                }
+                return Ok((named, on, list, false));
+            }
+        }
+        // Nothing fits by name, folder or work on any machine read, nor in
+        // the index: a name said nearly right, for a look only, the closest
+        // among them all, the index's too.
         if near && code == "session_not_found" {
+            let rows: Vec<Value> = kept.iter().map(|(_, row)| row.clone()).collect();
+            let kept_near =
+                nearest_rows(&rows, session).map(|(edits, near)| (edits, picked(&kept, &near)));
             let mut closest: Option<usize> = None;
             let mut nearest: Vec<(Named, Option<JoinedOn>)> = Vec::new();
             for (on, list) in &lists {
@@ -1543,6 +1579,25 @@ impl Cli {
                         nearest = vec![(named, on.clone())];
                     }
                 }
+            }
+            // One kept nearer than any listed: reached by its id; as near
+            // as one listed: asked about, never guessed.
+            let kept_first = match (closest, &kept_near) {
+                (_, None) => false,
+                (None, Some(_)) => true,
+                (Some(listed), Some((edits, _))) if *edits == listed => {
+                    return Err("session_ambiguous".to_owned());
+                }
+                (Some(listed), Some((edits, _))) => *edits < listed,
+            };
+            if let Some((_, picks)) = kept_near.filter(|_| kept_first)
+                && let Some((named, on, list)) =
+                    self.by_index(target, picks, began, seen, &mut unread, &mut kept)?
+            {
+                if let Named::Refused(code) = named {
+                    return Err(code.to_owned());
+                }
+                return Ok((named, on, list, true));
             }
             match nearest.len() {
                 0 => {}
@@ -1799,7 +1854,246 @@ impl Cli {
             // found near, not reopened.
             found.state = "stopped".into();
         }
+        // Opened to them: used now (#6274).
+        if join {
+            let machine = on
+                .as_ref()
+                .map_or(target.machine_id.as_str(), |on| on.machine_id.as_str());
+            self.index_used(machine, &agent_id, found.name.as_deref());
+        }
         Ok(found)
+    }
+
+    /// #6274: the session `launch` started (`new`, its id under
+    /// `agent.id`) or typed into (one the person named, or Harness's
+    /// router's pick) kept in the index of the sessions the lamp started
+    /// ([`crate::session_index`]), used now: by its id and, for one typed
+    /// into, the name the person knows it by; a started one's name is the
+    /// lamp's own, so none is kept until a list shows its title
+    /// ([`Cli::index_names`]).
+    fn index_launched(&self, launch: &Launch, outcome: &LaunchOutcome) {
+        let (machine, id, session) = match outcome {
+            LaunchOutcome::Created { agent_id } => {
+                (launch.target.machine_id.as_str(), agent_id, None)
+            }
+            LaunchOutcome::Joined { agent_id, session } => (
+                launch.target.machine_id.as_str(),
+                agent_id,
+                session.as_ref(),
+            ),
+            LaunchOutcome::JoinedOn {
+                agent_id,
+                session,
+                on,
+            } => (on.machine_id.as_str(), agent_id, session.as_ref()),
+            _ => return,
+        };
+        self.index_used(
+            machine,
+            id,
+            session.and_then(|session| session.name.as_deref()),
+        );
+    }
+
+    /// `id` on `machine` kept in the index, used now, with `name` when
+    /// known (#6274).
+    fn index_used(&self, machine: &str, id: &str, name: Option<&str>) {
+        let Some(file) = &self.config.session_index else {
+            return;
+        };
+        if !machine_id(machine) || !agent_id(id) {
+            return;
+        }
+        let name = name.filter(|name| !name.trim().is_empty() && !lamp_made(name.trim()));
+        crate::session_index::record(file, machine, id, name, unix_now_ms());
+    }
+
+    /// The names a `harness ps` list of `machine` shows for the sessions
+    /// the index keeps (#6274): a session's name becomes its agent's own
+    /// title once it has worked, so the index keeps the last one seen.
+    /// Never a lamp-made name, and nothing but the name.
+    fn index_names(&self, machine: &str, listed: &[u8]) {
+        let Some(file) = &self.config.session_index else {
+            return;
+        };
+        let Ok(answer) = serde_json::from_slice::<Value>(listed) else {
+            return;
+        };
+        let names: Vec<(String, String)> = answer["harnesses"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|row| {
+                let id = row["id"].as_str().filter(|id| agent_id(id))?;
+                let name = row["name"].as_str().map(str::trim)?;
+                (!name.is_empty() && !lamp_made(name)).then(|| (id.to_owned(), name.to_owned()))
+            })
+            .collect();
+        crate::session_index::rename(file, machine, &names);
+    }
+
+    /// The sessions the index keeps on each machine whose list was read
+    /// (`lists`, the launch's own as `None`) that the list does not show
+    /// (#6274): each as a row of its id and name, most lately used first.
+    fn indexed_unlisted(
+        &self,
+        target: &Target,
+        lists: &[(Option<JoinedOn>, Vec<u8>)],
+    ) -> Vec<(Option<JoinedOn>, Value)> {
+        let Some(file) = &self.config.session_index else {
+            return Vec::new();
+        };
+        let mut index = crate::session_index::read(file);
+        let mut kept = Vec::new();
+        for (on, list) in lists {
+            let machine = on
+                .as_ref()
+                .map_or(target.machine_id.as_str(), |on| on.machine_id.as_str());
+            let Some(mut entries) = index.remove(machine) else {
+                continue;
+            };
+            let answer = serde_json::from_slice::<Value>(list).unwrap_or(Value::Null);
+            let listed: BTreeSet<&str> = answer["harnesses"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|row| row["id"].as_str())
+                .collect();
+            entries.sort_by_key(|entry| std::cmp::Reverse(entry.last_used));
+            for entry in entries {
+                if agent_id(&entry.id) && !listed.contains(entry.id.as_str()) {
+                    kept.push((
+                        on.clone(),
+                        serde_json::json!({"id": entry.id, "name": entry.name}),
+                    ));
+                }
+            }
+        }
+        kept
+    }
+
+    /// The index's sessions that fit what was said (`picks`, #6274),
+    /// reached by their ids: the lamp's own first, as a listed one is
+    /// ([`chosen_session`]). Each is read with `harness show <id>` (at most
+    /// [`MOST_STOPPED_READ`], together, one thread each, within what is
+    /// left of the launch's bound less the reply's floor): one Harness says
+    /// is no longer there (`UNKNOWN_HARNESS`, `GONE`) is let go from the
+    /// index and from `kept`, and the lookup goes on; one that can't be
+    /// read is passed over, said as not read (`unread`) if nothing fits.
+    /// One still there: what it is ([`one_named`] of its id, name and
+    /// state), its machine, and a list of it alone; more than one:
+    /// `session_ambiguous`, never guessed; none: `None`.
+    #[allow(clippy::type_complexity)]
+    fn by_index(
+        &self,
+        target: &Target,
+        picks: Vec<(Option<JoinedOn>, Value)>,
+        began: Instant,
+        seen: &mut Seen,
+        unread: &mut Option<String>,
+        kept: &mut Vec<(Option<JoinedOn>, Value)>,
+    ) -> Result<Option<(Named, Option<JoinedOn>, Vec<u8>)>, String> {
+        let Some(file) = self.config.session_index.clone() else {
+            return Ok(None);
+        };
+        if picks.is_empty() {
+            return Ok(None);
+        }
+        let own: Vec<(Option<JoinedOn>, Value)> = picks
+            .iter()
+            .filter(|(on, _)| on.is_none())
+            .cloned()
+            .collect();
+        let picks = if own.is_empty() { picks } else { own };
+        if picks.len() > MOST_STOPPED_READ {
+            return Err("session_ambiguous".into());
+        }
+        let left = self.config.launch_timeout.saturating_sub(began.elapsed());
+        if left < REPLY_FLOOR * 2 {
+            unread.get_or_insert("sessions_timeout".to_owned());
+            return Ok(None);
+        }
+        let within = (left - REPLY_FLOOR).min(self.config.read_timeout);
+        let machine_of = |on: &Option<JoinedOn>| {
+            on.as_ref()
+                .map_or(target.machine_id.clone(), |on| on.machine_id.clone())
+        };
+        let asked: Vec<(String, String)> = picks
+            .iter()
+            .map(|(on, row)| {
+                (
+                    machine_of(on),
+                    row["id"].as_str().unwrap_or_default().to_owned(),
+                )
+            })
+            .collect();
+        let shown: Vec<Result<Reply, RunError>> = std::thread::scope(|scope| {
+            let reads: Vec<_> = asked
+                .iter()
+                .map(|(machine, id)| {
+                    scope.spawn(move || {
+                        self.run(
+                            &[
+                                "show".into(),
+                                "--machine".into(),
+                                machine.into(),
+                                id.into(),
+                                "--json".into(),
+                            ],
+                            within,
+                        )
+                    })
+                })
+                .collect();
+            reads
+                .into_iter()
+                .map(|read| {
+                    read.join()
+                        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+                })
+                .collect()
+        });
+        let mut there: Vec<(Option<JoinedOn>, Value)> = Vec::new();
+        for (((on, row), (machine, id)), shown) in picks.into_iter().zip(asked).zip(shown) {
+            seen.took(&shown);
+            match shown {
+                Ok(reply) if reply.success => match shown_row(&reply.stdout, &id, &row) {
+                    Some(row) => {
+                        self.index_names(
+                            &machine,
+                            &serde_json::to_vec(&serde_json::json!({"harnesses":[row.clone()]}))
+                                .unwrap_or_default(),
+                        );
+                        there.push((on, row));
+                    }
+                    None => {
+                        unread.get_or_insert("sessions_failed".to_owned());
+                    }
+                },
+                Ok(reply) if gone(&reply.stdout) => {
+                    eprintln!("tasks: a session the lamp started is no longer there; let go");
+                    crate::session_index::drop_id(&file, &machine, &id);
+                    kept.retain(|(_, row)| row["id"] != id.as_str());
+                }
+                Ok(_) => {
+                    unread.get_or_insert("sessions_failed".to_owned());
+                }
+                Err(error) if error.code == "cancelled" => return Err("cancelled".into()),
+                Err(error) => {
+                    unread.get_or_insert(format!("sessions_{}", error.code));
+                }
+            }
+        }
+        match there.len() {
+            0 => Ok(None),
+            1 => {
+                let (on, row) = there.remove(0);
+                let list = serde_json::to_vec(&serde_json::json!({"harnesses":[row.clone()]}))
+                    .unwrap_or_default();
+                Ok(Some((one_named(&row), on, list)))
+            }
+            _ => Err("session_ambiguous".into()),
+        }
     }
 
     /// The session the person named by its work among `machine`'s stopped
@@ -2417,6 +2711,7 @@ impl Cli {
         if !reply.success {
             return Err("status_failed".into());
         }
+        self.index_names(machine, &reply.stdout);
         parse_ps(&reply.stdout).map_err(str::to_string)
     }
 
@@ -4223,31 +4518,11 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
     let Some(rows) = answer["harnesses"].as_array() else {
         return Named::Refused("sessions_failed");
     };
-    let said = session_words(session);
-    if said.is_empty() {
+    if session_words(session).is_empty() {
         return Named::Refused("session_not_found");
     }
     let said_words = words_of(session);
-    let parts = name_parts;
-    let names = |row: &Value| parts(row).map(|part| session_words(&part));
-    // Each word said begins a word of the name, in order.
-    let begins = |part: &str| {
-        let mut words = words_of(part).into_iter();
-        said_words
-            .iter()
-            .all(|said| words.any(|word| word.starts_with(said.as_str())))
-    };
-    let exact: Vec<&Value> = rows
-        .iter()
-        .filter(|row| names(row).contains(&said))
-        .collect();
-    let fits: Vec<&Value> = if exact.is_empty() && said.chars().count() >= 3 {
-        rows.iter()
-            .filter(|row| parts(row).iter().any(|part| begins(part)))
-            .collect()
-    } else {
-        exact
-    };
+    let fits = by_name(rows, session);
     // No name or folder is it: what the person said is what the session
     // worked on ("the book program one"), found in what it was asked and
     // what it says it did (the owner, 9 Nov: a person remembers the work,
@@ -4293,6 +4568,100 @@ fn named_session(bytes: &[u8], session: &str) -> Named {
     }
 }
 
+/// The index's rows (#6274, [`Cli::indexed_unlisted`]) whose ids are among
+/// `rows`', with their machines.
+fn picked(kept: &[(Option<JoinedOn>, Value)], rows: &[&Value]) -> Vec<(Option<JoinedOn>, Value)> {
+    kept.iter()
+        .filter(|(_, row)| rows.iter().any(|fit| fit["id"] == row["id"]))
+        .cloned()
+        .collect()
+}
+
+/// A session of the index as `harness show <id> --json` gives it (#6274):
+/// a row of its id, its name (the one shown, or the one kept) and its
+/// state, nothing else; `None` for an answer that isn't of `id` or can't
+/// be read.
+fn shown_row(bytes: &[u8], id: &str, kept: &Value) -> Option<Value> {
+    let shown = serde_json::from_slice::<Value>(bytes).ok()?;
+    if shown["ok"] == false || !shown["error"].is_null() || shown["id"] != id {
+        return None;
+    }
+    let state = shown["state"].as_str().filter(|state| {
+        [
+            "working",
+            "idle",
+            "needs-input",
+            "stopped",
+            "offline",
+            "unknown",
+            "installing",
+            "starting",
+            "failed",
+        ]
+        .contains(state)
+    })?;
+    let name = shown["name"]
+        .as_str()
+        .map(str::trim)
+        .filter(|name| !name.is_empty() && !lamp_made(name))
+        .or_else(|| kept["name"].as_str())
+        .unwrap_or_default();
+    Some(serde_json::json!({"id": id, "name": name, "state": state}))
+}
+
+/// Whether a refused `harness show` says the session is no longer there:
+/// `UNKNOWN_HARNESS` (no harness of that name or id) or `GONE` (no longer
+/// on its machine), Harness 0.6.12's `target`.
+fn gone(bytes: &[u8]) -> bool {
+    let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
+    matches!(
+        reply["error"].as_str().or(reply["code"].as_str()),
+        Some("UNKNOWN_HARNESS" | "GONE")
+    )
+}
+
+/// Now, in unix milliseconds: when a session of the index was last used.
+fn unix_now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| {
+            u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+        })
+}
+
+/// The rows whose name or folder's last part is the words said, or, when
+/// none is, each of whose words said begins one of its words, in order
+/// (three letters said at least): [`named_session`]'s name rules, which the
+/// index of the sessions the lamp started is matched by too (#6274,
+/// [`Cli::find_named`]).
+fn by_name<'a>(rows: &'a [Value], session: &str) -> Vec<&'a Value> {
+    let said = session_words(session);
+    if said.is_empty() {
+        return Vec::new();
+    }
+    let said_words = words_of(session);
+    let parts = name_parts;
+    let names = |row: &Value| parts(row).map(|part| session_words(&part));
+    // Each word said begins a word of the name, in order.
+    let begins = |part: &str| {
+        let mut words = words_of(part).into_iter();
+        said_words
+            .iter()
+            .all(|said| words.any(|word| word.starts_with(said.as_str())))
+    };
+    let exact: Vec<&Value> = rows
+        .iter()
+        .filter(|row| names(row).contains(&said))
+        .collect();
+    if exact.is_empty() && said.chars().count() >= 3 {
+        rows.iter()
+            .filter(|row| parts(row).iter().any(|part| begins(part)))
+            .collect()
+    } else {
+        exact
+    }
+}
+
 /// A row's name and its folder's last part, as the person might say
 /// either.
 fn name_parts(row: &Value) -> [String; 2] {
@@ -4316,6 +4685,18 @@ fn name_parts(row: &Value) -> [String; 2] {
 fn near_session(bytes: &[u8], session: &str) -> Option<(usize, Named)> {
     let answer = serde_json::from_slice::<Value>(bytes).ok()?;
     let rows = answer["harnesses"].as_array()?;
+    let (edits, near) = nearest_rows(rows, session)?;
+    let named = match near.as_slice() {
+        [row] => one_named(row),
+        _ => Named::Refused("session_ambiguous"),
+    };
+    Some((edits, named))
+}
+
+/// The rows a name said nearly right is closest to ([`near_name`]), with
+/// how many slips; `None` when no row is near. [`near_session`]'s, and the
+/// index's of the sessions the lamp started (#6274), for a look only.
+fn nearest_rows<'a>(rows: &'a [Value], session: &str) -> Option<(usize, Vec<&'a Value>)> {
     let said_words = words_of(session);
     let mut closest: Option<usize> = None;
     let mut near: Vec<&Value> = Vec::new();
@@ -4336,12 +4717,7 @@ fn near_session(bytes: &[u8], session: &str) -> Option<(usize, Named)> {
             }
         }
     }
-    let edits = closest?;
-    let named = match near.as_slice() {
-        [row] => one_named(row),
-        _ => Named::Refused("session_ambiguous"),
-    };
-    Some((edits, named))
+    Some((closest?, near))
 }
 
 /// What one row that fits is ([`Named`]): live and idle, live and busy,
