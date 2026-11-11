@@ -313,6 +313,9 @@ pub fn arbitration_topics() -> Vec<(&'static str, Declaration)> {
 pub enum MarkKind {
     Camera,
     Microphone,
+    /// A computer's sound is playing through the lamp's speaker
+    /// (`speaker.stream`): not the lamp's own voice.
+    Speaker,
 }
 
 /// The ring's mark while a computer sees or hears through the lamp

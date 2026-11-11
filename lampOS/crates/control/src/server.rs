@@ -182,6 +182,9 @@ pub struct Shared {
     /// Each open connection's client (once hello'd) and its outbox.
     open: Mutex<HashMap<u64, Open>>,
     next: AtomicU64,
+    /// The speaker, once the lamp has built it: each connection's binary
+    /// messages go to it, never through the door's or the parts' locks.
+    speaker: crate::speaker::Handle,
     started: Instant,
     /// How far tests have moved the door's clock on ([`Shared::move_clock_on`]).
     ahead_us: AtomicU64,
@@ -320,6 +323,7 @@ impl Shared {
             parts: Mutex::new(parts),
             open: Mutex::new(HashMap::new()),
             next: AtomicU64::new(1),
+            speaker: Arc::default(),
             started: Instant::now(),
             ahead_us: AtomicU64::new(0),
             pin,
@@ -538,6 +542,7 @@ impl Shared {
                 parts: Mutex::new(parts(events)),
                 open: Mutex::new(HashMap::new()),
                 next: AtomicU64::new(1),
+                speaker: Arc::default(),
                 started: Instant::now(),
                 ahead_us: AtomicU64::new(0),
                 pin,
@@ -581,6 +586,12 @@ impl Shared {
 
     /// Binary frames for a client (`crate::camera`'s fast stream,
     /// `crate::microphone`'s blocks).
+    /// Gives the speaker the lamp built, once: from then on a connection's
+    /// binary messages reach its stream.
+    pub fn set_speaker(&self, speaker: Arc<crate::speaker::Speaker>) {
+        let _ = self.speaker.set(speaker);
+    }
+
     pub fn binary(self: &Arc<Self>) -> crate::parts::Binary {
         let shared = Arc::downgrade(self);
         Arc::new(
@@ -608,7 +619,9 @@ impl Shared {
         }
         // A stream's end is in the journal with its why, as its start was
         // (Thirteen's P3 on #4521): the camera's and the microphone's.
-        if let Some(ev @ ("camera.ended" | "microphone.ended")) = event["ev"].as_str() {
+        if let Some(ev @ ("camera.ended" | "microphone.ended" | "speaker.ended")) =
+            event["ev"].as_str()
+        {
             let why = event["why"].as_str().unwrap_or("ended");
             let now = self.now_us();
             self.door
@@ -1348,8 +1361,21 @@ async fn connection<S>(
                             }
                             continue;
                         }
-                        Some(Ok(Message::Binary(_))) => {
-                            let _ = socket.send(Message::text(crate::protocol::refused(None, &crate::protocol::Error::new(crate::protocol::ErrorCode::BadRequest, "text frames only")).to_string())).await;
+                        // A binary message is sound for the speaker, from a
+                        // known computer's own stream, and nothing else: any
+                        // other is dropped with no answer at all (before
+                        // hello, with no stream, from a revoked grant), so a
+                        // flood costs a counter and nothing more. It takes no
+                        // lock of the door's or the parts', is not a request
+                        // (the rates never count it), and the stream's own
+                        // frames keep the connection from going quiet.
+                        Some(Ok(Message::Binary(data))) => {
+                            if session.client().is_some()
+                                && let Some(speaker) = shared.speaker.get()
+                                && speaker.frame(id, &data)
+                            {
+                                quiet_until = tokio::time::Instant::now() + quiet;
+                            }
                             continue;
                         }
                         _ => break,
@@ -1434,7 +1460,9 @@ async fn connection<S>(
                     if remote
                         && event["ev"]
                             .as_str()
-                            .is_some_and(|ev| ev.starts_with("camera.") || ev.starts_with("microphone."))
+                            .is_some_and(|ev| ev.starts_with("camera.")
+                                || ev.starts_with("microphone.")
+                                || ev.starts_with("speaker."))
                     {
                         continue;
                     }
@@ -1523,6 +1551,10 @@ async fn connection<S>(
             reason: why.into(),
         }))
         .await;
+    // The stream this connection opened ends with it.
+    if let Some(speaker) = shared.speaker.get() {
+        speaker.end_conn(id);
+    }
     shared.open.lock().expect("open").remove(&id);
     let now = shared.now_us();
     let changes = shared.door.lock().expect("door").closed(&session, now);

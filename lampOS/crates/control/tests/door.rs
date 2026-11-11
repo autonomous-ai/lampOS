@@ -3171,3 +3171,273 @@ fn a_local_record_that_could_not_be_kept_is_not_left_in_memory() {
         "told again, not taken as made"
     );
 }
+
+/// Parts that route only `speaker.stream`, to a real speaker with a fake voice
+/// and publisher: what the door does with a computer's binary messages.
+struct Speaking {
+    speaker: Arc<lamp_control::speaker::Speaker>,
+    events: lamp_control::parts::Events,
+    asking: Option<u64>,
+}
+
+impl session::Parts for Speaking {
+    fn act(
+        &mut self,
+        client: &str,
+        _: u64,
+        op: &lamp_control::protocol::Op,
+        _: u64,
+    ) -> Result<Value, lamp_control::protocol::Error> {
+        match op {
+            lamp_control::protocol::Op::SpeakerStream { on, sample_rate } => self.speaker.stream(
+                self.asking.expect("a connection"),
+                client,
+                client,
+                *on,
+                *sample_rate,
+                self.events.clone(),
+            ),
+            _ => Err(lamp_control::protocol::Error::new(
+                lamp_control::protocol::ErrorCode::BadRequest,
+                "not an action",
+            )),
+        }
+    }
+    fn state(&self, _: lamp_control::protocol::StateKind) -> Value {
+        Value::Null
+    }
+    fn stop(&mut self, client: &str, _: u64) {
+        self.speaker.end_client(client);
+    }
+    fn asking(&mut self, connection: Option<u64>) {
+        self.asking = connection;
+    }
+}
+
+struct OpenVoice;
+
+struct OpenStream;
+
+impl lamp_control::speaker::Stream for OpenStream {
+    fn poll(&mut self) -> Option<lamp_control::speaker::Note> {
+        None
+    }
+}
+
+impl lamp_control::speaker::Voice for OpenVoice {
+    fn open(
+        &self,
+        _: &str,
+    ) -> Result<Box<dyn lamp_control::speaker::Stream>, lamp_control::protocol::Error> {
+        Ok(Box::new(OpenStream))
+    }
+}
+
+/// A lamp whose parts are [`Speaking`], with the blocks its stream publishes kept.
+async fn speaking_lamp(
+    name: &str,
+) -> (
+    Lamp,
+    Arc<std::sync::Mutex<Vec<Vec<u8>>>>,
+    Arc<lamp_control::speaker::Speaker>,
+) {
+    speaking_lamp_switched(name, true).await
+}
+
+/// [`speaking_lamp`] with the owner's `--speaker` switch as given.
+async fn speaking_lamp_switched(
+    name: &str,
+    switched: bool,
+) -> (
+    Lamp,
+    Arc<std::sync::Mutex<Vec<Vec<u8>>>>,
+    Arc<lamp_control::speaker::Speaker>,
+) {
+    let blocks = Arc::new(std::sync::Mutex::new(Vec::<Vec<u8>>::new()));
+    let kept = blocks.clone();
+    let speaker = Arc::new(
+        lamp_control::speaker::Speaker::new(Arc::new(|| false), Arc::new(|| false))
+            .playing(
+                Arc::new(OpenVoice),
+                Arc::new(move |payload| {
+                    kept.lock().unwrap().push(payload.to_vec());
+                    Ok(())
+                }),
+            )
+            .marking(
+                Arc::new(|_, _| {}),
+                Arc::new(|_| Some(std::time::Instant::now())),
+            )
+            .switched(switched),
+    );
+    let for_parts = speaker.clone();
+    let lamp = lamp_made(
+        name,
+        move |events| {
+            Box::new(Speaking {
+                speaker: for_parts,
+                events,
+                asking: None,
+            })
+        },
+        |door, _| door,
+    )
+    .await;
+    lamp.shared.set_speaker(speaker.clone());
+    (lamp, blocks, speaker)
+}
+
+#[tokio::test]
+async fn a_computers_binary_messages_play_through_its_own_stream_and_nothing_else_is_answered() {
+    let (lamp, blocks, _) = speaking_lamp("speaker-binary").await;
+    // A frame as docs/control.md gives it: the header's length (4 bytes,
+    // big-endian), the JSON header, then the samples.
+    let samples = |count: usize| -> Vec<u8> {
+        (0..count)
+            .flat_map(|n| ((n as i16) * 3).to_le_bytes())
+            .collect()
+    };
+    let frame = |count: usize| -> Vec<u8> {
+        let header = br#"{"ev":"speaker.audio","sequence":5}"#;
+        let mut frame = (header.len() as u32).to_be_bytes().to_vec();
+        frame.extend_from_slice(header);
+        frame.extend_from_slice(&samples(count));
+        frame
+    };
+    // Before hello, and with no stream: binary is dropped, with no word back.
+    let mut early = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut early).await;
+    early.send(Message::binary(frame(480))).await.unwrap();
+    let mut socket = paired(&lamp, json!(["speaker"]), 7).await;
+    socket.send(Message::binary(frame(480))).await.unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_millis(300), socket.next())
+            .await
+            .is_err(),
+        "a stray binary message gets no answer"
+    );
+    assert!(blocks.lock().unwrap().is_empty());
+    // The stream on: its frames play, one block each, 24 kHz as they came.
+    let answer = send(
+        &mut socket,
+        json!({"id": 3, "op": "speaker.stream", "on": true, "sample_rate": 24000}),
+    )
+    .await;
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert_eq!(answer["stream"], "on");
+    socket.send(Message::binary(frame(480))).await.unwrap();
+    socket.send(Message::binary(frame(480))).await.unwrap();
+    for _ in 0..100 {
+        if blocks.lock().unwrap().len() == 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(blocks.lock().unwrap().len(), 2, "two frames, two blocks");
+    // A frame with its header plays only its samples: the length and the JSON
+    // are not sound (the Reviewer-lead's P2 on S2).
+    {
+        let blocks = blocks.lock().unwrap();
+        let (_, played) = lamp_msgs::Audio::split(&blocks[0]).unwrap();
+        assert_eq!(played, &samples(480)[..], "the header is not played");
+    }
+    // A message with no header of ours is stray, whatever its size: bare
+    // samples play nothing and the stream's count of blocks stays.
+    socket.send(Message::binary(samples(480))).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(blocks.lock().unwrap().len(), 2, "bare samples are no frame");
+    // A second connection of the same computer is not the stream's: its frames
+    // are stray, played nowhere.
+    let (mut second, _) = {
+        let mut other = connect(&lamp, "/v1").await.unwrap();
+        let welcome = next(&mut other).await;
+        let _ = welcome;
+        (other, ())
+    };
+    second.send(Message::binary(frame(480))).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(blocks.lock().unwrap().len(), 2);
+    // Its own off ends it: later frames play nothing.
+    let off = send(
+        &mut socket,
+        json!({"id": 4, "op": "speaker.stream", "on": false}),
+    )
+    .await;
+    assert_eq!(off["stream"], "off");
+    socket.send(Message::binary(frame(480))).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(blocks.lock().unwrap().len(), 2);
+}
+
+/// The Reviewer-lead's P3 on S2: through the door, `speaker.stream` is refused
+/// without the `speaker` grant and, on a lamp whose owner has not switched it
+/// on, in the owner's words; neither opens a stream or plays a block. (A
+/// computer beyond the lamp's network is refused in `session.rs`' unit test
+/// `the_speaker_stream_needs_its_grant_and_is_never_given_beyond_the_lamps_network`:
+/// the door's own peers here are all local.)
+#[tokio::test]
+async fn the_speaker_stream_is_refused_without_its_grant_and_with_the_switch_off() {
+    let (lamp, blocks, speaker) = speaking_lamp("speaker-refused").await;
+    let mut plain = paired(&lamp, json!(["light", "camera", "microphone"]), 11).await;
+    let refused = send(
+        &mut plain,
+        json!({"id": 3, "op": "speaker.stream", "on": true}),
+    )
+    .await;
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert_eq!(refused["error"]["code"], "no_grant", "{refused}");
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    let client = listed["clients"][0]["id"].as_str().unwrap().to_owned();
+    assert!(!speaker.streaming(&client), "no stream without the grant");
+    assert!(blocks.lock().unwrap().is_empty());
+    // With the grant but the owner's switch off.
+    let (lamp, blocks, _) = speaking_lamp_switched("speaker-off", false).await;
+    let mut socket = paired(&lamp, json!(["speaker"]), 12).await;
+    let off = send(
+        &mut socket,
+        json!({"id": 3, "op": "speaker.stream", "on": true}),
+    )
+    .await;
+    assert_eq!(off["ok"], false, "{off}");
+    assert_eq!(
+        off["error"]["why"],
+        lamp_control::speaker::SWITCHED_OFF,
+        "{off}"
+    );
+    socket.send(Message::binary(vec![0u8; 960])).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(blocks.lock().unwrap().is_empty());
+}
+
+/// The app's `control.set_grants` taking `speaker` from a computer whose stream
+/// runs ends that stream at once, as it ends a camera's or a microphone's (the
+/// door's media list in `Session::set_grants`, nine's merge-order P2 on S2).
+#[tokio::test]
+async fn the_apps_set_grants_without_speaker_ends_its_stream() {
+    let (lamp, _, speaker) = speaking_lamp("speaker-set-grants").await;
+    let mut socket = paired(&lamp, json!(["light", "speaker", "body"]), 9).await;
+    let answer = send(
+        &mut socket,
+        json!({"id": 3, "op": "speaker.stream", "on": true, "sample_rate": 24000}),
+    )
+    .await;
+    assert_eq!(answer["ok"], true, "{answer}");
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    let client = listed["clients"][0]["id"].as_str().unwrap().to_owned();
+    assert!(speaker.streaming(&client), "the stream runs");
+    // The speaker taken away: the stream ends now.
+    let set = admin(
+        &lamp,
+        json!({"set_grants": {"client": client, "grants": ["light", "body"]}}),
+    )
+    .await;
+    assert_eq!(set["removed"], json!(["speaker"]), "{set}");
+    // Checked the moment the app has its answer. The computer's connection is also
+    // closed by any grant change, which ends its stream too, so this end-to-end check
+    // cannot tell the two apart; `Door::set_grants`' media list is pinned by the unit
+    // test `the_apps_grant_change_that_drops_the_speaker_lists_its_stream_to_end`.
+    assert!(
+        !speaker.streaming(&client),
+        "the stream ended with its grant"
+    );
+}

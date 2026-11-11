@@ -42,6 +42,7 @@ pub struct Ring {
     /// When a camera mark and a microphone mark were last asked, on the monotonic clock.
     pub camera_marked_us: u64,
     pub microphone_marked_us: u64,
+    pub speaker_marked_us: u64,
 }
 
 impl Ring {
@@ -64,6 +65,7 @@ impl Ring {
             pixels: [[0; 3]; PIXELS],
             camera_marked_us: 0,
             microphone_marked_us: 0,
+            speaker_marked_us: 0,
         })
     }
 
@@ -122,6 +124,7 @@ impl Ring {
             match mark.kind {
                 MarkKind::Camera => self.camera_marked_us = now,
                 MarkKind::Microphone => self.microphone_marked_us = now,
+                MarkKind::Speaker => self.speaker_marked_us = now,
             }
             self.marks_held
                 .insert(mark.claim.source.clone(), mark.claim.until_us);

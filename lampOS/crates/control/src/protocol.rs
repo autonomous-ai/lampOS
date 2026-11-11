@@ -156,7 +156,7 @@ impl ServiceGrant {
 }
 
 /// The plain grants' wire names, in [`Grant::ALL`]'s order.
-const PLAIN_WIRE: [&str; 13] = [
+const PLAIN_WIRE: [&str; 14] = [
     "body",
     "light",
     "speak",
@@ -168,6 +168,7 @@ const PLAIN_WIRE: [&str; 13] = [
     "device",
     "camera",
     "microphone",
+    "speaker",
     "notes",
     "speech",
 ];
@@ -224,6 +225,10 @@ pub enum Grant {
     /// The microphone's sound as it is heard, never while the lamp is
     /// private.
     Microphone,
+    /// Sound played through the lamp's speaker, any sound and not only the
+    /// lamp's own voice (`speaker.stream`, docs/control.md, "The speaker"):
+    /// never pre-ticked, and never while the lamp is private.
+    Speaker,
     /// Its own small notes kept on the lamp (`notes.set`, `notes.get`,
     /// `notes.delete`, `notes.list`): only its own, gone with its revoke
     /// (docs/control.md, "Notes").
@@ -268,7 +273,7 @@ impl Grant {
     }
 
     /// Every grant this build knows, in the pairing screen's order.
-    pub const ALL: [Grant; 13] = [
+    pub const ALL: [Grant; 14] = [
         Self::Body,
         Self::Light,
         Self::Speak,
@@ -280,6 +285,7 @@ impl Grant {
         Self::Device,
         Self::Camera,
         Self::Microphone,
+        Self::Speaker,
         Self::Notes,
         Self::Speech,
     ];
@@ -315,6 +321,9 @@ impl Grant {
             Self::Camera => "can see what the lamp's camera sees, never while it is private",
             Self::Microphone => {
                 "can hear what the lamp's microphone hears, never while it is private"
+            }
+            Self::Speaker => {
+                "can play any sound through the lamp's speaker, not only the lamp's own voice, so it can sound like a person; never while the lamp is private"
             }
             Self::Notes => {
                 "can keep small notes of its own on the lamp, which stay until it is let go"
@@ -472,6 +481,12 @@ pub struct Angles {
 /// built-in hum. Any other name is one of the computer's own clips
 /// (`sound.upload`, `crate::sounds`).
 pub const SOUNDS: [&str; 1] = ["hum"];
+/// The sample rates a speaker stream takes (mono S16LE): 16 kHz, the radio
+/// demo's (#6257), which the door resamples, and the voice's own speaker
+/// path's 24 kHz.
+pub const SPEAKER_RATES: [u32; 2] = [16_000, 24_000];
+/// The sample rate a speaker stream is given when it names none.
+pub const SPEAKER_RATE_DEFAULT: u32 = 16_000;
 /// The most parts one clip is sent in: a 30 s clip, about 1.4 MB, is 40
 /// parts of [`SKILL_PART_MAX_CHARS`].
 pub const SOUND_PARTS_MAX: u32 = 64;
@@ -750,6 +765,18 @@ pub enum Op {
         #[serde(default)]
         args: Map<String, Value>,
     },
+    /// Sound to the lamp's speaker: after `on: true` the connection sends
+    /// binary `speaker.audio` frames of 10 to 100 ms (`sample_rate` 16000, the
+    /// default, or 24000; mono S16LE), played through the voice's own speaker
+    /// path until `on: false`, `stop`, the client goes, or the lamp ends it
+    /// (`speaker.ended`, with why): private, muted, the lamp or the person
+    /// speaking, the ring's mark not shown, 2 s with no frame, 10 minutes.
+    #[serde(rename = "speaker.stream")]
+    SpeakerStream {
+        on: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sample_rate: Option<u32>,
+    },
 }
 
 /// What a skill run's `service.write` that tries to send is told: the
@@ -802,6 +829,7 @@ impl Op {
             }
             Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
             Self::MicrophoneStream { .. } => vec![Grant::Microphone],
+            Self::SpeakerStream { .. } => vec![Grant::Speaker],
             Self::NotesSet { .. }
             | Self::NotesGet { .. }
             | Self::NotesDelete { .. }
@@ -1160,6 +1188,16 @@ impl Op {
             | Self::NotesGet { .. }
             | Self::NotesDelete { .. }
             | Self::NotesList { .. } => {}
+            Self::SpeakerStream { sample_rate, .. } => {
+                if let Some(rate) = sample_rate
+                    && !SPEAKER_RATES.contains(rate)
+                {
+                    return Err(format!(
+                        "sample_rate: one of {}",
+                        SPEAKER_RATES.map(|rate| rate.to_string()).join(", ")
+                    ));
+                }
+            }
             Self::Volume { to, step, mute } => {
                 let asked = usize::from(to.is_some())
                     + usize::from(step.is_some())
@@ -1803,6 +1841,7 @@ mod tests {
             Grant::Device,
             Grant::Camera,
             Grant::Microphone,
+            Grant::Speaker,
             Grant::Notes,
             Grant::Speech,
         ]
@@ -1842,6 +1881,10 @@ mod tests {
                     "can hear what the lamp's microphone hears, never while it is private"
                 ),
                 (
+                    json!("speaker"),
+                    "can play any sound through the lamp's speaker, not only the lamp's own voice, so it can sound like a person; never while the lamp is private"
+                ),
+                (
                     json!("notes"),
                     "can keep small notes of its own on the lamp, which stay until it is let go"
                 ),
@@ -1863,6 +1906,31 @@ mod tests {
             let frame = format!(r#"{{"id":1,"op":"camera.stream","on":true,"fps":{fps}}}"#);
             assert_eq!(why(&frame).1, "fps: 1 to 30", "{fps}");
         }
+    }
+
+    #[test]
+    fn a_speaker_stream_is_on_or_off_under_the_speaker_grant_at_a_rate_it_takes() {
+        for on in ["true", "false"] {
+            let frame = format!(r#"{{"id":1,"op":"speaker.stream","on":{on}}}"#);
+            assert_eq!(op(&frame).check(), Ok(()), "{on}");
+            assert_eq!(op(&frame).needs(), [Grant::Speaker]);
+        }
+        for rate in [16_000, 24_000] {
+            let frame =
+                format!(r#"{{"id":1,"op":"speaker.stream","on":true,"sample_rate":{rate}}}"#);
+            assert_eq!(op(&frame).check(), Ok(()), "{rate}");
+            assert_eq!(op(&frame).needs(), [Grant::Speaker]);
+        }
+        // Another rate, a stray field or no `on` is refused in words.
+        assert_eq!(
+            why(r#"{"id":1,"op":"speaker.stream","on":true,"sample_rate":44100}"#).1,
+            "sample_rate: one of 16000, 24000"
+        );
+        assert_eq!(
+            why(r#"{"id":1,"op":"speaker.stream","on":true,"fps":5}"#).0,
+            Some(1)
+        );
+        assert_eq!(why(r#"{"id":1,"op":"speaker.stream"}"#).0, Some(1));
     }
 
     #[test]

@@ -239,6 +239,7 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::MicrophoneStream { .. } => "microphone.stream",
         Op::ServiceRead { .. } => "service.read",
         Op::ServiceWrite { .. } => "service.write",
+        Op::SpeakerStream { .. } => "speaker.stream",
     }
 }
 
@@ -268,6 +269,7 @@ pub fn went(op: &Op) -> &'static str {
         Op::ServiceRead { .. } | Op::ServiceWrite { .. } => {
             "lamp-services, by its tools' call.sock"
         }
+        Op::SpeakerStream { .. } => "the voice, by speaker/audio",
         _ => "the door",
     }
 }
@@ -370,6 +372,7 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
         Op::ServiceWrite { service, args } => {
             format!("{}, {}", word(service), word(text_of(args, "action")))
         }
+        Op::SpeakerStream { on, .. } => (if *on { "on" } else { "off" }).to_owned(),
         _ => return String::new(),
     };
     format!(" ({inside})")

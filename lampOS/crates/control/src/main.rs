@@ -6,7 +6,7 @@
 //!                    [--bus-root DIR] [--boot-id ID]
 //!                    [--sight-file PATH|off] [--frames-socket PATH|off] [--remote on|off]
 //!                    [--camera-opens-on-demand]
-//!                    [--microphone on|off]
+//!                    [--microphone on|off] [--speaker on|off]
 //!                    [--run-socket PATH] [--run-socket-user USER]
 //!                    [--services-socket PATH]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
@@ -56,6 +56,8 @@ const FRAMES: &str = "/run/lampos-eyes/frames.sock";
 const REMOTE_ENVIRONMENT: &str = "LAMP_CONTROL_REMOTE";
 /// The owner's switch for `microphone.stream`, off unless `on`.
 const MICROPHONE_ENVIRONMENT: &str = "LAMP_CONTROL_MICROPHONE";
+/// The owner's switch for `speaker.stream`, off unless `on`.
+const SPEAKER_ENVIRONMENT: &str = "LAMP_CONTROL_SPEAKER";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -317,7 +319,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     // stream is on; shared only where they publish it (`LAMP_BUS_AUDIO=on`).
     let hearing = bus
         .clone()
-        .zip(marked(lamp_msgs::MarkKind::Microphone).zip(drawn))
+        .zip(marked(lamp_msgs::MarkKind::Microphone).zip(drawn.clone()))
         .map(|(bus, marking)| (lamp_control::microphone::on_bus(bus), marking));
     // The fast stream from the eyes' frames socket, when they serve one; its
     // frames go out once the server below has a way to send them.
@@ -389,6 +391,49 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
             "the microphone stream is off (--microphone)"
         }
     );
+    // The speaker stream is off unless the owner switches it on, and needs the
+    // voice's say socket, the bus (`speaker/audio`) and the ring's mark: no
+    // unit sets it (docs/control.md, "The speaker").
+    let speaker_switch = match option(arguments, "--speaker")
+        .or_else(|| std::env::var(SPEAKER_ENVIRONMENT).ok())
+        .as_deref()
+    {
+        None | Some("off") => false,
+        Some("on") => true,
+        Some(_) => return Err("--speaker is on or off".to_owned()),
+    };
+    eprintln!(
+        "lamp-control: {}",
+        if speaker_switch {
+            "the speaker stream is on (--speaker on), played through the voice"
+        } else {
+            "the speaker stream is off (--speaker)"
+        }
+    );
+    let speaker = match (&bus, &say, marked(lamp_msgs::MarkKind::Speaker).zip(drawn)) {
+        (Some(bus), Some(say), Some(marking)) => match lamp_control::speaker::on_bus(bus) {
+            Ok(publish) => {
+                let (private, muted) = lamp_control::speaker::gates(Some(watching.clone()));
+                Some(Arc::new(
+                    lamp_control::speaker::Speaker::new(private, muted)
+                        .playing(
+                            Arc::new(lamp_control::speaker::SayVoice { path: say.clone() }),
+                            publish,
+                        )
+                        .marking(marking.0, marking.1)
+                        .switched(speaker_switch),
+                ))
+            }
+            Err(error) => {
+                eprintln!(
+                    "lamp-control: no speaker stream, since speaker/audio can't be published: {error}"
+                );
+                None
+            }
+        },
+        _ => None,
+    };
+    let speaker_for_door = speaker.clone();
     // The body's word on each motion (`body/gesture`), for a gesture's,
     // move's and feeling's move's `done` (#4209); without it they end at
     // their answer, as hello's limits then say.
@@ -417,6 +462,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
             Some((listen, marking)) => lamp.hearing(listen, marking, sink_for_ears, microphone),
             None => lamp,
         };
+        if let Some(speaker) = speaker {
+            lamp = lamp.speaking(speaker);
+        }
         if let Some(gestures) = gestures {
             lamp = lamp.telling_motions(gestures);
         }
@@ -446,6 +494,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     // which lamp-skills can't write (`lamp_control::task_yes`).
     shared.set_task_yes_folder(state.clone());
     let _ = sink.set(shared.binary());
+    if let Some(speaker) = speaker_for_door {
+        shared.set_speaker(speaker);
+    }
     let remote = match option(arguments, "--remote")
         .or_else(|| std::env::var(REMOTE_ENVIRONMENT).ok())
         .as_deref()
