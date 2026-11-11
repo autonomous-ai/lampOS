@@ -549,9 +549,13 @@ pub(crate) fn start(root: &Path, systemd: &mut dyn Systemd) -> Result<(), String
 /// `failed` with `version`, not `installed`. Pinned, the installer
 /// is this build's checked copy, run from a file, with every manifest it
 /// reads served checked from 127.0.0.1 ([`Kit`]). Harness already there
-/// is recorded `installed` and nothing runs. Each step goes through `run`.
-/// The record written is returned; an error only when another install
-/// holds [`LOCK`], with nothing written.
+/// is moved when [`ASK`] asks it ([`upgrade`], which always ends
+/// `installed` or `failed`, and the ask is then spent), else recorded
+/// `installed` (a `failed` `version` or `upgrade` kept) and nothing runs.
+/// Each step goes through `run`. The record written is returned; an error
+/// only when another install holds [`LOCK`], with nothing written: a
+/// move's `installing` then stays for that install to answer, or for the
+/// round to ask again past [`STUCK_AFTER`].
 pub fn install_now(
     root: &Path,
     records: &Path,
@@ -729,16 +733,33 @@ fn install_with(
         if let Some(ask) = asked(records)
             && let (Some(from), Some(pin)) = (&ask.upgrade_from, &ask.pin)
         {
-            return Ok(upgrade(
-                root,
-                records,
-                run,
-                now_unix_ms,
-                say,
-                kit,
-                pin,
-                from,
+            let said = upgrade(root, records, run, now_unix_ms, say, kit, pin, from);
+            // The move answered, `installed` or `failed` (#6275): the ask
+            // keeps its pin without `upgrade_from`, so a one-shot started
+            // later for Hermes moves nothing; a round asks again when
+            // [`upgrade_due`] says so.
+            let spent = Ask {
+                version: 1,
+                pin: Some(pin.clone()),
+                upgrade_from: None,
+            };
+            if let Ok(text) = serde_json::to_vec(&spent) {
+                let _ = write_whole(&records.join(ASK), &text, 0o600);
+            }
+            return Ok(said);
+        }
+        // A pinned install that left another version, or a move that
+        // failed and put the older one back, stays as recorded, as a
+        // round keeps it (`after_round_when`).
+        if let Some(said) = before
+            .as_ref()
+            .filter(|said| matches!(said.error.as_deref(), Some("version" | "upgrade")))
+        {
+            say(&format!(
+                "Harness is at {HARNESS}, recorded {}: nothing installed",
+                said.error.as_deref().unwrap_or_default()
             ));
+            return Ok(said.clone());
         }
         let mut said = state("installed", now_unix_ms());
         said.version = version(run);

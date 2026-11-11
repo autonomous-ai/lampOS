@@ -2442,3 +2442,155 @@ fn the_one_shot_runs_below_the_lamps_services() {
         );
     }
 }
+
+/// The one-shot as its unit runs it: Harness's part, then Hermes's.
+fn one_shot(lamp: &Lamp, run: &mut Runner, lines: &mut Vec<String>) -> Result<(), String> {
+    crate::hermes_install::one_shot(
+        lamp.root(),
+        &lamp.records(),
+        run,
+        &mut || 5,
+        &mut |line: &str| lines.push(line.to_owned()),
+    )
+}
+
+/// Whether the pinned installer ran, as `log` has it.
+fn installer_ran(log: &Rc<RefCell<Vec<String>>>) -> bool {
+    log.borrow()
+        .iter()
+        .any(|line| line.contains("HARNESS_METADATA_URL=http://127.0.0.1"))
+}
+
+/// #6275: a round asks to move Harness 0.5.39 to the build's pin; the
+/// one-shot runs the move, not Hermes's part alone, so the record ends
+/// `installed` at the pin or `failed` with `upgrade`, never `installing`.
+#[test]
+fn the_one_shot_runs_a_move_a_round_asked() {
+    for (installer, install, version, error) in [
+        (Ok(String::new()), "installed", Some(product::VERSION), None),
+        (
+            Err("sh: exit status 1".to_owned()),
+            "failed",
+            None,
+            Some("upgrade"),
+        ),
+    ] {
+        let lamp = Lamp::new();
+        asked_to_move(&lamp, "0.5.39");
+        assert_eq!(lamp.said().unwrap().install, "installing");
+        let log: Rc<RefCell<Vec<String>>> = Rc::default();
+        let mut run = mover(log.clone(), "0.5.39", product::VERSION, installer);
+        let mut lines = Vec::new();
+        let _ = one_shot(&lamp, &mut run, &mut lines);
+        let said = lamp.said().unwrap();
+        assert_eq!(
+            (
+                said.install.as_str(),
+                said.version.as_deref(),
+                said.error.as_deref()
+            ),
+            (install, version, error),
+            "{lines:?}"
+        );
+        assert!(installer_ran(&log), "{:?}", log.borrow());
+    }
+}
+
+/// #6275: Harness there, an install's ask (no `upgrade_from`) and its
+/// record left `installing`: the one-shot records it `installed` with the
+/// version it says.
+#[test]
+fn the_one_shot_answers_an_install_ask_with_harness_there() {
+    let lamp = Lamp::new();
+    let said = after_round(
+        lamp.root(),
+        &lamp.records(),
+        &Ok(Some(product::built_in())),
+        &mut Fake::default(),
+        2,
+        &mut quiet(),
+    )
+    .unwrap();
+    assert_eq!(said.install, "installing");
+    lamp.harness_there();
+    let runs = Runs::new();
+    let mut run = runs.runner();
+    one_shot(&lamp, &mut run, &mut Vec::new()).unwrap();
+    drop(run);
+    let said = lamp.said().unwrap();
+    assert_eq!(
+        (said.install.as_str(), said.version.as_deref()),
+        ("installed", Some("0.4.25"))
+    );
+    assert!(!runs.ran(install::HARNESS_INSTALLER));
+}
+
+/// #6275: started for Hermes alone, with no Harness ask, Harness's record
+/// is left as it is and nothing of Harness's runs.
+#[test]
+fn the_one_shot_without_a_harness_ask_leaves_harness_as_it_is() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    installed_at(&lamp, Some("0.5.39"), 1);
+    let before = lamp.said().unwrap();
+    let runs = Runs::new();
+    let mut run = runs.runner();
+    one_shot(&lamp, &mut run, &mut Vec::new()).unwrap();
+    drop(run);
+    assert_eq!(lamp.said().unwrap(), before);
+    assert!(runs.log.borrow().is_empty(), "{:?}", runs.log.borrow());
+}
+
+/// #6275: a move answered spends its ask: a failed move, then a one-shot
+/// started for Hermes, moves nothing again and keeps the `failed`
+/// `upgrade`, so the round's [`UPGRADE_RETRY_AFTER`] paces the next try.
+#[test]
+fn a_failed_move_is_not_run_again_by_a_one_shot_for_hermes() {
+    let lamp = Lamp::new();
+    asked_to_move(&lamp, "0.5.39");
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let mut run = mover(
+        log.clone(),
+        "0.5.39",
+        product::VERSION,
+        Err("sh: exit status 1".to_owned()),
+    );
+    let _ = one_shot(&lamp, &mut run, &mut Vec::new());
+    let failed = lamp.said().unwrap();
+    assert_eq!(
+        (failed.install.as_str(), failed.error.as_deref()),
+        ("failed", Some("upgrade"))
+    );
+    let ask = asked(&lamp.records()).unwrap();
+    assert_eq!(
+        (ask.upgrade_from, ask.pin),
+        (None, Some(product::built_in())),
+        "spent, its pin kept"
+    );
+
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let mut run = mover(log.clone(), "0.5.39", product::VERSION, Ok(String::new()));
+    let mut lines = Vec::new();
+    // The unit's result is Harness's record, kept `failed`.
+    assert_eq!(
+        one_shot(&lamp, &mut run, &mut lines),
+        Err("Harness is not installed: upgrade".to_owned())
+    );
+    assert!(!installer_ran(&log), "moved again: {:?}", log.borrow());
+    assert_eq!(lamp.said().unwrap(), failed, "{lines:?}");
+}
+
+/// #6275: the one exit that leaves a move `installing`: another install
+/// holds [`LOCK`] and writes its own record; the unit fails, and a round
+/// past [`STUCK_AFTER`] asks the move again.
+#[test]
+fn a_move_with_the_lock_held_stays_installing_for_its_holder() {
+    let lamp = Lamp::new();
+    asked_to_move(&lamp, "0.5.39");
+    let _held = lock(&lamp.records()).unwrap();
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let mut run = mover(log.clone(), "0.5.39", product::VERSION, Ok(String::new()));
+    assert!(one_shot(&lamp, &mut run, &mut Vec::new()).is_err());
+    assert!(log.borrow().is_empty());
+    assert_eq!(lamp.said().unwrap().install, "installing");
+}
