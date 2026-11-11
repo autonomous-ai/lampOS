@@ -822,7 +822,32 @@ fn no_lampos_service_folder_is_visible_to_hermes() {
 /// step failing ends it with Hermes not run.
 #[test]
 fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
-    stages_the_allowed_and_stops_at_any_failing_step(OFF);
+    stages_the_allowed_and_stops_at_any_failing_step(OFF, false);
+}
+
+/// A run started with [`NET_ENV`] `run` while [`TASKS_SWITCH`] is off:
+/// the script takes no notice, shows no bridge and starts no relay.
+#[test]
+fn with_the_tasks_switch_off_a_net_run_is_the_script_as_before() {
+    stages_the_allowed_and_stops_at_any_failing_step(OFF, true);
+}
+
+/// [`TASKS_SWITCH`] on and [`NET_ENV`] `run` (a skill's run, #6306): the
+/// script also stages [`MODEL_SOCKET`], the file alone, shows it
+/// read-only, brings `lo` up and starts [`RELAY`] `net-relay` as the
+/// caller's own ids, waiting for its `ready`, all before Hermes; each of
+/// those steps failing, `ip` missing or the bridge missing ends it before
+/// Hermes runs.
+#[test]
+fn with_the_tasks_switch_on_a_net_run_shows_the_bridge_and_starts_the_relay() {
+    stages_the_allowed_and_stops_at_any_failing_step(TASKS_ON, true);
+    stages_the_allowed_and_stops_at_any_failing_step(
+        Shown {
+            skills: true,
+            tasks: true,
+        },
+        true,
+    );
 }
 
 /// [`SKILLS_SWITCH`] on (#6128): the same script, run the same way, also
@@ -833,7 +858,7 @@ fn the_namespace_script_stages_the_allowed_and_stops_at_any_failing_step() {
 /// folder (no lamp-skills), it is skipped and Hermes still runs.
 #[test]
 fn with_the_skills_switch_on_the_namespace_script_shows_the_skills_socket_read_only() {
-    stages_the_allowed_and_stops_at_any_failing_step(SKILLS_ON);
+    stages_the_allowed_and_stops_at_any_failing_step(SKILLS_ON, false);
 }
 
 /// [`TASKS_SWITCH`] on (#6306): the same script, run the same way, also
@@ -844,24 +869,33 @@ fn with_the_skills_switch_on_the_namespace_script_shows_the_skills_socket_read_o
 /// Hermes still runs.
 #[test]
 fn with_the_tasks_switch_on_the_namespace_script_shows_the_control_socket_alone_read_only() {
-    stages_the_allowed_and_stops_at_any_failing_step(TASKS_ON);
+    stages_the_allowed_and_stops_at_any_failing_step(TASKS_ON, false);
 }
 
 /// Both switches on: both sockets shown, each in its place.
 #[test]
 fn with_both_switches_on_the_namespace_script_shows_both_sockets_read_only() {
-    stages_the_allowed_and_stops_at_any_failing_step(Shown {
-        skills: true,
-        tasks: true,
-    });
+    stages_the_allowed_and_stops_at_any_failing_step(
+        Shown {
+            skills: true,
+            tasks: true,
+        },
+        false,
+    );
 }
 
 /// [`ns_text`] for `shown` run under `sh`, every mount stubbed, on a
 /// stand-in root that has [`SKILLS_SOCKET`] and [`CONTROL_SOCKET`] (a
 /// real unix socket, with `admin.sock` beside it) either way: a switch
 /// off, nothing of its socket is touched.
-fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
+///
+/// With `net`, it is run with [`NET_ENV`] `run` and [`MODEL_SOCKET`] (a
+/// real unix socket) there; `ip` and the relay (through the `unshare`
+/// stub, which says `ready`) are stubbed too.
+fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
     let Shown { skills, tasks } = shown;
+    // The run's own network steps only with both.
+    let netted = tasks && net;
     let folder = tempfile::tempdir().unwrap();
     let base = folder.path().to_string_lossy().into_owned();
     let at = |path: &str| format!("{base}/root{path}");
@@ -886,13 +920,18 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
     let _control = std::os::unix::net::UnixListener::bind(&control).unwrap();
     let _admin =
         std::os::unix::net::UnixListener::bind(format!("{control_folder}/admin.sock")).unwrap();
+    let bridge = at(MODEL_SOCKET);
+    let bridge_folder = at("/run/lampos-tasks");
+    fs::create_dir_all(&bridge_folder).unwrap();
+    let _bridge = std::os::unix::net::UnixListener::bind(&bridge).unwrap();
     let uid_map = folder.path().join("uid_map");
     fs::write(&uid_map, "         0        996          1\n").unwrap();
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
                 if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
-                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; readlink) echo \"$RESOLV\";; unshare) echo \"HOME=$HOME\";; esac\n";
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; readlink) echo \"$RESOLV\";; \
+                unshare) case \"$*\" in *net-relay*) echo ready;; *) echo \"HOME=$HOME\";; esac;; esac\n";
     for name in [
-        "mount", "findmnt", "mkdir", "rmdir", "rm", "touch", "readlink", "unshare",
+        "mount", "findmnt", "mkdir", "rmdir", "rm", "touch", "readlink", "unshare", "ip",
     ] {
         let path = stubs.join(name);
         fs::write(&path, stub).unwrap();
@@ -918,7 +957,8 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
     }
     let text = text
         .replace("/proc/self/uid_map", &uid_map.to_string_lossy())
-        .replace("/usr/bin/unshare", &stubs.join("unshare").to_string_lossy());
+        .replace("/usr/bin/unshare", &stubs.join("unshare").to_string_lossy())
+        .replace("/usr/sbin/ip /sbin/ip", &stubs.join("ip").to_string_lossy());
     let script = folder.path().join("hermes-ns");
     fs::write(&script, text).unwrap();
     let run = |fail_on: &str| {
@@ -934,6 +974,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
             .env("HOME", "/somewhere-else")
             .env("LAMP_NS_UID", "996")
             .env("LAMP_NS_GID", "994")
+            .env(NET_ENV, if net { "run" } else { "" })
             .output()
             .unwrap();
         let lines: Vec<String> = fs::read_to_string(&log)
@@ -962,6 +1003,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
     // place; off, none.
     let when = |line: String| skills.then_some(line);
     let when_tasks = |line: String| tasks.then_some(line);
+    let when_net = |line: String| netted.then_some(line);
     let order = [
         Some(format!(
             "mount -t tmpfs -o size=256m,mode=1777,nosuid,nodev none {}",
@@ -979,6 +1021,8 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
         Some(format!("mount --bind {resolv} {stage}/r")),
         when_tasks(format!("touch {stage}/l")),
         when_tasks(format!("mount --bind {control} {stage}/l")),
+        when_net(format!("touch {stage}/b")),
+        when_net(format!("mount --bind {bridge} {stage}/b")),
         Some(format!(
             "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
             at("/run")
@@ -1012,8 +1056,14 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
         when_tasks(format!(
             "mount -o remount,bind,ro,nosuid,nodev,relatime {control}"
         )),
+        when_net(format!("mkdir -p {bridge_folder}")),
+        when_net(format!("touch {bridge}")),
+        when_net(format!("mount --move {stage}/b {bridge}")),
+        when_net(format!(
+            "mount -o remount,bind,ro,nosuid,nodev,relatime {bridge}"
+        )),
         Some(if tasks {
-            format!("rm -f {stage}/r {stage}/l")
+            format!("rm -f {stage}/r {stage}/l {stage}/b")
         } else {
             format!("rm -f {stage}/r")
         }),
@@ -1033,6 +1083,11 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
         Some(format!(
             "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
             at("/etc/lampOS")
+        )),
+        when_net("ip link set lo up".to_owned()),
+        when_net(format!(
+            "unshare --user --map-user=996 --map-group=994 {RELAY} net-relay \
+             --listen {RELAY_LISTEN} --to {bridge}"
         )),
         Some(format!(
             "unshare --user --map-user=996 --map-group=994 {} chat -q a b",
@@ -1057,6 +1112,17 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
             "{lines:#?}"
         );
     }
+    if !netted {
+        // No run of its own network: the bridge, there on this root, is
+        // never named, `lo` is left alone and no relay is started.
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.contains(&bridge_folder) || line.starts_with("ip ")),
+            "{lines:#?}"
+        );
+        assert!(!lines.iter().any(|line| line.contains("net-relay")));
+    }
     // Never lamp-control's owner socket, either way.
     assert!(
         !lines.iter().any(|line| line.contains("admin.sock")),
@@ -1075,6 +1141,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
         .chain(skills.then(|| socket.clone()))
         .chain([resolv.clone()])
         .chain(tasks.then(|| control.clone()))
+        .chain(netted.then(|| bridge.clone()))
         .collect();
     assert_eq!(
         shown,
@@ -1116,19 +1183,52 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
         format!("findmnt -no VFS-OPTIONS -M {control}"),
         format!("remount,bind,ro,nosuid,nodev,relatime {control}"),
     ];
+    let net_steps = [
+        format!("touch {stage}/b"),
+        format!("--bind {bridge}"),
+        format!("mount --move {stage}/b"),
+        format!("findmnt -no VFS-OPTIONS -M {bridge}"),
+        format!("remount,bind,ro,nosuid,nodev,relatime {bridge}"),
+        "ip link set lo up".to_owned(),
+        "net-relay".to_owned(),
+    ];
     let socket_steps = if skills { &socket_steps[..] } else { &[] };
     let control_steps = if tasks { &control_steps[..] } else { &[] };
-    for fail_on in steps.iter().chain(socket_steps).chain(control_steps) {
+    let net_steps = if netted { &net_steps[..] } else { &[] };
+    for fail_on in steps
+        .iter()
+        .chain(socket_steps)
+        .chain(control_steps)
+        .chain(net_steps)
+    {
         let (out, lines) = run(fail_on);
         assert!(!out.status.success(), "{fail_on}: {lines:#?}");
         assert!(
-            !lines.iter().any(|line| line.starts_with("unshare ")),
+            !lines.iter().any(|line| line.ends_with(" chat -q a b")),
             "{fail_on}: Hermes ran"
         );
         assert!(
             lines.iter().any(|line| line.contains(fail_on.as_str())),
             "{fail_on}: never reached"
         );
+    }
+    if netted {
+        // Fail closed: no `ip` to bring `lo` up, or no bridge socket (the
+        // switch off in lamp-tasks), and Hermes never runs.
+        let ip = stubs.join("ip");
+        fs::rename(&ip, stubs.join("ip.gone")).unwrap();
+        let (out, lines) = run("");
+        assert!(!out.status.success(), "{lines:#?}");
+        assert!(String::from_utf8_lossy(&out.stderr).contains("no ip"));
+        assert!(!lines.iter().any(|line| line.ends_with(" chat -q a b")));
+        assert!(!lines.iter().any(|line| line.contains("net-relay")));
+        fs::rename(stubs.join("ip.gone"), &ip).unwrap();
+        fs::remove_file(&bridge).unwrap();
+        let (out, lines) = run("");
+        assert!(!out.status.success(), "{lines:#?}");
+        assert!(String::from_utf8_lossy(&out.stderr).contains(&format!("no {bridge}")));
+        assert!(!lines.iter().any(|line| line.ends_with(" chat -q a b")));
+        let _bridge = std::os::unix::net::UnixListener::bind(&bridge).unwrap();
     }
     if tasks {
         // A lamp with no control socket (lamp-control not serving): skipped,
@@ -1163,6 +1263,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown) {
         shown,
         [at(PLACE), at(WORK), at(SKILLS), resolv.clone()]
             .iter()
+            .chain(netted.then_some(&bridge))
             .map(String::as_str)
             .collect::<Vec<_>>()
     );
@@ -1946,7 +2047,7 @@ fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
     let shown = on
         .find("mount --move \"$S/l\" \"$L\" && ro \"$L\"")
         .unwrap();
-    let unstaged = on.find("rm -f \"$S/r\" \"$S/l\" &&").unwrap();
+    let unstaged = on.find("rm -f \"$S/r\" \"$S/l\" \"$S/b\" &&").unwrap();
     let ro_run = on
         .find("mount -o remount,bind,ro,nosuid,nodev,noexec /run")
         .unwrap();
@@ -1954,10 +2055,151 @@ fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
     assert!(staged < hidden && hidden < shown && shown < unstaged);
     assert!(unstaged < ro_run && ro_run < hermes);
     assert_eq!(
-        on.matches("LAMP_").count(),
+        on.matches("LAMP_").count() - on.matches(NET_ENV).count(),
         NS_TEXT.matches("LAMP_").count() + 1,
         "only the comment names the switch"
     );
+    assert!(!NS_TEXT.contains(NET_ENV) && !NS_TEXT.contains(MODEL_SOCKET));
+}
+
+/// With [`TASKS_SWITCH`] on, a run started with [`NET_ENV`] `run` (and
+/// only then: every step tests it) also gets: [`MODEL_SOCKET`], the file
+/// alone, staged before `/run` is hidden and shown read-only after; `lo`
+/// brought up with `ip` from its two places, failing closed without one;
+/// and [`RELAY`] `net-relay` from [`RELAY_LISTEN`] to the bridge, started
+/// in the background as the caller's own ids in a nested user namespace,
+/// its `ready` waited for; all after `/run` is read-only and before Hermes.
+#[test]
+fn a_net_run_shows_the_bridge_brings_lo_up_and_starts_the_relay() {
+    let on = ns_text(false, true);
+    for line in [
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns\n",
+        "if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n",
+        "if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n",
+        "  I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x \"$p\" ]; then I=$p; break; fi; done\n",
+        "  [ -n \"$I\" ] || fail \"no ip: lo not up, the run has no way out\"\n",
+        "  \"$I\" link set lo up || fail \"lo not up\"\n",
+        "  [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n",
+        "unset LAMP_NS_NET\n",
+    ] {
+        assert_eq!(on.matches(line).count(), 1, "{line}");
+    }
+    assert!(on.contains(&format!(
+        "  M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" {RELAY} net-relay \
+         --listen {RELAY_LISTEN} --to \"$B\" &)\n"
+    )));
+    assert!(on.contains(&format!(" B={MODEL_SOCKET} ")));
+    assert_eq!(RELAY_LISTEN, "127.0.0.1:7741");
+    // Every step of its own is behind the variable, `run` exactly.
+    assert_eq!(
+        on.matches("if [ \"${LAMP_NS_NET-}\" = run ]; then").count(),
+        3
+    );
+    let staged = on.find("mount --bind \"$B\" \"$S/b\"").unwrap();
+    let hidden = on.find("none /run ||").unwrap();
+    let shown = on
+        .find("mount --move \"$S/b\" \"$B\" && ro \"$B\"")
+        .unwrap();
+    let ro_run = on
+        .find("mount -o remount,bind,ro,nosuid,nodev,noexec /run")
+        .unwrap();
+    let ids = on.find("U=$LAMP_NS_UID G=$LAMP_NS_GID").unwrap();
+    let lo = on.find("link set lo up").unwrap();
+    let relay = on.find("net-relay --listen").unwrap();
+    let hermes = on.find("exec /usr/bin/unshare --user").unwrap();
+    assert!(staged < hidden && hidden < shown && shown < ro_run);
+    assert!(ro_run < ids && ids < lo && lo < relay && relay < hermes);
+    // The relay's own program is lamp-tasks.service's, under /opt, which
+    // the script never hides.
+    let unit = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product/lamp-tasks.service"),
+    )
+    .unwrap();
+    assert!(unit.contains(&format!("ExecStart={RELAY} serve ")));
+    assert!(!OVERLAID.iter().any(|over| RELAY.starts_with(over)));
+    // Its socket is lamp-tasks', beside its others in its runtime folder.
+    assert!(unit.contains("RuntimeDirectory=lampos-tasks\nRuntimeDirectoryMode=0700\n"));
+    assert_eq!(MODEL_SOCKET, "/run/lampos-tasks/model.sock");
+    // Off, none of it.
+    for skills in [false, true] {
+        let off = ns_text(skills, false);
+        assert!(!off.contains(NET_ENV) && !off.contains("net-relay") && !off.contains("lo up"));
+    }
+}
+
+/// [`wrapper_text`]: off, [`WRAPPER_TEXT`] unchanged; with
+/// [`TASKS_SWITCH`] on, `--net` is added to the first `unshare` only when
+/// the caller's [`NET_ENV`] is `run` exactly, and the variable passed on
+/// then (unset otherwise). Run under `sh` with a stand-in `unshare`.
+#[test]
+fn the_wrapper_adds_net_only_for_a_net_run_with_the_tasks_switch_on() {
+    assert_eq!(wrapper_text(false), WRAPPER_TEXT);
+    for (from, _) in WRAPPER_TASKS_EDITS {
+        assert_eq!(WRAPPER_TEXT.matches(from).count(), 1, "{from}");
+    }
+    assert!(!WRAPPER_TEXT.contains("--net") && !WRAPPER_TEXT.contains(NET_ENV));
+    let on = wrapper_text(true);
+    assert!(on.ends_with(&format!(
+        "if [ \"${{LAMP_NS_NET-}}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n\
+         exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc \
+         --propagation private {NS} \"$@\"\n"
+    )));
+    assert_eq!(on.matches("exec ").count(), 1, "one way to run Hermes");
+    let folder = tempfile::tempdir().unwrap();
+    let printer = folder.path().join("unshare");
+    fs::write(
+        &printer,
+        "#!/bin/sh\necho \"net=${LAMP_NS_NET-unset}\"\necho \"args: $*\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
+    let token = folder.path().join("hermes-token");
+    fs::write(&token, "tok_0123456789abcdef0123456789abcdef\n").unwrap();
+    let ran = |text: &str, net: Option<&str>| {
+        let wrapper = folder.path().join("hermes");
+        fs::write(
+            &wrapper,
+            text.replace(TOKEN, &token.to_string_lossy())
+                .replace("/usr/bin/unshare", &printer.to_string_lossy()),
+        )
+        .unwrap();
+        let mut command = std::process::Command::new("/bin/sh");
+        command.arg(&wrapper).args(["chat", "-q", "a"]);
+        command.env_remove(NET_ENV);
+        if let Some(net) = net {
+            command.env(NET_ENV, net);
+        }
+        let out = command.output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    let plain = format!(
+        "args: --map-root-user --mount --pid --kill-child --mount-proc --propagation private {NS} chat -q a\n"
+    );
+    let netted = format!(
+        "net=run\nargs: --map-root-user --net --mount --pid --kill-child --mount-proc \
+         --propagation private {NS} chat -q a\n"
+    );
+    assert_eq!(ran(&on, Some("run")), netted);
+    for other in [None, Some(""), Some("RUN"), Some("on"), Some("run ")] {
+        assert_eq!(ran(&on, other), format!("net=unset\n{plain}"), "{other:?}");
+    }
+    // Off: the variable takes nothing away and adds nothing either.
+    assert_eq!(ran(WRAPPER_TEXT, Some("run")), format!("net=run\n{plain}"));
+    assert_eq!(ran(WRAPPER_TEXT, None), format!("net=unset\n{plain}"));
+}
+
+/// OpenClaw shares Hermes's namespace script without the tasks edits, and
+/// its own wrapper: never `--net`, never the bridge or the relay.
+#[test]
+fn openclaw_never_gets_a_net_namespace() {
+    for skills in [false, true] {
+        let text = crate::openclaw_install::ns_text(skills);
+        assert!(!text.contains(NET_ENV) && !text.contains("net-relay"));
+        assert!(!text.contains(MODEL_SOCKET));
+    }
+    assert!(!crate::openclaw_install::WRAPPER_TEXT.contains("--net"));
+    assert!(!crate::openclaw_install::WRAPPER_TEXT.contains(NET_ENV));
 }
 
 /// Both switches on: every edit of both made, both sockets staged and
@@ -1982,10 +2224,12 @@ fn both_switches_on_make_both_edits() {
     }
     assert!(both.contains("mount --move \"$S/c\" \"$C\" && ro \"$C\""));
     assert!(both.contains("mount --move \"$S/l\" \"$L\" && ro \"$L\""));
-    assert!(both.contains(" C=/run/lampos-skills L=/run/lampos-control/control.sock S="));
+    assert!(both.contains(
+        " C=/run/lampos-skills L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S="
+    ));
     assert!(!both.contains("admin.sock"));
     assert_eq!(
-        both.matches("LAMP_").count(),
+        both.matches("LAMP_").count() - both.matches(NET_ENV).count(),
         NS_TEXT.matches("LAMP_").count() + 2
     );
 }
