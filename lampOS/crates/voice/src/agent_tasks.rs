@@ -263,6 +263,11 @@ const HERMES: &str = "Hermes";
 /// and the lamp has no target of its own (#5978): nothing goes elsewhere.
 const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that isn't set up on this lamp, so nothing was handed over. Say so plainly in a few words.";
 
+/// Said when the tasks part answers `"lamp":"installing"` (#5978: Hermes on
+/// the lamp is switched on but not installed yet) and no target of the
+/// engine asked for is there: never that a computer needs setting up.
+const LAMP_INSTALLING: &str = "The lamp's own helper is still being installed (it sets itself up in a quiet moment), so nothing was handed over. Say so plainly in a few words.";
+
 /// The task prepared and not yet started.
 #[derive(Clone, Debug)]
 struct Pending {
@@ -1548,6 +1553,9 @@ enum Missing {
     Use(String),
     /// None of that engine, or more than one to choose between.
     NotSetUp,
+    /// None of that engine, and the lamp's own Hermes still installing
+    /// (`"lamp":"installing"`, #5978).
+    LampInstalling,
     /// Who is there couldn't be read: answered as any other refusal.
     Unread,
 }
@@ -1568,6 +1576,7 @@ fn missing_target(
     engine: &str,
     deadline: Duration,
 ) -> Missing {
+    let mut installing = false;
     let Some(there) = ask(
         &place.directory.join("request.sock"),
         &json!({"op":"targets"}),
@@ -1575,6 +1584,7 @@ fn missing_target(
     )
     .as_ref()
     .and_then(|answer| {
+        installing = answer.get("lamp") == Some(&json!("installing"));
         // Kept as the staff only where the staff are used ([`WHO_FLAG`]).
         if place.machine_names
             && let Some(names) = names_from(answer)
@@ -1607,6 +1617,7 @@ fn missing_target(
             );
             Missing::Use((*one).clone())
         }
+        [] if installing => Missing::LampInstalling,
         _ => Missing::NotSetUp,
     }
 }
@@ -2793,6 +2804,7 @@ fn run_for(
                         sent_to = other;
                     }
                     Missing::NotSetUp => return (not_set_up(who), true),
+                    Missing::LampInstalling => return (json!({"error": LAMP_INSTALLING}), true),
                     Missing::Unread => {}
                 }
             }
@@ -9446,5 +9458,66 @@ pub(crate) mod tests {
         assert_eq!(prepared, [json!("lamp")]);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #5978, 11 Nov: the switch on and Hermes not installed yet, no
+    /// computer paired. The tasks part says `"lamp":"installing"`, and the
+    /// model is told the lamp's helper is still being installed, never that
+    /// Claude Code needs setting up on a computer. Without the field it is
+    /// as before; a Claude target there still takes the work.
+    #[test]
+    fn a_lamp_whose_hermes_is_installing_says_so_instead_of_asking_for_a_computer() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-installing-{}", std::process::id()));
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task":"Write a two-line poem about a desk lamp"}),
+        };
+        let told = |targets: Value, prepared: bool| {
+            let _ = std::fs::remove_dir_all(&directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            let mut answers = vec![
+                ("request.sock", status.clone()),
+                ("request.sock", json!({"ok":false,"error":"target"})),
+                ("request.sock", targets),
+            ];
+            if prepared {
+                answers.push((
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ));
+            }
+            let seen = tasks_part(&directory, answers);
+            let at = place(&directory, false);
+            LAMP_THERE_HERE.with(|here| here.set(Some(false)));
+            let told = run(&at, &call, 9, true, PEER_WAIT).0;
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            *PENDING.lock().unwrap() = None;
+            let prepares: Vec<Value> = seen
+                .try_iter()
+                .filter(|line| line["op"] == "prepare")
+                .map(|line| line["target"].clone())
+                .collect();
+            (told, prepares)
+        };
+        let (installing, prepares) =
+            told(json!({"ok":true,"targets":[],"lamp":"installing"}), false);
+        assert_eq!(installing, json!({"error": LAMP_INSTALLING}));
+        assert_eq!(prepares.len(), 1, "nothing prepared after: {prepares:?}");
+        let (before, _) = told(json!({"ok":true,"targets":[]}), false);
+        assert_eq!(before, not_set_up("Claude Code"));
+        let (used, prepares) = told(
+            json!({"ok":true,"targets":[{"alias":"office-claude","engine":"claude"}],"lamp":"installing"}),
+            true,
+        );
+        assert_ne!(used, json!({"error": LAMP_INSTALLING}), "{used}");
+        assert_eq!(prepares.last(), Some(&json!("office-claude")), "{used}");
+        let _ = std::fs::remove_dir_all(&directory);
     }
 }

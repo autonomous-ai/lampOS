@@ -1427,6 +1427,17 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     alone instead of being removed. Hermes missing, not looked at, or the
     switch off: left out, as before. Without `--engines-from-machines` the
     part says once that the lamp is no target.
+  - **While Hermes is still installing.** With the switch on and no lamp
+    target yet (Hermes not installed; lamp-update installs it later in a
+    quiet window), the `targets` answer adds `"lamp":"installing"`;
+    otherwise it is as before. A hand-over the voice asks for then finds no
+    target of its engine and the model is told the lamp's own helper is
+    still being installed (`LAMP_INSTALLING`), never that it needs setting
+    up on a computer; nothing is prepared or kept waiting. A computer target
+    of that engine still takes the work, as before. Tests:
+    `engine::tests::the_targets_say_the_lamp_is_installing_only_with_the_switch_on_and_no_lamp_hermes`
+    and
+    `agent_tasks::tests::a_lamp_whose_hermes_is_installing_says_so_instead_of_asking_for_a_computer`.
   - **Hermes' home.** Hermes keeps its settings in
     `HERMES_HOME=/var/lib/lampos-hermes/.hermes`, outside `lampos`'s home,
     apart from Harness' sign-in and lamp-cloud's credentials. Hermes saves
