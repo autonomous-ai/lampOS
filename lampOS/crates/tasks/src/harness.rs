@@ -93,6 +93,9 @@ const ENVIRONMENT: &[&str] = &[
     // Where Harness finds the lamp's own Hermes' sessions
     // (`LAMP_HERMES_ON_LAMP`, crate::hold::HERMES_HOME, #5978).
     crate::hold::HERMES_HOME,
+    // Where Harness finds the lamp's own OpenClaw's sessions
+    // (`LAMP_OPENCLAW_ON_LAMP`, crate::hold::OPENCLAW_STATE_DIR, #6226).
+    crate::hold::OPENCLAW_STATE_DIR,
     // How Harness reads the engine's launch environment: `lampos` has a
     // nologin shell, so the hold gives it `/bin/sh` (crate::hold::SHELL).
     crate::hold::SHELL,
@@ -123,6 +126,11 @@ pub enum EngineKind {
     /// (`FIRST_PROMPT_ARGS` null, `PROMPT_UNSUPPORTED`), so no work can be
     /// handed to them and none is a target.
     Hermes,
+    /// OpenClaw (#6226), which Harness launches as `openclaw tui --session
+    /// harness-<agentId> --message "<prompt>"` through OpenClaw's own
+    /// Gateway, with a first prompt and no permission modes (Harness CLI
+    /// 0.6.11 and up). Like Hermes, a target only on the lamp itself.
+    Openclaw,
 }
 
 impl EngineKind {
@@ -134,6 +142,7 @@ impl EngineKind {
             Self::Devin => "devin",
             Self::DevinCloud => "devin-cloud",
             Self::Hermes => "hermes",
+            Self::Openclaw => "openclaw",
         }
     }
 
@@ -151,12 +160,21 @@ impl EngineKind {
         matches!(self, Self::DevinCloud)
     }
 
-    /// Whether the agent has Harness's permission modes. Devin and Hermes have
-    /// none: Harness leaves the mode out for them and refuses one they are
+    /// Whether this is an engine the lamp itself runs, for the target
+    /// [`crate::runtime::LAMP_TARGET`]: Hermes (#5978) or OpenClaw (#6226).
+    pub fn on_lamp(self) -> bool {
+        matches!(self, Self::Hermes | Self::Openclaw)
+    }
+
+    /// Whether the agent has Harness's permission modes. Devin, Hermes and
+    /// OpenClaw have none: Harness leaves the mode out for them and refuses one they are
     /// sent (`INVALID_PERMISSION_MODE`; openharness `cli/src/lib/newCommand.ts`,
     /// `PERMISSION_MODES`), so they open in their own default.
     fn has_modes(self) -> bool {
-        !matches!(self, Self::Devin | Self::DevinCloud | Self::Hermes)
+        !matches!(
+            self,
+            Self::Devin | Self::DevinCloud | Self::Hermes | Self::Openclaw
+        )
     }
 
     /// Whether Harness starts this agent with no first message: Devin on
@@ -262,12 +280,12 @@ pub struct SessionMachines {
 
 impl SessionMachines {
     /// From the targets: the lamp's own ([`crate::runtime::LAMP_TARGET`],
-    /// Hermes) and every other on a computer (not a cloud agent), each
+    /// Hermes or OpenClaw) and every other on a computer (not a cloud agent), each
     /// machine once.
     pub fn from_targets(targets: &BTreeMap<String, Target>) -> Self {
         let lamp = targets
             .get(crate::runtime::LAMP_TARGET)
-            .filter(|target| target.engine == EngineKind::Hermes)
+            .filter(|target| target.engine.on_lamp())
             .map(|target| target.machine_id.clone());
         let mut computers: Vec<(String, String, EngineKind)> = Vec::new();
         for (alias, target) in targets {
@@ -695,6 +713,10 @@ pub struct CliConfig {
     /// journaled ([`crate::hold::watch_health`], #5229). Set with the update
     /// hold (`LAMP_HARNESS_HOLD_UPDATES=on`); off unless set.
     pub health_after_start: bool,
+    /// `LAMP_OPENCLAW_ON_LAMP` (#6226): each OpenClaw launch first waits,
+    /// bounded, for the Gateway lamp-update keeps running to answer
+    /// ([`crate::gateway`]). Off unless set.
+    pub openclaw_gateway: bool,
 }
 
 /// Where systemd's logind makes each user's runtime folder.
@@ -762,6 +784,7 @@ impl CliConfig {
             calls: None,
             session_machines: None,
             health_after_start: false,
+            openclaw_gateway: false,
         }
     }
 }
@@ -825,6 +848,29 @@ fn executable_identity(path: &Path) -> io::Result<ExecutableIdentity> {
 }
 
 impl Cli {
+    /// The wait for the OpenClaw Gateway before an OpenClaw launch
+    /// ([`crate::gateway`]), with `CliConfig::openclaw_gateway`; none
+    /// without.
+    pub fn openclaw_gateway(&self) -> Option<crate::gateway::Gateway> {
+        self.config
+            .openclaw_gateway
+            .then(|| crate::gateway::Gateway::new(Box::new(crate::gateway::Loopback)))
+    }
+
+    /// Whether this Harness runs OpenClaw: `harness --version` says
+    /// [`OPENCLAW_HARNESS`] or later (#6226: the lamp's pinned 0.6.2 has no
+    /// OpenClaw). A version not read is no.
+    pub fn runs_openclaw(&self) -> bool {
+        let mut seen = Seen::default();
+        let version = self.run(&["--version".into()], self.config.read_timeout);
+        seen.took(&version);
+        version
+            .ok()
+            .filter(|reply| reply.success)
+            .and_then(|reply| harness_version(&reply.stdout))
+            .is_some_and(|version| version >= OPENCLAW_HARNESS)
+    }
+
     /// The environment each Harness child gets: the checked one, with the
     /// service user's runtime folder and bus looked up now ([`with_user_bus`]).
     pub fn child_environment(&self) -> BTreeMap<String, OsString> {
@@ -1146,6 +1192,15 @@ impl Cli {
                 let outcome = parse_launch(&reply.stdout, launch);
                 self.first_message(launch, outcome, until, seen)
             }
+            // OpenClaw's first prompt is only `--message` on its TUI's
+            // argv: a Gateway handshake that times out loses it, and Harness
+            // neither retries nor says so (#6226, lamp-c0a4). Looked at
+            // with `show`: taken (`ask` set), it is as any launch; idle
+            // with none, it is typed in once, as Devin's is.
+            Ok(reply) if reply.success && launch.target.engine == EngineKind::Openclaw => {
+                let outcome = parse_launch(&reply.stdout, launch);
+                self.first_message_unless_asked(launch, outcome, until, seen, true)
+            }
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
                 not_sent("folder_missing")
@@ -1258,7 +1313,7 @@ impl Cli {
         let mut offline: BTreeSet<String> = BTreeSet::new();
         if let Some(shared) = &self.config.session_machines
             && let Ok(known) = shared.lock()
-            && launch.target.engine == EngineKind::Hermes
+            && launch.target.engine.on_lamp()
             && known.lamp.as_ref() == Some(&launch.target.machine_id)
         {
             offline = known.offline.clone();
@@ -1703,6 +1758,20 @@ impl Cli {
         until: Instant,
         seen: &mut Seen,
     ) -> LaunchOutcome {
+        self.first_message_unless_asked(launch, outcome, until, seen, false)
+    }
+
+    /// [`Cli::first_message`], and with `unless_asked` (OpenClaw, #6226)
+    /// nothing typed once `show` says the harness was asked (`ask` set):
+    /// its first prompt arrived, and the launch is as Harness answered it.
+    fn first_message_unless_asked(
+        &self,
+        launch: &Launch,
+        outcome: LaunchOutcome,
+        until: Instant,
+        seen: &mut Seen,
+        unless_asked: bool,
+    ) -> LaunchOutcome {
         let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let agent_id = match outcome {
             LaunchOutcome::Created { agent_id } => agent_id,
@@ -1733,6 +1802,9 @@ impl Cli {
                 Err(error) => return uncertain(error.code),
                 _ => None,
             };
+            if unless_asked && observation.as_ref().is_some_and(|seen| seen.ask.is_some()) {
+                return LaunchOutcome::Created { agent_id };
+            }
             match observation.as_ref().map(|seen| seen.state.as_str()) {
                 Some("idle") => break,
                 // A Harness before the fresh-Devin fix (0.5.6) reads a Devin
@@ -4145,6 +4217,26 @@ fn lists_resume(bytes: &[u8]) -> bool {
             .strip_prefix("resume")
             .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
     })
+}
+
+/// The first Harness CLI that runs OpenClaw (#6226).
+pub const OPENCLAW_HARNESS: (u32, u32, u32) = (0, 6, 11);
+
+/// The first `major.minor.patch` in `harness --version`'s first line
+/// (`0.6.12_cli`, `harness 0.6.12`).
+pub fn harness_version(bytes: &[u8]) -> Option<(u32, u32, u32)> {
+    let text = String::from_utf8_lossy(bytes);
+    let line = text.lines().next()?;
+    line.split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .find_map(|word| {
+            let mut parts = word.split('.');
+            let numbers = (
+                parts.next()?.parse().ok()?,
+                parts.next()?.parse().ok()?,
+                parts.next()?.parse().ok()?,
+            );
+            Some(numbers)
+        })
 }
 
 /// `harness --version`'s first line as a journal can say it: letters,

@@ -34,6 +34,11 @@ Environment=LAMP_HERMES_ON_LAMP=on
 # A follow-up for a session --close-told already closed (#5978): it is found by its last ask with `harness show`
 # and reopened with `harness resume`, then the work is typed in, never a new session.
 Environment=LAMP_TASKS_RESUME_CLOSED=on
+# The same for the lamp's own OpenClaw (#6226), the lamp's engine by default (the owner's decision: every
+# lamp has 6 GB, no memory floor): with both installed the lamp's target is OpenClaw; LAMP_LAMP_ENGINE=hermes
+# picks Hermes, and either falls back to the other when it is not installed. Its Gateway runs always under
+# lamp-update's unit; lamp-tasks only waits for it to answer before a launch.
+Environment=LAMP_OPENCLAW_ON_LAMP=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks

@@ -2292,6 +2292,66 @@ fn a_lamp_with_no_computer_hands_work_to_its_own_hermes() {
     );
 }
 
+/// #6226, the owner's default: with both of the lamp's engines on and
+/// installed, the lamp's target is OpenClaw and a hand-over to `lamp`
+/// starts OpenClaw on the lamp's own machine, its guidance in the lamp's
+/// folder; `LAMP_LAMP_ENGINE=hermes` picks Hermes; with only one installed
+/// that one is the lamp's, whichever is chosen.
+#[test]
+fn the_lamps_engine_is_openclaw_by_default_hermes_when_chosen_or_the_one_installed() {
+    use EngineKind::{Hermes, Openclaw};
+    let both = vec![
+        row("hermes", Some(true), None),
+        row("openclaw", Some(true), None),
+    ];
+    let only_openclaw = vec![row("openclaw", Some(true), None)];
+    for (chosen, rows, want) in [
+        (None, both.clone(), Openclaw),
+        (Some("hermes"), both.clone(), Hermes),
+        (None, vec![row("hermes", Some(true), None)], Hermes),
+        (Some("hermes"), only_openclaw.clone(), Openclaw),
+    ] {
+        let home = tempfile::tempdir().unwrap();
+        let side = lamp_side(Some("on"), Some("on"), chosen, Some(home.path().to_owned()));
+        let (mut s, _) = engines_running(true);
+        s.config.set_up_later.as_mut().unwrap().lamp = side;
+        s.counts.machines.lock().unwrap().truncate(1);
+        s.counts
+            .engines
+            .lock()
+            .unwrap()
+            .insert("a".repeat(32), Ok(rows));
+        s.start();
+        let name = if want == Openclaw {
+            "openclaw"
+        } else {
+            "hermes"
+        };
+        targets_until(&s, json!([{"alias":"lamp","engine":name}]));
+        let guidance =
+            fs::read_to_string(home.path().join("harnesses/lamp-tasks/lamp/AGENTS.md")).unwrap();
+        let who = if want == Openclaw {
+            "OpenClaw"
+        } else {
+            "Hermes"
+        };
+        assert!(
+            guidance.contains(&format!("You are {who}, running on the lamp")),
+            "{chosen:?}: {guidance}"
+        );
+        let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+        let id = prepared["id"].clone();
+        let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+        assert_eq!(s.trusted(confirm)["ok"], true);
+        s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+        assert_eq!(
+            *s.counts.launched_on.lock().unwrap(),
+            [("a".repeat(32), want)],
+            "{chosen:?}"
+        );
+    }
+}
+
 /// #5978, the PM: with `LAMP_HERMES_ON_LAMP` off (unset, `off`, or any
 /// value but `on`), routing is as on stable. The lamp is listed as a
 /// Harness machine with Hermes installed, yet it is no target: the targets
@@ -2303,7 +2363,7 @@ fn a_lamp_with_no_computer_hands_work_to_its_own_hermes() {
 fn with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer() {
     let home = tempfile::tempdir().unwrap();
     for value in [None, Some("off"), Some(""), Some("ON")] {
-        let side = lamp_side(value, Some(home.path().to_owned()));
+        let side = lamp_side(value, None, None, Some(home.path().to_owned()));
         assert!(side.is_none(), "{value:?}");
         let (mut s, path) = engines_running(true);
         s.config.set_up_later.as_mut().unwrap().lamp = side;
@@ -2356,8 +2416,8 @@ fn with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer() {
         );
     }
     // On, with a home: the lamp's side, as the on-case above.
-    assert!(lamp_side(Some("on"), Some(home.path().to_owned())).is_some());
-    assert!(lamp_side(Some("on"), None).is_none());
+    assert!(lamp_side(Some("on"), None, None, Some(home.path().to_owned())).is_some());
+    assert!(lamp_side(Some("on"), None, None, None).is_none());
 }
 
 /// #5199: an engine not found on that computer (`installed` null with
@@ -2965,8 +3025,8 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
     s.stop();
     let mut store = released(&s);
     let mut newer: Value = serde_json::from_slice(&store.load().unwrap().unwrap()).unwrap();
-    // One past the engine's `SCHEMA` (6 since #5978's `joined_on`).
-    newer["schema"] = json!(7);
+    // One past the engine's `SCHEMA` (7 since #6226's `openclaw`).
+    newer["schema"] = json!(8);
     store.commit(&serde_json::to_vec(&newer).unwrap()).unwrap();
     drop(store);
     s.start();
@@ -2986,7 +3046,7 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
         "Tasks set aside a store from a newer build; its tasks are not followed"
     );
     let kept = kept.expect("the kept file is named");
-    assert!(kept.starts_with("tasks.sqlite3.newer-7-"), "{kept}");
+    assert!(kept.starts_with("tasks.sqlite3.newer-8-"), "{kept}");
     // Restarted: the store opens well now, and the kept file is still said.
     s.stop();
     drop(released(&s));

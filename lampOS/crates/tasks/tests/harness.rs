@@ -117,6 +117,7 @@ impl Rig {
             calls: None,
             session_machines: None,
             health_after_start: false,
+            openclaw_gateway: false,
             user_runtime_root: root.path().join("run-user"),
         };
         let rig = Self {
@@ -444,6 +445,67 @@ fn devins_task_is_typed_in_with_reply_once_it_is_idle() {
             .unwrap()
             .iter()
             .any(|arg| arg == "--task")
+    );
+}
+
+/// #6226, lamp-c0a4: OpenClaw's first prompt is lost when its Gateway's
+/// handshake times out. After `new`, `show` is read: asked already (`ask`
+/// set), nothing is typed; idle with no ask, the task is typed in once
+/// with `harness reply`.
+#[test]
+fn openclaws_lost_first_prompt_is_typed_in_once_and_a_taken_one_is_left() {
+    let mut request = launch();
+    request.target.engine = EngineKind::Openclaw;
+    let seen = |state: &str, ask: Value| {
+        step(json!({"id":AGENT,"state":state,"ask":ask,"answer":"","truncated":false,"tools":0}))
+    };
+    let verbs = |rig: &Rig| -> Vec<String> {
+        rig.calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .collect()
+    };
+    // Taken: the prompt arrived, no reply.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},
+        "show":{"each":[seen("working", json!("Inspect the authored fixture"))]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    assert_eq!(verbs(&rig), ["machines", "new", "show"]);
+    let new = rig.calls()[1]["args"].as_array().unwrap().clone();
+    assert!(new.iter().any(|arg| arg == "--task"), "{new:?}");
+    // Lost: idle with no ask, typed in once.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},
+        "show":{"each":[seen("starting", Value::Null), seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    assert_eq!(verbs(&rig), ["machines", "new", "show", "show", "reply"]);
+    assert_eq!(
+        rig.calls()[4]["args"],
+        json!([
+            "reply",
+            "--machine",
+            MACHINE,
+            AGENT,
+            "--json",
+            "--",
+            "Inspect the authored fixture"
+        ])
     );
 }
 
@@ -2008,6 +2070,39 @@ fn hermes_is_asked_for_by_name_with_no_mode() {
     ));
 }
 
+/// #6226: OpenClaw has no permission modes either (Harness CLI 0.6.11):
+/// asked for by name, `openclaw`, with no `--mode`, and a receipt claiming
+/// a mode that approves on its own is not taken.
+#[test]
+fn openclaw_is_asked_for_by_name_with_no_mode() {
+    let rig = Rig::new();
+    let mut request = launch();
+    request.target.engine = EngineKind::Openclaw;
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let args = rig.calls()[1]["args"].as_array().unwrap().clone();
+    assert_eq!(args[1], "openclaw");
+    assert!(!args.iter().any(|arg| arg == "--mode"), "{args:?}");
+    assert_eq!(EngineKind::Openclaw.bus_name(), "openclaw");
+    assert!(EngineKind::Openclaw.on_lamp() && EngineKind::Hermes.on_lamp());
+    assert!(!EngineKind::Claude.on_lamp());
+    assert_eq!(
+        serde_json::from_value::<EngineKind>(json!("openclaw")).unwrap(),
+        EngineKind::Openclaw
+    );
+    let rig = Rig::new();
+    rig.new_step(step(json!({"ok":true,"machineId":MACHINE,"agent":{
+        "id":AGENT,"name":"lamp-task-001","engine":"openclaw","permissionMode":"auto","bypassPermission":true}})));
+    assert!(matches!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Uncertain { .. }
+    ));
+}
+
 /// The reviewer's P1 on #2240: every engine's name on the bus passes
 /// `tasks/status`' check, Devin Cloud's as `devin_cloud`, while Harness is
 /// still asked for `devin-cloud`.
@@ -2020,6 +2115,7 @@ fn every_engines_bus_name_passes_the_status_check() {
         EngineKind::Devin,
         EngineKind::DevinCloud,
         EngineKind::Hermes,
+        EngineKind::Openclaw,
     ] {
         let settled = lamp_msgs::TaskSettled {
             task: 1,
@@ -5432,6 +5528,38 @@ fn a_named_session_is_looked_for_on_the_lamp_first_then_the_computers() {
     assert_eq!(calls.iter().filter(|call| call[0] == "ps").count(), 1);
 }
 
+/// #6226: a named hand-over to the lamp's own target with OpenClaw looks
+/// among the computers too, as with Hermes: one only on a computer is
+/// typed into there and said so (`joined_on`).
+#[test]
+fn a_named_session_for_the_lamps_openclaw_is_looked_for_on_the_computers_too() {
+    const LAPTOP: &str = "fedcba9876543210fedcba9876543210";
+    let mut request = launch();
+    request.target.engine = EngineKind::Openclaw;
+    request.session = Some("docs".into());
+    let ps = |rows: Value| step(json!({"you":null,"machine":"m","harnesses":rows,"next":[]}));
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.session_machines = Some(Arc::new(Mutex::new(SessionMachines {
+        lamp: Some(MACHINE.into()),
+        computers: vec![("office".into(), LAPTOP.into(), EngineKind::Claude)],
+        offline: Default::default(),
+    })));
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":{"each":[ps(json!([])), ps(json!([ps_row(OTHER, "docs", "idle", None)]))]},
+        "reply":step(json!({"ok":true,"name":"x","id":OTHER,"message":"m1","state":"queued"}))
+    }));
+    match rig.cli().launch(&request) {
+        LaunchOutcome::JoinedOn { agent_id, on, .. } => {
+            assert_eq!(agent_id, OTHER);
+            assert_eq!(on.machine_id, LAPTOP);
+            assert_eq!(on.engine, EngineKind::Claude);
+        }
+        outcome => panic!("{outcome:?}"),
+    }
+}
+
 /// #5978: the machines a named hand-over to the lamp looks among, from
 /// the targets: the lamp's own (Hermes) apart, each computer once, no cloud
 /// agent.
@@ -5468,4 +5596,43 @@ fn the_session_machines_come_from_the_targets() {
     let mut without = targets.clone();
     without.remove("lamp");
     assert_eq!(SessionMachines::from_targets(&without).lamp, None);
+    // #6226: the lamp with OpenClaw is the lamp's own as with Hermes.
+    let mut openclaw = targets.clone();
+    openclaw.insert("lamp".to_owned(), target('a', EngineKind::Openclaw));
+    let machines = SessionMachines::from_targets(&openclaw);
+    assert_eq!(machines.lamp, Some("a".repeat(32)));
+    assert_eq!(machines.computers.len(), 2);
+}
+
+/// #6226: OpenClaw needs Harness CLI 0.6.11 or later; the lamp's pinned
+/// 0.6.2 is refused, and a version not read is no version.
+#[test]
+fn the_harness_version_is_read_for_openclaw() {
+    use lamp_tasks::harness::{OPENCLAW_HARNESS, harness_version};
+    assert_eq!(harness_version(b"0.6.12_cli\n"), Some((0, 6, 12)));
+    assert_eq!(harness_version(b"harness v0.6.11\n"), Some((0, 6, 11)));
+    assert_eq!(harness_version(b"0.6.2\n"), Some((0, 6, 2)));
+    assert_eq!(harness_version(b"0.6\n"), None);
+    assert_eq!(harness_version(b""), None);
+    assert_eq!(harness_version(b"x\n0.6.12\n"), None, "first line only");
+    assert!(harness_version(b"0.6.2").unwrap() < OPENCLAW_HARNESS);
+    assert!(harness_version(b"0.6.10").unwrap() < OPENCLAW_HARNESS);
+    assert!(harness_version(b"0.6.11_cli").unwrap() >= OPENCLAW_HARNESS);
+    assert!(harness_version(b"1.0.0").unwrap() >= OPENCLAW_HARNESS);
+}
+
+/// #6226: the Harness on the lamp is asked its version before OpenClaw is
+/// offered: 0.6.2 (the lamp's pin) and a failed answer are no, 0.6.12 yes.
+#[test]
+fn openclaw_is_offered_only_by_a_harness_from_0_6_11() {
+    for (version, want) in [
+        (json!({"stdout":"0.6.12_cli\n"}), true),
+        (json!({"stdout":"0.6.11\n"}), true),
+        (json!({"stdout":"0.6.2\n"}), false),
+        (json!({"stdout":"0.6.12\n","exit":1}), false),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"--version": version.clone()}));
+        assert_eq!(rig.cli().runs_openclaw(), want, "{version}");
+    }
 }

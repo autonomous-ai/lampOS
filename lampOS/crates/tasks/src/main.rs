@@ -152,13 +152,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .into(),
         );
     }
-    // The lamp's own machine as a target, with Hermes (#5978): read only
-    // here, and only with the machines' engines looked at.
+    // The lamp's own machine as a target, with OpenClaw or Hermes (#5978,
+    // #6226): read only here, and only with the machines' engines looked at.
     let hermes_switch = std::env::var(lamp_tasks::runtime::HERMES_ON_LAMP).ok();
-    let hermes_on_lamp = lamp_tasks::runtime::hermes_on_lamp(hermes_switch.as_deref());
-    if hermes_on_lamp && !engines_from_machines {
+    let openclaw_switch = std::env::var(lamp_tasks::runtime::OPENCLAW_ON_LAMP).ok();
+    let lamp_engine = std::env::var(lamp_tasks::runtime::LAMP_ENGINE).ok();
+    let lamp_engines = lamp_tasks::runtime::lamp_engines(
+        hermes_switch.as_deref(),
+        openclaw_switch.as_deref(),
+        lamp_engine.as_deref(),
+    );
+    if !lamp_engines.is_empty() && !engines_from_machines {
         eprintln!(
-            "tasks: LAMP_HERMES_ON_LAMP is on, but without --engines-from-machines the lamp's own Hermes is never looked for; the lamp is no target"
+            "tasks: LAMP_OPENCLAW_ON_LAMP or LAMP_HERMES_ON_LAMP is on, but without --engines-from-machines the lamp's own engine is never looked for; the lamp is no target"
         );
     }
     if push_wait && !watch {
@@ -216,6 +222,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             // The work folder is under `lampos`'s (Harness's) home.
             lamp: lamp_tasks::runtime::lamp_side(
                 hermes_switch.as_deref(),
+                openclaw_switch.as_deref(),
+                lamp_engine.as_deref(),
                 std::env::var_os("HOME").map(PathBuf::from),
             ),
         }),

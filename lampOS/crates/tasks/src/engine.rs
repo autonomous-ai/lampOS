@@ -99,7 +99,10 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 /// one its named session was found on (`joined_on`, #5978): a build before
 /// would follow it on the wrong machine. Only a state holding such a task
 /// is written as 6, by the same rule.
-const SCHEMA: u32 = 6;
+///
+/// 7: a target's engine may be `openclaw` (#6226). Only a state holding an
+/// OpenClaw task is written as 7, by the same rule.
+const SCHEMA: u32 = 7;
 /// The oldest `schema` this build reads and writes: a state with no Devin
 /// task.
 const OLDEST_SCHEMA: u32 = 1;
@@ -736,13 +739,17 @@ fn task_label(store_id: &str, id: u64) -> String {
 
 impl State {
     /// The `schema` this state is written with: the lowest that reads every
-    /// task in it: 5 with a task whose launch names a session, 4 with a
+    /// task in it: 7 with an OpenClaw task, 6 with a task joined on another
+    /// machine, 5 with a task whose launch names a session, 4 with a
     /// Hermes task, 3 with a Devin Cloud one, 2 with a Devin one, else
     /// [`OLDEST_SCHEMA`].
     fn schema_needed(&self) -> u32 {
         self.tasks
             .iter()
             .map(|task| {
+                if task.launch.target.engine == EngineKind::Openclaw {
+                    return 7;
+                }
                 if task.dispatch.joined_on.is_some() {
                     return 6;
                 }
@@ -5123,6 +5130,36 @@ mod tests {
         assert!(Engine::open(memory, hermes(), STORE, RESTART, &clock(2)).is_err());
     }
 
+    /// #6226: a store that holds an OpenClaw task is written as 7, which a
+    /// build before it sets aside; one that names OpenClaw under schema 6 is
+    /// refused. A store without one stays as low as its other tasks need.
+    #[test]
+    fn a_store_with_an_openclaw_task_is_written_as_schema_seven() {
+        let openclaw = || {
+            let mut staff = targets();
+            staff.get_mut("desk").unwrap().engine = EngineKind::Openclaw;
+            staff
+        };
+        let memory = Memory::default();
+        let mut engine =
+            Engine::open(memory.clone(), openclaw(), STORE, SESSION, &clock(0)).unwrap();
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 0);
+        let stored = written(&memory);
+        assert_eq!(stored["schema"], 7);
+        assert_eq!(stored["tasks"][0]["launch"]["target"]["engine"], "openclaw");
+        drop(engine);
+        let engine = Engine::open(memory.clone(), openclaw(), STORE, RESTART, &clock(1))
+            .expect("a schema-7 store opens");
+        assert_eq!(engine.state.tasks.len(), 1);
+        drop(engine);
+        let mut wrong = written(&memory);
+        wrong["schema"] = json!(6);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&wrong).unwrap());
+        assert!(Engine::open(memory, openclaw(), STORE, RESTART, &clock(2)).is_err());
+    }
+
     /// #5535: a task whose launch names the session the person asked for
     /// is stored with it and written as 5, which a build before it sets
     /// aside; one that names a session under schema 4 is refused. A task
@@ -6183,6 +6220,7 @@ mod tests {
             EngineKind::Devin,
             EngineKind::DevinCloud,
             EngineKind::Hermes,
+            EngineKind::Openclaw,
         ];
         for value in engine {
             match value {
@@ -6191,7 +6229,8 @@ mod tests {
                 | EngineKind::Opencode
                 | EngineKind::Devin
                 | EngineKind::DevinCloud
-                | EngineKind::Hermes => {}
+                | EngineKind::Hermes
+                | EngineKind::Openclaw => {}
             }
         }
         let vocabulary = [
@@ -6205,10 +6244,10 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                6,
+                7,
                 "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
                  read: requested attempting finished failed; speech: claimed spoken uncertain; \
-                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes"
+                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes openclaw"
             ),
             "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
         );
