@@ -609,6 +609,9 @@ fn asks_of(directory: &std::path::Path, made: &Made) -> Option<crate::skill_writ
 /// The `make_skill` argument that reads a made skill back by its name.
 pub const READ_BACK: &str = "read_back";
 
+/// What the model is told when no made skill on the lamp has the name asked.
+pub const NO_SKILL_BY_THAT_NAME: &str = "no skill made on this lamp is on by that name";
+
 /// What the model is told when a read-back comes in a turn nobody spoke.
 pub const READ_BACK_NOT_ASKED: &str =
     "a skill is read back only when the person asks for it out loud";
@@ -620,16 +623,19 @@ pub struct Asking {
     pub request: u64,
     /// A line someone spoke.
     pub heard: bool,
-    /// What only the owner may hear is said to it: the private room, or
-    /// the owner seen saying it (`services::owner_hears`, as a read in full).
+    /// What only the owner may hear is said whole to it: the private room,
+    /// or, as a services read in full, the owner seen saying it, the one
+    /// face in view and in their voice on the judge route
+    /// (`services::owner_hears`).
     pub owner_hears: bool,
     /// The route with the echo judge, where a yes may be taken
     /// (`services::sends_here`).
     pub sends_here: bool,
 }
 
-/// What the model is told of a skill that sends, read back to a line the
-/// owner was not seen saying, outside the private room: its name only.
+/// What the model is told of a skill that sends, read back outside the
+/// private room to a line not the owner's alone in view and in their voice
+/// (`Asking::owner_hears` false): its name only.
 pub fn sends_unsaid(spoken: &str) -> String {
     format!(
         "Say only this, in the conversation's language: \"{spoken} sends something on its own; \
@@ -663,8 +669,9 @@ pub fn changed_since_made(spoken: &str) -> String {
 /// spoke), at `now`: the kept skill on the lamp named `name`
 /// ([`made_skill::kept_on_named`]), from the made skills' `directory`.
 /// One that sends or writes is read back only to the owner
-/// (`owner_hears`: the private room, or the owner seen saying the line, as
-/// a services read in full; App Only's P2 on #6230); to anyone else its
+/// (`owner_hears`: the private room, or, as a services read in full, the
+/// owner seen saying the line, the one face in view and in their voice on
+/// the judge route; App Only's P2s on #6230 and #6250); to anyone else its
 /// name only, that it sends ([`sends_unsaid`]), and no wait starts.
 /// One that sends or writes and is not approved for what it sends now
 /// (`approved`, `lamp-services`' `skill_writes_approved`; not told is not
@@ -678,8 +685,10 @@ pub fn changed_since_made(spoken: &str) -> String {
 /// can't take a yes (`sends_here` false), it is said to wait, no wait
 /// starts and a pending make's wait is left as it is ([`yes_not_here`];
 /// App Only's P3 on #6230). Its package on the lamp not the one made is
-/// said so ([`changed_since_made`]). One that sends nothing, or none of
-/// that name, is said so. What the model is told.
+/// said so ([`changed_since_made`]). One that sends nothing is said so.
+/// None of that name is said so, with the made skills' names on the lamp
+/// only under `owner_hears`, since a name can carry a person's (Thirteen's
+/// P3 on #6250). What the model is told.
 pub fn read_back(
     name: &str,
     asking: Asking,
@@ -694,21 +703,26 @@ pub fn read_back(
         );
         return json!({ "error": READ_BACK_NOT_ASKED });
     }
-    let not_on = |names: Vec<String>| {
-        let on: Vec<String> = names
+    let Some(made) = made_skill::kept_on_named(directory, name) else {
+        eprintln!("lamp-voice: request {request}: a made skill to read back was not found");
+        if !asking.owner_hears {
+            return json!({
+                "error": NO_SKILL_BY_THAT_NAME,
+                "on": [],
+                "next": "Say plainly, in a few words, that there is no skill by that name. Name \
+                         no other skill. Call nothing."
+            });
+        }
+        let on: Vec<String> = made_skill::kept_on_names(directory)
             .iter()
             .map(|name| made_skill::spoken_name(name))
             .collect();
-        json!({
-            "error": "no skill made on this lamp is on by that name",
+        return json!({
+            "error": NO_SKILL_BY_THAT_NAME,
             "on": on,
             "next": "Say plainly, in a few words, that no skill they made is on by that name, \
                      and name the ones that are, if any. Call nothing."
-        })
-    };
-    let Some(made) = made_skill::kept_on_named(directory, name) else {
-        eprintln!("lamp-voice: request {request}: a made skill to read back was not found");
-        return not_on(made_skill::kept_on_names(directory));
+        });
     };
     let spoken = made_skill::spoken_name(&made.name);
     let Some(asks) = asks_of(directory, &made) else {
@@ -2102,8 +2116,27 @@ light = { dim = 1 }
             "{told}"
         );
         let told = read_back("morning mail", asking(20), &keeping.directory, unasked, now);
-        assert!(told["error"].is_string(), "{told}");
+        assert_eq!(told["error"], NO_SKILL_BY_THAT_NAME, "{told}");
         assert_eq!(told["on"], json!(["evening dim"]), "{told}");
+        // Thirteen's P3 on #6250: to a line the owner may not hear, a name
+        // that matches none names no other skill, since a made skill's name
+        // can carry a person's.
+        let told = read_back(
+            "morning mail",
+            Asking {
+                owner_hears: false,
+                ..asking(20)
+            },
+            &keeping.directory,
+            unasked,
+            now,
+        );
+        assert_eq!(told["error"], NO_SKILL_BY_THAT_NAME, "{told}");
+        assert_eq!(told["on"], json!([]), "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("no skill by that name"), "{next}");
+        assert!(!next.contains("evening dim"), "{next}");
+        assert!(!told.to_string().contains("evening dim"), "{told}");
         let told = read_back(
             "evening dim",
             Asking {
@@ -2141,23 +2174,77 @@ light = { dim = 1 }
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// App Only's P2 on #6230: a write skill's recipients and words are
-    /// read back only in the private room or to the owner seen saying the
-    /// line (`services::owner_seen_saying`, as a read in full); to anyone
-    /// else its name only, that it sends, nothing asked of `lamp-services`
-    /// and no wait started.
+    /// App Only's P2s on #6230 and #6250: a write skill's recipients and
+    /// words are read back only in the private room or, as a services read
+    /// in full (`services::said_whole`), to the owner seen saying the line,
+    /// the one face in view and in their voice at 0.55 or more on the judge
+    /// route; to anyone else its name only, that it sends, nothing asked of
+    /// `lamp-services` and no wait started.
     #[test]
-    fn a_read_back_is_said_whole_only_in_the_private_room_or_to_the_owner_seen() {
+    fn a_read_back_is_said_whole_only_in_the_private_room_or_to_the_owner_alone_and_heard() {
         let (root, keeping, made_line) = made_write("read-back-who");
         let now = std::time::Instant::now();
-        for (why, private_room, owner, seen, whole) in [
-            ("the private room", true, Some("owner"), false, true),
-            ("the owner seen saying it", false, Some("owner"), true, true),
-            ("the owner not seen", false, Some("owner"), false, false),
-            ("no owner's line", false, None, true, false),
+        for (why, private_room, owner, seen, alone, likeness, whole) in [
+            (
+                "the private room",
+                true,
+                Some("owner"),
+                false,
+                false,
+                None,
+                true,
+            ),
+            (
+                "the owner alone, in their voice",
+                false,
+                Some("owner"),
+                true,
+                true,
+                Some(0.6),
+                true,
+            ),
+            (
+                "a silent guest in view",
+                false,
+                Some("owner"),
+                true,
+                false,
+                Some(0.9),
+                false,
+            ),
+            (
+                "a likeness under the bar",
+                false,
+                Some("owner"),
+                true,
+                true,
+                Some(0.5),
+                false,
+            ),
+            (
+                "no likeness, or Live",
+                false,
+                Some("owner"),
+                true,
+                true,
+                None,
+                false,
+            ),
+            (
+                "the owner not seen",
+                false,
+                Some("owner"),
+                false,
+                true,
+                Some(0.9),
+                false,
+            ),
+            ("no owner's line", false, None, true, true, Some(0.9), false),
         ] {
-            let owner_hears = private_room
-                || crate::services::owner_seen_saying(true, private_room, owner, |_| seen);
+            let seen_owner =
+                crate::services::owner_seen_saying(true, private_room, owner, |_| seen);
+            let owner_hears =
+                crate::services::said_whole(private_room, seen_owner, || alone, || likeness);
             let mut asked = false;
             let told = read_back(
                 "leaving mail",
