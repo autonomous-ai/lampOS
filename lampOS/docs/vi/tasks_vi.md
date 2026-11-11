@@ -174,9 +174,17 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
   cấp token một lần chạy) hoặc `run_failed`.
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên
-  #6071): với mỗi lần chạy, lamp-tasks xin lamp-control (#6304) một token tạo
-  từ lời đồng ý của chủ đèn cho đúng kỹ năng này, SHA-256 của thư mục và các
-  quyền của nó (trait `Tokens`). Lần chạy nhận nó qua `LAMP_CONTROL_TOKEN`,
+  #6071): với mỗi lần chạy, lamp-tasks xin lamp-control (#6304, PR #6408)
+  một token trên socket quản trị `/run/lampos-control/admin.sock`
+  (`ControlTokens`, trait `Tokens`): `{"mint":{"skill","run"}}`, với mã lần
+  chạy của riêng lamp-tasks, mới cho mỗi lần giao (`run_id`), và
+  `{"end":{"run"}}` khi lần chạy kết thúc. lamp-control tự đọc lời đồng ý
+  của chủ đèn và nêu các quyền; lần chạy nào có quyền được cấp không khớp
+  đúng các quyền dòng giao việc xin thì bị từ chối `no_token` và token bị
+  kết thúc, nên lần chạy không bao giờ nhận quyền mà kỹ năng không xin. Lời
+  từ chối của chính lamp-control (chưa có đồng ý, tắt chạy kỹ năng, không
+  liên lạc được trong 5 s) là thông điệp `no_token`. Lần chạy nhận token qua
+  `LAMP_CONTROL_TOKEN`,
   cùng `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`, và không thêm
   gì khác vào môi trường. Token kết thúc khi lần chạy kết thúc, kể cả khi lần
   chạy lỗi. Nó không bao giờ có trong lời của việc, nhật ký hay dòng debug.
@@ -185,9 +193,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   script cần chạy từ thư mục chỉ đọc của kỹ năng, và đường duy nhất tới đèn
   (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
 
-**Chưa có (nói rõ để không hiểu code là nhiều hơn):** #6304 chưa được gộp,
-nên nguồn token duy nhất là `NoTokens`, từ chối mọi lần chạy (`no_token`);
-bộ chuyển cho `control.sock` của nó sẽ cắm vào `Tokens`. Chưa có cờ serve nào
+**Chưa có (nói rõ để không hiểu code là nhiều hơn):** `ControlTokens` nói
+theo socket quản trị của #6408, PR này chưa được gộp, và lamp-control chưa
+giữ lời đồng ý nào của kỹ năng, nên mọi lần xin token ở đó đều bị từ chối.
+Chưa có cờ serve nào
 mở socket giao việc này, và chưa có `Runner` nào khởi động Hermes qua
 Harness, nên trên đèn chưa có việc của kỹ năng nào chạy. Việc "không mạng nào
 khác" của lần chạy (một lệnh gọi ra ngoài trực tiếp bị từ chối) và giới hạn
