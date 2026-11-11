@@ -3462,7 +3462,7 @@ fn the_apps_sign_in_is_its_own_routes_and_never_the_voices() {
         assert_eq!(s.trusted(op.clone())["error"], "untrusted", "{op}");
         assert_eq!(s.ask(op.clone())["error"], "untrusted", "{op}");
     }
-    // Only the code or the QR (#5198).
+    // A method the part doesn't know (#5198: the code or the QR).
     assert_eq!(
         s.app(json!({"op":"app_sign_in_start","method":"email"}))["error"],
         "bad_request"
@@ -3628,6 +3628,101 @@ fn the_apps_sign_in_is_its_own_routes_and_never_the_voices() {
         ended["message"],
         "Too many wrong codes. Try again in an hour."
     );
+}
+
+/// #5198: the app signs in by Harness's QR on its own route. The link goes
+/// out in one reply per telling (the start's or a state read's, never the
+/// relay word's), never to the voice; the question and the answer are the
+/// code's; and a sign-in started by voice afterwards is still by code.
+#[test]
+fn the_apps_qr_sign_in_gives_its_link_once_and_the_voice_keeps_the_code() {
+    use lamp_tasks::sign_in::{Done, Event, Method};
+    const URL: &str = "https://harness.autonomous.ai/signin#k=hnq_secret0123";
+    let push =
+        |s: &Running, event: SignInRead| s.counts.sign_in_lines.lock().unwrap().push_back(event);
+    let qr = || {
+        Ok(Event::Qr {
+            url: URL.into(),
+            expires_in: 120,
+        })
+    };
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.sign_in_by_code = true;
+    s.config.app_socket = Some(s.root.path().join("run/app"));
+    // This test stands in for lamp-cloud (#5379).
+    s.config.app_caller = |_| true;
+    s.start();
+    push(&s, qr());
+    let started = s.app(json!({"op":"app_sign_in_start","method":"qr"}));
+    assert_eq!(started["ok"], true, "{started}");
+    assert_eq!(started["method"], "qr");
+    assert_eq!(started["by"], "app");
+    assert_eq!(started["sign_in"], "qr");
+    assert_eq!(started["qr_url"], URL);
+    assert_eq!(started["expires_in"], 120);
+    assert!(started["expires_at"].as_u64().unwrap() > 1_700_000_000_000);
+    assert!(started.get("code").is_none());
+    assert_eq!(*s.counts.sign_in_methods.lock().unwrap(), [Method::Qr]);
+    let id = started["id"].as_u64().unwrap();
+    // Claimed: no later read, start again or relay word holds it.
+    let read = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(read["sign_in"], "qr");
+    assert!(read.get("qr_url").is_none(), "{read}");
+    assert_eq!(read["revision"], started["revision"]);
+    let again = s.app(json!({"op":"app_sign_in_start","method":"qr"}));
+    assert_eq!(again["id"], id);
+    assert!(again.get("qr_url").is_none());
+    assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 1);
+    // Kept alive by Harness: the relay word's reply doesn't spend it, the
+    // next state read gives it once more.
+    push(&s, qr());
+    let relayed = s.app(json!({"op":"app_sign_in_relay","id":id,"delivered":true}));
+    assert!(relayed.get("qr_url").is_none(), "{relayed}");
+    assert_eq!(s.app(json!({"op":"app_sign_in_state"}))["qr_url"], URL);
+    assert!(
+        s.app(json!({"op":"app_sign_in_state"}))
+            .get("qr_url")
+            .is_none()
+    );
+    // The voice: only `in_app`, no link, no claim.
+    let voice = s.trusted(json!({"op":"sign_in_state"}));
+    assert_eq!(voice["sign_in"], "in_app", "{voice}");
+    assert!(!voice.to_string().contains("hnq_"));
+    let claim = s.trusted(json!({"op":"sign_in_take_code","id":id}));
+    assert_eq!(claim["claim"], "not_available");
+    // The question and the answer, as the code's.
+    push(
+        &s,
+        Ok(Event::Confirm {
+            email: "someone@example.com".into(),
+        }),
+    );
+    let asking = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(asking["sign_in"], "asking", "{asking}");
+    assert_eq!(asking["answer_here"], true);
+    assert!(asking.get("qr_url").is_none());
+    let answered = s.app(json!({"op":"app_sign_in_answer","id":id,"answer":"yes"}));
+    assert_eq!(answered["sign_in"], "answered", "{answered}");
+    assert_eq!(*s.counts.sign_in_answers.lock().unwrap(), [true]);
+    push(&s, Ok(Event::Result(Done::Success { email: None })));
+    let done = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(done["result"], "success");
+    assert!(!done.to_string().contains("hnq_"));
+    // The voice's start is by code, whatever the app used before.
+    push(
+        &s,
+        Ok(Event::Code {
+            code: "12345678".into(),
+            expires_in: 120,
+        }),
+    );
+    let spoken = s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(spoken["code"], "12345678", "{spoken}");
+    assert_eq!(
+        *s.counts.sign_in_methods.lock().unwrap(),
+        [Method::Qr, Method::Code]
+    );
+    assert_eq!(s.app(json!({"op":"app_sign_in_state"}))["method"], "code");
 }
 
 /// Backend2 on #5198: a sign-in's id only grows, across a restart of the

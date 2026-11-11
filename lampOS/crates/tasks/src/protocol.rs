@@ -465,6 +465,9 @@ mod tests {
         assert!(!Request::parse(br#"{"op":"sign_in_start"}"#).unwrap().app());
         for bytes in [
             br#"{"op":"app_sign_in_start","method":"email"}"#.as_slice(),
+            br#"{"op":"app_sign_in_start","method":"sms"}"#,
+            br#"{"op":"app_sign_in_start","method":"QR"}"#,
+            br#"{"op":"app_sign_in_start","url":"https://a"}"#,
             br#"{"op":"app_sign_in_start","code":"12345678"}"#,
             br#"{"op":"app_sign_in_state","email":"someone@example.com"}"#,
             br#"{"op":"app_sign_in_answer","answer":"yes"}"#,
