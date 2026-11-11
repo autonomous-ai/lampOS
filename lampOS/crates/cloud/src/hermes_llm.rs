@@ -540,21 +540,38 @@ pub async fn run(
     key: &str,
     say: &mut dyn FnMut(&str),
 ) {
-    if !on_from_environment() {
+    serve_when(on_from_environment(), PORT, state, second_json, key, say).await
+}
+
+/// [`run`] with the switches already read (`on`, [`on_from`]) and the port
+/// given, so a test can show either switch alone starts the listener
+/// (#6226). Off, nothing is listened on.
+pub async fn serve_when(
+    on: bool,
+    port: u16,
+    state: Option<&Path>,
+    second_json: Option<&str>,
+    key: &str,
+    say: &mut dyn FnMut(&str),
+) {
+    if !on {
         return std::future::pending().await;
     }
     let started = async {
         let state = state.ok_or("no state folder for the local token")?;
         let token = token(state).map_err(|_| "the local token can't be kept")?;
         let forwarder = Forwarder::new(&relay_base(second_json), key, &token)?;
-        let listener = Forwarder::bind(PORT)
+        let listener = Forwarder::bind(port)
             .await
-            .map_err(|_| "127.0.0.1:7741 can't be listened on")?;
+            .map_err(|_| format!("127.0.0.1:{port} can't be listened on"))?;
         Ok::<_, String>((Arc::new(forwarder), listener))
     };
     match started.await {
         Ok((forwarder, listener)) => {
-            say("the Hermes forwarder listens on 127.0.0.1:7741");
+            let at = listener
+                .local_addr()
+                .map_or_else(|_| format!("127.0.0.1:{port}"), |at| at.to_string());
+            say(&format!("the Hermes forwarder listens on {at}"));
             forwarder.serve(listener).await;
         }
         Err(why) => {
