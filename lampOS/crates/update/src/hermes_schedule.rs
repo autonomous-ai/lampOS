@@ -34,7 +34,10 @@ use crate::{
 };
 use std::{
     path::Path,
-    sync::{Arc, Mutex, PoisonError},
+    sync::{
+        Arc, Mutex, PoisonError,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -88,6 +91,9 @@ pub struct Moment {
     /// The lamp's local minute of the day now, none when not known (the
     /// zone not read, or the clock not set).
     pub local_minute: Option<u16>,
+    /// The person asked for the install from the app (#6240,
+    /// [`crate::engines`]) and no round has started it yet.
+    pub asked: bool,
 }
 
 /// Why the install may start now.
@@ -102,6 +108,11 @@ pub enum Window {
     /// window, 11 Nov 01:15 on #6059), so it is usable the same day. A try
     /// that failed or was stopped waits for the night.
     AfterUpdate,
+    /// The person asked for it from the app (#6240): past the quiet
+    /// stretch and the clock windows, as a tap is a person's own choice;
+    /// still never in the first round nor while the setup walk is under
+    /// way, and the install still freezes while someone speaks.
+    Asked,
 }
 
 impl Window {
@@ -110,6 +121,7 @@ impl Window {
             Self::AfterWalk => "the first quiet stretch after the setup walk",
             Self::Night => "the quiet hour at night",
             Self::AfterUpdate => "the first quiet stretch after the update, by day",
+            Self::Asked => "asked from the app",
         }
     }
 }
@@ -122,6 +134,9 @@ pub fn window(moment: &Moment) -> Result<Window, String> {
     }
     if moment.walk_under_way {
         return Err(crate::walk::UNDER_WAY.to_owned());
+    }
+    if moment.asked {
+        return Ok(Window::Asked);
     }
     if let Err(why) = &moment.quiet {
         return Err(format!("not a quiet stretch: {why}"));
@@ -330,6 +345,7 @@ pub const LISTENER: &str = "update_hermes";
 pub struct Watcher {
     heard: Arc<Mutex<Quiet>>,
     began: Instant,
+    frozen: Arc<AtomicBool>,
 }
 
 impl Watcher {
@@ -342,14 +358,27 @@ impl Watcher {
         let _ = Systemctl::default().thaw_harness_unit();
         let (bus_root, records) = (bus_root.to_owned(), records.to_owned());
         let shared = Arc::clone(&heard);
+        let frozen = Arc::new(AtomicBool::new(false));
+        let held = Arc::clone(&frozen);
         let started = thread::Builder::new()
             .name("hermes-watch".to_owned())
-            .spawn(move || watch_installs(&bus_root, &records, &shared, began));
+            .spawn(move || watch_installs(&bus_root, &records, &shared, &held, began));
         if let Err(error) = started {
             // Nothing hears the voice: the window never opens.
             eprintln!("lamp-update: the Hermes install's watch did not start: {error}");
         }
-        Self { heard, began }
+        Self {
+            heard,
+            began,
+            frozen,
+        }
+    }
+
+    /// Set while the watch holds the install's one-shot frozen, cleared
+    /// once it is thawed or stopped, or the install ended (#6240: the
+    /// app's `frozen`).
+    pub fn frozen(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.frozen)
     }
 
     /// Whether the voice has been quiet for [`QUIET_STRETCH`], or why not.
@@ -364,7 +393,13 @@ impl Watcher {
 /// quiet, and, while [`hermes_install::installing`] (read once a second)
 /// says an install is under way, looks with a [`Watch`] of its own and
 /// carries out what it says ([`hermes_install::carry_out`]).
-fn watch_installs(bus_root: &Path, records: &Path, heard: &Mutex<Quiet>, began: Instant) {
+fn watch_installs(
+    bus_root: &Path,
+    records: &Path,
+    heard: &Mutex<Quiet>,
+    frozen: &AtomicBool,
+    began: Instant,
+) {
     let mut say = |line: &str| eprintln!("lamp-update: {line}");
     let mut ears = BusEars::named(bus_root, LISTENER, &mut say);
     let mut systemd = Systemctl::default();
@@ -388,6 +423,7 @@ fn watch_installs(bus_root: &Path, records: &Path, heard: &Mutex<Quiet>, began: 
             }
         }
         let Some(current) = &mut watch else {
+            frozen.store(false, Ordering::Relaxed);
             continue;
         };
         let act = current.look(now, quiet, &ears.lease());
@@ -399,6 +435,7 @@ fn watch_installs(bus_root: &Path, records: &Path, heard: &Mutex<Quiet>, began: 
             Carried::Done => {}
             Carried::NotRunning | Carried::Stopped => watch = None,
         }
+        frozen.store(watch.as_ref().is_some_and(Watch::frozen), Ordering::Relaxed);
     }
 }
 

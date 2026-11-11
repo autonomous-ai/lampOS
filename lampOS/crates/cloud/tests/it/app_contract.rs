@@ -725,6 +725,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                     commit: "5b40a1523".into(),
                 }),
             }),
+            engines: None,
         },
     )
     .unwrap();
@@ -780,6 +781,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         last: None,
         harness: None,
         round: None,
+        engines: None,
     };
     says.publish_json(0, &idle).unwrap();
     assert!(
@@ -886,6 +888,137 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
     real.update_page = false;
     assert!(answer(&mut real, "update.status", &json!({})).is_err());
     assert!(answer(&mut real, "update.check", &json!({})).is_err());
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// #6240: the lamp's agents in `update.status`, with the field types the
+/// app takes, only with `LAMP_APP_ENGINES=on` beside `LAMP_APP_UPDATE=on`;
+/// `engines.install` in the reply the app reads, refused for an agent that
+/// is not missing or failed, and not here without the switch.
+#[test]
+fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
+    let root = PathBuf::from(format!("/tmp/lce-{}", std::process::id()));
+    let places = lamp(&root);
+    let bus_root = root.join("bus");
+    std::fs::create_dir_all(&bus_root).unwrap();
+    let mut real = Real {
+        places,
+        bus: Some(Bus::new(&bus_root).unwrap()),
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: true,
+        update_checks: lamp_cloud::update::Checks::with_engines(true),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        write_skill: None,
+        share: None,
+        services: None,
+        control: None,
+        consent: None,
+        upload: None,
+        shutdown: None,
+        harness_sign_in: None,
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let sent = |real: &mut Real, kind: &str, data: Value| -> Value {
+        let result = answer(real, kind, &data);
+        let sent = me.data("2026-11-11T09:00:00Z", kind, &result).to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let update = Bus::new(&bus_root).unwrap();
+    let mut says = update
+        .publisher_declared(
+            lamp_msgs::UpdateStatus::TOPIC,
+            &lamp_msgs::UpdateStatus::declaration(),
+            "update",
+        )
+        .unwrap();
+    let with = |state: &str, version: Option<&str>, reason: Option<&str>| lamp_msgs::UpdateStatus {
+        running: None,
+        now: "idle".into(),
+        last: None,
+        harness: None,
+        round: None,
+        engines: Some(std::collections::BTreeMap::from([(
+            "hermes".to_owned(),
+            lamp_msgs::EngineInstall {
+                state: state.into(),
+                version: version.map(str::to_owned),
+                reason: reason.map(str::to_owned),
+                at_unix_ms: Some(1_762_850_000_000),
+            },
+        )])),
+    };
+    says.publish_json(0, &with("installed", Some("0.22.2"), None))
+        .unwrap();
+    let told = sent(&mut real, "update.status", json!({}));
+    assert_eq!(told["status"], "success", "{told}");
+    for (path, kind_of_value) in [
+        ("engines.hermes.state", Type::Text),
+        ("engines.hermes.version", Type::Text),
+        ("engines.hermes.at_unix_ms", Type::Whole),
+    ] {
+        let value = field(&told["data"], path);
+        assert!(
+            value.is_some_and(|value| is(value, kind_of_value)),
+            "update.status {path}: the app takes {kind_of_value:?}, lamp-cloud said {value:?}"
+        );
+    }
+    let refused = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
+    assert_eq!(refused["status"], "failure", "{refused}");
+    assert_eq!(refused["error"], lamp_cloud::update::NOT_MISSING);
+
+    says.publish_json(0, &with("failed", None, Some("no_memory")))
+        .unwrap();
+    let told = sent(&mut real, "update.status", json!({}));
+    assert_eq!(
+        told["data"]["engines"]["hermes"],
+        json!({"state": "failed", "reason": "no_memory", "at_unix_ms": 1_762_850_000_000_u64}),
+        "{told}"
+    );
+    let mut serve = update
+        .subscribe_typed(
+            lamp_msgs::EngineInstallAsk::TOPIC,
+            "update",
+            lamp_msgs::EngineInstallAsk::TYPE,
+        )
+        .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    let started = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
+    assert_eq!(started["status"], "success", "{started}");
+    assert_eq!(started["data"], json!({"install": "started"}));
+    let heard = serve
+        .recv(std::time::Duration::from_secs(1))
+        .unwrap()
+        .expect("one ask on the bus");
+    assert_eq!(
+        heard.parse::<lamp_msgs::EngineInstallAsk>().unwrap().engine,
+        "hermes"
+    );
+    let again = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
+    assert_eq!(again["error"], lamp_cloud::update::TOO_SOON, "{again}");
+
+    // Without the agents' switch: no `engines`, and the kind is not here.
+    real.update_checks = Default::default();
+    let told = sent(&mut real, "update.status", json!({}));
+    assert!(told["data"].get("engines").is_none(), "{told}");
+    assert!(answer(&mut real, "engines.install", &json!({"engine": "hermes"})).is_err());
     let _ = std::fs::remove_dir_all(root);
 }
 

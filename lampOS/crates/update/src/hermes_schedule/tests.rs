@@ -18,6 +18,7 @@ fn night() -> Moment {
         tried_unix_ms: Some(NOON - 30 * HOUR),
         now_unix_ms: NOON,
         local_minute: Some(2 * 60),
+        asked: false,
     }
 }
 
@@ -445,4 +446,59 @@ fn a_hermes_stage_has_room_for_the_most_it_may_be_frozen() {
         bound_of(&argv(&["systemctl", "restart", "x"])),
         RESTART_WITHIN
     );
+}
+
+/// The app's tap (#6240): past the quiet stretch and the clock windows,
+/// by day, with a recent try and with no local time; still never in the
+/// first round nor while the walk is under way.
+#[test]
+fn an_ask_from_the_app_opens_it_outside_the_quiet_stretch_and_the_clock() {
+    let asked = Moment {
+        asked: true,
+        quiet: Err("the voice is speaking".into()),
+        tried_unix_ms: Some(NOON - HOUR),
+        local_minute: Some(12 * 60),
+        ..night()
+    };
+    assert_eq!(window(&asked), Ok(Window::Asked));
+    for open in [
+        Moment {
+            local_minute: None,
+            ..asked.clone()
+        },
+        Moment {
+            now_unix_ms: 5 * HOUR,
+            ..asked.clone()
+        },
+        Moment {
+            quiet: Ok(()),
+            ..asked.clone()
+        },
+    ] {
+        assert_eq!(window(&open), Ok(Window::Asked), "{open:?}");
+    }
+    assert!(
+        window(&Moment {
+            round: 1,
+            ..asked.clone()
+        })
+        .unwrap_err()
+        .contains("first round")
+    );
+    assert_eq!(
+        window(&Moment {
+            walk_under_way: true,
+            ..asked.clone()
+        }),
+        Err(crate::walk::UNDER_WAY.to_owned())
+    );
+    // Not asked, the same moment stays closed.
+    assert!(
+        window(&Moment {
+            asked: false,
+            ..asked
+        })
+        .is_err()
+    );
+    assert_eq!(Window::Asked.name(), "asked from the app");
 }

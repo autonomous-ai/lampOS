@@ -934,13 +934,43 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     let local_time = hermes_watch
         .as_ref()
         .and_then(|_| lamp_local_time::LocalTime::zone("system").ok());
+    // The lamp's agents for the app (#6240): only with lamp-update's own
+    // LAMP_APP_ENGINES=on, read once here. Hermes's state on update/status,
+    // and the app's tap heard beside the app's checks.
+    let engines = lamp_update::engines::on(
+        std::env::var(lamp_update::engines::SWITCH).ok().as_deref(),
+    )
+    .then(|| lamp_update::engines::Engines {
+        hermes_on: matches!(hermes, Some((true, _))),
+        frozen: hermes_watch
+            .as_ref()
+            .map(lamp_update::hermes_schedule::Watcher::frozen)
+            .unwrap_or_default(),
+        pending: Default::default(),
+    });
+    if let Some(engines) = &engines {
+        app_check = app_check.map(|check| {
+            check.with_engines(lamp_update::engines::Asks::new(
+                &bus_root,
+                &records,
+                engines.clone(),
+                &mut say,
+            ))
+        });
+    }
     let mut rounds: u64 = 0;
     // `update/status` (#2194): where each round is, and how the last ended,
     // only for a round that acts; Harness's record looked at often only
     // with its switch on.
     // Held in a cell: the round's phase and target both tell it (#5473).
     let telling = std::cell::RefCell::new(config.apply.then(|| {
-        lamp_update::status::Telling::start(&bus_root, &records, harness.is_some(), &mut say)
+        lamp_update::status::Telling::start(
+            &bus_root,
+            &records,
+            harness.is_some(),
+            engines.clone(),
+            &mut say,
+        )
     }));
     loop {
         rounds = rounds.saturating_add(1);
@@ -1006,6 +1036,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     local_minute: local_time
                         .as_ref()
                         .map(|local| local.minute_of_day(now_unix_ms)),
+                    // The app's tap (#6240): past the quiet stretch and
+                    // the clock windows.
+                    asked: engines
+                        .as_ref()
+                        .is_some_and(lamp_update::engines::Engines::pending),
                 });
                 hermes_install::after_round(
                     &config.root,
@@ -1016,6 +1051,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     window,
                     &mut say,
                 );
+                if let Some(engines) = &engines {
+                    engines.settle(&records);
+                }
             }
         }
         if matches!(hermes, Some((false, _)))
@@ -1071,8 +1109,8 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // the wait (#4153); one that came during the round is dropped.
         match &mut app_check {
             Some(app_check) => {
-                app_check.forget();
-                if app_check.wait(ears.as_mut(), every) {
+                app_check.forget(&mut say);
+                if app_check.wait(ears.as_mut(), every, &mut say) {
                     eprintln!("lamp-update: the app asked for a check: a round now");
                 }
             }
