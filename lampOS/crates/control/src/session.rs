@@ -709,10 +709,12 @@ impl Door {
     /// first grants and kept as the owner's app changes it; its client id.
     pub fn ensure_local(&mut self, user: &str, wall_s: u64) -> std::io::Result<String> {
         let (id, made) = self.clients.ensure_local(user, wall_s);
-        // Not kept: the socket stays off (the caller says why), and the
-        // record made in memory is never reached, since nothing names it.
-        if made {
-            self.save()?;
+        // Not kept: the record made in memory is taken out again, so a retry
+        // makes and keeps it, and nothing runs on one the file never held;
+        // the socket stays off (the caller says why).
+        if made && let Err(error) = self.save() {
+            self.clients.undo_add(&id, None);
+            return Err(error);
         }
         Ok(id)
     }
@@ -1586,7 +1588,7 @@ impl Door {
                     Some(re),
                     Error::new(
                         ErrorCode::Unpaired,
-                        "the owner has not given the local agent anything: turn it on in the app",
+                        "the owner has not given the local agent anything: give it grants in the app",
                     ),
                 );
                 outcome.close = true;
