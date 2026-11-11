@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
+import { checked, describe, findControl, findStimulus } from './controls.js';
 import { newToken, originOk, tokenOk } from './guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
@@ -97,6 +98,9 @@ async function drag(joint, deg) {
   }
 }
 async function release() {
+  // A following the panel started (a row that follows the hand) holds the body lease too: let it go, so every row
+  // that needs the body (a look, a move) finds it free.
+  await lamp.following?.stop().catch(() => {});
   const held = lease;
   lease = null;
   if (!held) return;
@@ -108,79 +112,33 @@ async function release() {
   }
 }
 
-// The try-it app (`--stim-dir`): every button is one SDK call, or one `lamp-sim` stimulus, and the log
-// says the call and the lamp's own answer, a refusal in its words.
-const COLOURS = [...schema.colours];
-const GESTURES = [...schema.gestures];
-const PATTERNS = [...schema.patterns];
-const FEELINGS = ['glad', 'lively', 'low'];
-const oneOf = (value, list, what) => {
-  if (!list.includes(value)) throw new LampError(`${what}: one of ${list.join(', ')}`, { code: 'bad_request' });
-  return value;
-};
-const number = (value, low, high, what) => {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < low || n > high) throw new LampError(`${what}: a number from ${low} to ${high}`, { code: 'bad_request' });
-  return n;
-};
-const text = (value, most, what) => {
-  if (typeof value !== 'string' || !value.trim() || value.length > most) throw new LampError(`${what}: 1 to ${most} characters`, { code: 'bad_request' });
-  return value;
-};
-// One entry per button: what it calls, and how it is said in the log.
-const CALLS = {
-  gesture: async (a) => { const name = oneOf(a.name, GESTURES, 'gesture'); await lamp.gesture(name); return [`lamp.gesture(${JSON.stringify(name)})`]; },
-  express: async (a) => { const feeling = oneOf(a.feeling, FEELINGS, 'feeling'); await lamp.express(feeling); return [`lamp.express(${JSON.stringify(feeling)})`]; },
-  light: async (a) => {
-    const colour = oneOf(a.colour, COLOURS, 'colour');
-    const level = Math.round(number(a.level ?? 3, 1, 5, 'level'));
-    const pattern = a.pattern ? oneOf(a.pattern, PATTERNS, 'pattern') : undefined;
-    const forMs = Math.round(number(a.for_ms ?? 10_000, 1, 30_000, 'for_ms'));
-    await lamp.light(colour, level, forMs, pattern);
-    return [`lamp.light(${JSON.stringify(colour)}, ${level}, ${forMs}${pattern ? `, ${JSON.stringify(pattern)}` : ''})`];
-  },
-  light_off: async (a) => { const forMs = Math.round(number(a.for_ms ?? 10_000, 1, 30_000, 'for_ms')); await lamp.lightOff({ forMs }); return [`lamp.lightOff({ forMs: ${forMs} })`]; },
-  say: async (a) => { const words = text(a.text, 200, 'say'); await lamp.say(words); return [`lamp.say(${JSON.stringify(words)})`]; },
-  look: async (a) => {
-    const at = { yaw: number(a.yaw ?? 0, -180, 180, 'yaw'), pitch: number(a.pitch ?? 0, -90, 90, 'pitch') };
-    await release();
-    await lamp.withLease(['body'], () => lamp.look(at, { wait: true }));
-    return [`lamp.withLease(['body'], () => lamp.look(${JSON.stringify(at)}, { wait: true }))`];
-  },
-  move: async () => {
-    const poses = [{ pitch: 12, yaw: -15 }, { pitch: -6, yaw: 15 }, { pitch: 8, yaw: 0 }];
-    // A move needs the body lease at the door, as a look does.
-    await release();
-    await lamp.withLease(['body'], () => lamp.movePoses(poses, { wait: true }));
-    return [`lamp.withLease(['body'], () => lamp.movePoses(${JSON.stringify(poses)}, { wait: true }))`];
-  },
-  // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
-  sound: async () => { await lamp.sound('hum'); return ["lamp.sound('hum')"]; },
-  stop: async () => { await lamp.stop(); return ['lamp.stop()']; },
-};
-// The world, not the SDK: `lamp-sim <verb> ... DIR` writes what the lamp's stand-ins read. Arguments are an
-// array, never a shell string.
-const STIMULI = {
-  people: (a) => ['people', String(Math.round(number(a.n ?? 1, 0, 5, 'people')))],
-  hear: (a) => ['hear', text(a.text, 120, 'hear')],
-  hand: () => ['hand'],
-  sound: (a) => ['sound', oneOf(a.kind, ['music', 'laughter', 'door', 'footsteps'], 'sound')],
-  touch: (a) => ['touch', oneOf(a.kind, ['tap', 'pet'], 'touch')],
-  air: (a) => ['air', ...(oneOf(a.kind, ['stuffy', 'clear'], 'air') === 'stuffy' ? ['co2_ppm=1600', 'pm2_5=45'] : ['co2_ppm=450', 'pm2_5=5'])],
-};
+// The try-it app (`--stim-dir`): every button is one SDK call (CONTROLS) or one `lamp-sim` stimulus (STIMULI), both
+// in controls.js, and the log says the call and the lamp's own answer, a refusal in its words.
+const refuse = (why) => new LampError(why, { code: 'bad_request' });
 const said = (id, call, ok, answer) => tell({ type: 'result', id, call, ok, answer });
 let stimulating = Promise.resolve();
+const lastStimulus = new Map();
 async function press(message) {
   const { id, name, args = {} } = message;
   try {
     if (message.type === 'call') {
-      if (!Object.hasOwn(CALLS, name)) throw new LampError(`no button ${name}`, { code: 'bad_request' });
-      const [call] = await CALLS[name](args);
+      const control = findControl(name);
+      if (!control) throw refuse(`no button ${name}`);
+      const call = await control.run({ lamp, release, listenFor }, checked(control.fields, args));
       said(id, call, true, 'taken');
     } else {
-      if (!Object.hasOwn(STIMULI, name)) throw new LampError(`no stimulus ${name}`, { code: 'bad_request' });
-      const argv = [...STIMULI[name](args), stimDir];
-      if (name === 'hear') await listenFor(argv[1]);
+      const stimulus = findStimulus(name);
+      if (!stimulus) throw refuse(`no stimulus ${name}`);
+      const values = checked(stimulus.fields, args);
+      const argv = [...stimulus.argv(values), stimDir];
+      // The same stroke (a held hand, a repeated press) is one touch: nothing is forked for the repeats.
+      const now = Date.now();
+      if (stimulus.gapMs && now - (lastStimulus.get(stimulus.id) ?? 0) < stimulus.gapMs) {
+        said(id, `lamp-sim ${argv.slice(0, -1).join(' ')}`, true, `ignored: the same stroke (one ${stimulus.id} per ${stimulus.gapMs / 1000} s)`);
+        return;
+      }
+      lastStimulus.set(stimulus.id, now);
+      if (stimulus.listensFor) await listenFor(stimulus.listensFor(values));
       const [verb, ...rest] = argv;
       // One stimulus at a time: a button pressed often cannot fork lamp-sim without end.
       const run = stimulating.then(() => new Promise((resolve, reject) => execFile(lampSimBin, argv, { timeout: 10_000 }, (error, stdout, stderr) => (error ? reject(new Error((stderr || error.message).trim().split('\n')[0])) : resolve(stdout)))));
@@ -223,7 +181,7 @@ const files = {
   '/': ['text/html; charset=utf-8', () => readFileSync(here('./index.html'))],
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
-  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ gestures: GESTURES, colours: COLOURS, patterns: PATTERNS })] } : {}),
+  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone') })] } : {}),
   ...(stimDir ? { '/panel.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./panel.js'))] } : {}),
 };
 // What the lamp's camera sees now, for the page's "what the lamp sees" panel: the lamp's own newest

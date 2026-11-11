@@ -151,7 +151,7 @@ with `LAMPOS_HOME=DIR/sdk`. Linux for now (the real `lamp-body` runs only there)
 `examples/twin/try.js` is the same virtual lamp with a page to play with, on one URL for any device on your
 network: the 3D twin, a control panel whose every button is one SDK call (gesture, express, light, light off, say,
 look, move, sound, stop), buttons for the room (someone arrives or leaves, a phrase, a tap or pet, a hand, a sound,
-stuffy or clear air: `lamp-sim people|hear|touch|hand|sound|air`), and a log of the lamp's events and the answer
+stuffy or clear air: `lamp-sim people|hear|touch|hand|sound|air`; a click on the lamp's head in the picture is a tap, a hold of 0.6 s a pet), and a log of the lamp's events and the answer
 to each call, a refusal in the lamp's own words.
 
 ```sh
@@ -162,6 +162,8 @@ The lamp runs in a private folder (`~/.lampsim-try-PID`, 0700) and listens on 12
 thing on the network and answers only with the token in its URL. The camera and the microphone are off: the lamp
 has neither grant, so no picture of the room is ever on the page. The page is plain HTTP: the token in its URL can be read by anyone who can sniff your network (use a network you trust). `LAMPOS_HOME=<folder>/sdk` points a program of
 your own at the same lamp.
+
+Every button is one entry of the table in `examples/twin/controls.js` (a label, its fields, and the SDK call it makes, or the `lamp-sim` stimulus), and the page is drawn from that table: a new SDK feature is a new entry there, and `test/try.test.js` runs every entry with its defaults.
 
 ### The examples against a running lamp
 

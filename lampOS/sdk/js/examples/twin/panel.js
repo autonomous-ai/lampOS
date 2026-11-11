@@ -1,6 +1,6 @@
-// The try-it panel (served only with --stim-dir): buttons that drive the lamp through the SDK, buttons that
-// act on the room (lamp-sim's stimuli), and the lamp's own events. The twin's server does the calls; each
-// button is one SDK call or one stimulus, and the log says which, and the lamp's answer.
+// The try-it panel (served only with --stim-dir), drawn from the table in controls.js (the server sends it as
+// /try.json): one row per SDK call (a button and its fields), one row per thing that happens in the room, and the
+// lamp's own events. Nothing here is written per feature: a new SDK call is a new entry in controls.js.
 const send = (message) => window.twinSend?.(message);
 let counter = 0;
 const el = (tag, props = {}, ...children) => {
@@ -8,35 +8,54 @@ const el = (tag, props = {}, ...children) => {
   for (const child of children) node.append(child);
   return node;
 };
-const style = el('style', { textContent: `
+document.head.append(el('style', { textContent: `
   #panel { margin-top: 10px; font-size: 13px; }
   #panel h2 { font-size: 13px; margin: 12px 0 6px; color: var(--soft); text-transform: uppercase; letter-spacing: .04em; }
+  #panel h3 { font-size: 12px; margin: 8px 0 2px; color: var(--soft); font-weight: 600; }
   #panel .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; align-items: center; }
+  #panel .row label { display: inline-flex; gap: 4px; align-items: center; color: var(--soft); }
   #panel button { cursor: pointer; }
   #panel input[type=text] { flex: 1; min-width: 120px; }
   #panel input[type=number] { width: 64px; }
   #panel .world button { border-style: dashed; }
   #events { height: 220px; overflow: auto; font: 12px/1.35 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; white-space: pre-wrap; }
   #events .ok { color: var(--accent); } #events .no { color: #d9534f; } #events .ev { color: var(--soft); }
-` });
-document.head.append(style);
+` }));
 
-const button = (label, kind, name, args = () => ({})) => el('button', { textContent: label, onclick: () => send({ type: kind, id: ++counter, name, args: args() }) });
-const select = (options, value) => { const s = el('select'); for (const o of options) s.append(el('option', { value: o, textContent: o })); if (value) s.value = value; return s; };
+// The lamp's own names and the table of buttons, from the server.
+const table = await (await fetch(`/try.json${location.search}`)).json();
 
-// The lamp's own names (the SDK's schema), from the server.
-const names = await (await fetch(`/try.json${location.search}`)).json();
-const gesture = select(names.gestures);
-const colour = select(names.colours, 'warm');
-const level = el('input', { type: 'number', min: 1, max: 5, value: 3 });
-const pattern = select(['', ...names.patterns]);
-const words = el('input', { type: 'text', value: 'Hello, I am the virtual lamp.' });
-const yaw = el('input', { type: 'number', min: -180, max: 180, value: 20 });
-const pitch = el('input', { type: 'number', min: -90, max: 90, value: 0 });
-const feeling = select(['glad', 'lively', 'low']);
-const phrase = el('input', { type: 'text', value: 'good night lamp' });
-const people = el('input', { type: 'number', min: 0, max: 5, value: 1 });
-const soundKind = select(['music', 'laughter', 'door', 'footsteps']);
+// One input for a field, with its limits and default.
+function input(field) {
+  if (field.type === 'select') {
+    const node = el('select');
+    for (const option of field.options) node.append(el('option', { value: option, textContent: option === '' ? '(none)' : option }));
+    node.value = field.default ?? field.options[0];
+    return node;
+  }
+  if (field.type === 'number') return el('input', { type: 'number', min: field.min, max: field.max, value: field.default ?? field.min, step: field.integer ? 1 : 'any' });
+  return el('input', { type: 'text', value: field.default ?? '' });
+}
+
+// A row: the fields (named), then the button, which sends the entry's id and the values.
+function row(entry, kind) {
+  const inputs = entry.fields.map((field) => [field, input(field)]);
+  const values = () => Object.fromEntries(inputs.map(([field, node]) => [field.name, field.type === 'number' ? Number(node.value) : node.value]));
+  const children = inputs.map(([field, node]) => (field.type === 'text' ? node : el('label', {}, field.label ?? field.name, node)));
+  children.push(el('button', { textContent: entry.label, onclick: () => send({ type: kind, id: ++counter, name: entry.id, args: values() }) }));
+  return el('div', { className: 'row' }, ...children);
+}
+
+// The entries of one list, under a small heading for each group in the order they first appear.
+function section(entries, kind) {
+  const nodes = [];
+  let group;
+  for (const entry of entries) {
+    if (entry.group !== group) { group = entry.group; nodes.push(el('h3', { textContent: group })); }
+    nodes.push(row(entry, kind));
+  }
+  return nodes;
+}
 
 const events = el('div', { id: 'events' });
 const say = (cls, text) => {
@@ -46,25 +65,15 @@ const say = (cls, text) => {
 
 const panel = el('section', { id: 'panel' },
   el('h2', { textContent: 'The lamp, through the SDK' }),
-  el('div', { className: 'row' }, gesture, button('Gesture', 'call', 'gesture', () => ({ name: gesture.value })), feeling, button('Express', 'call', 'express', () => ({ feeling: feeling.value }))),
-  el('div', { className: 'row' }, colour, el('span', { textContent: 'level' }), level, pattern,
-    button('Light', 'call', 'light', () => ({ colour: colour.value, level: Number(level.value), pattern: pattern.value || undefined })),
-    button('Light off', 'call', 'light_off')),
-  el('div', { className: 'row' }, words, button('Say', 'call', 'say', () => ({ text: words.value }))),
-  el('div', { className: 'row' }, el('span', { textContent: 'yaw' }), yaw, el('span', { textContent: 'pitch' }), pitch,
-    button('Look', 'call', 'look', () => ({ yaw: Number(yaw.value), pitch: Number(pitch.value) })),
-    button('Move poses', 'call', 'move'), button('Sound', 'call', 'sound'), button('Stop', 'call', 'stop')),
+  ...section(table.controls, 'call'),
   el('div', { className: 'world' },
     el('h2', { textContent: 'The room (not the SDK)' }),
     el('p', { className: 'sub', textContent: 'The room starts empty. The lamp calls someone an arrival only after 5 s with nobody there.' }),
-    el('div', { className: 'row' }, el('span', { textContent: 'people' }), people, button('Set people', 'stim', 'people', () => ({ n: Number(people.value) })),
-      button('Someone arrives', 'stim', 'people', () => ({ n: 1 })), button('Everyone leaves', 'stim', 'people', () => ({ n: 0 }))),
-    el('div', { className: 'row' }, phrase, button('Hear it', 'stim', 'hear', () => ({ text: phrase.value }))),
-    el('div', { className: 'row' }, button('Tap', 'stim', 'touch', () => ({ kind: 'tap' })), button('Pet', 'stim', 'touch', () => ({ kind: 'pet' })), button('A hand', 'stim', 'hand'),
-      soundKind, button('Make the sound', 'stim', 'sound', () => ({ kind: soundKind.value }))),
-    el('div', { className: 'row' }, button('Stuffy air', 'stim', 'air', () => ({ kind: 'stuffy' })), button('Clear air', 'stim', 'air', () => ({ kind: 'clear' })))),
+    ...section(table.stimuli, 'stim')),
   el('h2', { textContent: 'What the lamp says' }),
-  el('p', { className: 'sub', textContent: 'Camera and microphone are off: the lamp sees and hears only what the buttons above make.' }),
+  el('p', { className: 'sub', textContent: table.camera || table.microphone
+    ? `${[table.camera && 'Camera', table.microphone && 'Microphone'].filter(Boolean).join(' and ')} ON for this run: the page can show the room to anyone on your network with this link (plain HTTP). The lamp sees the room only while it stands up (press a gesture first); folded down its picture is black.`
+    : 'Camera and microphone are off: the lamp sees and hears only what the buttons above make.' }),
   events,
 );
 // The panel first, the joint sliders (still there) folded away below it.
