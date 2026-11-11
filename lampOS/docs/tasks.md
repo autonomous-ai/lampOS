@@ -1667,6 +1667,23 @@ environment list), `harness start` among them. Its journal says `tasks:
 Harness's own updates held (ADAPTER_UPDATE_DISABLE=true,
 HARNESS_ENV_FILE=…)`, or `not held: <why>` when the file can't be written.
 
+**Dev and beta lamps: the hold lifted (#6300, (B)).** With the switch on,
+a lamp whose updater follows the lamp-voice feed is the canary for Harness's
+releases, and every writer of the hold lifts it there instead:
+`harness-hold.env` is written without `ADAPTER_UPDATE_DISABLE=true` (said
+changed on a lamp that held before, so a running daemon is started again once
+no task is busy, and `harness start` rewrites its unit without the hold), no
+Harness command is given `ADAPTER_UPDATE_DISABLE`, and the launcher's two
+lines below are taken out, at lamp-tasks' start and after `lamp-update
+harness-install`. The journal says `tasks: Harness's own updates not held:
+this lamp follows the lamp-voice feed, …`, and the health line after each
+start is kept. The feed is the `--channel-url` of `systemctl show
+lamp-update.service --property=ExecStart --value`, exactly
+`https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/`.
+The stable feed, any other, and a line not read (systemctl failed) keep the
+hold exactly as below. One predicate decides it for both lamp-tasks and
+lamp-update (`lamp_msgs::harness_hold`, `crates/msgs/src/harness_hold.rs`).
+
 **The pinned launcher (#5493).** The environment above reaches only the
 Harness commands lamp-tasks runs. A `harness logout` run by hand over ssh,
 without them, restarted the held daemon from its own environment, and the

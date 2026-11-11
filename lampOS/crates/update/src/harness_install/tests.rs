@@ -109,6 +109,9 @@ struct Runs {
     id: Result<String, String>,
     /// lamp-tasks' unit's `Environment`, as `systemctl show` says it.
     tasks_environment: String,
+    /// lamp-update's own `ExecStart`, as `systemctl show` says it: the
+    /// feed it follows (#6300). Empty unless set: not read, the hold kept.
+    update_exec_start: String,
 }
 
 impl Runs {
@@ -119,6 +122,7 @@ impl Runs {
             manifest: Ok(String::new()),
             id: Ok("990\n".into()),
             tasks_environment: String::new(),
+            update_exec_start: String::new(),
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -133,6 +137,8 @@ impl Runs {
                 self.installer.clone()
             } else if line.starts_with("systemctl show lamp-tasks.service") {
                 Ok(self.tasks_environment.clone())
+            } else if line.starts_with("systemctl show lamp-update.service") {
+                Ok(self.update_exec_start.clone())
             } else if line.ends_with("harness version") {
                 Ok("harness 0.4.25\n".into())
             } else {
@@ -1214,6 +1220,97 @@ fn the_launchers_own_exec_line_is_kept() {
     );
 }
 
+/// lamp-update's `ExecStart` following `feed`, as `systemctl show
+/// --property=ExecStart --value` gives it.
+fn exec_start(feed: &str) -> String {
+    format!(
+        "{{ path=/opt/lampOS/update/current/lamp-update ; argv[]=/opt/lampOS/update/current/lamp-update serve --channel-url {feed} --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}\n"
+    )
+}
+
+/// An install with the hold on, lamp-update showing `exec_start`, from a
+/// launcher left as `text`: the launcher after, and the lines said of it.
+fn install_on_feed(exec_start: &str, text: &str) -> (String, Vec<String>) {
+    let lamp = Lamp::new();
+    let launcher = launcher_left(&lamp, text);
+    asked_for_install(&lamp);
+    let mut runs = Runs::new();
+    runs.tasks_environment = HOLD_ON.into();
+    runs.update_exec_start = exec_start.into();
+    let mut lines = Vec::new();
+    {
+        let mut run = runs.runner();
+        install_now(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 3,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+        .unwrap();
+    }
+    let said = lines
+        .into_iter()
+        .filter(|line| line.contains("launcher"))
+        .collect();
+    (fs::read_to_string(&launcher).unwrap(), said)
+}
+
+/// #6300: on the stable feed, any other feed, or one not read, the install
+/// pins the launcher exactly as before, from an unpinned launcher or a
+/// pinned one.
+#[test]
+fn stable_and_an_unknown_feed_keep_the_launcher_pinned() {
+    for shown in [
+        exec_start(lamp_msgs::harness_hold::STABLE_FEED),
+        exec_start("file:///var/tmp/lampos-channel/"),
+        exec_start(
+            "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-11308/",
+        ),
+        String::new(),
+    ] {
+        let (launcher, said) = install_on_feed(&shown, UNPINNED);
+        assert_eq!(launcher, PINNED, "{shown}");
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(
+            said[0].starts_with("Harness's launcher pinned ("),
+            "{said:?}"
+        );
+        let (launcher, said) = install_on_feed(&shown, PINNED);
+        assert_eq!(launcher, PINNED, "{shown}");
+        assert_eq!(said, ["Harness's launcher already pinned"], "{shown}");
+    }
+}
+
+/// #6300: on the lamp-voice feed (a dev or beta lamp, the canary), the
+/// install takes the hold out of the launcher, its exec line kept, so a
+/// Harness command run by hand lets Harness's own updater run.
+#[test]
+fn the_lamp_voice_feed_takes_the_hold_out_of_the_launcher() {
+    let shown = exec_start(lamp_msgs::harness_hold::CANARY_FEED);
+    let (launcher, said) = install_on_feed(&shown, PINNED);
+    assert_eq!(launcher, UNPINNED);
+    assert_eq!(
+        said,
+        [
+            "Harness's launcher unpinned: this lamp follows the lamp-voice feed, the canary for Harness's releases (#6300)"
+        ]
+    );
+    let (launcher, said) = install_on_feed(&shown, UNPINNED);
+    assert_eq!(launcher, UNPINNED);
+    assert_eq!(
+        said,
+        [
+            "Harness's launcher not pinned: this lamp follows the lamp-voice feed, the canary for Harness's releases (#6300)"
+        ]
+    );
+    let updated = PINNED.replace("0.5.39", "0.6.13");
+    assert_eq!(
+        launcher::unpinned_launcher(&updated).unwrap(),
+        UNPINNED.replace("0.5.39", "0.6.13")
+    );
+}
+
 /// With the hold off (unset, or anything but `on`), the install leaves the
 /// launcher as it is.
 #[test]
@@ -1229,6 +1326,7 @@ fn with_the_hold_off_the_install_leaves_the_launcher_alone() {
         asked_for_install(&lamp);
         let mut runs = Runs::new();
         runs.tasks_environment = environment.into();
+        runs.update_exec_start = exec_start(lamp_msgs::harness_hold::CANARY_FEED);
         let mut lines = Vec::new();
         let mut run = runs.runner();
         install_now(
