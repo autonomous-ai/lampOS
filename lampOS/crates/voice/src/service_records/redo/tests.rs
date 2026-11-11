@@ -383,8 +383,10 @@ fn a_done_mail_becomes_a_follow_up_and_is_never_edited() {
     assert_eq!(passed.args["subject"], "Correction: dinner");
 }
 
-/// A created event is not edited here: refused with a plain note that
-/// changing it is a separate action, nothing prepared or linked.
+/// A created event is not made again from its record: refused with a
+/// note that moving or cancelling it is service_write's update_event or
+/// delete_event action,
+/// nothing prepared or linked.
 #[test]
 fn a_done_event_is_refused_here() {
     fresh(true);
@@ -397,9 +399,21 @@ fn a_done_event_is_refused_here() {
         FIELD: created,
         "start": "2026-11-15T20:00:00+07:00",
     }));
-    let told = gate(&mut pending, &redo, 21, &heard("move it to 8 PM", 20), now).unwrap_err();
+    let told = gate(&mut pending, &redo, 21, &heard("make it again", 20), now).unwrap_err();
     assert_eq!(told["error"], EVENT_DONE);
-    assert!(EVENT_DONE.contains("separate action"));
+    assert!(EVENT_DONE.contains(
+        "call service_write with action update_event (or delete_event) and the record's event_id"
+    ));
+    // Never named as a function of its own (the 9adf fake writes).
+    for told in [EVENT_DONE, DESCRIPTION] {
+        for alone in [
+            "call update_event",
+            "call delete_event",
+            "calling update_event",
+        ] {
+            assert!(!told.contains(alone), "{alone}: {told}");
+        }
+    }
     assert_eq!(super::super::held().len(), 1);
     assert!(by_key(&created).replaced_by.is_empty());
 }
@@ -644,4 +658,88 @@ fn the_ten_november_do_it_again_at_8_pm_needs_no_repeated_details() {
     assert_eq!(made.links, vec![key.clone()]);
     assert_eq!(by_key(&key).replaced_by, made.key);
     assert_eq!(by_key(&key).status, Status::Cancelled);
+}
+
+/// lamp-06c1, 11 Nov (requests 131 and 137): "move it to 8 PM" and
+/// "cancel it" after the lamp made the event. `from_record` with
+/// update_event or delete_event names the event by the record's
+/// `result_id`, Google's id: never the key. Only what the call gave is
+/// laid on, the record's calendar kept, and it still needs its read-back
+/// and a send.
+#[test]
+fn a_made_event_is_moved_or_cancelled_by_its_records_event_id() {
+    for action in ["update_event", "delete_event"] {
+        fresh(true);
+        let now = Instant::now();
+        let mut family = party();
+        family["calendar"] = json!("family@group.calendar.google.com");
+        let _ = read_back(&family, 20, "s9", PARTY_BACK, now);
+        keep_send(
+            Some(7),
+            Some("s9"),
+            Got::Answered(&json!({"sent": true, "event_id": "mbsiaoesblr6nec4tfh4flsbng"})),
+        );
+        let created = only(Status::Done).key;
+        let mut asked = json!({
+            "service": "google_calendar",
+            "action": action,
+            FIELD: created,
+        });
+        if action == "update_event" {
+            asked["start"] = json!("2026-11-15T20:00:00+07:00");
+            asked["end"] = json!("2026-11-15T22:00:00+07:00");
+        }
+        let mut pending = None;
+        let passed = gate(
+            &mut pending,
+            &call(asked),
+            21,
+            &heard("move it to 8 PM", 20),
+            now,
+        )
+        .expect("the owner's edit is prepared");
+        let args = &passed.args;
+        assert_eq!(args["action"], action, "{args}");
+        assert_eq!(args["event_id"], "mbsiaoesblr6nec4tfh4flsbng", "{args}");
+        assert_ne!(args["event_id"], json!(created));
+        assert_eq!(args["calendar"], "family@group.calendar.google.com");
+        // Nothing of the create's but its event and calendar.
+        assert!(args.get("title").is_none(), "{args}");
+        assert!(args.get("attendees").is_none(), "{args}");
+        if action == "update_event" {
+            assert_eq!(args["start"], "2026-11-15T20:00:00+07:00");
+        } else {
+            assert!(args.get("start").is_none(), "{args}");
+        }
+        assert!(args.get("said").is_none(), "a prepare, never a send");
+        assert!(pending.is_none(), "nothing waits before the read-back");
+    }
+}
+
+/// A made event's record with no `result_id` names no event: refused
+/// with a plain reason, nothing prepared.
+#[test]
+fn a_made_event_with_no_event_id_is_refused() {
+    fresh(true);
+    let now = Instant::now();
+    let created = done(&party(), "s9", PARTY_BACK, now);
+    kept::ledger(|ledger| {
+        for record in &mut ledger.records {
+            record.result_id.clear();
+        }
+    });
+    for action in ["update_event", "delete_event"] {
+        let mut pending = None;
+        let told = gate(
+            &mut pending,
+            &call(json!({"service":"google_calendar","action":action,FIELD: created})),
+            21,
+            &heard("cancel it", 20),
+            now,
+        )
+        .unwrap_err();
+        assert_eq!(told["error"], NO_EVENT_ID, "{action}");
+        assert!(pending.is_none());
+    }
+    assert_eq!(super::super::held().len(), 1);
 }

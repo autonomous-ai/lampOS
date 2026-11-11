@@ -1163,7 +1163,9 @@ Calendar's actions in `tools.json` add `update_event {event_id, title, start,
 end, text, calendar}` and `delete_event {event_id, calendar}`
 (`writes::CALENDAR_EDITS`), and `service_write` takes an `event_id`: the id a
 calendar read or a create gave (a confirmed `create_event` now answers
-`{"sent": true, "service", "event_id"}`). The write's description lists
+`{"sent": true, "service", "event_id"}`), or a service record's `event_id`
+("Records told" and "Redo or edit from a record", below), never a
+record key. The write's description lists
 Google Calendar as `create_event, update_event, delete_event: see event_id`
 (`writes::CALENDAR_ACTIONS_SHORT`), and `event_id`'s own description gives
 each of the three with its fields: the write's description has no room for
@@ -1192,15 +1194,31 @@ them within the 1,024 bytes its link takes.
   `DELETE …/events/<id>?sendUpdates=all` with no body; both are on
   Calendar's write list (`catalog.rs`) and nothing else is.
 - **Bounds.** `event_id` and `calendar` are ids in a path (no `/`, `\`,
-  `?`, `#`, at most 256 bytes); a move gives both its start and end, each
-  with the lamp's own UTC offset; an `update_event` needs at least one
-  change.
+  `?`, `#`; `calendar` at most 256 bytes, `event_id` at most 1,024).
+  `event_id`'s form is not checked further: an event from an Outlook
+  invite or an import can have an id of another form (starting with `_`,
+  say), so Google's read decides, and an id it has no event for is "Not
+  found" (below). A service record's key (`v<digits>-<n>`) alone is told
+  "that is a record key, not an event id; use the record's event_id"
+  (`writes::RECORD_KEY_NOT_EVENT`), before Google is asked. A move gives both
+  its start and end, each with the lamp's own UTC offset; an `update_event`
+  needs at least one change.
+- **Not found.** A 404 at the read before the read-back is an id Google has
+  no event for, as likely a wrong id as a deleted event (on lamp-06c1 on
+  11 Nov a record key sent as the id came back so and was told "no longer
+  on the calendar"). It answers `writes::EVENT_NOT_FOUND`: "I can't find
+  that event on the Google Calendar, and nothing was changed. Don't say it
+  was deleted: the event_id may be wrong. Use the event_id a create, a read
+  or their service records gave, or offer to look for it." Nothing is held.
+  The services keep no list of the ids they have seen, so every 404 there
+  is told so.
 - **Gone in Google.** When the event was deleted, or changed so, in Google
-  itself, its read or its send gets a 404 or 410, or the event reads as
-  `"status":"cancelled"`. Each answers `writes::EVENT_GONE`: "That event is
-  no longer on the Google Calendar: it was deleted or changed there, and
-  nothing was changed. Say it's no longer there, and offer to create it
-  again with create_event." (after "not sent: " on a send). Nothing is held.
+  itself, its read gets a 410 or reads as `"status":"cancelled"`, or its
+  send gets a 404 or 410 (it was read a moment before). Each answers
+  `writes::EVENT_GONE`: "That event is no longer on the Google Calendar: it
+  was deleted or changed there, and nothing was changed. Say it's no longer
+  there, and offer to create it again with create_event." (after "not sent:
+  " on a send). Nothing is held.
 
 ### Changing or deleting a saved Gmail draft (`LAMP_GMAIL_DRAFT_EDITS`)
 
@@ -2483,7 +2501,7 @@ with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
   `Calendar · create 'Hamburger party' · Sun 15 Nov 19:00–22:00 · cancelled:
   the lamp answered after the read-back with no send · today 15:40`,
   `Drive · search 'Sunday' · no result · today 15:34`. The latest 5, plus any still `prepared` or `failed`, and any `done`
-  write, changed in the last 7 days, at most 10 lines and 1,800 bytes. Past
+  write, changed in the last 7 days, at most 10 lines and 1,900 bytes. Past
   either, reads and cancels go first, then `prepared`/`failed`, and a
   `done` write last, the oldest of each first, and how many is said ("and
   N more not shown: recall finds them"). On lamp-06c1 on 11 Nov, newer
@@ -2491,9 +2509,19 @@ with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
   latest 5, and the lamp later said nothing was saved. With
   `LAMP_SERVICE_REDO` on, each write's line ends with its record key
   (`· key v1794373881497-2`), recall gives it as `key`, and the note adds
-  "To redo or change a write listed here, call service_write with
-  from_record set to its key, giving only what changed."; never in the
-  brief note, never for a read. With them the rule: "Your past service
+  "To redo a write listed here, call service_write with from_record set to
+  its key, giving only what changed. To move or cancel an event already
+  made, call service_write with action update_event (or delete_event) and
+  the record's event_id, or from_record set to its key; a key is never an
+  event_id." It names `update_event` and `delete_event` only as
+  `service_write`'s actions, never as calls of their own: worded as calls,
+  they are a likely trigger of a made-up read-back and "done" with no call
+  at all. Never in the
+  brief note, never for a read. A `done` Google Calendar `create_event` or
+  `update_event` with a `result_id` (Google's id, as the send answered it)
+  ends its line with `· event_id <id>` too, in the full note only: on
+  lamp-06c1 on 11 Nov only the key was shown, and the model sent the key
+  as the event's id. With them the rule: "Your past service
   actions are listed with their status. Never claim something was done
   unless its record says done; never say you can't do something a record
   shows you did.", then, in full and brief, and with a recall's records:
@@ -2596,7 +2624,8 @@ With `LAMP_SERVICE_REDO=on` beside `LAMP_SERVICE_RECORDS=on` (the second
 route only; alone it does nothing; the connector records plan, PR 1d),
 `service_write` takes `from_record`, a service record's key (the `key`
 the records note and recall show with each write), so "do it again at 8 PM"
-after a cancelled event needs nothing repeated
+after a cancelled event needs nothing repeated, and "move it to 8 PM" or
+"cancel it" after a made event names that event
 (`crates/voice/src/service_records/redo.rs`):
 
 - **Filled, then the change.** Inside the gate, after its heard, owner
@@ -2611,14 +2640,27 @@ after a cancelled event needs nothing repeated
   people is built from it (`Re:` its subject unless the call gives one, the
   call's new text; with none, the model is told to ask for it), and its
   answer carries `follow_up`, telling the model to say plainly that a sent
-  mail can't be changed. A `done` calendar event is refused: changing a
-  created event is a separate action. A `done` Gmail draft (`save_draft`
-  or `update_draft`) is refused with the way to change it,
+  mail can't be changed. A `done` calendar event is not made again: the
+  model is told to "call service_write with action update_event (or
+  delete_event) and the record's event_id, or from_record set to its key"
+  instead (`redo::EVENT_DONE`). `event_id`'s description in `tools.json`
+  says the same. A `done` Gmail draft (`save_draft` or
+  `update_draft`) is refused with the way to change it,
   `redo::DRAFT_DONE`: `update_draft` or `delete_draft` with its
   `draft_id`, the record's result id, when listed
   (`LAMP_GMAIL_DRAFT_EDITS`), never saved again beside the old one. A read,
-  any other `done` write, and
-  a record whose text was cut with no new text given are refused too.
+  any other `done` write, and a record whose text was cut with no new text
+  given are refused too.
+- **A made event moved or cancelled.** `update_event` or `delete_event`
+  with `from_record` naming a `done` Google Calendar `create_event` or
+  `update_event` record is that event's edit, not a redo: its `event_id`
+  is the record's `result_id` (Google's id), its `calendar` the record's
+  unless the call gives one, and only what the call gave is laid on;
+  nothing else of the record is filled. The services then read the event,
+  read the change back and send it only on a yes, as any edit ("Changing
+  or cancelling a calendar event", above, with `LAMP_CALENDAR_EDITS` on).
+  A record with no `result_id` is refused: "Not done: that record keeps no
+  event id, so the event can't be found from it. …" (`NO_EVENT_ID`).
 - **Linked.** The new record's `links` name the old one, and the old one
   gets `replaced_by` (its final status stays), both written to the memory.
 - **Only the owner's.** Only the owner's own records are found. A record

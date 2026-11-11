@@ -19,7 +19,10 @@
 //!   11 Nov newer reads and failures pushed a created event out, and the
 //!   lamp said nothing was saved. With `LAMP_SERVICE_REDO` on, each write
 //!   carries its record key and the note says to give it as `from_record`
-//!   ([`REDO_RULE`]): no key was ever shown, so a redo was never asked. Read
+//!   ([`REDO_RULE`]): no key was ever shown, so a redo was never asked. A
+//!   `done` calendar create or move shows its `event_id` (the record's
+//!   `result_id`), what moves or cancels it: shown only the key, the model
+//!   sent the key as the event's id. Read
 //!   from what the voice holds, never waited for: after a restart the
 //!   owner's records are asked of the memory beside the turns, once
 //!   ([`load_ahead`]), and a write left `prepared` by the restart, which
@@ -59,7 +62,7 @@ pub const HISTORY_RULE: &str = "These are history only, never a write of this tu
 /// What the model is told with the records when someone else may be here.
 pub const BRIEF: &str = "Someone else may be here: say only which service it was and how it went, never what it was about.";
 /// With `LAMP_SERVICE_REDO` on, told with the records in full.
-pub const REDO_RULE: &str = "To redo or change a write listed here, call service_write with from_record set to its key, giving only what changed.";
+pub const REDO_RULE: &str = "To redo a write listed here, call service_write with from_record set to its key, giving only what changed. To move or cancel an event already made, call service_write with action update_event (or delete_event) and the record's event_id, or from_record set to its key; a key is never an event_id.";
 /// The latest records told every time.
 pub const NOTE_SHOWN: usize = 5;
 /// Records still `prepared` or `failed`, and `done` writes, are told too
@@ -67,9 +70,10 @@ pub const NOTE_SHOWN: usize = 5;
 pub const OPEN_WITHIN_MS: u64 = 7 * 86_400_000;
 /// The most records told in one note.
 pub const NOTE_MOST: usize = 10;
-/// The most bytes of the note: 1,600 before [`HISTORY_RULE`], which takes
-/// about 200 of it.
-pub const NOTE_BYTES: usize = 1_800;
+/// The most bytes of the note: about 1,700 before [`HISTORY_RULE`] (the
+/// redo rule's event-id sentence and a made event's id included), which
+/// takes about 200 of it.
+pub const NOTE_BYTES: usize = 1_900;
 /// The most records a recall is told.
 pub const RECALL_MOST: u64 = 5;
 /// The most bytes of the records a recall is told: a function's answer is
@@ -294,7 +298,21 @@ pub fn line(record: &Record, now_ms: u64, offset: i32, in_full: bool) -> String 
     if super::redo::on() && !is_read(record) {
         parts.push(format!("key {}", record.key));
     }
+    if let Some(event_id) = event_id(record) {
+        parts.push(format!("event_id {event_id}"));
+    }
     parts.join(" · ")
+}
+
+/// The Google Calendar event a `done` create or move made, its id as the
+/// service answered it (`result_id`): what moves or cancels it. On
+/// lamp-06c1 on 11 Nov only the record key was shown, and the model sent
+/// it as the event's id.
+fn event_id(record: &Record) -> Option<&str> {
+    let made = record.service == "google_calendar"
+        && record.status == Status::Done
+        && matches!(record.action.as_str(), "create_event" | "update_event");
+    Some(record.result_id.trim()).filter(|id| made && !id.is_empty())
 }
 
 /// How long a record is kept in the note when there is too little room:

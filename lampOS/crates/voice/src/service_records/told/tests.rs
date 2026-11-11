@@ -767,8 +767,96 @@ fn the_history_rule_drops_no_line_of_the_switch_on_row() {
     hold(the_switch_on_row(NOW - 40 * MINUTE));
     let note = note_now(Some(OWNER), true, NOW, ZONE).expect("the owner is told");
     let without = note.len() - HISTORY_RULE.len() - 1;
-    assert!(without <= 1_600, "{without} bytes before the rule");
+    // 1,600 bytes before #6427; #6404's redo rule adds that a key is never
+    // an event id, and a made event's line its event_id.
+    assert!(without <= 1_750, "{without} bytes before the rule");
     assert!(!note.contains("more not shown"), "{note}");
     assert!(note.len() <= NOTE_BYTES, "{} bytes: {note}", note.len());
+    super::super::redo::on_for_test(false);
+}
+
+/// lamp-06c1, 11 Nov: the note showed a made event's record key and never
+/// its Google id, and the model sent the key as `event_id`. A `done`
+/// create or move shows its `event_id` (the record's `result_id`), in
+/// full only; a cancelled one, one with no id and a mail show none, and
+/// the redo rule says a key is never an event id.
+#[test]
+fn a_made_event_shows_its_event_id() {
+    fresh();
+    super::super::redo::on_for_test(true);
+    let made = |key: &str, action: &str, status: Status, id: &str, changed: u64| Record {
+        result_id: id.into(),
+        ..write_rec(
+            key,
+            action,
+            status,
+            json!({"title":"Friday edit test","start":"2026-11-12T19:00:00+07:00"}),
+            changed,
+        )
+    };
+    hold(vec![
+        made(
+            "v1794396042163-1",
+            "create_event",
+            Status::Done,
+            "mbsiaoesblr6nec4tfh4flsbng",
+            NOW - 9 * MINUTE,
+        ),
+        made(
+            "v1-2",
+            "update_event",
+            Status::Done,
+            "evnt12345",
+            NOW - 7 * MINUTE,
+        ),
+        made(
+            "v1-3",
+            "create_event",
+            Status::Cancelled,
+            "",
+            NOW - 5 * MINUTE,
+        ),
+        made("v1-4", "create_event", Status::Done, "", NOW - 3 * MINUTE),
+        write_rec(
+            "v1-5",
+            "send_mail",
+            Status::Done,
+            json!({"subject":"Lamp test"}),
+            NOW - MINUTE,
+        ),
+    ]);
+    let note = note_now(Some(OWNER), true, NOW, ZONE).expect("told");
+    let line_of = |key: &str| {
+        note.lines()
+            .find(|line| line.contains(&format!("key {key}")))
+            .unwrap_or_else(|| panic!("{key}: {note}"))
+            .to_owned()
+    };
+    assert!(
+        line_of("v1794396042163-1")
+            .contains("key v1794396042163-1 · event_id mbsiaoesblr6nec4tfh4flsbng"),
+        "{note}"
+    );
+    assert!(line_of("v1-2").contains("event_id evnt12345"), "{note}");
+    for key in ["v1-3", "v1-4", "v1-5"] {
+        assert!(!line_of(key).contains("event_id"), "{key}: {note}");
+    }
+    assert!(note.contains("a key is never an event_id"), "{note}");
+    assert!(
+        note.contains(
+            "call service_write with action update_event (or delete_event) and the record's event_id"
+        ),
+        "{note}"
+    );
+    // Never named as a function of its own (the 9adf fake writes).
+    for alone in [
+        "call update_event",
+        "call delete_event",
+        "calling update_event",
+    ] {
+        assert!(!note.contains(alone), "{alone}: {note}");
+    }
+    let brief = note_now(Some(OWNER), false, NOW, ZONE).expect("told brief");
+    assert!(!brief.contains("mbsiaoesblr6nec4tfh4flsbng"), "{brief}");
     super::super::redo::on_for_test(false);
 }
