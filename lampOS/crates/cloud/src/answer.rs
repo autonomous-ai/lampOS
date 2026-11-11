@@ -328,7 +328,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 67] = [
+pub const KINDS: [(&str, Switch); 68] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -366,6 +366,7 @@ pub const KINDS: [(&str, Switch); 67] = [
     (crate::settings::KINDS[2], SETTINGS),
     (crate::settings::KINDS[3], SETTINGS),
     (crate::settings::KINDS[4], SETTINGS),
+    (crate::settings::KINDS[5], SETTINGS),
     (crate::settings::PLACE_KINDS[0], PLACE),
     (crate::settings::PLACE_KINDS[1], PLACE),
     (crate::settings::VOICE_KINDS[0], VOICE),
@@ -1574,6 +1575,7 @@ pub mod tests {
             "device.soft_reset",
             "device.rename",
             "control.set",
+            "control.set_agent",
             "add_channel",
             "skills.install_store",
             "face.enroll",
@@ -1705,6 +1707,7 @@ pub mod tests {
                     "device.rename",
                     "language.set",
                     "control.set",
+                    "control.set_agent",
                     "wifi.set",
                     "wifi.confirm",
                 ],
@@ -1718,6 +1721,7 @@ pub mod tests {
                     "device.rename",
                     "language.set",
                     "control.set",
+                    "control.set_agent",
                     "keys.set",
                     "keys.remove",
                     "keys.get",
@@ -1735,6 +1739,7 @@ pub mod tests {
                     "device.rename",
                     "language.set",
                     "control.set",
+                    "control.set_agent",
                     "owner.place",
                     "owner.place.clear",
                 ],
@@ -1751,6 +1756,7 @@ pub mod tests {
                     "device.rename",
                     "language.set",
                     "control.set",
+                    "control.set_agent",
                     "voice.set",
                     "character.set",
                     "voice.get",

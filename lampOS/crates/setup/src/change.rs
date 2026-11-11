@@ -206,6 +206,9 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
             if on && fs::symlink_metadata(&config.control_dropin).is_err() {
                 return Err("turn developer access on first: the local agent's socket is the developer door's".into());
             }
+            if on && !agent_ready(config) {
+                return Err(AGENT_NOT_READY.into());
+            }
             Ok(Change::LocalAgent(on))
         }
         // Checked again here, whatever lamp-cloud sent (#5500).
@@ -762,6 +765,23 @@ pub const CLOSE_INSTALLING: &str = "an update is installing: try again in a few 
 /// Said when the drop-in is gone but lamp-control did not stop (or, for the
 /// local agent, did not restart).
 pub const CLOSE_MAY_STAY_OPEN: &str = "the door may stay open until the lamp next restarts";
+
+/// What the local agent's switch is refused with while the lamp lacks the
+/// agent's group or its socket folder: a unit that names either does not
+/// start, and lamp-control (the developer door too) would be down. The
+/// installer makes both (`lamp-update install`); a lamp that has not had that
+/// step has to have it first.
+pub const AGENT_NOT_READY: &str = "this lamp needs one more step before the local agent can be turned on: its user and group are made by a reinstall step (lamp-update install), which this lamp has not had";
+
+/// Whether the agent's group is in the group file and its socket folder is
+/// there.
+fn agent_ready(config: &Config) -> bool {
+    let group = lamp_msgs::local_agent::GROUP;
+    fs::read_to_string(&config.agent_group_file).is_ok_and(|text| {
+        text.lines()
+            .any(|line| line.split(':').next() == Some(group))
+    }) && config.agent_folder.is_dir()
+}
 
 /// systemd, as the change helper drives it for lamp-control. Injected for tests.
 pub trait Systemd {

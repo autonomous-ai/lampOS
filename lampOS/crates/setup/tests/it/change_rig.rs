@@ -34,6 +34,17 @@ impl Root {
         Self(path)
     }
 
+    /// The lamp as the installer leaves it for the local agent: its group in
+    /// the group file and its socket folder made.
+    pub(crate) fn agent_ready(&self) {
+        fs::write(
+            self.0.join("etc/group"),
+            "root:x:0:\nlamp-agents:x:995:lampagent\n",
+        )
+        .unwrap();
+        fs::create_dir_all(self.0.join("run/lampos-agent")).unwrap();
+    }
+
     pub(crate) fn config(&self) -> Config {
         serde_json::from_value(json!({
             "listen": "127.0.0.1:5000",
@@ -52,6 +63,8 @@ impl Root {
             "language": self.0.join("etc/setup/language"),
             "control_dropin": self.0.join("etc/systemd/system/lamp-control.service.d/developer.conf"),
             "agent_dropin": self.0.join("etc/systemd/system/lamp-control.service.d/agent.conf"),
+            "agent_group_file": self.0.join("etc/group"),
+            "agent_folder": self.0.join("run/lampos-agent"),
             "consent": self.0.join("var/lib/lampOS/consent"),
         }))
         .unwrap()

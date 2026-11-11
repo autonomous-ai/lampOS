@@ -70,6 +70,8 @@ impl Root {
             own_keys: self.0.join("etc/own"),
             control_dropin: self.0.join("etc/lamp-control.service.d/developer.conf"),
             agent_dropin: self.0.join("etc/lamp-control.service.d/agent.conf"),
+            agent_group_file: self.0.join("etc/group"),
+            agent_folder: self.0.join("run/lampos-agent"),
             consent: self.0.join("var/consent"),
             web_start: vec![],
             web_stop: vec![],

@@ -439,6 +439,7 @@ fn off_while_an_update_holds_the_lock_refuses_and_keeps_the_drop_in() {
 #[test]
 fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
     let root = Root::new();
+    root.agent_ready();
     let config = root.config();
     let (folder, records) = records_folder("agent-off");
     let mut ears = Script {

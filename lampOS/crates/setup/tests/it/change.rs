@@ -196,8 +196,40 @@ fn the_local_agent_switch_writes_a_fixed_drop_in_only_while_developer_access_is_
     let done = done.unwrap();
     assert!(!done.restart_control);
     assert_eq!(done.said, "the local agent is off already");
-    // Developer access on, then the agent.
+    // Developer access on, but a lamp that has not had the installer's step
+    // (no group, no socket folder): refused in words, nothing written: a unit
+    // naming either would not start, and the developer door with it.
     answer(r#"{"control": true}"#, &config, true);
+    let (reply, done) = answer(r#"{"local_agent": true}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"refused": lamp_setup::change::AGENT_NOT_READY})
+    );
+    assert!(done.is_none() && !agent.exists());
+    // The group alone is not enough, nor the folder alone.
+    fs::write(root.0.join("etc/group"), "lamp-agents:x:995:\n").unwrap();
+    let (reply, _) = answer(r#"{"local_agent": true}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"refused": lamp_setup::change::AGENT_NOT_READY})
+    );
+    fs::write(root.0.join("etc/group"), "root:x:0:\n").unwrap();
+    fs::create_dir_all(root.0.join("run/lampos-agent")).unwrap();
+    let (reply, _) = answer(r#"{"local_agent": true}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"refused": lamp_setup::change::AGENT_NOT_READY})
+    );
+    assert!(!agent.exists());
+    // Another group by a name that merely contains it is not it.
+    fs::write(root.0.join("etc/group"), "my-lamp-agents:x:1:\n").unwrap();
+    let (reply, _) = answer(r#"{"local_agent": true}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"refused": lamp_setup::change::AGENT_NOT_READY})
+    );
+    // Both there: written.
+    root.agent_ready();
     let (reply, done) = answer(r#"{"local_agent": true}"#, &config, true);
     assert_eq!(reply, json!({"done": {"on": true}}));
     let done = done.unwrap();
