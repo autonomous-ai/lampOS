@@ -21,6 +21,8 @@ import { LampError, schema } from 'lampos';
 const q = JSON.stringify;
 // The one skill the app may put on the lamp: a folder of its own with one recorded move, never one the page names.
 const TRY_SKILL = fileURLToPath(new URL('./skills/try-wave', import.meta.url));
+// A call and what it answered, for the log (one line: a long answer is cut).
+const answered = (call, value) => `${call} -> ${q(value ?? null).slice(0, 300)}`;
 const refuse = (why) => new LampError(why, { code: 'bad_request' });
 
 export const COLOURS = [...schema.colours];
@@ -108,6 +110,21 @@ export const CONTROLS = [
       await lamp.withLease(['body'], () => lamp.movePoses(poses, { wait: true }));
       return `lamp.withLease(['body'], () => lamp.movePoses(${q(poses)}, { wait: true }))`;
     } },
+  // The head follows the hand the lamp sees until the lease runs out (`for_ms`) or Stop; the `hand` events and the
+  // lease's end come in the log. The `hand` stimulus (room) puts one in view.
+  { id: 'follow_hand', group: 'Body', ops: ['look', 'lease.take', 'lease.release'], shows: ['hand'], label: 'Follow a hand', fields: [number('for_ms', 1000, 30_000, 8000, { integer: true })],
+    run: async ({ lamp, release }, a) => {
+      await release();
+      await lamp.followHand({ forMs: a.for_ms }).start();
+      return `lamp.followHand({ forMs: ${a.for_ms} }).start()`;
+    } },
+  { id: 'joints', group: 'Body', ops: ['joints', 'lease.take', 'lease.release'], shows: [], label: 'Joints (yaw, pitch)', fields: [number('yaw', -180, 180, 10), number('pitch', -90, 90, 5), number('within_ms', 0, 5000, 1000, { integer: true })],
+    run: async ({ lamp, release }, a) => {
+      const targets = { yaw: a.yaw, pitch: a.pitch };
+      await release();
+      await lamp.withLease(['body'], (lease) => lamp.joints(lease, a.within_ms, targets, { wait: true }));
+      return `lamp.withLease(['body'], (lease) => lamp.joints(lease, ${a.within_ms}, ${q(targets)}, { wait: true }))`;
+    } },
   { id: 'stop', group: 'Body', ops: ['stop'], shows: [], label: 'Stop', fields: [], run: async ({ lamp }) => { await lamp.stop(); return 'lamp.stop()'; } },
   // The owner's language the lamp said in hello: a read, so the log says the code it got.
   { id: 'language', group: 'Voice', ops: [], shows: [], label: 'Language', fields: [], run: async ({ lamp }) => `lamp.language // ${q(lamp.language)}` },
@@ -161,6 +178,12 @@ export const CONTROLS = [
   { id: 'turn_start', group: 'Voice', ops: ['turn.start'], shows: [], label: 'Ask the lamp (start a turn)', fields: [text('prompt', 200, 'What can you do?')],
     run: async ({ lamp }, a) => { await lamp.startTurn(a.prompt); return `lamp.startTurn(${q(a.prompt)})`; } },
   { id: 'turn_end', group: 'Voice', ops: ['turn.end'], shows: [], label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
+  { id: 'volume_to', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Volume to', fields: [number('to', 0, 100, 40, { integer: true })],
+    run: async ({ lamp }, a) => answered(`lamp.volume({ to: ${a.to} })`, await lamp.volume({ to: a.to })) },
+  { id: 'volume_step', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Volume step', fields: [select('step', ['up', 'down'])],
+    run: async ({ lamp }, a) => answered(`lamp.volume({ step: ${q(a.step)} })`, await lamp.volume({ step: a.step })) },
+  { id: 'volume_mute', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Mute', fields: [select('mute', ['on', 'off'], 'off')],
+    run: async ({ lamp }, a) => answered(`lamp.volume({ mute: ${a.mute === 'on'} })`, await lamp.volume({ mute: a.mute === 'on' })) },
   // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
   { id: 'sound', group: 'Voice', ops: ['sound'], shows: [], label: 'Sound (hum)', fields: [], run: async ({ lamp }) => { await lamp.sound('hum'); return "lamp.sound('hum')"; } },
   // Clips (grant `speak`): this computer's own, kept on the lamp. The rows touch ONLY this run's scratch clip: upload makes it,
@@ -272,6 +295,13 @@ export const CONTROLS = [
     } },
   { id: 'skill_remove', group: 'Skills', ops: ['skill.remove'], shows: [], label: 'Remove the try-wave skill', fields: [],
     run: async ({ lamp }) => { await lamp.removeSkill('try-wave'); return "lamp.removeSkill('try-wave')"; } },
+  // What the lamp says of itself, by name (`lamp.get`), and the three named reads (the `air`, `device` and `body`
+  // states): the answer is in the log; a `known: false` is the lamp having nothing to say yet.
+  { id: 'get', group: 'Reads', ops: ['get'], shows: [], label: 'Read a state', fields: [select('state', [...schema.states], 'presence')],
+    run: async ({ lamp }, a) => answered(`lamp.get(${q(a.state)})`, await lamp.get(a.state)) },
+  { id: 'air', group: 'Reads', ops: ['get'], shows: [], label: 'Air', fields: [], run: async ({ lamp }) => answered('lamp.air()', await lamp.air()) },
+  { id: 'device', group: 'Reads', ops: ['get'], shows: [], label: 'Device', fields: [], run: async ({ lamp }) => answered('lamp.device()', await lamp.device()) },
+  { id: 'body_info', group: 'Reads', ops: ['get'], shows: [], label: 'Body', fields: [], run: async ({ lamp }) => answered('lamp.bodyInfo()', await lamp.bodyInfo()) },
 ];
 
 // The world, not the SDK: `lamp-sim <verb> ... DIR` writes what the lamp's stand-ins read. `argv` is an array,
