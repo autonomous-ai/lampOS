@@ -3342,13 +3342,13 @@ gone ([switches.md](switches.md)). What happens:
 
 A made line said with no make behind it is never said
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): a reply that
-opens with "I made", a name of at most 8 words, then a ':', ", and it's on",
-". It waits for you to agree" or "I made it but couldn't put it on", in a
+opens with "I made", a name of at most 8 words, then a ':' with "It waits for you to agree"
+later in the reply, ", and it's on", ". It waits for you to agree" or "I made it but couldn't put it on", in a
 turn with no `make_skill` call, is held like any claimed action. The model is
 asked once more, and a second such reply is said as "Sorry, I didn't do that.
 Could you ask me again?". On lamp-9adf (11 Nov 21:28) a line begun inside the
 lamp's own answer got "I made lamp test event … It waits for you to agree"
-with `calls=none`, and no skill was made. "I made a mistake." is no claim.
+with `calls=none`, and no skill was made. "I made a mistake." and "I made a mistake: …" are no claims.
 Test: `action_claim::tests::a_skill_said_made_is_a_claim_only_a_make_backs`.
 
 Removing a made skill by voice is still to come.
