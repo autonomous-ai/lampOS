@@ -15162,10 +15162,30 @@ async fn each_answer_asks_for_its_speech_socket_as_it_begins() {
 /// without the switch, as before.
 #[test]
 fn a_written_turn_waits_longer_only_with_its_switch() {
-    assert_eq!(begin_within(false, true), WRITTEN_BEGIN_WITHIN);
-    assert_eq!(begin_within(true, true), BEGIN_WITHIN);
-    assert_eq!(begin_within(false, false), BEGIN_WITHIN);
+    assert_eq!(
+        begin_within(false, true, BEGIN_WITHIN),
+        WRITTEN_BEGIN_WITHIN
+    );
+    assert_eq!(begin_within(true, true, BEGIN_WITHIN), BEGIN_WITHIN);
+    assert_eq!(begin_within(false, false, BEGIN_WITHIN), BEGIN_WITHIN);
     assert!(WRITTEN_BEGIN_WITHIN > BEGIN_WITHIN && WRITTEN_BEGIN_WITHIN < Duration::from_secs(8));
+}
+
+/// #6414: the region file says `CN`, and a spoken turn's first round may
+/// begin as late as 5 s, 4 s after the wait's sound; empty, missing or
+/// unreadable, 3 s and 3 s as before.
+#[test]
+fn a_lamp_in_china_waits_longer_for_the_first_round() {
+    let secs = Duration::from_secs;
+    for (region, limits) in [
+        (Some("CN\n"), (secs(5), secs(4))),
+        (Some(""), (secs(3), secs(3))),
+        (Some("US"), (secs(3), secs(3))),
+        (None, (secs(3), secs(3))),
+    ] {
+        assert_eq!(begin_limits(in_china(region)), limits, "{region:?}");
+    }
+    assert_eq!(begin_within(true, true, CN_BEGIN_WITHIN), CN_BEGIN_WITHIN);
 }
 
 /// b0701 on lamp-4ace (#1722, 07:19), `LAMP_TASKS_NAMED_ASK`: a line whose
