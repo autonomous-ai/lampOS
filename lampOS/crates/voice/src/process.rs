@@ -2053,6 +2053,8 @@ fn second_route_worker_environment(
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
+        // Functions offered only while they apply (#6218).
+        crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
         crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
         // A plain keep answered at once, with no second round (C59).
@@ -2317,6 +2319,7 @@ mod tests {
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
             crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
+            crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
             crate::keep_at_once::ENVIRONMENT,
@@ -3219,6 +3222,7 @@ mod tests {
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
+                    || name == crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::SAY_WITH_CALL_ENVIRONMENT
                     || name == crate::keep_at_once::ENVIRONMENT
@@ -3515,6 +3519,7 @@ mod tests {
                     "LAMP_SECOND_STT_WARM=on",
                     "LAMP_SECOND_UNFINISHED_WAIT=on",
                     "LAMP_SECOND_WEATHER=on",
+                    "LAMP_SECOND_WHILE_THEY_APPLY=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SERVICES_TOLD=on",
                     "LAMP_SERVICE_CONTACTS=on",
