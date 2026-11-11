@@ -2093,8 +2093,8 @@ for each run, and is answered once the run ends
   prompt's words alone.
 
 **Not yet (said so the code is not read as more):** `ControlTokens` speaks
-#6408's admin socket, which is not merged yet, and lamp-control keeps no
-skill yes yet, so every mint is refused there. No serve flag
+lamp-control's admin socket (#6408, merged), but lamp-control keeps no skill
+yes yet, so every mint is refused there today. No serve flag
 binds the hand-over socket yet, and no `Runner` starts Hermes through
 Harness yet, so nothing on a lamp runs a skill's task. The run's "no other
 network" (a direct outbound call refused) and the caps on

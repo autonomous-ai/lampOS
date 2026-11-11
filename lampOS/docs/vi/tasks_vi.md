@@ -202,8 +202,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   (hermes-ns), không chỉ dựa vào lời trong prompt.
 
 **Chưa có (nói rõ để không hiểu code là nhiều hơn):** `ControlTokens` nói
-theo socket quản trị của #6408, PR này chưa được gộp, và lamp-control chưa
-giữ lời đồng ý nào của kỹ năng, nên mọi lần xin token ở đó đều bị từ chối.
+theo socket quản trị của lamp-control (#6408, đã gộp), nhưng lamp-control
+chưa giữ lời đồng ý nào của kỹ năng, nên hiện mọi lần xin token ở đó đều bị
+từ chối.
 Chưa có cờ serve nào
 mở socket giao việc này, và chưa có `Runner` nào khởi động Hermes qua
 Harness, nên trên đèn chưa có việc của kỹ năng nào chạy. Việc "không mạng nào
