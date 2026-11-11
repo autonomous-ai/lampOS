@@ -112,7 +112,9 @@ func (s *Service) StartStatusReporter(ctx context.Context) {
 			if resp.DeviceID != "" && resp.DeviceID != s.config.DeviceID {
 				s.config.DeviceID = resp.DeviceID
 			}
-			if resp.HasMQTT() && resp.GetMQTT().Endpoint != s.config.MQTTEndpoint {
+			// Apply when the broker, port or channels change: moving to the TLS port on
+			// the same broker changes only the port.
+			if resp.HasMQTT() && mqttConfigChanged(resp.GetMQTT(), s.config) {
 				mqttCfg := resp.GetMQTT()
 				slog.Info("received MQTT config from backend", "component", "status-reporter", "endpoint", mqttCfg.Endpoint)
 				s.config.MQTTEndpoint = mqttCfg.Endpoint
@@ -128,4 +130,14 @@ func (s *Service) StartStatusReporter(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// mqttConfigChanged reports whether the backend's MQTT config differs from the
+// running one in broker, port or channels. Login changes alone don't restart.
+func mqttConfigChanged(m *beclient.MQTTConfig, c *config.Config) bool {
+	port, _ := strconv.Atoi(m.Port)
+	return m.Endpoint != c.MQTTEndpoint ||
+		(port != 0 && port != c.MQTTPort) ||
+		(m.FaChannel != "" && m.FaChannel != c.FAChannel) ||
+		(m.FdChannel != "" && m.FdChannel != c.FDChannel)
 }
