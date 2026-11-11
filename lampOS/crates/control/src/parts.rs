@@ -817,7 +817,19 @@ impl Lamp {
                 ErrorCode::Refused,
                 "the ring took no light request (LAMP_LIGHT_REQUESTS off?)",
             )),
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                // Its own pixels are kept to be shown as `shows.pixels` while it
+                // holds them; any other light from it (or its stop) ends that.
+                if let Some(watch) = &self.watch
+                    && let Ok(mut watch) = watch.lock()
+                {
+                    match &request.pixels {
+                        Some(pixels) => watch.hold_pixels(client, &request.light, pixels, until_us),
+                        None => watch.release_pixels(client),
+                    }
+                }
+                Ok(())
+            }
             Err(error) => Err(Error::new(
                 ErrorCode::Refused,
                 format!("the ring did not take it: {error}"),

@@ -230,7 +230,15 @@ blinks or flashes. A test in `lamp-msgs` keeps the schema's lists in step.
 `level` from `light/state`, and `shows`, what the ring draws now from
 `light/drawn`: the person's light, or one a computer or skill asked for
 over it; each left out until the lamp has said it; a ring that stops
-leaves `shows` at its last draw, though `light/drawn` itself lapses in 3 s),
+leaves `shows` at its last draw, though `light/drawn` itself lapses in 3 s;
+`shows.pixels`, optional, is the ring's 32 pixels, each `#rrggbb`, while a
+paired computer holds its own `light` with `rgb` or `pixels` and the ring says
+that light is the one it draws: lamp-control keeps the request's pixels, never
+reads them from the ring, and leaves the field out once the hold lapses, ends
+(another light from that computer, or its stop) or another light is drawn, and
+on a lamp that does not say it; they are what was asked of the ring, which may
+draw them dimmer under its own channel ceiling; `body.state`'s light carries
+it too),
 mood
 (`mood/state`'s energy, warmth, awake, asleep), and `lamp_state`.
 
