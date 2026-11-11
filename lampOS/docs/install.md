@@ -1645,7 +1645,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
           can't be dropped, and the devices are hidden instead;
        5. back into the folder it was started in through the new mounts
           (the old one would reach the hidden folders by `..`); a folder
-          not shown ends it;
+          not shown starts it in Hermes's own folder instead, with one
+          line on stderr (`hermes-ns: <folder> is not visible to Hermes;
+          it starts in <Hermes's folder>`), and only when that too fails
+          does it end;
        6. `HOME` set to `/var/lib/lampos-hermes` and `unshare --user
           --map-user=<caller's uid> --map-group=<caller's gid>
           /var/lib/lampos-hermes/.local/bin/hermes`.

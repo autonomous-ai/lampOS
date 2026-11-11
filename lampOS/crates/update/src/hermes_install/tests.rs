@@ -598,6 +598,12 @@ fn the_namespace_script_shows_only_what_is_allowed_and_refuses_outside_its_names
         "the token's own file is hidden too"
     );
     assert!(NS_TEXT.contains("exec /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" "));
+    // The caller's folder, when it is hidden (a hand call from a login
+    // home), gives way to Hermes's own with one line, not a bare cd error.
+    let back = NS_TEXT
+        .find("cd \"$D\" 2>/dev/null || { echo \"hermes-ns: $D is not visible to Hermes; it starts in $H\" >&2; cd \"$H\"; } || fail ")
+        .expect("the cd back gives way to Hermes's folder");
+    assert!(back < hermes);
     assert!(NS_TEXT.contains("[ \"$count\" != 4294967295 ] ||"));
     // Outside a namespace (and on a host with no /proc), nothing runs.
     let folder = tempfile::tempdir().unwrap();
