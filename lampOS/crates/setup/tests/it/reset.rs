@@ -776,7 +776,10 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     let steps = reset::resume(&plan, &mut start).unwrap();
     wiped(&root);
     assert!(!steps.contains(&Step::Rebooting));
-    assert_eq!(*start.calls.borrow(), ["skills", "agents", "sync", "sync"]);
+    assert_eq!(
+        *start.calls.borrow(),
+        ["list-units", "skills", "agents", "sync", "sync"]
+    );
     // Nothing left to finish.
     assert!(
         reset::resume(&plan, &mut Fake::default())
@@ -2809,6 +2812,17 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, b"x").unwrap();
     }
+    // The kept settings as the lamp writes them, already cut.
+    fs::write(
+        root.path("var/lib/lampos-hermes/.hermes/config.yaml"),
+        reset::cut_hermes_config(b"").unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        root.path("var/lib/lampos-openclaw/state/openclaw.json"),
+        reset::cut_openclaw_config(b"{}").unwrap(),
+    )
+    .unwrap();
     // A link in a kept place is removed, never followed.
     fs::write(root.path("outside"), b"keep").unwrap();
     symlink(
@@ -2886,6 +2900,160 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
     }
     // OpenClaw's gateway, outside the lamp's target, is stopped first.
     assert!(reset::WRITERS.contains(&"lamp-openclaw-gateway.service"));
+}
+
+/// The Hermes a pin change moved aside (`hermes_install::ASIDE`), with the
+/// old owner's sessions and keys, goes whole; a link there is removed, never
+/// followed, and none at all is fine (#6343).
+#[test]
+fn a_reset_removes_the_hermes_moved_aside() {
+    let root = Root::new();
+    let aside = root.path("var/lib/lampos-hermes.old");
+    assert_eq!(
+        lamp_update::hermes_install::ASIDE,
+        "/var/lib/lampos-hermes.old"
+    );
+    fs::create_dir_all(aside.join(".hermes/sessions")).unwrap();
+    fs::write(aside.join(".hermes/sessions/s1.json"), b"{}").unwrap();
+    fs::write(aside.join(".hermes/.env"), b"KEY=x").unwrap();
+    assert!(reset::forget_agents(&root.0).unwrap() > 0);
+    assert!(fs::symlink_metadata(&aside).is_err());
+    assert!(root.path("var/lib").is_dir());
+    fs::create_dir_all(root.path("outside")).unwrap();
+    fs::write(root.path("outside/keep"), b"keep").unwrap();
+    symlink(root.path("outside"), &aside).unwrap();
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 1);
+    assert!(fs::symlink_metadata(&aside).is_err());
+    assert_eq!(fs::read(root.path("outside/keep")).unwrap(), b"keep");
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 0);
+}
+
+/// Hermes's `config.yaml` keeps only lamp-update's settings and Harness's
+/// `hooks:` block, and OpenClaw's `openclaw.json` only its `gateway`; a
+/// person's servers, skill folders, personality, other providers' keys and
+/// channel tokens go. A file that can't be read is removed (#6343).
+#[test]
+fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
+    let root = Root::new();
+    let hermes = root.path("var/lib/lampos-hermes/.hermes");
+    let state = root.path("var/lib/lampos-openclaw/state");
+    fs::create_dir_all(&hermes).unwrap();
+    fs::create_dir_all(&state).unwrap();
+    let config = hermes.join("config.yaml");
+    fs::write(
+        &config,
+        "model:\n  provider: custom:lamp\n  default: deepseek-flash\nupdates:\n  check: false\nmcp_servers:\n  mine:\n    command: /home/me/server\nskills:\n  external_dirs:\n  - /var/lib/lampOS/skills\n  - /home/me/skills\nhooks:\n  pre_tool_call:\n  - command: /usr/lib/harness/hook pre\n    timeout: 5\n# a person's note\n\npersonality: pirate\nlsp:\n  enabled: false\n",
+    )
+    .unwrap();
+    fs::set_permissions(&config, fs::Permissions::from_mode(0o640)).unwrap();
+    let json = state.join("openclaw.json");
+    fs::write(
+        &json,
+        r#"{"gateway":{"auth":{"mode":"token","token":"t"},"port":18789},"models":{"providers":{"other":{"apiKey":"sk-person"}}},"channels":{"telegram":{"botToken":"123:abc"}},"skills":{"load":{"extraDirs":["/home/me"]}},"plugins":{"allow":["x"]}}"#,
+    )
+    .unwrap();
+    assert!(reset::forget_agents(&root.0).unwrap() >= 2);
+    let cut = fs::read_to_string(&config).unwrap();
+    assert_eq!(
+        cut,
+        "updates:\n  check: false\nplugins:\n  auto_update_check_hours: 0\nlsp:\n  enabled: false\nterminal:\n  oneshot_completion_wait_seconds: 0\nhooks:\n  pre_tool_call:\n  - command: /usr/lib/harness/hook pre\n    timeout: 5\n"
+    );
+    for gone in ["mcp_servers", "/home/me", "personality", "model:", "note"] {
+        assert!(!cut.contains(gone), "{gone}");
+    }
+    assert_eq!(
+        fs::metadata(&config).unwrap().permissions().mode() & 0o7777,
+        0o640
+    );
+    for (key, _) in lamp_update::hermes_install::CONFIG {
+        let (top, sub) = key.split_once('.').unwrap();
+        assert!(cut.contains(&format!("{top}:\n")), "{key}");
+        assert!(cut.contains(&format!("  {sub}: ")), "{key}");
+    }
+    let kept: serde_json::Value = serde_json::from_slice(&fs::read(&json).unwrap()).unwrap();
+    assert_eq!(
+        kept,
+        serde_json::json!({"gateway": {"auth": {"mode": "token", "token": "t"}, "port": 18789}})
+    );
+    // Cut once, nothing changes again, and no staged copy is left.
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 0);
+    assert!(!hermes.join("config.yaml.cut").exists());
+    assert!(!state.join("openclaw.json.cut").exists());
+    // A staged copy a cut left is removed by the next run.
+    fs::write(hermes.join("config.yaml.cut"), b"mcp_servers: {}\n").unwrap();
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 1);
+    assert!(!hermes.join("config.yaml.cut").exists());
+    // Without hooks, only the lamp's settings; a file not read is removed.
+    assert_eq!(
+        reset::cut_hermes_config(b"personality: pirate\n").unwrap(),
+        reset::cut_hermes_config(b"").unwrap()
+    );
+    for unreadable in [
+        &b"\tkey: x\n"[..],
+        b"---\nhooks: {}\n",
+        b"- a\n",
+        b"not a key\n",
+        b"hooks: {}\nhooks: {}\n",
+        b"\xff\n",
+    ] {
+        assert!(reset::cut_hermes_config(unreadable).is_none());
+    }
+    assert_eq!(
+        reset::cut_openclaw_config(br#"{"models":{}}"#).unwrap(),
+        b"{}\n"
+    );
+    for unreadable in [&b"[]"[..], b"{", b"null"] {
+        assert!(reset::cut_openclaw_config(unreadable).is_none());
+    }
+    fs::write(&config, b"\tbroken: yes\n").unwrap();
+    fs::write(&json, b"{ not json").unwrap();
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 2);
+    assert!(!config.exists());
+    assert!(!json.exists());
+    // A link in a kept file's place is removed, never followed.
+    fs::write(root.path("outside"), b"{}").unwrap();
+    symlink(root.path("outside"), &json).unwrap();
+    assert_eq!(reset::forget_agents(&root.0).unwrap(), 1);
+    assert!(fs::symlink_metadata(&json).is_err());
+    assert_eq!(fs::read(root.path("outside")).unwrap(), b"{}");
+}
+
+/// A reset finished after a power cut stops OpenClaw's gateway first, as the
+/// reset itself does: it starts at boot outside the lamp's target and would
+/// write its state while the reset empties it (#6343). A stop that fails
+/// wipes nothing.
+#[test]
+fn a_resumed_reset_stops_the_openclaw_gateway_before_finishing() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    fs::write(&plan.journal, b"{}").unwrap();
+    let gateway = "lamp-openclaw-gateway.service loaded active running OpenClaw\n";
+    let mut failing = Fake {
+        writers: gateway.into(),
+        fail_stop: true,
+        ..Fake::default()
+    };
+    assert!(reset::resume(&plan, &mut failing).is_err());
+    assert!(root.path("people.json").exists());
+    assert!(plan.journal.exists());
+    let mut fake = Fake {
+        writers: gateway.into(),
+        agents: 1,
+        ..Fake::default()
+    };
+    let steps = reset::resume(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(steps.contains(&Step::AgentsForgotten));
+    let argvs = fake.argvs.borrow();
+    assert_eq!(
+        argvs[1],
+        ["/bin/systemctl", "stop", reset::OPENCLAW_GATEWAY].map(String::from)
+    );
+    assert_eq!(
+        *fake.calls.borrow(),
+        ["list-units", "stop", "skills", "agents", "sync", "sync"]
+    );
+    assert!(reset::WRITERS.contains(&reset::OPENCLAW_GATEWAY));
 }
 
 /// The agents' files go after the plan's wipes and the skills, said by no
