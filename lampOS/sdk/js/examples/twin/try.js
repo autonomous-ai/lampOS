@@ -3,7 +3,10 @@
 // for a browser on this network (a phone, a laptop).
 //
 //   node examples/twin/try.js [--lamp-sim PATH] [--bin-dir DIR] [--twin-port N] [--glb PATH] [--no-open]
-//        [--camera] [--microphone]
+//        [--camera] [--microphone] [--lan-address IP]
+//
+// --lan-address IP  the one network address the page is served on (default: the first real Ethernet or Wi-Fi address,
+//                  never a Docker, VM or VPN one; the others are listed). It must be one of this computer's own.
 //
 // --lamp-sim PATH  the lamp-sim binary (default: `lamp-sim` on the PATH; lamp-body and lamp-control beside it)
 // The lamp lives in a private folder of its own (~/.lampsim-try-PID, 0700) that Ctrl-C removes, and listens on

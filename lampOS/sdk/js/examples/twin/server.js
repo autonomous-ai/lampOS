@@ -27,7 +27,7 @@ import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
 import { checked, describe, findControl, findStimulus } from './controls.js';
-import { hostOk, newToken, originOk, tokenOk } from './guard.js';
+import { chooseLan, hostOk, newToken, originOk, tokenOk } from './guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const options = parse(process.argv.slice(2));
@@ -175,7 +175,6 @@ if (stimDir) {
     }).catch((error) => console.log(`not subscribed to ${event}: ${error.code ?? ''} ${error.message}`));
   }
 }
-const lanAddress = () => Object.values(networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal)?.address;
 
 const files = {
   '/': ['text/html; charset=utf-8', () => readFileSync(here('./index.html'))],
@@ -206,7 +205,16 @@ function snapshot() {
 }
 
 // With --lan the one network address the twin prints; a Host or an Origin is accepted only if it is that or loopback.
-const lanIp = lan ? lanAddress() : undefined;
+const lanChoice = lan ? chooseLan(networkInterfaces(), options['lan-address']) : undefined;
+if (options['lan-address'] !== undefined && !lan) {
+  console.error('--lan-address goes with --lan');
+  process.exit(2);
+}
+if (lanChoice?.error && options['lan-address'] !== undefined) {
+  console.error(`${lanChoice.error}; this computer's addresses: ${lanChoice.own.map(({ name, address }) => `${address} (${name})`).join(', ') || 'none'}`);
+  process.exit(2);
+}
+const lanIp = lanChoice?.address;
 const lanHost = lanIp ? `${lanIp}:${port}` : undefined;
 let cameraAskedAt = 0;
 const server = createServer((request, response) => {
@@ -281,7 +289,10 @@ server.listen(port, '127.0.0.1', () => {
   const network = createServer();
   network.on('request', (...handed) => server.emit('request', ...handed));
   network.on('upgrade', (...handed) => server.emit('upgrade', ...handed));
-  network.listen(port, lanIp, () => console.log(`on your network: http://${lanIp}:${port}/?t=${token}`));
+  network.listen(port, lanIp, () => {
+    console.log(`on your network: http://${lanIp}:${port}/?t=${token}`);
+    if (lanChoice.others.length) console.log(`other addresses (one is served; pick with --lan-address IP): ${lanChoice.others.map(({ name, address }) => `${address} (${name})`).join(', ')}`);
+  });
 });
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {

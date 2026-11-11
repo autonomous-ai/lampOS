@@ -26,3 +26,25 @@ export function originOk(origin, port, lanHost) {
 export function hostOk(host, port, lanHost) {
   return host === `localhost:${port}` || host === `127.0.0.1:${port}` || (Boolean(lanHost) && host === lanHost);
 }
+
+// The network address the twin prints with --lan. A computer has many IPv4 addresses and a phone reaches only
+// the one on its own network: the real interfaces (Ethernet, Wi-Fi), never a virtual one (Docker and its bridges,
+// virtual machines, VPN and tailscale tunnels, loopback). `table` is os.networkInterfaces().
+const VIRTUAL = /^(lo|docker\d*|br-|br\d+|veth|virbr|tailscale\d*|ts\d+|tun\d*|tap\d*|wg\d*|zt|utun\d*|vmnet\d*|vboxnet\d*|cni|flannel|kube|cali)/i;
+const ipv4 = (table) => Object.entries(table).flatMap(([name, list]) => (list ?? []).filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => ({ name, address: i.address })));
+export const lanAddresses = (table) => ipv4(table).filter(({ name }) => !VIRTUAL.test(name));
+
+// The one address to bind and print: `wanted` (the person's --lan-address) if it is one of this computer's own
+// IPv4 addresses, else the first real one. `others` are the other real addresses, to name a choice. An address
+// that is not this computer's, or no real address at all, is `error`, with `own` (every address, to choose from).
+export function chooseLan(table, wanted) {
+  const real = lanAddresses(table);
+  const own = ipv4(table);
+  if (wanted !== undefined) {
+    const found = own.find(({ address }) => address === wanted);
+    if (!found) return { error: `${wanted} is not an IPv4 address of this computer`, own };
+    return { address: found.address, name: found.name, others: real.filter(({ address }) => address !== wanted) };
+  }
+  if (!real.length) return { error: 'no network address found', own };
+  return { address: real[0].address, name: real[0].name, others: real.slice(1) };
+}
