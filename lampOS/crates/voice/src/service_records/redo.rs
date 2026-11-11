@@ -17,8 +17,16 @@
 //!   mail to the same people is built from it (its subject `Re:`, the new
 //!   text the call's), and the model is told to say plainly that a sent
 //!   mail can't be changed ([`FOLLOW_UP_NOTE`]). A `done` calendar event is
-//!   refused ([`EVENT_DONE`]): editing one is a separate action. Any other
-//!   `done` write, and a read, is refused.
+//!   not made again ([`EVENT_DONE`]), any other `done` write and a read are
+//!   refused.
+//! - **A made event moved or cancelled.** `update_event` or `delete_event`
+//!   naming a `done` `create_event` or `update_event` record is that
+//!   event's edit: its `event_id` is the record's `result_id` (Google's
+//!   id), its calendar the record's unless given, and nothing else is
+//!   filled ([`edit_of`]). The services read the event and read the change
+//!   back, and only a send after it changes it, as any edit. A record with
+//!   no `result_id` is refused ([`NO_EVENT_ID`]). On lamp-06c1 on 11 Nov
+//!   the model, shown only the key, sent the key itself as `event_id`.
 //! - **Linked.** The new record's `links` name the old one, and the old one
 //!   gets `replaced_by`, both written to the memory ([`link`]).
 //! - **Only the owner.** The fill runs inside the gate, after its owner,
@@ -37,16 +45,17 @@ pub const ENVIRONMENT: &str = "LAMP_SERVICE_REDO";
 pub const FIELD: &str = "from_record";
 
 /// What the model is told of [`FIELD`].
-pub const DESCRIPTION: &str = "To redo or change a past service write of theirs (cancelled, failed, timed out or refused; or a follow-up to a sent mail), such as \"do it again\" or \"redo it for Sunday\": its record key, the `key` shown with it in their past service actions or in what recall found. Give only what the person changed, each field whole; every other detail comes from the record. Read back and send as always.";
+pub const DESCRIPTION: &str = "To redo or change a past service write of theirs (cancelled, failed, timed out or refused; or a follow-up to a sent mail), such as \"do it again\" or \"redo it for Sunday\": its record key, the `key` shown with it in their past service actions or in what recall found. Give only what the person changed, each field whole; every other detail comes from the record. To move or cancel a calendar event they made (done), call service_write with action update_event (or delete_event) and this key: the record's event_id is filled in. Read back and send as always.";
 
 pub const NO_RECORD: &str = "Not done: no service action of theirs has that record key. Use a key from their past service actions, or ask for the whole write again.";
 pub const A_READ: &str = "Not done: a search or read is not redone from a record. Call service_read again if they want it.";
 pub const OTHER_KIND: &str = "Not done: that record is another service's or another action's. Keep the record's own service and action, or ask for a new write in full.";
-pub const EVENT_DONE: &str = "Not done: that event is already on their calendar, and changing a created event is a separate action, not a redo. Say so plainly, in a few words.";
 /// What a redo of a saved Gmail draft is told: it is changed or deleted by
 /// its id (`LAMP_GMAIL_DRAFT_EDITS`), never saved again beside the old one
 /// (a tester's lamp, 11 Nov).
 pub const DRAFT_DONE: &str = "Not done: that draft is already saved in their Gmail Drafts. To change or delete it, call update_draft or delete_draft with its draft_id, the record's result_id, if those are listed; never save it again beside the old one. Otherwise say so plainly.";
+pub const EVENT_DONE: &str = "Not done: that event is already on their calendar, so it is not made again. To move or cancel it, call service_write with action update_event (or delete_event) and the record's event_id, or from_record set to its key, giving only what changed.";
+pub const NO_EVENT_ID: &str = "Not done: that record keeps no event id, so the event can't be found from it. Say so plainly; read their calendar for it if they want it changed.";
 pub const DONE_ALREADY: &str = "Not done: that was already done, and a done action is not redone from its record. Say so plainly; they can ask for a new one in full.";
 pub const FOLLOW_UP_TEXT: &str = "Not done: that mail was already sent, and a sent mail can't be changed. Say so plainly, ask what a follow-up mail should say, and call again with from_record and that text.";
 pub const CUT_TEXT: &str = "Not done: the saved text was too long to keep whole. Ask them for the whole text, and call again with from_record and that text.";
@@ -249,7 +258,18 @@ pub fn fill(owner: &str, args: &mut Value) -> Result<(), &'static str> {
             .and_then(Value::as_str)
             .is_none_or(|said| said.trim() == kept)
     };
-    if !same("service", &record.service) || !same("action", &record.action) {
+    if !same("service", &record.service) {
+        return Err(OTHER_KIND);
+    }
+    if let Some(edit) = edit_of(&record, &given)? {
+        eprintln!(
+            "lamp-voice: a calendar {} filled from service record {key}: its event id (LAMP_SERVICE_REDO)",
+            edit["action"].as_str().unwrap_or_default()
+        );
+        *args = edit;
+        return Ok(());
+    }
+    if !same("action", &record.action) {
         return Err(OTHER_KIND);
     }
     let follow_up = record.status == Status::Done;
@@ -305,6 +325,40 @@ pub fn fill(owner: &str, args: &mut Value) -> Result<(), &'static str> {
     );
     *args = Value::Object(filled);
     Ok(())
+}
+
+/// A move or cancel of the calendar event `record` made or last moved
+/// (`done`), asked as `given`: only what the call gave, the record's
+/// `result_id` as its `event_id` and the record's calendar unless given.
+/// None for any other write; [`NO_EVENT_ID`] when the record keeps none.
+fn edit_of(record: &Record, given: &Map<String, Value>) -> Result<Option<Value>, &'static str> {
+    let action = given
+        .get("action")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or_default();
+    let edit = record.service == "google_calendar"
+        && record.status == Status::Done
+        && matches!(record.action.as_str(), "create_event" | "update_event")
+        && matches!(action, "update_event" | "delete_event");
+    if !edit {
+        return Ok(None);
+    }
+    let event_id = record.result_id.trim();
+    if event_id.is_empty() {
+        return Err(NO_EVENT_ID);
+    }
+    let mut edit = given.clone();
+    edit.retain(|_, value| !value.is_null());
+    if !edit.contains_key("calendar")
+        && let Some(calendar) = record.detail.get("calendar").filter(|c| c.is_string())
+    {
+        edit.insert("calendar".into(), calendar.clone());
+    }
+    edit.insert("service".into(), json!(record.service));
+    edit.insert("action".into(), json!(action));
+    edit.insert("event_id".into(), json!(event_id));
+    Ok(Some(Value::Object(edit)))
 }
 
 /// A write prepared from the record its call names: `record`, new, links

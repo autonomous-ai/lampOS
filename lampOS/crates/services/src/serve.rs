@@ -1138,7 +1138,13 @@ impl<H: Http, M: Mail> Services<H, M> {
         let reply = self
             .send_with_token(service, entry, method, url, body, write)
             .await?;
-        // One event's own, deleted or changed so in Google itself.
+        // One event's own. A 404 at the read before an edit's read-back is
+        // an id Google has no event for, as likely a wrong id as a deleted
+        // event: never told as gone. A 410 there, or a 404 or 410 at the
+        // send, is an event deleted or changed so in Google itself.
+        if event && reply.status == 404 && !write {
+            return Err(writes::EVENT_NOT_FOUND.into());
+        }
         if event && matches!(reply.status, 404 | 410) {
             return Err(writes::EVENT_GONE.into());
         }
@@ -5962,7 +5968,7 @@ mod tests {
     const EVENTS_SCOPE: &str = "https://www.googleapis.com/auth/calendar.events";
 
     /// The party as Google has it.
-    const PARTY: &str = r#"{"id":"ev1","status":"confirmed","summary":"Hamburger party","start":{"dateTime":"2026-11-12T18:00:00+07:00"},"end":{"dateTime":"2026-11-12T19:00:00+07:00"},"attendees":[{"email":"octavia@b.test"}]}"#;
+    const PARTY: &str = r#"{"id":"evnt1","status":"confirmed","summary":"Hamburger party","start":{"dateTime":"2026-11-12T18:00:00+07:00"},"end":{"dateTime":"2026-11-12T19:00:00+07:00"},"attendees":[{"email":"octavia@b.test"}]}"#;
 
     fn edit(args: Value) -> String {
         let mut args = args;
@@ -5986,7 +5992,7 @@ mod tests {
         let services = calendar(dir.path(), EVENTS_SCOPE, true);
         services.http.answer(200, PARTY);
         let moved = run(
-            services.tool(&edit(json!({"action":"update_event","event_id":"ev1",
+            services.tool(&edit(json!({"action":"update_event","event_id":"evnt1",
             "start":"2026-11-12T20:00:00+07:00","end":"2026-11-12T21:00:00+07:00"}))),
         );
         assert_eq!(moved["ok"], true, "{moved}");
@@ -6006,7 +6012,7 @@ mod tests {
         assert_eq!(calls[0].method, Method::Get);
         assert_eq!(
             calls[0].url,
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events/ev1"
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1"
         );
         // Anything but "send" cancels it, and nothing is changed.
         let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
@@ -6016,20 +6022,20 @@ mod tests {
         // Asked again and sent on "send": one PATCH of that event alone.
         services.http.answer(200, PARTY);
         let moved = run(
-            services.tool(&edit(json!({"action":"update_event","event_id":"ev1",
+            services.tool(&edit(json!({"action":"update_event","event_id":"evnt1",
             "start":"2026-11-12T20:00:00+07:00","end":"2026-11-12T21:00:00+07:00"}))),
         );
         let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
-        services.http.answer(200, r#"{"id":"ev1"}"#);
+        services.http.answer(200, r#"{"id":"evnt1"}"#);
         let sent = run(services.tool(&send_line(&id, "send")));
         assert_eq!(sent["result"]["sent"], true, "{sent}");
-        assert_eq!(sent["result"]["event_id"], "ev1");
+        assert_eq!(sent["result"]["event_id"], "evnt1");
         let calls = services.http.calls();
         assert_eq!(calls.len(), 3);
         assert_eq!(calls[2].method, Method::Patch);
         assert_eq!(
             calls[2].url,
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events/ev1?sendUpdates=all"
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1?sendUpdates=all"
         );
         let body: Value = serde_json::from_slice(calls[2].body.as_ref().unwrap()).unwrap();
         assert_eq!(
@@ -6046,7 +6052,7 @@ mod tests {
         );
         // Cancelled: read back, then one DELETE with no body.
         services.http.answer(200, PARTY);
-        let gone = run(services.tool(&edit(json!({"action":"delete_event","event_id":"ev1"}))));
+        let gone = run(services.tool(&edit(json!({"action":"delete_event","event_id":"evnt1"}))));
         assert_eq!(gone["ok"], true, "{gone}");
         let read_back = gone["result"]["read_back"].as_str().unwrap();
         assert!(
@@ -6064,26 +6070,81 @@ mod tests {
         assert_eq!(calls[4].method, Method::Delete);
         assert_eq!(
             calls[4].url,
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events/ev1?sendUpdates=all"
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1?sendUpdates=all"
         );
         assert_eq!(calls[4].body, None);
     }
 
+    /// lamp-06c1, 11 Nov: a record key sent as the event id came back 404
+    /// at the read and was told "no longer on the calendar". A 404 at the
+    /// read before the read-back is not found, never gone, and nothing is
+    /// held; an event Google says cancelled is still gone.
+    #[test]
+    fn an_event_not_found_at_its_read_is_not_told_gone() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = calendar(dir.path(), EVENTS_SCOPE, true);
+        for action in ["update_event", "delete_event"] {
+            services
+                .http
+                .answer(404, r#"{"error":{"code":404,"message":"Not Found"}}"#);
+            let answer = run(services.tool(&edit(
+                json!({"action":action,"event_id":"evnt1","title":"Burger night"}),
+            )));
+            assert_eq!(answer["error"], writes::EVENT_NOT_FOUND, "{answer}");
+            assert_ne!(answer["error"], writes::EVENT_GONE);
+            assert!(!services.desk.waiting());
+        }
+        services
+            .http
+            .answer(200, r#"{"id":"evnt1","status":"cancelled"}"#);
+        let answer = run(services.tool(&edit(json!({"action":"delete_event","event_id":"evnt1"}))));
+        assert_eq!(answer["error"], writes::EVENT_GONE, "{answer}");
+        // An id from an Outlook invite or an import, starting with `_`, is
+        // not refused here: it reaches Google's read.
+        let outlook = "_60q30c1g60o30e1i60o4ac1g60rj8gpl88rj2c1h84s34h9g60s30c1g60o30c1g";
+        services.http.answer(200, PARTY);
+        let calls = services.http.calls().len();
+        let answer = run(services.tool(&edit(json!({"action":"delete_event","event_id":outlook}))));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let read = services.http.calls();
+        assert_eq!(read.len(), calls + 1);
+        assert_eq!(read[calls].method, Method::Get);
+        assert!(
+            read[calls].url.ends_with(&format!("/events/{outlook}")),
+            "{}",
+            read[calls].url
+        );
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        let _ = run(services.tool(&send_line(&id, "no")));
+        // A record key is refused before Google is asked.
+        let calls = services.http.calls().len();
+        let answer = run(services.tool(&edit(
+            json!({"action":"delete_event","event_id":"v1794396042163-1"}),
+        )));
+        assert!(
+            answer["error"]
+                .as_str()
+                .unwrap()
+                .contains(writes::RECORD_KEY_NOT_EVENT),
+            "{answer}"
+        );
+        assert_eq!(services.http.calls().len(), calls);
+    }
+
     /// The event was deleted in Google, or changed so: told so in words
-    /// that offer to make it again, whether found gone on its read, said
-    /// cancelled by Google, or gone by the time of the send.
+    /// that offer to make it again, whether said deleted (410) or
+    /// cancelled by Google on its read, or gone by the time of the send.
     #[test]
     fn an_event_gone_from_google_is_told_so_and_nothing_held() {
         let dir = tempfile::tempdir().unwrap();
         let services = calendar(dir.path(), EVENTS_SCOPE, true);
-        let delete = edit(json!({"action":"delete_event","event_id":"ev1"}));
+        let delete = edit(json!({"action":"delete_event","event_id":"evnt1"}));
         for (status, body) in [
-            (404, r#"{"error":{"code":404,"message":"Not Found"}}"#),
             (
                 410,
                 r#"{"error":{"code":410,"message":"Resource has been deleted"}}"#,
             ),
-            (200, r#"{"id":"ev1","status":"cancelled"}"#),
+            (200, r#"{"id":"evnt1","status":"cancelled"}"#),
         ] {
             services.http.answer(status, body);
             let answer = run(services.tool(&delete));
@@ -6093,7 +6154,7 @@ mod tests {
         // Read, then deleted in Google before the "send".
         services.http.answer(200, PARTY);
         let moved = run(
-            services.tool(&edit(json!({"action":"update_event","event_id":"ev1",
+            services.tool(&edit(json!({"action":"update_event","event_id":"evnt1",
             "title":"Burger night"}))),
         );
         let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
@@ -6103,9 +6164,22 @@ mod tests {
             sent["error"].as_str().unwrap().contains(writes::EVENT_GONE),
             "{sent}"
         );
+        // A 404 at the send is gone too: it was read a moment before.
+        services.http.answer(200, PARTY);
+        let moved = run(
+            services.tool(&edit(json!({"action":"update_event","event_id":"evnt1",
+            "title":"Burger night"}))),
+        );
+        let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
+        services.http.answer(404, "{}");
+        let sent = run(services.tool(&send_line(&id, "send")));
+        assert!(
+            sent["error"].as_str().unwrap().contains(writes::EVENT_GONE),
+            "{sent}"
+        );
         // Every call was the one event's, never another.
         for call in services.http.calls() {
-            assert!(call.url.contains("/events/ev1"), "{}", call.url);
+            assert!(call.url.contains("/events/evnt1"), "{}", call.url);
         }
     }
 
@@ -6124,7 +6198,7 @@ mod tests {
             for action in ["update_event", "delete_event"] {
                 services.http.answer(200, PARTY);
                 let answer = run(services.tool(&edit(
-                    json!({"action":action,"event_id":"ev1","title":"Burger night"}),
+                    json!({"action":action,"event_id":"evnt1","title":"Burger night"}),
                 )));
                 assert_eq!(answer["ok"], true, "{scope} {action}: {answer}");
             }
@@ -6139,7 +6213,7 @@ mod tests {
             ("delete_event", "delete calendar events"),
         ] {
             let answer = run(services.tool(&edit(
-                json!({"action":action,"event_id":"ev1","title":"Burger night"}),
+                json!({"action":action,"event_id":"evnt1","title":"Burger night"}),
             )));
             assert_eq!(
                 answer["error"],
@@ -6159,7 +6233,7 @@ mod tests {
         let services = calendar(dir.path(), EVENTS_SCOPE, false);
         for action in ["update_event", "delete_event"] {
             let answer = run(services.tool(&edit(
-                json!({"action":action,"event_id":"ev1","title":"Burger night"}),
+                json!({"action":action,"event_id":"evnt1","title":"Burger night"}),
             )));
             assert_eq!(
                 answer,
