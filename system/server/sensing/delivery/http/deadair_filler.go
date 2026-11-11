@@ -46,8 +46,8 @@ const (
 	FillerCooldown = 2500 * time.Millisecond
 
 	// MaxFillersPerTurn includes the reserved opening slot (also for delegates),
-	// leaving at most one automatic continuation in each turn.
-	MaxFillersPerTurn = 2
+	// leaving at most two automatic continuations in each turn.
+	MaxFillersPerTurn = 3
 )
 
 // fillerCancelToolMarkers are URL fragments for tool calls that themselves
@@ -79,7 +79,6 @@ type fillerRun struct {
 	generation     uint64    // invalidates timer callbacks and speech completions after suspension
 	lastSpoken     string    // text of the most recent filler — used to dedup back-to-back picks
 	rearmPending   bool      // tool.end arrived while playing; fire() re-arms after speaking
-	armOnTool      bool      // delegated realtime turn: first filler waits for the first tool.start
 	lastToolName   string    // most recently started tool; selects the tool-aware filler pool
 }
 
@@ -96,6 +95,11 @@ func pickFiller(fired int, lastSpoken string) string {
 	lang := i18n.Lang()
 	// Automatic waiting feedback must not claim a tool-specific action.
 	opening, continuation := poolsForLang(lang)
+	if fired > 0 && len(continuation) > 0 {
+		// Continuations escalate in pool order ("One moment." then "Still working
+		// on it."): the wait reads as progress, not a random repeat.
+		return continuation[(fired-1)%len(continuation)]
+	}
 	primary, fallback := opening, continuation
 	if fired > 0 {
 		primary, fallback = continuation, opening
@@ -304,8 +308,8 @@ type FillerManager struct {
 	mu               sync.Mutex
 	runs             map[string]*fillerRun
 	voiceRuns        map[string]bool
-	// delegated marks voice runs the realtime model handed off after speaking
-	// its own filler — see fillerRun.armOnTool.
+	// delegated marks voice runs the realtime model handed off; they get no
+	// opening filler but still arm continuation fillers at turn start.
 	delegated map[string]bool
 	// interactions maps a run to HAL's voice-metrics interaction id, so a filler
 	// fired later in the turn is attributed the same way the opening one is.
@@ -428,12 +432,11 @@ func (fm *FillerManager) OnTurnStart(runID string) {
 	if _, exists := fm.runs[runID]; exists {
 		return
 	}
-	run := &fillerRun{fired: 1, lastActivityAt: time.Now(), armOnTool: delegated}
+	run := &fillerRun{fired: 1, lastActivityAt: time.Now()}
 	fm.runs[runID] = run
-	if delegated {
-		slog.Info("filler OnTurnStart deferred to first tool (delegated realtime turn)", "component", "sensing", "run_id", runID)
-		return
-	}
+	// Delegated realtime turns arm too: the realtime model usually hands off
+	// without speaking, and the main agent's first tool call can be 8 s away.
+	slog.Info("filler OnTurnStart armed", "component", "sensing", "run_id", runID, "delegated", delegated)
 	fm.armLocked(runID, run, FillerDelay)
 }
 
@@ -464,13 +467,9 @@ func (fm *FillerManager) OnToolStart(runID, toolArgs, toolName string) {
 	if !hw {
 		if wasSuspended {
 			fm.armLocked(runID, run, fillerRearmDelay(run))
-		} else if run.armOnTool {
-			fm.armLocked(runID, run, FillerDelay)
 		}
-		run.armOnTool = false
 		return
 	}
-	run.armOnTool = false
 	fm.softCancelLocked(run)
 }
 
@@ -715,13 +714,6 @@ func (fm *FillerManager) fire(runID string, expectedRun *fillerRun, generation u
 	fm.mu.Lock()
 	run, ok := fm.runs[runID]
 	if fm.Superseded(runID) || !ok || run != expectedRun || run.generation != generation || run.ended || run.suspended || run.timer == nil {
-		fm.mu.Unlock()
-		return
-	}
-	// Temporarily pause continuation audio; retain the timer lifecycle and playback code.
-	const continuationFillerPaused = true
-	if continuationFillerPaused {
-		run.timer = nil
 		fm.mu.Unlock()
 		return
 	}

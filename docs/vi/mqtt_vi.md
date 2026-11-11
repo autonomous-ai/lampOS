@@ -22,6 +22,26 @@ OS server sử dụng MQTT để giao tiếp với backend server (báo cáo tr�
 }
 ```
 
+### TLS (tùy chọn)
+
+Mặc định thiết bị kết nối broker bằng MQTT thường. Bật công tắc dưới đây để kết nối qua TLS; mặc định tắt, và khi tắt thì kết nối không đổi.
+
+| Công tắc | Ở đâu | Giá trị |
+|----------|-------|---------|
+| `MQTT_TLS` | biến môi trường của os-server | `1`, `true`, `yes` hoặc `on` |
+| `mqtt_tls` | `config/config.json` | `true` |
+
+Một trong hai là đủ để bật TLS. Với một thiết bị, thêm `"mqtt_tls": true` vào `config/config.json` (hoặc chạy os-server với `MQTT_TLS=1`) rồi restart os-server.
+
+Khi bật TLS, client:
+
+- kết nối tới `mqtt_endpoint` và `mqtt_port` mà backend trả về trong phản hồi ping, dùng scheme `ssl`;
+- kiểm tra chứng chỉ của broker theo root CA của hệ thống và tên host của broker;
+- yêu cầu TLS 1.2 trở lên;
+- không bao giờ chuyển về kết nối thường. Nếu bắt tay TLS thất bại, client thử lại bằng TLS.
+
+Khi công tắc bật, body ping có thêm `"mqtt_tls": true`. Khi tắt, key này không có và phần còn lại của ping không đổi.
+
 ## Topics
 
 | Topic | Hướng | Mô tả |

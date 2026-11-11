@@ -22,6 +22,26 @@ The OS server uses MQTT to communicate with the backend server (status reporting
 }
 ```
 
+### TLS (opt-in)
+
+By default the device connects to the broker over plain MQTT. Set the switch below to connect over TLS instead; it is off by default, and with it off the connection is unchanged.
+
+| Switch | Where | Values |
+|--------|-------|--------|
+| `MQTT_TLS` | os-server environment | `1`, `true`, `yes` or `on` |
+| `mqtt_tls` | `config/config.json` | `true` |
+
+Either one turns TLS on. For one device, add `"mqtt_tls": true` to `config/config.json` (or start os-server with `MQTT_TLS=1`) and restart os-server.
+
+With TLS on, the client:
+
+- connects to whichever `mqtt_endpoint` and `mqtt_port` the backend returned in the ping reply, using scheme `ssl`;
+- verifies the broker certificate against the system root CAs and the broker host name;
+- requires TLS 1.2 or newer;
+- never falls back to a plain connection. If the TLS handshake fails, it retries with TLS.
+
+While the switch is on, the ping body also carries `"mqtt_tls": true`. With the switch off the key is absent and the rest of the ping is unchanged.
+
 ## Topics
 
 | Topic | Direction | Description |

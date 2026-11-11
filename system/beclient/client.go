@@ -195,6 +195,8 @@ type PingPayload struct {
 	UnsupportedChannels []string `json:"unsupported_channels,omitempty"`
 	// Skills installed in the active runtime (name+description only).
 	Skills []domain.SkillSummary `json:"skills,omitempty"`
+	// MQTTTLS is true only when the device connects to the broker over TLS.
+	MQTTTLS bool `json:"mqtt_tls,omitempty"`
 }
 
 // MQTTConfig holds MQTT broker configuration from the backend.

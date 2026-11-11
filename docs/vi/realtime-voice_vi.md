@@ -109,6 +109,38 @@ tài khoản ElevenLabs. Khả năng sử dụng còn phụ thuộc provider/tà
 hình. Xác minh danh mục công khai không thay thế việc tổng hợp âm thanh thực tế
 bằng tài khoản đó hoặc nghe trên thiết bị.
 
+## Tiếng Hàn và giọng ElevenLabs
+
+Tiếng Hàn dùng `stt_language: "ko"` (`LANG_KO` trong `hal/presets.py`); `ko-KR` và
+`ko_KR` được chuẩn hóa về `ko`. Khi chọn Korean, STT nhận dạng tiếng Hàn, language
+gate nhận lời nói tiếng Hàn (nhãn AmberNet `ko`), Gemini Live nhận gợi ý `ko-KR`, và
+agent được yêu cầu trả lời bằng tiếng Hàn. Các câu của robot (nói lại, đang nghe,
+khởi động lại, bật/tắt mic, xoa đầu, câu chờ nhạc, filler, thông báo OTA, prompt
+chào khi thức dậy và khi đổi tên) đều có bản tiếng Hàn. Chitchat tiếng Hàn phải khớp
+nguyên câu như tiếng Nhật, vì tiếng Hàn gắn đuôi vào từ: `미안해` được trả lời tại
+chỗ, còn `미안한데 지금 몇 시야?` được gửi cho agent.
+
+Nhóm ElevenLabs `ko` dùng chung cho HAL HTTP và WebSocket. Vẫn chọn được giọng Hàn khi
+ngôn ngữ robot là ngôn ngữ khác; khi đó agent vẫn trả lời theo ngôn ngữ nó nghe được,
+và giọng Hàn đọc câu trả lời.
+
+Sáu giọng sau được chọn từ
+[danh mục tiếng Hàn chính thức của ElevenLabs](https://elevenlabs.io/text-to-speech/korean)
+ngày 2026-11-09. Từng giọng đã được tổng hợp qua proxy Autonomous và phát trên một
+Intern 2 (âm thanh đầu tiên khoảng 1,2 giây, tương đương các nhóm khác).
+
+| Giọng | Đặc điểm (nhãn ElevenLabs) | ElevenLabs voice ID |
+|---|---|---|
+| Anna Kim (mặc định) | Dịu dàng, điềm tĩnh, rõ ràng | `uyVNoMrnUku1dZyVEXwD` |
+| Selly Han | Ấm, điềm tĩnh, đều | `ETPP7D0aZVdEj12Aa7ho` |
+| Rosa Oh | Điềm tĩnh, trau chuốt, chừng mực | `sf8Bpb1IU97NI9BHSMRf` |
+| Stella | Đều, rõ ràng, vui vẻ | `1YzIw7PZ7iaD4alelyHY` |
+| Hyunbin | Khéo léo, rõ ràng, chừng mực | `s07IwTCOrCDCaETjUVjx` |
+| Minho | Khéo léo, rõ ràng, đều | `U1cJYS4EdbaHmfR7YzHd` |
+
+HAL đổi tên giọng sang ID. HAL trước 0.1.305 không biết các tên này và gửi chính tên
+làm voice ID, ElevenLabs từ chối, nên giọng tiếng Hàn cần HAL 0.1.305 trở lên.
+
 Lớp giọng nói speech-to-speech độ trễ thấp, chạy **song song** với pipeline STT
 → agent thông thường. Model realtime xử lý hội thoại tán gẫu trực tiếp (trả lời
 âm thanh dưới 1 giây) và **delegate** (chuyển giao) những gì cần đến agent chính
@@ -141,6 +173,8 @@ khi turn handled và cờ này true. Run backend đồng bộ memory không ch�
 turn realtime đã chạy xong. Phần đo xác nhận kết thúc thực thi, không đánh giá
 trả lời đúng hay phát hết audio; không thay đổi routing hoặc hành vi playback.
 
+Yêu cầu kể chuyện (“Tell me a story”, truyện trước khi ngủ, truyện audio hay radio drama, “kể tiếp đi”) luôn được delegate. Thiết bị phát các tập truyện có người đọc thật qua skill `radio-drama`, nên realtime không được tự bịa truyện hay nói câu kéo dài thời gian kiểu “để em nghĩ xem kể truyện gì” thay cho handoff. Quy tắc này áp dụng cho prompt của mọi provider realtime, kể cả GPT Live backend.
+
 ## Khái niệm: handle vs. delegate
 
 Mỗi lượt nói được stream tới model realtime *cùng lúc* với pipeline STT. Cuối
@@ -151,14 +185,18 @@ lượt, model sẽ:
 - **Delegate** bằng cách gọi tool `delegate_to_main` → dừng output realtime và
   chuyển đúng lời người dùng ở lượt hiện tại, giữ nguyên ngôn ngữ, tới OS server
   (→ runtime chính đang được chọn) để xử lý.
-  OS-server bỏ qua âm opening ngắn ("Ừm." ở tiếng Việt) cho lượt delegate;
-  lượt voice thông thường của agent chính vẫn giữ opening. Continuation chỉ dùng
-  âm ngắn ("Ừm..."), không chọn câu theo tool, và chờ
-  3,5 giây từ lúc bắt đầu lượt thông thường, hoặc từ tool đầu tiên với lượt
-  delegate (`FillerManager.MarkDelegatedVoiceRun`). Khi tool kết thúc, lịch phát
-  lại cộng phần cooldown 2,5 giây còn lại vào mốc 3,5 giây. Lượt delegate kết
-  thúc bằng NO_REPLY mà không bắt đầu tool sẽ im lặng.
-  Mỗi lượt có tối đa một continuation tự động, không phụ thuộc các tool tiếp theo.
+  OS-server bỏ qua âm opening ngắn cho lượt delegate
+  (`FillerManager.MarkDelegatedVoiceRun`). Continuation báo cho người dùng biết
+  yêu cầu vẫn đang được xử lý ("Đợi mình chút nhé." / "Mình vẫn đang làm nhé." ở
+  tiếng Việt, "One moment." / "Still working on it." ở tiếng Anh, theo đúng thứ
+  tự đó), không chọn câu
+  theo tool, và chờ 3,5 giây im lặng tính từ lúc bắt đầu lượt, cho cả lượt thường
+  lẫn lượt delegate: model realtime thường chuyển lượt mà không nói gì, còn tool
+  đầu tiên của agent chính có thể cách tới 8 giây. Khi tool kết thúc, lịch phát
+  lại cộng phần cooldown 2,5 giây còn lại vào mốc 3,5 giây. Phản ứng phần cứng
+  (`/emotion`, …) hủy filler đang chờ. Mỗi lượt có tối đa hai continuation tự
+  động (`MaxFillersPerTurn` = 3, gồm cả slot opening), không phụ thuộc các tool
+  tiếp theo.
 - **Từ chối rõ ràng** một turn chắc chắn không phải người nói với thiết bị bằng
   tool `reject_turn` → bỏ turn trước khi agent chính nhìn thấy STT text. Nó khác
   hẳn model im lặng: im lặng, timeout và lỗi transport vẫn fallback bình thường
@@ -1103,11 +1141,10 @@ hướng tới thiết bị.
 ### Filler tự động chỉ ở lượt mở hội thoại trên lamp Standard và Pro
 
 Tạm tắt phát opening filler của main agent: `PlayOpeningFillerNow` return sớm
-trước khi chọn hoặc gửi audio. Timer continuation của main cũng xóa timer đang
-chờ và return trước khi chọn hoặc phát filler. Giữ nguyên cả hai phần triển khai
-để có thể bật lại. Việc tạm tắt ưu tiên hơn điều kiện filler ở lượt mở bên dưới.
-Pool opening được giữ lại có cùng nội dung với continuation ở mọi ngôn ngữ hỗ trợ
-(tiếng Anh: `Hmm...`).
+trước khi chọn hoặc gửi audio; phần triển khai được giữ để có thể bật lại, và việc
+tạm tắt ưu tiên hơn điều kiện filler ở lượt mở bên dưới. Pool opening được giữ là
+một âm ngắn (tiếng Anh: `Hmm...`). Continuation filler của main agent đã phát lại
+(xem phần Delegate ở trên).
 
 Wait filler realtime tự động chỉ được bật sau khi chuẩn bị session và mở lượt
 thành công, kể cả nhánh STT đang drain. Khi session không khả dụng/hết quota

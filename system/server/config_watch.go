@@ -79,11 +79,11 @@ func (s *Server) handleDeviceIDChange(deviceID string) {
 }
 
 // handleMQTTConfigChange restarts the MQTT client when any broker-connection
-// field (endpoint, port, username, password, fa_channel) changes.
+// field (endpoint, port, username, password, fa_channel, TLS switch) changes.
 func (s *Server) handleMQTTConfigChange() {
-	sig := fmt.Sprintf("%s|%d|%s|%s|%s",
+	sig := fmt.Sprintf("%s|%d|%s|%s|%s|%t",
 		s.config.MQTTEndpoint, s.config.MQTTPort, s.config.MQTTUsername,
-		s.config.MQTTPassword, s.config.FAChannel)
+		s.config.MQTTPassword, s.config.FAChannel, s.config.MQTTTLSEnabled())
 	if s.lastMQTTSig == nil {
 		s.lastMQTTSig = &sig
 		return

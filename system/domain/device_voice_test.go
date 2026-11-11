@@ -8,6 +8,8 @@ func TestDefaultElevenLabsVoiceForLang(t *testing.T) {
 		"vi-VN": "Ngan",
 		"ja":    "Shizuka",
 		"ja-JP": "Shizuka",
+		"ko":    "Anna Kim",
+		"ko-KR": "Anna Kim",
 		"zh-CN": "Amy",
 		"zh-TW": "Amy",
 		"zh":    "Amy",
@@ -38,10 +40,10 @@ func TestIsValidTTSProvider(t *testing.T) {
 
 func TestElevenLabsVoicesAllLanguages(t *testing.T) {
 	voices := ElevenLabsVoicesForLang("")
-	if len(voices) != 42 {
-		t.Fatalf("got %d voices, want all 42 curated voices", len(voices))
+	if len(voices) != 48 {
+		t.Fatalf("got %d voices, want all 48 curated voices", len(voices))
 	}
-	for index, want := range map[int]string{0: "Rachel", 24: "Ngan", 30: "Shizuka", 36: "Amy"} {
+	for index, want := range map[int]string{0: "Rachel", 24: "Ngan", 30: "Shizuka", 36: "Anna Kim", 42: "Amy"} {
 		if voices[index] != want {
 			t.Errorf("voice[%d] = %q, want %q", index, voices[index], want)
 		}

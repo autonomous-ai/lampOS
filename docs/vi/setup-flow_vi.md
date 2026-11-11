@@ -77,6 +77,8 @@ Các field lấy từ `SetupRequest` trong `system/domain/device.go`. `device_id
 
 Tiếng Nhật dùng `stt_language: "ja"`. Setup có Japanese (日本語), các câu đăng ký giọng tiếng Nhật và sáu voice ElevenLabs chọn lọc; mặc định là Shizuka. Xem [danh mục giọng Nhật](realtime-voice_vi.md#tiếng-nhật-và-giọng-elevenlabs).
 
+Tiếng Hàn dùng `stt_language: "ko"`. Setup có Korean (한국어), các câu đăng ký giọng tiếng Hàn và sáu voice ElevenLabs chọn lọc; mặc định là Anna Kim. Xem [tiếng Hàn và giọng](realtime-voice_vi.md#tiếng-hàn-và-giọng-elevenlabs).
+
 **Response:** Trả về ngay `{"status": 1}`. Setup chạy async trong goroutine sau 2s delay.
 
 **Messaging channel:** Toàn bộ cấu hình Telegram, Slack, Discord hoặc iMessage là tuỳ chọn ở lần setup đầu. Không gửi chúng không chặn setup; có thể cấu hình channel sau qua `POST /api/device/channel`. Credential gửi cùng `POST /api/device/setup` vẫn đi theo luồng setup hiện tại nhưng không được validate theo channel tại đây; `POST /api/device/channel` sẽ validate credential bắt buộc của channel được chọn.

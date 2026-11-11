@@ -81,3 +81,36 @@ func TestPingIncludesVoiceInputMode(t *testing.T) {
 		}
 	}
 }
+
+func TestPingBodyMQTTTLS(t *testing.T) {
+	var body map[string]json.RawMessage
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body = nil
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	cfg := &config.Config{
+		BackendBaseURL: srv.URL + "/api/v1/ai/v1",
+		BackendAPIKey:  "k",
+		MQTTEndpoint:   "mqtt.example",
+	}
+	c := New(cfg)
+
+	if _, err := c.Ping(cfg.BackendKey(), PingPayload{Status: "online"}); err != nil {
+		t.Fatalf("ping: %v", err)
+	}
+	if _, ok := body["mqtt_tls"]; ok {
+		t.Fatalf("mqtt_tls must be absent when the switch is off: %v", body)
+	}
+	if string(body["status"]) != `"online"` {
+		t.Fatalf("other fields must be unchanged: %v", body)
+	}
+
+	if _, err := c.Ping(cfg.BackendKey(), PingPayload{Status: "online", MQTTTLS: true}); err != nil {
+		t.Fatalf("ping: %v", err)
+	}
+	if string(body["mqtt_tls"]) != "true" {
+		t.Fatalf("mqtt_tls = %s, want true", body["mqtt_tls"])
+	}
+}

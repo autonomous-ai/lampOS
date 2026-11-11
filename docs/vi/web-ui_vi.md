@@ -55,6 +55,14 @@ theo ngôn ngữ, nên trình duyệt Nhật chọn Shizuka thay vì giữ Rache
 đã lưu hoặc lấy từ URL được giữ; phản hồi catalog cũ bị bỏ qua sau khi đổi
 provider, ngôn ngữ hoặc voice.
 
+Settings → Language, Setup và Settings → Voice có **Korean (한국어)**
+(`stt_language: "ko"`). Bộ lọc Voice liệt kê Anna Kim, Selly Han, Rosa Oh, Stella,
+Hyunbin và Minho (mặc định Anna Kim), Test Voice gửi câu mẫu tiếng Hàn, My Voice hiện
+câu đăng ký tiếng Hàn, và trang chat có nhãn tiếng Hàn. Trình duyệt đặt tiếng Hàn sẽ
+chọn sẵn Korean trong Setup. Khi voice đã lưu là giọng Hàn nhưng ngôn ngữ robot khác,
+bộ lọc mở sẵn ở Korean thay vì Auto để voice đã lưu vẫn hiện. Một dòng ghi chú cho biết giọng tiếng Hàn cần HAL
+0.1.305 trở lên.
+
 ### 1.1 Tiêu đề tab trình duyệt
 
 Tiêu đề tab trình duyệt (`document.title`) hiển thị đúng theo page/tab đang focus, để mở nhiều tab thiết bị vẫn phân biệt được. Dùng hook chung `useDocumentTitle` (`system/web/src/hooks/useDocumentTitle.ts`); format: `Lamp · <segment>[· <sub-segment>]`.

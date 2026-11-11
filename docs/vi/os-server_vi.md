@@ -1,15 +1,13 @@
 # OS Server API — Tài Liệu
 
-Opening chỉ là một âm xác nhận ngắn: tiếng Anh "Uhm.", tiếng Việt "Ừm.",
-tiếng Nhật "うん。", tiếng Trung giản thể/phồn thể "嗯。". Lượt voice thông thường
-của agent chính gọi phát ngay trước khi chuyển lời người dùng; lượt delegate bỏ
-qua opening. Continuation chỉ dùng một âm ngắn (tiếng Anh "Hmm...", tiếng Việt
-"Ừm..."), chờ 3,5 giây từ lúc
-agent bắt đầu lượt (từ tool đầu tiên với lượt delegate). Khi tool kết thúc,
-lịch phát lại cộng thêm phần cooldown 2,5 giây còn lại. Timer này không làm
-trễ opening.
-Mỗi lượt có tối đa một continuation tự động; các tool sau đó không phát thêm.
-Đã xoá bộ câu opening và continuation cũ. Filler chờ tự động không chọn câu theo tool. Cue realtime/tool được gọi riêng không đổi.
+Opening (một âm ngắn, tiếng Anh "Hmm...") hiện đang tạm tắt trong
+`PlayOpeningFillerNow`. Continuation báo cho người dùng biết yêu cầu vẫn đang
+được xử lý — tiếng Việt "Đợi mình chút nhé." / "Mình vẫn đang làm nhé.", tiếng
+Anh "One moment." / "Still working on it.", theo đúng thứ tự đó — và chờ 3,5 giây im lặng từ lúc agent
+bắt đầu lượt, cho cả lượt thường lẫn lượt delegate từ realtime. Khi tool kết
+thúc, lịch phát lại cộng thêm phần cooldown 2,5 giây còn lại. Mỗi lượt có tối đa
+hai continuation tự động; các tool sau đó không phát thêm. Filler chờ tự động
+không chọn câu theo tool. Cue realtime/tool được gọi riêng không đổi.
 
 Với follow-up Automatic của lamp Standard và Pro, HAL có thể gửi metadata sensing tùy
 chọn `suppress_auto_fillers: true`. OS bỏ opening và continuation filler tự động
@@ -41,8 +39,10 @@ Nhật. Giọng ElevenLabs mặc định là `Shizuka`, với sáu giọng Nhậ
 danh mục voice chung. Chitchat tiếng Nhật chỉ khớp toàn câu sau khi chuẩn hóa
 dấu câu và wake word; câu hỏi như `何している？` tiếp tục được gửi cho agent. Khi HAL
 không trả được danh sách voice, fallback ElevenLabs vẫn lọc theo ngôn ngữ:
-English dùng Rachel, Japanese dùng Shizuka. Ngôn ngữ trống trả đủ 42 voice;
-ngôn ngữ không hỗ trợ dùng nhóm English. Xem [chọn giọng tiếng Nhật](realtime-voice_vi.md#tiếng-nhật-và-giọng-elevenlabs).
+English dùng Rachel, Japanese dùng Shizuka. Ngôn ngữ trống trả đủ 48 voice;
+ngôn ngữ không hỗ trợ dùng nhóm English. `ko` trả sáu giọng tiếng Hàn (mặc định
+Anna Kim). Xem
+[tiếng Hàn và giọng](realtime-voice_vi.md#tiếng-hàn-và-giọng-elevenlabs). Xem [chọn giọng tiếng Nhật](realtime-voice_vi.md#tiếng-nhật-và-giọng-elevenlabs).
 
 Ambient LED gọi HAL `/led/restore` sau khoảng yên lặng. OS không chọn màu fallback hay hiệu ứng thở; mỗi device khai báo `ambient_led.resting` trong `presets.json`. HAL giữ trạng thái user tắt/đặt màu và quyền sở hữu của overlay đang hoạt động.
 

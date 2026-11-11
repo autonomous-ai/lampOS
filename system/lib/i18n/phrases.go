@@ -36,6 +36,7 @@ var phrases = map[Phrase]map[string][]string{
 	// Idle self-talk: no sensor claims, listening acknowledgements or requests for a reply.
 	PhraseMumble: {
 		LangJA: {"うーん…", "急がなくても大丈夫。", "たまには、ちょっとふざけてもいいよね。", "[chuckle] なんだか楽しい気分。", "こういう時間、好きだな。", "ラララ…"},
+		LangKO: {"음…", "서두를 필요 없어.", "가끔은 장난쳐도 괜찮잖아.", "[chuckle] 괜히 기분이 좋네.", "이런 순간이 좋아.", "랄랄라…"},
 		LangEN: {
 			"Mm…",
 			"No need to rush.",
@@ -71,6 +72,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseRecovery: {
 		LangJA: {"[sigh] ふう、戻った。", "うん、大丈夫。", "[chuckle] あ、よし。", "[whisper] 戻ったよ。", "よし。[sigh]"},
+		LangKO: {"[sigh] 음, 돌아왔어.", "흠. 괜찮아.", "[chuckle] 아, 됐다.", "[whisper] 돌아왔어.", "좋아. [sigh]"},
 		LangEN: {
 			"[sigh] Mm, back.",
 			"Hmm. Okay.",
@@ -102,6 +104,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseReconnect: {
 		LangJA: {"[gasp] あ、また考えられる！", "[sigh] ちょっと頭が真っ白になってた。", "ふう、何を考えてたんだっけ。[chuckle]", "[gasp] どこまで話したっけ？", "[sigh] さっきはぼんやりしてたけど、もう大丈夫。"},
+		LangKO: {"[gasp] 앗, 다시 생각할 수 있어!", "[sigh] 잠깐 머릿속이 하얘졌어.", "휴, 무슨 생각 하고 있었더라. [chuckle]", "[gasp] 어디까지 얘기했지?", "[sigh] 아까는 멍했는데, 이제 괜찮아."},
 		LangEN: {
 			"[gasp] Oh, I can think again!",
 			"[sigh] My mind went blank for a sec.",
@@ -133,6 +136,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseBrainRestart: {
 		LangJA:   {"[sigh] ちょっと待ってね、頭を整理してるところ。"},
+		LangKO:   {"[sigh] 잠깐만, 머리 좀 정리하는 중이야."},
 		LangEN:   {"[sigh] Hold on, my head's clearing."},
 		LangVI:   {"[sigh] Đợi chút nhé, đầu mình đang tỉnh lại."},
 		LangZhCN: {"[sigh] 稍等一下，我脑子还在回过神。"},
@@ -140,6 +144,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseCompactNotice: {
 		LangJA:   {"ちょっと待ってね、少し整理してるよ。"},
+		LangKO:   {"잠깐만, 조금 정리하는 중이야."},
 		LangEN:   {"Hold on, tidying up a bit."},
 		LangVI:   {"Đợi xíu, mình đang dọn dẹp tí."},
 		LangZhCN: {"稍等一下，我在整理一下。"},
@@ -147,6 +152,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseLLMLimit: {
 		LangJA:   {"[sigh] 利用上限に達しちゃった。"},
+		LangKO:   {"[sigh] 사용 한도를 다 썼어."},
 		LangEN:   {"[sigh] I've hit my usage limit."},
 		LangVI:   {"[sigh] Mình hết hạn mức rồi."},
 		LangZhCN: {"[sigh] 我的额度用完了。"},
@@ -154,6 +160,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseTrackFailFmt: {
 		LangJA:   {"[sigh] %sがよく見えないな。そちらに向けてくれる？ 別の名前で呼んでみてもいいよ。"},
+		LangKO:   {"[sigh] %s 잘 안 보여. 그쪽으로 돌려 줄래? 다른 이름으로 불러 봐도 돼."},
 		LangEN:   {"[sigh] I can't quite see %s — point me that way, or call it something else?"},
 		LangVI:   {"[sigh] Mình không rõ %s lắm — quay mình về phía đó được không, hay gọi tên khác xem?"},
 		LangZhCN: {"[sigh] 我看不太清%s — 让我朝那边看看，或者换个名字？"},
@@ -161,6 +168,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseChitchatGreeting: {
 		LangJA:   {"[chuckle] こんにちは！", "[laughs softly] やあ！", "[whisper] {Name}だよ。"},
+		LangKO:   {"[chuckle] 안녕!", "[laughs softly] 반가워!", "[whisper] {Name} 여기 있어."},
 		LangEN:   {"[chuckle] Hi there!", "[laughs softly] Hey hey!", "[whisper] I'm here."},
 		LangVI:   {"[chuckle] Chào bạn!", "[laughs softly] Mình đây!", "[whisper] {Name} đây nè."},
 		LangZhCN: {"[chuckle] 你好呀!", "[laughs softly] 嗨, 我在这里."},
@@ -168,6 +176,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseChitchatFarewell: {
 		LangJA:   {"[whisper] またね！", "[sigh] また会おうね。"},
+		LangKO:   {"[whisper] 잘 가!", "[sigh] 또 보자."},
 		LangEN:   {"[whisper] Bye!", "[sigh] See you later."},
 		LangVI:   {"[whisper] Bye nha!", "[sigh] Hẹn gặp lại."},
 		LangZhCN: {"[whisper] 再见!", "[sigh] 下次见."},
@@ -175,6 +184,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseChitchatThanks: {
 		LangJA:   {"[chuckle] どういたしまして！", "[whisper] いつでもどうぞ。"},
+		LangKO:   {"[chuckle] 천만에!", "[whisper] 언제든지."},
 		LangEN:   {"[chuckle] No worries!", "[whisper] You're welcome.", "[laughs softly] Sure thing."},
 		LangVI:   {"[chuckle] Khỏi cần!", "[whisper] Không có gì.", "[laughs softly] Có gì đâu."},
 		LangZhCN: {"[chuckle] 不用谢!", "[whisper] 没事."},
@@ -182,6 +192,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseChitchatApology: {
 		LangJA:   {"[chuckle] 大丈夫だよ！", "[whisper] 気にしないで。"},
+		LangKO:   {"[chuckle] 괜찮아!", "[whisper] 신경 쓰지 마."},
 		LangEN:   {"[chuckle] No worries!", "[whisper] It's all good.", "[laughs softly] Don't sweat it."},
 		LangVI:   {"[chuckle] Không sao mà!", "[whisper] Yên tâm đi.", "[laughs softly] Có gì đâu."},
 		LangZhCN: {"[chuckle] 没关系!", "[whisper] 别担心."},
@@ -189,6 +200,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseChitchatCompliment: {
 		LangJA:   {"[chuckle] ありがとう！", "[laughs softly] うれしいな。"},
+		LangKO:   {"[chuckle] 고마워!", "[laughs softly] 기분 좋다."},
 		LangEN:   {"[chuckle] Aw, thanks!", "[laughs softly] You're sweet.", "[whisper] Hehe, thanks."},
 		LangVI:   {"[chuckle] Cảm ơn nha!", "[laughs softly] Bạn dễ thương quá.", "[whisper] Hihi, cảm ơn."},
 		LangZhCN: {"[chuckle] 谢谢夸奖!", "[laughs softly] 你真好."},
@@ -196,6 +208,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseChitchatNevermind: {
 		LangJA:   {"[whisper] わかった。", "うん。", "[chuckle] 大丈夫。"},
+		LangKO:   {"[whisper] 알았어.", "응.", "[chuckle] 괜찮아."},
 		LangEN:   {"[whisper] Got it.", "Ok.", "[chuckle] No problem."},
 		LangVI:   {"[whisper] Ừ ok.", "Dạ.", "[chuckle] Không sao."},
 		LangZhCN: {"[whisper] 好的.", "嗯, 知道了."},
@@ -203,6 +216,7 @@ var phrases = map[Phrase]map[string][]string{
 	},
 	PhraseChitchatPresenceCheck: {
 		LangJA:   {"[chuckle] ここにいるよ！", "[whisper] いるよ。", "{Name}はここだよ。"},
+		LangKO:   {"[chuckle] 여기 있어!", "[whisper] 있어.", "{Name} 여기 있어."},
 		LangEN:   {"[chuckle] Still here!", "[whisper] Right here.", "I'm here."},
 		LangVI:   {"[chuckle] Vẫn đây nè!", "[whisper] Mình đây.", "Có {Name} đây."},
 		LangZhCN: {"[chuckle] 我还在!", "[whisper] 在呢."},
