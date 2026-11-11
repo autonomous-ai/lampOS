@@ -59,8 +59,56 @@ pub const RUN_LIFETIME: Duration = Duration::from_secs(30 * 60);
 pub const SCRIPTS: &str = "scripts";
 /// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`).
 pub const MOST_TASK_BYTES: usize = 500;
-/// lamp-control's grants (protocol.rs, 13 of them): never more on one run.
-pub const MOST_GRANTS: usize = 13;
+/// lamp-control's own grants a run may hold (#6408, `protocol.rs`'s
+/// `Grant`), `skills` left out: a run never puts skills on the lamp.
+pub const CONTROL_GRANTS: &[&str] = &[
+    "body",
+    "light",
+    "speak",
+    "look",
+    "hear",
+    "sound",
+    "air",
+    "device",
+    "camera",
+    "microphone",
+    "notes",
+    "speech",
+];
+/// The lamp's linked services a run may be granted (#6432), each as
+/// `<code>-read` and `<code>-write`: lamp-services' catalog codes
+/// (`lamp_services::catalog::SERVICES`), a service with two ways in told as
+/// one (`gmail-app` as `gmail`, `figma-api` as `figma`). The service's
+/// tokens never leave root's store; a grant only names what the run may ask
+/// lamp-services for.
+pub const SERVICE_GRANTS: &[&str] = &[
+    "gmail",
+    "google_calendar",
+    "google_drive",
+    "figma",
+    "github",
+    "linear",
+    "asana",
+    "ahrefs",
+    "facebook",
+    "slack",
+    "mondaydotcom",
+    "hubspot",
+    "amplitude",
+    "notion",
+];
+/// The most grants one run may hold: every one there is.
+pub const MOST_GRANTS: usize = CONTROL_GRANTS.len() + 2 * SERVICE_GRANTS.len();
+
+/// Whether `grant` is one a run may hold: one of [`CONTROL_GRANTS`], or a
+/// service's `-read` or `-write` ([`SERVICE_GRANTS`]).
+pub fn grant_known(grant: &str) -> bool {
+    CONTROL_GRANTS.contains(&grant)
+        || grant
+            .strip_suffix("-read")
+            .or_else(|| grant.strip_suffix("-write"))
+            .is_some_and(|service| SERVICE_GRANTS.contains(&service))
+}
 
 /// Whether [`SWITCH`]'s `value` is on: `on` exactly.
 pub fn on(value: Option<&str>) -> bool {
@@ -165,7 +213,7 @@ impl HandOver {
         }
         let mut seen = std::collections::BTreeSet::new();
         for grant in &self.grants {
-            if grant == "skills" || !name_ok(grant) || !seen.insert(grant) {
+            if !name_ok(grant) || !grant_known(grant) || !seen.insert(grant) {
                 return Err("a grant is unknown, written twice or `skills`");
             }
         }
@@ -678,6 +726,11 @@ mod tests {
             Box::new(|v| v["grants"] = json!(["camera", "camera"])),
             Box::new(|v| v["grants"] = json!(["skills"])),
             Box::new(|v| v["grants"] = json!(["Camera"])),
+            Box::new(|v| v["grants"] = json!(["teleport"])),
+            Box::new(|v| v["grants"] = json!(["gmail-delete"])),
+            Box::new(|v| v["grants"] = json!(["gmail-app-read"])),
+            Box::new(|v| v["grants"] = json!(["calendar-write"])),
+            Box::new(|v| v["grants"] = json!(["gmail:read"])),
         ];
         for (index, edit) in bad.iter().enumerate() {
             let tokens = FakeTokens::default();
@@ -869,6 +922,66 @@ mod tests {
         };
         let why = tokens.mint("photo-booth", "task-1").unwrap_err();
         assert!(why.starts_with("lamp-control is not reachable"), "{why}");
+    }
+
+    #[test]
+    fn a_service_grant_is_read_or_write_of_a_listed_service() {
+        for grant in [
+            "gmail-read",
+            "google_calendar-write",
+            "notion-read",
+            "camera",
+            "light",
+        ] {
+            assert!(grant_known(grant), "{grant}");
+        }
+        for grant in [
+            "skills",
+            "gmail",
+            "gmail-send",
+            "-read",
+            "drive-read",
+            "github-read-write",
+        ] {
+            assert!(!grant_known(grant), "{grant}");
+        }
+        let tokens = FakeTokens {
+            yes: Some(vec!["gmail-read".into(), "light".into()]),
+            ..FakeTokens::default()
+        };
+        let runner = runner(&tokens, Ok(5));
+        let answer = answer(
+            &line(|v| v["grants"] = json!(["gmail-read", "light"])),
+            true,
+            skills(),
+            &tokens,
+            &runner,
+        );
+        assert_eq!(answer, json!({"ok": true, "id": 5}));
+        assert_eq!(MOST_GRANTS, 12 + 2 * 14);
+    }
+
+    /// Every service in lamp-services' catalog has its grants here, a
+    /// service with two ways in once, and nothing here is not there: a new
+    /// service can't be left out (#6432).
+    #[test]
+    fn the_service_grants_are_lamp_services_catalog() {
+        let catalog = include_str!("../../services/src/catalog.rs");
+        let mut codes: std::collections::BTreeSet<&str> = catalog
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("code: \""))
+            .filter_map(|rest| rest.split('"').next())
+            .map(|code| {
+                code.strip_suffix("-app")
+                    .or_else(|| code.strip_suffix("-api"))
+                    .unwrap_or(code)
+            })
+            .collect();
+        assert!(codes.len() >= 10, "the catalog's codes were not found");
+        let listed: std::collections::BTreeSet<&str> = SERVICE_GRANTS.iter().copied().collect();
+        assert_eq!(listed.len(), SERVICE_GRANTS.len(), "a service listed twice");
+        codes.retain(|code| !code.is_empty());
+        assert_eq!(codes, listed);
     }
 
     #[test]
