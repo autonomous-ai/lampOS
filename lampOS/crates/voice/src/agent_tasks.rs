@@ -3249,10 +3249,10 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
         .unwrap_or("unknown");
     // Each computer once, in the tasks part's alias order, with the agents
     // it has. Its targets are one computer by its own name where the tasks
-    // part has one, else by its alias; it is said by that name only with
-    // `LAMP_TASKS_MACHINE_NAMES` (as [`where_done`]), since a computer named
-    // after its user names a person to whoever is in the room, else by the
-    // first of its aliases (Thirteen's P2 on #6222).
+    // part has one, else by its alias; it is always said by the first of its
+    // aliases, never by its own name, since a device name often holds a
+    // person's name (Thirteen's P2 on #6222; the first builder, 11 Nov
+    // 09:50).
     let mut computers: Vec<(String, String, Vec<&'static str>)> = Vec::new();
     if let Some(targets) = ask(&socket, &json!({"op":"targets"}), left())
         .filter(|answer| answer.get("ok") == Some(&json!(true)))
@@ -3272,17 +3272,14 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
             let Some(agent) = name_of(engine) else {
                 continue;
             };
-            let own = target["name"].as_str().and_then(status_name);
-            let key = own.clone().unwrap_or_else(|| alias_said.to_owned());
+            let key = target["name"]
+                .as_str()
+                .and_then(status_name)
+                .unwrap_or_else(|| alias_said.to_owned());
             match computers.iter_mut().find(|(known, _, _)| *known == key) {
                 Some((_, _, agents)) if !agents.contains(&agent) => agents.push(agent),
                 Some(_) => {}
-                None => {
-                    let said = own
-                        .filter(|_| place.machine_names)
-                        .unwrap_or_else(|| alias_said.to_owned());
-                    computers.push((key, said, vec![agent]));
-                }
+                None => computers.push((key, alias_said.to_owned(), vec![agent])),
             }
         }
     }
@@ -7341,8 +7338,8 @@ pub(crate) mod tests {
             ]
         );
         assert_eq!(answered["signed_in"], "yes");
-        // `LAMP_TASKS_MACHINE_NAMES` off: one computer per own name, said
-        // by its first alias, never by the name.
+        // One computer per own name, said by its first alias, never by the
+        // name.
         assert_eq!(
             answered["computers"],
             json!([
@@ -7365,7 +7362,7 @@ pub(crate) mod tests {
         );
         std::fs::remove_dir_all(&directory).unwrap();
 
-        // `LAMP_TASKS_MACHINE_NAMES` on: each computer by its own name.
+        // `LAMP_TASKS_MACHINE_NAMES` on too: still its alias, never its name.
         let directory =
             std::env::temp_dir().join(format!("agent-tasks-status-n-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
@@ -7397,10 +7394,11 @@ pub(crate) mod tests {
         assert_eq!(
             answered["computers"],
             json!([
-                {"computer":"MacBook Air","agents":["Claude Code","Codex"]},
+                {"computer":"office","agents":["Claude Code","Codex"]},
                 {"computer":"lamp","agents":["Hermes"]},
             ])
         );
+        assert!(!answered.to_string().contains("MacBook"), "{answered}");
         std::fs::remove_dir_all(&directory).unwrap();
 
         // Each sign-in, by voice only where the lamp can sign in.
