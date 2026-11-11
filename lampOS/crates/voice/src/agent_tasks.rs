@@ -3364,6 +3364,9 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
     // person's name (Thirteen's P2 on #6222; the first builder, 11 Nov
     // 09:50).
     let mut computers: Vec<(String, String, Vec<&'static str>)> = Vec::new();
+    // The lamp's own target (#6407): signed out, it is there only as the
+    // lamp's own engine, which works without the sign-in.
+    let mut lamp_here = false;
     if let Some(targets) = ask(&socket, &json!({"op":"targets"}), left())
         .filter(|answer| answer.get("ok") == Some(&json!(true)))
     {
@@ -3379,6 +3382,7 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
             if !alias(alias_said) {
                 continue;
             }
+            lamp_here |= alias_said == LAMP_TARGET;
             let Some(agent) = name_of(engine) else {
                 continue;
             };
@@ -3411,7 +3415,7 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
     let mut answered = json!({
         "signed_in": signed_in,
         "computers": listed,
-        "next": status_next(signed_in, place.sign_in),
+        "next": status_next(signed_in, place.sign_in, lamp_here),
     });
     if computers.len() > MOST_STATUS_COMPUTERS {
         answered["more_computers"] = json!(computers.len() - MOST_STATUS_COMPUTERS);
@@ -3447,9 +3451,17 @@ fn refusal_code(answer: &Value) -> String {
 
 /// What the model is told to do with [`STATUS`]'s answer: answer only what
 /// was asked, short; with Harness signed out, how to sign it in, by voice
-/// only when the lamp can ([`SIGN_IN_FLAG`]).
-fn status_next(signed_in: &str, sign_in: bool) -> String {
+/// only when the lamp can ([`SIGN_IN_FLAG`]). Signed out with the lamp's
+/// own target (`lamp_here`, #6407), work still goes to the lamp's own
+/// agent: only the computers need the sign-in.
+fn status_next(signed_in: &str, sign_in: bool, lamp_here: bool) -> String {
     let how = match signed_in {
+        "no" if lamp_here && sign_in => {
+            "signed_in no: Harness is not signed in, so work goes to the lamp's own agent; sign in to hand tasks to your computers. Offer to sign it in now, and do it only if they say yes."
+        }
+        "no" if lamp_here => {
+            "signed_in no: Harness is not signed in, so work goes to the lamp's own agent; sign in to hand tasks to your computers. They can sign it in from the app."
+        }
         "yes" => "signed_in yes: Harness is signed in to their account.",
         "offline" => {
             "signed_in offline: Harness is signed in, but can't reach its service just now, so work may wait until it can."

@@ -514,11 +514,26 @@ fn token(value: &str, maximum: usize) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
 }
 
+/// A machine as a target names it: an account machine's id, 32 hex
+/// digits, named to Harness with `--machine`; or this computer's own id
+/// ([`this_computer`]), named with none.
 fn machine_id(value: &str) -> bool {
-    value.len() == 32
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    this_computer(value)
+        || (value.len() == 32
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+}
+
+/// Whether `value` is this computer's own id as Harness keeps it while no
+/// account is signed in (openharness `computerId()`, a UUID; #6407), never
+/// an account machine's. Signed out, Harness 0.6 refuses `machines` and
+/// every `--machine`, and starts and reads work with none on this computer,
+/// under this id (`new --json`'s `machineId`). So a target naming it is
+/// the lamp's own, asked with no machines look, and every call for it is
+/// made with no `--machine` ([`Cli::run_once`]).
+pub fn this_computer(value: &str) -> bool {
+    uuid(value)
 }
 
 /// An agent's id as Harness gives it: a UUID for one on a computer, or
@@ -1001,7 +1016,6 @@ impl Cli {
 
     fn launch_seen(&self, launch: &Launch, seen: &mut Seen) -> LaunchOutcome {
         let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
-        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         if let Err(code) = launch.validate() {
             return not_sent(&code);
         }
@@ -1012,6 +1026,33 @@ impl Cli {
         let Ok(_guard) = self.operation.try_lock() else {
             return not_sent("busy");
         };
+        // The lamp's own target signed out (#6407): no machines look, which
+        // Harness refuses then, and none of the computers' looks.
+        let here = this_computer(&launch.target.machine_id);
+        if here {
+            seen.machines
+                .insert(launch.target.machine_id.to_lowercase());
+        } else if let Some(outcome) = self.preflight(launch, seen) {
+            return outcome;
+        }
+        // The session the person named is already there: its engine is not
+        // asked about, nothing is routed, and nothing is started.
+        if let Some(session) = &launch.session {
+            return self.reply_named(launch, session, seen);
+        }
+        if self.config.engines_ready
+            && !here
+            && let Some(code) = self.engine_refusal(&launch.target, seen)
+        {
+            return not_sent(code);
+        }
+        self.start_new(launch, seen)
+    }
+
+    /// The machines look before a hand-over to an account machine: its
+    /// target's machine listed, or why not. `None`: listed.
+    fn preflight(&self, launch: &Launch, seen: &mut Seen) -> Option<LaunchOutcome> {
+        let not_sent = |code: &str| Some(LaunchOutcome::NotSent { code: code.into() });
         let preflight = self.run(
             &["machines".into(), "--json".into()],
             self.config.read_timeout,
@@ -1038,16 +1079,14 @@ impl Cli {
         if let Err(code) = machines(&preflight.stdout, &launch.target.machine_id) {
             return not_sent(code);
         }
-        // The session the person named is already there: its engine is not
-        // asked about, nothing is routed, and nothing is started.
-        if let Some(session) = &launch.session {
-            return self.reply_named(launch, session, seen);
-        }
-        if self.config.engines_ready
-            && let Some(code) = self.engine_refusal(&launch.target, seen)
-        {
-            return not_sent(code);
-        }
+        None
+    }
+
+    /// `harness new` for `launch`, its route first when asked for, after
+    /// the looks before it ([`Cli::launch_seen`]).
+    fn start_new(&self, launch: &Launch, seen: &mut Seen) -> LaunchOutcome {
+        let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         // This is a preflight, not a reservation. Harness resolves the account
         // list again and can fall back to a name if the ID disappears meanwhile.
         // The machine is named with `--machine` (Harness 0.4.2); the `@id`
@@ -2133,6 +2172,12 @@ impl Cli {
     /// status --json`, `serve --set-up-later`). A read only: it signs
     /// nothing in or out.
     pub fn signed_in(&self) -> Result<SignIn, String> {
+        self.signed_in_here().map(|(sign_in, _)| sign_in)
+    }
+
+    /// [`Cli::signed_in`], with this computer's own id when Harness names
+    /// one ([`parse_auth_here`], #6407). The same one call.
+    pub fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
         let reply = self
             .run(
@@ -2143,7 +2188,7 @@ impl Cli {
         if !reply.success {
             return Err("auth_status_failed".into());
         }
-        parse_auth_status(&reply.stdout).map_err(str::to_string)
+        parse_auth_here(&reply.stdout).map_err(str::to_string)
     }
 
     /// The machines on the person's account (`harness machines --json`,
@@ -2456,7 +2501,7 @@ impl Cli {
         let deadline = Instant::now() + timeout;
         let mut command = Command::new(&self.config.executable);
         command
-            .args(args)
+            .args(without_this_computer(args))
             .env_clear()
             .envs(self.child_environment());
         if !self.config.as_person {
@@ -4464,24 +4509,63 @@ impl SignIn {
     }
 }
 
+/// `args` with each `--machine` naming this computer's own id
+/// ([`this_computer`], #6407) left out, and every other as it is: signed
+/// out, Harness refuses any `--machine`, and with none it works on this
+/// computer. The journal's call line still names the machine.
+fn without_this_computer(args: &[OsString]) -> Vec<&OsString> {
+    let mut kept = Vec::with_capacity(args.len());
+    let mut at = 0;
+    while at < args.len() {
+        if args[at] == "--machine"
+            && args
+                .get(at + 1)
+                .and_then(|machine| machine.to_str())
+                .is_some_and(this_computer)
+        {
+            at += 2;
+            continue;
+        }
+        kept.push(&args[at]);
+        at += 1;
+    }
+    kept
+}
+
 /// What `harness auth status --json` says (openharness `cli.ts`
 /// `authStatusCommand`): one line, exit 0 signed in or not, with
 /// `loggedIn`, and `offline` when signed in but unrenewable just now.
 /// Other fields are passed over.
 pub fn parse_auth_status(bytes: &[u8]) -> Result<SignIn, &'static str> {
+    parse_auth_here(bytes).map(|(sign_in, _)| sign_in)
+}
+
+/// [`parse_auth_status`], with this computer's own id, `computerId`, when
+/// it is one as Harness mints it ([`this_computer`], #6407): the id work
+/// is started under while signed out. Anything else is none.
+pub fn parse_auth_here(bytes: &[u8]) -> Result<(SignIn, Option<String>), &'static str> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Status {
         logged_in: bool,
         #[serde(default)]
         offline: bool,
+        #[serde(default)]
+        computer_id: Option<Value>,
     }
     let status: Status = serde_json::from_slice(bytes).map_err(|_| "auth_status_invalid_reply")?;
-    Ok(match (status.logged_in, status.offline) {
+    let sign_in = match (status.logged_in, status.offline) {
         (false, _) => SignIn::Out,
         (true, true) => SignIn::Offline,
         (true, false) => SignIn::In,
-    })
+    };
+    let computer = status
+        .computer_id
+        .as_ref()
+        .and_then(Value::as_str)
+        .filter(|id| this_computer(id))
+        .map(str::to_owned);
+    Ok((sign_in, computer))
 }
 
 /// What `harness ps --json` says (Harness 0.4.2): an object whose

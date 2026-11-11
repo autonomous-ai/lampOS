@@ -1231,10 +1231,15 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
   |---|---|
   | `no_harness` | Harness is not installed on this lamp; hand-overs are off until it is |
   | `no_computer` | No computer to hand tasks to yet: the task targets are missing or empty |
+  | `computers_need_sign_in` | Harness is not signed in: tasks go to the lamp's own agent; sign in to hand tasks to your computers |
   | `not_signed_in` | Harness is not signed in to the person's account; hand-overs fail until it is |
 
   Their level is ok: a lamp not yet set up isn't unwell. With the sign-in
-  read, `signed_in` is `yes`, `offline` or `no`. Targets for a newer build
+  read, `signed_in` is `yes`, `offline` or `no`. `computers_need_sign_in`
+  is said in place of `not_signed_in` while the lamp's own target names
+  this computer's own id (signed out, #6407, "The lamp itself, signed
+  out" below): work goes to the lamp, and only the computers need the
+  sign-in. Targets for a newer build
   keep their own warning. Being signed out doesn't refuse a `prepare`: the
   sign-in read is up to a minute old, and the hand-over then fails as
   before ("could not hand the last task over").
@@ -1428,7 +1433,55 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     makes `lamp` is `lamp-2`. With no computer, the file holds the lamp
     alone instead of being removed. Hermes missing, not looked at, or the
     switch off: left out, as before. Without `--engines-from-machines` the
-    part says once that the lamp is no target.
+    part says once that the lamp is no target while signed in.
+  - **The lamp itself, signed out** (#6407). A product lamp never signed
+    in, Hermes 0.22.2 installed, answered "I can't reach Hermes": the
+    target above came only from `harness machines`, which works only signed
+    in, and the part said `Harness signed in: no` and `no engines file`.
+    Harness 0.6 signed out refuses `machines` and every `--machine`, while
+    `start` and `new` with none work on this computer, under its own id
+    (`computerId`, a UUID, which `auth status --json` names signed out too;
+    an account machine's id is 32 hex digits). So, with a lamp engine's
+    switch on (`LAMP_OPENCLAW_ON_LAMP` or `LAMP_HERMES_ON_LAMP`) and
+    `--targets-from-machines`:
+    - **The target from the lamp itself.** At each sign-in read that says
+      signed out and names this computer's id, the lamp's engine is
+      installed here when its program is where Harness finds it,
+      `/usr/local/bin/<engine>` (`LAMP_ENGINES_BIN`; `hermes` and
+      `openclaw` are lamp-update's wrappers), executable. Then the file is written, as
+      from the machines and never over a file the part didn't write, with
+      the lamp alone: `lamp`, that engine, `~/harnesses/lamp-tasks/lamp`
+      (made, with its guidance), under this computer's id. A computer's
+      targets written before go: none can be reached signed out. Not
+      installed here, a target written so before is removed; any other
+      file is left as it is. The engine is the first in `lamp_order` (the
+      lamp's engines switched on, in `LAMP_LAMP_ENGINE`'s order, OpenClaw
+      first unless set, OpenClaw left out while the Harness here is too old
+      for it) that is installed here; neither engine is named anywhere else.
+      One journal line a change.
+    - **No machines look and no `--machine`.** A target naming this
+      computer's id is started with no `machines --json` preflight (and no
+      `machines engines` with `--engines-ready`), and every call for its
+      work (`new`, `show`, `ps`, `wait`, `watch`, `reply`, `resume`,
+      `close`, `route`) leaves `--machine` out; the journal's call line
+      still names the machine. `new`'s `machineId` must still be that id.
+    - **The daemon at boot.** A part whose first sign-in read says signed
+      out starts Harness's daemon too, while a lamp engine's switch is on
+      (below).
+    - **Signed in again**, the machines write the targets, as above, and the
+      lamp's target names the account's machine. Work started under the
+      account's machine id stays readable only signed in (its calls name
+      it with `--machine`); the computers keep needing the sign-in.
+    - **What is said.** The health line says `computers_need_sign_in`
+      (above), and the voice's `harness_status` says only the computers
+      need the sign-in (below).
+    - **Tests:** `a_lamp_never_signed_in_hands_work_to_its_own_engine`
+      (`tests/runtime.rs`),
+      `the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine`
+      and `signed_out_the_computers_own_id_is_read_with_the_sign_in`
+      (`tests/harness.rs`).
+    - **Not yet shown on a lamp:** signed out, "ask Hermes …" answered and
+      a follow-up reaching the same session.
   - **While Hermes is still installing.** With the switch on and no lamp
     target yet (Hermes not installed; lamp-update installs it later in a
     quiet window), the `targets` answer adds `"lamp":"installing"`;
@@ -1882,8 +1935,11 @@ credential of its own.
   `machines_failed`). With `--sign-in-by-code` and `--set-up-later`, when
   the part's first sign-in read says signed in (or offline), it runs the
   same `harness start`, with the same tries below, and journals
-  `Harness signed in at this start: its daemon is started (#5379)`. A part
-  that starts signed out starts nothing until a sign-in.
+  `Harness read yes at this start: its daemon is started (#5379, #6407)`
+  (`offline`, or `no` below). A part that starts signed out starts nothing
+  until a sign-in, unless the lamp's own engine may be its target
+  (`LAMP_OPENCLAW_ON_LAMP` or `LAMP_HERMES_ON_LAMP` on, #6407): then it starts the daemon signed out
+  too, since the lamp's own work runs on it.
 - **A failed start is tried again.** On lamp-75c9 (21 October) the start
   right after a spoken sign-in said `start_failed`, and one by hand about a
   minute later worked. So a failed start is tried again 10 s later, then
@@ -3306,7 +3362,10 @@ the model also has `harness_status`. It answers "is Harness signed in?",
   - `next`: answer only what was asked, in one or two sentences, never a
     list, and name only what the answer has. With `signed_in: no`, it offers
     to sign in by voice only with `LAMP_TASKS_SIGN_IN` (`--tasks-sign-in`);
-    otherwise it says to sign in from the app.
+    otherwise it says to sign in from the app. Signed out with the lamp's
+    own target among the targets (#6407), it first says work goes to the
+    lamp's own agent, and to "sign in to hand tasks to your computers",
+    never that nothing works until then.
 - **When it fails.** No tasks part, or none set up, gets the same words as
   every task call (`unreached`). A `status` that is refused gets the light
   "can't do that" words, and the journal has only its code
@@ -3322,7 +3381,9 @@ the model also has `harness_status`. It answers "is Harness signed in?",
   - `harness_status_says_the_sign_in_the_computers_and_the_work_as_counts`
     (each `signed_in`, grouping, aliases only, names on or off, the cap, no task words, within
     500 ms of a local tasks part);
-  - `harness_status_refused_says_it_lightly`.
+  - `harness_status_refused_says_it_lightly`;
+  - `harness_status_signed_out_with_the_lamps_own_target_says_computers_need_the_sign_in`
+    (#6407).
 
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
 
