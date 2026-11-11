@@ -67,6 +67,12 @@ fn default_control_dropin() -> PathBuf {
 fn default_agent_dropin() -> PathBuf {
     crate::change::AGENT_DROPIN.into()
 }
+fn default_agent_group_file() -> PathBuf {
+    "/etc/group".into()
+}
+fn default_agent_folder() -> PathBuf {
+    lamp_msgs::local_agent::SOCKET_DIR.into()
+}
 fn default_consent() -> PathBuf {
     lamp_msgs::consent::FOLDER.into()
 }
@@ -151,6 +157,15 @@ pub struct Config {
     /// while it is there, root's, 0644. The reset's plan removes it.
     #[serde(default = "default_agent_dropin")]
     pub agent_dropin: PathBuf,
+    /// Where the groups are read (`/etc/group`), and the agent's socket folder
+    /// (`/run/lampos-agent`, made by the tmpfiles line the installer writes):
+    /// the local agent is turned on only where both are there, since a unit
+    /// naming a group or a folder the lamp lacks does not start, and the
+    /// developer door with it. Read, never written.
+    #[serde(default = "default_agent_group_file")]
+    pub agent_group_file: PathBuf,
+    #[serde(default = "default_agent_folder")]
+    pub agent_folder: PathBuf,
     /// The folder of the owner's face expressions and room sounds yeses
     /// (`lamp_msgs::consent::FOLDER`, 0750 `root:lampos`), written from the
     /// app's `consent.set` (`crate::change`, #5500) and by the voice's
@@ -178,7 +193,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 25] = [
+pub const FIELDS: [&str; 27] = [
     "listen",
     "marker",
     "credential",
@@ -199,6 +214,8 @@ pub const FIELDS: [&str; 25] = [
     "own_keys",
     "control_dropin",
     "agent_dropin",
+    "agent_group_file",
+    "agent_folder",
     "consent",
     "web_start",
     "web_stop",
@@ -238,6 +255,8 @@ impl Config {
             &self.own_keys,
             &self.control_dropin,
             &self.agent_dropin,
+            &self.agent_group_file,
+            &self.agent_folder,
             &self.consent,
         ] {
             if !path.is_absolute() {
