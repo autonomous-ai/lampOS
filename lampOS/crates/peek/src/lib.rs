@@ -4,9 +4,10 @@
 //! 2026: the person sat to the side, which only a Mac's camera pointed at
 //! the lamp showed.
 //!
-//! `/` is one page with a sidebar, Overview, Turns, Camera, Body and
-//! Health, kept fresh by one event stream (`/events`, [`page`]): each
-//! turn's timings from the voice's own records ([`turns`]), never words.
+//! `/` is one page with a sidebar, Overview, Timeline, Turns, Camera, Body
+//! and Health, kept fresh by one event stream (`/events`, [`page`]): each
+//! turn's steps on the bus ([`timeline`]) and its timings from the voice's
+//! own records ([`turns`]), words only in monitor mode.
 //! Beside it, three views:
 //! - `/cam`: the eyes' faces as boxes on a plain frame, never a picture,
 //!   and nothing while the camera is closed ([`view::cam_svg`]);
@@ -16,7 +17,9 @@
 //!   last error line ([`units`]).
 //!
 //! In monitor mode (`LAMP_PEEK=monitor`, [`monitor`]) the same views open
-//! to the local network by a one-time code from the app, not a token.
+//! to the local network by a one-time code from the app, not a token, and
+//! the page's Timeline ([`timeline`]) shows the words heard and said: in
+//! that mode only, never on `/bus`.
 //!
 //! It reads and never writes: no publisher, no setting, no button. Its one
 //! mark on the lamp is the subscriber socket each reader of an event topic
@@ -26,6 +29,7 @@ use std::net::SocketAddr;
 pub mod monitor;
 pub mod page;
 pub mod serve;
+pub mod timeline;
 pub mod turns;
 pub mod units;
 pub mod view;

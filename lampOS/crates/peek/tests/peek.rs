@@ -3,12 +3,14 @@
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
     BodyOffsets, Diagnostic, ExpressionBody, ExpressionGaze, ExpressionLease, Face, Faces, Health,
-    HealthItem, JointState, Level, RoomPresence, Speech, VoiceState,
+    HealthItem, JointState, Level, Light, RoomPresence, SkillEvent, SkillStage, Speech,
+    TurnVerdict, VoiceState, VoiceTurn,
 };
 use lamp_peek::{
     monitor::{Conn, Monitor, Redeemed, SESSION_LASTS},
     page,
     serve::{self, Peek},
+    timeline::{self, Timeline},
     units::UnitRow,
     watch::{self, Seen},
 };
@@ -94,15 +96,19 @@ impl Rig {
         let bus = Bus::new(&root)
             .unwrap()
             .rescan_every(Duration::from_millis(20));
-        let seen = Arc::new(Mutex::new(Seen::default()));
+        // As the binary: words kept in monitor mode only.
+        let seen = Arc::new(Mutex::new(Seen {
+            timeline: Timeline::new(monitor.is_some()),
+            ..Seen::default()
+        }));
         let stop = Arc::new(AtomicBool::new(false));
         let watching = thread::spawn({
             let (bus, seen, stop) = (bus.clone(), Arc::clone(&seen), Arc::clone(&stop));
             move || watch::watch(&bus, &seen, &stop)
         });
-        // Listening once its four subscribers are there.
+        // Listening once all its subscribers are there.
         let started = Instant::now();
-        while !watch::EVENTS.iter().all(|topic| {
+        while !watch::LISTENED.iter().all(|topic| {
             bus.subscribers(topic)
                 .unwrap()
                 .iter()
@@ -638,13 +644,18 @@ fn ended(mut command: Command) -> (Option<i32>, String) {
 /// until every section has come at least once since `wanted` was first in
 /// one: each section's newest HTML, by its name.
 fn stream_until(rig: &Rig, headers: &str, wanted: &str) -> BTreeMap<String, String> {
+    stream_until_as(rig, "localhost", headers, wanted)
+}
+
+/// The same, asking as `host`.
+fn stream_until_as(rig: &Rig, host: &str, headers: &str, wanted: &str) -> BTreeMap<String, String> {
     let mut stream = TcpStream::connect(("127.0.0.1", rig.port)).unwrap();
     stream
         .set_read_timeout(Some(Duration::from_millis(200)))
         .unwrap();
     write!(
         stream,
-        "GET /events HTTP/1.1\r\nHost: localhost\r\n{headers}\r\n"
+        "GET /events HTTP/1.1\r\nHost: {host}\r\n{headers}\r\n"
     )
     .unwrap();
     let started = Instant::now();
@@ -1004,6 +1015,13 @@ fn the_one_page_streams_each_section_and_never_a_word() {
         "{health}"
     );
     assert!(health.contains("Never heard from: eyes2"), "{health}");
+    // The timeline has the turn heard, without its words.
+    let timeline = &sections["timeline"];
+    assert!(
+        timeline.contains("request 4") && timeline.contains("<th>heard</th>"),
+        "{timeline}"
+    );
+    assert!(!timeline.contains(page::WORDS_SHOWN), "{timeline}");
     let overview = &sections["overview"];
     assert!(overview.contains("camera open"), "{overview}");
     assert!(overview.contains("newest 1400 ms"), "{overview}");
@@ -1018,6 +1036,122 @@ fn the_one_page_streams_each_section_and_never_a_word() {
     assert_eq!(status, 200);
     assert!(page.contains("new EventSource('/events')"), "{page}");
     assert!(!page.contains(WORD), "{page}");
+    assert!(!page.contains(page::WORDS_SHOWN), "{page}");
+}
+
+/// Monitor mode's timeline (#5883, second piece): a turn planted on a real
+/// bus, heard, understood, the light, a skill, said, shows in that order
+/// with each step's time from the end of speech, its words escaped, and
+/// the line saying anyone's words show. The light asked for again
+/// unchanged is not a second thing done.
+#[test]
+fn monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped() {
+    let monitor = monitor_names();
+    let session = {
+        let mut gate = monitor.gate();
+        let code = gate.issue(Instant::now()).unwrap();
+        match gate.redeem(&code, Instant::now()).unwrap() {
+            Redeemed::Session(session) => session,
+            other => panic!("{other:?}"),
+        }
+    };
+    let rig = Rig::monitor(
+        "mon-line",
+        monitor,
+        conn("192.168.1.20:50000", "192.168.1.5:80"),
+    );
+    let records = rig.root.join("sessions/s1/metadata");
+    fs::create_dir_all(&records).unwrap();
+    record(
+        &records.join("events-1.jsonl"),
+        r#"{"kind":"answer_stages","turn":9,"words_ms":250,"chat_first_ms":700,"first_answer_audio_ms":1100}"#,
+    );
+    let mut heard = rig.publisher(Speech::TOPICS[0], &Speech::declaration(), "voice");
+    let mut said = rig.publisher(Speech::TOPICS[1], &Speech::declaration(), "voice");
+    let mut turn = rig.publisher(VoiceTurn::TOPIC, &VoiceTurn::declaration(), "voice");
+    let mut light = rig.publisher(Light::TOPICS[0], &Light::declaration(), "voice");
+    let mut skills = rig.publisher(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills");
+    let speech = |text: &str| Speech {
+        text: text.into(),
+        finished: true,
+        locale: None,
+        request: Some(9),
+    };
+    let pause = || thread::sleep(Duration::from_millis(60));
+    heard
+        .publish_json(1, &speech("turn the light <script>blue</script>"))
+        .unwrap();
+    pause();
+    turn.publish_json(
+        2,
+        &VoiceTurn {
+            request: 9,
+            verdict: TurnVerdict::Answered,
+        },
+    )
+    .unwrap();
+    pause();
+    let blue = Light::new(true, "blue", 3).unwrap();
+    light.publish_json(3, &blue).unwrap();
+    pause();
+    light.publish_json(4, &blue).unwrap();
+    skills
+        .publish_json(
+            5,
+            &SkillEvent {
+                skill: "glow".into(),
+                stage: SkillStage::Done,
+                why: "PRIVATE why".into(),
+                allowed: None,
+            },
+        )
+        .unwrap();
+    pause();
+    said.publish_json(6, &speech("It's blue now.")).unwrap();
+    let with = format!("Cookie: peek_session={session}\r\n");
+    let sections = stream_until_as(&rig, "lamp-test.local", &with, "It&#39;s blue now.");
+    let timeline = &sections["timeline"];
+    assert!(timeline.contains(page::WORDS_SHOWN), "{timeline}");
+    let order = [
+        "<th>heard</th>",
+        "&lt;script&gt;blue&lt;/script&gt;",
+        "<th>understood</th>",
+        "answered, final words 250 ms",
+        "<th>did</th>",
+        "light blue at 3",
+        "skill glow done",
+        "<th>said</th>",
+        "first audio 1100 ms",
+    ];
+    let mut from = 0;
+    for wanted in order {
+        let at = timeline[from..]
+            .find(wanted)
+            .unwrap_or_else(|| panic!("{wanted} not after {from}: {timeline}"));
+        from += at + wanted.len();
+    }
+    assert!(!timeline.contains("<script>"), "{timeline}");
+    assert!(!timeline.contains("PRIVATE"), "{timeline}");
+    assert_eq!(timeline.matches("light blue at 3").count(), 1, "{timeline}");
+    // Heard is the end of speech; each later step comes after it.
+    assert!(timeline.contains("<td>+0 ms</td>"), "{timeline}");
+    let times: Vec<u64> = timeline
+        .split("<td>+")
+        .skip(1)
+        .map(|rest| rest.split(" ms").next().unwrap().parse().unwrap())
+        .collect();
+    assert_eq!(times.len(), 5, "{timeline}");
+    assert!(times.windows(2).all(|pair| pair[0] <= pair[1]), "{times:?}");
+    assert!(times[4] >= 180, "{times:?}");
+    assert_eq!(timeline.matches("class=\"slow\"").count(), 1, "{timeline}");
+    // Never on `/bus`.
+    let (status, _, body) = rig.ask_as("lamp-test.local", "GET", "/bus", &with, "");
+    assert_eq!(status, 200);
+    assert!(!body.contains("blue"), "{body}");
+    let (status, _, page) = rig.ask_as("lamp-test.local", "GET", "/", &with, "");
+    assert_eq!(status, 200);
+    assert!(page.contains(page::WORDS_SHOWN), "{page}");
+    assert_eq!(timeline::KEPT, 30);
 }
 
 /// The stream answers only GET, and with a token only with it.
