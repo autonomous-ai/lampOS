@@ -1855,15 +1855,20 @@ data: [DONE]
     /// one; the default client reuses it.
     #[tokio::test]
     async fn a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it() {
-        async fn connections(kept: Option<std::time::Duration>) -> usize {
+        async fn connections(kept: Option<std::time::Duration>) -> u64 {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let address = listener.local_addr().unwrap();
             let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             let accepted = count.clone();
-            tokio::spawn(async move {
+            let (probe_accepted, probe_seen) = tokio::sync::oneshot::channel();
+            let server = tokio::spawn(async move {
+                let mut probe_accepted = Some(probe_accepted);
                 loop {
                     let (socket, _) = listener.accept().await.unwrap();
                     accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    if let Some(told) = probe_accepted.take() {
+                        let _ = told.send(());
+                    }
                     tokio::spawn(kept_fixture_connection(
                         socket,
                         std::time::Duration::ZERO,
@@ -1871,7 +1876,22 @@ data: [DONE]
                     ));
                 }
             });
-            let client = super::super::client_kept(kept).unwrap();
+            // Count this client's openings, not discovery probes accepted by
+            // the shared host's listener. Keep a deliberate foreign socket as
+            // a negative control without changing the pool or its idle timing.
+            let opens = super::super::watch::Opens::default();
+            let client = super::super::kept_builder(kept)
+                .unwrap()
+                .connector_layer(opens.clone())
+                .build()
+                .unwrap();
+            let probe = tokio::net::TcpStream::connect(address).await.unwrap();
+            tokio::time::timeout(std::time::Duration::from_secs(5), probe_seen)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(opens.began(), 0);
+            drop(probe);
             for _ in 0..2 {
                 let answer = client
                     .get(format!("http://{address}/v1/models"))
@@ -1881,7 +1901,14 @@ data: [DONE]
                 answer.bytes().await.unwrap();
                 tokio::time::sleep(std::time::Duration::from_millis(600)).await;
             }
-            count.load(std::sync::atomic::Ordering::SeqCst)
+            let opened = opens.began();
+            let accepted = count.load(std::sync::atomic::Ordering::SeqCst);
+            assert!(
+                accepted as u64 > opened,
+                "accepted={accepted}, opened={opened}"
+            );
+            server.abort();
+            opened
         }
         assert_eq!(
             connections(Some(std::time::Duration::from_millis(200))).await,

@@ -6690,6 +6690,7 @@ mod tests {
             speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
             known: known.map(|(name, face)| (name.to_owned(), face.to_owned())),
             enrollment: None,
+            by_voice: false,
         };
         let theirs_said = seen(&["f1"], Some(("Alex", "f1")));
         for known in [Some(&alex), Some(&bo), None] {
@@ -6768,6 +6769,7 @@ mod tests {
             speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
             known: known_with_face(&known),
             enrollment: None,
+            by_voice: false,
         };
         let refused = |line: Option<&LineSeen>| {
             let told = run_for(&socket, &call("Alex"), switches, None, line);
@@ -6917,6 +6919,7 @@ mod tests {
             speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
             known: known_with_face(&known),
             enrollment: None,
+            by_voice: false,
         };
         let theirs = heard(&["f1"]);
         let kept = "Nothing was changed: the face of the one asking is kept as Loren. Use that name to forget or rename it.";

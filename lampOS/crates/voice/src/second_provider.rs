@@ -560,6 +560,7 @@ struct SpokenTurn {
     privacy_generation: u64,
     captured: bool,
     enrollment_generation: crate::remember_speaker::Generation,
+    confirmation_generation: Option<u64>,
 }
 
 // The background room-speaker publish must use the request's existing proof;
@@ -2145,6 +2146,26 @@ pub struct VoiceConfirms {
     pub print_of: PrintOf,
 }
 
+#[cfg(test)]
+fn confirmed_by_voice(
+    confirms: Option<&VoiceConfirms>,
+    request: u64,
+    person: &str,
+    speakers: crate::speaking_faces::Speakers,
+    own_face: Option<&str>,
+    one_face: impl FnOnce(&str) -> bool,
+) -> crate::speaking_faces::Speakers {
+    confirmed_by_voice_at(
+        confirms,
+        confirms.map(|confirms| confirms.owner.generation()),
+        request,
+        person,
+        speakers,
+        own_face,
+        one_face,
+    )
+}
+
 /// `LAMP_SAME_VOICE_CONFIRMS` (the memory owner's decision of 4 Nov: CAM++
 /// one way only), for the line `request` admitted as `person`'s, after the
 /// eyes' `speakers` of it: the faces seen speaking it, as they will be
@@ -2159,15 +2180,16 @@ pub struct VoiceConfirms {
 ///   seen saying it, and the speakers returned are that face.
 /// - Anything else, a score under the bar among it, changes nothing: the
 ///   speakers come back as they went in. Never a face not in view.
-fn confirmed_by_voice(
+fn confirmed_by_voice_at(
     confirms: Option<&VoiceConfirms>,
+    generation: Option<u64>,
     request: u64,
     person: &str,
     speakers: crate::speaking_faces::Speakers,
     own_face: Option<&str>,
     one_face: impl FnOnce(&str) -> bool,
 ) -> crate::speaking_faces::Speakers {
-    let (Some(confirms), Some(face)) = (confirms, own_face) else {
+    let (Some(confirms), Some(generation), Some(face)) = (confirms, generation, own_face) else {
         return speakers;
     };
     let seen_alone = speakers.len() == 1 && speakers[0] == face;
@@ -2178,7 +2200,7 @@ fn confirmed_by_voice(
         return speakers;
     };
     if seen_alone {
-        if confirms.owner.learn(person, request, print) {
+        if confirms.owner.learn_at(generation, person, request, print) {
             eprintln!(
                 "lamp-voice second: request {request}: the known person's face alone seen speaking it: its print kept as their voice, {} of {} (LAMP_SAME_VOICE_CONFIRMS)",
                 confirms.owner.known(person),
@@ -2188,7 +2210,7 @@ fn confirmed_by_voice(
         return speakers;
     }
     let bar = confirms.owner.bar();
-    match confirms.owner.judge(person, &print) {
+    match confirms.owner.judge_at(generation, person, &print) {
         crate::same_voice::Confirmed::Theirs(cosine) => {
             eprintln!(
                 "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view, their voice (cosine {cosine:.2}, bar {bar:.2}): taken as seen said by them (LAMP_SAME_VOICE_CONFIRMS)"
@@ -2251,7 +2273,7 @@ fn past_silent_inactive(keeps: bool, hears: bool) -> Option<&'static str> {
             "the rule keeps no sign of another voice here (LAMP_JOIN_CUT_WORDS or LAMP_SECOND_NAME_CARRIES keep it)",
         ),
         (true, false) => Some(
-            "the same-voice check is not running here (no printer started, a standby beside Live, or none of LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE, LAMP_GOING_ON_NOT_OWN, LAMP_MEMORY_FOLLOWS_FACE on)",
+            "no voice can show another person here (no printer started, a standby beside Live, the prints for the linked services only, the voice only confirming with LAMP_SAME_VOICE_CONFIRMS, or none of LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE, LAMP_GOING_ON_NOT_OWN, LAMP_MEMORY_FOLLOWS_FACE on)",
         ),
     }
 }
@@ -5112,7 +5134,7 @@ impl Engine {
     /// seen speaking counts as seen said by them when their known face was
     /// the one face in view through it and its voice print is at
     /// `confirms`' bar or over against their own (`LAMP_SAME_VOICE_CONFIRMS`,
-    /// [`confirmed_by_voice`]). Under the bar, nothing changes.
+    /// [`confirmed_by_voice_at`]). Under the bar, nothing changes.
     pub fn confirming_by_voice(mut self, confirms: VoiceConfirms) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.voice_confirms = Some(confirms);
@@ -6675,6 +6697,14 @@ impl Engine {
                 heard_of_cut,
                 ..
             } => {
+                // Token acquisition is the Start-processing observation boundary,
+                // before other callbacks or locks can span a forget.
+                // Events still queued upstream have no cache token yet.
+                let confirmation_generation = self
+                    .shared
+                    .voice_confirms
+                    .as_ref()
+                    .map(|confirms| confirms.owner.generation());
                 if self.shared.wordless_resumes
                     && let Ok(mut kept) = self.shared.heard_of_cut.lock()
                 {
@@ -7055,6 +7085,7 @@ impl Engine {
                             privacy_generation,
                             captured: false,
                             enrollment_generation: crate::remember_speaker::generation(),
+                            confirmation_generation,
                         },
                         lease,
                         marks.clone(),
@@ -8148,6 +8179,10 @@ async fn spoken(
     continues_from: Option<u64>,
 ) {
     let (mut turn, scope, marks) = context;
+    // Captured at Start-arm entry, before begin or any other callbacks:
+    // neither a delayed callback nor a task first polled after forgetting
+    // may adopt the new generation for this already-processing line.
+    let voice_generation = turn.confirmation_generation;
     let request = turn.request;
     // Known from its start, so a chat begun on its early words is asked
     // with it too.
@@ -8577,14 +8612,17 @@ async fn spoken(
                 let (speakers, pair, alone) =
                     line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
                 // `LAMP_SAME_VOICE_CONFIRMS`: their voice, their face the one
-                // face in view, is their face seen saying it.
+                // face in view, is their face seen saying it. Marked so, as
+                // it only ever fills an empty reading (`by_voice`).
+                let seen_none = speakers.is_empty();
                 let speakers = if shared.scope_seen {
                     let own_face = pair
                         .as_ref()
                         .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
                         .map(|(_, face)| face.as_str());
-                    confirmed_by_voice(
+                    confirmed_by_voice_at(
                         shared.voice_confirms.as_ref(),
+                        voice_generation,
                         request,
                         &person,
                         speakers,
@@ -8606,6 +8644,9 @@ async fn spoken(
                             speakers: speakers.clone(),
                             known: pair.clone(),
                             enrollment: enrollment.clone(),
+                            // Their voice alone made it theirs: never their
+                            // face seen saying it for a services write.
+                            by_voice: seen_none && !speakers.is_empty(),
                         },
                         shared.remember_speaker,
                         Some(scope),
@@ -8941,8 +8982,9 @@ async fn spoken(
                         .map(|(_, face)| face.clone());
                     // `LAMP_SAME_VOICE_CONFIRMS`, as at its admission.
                     let speakers = if seen_only {
-                        confirmed_by_voice(
+                        confirmed_by_voice_at(
                             voice_confirms.as_ref(),
+                            voice_generation,
                             request,
                             &person,
                             speakers,
@@ -9025,6 +9067,7 @@ async fn spoken(
                     speakers: speakers.clone(),
                     known: pair.clone(),
                     enrollment: enrollment.clone(),
+                    by_voice: false,
                 };
                 if shared.remember_speaker {
                     if let Some(lease) = scope.as_ref() {
@@ -9058,6 +9101,7 @@ async fn spoken(
                         speakers,
                         known: eyes.known_with_boot(&known),
                         enrollment,
+                        by_voice: false,
                     },
                     remember_speaker,
                     lease.as_ref(),
@@ -14617,6 +14661,79 @@ fn asked_just_before(
     }
 }
 
+/// Identity captured before either runner can delete it. Only an installed
+/// confirmation cache and a deletion call need this completion observer.
+struct ConfirmationForget {
+    owner: Arc<crate::same_voice::OwnerVoice>,
+    face_person: Option<String>,
+    scope: Option<crate::memory_scope::ScopeLease>,
+    name: String,
+    heard: bool,
+}
+
+impl ConfirmationForget {
+    fn prepare(
+        shared: &Shared,
+        heard: bool,
+        call: &net::ToolCall,
+        scope: Option<&crate::memory_scope::ScopeLease>,
+    ) -> Option<Self> {
+        let confirms = shared.voice_confirms.as_ref()?;
+        if !matches!(
+            call.name.as_str(),
+            crate::remember::FORGET_EVERYTHING | crate::known_faces::FORGET
+        ) {
+            return None;
+        }
+        // A room's successful face deletion validates this normalized
+        // requested name in known_faces::forget_name.
+        let face_person = (call.name == crate::known_faces::FORGET)
+            .then(|| {
+                scope
+                    .and_then(|lease| lease.scope())
+                    .and_then(|scope| scope.person())
+                    .map(str::to_owned)
+                    .or_else(|| {
+                        call.args["name"]
+                            .as_str()
+                            .map(crate::known_faces::memory_person)
+                    })
+            })
+            .flatten();
+        Some(Self {
+            owner: confirms.owner.clone(),
+            face_person,
+            scope: scope.cloned(),
+            name: call.name.clone(),
+            heard,
+        })
+    }
+
+    /// Observe the receipt before later scope/output checks. Return the exact
+    /// answer, including ToolAnswer's private audio metadata, unchanged.
+    fn after<T: Send + 'static>(
+        pending: Option<Self>,
+        running: BoxFuture<'static, T>,
+        told_of: fn(&T) -> &Value,
+    ) -> BoxFuture<'static, T> {
+        let Some(pending) = pending else {
+            return running;
+        };
+        Box::pin(async move {
+            let answer = running.await;
+            crate::tools::forget_confirmation_voice(
+                &pending.owner,
+                &pending.name,
+                pending.face_person.as_deref(),
+                pending.heard,
+                pending.scope.as_ref(),
+                told_of(&answer),
+            );
+            answer
+        })
+    }
+}
+
 /// One call run by the route's runner: the admitted request's scoped one
 /// when there is one.
 async fn run_tool(
@@ -14659,11 +14776,13 @@ async fn run_tool_in_context(
     // A send runs to its answer even if a newer line cuts the turn, its
     // receipt kept as its own (#5853).
     let (attempt, args) = send_attempt_in_context(shared, call, epoch);
+    let confirmation_forget = ConfirmationForget::prepare(shared, heard, call, scope);
     let running: BoxFuture<'static, Value> = match (&shared.scoped_tools, scope) {
         (Some(run), Some(scope)) => run(request, heard, call.name.clone(), args, scope.clone()),
         (Some(_), None) => Box::pin(std::future::ready(crate::tools::unavailable())),
         (None, _) => (shared.tools)(request, heard, call.name.clone(), args),
     };
+    let running = ConfirmationForget::after(confirmation_forget, running, |told| told);
     let running = sending(shared, (request, attempt), call, running, Value::clone);
     // A connected service can take seconds to answer (a mail box, a web
     // service): past the wait sound's time the person hears it, as for a
@@ -17882,6 +18001,12 @@ async fn answer(
                                 Some(scope) => {
                                     let (attempt, args) =
                                         send_attempt_in_context(shared, call, context_epoch);
+                                    let confirmation_forget = ConfirmationForget::prepare(
+                                        shared,
+                                        heard,
+                                        call,
+                                        Some(scope),
+                                    );
                                     let running = runner(
                                         context.clone(),
                                         lamp_gemini::ToolCall {
@@ -17890,6 +18015,11 @@ async fn answer(
                                             args,
                                         },
                                         scope.clone(),
+                                    );
+                                    let running = ConfirmationForget::after(
+                                        confirmation_forget,
+                                        running,
+                                        |answer: &crate::tools::ToolAnswer| &answer.told,
                                     );
                                     sending(
                                         shared,
