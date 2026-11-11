@@ -16,6 +16,7 @@ pub mod app_check;
 pub mod apply;
 pub mod check_units;
 pub mod companion;
+pub mod engines;
 pub mod fetch;
 pub mod fixed_copy;
 pub mod harness_install;

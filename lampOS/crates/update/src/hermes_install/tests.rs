@@ -2022,3 +2022,42 @@ fn the_watch_freezes_thaws_and_stops_only_a_running_one_shot() {
         "{lines:?}"
     );
 }
+
+/// A round in the window the app's tap opens (#6240).
+fn asked_round(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesInstall> {
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        false,
+        systemd,
+        at,
+        Ok(crate::hermes_schedule::Window::Asked),
+        &mut quiet(),
+    )
+}
+
+/// The app's tap (#6240) is a deliberate try again: a recent failure that
+/// waits a day for a round is started at once when asked; an install under
+/// way is still left alone until it is taken as stuck.
+#[test]
+fn an_ask_from_the_app_tries_a_recent_failure_again_but_not_an_install_under_way() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    lamp.ask();
+    let runs = Runs {
+        failing: Some("venv"),
+        stage: Err("bash: exit status 1".into()),
+        ..Runs::new(&lamp)
+    };
+    assert_eq!(install(&lamp, &runs, 100).unwrap().install, "failed");
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, 100 + HOUR_MS), None);
+    assert!(systemd.asked.is_empty());
+    let asked = asked_round(&lamp, &mut systemd, 100 + HOUR_MS).unwrap();
+    assert_eq!(asked.install, "installing");
+    assert_eq!(systemd.asked, ["reload", "show", "start"]);
+    // Under way: a tap starts nothing more.
+    let mut again = Fake::default();
+    assert_eq!(asked_round(&lamp, &mut again, 100 + 2 * HOUR_MS), None);
+    assert!(again.asked.is_empty());
+}
