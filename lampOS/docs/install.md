@@ -1421,6 +1421,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        second hard link or owned by another uid than its `bin` folder's
        owner (one line said; #5624), or over 64 KiB (Harness's is a few
        hundred bytes; not read past the cap, one line said; #5647).
+     - **Not held on a dev or beta lamp (#6300, (B)):** a lamp whose
+       `lamp-update.service` follows the lamp-voice feed (`--channel-url`
+       exactly `…/releases/download/lampos-lamp-voice/`) is the canary for
+       Harness's own releases: with the switch on, `harness-install` takes
+       the hold's two lines out of the launcher instead of putting them in
+       (`Harness's launcher unpinned: this lamp follows the lamp-voice
+       feed, …`), and lamp-tasks writes no hold (tasks.md, "Dev and beta
+       lamps: the hold lifted"). A stable lamp (`lampos-stable`, every
+       product lamp), any other feed, and a lamp whose feed `systemctl show
+       lamp-update.service --property=ExecStart` can't give keep the hold
+       exactly as above. The pin itself is unchanged: a canary lamp still
+       installs the build's pin, and a move to a newer pin moves only a
+       Harness older than it (a self-updated one is left).
    - **Said to the app:** `harness-install.json` in the records,
      `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
      "error"?, "from_version"?, "message"}` (`lamp_msgs::HarnessInstall`), on

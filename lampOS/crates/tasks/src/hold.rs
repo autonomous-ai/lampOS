@@ -30,6 +30,14 @@
 //! exported before its `exec` line, which Harness's own updates keep (they
 //! rewrite only that line). `lamp-update harness-install` writes the same
 //! after it installs (crates/update/src/harness_install/launcher.rs).
+//!
+//! On a dev or beta lamp, whose updater follows the lamp-voice feed, the
+//! switch's hold is lifted (#6300, (B)): the file is written without it,
+//! no Harness command is given it, and the launcher's preamble is taken out,
+//! so Harness's own updater runs and these lamps are the canary for its
+//! releases. Which lamp that is, is decided once, for lamp-update too, in
+//! `lamp_msgs::harness_hold`; every other lamp keeps the hold as before.
+use lamp_msgs::harness_hold::HarnessHold;
 use std::{
     collections::BTreeMap,
     ffi::OsString,
@@ -107,6 +115,20 @@ pub fn env_file(
     env_file_changed(environment, hold, hermes_home).map(|(path, _)| path)
 }
 
+/// The env file as `hold` asks (#6300), with what lamp-tasks' Hermes asks:
+/// held, with [`TEXT`] and [`DISABLE`] given, as before; lifted (the
+/// canary), written without them, so it is said changed on a lamp that held
+/// before and a daemon running with the hold is started again without it.
+/// `None`, nothing written, with the switch off and no Hermes.
+pub fn env_file_for(
+    hold: HarnessHold,
+    environment: &mut BTreeMap<String, OsString>,
+    hermes_home: Option<&Path>,
+) -> Option<Result<(PathBuf, bool), String>> {
+    (hold != HarnessHold::Off || hermes_home.is_some())
+        .then(|| env_file_changed(environment, hold == HarnessHold::Held, hermes_home))
+}
+
 /// As [`env_file`], and whether the file now says something else than it
 /// did (or was not there): Harness's daemon reads [`ENV_FILE`] only when it
 /// starts, so a daemon already running keeps the old words until it is
@@ -173,6 +195,19 @@ fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// they are, so a launcher already pinned comes back byte for byte. `None`
 /// when there is no `exec` line.
 pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
+    launcher_shaped(text, Some(env_file))
+}
+
+/// `text`, a Harness launcher, with the hold taken out (#6300): every
+/// `export ADAPTER_UPDATE_DISABLE=` and `export HARNESS_ENV_FILE=` line
+/// before its first `exec` line taken out, every other line kept, so one
+/// with neither comes back byte for byte. `None` when there is no `exec`
+/// line.
+pub fn unpinned_launcher(text: &str) -> Option<String> {
+    launcher_shaped(text, None)
+}
+
+fn launcher_shaped(text: &str, env_file: Option<&str>) -> Option<String> {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let exec = lines
         .iter()
@@ -187,18 +222,20 @@ pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
         }
         pinned.push_str(line);
     }
-    pinned.push_str(&format!("export {DISABLE}=true\n"));
-    pinned.push_str(&format!("export {ENV_FILE}={env_file}\n"));
+    if let Some(env_file) = env_file {
+        pinned.push_str(&format!("export {DISABLE}=true\n"));
+        pinned.push_str(&format!("export {ENV_FILE}={env_file}\n"));
+    }
     for line in &lines[exec..] {
         pinned.push_str(line);
     }
     Some(pinned)
 }
 
-/// What [`pin_launcher`] did.
+/// What [`pin_launcher`] or [`unpin_launcher`] did.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Launcher {
-    /// Written in the pinned shape.
+    /// Written in the shape asked.
     Written,
     /// Already in it: nothing written.
     Kept,
@@ -213,6 +250,17 @@ pub enum Launcher {
 /// unchanged, when it is not a plain file, has no `exec` line, or cannot be
 /// written.
 pub fn pin_launcher(launcher: &Path, env_file: &Path) -> Result<Launcher, String> {
+    shape_launcher(launcher, Some(env_file))
+}
+
+/// The launcher at `launcher` with the hold taken out
+/// ([`unpinned_launcher`]), written as [`pin_launcher`] writes it: one with
+/// no hold is not written, a missing one is not made (#6300).
+pub fn unpin_launcher(launcher: &Path) -> Result<Launcher, String> {
+    shape_launcher(launcher, None)
+}
+
+fn shape_launcher(launcher: &Path, env_file: Option<&Path>) -> Result<Launcher, String> {
     let said = |error: &dyn std::fmt::Display| format!("{}: {error}", launcher.display());
     let metadata = match fs::symlink_metadata(launcher) {
         Ok(metadata) => metadata,
@@ -223,16 +271,20 @@ pub fn pin_launcher(launcher: &Path, env_file: &Path) -> Result<Launcher, String
         return Err(said(&"not a plain file"));
     }
     let env_file = env_file
-        .to_str()
-        .filter(|path| {
-            path.starts_with('/')
-                && path
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"/._-".contains(&b))
+        .map(|env_file| {
+            env_file
+                .to_str()
+                .filter(|path| {
+                    path.starts_with('/')
+                        && path
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"/._-".contains(&b))
+                })
+                .ok_or_else(|| said(&"the hold file's path is not plain"))
         })
-        .ok_or_else(|| said(&"the hold file's path is not plain"))?;
+        .transpose()?;
     let text = fs::read_to_string(launcher).map_err(|error| said(&error))?;
-    let pinned = pinned_launcher(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
+    let pinned = launcher_shaped(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
     if pinned == text {
         return Ok(Launcher::Kept);
     }
@@ -267,18 +319,36 @@ fn write_launcher(next: &Path, bytes: &[u8], was: &fs::Metadata) -> io::Result<(
     file.sync_all()
 }
 
-/// At lamp-tasks' start: with `switch` [`on`] and an absolute `home`,
-/// `<home>/`[`LAUNCHER`] pinned to `<home>/`[`FILE`] ([`pin_launcher`]) and
-/// the journal line returned; with the switch off, nothing looked at or
-/// written, and no line.
-pub fn pin_at_start(switch: Option<&str>, home: Option<&Path>) -> Option<String> {
-    if !on(switch) {
+/// At lamp-tasks' start, with an absolute `home`: held, `<home>/`[`LAUNCHER`]
+/// pinned to `<home>/`[`FILE`] ([`pin_launcher`]); lifted (the canary,
+/// #6300), the hold taken out of it ([`unpin_launcher`]); and the journal
+/// line returned. With the switch off, nothing looked at or written, and no
+/// line.
+pub fn pin_at_start(hold: HarnessHold, home: Option<&Path>) -> Option<String> {
+    if hold == HarnessHold::Off {
         return None;
     }
     let Some(home) = home.filter(|home| home.is_absolute()) else {
         return Some("tasks: Harness's launcher not pinned: no absolute HOME".to_owned());
     };
     let launcher = home.join(LAUNCHER);
+    if hold == HarnessHold::Lifted {
+        return Some(match unpin_launcher(&launcher) {
+            Ok(Launcher::Written) => format!(
+                "tasks: Harness's launcher unpinned (the lamp-voice feed's canary, #6300): {}",
+                launcher.display()
+            ),
+            Ok(Launcher::Kept) => format!(
+                "tasks: Harness's launcher not pinned (the lamp-voice feed's canary, #6300): {}",
+                launcher.display()
+            ),
+            Ok(Launcher::Missing) => format!(
+                "tasks: no Harness launcher at {}: left alone",
+                launcher.display()
+            ),
+            Err(why) => format!("tasks: Harness's launcher not unpinned: {why}"),
+        });
+    }
     Some(match pin_launcher(&launcher, &home.join(FILE)) {
         Ok(Launcher::Written) => format!(
             "tasks: Harness's launcher pinned ({DISABLE}=true and {ENV_FILE} exported before its exec line): {}",
@@ -294,6 +364,28 @@ pub fn pin_at_start(switch: Option<&str>, home: Option<&Path>) -> Option<String>
         ),
         Err(why) => format!("tasks: Harness's launcher not pinned: {why}"),
     })
+}
+
+/// lamp-update's `ExecStart` as systemd has it loaded (`systemctl show
+/// lamp-update.service --property=ExecStart --value`), which names the feed
+/// it follows (`lamp_msgs::harness_hold::feed`). `None` when systemctl
+/// fails or says nothing: the hold is then kept.
+pub fn lamp_update_exec_start() -> Option<String> {
+    let shown = std::process::Command::new("systemctl")
+        .args([
+            "show",
+            "lamp-update.service",
+            "--property=ExecStart",
+            "--value",
+        ])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()
+        .filter(|shown| shown.status.success())?;
+    String::from_utf8(shown.stdout)
+        .ok()
+        .filter(|text| !text.trim().is_empty())
 }
 
 /// The port Harness listens on, from `environment`'s `PORT`.
@@ -438,6 +530,14 @@ pub fn watch_health(port: u16) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lamp_msgs::harness_hold::harness_hold;
+
+    /// lamp-update's `ExecStart` on a product lamp, the stable feed.
+    const STABLE_LINE: &str = "/opt/lampOS/update/current/lamp-update serve --channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/ --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on";
+    /// The same on a dev or beta lamp, the lamp-voice feed: the canary.
+    const CANARY_LINE: &str = "/opt/lampOS/update/current/lamp-update serve --channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/ --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on";
+    /// A feed of neither: a local channel folder.
+    const OTHER_LINE: &str = "/opt/lampOS/update/current/lamp-update serve --channel-url file:///var/tmp/lampos-channel/ --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on";
     use std::{net::TcpListener, os::unix::fs::PermissionsExt};
 
     #[test]
@@ -508,7 +608,7 @@ mod tests {
     fn with_the_switch_on_the_launcher_is_pinned_once_and_stays_executable() {
         let home = tempfile::tempdir().unwrap();
         let launcher = launcher_in(home.path(), UNPINNED, 0o755);
-        let line = pin_at_start(Some("on"), Some(home.path())).unwrap();
+        let line = pin_at_start(HarnessHold::Held, Some(home.path())).unwrap();
         assert!(
             line.starts_with("tasks: Harness's launcher pinned ("),
             "{line}"
@@ -521,7 +621,7 @@ mod tests {
         );
         assert!(!launcher.with_file_name(LAUNCHER_NEXT).exists());
         // Again: kept byte for byte, no second preamble.
-        let line = pin_at_start(Some("on"), Some(home.path())).unwrap();
+        let line = pin_at_start(HarnessHold::Held, Some(home.path())).unwrap();
         assert!(
             line.starts_with("tasks: Harness's launcher already pinned"),
             "{line}"
@@ -538,7 +638,12 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let launcher = launcher_in(home.path(), UNPINNED, 0o750);
         for switch in [None, Some("off"), Some("ON"), Some("")] {
-            assert_eq!(pin_at_start(switch, Some(home.path())), None);
+            for exec in [None, Some(STABLE_LINE), Some(CANARY_LINE)] {
+                assert_eq!(
+                    pin_at_start(harness_hold(switch, exec), Some(home.path())),
+                    None
+                );
+            }
         }
         assert_eq!(fs::read_to_string(&launcher).unwrap(), UNPINNED);
         assert_eq!(
@@ -550,14 +655,14 @@ mod tests {
     #[test]
     fn a_missing_launcher_is_not_made() {
         let home = tempfile::tempdir().unwrap();
-        let line = pin_at_start(Some("on"), Some(home.path())).unwrap();
+        let line = pin_at_start(HarnessHold::Held, Some(home.path())).unwrap();
         assert!(line.starts_with("tasks: no Harness launcher at "), "{line}");
         assert!(line.ends_with(": left alone"), "{line}");
         assert!(!home.path().join(LAUNCHER).exists());
         assert!(!home.path().join(".local").exists());
         // One with no exec line is left as it is too.
         let launcher = launcher_in(home.path(), "#!/bin/sh\necho hi\n", 0o755);
-        let line = pin_at_start(Some("on"), Some(home.path())).unwrap();
+        let line = pin_at_start(HarnessHold::Held, Some(home.path())).unwrap();
         assert!(line.ends_with("no exec line"), "{line}");
         assert_eq!(
             fs::read_to_string(&launcher).unwrap(),
@@ -728,5 +833,88 @@ mod tests {
         assert!(!env_file_changed(&mut environment, true, hermes).unwrap().1);
         fs::write(&path, "SHELL=/usr/sbin/nologin\n").unwrap();
         assert!(env_file_changed(&mut environment, true, hermes).unwrap().1);
+    }
+
+    /// #6300: lamp-tasks' three writers of the hold (the file, the
+    /// variables given to Harness, the launcher) for one lamp.
+    fn writers(hold: HarnessHold, launcher: &str) -> (String, BTreeMap<String, OsString>, String) {
+        let home = tempfile::tempdir().unwrap();
+        let at = launcher_in(home.path(), launcher, 0o755);
+        let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
+        env_file_for(hold, &mut environment, None).unwrap().unwrap();
+        pin_at_start(hold, Some(home.path())).unwrap();
+        environment.remove("HOME");
+        let env_at = home.path().join(FILE).to_string_lossy().into_owned();
+        (
+            fs::read_to_string(home.path().join(FILE)).unwrap(),
+            environment,
+            fs::read_to_string(at).unwrap().replace(&env_at, ENV_AT),
+        )
+    }
+
+    /// Stable, and any feed but lamp-voice or one not read, keeps every
+    /// writer of the hold exactly as before #6300 (#6283's line is
+    /// untouched): the file says it, Harness is given it, the launcher is
+    /// pinned, from an unpinned launcher or a pinned one.
+    #[test]
+    fn stable_and_an_unknown_feed_keep_the_hold_in_every_writer() {
+        for exec in [Some(STABLE_LINE), Some(OTHER_LINE), None] {
+            let hold = harness_hold(Some("on"), exec);
+            assert_eq!(hold, HarnessHold::Held, "{exec:?}");
+            for launcher in [UNPINNED, PINNED] {
+                let (file, environment, launcher) = writers(hold, launcher);
+                assert_eq!(file, TEXT, "{exec:?}");
+                assert_eq!(environment[DISABLE], OsString::from("true"), "{exec:?}");
+                assert!(environment.contains_key(ENV_FILE), "{exec:?}");
+                assert_eq!(launcher, PINNED, "{exec:?}");
+            }
+        }
+    }
+
+    /// A dev or beta lamp (the lamp-voice feed) lifts the hold in every
+    /// writer: the file without it (said changed where it held, so a
+    /// running daemon is started again), no `ADAPTER_UPDATE_DISABLE` given,
+    /// and the launcher's preamble taken out, its `exec` line kept.
+    #[test]
+    fn the_lamp_voice_feed_lifts_the_hold_in_every_writer() {
+        let hold = harness_hold(Some("on"), Some(CANARY_LINE));
+        assert_eq!(hold, HarnessHold::Lifted);
+        for launcher in [UNPINNED, PINNED] {
+            let (file, environment, launcher) = writers(hold, launcher);
+            assert_eq!(file, "");
+            assert!(!environment.contains_key(DISABLE));
+            assert_eq!(launcher, UNPINNED);
+        }
+        // A lamp that held before: the file is said changed.
+        let home = tempfile::tempdir().unwrap();
+        let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
+        hold_file_then(&mut environment, home.path());
+        let (_, changed) = env_file_for(hold, &mut environment, None).unwrap().unwrap();
+        assert!(changed);
+        assert!(!environment.contains_key(DISABLE));
+        // An updated exec line is kept as Harness wrote it.
+        let updated = PINNED.replace("0.5.39", "0.6.13");
+        assert_eq!(
+            unpinned_launcher(&updated).unwrap(),
+            UNPINNED.replace("0.5.39", "0.6.13")
+        );
+        assert_eq!(unpinned_launcher("#!/bin/sh\necho hi\n"), None);
+    }
+
+    fn hold_file_then(environment: &mut BTreeMap<String, OsString>, home: &Path) {
+        hold(environment).unwrap();
+        assert_eq!(fs::read_to_string(home.join(FILE)).unwrap(), TEXT);
+        environment.remove(DISABLE);
+    }
+
+    /// With the switch off, no writer runs, whichever the feed.
+    #[test]
+    fn with_the_switch_off_no_writer_runs_on_any_feed() {
+        for exec in [Some(STABLE_LINE), Some(CANARY_LINE), None] {
+            let hold = harness_hold(None, exec);
+            let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from("/nowhere"))]);
+            assert!(env_file_for(hold, &mut environment, None).is_none());
+            assert_eq!(pin_at_start(hold, Some(Path::new("/nowhere"))), None);
+        }
     }
 }
