@@ -92,7 +92,7 @@ pub struct Listener {
 }
 
 /// The mean square of a block, as a share of full scale squared.
-fn energy(samples: &[i16]) -> f64 {
+pub(crate) fn energy(samples: &[i16]) -> f64 {
     if samples.is_empty() {
         return 0.0;
     }
@@ -106,7 +106,7 @@ fn energy(samples: &[i16]) -> f64 {
     sum / samples.len() as f64
 }
 
-fn decibels(energy: f64) -> f32 {
+pub(crate) fn decibels(energy: f64) -> f32 {
     if energy <= 0.0 {
         return EARS_SILENCE_DB;
     }

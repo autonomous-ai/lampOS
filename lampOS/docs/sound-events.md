@@ -332,7 +332,13 @@ inference run on their own thread (`ears-classes`), never on capture or the
 Bus pump. Scores are independent sigmoids of the logits for Speech (0),
 Music (132) and Laughter (13), and Walk, footsteps (48) and a door for
 guard mode (#2562; read by `lamp-skills` only with `LAMP_GUARD_SOUNDS=on`).
-`door` is the highest of the door group: Door (348), Sliding door (351),
+A patch none of whose 20 ms blocks rose 6 dB over the room's quiet (the
+level floor of `ears/level`, once it is known) is not run through the
+model: it is published as scored with every score 0, on time, as YAMNet
+scores silence. A silent room then costs the classifier nothing
+(lamp-52e6, #5770: 14.8 % of a core with classes on at rest, 6.5 % off);
+music sway's 5 s gap and its 5 minutes under 0.3 to rearm read those zeros
+as before. `door` is the highest of the door group: Door (348), Sliding door (351),
 Slam (352) and Knock (353), since a knock on a door is AudioSet's Knock, not
 Door. Tap (354) is left out: desk taps and typing raise it all day. The
 indices are `yamnet_class_map.csv`'s, the same in qai-hub-models v0.59.0's

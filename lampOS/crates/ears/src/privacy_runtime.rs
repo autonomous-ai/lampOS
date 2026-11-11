@@ -654,6 +654,9 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
                 .pcm
                 .discard_invalid(&shared.publication, lamp_ipc::monotonic_us());
             if lamp_ipc::monotonic_us() >= retry_at {
+                // The quiet before this block: the classifier skips a patch
+                // that never rose over it (classes::NEAR_FLOOR_DB).
+                let floor_db = classes.as_ref().and_then(|_| owner.floor_db());
                 match owner.tick_export_while(
                     lamp_ipc::monotonic_us,
                     || Device::open(&arguments.device),
@@ -678,6 +681,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
                                 &shared.publication,
                                 stamp,
                                 shared.speaking.load(Ordering::Acquire),
+                                floor_db,
                                 lamp_ipc::monotonic_us(),
                             );
                         }
