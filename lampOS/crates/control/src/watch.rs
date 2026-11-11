@@ -697,6 +697,15 @@ impl Watch {
         self.private
     }
 
+    /// Whether the person's volume mute is on (`speaker/volume`): false until
+    /// lamp-actions says it, so a speaker stream asks the lamp, not a guess.
+    pub fn muted(&self) -> bool {
+        self.volume
+            .as_ref()
+            .and_then(|volume| volume["muted"].as_bool())
+            .unwrap_or(false)
+    }
+
     /// How many faces are in view now, by the newest `humans/faces/tracked`:
     /// counts, never who. None while the room is unseen: no faces message
     /// for [`FACES_STALE_US`] ([`Self::lapse`]), or none yet.

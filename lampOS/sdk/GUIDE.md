@@ -110,6 +110,7 @@ way to add one to a paired computer. For each grant:
 | `body`, `light`, `speak`, `look`, `hear`, `sound`, `skills`, `air`, `device` | the owner ticks it in the app (step 3) | nowhere |
 | `camera` | only a pairing code made on the lamp itself: its keeper, as root, runs `lamp-control code --grants body,camera` (the admin socket, `/run/lampos-control/admin.sock`, 0600; developer access on); then `lamp pair` as in step 5 | the app cannot make it; an owner without ssh cannot; the stream is local network only, with the ring's red dot, never while the lamp is private |
 | `microphone` | the same, with `microphone` in the list | the grant alone is not enough: the stream is off unless `lamp-control` runs `--microphone on` and the ears share their sound (`LAMP_BUS_AUDIO=on`), which the customer build does not: a stream ends "the microphone stream is off on this lamp (LAMP_CONTROL_MICROPHONE)" |
+| `speaker` | the same, with `speaker` in the list | the grant alone is not enough: the stream is off unless `lamp-control` runs `--speaker on` (`LAMP_CONTROL_SPEAKER`), which no unit sets; the pairing screen says it "can play any sound through the lamp's speaker, not only its own voice"; the app does not offer it |
 | `notes` | the same (a code made on the lamp) | not on the app's screen either, per App Only's list of nine |
 
 Asking for one without it is refused `no_grant`: "not granted: camera (the app does not

@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; speaker: sound played through the lamp's speaker, any sound and not only the lamp's own voice (speaker.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
       "enum": [
         "body",
         "light",
@@ -40,6 +40,7 @@
         "device",
         "camera",
         "microphone",
+        "speaker",
         "notes",
         "speech"
       ]

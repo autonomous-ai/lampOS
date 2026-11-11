@@ -202,7 +202,7 @@ pub struct Session {
 
 /// What a computer beyond the lamp's own network is told when it asks for
 /// the camera or the microphone, whatever it was granted.
-pub const LOCAL_ONLY: &str = "local network only: the camera and the microphone are never given beyond the lamp's own network";
+pub const LOCAL_ONLY: &str = "local network only: the camera, the microphone and the speaker are never given beyond the lamp's own network";
 
 impl Session {
     /// This connection comes from beyond the lamp's own network.
@@ -780,7 +780,7 @@ impl Door {
         }
         self.new_rev(client);
         self.tell_helper_grants(client, &grants);
-        let media: Vec<Media> = [Media::Camera, Media::Microphone]
+        let media: Vec<Media> = [Media::Camera, Media::Microphone, Media::Speaker]
             .into_iter()
             .filter(|media| removed.contains(&media.grant()))
             .collect();
@@ -1015,7 +1015,7 @@ impl Door {
             && op
                 .needs()
                 .iter()
-                .any(|grant| matches!(grant, Grant::Camera | Grant::Microphone))
+                .any(|grant| matches!(grant, Grant::Camera | Grant::Microphone | Grant::Speaker))
         {
             return refuse(ErrorCode::Refused, LOCAL_ONLY.to_owned());
         }
@@ -1492,7 +1492,7 @@ impl Door {
         }
         // Re-paired without the camera or the microphone: a stream it had
         // going ends now, not when it next asks (Thirteen's P2 on #4521).
-        for media in [Media::Camera, Media::Microphone] {
+        for media in [Media::Camera, Media::Microphone, Media::Speaker] {
             if before
                 .as_ref()
                 .is_some_and(|before| before.grants.contains(&media.grant()))
@@ -2157,6 +2157,29 @@ mod tests {
         let kept = &door.clients().clients[0];
         assert_eq!(kept.key, "");
         assert_eq!(kept.grants, [Grant::Light, Grant::Notes].into());
+    }
+
+    /// The app taking `speaker` away lists the speaker's stream to end, as it does
+    /// the camera's and the microphone's; a change that leaves it granted does not.
+    #[test]
+    fn the_apps_grant_change_that_drops_the_speaker_lists_its_stream_to_end() {
+        let computer = Computer::new(44);
+        let (mut door, _, _) = paired(&computer, &[Grant::Light, Grant::Speaker]);
+        let id = pairing::client_id(&computer.key());
+        let kept = door
+            .set_grants(&id, [Grant::Light, Grant::Speaker, Grant::Body].into())
+            .expect("a paired computer");
+        assert_eq!(kept.added, [Grant::Body]);
+        assert!(
+            kept.media.is_empty(),
+            "speaker still granted: {:?}",
+            kept.media
+        );
+        let dropped = door
+            .set_grants(&id, [Grant::Light, Grant::Body].into())
+            .expect("a paired computer");
+        assert_eq!(dropped.removed, [Grant::Speaker]);
+        assert_eq!(dropped.media, [Media::Speaker]);
     }
 
     /// As the camera's: a computer re-paired without the microphone has its
@@ -3119,6 +3142,33 @@ mod tests {
             r#"{"id":5,"op":"microphone.stream","on":true}"#,
             &mut fake,
             5 * S,
+            1,
+        );
+        assert_eq!(code_of(&far), Some("refused"));
+        assert_eq!(reply(&far)["error"]["why"], LOCAL_ONLY);
+    }
+
+    /// The Reviewer-lead's P3 on S2: `speaker.stream` is refused without the
+    /// `speaker` grant (the camera's and microphone's grants do not stand in
+    /// for it) and never reaches the part from a computer beyond the lamp's own
+    /// network, whatever it was granted.
+    #[test]
+    fn the_speaker_stream_needs_its_grant_and_is_never_given_beyond_the_lamps_network() {
+        let computer = Computer::new(1);
+        let on = r#"{"id":3,"op":"speaker.stream","on":true}"#;
+        let (mut door, mut session, mut fake) =
+            paired(&computer, &[Grant::Speak, Grant::Camera, Grant::Microphone]);
+        let refused = door.handle(&mut session, on, &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&refused), Some("no_grant"), "{refused:?}");
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Speaker]);
+        let near = door.handle(&mut session, on, &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&near), None, "{near:?}");
+        session.set_remote();
+        let far = door.handle(
+            &mut session,
+            r#"{"id":4,"op":"speaker.stream","on":true,"sample_rate":24000}"#,
+            &mut fake,
+            3 * S,
             1,
         );
         assert_eq!(code_of(&far), Some("refused"));
