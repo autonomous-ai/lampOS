@@ -586,7 +586,8 @@ std::thread_local! {
 /// a caller that gave it no turn to say it in (lamp-9adf, 11 Nov 02:16
 /// and 02:19: a wordless cut ended the turn waiting on `make_skill`, the
 /// skill was made and put on, and its line was never said): made and on
-/// ([`made_skill::on_line`]), made and not on ([`made_skill::not_on_line`]),
+/// ([`made_skill::on_line`]; one that sends or writes,
+/// [`made_skill::cut_write_line`]), made and not on ([`made_skill::not_on_line`]),
 /// or not made ([`made_skill::not_made_line`]). None when no make finished
 /// here since the last take (not asked aloud, the brief refused).
 pub fn take_said_line() -> Option<String> {
@@ -594,9 +595,13 @@ pub fn take_said_line() -> Option<String> {
 }
 
 /// The one short line of a make that kept `made`, `on` or not; or not
-/// made and why: the line [`told`] gives the model, as written.
+/// made and why: the line [`told`] gives the model, as written. One that
+/// sends or writes, made and on, is [`made_skill::cut_write_line`]: this
+/// line is said only for a turn cut, which never gave the model its say-back
+/// or its `approve_id`, so its yes can't be taken (App Only's P2 on #6142).
 fn said_line(made: &Result<Made, Refused>, on: &Result<(), String>) -> String {
     match (made, on) {
+        (Ok(made), Ok(())) if !made.uses.writes.is_empty() => made_skill::cut_write_line(made),
         (Ok(made), Ok(())) => made_skill::on_line(made),
         (Ok(_), Err(why)) => made_skill::not_on_line(why),
         (Err(Refused(why, _)), _) => made_skill::not_made_line(why),
@@ -1449,6 +1454,47 @@ light = { dim = 1 }
             (approved.skill.as_str(), &approved.writes, &approved.sha256),
             ("leaving-mail", &writes, &sha256)
         );
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// App Only's P2 on #6142: a write skill made in a turn that was cut is
+    /// said through the say service with no say-back and no `approve_id`
+    /// given the model, so its line names the wait and that nothing is
+    /// sent yet, never "it's on" alone; the model's own answer is unchanged.
+    #[test]
+    fn a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on() {
+        made_skill::set_writes_here(Some(true));
+        let (root, keeping) = keeping("write-cut");
+        let (url, served) = service(vec![(200, write_answer(WRITE_TOML))]);
+        let asked = manage_helper(&keeping.manage);
+        let told = make_with(
+            7,
+            Some(WRITE_REQUEST),
+            WRITE_REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1, "{told}");
+        assert_eq!(told["writes_wait_for_yes"], true, "{told}");
+        asked.join().unwrap();
+        let said = take_said_line().expect("a line for a cut turn");
+        assert_eq!(
+            said,
+            format!(
+                "I made leaving mail.{} {}",
+                made_skill::WAITS_FOR_YES,
+                made_skill::CUT_WRITE_UNSAID
+            )
+        );
+        assert!(!said.contains("it's on"), "{said}");
+        assert!(!said.contains("yes"), "no word to repeat: {said}");
+        // The turn that waits still gets the say-back whole, and its wait.
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("mails mai@example.com"), "{next}");
+        assert!(next.contains("approve_id"), "{next}");
         made_skill::set_writes_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }

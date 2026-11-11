@@ -2826,7 +2826,14 @@ gone ([switches.md](switches.md)). What happens:
     note in the conversation's language, the skill name `voice-make`, at a
     good moment within the hour, asked once more after a drop). A turn that
     still waits gets the answer as before, and nothing goes to the say
-    service. With the say service off, the line is not said. While the
+    service. With the say service off, the line is not said. A skill that
+    sends or writes, made and on, is never said "it's on" there (App
+    Only's P2 on #6142): that turn never gave the model its say-back or its
+    `approve_id`, so no later yes can be taken, and its line is
+    `made_skill::cut_write_line`, "I made leaving mail. It waits for you to
+    agree before it sends anything. I couldn't tell you just now what it
+    sends, so it sends nothing yet." (no word to repeat, no "yes"; test
+    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). While the
     make is under way, or its line is still to be said
     (`make_skill_local::Pending`), and for at most 2 minutes after its call
     (`make_skill_local::MAKE_WITHIN`, the longest a make goes on; the line's
