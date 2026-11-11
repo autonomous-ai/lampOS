@@ -55,10 +55,10 @@ check "apply never deletes a stray file" '[[ $(cat "$D/startle/notes.md") == min
 check "apply never touches a skill the person installed" '[[ $(cat "$D/my-own-skill/skill.toml") == mine ]]'
 
 # An off skill (the off line) turned on on the lamp stays on.
-tail -n +3 "$D/music-sway/skill.toml" >"$T/on" && cp "$T/on" "$D/music-sway/skill.toml"
+tail -n +3 "$D/light-out/skill.toml" >"$T/on" && cp "$T/on" "$D/light-out/skill.toml"
 out=$(sync --apply)
-check "an off skill turned on is said kept on" '[[ $out == *"kept on: music-sway"* ]]'
-check "an off skill turned on is written without the off line" 'cmp -s "$D/music-sway/skill.toml" "$REPO/lampOS/skills/music-sway/skill.toml"'
+check "an off skill turned on is said kept on" '[[ $out == *"kept on: light-out"* ]]'
+check "an off skill turned on is written without the off line" 'cmp -s "$D/light-out/skill.toml" "$REPO/lampOS/skills/light-out/skill.toml"'
 
 # Bedtime and Morning, off by its own enabled = false (Jarvis's P2): kept on when `on` names it,
 # or when the lamp's file turns it on; off again when the lamp turned it off again.

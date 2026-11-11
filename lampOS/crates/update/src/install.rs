@@ -305,10 +305,10 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Twenty-six keep their
-/// folders' own default: twenty-five enabled (Bedtime and Morning since #5753,
+/// `tests/install.rs` holds the two lists equal). Twenty-seven keep their
+/// folders' own default: twenty-six enabled (Bedtime and Morning since #5753,
 /// with `LAMP_OUTPUT_CAPS=on` in the product units; Light show since #5745,
-/// Light scenes and Point the light since #5744), and Comfort break
+/// Light scenes and Point the light since #5744; Music sway since #5770), and Comfort break
 /// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
 /// the product's skills units set (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
@@ -340,6 +340,10 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // Watch you leave (#2834): a core skill on in the product, reading the
     // eyes' activity (`LAMP_ACTIVITY=place` in lamp-eyes).
     "watch-you-leave",
+    // Music sway (#2834): on in the product, reading the ears' sound
+    // classes (`LAMP_EARS_CLASSES=on` in lamp-ears since #5748, with the
+    // pinned YAMNet install places, #6232).
+    "music-sway",
     // The wellbeing nudges (#1685), each saying one short line since the
     // owner's 25 Oct "talk to the user": water, the eyes, standing up and
     // winding down, with Stretch break's budget of one an hour between them.
@@ -379,7 +383,6 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "light-scenes",
     "point-light",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
-    "music-sway",
     "light-out",
     "smoky-air",
     "dusty-air",
@@ -392,12 +395,6 @@ pub const PRODUCT_SKILLS: &[&str] = &[
 /// default and its cases. A skill leaves this list once its lamp check has
 /// passed; until then a person or a trial turns it on on the lamp itself.
 pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
-    // #2834's music sway: its lamp row with the product's ears is owed.
-    (
-        "music-sway",
-        "it reads `ears/classes`, which the product's ears say since #5748 with the pinned \
-         YAMNet that install places (#6232): off until its lamp row after a full update is seen",
-    ),
     (
         "light-out",
         "not yet seen on a lamp (#1677): the eyes say `room/presence` in the product since \
@@ -612,7 +609,7 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("head-pat-wiggle", "SKILL.md"),
     skill_file!("head-pat-wiggle", "README.md"),
     skill_file!("head-pat-wiggle", "moves/pat-wiggle.json"),
-    skill_file_off!("music-sway"),
+    skill_file!("music-sway", "skill.toml"),
     skill_file!("music-sway", "SKILL.md"),
     skill_file!("music-sway", "moves/sway.json"),
     skill_file!("light-scenes", "skill.toml"),
