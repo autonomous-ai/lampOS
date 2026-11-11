@@ -698,6 +698,17 @@ sau:
      (`skill_write_yes::waiting_note`). Lời đồng ý sau đó được nhận đúng
      như của lần tạo bằng giọng nói, bên dưới. Chỉ được nói trên route
      Live, hoặc không bao giờ được nói, thì không có gì chờ và nó vẫn tắt.
+     Nó theo `LAMP_PRIVATE_ROOM` như lần ghi của một lần chạy kỹ năng: khi
+     tắt, nó chỉ được đọc lại cho chủ nhân được thấy một mình
+     (`services::owner_sees_alone`: khuôn mặt quen của mắt là một chủ nhân
+     và là khuôn mặt duy nhất trong tầm nhìn); nếu không, lượt đó chỉ nói
+     rằng nó vẫn tắt (`made_skill::not_on_line` của `CODE_BY_VOICE`), và
+     không có gì chờ. Khi tắt, lời đồng ý chỉ được nhận từ chủ nhân được
+     thấy nói ra hoặc bằng giọng của chủ nhân ở mức
+     `same_voice::SERVICES_SAME_FROM` (`services::owners_yes`); của bất kỳ
+     ai khác là `services::OTHER_VOICE`, cơ chế chờ bị bỏ và kỹ năng vẫn
+     tắt (`make_skill_local::app_code_yes_refused`). Khi bật, mọi dòng
+     nghe được là của chủ nhân, như trước.
      Bằng giọng nói, lần tạo chờ lời đồng ý qua đúng cơ chế chờ của lần ghi
      (`crate::skill_write_yes`, `Asks::code`), với mọi chốt chặn của nó:
      phải nói đủ trước (câu về mã là phần phải được nghe), chỉ một dòng
