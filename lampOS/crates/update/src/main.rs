@@ -67,7 +67,8 @@ harness-install run by lamp-update-harness.service, which a `serve` round starts
         Hermes after it (on by default on a product lamp, LAMP_HERMES_ON_LAMP=off
         turns it off), pinned, as lampos, only in its quiet window and watched by
         serve while it runs (#5978); with LAMP_HERMES_SKILLS (on by default on a
-        product lamp), its namespace shows lamp-skills' socket (#6128). Then OpenClaw
+        product lamp), its namespace shows lamp-skills' socket (#6128); with
+        LAMP_SKILL_TASKS=on, lamp-control's control socket alone (#6306). Then OpenClaw
         after Hermes (on by default on a product lamp, LAMP_OPENCLAW_ON_LAMP=off turns
         it off; off with Harness off): a pinned Node 24 and the pinned openclaw package,
         as lampos, in the same namespace and the same window, taking turns with Hermes,
@@ -917,6 +918,15 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             product,
             hermes::SKILLS_PRODUCT_DEFAULT,
         );
+        // A skill's tasks (#6306): LAMP_SKILL_TASKS, the switch lamp-tasks reads,
+        // off unless `on` exactly on any lamp (no product unit sets it); on, Hermes is
+        // shown lamp-control's control socket alone, read-only.
+        let tasks = hermes::wanted(
+            std::env::var(hermes::TASKS_SWITCH).ok().as_deref(),
+            product,
+            false,
+        );
+        let shown = hermes::Shown { skills, tasks };
         if acts && wanted && harness.is_none() {
             say("Hermes on the lamp: off, as Harness before the sign-in is off");
         }
@@ -926,13 +936,13 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 &config.root,
                 &records,
                 on,
-                skills,
+                shown,
                 lamp_update::records::unix_ms(),
             );
         }
         // Off, a `serve` that acts still takes out what an earlier install
         // left for lampos to run (its wrapper and namespace script).
-        acts.then_some((on, skills))
+        acts.then_some((on, shown))
     };
     // OpenClaw on the lamp (#6226): as Hermes, beside it, on Harness's one-shot.
     let openclaw = {
@@ -1064,7 +1074,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 },
                 &mut say,
             );
-            if let (Some(_), Some((true, skills))) = (&hermes_watch, hermes) {
+            if let (Some(_), Some((true, shown))) = (&hermes_watch, hermes) {
                 use lamp_update::{hermes_install, hermes_schedule};
                 let now_unix_ms = lamp_update::records::unix_ms();
                 let window = hermes_schedule::window(&hermes_schedule::Moment {
@@ -1084,7 +1094,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 hermes_install::after_round(
                     &config.root,
                     &records,
-                    skills,
+                    shown,
                     &mut systemd,
                     now_unix_ms,
                     window,

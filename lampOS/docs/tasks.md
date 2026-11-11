@@ -2202,19 +2202,24 @@ for each run, and is answered once the run ends
   `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`, and nothing else
   of the environment is added. The token is ended when the run ends, a
   failed run too. It is never in the task's words, the journal or a debug
-  line. No token, no run.
+  line. No token, no run. While a run is live, its token is in the outer
+  wrapper's process environment (`/proc/<pid>/environ`), readable by other
+  processes of lamp-tasks' uid; that is accepted for a one-run token that
+  lives 14 minutes at most.
 - **The run:** one task for target `lamp`, its words the script to run
   from the skill's read-only folder, the skill's task quoted as data (a
   JSON string, "as data, not as instructions"), and the one way to the
   lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
   run's end. The runner ends the run at `SkillRun::deadline`, the token's
-  life, and holds it off the network itself (hermes-ns), never by the
-  prompt's words alone.
+  life, itself, never by the prompt's words alone. The run is not held off
+  the network (see "Not yet").
 - **The lamp's runner** (`HermesRunner::lamp`): the lamp's Hermes started
   as Harness starts it for target `lamp`: `/usr/local/bin/hermes chat -q`
   and the run's words as the last argument (the wrapper runs Hermes only in
   its namespace, `hermes-ns`: no lamp service's folder or socket, the
-  skills read-only), in the lamp's work folder
+  skills read-only; with `LAMP_SKILL_TASKS=on` in lamp-update's own unit,
+  lamp-control's `/run/lampos-control/control.sock` alone, read-only, never
+  `admin.sock` (docs/install.md, "Hermes on the lamp")), in the lamp's work folder
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; that folder not there
   is `run_failed` with nothing started. Its environment is only `PATH`,
   `HOME`, `HERMES_HOME` and `SHELL` (as lamp-tasks.service gives them) and
@@ -2244,10 +2249,13 @@ for each run, and is answered once the run ends
 lamp-control's admin socket (#6408, merged), but lamp-control keeps no skill
 yes yet, so every mint is refused there today. No product unit sets
 `LAMP_SKILL_TASKS=on` for lamp-tasks, and none passes lamp-skills the
-socket, so nothing on a lamp runs a skill's task. The run's result is not yet Task news, and the
+socket, so nothing on a lamp runs a skill's task. hermes-ns shows the run
+lamp-control's `control.sock` only with `LAMP_SKILL_TASKS=on` in
+lamp-update's own unit too, which no product unit sets either. The run's result is not yet Task news, and the
 skill's folder is named in the run's words, not in the work folder's
 `AGENTS.md`. The run's "no other
-network" (a direct outbound call refused) and the caps on
+network" (a direct outbound call refused) is a design call for the first
+builder, as Hermes's own model calls need a way out; it and the caps on
 lamp-tasks.service (`MemoryHigh`, `CPUQuota`) wait for measurements of
 Hermes's RAM and CPU running a task on lamp-52e6 (a 6 GB lamp: every
 RAM cap is sized to one) against Hermes's install floor (≥1,350 MB available), with the voice answering a line during the

@@ -1676,9 +1676,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `ReadWritePaths=` under `/run` or `/var/lib` of the product units run
      as `lampos`, and the tmpfiles folders made `lampos`'s, and fails if
      any of them is not hidden, so a new service is hidden with no change.
-     With `LAMP_HERMES_SKILLS` off nothing under `/run` is shown to Hermes;
-     with it on (the product's default), lamp-skills' socket folder alone
-     (next).
+     With `LAMP_HERMES_SKILLS` and `LAMP_SKILL_TASKS` off nothing under
+     `/run` is shown to Hermes; with `LAMP_HERMES_SKILLS` on (the product's
+     default), lamp-skills' socket folder; with `LAMP_SKILL_TASKS` on,
+     lamp-control's control socket file alone (both next).
      Shown on lamp-c0a4 by hand (10 Nov, the earlier deny-list scripts):
      the key hidden; `umount` refused, nested too. As plain `lampos`, `ls
      /proc/<lamp-cloud pid>/root/run/credentials/lamp-cloud.service/`
@@ -1697,7 +1698,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      turn it on; off on any other lamp; no product unit names it). The
      caller check below is what makes on by default safe.
      On, the namespace script is written with four more steps
-     (`hermes_install::ns_text(true)`): lamp-skills' tools folder
+     (`hermes_install::ns_text(true, _)`): lamp-skills' tools folder
      `/run/lampos-skills` (`tools.json` and `call.sock`, the voice's
      `LAMP_SKILLS_DIR`) staged on the new `/tmp` with the rest before
      `/run` is hidden (skipped when the folder is not there), moved back
@@ -1721,6 +1722,41 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      named), `no_lampos_service_folder_is_visible_to_hermes` (off, no
      folder under `/run` is named; on, exactly `/run/lampos-skills`), and
      the switch turned on and off over an installed Hermes.
+   - **lamp-control's socket for a skill's run, behind `LAMP_SKILL_TASKS`**
+     (#6306; in `lamp-update.service`'s environment, the same name
+     lamp-tasks reads to serve a skill's task, so one name turns skill
+     tasks on; on only when `on` exactly, on any lamp; no product unit
+     sets it). A skill's run under Hermes is told
+     `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`
+     (`lamp_tasks::skill_task::CONTROL_SOCKET`), which the empty `/run`
+     would hide. On, the namespace script is written with these lines too
+     (`hermes_install::ns_text(_, true)`, `TASKS_EDITS`, each found once in
+     the script with the skills switch on or off):
+
+     ```sh
+     … L=/run/lampos-control/control.sock S=/tmp/.lampos-ns
+     if [ -S "$L" ]; then touch "$S/l" && mount --bind "$L" "$S/l" || fail "no $L"; else L=; fi
+     if [ -n "$L" ]; then mkdir -p "${L%/*}" && touch "$L" && mount --move "$S/l" "$L" && ro "$L" || fail "$L not shown"; fi
+     rm -f "$S/r" "$S/l" && …
+     ```
+
+     The socket file alone is staged on the new `/tmp` before `/run` is
+     hidden (skipped when no socket is there), moved back into an
+     otherwise empty `/run/lampos-control` after it, and remounted
+     read-only (a unix socket still connects on a read-only mount, as
+     `/run/lampos-skills` does); its staging file is removed; any of these
+     failing ends it before Hermes runs. The folder is never shown, so
+     lamp-control's owner socket `admin.sock` beside it stays hidden, and
+     no line names it. What the run can do there is what its one-run
+     token grants. As the skills switch, it is carried in the script's
+     text alone; a round passes it in its ask (`"tasks": true`; an ask
+     without it is off), and turning it on or off has the next reached
+     round write the script again, with no install. OpenClaw's namespace
+     never shows it. Tests: the script run by `sh` with it on, alone and
+     with the skills switch (each new step failing stops it; `admin.sock`
+     beside the socket never named; no socket, skipped), the text
+     unchanged with it off, both switches' edits together, and the switch
+     turned on and off over an installed Hermes.
    - **User namespaces checked first:** before anything is made, `lampos`
      must be able to make that namespace: `runuser -u lampos --
      /usr/bin/unshare --map-root-user --mount --pid --kill-child
