@@ -280,6 +280,35 @@ releases.
 The ARM64 workflow runs them; Linux Clippy also checks the standalone tool.
 These tests do not establish a real stable promotion or lamp acceptance.
 
+### The stable build on the CDN
+
+After a promotion, the `mirror-cdn` job (`.github/scripts/lampos-mirror.py`)
+puts the same build on `https://cdn.autonomous.ai/lampos/stable/`. It is off
+until repository variable `LAMPOS_CDN_MIRROR` is exactly `on`, and a failure
+in it never fails the promotion: the GitHub stable feed above stays the one
+lamps read until a lamp is pointed at the CDN one.
+
+The job reads the stable envelope, checks it with the trusted public key
+(`lamp-update check`, as `publish` does), then downloads every file, unit
+and model the signed manifest names from the build's own releases and checks
+each size and SHA-256. It copies them to `lampos/stable/<sequence>/files/`
+and `lampos/stable/<sequence>/models/<release>/<name>`. A folder of one
+sequence is never overwritten: an object already there with the same bytes is
+left alone, one with other bytes fails the job. It then rewrites `files_url`
+and each model's `url` to those copies, signs the manifest again with the
+same key (same sequence, commit and channel; nothing else changes) and puts it
+at `lampos/stable/lampos-manifest.json` last, with `Cache-Control: no-cache`.
+Before it replaces the head it refuses a later sequence already there. Last,
+every copied object and the head are read back through the CDN and checked,
+and `lamp-update check --channel-url https://cdn.autonomous.ai/lampos/stable/`
+verifies the head the way a lamp would.
+
+Every write is to a path that starts with `lampos/`, checked before it is
+made; any other destination stops the step. The job runs from `lamp-voice`
+only, never for a pull request or a tag. The `lampos-cdn-probe` workflow,
+run by hand on `lamp-voice`, writes one file under `lampos/_probe/`, reads it
+back with `gcloud` and through the CDN, and deletes it.
+
 ### The build and its identity
 
 - The job checks out that run's `github.sha` and downloads

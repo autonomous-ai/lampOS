@@ -123,6 +123,8 @@ on:
       - '.github/scripts/lampos-route*.py'
       - '.github/scripts/lampos-publish*.py'
       - '.github/scripts/lampos-reuse*.py'
+      - '.github/scripts/lampos-mirror*.py'
+      - '.github/workflows/lampos-cdn-probe.yml'
       - '.github/scripts/lampos-stable-notes*.py'
       - '.github/tools/lampos-promote/**'
   workflow_dispatch:
@@ -455,6 +457,8 @@ jobs:
         run: python3 -I .github/scripts/lampos-stable-notes-test.py
       - name: runner choice tests (offline)
         run: python3 -I .github/scripts/lampos-route-test.py
+      - name: CDN mirror tests (offline)
+        run: python3 -I .github/scripts/lampos-mirror-test.py
       - name: train build reuse tests (offline)
         run: python3 -I .github/scripts/lampos-reuse-test.py
       - name: Rust 1.96.0
@@ -861,6 +865,62 @@ jobs:
           git worktree add --detach "$RUNNER_TEMP/promoted" "$commit"
           cd "$RUNNER_TEMP/promoted"
           cargo run --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --bin lampos-notes -- --sequence "$PROMOTE_SEQUENCE"
+
+  # After a promotion, the same build on the CDN: its files and models under
+  # lampos/stable/<sequence>/, the signed manifest pointed at them, signed
+  # again with the same key. Off until the owner sets vars.LAMPOS_CDN_MIRROR to
+  # on. A failure here never fails the promotion, which already stands: the
+  # lamps keep reading the feed they read before.
+  mirror-cdn:
+    name: lampOS — mirror the promoted stable release to the CDN
+    needs: promote-stable
+    if: >-
+      ${{ !cancelled() && needs.promote-stable.result == 'success' && github.event_name == 'workflow_dispatch'
+      && inputs.promote_sequence != '' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS'
+      && vars.LAMPOS_CDN_MIRROR == 'on' }}
+    continue-on-error: true
+    # The branch-restricted environment holds the signing key and the three
+    # mirror variables. The storage identity is issued by GitHub's own token
+    # to lamp-voice's runs only, never to a pull request or a tag.
+    environment: lampos-update-publish
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: lampos-cdn-mirror
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      # Logs of this repository are public: the three values stay out of them.
+      - name: keep the mirror's values out of the logs
+        env:
+          WIF_PROVIDER: ${{ vars.LAMPOS_MIRROR_WIF_PROVIDER }}
+          MIRROR_SA: ${{ vars.LAMPOS_MIRROR_SA }}
+          MIRROR_BUCKET: ${{ vars.LAMPOS_MIRROR_BUCKET }}
+        run: |
+          for value in "$WIF_PROVIDER" "$MIRROR_SA" "$MIRROR_BUCKET"; do
+            test -n "$value" || { echo "::error::a mirror variable is not set"; exit 1; }
+            echo "::add-mask::$value"
+          done
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.LAMPOS_MIRROR_WIF_PROVIDER }}
+          service_account: ${{ vars.LAMPOS_MIRROR_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: copy the build to the CDN, sign the manifest again, publish it last
+        env:
+          LAMPOS_CDN_MIRROR: ${{ vars.LAMPOS_CDN_MIRROR }}
+          LAMPOS_MIRROR_BUCKET: ${{ vars.LAMPOS_MIRROR_BUCKET }}
+          PROMOTE_SEQUENCE: ${{ inputs.promote_sequence }}
+          LAMPOS_UPDATE_PUBLIC_KEY: ${{ vars.LAMPOS_UPDATE_PUBLIC_KEY }}
+          # The same branch-restricted environment secret `publish` signs with.
+          LAMPOS_UPDATE_KEY: ${{ secrets.LAMPOS_UPDATE_KEY }}
+        run: python3 -I .github/scripts/lampos-mirror.py mirror
 
   # A full run that fails opens an issue (or comments on the open one), so a
   # realtime test broken by a merge is not left unseen: no other run has it.
