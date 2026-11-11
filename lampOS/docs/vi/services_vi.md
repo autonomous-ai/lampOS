@@ -146,6 +146,7 @@ dịch vụ.
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
 | `LAMP_SKILL_WRITES=on` (#6066; tắt trong mọi unit sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
+| `LAMP_SKILL_TASKS=on` (#6432; tắt trong mọi unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, và `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -2255,6 +2256,85 @@ toàn bộ):
 - Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
   bạ, nên mô hình tạo kỹ năng xin địa chỉ.
 - Một unit sản phẩm đặt `LAMP_SKILL_WRITES=on`.
+
+## Lượt chạy của một kỹ năng trên Hermes của đèn (#6432, `LAMP_SKILL_TASKS`, tắt)
+
+Một kỹ năng dùng một dịch vụ đã liên kết được Hermes của đèn chạy với dịch
+vụ đó làm một công cụ, như ở V1: một lượt chạy `do.task` (#6417,
+lamp-tasks) giữ một **token một lượt** (#6408, `control.sock` của
+lamp-control), và chỉ chạm đến dịch vụ qua lamp-control rồi qua chương
+trình này. Không token dịch vụ nào rời khỏi kho của root: cả lamp-control
+lẫn lượt chạy đều không giữ token nào.
+
+- **Các quyền.** Mỗi dịch vụ và mỗi loại một quyền, `<code>-read` và
+  `<code>-write` (`lamp_control::protocol::SERVICE_CODES`, một
+  `Grant::Service` trong danh sách quyền của lamp-control). Mã là mã của
+  catalog, mã người dùng thấy, mỗi cặp mã của cùng một dịch vụ gộp về mã
+  đầu: `gmail-read` gồm cả `gmail` và `gmail-app`, `figma-write` gồm cả
+  `figma` và `figma-api`. Ví dụ `gmail-read`, `google_calendar-write`,
+  `github-read`; mọi tên đều qua phép kiểm của lamp-tasks (`a-z 0-9 - _`,
+  tối đa 64). Một test giữ danh sách khớp với `catalog::SERVICES`. Quyền
+  dịch vụ chỉ dành cho lượt chạy của kỹ năng: ứng dụng của chủ đèn không
+  thể cấp nó cho một máy tính đã ghép đôi (`code` và `set_grants` từ chối,
+  "a linked service is a skill run's alone"), và một quyền như thế gặp
+  trong `clients.json` được giữ lại nhưng không bao giờ có hiệu lực.
+- **Các lời gọi.** Trên `control.sock`, sau `hello` có token:
+  `{"id":N,"op":"service.read","service":"gmail","args":{"what":"recent"}}`
+  và `{"id":N,"op":"service.write","service":"gmail","args":{"action":"send_mail",...}}`,
+  `args` đúng như `service_read` và `service_write` của giọng nói nhận,
+  `service` nằm bên cạnh (không bao giờ ở trong). Một dịch vụ đèn không có
+  quyền cho nó, `service` nằm trong `args`, hay một lần ghi có `send_id`
+  hoặc `said` đều là `bad_request`. lamp-control kiểm rằng token của lượt
+  chạy có đúng quyền tương ứng (nếu không thì `no_grant` "missing grant:
+  gmail-write": quyền đọc không phải quyền ghi, và quyền của dịch vụ khác
+  không phải của dịch vụ này), rằng kết nối đến qua socket lượt chạy và
+  lượt chạy vẫn đang diễn ra, rồi gửi một dòng
+  `{"op":"call","name":"service_read"|"service_write","args":{...,"service"},"skill":"<skill>"}`
+  đến socket tools của chương trình này, ngoài khoá của cửa (tối đa 20 giây).
+  Trả lời là `{"re":N,"ok":true,"result":...}`, hoặc lời từ chối của chương
+  trình này bằng chính lời của nó, dưới mã `refused`.
+- **Ai được gọi.** Với `LAMP_SKILL_TASKS=on` ở đây, cgroup
+  `lamp-control.service` (`CONTROL_ASKER_CGROUP`) là bên gọi thứ ba của
+  socket tools, chỉ được `Services::run_tool` trả lời: `service_read` và
+  `service_write`, không gì khác (`services_connected`, các lời gọi của kỹ
+  năng tự tạo và các lời gọi đồng ý của chủ đèn đều bị từ chối, "a skill's
+  run may only read a linked service or prepare a write to it"). Lời gọi
+  phải nêu một kỹ năng (`a-z 0-9 -`, như lamp-skills đặt tên) và dịch vụ
+  bằng đúng mã của nó (một tên như "Gmail" bị từ chối). lamp-control chỉ
+  gửi các lời gọi này khi có `LAMP_SKILL_TASKS=on` trong môi trường của
+  chính nó (`--services-socket` dời socket khỏi
+  `/run/lampos-services/tools/call.sock`); tắt ở đó, chúng là `off`, "a
+  skill's linked services are off on this lamp (LAMP_SKILL_TASKS)".
+- **Một lần đọc** chỉ cần quyền, được trích như lần đọc của kỹ năng tự tạo
+  (`Asker::Skill`: thư bảo mật bị bỏ ra, không bao giờ chỉ che), với cùng
+  danh sách cho phép. Khác với lần đọc cố định của kỹ năng tự tạo, một lượt
+  chạy được đọc nguyên văn bản hay một lần đọc tự do, như mô hình của giọng
+  nói, vì Hermes tóm tắt những gì nó đọc. Không có cổng danh tính:
+  `LAMP_PRIVATE_ROOM` coi bất kỳ ai nói là chủ đèn.
+- **Một lần ghi** chỉ được chuẩn bị: cùng đường `service_write` như của
+  giọng nói, đọc lại và giữ 2 phút (`writes::HOLD`), mỗi lúc một lần. Lượt
+  chạy nhận `read_back`, `sent: false`, `held: true` và một `next` nói rằng
+  chưa gì được gửi, và **không có `send_id`**: không gì gửi được nó từ lượt
+  chạy, và lamp-control từ chối `send_id` hay `said` trước khi chúng đến đây
+  (chương trình này cũng vậy). Một lần ghi của lượt chạy trong khi một lần
+  ghi khác đang chờ lời đồng ý bị từ chối ("another write waits for the
+  person's yes"), nên nó không bao giờ làm rơi lần ghi của chính người
+  dùng. Lần ghi chỉ được gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
+  cổng của giọng nói, và khi đó tính vào giới hạn của kỹ năng như lần ghi
+  của kỹ năng tự tạo (3 lần một ngày mỗi kỹ năng, 10 lần cho mọi kỹ năng,
+  `skill_writes::Ledger`): vượt quá thì "not sent".
+- **Chưa làm (nói ra để không ai đọc code thành nhiều hơn):** giọng nói
+  chưa đọc lại lần ghi đang giữ của một lượt chạy hay nhận lời đồng ý cho
+  nó, nên trên đèn hôm nay lần ghi của lượt chạy được giữ và, không ai trả
+  lời, bị bỏ sau 2 phút; phía giọng nói (báo người dùng rằng có lần ghi của
+  lượt chạy đang chờ, đọc lại nó và gửi qua cổng của nó) là việc tiếp theo.
+  lamp-control chưa giữ lời đồng ý cho kỹ năng nào (`SkillYes` của #6408),
+  nên chưa token nào được tạo, và chưa unit sản phẩm nào đặt
+  `LAMP_SKILL_TASKS`. Test: `serve::tests::lamp_control_calls_only_with_the_switch_on`,
+  `a_skill_run_reads_by_its_grant` và
+  `a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent`; trong
+  lamp-control, `session::tests` (công tắc tắt, không có quyền, sai loại,
+  một máy tính đã ghép đôi, một lần đọc được cấp quyền) và `protocol::tests`.
 
 ## Làm mới
 

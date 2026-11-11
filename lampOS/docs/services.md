@@ -124,6 +124,7 @@ connected apps.
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_WRITES=on` (#6066; off in every product unit) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
+| `LAMP_SKILL_TASKS=on` (#6432; off in every product unit) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, and `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket ("A skill's run on the lamp's Hermes", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -2161,6 +2162,80 @@ whole):
 - A contact named without an address: the lamp keeps no contact book, so
   the making model asks for the address.
 - A product unit that sets `LAMP_SKILL_WRITES=on`.
+
+## A skill's run on the lamp's Hermes (#6432, `LAMP_SKILL_TASKS`, off)
+
+A skill that uses a linked service is run by the lamp's Hermes with that
+service as a tool, as in V1: a `do.task` run (#6417, lamp-tasks) holds a
+**one-run token** (#6408, lamp-control's `control.sock`), and reaches
+the service only through lamp-control and then this program. No service
+token ever leaves root's store: neither lamp-control nor the run holds one.
+
+- **The grants.** One per service and kind, `<code>-read` and
+  `<code>-write` (`lamp_control::protocol::SERVICE_CODES`, a `Grant::Service`
+  in lamp-control's grant list). The code is the catalog's, the one the
+  person sees, with each pair of codes for one service folded to the first:
+  `gmail-read` covers `gmail` and `gmail-app`, `figma-write` covers
+  `figma` and `figma-api`. So `gmail-read`, `google_calendar-write`,
+  `github-read`; every name passes lamp-tasks' check (`a-z 0-9 - _`, at most
+  64). A test holds the list to `catalog::SERVICES`. A service grant is a
+  skill run's alone: the owner's app can't give one to a paired computer
+  (`code` and `set_grants` refuse it, "a linked service is a skill run's
+  alone"), and one found in `clients.json` is kept but never held.
+- **The calls.** On `control.sock`, after the token's `hello`:
+  `{"id":N,"op":"service.read","service":"gmail","args":{"what":"recent"}}`
+  and `{"id":N,"op":"service.write","service":"gmail","args":{"action":"send_mail",...}}`,
+  `args` exactly as the voice's `service_read` and `service_write` take
+  them, `service` beside them (never inside). A service the lamp has no
+  grant for, `service` in `args`, or a write with `send_id` or `said` is a
+  `bad_request`. lamp-control checks the run's token names the matching
+  grant (`no_grant` "missing grant: gmail-write" otherwise: a read grant is
+  no write, and another service's is not this one's), that the connection
+  came by the run socket and its run still goes, and then sends one line,
+  `{"op":"call","name":"service_read"|"service_write","args":{...,"service"},"skill":"<skill>"}`,
+  to this program's tools socket, off the door's lock (at most 20 s). The
+  reply is `{"re":N,"ok":true,"result":...}`, or this program's refusal in
+  its own words as `refused`.
+- **Who may call.** With `LAMP_SKILL_TASKS=on` here, the
+  `lamp-control.service` cgroup (`CONTROL_ASKER_CGROUP`) is a third caller
+  of the tools socket, answered by `Services::run_tool` alone: `service_read`
+  and `service_write`, nothing else (`services_connected`, a made skill's
+  calls and the owner's yes calls are refused, "a skill's run may only
+  read a linked service or prepare a write to it"). The call must name a
+  skill (`a-z 0-9 -`, as lamp-skills names one) and the service by its exact
+  code (a name such as "Gmail" is refused). lamp-control sends these calls
+  only with `LAMP_SKILL_TASKS=on` in its own environment
+  (`--services-socket` moves the socket from
+  `/run/lampos-services/tools/call.sock`); off there, they are `off`, "a
+  skill's linked services are off on this lamp (LAMP_SKILL_TASKS)".
+- **A read** goes on the grant alone, quoted as a made skill's read is
+  (`Asker::Skill`: a security mail left out, never masked), with the same
+  allow-lists. Unlike a made skill's fixed read, a run may read a whole text
+  or a free-form read, as the voice's model may, since Hermes summarises
+  what it reads. No identity gate: `LAMP_PRIVATE_ROOM` treats whoever speaks
+  as the owner.
+- **A write** is only prepared: the same `service_write` path as the
+  voice's, read back and held 2 minutes (`writes::HOLD`), one at a time.
+  The run is answered `read_back`, `sent: false`, `held: true` and a `next`
+  that says nothing went, and **no `send_id`**: nothing can send it from
+  the run, and lamp-control refuses a `send_id` or `said` before it reaches
+  here (and so does this program). A run's write while another write waits
+  for its yes is refused ("another write waits for the person's yes"),
+  so it never drops the person's own. The write is sent only by the
+  existing send, the spoken yes through the voice's gate, and then counts
+  against the skills' bounds as a made skill's write does (3 a day a skill,
+  10 across every skill, `skill_writes::Ledger`): over them it is "not sent".
+- **Not yet (said so the code is not read as more):** the voice does not
+  yet read a run's held write back or take its yes, so on a lamp today a
+  run's write is held and, unanswered, dropped after 2 minutes; the voice's
+  side (telling the person a run's write waits, its read-back and the
+  send through its gate) is a follow-up. lamp-control keeps no skill yes
+  yet (#6408's `SkillYes`), so no token is minted, and no product unit sets
+  `LAMP_SKILL_TASKS`. Tests: `serve::tests::lamp_control_calls_only_with_the_switch_on`,
+  `a_skill_run_reads_by_its_grant` and
+  `a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent`; in
+  lamp-control, `session::tests` (the switch off, no grant, the wrong
+  kind, a paired computer, a granted read) and `protocol::tests`.
 
 ## Refresh
 
