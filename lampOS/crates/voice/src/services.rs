@@ -214,6 +214,9 @@ pub fn reads_only(name: &str) -> bool {
 /// with no file, or one that can't be read. [`WRITE`]'s `said` is never the
 /// model's to give ([`gate`]), so it is not offered.
 pub fn tools(folder: &Path) -> Vec<Tool> {
+    // Off until this read lists it: a file that can't be read, or no longer
+    // lists `service_write`, never keeps an earlier read's yes.
+    crate::service_records::redo::drafts_listed(false);
     crate::tools::catalog(&folder.join(crate::tools::CATALOG_FILE))
         .into_iter()
         .filter(|tool| is_tool(&tool.name))
