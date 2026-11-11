@@ -31,7 +31,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const GRANTS = 'body,light,speak,look,hear,sound,air,device,camera,microphone';
 // The try-it app's lamp has no camera or microphone grant unless that is asked for (`--camera`, `--microphone`):
 // a picture of the room would sit on the LAN page.
-const TRY_GRANTS = 'body,light,speak,look,hear,sound,air,device';
+const TRY_GRANTS = 'body,light,speak,look,hear,sound,air,device,skills';
 export function grantsFor(flags, tryApp) {
   if (!tryApp) return GRANTS;
   const camera = flags.some((f) => f === '--camera' || f.startsWith('--camera='));
