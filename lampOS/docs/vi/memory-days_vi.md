@@ -1088,10 +1088,29 @@ Một lệnh quên xoá mọi mục dẫn tới thứ bị quên, lan tiếp (d�
 fact bị quên); quên trong lúc lượt đang chạy thì khi áp dụng, các mục dẫn tới
 thứ đã mất bị bỏ `forgotten`, phần còn lại vẫn ghi.
 
-Dấu quên (phương án 2 của El trên #5333): quên theo chủ đề (`forget
-{about}`) chỉ khớp điều đã giữ và quan sát, nên một lượt nói chưa từng được
-giữ không có gì để khớp và vẫn còn 30 ngày; lượt đêm sẽ đọc và giữ nó kèm lời
-trích. Vì vậy mọi lần quên của một người đã biết đánh dấu ngày đó: `forget`,
+Lời nói về một điều đã quên (lamp-06c1, 11/11). Quên theo chủ đề (`forget
+{about}`) trước đây chỉ khớp điều đã giữ và quan sát, nên một lượt nói chưa
+từng được giữ vẫn còn, và `recall` tìm thấy nó: "quên bữa tiệc recheck" rồi
+"bữa tiệc recheck thế nào rồi?" vẫn được trả lời từ lời nói về nó. Sau các
+điều đã giữ, voice giờ gửi `exchanges_forget {person, about}` (cùng các chủ
+đề như `service_records_forget`): mỗi lượt nói của chính người đã biết đó mà
+lời nghe và lời đáp có mọi từ khóa của một chủ đề (chữ thường, bỏ dấu, dạng
+số ít) bị quên như `forget {id}` của một lượt nói, cùng những gì dẫn từ nó
+(ghi chú trò chuyện), không bao giờ một điều đã giữ (#3113):
+`{ok:true,removed}`, số lượt nói. Lượt nói của phòng là của mọi người trong
+nhà và không bao giờ bị chạm tới (phòng, phạm vi quy tắc hay id khác bị từ
+chối `bad_person`); bộ nhớ cũ trả `unknown_op` và voice đi tiếp. Không gửi
+khi các điều đã giữ chưa xong: bộ nhớ không trả lời hay từ chối danh sách,
+quá nhiều để xem hết, hoặc hơn tám điều khớp (mô hình hỏi điều nào). Khi có lượt
+bị xóa, câu trả lời nói bao nhiêu (`exchanges`, không bao giờ lời của chúng)
+và cuộc trò chuyện ngừng được ghi nhật ký, như sau khi quên một điều đã giữ.
+Thêm một yêu cầu cục bộ trong 1,5 s của lệnh gọi.
+
+Dấu quên (phương án 2 của El trên #5333): trước thay đổi trên, quên theo chủ
+đề chỉ khớp điều đã giữ và quan sát, nên một lượt nói chưa từng được giữ
+không có gì để khớp và vẫn còn 30 ngày; lượt đêm sẽ đọc và giữ nó kèm lời
+trích. Dấu quên vẫn giữ: một lượt nói có lời khác với lệnh quên (nói cách
+khác) vẫn không có gì để khớp. Vì vậy mọi lần quên của một người đã biết đánh dấu ngày đó: `forget`,
 `forget_last` (thấy hay không), và `forget_mark {person}` voice gửi sau một
 `forget {about}`, thấy hay không (`{ok:true}`; phòng hay phạm vi quy tắc
 không đánh dấu; bộ nhớ cũ trả `unknown_op` và voice đi tiếp). Mỗi người, mỗi

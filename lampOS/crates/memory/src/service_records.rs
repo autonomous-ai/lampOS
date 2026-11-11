@@ -82,7 +82,7 @@ fn key_ok(key: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
-fn owner_only(person: &Person) -> Result<()> {
+pub(crate) fn owner_only(person: &Person) -> Result<()> {
     if lamp_msgs::known::is_person_id(person.as_str()) {
         Ok(())
     } else {
@@ -134,7 +134,7 @@ pub(crate) fn has_word(words: &[&str], word: &str) -> bool {
 
 /// `about` (each subject's words) folded, the empty words and subjects
 /// left out.
-fn subjects_of(about: &[Vec<String>]) -> Vec<Vec<String>> {
+pub(crate) fn subjects_of(about: &[Vec<String>]) -> Vec<Vec<String>> {
     about
         .iter()
         .map(|words| {
@@ -150,7 +150,7 @@ fn subjects_of(about: &[Vec<String>]) -> Vec<Vec<String>> {
 
 /// Whether a record whose words are `text` (its service, action, reason,
 /// result id and every text of its detail) has every word of a subject.
-fn about_any(subjects: &[Vec<String>], text: &str) -> bool {
+pub(crate) fn about_any(subjects: &[Vec<String>], text: &str) -> bool {
     let text = folded(text);
     let words: Vec<&str> = text
         .split(|c: char| !c.is_alphanumeric())

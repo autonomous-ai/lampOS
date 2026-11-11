@@ -1333,6 +1333,57 @@ impl Days {
         Ok(count)
     }
 
+    /// A known person's own exchanges (what they said and the lamp said,
+    /// never kept) with every key word of any of `about` (a forget about a
+    /// thing's subjects, as `service_records_forget` matches them: lower
+    /// case, without accents, a plural its singular), each forgotten as
+    /// `forget {id}` of an exchange forgets it: what derives from it goes
+    /// too (its talk notes), never a kept thing (#3113). A forget about a
+    /// thing matched kept things and observations only, so recall still
+    /// found the talk about it (lamp-06c1, 11 Nov: "forget the recheck
+    /// party", then "what happened with the recheck party?"). The room's
+    /// exchanges are everyone's in the house: never reached here. Marked
+    /// for the night first, found or not ([`Self::forget_mark`]). How many
+    /// exchanges went.
+    pub fn exchanges_forget(&mut self, person: &Person, about: &[Vec<String>]) -> Result<u64> {
+        crate::service_records::owner_only(person)?;
+        let subjects = crate::service_records::subjects_of(about);
+        if subjects.is_empty() {
+            return Ok(0);
+        }
+        self.forget_mark(person)?;
+        let matching: Vec<u64> = {
+            let mut statement = self.db.prepare(
+                "SELECT id,heard,said FROM entries WHERE person=?1 AND kind='exchange' ORDER BY id",
+            )?;
+            statement
+                .query_map([person.as_str()], |r| {
+                    Ok((
+                        r.get::<_, u64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, String>(2)?,
+                    ))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+                .into_iter()
+                .filter(|(_, heard, said)| {
+                    crate::service_records::about_any(&subjects, &format!("{heard} {said}"))
+                })
+                .map(|(id, _, _)| id)
+                .collect()
+        };
+        let mut removed = 0;
+        for id in matching {
+            if self.forget_here(person, id, false)? > 0 {
+                removed += 1;
+            }
+        }
+        if removed > 0 {
+            self.forget_set_aside()?;
+        }
+        Ok(removed)
+    }
+
     fn forget_here(&mut self, person: &Person, id: u64, selective: bool) -> Result<u64> {
         let Some(record) = self.record(person, id)? else {
             return Ok(0);
