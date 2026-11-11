@@ -43,6 +43,10 @@ pub const NO_RECORD: &str = "Not done: no service action of theirs has that reco
 pub const A_READ: &str = "Not done: a search or read is not redone from a record. Call service_read again if they want it.";
 pub const OTHER_KIND: &str = "Not done: that record is another service's or another action's. Keep the record's own service and action, or ask for a new write in full.";
 pub const EVENT_DONE: &str = "Not done: that event is already on their calendar, and changing a created event is a separate action, not a redo. Say so plainly, in a few words.";
+/// What a redo of a saved Gmail draft is told: it is changed or deleted by
+/// its id (`LAMP_GMAIL_DRAFT_EDITS`), never saved again beside the old one
+/// (a tester's lamp, 11 Nov).
+pub const DRAFT_DONE: &str = "Not done: that draft is already saved in their Gmail Drafts. To change or delete it, call update_draft or delete_draft with its draft_id, the record's result_id, if those are listed; never save it again beside the old one. Otherwise say so plainly.";
 pub const DONE_ALREADY: &str = "Not done: that was already done, and a done action is not redone from its record. Say so plainly; they can ask for a new one in full.";
 pub const FOLLOW_UP_TEXT: &str = "Not done: that mail was already sent, and a sent mail can't be changed. Say so plainly, ask what a follow-up mail should say, and call again with from_record and that text.";
 pub const CUT_TEXT: &str = "Not done: the saved text was too long to keep whole. Ask them for the whole text, and call again with from_record and that text.";
@@ -254,6 +258,10 @@ pub fn fill(owner: &str, args: &mut Value) -> Result<(), &'static str> {
             return Err(
                 if record.service == "google_calendar" && record.action == "create_event" {
                     EVENT_DONE
+                } else if record.service.starts_with("gmail")
+                    && matches!(record.action.as_str(), "save_draft" | "update_draft")
+                {
+                    DRAFT_DONE
                 } else {
                     DONE_ALREADY
                 },

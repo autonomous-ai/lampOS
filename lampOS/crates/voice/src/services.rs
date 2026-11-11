@@ -157,6 +157,13 @@ pub const SENT_NEXT: &str = "Say only that it was sent, in the conversation's la
 /// What the model is told to say once a draft was saved: a draft is never
 /// sent, so the lamp says "Saved as a draft.", never "sent".
 pub const SAVED_NEXT: &str = "Say only that it was saved as a draft in their Gmail Drafts, not sent, in the conversation's language.";
+/// What the model is told after a saved Gmail draft's delete is prepared
+/// (`delete_draft`, `LAMP_GMAIL_DRAFT_EDITS`): nothing is ever sent, so
+/// the lamp asks "Shall I delete it?". No longer than [`READ_BACK_NEXT`].
+pub const DELETE_READ_BACK_NEXT: &str = "Nothing is deleted yet, and nothing is ever sent. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I delete it?\" (in Vietnamese \"Xoá không?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline or wait, don't delete: say it's cancelled.";
+/// What the model is told to say once a saved draft was deleted
+/// (`delete_draft`): nothing was sent.
+pub const DELETED_NEXT: &str = "Say only that the draft was deleted from their Gmail Drafts, not sent, in the conversation's language.";
 /// What the model is told to say when the service did not send it.
 pub const NOT_SENT_NEXT: &str = "Say only that it was not sent, in the conversation's language.";
 /// What the model is told to say when the service did not save a draft.
@@ -1024,9 +1031,10 @@ enum Got<'a> {
 }
 
 /// Whether a write's answer says it was done: sent, or a Gmail draft saved
-/// (never sent, so told [`SAVED_NEXT`], never "sent").
+/// or deleted (never sent, so told [`SAVED_NEXT`] or [`DELETED_NEXT`],
+/// never "sent").
 pub fn went(told: &Value) -> bool {
-    told["sent"] == true || told["saved"] == true
+    told["sent"] == true || told["saved"] == true || told["deleted"] == true
 }
 
 /// The send try `attempt` kept for [`send_state`], with the record of the
@@ -1295,6 +1303,7 @@ pub fn answered(
     if call.args.get("send_id").is_some_and(|id| id.is_string()) {
         let sent = told.get("sent").and_then(Value::as_bool) == Some(true);
         let saved = told.get("saved").and_then(Value::as_bool) == Some(true);
+        let deleted = told.get("deleted").and_then(Value::as_bool) == Some(true);
         let draft_failed = told
             .get("error")
             .and_then(Value::as_str)
@@ -1303,6 +1312,8 @@ pub fn answered(
             MADE_NEXT
         } else if sent {
             SENT_NEXT
+        } else if deleted {
+            DELETED_NEXT
         } else if saved {
             SAVED_NEXT
         } else if draft_failed {
@@ -1330,10 +1341,18 @@ pub fn answered(
                 .and_then(Value::as_str)
                 .unwrap_or_default()
                 .clone_into(&mut kept.service);
-            kept.draft = call.args.get("action").and_then(Value::as_str) == Some("save_draft");
+            // A saved draft's change is saved as a draft is; its delete
+            // asks to delete ([`DELETE_READ_BACK_NEXT`]).
+            kept.draft = matches!(
+                call.args.get("action").and_then(Value::as_str),
+                Some("save_draft" | "update_draft")
+            );
             crate::service_records::prepared(owner, &kept.service, &call.args, send_id, now);
+            let deleting = call.args.get("action").and_then(Value::as_str) == Some("delete_draft");
             told["next"] = json!(if kept.draft {
                 SAVE_READ_BACK_NEXT
+            } else if deleting {
+                DELETE_READ_BACK_NEXT
             } else {
                 READ_BACK_NEXT
             });
@@ -2866,6 +2885,44 @@ mod tests {
         answered(&mut None, &send("s1"), 11, &mut told, now, "ann");
         assert_eq!(told["next"], NOT_SAVED_NEXT);
         assert!(!went(&told));
+    }
+
+    /// The tester's lamp, 11 Nov: a draft changed by voice was saved again
+    /// beside the old one. With `LAMP_GMAIL_DRAFT_EDITS`, `update_draft`
+    /// is kept and asked as a draft's save ("Shall I save it?") and told
+    /// saved; `delete_draft` asks "Shall I delete it?" and is told deleted,
+    /// never "sent"; each is a write done, through the same gate. The
+    /// delete's words are no longer than a send's, so the longest
+    /// read-back still reaches the model with them.
+    #[test]
+    fn a_saved_draft_changed_or_deleted_is_told_as_a_draft_never_sent() {
+        assert!(DELETE_READ_BACK_NEXT.len() <= READ_BACK_NEXT.len());
+        assert!(DELETE_READ_BACK_NEXT.contains("\"Shall I delete it?\""));
+        assert!(DELETE_READ_BACK_NEXT.contains("in any words"));
+        let now = Instant::now();
+        for (action, draft, next) in [
+            ("update_draft", true, SAVE_READ_BACK_NEXT),
+            ("delete_draft", false, DELETE_READ_BACK_NEXT),
+        ] {
+            let prepare = call(
+                WRITE,
+                json!({"service":"gmail","action":action,"draft_id":"draft12"}),
+            );
+            let mut pending = None;
+            let mut told = json!({"read_back": "Delete the draft to mom@home.test, subject \"Party\", from the Gmail Drafts of me@home.test. The lamp can't bring it back. Nothing is sent.", "send_id": "s1", "sent": false});
+            answered(&mut pending, &prepare, 10, &mut told, now, "ann");
+            assert_eq!(told["next"], next, "{action}");
+            assert_eq!(pending.as_ref().unwrap().draft, draft, "{action}");
+        }
+        let mut told = json!({"sent": false, "deleted": true, "service": "Gmail"});
+        answered(&mut None, &send("s1"), 11, &mut told, now, "ann");
+        assert_eq!(told["next"], DELETED_NEXT);
+        assert!(DELETED_NEXT.contains("deleted") && DELETED_NEXT.contains("not sent"));
+        assert!(went(&told));
+        let mut told =
+            json!({"sent": false, "saved": true, "service": "Gmail", "draft_id": "draft13"});
+        answered(&mut None, &send("s1"), 11, &mut told, now, "ann");
+        assert_eq!(told["next"], SAVED_NEXT);
     }
 
     /// #5962 (d): a mail is never a remember. The owner, 10 Nov: after a

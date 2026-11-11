@@ -1,12 +1,17 @@
 //! Gmail on the lamp: a small IMAP client (LOGIN, LIST, EXAMINE, UID SEARCH,
-//! UID FETCH of headers and text, APPEND of one draft, LOGOUT) over TLS to
+//! UID FETCH of headers and text, APPEND of one draft, a saved draft's
+//! SELECT, UID STORE and UID EXPUNGE in Drafts, LOGOUT) over TLS to
 //! `imap.gmail.com:993`, and SMTP over TLS to `smtp.gmail.com:465` (AUTH
 //! PLAIN or LOGIN, one message). `recent` reads the inbox; `search` reads
 //! All Mail, as Gmail's own search does (the mailbox LIST flags `\All`, else
 //! the inbox); `drafts` reads Drafts (the mailbox LIST flags `\Drafts`, else
 //! `[Gmail]/Drafts`). A mailbox is only ever opened with EXAMINE, read-only,
 //! and every body is fetched with `BODY.PEEK`, so reading marks nothing
-//! read. A draft is saved with APPEND to Drafts alone, never sent.
+//! read. A draft is saved with APPEND to Drafts alone, never sent. A saved
+//! draft is changed or deleted by its UID in Drafts alone
+//! (`LAMP_GMAIL_DRAFT_EDITS`, [`edit_draft_over`]): Drafts is the one
+//! mailbox ever opened with SELECT, and only that draft is marked deleted
+//! and expunged.
 //!
 //! One-time codes and security mails (sign-in codes, password resets,
 //! sign-in alerts, verification) are found by [`is_security_mail`]: the
@@ -83,6 +88,12 @@ pub enum Failure {
     /// No answer, a broken one, or a command refused after login. Which
     /// one is said only to the journal ([`Imap`]'s `why`).
     Unreached,
+    /// The draft a change names is no longer in Drafts: deleted or sent
+    /// in Gmail itself. Nothing was changed.
+    DraftGone,
+    /// A draft's change saved the new draft, but the old one could not be
+    /// removed: both are in Drafts.
+    OldDraftKept,
 }
 
 impl Failure {
@@ -91,6 +102,10 @@ impl Failure {
             Self::Refused => "Gmail refused the app password",
             Self::SignInRefused => "Google refused the Gmail sign-in",
             Self::Unreached => "Gmail couldn't be reached",
+            Self::DraftGone => "that draft is no longer in Gmail's Drafts",
+            Self::OldDraftKept => {
+                "the new draft was saved, but the old one is still in Gmail's Drafts"
+            }
         }
     }
 }
@@ -159,13 +174,25 @@ pub trait Mail {
         id: &str,
         pick: &Pick,
     ) -> impl Future<Output = Result<Option<MailItem>, Failure>>;
-    /// `out` saved in the account's Drafts, never sent.
+    /// `out` saved in the account's Drafts, never sent: its UID there
+    /// when Gmail gives it (APPENDUID), for its id (`draft12`).
     fn draft(
         &self,
         user: &str,
         pass: &str,
         out: &Outgoing,
-    ) -> impl Future<Output = Result<(), Failure>>;
+    ) -> impl Future<Output = Result<Option<u32>, Failure>>;
+    /// The draft of UID `uid` in the account's Drafts replaced by `out`,
+    /// or deleted with none ([`edit_draft_over`]): the new draft's UID
+    /// when Gmail gives it. Nothing is sent, and no other mailbox is
+    /// opened.
+    fn edit_draft(
+        &self,
+        user: &str,
+        pass: &str,
+        uid: u32,
+        out: Option<&Outgoing>,
+    ) -> impl Future<Output = Result<Option<u32>, Failure>>;
 }
 
 mod attachments;
@@ -2076,6 +2103,26 @@ fn imap_quoted(text: &str) -> Option<String> {
     ))
 }
 
+/// Every UID a `UID SEARCH` answered, oldest first.
+fn searched(found: &[Response]) -> Vec<u32> {
+    let mut uids: Vec<u32> = found
+        .iter()
+        .filter_map(|response| response.text.strip_prefix("* SEARCH"))
+        .flat_map(|rest| rest.split_whitespace().filter_map(|n| n.parse().ok()))
+        .collect();
+    uids.sort_unstable();
+    uids
+}
+
+/// The UID an APPEND's tagged OK names (`OK [APPENDUID 7 12] ...` gives
+/// 12), none when it names none.
+fn appended_uid(status: &str) -> Option<u32> {
+    let at = status.to_ascii_uppercase().find("[APPENDUID ")?;
+    let mut fields = status[at + 11..].split_whitespace();
+    fields.next()?.parse::<u32>().ok()?;
+    fields.next()?.strip_suffix(']')?.parse().ok()
+}
+
 /// Why reading a line broke, for the journal.
 struct Broke(String);
 
@@ -2371,6 +2418,18 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
         command: &str,
         literal: Option<&[u8]>,
     ) -> Result<Vec<Response>, Failure> {
+        self.run_status(command, literal)
+            .await
+            .map(|(untagged, _)| untagged)
+    }
+
+    /// [`Self::run`], with the tagged OK's own text after it (APPEND's
+    /// `[APPENDUID ...]`).
+    async fn run_status(
+        &mut self,
+        command: &str,
+        literal: Option<&[u8]>,
+    ) -> Result<(Vec<Response>, String), Failure> {
         self.tag += 1;
         self.step = step_of(command);
         let tag = format!("A{}", self.tag);
@@ -2418,7 +2477,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
             let response = self.response().await?;
             if let Some(status) = response.text.strip_prefix(&format!("{tag} ")) {
                 return if status.starts_with("OK") {
-                    Ok(untagged)
+                    Ok((untagged, status.to_owned()))
                 } else {
                     Err(self.broke(
                         Failure::Refused,
@@ -2508,13 +2567,58 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
     }
 
     /// APPEND: `message` saved in `mailbox` flagged `\Draft \Seen`, as a
-    /// draft the person has seen; a refusal is [`Failure::Unreached`].
-    pub async fn append_draft(&mut self, mailbox: &str, message: &[u8]) -> Result<(), Failure> {
+    /// draft the person has seen: its UID there when the server says it
+    /// (UIDPLUS's `[APPENDUID <validity> <uid>]`, RFC 4315); a refusal is
+    /// [`Failure::Unreached`].
+    pub async fn append_draft(
+        &mut self,
+        mailbox: &str,
+        message: &[u8],
+    ) -> Result<Option<u32>, Failure> {
         let mailbox = imap_quoted(mailbox).ok_or(Failure::Unreached)?;
-        self.run(&format!("APPEND {mailbox} (\\Draft \\Seen)"), Some(message))
+        self.run_status(&format!("APPEND {mailbox} (\\Draft \\Seen)"), Some(message))
+            .await
+            .map(|(_, status)| appended_uid(&status))
+            .map_err(|_| Failure::Unreached)
+    }
+
+    /// CAPABILITY: whether the server offers UIDPLUS (RFC 4315), whose
+    /// `UID EXPUNGE` removes only the messages named. A refusal is none.
+    pub async fn uidplus(&mut self) -> Result<bool, Failure> {
+        match self.run("CAPABILITY", None).await {
+            Ok(said) => Ok(said.iter().any(|response| {
+                response
+                    .text
+                    .get(..13)
+                    .is_some_and(|head| head.eq_ignore_ascii_case("* CAPABILITY "))
+                    && response.text[13..]
+                        .split_whitespace()
+                        .any(|capability| capability.eq_ignore_ascii_case("UIDPLUS"))
+            })),
+            Err(Failure::Refused) => Ok(false),
+            Err(_) => Err(Failure::Unreached),
+        }
+    }
+
+    /// SELECT of Drafts: the one mailbox ever opened to be changed, for a
+    /// draft's change ([`edit_draft_over`]); every read opens its mailbox
+    /// with [`Self::examine`].
+    async fn select_drafts(&mut self, drafts: &str) -> Result<(), Failure> {
+        let mailbox = imap_quoted(drafts).ok_or(Failure::Unreached)?;
+        self.run(&format!("SELECT {mailbox}"), None)
             .await
             .map(|_| ())
             .map_err(|_| Failure::Unreached)
+    }
+
+    /// UID SEARCH by `criteria` the lamp wrote (never the person's words):
+    /// every UID found, oldest first.
+    async fn search_by(&mut self, criteria: &str) -> Result<Vec<u32>, Failure> {
+        let found = self
+            .run(&format!("UID SEARCH {criteria}"), None)
+            .await
+            .map_err(|_| Failure::Unreached)?;
+        Ok(searched(&found))
     }
 
     /// UID SEARCH: the newest `most` UIDs found (the highest), oldest
@@ -2795,23 +2899,23 @@ pub async fn draft_over<S, C>(
     pass: &str,
     message: &[u8],
     within: Duration,
-) -> Result<(), Failure>
+) -> Result<Option<u32>, Failure>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     C: Future<Output = Result<S, Failure>>,
 {
-    let mut imap = tokio::time::timeout(within, async {
+    let (mut imap, uid) = tokio::time::timeout(within, async {
         let mut imap = Imap::new(connect.await?);
         imap.greet().await?;
         imap.login(user, pass).await?;
         let drafts = imap.drafts().await?;
-        imap.append_draft(&drafts, message).await?;
-        Ok::<_, Failure>(imap)
+        let uid = imap.append_draft(&drafts, message).await?;
+        Ok::<_, Failure>((imap, uid))
     })
     .await
     .map_err(|_| Failure::Unreached)??;
     tokio::spawn(async move { imap.logout().await });
-    Ok(())
+    Ok(uid)
 }
 
 /// [`draft_over`] on a stream already open.
@@ -2821,8 +2925,76 @@ pub async fn save_draft<S: AsyncRead + AsyncWrite + Unpin + Send + 'static>(
     pass: &str,
     message: &[u8],
     within: Duration,
-) -> Result<(), Failure> {
+) -> Result<Option<u32>, Failure> {
     draft_over(async { Ok(stream) }, user, pass, message, within).await
+}
+
+/// One saved draft changed on the stream `connect` gives, all within
+/// `within` (`LAMP_GMAIL_DRAFT_EDITS`): login, CAPABILITY, Drafts found by
+/// its `\Drafts` flag (else [`DRAFTS_FALLBACK`]) and opened with SELECT,
+/// the one mailbox ever opened to be changed. The draft of UID `uid` must
+/// still be there (`UID SEARCH UID <uid>`), else [`Failure::DraftGone`] and
+/// nothing is changed. With `message`, it is APPENDed to Drafts as a draft
+/// first; then the old draft alone is marked `\Deleted` (`UID STORE`) and
+/// expunged: `UID EXPUNGE <uid>` with UIDPLUS, else a plain EXPUNGE, and
+/// that only when no other message in Drafts was already marked deleted
+/// (checked before anything is changed; else [`Failure::Unreached`], and
+/// nothing is). Without `message`, the same delete alone. No SMTP is
+/// spoken: nothing is sent. The new draft's UID when the server says it;
+/// LOGOUT after, apart, as [`draft_over`]'s.
+pub async fn edit_draft_over<S, C>(
+    connect: C,
+    user: &str,
+    pass: &str,
+    uid: u32,
+    message: Option<&[u8]>,
+    within: Duration,
+) -> Result<Option<u32>, Failure>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    C: Future<Output = Result<S, Failure>>,
+{
+    let (mut imap, made) = tokio::time::timeout(within, async {
+        let mut imap = Imap::new(connect.await?);
+        imap.greet().await?;
+        imap.login(user, pass).await?;
+        let uidplus = imap.uidplus().await?;
+        let drafts = imap.drafts().await?;
+        imap.select_drafts(&drafts).await?;
+        if !imap.search_by(&format!("UID {uid}")).await?.contains(&uid) {
+            return Err(Failure::DraftGone);
+        }
+        // A plain EXPUNGE removes every message marked deleted: used only
+        // when this draft will be the one.
+        if !uidplus && !imap.search_by("DELETED").await?.is_empty() {
+            return Err(Failure::Unreached);
+        }
+        let made = match message {
+            Some(message) => imap.append_draft(&drafts, message).await?,
+            None => None,
+        };
+        let removed = async {
+            imap.run(&format!("UID STORE {uid} +FLAGS.SILENT (\\Deleted)"), None)
+                .await?;
+            if uidplus {
+                imap.run(&format!("UID EXPUNGE {uid}"), None).await?;
+            } else {
+                imap.run("EXPUNGE", None).await?;
+            }
+            Ok::<_, Failure>(())
+        }
+        .await;
+        match removed {
+            Ok(()) => Ok((imap, made)),
+            // The new draft is saved: both are there now.
+            Err(_) if message.is_some() => Err(Failure::OldDraftKept),
+            Err(_) => Err(Failure::Unreached),
+        }
+    })
+    .await
+    .map_err(|_| Failure::Unreached)??;
+    tokio::spawn(async move { imap.logout().await });
+    Ok(made)
 }
 
 /// A login and nothing more, for `set`.
@@ -3300,7 +3472,7 @@ impl Mail for Gmail {
         .map_err(|_| Failure::Unreached)?
     }
 
-    async fn draft(&self, user: &str, pass: &str, out: &Outgoing) -> Result<(), Failure> {
+    async fn draft(&self, user: &str, pass: &str, out: &Outgoing) -> Result<Option<u32>, Failure> {
         let id = crate::writes::random_id();
         let text = message(user, out, &rfc5322_date(crate::now_secs()), &id);
         // One budget from connecting to APPEND's OK; LOGOUT after it apart.
@@ -3309,6 +3481,29 @@ impl Mail for Gmail {
             user,
             pass,
             &text,
+            DRAFT_WITHIN,
+        )
+        .await
+    }
+
+    async fn edit_draft(
+        &self,
+        user: &str,
+        pass: &str,
+        uid: u32,
+        out: Option<&Outgoing>,
+    ) -> Result<Option<u32>, Failure> {
+        let text = out.map(|out| {
+            let id = crate::writes::random_id();
+            message(user, out, &rfc5322_date(crate::now_secs()), &id)
+        });
+        // One budget from connecting to EXPUNGE's OK, as a save's.
+        edit_draft_over(
+            connect(IMAP_HOST, IMAP_PORT),
+            user,
+            pass,
+            uid,
+            text.as_deref(),
             DRAFT_WITHIN,
         )
         .await
@@ -3911,7 +4106,10 @@ pub(crate) mod tests {
         * LIST (\\All \\HasNoChildren) \"/\" \"[Gmail]/T&HqU-t c&HqM- th&AbA-\"\r\n";
 
     /// One draft saved against a script, and all the client sent.
-    fn scripted_draft(message: &[u8], replies: Vec<String>) -> (Result<(), Failure>, String) {
+    fn scripted_draft(
+        message: &[u8],
+        replies: Vec<String>,
+    ) -> (Result<Option<u32>, Failure>, String) {
         let (client, server) = duplex(1 << 16);
         run(async {
             let server = tokio::spawn(scripted(server, "* OK Gimap ready\r\n", replies));
@@ -3943,7 +4141,8 @@ pub(crate) mod tests {
                 "* BYE\r\nA4 OK\r\n".into(),
             ],
         );
-        saved.unwrap();
+        // Its UID in Drafts, from APPENDUID, is the draft's id (`draft12`).
+        assert_eq!(saved, Ok(Some(12)));
         let lines: Vec<&str> = heard.lines().collect();
         assert_eq!(lines[0], "A1 LOGIN \"a@b.c\" \"pw\"");
         assert_eq!(lines[1], "A2 LIST \"\" \"*\"");
@@ -3988,7 +4187,8 @@ pub(crate) mod tests {
                 "A4 OK\r\n".into(),
             ],
         );
-        saved.unwrap();
+        // No APPENDUID: saved, its id not known.
+        assert_eq!(saved, Ok(None));
         assert_eq!(
             heard.lines().nth(2),
             Some(
@@ -4029,7 +4229,7 @@ pub(crate) mod tests {
                 "A4 OK\r\n".into(),
             ],
         );
-        assert_eq!(saved, Ok(()));
+        assert_eq!(saved, Ok(Some(12)));
         assert!(heard.contains("From: a@b.c\r\nSubject: s\r\n\r\nt\r\n\r\nA4 LOGOUT"));
         let (saved, heard) = scripted_draft(
             text,
@@ -4065,10 +4265,187 @@ pub(crate) mod tests {
             ));
             save_draft(client, "a@b.c", "pw", text, Duration::from_millis(500)).await
         });
-        assert_eq!(saved, Ok(()));
+        assert_eq!(saved, Ok(Some(12)));
         // Answered at APPEND's OK, LOGOUT not waited on.
         let took = started.elapsed();
         assert!(took < Duration::from_millis(500), "{took:?}");
+    }
+
+    /// One saved draft changed against a script, and all the client sent.
+    fn scripted_edit(
+        uid: u32,
+        message: Option<&[u8]>,
+        replies: Vec<String>,
+    ) -> (Result<Option<u32>, Failure>, String) {
+        let (client, server) = duplex(1 << 16);
+        run(async {
+            let server = tokio::spawn(scripted(server, "* OK Gimap ready\r\n", replies));
+            let edited =
+                edit_draft_over(async { Ok(client) }, "a@b.c", "pw", uid, message, WITHIN).await;
+            (edited, server.await.unwrap())
+        })
+    }
+
+    /// Gmail's CAPABILITY, UIDPLUS among them.
+    const CAPABILITY_UIDPLUS: &str =
+        "* CAPABILITY IMAP4rev1 UNSELECT IDLE X-GM-EXT-1 UIDPLUS MOVE SPECIAL-USE\r\nA2 OK\r\n";
+
+    /// The tester's lamp, 11 Nov: a saved draft changed by voice left the
+    /// old one in Drafts beside the new. Now one change is Drafts opened
+    /// with SELECT (the one mailbox ever opened to be changed), the old
+    /// draft's UID found there, one APPEND of the whole new draft, and the
+    /// old UID alone marked deleted and expunged by UID; nothing is sent.
+    /// The new draft's id is its APPENDUID.
+    #[test]
+    fn a_draft_is_replaced_by_one_append_and_one_delete_of_its_uid() {
+        let out = Outgoing {
+            to: vec!["mom@home.test".into()],
+            cc: Vec::new(),
+            subject: "Party".into(),
+            text: "At 12 Elm St. Wear something casual.".into(),
+        };
+        let text = message("a@b.c", &out, &rfc5322_date(0), "id2");
+        let (edited, heard) = scripted_edit(
+            12,
+            Some(&text),
+            vec![
+                "A1 OK\r\n".into(),
+                CAPABILITY_UIDPLUS.into(),
+                format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
+                "* 3 EXISTS\r\nA4 OK [READ-WRITE] selected\r\n".into(),
+                "* SEARCH 12\r\nA5 OK\r\n".into(),
+                "+ go ahead\r\n".into(),
+                "A6 OK [APPENDUID 7 13] appended\r\n".into(),
+                "A7 OK stored\r\n".into(),
+                "* 2 EXPUNGE\r\nA8 OK expunged\r\n".into(),
+                "A9 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(edited, Ok(Some(13)));
+        let drafts = "\"[Gmail]/Th&AbA- nh&AOE-p\"";
+        let lines: Vec<&str> = heard.lines().collect();
+        assert_eq!(lines[0], "A1 LOGIN \"a@b.c\" \"pw\"");
+        assert_eq!(lines[1], "A2 CAPABILITY");
+        assert_eq!(lines[2], "A3 LIST \"\" \"*\"");
+        assert_eq!(lines[3], format!("A4 SELECT {drafts}"));
+        assert_eq!(lines[4], "A5 UID SEARCH UID 12");
+        assert_eq!(
+            lines[5],
+            format!("A6 APPEND {drafts} (\\Draft \\Seen) {{{}}}", text.len())
+        );
+        let literal = std::str::from_utf8(&text).unwrap();
+        assert!(heard.contains(&format!(
+            "{}}}\r\n{literal}\r\nA7 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA8 UID EXPUNGE 12\r\nA9 LOGOUT\r\n",
+            text.len()
+        )));
+        // One APPEND, one STORE and one EXPUNGE, each of that draft alone.
+        assert_eq!(heard.matches("APPEND").count(), 1);
+        assert_eq!(heard.matches("STORE").count(), 1);
+        assert_eq!(heard.matches("EXPUNGE").count(), 1);
+        for never in ["EXAMINE", "INBOX", "All Mail", "MAIL FROM", "RCPT", "MOVE"] {
+            assert!(!heard.contains(never), "{never}");
+        }
+    }
+
+    /// Deleted: the same, with no APPEND. Without UIDPLUS a plain EXPUNGE,
+    /// only when nothing else in Drafts was marked deleted; with another
+    /// marked, nothing is changed at all.
+    #[test]
+    fn a_draft_is_deleted_by_its_uid_alone() {
+        let (edited, heard) = scripted_edit(
+            12,
+            None,
+            vec![
+                "A1 OK\r\n".into(),
+                CAPABILITY_UIDPLUS.into(),
+                format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
+                "A4 OK [READ-WRITE] selected\r\n".into(),
+                "* SEARCH 12\r\nA5 OK\r\n".into(),
+                "A6 OK stored\r\n".into(),
+                "* 2 EXPUNGE\r\nA7 OK expunged\r\n".into(),
+                "A8 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(edited, Ok(None));
+        assert!(heard.contains(
+            "A5 UID SEARCH UID 12\r\nA6 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA7 UID EXPUNGE 12\r\nA8 LOGOUT\r\n"
+        ));
+        assert!(!heard.contains("APPEND"));
+        // No UIDPLUS, nothing else marked: a plain EXPUNGE.
+        let (edited, heard) = scripted_edit(
+            12,
+            None,
+            vec![
+                "A1 OK\r\n".into(),
+                "* CAPABILITY IMAP4rev1 IDLE\r\nA2 OK\r\n".into(),
+                format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
+                "A4 OK [READ-WRITE] selected\r\n".into(),
+                "* SEARCH 12\r\nA5 OK\r\n".into(),
+                "* SEARCH\r\nA6 OK\r\n".into(),
+                "A7 OK stored\r\n".into(),
+                "A8 OK expunged\r\n".into(),
+                "A9 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(edited, Ok(None));
+        assert!(heard.contains(
+            "A6 UID SEARCH DELETED\r\nA7 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA8 EXPUNGE\r\n"
+        ));
+        // No UIDPLUS and another draft already marked: nothing changed.
+        let (edited, heard) = scripted_edit(
+            12,
+            None,
+            vec![
+                "A1 OK\r\n".into(),
+                "* CAPABILITY IMAP4rev1 IDLE\r\nA2 OK\r\n".into(),
+                format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
+                "A4 OK [READ-WRITE] selected\r\n".into(),
+                "* SEARCH 12\r\nA5 OK\r\n".into(),
+                "* SEARCH 9\r\nA6 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(edited, Err(Failure::Unreached));
+        assert!(!heard.contains("STORE") && !heard.contains("EXPUNGE"));
+    }
+
+    /// A draft no longer in Drafts (sent or deleted in Gmail) is told gone,
+    /// and nothing is appended, marked or expunged.
+    #[test]
+    fn a_draft_gone_from_drafts_changes_nothing() {
+        let (edited, heard) = scripted_edit(
+            12,
+            Some(b"From: a@b.c\r\nSubject: s\r\n\r\nt\r\n"),
+            vec![
+                "A1 OK\r\n".into(),
+                CAPABILITY_UIDPLUS.into(),
+                format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
+                "A4 OK [READ-WRITE] selected\r\n".into(),
+                "* SEARCH\r\nA5 OK\r\n".into(),
+            ],
+        );
+        assert_eq!(edited, Err(Failure::DraftGone));
+        for never in ["APPEND", "STORE", "EXPUNGE"] {
+            assert!(!heard.contains(never), "{never}");
+        }
+        // Saved anew, but the old one not removed: told so, never "not saved".
+        let (edited, _) = scripted_edit(
+            12,
+            Some(b"From: a@b.c\r\nSubject: s\r\n\r\nt\r\n"),
+            vec![
+                "A1 OK\r\n".into(),
+                CAPABILITY_UIDPLUS.into(),
+                format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
+                "A4 OK [READ-WRITE] selected\r\n".into(),
+                "* SEARCH 12\r\nA5 OK\r\n".into(),
+                "+ go ahead\r\n".into(),
+                "A6 OK [APPENDUID 7 13] appended\r\n".into(),
+                "A7 NO planted words\r\n".into(),
+            ],
+        );
+        assert_eq!(edited, Err(Failure::OldDraftKept));
+        assert!(appended_uid("OK [APPENDUID 7 13] appended") == Some(13));
+        assert_eq!(appended_uid("OK appended"), None);
+        assert_eq!(appended_uid("OK [APPENDUID 7 x] appended"), None);
     }
 
     /// "Read my drafts": Drafts found by its flag and read read-only, each
