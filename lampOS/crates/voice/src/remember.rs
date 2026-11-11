@@ -1685,6 +1685,28 @@ pub(crate) fn records_forgotten(told: (Value, bool), records: Option<u64>) -> (V
     }
 }
 
+/// A forget about's answer `told` with the person's exchanges about it
+/// that went too (`exchanges_forget`): none, as it was; some, how many.
+/// Never their words.
+pub(crate) fn exchanges_forgotten(told: (Value, bool), exchanges: Option<u64>) -> (Value, bool) {
+    let Some(exchanges) = exchanges.filter(|exchanges| *exchanges > 0) else {
+        return told;
+    };
+    let (mut answer, answered) = told;
+    let note =
+        format!("{exchanges} line(s) of what was said about it in conversation are forgotten too.");
+    if answer["forgotten"] == true {
+        answer["exchanges"] = json!(exchanges);
+        answer["exchanges_note"] = json!(note);
+        (answer, answered)
+    } else {
+        (
+            json!({"forgotten": true, "exchanges": exchanges, "note": note}),
+            true,
+        )
+    }
+}
+
 /// A forget about's answer `told` with the mail contacts it removed too
 /// (`LAMP_SERVICE_CONTACTS`): none, as it was; some, how many, and that
 /// nothing already sent is undone. Never a name or an address.
@@ -8651,6 +8673,12 @@ enum Listed {
 /// An older lamp-memory, updated after the voice, refuses the listing's
 /// `observations` ([`Listed::Refused`], #3113): nothing is removed, never
 /// the last kept thing instead, and the person is told plainly.
+/// A forget about's note when the kept things are too many to look through.
+const ABOUT_TOO_MUCH: &str =
+    "I keep too much to look through it all for that, so I forgot nothing.";
+/// A forget about's note when more than [`ABOUT_MOST`] kept things match.
+const ABOUT_ASK_WHICH: &str = "More than eight things I noticed or was asked to remember are about that, so I forgot nothing. Ask which one they mean.";
+
 fn older_memory_refused() -> (Value, bool) {
     (
         json!({"forgotten": false, "note": "My memory couldn't look that up just now, so I forgot nothing, and nothing else instead. Tell them plainly: \"I couldn't forget that just now.\""}),
@@ -10299,6 +10327,21 @@ impl DaysClient {
             (records, sent_to) => records.or(sent_to),
         };
         let told = self.forget_kept_about(about, person, until, lease, named);
+        // Their talk about it too, after the kept things, so each `forget
+        // {id}` above still finds the exchanges a kept thing came from.
+        // Not when the kept things were not settled (the memory lost or
+        // older, too much to look through, or which one is asked): the
+        // talk waits for the forget they then confirm.
+        let held = !told.1
+            || told.0.get("error").is_some()
+            || told.0 == older_memory_refused().0
+            || [ABOUT_TOO_MUCH, ABOUT_ASK_WHICH].contains(&told.0["note"].as_str().unwrap_or(""));
+        let exchanges = if held {
+            None
+        } else {
+            self.forget_exchanges_about(about, person, until, lease)
+        };
+        let told = exchanges_forgotten(told, exchanges);
         contacts_forgotten(records_forgotten(told, records), contacts)
     }
 
@@ -10333,6 +10376,53 @@ impl DaysClient {
         }
         crate::service_records::forgot(Some(owner));
         crate::service_contacts::forgot(Some(owner));
+    }
+
+    /// A known person's own exchanges about `about` (what was said, never
+    /// kept) forgotten in the memory (`exchanges_forget`), in their scope
+    /// alone, never the room's: how many went, `None` with no known person
+    /// or no answer. Recall finds those exchanges, so a forget about a
+    /// thing that took only the kept things left the talk about it to be
+    /// told again (lamp-06c1, 11 Nov: "forget the recheck party"). Some
+    /// gone, nothing of this conversation is journalled after it, as after
+    /// a forget of a kept thing. An older memory answers `unknown_op`, and
+    /// none are said removed.
+    fn forget_exchanges_about(
+        &self,
+        about: &Value,
+        person: Option<&str>,
+        until: Instant,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+    ) -> Option<u64> {
+        let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
+        let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
+            .into_iter()
+            .map(|(_, words)| words)
+            .collect();
+        if words.is_empty() {
+            return None;
+        }
+        let left = until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())?;
+        let answer = bounded_exchange_scoped(
+            &self.socket,
+            &json!({"op":"exchanges_forget","person":person,"about":words}),
+            left,
+            lease,
+        )?;
+        let removed = answer["removed"]
+            .as_u64()
+            .filter(|_| answer["ok"] == true)?;
+        if removed > 0 {
+            let said = match self.context.try_lock() {
+                Ok(mut context) => self.forgotten(&mut context),
+                Err(_) => None,
+            };
+            say(said);
+        }
+        eprintln!("lamp-voice provider: a forget about removed {removed} exchanges");
+        Some(removed)
     }
 
     /// `LAMP_SERVICE_CONTACTS`: a known person's mail contacts about
@@ -10464,12 +10554,7 @@ impl DaysClient {
             );
         }
         let words: Vec<Vec<String>> = subjects.iter().map(|(_, words)| words.clone()).collect();
-        let too_much = || {
-            (
-                json!({"forgotten": false, "note": "I keep too much to look through it all for that, so I forgot nothing."}),
-                true,
-            )
-        };
+        let too_much = || (json!({"forgotten": false, "note": ABOUT_TOO_MUCH}), true);
         let refused = older_memory_refused;
         let mut scope = person;
         let (mut matching, mut missed) = match self.about_matching(scope, &words, left, lease) {
@@ -10545,10 +10630,7 @@ impl DaysClient {
                     );
                 }
                 if matching.len() > ABOUT_MOST {
-                    return (
-                        json!({"forgotten": false, "note": "More than eight things I noticed or was asked to remember are about that, so I forgot nothing. Ask which one they mean."}),
-                        true,
-                    );
+                    return (json!({"forgotten": false, "note": ABOUT_ASK_WHICH}), true);
                 }
                 context.uncertain_writes = context.uncertain_writes.saturating_add(1);
                 context.changing();
@@ -18811,7 +18893,7 @@ mod tests {
         }
         // Named, none of theirs: the room's is searched and its shown one
         // forgotten, in the room's scope.
-        let (socket, served) = memory("one-face-named-none", 4, none_of_theirs);
+        let (socket, served) = memory("one-face-named-none", 5, none_of_theirs);
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_about.store(true, Ordering::Release);
         let _ = client.context.lock().unwrap().include(None, &[50]);
@@ -18821,6 +18903,7 @@ mod tests {
         assert_eq!(
             served.join().unwrap()[1..],
             [
+                json!({"op":"exchanges_forget","person":MINH,"about":[["coffee"]]}),
                 json!({"op":"forget_mark","person":MINH}),
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
                 json!({"op":"forget","id":50,"selective":true}),
@@ -18830,7 +18913,7 @@ mod tests {
         std::fs::remove_file(&socket).unwrap();
         // Unnamed, none of theirs: forget_about's own look in the room's
         // forgets it; the room's is not run again (a fourth request).
-        let (socket, served) = memory("one-face-unnamed-none", 4, none_of_theirs);
+        let (socket, served) = memory("one-face-unnamed-none", 5, none_of_theirs);
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_about.store(true, Ordering::Release);
         let _ = client.context.lock().unwrap().include(None, &[50]);
@@ -18843,6 +18926,7 @@ mod tests {
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH}),
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
                 json!({"op":"forget","id":50,"selective":true}),
+                json!({"op":"exchanges_forget","person":MINH,"about":[["coffee"]]}),
                 json!({"op":"forget_mark","person":MINH}),
             ]
         );
