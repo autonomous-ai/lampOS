@@ -261,6 +261,20 @@ next step (`Grids::first`), so a name a later grid hears best is heard up
 to 0.4 s after it was said, plus the time the catch-up takes, within the two
 bounds below; past them it is let go.
 
+**Dated by the sound, not by when its score came (#6114).** A step's score
+says how many steps back the sound its name score is of (`Score::late`: 0
+for the first grid's own and a later grid's on time). lamp-name dates a
+hearing from that sound (`Hearings::score_of`): the newest step is the one
+that just came, each step before it is 80 ms older, and a late score is
+`late` steps older again. So `name/heard`'s and `name/rising`'s `ago_ms`
+reach back to where the name was said, and the voice, which dates a hearing
+as its arrival less `ago_ms`, finds a "Lamp" at a line's start inside its
+start window, even when only a woken grid's score a second later reached
+the bar (lamp-52e6, #6078: the first grid gave 0.27–0.79 at the start, and
+the 0.89–0.94 that came 2.0–2.7 s in were of that same "Lamp"). A late score
+of sound inside the hold-off after a hearing is passed over, so one call is
+still one hearing. `check` dates its lines the same way.
+
 The later grids run on a thread of their own (`hear::Woken`), so the first
 grid's steps, and its own hearing, never wait for them: a wake's catch-up
 took 0.95 to 1.16 s of one core on lamp-75c9. Done on lamp-name's own loop,

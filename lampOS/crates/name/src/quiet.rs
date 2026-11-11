@@ -268,6 +268,7 @@ mod tests {
                         name: (sum % 1_000_003) as f32 / 1_000_003.0,
                         stop: None,
                         rescue: None,
+                        late: 0,
                     }
                 })
                 .collect();
