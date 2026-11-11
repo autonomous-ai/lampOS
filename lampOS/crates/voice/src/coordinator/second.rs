@@ -261,14 +261,39 @@ pub(super) fn routes(
     }
 }
 
-/// [`routes`], from this process's environment.
+/// [`routes`], from this process's environment; in mainland China
+/// ([`in_china`]).
 pub(super) fn routes_from_environment(serving: bool) -> io::Result<Routes> {
     routes(
         var_os(ROUTE_ENV),
         var_os(crate::second_config::SECOND_CONFIG_ENV),
         serving,
     )
+    .map(|routes| {
+        in_china(
+            routes,
+            crate::second_provider::in_china(crate::second_provider::region_from_file().as_deref()),
+        )
+    })
     .map_err(|why| io::Error::new(io::ErrorKind::InvalidInput, why))
+}
+
+/// Gemini Live is not reached from mainland China (#6414): with the region
+/// `CN` and the second route configured, Gemini's routes become the second
+/// alone, said in the journal. Without a second route, Gemini's stay: there
+/// is nothing to fall back to.
+fn in_china(routes: Routes, in_china: bool) -> Routes {
+    match routes {
+        Routes::Live {
+            standby: Some(config),
+        } if in_china => {
+            eprintln!(
+                "lamp-voice: region CN: Gemini Live is refused, the voice route is second ({ROUTE_ENV})"
+            );
+            Routes::SecondOnly(config)
+        }
+        routes => routes,
+    }
 }
 
 /// The second route's own switches (`LAMP_SECOND_*`), from this process's
@@ -1145,6 +1170,25 @@ mod tests {
         }
         assert!(standby.standing_by());
         assert!(!alone.standing_by());
+    }
+
+    /// #6414: in China, Gemini's routes become the second alone when it is
+    /// configured; without it, or outside China, nothing changes.
+    #[test]
+    fn in_china_gemini_falls_back_to_the_second_route_when_there_is_one() {
+        let config = PathBuf::from("/etc/second.json");
+        let standby = Routes::Live {
+            standby: Some(config.clone()),
+        };
+        let alone = Routes::Live { standby: None };
+        assert_eq!(
+            in_china(standby.clone(), true),
+            Routes::SecondOnly(config.clone())
+        );
+        assert_eq!(in_china(standby.clone(), false), standby);
+        assert_eq!(in_china(alone.clone(), true), alone);
+        let second = Routes::SecondOnly(config);
+        assert_eq!(in_china(second.clone(), true), second);
     }
 
     /// The reviewer on #1686: `run_start` says `"voice_route":"second"` with

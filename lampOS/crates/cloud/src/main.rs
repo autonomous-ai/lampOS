@@ -390,6 +390,20 @@ fn main() -> ExitCode {
                 say("the rotated login could not be kept: it lasts until a restart");
             }
         };
+        // Where the backend places the lamp (#6414), kept beside the rotated
+        // login for the voice to read; said once each time it changes.
+        let mut region_kept = std::env::var_os("STATE_DIRECTORY")
+            .map(|dir| ping::Region::at(PathBuf::from(dir).join("region")));
+        let mut region = |region: &str| {
+            if let Some(result) = region_kept.as_mut().and_then(|kept| kept.take(region)) {
+                match result {
+                    Ok(()) => say(&format!("the backend places the lamp in region {region:?}")),
+                    Err(_) => say(&format!(
+                        "the backend places the lamp in region {region:?}, which could not be kept"
+                    )),
+                }
+            }
+        };
         let mut said_too = |line: &str| say(line);
         let pinging = beat::pings(
             accounts_tx,
@@ -398,6 +412,7 @@ fn main() -> ExitCode {
             ping::EVERY,
             &mut said,
             &mut keep,
+            &mut region,
             login.as_mut(),
         );
         let telling = async move {
