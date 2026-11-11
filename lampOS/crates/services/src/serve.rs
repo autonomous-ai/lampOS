@@ -1034,6 +1034,15 @@ impl<H: Http, M: Mail> Services<H, M> {
         write: bool,
     ) -> Result<String, String> {
         let name = service.name;
+        // Gmail's error status to the journal, which the words below may
+        // not tell (any other is "answered with an error"); nothing of its
+        // body.
+        if service.code.starts_with("gmail") && !(200..=299).contains(&reply.status) {
+            eprintln!(
+                "lamp-services: {} answered HTTP {}",
+                service.code, reply.status
+            );
+        }
         match reply.status {
             200..=299 => {}
             // A write the link's scopes don't allow, as Google says it.
@@ -1152,6 +1161,8 @@ impl<H: Http, M: Mail> Services<H, M> {
         entry: &Entry,
         ask: &MailAsk,
     ) -> Result<Vec<MailItem>, String> {
+        // The step running, for the journal when the read fails.
+        let step = std::cell::Cell::new("the list");
         let read = async {
             let get = async |url: String| {
                 self.call(service, entry, Method::Get, url, None, false)
@@ -1172,6 +1183,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             };
             let mut items = Vec::new();
             let gone = format!("{} has no such item", service.name);
+            step.set("a mail's get");
             for id in ids {
                 // A mail deleted between the list and its get is left out
                 // of a list's read, not the read's end (El's P3 on #5120).
@@ -1198,9 +1210,18 @@ impl<H: Http, M: Mail> Services<H, M> {
             // (`scrub_mail`).
             Ok(items)
         };
-        tokio::time::timeout(mail::WITHIN, read)
+        let read = tokio::time::timeout(mail::WITHIN, read)
             .await
-            .map_err(|_| format!("{} didn't answer in time", service.name))?
+            .unwrap_or_else(|_| Err(format!("{} didn't answer in time", service.name)));
+        // The step and the lamp's own words for why (an error status is
+        // told by `answer`), nothing of a mail.
+        if let Err(why) = &read {
+            eprintln!(
+                "lamp-services: a Gmail read (sign-in) failed at {}: {why}",
+                step.get()
+            );
+        }
+        read
     }
 
     /// A Gmail attachment's read with a Google sign-in: the mail whole
