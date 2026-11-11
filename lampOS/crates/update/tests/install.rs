@@ -188,6 +188,11 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn refresh(&mut self, argv: &[&str]) -> Result<(), String> {
+        self.calls.push(format!("refresh {}", argv.join(" ")));
+        Ok(())
+    }
+
     fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String> {
         self.calls.push(format!("harness version {user} {home}"));
         self.versions
@@ -7689,4 +7694,74 @@ fn the_product_carries_guard_modes_texts_alone_and_its_off_first_words() {
             assert!(!line.contains(&format!("Environment={closed}")), "{line}");
         }
     }
+}
+
+/// Debian's openresolv file as the V2 image leaves it
+/// (`scripts/imager/build-orangepi-v2.sh` before #6256): `name_servers=`,
+/// which openresolv puts before the router's.
+const RESOLVCONF_V2_IMAGE: &str = include_str!("fixtures/resolvconf-v2-image.conf");
+
+#[test]
+fn name_servers_follow_the_routers_and_answer_in_china() {
+    // #6256: absent, the V2 image's, and already fixed.
+    let absent = install::resolvconf_fixed(None);
+    assert_eq!(absent, format!("{}\n", install::NAME_SERVERS));
+    let image = install::resolvconf_fixed(Some(RESOLVCONF_V2_IMAGE));
+    assert_eq!(
+        image,
+        RESOLVCONF_V2_IMAGE.replace(
+            "name_servers=\"1.1.1.1 8.8.8.8\"",
+            r#"name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8""#
+        )
+    );
+    assert!(
+        image.contains("#name_servers=127.0.0.1\n"),
+        "a comment is kept"
+    );
+    for fixed in [&absent, &image] {
+        assert_eq!(&install::resolvconf_fixed(Some(fixed)), fixed);
+    }
+    // A second `name_servers*` line goes; the first one's place is kept.
+    assert_eq!(
+        install::resolvconf_fixed(Some("a=1\nname_servers=x\nb=2\n  name_servers_append=y\n")),
+        format!("a=1\n{}\nb=2\n", install::NAME_SERVERS)
+    );
+}
+
+#[test]
+fn the_v2_image_writes_the_same_name_servers_as_install() {
+    let imager = include_str!("../../../../scripts/imager/build-orangepi-v2.sh");
+    assert!(imager.contains(install::NAME_SERVERS), "the imager's line");
+    assert!(
+        !imager
+            .lines()
+            .any(|line| !line.trim_start().starts_with('#') && line.contains("name_servers=")),
+        "no name_servers= before the router's"
+    );
+}
+
+#[test]
+fn install_fixes_the_name_servers_and_asks_resolvconf_once() {
+    let mut lamp = Lamp::new(188, &[]);
+    fs::create_dir_all(lamp.on("/etc")).unwrap();
+    fs::write(lamp.on(install::RESOLVCONF_PATH), RESOLVCONF_V2_IMAGE).unwrap();
+    let done = lamp.install().unwrap();
+    assert!(
+        done.changed
+            .contains(&format!("wrote {}", install::RESOLVCONF_PATH))
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.on(install::RESOLVCONF_PATH)).unwrap(),
+        install::resolvconf_fixed(Some(RESOLVCONF_V2_IMAGE))
+    );
+    let refreshed = |lamp: &Lamp| {
+        lamp.host
+            .calls
+            .iter()
+            .filter(|call| *call == "refresh resolvconf -u")
+            .count()
+    };
+    assert_eq!(refreshed(&lamp), 1, "{:?}", lamp.host.calls);
+    lamp.install().unwrap();
+    assert_eq!(refreshed(&lamp), 1, "already fixed: nothing asked");
 }
