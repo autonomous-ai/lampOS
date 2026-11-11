@@ -2382,7 +2382,7 @@ the store's side in [memory-days](memory-days.md)):
 - **Off**, nothing is kept or written, and the receipts are kept exactly as
   before.
 
-### Records told (`LAMP_SERVICE_RECORDS_TOLD`, off unless set; on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064)
+### Records told (`LAMP_SERVICE_RECORDS_TOLD`, off unless set; on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, then off again the same night: with the records told, lamp-9adf spoke a read-back and said a move and a mail were done with no `service_write`; off until #6427 passes its rows)
 
 With `LAMP_SERVICE_RECORDS_TOLD=on` too (the second route only; it acts only
 with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,

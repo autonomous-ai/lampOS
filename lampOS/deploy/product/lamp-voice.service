@@ -638,7 +638,9 @@ Environment=LAMP_MEMORY_ROLE=on
 # to the owner's turns, redone from its record, and confirmed mail addresses kept as contacts. On: the owner's call
 # of 11 Nov, on the lamp-06c1 row https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064 (its two forget gaps follow later). Needs same-build lamp-memory.
 Environment=LAMP_SERVICE_RECORDS=on
-Environment=LAMP_SERVICE_RECORDS_TOLD=on
+# LAMP_SERVICE_RECORDS_TOLD stays off (11 Nov, a P1 on stable 11913: with the records told, the model spoke a
+# read-back and then "done" with no service_write, on lamp-9adf). Records are still kept, just not told, until
+# the history-only rule (#6427) passes its rows.
 Environment=LAMP_SERVICE_CONTACTS=on
 Environment=LAMP_SERVICE_REDO=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
