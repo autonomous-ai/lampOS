@@ -151,9 +151,10 @@ struct Exchange {
     named: Option<String>,
 }
 
-/// One function a turn ran ([`Thread::called`]): its name, and the
-/// arguments it is told with, an empty object for none.
-type Called = (String, serde_json::Value);
+/// One function a turn ran ([`Thread::called`]): its name, the arguments
+/// it is told with, an empty object for none, and what its result is told
+/// as ([`KeptCall::result`]), `None` for the plain kept result.
+type Called = (String, serde_json::Value, Option<&'static str>);
 
 /// A completed exchange, preserving the scope bound when its response began.
 /// This is journal attribution, not request-admission identity authorization.
@@ -249,10 +250,11 @@ impl Exchange {
         self.calls
             .iter()
             .enumerate()
-            .map(|(at, (name, args))| KeptCall {
+            .map(|(at, (name, args, result))| KeptCall {
                 id: format!("{KEPT_CALL_ID}{}-{at}", self.request),
                 name: name.clone(),
                 args: args.clone(),
+                result: *result,
             })
             .collect()
     }
@@ -302,6 +304,10 @@ pub struct KeptCall {
     pub id: String,
     pub name: String,
     pub args: serde_json::Value,
+    /// What its result is told as, a fixed line with nothing of the
+    /// person's in it (`second_provider::kept_result`: a service write's
+    /// status); `None`, the plain kept result (`worker::KEPT_CALL_RESULT`).
+    pub result: Option<&'static str>,
 }
 
 /// A scope's exchanges due for its running summary ([`Thread::summary_due`]).
@@ -1029,6 +1035,21 @@ impl Thread {
     /// (one whose words are not kept, a gone scope's, a silent one) is
     /// never told, nor are its calls.
     pub fn called(&mut self, request: u64, name: &str, args: &serde_json::Value) {
+        self.called_told(request, name, args, None);
+    }
+
+    /// [`Self::called`], its result told as `result` ([`KeptCall::result`])
+    /// when given: a service write's status, so a later turn sees that a
+    /// read-back or a "done" came from a call (lamp-06c1 at 11913, 11 Nov:
+    /// with each earlier write kept as words alone, the second write of a
+    /// kind in a conversation was read back by the model itself, no call).
+    pub fn called_told(
+        &mut self,
+        request: u64,
+        name: &str,
+        args: &serde_json::Value,
+        result: Option<&'static str>,
+    ) {
         if name.is_empty() || name.len() > NAME_BYTES || args.to_string().len() > KEPT_ARGS_BYTES {
             return;
         }
@@ -1036,9 +1057,9 @@ impl Thread {
             if calls.len() < CALLS
                 && !calls
                     .iter()
-                    .any(|(called, with)| called == name && with == args)
+                    .any(|(called, with, told)| called == name && with == args && *told == result)
             {
-                calls.push((name.to_owned(), args.clone()));
+                calls.push((name.to_owned(), args.clone(), result));
             }
         };
         if let Some(exchange) = self
@@ -4957,6 +4978,36 @@ mod tests {
         let recent = thread.recent(now, REMEMBERED_FOR, EXCHANGES);
         assert_eq!(recent.len(), 1);
         assert!(recent[0].calls.is_empty(), "{recent:?}");
+    }
+
+    /// lamp-06c1 at 11913 (11 Nov): a service write is kept with the
+    /// status its result is told as ([`Thread::called_told`]); a call kept
+    /// plainly has none, and the same call told two ways is kept twice.
+    #[test]
+    fn a_kept_call_keeps_the_result_it_is_told_with() {
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        let write = serde_json::json!({"service": "gmail", "action": "send_mail"});
+        thread.person("Send a mail to Ann.", true, now);
+        thread.called_told(1, "service_write", &write, Some("(prepared)"));
+        thread.called_told(1, "service_write", &write, Some("(prepared)"));
+        thread.called_told(1, "service_write", &write, Some("(done)"));
+        thread.called(1, "volume_down", &serde_json::json!({}));
+        thread.lamp(1, "Send an email to Ann. Shall I send it?", now);
+        let recent = thread.recent(now, REMEMBERED_FOR, EXCHANGES);
+        let told: Vec<_> = recent[0]
+            .calls
+            .iter()
+            .map(|call| (call.name.as_str(), call.result))
+            .collect();
+        assert_eq!(
+            told,
+            [
+                ("service_write", Some("(prepared)")),
+                ("service_write", Some("(done)")),
+                ("volume_down", None),
+            ]
+        );
     }
 
     /// #5045(a): a call is kept with the arguments it ran with, the same
