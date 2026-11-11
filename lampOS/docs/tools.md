@@ -546,7 +546,8 @@ functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
 voice's own 24 with these two among them (and `set_role` and `end_role`
 since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov), the actions part's
 17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
-(#4135, #2826). At the bound a core skill's function is never the one cut (the
+(#4135, #2826), Light show's `light_show` (#5745), and Light scenes'
+`light_scene` and Point the light's `point_light` (#5744). At the bound a core skill's function is never the one cut (the
 owner's rule, on #2614; [install.md](install.md)), and on the chat route
 neither is `reports_stop` nor any of the actions part's (the first builder,
 on #2644): the cut takes the second route's fetch, then its time
