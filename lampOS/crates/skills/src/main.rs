@@ -1039,6 +1039,41 @@ fn serve(
             Err(error) => eprintln!("lamp-skills: the skills turned off not read: {error}"),
         }
     }
+    // A long held trigger kept across a short restart (an update's), in the
+    // runtime folder beside the tools: tmpfs, so never across a reboot, and
+    // taken back only on the same boot (`lamp_skills::holds`).
+    if let Some(tools) = tools {
+        let boot = match options.boot_id.as_deref() {
+            Some(id) => Ok(id.to_owned()),
+            None => std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+                .map(|id| id.trim().to_owned())
+                .map_err(|error| format!("the boot not known ({error}): supply --boot-id")),
+        };
+        match boot.and_then(|boot| {
+            if boot.is_empty() {
+                Err("the boot not known".to_owned())
+            } else {
+                Ok(boot)
+            }
+        }) {
+            Ok(boot) => {
+                let file = tools.join(lamp_skills::holds::FILE);
+                match engine.keep_holds_in(file.clone(), boot, clock::now_us()) {
+                    Ok(read) => eprintln!(
+                        "lamp-skills: the long holds kept in {}: {read} read from before",
+                        file.display()
+                    ),
+                    Err(error) => eprintln!(
+                        "lamp-skills: the long holds kept in {}; none read: {error}",
+                        file.display()
+                    ),
+                }
+            }
+            Err(error) => {
+                eprintln!("lamp-skills: the long holds not kept across a restart: {error}")
+            }
+        }
+    }
     // Each run counted by where its skill came from, added to the state
     // folder's totals at most once a minute, for lamp-cloud's opt-in health
     // report to read (`lamp_skills::usage`, `docs/cloud.md`).
@@ -1533,6 +1568,8 @@ fn serve(
         for run in engine.tick(clock::now_us()) {
             handle(run, &mut runs, &mut out, &runner);
         }
+        // The long holds written when they changed, or every 30 s.
+        engine.keep_holds(clock::now_us());
         watch_look(&mut out, &runner);
     }
 }

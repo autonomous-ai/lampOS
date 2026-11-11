@@ -12,9 +12,11 @@ line suggesting a sip of water. Then the light is as it was.
 
 What it says and when:
 
-- It says nothing, ever. It never starts a conversation about water. If
-  you want a spoken reminder, ask for one ("remind me to drink water at
-  three"): that is your own reminder, which the lamp keeps and says.
+- It says one short line, worded by the voice the way a friend would: no
+  lecture, nothing about health. It never starts a conversation about
+  water beyond that line. If you want a reminder at a set time, ask for one
+  ("remind me to drink water at three"): that is your own reminder, which
+  the lamp keeps and says.
 - Once a sitting: it does not do it again while you stay. Three times a day
   at most, never while you read or write head down (with the eyes' activity on),
   and never in the middle of a conversation, before 10:00, after
@@ -36,11 +38,13 @@ stay, between 08:00 and 22:00, six times a day at most, and the wellbeing
 nudges share two an hour, never within half an hour of each other.
 
 It keeps nothing about you: only, in memory, how many times it went today
-and whether it is resting; off is one line with its name.
+and whether it is resting; off is one line with its name. How long you
+have sat is a time kept through a short restart of the lamp's skills (an
+update's), never across a reboot, with no person in it.
 
-An installable skill: its owner puts it on the lamp (`lamp-skills install`)
-and takes it off. Not in the product yet.
+A core skill: it comes with the lamp, on, and can be turned off by voice
+or in the app.
 
 If asked about it, the lamp says something like: "After you've sat a long
-while I give a slow blue glow, a hint to drink some water. I won't nag: say
+while I give a slow blue glow and suggest a sip of water. I won't nag: say
 'not today' and I'll stop until tomorrow."
