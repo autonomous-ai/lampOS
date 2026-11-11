@@ -153,3 +153,34 @@ Như vậy probe chưa tái hiện được kết quả 0 trên 3 của lamp-4ac
 chạy thật gửi thêm (ghi chú của bộ nhớ, các dòng của skill, các hàm tìm kiếm
 web, tên vừa nghe thấy) không có trong probe. D giúp việc giao việc không còn
 phụ thuộc vào những thứ đó. Chưa được phát thử trên đèn.
+
+## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
+
+Trước đây giọng nói không nói được Harness của đèn đã đăng nhập chưa, hay giao
+việc được cho máy tính và trợ lý nào, dù lamp-tasks biết cả hai. Với
+`LAMP_TASKS_HARNESS_STATUS=on` và phần tasks (`LAMP_TASKS_DIR`), cờ
+`--tasks-harness-status` của giọng nói (đứng cuối, sau `--tasks-reply-named`)
+cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng nhập chưa?",
+"đèn có những máy tính nào?" và "đèn giao việc được cho ai?".
+
+- **Đọc ở đâu.** Ba yêu cầu trên socket của phần tasks: `status` (lấy
+  `signed_in`), `targets` (bí danh, tên riêng và engine của từng máy) và
+  `tasks_now` (đếm số việc đang làm). Cả ba đều là bộ nhớ riêng của phần tasks,
+  không gọi Harness, nên trả lời ngay. lamp-tasks không đổi gì.
+- **Mô hình nhận được.** `signed_in` (`yes`, `offline`, `no` hoặc `unknown`);
+  `computers`: mỗi máy một lần, gọi bằng tên riêng nếu có (tối đa 40 ký tự,
+  một dòng), không thì bằng bí danh, kèm các trợ lý máy đó có (bỏ engine
+  `installed: false`), tối đa ba máy, phần còn lại đếm trong
+  `more_computers`; `working`: số việc đang làm, không có lời của việc nào,
+  và bỏ trống khi `tasks_now` bị từ chối; `next`: chỉ trả lời điều được hỏi,
+  một hai câu. Khi chưa đăng nhập, chỉ mời đăng nhập bằng giọng nói khi có
+  `LAMP_TASKS_SIGN_IN`, không thì bảo đăng nhập trong app.
+- **Khi lỗi.** Không có phần tasks thì nói như mọi lệnh giao việc khác. `status`
+  bị từ chối thì nói nhẹ nhàng là không làm được, journal chỉ ghi mã lỗi.
+- **Tắt** thì hàm không được khai báo, các hàm khác giữ nguyên từng chữ.
+- **Ai nghe.** Bất kỳ ai hỏi đèn đều nghe tên máy tính và trợ lý của người
+  dùng, nên công tắc tắt trong bản product cho đến khi first builder xét
+  (TWO READS).
+- **Test** (`agent_tasks`): `harness_status_is_declared_and_run_only_with_its_switch`,
+  `harness_status_says_the_sign_in_the_computers_and_the_work_as_counts`,
+  `harness_status_refused_says_it_lightly`.

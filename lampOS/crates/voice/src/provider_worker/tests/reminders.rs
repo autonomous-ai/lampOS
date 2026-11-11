@@ -900,6 +900,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
             now: false,
             one_yes: false,
             reply_named: false,
+            harness_status: false,
             sign_in: false,
             sign_in_app: false,
         }),

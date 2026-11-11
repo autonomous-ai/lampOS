@@ -3188,6 +3188,56 @@ Tests: `agent_tasks::tests::tasks_now_is_declared_and_run_only_with_its_switch`,
 `agent_tasks::tests::tasks_now_with_no_task_or_no_record_says_so_lightly`,
 `agent_tasks::tests::every_description_fits_the_service_whatever_the_switches`.
 
+### How the lamp's Harness is (#6061 part B, off unless `LAMP_TASKS_HARNESS_STATUS=on`)
+
+The voice could not say whether the lamp's Harness is signed in, or which
+computers and agents it can hand work to, though lamp-tasks knows both. With
+`LAMP_TASKS_HARNESS_STATUS=on` and the tasks part (`LAMP_TASKS_DIR`), the
+voice's `--tasks-harness-status`, taken last, after `--tasks-reply-named`,
+the model also has `harness_status`. It answers "is Harness signed in?",
+"which computers do you have?" and "what can you hand work to?".
+
+- **Where it reads.** Three requests on the tasks part's request socket,
+  each under the call's own deadline: `{"op":"status"}` for `signed_in`
+  (#5488), `{"op":"targets"}` for each computer's alias, `name` (#1676) and
+  engine, and `{"op":"tasks_now"}` for how many pieces of work are under
+  way. All three are the tasks part's own memory, so there is no Harness call
+  and the answer comes at once. lamp-tasks does not change.
+- **What the model gets.**
+  - `signed_in`: `yes`, `offline` (signed in, but Harness can't reach its
+    service just now), `no`, or `unknown` (not read yet since lamp-tasks
+    started, or any other value).
+  - `computers`: each computer once, in the targets' order, called by its
+    own name where the tasks part has one (trimmed, one line, at most 40
+    characters), else by its alias, with the agents it has by name. A target
+    whose engine wasn't found there (`installed: false`, #5199), one whose
+    alias isn't an alias's shape, and an engine the voice doesn't know are
+    left out. At most three are listed, and `more_computers` counts the rest.
+  - `working`: how many pieces of work are `working`. It is left out when
+    `tasks_now` is refused (no `serve --progress`), never a guess. No task's
+    words and no last step are given.
+  - `next`: answer only what was asked, in one or two sentences, never a
+    list, and name only what the answer has. With `signed_in: no`, it offers
+    to sign in by voice only with `LAMP_TASKS_SIGN_IN` (`--tasks-sign-in`);
+    otherwise it says to sign in from the app.
+- **When it fails.** No tasks part, or none set up, gets the same words as
+  every task call (`unreached`). A `status` that is refused gets the light
+  "can't do that" words, and the journal has only its code
+  (`lamp-voice: tasks: harness_status was refused: <code>`). A `targets` or
+  `tasks_now` that doesn't answer only leaves its part out.
+- **Off**, the function is not declared, and every other tool's description
+  is word for word as before (a test holds it).
+- **Who hears it.** Whoever asks the lamp hears the person's computer names
+  and agents. That is the same as the read-backs with
+  `LAMP_TASKS_MACHINE_NAMES`, but here it is asked for directly, so the switch
+  stays off in the product until the first builder judges it (TWO READS).
+- **Tests** (`agent_tasks`):
+  - `harness_status_is_declared_and_run_only_with_its_switch`;
+  - `harness_status_says_the_sign_in_the_computers_and_the_work_as_counts`
+    (each `signed_in`, grouping, names, the cap, no task words, within
+    500 ms of a local tasks part);
+  - `harness_status_refused_says_it_lightly`.
+
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
 
 On in the product's voice since 5 Nov (#5198), which the app's sign-in needs
