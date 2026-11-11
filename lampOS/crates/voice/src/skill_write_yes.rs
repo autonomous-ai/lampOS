@@ -91,6 +91,10 @@ pub struct Waiting {
     /// The lamp's words in each request from the make's on, and whether
     /// that answer was cut.
     pub said: VecDeque<(u64, String, bool)>,
+    /// Its id is told in a note to each later heard line
+    /// ([`waiting_note`]): a wait the voice's model began with no call of
+    /// its own (an app's make with code, #6307, [`wait_for_yes_noted`]).
+    pub noted: bool,
 }
 
 #[cfg(not(test))]
@@ -122,6 +126,19 @@ mod kept {
 /// yes to its writes: any other waiting is dropped (one at a time). Its
 /// id, for the model.
 pub fn wait_for_yes(asks: Asks, request: u64, now: Instant) -> String {
+    wait_for_yes_with(asks, request, now, false)
+}
+
+/// [`wait_for_yes`] for a say-back the lamp was given to say, with no call
+/// of the model's that it answers (an app's make with code of its own,
+/// #6307, `make_skill_local::app_code_asked`): its id is told in a note to
+/// each later heard line while it waits ([`waiting_note`]), as the history
+/// keeps no call's answer.
+pub fn wait_for_yes_noted(asks: Asks, request: u64, now: Instant) -> String {
+    wait_for_yes_with(asks, request, now, true)
+}
+
+fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> String {
     let id = format!(
         "yes-{:08x}",
         rand_u32(&asks.skill, request, now) // not a secret: only matched here
@@ -136,6 +153,7 @@ pub fn wait_for_yes(asks: Asks, request: u64, now: Instant) -> String {
             at: now,
             echoes: Vec::new(),
             said: VecDeque::new(),
+            noted,
         });
     });
     if code {
@@ -159,6 +177,28 @@ fn rand_u32(skill: &str, request: u64, now: Instant) -> u32 {
     hasher.write_u64(request);
     hasher.write_u128(now.elapsed().as_nanos());
     hasher.finish() as u32
+}
+
+/// The note a later heard line `request` is told at `now` of a wait begun
+/// by [`wait_for_yes_noted`]: the skill said back waits for the person's
+/// yes, and how to take it ([`then_wait`]'s words). None for any other
+/// wait, none waiting, or past [`YES_WITHIN`].
+pub fn waiting_note(request: u64, now: Instant) -> Option<String> {
+    kept::waiting(|waiting| {
+        let waiting = waiting.as_ref().filter(|waiting| {
+            waiting.noted
+                && request > waiting.request
+                && now.saturating_duration_since(waiting.at) <= YES_WITHIN
+        })?;
+        Some(format!(
+            "(For you to know, not to answer: the skill {} that the lamp just said back waits \
+             for their yes before it runs any code, approve_id \"{}\". If they agree, in any \
+             words, call make_skill with only that approve_id. If they decline, wait or change \
+             it, don't call it: it stays off.)",
+            crate::made_skill::spoken_name(&waiting.asks.skill),
+            waiting.id
+        ))
+    })
 }
 
 /// Whether a made skill's writes wait for the yes at `now`: the echo hold
