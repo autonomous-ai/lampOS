@@ -6,8 +6,8 @@
 # turns back. From the middle, no clear side: it does not move. No search,
 # no second look. Written to lamp-skills' schema (docs/skills.md).
 needs = ["eyes", "body"]
-# A core skill (docs/skills.md, "Core and installable skills"), installed
-# disabled until its lamp check (install::PRODUCT_SKILLS_OFF).
+# A core skill (docs/skills.md, "Core and installable skills"), on in the
+# product since #2834 (install::PRODUCT_SKILLS).
 # It moves the body, so it is tried only with someone at the arm.
 kind = "core"
 version = "1.0.0"
@@ -20,7 +20,7 @@ topics = ["room/stood_up", "voice/state", "body/hand"]
 body = true
 
 [trigger]
-topic = "room/stood_up"   # said by the eyes (LAMP_ACTIVITY=on) only for the sitter, never a passer-by
+topic = "room/stood_up"   # said by the eyes (LAMP_ACTIVITY=place in the product) only for the sitter, never a passer-by
 field = "sitting_s"
 above = 0                 # every departure the eyes say
 when = "appears"          # once a departure

@@ -13,7 +13,8 @@ desk; a short look away does not end it, getting up for a few minutes does.
 
 What it says and when:
 
-- It says nothing, ever, and never anything about how you sit.
+- It says one short, friendly line, worded by the voice the way a friend
+  would, and never anything about how you sit.
 - Once a sitting: it does not do it again while you stay. Twice a day at
   most, never while you read or write head down (with the eyes' activity on),
   and never in the middle of a conversation, before 08:00, after
@@ -21,7 +22,9 @@ What it says and when:
 - With the eyes' activity on, the sitting is yours: someone else sitting down in
   your chair begins it again, so it is never theirs at your 100 minutes.
 - At most one of the wellbeing nudges (this, A sip of water, Rest your eyes
-  and Wind down) an hour between them.
+  and Wind down) an hour between them; with the lamp's `LAMP_NUDGES_PRESENT`
+  switch on (#5207, set in the product's skills units), two an hour, never
+  within half an hour of each other.
 - If it does it twice and you neither look at it nor move nor say
   anything, it rests until tomorrow morning.
 - "Not today" or "stop the stand-up reminders" to the lamp (one function
@@ -31,9 +34,9 @@ What it says and when:
 It keeps nothing about you: only, in memory, how many times it went today
 and whether it is resting; off is one line with its name.
 
-An installable skill: its owner puts it on the lamp (`lamp-skills install`)
-and takes it off. Not in the product yet.
+A core skill: it comes with the lamp, on, and can be turned off by voice
+or in the app.
 
 If asked about it, the lamp says something like: "When you've sat a really
-long time I give you a little look, a hint to get up and move. Say 'not
+long time I give you a little look and suggest you get up and move. Say 'not
 today' and I'll stop until tomorrow."
