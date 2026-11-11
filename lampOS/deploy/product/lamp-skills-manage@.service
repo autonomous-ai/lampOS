@@ -27,6 +27,9 @@ Environment=LAMP_SKILLS_STORE=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): a made skill's read step is held
 # to its cap again as it is put on (install_made, lamp_voice::made_skill::put_on_cap). Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# A made skill's write (#6066, #6142): a made skill with one fixed write step loads as it is put on; it sends
+# only after the owner's yes to its content, at most three a day, never a public post. On in the product (owner, 11 Nov).
+Environment=LAMP_SKILL_WRITES=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills' [present] values, as lamp-skills
 # loads them, so the app's on and off act on the skills as they run. The same line in lamp-skills.service and lamp-cloud.service.
 Environment=LAMP_NUDGES_PRESENT=on

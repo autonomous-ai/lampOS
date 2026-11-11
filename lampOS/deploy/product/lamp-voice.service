@@ -423,6 +423,10 @@ Environment=LAMP_SAME_VOICE_FOR=services
 # A made skill reads a linked service to its owner alone (#5288, #5303): the made-skill brief lets one read
 # through, passed to the provider and second routes. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# A made skill's write (#6066, #6142): the made-skill brief carries one fixed write, said back whole, and the
+# owner's later yes approves its content (the say-back's own echo held), passed to both routes; a send needs that
+# yes, at most three a day, never a public post, and is told at the next heard line. On in the product (owner, 11 Nov).
+Environment=LAMP_SKILL_WRITES=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill

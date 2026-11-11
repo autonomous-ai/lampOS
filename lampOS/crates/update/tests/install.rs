@@ -1907,6 +1907,53 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
     }
 }
 
+/// A made skill's write goes out after its owner's yes in the product
+/// (#6066, #6142): the owner's ask on 11 Nov, so the testers can try it.
+/// `LAMP_SKILL_WRITES=on` in the four units that read it, `lamp-services`
+/// (sends it on the owner's yes to its content, with writes on),
+/// `lamp-skills` (loads a write step and runs it), its manage helper (loads
+/// a made write as it is put on) and `lamp-voice` (carries a write in a
+/// made skill and takes the yes), each once, and no other product unit
+/// names it.
+#[test]
+fn the_product_lets_a_made_skill_write_after_its_owners_yes() {
+    let owners = [
+        "lamp-services.service",
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+        "lamp-voice.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_SKILL_WRITES=on")
+            .count();
+        let mentioned = service
+            .iter()
+            .filter(|line| line.contains("LAMP_SKILL_WRITES"))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+    // A made skill's write is sent only with the services' writes on too.
+    let services = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-services.service")
+        .unwrap()
+        .1;
+    assert!(
+        section(services, "Service").contains(&"Environment=LAMP_SERVICES_WRITE=on"),
+        "lamp-services lacks LAMP_SERVICES_WRITE"
+    );
+}
+
 /// A skill added from a file in the app, on at once (#5080, #5977): the
 /// switch is on in both parts that read it, `lamp-cloud` (the kind, with
 /// the skills page) and `lamp-voice` (the app-make socket, with the maker
