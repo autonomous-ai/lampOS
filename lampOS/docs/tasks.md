@@ -1708,6 +1708,21 @@ environment list), `harness start` among them. Its journal says `tasks:
 Harness's own updates held (ADAPTER_UPDATE_DISABLE=true,
 HARNESS_ENV_FILE=…)`, or `not held: <why>` when the file can't be written.
 
+**The managed grid held too (#6283).** `ADAPTER_UPDATE_DISABLE` doesn't
+reach Harness's managed grid runtime: the daemon's `ensureManagedGrid`
+(openharness `lib/runtimeInstall.ts`, v0.6.13_cli) follows the grid pin at
+`ADAPTER_GRID_RUNTIME_METADATA_URL` (Harness's CDN) on each start and every
+10 minutes, held or not. So a held lamp's `harness-hold.env` also says
+`HARNESS_GRID_BIN=<the grid binary>`, the path Harness's installer recorded
+in `/var/lib/lampos-tasks/.harness/runtime/current-grid` when it laid down
+the pin's grid. With it set the daemon uses that binary and never fetches
+another, so a newer grid comes only with a pin move, whose install lays
+down the pinned grid and records it again (lamp-tasks is started again
+after the move, and the file's new words restart the daemon). The line is
+written only when that record is a plain absolute path to a `bin/grid` file
+inside `.harness/runtime`. With no grid installed, or on a dev or beta lamp
+where the hold is lifted, there is no line, and the variable isn't given.
+
 **Dev and beta lamps: the hold lifted (#6300, (B)).** With the switch on,
 a lamp whose updater follows the lamp-voice feed is the canary for Harness's
 releases, and every writer of the hold lifts it there instead:
