@@ -192,6 +192,9 @@ pub struct Shared {
     /// The manage helper's socket, root's, which installs, lists and
     /// removes pushed skills (`crate::push`).
     manage: Mutex<Option<PathBuf>>,
+    /// Where the owner's yeses to skills' tasks are kept (`--state-dir`,
+    /// [`crate::task_yes`]): none, and the yes requests are refused.
+    task_yes: Mutex<Option<PathBuf>>,
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
@@ -224,6 +227,7 @@ impl Shared {
             limits: Mutex::new(Limits::default()),
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
+            task_yes: Mutex::new(None),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
             close_reasons: Mutex::new(HashMap::new()),
@@ -239,6 +243,12 @@ impl Shared {
 
     pub fn set_manage_socket(&self, socket: PathBuf) {
         *self.manage.lock().expect("manage") = Some(socket);
+    }
+
+    /// The folder the owner's yeses to skills' tasks are kept in
+    /// ([`crate::task_yes`], lamp-control's `--state-dir`).
+    pub fn set_task_yes_folder(&self, folder: PathBuf) {
+        *self.task_yes.lock().expect("task_yes") = Some(folder);
     }
 
     /// `ask` of the manage helper off the door's lock and the runtime's
@@ -373,6 +383,7 @@ impl Shared {
                 limits: Mutex::new(Limits::default()),
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
+                task_yes: Mutex::new(None),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
                 close_reasons: Mutex::new(HashMap::new()),
@@ -1337,11 +1348,15 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
             continue;
         };
         let shared = shared.clone();
+        // Whether the peer is the voice, by its pid's cgroup: the one part
+        // that may record the person's yes to a skill's task.
+        let from_the_voice =
+            crate::task_yes::peer_is_voice(stream.peer_cred().ok().and_then(|peer| peer.pid()));
         tokio::spawn(async move {
             let (read, mut write) = stream.into_split();
             let mut lines = BufReader::new(read).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let answer = admin_answer(&shared, &line);
+                let answer = admin_answer(&shared, &line, from_the_voice);
                 if write
                     .write_all(format!("{answer}\n").as_bytes())
                     .await
@@ -1363,10 +1378,22 @@ fn grant_names(grants: &[Grant]) -> String {
         .join(", ")
 }
 
-fn admin_answer(shared: &Shared, line: &str) -> Value {
+fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
     let Ok(Value::Object(asked)) = serde_json::from_str::<Value>(line) else {
         return json!({"error": "one JSON object a line"});
     };
+    // The owner's yes to a skill's task (#6305): recorded by the voice
+    // alone, checked by lamp-skills, taken back by a remove.
+    let folder = shared.task_yes.lock().expect("task_yes").clone();
+    if let Some(answer) = crate::task_yes::answer(
+        folder.as_deref(),
+        &asked,
+        from_the_voice,
+        crate::task_yes::on(),
+        wall_ms(),
+    ) {
+        return answer;
+    }
     let now = shared.now_us();
     if let Some(code) = asked.get("code") {
         let say_pin = code.get("say_pin") == Some(&json!(true));
@@ -1503,7 +1530,7 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
         // a grant it has no label of its own for.
         return json!({"clients": clients, "shown": Grant::shown_all()});
     }
-    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke or clients"})
+    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check or task_yes_forget"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`

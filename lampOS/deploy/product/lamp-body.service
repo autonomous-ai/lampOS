@@ -30,6 +30,10 @@ RuntimeDirectoryMode=0755
 # Shared with lamp-body-measure's measured.env and the first stand's record, at the same mode.
 StateDirectory=lampos-body
 StateDirectoryMode=0755
+# lamp-control's state folder hidden (#6305): it keeps the owner's yes to a skill's task, which a part
+# running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
+# made at lamp-control's first start, and a part started before it is not refused.
+InaccessiblePaths=-/var/lib/lampos-control
 Environment=LAMP_BUS=on
 Environment=LAMP_EXPRESSION_BODY=on
 Environment=LAMP_BODY_POSE_ASK=on

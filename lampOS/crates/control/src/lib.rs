@@ -35,4 +35,5 @@ pub mod rate;
 pub mod server;
 pub mod session;
 pub mod sounds;
+pub mod task_yes;
 pub mod watch;
