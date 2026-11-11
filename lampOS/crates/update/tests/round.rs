@@ -3170,6 +3170,10 @@ impl lamp_update::install::Host for InstallHost {
         Ok(())
     }
 
+    fn refresh(&mut self, _: &[&str]) -> Result<(), String> {
+        Ok(())
+    }
+
     fn running_sha256(&mut self) -> Result<String, String> {
         Err("not asked of this lamp".into())
     }
