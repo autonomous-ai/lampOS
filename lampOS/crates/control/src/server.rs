@@ -1634,6 +1634,9 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
         let grants: Result<BTreeSet<Grant>, _> =
             serde_json::from_value(code.get("grants").cloned().unwrap_or(json!([])));
         return match grants {
+            Ok(grants) if grants.iter().any(|grant| grant.is_service()) => {
+                json!({"error": format!("grants: {}", crate::services::RUNS_ONLY)})
+            }
             Ok(grants) => {
                 // The pairing screen's words for what is granted.
                 let shown: Vec<&str> = grants.iter().map(|grant| grant.shown()).collect();
@@ -1680,6 +1683,9 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
         };
         let grants: Result<BTreeSet<Grant>, _> = serde_json::from_value(asked_grants);
         let grants = match grants {
+            Ok(grants) if grants.iter().any(|grant| grant.is_service()) => {
+                return json!({"error": format!("grants: {}", crate::services::RUNS_ONLY)});
+            }
             Ok(grants) => grants,
             Err(error) => return json!({"error": format!("grants: {error}")}),
         };

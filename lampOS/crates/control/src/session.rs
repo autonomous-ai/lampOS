@@ -304,6 +304,9 @@ pub struct Door {
     /// The recorded moves of the computers' pushed skills (`crate::
     /// pushed_moves`), kept beside the packages: with skill push on.
     moves: Option<crate::pushed_moves::Moves>,
+    /// A skill run's linked services, with `LAMP_SKILL_TASKS=on`: none, and
+    /// `service.read` and `service.write` are off (`crate::services`).
+    services: Option<crate::services::Services>,
     /// Each computer's pairing generation, raised at its every pair,
     /// re-pair and revoke from one counter, so an install asked under one
     /// pairing knows when it's no longer the same (the same key gets the
@@ -416,6 +419,7 @@ impl Door {
             sounds: None,
             notes: None,
             moves: None,
+            services: None,
             revs: BTreeMap::new(),
             last_rev: 0,
             asking: BTreeSet::new(),
@@ -552,6 +556,13 @@ impl Door {
     /// `sounds`, which the voice plays from).
     pub fn with_sound_folder(mut self, folder: PathBuf) -> Self {
         self.sounds = Some(crate::sounds::Sounds::new(folder));
+        self
+    }
+
+    /// A skill run's `service.read` and `service.write` sent on to
+    /// lamp-services' tools socket at `socket` (`LAMP_SKILL_TASKS=on`).
+    pub fn with_skill_services(mut self, socket: PathBuf) -> Self {
+        self.services = Some(crate::services::Services::new(socket));
         self
     }
 
@@ -707,7 +718,10 @@ impl Door {
     }
 
     /// The owner's app asks for a pairing code with `grants`.
-    pub fn issue_code(&mut self, grants: BTreeSet<Grant>, now_us: u64) -> String {
+    pub fn issue_code(&mut self, mut grants: BTreeSet<Grant>, now_us: u64) -> String {
+        // A linked service is a skill run's alone (the admin socket refuses
+        // one in words first).
+        grants.retain(|grant| !grant.is_service());
         self.code_grants = grants;
         self.codes.issue(&self.random, now_us)
     }
@@ -741,8 +755,9 @@ impl Door {
     pub fn set_grants(
         &mut self,
         client: &str,
-        grants: BTreeSet<Grant>,
+        mut grants: BTreeSet<Grant>,
     ) -> Result<GrantsSet, SetGrantsRefused> {
+        grants.retain(|grant| !grant.is_service());
         let Some((before, unknown)) = self.clients.set_grants(client, grants.clone()) else {
             return Err(SetGrantsRefused::NoSuchComputer);
         };
@@ -975,6 +990,11 @@ impl Door {
         let Some(client) = session.client.clone() else {
             return refuse(ErrorCode::NoHello, "say hello first".to_owned());
         };
+        // A skill run's linked services: off, nothing else is looked at.
+        if matches!(op, Op::ServiceRead { .. } | Op::ServiceWrite { .. }) && self.services.is_none()
+        {
+            return refuse(ErrorCode::Off, crate::services::OFF.to_owned());
+        }
         let grants = self
             .clients
             .get(&client)
@@ -996,6 +1016,30 @@ impl Door {
                 .any(|grant| matches!(grant, Grant::Camera | Grant::Microphone))
         {
             return refuse(ErrorCode::Refused, LOCAL_ONLY.to_owned());
+        }
+        if let Op::ServiceRead { service, args } | Op::ServiceWrite { service, args } = &op {
+            // Its grant is held (above); and it is a skill run's, by the run
+            // socket, whose run is still going: sent on to lamp-services,
+            // which answers off the door's lock.
+            let skill = self
+                .runs
+                .of_client(&client, now_us)
+                .filter(|_| session.run_socket)
+                .map(|run| run.skill.clone());
+            let (Some(skill), Some(services)) = (skill, self.services.clone()) else {
+                return refuse(ErrorCode::NoGrant, crate::services::RUNS_ONLY.to_owned());
+            };
+            let write = matches!(op, Op::ServiceWrite { .. });
+            let line = crate::services::Services::line(&skill, write, service, args);
+            return Outcome {
+                later: Some(Later {
+                    re,
+                    client,
+                    op: journal::op_name(&op),
+                    run: Box::new(move || services.call(&line)),
+                }),
+                ..Outcome::default()
+            };
         }
         match &op {
             Op::Subscribe { events, phrases } => {
@@ -3790,5 +3834,175 @@ mod tests {
         );
         assert_eq!(reply(&outcome)["re"], 4);
         assert!(fake.did.is_empty());
+    }
+
+    // --- A skill run's linked services (#6432) ---
+
+    fn service(code: &str, access: protocol::Access) -> Grant {
+        Grant::Service(protocol::ServiceGrant::of(code, access).unwrap())
+    }
+
+    /// A door (its services sent to `services`, or off) with run `r1` of
+    /// skill `mail-count` holding `grants`, said hello on the run socket.
+    fn run_door(grants: &[Grant], services: Option<PathBuf>) -> (Door, Session, Fake) {
+        let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+        if let Some(socket) = services {
+            door = door.with_skill_services(socket);
+        }
+        let token = "T".repeat(43);
+        door.mint_run(
+            &token,
+            "r1",
+            "mail-count",
+            grants.iter().copied().collect(),
+            None,
+            0,
+        )
+        .unwrap();
+        let mut fake = Fake::default();
+        let (mut session, _) = door.open_run();
+        let hello = json!({"id": 1, "op": "hello", "client": crate::runs::HELLO_CLIENT,
+            "sig": crate::runs::hello_sig(), "token": token})
+        .to_string();
+        let outcome = door.handle(&mut session, &hello, &mut fake, S, 1);
+        assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+        (door, session, fake)
+    }
+
+    fn read_frame(service: &str) -> String {
+        json!({"id": 3, "op": "service.read", "service": service,
+            "args": {"what": "search", "query": "is:unread"}})
+        .to_string()
+    }
+
+    fn write_frame(service: &str) -> String {
+        json!({"id": 4, "op": "service.write", "service": service,
+            "args": {"action": "send", "to": ["ann@example.com"], "text": "hi"}})
+        .to_string()
+    }
+
+    #[test]
+    fn with_the_switch_off_a_runs_service_call_is_off_and_nothing_is_sent() {
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Read)], None);
+        let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&outcome), Some("off"), "{outcome:?}");
+        assert_eq!(
+            reply(&outcome)["error"]["why"],
+            crate::services::OFF,
+            "{outcome:?}"
+        );
+        assert!(outcome.later.is_none() && fake.did.is_empty());
+    }
+
+    #[test]
+    fn a_run_without_the_services_grant_is_refused() {
+        let socket = PathBuf::from("/nonexistent/call.sock");
+        let (mut door, mut session, mut fake) = run_door(&[Grant::Light], Some(socket.clone()));
+        let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&outcome), Some("no_grant"), "{outcome:?}");
+        assert_eq!(
+            reply(&outcome)["error"]["why"],
+            not_granted(&["gmail-read".to_owned()])
+        );
+        // Another service's grant is not this one's.
+        let (mut door, mut session, mut fake) = run_door(
+            &[service("google_calendar", protocol::Access::Read)],
+            Some(socket),
+        );
+        let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&outcome), Some("no_grant"), "{outcome:?}");
+        assert!(outcome.later.is_none());
+    }
+
+    #[test]
+    fn a_read_grant_is_no_write_and_a_write_grant_no_read() {
+        let socket = PathBuf::from("/nonexistent/call.sock");
+        let (mut door, mut session, mut fake) = run_door(
+            &[service("gmail", protocol::Access::Read)],
+            Some(socket.clone()),
+        );
+        let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&outcome), Some("no_grant"), "{outcome:?}");
+        assert_eq!(
+            reply(&outcome)["error"]["why"],
+            not_granted(&["gmail-write".to_owned()])
+        );
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], Some(socket));
+        let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&outcome), Some("no_grant"), "{outcome:?}");
+        // A write that tries to send is no request at all.
+        let send = json!({"id": 5, "op": "service.write", "service": "gmail",
+            "args": {"action": "send", "send_id": "s1", "said": "send"}})
+        .to_string();
+        let outcome = door.handle(&mut session, &send, &mut fake, S, 1);
+        assert_eq!(code_of(&outcome), Some("bad_request"), "{outcome:?}");
+        assert_eq!(reply(&outcome)["error"]["why"], protocol::RUN_PREPARES_ONLY);
+        assert!(outcome.later.is_none());
+    }
+
+    #[test]
+    fn a_paired_computer_never_holds_a_services_grant() {
+        let computer = Computer::new(61);
+        let (mut door, mut session, mut fake) = paired(
+            &computer,
+            &[Grant::Light, service("gmail", protocol::Access::Read)],
+        );
+        door = door.with_skill_services(PathBuf::from("/nonexistent/call.sock"));
+        let id = pairing::client_id(&computer.key());
+        assert_eq!(
+            door.clients().get(&id).unwrap().grants,
+            [Grant::Light].into()
+        );
+        let set = door
+            .set_grants(&id, [service("gmail", protocol::Access::Write)].into())
+            .unwrap();
+        assert!(set.grants.is_empty(), "{set:?}");
+        let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&outcome), Some("no_grant"), "{outcome:?}");
+    }
+
+    #[test]
+    fn a_granted_read_goes_to_lamp_services_off_the_lock_with_the_runs_skill() {
+        use std::io::{BufRead as _, Write as _};
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-run-read-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let socket = dir.join("call.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            writeln!(stream, r#"{{"ok":true,"result":{{"items":[],"count":0}}}}"#).unwrap();
+            line
+        });
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Read)], Some(socket));
+        // `gmail-app` is granted as `gmail`.
+        let outcome = door.handle(&mut session, &read_frame("gmail-app"), &mut fake, S, 1);
+        assert!(outcome.send.is_empty(), "{outcome:?}");
+        let later = outcome.later.expect("answered off the lock");
+        assert_eq!(later.op, "service.read");
+        let answered = later.reply();
+        assert_eq!(
+            answered,
+            json!({"re": 3, "ok": true, "result": {"items": [], "count": 0}})
+        );
+        let asked: Value = serde_json::from_str(&served.join().unwrap()).unwrap();
+        assert_eq!(
+            asked,
+            json!({"op": "call", "name": "service_read", "skill": "mail-count",
+                "args": {"what": "search", "query": "is:unread", "service": "gmail-app"}})
+        );
+        // Once the run ends, its connection holds nothing.
+        door.end_run("r1", None);
+        let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
+        assert!(outcome.later.is_none(), "{outcome:?}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
