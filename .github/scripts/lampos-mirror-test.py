@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline CDN mirror tests: gcloud, the network and the updater are simulated."""
 
+import base64
 import copy
 import hashlib
 import importlib.util
@@ -232,20 +233,37 @@ class RunTests(unittest.TestCase):
     ENV = {"LAMPOS_CDN_MIRROR": "on", "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": M.REPO, "GITHUB_EVENT_NAME": "workflow_dispatch",
            "GITHUB_REF": "refs/heads/lamp-voice", "PROMOTE_SEQUENCE": str(SEQUENCE), M.SECRET: "not-a-key", "LAMPOS_UPDATE_PUBLIC_KEY": "AAAA"}
 
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.work = Path(self.folder.name)
+        self.updater = self.work / "built" / "lamp-update"
+        self.updater.parent.mkdir()
+        self.updater.write_bytes(b"#!/bin/false\n")
+        self.updater.chmod(0o700)
+
+    def tearDown(self):
+        self.folder.cleanup()
+
     def mirror(self, **changes):
-        env = {**self.ENV, **changes}
+        env = {**self.ENV, "LAMPOS_MIRROR_UPDATER": str(self.updater), **changes}
         env = {key: value for key, value in env.items() if value is not None}
-        return M.Mirror(env, tempfile.gettempdir(), store=M.Store(BUCKET, FakeGcloud()))
+        return M.Mirror(env, self.work, store=M.Store(BUCKET, FakeGcloud()))
 
     def test_a_complete_context_passes(self):
         mirror = self.mirror()
         mirror.validate_context()
         self.assertEqual(mirror.sequence, SEQUENCE)
+        self.assertEqual(mirror.updater, self.updater)
 
     def test_every_missing_piece_of_the_context_refuses(self):
+        plain = self.work / "plain"
+        plain.write_bytes(b"x")
+        plain.chmod(0o600)
         for change in ({"LAMPOS_CDN_MIRROR": "off"}, {"LAMPOS_CDN_MIRROR": None}, {"GITHUB_ACTIONS": "false"}, {"GITHUB_REPOSITORY": "x/y"},
                        {"GITHUB_EVENT_NAME": "pull_request"}, {"GITHUB_EVENT_NAME": "push"}, {"GITHUB_REF": "refs/heads/main"}, {"GITHUB_REF": "refs/tags/v1"},
-                       {"PROMOTE_SEQUENCE": ""}, {"PROMOTE_SEQUENCE": "0"}, {"PROMOTE_SEQUENCE": "1x"}, {M.SECRET: None}, {"LAMPOS_UPDATE_PUBLIC_KEY": None}):
+                       {"PROMOTE_SEQUENCE": ""}, {"PROMOTE_SEQUENCE": "0"}, {"PROMOTE_SEQUENCE": "1x"}, {M.SECRET: None}, {"LAMPOS_UPDATE_PUBLIC_KEY": None},
+                       {"LAMPOS_MIRROR_UPDATER": None}, {"LAMPOS_MIRROR_UPDATER": "lamp-update"}, {"LAMPOS_MIRROR_UPDATER": str(self.work / "absent")},
+                       {"LAMPOS_MIRROR_UPDATER": str(plain)}, {"LAMPOS_MIRROR_UPDATER": RELEASE + "lamp-update"}):
             with self.subTest(change=change):
                 with self.assertRaises(M.Refused):
                     self.mirror(**change).validate_context()
@@ -262,6 +280,93 @@ class RunTests(unittest.TestCase):
             mirror.not_behind(current)
         with self.assertRaises(M.Refused):
             mirror.not_behind(SEQUENCE + 1)
+
+
+class RunOrderTests(unittest.TestCase):
+    """`Mirror.run` end to end with the network, gcloud and the updater simulated:
+    what is downloaded, what is executed and whether anything is signed."""
+
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.work = Path(self.folder.name) / "work"
+        self.work.mkdir()
+        self.updater = Path(self.folder.name) / "built" / "lamp-update"
+        self.updater.parent.mkdir()
+        self.updater.write_bytes(b"#!/bin/false\n")
+        self.updater.chmod(0o700)
+        self.downloads = []
+        self.executed = []
+        self.served = {}
+        self.signature_ok = True
+        self.gcloud = FakeGcloud()
+
+    def tearDown(self):
+        self.folder.cleanup()
+
+    def envelope(self, value):
+        raw = M.pretty(value)
+        self.served[M.STABLE_URL] = json.dumps({"manifest": base64.b64encode(raw).decode(), "signature": "x"}).encode()
+
+    def download(self, url, path, most, sleep):
+        self.downloads.append(url)
+        if url not in self.served:
+            raise M.Refused("download failed")
+        Path(path).write_bytes(self.served[url])
+
+    def run_mirror(self):
+        test = self
+
+        class Commands:
+            def run(self, words, output=None):
+                test.executed.append([str(word) for word in words])
+                if words[1] == "check":
+                    return f"up to date: build {SEQUENCE}\n".encode() if test.signature_ok else b"refused: bad signature\n"
+                return b"AAAA\n"
+        env = {**RunTests.ENV, "LAMPOS_MIRROR_UPDATER": str(self.updater)}
+        mirror = M.Mirror(env, self.work, store=M.Store(BUCKET, self.gcloud), commands=Commands(), download=self.download, sleep=lambda _s: None)
+        with self.assertRaises(M.Refused):
+            mirror.run()
+
+    def assert_nothing_signed(self):
+        self.assertFalse(any(words[1] in ("sign", "public-key") for words in self.executed))
+        self.assertFalse((self.work / "signing.key").exists())
+        self.assertEqual(self.gcloud.writes(), [])
+
+    def assert_only_the_built_updater_ran(self):
+        self.assertTrue(all(words[0] == str(self.updater) for words in self.executed))
+
+    def test_an_envelope_naming_a_foreign_files_folder_downloads_and_signs_nothing(self):
+        for files_url in ("https://example.invalid/evil/", RELEASE.replace("4242", "4241"), RELEASE.replace("lampOS", "other")):
+            with self.subTest(files_url=files_url):
+                self.downloads, self.executed = [], []
+                value = manifest()
+                value["files_url"] = files_url
+                self.envelope(value)
+                self.served[files_url + "lamp-update"] = b"swapped updater"
+                self.run_mirror()
+                self.assertEqual(self.downloads, [M.STABLE_URL])
+                self.assertEqual(self.executed, [])
+                self.assert_nothing_signed()
+
+    def test_a_swapped_updater_in_the_release_is_never_executed(self):
+        value = manifest()
+        value["units"] = []
+        self.envelope(value)
+        self.served[RELEASE + "lamp-update"] = b"swapped updater"
+        self.run_mirror()
+        self.assertIn(RELEASE + "lamp-update", self.downloads)
+        self.assertEqual([words[1] for words in self.executed], ["check"])
+        self.assert_only_the_built_updater_ran()
+        self.assert_nothing_signed()
+
+    def test_a_failed_signature_check_stops_before_any_further_step(self):
+        self.signature_ok = False
+        self.envelope(manifest())
+        self.run_mirror()
+        self.assertEqual(self.downloads, [M.STABLE_URL])
+        self.assertEqual([words[1] for words in self.executed], ["check"])
+        self.assert_only_the_built_updater_ran()
+        self.assert_nothing_signed()
 
 
 class ProbeTests(unittest.TestCase):
