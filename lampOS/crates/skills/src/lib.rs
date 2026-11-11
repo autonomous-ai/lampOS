@@ -23,6 +23,7 @@ pub mod addon;
 pub mod clock;
 pub mod daily;
 pub mod glow;
+pub mod holds;
 pub mod knowledge;
 pub mod known;
 pub mod limits;
@@ -5676,6 +5677,31 @@ struct Watch {
     /// Each gate a due chance was said dropped by ([`dropped`], #2602): the
     /// hold it was said in and when. A run clears them.
     said: HashMap<&'static str, (Option<u64>, u64)>,
+    /// Its hold was taken back from before a restart ([`holds`]): the next
+    /// message of its topic must hold, or the hold is dropped, whatever its
+    /// `gap`.
+    restored: bool,
+}
+
+/// Whether a trigger's hold is kept across a short restart ([`holds`]): a
+/// plain `present` trigger with a `for` of at least [`holds::KEPT_FROM_US`],
+/// with none of the state a restart forgets beside its own watch (`each`, a
+/// `rise`, a rearm line, `once_per_day`), in a skill none of whose triggers
+/// works with another (`follows`, `instead_of`, `yields_to`,
+/// `stands_in_for_group`).
+fn kept_hold(skill: &Skill, trigger: &Trigger) -> bool {
+    trigger.when == When::Present
+        && trigger.for_us >= holds::KEPT_FROM_US
+        && trigger.each.is_none()
+        && trigger.rise.is_none()
+        && trigger.rearm_line.is_none()
+        && !trigger.once_per_day
+        && skill.triggers.iter().all(|any| {
+            any.follows.is_none()
+                && any.instead_of.is_none()
+                && any.yields_to.is_none()
+                && !any.stands_in_for_group
+        })
 }
 
 /// A gate's line is not said again for the same trigger within this long,
@@ -5896,6 +5922,10 @@ pub struct Engine {
     /// the same words twice (#3997). Behind a lock as [`Engine::still`]
     /// makes calls from a shared engine; in memory only.
     picked: std::sync::Mutex<HashMap<String, usize>>,
+    /// Where the long holds are kept across a short restart ([`holds`]).
+    holds: Option<holds::Keeper>,
+    /// The holds read at the start, taken back at the first load of skills.
+    restoring: Option<holds::Restored>,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -6093,6 +6123,8 @@ impl Engine {
             rest_through_sounds: false,
             sooner: false,
             picked: std::sync::Mutex::default(),
+            holds: None,
+            restoring: None,
         }
     }
 
@@ -6110,6 +6142,149 @@ impl Engine {
     pub fn sooner(mut self) -> Self {
         self.sooner = true;
         self
+    }
+
+    /// The long holds kept in `file` across a short restart of the program
+    /// ([`holds`], `docs/skills.md`, "A hold kept across a restart"), on the
+    /// boot `boot`: what the file keeps of this boot is read now, and taken
+    /// back at the first load of skills; from then on [`Engine::keep_holds`]
+    /// writes them. How many holds were read is returned.
+    pub fn keep_holds_in(
+        &mut self,
+        file: PathBuf,
+        boot: String,
+        now_us: u64,
+    ) -> Result<usize, String> {
+        let keeper = holds::Keeper::new(file, boot);
+        let read = keeper.read(now_us);
+        self.holds = Some(keeper);
+        let read = read.map_err(|error| error.to_string())?;
+        let count = read.as_ref().map_or(0, |read| read.holds.len());
+        self.restoring = read;
+        self.restore_holds();
+        Ok(count)
+    }
+
+    /// The long holds written where they are kept ([`Engine::keep_holds_in`]),
+    /// when they changed, or every [`holds::WRITE_EVERY_US`] while any is
+    /// kept. The program calls it at each turn of its loop.
+    pub fn keep_holds(&mut self, now_us: u64) {
+        if self.holds.is_none() {
+            return;
+        }
+        let now = self.holds_now(now_us);
+        if let Some(keeper) = &mut self.holds {
+            keeper.keep(now, now_us);
+        }
+    }
+
+    /// The holds to keep at `now_us`: each [`kept_hold`] trigger that holds,
+    /// of a skill nothing a restart forgets holds back now (a snooze, a rest
+    /// or a nudge still being judged, its day's most, a run of its group
+    /// within the hour, a word that stands in for its group still to come).
+    /// Such a hold is not kept, and begins again after a restart, as before:
+    /// a hold taken back never brings a nudge sooner than a lamp that never
+    /// restarted.
+    fn holds_now(&self, now_us: u64) -> Vec<holds::Hold> {
+        let day = day_of(self.clock, now_us);
+        let mut kept = Vec::new();
+        for skill in &self.skills {
+            let name = &skill.name;
+            let held_back = self.snoozed.get(name).is_some_and(|until| now_us < *until)
+                || self
+                    .nudges
+                    .get(name)
+                    .is_some_and(|nudge| !nudge.judged || now_us < nudge.resting_until_us)
+                || skill.most_a_day.is_some_and(|most| {
+                    self.day_runs
+                        .get(name)
+                        .is_some_and(|(on, count)| *on == day && *count >= most)
+                })
+                || skill.budget.as_ref().is_some_and(|(group, _)| {
+                    self.group_runs.get(group).is_some_and(|began| {
+                        began.iter().any(|at| now_us.saturating_sub(*at) < HOUR_US)
+                    })
+                })
+                || self.stood_in_by(name, now_us).is_some();
+            if held_back {
+                continue;
+            }
+            for (index, trigger) in skill.triggers.iter().enumerate() {
+                if !kept_hold(skill, trigger) {
+                    continue;
+                }
+                let Some(watch) = self.watches.get(&(name.clone(), index)) else {
+                    continue;
+                };
+                if let (Some(since_us), Some(last_held_us)) = (watch.since_us, watch.last_held_us) {
+                    kept.push(holds::Hold {
+                        skill: name.clone(),
+                        trigger: index,
+                        fingerprint: holds::fingerprint(trigger),
+                        since_us,
+                        last_held_us,
+                        spent: watch.spent,
+                        ran_us: watch.ran_us,
+                        waiting_us: watch.waiting_us,
+                    });
+                }
+            }
+        }
+        kept
+    }
+
+    /// The holds read at the start taken back, once skills are loaded: each
+    /// of a loaded skill whose trigger at that place is still [`kept_hold`]
+    /// and has the same fingerprint, last seen holding within that trigger's
+    /// `gap` of when the file was read, and not holding here already. The
+    /// next message of its topic must hold, or it is dropped ([`Watch`]'s
+    /// `restored`). The rest are let go.
+    fn restore_holds(&mut self) {
+        if self.skills.is_empty() {
+            return;
+        }
+        let Some(read) = self.restoring.take() else {
+            return;
+        };
+        for hold in read.holds {
+            let Some(skill) = self.skills.iter().find(|skill| skill.name == hold.skill) else {
+                continue;
+            };
+            let Some(trigger) = skill.triggers.get(hold.trigger) else {
+                continue;
+            };
+            let sound = hold.since_us <= hold.last_held_us
+                && hold.last_held_us <= read.written_us
+                && hold.ran_us.is_none_or(|ran| ran <= read.written_us)
+                && hold
+                    .waiting_us
+                    .is_none_or(|waiting| waiting <= read.written_us);
+            if !sound
+                || !kept_hold(skill, trigger)
+                || holds::fingerprint(trigger) != hold.fingerprint
+                || read.read_us.saturating_sub(hold.last_held_us) > trigger.gap_us
+            {
+                continue;
+            }
+            let watch = self
+                .watches
+                .entry((skill.name.clone(), hold.trigger))
+                .or_default();
+            if watch.since_us.is_some() {
+                continue;
+            }
+            watch.since_us = Some(hold.since_us);
+            watch.last_held_us = Some(hold.last_held_us);
+            watch.spent = hold.spent;
+            watch.ran_us = watch.ran_us.max(hold.ran_us);
+            watch.waiting_us = hold.waiting_us;
+            watch.restored = true;
+            eprintln!(
+                "lamp-skills: {}: its hold taken back from before the restart, held {} s",
+                skill.name,
+                read.read_us.saturating_sub(hold.since_us) / 1_000_000
+            );
+        }
     }
 
     /// The lines of due chances dropped since the last take, each
@@ -6893,6 +7068,7 @@ impl Engine {
             let before = condition(&old, name, *index);
             before.is_some() && before == condition(new, name, *index)
         });
+        self.restore_holds();
         ends
     }
 
@@ -7575,10 +7751,14 @@ impl Engine {
                     }
                 }
                 let holds = trigger.test.holds(&value) && followed;
+                // A hold taken back from before a restart is confirmed by
+                // its topic's next message, or dropped (`holds`).
+                let restored = std::mem::take(&mut watch.restored);
                 if !(rose && holds && chooses(skill, &value)) {
-                    if watch
-                        .last_held_us
-                        .is_none_or(|held| now_us - held >= trigger.gap_us)
+                    if restored
+                        || watch
+                            .last_held_us
+                            .is_none_or(|held| now_us - held >= trigger.gap_us)
                     {
                         if trigger.once_per_day
                             && let Some(since) = watch.since_us

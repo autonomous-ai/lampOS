@@ -1269,3 +1269,66 @@ của lamp-voice (`/lampos.slice/lampos-voice.slice/lamp-voice.service`,
 Danh tính bên gọi chỉ đọc được trên Linux; ở nơi khác không bên nào là giọng
 nói. `LAMP_SKILLS_ANY_ASKER=on` trong môi trường của chính lamp-skills (không
 unit nào đặt nó) coi mọi bên là giọng nói, chỉ dùng cho các bài kiểm thử.
+
+## Giữ một lần giữ dài qua lần khởi động lại
+
+`for` của một trigger được đếm trong bộ nhớ từ lúc nó bắt đầu giữ, theo đồng
+hồ đơn điệu của máy, đồng hồ này chạy tiếp qua lần khởi động lại chương
+trình và chỉ bắt đầu lại khi khởi động lại máy. Mỗi bản cập nhật khởi động
+lại `lamp-skills`, nên trước đây một lần ngồi 50 hay 90 phút bắt đầu lại ở
+mỗi bản cập nhật (một đèn sản phẩm, bản 11756, khởi động lại nó lúc 11:03,
+11:03 và 11:39, và lời nhắc uống nước hiếm khi tới). Giờ một lần giữ dài
+được giữ qua một lần khởi động lại ngắn trong cùng lần khởi động máy
+(`crates/skills/src/holds.rs`). Không có công tắc: đó là cách `for` và `gap`
+vốn được đọc, giữ qua một lần khởi động lại vốn không phải khoảng trống
+trong lần ngồi.
+
+- **Giữ gì.** Với `--tools-dir DIR`, `DIR/holds.json` (0600): lần khởi động
+  máy (`--boot-id`, không thì `/proc/sys/kernel/random/boot_id`; không có cả
+  hai thì không giữ gì, và journal nói vậy), lúc ghi, và mỗi lần giữ: kỹ
+  năng, vị trí của trigger trong nó, dấu vân tay của trigger (SHA-256 của
+  những gì chương trình đọc được từ nó), lúc bắt đầu và lúc thấy giữ lần
+  cuối, cơ hội đã dùng chưa (một lần mỗi lần ngồi), lần chạy cuối (cho
+  `cooldown`) và từ lúc nào cơ hội chờ `[[while]]` (`wait`). Không có gì về
+  một người. Tệp được ghi trọn bên cạnh rồi chuyển đè, khi một lần giữ bắt
+  đầu, kết thúc hay đổi, và mỗi 30 s khi còn giữ (`holds::WRITE_EVERY_US`),
+  không bao giờ ở mỗi tin nhắn. Unit sản phẩm cho `--tools-dir
+  /run/lampos-skills`, tmpfs, mất khi khởi động lại máy, và
+  `RuntimeDirectoryPreserve=restart`, nên thư mục còn qua một lần khởi động
+  lại (`systemctl restart` của bản cập nhật, hoặc `Restart=on-failure`) và
+  mất khi dừng.
+- **Trigger nào.** Một trigger `present` có `for` ít nhất một phút
+  (`holds::KEPT_FROM_US`), không có `each`, `rise`, đường rearm hay
+  `once_per_day`, trong một kỹ năng không có trigger nào làm việc cùng
+  trigger khác (`follows`, `instead_of`, `yields_to`,
+  `stands_in_for_group`): các lời nhắc sức khỏe (A sip of water, Rest your
+  eyes, Stand up, Stretch break, Wind down, Comfort break) và tương tự.
+- **Không giữ khi lần khởi động lại sẽ quên điều đang cản kỹ năng.** Tạm
+  hoãn, nghỉ sau các lời nhắc không ai để ý hay một lời nhắc còn đang được
+  xét, đã tới `most_a_day` của ngày, một lần chạy của nhóm `[budget]` trong
+  giờ qua, hay một từ `stands_in_for_group` còn chờ: những thứ này chỉ ở
+  trong bộ nhớ, và lần khởi động lại quên chúng. Khi bất kỳ thứ nào đang
+  cản một kỹ năng, lần giữ của nó không được ghi, và bắt đầu lại sau lần
+  khởi động lại, như trước. Vậy một lần giữ được lấy lại không bao giờ làm
+  lời nhắc tới sớm hơn một đèn chưa từng khởi động lại.
+- **Lấy lại khi khởi động.** Đọc lúc khởi động, lấy lại ở lần nạp kỹ năng
+  đầu tiên, chỉ từ tệp của cùng lần khởi động máy, ghi không muộn hơn bây
+  giờ, cho một kỹ năng đã nạp mà trigger ở vị trí đó vẫn thuộc loại được
+  giữ và có cùng dấu vân tay (trigger bị sửa, hay chương trình đọc nó khác
+  đi, thì bắt đầu lại), thấy giữ lần cuối trong `gap` của chính trigger đó
+  tính tới lúc khởi động (quá `gap` thì lần ngồi đã hết, như khi không khởi
+  động lại). Journal nói `<skill>: its hold taken back from before the
+  restart, held N s`. Tin nhắn kế tiếp của topic trigger phải giữ, không thì
+  lần giữ bị bỏ ngay, bất kể `gap`, và bắt đầu lại từ tin nhắn kế tiếp có
+  giữ; một tin nhắn có giữ thì đi tiếp từ lúc bắt đầu đã giữ. Khởi động lại
+  máy, tệp của lần khởi động khác, hay tệp không đọc được thì không giữ gì.
+  Số lần trong ngày, giờ của nhóm, `[rest]` và tạm hoãn vẫn ở trong bộ nhớ
+  như trước; `off` và journal hằng ngày được giữ như cũ.
+
+Kiểm thử (`crates/skills/tests/it/holds.rs`):
+`a_hold_kept_across_a_short_restart_comes_at_its_own_time`,
+`a_hold_begins_again_past_its_gap_on_another_boot_or_edited`,
+`a_hold_taken_back_is_dropped_by_a_first_message_that_does_not_hold`,
+`a_hold_that_ran_keeps_its_cooldown_across_a_restart`,
+`a_snoozed_skills_hold_is_not_kept`. Bản đầy đủ ở [skills.md](../skills.md),
+"A hold kept across a restart".

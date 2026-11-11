@@ -173,7 +173,7 @@ must not leave a step silently undone)*.
 | `trigger.changes` | with `when = "changes"` only | 1 to 8 distinct dot-separated field paths, each at most 128 bytes without control characters. The selected scalar values are compared together, so simultaneous changes make one chance. Missing fields, objects, arrays and strings over 256 bytes make no chance and do not replace the previous snapshot. A selected path cannot equal, contain, or lie inside a `[[while]]` field on the same topic; loading refuses that combination. This mode requires a scalar `field` comparison (array/object equality is refused); it refuses `each`, `key`, `near`, `present`, `absent_for`, `for`, `gap`, `rearm`, `cooldown`, `wait`, `rise`, `during`, `once_per_day`, `unless_heard` and `yields_to` |
 | `trigger.near` | no | On `humans/faces/tracked` alone: only a face at least this share of the picture's height counts (Welcome back: 0.14, the voice's Presence line for someone at the desk) |
 | `trigger.for` | no | It has held this long |
-| `trigger.gap` | no | A dropout shorter than this does not break `for` |
+| `trigger.gap` | no | A dropout shorter than this does not break `for`. A long `for` is kept through a short restart of `lamp-skills` within its `gap` ("A hold kept across a restart") |
 | `trigger.absent_for` | no | `appears` only: at least this long before, it did not hold, counted from the last time it held in a hold that lasted its `for`: a glimpse shorter than `for` lost past its `gap` (a face caught for 2 s as someone sits down) is no visit and does not start the clock again (#2825). At the program's start nothing has been away: someone there at the first message is not greeted |
 | `trigger.rearm` | no | `leaves` or `ends`, which mean the same: once each time it holds, and again only after it stopped. Without it, `present` runs at every message once `for` has passed, as often as `cooldown` lets it. Or a line, on a trigger with a `field` (#1021): `{ below = N, for = D }` (or `above`): once each time it holds, and again only after the trigger's field has been below N, by the messages of its topic, for D since the last chance; a dip that does not stay past the line does not count, however often the trigger stops and holds again (Stuffy air: `{ below = 1000, for = "10m" }` on a trigger above 1,200). A chance held back by a condition, the cooldown or the Policy is spent as one that ran, unless `wait` keeps one held back by a condition; one that comes in the quiet hours is kept (`[quiet]`): the line waits for the chance taken |
 | `trigger.cooldown` | no | Not again within this long of the last run. A run the Policy refused does not count |
@@ -1132,6 +1132,71 @@ lamp-voice's unit (`/lampos.slice/lampos-voice.slice/lamp-voice.service`,
 Peer credentials are read on Linux only; elsewhere no peer is the voice.
 `LAMP_SKILLS_ANY_ASKER=on` in lamp-skills' own environment (no unit sets
 it) takes any peer as the voice, for the tests that drive the socket.
+
+### A hold kept across a restart
+
+A trigger's `for` is counted in memory from when it began to hold, on the
+host's monotonic clock, which runs on through a restart of the program and
+begins again only at a reboot. Each update restarts `lamp-skills`, so
+before this a 50- or 90-minute sitting began again at every update (a
+product lamp, build 11756, restarted it at 11:03, 11:03 and 11:39, and its
+water nudge rarely came). Now a long hold is kept through a short restart
+on the same boot (`crates/skills/src/holds.rs`). No switch: it is how
+`for` and `gap` already read, kept through a restart that is no gap in the
+sitting.
+
+- **What is kept.** With `--tools-dir DIR`, `DIR/holds.json` (0600): the
+  boot (`--boot-id`, else `/proc/sys/kernel/random/boot_id`; with neither,
+  nothing is kept, and the journal says so), when it was written, and each
+  hold: the skill, the trigger's place in it, a fingerprint of the trigger
+  (the SHA-256 of what the program read of it), when it began and was last
+  seen holding, whether its chance was had (once a sitting), its last run
+  (for its `cooldown`) and since when its chance waits for its `[[while]]`
+  (`wait`). Nothing about a person. It is written whole beside it and moved
+  over it, when a hold begins, ends or changes, and every 30 s while one is
+  kept (`holds::WRITE_EVERY_US`), never at each message. The product's
+  unit gives `--tools-dir /run/lampos-skills`, tmpfs, gone at a reboot, and
+  `RuntimeDirectoryPreserve=restart`, so the folder stays through a restart
+  (an update's `systemctl restart`, or `Restart=on-failure`) and goes at a
+  stop.
+- **Which triggers.** A `present` trigger with a `for` of at least a minute
+  (`holds::KEPT_FROM_US`), with no `each`, `rise`, rearm line or
+  `once_per_day`, in a skill none of whose triggers works with another
+  (`follows`, `instead_of`, `yields_to`, `stands_in_for_group`): the
+  wellbeing nudges (A sip of water, Rest your eyes, Stand up, Stretch break,
+  Wind down, Comfort break) and the like. A shorter `for` loses little to a
+  restart of a few seconds.
+- **Not kept while a restart would forget what holds the skill back.** A
+  snooze, a rest after nudges nobody noticed or a nudge still being judged,
+  its day's `most_a_day` reached, a run of its `[budget]` group within the
+  last hour, or a `stands_in_for_group` word still to come are in memory
+  only, and a restart forgets them. While any of them holds a skill back,
+  its hold is not written, and begins again after a restart, as before. So
+  a hold taken back never brings a nudge sooner than on a lamp that never
+  restarted.
+- **Taken back at the start.** Read at the start, and taken back at the
+  first load of skills, only from a file of the same boot written no later
+  than now, for a loaded skill whose trigger at that place is still one
+  that is kept and has the same fingerprint (an edited trigger, or a
+  program that reads it differently, begins again), last seen holding
+  within that trigger's own `gap` of the start (a restart is a time it was
+  not seen: past the gap, the sitting is over, as without a restart). The
+  journal says `<skill>: its hold taken back from before the restart, held
+  N s`. The next message of the trigger's topic must hold, or the hold is
+  dropped at once, whatever its `gap`, and begins again with the next that
+  holds; one that holds goes on from the kept start. A reboot, another
+  boot's file, or one that can't be read keeps nothing. The day's count,
+  the group's hour, `[rest]` and a snooze stay in memory as before; `off`
+  and the daily journal are kept as they were.
+
+Tests (`crates/skills/tests/it/holds.rs`):
+`a_hold_kept_across_a_short_restart_comes_at_its_own_time` (held 30
+minutes, restarted 20 s later: it comes at 50 minutes of the first start,
+as on a lamp that never restarted),
+`a_hold_begins_again_past_its_gap_on_another_boot_or_edited`,
+`a_hold_taken_back_is_dropped_by_a_first_message_that_does_not_hold`,
+`a_hold_that_ran_keeps_its_cooldown_across_a_restart`,
+`a_snoozed_skills_hold_is_not_kept`; the file's own in `src/holds.rs`.
 
 ### A watch
 
