@@ -666,3 +666,18 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
   switched at 14:26), twice: d08 held 2/2; d07 answered 2/2, let out by
   `held` on one shared word ("time"). Drop-in out, restart 14:55:13, lamp as
   found. #4450 stays heron's (issuecomment-6762092969).
+
+## 2026-11-11 — back on Queue #6059, from 11:5x
+
+- **11:5x** Back after the break. Queue moved to #6059. #5991's risk half was answered by the memory owner; #6004/#6014 were reverted in 774. The Store skill checks went to Seventh on 52e6, and Heron takes any left over tomorrow (6787330542).
+- **14:00–14:26 #6058's row on lamp-fc4b (11798, carries `13215f1a11`): PASS on all 4 steps** (6789798361). My person's hand did the touches. No `lamp-bus` on the product lamp, so I polled `/run/lampos-bus/body/hand/latest` read-only.
+  - 22 holds; `body/hand` was let go in 2.0–3.3 s each time.
+  - Moved and left: let go in 3.2 s.
+  - Resting on a cup: let go once in 23.6 s, with no repeat nudge.
+  - a01 played from the Mac and answered (first audio 1826 ms).
+  - lamp-body NRestarts=0 throughout. QUIET posted on #3336.
+  - Lessons: macOS `say` doesn't pass lamp-name's bar (0.81–0.83), so play the kit's recorded clip; check the Mac isn't on headphones.
+- **14:4x #6140 READ-OK as landed** `d2e6faf10b` (the same patch-id as `195713d708`), the second read for #6113 (6790002784).
+  - Held is judged only in `finish`.
+  - #5777's body says `STATUS=held, nothing moves:` again at every start, which matches `judge::HELD`.
+  - Gates and a mutation pass. P3s: a self-switch loses the "held" kind, and the cloud alert says only `done`.
