@@ -2381,15 +2381,20 @@ lẫn lượt chạy đều không giữ token nào.
   và chương trình này chỉ gửi lần ghi của lượt chạy khi đó là SHA của lời
   đọc lại nó đang giữ (`serve::read_back_sha256`, nếu không thì
   `RUN_NOT_SAID`, không gì được gửi). Một lời từ chối, một lời chờ, một
-  request khác được trả lời hay hết thời gian giữ: không gì được gửi. Mô
+  request khác được trả lời hay hết thời gian giữ: không gì được gửi. Một
+  lời từ chối đơn giản nói ra ("no", "don't send it", "cancel", "stop",
+  "không, đừng gửi", nhiều nhất sáu từ; "no, send it" thì không phải) bỏ nó
+  ngay (`services::run_declined`): lần ghi đang chờ của giọng nói, và việc
+  giữ của chương trình này qua đường huỷ hiện có (`send_id` với `said` khác
+  "send"), và mô hình được bảo chỉ nói "Okay, I won't send it." Mô
   hình chỉ được báo "đã gửi" từ câu trả lời `sent: true` của chương trình
   này (`services::answered`); vượt giới hạn của kỹ năng hay bị từ chối thì
   "chưa gửi".
 - **Chưa làm (nói ra để không ai đọc code thành nhiều hơn):** lamp-control
   chưa giữ lời đồng ý cho kỹ năng nào (`SkillYes` của #6408), nên chưa token
   nào được tạo, và chưa unit sản phẩm nào đặt `LAMP_SKILL_TASKS`. Một lời từ
-  chối không huỷ việc giữ ở đây: nó hết hạn sau 2 phút, và lần ghi của lượt
-  chạy khác phải chờ đến lúc đó. Bộ điều phối không biết tuyến nào trả lời:
+  chối bằng những từ khác ngoài lời từ chối đơn giản chỉ bỏ lần ghi đang
+  chờ của giọng nói, còn việc giữ của chương trình này hết hạn sau 2 phút. Bộ điều phối không biết tuyến nào trả lời:
   trên tuyến Live lời đọc lại vẫn được nói nhưng lời đồng ý của nó là "không
   làm trên giọng này". Test:
   `serve::tests::lamp_control_calls_only_with_the_switch_on`,
@@ -2397,7 +2402,8 @@ lẫn lượt chạy đều không giữ token nào.
   `a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent` và
   `the_voice_is_told_a_runs_held_write_and_sends_only_what_it_read_back`;
   trong giọng nói, `run_write_yes::tests` (nói kèm tên kỹ năng, một lời đồng
-  ý đơn giản gửi nó, một lời từ chối bỏ nó, công tắc tắt thì bỏ qua, không
+  ý đơn giản gửi nó, một lời từ chối bỏ nó, một lời từ chối nói ra bỏ việc giữ ngay, công tắc
+  tắt thì bỏ qua, không
   nói "đã gửi" khi chưa xong); trong lamp-control, `session::tests` (công tắc
   tắt, không có quyền, sai loại, một máy tính đã ghép đôi, một lần đọc được
   cấp quyền) và `protocol::tests`.

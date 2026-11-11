@@ -966,6 +966,111 @@ pub fn wait_for_run_yes(request: u64, run: &crate::run_write_yes::RunWrite, now:
     );
 }
 
+/// What the model is told when the person said no to a skill run's write
+/// read back: it is dropped at once, here and in `lamp-services`.
+pub const RUN_DECLINED_NOTE: &str = "(For you to know: they said no to the skill's write. It is dropped and nothing was sent. Say only, in the conversation's language: \"Okay, I won't send it.\" Call nothing.)";
+
+/// The words a plain no is made of ([`plain_no`]), at least one of them.
+const NO_WORDS: [&str; 13] = [
+    "no", "nope", "nah", "don't", "dont", "cancel", "stop", "không", "đừng", "thôi", "hủy", "huỷ",
+    "never",
+];
+/// Words a plain no may have beside them.
+const NO_BESIDE: [&str; 9] = [
+    "please", "lamp", "hey", "it", "that", "thanks", "mind", "now", "đi",
+];
+
+/// Whether `words` are a plain no and nothing else: "No.", "Don't send
+/// it.", "Cancel.", "Stop.", "Không, đừng gửi." At most six words, no
+/// question, a no word in it, and "send" or "gửi" only after "don't",
+/// "dont" or "đừng", so "no, send it" is never a no.
+pub fn plain_no(words: &str) -> bool {
+    if words.trim_end().ends_with('?') {
+        return false;
+    }
+    let words: Vec<String> = words
+        .split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '’'))
+        .map(|word| {
+            word.trim_matches(['\'', '’'])
+                .replace('’', "'")
+                .to_lowercase()
+        })
+        .filter(|word| !word.is_empty())
+        .collect();
+    if words.is_empty() || words.len() > 6 {
+        return false;
+    }
+    let mut no = false;
+    let mut negated = false;
+    for word in &words {
+        let word = word.as_str();
+        if NO_WORDS.contains(&word) {
+            no = true;
+            negated |= matches!(word, "don't" | "dont" | "đừng");
+        } else if matches!(word, "send" | "gửi") {
+            if !negated {
+                return false;
+            }
+        } else if !NO_BESIDE.contains(&word) {
+            return false;
+        }
+    }
+    no
+}
+
+/// The person's line `words` in `request` said a plain no ([`plain_no`]) to
+/// a skill run's write read back in an earlier request: it is dropped at
+/// once, `lamp-services`' hold too (its existing discard: the write's
+/// `send_id` with anything but "send", on a thread of its own), and the
+/// model is told to say only that it won't be sent ([`RUN_DECLINED_NOTE`]).
+pub fn run_declined(request: u64, words: &str) -> Option<String> {
+    run_declined_with(request, words, |kept| {
+        let call = json!({"op": "call", "name": WRITE,
+            "args": {"service": kept.service, "send_id": kept.send_id, "said": "no"}});
+        let spawned = std::thread::Builder::new()
+            .name("lamp-voice-run-no".into())
+            .spawn(move || {
+                let told = crate::tools::exchange(
+                    &Path::new(FOLDER).join(crate::tools::CALL_SOCKET),
+                    &call,
+                    LINKED_DEADLINE,
+                );
+                if told.is_none() {
+                    eprintln!(
+                        "lamp-voice: a skill run's declined write: the lamp's services didn't answer; its hold lapses"
+                    );
+                }
+            });
+        if spawned.is_err() {
+            eprintln!("lamp-voice: a skill run's declined write: no thread to drop its hold");
+        }
+    })
+}
+
+/// [`run_declined`] with `discard` for `lamp-services`' hold.
+pub fn run_declined_with(
+    request: u64,
+    words: &str,
+    discard: impl FnOnce(&Pending),
+) -> Option<String> {
+    if !plain_no(words) {
+        return None;
+    }
+    let kept = kept::pending(|pending| {
+        pending
+            .as_ref()
+            .is_some_and(|kept| kept.run.is_some() && request > kept.request)
+            .then(|| pending.take())
+            .flatten()
+    })?;
+    crate::service_records::settle(&kept.send_id, Status::Cancelled, "the person said no");
+    discard(&kept);
+    eprintln!(
+        "lamp-voice: request {request}: a skill run's write dropped: the person said no (#6432)"
+    );
+    Some(RUN_DECLINED_NOTE.to_owned())
+}
+
 /// The write a skill's run prepared and `lamp-services` holds, if any
 /// (`run_write_waiting`, the voice's own call, never offered to its model,
 /// #6432): `None` when there is none or it can't be told. Blocking, at

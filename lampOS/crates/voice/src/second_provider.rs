@@ -10007,6 +10007,9 @@ async fn spoken(
         .task_waiting
         .as_ref()
         .and_then(|note| note(request))
+        // A plain no to a skill run's write read back drops it at once
+        // (#6432).
+        .or_else(|| crate::services::run_declined(request, &text))
         .or_else(|| {
             let owner = crate::services::owner_of(scope.as_ref());
             crate::services::waiting_note(request, owner.as_deref(), Instant::now())
