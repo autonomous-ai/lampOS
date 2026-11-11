@@ -2104,8 +2104,16 @@ thúc một token vẫn còn dùng được ở dịch vụ (người thử ph�
 và GitHub mỗi ngày). Nó được dùng cho đến khi chính dịch vụ từ chối: một 401
 cho một lần gọi HTTP (kể cả "Bad credentials" của GitHub, nhưng không phải
 một 401 có body nói scope quá ít), hoặc một 401 của dịch vụ MCP hay lời của
-nó cho một token chết (`invalid_auth`, `token_expired`, `token_revoked`,
-trong một lỗi JSON-RPC hoặc lỗi của một tool; `mcp::DEAD_TOKEN`). Lần gọi đó
+nó cho một token chết (`invalid_auth`, `token_expired`, `token_revoked`;
+`mcp::DEAD_TOKEN`) trong một trường của chính lỗi của nó: `message` của một
+lỗi JSON-RPC, một `code`, `error` hay `data` dạng text, hoặc `error`, `code`
+hay `message` của chính `data`; lỗi của một tool (`isError`) theo các trường
+đó của `structuredContent` hoặc khối nội dung đầu tiên, dạng text hay dạng
+các trường của một object JSON (`{"ok":false,"error":"invalid_auth"}` của
+Slack). Trường phải là chính từ đó, đứng một mình hoặc đứng đầu lời giải
+thích, sau một "Error:" tuỳ chọn (`mcp::says_dead_token`): từ đó được trích
+ở bất kỳ chỗ nào khác, như trong một tin nhắn hay một issue mà tool trả về,
+một khối sau, hay một kết quả thành công, không đánh dấu gì. Lần gọi đó
 được trả lời như trước ("<Service> refused the lamp's link: it may need
 linking again in the app"), và file của liên kết giữ `refused: true`
 (`serve::mark_refused`; journal ghi "<code> refused its link: kept as
@@ -2113,7 +2121,12 @@ expired until it is linked again"): `list` và `services_connected` hiện nó
 `expired: true`, và lần gọi kế tiếp được bảo "the link to <Service> has
 expired: link it again in the app" mà không hỏi dịch vụ. Một 403, một lời từ
 chối scope hay mọi lỗi khác không đánh dấu gì. Liên kết lại trong ứng dụng
-ghi một mục mới, dấu bị xoá. Một liên kết được cho thời hạn, một liên kết
+ghi một mục mới, dấu bị xoá. Gỡ nó trong ứng dụng thì xoá nó, và một lần
+khôi phục cài đặt gốc cũng vậy: reset plan xoá `/var/lib/lampos-services`
+(`store::DIR`; `crates/setup/fixtures/reset-plan-product.json`), mọi liên
+kết và dấu của nó cùng đi, nên sau một lần reset mỗi dịch vụ được liên kết
+lại trong ứng dụng. Cả hai đều không thu hồi gì ở dịch vụ ([Những gì việc gỡ
+đèn không hoàn tác](#những-gì-việc-gỡ-đèn-không-hoàn-tác)). Một liên kết được cho thời hạn, một liên kết
 được gia hạn qua backend và một khoá tĩnh vẫn như trước: lời từ chối không
 đánh dấu chúng.
 
