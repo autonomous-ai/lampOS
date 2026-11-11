@@ -138,13 +138,29 @@ fn system() -> String {
 fn system_with(reads: bool) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
     let writes = made_skill::writes_on();
-    let services = services(reads, writes, &own_accounts());
+    // Today and the offset only for a write's calendar event (#6066).
+    let today = writes
+        .then(crate::local_time::today_and_offset_here)
+        .flatten();
+    let services = services(reads, writes, &own_accounts(), today.as_ref());
     // With a made skill's writes (#6066) a write to a linked service is
-    // told below; a text to a phone stays out of reach.
-    let cant_send = if writes {
-        "or send a message to a phone"
+    // one of what a skill may do, told below; a text to a phone stays out
+    // of reach. Its can't-yet example is then no send: on lamp-9adf, 11
+    // Nov, writes on, every mail and calendar make came back `cannot:`
+    // within 1.5 s, the may-do list naming no write and the example
+    // refusal "sending a message".
+    let (may_also, cant_send, cant_example) = if writes {
+        (
+            "a read or a write to a linked service as below",
+            "or send a message to a phone",
+            "hearing what is said",
+        )
     } else {
-        "send a message or write to a service"
+        (
+            "a read as below",
+            "send a message or write to a service",
+            "sending a message",
+        )
     };
     let triggers = made_skill::TRIGGER_MEANINGS;
     let gestures = made_skill::gesture_names();
@@ -156,8 +172,8 @@ fn system_with(reads: bool) -> String {
          the form only: never answer with it. A reminder at a time or every so often is the \
          lamp's own timer, not a skill; a skill runs at a time only each day or on named \
          days of the week, by the clock trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
-         the request asks with the light, the head, a few exact words it says, its hum, or a \
-         read as below, on one of the triggers below. {more} {BLINK} To speak, a skill has speak = \
+         the request asks with the light, the head, a few exact words it says, its hum, or \
+         {may_also}, on one of the triggers below. {more} {BLINK} To speak, a skill has speak = \
          true in [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
          \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
          language the person asked in, said as written. Its one sound is a soft hum: a [[do]] \
@@ -168,10 +184,10 @@ fn system_with(reads: bool) -> String {
          most_a_day, [quiet], [budget] or [rest] unless the request asks for more in its own \
          words: the lamp sets them. A skill can't yet \
          hear what is said, know who someone is, {cant_send}: a \
-         request that needs one, or anything else no step or trigger here does, is answered \
-         with one line and no blocks: {cannot} then one short sentence said to the person, \
-         beginning \"{cant_yet}\" and naming what in plain words (\"{cant_yet} sending a \
-         message.\"), never a rule, ending with \
+         request that needs one, or anything else no step or trigger here or below does, is \
+         answered with one line and no blocks: {cannot} then one short sentence said to the \
+         person, beginning \"{cant_yet}\" and naming what in plain words (\"{cant_yet} \
+         {cant_example}.\"), never a rule, ending with \
          what to ask instead when there is one; \
          for a reminder at a time or every so often: \"Ask me for a reminder instead, like 'remind \
          me every hour to stand up'.\" Never stand something \
@@ -193,13 +209,18 @@ fn system_with(reads: bool) -> String {
 /// the owner to link a calendar already linked (the first builder on
 /// #5288). The cap (`made_skill::capped`) still holds every made skill to
 /// these whatever the model answers.
-fn services(reads: bool, writes: bool, own: &[(String, String)]) -> String {
+fn services(
+    reads: bool,
+    writes: bool,
+    own: &[(String, String)],
+    today: Option<&(String, String)>,
+) -> String {
     let cannot = made_skill::CANNOT;
     let ask_me = "You can ask me for it yourself any time.";
     // A write on its own (#6066): its rules with the switch, else the
     // lamp's "can't do that yet".
     let write = if writes {
-        write_rules(own)
+        write_rules(own, today)
     } else {
         format!(
             "A skill never sends or writes anything to a service by itself: a request for one \
@@ -210,10 +231,14 @@ fn services(reads: bool, writes: bool, own: &[(String, String)]) -> String {
         )
     };
     if !reads {
-        let what = if writes { "read" } else { "use" };
+        let (what, needs) = if writes {
+            ("read", "a read of one (a write below is no read)")
+        } else {
+            ("use", "one")
+        };
         return format!(
             "A skill can't {what} the person's mail, calendar or any other linked service yet, \
-             even one already linked: a request that needs one is answered with one line and \
+             even one already linked: a request that needs {needs} is answered with one line and \
              no blocks: {cannot} Not possible yet: a skill can't {what} your mail, calendar or \
              other services, even ones already linked. {ask_me} Never tell them to link one.\n\
              {write}"
@@ -221,21 +246,27 @@ fn services(reads: bool, writes: bool, own: &[(String, String)]) -> String {
     }
     let steps = made_skill::read_steps().join("\n- ");
     let unreadable = made_skill::unreadable_names().join(", ");
+    // With writes on, a mail sent or an event added is a write, never a
+    // change of what is there: read as one, every write is refused.
     let (only, asks_more) = if writes {
         (
-            "never deletes or changes anything in a service, and writes only as below",
-            "A request to delete or change anything in a service",
+            "A skill may read at most one of the person's linked services, and a read only \
+             reads it: it never deletes or changes anything already in a service. Sending a \
+             mail or adding a calendar event, an issue, a task or a comment is no change: it is \
+             a write, made as the write rules at the end say",
+            "A request to delete or change anything already in a service (a mail or an event \
+             already there)",
         )
     } else {
         (
-            "never sends, writes, posts, books, schedules, deletes or changes anything in a \
+            "A skill may read at most one of the person's linked services, and only read it: it \
+             never sends, writes, posts, books, schedules, deletes or changes anything in a \
              service",
             "A request to send, write or change anything in a service",
         )
     };
     format!(
-        "A skill may read at most one of the person's linked services, and only read it: it \
-         {only}. A request to be read one of these is a skill with [permissions] only \
+        "{only}. A request to be read one of these is a skill with [permissions] only \
          speak = true, services = {{ CODE = \"read\" }} and its topics; its trigger's during \
          only for a time the request names; and exactly one [[do]] step, the one shown here \
          for that service, filled in from the request, and no light or head step. The services a skill can read, each as name (CODE): step:\n- {steps}\n\
@@ -254,7 +285,7 @@ fn services(reads: bool, writes: bool, own: &[(String, String)]) -> String {
 /// only an address the request says or the person's own (`own`, each
 /// linked service's code and account); and the lamp says it back whole and
 /// waits for the person's yes. A request it can't make so is `cannot:`.
-fn write_rules(own: &[(String, String)]) -> String {
+fn write_rules(own: &[(String, String)], today: Option<&(String, String)>) -> String {
     let cannot = made_skill::CANNOT;
     let cant_yet = made_skill::CANT_YET;
     let kinds: Vec<String> = lamp_services::skill_writes::KINDS
@@ -283,9 +314,37 @@ fn write_rules(own: &[(String, String)]) -> String {
          or file is only one the request names. A request whose words to send, or whose \
          recipient's address, it doesn't say (\"mail Mai that I left\") is answered with one \
          line and no blocks: {cannot} {cant_yet} sending what you didn't say word for word, or \
-         to an address you didn't say; say the exact words and the address.",
-        kinds.join("\n- ")
+         to an address you didn't say; say the exact words and the address.\n{}",
+        kinds.join("\n- "),
+        event_times(today)
     )
+}
+
+/// How a made calendar write's `start` and `end` are written (#6066):
+/// fixed in the file, as `lamp-services` takes them (RFC 3339 with this
+/// lamp's own UTC offset, both required), from today's local date and the
+/// offset (`today`, [`crate::local_time::today_and_offset_here`]); with
+/// neither known, an event is `cannot:`. On lamp-9adf, 11 Nov, the model,
+/// told no date, offset or form, refused "a calendar event called Lamp
+/// test on November twentieth at nine pm".
+fn event_times(today: Option<&(String, String)>) -> String {
+    let (cannot, cant_yet) = (made_skill::CANNOT, made_skill::CANT_YET);
+    match today {
+        Some((date, offset)) => format!(
+            "A calendar event's start and end are each a date and a time with this lamp's UTC \
+             offset, like 2026-11-20T21:00:00{offset}: today here is {date}, offset {offset}. \
+             Its start is the day and time the request names (a day said from today, like \
+             tonight or tomorrow, counted from {date}), and its end the one it names, else one \
+             hour after its start. A request for an event that names no day or no time is \
+             answered with one line and no blocks: {cannot} {cant_yet} adding an event with no \
+             day and time; say the day and the time."
+        ),
+        None => format!(
+            "This lamp's date isn't known now: a request for a calendar event is answered with \
+             one line and no blocks: {cannot} {cant_yet} adding a calendar event while my clock \
+             isn't set."
+        ),
+    }
 }
 
 /// The person's linked services' codes and accounts, for a write's own
@@ -1776,6 +1835,49 @@ light = { dim = 1 }
         format!("```skill.toml\n{toml}```\n\n```SKILL.md\n{WRITE_CARD}```\n")
     }
 
+    /// Lamp-9adf, 11 Nov: a calendar event made by voice, its start and
+    /// end fixed from the date said, as the instructions now tell the
+    /// model, is kept, put on and waits for the person's yes.
+    #[test]
+    fn a_made_calendar_event_with_its_times_fixed_is_kept_and_waits_for_a_yes() {
+        made_skill::set_writes_here(Some(true));
+        let (root, keeping) = keeping("calendar-write");
+        let request = "make a skill that adds a calendar event called Lamp test on November \
+                       twentieth at nine pm when I come back to my desk";
+        let toml = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+            [permissions]\ntopics = [\"room/presence\"]\n\
+            services = { google_calendar = \"write\" }\n\
+            [trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+            cooldown = \"1h\"\nrearm = \"ends\"\n[ask]\npolicy = \"nudge\"\n[[do]]\n\
+            write = { service = \"google_calendar\", action = \"create_event\", \
+            title = \"Lamp test\", start = \"2026-11-20T21:00:00+07:00\", \
+            end = \"2026-11-20T22:00:00+07:00\" }\n";
+        let (url, served) = service(vec![(200, write_answer(toml))]);
+        let asked = manage_helper(&keeping.manage);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1, "{told}");
+        assert_eq!(told["made"], "leaving-mail", "{told}");
+        assert_eq!(told["writes_wait_for_yes"], true, "{told}");
+        asked.join().unwrap();
+        let sha256 = made_skill::entries(&keeping.directory)[0]["sha256"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let writes = made_skill::writes_of(&keeping.directory, &sha256);
+        assert_eq!(writes[0]["start"], "2026-11-20T21:00:00+07:00");
+        assert_eq!(writes[0]["title"], "Lamp test");
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// Items 2, 4 and 5 (#6066): a write whose words aren't the request's
     /// goes back for repair; the one kept is put on, said back whole with
     /// its wait, and its writes wait for a yes in a later heard line, which
@@ -2433,6 +2535,105 @@ light = { dim = 1 }
             assert!(!on.contains("sending or writing on its own."), "{on}");
         }
         assert!(parameters(true)["properties"]["approve_id"].is_object());
+        made_skill::set_writes_here(None);
+    }
+
+    /// Lamp-9adf, 11 Nov, writes on: a mail or a calendar event made by
+    /// voice was refused `cannot:` each time, the instructions naming no
+    /// write among what a skill may do, giving "sending a message" as the
+    /// example of what it can't, and refusing "a request to ... change
+    /// anything in a service". With writes on, a write is among what a
+    /// skill may do, no can't-yet rule or example names a send, and a mail
+    /// sent or an event added is a write, never a change; the brief for
+    /// each request points to the write and carries the request whole.
+    #[test]
+    fn with_writes_on_nothing_in_the_instructions_refuses_a_write() {
+        made_skill::set_writes_here(Some(true));
+        for reads in [true, false] {
+            let on = system_with(reads);
+            for rule in [
+                "its hum, or a read or a write to a linked service as below, on one of the \
+                 triggers below",
+                "no step or trigger here or below does",
+                "(\"I can't do that yet: hearing what is said.\")",
+                "A skill may also send or write to one linked service by itself",
+                "write = { service = \"CODE\", action = \"ACTION\", its keys }",
+                "google_calendar create_event: title, start",
+            ] {
+                assert!(on.contains(rule), "{rule}: {on}");
+            }
+            for refusal in [
+                "sending a message.",
+                "send a message or write to a service",
+                "sending or writing on its own",
+                "and only read it",
+                "A request to delete or change anything in a service",
+                "A request to send, write or change anything",
+                "never sends, writes, posts",
+            ] {
+                assert!(!on.contains(refusal), "{refusal}: {on}");
+            }
+            if reads {
+                assert!(
+                    on.contains(
+                        "Sending a mail or adding a calendar event, an issue, a task or a \
+                         comment is no change: it is a write"
+                    ),
+                    "{on}"
+                );
+            } else {
+                assert!(
+                    on.contains("a request that needs a read of one (a write below is no read)")
+                );
+            }
+        }
+        for request in [
+            "make a skill that adds a calendar event called Lamp test on November twentieth at \
+             nine pm when I come back to my desk",
+            "make a skill that emails test@example.com with the subject Lamp test and the words \
+             I am back when I come back to my desk",
+        ] {
+            let brief = made_skill::brief_with(request, true).unwrap();
+            assert!(brief.contains(" Or a read/write as above."), "{brief}");
+            assert!(brief.ends_with(&format!("Request: {request}")), "{brief}");
+        }
+        // A calendar event's start and end: today's local date, the
+        // offset, the form `lamp-services` takes and an end when none is
+        // said; with the date unknown, an event is `cannot:`.
+        let today = ("Wednesday 2026-11-11".to_owned(), "+07:00".to_owned());
+        let rules = services(true, true, &[], Some(&today));
+        for rule in [
+            "like 2026-11-20T21:00:00+07:00: today here is Wednesday 2026-11-11, offset +07:00",
+            "the day and time the request names (a day said from today, like tonight or \
+             tomorrow, counted from Wednesday 2026-11-11)",
+            "else one hour after its start",
+            "cannot: I can't do that yet: adding an event with no day and time",
+        ] {
+            assert!(rules.contains(rule), "{rule}: {rules}");
+        }
+        let unknown = services(true, true, &[], None);
+        assert!(
+            unknown.contains(
+                "This lamp's date isn't known now: a request for a calendar event is answered \
+                 with one line and no blocks: cannot:"
+            ),
+            "{unknown}"
+        );
+        assert!(!unknown.contains("today here is"), "{unknown}");
+        assert!(!services(true, false, &[], Some(&today)).contains("today here is"));
+        // Off, the lamp's "can't do that yet" stays as it was.
+        made_skill::set_writes_here(Some(false));
+        for reads in [true, false] {
+            let off = system_with(reads);
+            assert!(
+                off.contains("(\"I can't do that yet: sending a message.\")"),
+                "{off}"
+            );
+            assert!(
+                off.contains("its hum, or a read as below, on one of"),
+                "{off}"
+            );
+        }
         made_skill::set_writes_here(None);
     }
 
