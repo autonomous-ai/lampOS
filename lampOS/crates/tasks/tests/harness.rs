@@ -5737,3 +5737,161 @@ fn openclaw_is_offered_only_by_a_harness_from_0_6_11() {
         assert_eq!(rig.cli().runs_openclaw(), want, "{version}");
     }
 }
+
+/// #6274: a name said nearly right, one word misheard or misspelt by the
+/// speech to text ("costumer survey" for "Customer Survey", "survay"),
+/// still finds the one closest session; two as close are asked about,
+/// never guessed. A word under four letters takes no slip, and "api" still
+/// never fits "rapid-prototype".
+#[test]
+fn a_name_said_nearly_right_finds_the_one_closest_session() {
+    let named = |session: &str, rows: Value| {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.plan(json!({
+            "machines":{"default":true},
+            "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]})),
+            "reply":step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"})),
+        }));
+        let mut request = launch();
+        request.session = Some(session.into());
+        bare(rig.cli().launch(&request))
+    };
+    let joined = LaunchOutcome::Joined {
+        agent_id: AGENT.into(),
+        session: None,
+    };
+    let rows = json!([
+        ps_row(AGENT, "Customer Survey", "idle", Some("/w/survey")),
+        ps_row(OTHER, "login fix", "idle", Some("/w/auth")),
+    ]);
+    for said in [
+        "costumer survey",
+        "survay",
+        "customer survay",
+        "cusotmer survey",
+        "Customer Srvey",
+        // Two slips in a word of eight letters or more.
+        "custommmer",
+    ] {
+        assert_eq!(named(said, rows.clone()), joined, "{said}");
+    }
+    // Two slips in a shorter word, or a slip in a word under four letters:
+    // not that session.
+    assert_eq!(named("svrvay", rows.clone()), not_sent("session_not_found"));
+    let short = json!([ps_row(AGENT, "docs", "idle", None)]);
+    assert_eq!(named("dox", short), not_sent("session_not_found"));
+    // Never "api" for "rapid-prototype" (the Reviewer-lead's P2 on #5779).
+    let near = json!([ps_row(AGENT, "rapid-prototype", "idle", Some("/w/rapid"))]);
+    assert_eq!(named("api", near), not_sent("session_not_found"));
+    // Two as close: asked about, never guessed.
+    let two = json!([
+        ps_row(AGENT, "Customer Survey", "idle", None),
+        ps_row(OTHER, "Customer Surveys", "idle", None),
+    ]);
+    assert_eq!(named("costumer survey", two), not_sent("session_ambiguous"));
+    // The closer of two is the one.
+    let closer = json!([
+        ps_row(OTHER, "Customers Survey", "idle", None),
+        ps_row(AGENT, "Customer Survey", "idle", None),
+    ]);
+    assert_eq!(named("costumer survey", closer), joined);
+    // Found so and busy: busy, as by its whole name.
+    let busy = json!([ps_row(AGENT, "Customer Survey", "working", None)]);
+    assert_eq!(named("costumer survey", busy), not_sent("session_busy"));
+}
+
+/// #6274: a look at the session the person named, with no words to type.
+/// To open it (`join`): one idle live session is open as it is, one busy
+/// says so, one stopped is reopened only with `LAMP_TASKS_RESUME_CLOSED`.
+/// To say how it is: whatever fits is told as it stands, stopped too, a
+/// session the lamp never handed anything included. More than one fitting
+/// is `session_ambiguous`, none `session_not_found`; nothing is ever typed
+/// or started, and with the switch off nothing runs.
+#[test]
+fn a_named_session_is_looked_at_to_open_or_say_how_it_is_with_nothing_typed() {
+    let looked = |session: &str, rows: Value, join: bool, resume: bool| {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.config.resume_closed = resume;
+        rig.plan(json!({
+            "machines":{"default":true},
+            "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]})),
+            "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+            "resume":step(json!({"ok":true,"name":"Customer Survey","id":AGENT,"state":"idle","resumed":true,"effect":"x","next":[]})),
+            "reply":{"default":true},
+            "new":{"default":true},
+        }));
+        let target = launch().target;
+        let seen = rig.cli().look_session(&target, session, join);
+        let verbs: Vec<String> = rig
+            .calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .collect();
+        (seen, verbs)
+    };
+    let mut theirs = ps_row(AGENT, "Customer Survey", "working", Some("/w/survey"));
+    theirs["asks"] = json!(["Summarise the customer survey answers"]);
+    theirs["about"] = json!("Reading   the answers\n of week two");
+    let rows = json!([theirs, ps_row(OTHER, "login fix", "idle", None)]);
+    // How it is: its own state, by a name said nearly right, nothing typed.
+    let (seen, verbs) = looked("costumer survey", rows.clone(), false, false);
+    let seen = seen.unwrap();
+    assert_eq!(seen.state, "working");
+    assert_eq!(seen.name.as_deref(), Some("Customer Survey"));
+    assert_eq!(
+        seen.ask.as_deref(),
+        Some("Summarise the customer survey answers")
+    );
+    assert_eq!(
+        seen.about.as_deref(),
+        Some("Reading the answers of week two")
+    );
+    assert!(seen.last_active_unix_ms.is_some());
+    assert_eq!(seen.resumed, None);
+    assert_eq!(verbs, ["ps"]);
+    // Opened while it works: said busy as it stands, nothing typed.
+    let (seen, verbs) = looked("customer survey", rows.clone(), true, false);
+    assert_eq!(seen.unwrap().state, "working");
+    assert_eq!(verbs, ["ps"]);
+    // Opened while idle: open as it is.
+    let idle = json!([ps_row(AGENT, "Customer Survey", "idle", None)]);
+    let (seen, verbs) = looked("customer survey", idle, true, false);
+    assert_eq!(seen.unwrap().state, "idle");
+    assert_eq!(verbs, ["ps"]);
+    // Stopped: told stopped when asked about, reopened to open it only with
+    // the switch, and said stopped without it.
+    let stopped = json!([stopped_row(
+        AGENT,
+        "Customer Survey",
+        "2026-11-10T05:00:00.000Z"
+    )]);
+    let (seen, verbs) = looked("customer survey", stopped.clone(), false, true);
+    assert_eq!(seen.unwrap().state, "stopped");
+    assert_eq!(verbs, ["ps"]);
+    let (seen, verbs) = looked("customer survey", stopped.clone(), true, false);
+    assert_eq!(seen, Err("session_stopped".to_owned()));
+    assert_eq!(verbs, ["ps"]);
+    let (seen, verbs) = looked("customer survey", stopped, true, true);
+    let seen = seen.unwrap();
+    assert_eq!((seen.state.as_str(), seen.resumed), ("idle", Some(true)));
+    assert_eq!(verbs, ["ps", "--help", "resume"]);
+    // None fits, or two do: never a guess.
+    let (seen, _) = looked("billing", rows.clone(), false, false);
+    assert_eq!(seen, Err("session_not_found".to_owned()));
+    let two = json!([
+        ps_row(AGENT, "survey one", "idle", None),
+        ps_row(OTHER, "survey two", "idle", None),
+    ]);
+    let (seen, _) = looked("survey", two, true, false);
+    assert_eq!(seen, Err("session_ambiguous".to_owned()));
+    // Off: nothing runs.
+    let rig = Rig::new();
+    assert_eq!(
+        rig.cli()
+            .look_session(&launch().target, "customer survey", true),
+        Err("reply_named_off".to_owned())
+    );
+    assert!(rig.calls().is_empty());
+}

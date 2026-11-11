@@ -5,13 +5,13 @@ use lamp_tasks::{
     follow::WatchLane,
     harness::{
         AccountMachine, Closed, Ended, EngineKind, EngineRow, Launch, LaunchOutcome, Listed,
-        Observation, SignIn, Target, WatchEnd, WatchEvent,
+        Observation, SessionSeen, SignIn, Target, WatchEnd, WatchEvent,
     },
     progress::SETTLED_FOR_MS,
     readiness::{Computer, engines_path, read_engines},
     runtime::{
-        Adapter, Clock, Config, EnginesLane, LampSide, SetUpLater, WaitLane, lamp_side, request,
-        serve_with_adapter,
+        Adapter, Clock, Config, EnginesLane, LampSide, SessionLane, SetUpLater, WaitLane,
+        lamp_side, request, serve_with_adapter,
     },
     store::Store,
 };
@@ -234,6 +234,33 @@ impl EnginesLane for ScriptEngines {
             .unwrap_or_else(|| Err("unreachable".into()))
     }
 }
+/// Looks at a named session (#6274): "customer survey" is found idle after
+/// a moment, as a list of the person's sessions takes; anything else fits
+/// none.
+struct ScriptSessions;
+impl SessionLane for ScriptSessions {
+    fn look_session(
+        &self,
+        target: &Target,
+        session: &str,
+        join: bool,
+    ) -> Result<SessionSeen, String> {
+        assert_eq!(target.machine_id, "0123456789abcdef0123456789abcdef");
+        thread::sleep(Duration::from_millis(150));
+        if session != "customer survey" {
+            return Err("session_not_found".into());
+        }
+        Ok(SessionSeen {
+            state: if join { "idle" } else { "working" }.into(),
+            name: Some("Customer Survey".into()),
+            ask: Some("Summarise the survey".into()),
+            about: None,
+            last_active_unix_ms: None,
+            resumed: None,
+            on: None,
+        })
+    }
+}
 struct Script {
     counts: Arc<Counts>,
     stop: Arc<AtomicBool>,
@@ -293,6 +320,9 @@ impl Adapter for Script {
     }
     fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
         Some(Arc::new(ScriptEngines(self.counts.clone())))
+    }
+    fn session_lane(&self) -> Option<Arc<dyn SessionLane>> {
+        Some(Arc::new(ScriptSessions))
     }
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
         self.counts
@@ -3638,4 +3668,54 @@ fn the_apps_state_says_harness_signed_in_across_a_restart() {
     let view = s.app(json!({"op":"app_sign_in_state"}));
     assert_eq!(view["sign_in"], "none");
     assert!(view.get("signed_in").is_none(), "{view}");
+}
+
+/// #6274: a look at a named session answers at once, as every request
+/// must, while the look runs beside the part; asked again with the same
+/// `look`, it gives what was found, or why none was. Only on the voice's
+/// route, for a target the part has, and nothing is handed over.
+#[test]
+fn a_look_at_a_named_session_answers_at_once_and_is_asked_again_for_what_it_found() {
+    let s = Running::new(false);
+    let line = |look: &str, target: &str, session: &str, join: bool| json!({"op":"session","look":look,"target":target,"session":session,"join":join});
+    let until_done = |line: Value| {
+        let start = Instant::now();
+        loop {
+            let answer = s.trusted(line.clone());
+            assert_eq!(answer["ok"], true, "{answer}");
+            if answer["done"] == true {
+                return answer;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "{answer}");
+            thread::sleep(Duration::from_millis(20));
+        }
+    };
+    let open = line("voice-3-look-a", "coding", "customer survey", true);
+    assert_eq!(s.ask(open.clone())["error"], "untrusted");
+    let first = s.trusted(open.clone());
+    assert_eq!(
+        (first["ok"].clone(), first["done"].clone()),
+        (json!(true), json!(false)),
+        "{first}"
+    );
+    let found = until_done(open);
+    assert_eq!(found["found"]["state"], "idle", "{found}");
+    assert_eq!(found["found"]["name"], "Customer Survey", "{found}");
+    // How it is, not opened.
+    let how = until_done(line("voice-4-look-b", "coding", "customer survey", false));
+    assert_eq!(how["found"]["state"], "working", "{how}");
+    // None fits: said, never a guess.
+    let none = until_done(line("voice-5-look-c", "coding", "billing", false));
+    assert_eq!(none["code"], "session_not_found", "{none}");
+    assert!(none.get("found").is_none());
+    // No such target, or a look with no id: refused, nothing looked at.
+    assert_eq!(
+        s.trusted(line("voice-6-look-d", "nowhere", "customer survey", true))["error"],
+        "target"
+    );
+    assert_eq!(
+        s.trusted(line("", "coding", "customer survey", true))["error"],
+        "bad_request"
+    );
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
 }
