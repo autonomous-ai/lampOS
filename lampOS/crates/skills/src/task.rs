@@ -17,8 +17,9 @@
 //!   from the Skills Store (backend-reviewed, its `.package.json`'s
 //!   `from_store`) or was pushed by the owner's own paired computer (the
 //!   developer folder's). A skill made or added on the lamp (`made: here`),
-//!   or put on by hand from a folder or a file, is not loaded with one:
-//!   model-written scripts are #6307's, behind a switch of their own.
+//!   or put on by hand from a folder or a file, is not loaded with one,
+//!   but for one the lamp's own model made, put on as a package, with
+//!   `LAMP_MADE_SCRIPTS=on` ([`made_with_code`], #6307).
 //! - **The yes** (kept by lamp-control, `lamp_control::task_yes`, never
 //!   here: the first builder's ruling on #6059; this unit's
 //!   `ProtectSystem=strict` gives it no write path to lamp-control's
@@ -200,11 +201,58 @@ pub fn grants_of(grants: &[String]) -> Result<Vec<String>, String> {
     Ok(kept)
 }
 
+/// A skill made by the lamp's own model with code of its own (#6307): its
+/// `do.task` loads only with this on, here and in the manage helper. `on`
+/// only.
+pub const MADE_ENVIRONMENT: &str = lamp_voice::made_skill::SCRIPTS_ENVIRONMENT;
+
+#[cfg(test)]
+thread_local! {
+    /// A made skill's code as a test of this thread sets it.
+    static MADE_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill's code is on in this process.
+pub fn made_on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = MADE_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(MADE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// A made skill's code for this test's thread alone.
+#[cfg(test)]
+pub fn set_made_here(on: Option<bool>) {
+    MADE_HERE.with(|here| here.set(on));
+}
+
+/// Where the script of a skill whose `do.task` may run came from, as the
+/// say-back says it, when it is the lamp's own model's ([`origin_refuses`]).
+pub const FROM_MADE: &str = "the lamp's own model";
+
+/// Whether the skill in `folder` is one the lamp's own model made with code
+/// of its own (#6307), with [`made_on`]: its card says `made: here` and it
+/// went on as a package (`.package.json`, as the manage helper's
+/// `install_made` puts one on, a package said back and agreed to by its
+/// SHA-256), not from the Store, nor pushed, nor put on from a folder.
+pub fn made_with_code(folder: &Path, pushed: bool) -> bool {
+    let card = fs::read_to_string(folder.join("SKILL.md")).unwrap_or_default();
+    made_on()
+        && !pushed
+        && card.lines().any(|line| line.trim() == "made: here")
+        && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
+}
+
 /// Why the skill in `folder` may not carry a `do.task`, or none: only one
 /// from the Skills Store (its `.package.json` says `from_store`, and its
 /// card is not marked made or added here) or pushed by the owner's own
-/// paired computer (`pushed`, the developer folder's).
+/// paired computer (`pushed`, the developer folder's), or one the lamp's
+/// own model made with its code's switch on ([`made_with_code`], #6307).
 pub fn origin_refuses(folder: &Path, pushed: bool) -> Option<String> {
+    if made_with_code(folder, pushed) {
+        return None;
+    }
     let card = fs::read_to_string(folder.join("SKILL.md")).unwrap_or_default();
     if card.lines().any(|line| {
         matches!(
@@ -676,8 +724,54 @@ mod tests {
             "---\nname: photo-booth\ndescription: Photos.\nmade: here\n---\n",
         )
         .unwrap();
+        set_made_here(Some(false));
         let made = origin_refuses(&folder, true).unwrap();
         assert!(made.contains("made or added on the lamp"), "{made}");
+        set_made_here(None);
+    }
+
+    /// #6307: a skill the lamp's own model made carries a task only with
+    /// its code's switch on, and only as it went on as a package, never
+    /// from a folder, pushed, or from the Store.
+    #[test]
+    fn a_made_skill_carries_a_task_only_with_its_code_on_and_as_a_package() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = folder(dir.path());
+        fs::write(
+            folder.join("SKILL.md"),
+            "---\nname: photo-booth\ndescription: Photos.\nmade: here\n---\n",
+        )
+        .unwrap();
+        let record = |from_store: bool| {
+            let installed = package::Installed {
+                sha256: "ab".repeat(32),
+                manifest: package::Manifest {
+                    format: 1,
+                    name: "photo-booth".into(),
+                    version: "1.0.0".into(),
+                    files: Vec::new(),
+                },
+                from_store,
+            };
+            fs::write(
+                folder.join(package::INSTALLED_FROM),
+                serde_json::to_vec(&installed).unwrap(),
+            )
+            .unwrap();
+        };
+        set_made_here(Some(true));
+        // Put on from a folder: no package record.
+        assert!(origin_refuses(&folder, false).is_some());
+        record(false);
+        assert!(made_with_code(&folder, false));
+        assert!(origin_refuses(&folder, false).is_none());
+        assert!(!made_with_code(&folder, true));
+        set_made_here(Some(false));
+        assert!(origin_refuses(&folder, false).is_some());
+        set_made_here(Some(true));
+        record(true);
+        assert!(!made_with_code(&folder, false));
+        set_made_here(None);
     }
 
     /// lamp-control at `path`, answering each of `answers` in turn, one a

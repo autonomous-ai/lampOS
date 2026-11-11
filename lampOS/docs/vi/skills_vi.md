@@ -629,6 +629,102 @@ sau:
      trước khi báo; khi chưa có mốc, chỉ báo các lần gửi trong ngày qua.
    - **Gỡ nó** không đổi, bằng giọng nói hay trong ứng dụng; với
      `lamp-services` một package đã gỡ hay đã đổi chờ lời đồng ý mới.
+   Mã riêng của kỹ năng (#6307, PR 4 của #6071, PR cuối trong năm PR, điều
+   kiện 4 của first builder lúc 12:45; `LAMP_MADE_SCRIPTS=on` trong
+   `lamp-voice`, được truyền cho cả hai route, trong `lamp-skills` và trong
+   `lamp-skills-manage@`, chỉ nhận `on`, tắt nếu không đặt và trong mọi
+   unit sản phẩm; xếp chồng trên `do.task` của #6305, `LAMP_SKILL_TASKS`).
+   Khi tắt, mô hình tạo kỹ năng không bao giờ được bảo rằng một kỹ
+   năng có thể mang mã (system prompt và brief giữ như cũ), và một khối
+   `scripts/…` trong câu trả lời, một bước `task` hay một danh sách
+   `grants` được trả lời "I can't do that yet: running code of its own",
+   không bao giờ bị sửa. Khi bật:
+   - **Được mang gì** (`made_skill::files`, `made_skill::capped`): tối đa
+     4 khối fenced nữa, mỗi khối tên ```` ```scripts/NAME ```` (sâu một hay
+     hai tên, chữ, số, `-`, `_` và `.`, không bắt đầu bằng dấu chấm, nên
+     không bao giờ là `..`; đuôi `.py`, `.json`, `.txt` hoặc `.md`), văn bản
+     thuần (không ký tự điều khiển nào ngoài tab và xuống dòng, không ký tự
+     định dạng như dấu hai chiều), tối đa 8 KiB mỗi tệp và 16 KiB tổng
+     (`MOST_SCRIPTS`, `MOST_SCRIPT_BYTES`, `MOST_SCRIPTS_BYTES`); đúng một
+     bước `[[do]]` chỉ gồm một `task`, `task = { task = "take a photo",
+     run = "scripts/main.py" }` (`do.task` của #6305), lời của nó là văn
+     bản thuần và tối đa 120 ký tự, `run` là một tệp `.py` nó đã viết; và
+     một `grants = [...]` ở đầu tệp gồm các quyền của #6305
+     (`made_skill::GRANTS`, đúng các tên của `skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`, `hear`,
+     `sound`, `air`, `device`, `camera`, `microphone`, `notes`, `speech`;
+     không có thì là không quyền nào). `skills` là "I can't do that yet:
+     code that puts other skills on the lamp", và mã đi cùng một lần ghi là
+     "I can't do that yet: running code of its own and sending on its own
+     in one skill". Mọi thứ khác vượt các giới hạn này được trả về để sửa
+     (`made_skill::SCRIPTS_NOT_HELD`, lần sửa được nói dạng đúng): mã không
+     có bước `task`, một `task` không có mã hay chỉ tới một tệp không được
+     viết, tệp thứ năm, quá nhiều mã, một tên sai. System prompt
+     (`make_skill_local::code_rules`) nói dạng, các giới hạn và các quyền,
+     rằng mã chỉ tới được đèn qua SDK của đèn với đúng các quyền đó và không
+     có mạng nào khác, và rằng đèn đọc lại rồi chờ lời đồng ý; brief thêm
+     "Or code, as above." (vẫn trong 1.160 byte), và một câu trả lời có thể
+     dài tới 37 KiB.
+   - **Được đóng gói cùng hai tệp kia**, nên SHA-256 của package phủ mọi
+     byte của mã: một script đã đổi là một package khác.
+   - **Lời task và các quyền được đọc lại trọn vẹn** (bản thân mã không
+     bao giờ được đọc ra; `made_skill::plainly`, không bao giờ bị cắt, tối
+     đa 1.400 ký tự): "When someone comes to the desk, … it runs its own
+     code to “take a photo”, … The lamp's model wrote its code, and that
+     code may use the camera and its light. It waits for you to agree
+     before it runs any code." (`made_skill::code_said`,
+     `made_skill::RUNS_AFTER_YES`; không có chữ "yes"). Câu nói là "I made
+     photo booth: …", không bao giờ là "it's on"; `uses` của ứng dụng mang
+     `code` và `grants`.
+   - **Không bao giờ bật ngay.** `made_skill::put_on` từ chối nó và giữ lý
+     do (`made_skill::CODE_BY_VOICE`), nên MAKE IT của ứng dụng để nó tắt và
+     nói "I made it but couldn't put it on: a skill that runs its own code
+     goes on only once you agree to it out loud; ask me for it by voice."
+     Bằng giọng nói, lần tạo chờ lời đồng ý qua đúng cơ chế chờ của lần ghi
+     (`crate::skill_write_yes`, `Asks::code`), với mọi chốt chặn của nó:
+     phải nói đủ trước (câu về mã là phần phải được nghe), chỉ một dòng
+     nghe được sau đó trên route thứ hai, không bao giờ là tiếng vọng của
+     chính đèn, 120 s. Một lời đồng ý duy nhất
+     (`make_skill_local::code_approve`) bật đúng package đã đọc lại, theo
+     SHA-256 của nó (`made_skill::put_on_agreed`, helper quản lý chỉ cài
+     đúng các byte đó; một kỹ năng không có mã không bao giờ được bật qua
+     đường đó), rồi, khi `LAMP_SKILL_TASKS=on`, đọc kỹ năng như lúc nó vừa
+     được bật (`task_asks` của #6305) và để lamp-control ghi lời đồng ý cho
+     task của nó (`task_yes_record`, không bao giờ vào state của
+     lamp-skills) theo SHA-256 của thư mục lúc đó và các quyền của nó, chỉ
+     khi đó đúng là các quyền đã đọc lại và thư mục mang tên đó được bật từ
+     đúng package đã đồng ý (SHA-256 trong `.package.json` của nó là cái đã
+     đồng ý, `package` trong `task_asks` của helper), không bao giờ là bất kỳ
+     thư mục nào mang tên đó lúc ấy: một script bị đổi sau đó sẽ hỏi
+     lại, như mọi `do.task`. Một task không được giữ (tắt task, quyền không
+     khớp với lời đã đọc, không tới được helper) để kỹ năng bật nhưng mã của
+     nó không chạy ở đâu cả, và đèn nói vậy
+     (`skill_write_yes::CODE_ON_TASK_WAITS_NEXT`). Một lượt bị cắt trước khi
+     đọc lại thì nói `made_skill::cut_code_line` ("… so it isn't on."), và
+     không có gì chờ. Một kỹ năng có mã còn tắt chưa có đọc lại theo yêu
+     cầu.
+   - **Cái chạy nó** là `do.task` của #6305: `lamp-skills` chỉ nạp task của
+     một kỹ năng `made: here` khi `LAMP_MADE_SCRIPTS=on`, và chỉ khi nó được
+     bật dưới dạng package, không bao giờ từ Store, được đẩy lên hay bật từ
+     một thư mục (`task::made_with_code`, trong `task::origin_refuses`); lời
+     đọc lại của nó nói script đến từ "the lamp's own model"
+     (`task::FROM_MADE`). Sau đó là token một lần chạy của #6304 và việc
+     chuyển cho Hermes của đèn ở #6306. `install_made` của helper quản lý
+     giữ một kỹ năng tự tạo theo đúng giới hạn đó một lần nữa
+     (`made_skill::put_on_cap`), và mã của nó theo đúng số tệp, kích thước
+     và đuôi tệp đó, có tệp của task trong đó (`made_skill::put_on_scripts`),
+     nên nó chỉ bật một kỹ năng có mã khi công
+     tắc cũng có trong `lamp-skills-manage@`; không có thì lời đồng ý được
+     trả lời rằng bước kiểm tra của đèn không cho bật.
+     Kiểm thử: `made_skill::tests::code_is_refused_and_never_offered_with_its_switch_off`,
+     `code_is_taken_within_its_bounds_and_refused_past_them`,
+     `codes_say_back_names_its_grants_and_its_code_and_waits`,
+     `code_is_kept_in_its_package_and_goes_on_only_by_its_agreed_sha256`,
+     `code_grants_are_a_tasks_grants`, `a_scripts_fence_is_its_own_block_as_written`,
+     `a_packages_code_is_held_again_as_it_goes_on`, `no_said_line_has_a_run_of_spaces`;
+     `make_skill_local::tests::code_is_told_to_the_maker_only_with_its_switch`,
+     `a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256`
+     và `a_made_skills_task_is_kept_only_for_the_grants_said_back`;
+     `lamp_skills::task::tests::a_made_skill_carries_a_task_only_with_its_code_on_and_as_a_package`.
    Khi đã giữ, một kỹ năng có bước đọc một
    dịch vụ chưa liên kết lúc đó (`services_connected`, hỏi một lần, tối đa
    500 ms) vẫn được giữ, và việc tạo báo điều đó: tạo bằng giọng nói,

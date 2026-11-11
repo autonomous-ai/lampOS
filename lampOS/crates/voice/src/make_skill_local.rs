@@ -62,6 +62,16 @@ fn round_fits(elapsed: Duration) -> bool {
 }
 /// The most of an answer read: two files of at most 8 KiB, and the fences.
 const MOST_ANSWER_BYTES: usize = 20 * 1024;
+
+/// [`MOST_ANSWER_BYTES`], and with a made skill's code on (#6307) its
+/// code's most too ([`made_skill::MOST_SCRIPTS_BYTES`]) and its fences.
+fn most_answer_bytes() -> usize {
+    if made_skill::scripts_on() {
+        MOST_ANSWER_BYTES + made_skill::MOST_SCRIPTS_BYTES + 1024
+    } else {
+        MOST_ANSWER_BYTES
+    }
+}
 /// What a made skill's answer is kept from: this, and when it was made.
 pub const FROM: &str = "local:";
 /// A made skill that `lamp-skills pack` and [`made_skill::capped`] take,
@@ -181,9 +191,19 @@ fn system_with(reads: bool) -> String {
     let triggers = made_skill::TRIGGER_MEANINGS;
     let gestures = made_skill::gesture_names();
     let (more, cant_yet) = (made_skill::MORE_STEPS, made_skill::CANT_YET);
+    // Code of its own (#6307), told only with its switch: off, the model
+    // never hears that a skill may carry code, and the prompt is as before.
+    let (blocks, code) = if made_skill::scripts_on() {
+        (
+            "the two fenced blocks, and any code blocks as told at the end,",
+            format!("\n{}", code_rules()),
+        )
+    } else {
+        ("the two fenced blocks", String::new())
+    };
     format!(
-        "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
-         blocks and nothing else. Use only the keys and values the request names, written as \
+        "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
+         and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
          the form only: never answer with it. A reminder at a time or every so often is the \
          lamp's own timer, not a skill; a skill runs at a time only each day or on named \
@@ -210,7 +230,35 @@ fn system_with(reads: bool) -> String {
          else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
-         {services}"
+         {services}{code}"
+    )
+}
+
+/// What the making model is told of a made skill's code of its own (#6307,
+/// with [`made_skill::SCRIPTS_ENVIRONMENT`] on): when to write it, its
+/// files' form and bounds (as [`made_skill::files`] holds them), the one
+/// `task` step that runs it (#6305's `do.task`), its `grants`
+/// ([`made_skill::GRANTS`]), how it reaches the lamp (the lamp's SDK alone,
+/// #6071's design), and that the lamp says it back and waits for the
+/// person's yes.
+fn code_rules() -> String {
+    let grants: Vec<&str> = made_skill::GRANTS.iter().map(|(name, _)| *name).collect();
+    format!(
+        "A skill may also run code of its own, for what no step or trigger above does (a photo \
+         booth, for one); never for what a step does. Then add up to {most} more fenced blocks, \
+         each named ```scripts/NAME (letters, digits, -, _ and ., ending .py, .json, .txt or \
+         .md), plain text, at most {each} KiB each and {all} KiB in all; and exactly one \
+         [[do]] step, alone in its step: task = {{ task = \"what the code does, in a few plain \
+         words\", run = \"scripts/main.py\" }}, run naming one of its .py files; and at the \
+         top, before any table, grants = [ ... ] listing only what the code uses on the lamp, \
+         of: {grants}. The code is Python run on the lamp; it reaches the lamp only through \
+         the lamp's own SDK, with only those grants, and has no other network. Its other steps \
+         run at once; what the code finds comes back as the lamp's task news. The lamp says \
+         back what it uses and waits for the person's yes before it runs any code.",
+        most = made_skill::MOST_SCRIPTS,
+        each = made_skill::MOST_SCRIPT_BYTES / 1024,
+        all = made_skill::MOST_SCRIPTS_BYTES / 1024,
+        grants = grants.join(", "),
     )
 }
 
@@ -441,13 +489,23 @@ pub fn tool() -> lamp_gemini::Tool {
     if tasks {
         description.push_str(TASKS_READ_BACK_TOLD);
     }
+    // A made skill with code of its own (#6307): not on until the person
+    // agrees to its say-back.
+    let code = made_skill::scripts_on();
+    if code {
+        description.push_str(CODE_TOLD);
+    }
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description,
-        parameters: Some(parameters_with(writes, tasks)),
+        parameters: Some(parameters_with(writes, tasks, code)),
         silent: false,
     }
 }
+
+/// What [`tool`]'s description adds with a made skill's code on (#6307).
+pub const CODE_TOLD: &str = " One that runs its own code is not put on until the person agrees \
+     to what you are told to say of it.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -458,15 +516,16 @@ pub const TASKS_READ_BACK_TOLD: &str = " Call it with read_back alone too when t
      asks what a skill on the lamp uses, saying nothing before it.";
 
 /// The function's parameters: the request, and with a made skill's writes
-/// on (#6066) the yes to one that waits for it, `approve_id`, given alone.
+/// (#6066) or code (#6307) on, the yes to one that waits for it,
+/// `approve_id`, given alone, and with writes a read-back.
 #[cfg(test)]
-fn parameters(writes: bool) -> Value {
-    parameters_with(writes, false)
+fn parameters(writes: bool, code: bool) -> Value {
+    parameters_with(writes, false, code)
 }
 
 /// [`parameters`], and with a skill's tasks on (#6305) the same
 /// `approve_id` and `read_back` for a skill's task.
-fn parameters_with(writes: bool, tasks: bool) -> Value {
+fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     let mut parameters = json!({
         "type": "object",
         "properties": {
@@ -477,11 +536,14 @@ fn parameters_with(writes: bool, tasks: bool) -> Value {
         },
         "required": ["request"]
     });
-    if writes || tasks {
+    if writes || tasks || code {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
             "type": "string",
             "description": "Only when a skill you just made or read back waits for the person's yes and they then agree, in any words: its approve_id, given alone with no request."
         });
+        parameters["required"] = json!([]);
+    }
+    if writes || tasks {
         let asked = match (writes, tasks) {
             (true, false) => "what a skill they made sends, or to hear it read back",
             (false, _) => "what a skill on the lamp uses",
@@ -582,7 +644,7 @@ async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
         while let Some(event) = stream.next().await? {
             if let ChatEvent::Text(words) = event {
                 text.push_str(&words);
-                if text.len() > MOST_ANSWER_BYTES {
+                if text.len() > most_answer_bytes() {
                     return Err(net::Error::Protocol("answer length"));
                 }
             }
@@ -733,16 +795,33 @@ fn make_with_by(
         .as_ref()
         .ok()
         .and_then(|made| made_skill::needs_link(&made.uses, linked));
-    let on = made
-        .as_ref()
-        .map(|made| made_skill::put_on(keeping, made))
-        .unwrap_or(Ok(()));
+    // One with code of its own (#6307) is not put on here: it waits for
+    // the person's yes to its say-back, which puts on that package alone.
+    let on = match &made {
+        Ok(made) if made.uses.code => Ok(()),
+        Ok(made) => made_skill::put_on(keeping, made),
+        Err(_) => Ok(()),
+    };
     MADE_LINE.with(|kept| kept.replace(Some(said_line(&made, &on))));
     let told = told(made.clone(), on.clone(), needs.as_deref());
     // A skill that sends or writes, once on (its yes binds the installed
     // package): its writes wait for the person's yes, in a later heard
     // line (#6066, `crate::skill_write_yes`).
     match (&made, &on) {
+        (Ok(made), Ok(())) if made.uses.code => {
+            let id = crate::skill_write_yes::wait_for_yes(
+                code_asks(made),
+                made_in,
+                std::time::Instant::now(),
+            );
+            let mut told = waits_for_yes(told, &made_skill::on_line(made), &id);
+            told["on"] = json!(false);
+            told["code_waits_for_yes"] = json!(true);
+            if let Some(told) = told.as_object_mut() {
+                told.remove("writes_wait_for_yes");
+            }
+            told
+        }
         (Ok(made), Ok(())) => {
             let Some(asks) = asks_of(&keeping.directory, made) else {
                 return told;
@@ -775,7 +854,104 @@ fn asks_of(directory: &std::path::Path, made: &Made) -> Option<crate::skill_writ
         writes,
         say_back,
         grants: None,
+        code: false,
     })
+}
+
+/// What the person's yes to the kept skill `made`, with code of its own
+/// (#6307), would agree to: that package, by its SHA-256 (every byte of its
+/// code), put on, and its task kept for exactly the grants said
+/// (`skill_task_yes`, #6305); and what must be heard whole before the yes,
+/// what its code may use ([`made_skill::code_said`]).
+fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
+    crate::skill_write_yes::Asks {
+        skill: made.name.clone(),
+        sha256: made.sha256.clone(),
+        writes: Vec::new(),
+        say_back: made_skill::code_said(&made.uses.grants).trim().to_owned(),
+        grants: Some(made.uses.grants.clone()),
+        code: true,
+    }
+}
+
+/// The person's yes to a made skill with code of its own (#6307), once its
+/// say-back was heard whole: its package put on by the SHA-256 said back
+/// ([`made_skill::put_on_agreed`]), then, with a skill's tasks on (#6305),
+/// its task's yes recorded by lamp-control for the SHA-256 of its folder as
+/// the manage helper reads it once on, only while that folder's grants are
+/// the ones said back (`task_asks` and `task_yes`,
+/// `skill_task_yes::asks_by` and `approve_by`, never lamp-skills' state),
+/// and only while the folder of that name went on as the very package
+/// agreed to (its `.package.json`'s SHA-256 is the one said back), never
+/// whatever folder has that name by then (the Reviewer-lead's P3 on #6355).
+/// `{"on": NAME, "task": KEPT}`; a task not kept leaves the skill on with
+/// its code run nowhere, as lamp-skills hands over only a kept task.
+pub fn code_approve(
+    keeping: &Keeping,
+    asks: &crate::skill_write_yes::Asks,
+    task_asks: impl FnOnce(&str) -> Result<Option<crate::skill_task_yes::TaskAsks>, String>,
+    task_yes: impl FnOnce(&crate::skill_write_yes::Asks) -> Result<Value, String>,
+) -> Result<Value, String> {
+    let name = made_skill::put_on_agreed(keeping, &asks.sha256)?;
+    let task = code_task_kept(&name, asks, task_asks, task_yes);
+    Ok(json!({ "on": name, "task": task }))
+}
+
+/// [`code_approve`]'s task, kept for the skill `name` as it is on the lamp
+/// now: whether it was.
+fn code_task_kept(
+    name: &str,
+    asks: &crate::skill_write_yes::Asks,
+    task_asks: impl FnOnce(&str) -> Result<Option<crate::skill_task_yes::TaskAsks>, String>,
+    task_yes: impl FnOnce(&crate::skill_write_yes::Asks) -> Result<Value, String>,
+) -> bool {
+    if !crate::skill_task_yes::on() {
+        eprintln!("lamp-voice: a made skill's task not kept: a skill's tasks are off");
+        return false;
+    }
+    let set = |grants: &[String]| {
+        grants
+            .iter()
+            .cloned()
+            .collect::<std::collections::BTreeSet<String>>()
+    };
+    let said = asks.grants.as_deref().unwrap_or_default();
+    let task = match task_asks(name) {
+        Ok(Some(task)) if task.package.as_deref() != Some(asks.sha256.as_str()) => {
+            eprintln!(
+                "lamp-voice: a made skill's task not kept: the skill on the lamp isn't the package agreed to"
+            );
+            return false;
+        }
+        Ok(Some(task)) if task.name == name && set(&task.grants) == set(said) => task,
+        Ok(Some(_)) => {
+            eprintln!("lamp-voice: a made skill's task not kept: its grants aren't those said");
+            return false;
+        }
+        Ok(None) => {
+            eprintln!("lamp-voice: a made skill's task not kept: the lamp reads no task in it");
+            return false;
+        }
+        Err(why) => {
+            eprintln!("lamp-voice: a made skill's task not kept: {why}");
+            return false;
+        }
+    };
+    let kept = crate::skill_write_yes::Asks {
+        skill: task.name,
+        sha256: task.sha256,
+        writes: Vec::new(),
+        say_back: asks.say_back.clone(),
+        grants: Some(task.grants),
+        code: false,
+    };
+    match task_yes(&kept) {
+        Ok(_) => true,
+        Err(why) => {
+            eprintln!("lamp-voice: a made skill's task not kept: {why}");
+            false
+        }
+    }
 }
 
 /// The `make_skill` argument that reads a made skill back by its name.
@@ -1017,6 +1193,7 @@ pub fn take_said_line() -> Option<String> {
 fn said_line(made: &Result<Made, Refused>, on: &Result<(), String>) -> String {
     match (made, on) {
         (Ok(made), Ok(())) if !made.uses.writes.is_empty() => made_skill::cut_write_line(made),
+        (Ok(made), Ok(())) if made.uses.code => made_skill::cut_code_line(made),
         (Ok(made), Ok(())) => made_skill::on_line(made),
         (Ok(_), Err(why)) => made_skill::not_on_line(why),
         (Err(Refused(why, _)), _) => made_skill::not_made_line(why),
@@ -1476,16 +1653,30 @@ pub fn answer(
             heard,
             crate::services::sends_here(),
             std::time::Instant::now(),
-            |asks| match asks.grants {
+            |asks| match (asks.code, &asks.grants) {
+                // Code of its own (#6307): that package put on, by its
+                // SHA-256, then its task's yes recorded by lamp-control for
+                // the folder as it went on; nothing is asked of
+                // `lamp-services`.
+                (true, _) => {
+                    let keeping = Keeping::when(true).ok_or("the lamp can't make skills")?;
+                    let control = std::path::Path::new(crate::skill_task_yes::CONTROL_SOCKET);
+                    code_approve(
+                        &keeping,
+                        asks,
+                        |name| crate::skill_task_yes::asks_by(&keeping.manage, control, name),
+                        |task| crate::skill_task_yes::approve_by(&keeping.manage, control, task),
+                    )
+                }
                 // A skill's task (#6305): recorded by lamp-control, for
                 // the folder and grants said back, as the manage helper
                 // reads the skill again.
-                Some(_) => crate::skill_task_yes::approve_by(
+                (false, Some(_)) => crate::skill_task_yes::approve_by(
                     std::path::Path::new(made_skill::MANAGE_SOCKET),
                     std::path::Path::new(crate::skill_task_yes::CONTROL_SOCKET),
                     asks,
                 ),
-                None => crate::services::skill_write_approve(
+                (false, None) => crate::services::skill_write_approve(
                     std::path::Path::new(crate::services::FOLDER),
                     asks,
                 ),
@@ -2840,8 +3031,12 @@ light = { dim = 1 }
             );
             assert!(!off.contains("services = { CODE = \"write\" }"));
         }
-        assert!(parameters(false)["properties"].get("approve_id").is_none());
-        assert_eq!(parameters(false)["required"], json!(["request"]));
+        assert!(
+            parameters(false, false)["properties"]
+                .get("approve_id")
+                .is_none()
+        );
+        assert_eq!(parameters(false, false)["required"], json!(["request"]));
         made_skill::set_writes_here(Some(true));
         for reads in [true, false] {
             let on = system_with(reads);
@@ -2856,7 +3051,7 @@ light = { dim = 1 }
             }
             assert!(!on.contains("sending or writing on its own."), "{on}");
         }
-        assert!(parameters(true)["properties"]["approve_id"].is_object());
+        assert!(parameters(true, false)["properties"]["approve_id"].is_object());
         made_skill::set_writes_here(None);
     }
 
@@ -3955,5 +4150,225 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(answer.get("needs_link").is_none(), "{answer}");
         assert_eq!(served.join().unwrap(), 1);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A made photo booth with code of its own (#6307).
+    const CODE_TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+        grants = [\"camera\"]\n[permissions]\ntopics = [\"room/presence\"]\n\
+        [trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+        for = \"5s\"\ncooldown = \"1h\"\nrearm = \"ends\"\n[ask]\npolicy = \"nudge\"\n[[do]]\n\
+        task = { task = \"take a photo\", run = \"scripts/main.py\" }\n";
+    const CODE_CARD: &str =
+        "---\nname: photo-booth\ndescription: Takes a photo.\n---\n\n# Photo booth\n";
+    const CODE_REQUEST: &str = "make me a photo booth that takes a photo when I sit down";
+
+    /// #6307, with `LAMP_MADE_SCRIPTS` off: the making model is never told
+    /// a skill may carry code, nor the function that a yes may put one on;
+    /// on, it is told the form, its bounds and its grants.
+    #[test]
+    fn code_is_told_to_the_maker_only_with_its_switch() {
+        made_skill::set_scripts_here(Some(false));
+        let off = system_with(false);
+        assert!(!off.contains("scripts/"), "{off}");
+        assert!(!off.contains("code of its own"), "{off}");
+        assert!(!tool().description.contains(CODE_TOLD));
+        made_skill::set_scripts_here(Some(true));
+        let on = system_with(false);
+        for part in [
+            "```scripts/NAME",
+            "at most 8 KiB each and 16 KiB in all",
+            "task = { task = \"what the code does",
+            "grants = [ ... ]",
+            "body, light, speak, look, hear, sound, air, device, camera, microphone, notes, speech",
+            "waits for the person's yes before it runs any code",
+        ] {
+            assert!(on.contains(part), "{part}: {on}");
+        }
+        assert!(!on.contains("skills,"), "{on}");
+        assert!(tool().description.contains(CODE_TOLD));
+        let parameters = parameters(false, true);
+        assert!(parameters["properties"]["approve_id"].is_object());
+        assert!(parameters["properties"].get(READ_BACK).is_none());
+        made_skill::set_scripts_here(None);
+    }
+
+    /// #6307, on: a made skill with code of its own is kept and said back
+    /// whole, its grants and that it runs its own code, and is not put on;
+    /// it waits for a yes in a later heard line, once said whole, which puts
+    /// on exactly the package said back, by its SHA-256.
+    #[test]
+    fn a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256() {
+        made_skill::set_scripts_here(Some(true));
+        let (root, keeping) = keeping("code");
+        let answer = format!(
+            "```skill.toml\n{CODE_TOML}```\n\n```SKILL.md\n{CODE_CARD}```\n\n\
+             ```scripts/main.py\nprint('photo')\n```\n"
+        );
+        let (url, served) = service(vec![(200, answer)]);
+        let told = make_with(
+            7,
+            Some(CODE_REQUEST),
+            CODE_REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(told["made"], "photo-booth", "{told}");
+        assert_eq!(told["on"], false, "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        let next = told["next"].as_str().unwrap();
+        for part in [
+            "runs its own code to “take a photo”",
+            made_skill::code_said(&["camera".to_owned()]).trim(),
+            "word for word",
+            "call make_skill again with only approve_id",
+        ] {
+            assert!(next.contains(part), "{part}: {next}");
+        }
+        assert!(!next.contains("it's on"), "{next}");
+        // Not put on, nor even tried: no helper was asked.
+        let entry = &made_skill::entries(&keeping.directory)[0];
+        assert_ne!(entry["on"], true, "{entry}");
+        assert!(entry.get("not_on").is_none(), "{entry}");
+        assert_eq!(entry["uses"]["grants"], json!(["camera"]));
+        let sha256 = entry["sha256"].as_str().unwrap().to_owned();
+        let said = take_said_line().unwrap();
+        assert!(said.ends_with("so it isn't on."), "{said}");
+        let id = told[crate::skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let now = std::time::Instant::now();
+        let never = |_: &crate::skill_write_yes::Asks| -> Result<Value, String> {
+            panic!("put on before its say-back was heard")
+        };
+        let early = crate::skill_write_yes::approve(&id, 8, true, true, now, never);
+        assert_eq!(early["error"], crate::skill_write_yes::NOT_SAID_WHOLE);
+        let line = next.split('"').nth(1).unwrap();
+        crate::skill_write_yes::lamp_said(7, line);
+        let asked = manage_helper(&keeping.manage);
+        // With a skill's tasks on (#6305), its task is kept for the folder
+        // as it went on, with exactly the grants said back.
+        crate::skill_task_yes::set_on_here(Some(true));
+        let folder = "cd".repeat(32);
+        let kept = std::cell::RefCell::new(None);
+        let agreed = crate::skill_write_yes::approve(&id, 9, true, true, now, |asks| {
+            assert!(asks.code && asks.writes.is_empty(), "{asks:?}");
+            assert_eq!(asks.grants, Some(vec!["camera".to_owned()]));
+            code_approve(
+                &keeping,
+                asks,
+                |name| Ok(Some(task_asks(name, &folder, &sha256, &["camera"]))),
+                |task| {
+                    *kept.borrow_mut() = Some(task.clone());
+                    Ok(json!({ "approved": 1 }))
+                },
+            )
+        });
+        assert_eq!(agreed["approved"], true, "{agreed}");
+        assert_eq!(agreed["task"], true, "{agreed}");
+        assert_eq!(agreed["next"], crate::skill_write_yes::CODE_APPROVED_NEXT);
+        assert_eq!(asked.join().unwrap()["install_made"], sha256.as_str());
+        assert_eq!(made_skill::entries(&keeping.directory)[0]["on"], true);
+        let kept = kept.into_inner().unwrap();
+        assert_eq!(
+            (kept.skill.as_str(), kept.sha256.as_str(), kept.code),
+            ("photo-booth", folder.as_str(), false)
+        );
+        assert_eq!(kept.grants, Some(vec!["camera".to_owned()]));
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_scripts_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn task_asks(
+        name: &str,
+        sha256: &str,
+        package: &str,
+        grants: &[&str],
+    ) -> crate::skill_task_yes::TaskAsks {
+        crate::skill_task_yes::TaskAsks {
+            name: name.to_owned(),
+            sha256: sha256.to_owned(),
+            grants: grants.iter().map(|grant| (*grant).to_owned()).collect(),
+            task: "take a photo".to_owned(),
+            package: Some(package.to_owned()),
+            from: "the lamp's own model".to_owned(),
+            approved: false,
+        }
+    }
+
+    /// #6307: the task of a made skill with code is kept only with a
+    /// skill's tasks on, and only for the grants said back; otherwise none
+    /// is asked for, and the skill is on with its code run nowhere.
+    #[test]
+    fn a_made_skills_task_is_kept_only_for_the_grants_said_back() {
+        let said = crate::skill_write_yes::Asks {
+            skill: "photo-booth".to_owned(),
+            sha256: "ab".repeat(32),
+            writes: Vec::new(),
+            say_back: made_skill::code_said(&["camera".to_owned()]),
+            grants: Some(vec!["camera".to_owned()]),
+            code: true,
+        };
+        let folder = "cd".repeat(32);
+        let never = |_: &crate::skill_write_yes::Asks| -> Result<Value, String> {
+            panic!("a task kept that wasn't said back")
+        };
+        crate::skill_task_yes::set_on_here(Some(false));
+        assert!(!code_task_kept(
+            "photo-booth",
+            &said,
+            |_| panic!("asked with tasks off"),
+            never
+        ));
+        crate::skill_task_yes::set_on_here(Some(true));
+        for (name, grants) in [
+            ("photo-booth", ["camera", "microphone"].as_slice()),
+            ("photo-booth", [].as_slice()),
+            ("other", ["camera"].as_slice()),
+        ] {
+            let read = task_asks(name, &folder, &said.sha256, grants);
+            assert!(!code_task_kept(
+                "photo-booth",
+                &said,
+                |_| Ok(Some(read)),
+                never
+            ));
+        }
+        assert!(!code_task_kept("photo-booth", &said, |_| Ok(None), never));
+        assert!(!code_task_kept(
+            "photo-booth",
+            &said,
+            |_| Err("busy".into()),
+            never
+        ));
+        // Another folder by that name by then: not the package agreed to.
+        for package in [Some("ef".repeat(32)), None] {
+            let mut other = task_asks("photo-booth", &folder, &said.sha256, &["camera"]);
+            other.package = package;
+            assert!(!code_task_kept(
+                "photo-booth",
+                &said,
+                |_| Ok(Some(other)),
+                never
+            ));
+        }
+        let read = task_asks("photo-booth", &folder, &said.sha256, &["camera"]);
+        assert!(!code_task_kept(
+            "photo-booth",
+            &said,
+            |_| Ok(Some(read.clone())),
+            |_| Err("changed".into())
+        ));
+        assert!(code_task_kept(
+            "photo-booth",
+            &said,
+            |_| Ok(Some(read)),
+            |_| Ok(json!({}))
+        ));
+        crate::skill_task_yes::set_on_here(None);
     }
 }

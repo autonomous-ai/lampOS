@@ -150,6 +150,9 @@ pub struct TaskAsks {
     pub grants: Vec<String>,
     /// The step's `task`, the skill file's own words.
     pub task: String,
+    /// The SHA-256 of the package it went on as (its `.package.json`), none
+    /// for one put on from a folder or pushed.
+    pub package: Option<String>,
     /// Where its script came from: "the Skills Store", or "your computer
     /// NAME".
     pub from: String,
@@ -176,6 +179,7 @@ impl TaskAsks {
             sha256,
             grants,
             task: text("task")?,
+            package: text("package"),
             from: text("from")?,
             approved: false,
         })
@@ -189,6 +193,7 @@ impl TaskAsks {
             writes: Vec::new(),
             say_back: said(self),
             grants: Some(self.grants.clone()),
+            code: false,
         }
     }
 }
@@ -440,6 +445,7 @@ mod tests {
             sha256: "ab".repeat(32),
             grants: vec!["camera".into(), "light".into()],
             task: "Take a photo and send it to my phone".into(),
+            package: None,
             from: "the Skills Store".into(),
             approved,
         }
@@ -561,9 +567,11 @@ mod tests {
     }
 
     /// A skill made or added here carrying `grants` or a `task` step is
-    /// refused by the made cap, before and as it is put on (until #6307).
+    /// refused by the made cap, before and as it is put on, with a made
+    /// skill's code off (`LAMP_MADE_SCRIPTS`, #6307).
     #[test]
     fn a_made_skill_carrying_a_task_or_grants_is_refused() {
+        crate::made_skill::set_scripts_here(Some(false));
         let base = "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nlight = true\n\
                     topics = [\"voice/state\"]\n[trigger]\ntopic = \"voice/state\"\n\
                     field = \"state\"\nequals = \"resting\"\n[[do]]\nlight = \"warm\"\n";
@@ -577,9 +585,11 @@ mod tests {
                 crate::made_skill::capped(&text),
             ] {
                 let why = format!("{:?}", refused.unwrap_err());
-                assert!(why.contains(crate::made_skill::SCRIPT_NOT_YET), "{why}");
+                // Made here: what the lamp can't do yet (#6307's switch).
+                assert!(why.contains("running code of its own"), "{why}");
             }
         }
+        crate::made_skill::set_scripts_here(None);
     }
 
     /// With the switch on, `make_skill` offers the read-back and the yes
