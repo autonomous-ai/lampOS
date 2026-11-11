@@ -706,7 +706,7 @@ setup the app changes them through root's keys helper,
 `lamp-setup keys` on `lamp-setup-keys.socket`. All of it is in
 [own-keys.md](own-keys.md).
 
-## A new lamp's first volume (#5551, built, off unless set)
+## A new lamp's first volume (#5551, on for the product)
 
 The speaker's volume is the softvol control "Speaker" on the HDMI card
 (`allwinnerhdmi`, `device_speaker` in `/etc/asound.conf`, -30 to 0 dB over
@@ -731,7 +731,8 @@ app's slider. Read from the code on 6 Nov, before this switch:
   (`lamp-cmedia-speaker.service`'s drop-in), a different control,
   re-pinned at every boot.
 
-With `LAMP_FIRST_VOLUME=on` in `lamp-setup.service`, a setup run that has
+With `LAMP_FIRST_VOLUME=on` in `lamp-setup.service` (on in the product's
+unit, `deploy/product/lamp-setup.service`), a setup run that has
 joined the Wi-Fi and saved the settings sets that control to 70 % (about
 9 dB below full) and stores that card alone (`alsactl store allwinnerhdmi`,
 so a power cut before the first clean shutdown keeps it), just before the
