@@ -2143,6 +2143,50 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   `lampos`'s home), where the lamp's skills keys point and the guidance
   (`AGENTS.md`) is written, as for Hermes.
 
+## A skill's task on the lamp's Hermes (#6306, #6071's PR 3, off unless `LAMP_SKILL_TASKS=on`)
+
+A made skill's `do.task` step (#6305, docs/skills.md, "A skill's task")
+hands its slower part to the lamp's own Hermes. lamp-skills sends one line
+for each run, and is answered once the run ends
+(`lamp_tasks::skill_task::answer`):
+
+- **The line:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
+  Every field is needed and no other is taken. `skill` is a skill's name
+  (`a-z`, `0-9`, `-`, `_`, at most 64), `folder` is exactly
+  `/var/lib/lampOS/skills/<skill>` (the skills Hermes sees read-only),
+  `run` is a file under the skill's `scripts/` (no `..`, no hidden part, not
+  absolute), `task` is 1 to 500 bytes, `sha256` is 64 lowercase hex digits,
+  and `grants` are at most 13, each once, never `skills`. Anything else is
+  `bad_request`, and no token is asked for.
+- **The answer:** `{"ok":true,"id":N}` once the run ended, or
+  `{"ok":false,"error","message"}`: `off` (the switch is not `on`),
+  `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
+  no one-run token) or `run_failed`.
+- **A one-run token** (the first builder's 12:45 conditions on #6071): for
+  each run lamp-tasks asks lamp-control (#6304) for a token minted from the
+  owner's yes for exactly this skill, its folder's SHA-256 and its grants
+  (the `Tokens` trait). The run is given it as `LAMP_CONTROL_TOKEN`, beside
+  `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`, and nothing else
+  of the environment is added. The token is ended when the run ends, a
+  failed run too. It is never in the task's words, the journal or a debug
+  line. No token, no run.
+- **The run:** one task for target `lamp`, its words the skill's task, the
+  script to run from the skill's read-only folder, and the one way to the
+  lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
+  run's end.
+
+**Not yet (said so the code is not read as more):** #6304 has not landed,
+so the only token source is `NoTokens`, which refuses every run
+(`no_token`); its `control.sock` adapter plugs into `Tokens`. No serve flag
+binds the hand-over socket yet, and no `Runner` starts Hermes through
+Harness yet, so nothing on a lamp runs a skill's task. The run's "no other
+network" (a direct outbound call refused) and the caps on
+lamp-tasks.service (`MemoryHigh`, `CPUQuota`) wait for measurements of
+Hermes's RAM and CPU running a task on lamp-52e6 (a 6 GB lamp: every
+RAM cap is sized to one) against Hermes's install floor (≥1,350 MB available), with the voice answering a line during the
+run. Tests: `skill_task::tests` (the switch, the token's life, a failed
+run, no token, every refused line).
+
 ## Devin (#1854)
 
 `devin` is Devin's own terminal program on the person's computer, which
