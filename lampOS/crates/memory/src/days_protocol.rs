@@ -1162,12 +1162,12 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
         }
         Extra::ServiceContactsForget { person, about, all } => {
             let person = one(person)?;
-            let removed = if all {
-                store.service_contacts_forget_all(&person)?
+            if all {
+                json!({"ok":true,"removed":store.service_contacts_forget_all(&person)?})
             } else {
-                store.service_contacts_forget(&person, &about)?
-            };
-            json!({"ok":true,"removed":removed})
+                let forgot = store.service_contacts_forget(&person, &about)?;
+                json!({"ok":true,"removed":forgot.removed,"records":forgot.records,"addresses":forgot.addresses})
+            }
         }
         Extra::ServiceRecordsForget { person, about, all } => {
             let person = one(person)?;

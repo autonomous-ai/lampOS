@@ -352,7 +352,17 @@ links, replaced_by)`, khóa `(person, key)`, tạo `IF NOT EXISTS`,
   `service_records_forget` có chủ đề khớp với nó (chỉ giữ trong bộ nhớ, 64 lần
   gần nhất, vì các từ nói điều đã quên). Nhờ vậy một thay đổi voice gửi trước
   lần quên mà memory nhận sau đó không bao giờ được giữ; thay đổi hỏi sau thì
-  vẫn được giữ.
+  vẫn được giữ. Bản ghi gửi tới (`to`, `cc` hay `bcc`) một địa chỉ mà
+  `service_contacts_forget` đã xóa sau khi nó được hỏi cũng bị từ chối (giữ
+  cùng cách).
+- `service_contacts_forget {person, about}` xóa các liên hệ thư khớp với
+  chủ đề: `{ok:true,removed,records,addresses}`. Trong cùng giao dịch, mọi
+  bản ghi dịch vụ của người đó gửi tới một địa chỉ vừa xóa (`to`, `cc` hay
+  `bcc` của chi tiết, danh sách hoặc chuỗi cách nhau bằng dấu phẩy,
+  `Tên <địa chỉ>` đọc là địa chỉ) cũng bị xóa, dù chữ của bản ghi là gì:
+  `records` đếm chúng, `addresses` nêu các địa chỉ đã xóa để voice bỏ bản
+  sao của mình. Nếu không, một thư `done` được kể cho mô hình sẽ đưa địa chỉ
+  đã quên trở lại.
 
 Chỉ người đã biết (id `p-`) có bản ghi; còn lại bị từ chối `bad_person`.
 Giữ đến khi bị quên: hết hạn theo ngày, hết hạn khi không dùng, tidy và

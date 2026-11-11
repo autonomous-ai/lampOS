@@ -212,6 +212,11 @@ pub struct Days {
     /// can come after it. The oldest goes past
     /// [`crate::service_records::FORGOT_ABOUT_HELD`].
     pub(crate) records_forgot_about: std::collections::VecDeque<(String, Vec<Vec<String>>, u64)>,
+    /// Each forget about a mail contact
+    /// ([`crate::service_contacts`]): whose, the addresses it removed and
+    /// when, so a record asked before it that was sent to one of them is
+    /// refused. Never on disk, held as [`Self::records_forgot_about`] is.
+    pub(crate) records_forgot_addresses: std::collections::VecDeque<(String, Vec<String>, u64)>,
     _held: File,
 }
 
@@ -282,6 +287,7 @@ impl Days {
             set_aside,
             said_pending: std::collections::VecDeque::new(),
             records_forgot_about: std::collections::VecDeque::new(),
+            records_forgot_addresses: std::collections::VecDeque::new(),
             taste_rules: false,
             _held: held,
         };

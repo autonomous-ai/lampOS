@@ -168,6 +168,65 @@ fn text_of(service: &str, action: &str, reason: &str, result_id: &str, detail: &
     text
 }
 
+/// The mail addresses a record's `detail` was sent to: its `to`, `cc`
+/// and `bcc`, each a list or a comma-separated text, an entry's
+/// `Name <address>` read as its address, lower case.
+pub(crate) fn recipients(detail: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    for key in ["to", "cc", "bcc"] {
+        let entries: Vec<&str> = match detail.get(key) {
+            Some(Value::String(text)) => text.split(',').collect(),
+            Some(Value::Array(list)) => list.iter().filter_map(Value::as_str).collect(),
+            _ => Vec::new(),
+        };
+        for entry in entries {
+            let entry = entry.trim();
+            let address = match (entry.rfind('<'), entry.ends_with('>')) {
+                (Some(open), true) => &entry[open + 1..entry.len() - 1],
+                _ => entry,
+            };
+            let address = address.trim().to_lowercase();
+            if !address.is_empty() {
+                out.push(address);
+            }
+        }
+    }
+    out
+}
+
+/// A contact forget removed `addresses` of `person`'s: every record of
+/// theirs sent to one of them goes in the same transaction. How many went.
+pub(crate) fn forget_sent_to(
+    tx: &Transaction<'_>,
+    person: &Person,
+    addresses: &[String],
+) -> Result<u64> {
+    if addresses.is_empty() {
+        return Ok(0);
+    }
+    let rows: Vec<(String, String)> = {
+        let mut statement =
+            tx.prepare("SELECT key, detail FROM service_records WHERE person=?1")?;
+        statement
+            .query_map([person.as_str()], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    let mut removed = 0;
+    for (key, detail) in rows {
+        let detail = serde_json::from_str::<Value>(&detail).unwrap_or(Value::Null);
+        if recipients(&detail)
+            .iter()
+            .any(|address| addresses.contains(address))
+        {
+            removed += tx.execute(
+                "DELETE FROM service_records WHERE person=?1 AND key=?2",
+                params![person.as_str(), key],
+            )? as u64;
+        }
+    }
+    Ok(removed)
+}
+
 /// Forget everything of `person` (or everyone's, `None`) at `now`: a
 /// record asked before it is refused from now on ([`Days::service_record_put`]).
 /// Only a known person's own, or everyone's, is marked.
@@ -337,6 +396,20 @@ impl Days {
             .filter(|(whose, _, at)| whose == person.as_str() && *at > record.asked_unix_ms)
             .map(|(_, subjects, _)| subjects)
             .collect();
+        // Sent to an address a contact forget removed (step 5d).
+        let sent_to = recipients(record.detail.as_ref().unwrap_or(&Value::Null));
+        if !sent_to.is_empty()
+            && self
+                .records_forgot_addresses
+                .iter()
+                .any(|(whose, addresses, at)| {
+                    whose == person.as_str()
+                        && *at > record.asked_unix_ms
+                        && addresses.iter().any(|address| sent_to.contains(address))
+                })
+        {
+            return refused();
+        }
         if about.is_empty() {
             return Ok(());
         }

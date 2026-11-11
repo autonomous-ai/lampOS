@@ -20,7 +20,7 @@
 //!   longest ago going first past it.
 use crate::{
     days::{Days, Error, Result, ensure_person},
-    service_records::{FORGOT_ABOUT_HELD, folded, has_word},
+    service_records::{self, FORGOT_ABOUT_HELD, folded, has_word},
     store::Person,
 };
 use rusqlite::{OptionalExtension, Transaction, params};
@@ -33,6 +33,16 @@ const NAME_BYTES: usize = 64;
 /// The words every contact is found by in a forget about, besides its name
 /// and address: "forget Octavia's address", "forget that contact".
 const CONTACT_WORDS: &str = "contact address email mail";
+
+/// What a forget about removed of the contacts
+/// ([`Days::service_contacts_forget`]): how many, their addresses, and how
+/// many service records sent to one of them went with them.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ContactsForgot {
+    pub removed: u64,
+    pub addresses: Vec<String>,
+    pub records: u64,
+}
 
 fn owner_only(person: &Person) -> Result<()> {
     if lamp_msgs::known::is_person_id(person.as_str()) {
@@ -203,11 +213,11 @@ impl Days {
         &mut self,
         person: &Person,
         about: &[Vec<String>],
-    ) -> Result<u64> {
+    ) -> Result<ContactsForgot> {
         owner_only(person)?;
         let subjects = contact_subjects(about);
         if subjects.is_empty() {
-            return Ok(0);
+            return Ok(ContactsForgot::default());
         }
         // Held first, found or not, as 1a's records forget holds its own: a
         // save stamped before it that matches is refused
@@ -221,25 +231,43 @@ impl Days {
             self.now,
         ));
         let tx = self.db.transaction()?;
-        let rows: Vec<(String, String)> = {
+        let rows: Vec<(String, String, String)> = {
             let mut statement = tx.prepare(
-                "SELECT name_key, name||' '||address FROM service_contacts WHERE person=?1",
+                "SELECT name_key, name||' '||address, address FROM service_contacts WHERE person=?1",
             )?;
             statement
-                .query_map([person.as_str()], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .query_map([person.as_str()], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
                 .collect::<rusqlite::Result<Vec<_>>>()?
         };
-        let mut removed = 0;
-        for (key, text) in rows {
+        let mut forgot = ContactsForgot::default();
+        for (key, text, address) in rows {
             if contact_matches(&subjects, &text, "") {
-                removed += tx.execute(
+                forgot.removed += tx.execute(
                     "DELETE FROM service_contacts WHERE person=?1 AND name_key=?2",
                     params![person.as_str(), key],
                 )? as u64;
+                if !forgot.addresses.contains(&address) {
+                    forgot.addresses.push(address);
+                }
             }
         }
+        // The records sent to a removed address go with it, whatever their
+        // words: a `done` mail told to the model would bring the address
+        // back (step 5d on lamp-06c1, 11 Nov). One asked before and taken
+        // after is refused ([`Self::service_record_put`]).
+        forgot.records = service_records::forget_sent_to(&tx, person, &forgot.addresses)?;
         tx.commit()?;
-        Ok(removed)
+        if !forgot.addresses.is_empty() {
+            if self.records_forgot_addresses.len() >= FORGOT_ABOUT_HELD {
+                self.records_forgot_addresses.pop_front();
+            }
+            self.records_forgot_addresses.push_back((
+                person.as_str().to_owned(),
+                forgot.addresses.clone(),
+                self.now,
+            ));
+        }
+        Ok(forgot)
     }
 }
 
@@ -558,5 +586,73 @@ mod tests {
         assert_eq!(left.len(), 1, "{left:?}");
         assert_eq!(left[0]["name"], "Mai");
         assert_eq!(contacts(&mut store, OTHER).len(), 1);
+    }
+    /// A done send record to a forgotten contact's address, words or not:
+    /// "forget Tom's address" takes the contact and every record of that
+    /// owner sent to it, in the same forget; a record to another address,
+    /// or another person's to it, stays. One asked before the forget and
+    /// taken after it is refused (step 5d on lamp-06c1, 11 Nov).
+    #[test]
+    fn forget_about_a_contact_takes_the_records_sent_to_its_address() {
+        let (_scratch, mut store) = Scratch::new("forget-sent-to");
+        let mail = |person: &str, key: &str, to: Value, asked: u64| {
+            json!({
+                "op": "service_record",
+                "person": person,
+                "key": key,
+                "service": "gmail",
+                "action": "send_mail",
+                "status": "done",
+                "reason": "",
+                "detail": {"to": to, "subject": "Lunch", "text": "See you at noon"},
+                "asked_unix_ms": asked,
+                "changed_unix_ms": asked,
+            })
+        };
+        put(&mut store, OWNER, "Tom", "tom@example.com");
+        for (person, key, to) in [
+            (OWNER, "sent-1", json!(["Tom@Example.com"])),
+            (OWNER, "sent-2", json!("other@example.com, tom@example.com")),
+            (OWNER, "sent-3", json!(["other@example.com"])),
+            (OTHER, "sent-4", json!(["tom@example.com"])),
+        ] {
+            let kept = send(&mut store, mail(person, key, to, NOW));
+            assert_eq!(kept["ok"], true, "{kept}");
+        }
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"service_contacts_forget","person":OWNER,"about":[["tom", "s", "address"]]}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot["ok"], true, "{forgot}");
+        assert_eq!(forgot["removed"], 1, "{forgot}");
+        assert_eq!(forgot["records"], 2, "{forgot}");
+        assert_eq!(forgot["addresses"], json!(["tom@example.com"]), "{forgot}");
+        let listed = send(&mut store, json!({"op":"service_records","person":OWNER}));
+        let left = listed["records"].as_array().unwrap();
+        assert!(
+            !left.iter().any(|record| record
+                .to_string()
+                .to_lowercase()
+                .contains("tom@example.com")),
+            "{left:?}"
+        );
+        assert_eq!(left.len(), 1, "{left:?}");
+        let theirs = send(&mut store, json!({"op":"service_records","person":OTHER}));
+        assert_eq!(theirs["records"].as_array().unwrap().len(), 1, "{theirs}");
+        // In flight at the forget: refused, nothing kept.
+        let late = send_at(
+            &mut store,
+            mail(OWNER, "sent-5", json!(["tom@example.com"]), NOW + 500),
+            NOW + 1_500,
+        );
+        assert_eq!(late["error"], "forgotten", "{late}");
+        // Asked after it: kept.
+        let after = send_at(
+            &mut store,
+            mail(OWNER, "sent-6", json!(["tom@example.com"]), NOW + 2_000),
+            NOW + 2_000,
+        );
+        assert_eq!(after["ok"], true, "{after}");
     }
 }
