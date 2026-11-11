@@ -14182,6 +14182,8 @@ fn a_fold_that_hears_no_yes_stands_up_and_never_turns_off() {
     assert!(stood, "{notes:?}");
 }
 
+/// Refused, the lamp says not to unplug it yet and stands up as after
+/// "never mind": nothing kept holds it folded.
 #[test]
 fn a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now() {
     let (asked, said, stood) = unplug_with_turn_off(
@@ -14195,7 +14197,11 @@ fn a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now() {
     assert!(notes.iter().all(|note| !note.contains("unplug me now")));
     assert_eq!(notes.len(), 2, "{notes:?}");
     assert!(notes[1].contains("please don't unplug me yet"), "{notes:?}");
-    let _ = stood;
+    // lamp-52e6, build 11913: the kept request held it folded until a reboot.
+    assert!(
+        stood,
+        "a turn-off not taken left the fold latched: {notes:?}"
+    );
 }
 
 /// #5777's P2: an update holds the turn-off, and an install round restarts

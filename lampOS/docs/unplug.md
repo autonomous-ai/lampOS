@@ -145,8 +145,11 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    there was lost at the restart, the lamp left folded, never off and
    never up). Refused otherwise, not reached or no answer:
    Skills says the skill's `not_off` line ("I couldn't turn myself off just
-   now, so please don't unplug me yet."), and the latch is kept, as for any
-   failure; "never mind" or the timeout stands it up. A "never mind" before
+   now, so please don't unplug me yet.") and stands up, publishing the
+   cancel a "never mind" publishes, even when the line never began
+   (expired, the voice not reached): on lamp-52e6 (build 11913) a kept
+   request after `not turned off: expired` held it folded until a reboot.
+   A "never mind" before
    the helper's yes cancels as below; after it, the lamp is turning off, as
    after the app's Turn off, and comes back at its power-up. About 30 s from
    the ask to the power-off: the fold (6.7 s on lamp-52e6, 20 Oct) and the
@@ -163,7 +166,9 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    `a_turn_off_held_by_an_update_stands_up_at_once_and_asks_to_be_told_again`,
    `a_yes_in_a_busy_room_stands_up_and_never_turns_off`,
    `a_yes_in_the_echo_tail_is_not_taken_and_the_wait_ends_standing_up`,
-   `a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now`;
+   `a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now`,
+   `a_turn_off_not_taken_says_not_off_then_stands`,
+   `a_turn_off_not_taken_stands_even_when_its_note_expires`;
    the install pin holds the product unit's socket to the helper's.
 
 The tool response target is under 150 ms on a warmed lamp. This target does
