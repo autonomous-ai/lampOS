@@ -204,11 +204,24 @@ pub struct Shared {
     /// Why the lamp ended a connection (a revoke, a change of grants), by connection:
     /// said in the close frame, so the computer's SDK can log why it was cut off.
     close_reasons: Mutex<HashMap<u64, &'static str>>,
+    /// Whether the camera's and the microphone's streams are usable on this lamp
+    /// now (wired, and the owner's switch on): what `{"features": true}` says.
+    features: Mutex<Features>,
     /// What the helper is told of pairings, one at a time in the door's
     /// order, by one thread started at the first (Reviewer-two on #3504: a
     /// late wider grant change must never be served after a newer narrower
     /// one).
     changes: Mutex<Option<std::sync::mpsc::Sender<Value>>>,
+}
+
+/// Whether the camera's and the microphone's streams are usable on this lamp:
+/// wired to their parts, and for the microphone the owner's switch (`--microphone
+/// on`) is on. Not whether the ears share their sound right now (they do on
+/// demand), so `true` means a stream is allowed, not that one starts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Features {
+    pub camera: bool,
+    pub microphone: bool,
 }
 
 impl Shared {
@@ -318,6 +331,7 @@ impl Shared {
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
             close_reasons: Mutex::new(HashMap::new()),
+            features: Mutex::new(Features::default()),
         })
     }
 
@@ -326,6 +340,11 @@ impl Shared {
     /// on`), never to the camera or the microphone.
     pub fn set_remote(&self, remote: bool) {
         self.remote.store(remote, Ordering::Relaxed);
+    }
+
+    /// What streams this lamp can serve now, for the app's grants screen.
+    pub fn set_features(&self, features: Features) {
+        *self.features.lock().expect("features") = features;
     }
 
     pub fn set_manage_socket(&self, socket: PathBuf) {
@@ -475,6 +494,7 @@ impl Shared {
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
                 close_reasons: Mutex::new(HashMap::new()),
+                features: Mutex::new(Features::default()),
             }
         })
     }
@@ -1488,6 +1508,9 @@ async fn connection<S>(
 ///   old grants kept. A stream whose grant goes ends at once, its pushed skills
 ///   are held to the new grants and its connections close so it reads them at
 ///   its next `hello`;
+/// - `{"features": true}` → `{"camera": bool, "microphone": bool}`: whether a
+///   camera or microphone stream is usable on this lamp (wired, and for the
+///   microphone the owner's switch on), for the app's grants screen;
 /// - `{"cancel_code": true}` → `{"dropped": true|false}`: the code out is
 ///   dropped, so nobody can pair with it (the app's answer to a spoken check
 ///   that doesn't match), and whether there was one;
@@ -1674,6 +1697,12 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
         // Refused in memory either way, so its connections go now.
         shared.close_client(client, CLOSED_REVOKED);
         return answer;
+    }
+    // What the app's grants screen may offer: whether a camera or microphone
+    // stream is usable here (`system.info`'s `developer`).
+    if asked.get("features") == Some(&json!(true)) {
+        let features = *shared.features.lock().expect("features");
+        return json!({"camera": features.camera, "microphone": features.microphone});
     }
     if asked.get("clients").is_some() {
         let door = shared.door.lock().expect("door");
