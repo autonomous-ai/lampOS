@@ -59,6 +59,10 @@ pub const RUN_PREPARES_ONLY: &str = "a skill's run only prepares a write: the la
 /// What a skill run's write is told while another write waits for its yes.
 pub const RUN_WRITE_WAITS: &str =
     "another write waits for the person's yes: nothing was prepared, try again later";
+/// The services with two catalog codes, its own (the code a run's grant
+/// names) first: a skill run's call goes to whichever is linked
+/// ([`Services::run_code`]).
+pub const RUN_PAIRS: [(&str, &str); 2] = [("gmail", "gmail-app"), ("figma", "figma-api")];
 /// What a skill run's prepared write tells it: nothing went.
 pub const RUN_HELD: &str = "Nothing is sent. The lamp reads it back to the person and sends it only if they say yes; say nothing of it as sent.";
 /// What a skill's call to anything but a read is told.
@@ -465,13 +469,17 @@ impl<H: Http, M: Mail> Services<H, M> {
         let Some(skill) = skill else {
             return refused("the call names no skill");
         };
-        let asked = args
+        let Some(asked) = args
             .get("service")
             .and_then(Value::as_str)
-            .unwrap_or_default();
-        if catalog::service(asked).is_none() {
-            return refused(&cant_link(Some(asked)));
-        }
+            .and_then(catalog::service)
+            .map(|service| self.run_code(service.code))
+        else {
+            return refused(&cant_link(args.get("service").and_then(Value::as_str)));
+        };
+        // The pair's linked code, named exactly from here on.
+        let mut args = args;
+        args["service"] = json!(asked);
         let answer = match name.as_str() {
             tools::READ => self.read(&args, Asker::Skill).await,
             tools::WRITE if args.get("send_id").is_some() || args.get("said").is_some() => {
@@ -510,6 +518,27 @@ impl<H: Http, M: Mail> Services<H, M> {
             answer
         } else {
             refused("the answer was too long to give")
+        }
+    }
+
+    /// The code a skill run's call goes to, for catalog code `code`: a run's
+    /// grant names a service's pair of codes as one ([`RUN_PAIRS`], as
+    /// `lamp_control::protocol::SERVICE_CODES_FOLDED` folds them), so the
+    /// call goes to whichever of the pair is linked, the folded name's own
+    /// (`gmail`, `figma`) when both are, and as asked when neither is.
+    fn run_code(&self, code: &'static str) -> &'static str {
+        let Some(&(own, other)) = RUN_PAIRS
+            .iter()
+            .find(|(own, other)| *own == code || *other == code)
+        else {
+            return code;
+        };
+        if self.store.load(own).is_some() {
+            own
+        } else if self.store.load(other).is_some() {
+            other
+        } else {
+            code
         }
     }
 
@@ -2463,6 +2492,63 @@ mod tests {
             );
         }
         assert!(services.mail.sent.lock().unwrap().is_empty());
+    }
+
+    /// #6432 (SubDarren's P2 on #6436): a run's grant names a service's two
+    /// codes as one, so its call goes to whichever is linked, the folded
+    /// name's own when both are.
+    #[test]
+    fn a_skill_runs_call_goes_to_the_linked_code_of_its_pair() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "{}", true).with_skill_tasks(true);
+        let read = |service: &str, what: &str| {
+            run(services.run_tool(&run_line(
+                tools::READ,
+                json!({"service": service, "what": what}),
+            )))
+        };
+        // Only `gmail-app` linked: a `gmail` read is that link's (which
+        // only sends), not "not linked".
+        let (linked, _) =
+            run(services.admin(&gmail_app("t-app", json!({"user_email":"me@work.test"}))));
+        assert_eq!(linked["ok"], true, "{linked}");
+        assert_eq!(read("gmail", "recent")["error"], reads::GMAIL_APP_NO_READS);
+        // Both linked: `gmail`, the folded name's own, whichever was asked.
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        for asked in ["gmail", "gmail-app"] {
+            let answer = read(asked, "recent");
+            assert_eq!(answer["ok"], true, "{asked}: {answer}");
+            assert!(answer.to_string().contains("Dinner"), "{asked}");
+        }
+        // Figma the same: only `figma-api`, then both.
+        let token_of = |call: &Call| {
+            call.headers
+                .iter()
+                .map(|(_, value)| value.clone())
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        run(services.admin(&set_line(
+            "figma-api",
+            json!({"auth_type":"oauth","access_token":"t-api"}),
+        )));
+        assert_eq!(read("figma", "me")["ok"], true);
+        let calls = services.http.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 1);
+        assert!(token_of(&calls[0]).contains("t-api"), "{calls:?}");
+        run(services.admin(&set_line(
+            "figma",
+            json!({"auth_type":"oauth","access_token":"t-own"}),
+        )));
+        for asked in ["figma", "figma-api"] {
+            assert_eq!(read(asked, "me")["ok"], true, "{asked}");
+            let calls = services.http.calls.lock().unwrap().clone();
+            let last = token_of(calls.last().unwrap());
+            assert!(last.contains("t-own") && !last.contains("t-api"), "{asked}");
+        }
     }
 
     /// #6432: a skill run's write is only prepared, read back and held as

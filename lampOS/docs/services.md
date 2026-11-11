@@ -2203,7 +2203,10 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   calls and the owner's yes calls are refused, "a skill's run may only
   read a linked service or prepare a write to it"). The call must name a
   skill (`a-z 0-9 -`, as lamp-skills names one) and the service by its exact
-  code (a name such as "Gmail" is refused). lamp-control sends these calls
+  code (a name such as "Gmail" is refused). A code of a pair (`gmail` and
+  `gmail-app`, `figma` and `figma-api`, one grant each) goes to whichever of
+  the pair is linked, the folded name's own (`gmail`, `figma`) when both are
+  (`Services::run_code`). lamp-control sends these calls
   only with `LAMP_SKILL_TASKS=on` in its own environment
   (`--services-socket` moves the socket from
   `/run/lampos-services/tools/call.sock`); off there, they are `off`, "a
