@@ -831,9 +831,10 @@ and alone in view, with no other voice heard, is told their recall, hits
 and thread. **Writes happen too:** filing the exchange in their record is
 the owner's "saving counts", so a guest's words can be filed as theirs, and
 their day recall and the nightly extraction (if it is ever on) may take
-them as theirs. `LAMP_SAME_VOICE_CONFIRMS`, when on, makes the guest's voice a
-second voice only once the conversation has a print to tell it from; with
-the guest the conversation's first voice, nothing tells them apart. The
+them as theirs. `LAMP_SAME_VOICE_CONFIRMS` (off in the product, the lead's ruling of 11 Nov (#1711))
+never makes the guest's voice a second voice: it only confirms, so a voice
+like theirs is taken as theirs and any other changes nothing
+([same-voice.md](same-voice.md), "One way only"). The
 lead's ruling on #5522 said a lone face never counts for reads; this rests
 on the memory owner's 16:43 word and the PM's 16:46 reading, so the lead
 confirms before the switch goes on. Off,
@@ -851,6 +852,52 @@ the one-face rule is as above, byte for byte. Tests:
 `memory_scope::tests::a_one_face_line_with_reads_is_read_as_its_persons_and_forgets_need_the_mouth`.
 A line kept as yours while you were the only face in view can include words
 someone else said out of view.
+
+**A line their own voice confirmed** (`LAMP_SAME_VOICE_CONFIRMS=on`; off in
+the product by the lead's ruling of 11 Nov (#1711): CAM++ is trained on VoxCeleb, YouTube speech
+released for research, so it stays off until a speaker model whose training
+data is cleared for commercial use, and this code lands dark): a line no face was
+seen speaking, their known face the one face in view, whose voice print scores
+0.45 or over against the mean of 3 or more prints of lines their face alone was
+seen saying (kept in RAM only), is taken as their face seen saying it: its keeps,
+reads and seen-saying checks are theirs, as for a line their mouth was read
+saying. A held forget's yes still needs their face. The line is marked
+`LineSeen::by_voice`, so it never counts as the owner's face seen saying it for
+a linked service's send, full read or enrolled print. The voice never ends,
+holds or carries a conversation, and the carry past a silent face stays
+inactive beside it. Known risk, wherever it is set: a voice like
+theirs (a relative) off camera while they sit silent alone in view is kept and
+read as theirs ([same-voice.md](same-voice.md), "One way only"). A successful
+reply to a heard, confirmed whole-person forget also clears the admitted
+person's in-memory confirmation prints; a successful face forget reply clears
+the deleted person's prints. Both ordinary and optional requested-audio runners
+capture the deletion identity before dispatch and observe its receipt before
+later scope/output checks; the audio offer and other reply metadata stay
+unchanged. Declined, failed and unadmitted whole-forget receipts leave
+them intact, as does forgetting a different person's stored prints. Pending
+voice observations carry a generation captured at spoken Start-processing
+entry, before `begin`, callbacks, locks or task spawning. Events still queued
+upstream are outside this boundary: after forget they cannot learn or
+confirm from that old generation, even if fresh lines have since taught the
+same person again. This bounded
+RAM fence is separate from the persisted services enrollment cleanup.
+
+Validated `memory/forgot` events also clear the same Engine cache, including
+app removal and a completed deletion whose tool receipt was lost. One bus
+reader runs when confirmation or summaries are enabled and polls every 500 ms;
+cleanup does not depend on the summary switch. A person's id clears only their
+prints and advances the observation generation; a null person clears all.
+The literal room id `everyone` and rules scopes do not clear personal prints.
+The existing source and payload checks still apply. Until an event is delivered
+and handled, old prints may remain usable; this is not an atomic cross-process
+cutoff or a guarantee of replay after a lost bus event.
+Each poll handles at most eight messages; scheduling and backlog can delay
+cleanup beyond one polling interval.
+
+Activation also depends on the update round installing `lamp-same-voice` and
+its model. Setting the switch alone does not supply them; a round without those
+artifacts cannot confirm a voice. The round-install repair is a separate
+dependency, not supplied by this cache cleanup.
 
 **Their reminders on such a line** (`LAMP_ONE_FACE_REMINDERS=on`, on in the
 product, the memory owner's call on 4 Nov): the line's keep decides its
