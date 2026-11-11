@@ -3533,18 +3533,7 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
                 let socket = std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).unwrap_or_default();
                 return match yes_to_turn_off(skill, sockets, bus) {
                     Ok(()) => turn_off(sockets, bus, &request, since, Path::new(&socket)),
-                    Err(why) => {
-                        let line = sockets
-                            .may
-                            .unplug
-                            .as_ref()
-                            .map(|lines| lines.stay.clone())
-                            .unwrap_or_default();
-                        format!(
-                            "unplug: not turned off: {why}; {}",
-                            stay(sockets, bus, &request, &line)
-                        )
-                    }
+                    Err(why) => not_turned_off(sockets, bus, &request, &why),
                 };
             }
             Ok(Progress::Ready) => {
@@ -3614,9 +3603,33 @@ fn stay_call((name, args, _, reply, admission): ToolAsk, engine: &Engine, runner
         .map(|lines| lines.stay.clone())
         .unwrap_or_default();
     std::thread::spawn(move || {
-        let outcome = stay(&sockets, &bus, &request, &line);
+        let outcome = never_mind(&sockets, &bus, &request, &line);
         eprintln!("lamp-skills: {name}: {outcome}");
     });
+}
+
+/// A spoken "never mind": the person is there and asked, so the cancel is
+/// published even if the line never begins (lamp-52e6, build 12130). It
+/// needs no run under way, only the kept request (`may_stay`).
+fn never_mind(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
+    stay_even_unsaid(sockets, bus, request, line, true)
+}
+
+/// No yes to the turn-off ask: the stay line, then it stands. A heard
+/// refusal (words that aren't a yes) stands even if the line never begins:
+/// the person is there and said no (lamp-52e6, build 12130). Silence, or a
+/// yes not taken, keeps the line-first rule of [`stay`].
+fn not_turned_off(sockets: &Sockets, bus: &Bus, request: &str, why: &str) -> String {
+    let line = sockets
+        .may
+        .unplug
+        .as_ref()
+        .map(|lines| lines.stay.clone())
+        .unwrap_or_default();
+    format!(
+        "unplug: not turned off: {why}; {}",
+        stay_even_unsaid(sockets, bus, request, &line, why == NOT_A_YES)
+    )
 }
 
 /// The line first; only once it has begun is the cancel published, and the
@@ -3628,7 +3641,8 @@ fn stay(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
 
 /// [`stay`], and with `unsaid_too` the cancel is published even when the
 /// line never began (refused, expired, the voice not reached): a turn-off
-/// that failed never leaves the lamp kept folded.
+/// that failed, a heard "no" and a spoken "never mind" never leave the lamp
+/// kept folded.
 fn stay_even_unsaid(
     sockets: &Sockets,
     bus: &Bus,
@@ -3813,6 +3827,9 @@ const OFF_UPDATING: &str = "an update is being installed: try again once it is d
 /// finished line after the ask decides: any other words are no yes. In a
 /// language other than English nothing is asked, since the yes is heard by
 /// English words only: the lamp stays (#5774's P2).
+/// The heard refusal of the turn-off ask: it stands even unsaid.
+const NOT_A_YES: &str = "words that aren't a yes were heard";
+
 fn yes_to_turn_off(skill: &str, sockets: &Sockets, bus: &Bus) -> Result<(), String> {
     use lamp_body::first_stand;
     let lines = sockets
@@ -3864,7 +3881,7 @@ fn yes_to_turn_off(skill: &str, sockets: &Sockets, bus: &Bus) -> Result<(), Stri
             continue;
         }
         if !first_stand::is_yes(&text) {
-            return Err("words that aren't a yes were heard".into());
+            return Err(NOT_A_YES.into());
         }
         let busy = bus
             .latest(lamp_msgs::RoomState::TOPIC)
@@ -6190,6 +6207,61 @@ mod tests {
         let outcome = stay(&sockets, &bus, "r1", &unplug_lines().stay);
         assert!(outcome.contains("nothing cancelled"), "{outcome}");
         assert!(cancels(&bus).is_none());
+    }
+
+    /// A say service whose every line expires unbegun, as the voice answered
+    /// the stay line on lamp-52e6 (build 12130).
+    fn expiring(listener: UnixListener) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            while let Ok((stream, _)) = listener.accept() {
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let mut stream = &stream;
+                writeln!(stream, "{}", json!({"outcome": "expired"})).unwrap();
+            }
+        })
+    }
+
+    /// lamp-52e6, build 12130: "No." to the turn-off ask, the stay line
+    /// expired and nothing was cancelled, so the lamp stayed folded. A
+    /// heard refusal stands even unsaid; silence still cancels nothing.
+    #[test]
+    fn a_heard_no_stands_even_when_the_stay_line_expires() {
+        let dir = tempfile::Builder::new()
+            .prefix("uh")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let _voice = expiring(UnixListener::bind(dir.path().join("say.sock")).unwrap());
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let silent = not_turned_off(&sockets, &bus, "r1", "no spoken yes within 30 s");
+        assert!(silent.contains("nothing cancelled"), "{silent}");
+        assert!(cancels(&bus).is_none());
+        let outcome = not_turned_off(&sockets, &bus, "r1", NOT_A_YES);
+        assert!(outcome.contains("expired"), "{outcome}");
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert!(cancels(&bus).is_some());
+    }
+
+    /// The same lamp: "never mind" 75 s after the ask had ended. No run is
+    /// under way, only the kept request; it is taken and stands the lamp up
+    /// even when its line expires.
+    #[test]
+    fn a_never_mind_after_the_ask_ended_stands_even_unsaid() {
+        let dir = tempfile::Builder::new()
+            .prefix("um")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let _voice = expiring(UnixListener::bind(dir.path().join("say.sock")).unwrap());
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let request = lamp_skills::unplug::may_stay(&bus, clock::now_us(), false).unwrap();
+        let outcome = never_mind(&sockets, &bus, &request, &unplug_lines().stay);
+        assert!(outcome.contains("expired"), "{outcome}");
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert!(cancels(&bus).is_some());
     }
 
     /// lamp-52e6 on build 11913: a turn-off not taken left the request
