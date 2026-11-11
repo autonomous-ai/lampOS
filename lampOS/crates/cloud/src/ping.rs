@@ -43,6 +43,11 @@ pub struct Payload {
     /// V1 always sends these two.
     pub wakeword_enabled: bool,
     pub voice_input_mode: &'static str,
+    /// `true` when lamp-cloud runs with `LAMP_CLOUD_TLS=on`, so the backend
+    /// can hand this lamp its TLS broker (#6031); left out otherwise, so a
+    /// lamp without the switch sends what it sent before.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub mqtt_tls: bool,
 }
 
 impl Payload {
@@ -58,7 +63,15 @@ impl Payload {
             timezone: identity.timezone.clone(),
             wakeword_enabled: false,
             voice_input_mode: "automatic",
+            mqtt_tls: false,
         }
+    }
+
+    /// The payload saying whether the broker is reached over TLS
+    /// ([`crate::online::tls_on`], #6031).
+    pub fn with_tls(mut self, tls: bool) -> Self {
+        self.mqtt_tls = tls;
+        self
     }
 }
 
@@ -187,6 +200,43 @@ mod tests {
         assert_eq!(after(&kept, &renamed).unwrap().device_id, "d-43");
         // Not a reply: nothing, as V1.
         assert_eq!(reply(b"<html>"), None);
+    }
+
+    /// #6031: with `LAMP_CLOUD_TLS=on` the ping says `"mqtt_tls": true`;
+    /// off, unset or any other value, the key is not there at all, so the
+    /// body is byte for byte what it was.
+    #[test]
+    fn the_ping_says_mqtt_tls_only_with_its_switch_on() {
+        let identity = Identity {
+            device: "lamp".into(),
+            version: "0.1.0+abc".into(),
+            id: "d-42".into(),
+            mac: "lamp-7f72".into(),
+            timezone: String::new(),
+            local_ip: String::new(),
+        };
+        let before = serde_json::to_vec(&Payload::of(&identity)).unwrap();
+        for value in [None, Some("off"), Some("ON"), Some("1"), Some("on ")] {
+            let body = Payload::of(&identity).with_tls(crate::online::tls_from(value));
+            let bytes = serde_json::to_vec(&body).unwrap();
+            assert_eq!(bytes, before, "{value:?}");
+            assert!(
+                serde_json::to_value(&body)
+                    .unwrap()
+                    .get("mqtt_tls")
+                    .is_none()
+            );
+        }
+        let on = Payload::of(&identity).with_tls(crate::online::tls_from(Some("on")));
+        let value = serde_json::to_value(&on).unwrap();
+        assert_eq!(value["mqtt_tls"], json!(true));
+        let mut without = value.as_object().unwrap().clone();
+        without.remove("mqtt_tls");
+        assert_eq!(
+            serde_json::Value::Object(without),
+            serde_json::to_value(Payload::of(&identity)).unwrap(),
+            "nothing else changes"
+        );
     }
 
     #[test]

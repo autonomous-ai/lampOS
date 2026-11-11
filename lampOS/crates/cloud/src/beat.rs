@@ -123,6 +123,8 @@ pub async fn pings(
         }
     };
     let mut address = identity.borrow().local_ip.clone();
+    // The unit's switch, read once: the ping says it (#6031).
+    let tls = crate::online::tls_on();
     // The ping's last state, said only when it changes.
     let mut failing: Option<String> = None;
     loop {
@@ -140,7 +142,7 @@ pub async fn pings(
         if let Some(account) = account
             && let Some(url) = ping::url(&account)
         {
-            let result = once(&client, &url, &key, &Payload::of(&me)).await;
+            let result = once(&client, &url, &key, &Payload::of(&me).with_tls(tls)).await;
             if let Some(login) = login.as_deref_mut() {
                 let answer = match &result {
                     Ok(body) => Answer::of_body(body),

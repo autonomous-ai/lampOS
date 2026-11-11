@@ -90,10 +90,18 @@ pub const TLS_ENVIRONMENT: &str = "LAMP_CLOUD_TLS";
 /// when TLS is asked and cannot be set up, so it never connects in the
 /// clear in its place.
 pub fn options(account: &Account) -> Option<MqttOptions> {
-    options_with(
-        account,
-        std::env::var(TLS_ENVIRONMENT).is_ok_and(|value| value == "on"),
-    )
+    options_with(account, tls_on())
+}
+
+/// Whether this lamp-cloud runs with `LAMP_CLOUD_TLS=on`: the broker over
+/// TLS, and the ping saying so (`mqtt_tls`, #6031).
+pub fn tls_on() -> bool {
+    tls_from(std::env::var(TLS_ENVIRONMENT).ok().as_deref())
+}
+
+/// [`tls_on`] for a given value: `on` exactly.
+pub fn tls_from(value: Option<&str>) -> bool {
+    value == Some("on")
 }
 
 /// The client's options for `account`: V1's, with this lamp's keepalive,
