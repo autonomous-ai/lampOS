@@ -21,6 +21,9 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: none
 - Log: `lampOS/docs/work-log-sim-2.md`
 - Tasks: the virtual lamp task, paired with sim-1; none labelled yet
+## Pair role (the person, 11 Nov 13:39)
+
+sim-2 is the **navigator** and sim-1 the **driver** of the virtual-lamp pair: sim-1 writes the code, runs the gates and makes the commits; sim-2 reads each change as it is written, plans the next step, keeps the task list, catches bugs before a commit, and is the only one of the two who talks to the lead (one [review] per change, push asks, status) and who posts the PRs, READ ASKs and NEXT TRAINs. The pair's open PRs are tracked by sim-2.
 
 ## It may
 
