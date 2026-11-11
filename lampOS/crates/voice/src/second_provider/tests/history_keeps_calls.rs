@@ -13,6 +13,12 @@ fn told(name: &str) -> Value {
             json!({"error": "I asked for it but could not confirm my light changed."})
         }
         "remember" => json!({"remembered": false, "note": "Not kept."}),
+        // A write prepared: its read-back, the person's words in it.
+        "service_write" => json!({
+            "read_back": "Send an email from me@home.test to ann@b.test. Subject: \"Hi\". It says: \"Home by 7\". Shall I send it?",
+            "send_id": "v17-1",
+            "sent": false
+        }),
         _ => json!({"ok": true}),
     }
 }
@@ -36,6 +42,19 @@ fn handed_on_with(
     heard: &str,
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Vec<(u64, String, Value)> {
+    handed_on_told(on, heard, rounds)
+        .into_iter()
+        .map(|(request, name, args, _)| (request, name, args))
+        .collect()
+}
+
+/// [`handed_on_with`], each with what its result is told as
+/// (`kept_result`).
+fn handed_on_told(
+    on: bool,
+    heard: &str,
+    rounds: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Vec<(u64, String, Value, Option<&'static str>)> {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(rounds.into()),
@@ -45,7 +64,8 @@ fn handed_on_with(
         let answer = told(&name);
         Box::pin(async move { answer })
     });
-    let kept: Arc<Mutex<Vec<(u64, String, Value)>>> = Arc::default();
+    type Kept = Vec<(u64, String, Value, Option<&'static str>)>;
+    let kept: Arc<Mutex<Kept>> = Arc::default();
     let keep = kept.clone();
     let mut engine = Engine::with_clock(
         script,
@@ -55,10 +75,10 @@ fn handed_on_with(
     )
     .announcing(false)
     .keeping_calls_by(on.then(|| -> CallsKept {
-        Arc::new(move |request, name: &str, args: &Value| {
+        Arc::new(move |request, name: &str, args: &Value, result| {
             keep.lock()
                 .unwrap()
-                .push((request, name.to_owned(), args.clone()));
+                .push((request, name.to_owned(), args.clone(), result));
         })
     }));
     tokio::runtime::Builder::new_current_thread()
@@ -331,5 +351,93 @@ async fn a_chat_that_refuses_kept_calls_is_asked_again_without_them() {
                 "{labels:?}"
             );
         }
+    }
+}
+
+/// lamp-06c1 at 11913 (11 Nov): create, move, cancel, then the same again
+/// in one conversation. Each first write called `service_write`; each
+/// second was read back by the model itself with no call, the history
+/// showing every earlier write as words alone. A prepared write is handed
+/// on with only its service, action and send id, its result its status:
+/// never a recipient, a subject, a body or the person's "said".
+#[test]
+fn a_service_write_is_handed_on_with_no_ones_words() {
+    let asked = json!({
+        "service": "gmail",
+        "action": "send_mail",
+        "to": ["ann@b.test"],
+        "subject": "Hi",
+        "text": "Home by 7",
+        "said": "send a mail to Ann",
+        "event_id": "7ckf9",
+    });
+    let rounds = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                "service_write",
+                asked,
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        saying("Send an email from me@home.test to ann@b.test. Shall I send it?"),
+    ];
+    let handed = handed_on_told(true, "Send a mail to Ann saying home by 7.", rounds);
+    assert_eq!(
+        handed,
+        [(
+            1,
+            "service_write".to_owned(),
+            json!({"service": "gmail", "action": "send_mail"}),
+            Some(WRITE_PREPARED),
+        )]
+    );
+    let told = handed[0].2.to_string();
+    for private in ["ann@b.test", "Hi", "Home by 7", "Ann", "7ckf9"] {
+        assert!(!told.contains(private), "{private} kept in {told}");
+    }
+}
+
+/// A service write's kept arguments ([`kept_args`]) and its status
+/// ([`kept_result`]): a send's yes keeps its send id, a field that is not a
+/// string is left out, and a call that is not a write keeps its plain
+/// result.
+#[test]
+fn a_service_writes_status_and_fields_are_kept() {
+    assert_eq!(
+        kept_args(
+            "service_write",
+            &json!({"service": "google_calendar", "send_id": "v1-2", "said": "yes", "event": {"title": "x"}}),
+        ),
+        Some(json!({"service": "google_calendar", "send_id": "v1-2"}))
+    );
+    assert_eq!(
+        kept_args(
+            "service_write",
+            &json!({"service": "x".repeat(crate::thread::KEPT_ARGS_BYTES)})
+        ),
+        None
+    );
+    assert_eq!(
+        kept_result(
+            "service_write",
+            &json!({"read_back": "Add it?", "send_id": "v1"})
+        ),
+        Some(WRITE_PREPARED)
+    );
+    for done in [json!({"sent": true}), json!({"sent": false, "saved": true})] {
+        assert_eq!(
+            kept_result("service_write", &done),
+            Some(WRITE_DONE),
+            "{done}"
+        );
+    }
+    assert_eq!(
+        kept_result("service_write", &json!({"sent": false, "cancelled": true})),
+        Some(WRITE_NOT_DONE)
+    );
+    assert_eq!(kept_result("set_timer", &json!({"ok": true})), None);
+    for line in [WRITE_PREPARED, WRITE_DONE, WRITE_NOT_DONE] {
+        assert!(line.starts_with('(') && line.ends_with(')'), "{line}");
     }
 }
