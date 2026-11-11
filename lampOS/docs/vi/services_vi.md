@@ -229,8 +229,9 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   chỉ `service_read`: mọi tên khác nhận "a skill may only read a linked
   service" (`serve::Services::skill_tool`). Với `LAMP_SKILL_WRITES=on` nó
   còn được gọi `skill_write`, lần ghi của kỹ năng tự tạo mà chủ đèn đã đồng
-  ý, và chỉ giọng nói được gọi `skill_write_approve` và `skill_writes_sent`
-  ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới).
+  ý, và chỉ giọng nói được gọi `skill_write_approve`, `skill_writes_sent`
+  và `skill_writes_approved` ("Một kỹ năng tự tạo ghi vào dịch vụ", bên
+  dưới).
 
 Mỗi cửa trả lời tối đa 8 kết nối cùng lúc ("busy" khi vượt quá), và một peer
 có 5 s để gửi dòng của nó và nhận câu trả lời. Unit là một service thường,
@@ -1966,6 +1967,16 @@ Nó không giữ nội dung, chủ đề hay tiêu đề. Giọng nói đọc n�
 `skill_writes_sent`, lệnh gọi riêng của nó như lần đồng ý, dưới dạng
 `{"sent": [{"skill", "service", "at", "to"}]}`, để nói với chủ đèn "I sent
 your arrival mail to boss at 18:02" vào lần tới thấy họ, như bên dưới.
+
+**Đã được đồng ý chưa** (`skill_writes_approved`, lệnh gọi riêng của
+giọng nói, để đọc lại một kỹ năng đang chờ). `{"skill", "writes": [...],
+"sha256"}` như lời đồng ý nhận; trả lời `{"on", "approved"}`: `on` khi kỹ
+năng được cài đúng package đó, `approved` khi nội dung của mọi lần ghi đều
+được đồng ý cho package đó và dịch vụ của nó hiện vẫn được liên kết dưới
+đúng liên kết đã đồng ý, như lúc gửi kiểm tra. Nó không đồng ý gì (các lần
+đồng ý của một package đã đổi bị bỏ, như lúc gửi); `lamp-skills` bị từ chối
+(`SKILL_READS_AND_WRITES_ONLY`), và khi công tắc tắt thì bị từ chối. Kiểm thử
+`whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`.
 
 **Phía giọng nói** ([skills_vi.md](skills_vi.md), "Made by voice", cho
 toàn bộ):

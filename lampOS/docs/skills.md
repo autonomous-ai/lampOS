@@ -2505,6 +2505,37 @@ gone ([switches.md](switches.md)). What happens:
      is held whatever its length, its name or a question, with
      `LAMP_SECOND_OWN_ECHO` on or off and in the private room; its request
      is kept and an approval in it refused.
+   - **Read back, and agreed to then** (the owner, 11 Nov;
+     `make_skill_local::read_back`): a write skill still waiting for its
+     yes (its make's turn cut, no answer then, or a "no") is heard again
+     by asking "what does my leaving mail skill send?" or "read me my
+     leaving mail skill". The model calls `make_skill` with only
+     `read_back`, the skill's name (offered with `LAMP_SKILL_WRITES` alone;
+     "my" and "skill" dropped, `made_skill::name_asked`), and the voice
+     finds the kept skill on the lamp of that name. Not approved for what
+     it sends now, as `lamp-services` tells it (`skill_writes_approved`,
+     the voice's own call, which approves nothing; not told counts as not
+     approved), its make's own line (`made_skill::on_line`, "I made leaving
+     mail: … It waits for you to agree before it sends anything.") is said
+     word for word, and its writes wait for the yes again through the
+     make's very wait, `approve_id`: a plain agreement on a later heard
+     line approves it as at the make, with every guard of the make's (said
+     whole and uncut, so a cut read-back and then a yes is
+     `NOT_SAID_WHOLE`; the echo hold; the second route; the package said
+     back; the link). A "no", or no answer, calls nothing: it stays
+     unapproved. Approved already, its say-back is said ending "You agreed
+     to it, so it sends as it says." (`made_skill::approved_line`), and
+     nothing is asked or awaited. One that sends nothing is said so ("…
+     doesn't send or write anything"); none of that name on the lamp, or
+     another package of it installed, is said so, with the names on.
+     Tests: `a_waiting_write_skill_read_back_is_said_whole_and_a_later_yes_approves`,
+     `a_cut_or_echoed_read_back_approves_nothing`,
+     `a_read_back_declined_or_unanswered_stays_unapproved`,
+     `an_approved_write_skill_read_back_is_said_and_asks_nothing`,
+     `a_read_back_of_no_write_skill_or_none_says_so_plainly`,
+     `the_read_back_is_offered_with_writes_alone_within_the_bounds`, and
+     `lamp-services`'
+     `whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`.
    - **"I sent …"** (`crate::skill_writes_told`): the second route asks
      `skill_writes_sent` off the line's path, at most every 5 s, as a
      heard line comes, and the next heard line is told each send since the

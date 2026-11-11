@@ -199,6 +199,7 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
                 skill_writes::FUNCTION,
                 skill_writes::APPROVE,
                 skill_writes::SENT,
+                skill_writes::APPROVED,
             ]
             .contains(name)
         })
@@ -533,6 +534,9 @@ impl<H: Http, M: Mail> Services<H, M> {
                 skill_writes::SENT if asker == Asker::Owner => {
                     Ok(skill_writes::SentLog::new(&self.store.0).list())
                 }
+                skill_writes::APPROVED if asker == Asker::Owner => {
+                    self.skill_writes_approved(&args)
+                }
                 // A made skill's write is `lamp-skills`' alone.
                 _ => Err("no such function".into()),
             },
@@ -653,6 +657,56 @@ impl<H: Http, M: Mail> Services<H, M> {
             approved.len()
         );
         Ok(json!({"approved": approved.len(), "public": public}))
+    }
+
+    /// Whether a made skill's writes are approved, for the voice to read a
+    /// skill waiting for its yes back (#6066): `{"skill", "writes": [...],
+    /// "sha256"?}` as [`Self::skill_write_approve`] takes it. `{"on",
+    /// "approved"}`: `on` when the skill is installed as a package (that
+    /// very one when `sha256` is given), `approved` when every write's
+    /// content is approved for that package and its service is linked now
+    /// under the link approved, as a send holds it. Read only: it approves
+    /// nothing, and drops a changed package's approvals as a send does.
+    pub fn skill_writes_approved(&self, args: &Value) -> Result<Value, String> {
+        if !self.skill_writes {
+            return Err(format!(
+                "a skill's writes are off on this lamp ({} is not on)",
+                skill_writes::ENVIRONMENT
+            ));
+        }
+        let skill = args
+            .get("skill")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !skill_writes::skill_name_ok(skill) {
+            return Err("the ask names no skill".into());
+        }
+        let writes = args
+            .get("writes")
+            .and_then(Value::as_array)
+            .filter(|writes| !writes.is_empty())
+            .ok_or("writes is a list of the skill's writes")?;
+        let package = skill_writes::installed_package(&self.skills_dir, skill);
+        let on = package.is_some()
+            && args
+                .get("sha256")
+                .is_none_or(|said| said.as_str() == package.as_deref());
+        if !on {
+            return Ok(json!({"on": false, "approved": false}));
+        }
+        let approvals = skill_writes::Approvals::new(&self.store.0);
+        let approved = writes.iter().all(|write| {
+            let skill_writes::Found::Approved(approval) =
+                approvals.find(skill, package.as_deref(), write)
+            else {
+                return false;
+            };
+            catalog::service(&approval.service)
+                .and_then(|service| self.store.load(service.code))
+                .and_then(|entry| skill_writes::link_of(&entry))
+                .is_some_and(|link| link == approval.link_of)
+        });
+        Ok(json!({"on": true, "approved": approved}))
     }
 
     /// A made skill's write (#6066, [`skill_writes`]): `{"skill", "write"}`,
@@ -2603,6 +2657,64 @@ mod tests {
         let admin = json!({"op":"skill_write_approve","skill":"arrive-mail",
                            "writes":[arrival_mail()],"sha256":now});
         assert_eq!(run(on.admin(&admin.to_string())).0["result"]["approved"], 1);
+    }
+
+    /// The voice's read-back of a waiting skill asks whether its writes are
+    /// approved (`skill_writes_approved`): not before the yes, yes after it,
+    /// no for another package, another content or a link gone; it approves
+    /// nothing, and is the voice's alone.
+    #[test]
+    fn whether_a_skills_writes_are_approved_is_told_to_the_voice_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        put_on(dir.path(), "arrive-mail", "1");
+        let on = services(dir.path(), "{}", true).with_skill_writes(true);
+        run(on.admin(&app_password_gmail("me@home.test")));
+        let package =
+            skill_writes::installed_package(&dir.path().join("skills"), "arrive-mail").unwrap();
+        let ask = |writes: &[Value], sha256: &str| {
+            json!({"op":"call","name":"skill_writes_approved","args":{
+                "skill":"arrive-mail","writes":writes,"sha256":sha256}})
+            .to_string()
+        };
+        let told = |line: &str| run(on.tool(line))["result"].clone();
+        assert_eq!(
+            told(&ask(&[arrival_mail()], &package)),
+            json!({"on": true, "approved": false})
+        );
+        // Asking approves nothing.
+        let line = skill_write_line("arrive-mail", &arrival_mail());
+        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])))["result"]["approved"],
+            1
+        );
+        assert_eq!(
+            told(&ask(&[arrival_mail()], &package)),
+            json!({"on": true, "approved": true})
+        );
+        // Another content, or another package said back: not approved.
+        let mut other = arrival_mail();
+        other["text"] = json!("I'm here.");
+        assert_eq!(told(&ask(&[other], &package))["approved"], false);
+        assert_eq!(
+            told(&ask(&[arrival_mail()], &"0".repeat(64))),
+            json!({"on": false, "approved": false})
+        );
+        // Never lamp-skills'.
+        let asked = run(on.skill_tool(&ask(&[arrival_mail()], &package)));
+        assert_eq!(asked["ok"], false, "{asked}");
+        // Gmail unlinked: its approvals are gone.
+        run(on.admin(r#"{"op":"remove","code":"gmail"}"#));
+        assert_eq!(
+            told(&ask(&[arrival_mail()], &package)),
+            json!({"on": true, "approved": false})
+        );
+        // Off: refused.
+        let off = services(dir.path(), "{}", true);
+        assert_eq!(
+            run(off.tool(&ask(&[arrival_mail()], &package)))["ok"],
+            false
+        );
     }
 
     /// #6066: a made skill's write goes only as the owner approved it,
