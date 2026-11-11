@@ -1351,3 +1351,42 @@ fn loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused() {
     .unwrap_err();
     assert_eq!(refused.0, lamp_voice::made_skill::NOT_PASSED, "{refused:?}");
 }
+
+/// Heron's P2 on #6437: a trigger the check refuses stays refused,
+/// loosened too. The desk left (`equals = false`) with a wait the check
+/// can't read, which no key left out of a step can fix: its `for` is never
+/// taken out, the make fails as today, on and off alike, and nothing is
+/// kept.
+#[test]
+fn loosened_a_trigger_the_check_refuses_is_never_loosened() {
+    let toml = TOML
+        .replace("topics = [\"voice/state\"]", "topics = [\"room/presence\"]")
+        .replace(
+            "topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"",
+            "topic = \"room/presence\"\nfield = \"someone\"\nequals = false\nfor = \"banana\"",
+        );
+    assert!(toml.contains("equals = false\nfor = \"banana\""));
+    let request = Asked {
+        request: "dim the light when the lamp goes quiet",
+        ..Asked::default()
+    };
+    for on in [false, true] {
+        let _loose = LooseHere::set(on);
+        let dir = tempfile::tempdir().unwrap();
+        let keeping = keeping(dir.path());
+        let refused = keep_asked(
+            &answer(&toml, "quiet-dim"),
+            false,
+            "s1:quiet-dim:1",
+            &keeping,
+            &request,
+        )
+        .unwrap_err();
+        assert_eq!(
+            refused.0,
+            lamp_voice::made_skill::NOT_PASSED,
+            "on {on}: {refused:?}"
+        );
+        assert!(tars(&keeping.directory).is_empty(), "on {on}");
+    }
+}
