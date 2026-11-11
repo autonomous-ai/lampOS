@@ -16,4 +16,5 @@ pub mod readiness;
 pub mod runtime;
 pub mod sign_in;
 pub mod skill_call;
+pub mod skill_task;
 pub mod store;

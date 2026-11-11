@@ -154,6 +154,50 @@ chạy thật gửi thêm (ghi chú của bộ nhớ, các dòng của skill, c�
 web, tên vừa nghe thấy) không có trong probe. D giúp việc giao việc không còn
 phụ thuộc vào những thứ đó. Chưa được phát thử trên đèn.
 
+## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`)
+
+Bước `do.task` của một kỹ năng (#6305, docs/skills.md, "A skill's task")
+giao phần chậm hơn cho Hermes của chính đèn. lamp-skills gửi một dòng cho mỗi
+lần chạy, và được trả lời khi lần chạy kết thúc
+(`lamp_tasks::skill_task::answer`):
+
+- **Dòng gửi:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
+  Cần đủ mọi trường và không nhận trường nào khác. `skill` là tên một kỹ năng
+  (`a-z`, `0-9`, `-`, `_`, tối đa 64), `folder` đúng là
+  `/var/lib/lampOS/skills/<skill>` (các kỹ năng Hermes thấy ở chế độ chỉ đọc),
+  `run` là một tệp trong `scripts/` của kỹ năng (không `..`, không phần ẩn,
+  không đường dẫn tuyệt đối), `task` dài 1 đến 500 byte, `sha256` là 64 chữ
+  số hex viết thường, và `grants` tối đa 13, mỗi quyền một lần, không bao giờ
+  là `skills`. Mọi thứ khác là `bad_request`, và không xin token nào.
+- **Câu trả lời:** `{"ok":true,"id":N}` khi lần chạy đã kết thúc, hoặc
+  `{"ok":false,"error","message"}`: `off` (công tắc không phải `on`),
+  `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
+  cấp token một lần chạy) hoặc `run_failed`.
+- **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên
+  #6071): với mỗi lần chạy, lamp-tasks xin lamp-control (#6304) một token tạo
+  từ lời đồng ý của chủ đèn cho đúng kỹ năng này, SHA-256 của thư mục và các
+  quyền của nó (trait `Tokens`). Lần chạy nhận nó qua `LAMP_CONTROL_TOKEN`,
+  cùng `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`, và không thêm
+  gì khác vào môi trường. Token kết thúc khi lần chạy kết thúc, kể cả khi lần
+  chạy lỗi. Nó không bao giờ có trong lời của việc, nhật ký hay dòng debug.
+  Không có token thì không chạy.
+- **Lần chạy:** một việc cho đích `lamp`, lời của nó là việc của kỹ năng,
+  script cần chạy từ thư mục chỉ đọc của kỹ năng, và đường duy nhất tới đèn
+  (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
+
+**Chưa có (nói rõ để không hiểu code là nhiều hơn):** #6304 chưa được gộp,
+nên nguồn token duy nhất là `NoTokens`, từ chối mọi lần chạy (`no_token`);
+bộ chuyển cho `control.sock` của nó sẽ cắm vào `Tokens`. Chưa có cờ serve nào
+mở socket giao việc này, và chưa có `Runner` nào khởi động Hermes qua
+Harness, nên trên đèn chưa có việc của kỹ năng nào chạy. Việc "không mạng nào
+khác" của lần chạy (một lệnh gọi ra ngoài trực tiếp bị từ chối) và giới hạn
+của lamp-tasks.service (`MemoryHigh`, `CPUQuota`) chờ số đo RAM và CPU của
+Hermes khi chạy một việc trên lamp-52e6 (đèn 6 GB: mọi giới hạn RAM được
+tính theo loại đèn này), so với mức sàn khi cài Hermes
+(≥1.350 MB còn trống), trong lúc giọng nói trả lời một câu. Kiểm thử:
+`skill_task::tests` (công tắc, vòng đời token, lần chạy lỗi, không có token,
+mọi dòng bị từ chối).
+
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
 Trước đây giọng nói không nói được Harness của đèn đã đăng nhập chưa, hay giao
