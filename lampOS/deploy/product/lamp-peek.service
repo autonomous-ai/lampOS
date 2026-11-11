@@ -1,0 +1,54 @@
+# lampOS peek as the owner's dev monitor (lampOS/docs/peek.md, "Monitor mode", #5883). The product unit
+# (lampOS/docs/install.md): installed and enabled on every lamp, and off unless the owner's dev monitor in
+# the app (`monitor.set`, through root's `lamp-setup change`) writes
+#   [Service]
+#   Environment=LAMP_PEEK=monitor
+# as /etc/systemd/system/lamp-peek.service.d/monitor.conf and restarts it. Off, it says so and exits 0 with
+# nothing listening and no admin socket. Off the app stops it before it answers, and the reset wipes the
+# drop-in. On: http://lamp-xxxx.local/ on port 80, to the local network only, by one-time links from the
+# app (lamp-cloud asks the admin socket for a code).
+[Unit]
+Description=lampOS peek (the owner's dev monitor)
+# Outside lampos.target, as on an office lamp: while setup runs, its hotspot page has port 80, and a reset
+# started in place stops this unit and never starts it again before the next boot (setup/src/reset.rs
+# WRITERS). No Conflicts= with lamp-setup (the reviewer on #2259).
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target lamp-setup.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+# The journal, for each unit's last error line.
+SupplementaryGroups=systemd-journal
+Slice=lampos-parts.slice
+Nice=10
+Environment=LAMP_BUS_ROOT=/run/lampos-bus
+# Its admin socket, where lamp-cloud asks for a one-time code: /run/lampos-peek/admin.sock, lampos and
+# root only.
+RuntimeDirectory=lampos-peek
+RuntimeDirectoryMode=0700
+# Port 80 and nothing else: the one capability it is given.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ExecStart=/opt/lampOS/peek/current/lamp-peek
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-peek
+NoNewPrivileges=yes
+# It reads: the whole system is read-only to it, but for the bus root, where each reader of an event topic
+# binds its subscriber socket.
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

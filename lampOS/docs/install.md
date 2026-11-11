@@ -96,6 +96,7 @@ differs. Folders are what the unit makes or names.
 | addons | `lamp-addons serve` (off unless `LAMP_ADDONS=on`, `addons.md`) | lampos | none | none | the bus (`addon/proposal` and the lamp's state in, `light/request` out) |
 | services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services` (on in the product unit, `LAMP_SERVICES=on`, with writes, `LAMP_SERVICES_WRITE=on`, since 4 Nov; `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
 | control | `lamp-control serve` (off unless `LAMP_CONTROL=on`, `control.md`) | lampos | `/var/lib/lampos-control/` (0700, its `StateDirectory`: certificate, key, paired computers); `/run/lampos-control/` (0700, the admin socket) | none | TCP 7731 (WebSocket over TLS, paired computers only); `admin.sock`; the body's `mood.sock`, the voice's `say.sock`, the bus |
+| peek | `lamp-peek` (the owner's dev monitor, #5883: off unless `LAMP_PEEK=monitor`, which the app's `monitor.set` writes as a drop-in; outside `lampos.target`, `lamp-peek.service` is `WantedBy=multi-user.target` once setup's marker exists, `peek.md`) | lampos | `/run/lampos-peek/` (0700, the admin socket) | none | TCP 80 to the local network only, while on; `admin.sock`; reads the bus |
 | cloud | `lamp-cloud --bus-root /run/lampos-bus` (on in the product, `LAMP_CLOUD=on` in its unit since #1815, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
@@ -146,8 +147,9 @@ eleven parts; the four it does not name are placed by what they serve
 | 4 | eyes, expression | |
 
 Outside `lampos.target`, each started by `multi-user.target` on its own:
-the keeper (which starts the target), update, surround, and the records
-timer. Stop is the reverse.
+the keeper (which starts the target), update, surround, the records
+timer, and the dev monitor's `lamp-peek.service` (#5883), which exits at
+once unless the owner turned it on in the app. Stop is the reverse.
 
 Only a `Type=notify` part makes an `After=` wait. Today that is the body on
 lamp-52e6 and in the template; every lamp-4ace part is `Type=exec` or

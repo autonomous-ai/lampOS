@@ -146,7 +146,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `developer` | `{"camera": bool, "microphone": bool, "speaker": bool}` while lamp-control's admin socket is there (developer access on), else no field: whether a camera, microphone or speaker stream is usable on this lamp (wired, and for the microphone and the speaker the owner's `--microphone on` and `--speaker on`), asked of lamp-control (`{"features": true}`, "The developer door"). `true` means a stream is allowed, not that one starts now (the ears share their sound on demand). The app offers its grants screen only when the field is there and shows the `microphone` tick disabled while it is `false` (and, once it offers the `speaker` tick, that one while `speaker` is `false`); a lamp-control too old to say reads as all `false`, and one from before the speaker reads `speaker` as `false` (App Only's C, 11 Nov 2026) |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
@@ -195,6 +195,7 @@ lamp says so.
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters), `language.set` (`{"language": "en" \| "vi" \| "ja" \| "zh" \| "ko"}`, #4473) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}`, `{"name"}` or `{"language"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | `control.set` (`{"on": true}` or `{"on": false}`, exactly that one field) | with `LAMP_SETTINGS_CHANGE=on` (the owner's developer setting, [control.md](control.md) "Running the door"): V1's `starting` at once, then `success` or `failure` with why; anything but one boolean `on` fails at once, "on must be true or false, and the only field". **On** on a lamp that has not had the installer's step (a channel update never makes users) first has the root helper make the agent's group `lamp-agents`, its user `lampagent` and the folder `/run/lampos-agent` from fixed constants (`docs/setup.md`), as the owner's tap; the app can show "Setting up the agent's user…" while it waits; a step that fails is refused in words and nothing is written. On: `success` with `{"on": true}` once root's helper has written lamp-control's drop-in, and the door opens within moments after it (or once an update in progress finishes). Off: the door is closed before `success` (`{"on": false, "closed": true}`; `"closed": false` with a `note` if lamp-control would not stop, the door then possibly open until the lamp next restarts), or `failure`, "an update is installing: try again in a few minutes", with nothing changed. Off with developer access already off: `success` with `{"on": false}`. Without the switch, V1's "not on this lamp" |
 | `control.set_agent` (`{"on": true}` or `{"on": false}`, exactly that one field; **no user is ever named**) | with `LAMP_SETTINGS_CHANGE=on` (the owner's local agent switch, [control.md](control.md) "The local agent"): V1's `starting` at once, then `success` with `{"on": bool}` or `failure` with why; anything but one boolean `on` fails at once, "on must be true or false, and the only field". Root's change helper (`{"local_agent": bool}`, [setup.md](setup.md)) writes or removes lamp-control's second drop-in with fixed text and restarts lamp-control; on is refused with the helper's words while developer access is off ("turn developer access on first: the local agent's socket is the developer door's"). Listed in `system.info`'s `can` with the other settings kinds |
+| `monitor.set` (`{"on": bool}`, exactly that one field), `monitor.get` (`{}`), `monitor.link` (`{"seal_to", "request_id"}`) | with `LAMP_APP_MONITOR=on` beside `LAMP_SETTINGS_CHANGE=on` (the owner's dev monitor, #5883, "The dev monitor" below): `monitor.set` as `control.set`, for lamp-peek: `starting`, then `success` with `{"on": true}` once root's helper wrote lamp-peek's drop-in (the page opens within moments, or once an update finishes), or with `{"on": false, "closed": true}` once lamp-peek has stopped (`"closed": false` with a `note` if it would not stop); `monitor.get` answers `{"on": bool}` at once from the drop-in; `monitor.link` answers a one-time link sealed to the app's key, `{"sealed": {"v", "enc", "ct"}, "until_unix_ms"}`, or why not ("the dev monitor is off on this lamp: turn it on first"). Without the switch, V1's "not on this lamp" |
 | `owner.place` (`{"lat", "lon", "name", "set_at"}`, `set_at` ISO 8601 UTC), `owner.place.clear` (`{}`) | with `LAMP_OWNER_PLACE=on` beside `LAMP_SETTINGS_CHANGE=on` (#4333, [owner-place.md](owner-place.md), "The owner's place" below): rounded here to about a kilometre and handed to root's helper as the names are; `starting` at once, then `success` with what was kept (`{"name", "lat", "lon", "set_at"}`) or `{"cleared": true}` (also when none was kept), or `failure` with why; a request that doesn't fit fails at once. `name` is an area name (sub-locality and locality from the phone's geocoder), never a street address; `lat`/`lon` is where the lamp stands, set by the person at setup or with Update now, never resent as the phone moves, rounded by the app to 2 decimals. Listed in `can` only with the switch. Without it, `owner.place` gets V1's "not on this lamp", and `owner.place.clear` is still taken, unlisted (#4356) |
 | `voice.set` (`{"provider"?, "voice", "language"?, "speed"?}`, V1's `tts.set` shape), `character.set` (`{"text"}`) | with `LAMP_CHOSEN_VOICE=on` beside `LAMP_SETTINGS_CHANGE=on` (#5394, [chosen-voice.md](chosen-voice.md)): checked here and handed to root's helper as the names are; `starting` at once, then `success` with `{"provider": "elevenlabs", "voice", "speed": 1.0}` or `{"text"}`, or `failure` with why. `provider` absent or `elevenlabs`; `voice` one of the lamp's voices (every name in `lamp-2-tts-catalog`), `""` for the default; `language` and `speed` are taken and left alone. `text` plain, one line, at most 200 characters, `""` clears. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `voice.get` (`{}`) | with the same switch (#5394): answered at once with what the lamp keeps, read from `/etc/lampOS/setup/voice` and `character` as `language` is read, writing nothing: `{"provider": "elevenlabs", "voice", "text"}`, `""` for none kept and for a kept value that does not fit the rules (the default voice, no words, as the voice takes them). Listed in `can` only with the switch; without it, V1's "not on this lamp" |
@@ -2850,6 +2851,53 @@ app that asks anyway is told `developer access is off on this lamp`.
   (`online::commanded`), and that channel is plain too. Broker TLS
   (`LAMP_CLOUD_TLS`) closes the rest. Until it is on this is an accepted risk,
   and the pairing is never described as end to end.
+
+## The dev monitor (#5883, `monitor.set`, `monitor.get`, `monitor.link`)
+
+A developer who owns the lamp turns on a live page of its turns in the app
+and opens it from a browser on the same Wi-Fi ([peek.md](peek.md), "Monitor
+mode"). Off unless `LAMP_APP_MONITOR=on`, with `LAMP_CLOUD=on` and
+`LAMP_SETTINGS_CHANGE=on` (root's helper); the product's `lamp-cloud.service`
+does not set it until the first builder's default-on read, the owner's word
+on words and frames, the app's switch and #5883's lamp row. Without it the
+three kinds are not in `can` and each is "not on this lamp".
+
+- **`monitor.set`** (`{"on": bool}`) goes to root's helper as `control.set`
+  does (`{"monitor": bool}`, setup.md, "Changed after setup"). On writes
+  `/etc/systemd/system/lamp-peek.service.d/monitor.conf`
+  (`Environment=LAMP_PEEK=monitor`) and restarts `lamp-peek.service` once no
+  update holds lamp-update's lock. Off stops it before the result, so no
+  page stays open once the app says off; its sessions end with it. The
+  product installs `lamp-peek.service` on every lamp, outside
+  `lampos.target`, and it exits at once without the drop-in. The reset
+  wipes the drop-in.
+- **`monitor.get`** (`{}`) reads the drop-in: `{"on": true}` only while it
+  holds exactly what the helper writes.
+- **`monitor.link`** (`{"seal_to", "request_id"}`, both as `control.code`'s)
+  asks lamp-peek's admin socket (`/run/lampos-peek/admin.sock`, lampos and
+  root only, waited on 2 s) for a code, good once for 5 minutes, and answers
+  ```
+  {"sealed": {"v": 1, "enc": "<base64url, 32 bytes>", "ct": "<base64url>"}, "until_unix_ms": N}
+  ```
+  `ct` opens to `{"url": "http://lamp-xxxx.local/in#<64 hex>", "code": "<64 hex>", "until_unix_ms": N}`.
+  The seal is `control.code`'s, under `info` `lampos/v1/monitor.link`, with
+  `aad` the lamp's device id and the `request_id` joined by a newline. No
+  key, a key that is not one, no `request_id`, or the dev monitor off: refused
+  before any code is made. lamp-peek not running or giving no code: "the dev
+  monitor did not answer on the lamp now". The code and the link are in no
+  journal line, error or clear part of the reply; the code rides only in the
+  link's fragment, so the browser never sends it in a request line. The app
+  shows the link and its QR; the page is on port 80, so the link names none.
+- **Words on the page:** with the switch on, the page shows the words anyone
+  says to the lamp, household and guests too; the app's switch says so in
+  one line, "Words anyone says to the lamp show here while this is on."
+  (the first builder on #5883).
+
+Tests: `monitor::tests` (the switch, the set's line, the get from the
+drop-in, the link sealed, bound to the lamp and the request and refused
+before a code is made, lamp-peek giving none); setup's
+`the_dev_monitor_writes_lamp_peeks_drop_in_and_the_reset_forgets_it` and
+`the_dev_monitor_starts_once_unlocked_and_stops_before_the_reply`.
 
 ## Hermes' DeepSeek, forwarded on the lamp (#5978, `LAMP_HERMES_ON_LAMP`)
 

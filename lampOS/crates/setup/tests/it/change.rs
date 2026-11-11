@@ -394,6 +394,58 @@ fn the_developer_setting_writes_or_removes_lamp_controls_drop_in() {
     );
 }
 
+/// The owner's dev monitor (`monitor.set`, #5883): on writes lamp-peek's
+/// drop-in, 0644, and asks for lamp-peek's restart only when it changed;
+/// anything but one boolean is refused; the product's path is the one the
+/// reset forgets.
+#[test]
+fn the_dev_monitor_writes_lamp_peeks_drop_in_and_the_reset_forgets_it() {
+    let root = Root::new();
+    let config = root.config();
+    let dropin = &config.monitor_dropin;
+    let (reply, done) = answer(r#"{"monitor": false}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": false}}));
+    let done = done.unwrap();
+    assert!(!done.restart_peek && !done.restart_control);
+    assert_eq!(done.said, "the dev monitor is off already");
+    let (reply, done) = answer(r#"{"monitor": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    assert!(done.unwrap().restart_peek);
+    assert_eq!(
+        fs::read_to_string(dropin).unwrap(),
+        change::MONITOR_DROPIN_TEXT
+    );
+    assert_eq!(mode(dropin), 0o644);
+    assert_eq!(fs::read_dir(dropin.parent().unwrap()).unwrap().count(), 1);
+    // On again: nothing changed, nothing to restart.
+    let (_, done) = answer(r#"{"monitor": true}"#, &config, true);
+    assert!(!done.unwrap().restart_peek);
+    for line in [r#"{"monitor": "on"}"#, r#"{"monitor": null}"#] {
+        let (reply, done) = answer(line, &config, true);
+        assert_eq!(
+            reply,
+            json!({"refused": "monitor must be true or false"}),
+            "{line}"
+        );
+        assert!(done.is_none());
+    }
+    let own: Config =
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        own.monitor_dropin,
+        std::path::Path::new("/etc/systemd/system/lamp-peek.service.d/monitor.conf")
+    );
+    let plan: Value =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    assert!(
+        plan["wipe"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w == change::MONITOR_DROPIN)
+    );
+}
+
 #[test]
 fn the_lamps_name_in_the_app_is_kept_readable_and_never_empty() {
     let root = Root::new();

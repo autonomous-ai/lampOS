@@ -714,7 +714,7 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         }
         return Ok(true);
     }
-    // Developer access turned off with its drop-in there: the door is closed
+    // Developer access or the dev monitor turned off with its drop-in there: the door is closed
     // (lamp-update's lock, the drop-in removed, reload, stop) before the
     // reply is written. Every other change is answered first, and a new
     // language, voice or character waits for lamp-update's lock (at most
@@ -753,6 +753,15 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
     // restart makes no sound.
     if done.as_ref().is_some_and(|done| done.restart_control) {
         let said = change::restart_control_when_unlocked(
+            &mut change::Clock::default(),
+            &records,
+            &mut change::Systemctl,
+        );
+        eprintln!("lamp-setup: change: {said}");
+    }
+    // The dev monitor turned on (#5883): as lamp-control, no quiet.
+    if done.as_ref().is_some_and(|done| done.restart_peek) {
+        let said = change::restart_peek_when_unlocked(
             &mut change::Clock::default(),
             &records,
             &mut change::Systemctl,

@@ -443,7 +443,7 @@ fn set_grants(
 
 /// The app's one-time X25519 public key: 32 bytes of base64url, padded or
 /// not.
-fn key_of(text: &str) -> Option<[u8; crate::seal::KEY_BYTES]> {
+pub(crate) fn key_of(text: &str) -> Option<[u8; crate::seal::KEY_BYTES]> {
     URL_SAFE_NO_PAD
         .decode(text.trim_end_matches('='))
         .ok()?

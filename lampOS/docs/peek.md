@@ -5,11 +5,12 @@ what an office lamp sees and is doing. It came out of `where_you_sit` failing
 twice on lamp-52e6 on 20 Oct 2026. The cause was a person sitting to the side,
 and only a Mac's camera pointed at the lamp showed it.
 
-It is **off unless `LAMP_PEEK=on`**. It is **never in `deploy/product`**, and
-**never on a person's lamp**: putting it there would loosen privacy, which is
-the owner's call. Monitor mode (`LAMP_PEEK=monitor`, [below](#monitor-mode-lamp_peekmonitor-5883-first-piece))
-is the way the owner's own lamp will offer it, off until the app turns it on
-(#5883); it is not in `deploy/product` yet either.
+It is **off unless `LAMP_PEEK=on`**. The office page (`on`) is **never on a
+person's lamp**: putting it there would loosen privacy, which is the owner's
+call. Monitor mode (`LAMP_PEEK=monitor`, [below](#monitor-mode-lamp_peekmonitor-5883-first-piece))
+is the way the owner's own lamp offers it: `deploy/product/lamp-peek.service`
+is on every lamp with neither set, and only the owner's switch in the app
+writes `monitor` (#5883).
 
 ## The one page
 
@@ -292,7 +293,7 @@ and it is not started again, since on port 80 it would keep the port from
 setup, which ends serving at once on a port still held (`serve.rs`). It
 comes back at the lamp's next boot once setup is done. Before this, an
 in-place reset on such a lamp left setup with no page on the hotspot
-(#4536). Product lamps don't install it. It has no `Conflicts=`
+(#4536). The product's unit (`deploy/product/lamp-peek.service`, monitor mode only) sits outside `lampos.target` for the same reasons. It has no `Conflicts=`
 with `lamp-setup.service`: both are wanted by `multi-user.target`, and at
 boot after a reset systemd would keep this unit's start and drop setup's,
 and then this unit's condition fails and nothing listens (the reviewer on
@@ -331,10 +332,13 @@ token, or with one too short, it refuses to start (exit 2).
 ## Monitor mode: `LAMP_PEEK=monitor` (#5883, first piece)
 
 A developer who owns the lamp opens the same page from a computer or phone
-on the same Wi-Fi, by a one-time link from the app. This piece is peek's
-side only: the app's switch, lamp-cloud's `monitor.set/get/link`, the
-product unit, the timeline and camera frames are later pieces of #5883's
-plan. **Off by default:** with `LAMP_PEEK` unset, or anything but `on` or
+on the same Wi-Fi, by a one-time link from the app. The product installs
+`deploy/product/lamp-peek.service` (outside `lampos.target`, as `lampos`)
+with no `LAMP_PEEK`, so nothing listens; lamp-cloud's `monitor.set` (with
+`LAMP_APP_MONITOR=on`, cloud.md, "The dev monitor") has root's helper write
+the drop-in below and restart it, or stop it and remove the drop-in, and
+`monitor.link` asks the admin socket for the code. The timeline and camera
+frames are later pieces of #5883's plan. **Off by default:** with `LAMP_PEEK` unset, or anything but `on` or
 `monitor` exactly, the binary ends at once, nothing listens and no admin
 socket is made.
 
