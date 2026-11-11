@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Mirror the promoted stable lampOS release to the CDN, and probe the CDN path.
 
-`mirror` takes the stable envelope the promotion just made, checks it with the
-trusted public key, copies the build's files and models to
+`mirror` takes the stable envelope the promotion just made, checks that it
+names the build's own release, verifies it with the trusted public key using
+the updater this run built from its own checkout (never one it downloads),
+then copies the build's files and models to
 `lampos/stable/<sequence>/`, points the signed manifest at those copies,
 signs it again with the same key (same sequence, commit and channel) and
 puts it at `lampos/stable/lampos-manifest.json` last. `probe` writes, reads
@@ -242,21 +244,19 @@ class Mirror:
         require(P.positive(self.sequence), "sequence is out of range")
         require(bool(self.env.get(SECRET)), "real signing key is absent")
         require(bool(self.env.get("LAMPOS_UPDATE_PUBLIC_KEY", "").strip()), "trusted public key is absent")
+        self.use_updater(self.env.get("LAMPOS_MIRROR_UPDATER", ""))
         require(self.store is not None, "no mirror bucket")
 
     def command(self, *words):
         return self.commands.run(words)
 
-    def get_updater(self, manifest):
-        """The build's own `lamp-update`, from its immutable release. The
-        promotion has just checked the envelope against the trusted key and
-        every file against it; the updater below checks the signature again."""
-        entry = next((file for file in manifest["files"] if file["name"] == "lamp-update"), None)
-        require(entry is not None, "the build has no updater")
-        updater = self.work / "lamp-update"
-        self.download(manifest["files_url"] + "lamp-update", updater, entry["size"], self.sleep)
-        require(P.file_info(updater) == {"size": entry["size"], "sha256": entry["sha256"]}, "updater differs from the signed manifest")
-        updater.chmod(0o700)
+    def use_updater(self, path):
+        """The `lamp-update` this run built from its own checkout. The mirror
+        never downloads an updater: the one that verifies the envelope and
+        signs is never chosen by the envelope it checks."""
+        require(isinstance(path, str) and os.path.isabs(path), "no locally built updater")
+        updater = Path(path)
+        require(updater.is_file() and not updater.is_symlink() and os.access(updater, os.X_OK), "no locally built updater")
         self.updater = updater
         self.public_key = self.work / "public.key"
         self.public_key.write_text(self.env["LAMPOS_UPDATE_PUBLIC_KEY"].strip() + "\n")
@@ -338,8 +338,11 @@ class Mirror:
         require(isinstance(original, dict) and original.get("sequence") == self.sequence, "stable is not the promoted sequence")
         for name in ("files", "units"):
             require(isinstance(original.get(name), list) and all(isinstance(entry, dict) for entry in original[name]), "manifest has no asset inventory")
-        require(isinstance(original.get("files_url"), str), "manifest has no files folder")
-        self.get_updater(original)
+        # Before anything else is fetched or run: the build's own release.
+        source = f"https://github.com/{REPO}/releases/download/{HEAD}-{self.sequence}/"
+        require(original.get("files_url") == source, "manifest files are not at the build's own release")
+        # The signature, with the trusted key and the run's own updater, before
+        # any further step.
         manifest = self.publisher().verified_manifest(stable)
         require(manifest == original, "verified manifest differs from the one read")
         plain = base64.b64decode(value["manifest"], validate=True)
