@@ -109,6 +109,8 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | read a note | `await lamp.notes.get("mood", default=None)` or `notes_get(key)` | `lamp.notes.get('mood', fallback)` or `notesGet(key)` | `lamp_notes_get(key)` | notes |
 | drop a note | `await lamp.notes.delete("mood")` or `notes_delete(key)` | `lamp.notes.delete('mood')` or `notesDelete(key)` | `lamp_notes_delete(key)` | notes |
 | your note keys | `await lamp.notes.list("mo")` or `notes_list(prefix)` | `lamp.notes.list('mo')` or `notesList(prefix)` | `lamp_notes_list(prefix)` | notes |
+| read a linked service (a skill's run on the control socket only) | `await lamp.service_read("gmail", {"what": "recent"})` | `lamp.serviceRead('gmail', { what: 'recent' })` | — | `<service>-read` |
+| prepare a write for the person's spoken yes (a skill's run only; never sent by the run) | `await lamp.service_write("gmail", {...})` | `lamp.serviceWrite('gmail', {...})` | — | `<service>-write` |
 | the speaker's volume, the person's own (one of `to` 0–100, `step` `up`/`down`, `mute`) | `await lamp.volume(to=30)`, `volume(step="down")`, `volume(mute=True)` | `lamp.volume({ to: 30 })` | `lamp_volume(to, step, mute)`, `lamp://state/volume` | speak |
 | start a turn (the lamp asks, the person answers) | `await lamp.start_turn("Shall we start?", wait=True)` | `lamp.startTurn('Shall we start?', { wait: true })` | `lamp_start_turn(prompt, wait)` | speak and hear |
 | end the turn you started | `await lamp.end_turn()` | `lamp.endTurn()` | `lamp_end_turn()` | speak |

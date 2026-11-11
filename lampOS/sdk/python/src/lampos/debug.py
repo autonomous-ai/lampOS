@@ -20,8 +20,10 @@ from typing import Any
 
 # Fields replaced wherever they appear in a frame.
 # A note's key and value and a list's prefix are the program's own: `key` was
-# secret already (the pairing key), and `value` and `prefix` join it.
-SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix", "token"})
+# secret already (the pairing key), and `value` and `prefix` join it. A skill
+# run's `service.read` / `service.write` `args` and their `result` are the
+# person's mail, calendar and the like: never logged.
+SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix", "token", "args", "result"})
 # Fields given only as a summary: a said text or a turn's prompt, a pushed
 # skill part's bytes, a camera picture.
 SUMMARISED = frozenset({"text", "prompt", "data", "jpeg"})
@@ -34,6 +36,9 @@ SUMMARISED = frozenset({"text", "prompt", "data", "jpeg"})
 SHOWN = frozenset({
     # hello's lamp: the owner's language (en, vi, ja, zh, ko).
     "language",
+    # A skill run's `service.read` / `service.write`: the service's code (its
+    # grants, `<code>-read` / `<code>-write`, show in `grants`).
+    "service",
     # A dev lamp's `--rates off`, said in hello's limits.
     "rates",
     # `say`'s choice of the model's words over the exact ones.

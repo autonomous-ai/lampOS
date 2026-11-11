@@ -1189,6 +1189,20 @@ class Lamp:
         reply = await self.request("notes.list", prefix=prefix) if prefix else await self.request("notes.list")
         return {k: v for k, v in reply.items() if k not in ("re", "ok")}
 
+    # A skill run's linked services (the control socket only, #6432).
+
+    async def service_read(self, service: str, args: dict | None = None) -> Any:
+        """One read of `service` (a lamp-services code, such as `gmail`)
+        with `service_read`'s own `args`: lamp-services' `result`. Needs
+        `<service>-read`."""
+        return (await self.request("service.read", service=service, args=args or {})).get("result")
+
+    async def service_write(self, service: str, args: dict | None = None) -> Any:
+        """A write to `service`, only prepared: `result` holds its
+        `read_back` and `held: True`, and the person's spoken yes sends it,
+        never the run. Needs `<service>-write`."""
+        return (await self.request("service.write", service=service, args=args or {})).get("result")
+
     # Turns and listening (docs/control.md): the person wins over each.
 
     async def start_turn(self, prompt: str | None = None, *, wait: bool = False) -> dict:
