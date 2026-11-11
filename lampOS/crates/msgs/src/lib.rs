@@ -194,6 +194,16 @@ impl Audio {
     /// voice publishes here only while every subscriber is the name
     /// listener (`lamp-name --sleep-source`); any other stops it.
     pub const SLEEP_TOPIC: &str = "mic2/sleep_audio";
+    /// Sound a paired computer sends to the lamp's speaker (`speaker.stream`,
+    /// docs/control.md "The speaker"): the same header and `json+pcm` payload
+    /// as a microphone's block, 24 kHz mono S16LE (the voice's speaker path),
+    /// published by lamp-control alone and read by the voice only while it
+    /// holds that computer's open stream. A block is 10 to 100 ms long, not
+    /// the microphone's fixed 20 ms.
+    pub const SPEAKER_TOPIC: &str = "speaker/audio";
+    /// The speaker path's sample rate, in hertz: the only one on
+    /// [`Audio::SPEAKER_TOPIC`].
+    pub const SPEAKER_SAMPLE_RATE: u32 = 24_000;
     /// The bus's label for a payload made by [`Audio::block`].
     pub const ENCODING: &str = "json+pcm";
     pub const S16LE: &str = "S16LE";
@@ -201,6 +211,12 @@ impl Audio {
     /// A stream: each block is over when it has been sent. One every 20 ms.
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event).every(Duration::from_millis(20))
+    }
+
+    /// A stream to the speaker: blocks of 10 to 100 ms, so one at least every
+    /// 100 ms while a stream runs.
+    pub fn speaker_declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event).every(Duration::from_millis(100))
     }
 
     /// A message's payload: this header, a line end, then `samples`.
@@ -2089,6 +2105,13 @@ pub fn sleep_audio_topics() -> Vec<(&'static str, Declaration)> {
     vec![(Audio::SLEEP_TOPIC, Audio::declaration())]
 }
 
+/// Sound a computer plays through the lamp's speaker (`speaker/audio`),
+/// separate from the original seventeen: lamp-control publishes it and the
+/// voice reads it only while it holds that computer's open stream.
+pub fn speaker_audio_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(Audio::SPEAKER_TOPIC, Audio::speaker_declaration())]
+}
+
 /// Semantic room sound is separate from the original topics and level/onset.
 pub fn sound_class_topics() -> Vec<(&'static str, Declaration)> {
     vec![(SoundClasses::TOPIC, SoundClasses::declaration())]
@@ -2109,6 +2132,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(name_topics())
         .chain(stop_topics())
         .chain(sleep_audio_topics())
+        .chain(speaker_audio_topics())
         .chain(mute_topics())
         .chain(tasks_topics())
         .chain(logging_topics())
@@ -3244,6 +3268,39 @@ mod tests {
                 .iter()
                 .any(|(name, _)| *name == Audio::SLEEP_TOPIC)
         );
+    }
+
+    /// `speaker/audio`: a computer's sound to the speaker, the microphone's
+    /// block under another topic and a longer period (blocks of up to 100 ms),
+    /// a payload the same `json+pcm` as a microphone's, and not one of the
+    /// original topics.
+    #[test]
+    fn the_speaker_audio_topic_is_a_microphone_block_to_the_speaker() {
+        let declared = declaration_of(Audio::SPEAKER_TOPIC).unwrap();
+        assert_eq!(
+            (
+                declared.type_name.as_str(),
+                declared.kind,
+                declared.period_ms
+            ),
+            (Audio::TYPE, Kind::Event, Some(100))
+        );
+        assert!(
+            !first_topics()
+                .iter()
+                .any(|(name, _)| *name == Audio::SPEAKER_TOPIC)
+        );
+        assert!(!Audio::TOPICS.contains(&Audio::SPEAKER_TOPIC));
+        let header = Audio {
+            sample_rate: Audio::SPEAKER_SAMPLE_RATE,
+            channels: 1,
+            sample_format: Audio::S16LE.into(),
+            sequence: 7,
+        };
+        let samples = [1u8, 2, 3, 4];
+        let payload = header.block(&samples).unwrap();
+        let (back, got) = Audio::split(&payload).unwrap();
+        assert_eq!((back, got), (header, &samples[..]));
     }
 
     /// `muted_by` (#4332) is said in snake_case, only while muted, and
