@@ -190,15 +190,14 @@ cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng
 ## Chính đèn, với OpenClaw (#6226)
 
 `LAMP_OPENCLAW_ON_LAMP=on`, chỉ cùng `--engines-from-machines`; tắt nếu không
-đặt. OpenClaw là engine mặc định của đèn (khi lần đọc ngưỡng RAM của first
-builder đạt; trước đó, phần tasks của đèn chọn Hermes khi thiếu bộ nhớ
-(#6226)): nó thay Hermes làm target riêng của đèn, đúng vai trò của Hermes
-(`tasks.md`, "The lamp itself, with Hermes"), và Hermes vẫn chọn được. Phần
-lamp-tasks là phần của một coder khác trong #6226; ở đây mô tả phần của voice.
+đặt. OpenClaw là engine mặc định của đèn (không có ngưỡng bộ nhớ: chủ sản
+phẩm, #6226, mọi đèn đều có 6 GB): nó thay Hermes làm target riêng của đèn,
+đúng vai trò của Hermes (`tasks.md`, "The lamp itself, with Hermes"), và
+Hermes vẫn chọn được. `lamp_order` (`crates/tasks/src/runtime.rs`) chỉ bỏ
+OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
 
 - **Engine nào:** `LAMP_LAMP_ENGINE` là `openclaw` hoặc `hermes`, không đặt
-  thì `openclaw`, mặc định khi lần đọc ngưỡng RAM của first builder đạt;
-  trước đó, phần tasks của đèn chọn Hermes khi thiếu bộ nhớ (#6226). Target
+  thì `openclaw`, mặc định (không có ngưỡng bộ nhớ, #6226). Target
   của đèn vẫn là `lamp`, với engine đó; khi engine được chọn chưa cài mà
   engine kia đã cài, dùng engine kia.
 - **Khởi động** như Harness khởi động OpenClaw:
@@ -209,8 +208,7 @@ lamp-tasks là phần của một coder khác trong #6226; ở đây mô tả ph
   `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
   nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the
   lamp"; nếu là `hermes` thì "Hermes" như trước. Khi chưa đọc targets, voice
-  nói OpenClaw, mặc định (khi lần đọc ngưỡng RAM của first builder đạt; trước
-  đó, phần tasks của đèn chọn Hermes khi thiếu bộ nhớ (#6226)). `who`
+  nói OpenClaw, mặc định. `who`
   "OpenClaw" hoặc "Hermes", khi đèn có target của mình, là của đèn, không bao
   giờ của máy tính. OpenClaw cũng là một agent mà voice có thể gọi tên trên
   máy tính, nghe được là "OpenClaw", "open claw", "open clause", "open
@@ -237,5 +235,7 @@ là phần của một coder khác trong #6226; thiết kế:
   (model duy nhất của forwarder). Target loopback có thể cần
   `request.allowPrivateNetwork: true` trên provider.
 - `agents.defaults.model.primary`: `"lampos/deepseek-flash"`.
-- Các khóa skill của đèn, và hướng dẫn (`AGENTS.md`) ghi trong workspace của
-  OpenClaw (`<state>/workspace`), như với Hermes.
+- `agents.defaults.workspace`: thư mục làm việc riêng của đèn
+  (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` trong
+  home của `lampos`), nơi các khóa skill của đèn trỏ tới và hướng dẫn
+  (`AGENTS.md`) được ghi, như với Hermes.

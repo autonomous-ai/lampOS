@@ -1617,12 +1617,12 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     own namespace.
 - **The lamp itself, with OpenClaw** (`LAMP_OPENCLAW_ON_LAMP=on`, only
   with `--engines-from-machines`; off unless set, #6226). OpenClaw is the
-  lamp's default engine (once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226)): it takes Hermes's place as the lamp's own target
-  in exactly Hermes's role (above), and Hermes stays selectable. The
-  lamp-tasks side is another coder's part of #6226; the voice's side is
-  described here.
+  lamp's default engine (no memory floor: the owner, #6226, every lamp has 6 GB): it takes Hermes's place as the lamp's own target
+  in exactly Hermes's role (above), and Hermes stays selectable.
+  `lamp_order` (`crates/tasks/src/runtime.rs`) leaves OpenClaw out only
+  while the Harness on the lamp is older than 0.6.11.
   - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
-    `openclaw`, the default once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226). The lamp's target is still `lamp`, with that engine; when
+    `openclaw`, the default (no memory floor, #6226). The lamp's target is still `lamp`, with that engine; when
     the one chosen is not installed but the other is, the other.
   - **Started** as Harness starts OpenClaw:
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
@@ -1632,8 +1632,7 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
     say "OpenClaw here on the lamp"; with `hermes` there, "Hermes" as
-    before. Until the targets are read it says OpenClaw, the default
-    (once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226)).
+    before. Until the targets are read it says OpenClaw, the default.
     `who` "OpenClaw" or "Hermes", while the lamp has its target, is the
     lamp's own, never a computer's. OpenClaw is also one of the agents the
     voice can name on a computer, heard as "OpenClaw", "open claw", "open
@@ -1963,7 +1962,7 @@ With `LAMP_OPENCLAW_ON_LAMP` on, lamp-tasks at its start merges what
 OpenClaw on the lamp needs into `<state>/openclaw.json`
 (`/var/lib/lampos-openclaw/state`, JSON5), exactly as `hermes_config` does
 for Hermes, and keeps every other key (lamp-update's `gateway` block among
-them). This is another coder's part of #6226; the design:
+them) (`crates/tasks/src/openclaw_config.rs`):
 
 - `models`: `mode: "merge"`, with the provider `lampos`: `baseUrl`
   `http://127.0.0.1:7741/v1/deepseek` (lamp-cloud's forwarder, docs/cloud.md),
@@ -1972,8 +1971,10 @@ them). This is another coder's part of #6226; the design:
   `deepseek-flash` (the forwarder's only model). A loopback target may
   need `request.allowPrivateNetwork: true` on the provider.
 - `agents.defaults.model.primary`: `"lampos/deepseek-flash"`.
-- The lamp's skills keys, and the guidance (`AGENTS.md`) written in
-  OpenClaw's workspace (`<state>/workspace`), as for Hermes.
+- `agents.defaults.workspace`: the lamp's own work folder
+  (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
+  `lampos`'s home), where the lamp's skills keys point and the guidance
+  (`AGENTS.md`) is written, as for Hermes.
 
 ## Devin (#1854)
 

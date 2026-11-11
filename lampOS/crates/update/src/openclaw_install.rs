@@ -23,9 +23,20 @@
 //! [`crate::hermes_install::ns_text`]) with OpenClaw's folder and command:
 //! OpenClaw sees only [`ALLOWED`] (its own folder, the work folder, the
 //! skills read-only) over the same empty read-only `/run`, `/var/lib` and
-//! `/etc/lampOS`, its own `/tmp`, no camera, mic or serial device and no
-//! lamp process. The gateway runs the tools the model chooses, so it is
-//! the gateway that runs in the namespace. It is given only lamp-cloud's
+//! `/etc/lampOS`, its own `/tmp`, and no camera, mic or serial device. The
+//! gateway runs the tools the model chooses, so it is the gateway that runs
+//! in the namespace. Unlike Hermes, OpenClaw shares the lamp's PID
+//! namespace ([`NS_FLAGS`]: a user and mount namespace only). OpenClaw
+//! 2026.11.2 refuses to open its state from a PID namespace other than its
+//! Gateway's (`GatewayLockNamespaceError`), so with one each, every Harness
+//! pane exited at once on lamp-c0a4 and no task was delivered. So OpenClaw
+//! sees the lamp's process list (names and command lines in `/proc`). It
+//! still reaches no file, socket or device beyond what its mount namespace
+//! shows: another user namespace's processes' `/proc/<pid>/root`, `cwd`,
+//! `fd` and `environ` are refused to it (the kernel's ptrace check). But it
+//! runs as `lampos`, the user every lamp service runs as, so it can send
+//! them signals; its own PID namespace prevented that, and a namespace
+//! shared by the Gateway and its panes is the follow-up that would again. It is given only lamp-cloud's
 //! local forwarder token ([`TOKEN`], as [`TOKEN_ENV`]: the forwarder is the
 //! one Hermes uses). With [`SKILLS_SWITCH`] on, the namespace also shows
 //! lamp-skills' socket folder, read-only, as Hermes's does with its own
@@ -41,12 +52,15 @@
 //! **Pinned.** A Node 24 runtime ([`NODE_VERSION`], nodejs.org's
 //! linux-arm64 tarball from the same place as Harness's pin, checked by its
 //! SHA-256 [`NODE_SHA256`], never fetched loose) is unpacked
-//! at [`NODE_DIR`], and the npm package `openclaw` [`VERSION`] (fetched
-//! from the registry, checked by its sha512 integrity [`PACKAGE_INTEGRITY`])
-//! is installed from the checked file into [`PREFIX`] with that Node's npm,
-//! as `lampos`. OpenClaw's own dependencies are resolved by npm from the
-//! registry: the package pins its direct ones exactly, and carries no
-//! shrinkwrap.
+//! at [`NODE_DIR`]. The npm package `openclaw` [`VERSION`] and its whole
+//! tree are installed by `npm ci` from a lockfile shipped in this build
+//! ([`LOCKFILE`], every package with its sha512 integrity, the file itself
+//! checked by its SHA-256 [`LOCKFILE_SHA256`], its `openclaw` entry
+//! checked against [`PACKAGE_URL`] and [`PACKAGE_INTEGRITY`]), never
+//! resolved freely. npm runs as `lampos` inside OpenClaw's own namespace
+//! ([`NPM_CI_ENV`], the one mode of [`NS`]), with no package's install
+//! scripts: OpenClaw finishes its own package step at its first run (the
+//! install's `openclaw --version`, in the namespace too).
 use crate::{
     harness_install,
     hermes_install::{
@@ -122,15 +136,18 @@ pub const NODE: &str = "/var/lib/lampos-openclaw/node/bin/node";
 pub const NPM: &str = "/var/lib/lampos-openclaw/node/bin/npm";
 /// The header the Node version is read from, never run.
 pub const NODE_VERSION_H: &str = "/var/lib/lampos-openclaw/node/include/node/node_version.h";
-/// The npm prefix OpenClaw is installed in (`npm install --global
-/// --prefix`).
+/// The npm folder OpenClaw is installed in: [`MANIFEST`] and [`LOCKFILE`]
+/// written there by root, then `npm ci` run there.
 pub const PREFIX: &str = "/var/lib/lampos-openclaw/npm";
-/// The `openclaw` command npm publishes there. Never on any `PATH`: only
+/// [`MANIFEST`] there.
+pub const MANIFEST_AT: &str = "/var/lib/lampos-openclaw/npm/package.json";
+/// [`LOCKFILE`] there.
+pub const LOCKFILE_AT: &str = "/var/lib/lampos-openclaw/npm/package-lock.json";
+/// The `openclaw` command npm links there. Never on any `PATH`: only
 /// [`NS`] runs it.
-pub const OPENCLAW: &str = "/var/lib/lampos-openclaw/npm/bin/openclaw";
+pub const OPENCLAW: &str = "/var/lib/lampos-openclaw/npm/node_modules/.bin/openclaw";
 /// The installed package's own `package.json`, its version read there.
-pub const PACKAGE_JSON: &str =
-    "/var/lib/lampos-openclaw/npm/lib/node_modules/openclaw/package.json";
+pub const PACKAGE_JSON: &str = "/var/lib/lampos-openclaw/npm/node_modules/openclaw/package.json";
 /// The `openclaw` Harness finds on `lampos`'s login `PATH`:
 /// [`WRAPPER_TEXT`], root's, 0755.
 pub const WRAPPER: &str = "/usr/local/bin/openclaw";
@@ -176,13 +193,28 @@ pub const NODE_ORIGIN: &str = "https://nodejs.org/dist/v24.22.2/node-v24.22.2-li
 pub const NODE_SHA256: &str = "95c264150aceb7f3437a29fd6984924f5f8d1511ea3cbd6c508b83f6c555dae2";
 /// The OpenClaw package installed: the one Harness measured.
 pub const VERSION: &str = "2026.11.2";
-/// Where it is fetched: the npm registry's tarball.
+/// Its tarball, as [`LOCKFILE`]'s `openclaw` entry must give it.
 pub const PACKAGE_URL: &str = "https://registry.npmjs.org/openclaw/-/openclaw-2026.11.2.tgz";
-/// Its integrity, as the registry gives it (`dist.integrity`), checked
-/// before npm is handed the file.
+/// Its integrity, as the registry gives it (`dist.integrity`): what
+/// [`LOCKFILE`]'s `openclaw` entry must hold, so npm checks the tarball by it.
 pub const PACKAGE_INTEGRITY: &str = "sha512-SgBml4WLp8V1DdAYkrTPLzVdA/iYo3iuHCtm4788GjaG83QZdd1VeOTlue0HBJGdn3SbFE06b6uPs+AM5ShMgg==";
-/// Its sha1 (`dist.shasum`), said only: the integrity is what is checked.
-pub const PACKAGE_SHASUM: &str = "4185b164092d40a2b49d5630808031a0b28632de";
+/// The npm project `npm ci` installs: `openclaw` at [`VERSION`] exactly.
+pub const MANIFEST: &str = include_str!("../openclaw/package.json");
+/// Its lockfile, made once on a developer's machine by `npm install
+/// --package-lock-only --ignore-scripts` (npm 11, lockfile version 3) for
+/// [`MANIFEST`]: every package of the tree with its registry tarball and
+/// sha512 integrity, so npm installs that tree and no other. A new
+/// [`VERSION`] makes a new lockfile, and a new [`LOCKFILE_SHA256`].
+pub const LOCKFILE: &str = include_str!("../openclaw/package-lock.json");
+/// [`LOCKFILE`]'s SHA-256, checked by a test and again before each install.
+pub const LOCKFILE_SHA256: &str =
+    "2a916259319f5f67b1f8a93d3431839a81ea0f233ceb4cbc18676ecb72962fee";
+/// Set to `on` for [`NS`], it runs `npm ci` in [`PREFIX`] instead of
+/// OpenClaw: lamp-update's install step, in OpenClaw's namespace.
+pub const NPM_CI_ENV: &str = "LAMP_OPENCLAW_NPM_CI";
+/// The flags of the first `unshare` (the wrapper's and the install's): a
+/// user and mount namespace, no PID namespace (see the module's notes).
+pub const NS_FLAGS: [&str; 4] = ["--map-root-user", "--mount", "--propagation", "private"];
 /// The hard bound of each of OpenClaw's long steps ([`runs_long_step`]:
 /// a fetch, Node's unpacking, npm's install), past which the step is
 /// killed and the install recorded `failed` with `timeout` (#6226: on
@@ -198,14 +230,16 @@ const DOWNLOADS: &str = "lamp-update-openclaw-";
 
 /// [`WRAPPER`]: Hermes's wrapper with OpenClaw's state folder and the
 /// pinned Node first on the `PATH`. Reads the token, fails closed without
-/// it, and runs [`NS`] in a new user, mount and PID namespace with its own
-/// `/proc`.
+/// it, and runs [`NS`] in a new user and mount namespace ([`NS_FLAGS`]),
+/// in the lamp's PID namespace, which every OpenClaw process shares with
+/// its Gateway.
 pub const WRAPPER_TEXT: &str = r#"#!/bin/sh
 # lampOS: OpenClaw on the lamp (#6226; lampOS/docs/install.md, "OpenClaw on the lamp"). Written by lamp-update.
-# OpenClaw (its gateway and each Harness pane) runs as its caller (lampos), in a user, mount and PID namespace with its
-# own /proc, where it sees only its own folder, its work folder and the skills, no lamp service's files or sockets, no
-# camera, mic or serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never
-# run any other way.
+# OpenClaw (its gateway and each Harness pane) runs as its caller (lampos), in a user and mount namespace where it sees
+# only its own folder, its work folder and the skills, no lamp service's files or sockets and no camera, mic or serial
+# device; it is given only lamp-cloud's local forwarder token. It shares the lamp's PID namespace (OpenClaw opens its
+# state only from its Gateway's): it sees the lamp's process list and, as lampos, can signal lampos's processes, but
+# reads none of their files or environment. It is never run any other way.
 T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   echo "openclaw: no forwarder token at /var/lib/lampos-cloud/hermes-token; lamp-cloud makes it with LAMP_OPENCLAW_ON_LAMP=on" >&2
   exit 1
@@ -213,7 +247,7 @@ T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
 export LAMP_HERMES_TOKEN="$T" OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state PATH="/var/lib/lampos-openclaw/node/bin:$PATH" LAMP_NS_UID LAMP_NS_GID
 unset T
-exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/openclaw-ns "$@"
+exec /usr/bin/unshare --map-root-user --mount --propagation private /usr/local/lib/lampos/openclaw-ns "$@"
 "#;
 
 /// What [`ns_text`] changes in Hermes's namespace script, in order, each
@@ -223,7 +257,7 @@ exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --
 const ENGINE_EDITS: [(&str, &str); 7] = [
     (
         "/var/lib/lampos-hermes/.local/bin/hermes \"$@\"",
-        "/var/lib/lampos-openclaw/npm/bin/openclaw \"$@\"",
+        "/var/lib/lampos-openclaw/npm/node_modules/.bin/openclaw \"$@\"",
     ),
     (
         "(#5978; lampOS/docs/install.md,\n# \"Hermes on the lamp\")",
@@ -239,15 +273,35 @@ const ENGINE_EDITS: [(&str, &str); 7] = [
     ("Hermes", "OpenClaw"),
 ];
 
+/// The line [`NPM_CI_MODE`] goes before: the script's last, which runs
+/// OpenClaw.
+const RUN_LINE: &str = "exec /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /var/lib/lampos-openclaw/npm/node_modules/.bin/openclaw \"$@\"\n";
+
+/// [`NS`]'s one other mode, before OpenClaw would run: with [`NPM_CI_ENV`]
+/// `on`, the pinned Node's npm runs `npm ci` in [`PREFIX`] from the
+/// lockfile root put there, with no install scripts, as the caller's own
+/// ids, behind the same mounts; its arguments are not used. The variable
+/// is taken out of OpenClaw's environment either way.
+const NPM_CI_MODE: &str = "M=${LAMP_OPENCLAW_NPM_CI-}
+unset LAMP_OPENCLAW_NPM_CI
+# LAMP_OPENCLAW_NPM_CI=on: lamp-update's install step. npm ci from the pinned lockfile lamp-update wrote in OpenClaw's npm
+# folder, with no package's install scripts, behind these same mounts; nothing else.
+if [ \"$M\" = on ]; then
+  cd /var/lib/lampos-openclaw/npm || fail \"no /var/lib/lampos-openclaw/npm\"
+  exec /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /var/lib/lampos-openclaw/node/bin/node /var/lib/lampos-openclaw/node/bin/npm ci --omit=dev --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=http
+fi
+";
+
 /// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills)`, the
-/// same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]). With
+/// same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]), with
+/// its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
 /// `skills`, lamp-skills' socket folder is shown read-only too.
 pub fn ns_text(skills: bool) -> String {
     let mut text = hermes_install::ns_text(skills);
     for (from, to) in ENGINE_EDITS {
         text = text.replace(from, to);
     }
-    text
+    text.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1)
 }
 
 /// [`UNIT`], written by a round (whose sandbox writes
@@ -511,12 +565,14 @@ fn unit_path(root: &Path) -> PathBuf {
 }
 
 /// OpenClaw there as this build puts it, under `root`: the package at
-/// [`VERSION`] with its command, the Node at [`NODE_VERSION`], the wrapper
+/// [`VERSION`] with its command, installed from this build's
+/// [`LOCKFILE`], the Node at [`NODE_VERSION`], the wrapper
 /// and namespace script with this build's text (the script's as
 /// [`ns_text`]`(skills)`), and the gateway's unit.
 pub fn present(root: &Path, skills: bool) -> bool {
     fs::metadata(on(root, OPENCLAW)).is_ok()
         && package_version(root).as_deref() == Some(VERSION)
+        && holds(root, LOCKFILE_AT, LOCKFILE)
         && node_version(root).as_deref() == Some(NODE_VERSION)
         && holds(root, WRAPPER, WRAPPER_TEXT)
         && holds(root, NS, &ns_text(skills))
@@ -767,8 +823,8 @@ struct Kit {
     node_url: &'static str,
     node_sha256: &'static str,
     node_version: &'static str,
-    package_url: &'static str,
-    package_integrity: &'static str,
+    lockfile: &'static str,
+    lockfile_sha256: &'static str,
     version: &'static str,
 }
 
@@ -777,14 +833,68 @@ impl Kit {
         node_url: NODE_URL,
         node_sha256: NODE_SHA256,
         node_version: NODE_VERSION,
-        package_url: PACKAGE_URL,
-        package_integrity: PACKAGE_INTEGRITY,
+        lockfile: LOCKFILE,
+        lockfile_sha256: LOCKFILE_SHA256,
         version: VERSION,
     };
 
     fn built(&self) -> bool {
-        self.node_sha256 == NODE_SHA256 && self.package_integrity == PACKAGE_INTEGRITY
+        self.node_sha256 == NODE_SHA256 && self.lockfile_sha256 == LOCKFILE_SHA256
     }
+}
+
+/// Whether `lockfile` is the pinned one: its SHA-256 `sha256`, a lockfile
+/// npm 7 or later reads (version 2 or 3), whose project wants `openclaw`
+/// at `version` exactly (as [`MANIFEST`]), and whose `openclaw` is
+/// `version` from [`PACKAGE_URL`] with [`PACKAGE_INTEGRITY`]. Every other
+/// package of the tree must carry a registry tarball and its integrity,
+/// unless it comes inside another package's tarball (`inBundle`).
+pub fn lockfile_pinned(lockfile: &str, sha256: &str, version: &str) -> Result<(), String> {
+    let found = crate::manifest::sha256_hex(lockfile.as_bytes());
+    if found != sha256 {
+        return Err(format!("the lockfile's sha256 is {found}, not {sha256}"));
+    }
+    let lock: serde_json::Value =
+        serde_json::from_str(lockfile).map_err(|error| format!("the lockfile: {error}"))?;
+    if !matches!(lock["lockfileVersion"].as_u64(), Some(2 | 3)) {
+        return Err("the lockfile is not npm's version 2 or 3".to_owned());
+    }
+    let packages = lock["packages"]
+        .as_object()
+        .ok_or("the lockfile lists no packages")?;
+    let wants = &packages.get("").ok_or("the lockfile has no project")?["dependencies"];
+    if wants != &serde_json::json!({"openclaw": version}) {
+        return Err(format!(
+            "the lockfile's project wants {wants}, not openclaw {version}"
+        ));
+    }
+    let openclaw = packages
+        .get("node_modules/openclaw")
+        .ok_or("the lockfile has no openclaw")?;
+    let pinned = serde_json::json!([version, PACKAGE_URL, PACKAGE_INTEGRITY]);
+    let given = serde_json::json!([
+        openclaw["version"],
+        openclaw["resolved"],
+        openclaw["integrity"]
+    ]);
+    if given != pinned {
+        return Err(format!("the lockfile's openclaw is {given}, not {pinned}"));
+    }
+    for (name, package) in packages {
+        let bundled = package["inBundle"].as_bool() == Some(true);
+        let fetched = package["resolved"]
+            .as_str()
+            .is_some_and(|url| url.starts_with("https://registry.npmjs.org/"))
+            && package["integrity"]
+                .as_str()
+                .is_some_and(|integrity| integrity.starts_with("sha512-"));
+        if !name.is_empty() && !bundled && !fetched {
+            return Err(format!(
+                "the lockfile's {name} has no registry tarball with a sha512 integrity"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// `lamp-update harness-install`'s OpenClaw part, after Hermes's: none
@@ -850,16 +960,19 @@ fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str))
 
 /// The install, in order: `lampos` and its ids looked up; `curl`, `tar`
 /// and `gzip` looked for as `lampos`, `unshare` at its path; the
-/// namespace tried as `lampos`. Then, unless the pinned Node and package
-/// are in [`PLACE`] already (`lampos`'s): memory and free space checked,
-/// another OpenClaw's Node and package moved aside to [`ASIDE`], [`PLACE`]
-/// and [`STATE`] made `lampos`'s 0700, the Node tarball fetched, checked
-/// and unpacked as `lampos`, the package fetched, checked and installed
-/// from that file by the Node's npm as `lampos`. Then the gateway's token
-/// made once, OpenClaw's config given its `gateway` block, `openclaw
-/// --version` run, the namespace script and the wrapper written, the
-/// gateway (re)started (the round enables it), [`ASIDE`] removed, and after a new
-/// install lamp-tasks started again if it runs.
+/// namespace tried as `lampos`; the lockfile checked ([`lockfile_pinned`]).
+/// Then, unless the pinned Node and package are in [`PLACE`] already
+/// (`lampos`'s): memory and free space checked, another OpenClaw's Node
+/// and package moved aside to [`ASIDE`], [`PLACE`] and [`STATE`] made
+/// `lampos`'s 0700, the Node tarball fetched, checked and unpacked as
+/// `lampos`, the namespace script written, [`MANIFEST`] and the lockfile
+/// written in [`PREFIX`] (root's, 0644), and `npm ci` run there by the
+/// Node's npm as `lampos` inside the namespace ([`NPM_CI_ENV`]). Then the
+/// gateway's token made once, OpenClaw's config given its `gateway` block,
+/// `openclaw --version` run in the namespace (OpenClaw's first run, which
+/// finishes its package step), the namespace script and the wrapper
+/// written, the gateway (re)started (the round enables it), [`ASIDE`]
+/// removed, and after a new install lamp-tasks started again if it runs.
 fn steps(
     root: &Path,
     records: &Path,
@@ -909,8 +1022,12 @@ fn steps(
         );
         return fail("no_userns", why, say);
     }
+    if let Err(why) = lockfile_pinned(kit.lockfile, kit.lockfile_sha256, kit.version) {
+        return fail("pin_mismatch", why, say);
+    }
     let pinned_there = fs::metadata(on(root, OPENCLAW)).is_ok()
         && package_version(root).as_deref() == Some(kit.version)
+        && holds(root, LOCKFILE_AT, kit.lockfile)
         && node_version(root).as_deref() == Some(kit.node_version)
         && owner(root, PLACE).as_deref() == Some(uid.as_str());
     if !pinned_there {
@@ -1002,41 +1119,28 @@ fn steps(
             );
             return fail("version", why, say);
         }
-        let package_file = downloads.file("openclaw.tgz");
-        if let Err((error, why)) = fetch_checked(run, kit.package_url, &package_file, &|bytes| {
-            let found = integrity_of(bytes);
-            (found == kit.package_integrity)
-                .then_some(())
-                .ok_or(format!("integrity {found}, not {}", kit.package_integrity))
-        }) {
-            return fail(error, format!("the openclaw package: {why}"), say);
+        drop(downloads);
+        // The namespace script first: npm runs inside it.
+        let ns = ns_text(skills);
+        if let Err(why) = write_root_file(root, NS, &ns, 0o755) {
+            return fail("entry", why, say);
         }
-        let package_file = package_file.to_string_lossy().into_owned();
-        let npm = [
-            NPM,
-            "install",
-            "--global",
-            "--prefix",
-            PREFIX,
-            "--omit=dev",
-            "--no-audit",
-            "--no-fund",
-            "--no-update-notifier",
-            // (#6226) with no output npm hung 38 min at its extract on
-            // lamp-c0a4; with these it took 3 min.
-            "--foreground-scripts",
-            "--loglevel=http",
-            package_file.as_str(),
-        ];
+        for (path, text) in [(MANIFEST_AT, MANIFEST), (LOCKFILE_AT, kit.lockfile)] {
+            if let Err(why) = write_root_file(root, path, text, 0o644) {
+                return fail("serve", why, say);
+            }
+        }
         let started = std::time::Instant::now();
-        if let Err(why) = run(&as_lampos(&npm)) {
-            return fail(long_error(&why), format!("npm install: {why}"), say);
+        if let Err(why) = run(&in_namespace(&uid, &gid, true, &[])) {
+            return fail(long_error(&why), format!("npm ci: {why}"), say);
         }
         say(&format!(
-            "OpenClaw's package installed by npm in {} s",
+            "OpenClaw's package installed by npm ci from the pinned lockfile in {} s",
             started.elapsed().as_secs()
         ));
-        drop(downloads);
+        if !holds(root, LOCKFILE_AT, kit.lockfile) {
+            return fail("installer", format!("{LOCKFILE_AT} changed by npm ci"), say);
+        }
         if fs::metadata(on(root, OPENCLAW)).is_err() {
             return fail(
                 "installer",
@@ -1057,7 +1161,7 @@ fn steps(
     if let Err(why) = gateway_config(root, run, say) {
         return fail("config", why, say);
     }
-    match run(&as_lampos(&[NODE, OPENCLAW, "--version"])) {
+    match run(&in_namespace(&uid, &gid, false, &["--version"])) {
         Ok(said) => say(&format!(
             "OpenClaw runs: {}",
             said.lines().next().unwrap_or("").trim()
@@ -1164,11 +1268,12 @@ pub fn integrity_of(bytes: &[u8]) -> String {
 }
 
 /// Whether `argv` is one of OpenClaw's long steps: one that names a file in
-/// its downloads folder (a fetch, the Node's unpacking, npm's install).
-/// [`install::output_of`] gives each [`STEP_WITHIN`].
+/// its downloads folder (a fetch, the Node's unpacking), or `npm ci`
+/// ([`NPM_CI_ENV`]). [`install::output_of`] gives each [`STEP_WITHIN`].
 pub fn runs_long_step(argv: &[String]) -> bool {
+    let npm_ci = format!("{NPM_CI_ENV}=on");
     argv.iter()
-        .any(|arg| arg.contains(&format!("/{DOWNLOADS}")))
+        .any(|arg| arg.contains(&format!("/{DOWNLOADS}")) || *arg == npm_ci)
 }
 
 /// The gateway's token made once (32 random bytes, hex; `lampos`'s, 0600)
@@ -1272,18 +1377,41 @@ fn as_lampos(args: &[&str]) -> Vec<String> {
     argv
 }
 
+/// `args` as `lampos` inside OpenClaw's namespace, as [`WRAPPER`] runs it
+/// ([`NS_FLAGS`], then [`NS`] with the caller's ids), but with no token:
+/// with `npm_ci`, [`NS`]'s install mode ([`NPM_CI_ENV`]), else OpenClaw.
+fn in_namespace(uid: &str, gid: &str, npm_ci: bool, args: &[&str]) -> Vec<String> {
+    let ids = [format!("LAMP_NS_UID={uid}"), format!("LAMP_NS_GID={gid}")];
+    let mut tail: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let npm_ci_on = format!("{NPM_CI_ENV}=on");
+    if npm_ci {
+        tail.push(&npm_ci_on);
+    }
+    tail.push("/usr/bin/unshare");
+    tail.extend(NS_FLAGS);
+    tail.push(NS);
+    tail.extend(args);
+    as_lampos(&tail)
+}
+
+/// `text` written whole at `path` under `root` (beside, then renamed in),
+/// root's, with `mode`; its folder must be there.
+fn write_root_file(root: &Path, path: &str, text: &str, mode: u32) -> Result<(), String> {
+    let place = on(root, path);
+    if let Some(folder) = place.parent()
+        && !folder.is_dir()
+    {
+        return Err(format!("{}: no such folder", folder.display()));
+    }
+    write_whole(&place, text.as_bytes(), mode).map_err(|error| format!("{path}: {error}"))
+}
+
 /// The namespace script, then the wrapper: root's, 0755, each written
 /// whole beside and renamed in.
 fn write_entry_points(root: &Path, skills: bool) -> Result<(), String> {
     let ns = ns_text(skills);
     for (path, text) in [(NS, ns.as_str()), (WRAPPER, WRAPPER_TEXT)] {
-        let place = on(root, path);
-        if let Some(folder) = place.parent()
-            && !folder.is_dir()
-        {
-            return Err(format!("{}: no such folder", folder.display()));
-        }
-        write_whole(&place, text.as_bytes(), 0o755).map_err(|error| format!("{path}: {error}"))?;
+        write_root_file(root, path, text, 0o755)?;
     }
     Ok(())
 }

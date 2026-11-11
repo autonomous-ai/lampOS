@@ -1875,28 +1875,82 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `lamp-update.service`'s environment, read as `LAMP_HERMES_ON_LAMP` is:
    set, on only when `on` exactly; unset, on on a lamp installed as the
    product, off on any other lamp; no product unit sets it). OpenClaw is
-   the lamp's default engine under Harness (once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226); Harness's engine id
-   `openclaw`), installed beside Hermes in exactly Hermes's role and under
-   the same rules: the same schedule (window, freeze while the voice is
-   not quiet, stop on a lost privacy reading, the one-shot's bounds), the
-   same user `lampos` in its own user namespace, its DeepSeek through
-   lamp-cloud's forwarder, and the lamp's skills. Hermes stays installed
-   and selectable (`LAMP_LAMP_ENGINE` in lamp-tasks, docs/tasks.md). The
-   install itself is another coder's part of #6226; this is the design it
-   follows, not a description of a run.
+   the lamp's default engine under Harness (no memory floor: the owner,
+   #6226, every lamp has 6 GB; Harness's engine id `openclaw`), installed
+   beside Hermes in exactly Hermes's role and under the same rules: the
+   same schedule (window, freeze while the voice is not quiet, stop on a
+   lost privacy reading, the one-shot's bounds), the same user `lampos` in
+   its own user and mount namespace, its DeepSeek through lamp-cloud's
+   forwarder, and the lamp's skills. Hermes stays installed and selectable
+   (`LAMP_LAMP_ENGINE` in lamp-tasks, docs/tasks.md). The code is
+   `crates/update/src/openclaw_install.rs`.
    - **What lamp-update puts in:** a Node 24 runtime in
      `/var/lib/lampos-openclaw/node` (OpenClaw needs Node 24, and Harness
      reads OpenClaw only on Node 24, while the lamp's Harness stays pinned
-     on Node 22); the npm package `openclaw` under
-     `/var/lib/lampos-openclaw`; the wrapper `/usr/local/bin/openclaw`, so
-     Harness finds `openclaw` on `lampos`'s login `PATH`; the namespace
+     on Node 22), the tarball checked by its SHA-256; the npm package
+     `openclaw` 2026.11.2 and its whole tree in
+     `/var/lib/lampos-openclaw/npm`; the wrapper `/usr/local/bin/openclaw`,
+     so Harness finds `openclaw` on `lampos`'s login `PATH`; the namespace
      script `/usr/local/lib/lampos/openclaw-ns`; OpenClaw's state in
      `/var/lib/lampos-openclaw/state` (`OPENCLAW_STATE_DIR`), its tools
-     working in `<state>/workspace`; and an initial
+     working in the lamp's own work folder
+     (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, set by lamp-tasks
+     as `agents.defaults.workspace`); and an initial
      `<state>/openclaw.json` with only its `gateway` block
      (`mode: "local"`, `bind: "loopback"`, token auth). lamp-tasks merges
      the rest in at its start (docs/tasks.md, "OpenClaw's settings on the
      lamp").
+   - **From a pinned lockfile, inside the namespace:** the tree is never
+     resolved freely. The build carries `crates/update/openclaw/package.json`
+     (`openclaw` at 2026.11.2 exactly) and its `package-lock.json` (made
+     once with `npm install --package-lock-only --ignore-scripts`: every
+     package with its registry tarball and sha512 integrity). Before
+     anything is fetched, lamp-update checks the lockfile's SHA-256, that
+     its `openclaw` is the registry tarball with the pinned integrity, and
+     that every other package carries a registry tarball and a sha512
+     integrity or comes bundled inside one that does; any other is
+     `pin_mismatch`. It writes both files in `/var/lib/lampos-openclaw/npm`
+     (root's, 0644), writes `openclaw-ns` first, then runs `npm ci` as
+     `lampos` through `unshare --map-root-user --mount --propagation
+     private /usr/local/lib/lampos/openclaw-ns` with
+     `LAMP_OPENCLAW_NPM_CI=on`, the script's one other mode: behind the
+     same mounts, it runs only the pinned Node's `npm ci --omit=dev
+     --ignore-scripts --no-audit --no-fund --no-update-notifier
+     --loglevel=http` in that folder. npm checks each tarball against the
+     lockfile's integrity, and no package's install script runs (OpenClaw's
+     own preinstall only warns; its postinstall step is finished by
+     OpenClaw itself at its first run, which is the install's `openclaw
+     --version`, in the namespace too). npm never runs as `lampos` outside
+     the namespace. Checked in Docker (Node 24.22.2, linux-x64, 11 Nov):
+     `npm ci --ignore-scripts` from this lockfile added 364 packages in
+     about a minute, `openclaw --version` said `OpenClaw 2026.11.2` and
+     cleared its pending package step, and the lockfile was left as it was.
+     A lamp that had the earlier `npm install --global` layout finds no
+     package at the new path, so its next install sets the old one aside
+     and installs from the lockfile.
+   - **The namespace and the PID namespace:** the wrapper runs
+     `unshare --map-root-user --mount --propagation private`, a user and
+     mount namespace only. Unlike Hermes's wrapper there is no `--pid
+     --kill-child --mount-proc`: OpenClaw 2026.11.2 refuses to open its
+     state database from a PID namespace other than its Gateway's
+     (`GatewayLockNamespaceError: cannot verify Gateway ownership from this
+     process (different PID namespace)`), so with one each, every Harness
+     pane exited at once on lamp-c0a4 and no task was delivered
+     (`dispatch uncertain stopped_before_message`); without them the pane
+     connects (lamp-c0a4, 11 Nov). So OpenClaw shares the lamp's PID
+     namespace and sees the lamp's process list (names and command lines
+     under the lamp's `/proc`). It still reaches no file, socket or device
+     beyond what its mount namespace shows: from its own user namespace,
+     the kernel's ptrace check refuses it other processes' `/proc/<pid>/root`,
+     `cwd` and `environ` (checked in Docker, 11 Nov: a same-user process
+     outside the namespace, all three refused). **What it loses:** it runs
+     as `lampos`, the user every lamp service runs as, so it can send those
+     services signals (`kill -0` succeeded in the same check); its own PID
+     namespace prevented that. A PID namespace shared by the Gateway and its
+     panes (the panes joining the Gateway's) would close it again; that is
+     a follow-up, not built. `openclaw-ns` itself reads only
+     `/proc/self/uid_map` and `findmnt` (`/proc/self/mountinfo`), which are
+     the calling process's own in either case.
    - **The Gateway:** OpenClaw's TUI panes need a running Gateway, and
      Harness never starts or configures one.
      `lamp-openclaw-gateway.service` runs `openclaw gateway run` through
