@@ -26,7 +26,7 @@ use std::{
 /// Every grant, as lamp-control names them: the sim is a developer's own desk
 /// lamp, so its pairing gives all of them unless `--grants` says fewer.
 const ALL_GRANTS: &str =
-    "body,light,speak,look,hear,sound,skills,air,device,camera,microphone,notes";
+    "body,light,speak,speech,look,hear,sound,skills,air,device,camera,microphone,notes";
 
 /// A short id of the lamp's folder, so that two virtual lamps (or one made
 /// again elsewhere) are two lamps to a computer's key store, not one.
@@ -208,12 +208,16 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     let mut threads = vec![spawn_named("servo bus", move || {
         let _ = port.serve(&mut servo_bus, &link, || false);
     })];
-    // The voice and the volume.
+    // The voice and the volume. The bus first: the voice tells its lines on it.
+    let bus = lamp_bus::Bus::new(&bus_root)?;
     let (say, act) = (dir.join("say.sock"), dir.join("act.sock"));
     {
         let say = say.clone();
+        let voice_bus = bus.clone();
         threads.push(spawn_named("say socket", move || {
-            let _ = voice::serve_say(&say);
+            if let Err(error) = voice::serve_say(&say, &voice_bus) {
+                eprintln!("lamp-sim: the say socket ended: {error}");
+            }
         }));
         let act = act.clone();
         threads.push(spawn_named("volume socket", move || {
@@ -239,7 +243,6 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
         eprintln!("lamp-sim: no lamp-skills beside lamp-sim: skill.push is off");
     }
     // The ring, before lamp-control asks it anything.
-    let bus = lamp_bus::Bus::new(&bus_root)?;
     // One boot id for the ring and lamp-control (macOS has no /proc).
     let clock_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
         .map(|id| id.trim().to_owned())
