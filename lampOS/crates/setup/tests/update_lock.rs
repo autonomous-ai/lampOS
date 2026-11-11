@@ -839,3 +839,79 @@ fn a_room_sounds_yes_restarts_ears_once_unlocked() {
     );
     let _ = fs::remove_dir_all(folder);
 }
+
+/// #5883: the dev monitor goes the way developer access does, for
+/// lamp-peek. On is answered with the drop-in written, then lamp-peek is
+/// restarted under lamp-update's lock; off with the drop-in there stops
+/// lamp-peek under the lock before the reply exists.
+#[test]
+fn the_dev_monitor_starts_once_unlocked_and_stops_before_the_reply() {
+    let root = Root::new();
+    let config = root.config();
+    let (folder, records) = records_folder("peek");
+    let (reply, done) = answer(r#"{"monitor": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    let done = done.unwrap();
+    assert!(done.restart_peek && !done.restart_control);
+    assert_eq!(
+        fs::read_to_string(&config.monitor_dropin).unwrap(),
+        "[Service]\nEnvironment=LAMP_PEEK=monitor\n"
+    );
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    let said = change::restart_peek_when_unlocked(&mut ears, &records, &mut units);
+    assert_eq!(said, "lamp-peek restarted on the dev monitor");
+    assert_eq!(
+        units.calls,
+        vec![
+            ("daemon-reload".to_owned(), true),
+            ("restart lamp-peek.service".to_owned(), true)
+        ]
+    );
+    // Off: stopped under the lock, and only then the reply.
+    units.calls.clear();
+    let off = r#"{"monitor": false}"#;
+    let (reply, done) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    assert_eq!(
+        units.calls,
+        vec![
+            ("daemon-reload".to_owned(), true),
+            ("stop lamp-peek.service".to_owned(), true)
+        ]
+    );
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    assert_eq!(
+        done.unwrap().said,
+        "the dev monitor is off; lamp-peek stopped"
+    );
+    assert!(!config.monitor_dropin.exists());
+    // Off again with nothing there: answered as any change, systemd not asked.
+    units.calls.clear();
+    assert!(
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).is_none()
+    );
+    assert!(units.calls.is_empty());
+    // A stop that fails is said, never claimed closed.
+    answer(r#"{"monitor": true}"#, &config, true);
+    let mut failing = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: true,
+    };
+    let (reply, _) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut failing).unwrap();
+    assert_eq!(
+        reply,
+        json!({"done": {"on": false, "closed": false, "note": change::MONITOR_MAY_STAY_OPEN}})
+    );
+    assert!(!config.monitor_dropin.exists());
+    let _ = fs::remove_dir_all(folder);
+}

@@ -140,6 +140,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-control.service",
         include_str!("../../../deploy/product/lamp-control.service"),
     ),
+    // The owner's dev monitor (#5883, docs/peek.md): outside the target,
+    // off unless the owner's switch writes LAMP_PEEK=monitor.
+    (
+        "lamp-peek.service",
+        include_str!("../../../deploy/product/lamp-peek.service"),
+    ),
     (
         "lamp-skills.service",
         include_str!("../../../deploy/product/lamp-skills.service"),
@@ -289,6 +295,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-memory.service",
     "lamp-mood.service",
     "lamp-name.service",
+    "lamp-peek.service",
     "lamp-policy.service",
     "lamp-records.service",
     "lamp-region.service",
@@ -671,6 +678,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "ca5d00537b7b28afcffc8465df192928ebdde49411310b0706b83977505e74f1", // #5883: the owner's dev monitor (lamp-peek's drop-in)
     "857a152d4b052f9dffc5cdeed5817b6590405806d32bfd5318d3922a7c89b7fa", // #6343: Hermes's and OpenClaw's work folder
     "b3fc8a01c4e8efb457ddbf784bff558bc6bd52d2a4c1770f7512f79c78789041", // the owner's local agent switch: its drop-in (agent.conf)
     "74178b7911c982cc32f3210b78b1bc9a6120fd2f5ddc52ff83e367e2f8e9090a", // #5750: the faces from photos' staging copy

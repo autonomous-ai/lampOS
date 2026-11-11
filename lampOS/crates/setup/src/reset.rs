@@ -1498,7 +1498,8 @@ pub const STARTERS: [&str; 8] = [
 /// records' check (`/var/lib/lampOS/voice/sessions`), and the updater and
 /// its apply (the skills' state, `/var/lib/lampOS`; the reboot after the
 /// reset would end them all the same), and the boot's Wi-Fi restore (the
-/// Wi-Fi file; Third on #3579). And `lamp-peek`, an office lamp's page,
+/// Wi-Fi file; Third on #3579). And `lamp-peek`, an office lamp's page or
+/// the owner's dev monitor (#5883),
 /// which a reboot kept off by its setup condition: a start in place would
 /// leave it holding port 80 from setup's page (#4536); stopped, it is not
 /// started again until the lamp next boots. And OpenClaw's gateway
@@ -1506,7 +1507,7 @@ pub const STARTERS: [&str; 8] = [
 /// `multi-user.target` and writing its state as it runs: stopped before
 /// [`forget_agents`] empties that state (#6343), started again by the
 /// lamp's next boot or the updater's next round. Patterns name only loaded
-/// units (no product lamp has `lamp-peek`), and none matches
+/// units, and none matches
 /// `lamp-setup-wipe.service`, the reset's own unit.
 pub const WRITERS: [&str; 12] = [
     "lamp-setup.service",

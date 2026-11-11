@@ -73,6 +73,9 @@ fn default_agent_group_file() -> PathBuf {
 fn default_agent_folder() -> PathBuf {
     lamp_msgs::local_agent::SOCKET_DIR.into()
 }
+fn default_monitor_dropin() -> PathBuf {
+    crate::change::MONITOR_DROPIN.into()
+}
 fn default_consent() -> PathBuf {
     lamp_msgs::consent::FOLDER.into()
 }
@@ -166,6 +169,11 @@ pub struct Config {
     pub agent_group_file: PathBuf,
     #[serde(default = "default_agent_folder")]
     pub agent_folder: PathBuf,
+    /// lamp-peek's drop-in, the owner's dev monitor from the app
+    /// (`monitor.set`, `crate::change`, #5883): `LAMP_PEEK=monitor` while it
+    /// is there, root's, 0644. The reset's plan removes it.
+    #[serde(default = "default_monitor_dropin")]
+    pub monitor_dropin: PathBuf,
     /// The folder of the owner's face expressions and room sounds yeses
     /// (`lamp_msgs::consent::FOLDER`, 0750 `root:lampos`), written from the
     /// app's `consent.set` (`crate::change`, #5500) and by the voice's
@@ -193,7 +201,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 27] = [
+pub const FIELDS: [&str; 28] = [
     "listen",
     "marker",
     "credential",
@@ -216,6 +224,7 @@ pub const FIELDS: [&str; 27] = [
     "agent_dropin",
     "agent_group_file",
     "agent_folder",
+    "monitor_dropin",
     "consent",
     "web_start",
     "web_stop",
@@ -257,6 +266,7 @@ impl Config {
             &self.agent_dropin,
             &self.agent_group_file,
             &self.agent_folder,
+            &self.monitor_dropin,
             &self.consent,
         ] {
             if !path.is_absolute() {
@@ -956,6 +966,12 @@ impl Files<'_> {
     pub fn agent_dropin(&mut self, bytes: &[u8]) -> io::Result<()> {
         let temporary = stage(&self.0.agent_dropin, bytes, 0o644)?;
         put_in_place(&temporary, &self.0.agent_dropin)
+    }
+
+    /// lamp-peek's drop-in (`monitor.set`, #5883), as lamp-control's.
+    pub fn monitor_dropin(&mut self, bytes: &[u8]) -> io::Result<()> {
+        let temporary = stage(&self.0.monitor_dropin, bytes, 0o644)?;
+        put_in_place(&temporary, &self.0.monitor_dropin)
     }
 }
 

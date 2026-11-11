@@ -34,6 +34,13 @@
 //!   restart makes no sound), `systemctl daemon-reload` and a restart of
 //!   [`CONTROL_UNIT`] ([`restart_control_when_unlocked`]). Off: the door is
 //!   closed before the answer ([`close_before_answer`]);
+//! - the owner's dev monitor (`monitor.set`, #5883, `docs/peek.md`):
+//!   lamp-peek's drop-in ([`MONITOR_DROPIN`], `LAMP_PEEK=monitor`), as
+//!   developer access: on is written, answered, then [`PEEK_UNIT`] is
+//!   restarted once no update is at work ([`restart_peek_when_unlocked`]);
+//!   off stops it before the answer ([`close_before_answer`]), so no page is
+//!   left open once the app says off. `lamp-cloud` sends it only with
+//!   `LAMP_APP_MONITOR=on`;
 //! - the owner's chosen voice and character words (`voice` and `character`
 //!   beside the language, #5394, `docs/chosen-voice.md`): one line each,
 //!   root's, 0644, checked by [`lamp_msgs::chosen_voice`]'s rules; an empty
@@ -78,6 +85,12 @@ pub const CONTROL_UNIT: &str = "lamp-control.service";
 pub const CONTROL_DROPIN: &str = "/etc/systemd/system/lamp-control.service.d/developer.conf";
 /// What the drop-in holds, exactly.
 pub const CONTROL_DROPIN_TEXT: &str = "[Service]\nEnvironment=LAMP_CONTROL=on\n";
+/// The unit started and stopped with the owner's dev monitor (#5883).
+pub const PEEK_UNIT: &str = "lamp-peek.service";
+/// lamp-peek's drop-in while the dev monitor is on.
+pub const MONITOR_DROPIN: &str = "/etc/systemd/system/lamp-peek.service.d/monitor.conf";
+/// What it holds, exactly.
+pub const MONITOR_DROPIN_TEXT: &str = "[Service]\nEnvironment=LAMP_PEEK=monitor\n";
 
 /// lamp-control's second drop-in, while the owner's local agent switch is on:
 /// the one user the lamp's coding agents run as, and the group and folder its
@@ -103,6 +116,8 @@ pub enum Change {
     /// The owner's switch for the local agent (`docs/control.md`, "The local
     /// agent"): lamp-control's socket for the one fixed user, on or off.
     LocalAgent(bool),
+    /// The owner's dev monitor: lamp-peek in monitor mode or off (#5883).
+    Monitor(bool),
     /// The owner's chosen voice's name; `None` goes back to the default.
     Voice(Option<String>),
     /// The owner's words for the character; `None` clears them.
@@ -141,7 +156,7 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`,
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
 /// either), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
-/// (`null` clears it), or `{"control": bool}`, or `{"local_agent": bool}`, or `{"consent": {KEY: bool}}`
+/// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`, or `{"consent": {KEY: bool}}`
 /// with exactly one key of [`lamp_msgs::consent::FILES`].
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
@@ -211,6 +226,9 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
             }
             Ok(Change::LocalAgent(on))
         }
+        "monitor" => Ok(Change::Monitor(
+            given.as_bool().ok_or("monitor must be true or false")?,
+        )),
         // Checked again here, whatever lamp-cloud sent (#5500).
         "consent" => {
             let why = "consent holds one of face_expressions or room_sounds, true or false";
@@ -243,6 +261,8 @@ pub struct Done {
     pub restart_control: bool,
     /// lamp-ears must take a new room sounds yes, read only at its start.
     pub restart_ears: bool,
+    /// lamp-peek must follow its drop-in: the dev monitor was turned on.
+    pub restart_peek: bool,
     /// The journal's line: what changed, never a name.
     pub said: String,
 }
@@ -272,6 +292,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: false,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 said: format!(
                     "the person's name was changed ({} characters)",
                     name.chars().count()
@@ -286,6 +307,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: false,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 said: "the person's name was removed".into(),
             })
         }
@@ -297,6 +319,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: false,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 said: format!(
                     "the lamp's name in the app was changed ({} characters)",
                     name.chars().count()
@@ -313,6 +336,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: false,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 // A zone is no one's name: said, as setup's own line says it.
                 said: format!("the time zone is now {zone}"),
             })
@@ -329,6 +353,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: false,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 said: "the owner's place was set".into(),
             })
         }
@@ -342,33 +367,24 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: before != after,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 said: format!("the language is now {code}"),
             })
         }
         // Written only when it is not there as it should be, so a repeat
         // restarts nothing.
         Change::Control(on) => {
-            let path = &config.control_dropin;
-            let changed = if *on {
-                let there = fs::read(path).ok();
-                if there.as_deref() != Some(CONTROL_DROPIN_TEXT.as_bytes()) {
-                    files.control_dropin(CONTROL_DROPIN_TEXT.as_bytes())?;
-                    true
-                } else {
-                    false
-                }
-            } else if fs::symlink_metadata(path).is_ok() {
-                remove(path)?;
-                true
-            } else {
-                false
-            };
+            let changed =
+                follow_dropin(&config.control_dropin, *on, CONTROL_DROPIN_TEXT, |text| {
+                    files.control_dropin(text)
+                })?;
             Ok(Done {
                 data: json!({"on": on}),
                 restart_schedule: false,
                 restart_voice: false,
                 restart_control: changed,
                 restart_ears: false,
+                restart_peek: false,
                 said: format!(
                     "developer access is {}{}",
                     if *on { "on" } else { "off" },
@@ -401,8 +417,30 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: false,
                 restart_control: changed,
                 restart_ears: false,
+                restart_peek: false,
                 said: format!(
                     "the local agent is {}{}",
+                    if *on { "on" } else { "off" },
+                    if changed { "" } else { " already" }
+                ),
+            })
+        }
+        // Off reaches here only with no drop-in there (or the helper off):
+        // [`close_before_answer`] takes an off that has one to remove.
+        Change::Monitor(on) => {
+            let changed =
+                follow_dropin(&config.monitor_dropin, *on, MONITOR_DROPIN_TEXT, |text| {
+                    files.monitor_dropin(text)
+                })?;
+            Ok(Done {
+                data: json!({"on": on}),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: false,
+                restart_peek: *on && changed,
+                said: format!(
+                    "the dev monitor is {}{}",
                     if *on { "on" } else { "off" },
                     if changed { "" } else { " already" }
                 ),
@@ -417,6 +455,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: changed,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 // A voice's name is no one's: said, as the language is.
                 said: format!(
                     "the chosen voice is now {}",
@@ -434,6 +473,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: changed,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 said: match text {
                     Some(text) => format!(
                         "the character's words were set ({} characters)",
@@ -463,6 +503,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: false,
                 restart_control: false,
                 restart_ears: *yes && !before && *key == lamp_msgs::consent::ROOM_SOUNDS,
+                restart_peek: false,
                 said: format!(
                     "the {words} yes is {} from the app{}",
                     if *yes { "on" } else { "off" },
@@ -478,10 +519,34 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_voice: false,
                 restart_control: false,
                 restart_ears: false,
+                restart_peek: false,
                 said: "the owner's place was cleared".into(),
             })
         }
     }
+}
+
+/// A drop-in at `path` made to follow `on`: written with `write` when it
+/// does not hold `text` exactly, removed when off. Whether it changed, so a
+/// repeat restarts nothing.
+fn follow_dropin(
+    path: &Path,
+    on: bool,
+    text: &str,
+    write: impl FnOnce(&[u8]) -> io::Result<()>,
+) -> io::Result<bool> {
+    if on {
+        if fs::read(path).ok().as_deref() == Some(text.as_bytes()) {
+            return Ok(false);
+        }
+        write(text.as_bytes())?;
+        return Ok(true);
+    }
+    if fs::symlink_metadata(path).is_err() {
+        return Ok(false);
+    }
+    remove(path)?;
+    Ok(true)
 }
 
 /// `line` kept at `path` as one line, root's, 0644 (the voice reads it as
@@ -920,6 +985,10 @@ pub fn make_agent_account(
     }
 }
 
+/// Said when lamp-peek's drop-in is gone but it did not stop (#5883).
+pub const MONITOR_MAY_STAY_OPEN: &str =
+    "the dev monitor is off, but its page may stay open until the lamp next restarts";
+
 /// systemd, as the change helper drives it for lamp-control. Injected for tests.
 pub trait Systemd {
     /// `systemctl` with `args`; why not, when it failed.
@@ -961,16 +1030,17 @@ impl Ears for Clock {
     }
 }
 
-/// Developer access turned off while lamp-control's drop-in is there, or the
-/// local agent turned off while its drop-in is there: the door is closed
+/// Developer access turned off while lamp-control's drop-in is there, the
+/// local agent turned off while its drop-in is there, or the dev monitor
+/// (#5883) turned off while lamp-peek's drop-in is there: the door is closed
 /// before the app is told. lamp-update's lock first, at most
 /// [`CLOSE_LOCK_MOST`], else refused with nothing changed; then, holding it,
 /// the drop-in removed (developer off also the agent's), `daemon-reload` and
-/// `stop` (a `restart` for the agent off beside developer access still on, so
-/// the agent's socket goes and the developer door stays), and only then the reply,
-/// which this returns for the caller to write. A stop that failed is said,
-/// never claimed closed. `None` when `line` is not such a request: it is
-/// answered by [`answer`] as any other.
+/// `stop` of its unit (a `restart` for the agent off beside developer access
+/// still on, so the agent's socket goes and the developer door stays), and
+/// only then the reply, which this returns for the caller to write. A stop
+/// that failed is said, never claimed closed. `None` when `line` is not such
+/// a request: it is answered by [`answer`] as any other.
 pub fn close_before_answer(
     line: &str,
     config: &Config,
@@ -988,7 +1058,7 @@ pub fn close_before_answer(
     // agent without the owner's own yes. The agent off alone removes only its
     // drop-in and keeps the developer door, so the unit is restarted then
     // (a stop only when developer access is off as well).
-    let (files, what, restart): (Vec<&Path>, &str, bool) =
+    let (files, what, unit, part, note, restart): (Vec<&Path>, &str, &str, &str, &str, bool) =
         match parse(line.trim_end_matches(['\n', '\r']), config) {
             // The agent's drop-in first, the developer's last: a removal that
             // fails then leaves the retry on this path. An agent drop-in left
@@ -1002,13 +1072,27 @@ pub fn close_before_answer(
                         config.control_dropin.as_path(),
                     ],
                     "developer access",
+                    CONTROL_UNIT,
+                    "lamp-control",
+                    CLOSE_MAY_STAY_OPEN,
                     false,
                 )
             }
             Ok(Change::LocalAgent(false)) if there(&config.agent_dropin) => (
                 vec![config.agent_dropin.as_path()],
                 "the local agent",
+                CONTROL_UNIT,
+                "lamp-control",
+                CLOSE_MAY_STAY_OPEN,
                 there(&config.control_dropin),
+            ),
+            Ok(Change::Monitor(false)) if there(&config.monitor_dropin) => (
+                vec![config.monitor_dropin.as_path()],
+                "the dev monitor",
+                PEEK_UNIT,
+                "lamp-peek",
+                MONITOR_MAY_STAY_OPEN,
+                false,
             ),
             _ => return None,
         };
@@ -1034,16 +1118,16 @@ pub fn close_before_answer(
     };
     let stopped = systemd
         .systemctl(&["daemon-reload"])
-        .and_then(|()| systemd.systemctl(&[verb, CONTROL_UNIT]));
+        .and_then(|()| systemd.systemctl(&[verb, unit]));
     // Refused, and said in full: what could not be removed, and whether
-    // lamp-control was nevertheless stopped (it comes back at its next start
+    // the unit was nevertheless stopped (it comes back at its next start
     // while a drop-in is still there) or the stop failed too.
     if let Some(kind) = failed {
         let then = match &stopped {
             Ok(()) => format!(
-                "; lamp-control was {did} for now, and comes back at its next start while the drop-in is there"
+                "; {part} was {did} for now, and comes back at its next start while the drop-in is there"
             ),
-            Err(why) => format!("; lamp-control did not {verb} either ({why})"),
+            Err(why) => format!("; {part} did not {verb} either ({why})"),
         };
         return Some((
             json!({"refused": format!("the change could not be saved: {kind}{then}")}),
@@ -1053,11 +1137,11 @@ pub fn close_before_answer(
     let (data, said) = match stopped {
         Ok(()) => (
             json!({"on": false, "closed": true}),
-            format!("{what} is off; lamp-control {did}"),
+            format!("{what} is off; {part} {did}"),
         ),
         Err(why) => (
-            json!({"on": false, "closed": false, "note": CLOSE_MAY_STAY_OPEN}),
-            format!("{what} is off; lamp-control did not {verb} ({why})"),
+            json!({"on": false, "closed": false, "note": note}),
+            format!("{what} is off; {part} did not {verb} ({why})"),
         ),
     };
     let done = Done {
@@ -1066,6 +1150,7 @@ pub fn close_before_answer(
         restart_voice: false,
         restart_control: false,
         restart_ears: false,
+        restart_peek: false,
         said,
     };
     Some((json!({ "done": data }), Some(done)))
@@ -1095,6 +1180,32 @@ pub fn restart_control_when_unlocked(
     {
         Ok(()) => "lamp-control restarted on the developer setting".into(),
         Err(why) => format!("lamp-control's restart failed: {why}"),
+    }
+}
+
+/// After the dev monitor was turned on and answered (#5883): as
+/// [`restart_control_when_unlocked`], for [`PEEK_UNIT`]. What happened, for
+/// the journal.
+pub fn restart_peek_when_unlocked(
+    ears: &mut impl Ears,
+    records: &lamp_update::records::Records,
+    systemd: &mut impl Systemd,
+) -> String {
+    let _held = match unlocked(ears, records, UPDATE_LOOK_EVERY, QUIET_MOST) {
+        Ok(lock) => lock,
+        Err(why) => {
+            return format!(
+                "no lock within {} min ({why}); lamp-peek follows the dev monitor when it next starts",
+                QUIET_MOST.as_secs() / 60
+            );
+        }
+    };
+    match systemd
+        .systemctl(&["daemon-reload"])
+        .and_then(|()| systemd.systemctl(&["restart", PEEK_UNIT]))
+    {
+        Ok(()) => "lamp-peek restarted on the dev monitor".into(),
+        Err(why) => format!("lamp-peek's restart failed: {why}"),
     }
 }
 

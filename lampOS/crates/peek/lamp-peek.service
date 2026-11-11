@@ -1,5 +1,6 @@
 # lampOS peek: a read-only page on an office lamp (lampOS/docs/peek.md, #2141).
-# Office lamps only, installed by hand: never in deploy/product, never on a person's lamp.
+# Office lamps only, installed by hand, never on a person's lamp. A person's lamp has
+# deploy/product/lamp-peek.service, in monitor mode only when the owner's app switch says so (#5883).
 # Template: replace every @NAME@ as deploy/units/README.md says. Off until a drop-in sets
 # LAMP_PEEK=on (/etc/systemd/system/lamp-peek.service.d/on.conf).
 [Unit]

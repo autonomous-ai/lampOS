@@ -18,6 +18,7 @@ pub mod hermes_llm;
 pub mod lamp;
 pub mod light;
 pub mod make_skill;
+pub mod monitor;
 pub mod onboarding_done;
 pub mod onboarding_page;
 pub mod onboarding_step;
