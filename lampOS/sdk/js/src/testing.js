@@ -15,6 +15,7 @@
 import { execFileSync } from 'node:child_process';
 import { X509Certificate, createHash, createPublicKey, randomBytes, verify } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -387,7 +388,13 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false } = {}) {
+    // `local`: also serve lamp-control's control socket (a unix socket, `localPath`) for a skill's run, where a
+    // one-run token from `mintToken` is what lets a connection in (`Lamp.local`).
+    this.local = local;
+    this.localPath = null;
+    this.localWs = new Set();
+    this.tokens = new Map();
     // `followsHand: false` answers a look at `hand` as a lamp-control from
     // before #4183 does: taken, with no `follow`, and nothing follows it.
     // 'all': every grant the protocol names, as `lamp fake` pairs with. The default
@@ -466,6 +473,33 @@ export class FakeLamp {
     this.wss.on('connection', (ws) => this.serve(ws));
     await new Promise((resolve) => this.https.listen(0, this.host, resolve));
     this.port = this.https.address().port;
+    if (this.local) {
+      this.localDir = mkdtempSync(join(tmpdir(), 'lampos-fake-local-'));
+      this.localPath = join(this.localDir, 'control.sock');
+      this.localHttp = createHttpServer();
+      this.localWss = new WebSocketServer({ server: this.localHttp });
+      this.localWss.on('connection', (ws) => {
+        this.localWs.add(ws);
+        ws.on('close', () => this.localWs.delete(ws));
+        this.serve(ws);
+      });
+      await new Promise((resolve) => this.localHttp.listen(this.localPath, resolve));
+    }
+  }
+
+  // A one-run token for `run` with exactly `grants`, as lamp-control mints one from the owner's yes for a skill
+  // (`Lamp.local(token, { path: fake.localPath })`). One live token a run: a second mint replaces the first.
+  mintToken(grants, run = 'run-1', skill = 'skill') {
+    for (const [token, held] of [...this.tokens]) if (held.run === run) this.tokens.delete(token);
+    const token = randomBytes(32).toString('base64url');
+    this.tokens.set(token, { grants: [...grants], run, skill });
+    return token;
+  }
+
+  // The run ended: its token is no good and its connections close, saying why.
+  endRun(run) {
+    for (const [token, held] of [...this.tokens]) if (held.run === run) this.tokens.delete(token);
+    for (const [ws, client] of [...this.clientOf]) if (this.localWs.has(ws) && client === `t_${run}`) ws.close(1000, 'the run ended');
   }
 
   // A `Lamp` paired with this fake and connected, for a test of your own
@@ -501,6 +535,13 @@ export class FakeLamp {
       await new Promise((resolve) => this.wss.close(resolve));
       this.https.closeAllConnections();
       await new Promise((resolve) => this.https.close(resolve));
+      if (this.localWss) {
+        for (const ws of this.localWss.clients) ws.terminate();
+        await new Promise((resolve) => this.localWss.close(resolve));
+        this.localHttp.closeAllConnections();
+        await new Promise((resolve) => this.localHttp.close(resolve));
+        rmSync(this.localDir, { recursive: true, force: true });
+      }
     } finally {
       // The folders go even if closing the server threw.
       for (const folder of this.folders ?? []) rmSync(folder, { recursive: true, force: true });
@@ -739,6 +780,7 @@ export class FakeLamp {
         const refusal = lightRefusal(request);
         if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
       }
+      if (request.op === 'pair' && this.localWs.has(ws)) return this.refuse(ws, id, 'bad_request', "this socket is not for pairing: it is a skill run's");
       if (request.op === 'pair') return this.pair(ws, request, nonce);
       if (request.op === 'hello') {
         client = this.hello(ws, request, nonce);
@@ -801,6 +843,7 @@ export class FakeLamp {
   }
 
   hello(ws, request, nonce) {
+    if (this.localWs.has(ws) || 'token' in request) return this.helloToken(ws, request);
     const paired = this.clients.get(request.client);
     let good = false;
     if (paired) {
@@ -815,6 +858,33 @@ export class FakeLamp {
     const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
     this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits });
     return request.client;
+  }
+
+  // A hello on the control socket: a live one-run token and no key (client c_0, a zero signature).
+  helloToken(ws, request) {
+    if (!this.localWs.has(ws)) {
+      // As lamp-control's other doors: a token is no part of hello there.
+      this.refuse(ws, request.id, 'bad_request', "token: only on a skill run's socket");
+      return null;
+    }
+    // The hello an SDK sends here, exactly: client c_0 and the zero signature beside the token. A real client's id or
+    // signature is refused, not ignored, as lamp-control does (bad_request).
+    if (request.client !== 'c_0' || request.sig !== Buffer.alloc(64).toString('base64')) {
+      this.refuse(ws, request.id, 'bad_request', 'on this socket hello is client c_0, a zero sig and the token');
+      ws.close();
+      return null;
+    }
+    const held = this.tokens.get(request.token ?? '');
+    if (!held) {
+      this.refuse(ws, request.id, 'no_grant', 'no token for this run');
+      ws.close();
+      return null;
+    }
+    const client = `t_${held.run}`;
+    this.clients.set(client, { key: Buffer.alloc(0), name: `skill (run ${held.run})`, grants: held.grants });
+    const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
+    this.ok(ws, request.id, { lamp: this.lamp, grants: held.grants, limits, run: held.run, skill: held.skill });
+    return client;
   }
 
   // The grant each event and state needs, as lamp-control's own (#3736).
