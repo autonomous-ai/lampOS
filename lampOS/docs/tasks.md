@@ -2173,8 +2173,14 @@ for each run, and is answered once the run ends
   . _ -`, never starting with `.`, so no `..`, no hidden part, no newline,
   backtick or space; not absolute), `task` is 1 to 500 bytes with no
   control character, `sha256` is 64 lowercase hex digits,
-  and `grants` are at most 13, each once, never `skills`. Anything else is
-  `bad_request`, and no token is asked for.
+  and `grants` are each once and each known (`grant_known`): one of
+  lamp-control's own (`CONTROL_GRANTS`: `body`, `light`, `speak`, `look`,
+  `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
+  `speech`; never `skills`), or a linked service's `<code>-read` or
+  `<code>-write` (#6432, `SERVICE_GRANTS`: lamp-services' catalog codes,
+  `gmail-app` told as `gmail` and `figma-api` as `figma`, so `gmail-read`,
+  `google_calendar-write`). A test holds `SERVICE_GRANTS` to the catalog.
+  Anything else is `bad_request`, and no token is asked for.
 - **The answer:** `{"ok":true,"id":N}` once the run ended, or
   `{"ok":false,"error","message"}`: `off` (the switch is not `on`),
   `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave

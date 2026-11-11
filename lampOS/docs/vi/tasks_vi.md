@@ -169,8 +169,15 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   0-9 . _ -`, không bắt đầu bằng `.`, nên không `..`, không phần ẩn, không
   xuống dòng, dấu backtick hay khoảng trắng,
   không đường dẫn tuyệt đối), `task` dài 1 đến 500 byte, `sha256` là 64 chữ
-  số hex viết thường, và `grants` tối đa 13, mỗi quyền một lần, không bao giờ
-  là `skills`. Mọi thứ khác là `bad_request`, và không xin token nào.
+  số hex viết thường, và `grants` mỗi quyền một lần và là quyền đã biết (`grant_known`):
+  một quyền của lamp-control (`CONTROL_GRANTS`: `body`, `light`, `speak`,
+  `look`, `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
+  `speech`; không bao giờ là `skills`), hoặc `<code>-read` hay
+  `<code>-write` của một dịch vụ liên kết (#6432, `SERVICE_GRANTS`: mã
+  trong danh mục của lamp-services, `gmail-app` tính là `gmail` và
+  `figma-api` là `figma`, nên có `gmail-read`, `google_calendar-write`).
+  Một test giữ `SERVICE_GRANTS` khớp với danh mục. Mọi thứ khác là
+  `bad_request`, và không xin token nào.
 - **Câu trả lời:** `{"ok":true,"id":N}` khi lần chạy đã kết thúc, hoặc
   `{"ok":false,"error","message"}`: `off` (công tắc không phải `on`),
   `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
