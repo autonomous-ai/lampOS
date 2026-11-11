@@ -2170,9 +2170,18 @@ with `LAMP_SERVICE_RECORDS` on; the connector records plan, PR 1b,
   recent records beside it, one line each, the latest first:
   `Calendar · create 'Hamburger party' · Sun 15 Nov 19:00–22:00 · cancelled:
   the lamp answered after the read-back with no send · today 15:40`,
-  `Drive · search 'Sunday' · no result · today 15:34`. The latest 5, plus any still `prepared` or `failed` changed
-  in the last 7 days, at most 10 lines and 1,200 bytes (the oldest lines go
-  first, and how many is said). With them the rule: "Your past service
+  `Drive · search 'Sunday' · no result · today 15:34`. The latest 5, plus any still `prepared` or `failed`, and any `done`
+  write, changed in the last 7 days, at most 10 lines and 1,600 bytes. Past
+  either, reads and cancels go first, then `prepared`/`failed`, and a
+  `done` write last, the oldest of each first, and how many is said ("and
+  N more not shown: recall finds them"). On lamp-06c1 on 11 Nov, newer
+  calendar reads and a failed cancel pushed a created event out of the
+  latest 5, and the lamp later said nothing was saved. With
+  `LAMP_SERVICE_REDO` on, each write's line ends with its record key
+  (`· key v1794373881497-2`), recall gives it as `key`, and the note adds
+  "To redo or change a write listed here, call service_write with
+  from_record set to its key, giving only what changed."; never in the
+  brief note, never for a read. With them the rule: "Your past service
   actions are listed with their status. Never claim something was done
   unless its record says done; never say you can't do something a record
   shows you did." Read from what the voice holds, never waited for; after a
@@ -2255,8 +2264,9 @@ said it had no address for that friend.
 
 With `LAMP_SERVICE_REDO=on` beside `LAMP_SERVICE_RECORDS=on` (the second
 route only; alone it does nothing; the connector records plan, PR 1d),
-`service_write` takes `from_record`, a service record's key, so "do it
-again at 8 PM" after a cancelled event needs nothing repeated
+`service_write` takes `from_record`, a service record's key (the `key`
+the records note and recall show with each write), so "do it again at 8 PM"
+after a cancelled event needs nothing repeated
 (`crates/voice/src/service_records/redo.rs`):
 
 - **Filled, then the change.** Inside the gate, after its heard, owner
