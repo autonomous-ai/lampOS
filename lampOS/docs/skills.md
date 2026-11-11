@@ -2380,12 +2380,45 @@ gone ([switches.md](switches.md)). What happens:
      `skill.toml`. Tests: `a_made_skill_may_play_the_lamps_soft_hum`,
      `a_sound_the_lamp_doesnt_ship_is_refused`, and in `tests/it/made.rs`
      the real `lamp-skills pack` keeping one.
+   - **A dim and a `relative` light are said only as `lamp-skills`
+     checks them** (lamp-9adf, 11 Nov 05:34: "every night at ten, dim the
+     light a step" was written as `relative` with `until`, once with a
+     `for` in words, and failed all three repairs on the check's own
+     words). `made_skill::plainly` says `{ dim = N }` only with N 1 to 4
+     and nothing but `until = "ends"` beside it, and `relative` only with
+     `warmer` 0 or 1 and `dimmer` 0 to 4, not both 0, `warm_at_dimmest =
+     true` only with `warmer = 1`, a `for` (required) of at most 10
+     minutes, and at most a breathe `pattern` with no `low` and a period of
+     4 to 12 s: no `until`, colour or level (`lamp_skills::light_call`).
+     A step that is one such light and isn't said is refused before the
+     check, and the repair is told after its keys how to write it
+     (`made_skill::LIGHT_PART`: `relative = { dimmer = 1 }, for = "10m"
+     takes only for, at most 10m; dim = 1 to 4 takes only until =
+     "ends"`). The making model's system prompt (`MORE_STEPS`) says the
+     same: `{ dim = 1 }` (1 to 4, beside it only `until = "ends"`),
+     `{ relative = { dimmer = 1 }, for = "10m" }` (only `for`, at most
+     10m), and every `for` a whole number and ms, s, m or h, never words.
+   - **Its trigger's topic is granted** (lamp-9adf, 11 Nov 05:36: a
+     `clock/local` trigger written with no such topic, which
+     `lamp-skills` refuses). Before the pace and the manners,
+     `made_skill::topic_granted` puts the `[trigger]`'s topic in
+     `[permissions] topics` when the model left it out: last in a
+     one-line `topics`, as a `topics` line of its own in `[permissions]`,
+     or as a `[permissions]` table before `[trigger]` when there is none.
+     The trigger reads that topic whatever the grant says, so the skill
+     gains nothing its trigger didn't name, and the said-back line names
+     it. Grants written inline or dotted, or `topics` over several lines,
+     are given back as they came, and the check says why.
    - Tests for the lifted cap (#6066):
      `a_made_skill_may_use_whatever_a_skill_can_declare`,
      `every_kind_a_skill_can_declare_is_kept_and_said`,
-     and the
+     the
      `voice/heard` trigger's "can't yet" in
-     `what_it_cant_say_is_refused_with_lines_for_a_repair`.
+     `what_it_cant_say_is_refused_with_lines_for_a_repair`,
+     `a_dim_step_is_said_only_as_lamp_skills_takes_it`,
+     `a_made_skills_trigger_topic_is_granted`, and in `tests/it/made.rs`
+     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` (the real
+     `lamp-skills pack`).
    The read of a linked service (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
    `lamp-skills-manage@`, on in the product units): `services` naming one linked
@@ -2590,7 +2623,8 @@ gone ([switches.md](switches.md)). What happens:
      plainly: trigger topic humans/faces/tracked, keys gap, near",
      "[[do]] step 1, light (dim, for)", "parts while"), and the journal
      says the same: `lamp-voice: a made skill can't be said plainly:
-     <part>`. A trigger's refusal goes on with the triggers it can have,
+     <part>`; a dim or `relative` light's part is followed, in the repair
+     alone, by how to write it (`LIGHT_PART`, above). A trigger's refusal goes on with the triggers it can have,
      each with what it means (`SAYABLE_TRIGGERS`): someone comes or comes
      back to the desk is `room/presence`, `someone`, `true` (back after a
      while away: `when = "appears"`, `absent_for`); the desk left,

@@ -863,6 +863,70 @@ fn a_made_evening_dim_runs_at_ten_past_ten() {
     assert!(!ran, "{installed}");
 }
 
+/// lamp-9adf, 11 Nov 05:34-05:37: "every night at ten, dim the light a
+/// step" failed all three repairs, its dim written as a `relative` with
+/// `until`, and once with no `clock/local` in its topics. A `relative`
+/// with only its `for`, on a 22:00 clock with its topic left out, is given
+/// its topic, said plainly and passed by the real `lamp-skills pack`; one
+/// with `until` is refused before the check with a plain hint.
+#[test]
+fn a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let toml = TOML
+        .replace("topics = [\"voice/state\"]\n", "")
+        .replace(
+            "topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\ncooldown = \"12h\"\n\
+             during = { from = \"22:00\", to = \"22:30\" }",
+            "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+             during = { from = \"22:00\", to = \"22:01\" }",
+        )
+        .replace(
+            "light = { dim = 1 }",
+            "light = { relative = { dimmer = 1 }, for = \"10m\" }",
+        );
+    assert!(
+        !toml.contains("topics") && toml.contains("clock/local"),
+        "{toml}"
+    );
+    let made = keep_asked(
+        &answer(&toml, "night-dim"),
+        false,
+        "s1:night-dim:1",
+        &keeping,
+        &Asked {
+            request: "every night at ten, dim the light a step",
+            ..Asked::default()
+        },
+    )
+    .unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert_eq!(made.uses.topics, ["clock/local"]);
+    assert!(
+        made.description
+            .starts_with("Every day at 22:00, it makes your light a step dimmer for 10 minutes."),
+        "{}",
+        made.description
+    );
+    assert_eq!(tars(&keeping.directory).len(), 1);
+    let until = toml.replace("for = \"10m\"", "until = \"ends\"");
+    let refused = keep(
+        &answer(&until, "night-until"),
+        false,
+        "s1:night-until:1",
+        &keeping,
+    )
+    .unwrap_err();
+    assert_eq!(refused.0, lamp_voice::made_skill::UNSAID);
+    let lines = refused.1.unwrap();
+    assert!(
+        lines.contains(
+            "light (relative, until): relative = { dimmer = 1 }, for = \"10m\" takes only for"
+        ),
+        "{lines}"
+    );
+    assert_eq!(tars(&keeping.directory).len(), 1);
+}
+
 /// #6070, the Reviewer-lead's P2: a made skill on a face coming into view
 /// that only moves, made by voice with no `absent_for`, kept, put on and
 /// run by the real engine. Someone at the desk who glances away for a frame
