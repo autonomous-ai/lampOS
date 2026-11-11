@@ -826,7 +826,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_TASKS_CORRECT` | After the lamp reads back a task, you can say no, I said, and correct it before saying yes. |
 | `LAMP_TASK_NEWS_RETELL` | If you talk over the lamp telling you a task finished, it tells you once more when the room is quiet. |
 | `LAMP_TASKS_NOW` | You can ask how any of your agents' recent work is going, or if one finished, and hear it at once. |
-| `LAMP_TASKS_HARNESS_STATUS` | You can ask whether the lamp's Harness is signed in, and which of your computers and agents it can hand work to. |
+| `LAMP_TASKS_HARNESS_STATUS` | You can ask if the lamp's Harness is signed in, and which of your computers and agents it can hand work to. |
 | `LAMP_TASKS_ONE_YES` | When the lamp reads back a task for your computer, one yes is enough to start it. |
 | `LAMP_TASKS_REPLY_NAMED` | Describe earlier work on your computer ("the book program one") and the lamp gives it the new work. |
 | `LAMP_UNPLUG` | You can ask the lamp to fold up for unplugging; it says when it's done, and "never mind" undoes it. |
