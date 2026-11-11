@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
-import { createServer } from 'node:net';
+import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -255,6 +255,39 @@ test('--lan-address with an address that is not this computer\'s ends the twin w
     rmSync(folder, { recursive: true, force: true });
   }
 });
+
+// A request the twin cannot parse as a URL is answered, never allowed to end it: `new URL('//', base)` throws, and
+// tokenOk() used to run first on the raw target with no token (found on the lead's read of #6317). Raw bytes, because
+// fetch() tidies a target before it is sent.
+const raw = (port, text) => new Promise((resolve) => {
+  const socket = connect(Number(port), '127.0.0.1');
+  let got = '';
+  socket.on('connect', () => socket.write(text));
+  socket.on('data', (chunk) => { got += chunk; });
+  socket.on('error', () => {});
+  socket.on('close', () => resolve(got));
+  setTimeout(() => socket.destroy(), 1500);
+});
+
+for (const lanFlags of [[], ['--lan']]) {
+  test(`a target that is not a URL gets an answer or a closed connection and the twin goes on (${lanFlags.length ? 'with' : 'without'} --lan)`, async (t) => {
+    const { port, token } = await started(t, (dir, stub) => [...lanFlags, '--stim-dir', dir, '--lamp-sim', stub]);
+    const host = `Host: 127.0.0.1:${port}\r\n`;
+    const upgrade = 'Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n';
+    for (const target of ['//', 'http://[', '//a b', '/a%00b?t=x', '/\u0000']) {
+      const answer = await raw(port, `GET ${target} HTTP/1.1\r\n${host}Connection: close\r\n\r\n`);
+      assert.ok(answer === '' || /^HTTP\/1\.1 (400|403|404) /.test(answer), `${JSON.stringify(target)}: ${answer.slice(0, 40)}`);
+      const upgraded = await raw(port, `GET ${target} HTTP/1.1\r\n${host}${upgrade}Origin: http://127.0.0.1:${port}\r\n\r\n`);
+      assert.ok(upgraded === '' || /^HTTP\/1\.1 (400|403|404) /.test(upgraded), `upgrade ${JSON.stringify(target)}: ${upgraded.slice(0, 40)}`);
+      // The twin is still there for the page that has the token.
+      assert.equal((await fetch(`http://127.0.0.1:${port}/?t=${token}`)).status, 200, `after ${JSON.stringify(target)}`);
+    }
+    // A broken request line (the parser's own refusal) ends that connection; the twin goes on.
+    const broken = await raw(port, 'GET\r\n\r\n');
+    assert.ok(broken === '' || /^HTTP\/1\.1 400 /.test(broken), broken.slice(0, 40));
+    assert.equal((await fetch(`http://127.0.0.1:${port}/?t=${token}`)).status, 200);
+  });
+}
 
 test('with --lan the twin listens on loopback and the printed address, never on every interface', async (t) => {
   if (!existsSync('/proc/net/tcp')) return t.skip('needs /proc/net/tcp (Linux)');

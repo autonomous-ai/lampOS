@@ -27,7 +27,7 @@ import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
 import { checked, describe, findControl, findStimulus } from './controls.js';
-import { chooseLan, hostOk, newToken, originOk, tokenOk } from './guard.js';
+import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const options = parse(process.argv.slice(2));
@@ -222,7 +222,13 @@ const server = createServer((request, response) => {
     response.writeHead(403).end('not the address the twin printed\n');
     return;
   }
-  const pathname = new URL(request.url, 'http://localhost').pathname;
+  // The target parsed once, here: one that is not a URL is a bad request (never a throw), before anything else.
+  const parsed = parseUrl(request.url);
+  if (!parsed) {
+    response.writeHead(400).end('bad request\n');
+    return;
+  }
+  const pathname = parsed.pathname;
   if (Object.hasOwn(vendored, pathname) && (request.method === 'GET' || request.method === 'HEAD')) {
     response.writeHead(200, { 'content-type': vendored[pathname], 'cache-control': 'public, max-age=3600' }).end(readFileSync(here(`.${pathname}`)));
     return;
@@ -251,9 +257,16 @@ const server = createServer((request, response) => {
   }
   response.writeHead(200, { 'content-type': file[0], 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }).end(file[1]());
 });
+// A request the HTTP parser itself refuses (a broken line, a header too long) ends that one connection and nothing
+// else; on both servers, the loopback one and the network address's.
+const dropBadClient = (error, socket) => {
+  if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
+  socket.destroy();
+};
+server.on('clientError', dropBadClient);
 const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 server.on('upgrade', (request, socket, head) => {
-  const path = new URL(request.url, 'http://localhost').pathname;
+  const path = parseUrl(request.url)?.pathname;
   if (path !== '/live' || !tokenOk(request.url, token) || !originOk(request.headers.origin, port, lanHost) || (lan && !hostOk(request.headers.host, port, lanHost))) {
     socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
     return;
@@ -287,6 +300,7 @@ server.listen(port, '127.0.0.1', () => {
   if (lan && !lanIp) console.log('no network address found: the twin is served on this computer only (127.0.0.1)');
   if (!lanIp) return;
   const network = createServer();
+  network.on('clientError', dropBadClient);
   network.on('request', (...handed) => server.emit('request', ...handed));
   network.on('upgrade', (...handed) => server.emit('upgrade', ...handed));
   network.listen(port, lanIp, () => {
