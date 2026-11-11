@@ -117,6 +117,7 @@ async function release() {
 const refuse = (why) => new LampError(why, { code: 'bad_request' });
 const said = (id, call, ok, answer) => tell({ type: 'result', id, call, ok, answer });
 let stimulating = Promise.resolve();
+const lastStimulus = new Map();
 async function press(message) {
   const { id, name, args = {} } = message;
   try {
@@ -130,6 +131,13 @@ async function press(message) {
       if (!stimulus) throw refuse(`no stimulus ${name}`);
       const values = checked(stimulus.fields, args);
       const argv = [...stimulus.argv(values), stimDir];
+      // The same stroke (a held hand, a repeated press) is one touch: nothing is forked for the repeats.
+      const now = Date.now();
+      if (stimulus.gapMs && now - (lastStimulus.get(stimulus.id) ?? 0) < stimulus.gapMs) {
+        said(id, `lamp-sim ${argv.slice(0, -1).join(' ')}`, true, `ignored: the same stroke (one ${stimulus.id} per ${stimulus.gapMs / 1000} s)`);
+        return;
+      }
+      lastStimulus.set(stimulus.id, now);
       if (stimulus.listensFor) await listenFor(stimulus.listensFor(values));
       const [verb, ...rest] = argv;
       // One stimulus at a time: a button pressed often cannot fork lamp-sim without end.

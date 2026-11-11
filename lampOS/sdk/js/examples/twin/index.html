@@ -259,21 +259,36 @@ document.getElementById('copy').addEventListener('click', async () => {
     for (let node = hit; node; node = node.parent) if (names.some((bone) => node.name === bone || node.name.endsWith(`_${bone}`))) return true;
     return false;
   };
+  // One touch per press: `latched` from the press on the head until the pointer is up or cancelled (a browser that
+  // repeats a press, or a long-press menu, adds no second touch), and never two touches within 0.8 s.
   let down = null;
   let pet = null;
+  let latched = false;
+  let lastSent = 0;
+  const touch = (kind) => {
+    const now = Date.now();
+    if (now - lastSent < 800) return;
+    lastSent = now;
+    window.twinSend?.({ type: 'stim', id: now, name: 'touch', args: { kind } });
+  };
+  const finish = () => {
+    clearTimeout(pet);
+    if (down && Date.now() - down.at < 600) touch('tap');
+    down = null;
+    latched = false;
+  };
   renderer.domElement.addEventListener('pointerdown', (event) => {
-    if (!onHead(event)) return;
+    if (latched || !onHead(event)) return;
+    latched = true;
     down = { x: event.clientX, y: event.clientY, at: Date.now() };
-    pet = setTimeout(() => { if (down) { down = null; window.twinSend?.({ type: 'stim', id: Date.now(), name: 'touch', args: { kind: 'pet' } }); } }, 600);
+    pet = setTimeout(() => { if (down) { down = null; touch('pet'); } }, 600);
   });
   renderer.domElement.addEventListener('pointermove', (event) => {
     if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6) { down = null; clearTimeout(pet); }
   });
-  renderer.domElement.addEventListener('pointerup', () => {
-    clearTimeout(pet);
-    if (down && Date.now() - down.at < 600) window.twinSend?.({ type: 'stim', id: Date.now(), name: 'touch', args: { kind: 'tap' } });
-    down = null;
-  });
+  renderer.domElement.addEventListener('pointerup', finish);
+  renderer.domElement.addEventListener('pointercancel', () => { down = null; finish(); });
+  renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
 }
 
 // The live link.
