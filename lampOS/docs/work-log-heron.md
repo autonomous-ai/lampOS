@@ -681,3 +681,12 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
   - Held is judged only in `finish`.
   - #5777's body says `STATUS=held, nothing moves:` again at every start, which matches `judge::HELD`.
   - Gates and a mutation pass. P3s: a self-switch loses the "held" kind, and the cloud alert says only `done`.
+- **16:3x #6309 READ-OK** `d9d6645ffb` (6792073093). Its holds tests pass (5 lib, 27 it, 3 install). P3: the title says "written at start"; in fact the list is let go at start and the first load writes it again.
+- **16:3x #6323 HOLD** `8ff8b25242` (6792073776). P2: each wait's `last` changed at every message, so `holds.json` was rewritten at every loop turn while a member waited out the group gap. My probe counted 1,301 writes in 1,301 one-second turns, where #6309 made 1 and the cadence predicts about 43. **Fixed at `05337a081b`, READ-OK.** The fix compares the limits without `last` and restores `last = now`; my probe now counts 44 writes, and Fourteen added a test for the same bound.
+- **16:28–16:44 the five Store skills on lamp-fc4b (stable 11879): all five PASS** (6792521880). Each package was checked against its sha256 and installed by hand. Clips: a recorded "Lamp," plus Mac `say`, level-matched.
+  - The 25-minute ask set a real timer.
+  - Sleep Routine 1.0.1 never put the lamp to rest.
+  - P3s: a second mode within a run's 10 minutes is "left as it is", so no new light; "stop" cancels the timer but not the skill's light.
+  - Backend3 keeps all five listed. The test installs are removed.
+- **16:39–16:42 #6295's row on fc4b: PASS.** A face was seen from 16:39:31. After `systemctl restart lamp-skills` at 16:40:59, the journal said "hold-test: its hold taken back … held 88 s". One green glow came at 16:41:31, 120 s into the sitting. hold-test is removed, and QUIET is posted on #3336.
+  - Lesson: the head was still tilted down from Study Buddy's reading pose, so the camera saw no face until my person leaned into the frame.
