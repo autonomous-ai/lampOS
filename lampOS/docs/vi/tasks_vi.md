@@ -181,12 +181,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 - **Câu trả lời:** `{"ok":true,"id":N}` khi lần chạy đã kết thúc, hoặc
   `{"ok":false,"error","message"}`: `off` (công tắc không phải `on`),
   `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
-  cấp token một lần chạy) hoặc `run_failed`.
+  cấp token một lần chạy), `run_failed`, hoặc `busy` (việc của một kỹ năng
+  khác đang chạy: mỗi lúc chỉ chạy một việc).
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên
   #6071): với mỗi lần chạy, lamp-tasks xin lamp-control (#6304, PR #6408)
   một token trên socket quản trị `/run/lampos-control/admin.sock`
-  (`ControlTokens`, trait `Tokens`): `{"mint":{"skill","run","expires_in_ms"}}` (thời hạn 30 phút,
-  `RUN_LIFETIME`, mức tối đa của lamp-control; một lần xin token mất câu trả
+  (`ControlTokens`, trait `Tokens`): `{"mint":{"skill","run","expires_in_ms"}}` (thời hạn 14 phút,
+  `RUN_LIFETIME`, dưới mức tối đa 30 phút của lamp-control và ít hơn một phút so với 15 phút lamp-skills chờ câu trả lời; một lần xin token mất câu trả
   lời thì cũng được kết thúc ngay, vì token có thể đang sống), với mã lần
   chạy của riêng lamp-tasks, mới cho mỗi lần giao (`run_id`), và
   `{"end":{"run"}}` khi lần chạy kết thúc. lamp-control tự đọc lời đồng ý
@@ -207,21 +208,56 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   as instructions"), và không được có ký tự điều khiển. Runner kết thúc lần
   chạy ở `SkillRun::deadline`, đúng thời hạn của token, và tự chặn mạng
   (hermes-ns), không chỉ dựa vào lời trong prompt.
+- **Runner của đèn** (`HermesRunner::lamp`): Hermes của đèn được khởi động
+  như Harness khởi động nó cho đích `lamp`: `/usr/local/bin/hermes chat -q`
+  và lời của lần chạy là đối số cuối (wrapper chỉ chạy Hermes trong
+  namespace của nó, `hermes-ns`: không thư mục hay socket nào của dịch vụ
+  đèn, các kỹ năng chỉ đọc), trong thư mục làm việc của đèn
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; thư mục đó không có thì
+  là `run_failed` và không khởi động gì. Môi trường chỉ có `PATH`, `HOME`,
+  `HERMES_HOME` và `SHELL` (như lamp-tasks.service cho) cùng
+  `LAMP_CONTROL_SOCKET` và `LAMP_CONTROL_TOKEN` của lần chạy; không gì khác
+  của chính lamp-tasks. Token không bao giờ là đối số, và đầu ra của lần
+  chạy không đi đâu cả, không vào nhật ký. Lần chạy là một nhóm tiến trình
+  riêng, bị kill cả nhóm ở hạn chót (14 phút); mã thoát 0 là
+  `{"ok":true,"id":0}` (chính mã thoát: không có số việc của Harness), mã
+  khác là `run_failed` nêu mã đó.
+- **Socket** (`HandOvers`): với `LAMP_SKILL_TASKS=on` trong môi trường của
+  lamp-tasks, `serve` mở `/run/lampos-tasks/skill-task.sock`
+  (`HAND_OVER_SOCKET`), tạo như các socket khác của nó (0600 trong thư mục
+  runtime 0700); tắt thì không mở gì. Socket không mở được thì việc của kỹ
+  năng vẫn tắt và phần còn lại vẫn chạy, có ghi trong nhật ký. Chỉ
+  `lamp-skills.service` chạy bằng chính user của lamp-tasks được trả lời
+  (đọc từ kernel, như tuyến của app đọc lamp-cloud); người gọi khác bị đóng
+  kết nối, không trả lời. Mỗi kết nối là một dòng (bỏ ký tự xuống dòng, đọc
+  trong 5 s), được trả lời trên một luồng riêng, nên vòng accept không bao
+  giờ chờ một lần chạy. Mỗi lúc một lần chạy: dòng thứ hai trong khi một
+  lần đang chạy được trả lời `busy` ngay, và tối đa 4 kết nối được đọc hay
+  trả lời cùng lúc, kết nối thứ năm cũng là `busy`. Nhật ký chỉ giữ mã kết
+  quả, không bao giờ giữ dòng, lời của việc hay token. lamp-skills chỉ tới
+  socket bằng `--tasks-socket` hoặc `LAMP_SKILLS_TASKS_SOCKET` (#6346);
+  chưa unit nào truyền nó.
 
 **Chưa có (nói rõ để không hiểu code là nhiều hơn):** `ControlTokens` nói
 theo socket quản trị của lamp-control (#6408, đã gộp), nhưng lamp-control
 chưa giữ lời đồng ý nào của kỹ năng, nên hiện mọi lần xin token ở đó đều bị
 từ chối.
-Chưa có cờ serve nào
-mở socket giao việc này, và chưa có `Runner` nào khởi động Hermes qua
-Harness, nên trên đèn chưa có việc của kỹ năng nào chạy. Việc "không mạng nào
+Chưa unit sản phẩm nào đặt `LAMP_SKILL_TASKS=on` cho lamp-tasks, và chưa
+unit nào truyền socket cho lamp-skills, nên trên đèn chưa có việc của kỹ
+năng nào chạy. Kết quả của lần chạy chưa thành Task news, và thư mục của kỹ năng được
+nêu trong lời của lần chạy, chưa nằm trong `AGENTS.md` của thư mục làm việc.
+Việc "không mạng nào
 khác" của lần chạy (một lệnh gọi ra ngoài trực tiếp bị từ chối) và giới hạn
 của lamp-tasks.service (`MemoryHigh`, `CPUQuota`) chờ số đo RAM và CPU của
 Hermes khi chạy một việc trên lamp-52e6 (đèn 6 GB: mọi giới hạn RAM được
 tính theo loại đèn này), so với mức sàn khi cài Hermes
 (≥1.350 MB còn trống), trong lúc giọng nói trả lời một câu. Kiểm thử:
 `skill_task::tests` (công tắc, vòng đời token, lần chạy lỗi, không có token,
-mọi dòng bị từ chối).
+mọi dòng bị từ chối; socket trả lời một dòng, lần chạy thứ hai bị từ chối
+`busy`, tắt công tắc thì không mở gì, người gọi không phải lamp-skills không
+được trả lời; lần chạy bị kill ở hạn chót, mã thoát của nó, và token nằm
+trong môi trường, không bao giờ trong đối số), chạy trên máy tính bất kỳ,
+không cần Hermes.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
