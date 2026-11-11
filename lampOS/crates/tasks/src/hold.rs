@@ -65,6 +65,10 @@ pub const TEXT: &str = "ADAPTER_UPDATE_DISABLE=true\n";
 /// With the switch it is in the file too, and given to every Harness
 /// command ([`env_file`]), whether or not updates are held.
 pub const HERMES_HOME: &str = "HERMES_HOME";
+/// `LAMP_OPENCLAW_ON_LAMP` (#6226): the variable Harness finds OpenClaw's
+/// state, and its sessions under it, by. In the file with the switch, as
+/// [`HERMES_HOME`] is.
+pub const OPENCLAW_STATE_DIR: &str = "OPENCLAW_STATE_DIR";
 /// With the lamp's own Hermes (#5978): the shell Harness reads an engine's
 /// launch environment through (`process.env.SHELL` first). `lampos`'s own
 /// is `/usr/sbin/nologin`, with which `harness new` waits on that read
@@ -97,12 +101,14 @@ pub fn on(value: Option<&str>) -> bool {
 /// written is returned; an error when there is no absolute `HOME` or the
 /// file cannot be written, with `environment` unchanged.
 pub fn hold(environment: &mut BTreeMap<String, OsString>) -> Result<PathBuf, String> {
-    env_file(environment, true, None)
+    env_file(environment, true, None, None)
 }
 
 /// [`FILE`] written in `environment`'s `HOME` (0600, whole) with what is
-/// asked: [`TEXT`] with `hold`, and `HERMES_HOME=<hermes_home>` and
-/// `SHELL=/bin/sh` ([`LAUNCH_SHELL`]) with the lamp's own Hermes (#5978); [`ENV_FILE`] and each variable the file
+/// asked: [`TEXT`] with `hold`, `HERMES_HOME=<hermes_home>` with the
+/// lamp's own Hermes (#5978), `OPENCLAW_STATE_DIR=<openclaw_state>` with
+/// its own OpenClaw (#6226), and `SHELL=/bin/sh` ([`LAUNCH_SHELL`]) with
+/// either; [`ENV_FILE`] and each variable the file
 /// names added to `environment`. With the hold off, Harness's launcher is
 /// not pinned ([`pin_at_start`]), so only Harness commands lamp-tasks
 /// runs, and the daemon they start, have them. An error, with
@@ -111,22 +117,30 @@ pub fn env_file(
     environment: &mut BTreeMap<String, OsString>,
     hold: bool,
     hermes_home: Option<&Path>,
+    openclaw_state: Option<&Path>,
 ) -> Result<PathBuf, String> {
-    env_file_changed(environment, hold, hermes_home).map(|(path, _)| path)
+    env_file_changed(environment, hold, hermes_home, openclaw_state).map(|(path, _)| path)
 }
 
 /// The env file as `hold` asks (#6300), with what lamp-tasks' Hermes asks:
 /// held, with [`TEXT`] and [`DISABLE`] given, as before; lifted (the
 /// canary), written without them, so it is said changed on a lamp that held
 /// before and a daemon running with the hold is started again without it.
-/// `None`, nothing written, with the switch off and no Hermes.
+/// `None`, nothing written, with the switch off and neither lamp engine.
 pub fn env_file_for(
     hold: HarnessHold,
     environment: &mut BTreeMap<String, OsString>,
     hermes_home: Option<&Path>,
+    openclaw_state: Option<&Path>,
 ) -> Option<Result<(PathBuf, bool), String>> {
-    (hold != HarnessHold::Off || hermes_home.is_some())
-        .then(|| env_file_changed(environment, hold == HarnessHold::Held, hermes_home))
+    (hold != HarnessHold::Off || hermes_home.is_some() || openclaw_state.is_some()).then(|| {
+        env_file_changed(
+            environment,
+            hold == HarnessHold::Held,
+            hermes_home,
+            openclaw_state,
+        )
+    })
 }
 
 /// As [`env_file`], and whether the file now says something else than it
@@ -139,26 +153,31 @@ pub fn env_file_changed(
     environment: &mut BTreeMap<String, OsString>,
     hold: bool,
     hermes_home: Option<&Path>,
+    openclaw_state: Option<&Path>,
 ) -> Result<(PathBuf, bool), String> {
     let home = environment
         .get("HOME")
         .map(PathBuf::from)
         .filter(|home| home.is_absolute())
         .ok_or("no absolute HOME")?;
-    let hermes = hermes_home
-        .map(|hermes| {
-            hermes
-                .to_str()
-                .filter(|text| hermes.is_absolute() && !text.contains(['\n', '\0', '"']))
-                .ok_or("HERMES_HOME is not a plain absolute path")
-        })
-        .transpose()?;
+    let hermes = plain(hermes_home, "HERMES_HOME is not a plain absolute path")?;
+    let openclaw = plain(
+        openclaw_state,
+        "OPENCLAW_STATE_DIR is not a plain absolute path",
+    )?;
     let mut text = String::new();
     if hold {
         text.push_str(TEXT);
     }
     if let Some(hermes) = hermes {
-        text.push_str(&format!("{HERMES_HOME}={hermes}\n{SHELL}={LAUNCH_SHELL}\n"));
+        text.push_str(&format!("{HERMES_HOME}={hermes}\n"));
+    }
+    if let Some(openclaw) = openclaw {
+        text.push_str(&format!("{OPENCLAW_STATE_DIR}={openclaw}\n"));
+    }
+    let lamp_engine = hermes.is_some() || openclaw.is_some();
+    if lamp_engine {
+        text.push_str(&format!("{SHELL}={LAUNCH_SHELL}\n"));
     }
     let path = home.join(FILE);
     let changed = !matches!(fs::read(&path), Ok(was) if was == text.as_bytes());
@@ -169,9 +188,25 @@ pub fn env_file_changed(
     }
     if let Some(hermes) = hermes {
         environment.insert(HERMES_HOME.into(), hermes.into());
+    }
+    if let Some(openclaw) = openclaw {
+        environment.insert(OPENCLAW_STATE_DIR.into(), openclaw.into());
+    }
+    if lamp_engine {
         environment.insert(SHELL.into(), LAUNCH_SHELL.into());
     }
     Ok((path, changed))
+}
+
+/// `path` as text when it is a plain absolute path, one an env file line
+/// can carry; `why` otherwise.
+fn plain<'a>(path: Option<&'a Path>, why: &'static str) -> Result<Option<&'a str>, &'static str> {
+    path.map(|path| {
+        path.to_str()
+            .filter(|text| path.is_absolute() && !text.contains(['\n', '\0', '"']))
+            .ok_or(why)
+    })
+    .transpose()
 }
 
 fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -796,6 +831,7 @@ mod tests {
                 &mut environment,
                 hold,
                 Some(Path::new("/var/lib/lampos-hermes/.hermes")),
+                None,
             )
             .unwrap();
             let text = fs::read_to_string(&path).unwrap();
@@ -815,7 +851,43 @@ mod tests {
         assert_eq!(fs::read_to_string(home.path().join(FILE)).unwrap(), TEXT);
         assert!(!environment.contains_key(HERMES_HOME));
         assert!(!environment.contains_key(SHELL));
-        assert!(env_file(&mut environment, false, Some(Path::new("relative"))).is_err());
+        assert!(env_file(&mut environment, false, Some(Path::new("relative")), None).is_err());
+    }
+
+    /// #6226: with the lamp's own OpenClaw, the file names
+    /// `OPENCLAW_STATE_DIR` and the shell, beside `HERMES_HOME` when both
+    /// are on, and Harness is given them.
+    #[test]
+    fn the_env_file_names_openclaw_state_dir_beside_hermes_home() {
+        let state = Path::new("/var/lib/lampos-openclaw/state");
+        let hermes = Path::new("/var/lib/lampos-hermes/.hermes");
+        for (hermes_home, want) in [
+            (
+                None,
+                "OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state\nSHELL=/bin/sh\n",
+            ),
+            (
+                Some(hermes),
+                "HERMES_HOME=/var/lib/lampos-hermes/.hermes\n\
+                 OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state\nSHELL=/bin/sh\n",
+            ),
+        ] {
+            let home = tempfile::tempdir().unwrap();
+            let mut environment =
+                BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
+            let path = env_file(&mut environment, false, hermes_home, Some(state)).unwrap();
+            assert_eq!(fs::read_to_string(&path).unwrap(), want);
+            assert_eq!(
+                environment[OPENCLAW_STATE_DIR],
+                "/var/lib/lampos-openclaw/state"
+            );
+            assert_eq!(environment[SHELL], "/bin/sh");
+            assert_eq!(environment.contains_key(HERMES_HOME), hermes_home.is_some());
+        }
+        let home = tempfile::tempdir().unwrap();
+        let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
+        assert!(env_file(&mut environment, false, None, Some(Path::new("relative"))).is_err());
+        assert!(!environment.contains_key(OPENCLAW_STATE_DIR));
     }
 
     /// #5978, lamp-c0a4 on 10 Nov: the file is said changed when it was not
@@ -826,13 +898,29 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
         let hermes = Some(Path::new("/var/lib/lampos-hermes/.hermes"));
-        let (path, changed) = env_file_changed(&mut environment, true, None).unwrap();
+        let (path, changed) = env_file_changed(&mut environment, true, None, None).unwrap();
         assert!(changed, "not there before");
-        assert!(!env_file_changed(&mut environment, true, None).unwrap().1);
-        assert!(env_file_changed(&mut environment, true, hermes).unwrap().1);
-        assert!(!env_file_changed(&mut environment, true, hermes).unwrap().1);
+        assert!(
+            !env_file_changed(&mut environment, true, None, None)
+                .unwrap()
+                .1
+        );
+        assert!(
+            env_file_changed(&mut environment, true, hermes, None)
+                .unwrap()
+                .1
+        );
+        assert!(
+            !env_file_changed(&mut environment, true, hermes, None)
+                .unwrap()
+                .1
+        );
         fs::write(&path, "SHELL=/usr/sbin/nologin\n").unwrap();
-        assert!(env_file_changed(&mut environment, true, hermes).unwrap().1);
+        assert!(
+            env_file_changed(&mut environment, true, hermes, None)
+                .unwrap()
+                .1
+        );
     }
 
     /// #6300: lamp-tasks' three writers of the hold (the file, the
@@ -841,7 +929,9 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let at = launcher_in(home.path(), launcher, 0o755);
         let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
-        env_file_for(hold, &mut environment, None).unwrap().unwrap();
+        env_file_for(hold, &mut environment, None, None)
+            .unwrap()
+            .unwrap();
         pin_at_start(hold, Some(home.path())).unwrap();
         environment.remove("HOME");
         let env_at = home.path().join(FILE).to_string_lossy().into_owned();
@@ -889,7 +979,9 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
         hold_file_then(&mut environment, home.path());
-        let (_, changed) = env_file_for(hold, &mut environment, None).unwrap().unwrap();
+        let (_, changed) = env_file_for(hold, &mut environment, None, None)
+            .unwrap()
+            .unwrap();
         assert!(changed);
         assert!(!environment.contains_key(DISABLE));
         // An updated exec line is kept as Harness wrote it.
@@ -913,7 +1005,7 @@ mod tests {
         for exec in [Some(STABLE_LINE), Some(CANARY_LINE), None] {
             let hold = harness_hold(None, exec);
             let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from("/nowhere"))]);
-            assert!(env_file_for(hold, &mut environment, None).is_none());
+            assert!(env_file_for(hold, &mut environment, None, None).is_none());
             assert_eq!(pin_at_start(hold, Some(Path::new("/nowhere"))), None);
         }
     }

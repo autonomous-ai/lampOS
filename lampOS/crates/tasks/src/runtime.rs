@@ -216,10 +216,11 @@ pub struct SetUpLater {
     /// computer is known offline, or its engine not found there or known not
     /// signed in ([`crate::readiness`]). Off unless set.
     pub engines: bool,
-    /// `LAMP_HERMES_ON_LAMP=on` (#5978), only with `engines`: the lamp's
-    /// own machine is looked at too, and kept as the target
-    /// [`LAMP_TARGET`], engine Hermes, while its look says Hermes is
-    /// installed ([`LampSide`]). `None`: off, as before.
+    /// `LAMP_OPENCLAW_ON_LAMP=on` or `LAMP_HERMES_ON_LAMP=on` (#5978,
+    /// #6226), only with `engines`: the lamp's own machine is looked at
+    /// too, and kept as the target [`LAMP_TARGET`], with the lamp's engine
+    /// ([`LampSide::order`]) its look says is installed. `None`: off, as
+    /// before.
     pub lamp: Option<LampSide>,
 }
 
@@ -229,19 +230,46 @@ pub struct SetUpLater {
 /// the machines a named hand-over to the lamp looks among for its session,
 /// kept from the targets as they are read and given to Harness's adapter
 /// ([`crate::harness::SessionMachines`]).
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct LampSide {
     pub home: PathBuf,
     pub machines: Arc<Mutex<SessionMachines>>,
+    /// The lamp's engines switched on, the one [`LAMP_ENGINE`] chooses
+    /// first (#6226): the lamp's target has the first its look says is
+    /// installed ([`lamp_order`]).
+    pub order: Vec<EngineKind>,
+    /// What the Harness lane tells the targets (#6226): a Harness too old
+    /// for OpenClaw.
+    pub gateway: Arc<crate::gateway::Shared>,
 }
 
 impl LampSide {
+    /// Both engines on, OpenClaw first ([`LAMP_ENGINE`] unset).
     pub fn new(home: PathBuf) -> Self {
+        Self::with_order(home, vec![EngineKind::Openclaw, EngineKind::Hermes])
+    }
+
+    pub fn with_order(home: PathBuf, order: Vec<EngineKind>) -> Self {
         Self {
             home,
             machines: Default::default(),
+            order,
+            gateway: Default::default(),
         }
     }
+}
+
+/// The lamp's engines in the order its target is chosen from now (#6226):
+/// [`LampSide::order`], without OpenClaw while the Harness on the lamp is
+/// too old for it (before 0.6.11). No memory floor (the owner, #6226:
+/// every lamp has 6 GB).
+pub fn lamp_order(side: &LampSide) -> Vec<EngineKind> {
+    let refused = side.gateway.refused.load(Ordering::Acquire);
+    side.order
+        .iter()
+        .copied()
+        .filter(|engine| !(refused && *engine == EngineKind::Openclaw))
+        .collect()
 }
 
 /// The switch for the lamp's own Hermes (#5978), in lamp-tasks' unit.
@@ -254,14 +282,60 @@ pub fn hermes_on_lamp(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
-/// [`SetUpLater::lamp`] from [`HERMES_ON_LAMP`]'s `value` and `lampos`'s
-/// (Harness's) `home`: `None`, the lamp no target, unless the switch is on
-/// and there is a home.
-pub fn lamp_side(value: Option<&str>, home: Option<PathBuf>) -> Option<LampSide> {
-    hermes_on_lamp(value)
+/// The switch for the lamp's own OpenClaw (#6226), in lamp-tasks' unit,
+/// read as [`HERMES_ON_LAMP`] is: `on` exactly.
+pub const OPENCLAW_ON_LAMP: &str = "LAMP_OPENCLAW_ON_LAMP";
+
+/// Whether [`OPENCLAW_ON_LAMP`] is on: `on` exactly.
+pub fn openclaw_on_lamp(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// Which engine the lamp's own target runs (#6226): `openclaw` or
+/// `hermes`; unset, or any other value, puts `openclaw` first. The other is
+/// used when the chosen one is switched off or not installed.
+///
+/// OpenClaw first by default is the owner's decision (#6226): every lamp
+/// has 6 GB, so no memory floor is checked; OpenClaw is the lamp's target
+/// while it is installed and the Harness there runs it ([`lamp_order`]),
+/// else Hermes. `hermes` always puts Hermes first.
+pub const LAMP_ENGINE: &str = "LAMP_LAMP_ENGINE";
+
+/// The lamp's engines in the order [`LAMP_ENGINE`]'s `chosen` gives, each
+/// only with its switch on (`hermes`, `openclaw`: the switches' values).
+pub fn lamp_engines(
+    hermes: Option<&str>,
+    openclaw: Option<&str>,
+    chosen: Option<&str>,
+) -> Vec<EngineKind> {
+    let order = if chosen == Some("hermes") {
+        [EngineKind::Hermes, EngineKind::Openclaw]
+    } else {
+        [EngineKind::Openclaw, EngineKind::Hermes]
+    };
+    order
+        .into_iter()
+        .filter(|engine| match engine {
+            EngineKind::Hermes => hermes_on_lamp(hermes),
+            _ => openclaw_on_lamp(openclaw),
+        })
+        .collect()
+}
+
+/// [`SetUpLater::lamp`] from [`HERMES_ON_LAMP`]'s and [`OPENCLAW_ON_LAMP`]'s
+/// values, [`LAMP_ENGINE`]'s `chosen`, and `lampos`'s (Harness's) `home`:
+/// `None`, the lamp no target, unless a switch is on and there is a home.
+pub fn lamp_side(
+    hermes: Option<&str>,
+    openclaw: Option<&str>,
+    chosen: Option<&str>,
+    home: Option<PathBuf>,
+) -> Option<LampSide> {
+    let order = lamp_engines(hermes, openclaw, chosen);
+    (!order.is_empty())
         .then_some(home)
         .flatten()
-        .map(LampSide::new)
+        .map(|home| LampSide::with_order(home, order))
 }
 
 /// `serve --targets-from-machines` asks Harness for the machines once in
@@ -286,8 +360,11 @@ pub const HERMES_HOME: &str = "/var/lib/lampos-hermes/.hermes";
 /// the computers' [`MACHINES_PROJECT`].
 pub const LAMP_PROJECT: &str = "~/harnesses/lamp-tasks/lamp";
 /// lamp-cloud's loopback forwarder for Hermes' DeepSeek
-/// (`lamp_cloud::hermes_llm::PORT`).
+/// (`lamp_cloud::hermes_llm::PORT`), OpenClaw's too (#6226).
 pub const HERMES_FORWARDER_PORT: u16 = 7741;
+/// OpenClaw's own state, `OPENCLAW_STATE_DIR` (#6226), as Harness finds its
+/// sessions by it too: lamp-update's install, outside `lampos`'s home.
+pub const OPENCLAW_STATE_DIR: &str = "/var/lib/lampos-openclaw/state";
 
 /// How often `serve --set-up-later` looks at the targets and the sign-in.
 pub const SET_UP_LOOK_EVERY: Duration = Duration::from_secs(60);
@@ -455,6 +532,11 @@ impl WaitLane for Cli {
 
 pub trait Adapter: Send + 'static {
     fn launch(&self, launch: &Launch) -> LaunchOutcome;
+    /// The lamp's OpenClaw Gateway (#6226), started before an OpenClaw
+    /// launch and stopped once idle; none when the adapter has none.
+    fn openclaw_gateway(&self) -> Option<crate::gateway::Gateway> {
+        None
+    }
     fn observe(&self, machine_id: &str, agent_id: &str) -> Result<Observation, String>;
     /// Every harness on one machine (`harness ps`), for progress. Asked only
     /// with `serve --progress`; an adapter without it says so.
@@ -571,6 +653,9 @@ impl Adapter for Cli {
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
         Cli::launch(self, launch)
     }
+    fn openclaw_gateway(&self) -> Option<crate::gateway::Gateway> {
+        Cli::openclaw_gateway(self)
+    }
     fn observe(&self, machine_id: &str, agent_id: &str) -> Result<Observation, String> {
         Cli::observe(self, machine_id, agent_id)
     }
@@ -640,6 +725,12 @@ impl Adapter for Production {
     fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
         match self {
             Self::Cli(cli) => Adapter::engines_lane(&**cli),
+            Self::Absent => None,
+        }
+    }
+    fn openclaw_gateway(&self) -> Option<crate::gateway::Gateway> {
+        match self {
+            Self::Cli(cli) => Adapter::openclaw_gateway(&**cli),
             Self::Absent => None,
         }
     }
@@ -1183,16 +1274,17 @@ fn owner<C: Clock>(
             }
             if let (Some(wanted), Some(listed)) = (later.from_machines, last_listed.as_ref()) {
                 let mut chosen = known.choices(listed, wanted, unix_ms());
-                // The lamp itself, with Hermes (#5978), as at the machines'
-                // look: without it, each look that comes back wrote the
-                // targets again without the lamp.
+                // The lamp itself, with its engine (#5978, #6226), as at the
+                // machines' look: without it, each look that comes back
+                // wrote the targets again without the lamp.
                 if let Some(side) = later.lamp.as_ref()
-                    && let Some(lamp) = known.lamp_with_hermes(listed, unix_ms())
+                    && let Some((lamp, engine)) =
+                        known.lamp_engine(listed, &lamp_order(side), unix_ms())
                 {
                     // Its work folder too, as at the machines' look: the
                     // lamp may first be found here (a fresh lamp, #5978).
-                    make_lamp_folder(&side.home);
-                    chosen.insert(lamp, EngineKind::Hermes);
+                    make_lamp_folder(&side.home, engine);
+                    chosen.insert(lamp, engine);
                 }
                 let said =
                     machines_written(&later.targets, listed, wanted, &chosen, &mut targets_due);
@@ -1240,13 +1332,17 @@ fn owner<C: Clock>(
                                 let chosen = if engines_on {
                                     known.listed(&listed, unix_ms());
                                     let mut chosen = known.choices(&listed, wanted, unix_ms());
-                                    // The lamp itself, with Hermes (#5978).
+                                    // The lamp itself, with its engine
+                                    // (#5978, #6226).
                                     if let Some(side) = later.lamp.as_ref()
-                                        && let Some(lamp) =
-                                            known.lamp_with_hermes(&listed, unix_ms())
+                                        && let Some((lamp, engine)) = known.lamp_engine(
+                                            &listed,
+                                            &lamp_order(side),
+                                            unix_ms(),
+                                        )
                                     {
-                                        make_lamp_folder(&side.home);
-                                        chosen.insert(lamp, EngineKind::Hermes);
+                                        make_lamp_folder(&side.home, engine);
+                                        chosen.insert(lamp, engine);
                                     }
                                     chosen
                                 } else {
@@ -2047,8 +2143,9 @@ fn label_of(label: &str) -> Option<String> {
 /// `chosen` gives a machine, by id, another engine than `engine`: the one
 /// that computer is known to have (`serve --engines-from-machines`, #5199,
 /// [`crate::readiness::Known::chosen`]). Empty without it. The lamp's own
-/// machine (`current`) is a target only where `chosen` gives it Hermes
-/// (`LAMP_HERMES_ON_LAMP`, #5978): [`LAMP_TARGET`] in [`LAMP_PROJECT`],
+/// machine (`current`) is a target only where `chosen` gives it a lamp
+/// engine, Hermes or OpenClaw (`LAMP_HERMES_ON_LAMP`, #5978;
+/// `LAMP_OPENCLAW_ON_LAMP`, #6226): [`LAMP_TARGET`] in [`LAMP_PROJECT`],
 /// with no name, and then at most 7 computers, so the file keeps its 8.
 fn from_machines(
     machines: &[AccountMachine],
@@ -2057,10 +2154,12 @@ fn from_machines(
 ) -> (BTreeMap<String, Target>, BTreeMap<String, String>) {
     let mut targets = BTreeMap::new();
     let mut names = BTreeMap::new();
-    let lamp = machines
-        .iter()
-        .find(|m| m.current)
-        .filter(|m| chosen.get(&m.machine_id) == Some(&EngineKind::Hermes));
+    let lamp = machines.iter().find(|m| m.current).and_then(|m| {
+        chosen
+            .get(&m.machine_id)
+            .filter(|engine| engine.on_lamp())
+            .map(|engine| (m, *engine))
+    });
     let most = if lamp.is_some() { 7 } else { 8 };
     for (index, machine) in machines
         .iter()
@@ -2091,13 +2190,13 @@ fn from_machines(
             },
         );
     }
-    if let Some(lamp) = lamp {
+    if let Some((lamp, engine)) = lamp {
         targets.insert(
             LAMP_TARGET.to_owned(),
             Target {
                 machine_id: lamp.machine_id.clone(),
                 project: LAMP_PROJECT.into(),
-                engine: EngineKind::Hermes,
+                engine,
             },
         );
     }
@@ -2107,11 +2206,13 @@ fn from_machines(
 /// The lamp's own work folder, [`LAMP_PROJECT`] under `home`, `lampos`'s
 /// (#5978): made here when it is not there, 0700, since Harness makes
 /// only a `~/harnesses/<name>` folder. A failure is said; the hand-over
-/// then says the folder is missing. The lamp's guidance for Hermes, its
-/// `AGENTS.md` ([`crate::hermes_config::write_guidance`]), is written in
-/// it when what is there differs, with one journal line.
-fn make_lamp_folder(home: &Path) {
-    let folder = home.join(LAMP_PROJECT.trim_start_matches("~/"));
+/// then says the folder is missing. The lamp's guidance for its `engine`,
+/// Hermes or OpenClaw, its `AGENTS.md`
+/// ([`crate::hermes_config::write_guidance`],
+/// [`crate::openclaw_config::write_guidance`]), is written in it when what
+/// is there differs, with one journal line.
+fn make_lamp_folder(home: &Path, engine: EngineKind) {
+    let folder = lamp_folder(home);
     if !folder.is_dir() {
         let made = fs::DirBuilder::new()
             .recursive(true)
@@ -2122,10 +2223,40 @@ fn make_lamp_folder(home: &Path) {
             return;
         }
     }
-    match crate::hermes_config::write_guidance(&folder) {
-        Ok(true) => eprintln!("tasks: the lamp's guidance for Hermes written"),
+    let (name, written) = match engine {
+        EngineKind::Openclaw => ("OpenClaw", crate::openclaw_config::write_guidance(&folder)),
+        _ => ("Hermes", crate::hermes_config::write_guidance(&folder)),
+    };
+    match written {
+        Ok(true) => eprintln!("tasks: the lamp's guidance for {name} written"),
         Ok(false) => {}
-        Err(error) => eprintln!("tasks: the lamp's guidance for Hermes not written: {error}"),
+        Err(error) => eprintln!("tasks: the lamp's guidance for {name} not written: {error}"),
+    }
+}
+
+/// The lamp's own work folder, [`LAMP_PROJECT`] under `home`.
+fn lamp_folder(home: &Path) -> PathBuf {
+    home.join(LAMP_PROJECT.trim_start_matches("~/"))
+}
+
+/// `LAMP_OPENCLAW_ON_LAMP` (#6226): OpenClaw's settings written at the
+/// part's start ([`crate::openclaw_config::write`]) under `state_dir`, for
+/// lamp-cloud's forwarder, with the lamp's work folder under `home` its
+/// workspace and the lamp's skills when `skills`. Run as `lampos`,
+/// OpenClaw's own user. One journal line; no token is in the file.
+pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
+    let workspace = lamp_folder(home);
+    match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills) {
+        Ok(changed) => format!(
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config {}{}",
+            if changed { "written" } else { "unchanged" },
+            if skills {
+                ""
+            } else {
+                ", the lamp's skills off"
+            }
+        ),
+        Err(error) => format!("tasks: OpenClaw's settings not written: {error}"),
     }
 }
 
@@ -3149,20 +3280,38 @@ pub fn serve<C: Clock>(
             executable.display()
         );
     }
-    // The lamp's own Hermes (#5978), only with the machines' engines looked
-    // at: its settings written now, and Harness told where its sessions are.
+    // The lamp's own Hermes and OpenClaw (#5978, #6226), each switched on,
+    // only with the machines' engines looked at: their settings written
+    // now, and Harness told where their sessions are.
     let lamp_side = config
         .set_up_later
         .as_ref()
         .filter(|later| later.engines && later.from_machines.is_some())
         .and_then(|later| later.lamp.clone());
-    if lamp_side.is_some() {
+    let lamp_has = |engine: EngineKind| {
+        lamp_side
+            .as_ref()
+            .is_some_and(|side| side.order.contains(&engine))
+    };
+    let (hermes_on, openclaw_on) = (lamp_has(EngineKind::Hermes), lamp_has(EngineKind::Openclaw));
+    if hermes_on {
         eprintln!(
             "{}",
             set_up_hermes(
                 Path::new(HERMES_HOME),
                 Path::new(crate::hermes_config::TOKEN_PATH)
             )
+        );
+    }
+    if let Some(side) = lamp_side.as_ref().filter(|_| openclaw_on) {
+        let skills = crate::openclaw_config::skills_on(
+            std::env::var(crate::openclaw_config::SKILLS_SWITCH)
+                .ok()
+                .as_deref(),
+        );
+        eprintln!(
+            "{}",
+            set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
         );
     }
     serve_with_adapter(config, clock, stop, move |session| {
@@ -3195,10 +3344,14 @@ pub fn serve<C: Clock>(
                 .as_deref(),
         );
         // Harness held at the version installed (#5229), off unless set;
-        // and where the lamp's own Hermes keeps its sessions (#5978).
+        // and where the lamp's own Hermes and OpenClaw keep their sessions
+        // (#5978, #6226).
         let held = hold == lamp_msgs::harness_hold::HarnessHold::Held;
-        let hermes = lamp_side.as_ref().map(|_| Path::new(HERMES_HOME));
-        if let Some(written) = crate::hold::env_file_for(hold, &mut cli.environment, hermes) {
+        let hermes = hermes_on.then(|| Path::new(HERMES_HOME));
+        let openclaw = openclaw_on.then(|| Path::new(OPENCLAW_STATE_DIR));
+        if let Some(written) =
+            crate::hold::env_file_for(hold, &mut cli.environment, hermes, openclaw)
+        {
             match written {
                 Ok((path, changed)) => {
                     // Read by the daemon only at its start: one already
@@ -3232,16 +3385,36 @@ pub fn serve<C: Clock>(
                             crate::hold::HERMES_HOME
                         );
                     }
+                    if openclaw.is_some() {
+                        eprintln!(
+                            "tasks: Harness finds the lamp's own OpenClaw by {}={OPENCLAW_STATE_DIR}",
+                            crate::hold::OPENCLAW_STATE_DIR
+                        );
+                    }
                 }
                 Err(why) if held => eprintln!("tasks: Harness's own updates not held: {why}"),
                 Err(why) if hold == lamp_msgs::harness_hold::HarnessHold::Lifted => eprintln!(
                     "tasks: Harness's hold not taken off on the canary (its env file as it was): {why}"
                 ),
-                Err(why) => eprintln!("tasks: Harness not told of the lamp's own Hermes: {why}"),
+                Err(why) => eprintln!("tasks: Harness not told of the lamp's own engines: {why}"),
             }
         }
         cli.session_machines = lamp_side.as_ref().map(|side| side.machines.clone());
-        Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
+        // An OpenClaw launch waits for the Gateway lamp-update keeps
+        // running (#6226); lamp-tasks never starts or stops it.
+        cli.openclaw_gateway = openclaw_on;
+        let cli = Cli::new(cli, session.into())?;
+        // A Harness before 0.6.11 has no OpenClaw (#6226): the lamp's
+        // target is never OpenClaw with it.
+        if let Some(side) = lamp_side.as_ref().filter(|_| openclaw_on)
+            && !cli.runs_openclaw()
+        {
+            side.gateway.refused.store(true, Ordering::Release);
+            eprintln!(
+                "tasks: the Harness here is older than 0.6.11 or its version not read; OpenClaw is not the lamp's engine"
+            );
+        }
+        Ok(Production::Cli(Box::new(cli)))
     })
 }
 
@@ -3391,13 +3564,17 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     let cli = thread::Builder::new()
         .name("tasks-harness".into())
         .spawn(move || {
+            let mut gateway = adapter.openclaw_gateway();
             while !cli_stop.load(Ordering::Acquire) {
                 match jobs_rx.recv_timeout(TICK) {
                     Ok(job) => {
                         let result = match job {
-                            Job::Launch(job) => {
-                                Outcome::Launch(job.task_id, adapter.launch(&job.launch))
-                            }
+                            Job::Launch(job) => Outcome::Launch(
+                                job.task_id,
+                                crate::gateway::launch_with(gateway.as_mut(), &job.launch, || {
+                                    adapter.launch(&job.launch)
+                                }),
+                            ),
                             Job::Observe(job) => {
                                 let result = adapter.observe(&job.machine_id, &job.agent_id);
                                 Outcome::Observe(job, result)
@@ -4635,7 +4812,7 @@ mod tests {
     #[test]
     fn the_lamp_folder_gets_the_guidance_once_and_again_when_changed() {
         let home = tempfile::tempdir().unwrap();
-        make_lamp_folder(home.path());
+        make_lamp_folder(home.path(), EngineKind::Hermes);
         let folder = home.path().join("harnesses/lamp-tasks/lamp");
         let guidance = folder.join(crate::hermes_config::GUIDANCE_FILE);
         let written = fs::read_to_string(&guidance).unwrap();
@@ -4645,9 +4822,125 @@ mod tests {
             0o700
         );
         fs::write(&guidance, "changed by hand\n").unwrap();
-        make_lamp_folder(home.path());
+        make_lamp_folder(home.path(), EngineKind::Hermes);
         assert_eq!(fs::read_to_string(&guidance).unwrap(), written);
         assert!(!crate::hermes_config::write_guidance(&folder).unwrap());
+        // #6226: the lamp's engine OpenClaw, its own guidance in its place.
+        make_lamp_folder(home.path(), EngineKind::Openclaw);
+        assert_eq!(
+            fs::read_to_string(&guidance).unwrap(),
+            crate::openclaw_config::guidance()
+        );
+    }
+
+    /// #6226: the lamp's engines in order: OpenClaw first unless
+    /// `LAMP_LAMP_ENGINE=hermes`, each only with its switch on.
+    #[test]
+    fn the_lamps_engines_are_openclaw_first_unless_hermes_is_chosen() {
+        use EngineKind::{Hermes, Openclaw};
+        let on = Some("on");
+        for (hermes, openclaw, chosen, want) in [
+            (on, on, None, vec![Openclaw, Hermes]),
+            (on, on, Some("openclaw"), vec![Openclaw, Hermes]),
+            (on, on, Some("other"), vec![Openclaw, Hermes]),
+            (on, on, Some("hermes"), vec![Hermes, Openclaw]),
+            (on, None, None, vec![Hermes]),
+            (None, on, Some("hermes"), vec![Openclaw]),
+            (Some("off"), Some("ON"), None, vec![]),
+        ] {
+            assert_eq!(
+                lamp_engines(hermes, openclaw, chosen),
+                want,
+                "{hermes:?} {openclaw:?} {chosen:?}"
+            );
+        }
+        let home = || Some(PathBuf::from("/var/lib/lampos-tasks"));
+        assert!(lamp_side(None, None, None, home()).is_none());
+        assert!(lamp_side(None, on, None, None).is_none());
+        assert_eq!(lamp_side(None, on, None, home()).unwrap().order, [Openclaw]);
+        assert_eq!(LampSide::new(PathBuf::new()).order, [Openclaw, Hermes]);
+    }
+
+    /// #6226: a Harness too old for OpenClaw (before 0.6.11) leaves it
+    /// out of the lamp's engines; otherwise the order is as chosen.
+    #[test]
+    fn an_old_harness_leaves_openclaw_out() {
+        use EngineKind::{Hermes, Openclaw};
+        let side = LampSide::new(PathBuf::new());
+        assert_eq!(lamp_order(&side), [Openclaw, Hermes]);
+        side.gateway.refused.store(true, Ordering::Release);
+        assert_eq!(lamp_order(&side), [Hermes]);
+        let only = LampSide::with_order(PathBuf::new(), vec![Openclaw]);
+        only.gateway.refused.store(true, Ordering::Release);
+        assert!(lamp_order(&only).is_empty());
+    }
+
+    /// #6226: the lamp's own machine is the target `lamp` with OpenClaw
+    /// when `chosen` gives it OpenClaw, as with Hermes.
+    #[test]
+    fn the_lamp_is_kept_with_openclaw_chosen_for_it() {
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+        ];
+        let lamp = "a".repeat(32);
+        let chosen = BTreeMap::from([(lamp.clone(), EngineKind::Openclaw)]);
+        let (targets, _) = from_machines(&listed, EngineKind::Claude, &chosen);
+        assert_eq!(
+            targets["lamp"],
+            Target {
+                machine_id: lamp,
+                project: LAMP_PROJECT.into(),
+                engine: EngineKind::Openclaw,
+            }
+        );
+        assert!(targets["lamp"].validate().is_ok());
+        assert_eq!(targets["office"].engine, EngineKind::Claude);
+    }
+
+    /// #6226: OpenClaw's settings at the part's start: merged into
+    /// `openclaw.json` beside lamp-update's Gateway block, its workspace
+    /// the lamp's work folder, and a second start idle.
+    #[test]
+    fn openclaw_settings_are_written_at_start_beside_the_gateway() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        fs::write(
+            state.join("openclaw.json"),
+            "{\"gateway\":{\"auth\":{\"mode\":\"token\",\"token\":\"kept\"}}}\n",
+        )
+        .unwrap();
+        let home = dir.path().join("home");
+        assert_eq!(
+            set_up_openclaw(&state, &home, true),
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config written"
+        );
+        let config: Value =
+            serde_json::from_str(&fs::read_to_string(state.join("openclaw.json")).unwrap())
+                .unwrap();
+        assert_eq!(config["gateway"]["auth"]["token"], "kept");
+        assert_eq!(
+            config["models"]["providers"]["lampos"]["baseUrl"],
+            "http://127.0.0.1:7741/v1/deepseek"
+        );
+        assert_eq!(
+            config["agents"]["defaults"]["workspace"],
+            home.join("harnesses/lamp-tasks/lamp").to_str().unwrap()
+        );
+        assert_eq!(
+            config["skills"]["load"]["extraDirs"],
+            json!(["/var/lib/lampOS/skills"])
+        );
+        assert_eq!(
+            set_up_openclaw(&state, &home, true),
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"
+        );
+        fs::write(state.join("openclaw.json"), "{\"models\": []}").unwrap();
+        assert!(
+            set_up_openclaw(&state, &home, true)
+                .starts_with("tasks: OpenClaw's settings not written:")
+        );
     }
 
     /// #1676: the part writes the targets file only where it is its own: none

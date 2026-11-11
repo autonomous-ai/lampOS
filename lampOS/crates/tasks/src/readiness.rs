@@ -273,7 +273,7 @@ impl Known {
 
     /// The engine [`Known::chosen`] gives each machine, by machine id: the
     /// lamp's own (`current`) never, as it is no computer of the person's;
-    /// it is a target only with [`Known::lamp_with_hermes`].
+    /// it is a target only with [`Known::lamp_engine`].
     pub fn choices(
         &self,
         machines: &[AccountMachine],
@@ -294,14 +294,24 @@ impl Known {
 }
 
 impl Known {
-    /// `LAMP_HERMES_ON_LAMP` (#5978): the lamp's own machine, the one
-    /// Harness marks `current`, where Hermes is known installed now (its
-    /// engines' look said `installed: true`); its id. None otherwise: not
-    /// looked at yet, Hermes not there, or the reading stale.
-    pub fn lamp_with_hermes(&self, machines: &[AccountMachine], now_ms: u64) -> Option<String> {
+    /// `LAMP_OPENCLAW_ON_LAMP` and `LAMP_HERMES_ON_LAMP` (#5978, #6226):
+    /// the lamp's own machine, the one Harness marks `current`, with the
+    /// first engine of `order` (the lamp's engines switched on, the chosen
+    /// one first) known installed there now (its engines' look said
+    /// `installed: true`): its id and that engine. None otherwise: not
+    /// looked at yet, none of them there, or the reading stale.
+    pub fn lamp_engine(
+        &self,
+        machines: &[AccountMachine],
+        order: &[EngineKind],
+        now_ms: u64,
+    ) -> Option<(String, EngineKind)> {
         let lamp = machines.iter().find(|m| m.current)?;
         let computer = self.computer(&lamp.machine_id, now_ms)?;
-        (computer.installed(EngineKind::Hermes) == Some(true)).then(|| lamp.machine_id.clone())
+        order
+            .iter()
+            .find(|engine| computer.installed(**engine) == Some(true))
+            .map(|engine| (lamp.machine_id.clone(), *engine))
     }
 }
 
@@ -857,21 +867,79 @@ mod tests {
         let listed = [lamp.clone(), machine('b', Some("running"))];
         let mut known = Known::default();
         known.listed(&listed, NOW);
-        assert_eq!(known.lamp_with_hermes(&listed, NOW), None, "not looked at");
+        let hermes = [EngineKind::Hermes];
+        assert_eq!(
+            known.lamp_engine(&listed, &hermes, NOW),
+            None,
+            "not looked at"
+        );
         known.probed(&lamp.machine_id, &[not_found("hermes")], NOW);
-        assert_eq!(known.lamp_with_hermes(&listed, NOW), None, "not there");
+        assert_eq!(known.lamp_engine(&listed, &hermes, NOW), None, "not there");
         known.probed(&lamp.machine_id, &[row("hermes", Some(true), None)], NOW);
         assert_eq!(
-            known.lamp_with_hermes(&listed, NOW),
-            Some(lamp.machine_id.clone())
+            known.lamp_engine(&listed, &hermes, NOW),
+            Some((lamp.machine_id.clone(), EngineKind::Hermes))
         );
         assert_eq!(
-            known.lamp_with_hermes(&listed, NOW + STALE_AFTER_MS + 1),
+            known.lamp_engine(&listed, &hermes, NOW + STALE_AFTER_MS + 1),
             None,
             "stale"
         );
         // Only a computer's: the lamp's own machine gets no engine choice.
         let chosen = known.choices(&listed, EngineKind::Claude, NOW);
         assert_eq!(chosen.keys().collect::<Vec<_>>(), [&"b".repeat(32)]);
+    }
+
+    /// #6226: the lamp's engine is the first of the order installed there:
+    /// OpenClaw by default with both, Hermes when it is chosen first, and
+    /// the one installed when only one is; none when neither is switched on.
+    #[test]
+    fn the_lamps_engine_is_the_first_of_the_order_installed_there() {
+        let lamp = AccountMachine {
+            current: true,
+            ..machine('a', Some("running"))
+        };
+        let listed = [lamp.clone(), machine('b', Some("running"))];
+        let id = lamp.machine_id.clone();
+        let default = [EngineKind::Openclaw, EngineKind::Hermes];
+        let hermes_first = [EngineKind::Hermes, EngineKind::Openclaw];
+        let mut known = Known::default();
+        known.listed(&listed, NOW);
+        let both = [
+            row("hermes", Some(true), None),
+            row("openclaw", Some(true), None),
+        ];
+        known.probed(&id, &both, NOW);
+        assert_eq!(
+            known.lamp_engine(&listed, &default, NOW),
+            Some((id.clone(), EngineKind::Openclaw))
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &hermes_first, NOW),
+            Some((id.clone(), EngineKind::Hermes))
+        );
+        assert_eq!(known.lamp_engine(&listed, &[], NOW), None);
+        known.probed(
+            &id,
+            &[row("hermes", Some(true), None), not_found("openclaw")],
+            NOW,
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &default, NOW),
+            Some((id.clone(), EngineKind::Hermes))
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &[EngineKind::Openclaw], NOW),
+            None
+        );
+        known.probed(
+            &id,
+            &[not_found("hermes"), row("openclaw", Some(true), None)],
+            NOW,
+        );
+        assert_eq!(
+            known.lamp_engine(&listed, &hermes_first, NOW),
+            Some((id, EngineKind::Openclaw))
+        );
     }
 }
