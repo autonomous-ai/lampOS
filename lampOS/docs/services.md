@@ -20,9 +20,9 @@ at 14:11 on 3 Nov 2026):
   opened read-only.
 - **Writes only live**, behind their own switch: asked by the owner at the
   lamp, read back in full (where it lands, every recipient, who can see it,
-  the whole text), then the lamp says "Say 'yes, send it' to send it."; the
-  model decides whether the answer confirms or cancels, in any words (the
-  owner, 10 Nov), and sends with the write's `send_id` within two minutes,
+  the whole text), then the lamp asks "Shall I send it?" (a draft: "Shall I
+  save it?"; an event or a file: "Shall I go ahead?"); the model decides
+  whether the answer confirms or cancels, in any words (the owner, 10 Nov), and sends with the write's `send_id` within two minutes,
   whoever says it; no word list in the lamp decides it. Only an answer begun
   within the lamp's words' 1.5 s echo tail, sharing any of them, must be in
   the asker's voice, so the lamp's own words heard back never send.
@@ -1149,9 +1149,9 @@ The model is told of `service_write`, first in its description
 draft, write or reply to a mail or message is one, never a remember. A mail
 draft: gmail's action save_draft; if refused, say what the call said. Call it
 first without send_id: it sends nothing and gives a read_back. Say it in full,
-word for word, then "Say 'yes, send it' to send it." (Vietnamese "Nói 'gửi đi'
-để gửi nhé."; a draft: "save it"). If they agree, in any words, call it again
-with its send_id; if they cancel or wait, don't send and say it's cancelled.
+word for word, then ask "Shall I send it?" (Vietnamese "Gửi nhé?"; a draft:
+"Shall I save it?"). If they agree, in any words, call it again with its
+send_id; if they cancel or wait, don't send and say it's cancelled.
 Never say a read-back no call gave in this turn. Never say you can't use their
 services: refuse only for a reason a call gave."
 
@@ -1163,14 +1163,19 @@ words (above, "Drafts"), never sent. A Google sign-in's Gmail link
 none: its `save_draft` is refused with the call's own reason, which carries
 the line to say, "I can't save a draft yet. I can read it back and send it
 when you say 'send it'." After any read-back the lamp asks short (the owner,
-10 Nov), "Say 'yes, send it' to send it." (a draft: "save it"), and the model
-judges any answer. It is never a `remember`: on lamp-3e83 on 10 Nov the
+10 Nov), and the model judges any answer. Since any yes sends it (#6009),
+the lamp asks rather than names words to say: "Shall I send it?" ("Gửi
+nhé?"), a draft "Shall I save it?" ("Lưu nhé?"), an event or a file "Shall I
+go ahead?" ("Làm nhé?"), the last two told with the prepared write
+(`SAVE_READ_BACK_NEXT`, `READ_BACK_NEXT`). On lamp-9adf on 11 Nov (build
+11710) it still said "Say 'yes, send it' to send it." after a calendar
+event's read-back, and "Sure. Do it." sent it. It is never a `remember`: on lamp-3e83 on 10 Nov the
 model called `remember` three times for a draft before it wrote, and the
 draft ended in "shall I send it?". On lamp-29e7 on 9 Nov "Draft a new email
 for me" was refused with no call ("I cannot touch your mail") and, asked why,
 "Because I'm a lamp."; the rule said nothing of drafts, nor where a refusal's
-reason comes from. The whole rule with the shared one is 997 of the
-description's 1,024 bytes, which leaves 26 for `lamp-services`' own words
+reason comes from. The whole rule with the shared one is 973 of the
+description's 1,024 bytes, which leaves 50 for `lamp-services`' own words
 for the write: whole sentences only, so its "action, by service: …" list is
 told on the `action` parameter.
 
@@ -1215,17 +1220,17 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   write forgotten first. When the answer has a `read_back` and a `send_id`,
   that id is kept with the request it came in, the service, the read-back,
   and the owner who asked, and the model is told "Nothing is sent yet. Say
-  read_back in full, word for word, leaving nothing out, then say "Say 'yes,
-  send it' to send it." (in Vietnamese "Nói 'gửi đi' để gửi nhé."). If they
-  agree, in any words, call service_write again with its send_id. If they
+  read_back in full, word for word, leaving nothing out, then ask, short,
+  "Shall I send it?" (in Vietnamese "Gửi nhé?"); for an event or a file,
+  "Shall I go ahead?" (in Vietnamese "Làm nhé?"). If they agree, in any words, call service_write again with its send_id. If they
   cancel, decline, wait or change it, don't send: say it's cancelled, or
   prepare the changed one anew.";
   an id with no read-back is dropped and never sent. A write prepared with
   `action` `save_draft` is kept as a draft (`Pending::draft`), and the model
   is told instead `SAVE_READ_BACK_NEXT`, "Nothing is saved yet, and nothing
   is ever sent. Say read_back in full, word for word, leaving nothing out,
-  then say "Say 'yes, save it' to save it as a draft." (in Vietnamese "Nói
-  'lưu đi' để lưu nháp nhé."). If they agree, in any words, call
+  then ask, short, "Shall I save it?" (in Vietnamese "Lưu nhé?"). If they
+  agree, in any words, call
   service_write again with its send_id. If they cancel, decline, wait or
   change it, don't save: say it's cancelled, or prepare the changed one
   anew."
@@ -1273,8 +1278,9 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   line's words come, whether or not `LAMP_SECOND_OWN_ECHO` is on, and kept
   with the waiting write: `services::line_in_echo_tail`,
   `Pending.echo_tail`, `Turn.in_echo_tail`), may be the lamp's own words
-  heard back, however short: "Yes." or "Send it." is too short for
-  `own_echo` to hold (`HELD_LEAST`, 3). Such a send goes only when the
+  heard back, however short: "Send it." (the read-back's "Shall I send it?"
+  shares it with a person's "Yes, send it.") is too short for `own_echo` to
+  hold (`HELD_LEAST`, 3). Such a send goes only when the
   line's voice is the asker's: `Turn.alike`, against the asker's enrolled
   print (`VoiceAsk::Owner`) or else the line that prepared the write
   (`VoiceAsk::Alike`), at `same_voice::SERVICES_SAME_FROM` (0.55) or over,
@@ -1376,20 +1382,22 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   counted as the first line, and the owner said "send" five times.
 - **The read-back's own words heard back never agree for the person**
   (App Only's and Thirteen's P1s on #6009). A waiting write's read-back is
-  judged by `own_echo` as any line of the lamp's: within its 1.5 s tail the
-  room returning "Yes, send it." is held, and "Um, yes, send it." (an ASR
-  filler) has its own run taken out, so the model gets "Um," and never the
-  lamp's agreement. A shorter echo, "Yes." or "Send it.", is not held
-  (`own_echo` holds a line of 3 of its words or more, `HELD_LEAST`, and takes
-  out runs of 2 or more, `STRIP_RUN`) and reaches the model whole; what
-  keeps the lamp from sending on it is the send's voice check in the tail
-  ("In the lamp's echo tail, the asker's voice", above): the lamp's own
-  voice is not the asker's, and no print twice cancels. A person who says
-  the phrase word for word right on the lamp's last word is held once and
-  says it again (lamp-3e83, 10 Nov); one who adds a word ("Okay, yes, send
-  it.") reaches the model as "Okay,", and the send then goes in the asker's
-  voice; one who begins after the tail reaches it as said, and the send goes
-  whoever says it.
+  judged by `own_echo` as any line of the lamp's. It ends on a question,
+  "Shall I send it?", so its own question returned by the room over its
+  voice is held, and a line begun after its words is an answer to the
+  lamp's question and reaches the model whole: a person's "Yes, send it."
+  or "Um, yes, send it." within the 1.5 s tail, and also the lamp's own
+  "Shall I send it?" or "Send it." returned by the room then. What keeps the
+  lamp from sending on its own words is the send's voice check in the tail
+  ("In the lamp's echo tail, the asker's voice", above): such a line shares
+  "send it" with the read-back, so it is marked, the lamp's own voice is not
+  the asker's, and no print twice cancels; a person's "Yes, send it." there
+  goes in the asker's voice. A lone "Yes." the lamp did not say is not
+  marked, and goes whoever says it, as does any line begun after the tail.
+  Until 11 Nov the read-back ended "Say 'yes, send it' to send it.": a
+  person who said that phrase right on the lamp's last word was held once
+  and said it again (lamp-3e83, 10 Nov), and "Okay, yes, send it." reached
+  the model as "Okay,".
 - **After a send** the model is told one fixed line: "Say only that it was
   sent, in the conversation's language." when the service answered
   `sent: true`; "Say only that the file was made in their Google Drive,
@@ -2225,8 +2233,8 @@ declared and routed only with the switch and the folder, the rule first, only th
 whatever the words (the model decides, the owner, 10 Nov), a made-up id
 cancelling and a call with none preparing anew, any line right after a
 read-back awaited as its answer, a known other's or a different speaker's
-send sending the waiting write, the lamp saying "Say 'yes, send it' to send
-it." and the waiting note giving the send_id, a "Yes, send it." after that
+send sending the waiting write, the lamp asking "Shall I send it?" and the
+waiting note giving the send_id, a "Yes, send it." after that
 read-back never held as the lamp's echo (lamp-3e83), a send after another line the lamp never answered or after a read-back not
 said whole still sending, the read-back's answer with no send ("Okay,
 cancelled.", "It's three.") ending the write so a later send finds

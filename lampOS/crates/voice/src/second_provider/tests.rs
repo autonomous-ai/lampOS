@@ -18290,32 +18290,33 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
     }
 }
 
-/// A waiting read-back's own "yes, send it" returned by the room never
-/// sends it (App Only's and Thirteen's P1s on #6009): alone within the tail
-/// it is held; after an ASR filler ("Um, yes, send it.") or a person's own
-/// word ("Okay, yes, send it.") its run is taken out, so the model gets only
-/// "Um," or "Okay,". A line too short to hold ("Yes.", "Send it.") reaches
-/// the model whole, but begun in the tail with the lamp's words it is marked
-/// (Thirteen's option 1), and the model's send on it goes only in the
-/// asker's voice: the lamp's own, or no print twice, never sends. A line past
-/// the tail is anyone's agreement, as the owner settled.
+/// A waiting read-back's own words returned by the room never send it (App
+/// Only's and Thirteen's P1s on #6009). The read-back ends by asking, "Shall
+/// I send it?", so a line begun after it is an answer to the lamp's question
+/// and reaches the model whole: the person's "Yes, send it.", or the lamp's
+/// own "Shall I send it?" or "Send it." heard back. Begun in the tail with
+/// the lamp's words ("send it" is in both), it is marked (Thirteen's option
+/// 1), and the model's send on it goes only in the asker's voice: the
+/// lamp's own, or no print twice, never sends. A "Yes." or a line past the
+/// tail, with none of the lamp's words, is anyone's agreement, as the owner
+/// settled.
 #[tokio::test(start_paused = true)]
 async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
-    const READ_BACK: &str = "Send an email to Bob saying hi. Say 'yes, send it' to send it.";
+    const READ_BACK: &str = "Send an email to Bob saying hi. Shall I send it?";
     // The line's first sound read at 100 s on the monotonic clock.
     const BEGAN_US: u64 = 100_000_000;
-    for (heard, waits, after_tail, model_gets) in [
-        ("Okay, yes, send it.", true, false, Some("Okay,")),
-        ("Um, yes, send it.", true, false, Some("Um,")),
-        ("Yes, send it.", true, false, None),
-        ("Yes, send it.", false, false, None),
-        ("Send it.", true, false, Some("Send it.")),
-        ("Yes.", true, false, Some("Yes.")),
-        ("Yes, send it.", true, true, Some("Yes, send it.")),
-        ("Send it.", true, true, Some("Send it.")),
-        ("Yes.", true, true, Some("Yes.")),
+    for (heard, after_tail, marked) in [
+        ("Okay, yes, send it.", false, true),
+        ("Um, yes, send it.", false, true),
+        ("Yes, send it.", false, true),
+        ("Shall I send it?", false, true),
+        ("Send it.", false, true),
+        ("Yes.", false, false),
+        ("Yes, send it.", true, false),
+        ("Send it.", true, false),
+        ("Yes.", true, false),
     ] {
-        let why = format!("{heard} waits {waits} after the tail {after_tail}");
+        let why = format!("{heard} after the tail {after_tail}");
         let script = Arc::new(Script {
             heard: Mutex::new([Ok("Email Bob hi.".to_owned()), Ok(heard.to_owned())].into()),
             chats: Mutex::new(
@@ -18340,7 +18341,7 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
         );
         kept.service = "gmail".to_owned();
         kept.spoken_from = Some(std::time::Instant::now() - Duration::from_secs(60));
-        crate::services::pending_for_test(waits.then_some(kept));
+        crate::services::pending_for_test(Some(kept));
         // The read-back played to its end 0.3 s before the line began, or
         // 3 s before it: past the 1.5 s tail.
         let ended_ago_us = if after_tail { 3_000_000 } else { 300_000 };
@@ -18359,20 +18360,9 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
         engine.submit(end(2));
         let labels = turn(&mut engine).await;
         let asked = script.asked.lock().unwrap().len();
-        assert_eq!(
-            asked,
-            if model_gets.is_some() { 2 } else { 1 },
-            "{why}: {labels:?}"
-        );
-        let Some(model_gets) = model_gets else {
-            crate::services::pending_for_test(None);
-            continue;
-        };
+        assert_eq!(asked, 2, "{why}: {labels:?}");
         let last = format!("{:?}", script.asked.lock().unwrap()[1].last());
-        assert!(last.contains(model_gets), "{why}: {last}");
-        if model_gets != heard {
-            assert!(!last.to_lowercase().contains("send it"), "{why}: {last}");
-        }
+        assert!(last.contains(heard), "{why}: {last}");
         assert!(
             labels.contains(&"said:Sent.".to_owned()),
             "{why}: {labels:?}"
@@ -18382,7 +18372,7 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
         // to the asker's (the lamp's own sounds unlike it, or gives no print).
         let pending = crate::services::pending_for_test_take();
         let in_echo_tail = pending.as_ref().is_some_and(|kept| kept.in_echo_tail(2));
-        assert_eq!(in_echo_tail, !after_tail, "{why}");
+        assert_eq!(in_echo_tail, marked, "{why}");
         let send_on = |mut pending: Option<crate::services::Pending>, alike, request| {
             let send = lamp_gemini::ToolCall {
                 id: "c".to_owned(),
@@ -18407,7 +18397,7 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
             );
             (told, pending)
         };
-        if after_tail {
+        if !marked {
             // Any voice, or none known.
             for alike in [None, Some(0.1), Some(0.9)] {
                 let (told, _) = send_on(pending.clone(), alike, 2);

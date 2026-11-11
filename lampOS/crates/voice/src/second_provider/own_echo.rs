@@ -833,26 +833,42 @@ mod tests {
     }
 
     /// A read-back waiting for its answer is judged as any line of the
-    /// lamp's (App Only's and Thirteen's P1s on #6009): within the tail, its
-    /// own "Yes, send it." returned by the room is held, and with a word
-    /// before it ("Um, yes, send it.", an ASR filler) its own run is taken
-    /// out, so the model gets "Um" and never the lamp's agreement. After the
-    /// tail it is the person's, as any line is.
+    /// lamp's (App Only's and Thirteen's P1s on #6009). Since any yes sends
+    /// it, the read-back ends by asking, "Shall I send it?", which a
+    /// person's "Yes, send it." shares "send it" with. Its own question
+    /// returned by the room over its voice is held; begun after it, a line
+    /// is the person's answer to the lamp's question and reaches the model
+    /// whole (its send then needs the asker's voice, as the line is marked:
+    /// [`in_tail_with_its_words`]). After the tail it is the person's, as
+    /// any line is.
     #[test]
-    fn the_lamps_own_send_phrase_from_the_room_never_reaches_the_model() {
+    fn a_read_back_asking_holds_its_own_question_and_hears_the_answer() {
         let read_back = Said {
-            words: "Send an email to Bob saying hi. Say 'yes, send it' to send it.",
+            words: "Send an email to Bob saying hi. Shall I send it?",
             ..said()
         };
         let at = |heard, began_us| line(heard, began_us, false);
         assert!(matches!(
-            judge(&at("Yes, send it.", UNTIL_US + 300_000), Some(&read_back)),
+            judge(&line("Shall I send it?", 9_000_000, true), Some(&read_back)),
             Echo::Held(_)
         ));
         assert!(matches!(
-            judge(&at("Um, yes, send it.", UNTIL_US + 300_000), Some(&read_back)),
-            Echo::Stripped(kept, _) if kept == "Um,"
+            judge(
+                &line("saying hi shall I send it", 9_000_000, true),
+                Some(&read_back)
+            ),
+            Echo::Held(_)
         ));
+        for heard in ["Yes, send it.", "Um, yes, send it.", "Shall I send it?"] {
+            assert!(
+                matches!(
+                    judge(&at(heard, UNTIL_US + 300_000), Some(&read_back)),
+                    Echo::Answered(Some(journal)) if journal.contains("of its own")
+                        || journal.contains("after the lamp's question")
+                ),
+                "{heard}"
+            );
+        }
         assert!(matches!(
             judge(
                 &at("Yes, send it.", UNTIL_US + TAIL_US + 100_000),
@@ -865,21 +881,26 @@ mod tests {
     /// Thirteen's option 1 on #6009: a line begun within the tail or over
     /// the lamp's voice with any of its words, however short, is marked so
     /// a send on it needs the asker's voice; one past the tail, with no
-    /// word of when it began, or with none of the lamp's words, is not.
+    /// word of when it began, or with none of the lamp's words, is not. The
+    /// read-back's "Shall I send it?" shares "send it" with a person's
+    /// "Yes, send it.", so that line is marked as before; a lone "Yes." the
+    /// lamp did not say is not.
     #[test]
     fn a_line_in_the_tail_with_the_lamps_words_is_marked_however_short() {
         let read_back = Said {
-            words: "Send an email to Bob saying hi. Say 'yes, send it' to send it.",
+            words: "Send an email to Bob saying hi. Shall I send it?",
             ..said()
         };
         for (heard, began_us, over, marked) in [
-            ("Yes.", UNTIL_US + 300_000, false, true),
             ("Send it.", UNTIL_US + 300_000, false, true),
             ("Yes, send it.", UNTIL_US + 300_000, false, true),
-            ("Yes.", 0, true, true),
+            ("Shall I send it?", UNTIL_US + 300_000, false, true),
+            ("Send it.", 0, true, true),
+            ("Yes.", UNTIL_US + 300_000, false, false),
+            ("Sure.", UNTIL_US + 300_000, false, false),
             ("Okay.", UNTIL_US + 300_000, false, false),
-            ("Yes.", UNTIL_US + TAIL_US + 100_000, false, false),
-            ("Yes.", 0, false, false),
+            ("Send it.", UNTIL_US + TAIL_US + 100_000, false, false),
+            ("Send it.", 0, false, false),
         ] {
             assert_eq!(
                 in_tail_with_its_words(&line(heard, began_us, over), Some(&read_back)),
