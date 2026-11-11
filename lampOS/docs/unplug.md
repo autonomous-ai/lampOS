@@ -123,6 +123,10 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    up). Only on the yes, Ready read once more,
    Skills sends setup's change helper `{"shutdown":"lamp"}`, the app's Turn
    off (shutdown.md, "The ways a person asks"), and waits 2 s for its answer.
+   The helper takes this one request from `lamp-skills.service`, by its
+   cgroup, and refuses it any other (setup.md, "Changed after setup"; #5747:
+   before, it took only `lamp-cloud`, and lamp-52e6 on build 11913 answered
+   the yes with "only the app's link may change the lamp's settings").
    On `{"done":{"shutting_down":true}}` the runner says "Going to sleep now.
    Unplug me when my light turns green.", stops every part read back
    stopped, lets the arm go only while it is down, lights the ring green only

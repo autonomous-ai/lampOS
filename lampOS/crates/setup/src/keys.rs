@@ -62,11 +62,30 @@ pub const ASKER_CGROUP: &str = "/lampos.slice/lampos-parts.slice/lamp-cloud.serv
 /// The refusal to any other peer, before its line is read.
 pub const NOT_THE_ASKER: &str = "only the app's link may change the lamp's keys";
 
+/// The one other unit that may ask the change helper, and only for the
+/// turn-off (#5747): `lamp-skills`, whose unplug turns the lamp off after a
+/// confirmed fold and a spoken yes (unplug.md). Told apart from
+/// `lamp-cloud` by its cgroup, as [`ASKER_UNIT`] is.
+pub const TURN_OFF_UNIT: &str = "lamp-skills.service";
+
+/// Where the system's manager puts [`TURN_OFF_UNIT`]
+/// (`Slice=lampos-parts.slice` in its product unit), as [`ASKER_CGROUP`].
+pub const TURN_OFF_CGROUP: &str = "/lampos.slice/lampos-parts.slice/lamp-skills.service";
+
 /// Whether `/proc/<pid>/cgroup`'s text puts the process in [`ASKER_UNIT`]
 /// at the system's place for it, [`ASKER_CGROUP`] (or a cgroup under it):
 /// the unified hierarchy's line (`0::…`), or systemd's own on a hybrid one
 /// (`…:name=systemd:…`).
 pub fn from_asker(cgroup: &str) -> bool {
+    in_cgroup(cgroup, ASKER_CGROUP)
+}
+
+/// [`from_asker`] for [`TURN_OFF_UNIT`] at [`TURN_OFF_CGROUP`].
+pub fn from_turn_off_asker(cgroup: &str) -> bool {
+    in_cgroup(cgroup, TURN_OFF_CGROUP)
+}
+
+fn in_cgroup(cgroup: &str, place: &str) -> bool {
     cgroup.lines().any(|line| {
         let mut fields = line.splitn(3, ':');
         let (Some(_), Some(controllers), Some(path)) =
@@ -76,25 +95,35 @@ pub fn from_asker(cgroup: &str) -> bool {
         };
         (controllers.is_empty() || controllers == "name=systemd")
             && path
-                .strip_prefix(ASKER_CGROUP)
+                .strip_prefix(place)
                 .is_some_and(|below| below.is_empty() || below.starts_with('/'))
     })
 }
 
-/// Whether the peer on standard input (the socket systemd hands over) is
-/// in [`ASKER_UNIT`], by its credentials (`SO_PEERCRED`) and its cgroup.
-/// Peer credentials are read on Linux only; elsewhere no peer is.
-pub fn peer_is_asker() -> bool {
+/// The cgroup text of the peer on standard input (the socket systemd hands
+/// over), by its credentials (`SO_PEERCRED`). Peer credentials are read on
+/// Linux only; elsewhere there is no peer's cgroup.
+fn peer_cgroup() -> Option<String> {
     #[cfg(target_os = "linux")]
     {
         let stdin = std::io::stdin();
-        rustix::net::sockopt::socket_peercred(&stdin).is_ok_and(|peer| {
-            fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
-                .is_ok_and(|cgroup| from_asker(&cgroup))
-        })
+        let peer = rustix::net::sockopt::socket_peercred(&stdin).ok()?;
+        fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero())).ok()
     }
     #[cfg(not(target_os = "linux"))]
-    false
+    None
+}
+
+/// Whether the peer on standard input is in [`ASKER_UNIT`], by its
+/// credentials and its cgroup.
+pub fn peer_is_asker() -> bool {
+    peer_cgroup().is_some_and(|cgroup| from_asker(&cgroup))
+}
+
+/// Whether the peer on standard input is in [`TURN_OFF_UNIT`], by its
+/// credentials and its cgroup.
+pub fn peer_is_turn_off_asker() -> bool {
+    peer_cgroup().is_some_and(|cgroup| from_turn_off_asker(&cgroup))
 }
 
 /// Whether a helper on a socket systemd hands over (the change, Wi-Fi and

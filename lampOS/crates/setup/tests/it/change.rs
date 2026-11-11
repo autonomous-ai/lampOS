@@ -742,6 +742,33 @@ fn a_socket_peer_that_is_not_lamp_cloud_is_refused_and_nothing_changes() {
     );
 }
 
+/// lamp-skills may ask the turn-off its unplug sends (#5747), exactly the
+/// app's shutdown request, and no other change: no restart, no name, no
+/// shutdown with anything more in it.
+#[test]
+fn lamp_skills_may_ask_only_the_turn_off() {
+    // The line lamp-skills writes (its `TURN_OFF_REQUEST`).
+    let skills = include_str!("../../../skills/src/main.rs");
+    let sent = skills
+        .lines()
+        .find_map(|line| line.strip_prefix("const TURN_OFF_REQUEST: &str = r#\""))
+        .and_then(|rest| rest.strip_suffix("\"#;"))
+        .expect("lamp-skills' TURN_OFF_REQUEST");
+    assert!(change::turn_off_asker_may(sent), "{sent}");
+    assert!(change::turn_off_asker_may(" {\"shutdown\": \"lamp\"}\n"));
+    for line in [
+        r#"{"restart":"lamp"}"#,
+        r#"{"person_name": "Lan"}"#,
+        r#"{"time_zone": "Asia/Ho_Chi_Minh"}"#,
+        r#"{"shutdown":"lamp", "person_name": "Lan"}"#,
+        r#"{"shutdown":"other"}"#,
+        "",
+        "garbage",
+    ] {
+        assert!(!change::turn_off_asker_may(line), "{line}");
+    }
+}
+
 #[test]
 fn the_helper_answers_one_line_and_never_journals_a_name() {
     let root = Root::new();

@@ -365,6 +365,44 @@ fn only_lamp_clouds_processes_are_the_asker() {
     }
 }
 
+/// The unplug's turn-off (#5747): lamp-skills' processes are the change
+/// helper's one other peer, by their cgroup only, never lamp-cloud's as
+/// it nor it as lamp-cloud.
+#[test]
+fn only_lamp_skills_processes_are_the_turn_off_asker() {
+    for cgroup in [
+        "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n",
+        "1:name=systemd:/lampos.slice/lampos-parts.slice/lamp-skills.service\n0::/\n",
+    ] {
+        assert!(keys::from_turn_off_asker(cgroup), "{cgroup}");
+        assert!(!keys::from_asker(cgroup), "{cgroup}");
+    }
+    for cgroup in [
+        "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n",
+        "0::/system.slice/lamp-skills.service\n",
+        "0::/user.slice/user-1001.slice/user@1001.service/app.slice/lamp-skills.service\n",
+        "0::/lampos.slice/lampos-parts.slice/lamp-skills.service2\n",
+        "0::/lampos.slice/lampos-voice.slice/lamp-voice.service\n",
+        "",
+    ] {
+        assert!(!keys::from_turn_off_asker(cgroup), "{cgroup}");
+    }
+    // Where the product unit puts lamp-skills, as for lamp-cloud above.
+    const UNIT: &str = include_str!("../../../../deploy/product/lamp-skills.service");
+    assert!(UNIT.contains("\nSlice=lampos-parts.slice\n"));
+    assert_eq!(
+        keys::TURN_OFF_CGROUP,
+        format!("/lampos.slice/lampos-parts.slice/{}", keys::TURN_OFF_UNIT)
+    );
+    // It asks on the change helper's socket.
+    let socket = include_str!("../../../../deploy/product/lamp-setup-change.socket");
+    let path = socket
+        .lines()
+        .find_map(|line| line.strip_prefix("ListenStream="))
+        .unwrap();
+    assert!(UNIT.contains(&format!("\nEnvironment=LAMP_UNPLUG_OFF_SOCKET={path}\n")));
+}
+
 /// The helper's units: its socket, root with the network for the one
 /// check, writing only the keys' folder, which the reset plan wipes whole,
 /// and lamp-update's lock.
