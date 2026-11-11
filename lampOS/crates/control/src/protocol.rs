@@ -1935,6 +1935,31 @@ mod tests {
         }
     }
 
+    /// control.schema.json's `service_grant` pattern and `service_code`
+    /// list are `SERVICE_CODES` and its folded codes, so the SDKs' schema
+    /// can't drift from the door's grants.
+    #[test]
+    fn the_schemas_service_grants_are_service_codes() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
+        assert_eq!(
+            schema["$defs"]["service_grant"]["pattern"],
+            format!("^({})-(read|write)$", SERVICE_CODES.join("|"))
+        );
+        let codes: std::collections::BTreeSet<&str> = schema["$defs"]["service_code"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|code| code.as_str().unwrap())
+            .collect();
+        let ours: std::collections::BTreeSet<&str> = SERVICE_CODES
+            .iter()
+            .copied()
+            .chain(SERVICE_CODES_FOLDED.iter().map(|(other, _)| *other))
+            .collect();
+        assert_eq!(codes, ours);
+    }
+
     #[test]
     fn a_service_call_names_a_known_service_and_a_write_never_sends() {
         let checked = |frame: &str| parse(frame).map(|request| request.op);
