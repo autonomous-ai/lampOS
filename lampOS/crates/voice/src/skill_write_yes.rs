@@ -7,6 +7,12 @@
 //! in memory, one skill at a time, for [`YES_WITHIN`], with an id the
 //! voice's model is given (`approve_id`), never the writes themselves.
 //!
+//! A made skill with code of its own (#6307, `LAMP_MADE_SCRIPTS`) waits
+//! here the same way, with every guard below, but is not on until then:
+//! its say-back ends on [`crate::made_skill::RUNS_AFTER_YES`], and the yes
+//! puts on the very package said back, by its SHA-256
+//! ([`crate::made_skill::put_on_agreed`]), so a changed script asks again.
+//!
 //! - **The yes** is the model's to judge, in any words, as #6009 has a
 //!   waiting mail's send judged: on an agreement it calls `make_skill` again
 //!   with only that id. The voice itself then calls `lamp-services`'
@@ -57,12 +63,19 @@ pub struct Asks {
     pub sha256: String,
     pub writes: Vec<Value>,
     /// What the lamp must have said whole before the yes: each write's
-    /// plain words ([`crate::made_skill::write_said`]).
+    /// plain words ([`crate::made_skill::write_said`]); for code of its
+    /// own, what its code may use ([`crate::made_skill::code_said`]).
     pub say_back: String,
     /// For a skill's `do.task` (#6305, [`crate::skill_task_yes`]): the
     /// grants said back, which the yes covers with `sha256`, then the
     /// skill's folder's; `writes` is empty. None for a made skill's writes.
     pub grants: Option<Vec<String>>,
+    /// It runs code of its own (#6307, `LAMP_MADE_SCRIPTS`), with no
+    /// write: the yes puts that package on by its SHA-256
+    /// ([`crate::made_skill::put_on_agreed`]), then keeps its task for the
+    /// folder as it went on and the `grants` said
+    /// ([`crate::make_skill_local::code_approve`]); never approves a send.
+    pub code: bool,
 }
 
 /// A made skill's writes waiting for the yes.
@@ -114,6 +127,7 @@ pub fn wait_for_yes(asks: Asks, request: u64, now: Instant) -> String {
         rand_u32(&asks.skill, request, now) // not a secret: only matched here
     );
     let count = asks.writes.len();
+    let code = asks.code;
     kept::waiting(|waiting| {
         *waiting = Some(Waiting {
             id: id.clone(),
@@ -124,9 +138,15 @@ pub fn wait_for_yes(asks: Asks, request: u64, now: Instant) -> String {
             said: VecDeque::new(),
         });
     });
-    eprintln!(
-        "lamp-voice: request {request}: a made skill's {count} write(s) wait for the person's yes (#6066)"
-    );
+    if code {
+        eprintln!(
+            "lamp-voice: request {request}: a made skill with code of its own waits for the person's yes (#6307)"
+        );
+    } else {
+        eprintln!(
+            "lamp-voice: request {request}: a made skill's {count} write(s) wait for the person's yes (#6066)"
+        );
+    }
     id
 }
 
@@ -260,6 +280,16 @@ pub const NOT_HERE: &str = "Not approved: this live voice can't take that yes. S
 /// What the model is told once approved.
 pub const APPROVED_NEXT: &str =
     "Say only, in the conversation's language, that it will now send as it said.";
+/// What the model is told once a skill with code of its own is agreed to
+/// and on (#6307).
+pub const CODE_APPROVED_NEXT: &str =
+    "Say only, in the conversation's language, that it's on now and runs as it said.";
+
+/// What the model is told once a skill with code of its own is on but its
+/// task wasn't kept (#6307): a skill's tasks off, or its folder's grants
+/// not those said back, so its code runs nowhere.
+pub const CODE_ON_TASK_WAITS_NEXT: &str = "Say only, in the conversation's language, that it's \
+     on now, but this lamp doesn't run its code yet.";
 
 /// Why a yes is never taken, or `None`.
 fn refused(waiting: &Waiting, request: u64, heard: bool, now: Instant) -> Option<&'static str> {
@@ -347,6 +377,21 @@ pub fn approve(
         return json!({ "error": NOT_HERE });
     }
     match approve(&waiting.asks) {
+        // Code of its own (#6307): that package put on, nothing sent, and
+        // its task kept when the lamp hands tasks over (#6305).
+        Ok(result) if waiting.asks.code => {
+            let task = result["task"] == true;
+            eprintln!(
+                "lamp-voice: request {request}: a made skill with code of its own is on, on the person's yes (#6307); its task {}",
+                if task { "kept" } else { "not kept" }
+            );
+            let next = if task {
+                CODE_APPROVED_NEXT
+            } else {
+                CODE_ON_TASK_WAITS_NEXT
+            };
+            json!({ "approved": true, "on": true, "task": task, "next": next })
+        }
         // A skill's task (#6305): its grants and folder kept, as said.
         Ok(_) if waiting.asks.grants.is_some() => {
             eprintln!(
@@ -404,6 +449,7 @@ mod tests {
             writes: writes.to_vec(),
             say_back: SAY_BACK.to_owned(),
             grants: None,
+            code: false,
         }
     }
 
@@ -572,6 +618,8 @@ mod tests {
             crate::make_skill_local::changed_since_made("leaving mail"),
             crate::skill_task_yes::then_wait("ab12"),
             crate::skill_task_yes::APPROVED_NEXT.to_owned(),
+            CODE_APPROVED_NEXT.to_owned(),
+            CODE_ON_TASK_WAITS_NEXT.to_owned(),
             crate::skill_task_yes::yes_not_here("photo booth"),
             crate::skill_task_yes::unread("photo booth"),
             crate::make_skill_local::TASKS_READ_BACK_TOLD.to_owned(),

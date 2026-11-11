@@ -19,6 +19,12 @@
 //! those bytes, held again to the cap, and only for a hash marked so
 //! within [`GOES_ON_WITHIN`]. The lamp then says [`on_line`], or
 //! [`not_on_line`] with why it isn't on.
+//!
+//! With [`SCRIPTS_ENVIRONMENT`] on (#6307, off unless set), the model may
+//! also write the skill's `scripts/`, run by one `task` step and granted
+//! only its `grants`: held to their bounds, packed with the two files,
+//! said back with what the code may use, and put on only on the person's
+//! yes to that package's SHA-256 ([`put_on_agreed`]), never at once.
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -163,6 +169,104 @@ pub const SENDS_ON_ITS_OWN: &str = "sending or writing on its own";
 /// person's quick "Yes." must not be one.
 pub const WAITS_FOR_YES: &str = " It waits for you to agree before it sends anything.";
 
+/// The switch for a made skill that carries code of its own (#6307, #6071
+/// PR 4, the first builder's 12:45 condition 4: model-written scripts last,
+/// behind a switch of their own, off). `on` only. Off, the making model is
+/// never told a skill may carry code, and any `scripts/` file in its answer,
+/// a `task` step or a `grants` list is refused as what the lamp can't do yet
+/// ([`CODE_OF_ITS_OWN`]). On, the model may write a skill's `scripts/`
+/// within [`MOST_SCRIPTS`], [`MOST_SCRIPT_BYTES`] and [`MOST_SCRIPTS_BYTES`],
+/// run by one `task = { task, run }` step (#6305's `do.task`) and granted
+/// only its `grants`; its say-back names the grants and that it runs its own
+/// code, and it goes on only on the person's yes to that package's SHA-256
+/// (the whole folder, its scripts with it), never at once.
+pub const SCRIPTS_ENVIRONMENT: &str = "LAMP_MADE_SCRIPTS";
+
+#[cfg(test)]
+thread_local! {
+    /// [`SCRIPTS_ENVIRONMENT`] as a test of this thread sets it.
+    static SCRIPTS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill may carry code of its own in this process.
+pub fn scripts_on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = SCRIPTS_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(SCRIPTS_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`scripts_on`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_scripts_here(on: Option<bool>) {
+    SCRIPTS_HERE.with(|here| here.set(on));
+}
+
+/// What the lamp can't do yet with [`SCRIPTS_ENVIRONMENT`] off, said as
+/// [`cant_yet`]: "I can't do that yet: running code of its own".
+pub const CODE_OF_ITS_OWN: &str = "running code of its own";
+/// The folder a made skill's code is kept in, inside its own.
+pub const SCRIPTS_FOLDER: &str = "scripts/";
+/// The most files a made skill's code may have.
+pub const MOST_SCRIPTS: usize = 4;
+/// The most of one of them, as of either of its other two files.
+pub const MOST_SCRIPT_BYTES: usize = MOST_FILE_BYTES;
+/// The most of them all together.
+pub const MOST_SCRIPTS_BYTES: usize = 16 * 1024;
+/// The kinds of text file its code may have, by their ending; the one its
+/// `task` step runs is Python, as the lamp's SDK is first (#6304).
+const SCRIPT_ENDINGS: [&str; 4] = ["py", "json", "txt", "md"];
+/// The ending of the file a `task` step runs.
+const RUNNABLE_ENDING: &str = ".py";
+/// The most of a script's path past [`SCRIPTS_FOLDER`], in bytes.
+const MOST_SCRIPT_PATH_BYTES: usize = 64;
+/// The most of a `task` step's own words, said back whole.
+pub const MOST_TASK_CHARS: usize = 120;
+
+/// What a made skill's code may be granted: the grants a `do.task`'s script
+/// may hold (`crate::skill_task_yes::GRANTS`, #6305, the same names in the
+/// same order, a test holds), each with what this say-back's sentence says
+/// of it ("that code may use the camera"). `skills` is left out: code a
+/// model wrote never puts other skills on the lamp, which would then run
+/// with no yes of their own ([`SKILLS_GRANT`]).
+pub const GRANTS: [(&str, &str); 12] = [
+    ("body", "its head and arm"),
+    ("light", "its light"),
+    ("speak", "its voice and sounds"),
+    ("look", "whether someone is there, never who"),
+    ("hear", "its own phrases when it hears them"),
+    ("sound", "the kinds of sound it hears"),
+    ("air", "the air sensor"),
+    ("device", "the lamp's processor, memory and temperature"),
+    ("camera", "the camera"),
+    ("microphone", "the microphone"),
+    ("notes", "small notes of its own on the lamp"),
+    ("speech", "everything the lamp says out loud"),
+];
+
+/// The grant a made skill's code never has ([`GRANTS`]), and what the lamp
+/// can't do yet when it is asked for.
+const SKILLS_GRANT: (&str, &str) = ("skills", "code that puts other skills on the lamp");
+
+/// Why a made skill's code is refused for its form, the person's reason;
+/// the repair is told [`SCRIPTS_ONLY`] with what was wrong.
+pub const SCRIPTS_NOT_HELD: &str = "its code isn't in a form a made skill may carry; try asking \
+                                    for something simpler";
+
+/// What a repair is told of a made skill's code ([`SCRIPTS_NOT_HELD`]).
+const SCRIPTS_ONLY: &str = "Code is at most 4 more fenced blocks, each named ```scripts/NAME \
+                            (letters, digits, - _ and ., ending .py, .json, .txt or .md), plain \
+                            text, at most 8 KiB each and 16 KiB in all; it runs only by exactly \
+                            one [[do]] step task = { task = \"what it does\", run = \
+                            \"scripts/main.py\" }, naming one of its .py files; grants = [ ... ] \
+                            at the top lists only what the code uses";
+
+/// How the say-back of a skill with code of its own ends, as
+/// [`WAITS_FOR_YES`] does: it goes on only once the person agrees, never
+/// on a word for them to repeat, with no "yes" in it.
+pub const RUNS_AFTER_YES: &str = " It waits for you to agree before it runs any code.";
+
 /// A calendar's step, given whole: its events of a day.
 pub const CALENDAR_READ: &str = "read = { service = \"google_calendar\", what = \"events\", \
      day = \"today\" }, or day = \"tomorrow\" when tomorrow is asked";
@@ -261,6 +365,13 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
         (false, true) => " Or one write, as above.",
         (false, false) => "",
     };
+    // Code of its own as the system prompt says it (#6307), only with its
+    // switch: off, the brief never offers it.
+    let code = if scripts_on() {
+        " Or code, as above."
+    } else {
+        ""
+    };
     Ok(format!(
         "{BRIEF_HEAD} for the request. Reply with two fenced blocks: \
          ```skill.toml, ```SKILL.md. skill.toml: \
@@ -270,7 +381,7 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
          during = {{ from = \"HH:MM\", to = \"HH:MM\" }} if asked; \
          [ask] policy = \"nudge\" or listed; [[do]] only steps asked: light = \
          {{ colour, level 1-5, for }}, body = {{ gesture }}, say = {{ text }} (exact \
-         words, asker's language) or cue = \"hum\".{read} SKILL.md: \
+         words, asker's language) or cue = \"hum\".{read}{code} SKILL.md: \
          front matter name (lowercase, hyphens), description. \
          {REQUEST_MARK}{request}"
     ))
@@ -348,6 +459,52 @@ pub struct Files {
     /// What was asked and isn't in it, as the model's [`LEFT_OUT`] line
     /// outside the blocks said it: told with what it does.
     pub left_out: Option<String>,
+    /// Its code, with [`SCRIPTS_ENVIRONMENT`] on: each file's path, under
+    /// [`SCRIPTS_FOLDER`], and its text, in the order written. None off.
+    pub scripts: Vec<(String, String)>,
+}
+
+/// Whether `path` is a made skill's script as it may be written: under
+/// [`SCRIPTS_FOLDER`], one or two names deep, each name of ASCII letters,
+/// digits, `-`, `_` and `.`, never beginning with a dot (so never `..`), and
+/// the file ending as one of [`SCRIPT_ENDINGS`].
+fn script_path_ok(path: &str) -> bool {
+    let Some(rest) = path.strip_prefix(SCRIPTS_FOLDER) else {
+        return false;
+    };
+    let names: Vec<&str> = rest.split('/').collect();
+    let named = |name: &&str| {
+        !name.is_empty()
+            && !name.starts_with('.')
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+    };
+    rest.len() <= MOST_SCRIPT_PATH_BYTES
+        && (1..=2).contains(&names.len())
+        && names.iter().all(named)
+        && rest
+            .rsplit_once('.')
+            .is_some_and(|(_, ending)| SCRIPT_ENDINGS.contains(&ending))
+}
+
+/// Whether `text` is a made skill's script as it may be kept: plain text,
+/// no control character but a tab or a line's end, and no format character
+/// ([`is_format`]), which could make what is shown differ from what runs.
+fn script_text_ok(text: &str) -> bool {
+    text.chars()
+        .all(|c| (!c.is_control() || c == '\n' || c == '\t') && !is_format(c))
+}
+
+/// A made skill's code refused for its form: [`SCRIPTS_NOT_HELD`] said, and
+/// `what` with [`SCRIPTS_ONLY`] told the repair; `what`, a fixed phrase,
+/// journaled.
+fn scripts_not_held(what: &str) -> Refused {
+    eprintln!("lamp-voice: a made skill's code isn't held: {what}");
+    Refused(
+        SCRIPTS_NOT_HELD.into(),
+        Some(format!("The lamp refused its code: {what}. {SCRIPTS_ONLY}")),
+    )
 }
 
 /// What follows `word` at the start of `line`, in any case.
@@ -469,8 +626,10 @@ pub const NOT_MADE_HEAD: &str = "I couldn't make that:";
 /// The two files of the model's answer: exactly one fenced block named
 /// `skill.toml` and one named `SKILL.md` (its info string's last word, in
 /// any case, or its language, `toml` or `md`; a bare fence by what it
-/// holds, [`fenced`]), and no other fenced block; each at most
-/// [`MOST_FILE_BYTES`]. A block left open is the model cut off
+/// holds, [`fenced`]), and no other fenced block but, with
+/// [`SCRIPTS_ENVIRONMENT`] on, its code (`scripts/NAME`, [`script_path_ok`],
+/// plain text, within [`MOST_SCRIPTS`] and [`MOST_SCRIPTS_BYTES`]); each at
+/// most [`MOST_FILE_BYTES`]. A block left open is the model cut off
 /// ([`MODEL_CUT_OFF`]): the lamp's own maker closes one left open at the
 /// end of an answer that ended whole before it comes here
 /// ([`open_fence`]).
@@ -491,6 +650,7 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
     }
     let mut toml = None;
     let mut card = None;
+    let mut scripts: Vec<(String, String)> = Vec::new();
     let fenced = fenced(answer);
     for block in fenced.blocks {
         if block.open {
@@ -501,6 +661,32 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
                 "the lamp's model wrote more than a skill can hold; try asking for something \
                  simpler",
             ));
+        }
+        // A file of its code (#6307): only with its switch, and only
+        // within its bounds. Off, what the lamp can't do yet, never
+        // repaired away.
+        if let Named::Script(name) = &block.named {
+            if !scripts_on() {
+                eprintln!("lamp-voice: a made skill's answer carries code, and its switch is off");
+                return Err(Refused::new(cant_yet(CODE_OF_ITS_OWN)));
+            }
+            if !script_path_ok(name) {
+                return Err(scripts_not_held("a file's name or ending"));
+            }
+            if !script_text_ok(&block.body) {
+                return Err(scripts_not_held("a file that isn't plain text"));
+            }
+            if scripts.iter().any(|(path, _)| path == name) {
+                return Err(not_a_skills_form("one of its files twice"));
+            }
+            scripts.push((name.clone(), block.body));
+            if scripts.len() > MOST_SCRIPTS {
+                return Err(scripts_not_held("more files than a made skill may carry"));
+            }
+            if scripts.iter().map(|(_, text)| text.len()).sum::<usize>() > MOST_SCRIPTS_BYTES {
+                return Err(scripts_not_held("more code than a made skill may carry"));
+            }
+            continue;
         }
         let slot = match block.part() {
             Some(Part::Toml) => &mut toml,
@@ -517,6 +703,7 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
             toml,
             card,
             left_out,
+            scripts,
         }),
         _ => Err(not_a_skills_form("not both of a skill's files")),
     }
@@ -544,11 +731,13 @@ enum Part {
     Card,
 }
 
-/// A fence's name, from its info string: one of the two files, none, or
+/// A fence's name, from its info string: one of the two files, a file of
+/// its code (#6307, `scripts/…` as written, never lowercased), none, or
 /// another.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Named {
     Part(Part),
+    Script(String),
     Bare,
     Other,
 }
@@ -565,11 +754,11 @@ impl Block {
     /// The file it is: as named, or for a fence with no name, `SKILL.md`
     /// when it begins with front matter and `skill.toml` otherwise.
     fn part(&self) -> Option<Part> {
-        match self.named {
-            Named::Part(part) => Some(part),
+        match &self.named {
+            Named::Part(part) => Some(*part),
             Named::Bare if self.body.trim_start().starts_with("---") => Some(Part::Card),
             Named::Bare => Some(Part::Toml),
-            Named::Other => None,
+            Named::Script(_) | Named::Other => None,
         }
     }
 }
@@ -603,8 +792,13 @@ fn fence_named(info: &str) -> (Named, bool) {
     let word = word.rsplit_once('=').map_or(word, |(_, value)| value);
     let word = word
         .trim_matches(|c| matches!(c, '"' | '\'' | '*' | '`'))
-        .trim_end_matches(':')
-        .to_ascii_lowercase();
+        .trim_end_matches(':');
+    // A file of its code (#6307), its path as written: held to its form
+    // where it is read ([`files`]).
+    if word.starts_with(SCRIPTS_FOLDER) {
+        return (Named::Script(word.to_owned()), true);
+    }
+    let word = word.to_ascii_lowercase();
     match word.as_str() {
         "" => (Named::Bare, false),
         "skill.toml" => (Named::Part(Part::Toml), true),
@@ -660,7 +854,10 @@ fn fenced(answer: &str) -> Fenced {
             Some((this, length, "")) if this == mark && length >= run => closed = true,
             Some((_, _, info)) if !info.is_empty() && depth == 0 => {
                 let (name, whole) = fence_named(info);
-                let other_file = whole && matches!(name, Named::Part(_)) && name != block.named;
+                // A file of its code always begins a block of its own, so
+                // it is refused with its switch off, never kept as words.
+                let other_file = (whole && matches!(name, Named::Part(_)) && name != block.named)
+                    || matches!(name, Named::Script(_));
                 if other_file || block.named == Named::Part(Part::Toml) {
                     closed = true;
                     again = Some(line);
@@ -751,6 +948,12 @@ pub struct Uses {
     /// Where its writes go, every recipient or place, for the say-back and
     /// the app's list ("sends to …").
     pub sends_to: Vec<String>,
+    /// It runs code of its own (#6307, with [`SCRIPTS_ENVIRONMENT`] on): a
+    /// `task` step and its `scripts/`, put on only on the person's yes.
+    pub code: bool,
+    /// What its code may use on the lamp, its `grants` ([`GRANTS`]), each
+    /// named when it is said back.
+    pub grants: Vec<String>,
 }
 
 /// The topics that are what the microphone hears: words, its name, the
@@ -800,6 +1003,12 @@ impl Uses {
         }
         if self.output_limits {
             parts.push("limits on its light and volume".to_owned());
+        }
+        if self.code {
+            parts.push(match grants_plainly(&self.grants) {
+                Some(grants) => format!("code of its own that may use {grants}"),
+                None => "code of its own".to_owned(),
+            });
         }
         for action in &self.actions {
             parts.push(format!("its action {}", named(action)));
@@ -861,6 +1070,11 @@ impl Uses {
             uses["writes"] = json!(self.writes);
             uses["sends_to"] = json!(self.sends_to);
         }
+        // Its code and what it may use (#6307), only when it has code.
+        if self.code {
+            uses["code"] = json!(true);
+            uses["grants"] = json!(self.grants);
+        }
         uses
     }
 
@@ -891,8 +1105,35 @@ impl Uses {
             output_limits: uses["output_limits"] == true,
             writes: strings("writes"),
             sends_to: strings("sends_to"),
+            code: uses["code"] == true,
+            grants: strings("grants"),
         }
     }
+}
+
+/// A made skill's code's grants in plain words ([`GRANTS`]), "the camera
+/// and its light"; none for no grant. A name not in [`GRANTS`] is said as
+/// its name, though [`capped`] never keeps one.
+fn grants_plainly(grants: &[String]) -> Option<String> {
+    let said: Vec<String> = grants
+        .iter()
+        .map(|grant| {
+            GRANTS
+                .iter()
+                .find(|(name, _)| name == grant)
+                .map_or_else(|| named(grant).to_owned(), |(_, said)| (*said).to_owned())
+        })
+        .collect();
+    (!said.is_empty()).then(|| and_list(&said))
+}
+
+/// What the say-back of a skill with code of its own says of it (#6307),
+/// after its manners: who wrote its code and what it may use, then
+/// [`RUNS_AFTER_YES`]. What must be heard whole before the person's yes is
+/// taken (`crate::skill_write_yes`).
+pub fn code_said(grants: &[String]) -> String {
+    let uses = grants_plainly(grants).unwrap_or_else(|| "nothing of the lamp's".to_owned());
+    format!(" The lamp's model wrote its code, and that code may use {uses}.{RUNS_AFTER_YES}")
 }
 
 /// A linked service a made skill may read, as the person hears it.
@@ -2311,9 +2552,9 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         return Err(Refused::new("it's missing its version number"));
     };
     // A script's task and its grants (#6305) only come from the Store or the
-    // owner's own computer: a skill made or added here carries none until
-    // #6307, behind its own switch.
-    if carries_task(table) {
+    // owner's own computer: a skill added here carries none, and one made
+    // here only with its own switch on (#6307, [`code_held`] below).
+    if carries_task(table) && added {
         return Err(Refused::new(SCRIPT_NOT_YET));
     }
     // A skill added from a file keeps the cap from before #6066 (App
@@ -2410,6 +2651,16 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         if says.iter().any(|say| say_text(say).is_none()) {
             return Err(Refused::new(SAY_NOT_TEXT));
         }
+        // Code of its own (#6307): a `task` step and its grants, only with
+        // their switch; off, what the lamp can't do yet.
+        let tasks: Vec<&toml::Value> = steps().filter_map(|step| step.get("task")).collect();
+        if !tasks.is_empty() || table.contains_key("grants") {
+            if !scripts_on() {
+                return Err(Refused::new(cant_yet(CODE_OF_ITS_OWN)));
+            }
+            uses.grants = code_held(table, &tasks, &uses)?;
+            uses.code = true;
+        }
         // A step the lamp can't do yet in a made skill, said so before the
         // check refuses it (#6066): a send or a write, a move of its own, a
         // sound other than the hum ([`SOUNDS`]: a made skill carries no
@@ -2503,6 +2754,130 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         }
     }
     Ok((version.to_owned(), uses))
+}
+
+/// A made skill's code as its `skill.toml` names it (#6307, with
+/// [`SCRIPTS_ENVIRONMENT`] on): exactly one `[[do]]` step that is a `task`
+/// alone, `task = { task = "what it does", run = "scripts/main.py" }`
+/// (#6305's `do.task`), its words plain and at most [`MOST_TASK_CHARS`],
+/// its `run` a Python file under [`SCRIPTS_FOLDER`]; and a `grants` list of
+/// [`GRANTS`] (none when it has no list), each once. No write beside it:
+/// the person's yes is to its code, not to a send. Its grants, or why not.
+fn code_held(
+    table: &toml::Table,
+    tasks: &[&toml::Value],
+    uses: &Uses,
+) -> Result<Vec<String>, Refused> {
+    if !uses.writes.is_empty() {
+        return Err(Refused::new(cant_yet(
+            "running code of its own and sending on its own in one skill",
+        )));
+    }
+    let [task] = tasks else {
+        return Err(scripts_not_held(if tasks.is_empty() {
+            "grants with no task step to run its code"
+        } else {
+            "more than one task step"
+        }));
+    };
+    let alone = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|step| step.get("task").is_some())
+        .all(|step| step.as_table().is_some_and(|step| step.len() == 1));
+    if !alone {
+        return Err(scripts_not_held("a task step with another kind beside it"));
+    }
+    let Some(task) = task.as_table() else {
+        return Err(scripts_not_held("a task step that isn't a table"));
+    };
+    if task.keys().any(|key| key != "task" && key != "run") {
+        return Err(scripts_not_held(
+            "a task step with a key other than task and run",
+        ));
+    }
+    let words = task.get("task").and_then(toml::Value::as_str).unwrap_or("");
+    let plain = !words.trim().is_empty()
+        && words.chars().count() <= MOST_TASK_CHARS
+        && words.chars().all(|c| !c.is_control() && !is_format(c));
+    if !plain {
+        return Err(scripts_not_held(
+            "a task's words, empty, too long or not plain",
+        ));
+    }
+    let runs = task
+        .get("run")
+        .and_then(toml::Value::as_str)
+        .is_some_and(|run| script_path_ok(run) && run.ends_with(RUNNABLE_ENDING));
+    if !runs {
+        return Err(scripts_not_held(
+            "a task's run, not a .py file under scripts/",
+        ));
+    }
+    let mut grants: Vec<String> = Vec::new();
+    if let Some(list) = table.get("grants") {
+        let Some(list) = list.as_array() else {
+            return Err(scripts_not_held("grants that aren't a list"));
+        };
+        for grant in list {
+            let Some(grant) = grant.as_str() else {
+                return Err(scripts_not_held("a grant that isn't a name"));
+            };
+            if grant == SKILLS_GRANT.0 {
+                return Err(Refused::new(cant_yet(SKILLS_GRANT.1)));
+            }
+            if !GRANTS.iter().any(|(name, _)| *name == grant) {
+                eprintln!(
+                    "lamp-voice: a made skill's code asks for a grant the lamp doesn't have: {}",
+                    named(grant)
+                );
+                let names: Vec<&str> = GRANTS.iter().map(|(name, _)| *name).collect();
+                return Err(Refused(
+                    SCRIPTS_NOT_HELD.into(),
+                    Some(format!(
+                        "The lamp refused its code: a grant it doesn't have. Grants are only {}. \
+                         {SCRIPTS_ONLY}",
+                        names.join(", ")
+                    )),
+                ));
+            }
+            if !grants.iter().any(|kept| kept == grant) {
+                grants.push(grant.to_owned());
+            }
+        }
+    }
+    Ok(grants)
+}
+
+/// The `run` of a made skill's `task` step: the file its code starts at.
+pub fn task_run(toml: &str) -> Option<String> {
+    let table: toml::Table = toml::from_str(toml).ok()?;
+    table
+        .get("do")?
+        .as_array()?
+        .iter()
+        .find_map(|step| step.get("task")?.get("run")?.as_str().map(str::to_owned))
+}
+
+/// A made skill's code held to its `skill.toml` (#6307): code only with a
+/// `task` step, a `task` step only with code, and its `run` one of the
+/// files written.
+fn code_matches(files: &Files, uses: &Uses) -> Result<(), Refused> {
+    match (uses.code, files.scripts.is_empty()) {
+        (false, true) => Ok(()),
+        (false, false) => Err(scripts_not_held("code with no task step to run it")),
+        (true, true) => Err(scripts_not_held("a task step with no code written")),
+        (true, false) => {
+            let run = task_run(&files.toml).unwrap_or_default();
+            if files.scripts.iter().any(|(path, _)| *path == run) {
+                Ok(())
+            } else {
+                Err(scripts_not_held("a task's run that names no file written"))
+            }
+        }
+    }
 }
 
 /// [`held`] for a skill added from a file ([`capped_added`]): the cap
@@ -2875,9 +3250,21 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
         "budget",
         "rest",
     ];
+    // Its code's grants, said below, only with their switch (#6307).
+    let code = scripts_on();
+    let has_task = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|steps| steps.iter().any(|step| step.get("task").is_some()));
+    if !code && (has_task || table.contains_key("grants")) {
+        return Err(Unsaid::cant(CODE_OF_ITS_OWN));
+    }
     let extras: Vec<&String> = table
         .keys()
-        .filter(|key| !parts.contains(&key.as_str()))
+        .filter(|key| {
+            let said_below = parts.contains(&key.as_str()) || (code && key.as_str() == "grants");
+            !said_below
+        })
         .collect();
     let extras = (!extras.is_empty()).then(|| format!("parts {}", keys_named(extras.into_iter())));
     let steps_of = |table: &toml::Table| {
@@ -2979,10 +3366,12 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
             .iter()
             .enumerate()
             .map(|(index, step)| {
-                step_plainly(step).ok_or_else(|| match step_cant_yet(step) {
-                    Some(what) => Unsaid::cant(what),
-                    None => unsaid_step(index, step),
-                })
+                step_plainly(step)
+                    .or_else(|| task_plainly(step).filter(|_| code))
+                    .ok_or_else(|| match step_cant_yet(step) {
+                        Some(what) => Unsaid::cant(what),
+                        None => unsaid_step(index, step),
+                    })
             })
             .collect::<Result<Vec<_>, _>>()?;
         said.push_str(&format!(", it {}", steps.join(", then ")));
@@ -3005,9 +3394,12 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
         false => said.push_str(&reach),
     }
     said.push('.');
+    // Code of its own (#6307): its task's words and what its code may use
+    // said whole, never cut.
+    let runs_code = code && has_task;
     // Said whole or not at all: never cut before a step or the cooldown. A
     // write's words are the request's own, so at most its length again.
-    let most = if writes {
+    let most = if writes || runs_code {
         MOST_WRITE_PLAIN_CHARS
     } else {
         MOST_PLAIN_CHARS
@@ -3023,7 +3415,34 @@ fn said_plainly(table: &toml::Table, reads: bool) -> Result<String, Unsaid> {
     if writes {
         said.push_str(WAITS_FOR_YES);
     }
+    // And who wrote its code, what it may use, and that it runs nothing
+    // until the person's yes (#6307).
+    if runs_code {
+        let grants: Vec<String> = table
+            .get("grants")
+            .and_then(toml::Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|grant| grant.as_str().map(str::to_owned))
+            .collect();
+        said.push_str(&code_said(&grants));
+    }
     Ok(said)
+}
+
+/// A made skill's `task` step in plain words (#6307): "runs its own code
+/// to “take a photo”", its words as written, at most [`MOST_TASK_CHARS`];
+/// none for any other step, or one not in that form.
+fn task_plainly(step: &toml::Value) -> Option<String> {
+    let step = step.as_table().filter(|step| step.len() == 1)?;
+    let task = step.get("task")?.as_table()?;
+    let words = task.get("task")?.as_str()?.trim();
+    task.get("run")?.as_str()?;
+    let words = words.trim_end_matches(['.', '!', '?']);
+    (!words.is_empty()
+        && words.chars().count() <= MOST_TASK_CHARS
+        && words.chars().all(|c| !c.is_control() && !is_format(c)))
+    .then(|| format!("runs its own code to “{words}”"))
 }
 
 /// The most [`manners_plainly`] says: each part at its longest.
@@ -3165,6 +3584,10 @@ fn step_cant_yet(step: &toml::Value) -> Option<&'static str> {
     // A fixed write to a linked service, only with its switch (#6066).
     if step.contains_key("write") && step.len() == 1 {
         return (!writes_on()).then_some(SENDS_ON_ITS_OWN);
+    }
+    // Code of its own, only with its switch (#6307).
+    if step.contains_key("task") && step.len() == 1 {
+        return (!scripts_on()).then_some(CODE_OF_ITS_OWN);
     }
     let sends = [
         "text", "message", "messages", "send", "mail", "email", "post", "write", "notify",
@@ -4683,6 +5106,55 @@ pub fn put_on_cap(text: &str) -> Result<(String, Uses), Refused> {
     }
 }
 
+/// A made package's other files held again as it is put on (lamp-skills'
+/// manage helper, `install_made`; the Reviewer-lead's P3 on #6355), beside
+/// [`put_on_cap`]'s `uses` for its `skill.toml`: every file but its two is
+/// its code, as [`files`] took it (a script's name and ending, plain text,
+/// at most [`MOST_SCRIPT_BYTES`] each, [`MOST_SCRIPTS`] and
+/// [`MOST_SCRIPTS_BYTES`] in all), only with [`SCRIPTS_ENVIRONMENT`] on, and
+/// matched to its `task` step ([`code_matches`]).
+pub fn put_on_scripts<'a>(
+    toml: &str,
+    uses: &Uses,
+    files: impl IntoIterator<Item = (&'a str, &'a [u8])>,
+) -> Result<(), Refused> {
+    let mut scripts: Vec<(String, String)> = Vec::new();
+    for (path, bytes) in files {
+        if path == "skill.toml" || path == "SKILL.md" {
+            continue;
+        }
+        if !script_path_ok(path) {
+            return Err(scripts_not_held("a file's name or ending"));
+        }
+        let Some(text) = std::str::from_utf8(bytes)
+            .ok()
+            .filter(|text| script_text_ok(text))
+        else {
+            return Err(scripts_not_held("a file that isn't plain text"));
+        };
+        if bytes.len() > MOST_SCRIPT_BYTES {
+            return Err(scripts_not_held("more code than a made skill may carry"));
+        }
+        scripts.push((path.to_owned(), text.to_owned()));
+    }
+    if !scripts.is_empty() && !scripts_on() {
+        return Err(Refused::new(cant_yet(CODE_OF_ITS_OWN)));
+    }
+    if scripts.len() > MOST_SCRIPTS {
+        return Err(scripts_not_held("more files than a made skill may carry"));
+    }
+    if scripts.iter().map(|(_, text)| text.len()).sum::<usize>() > MOST_SCRIPTS_BYTES {
+        return Err(scripts_not_held("more code than a made skill may carry"));
+    }
+    let files = Files {
+        toml: toml.to_owned(),
+        card: String::new(),
+        left_out: None,
+        scripts,
+    };
+    code_matches(&files, uses)
+}
+
 /// What a written skill does, in plain words: "When you ask for it (when I
 /// say study mode), the lamp follows the instructions you wrote: Dim the
 /// light…". Its `when` and its instructions are cut short, never left out.
@@ -4751,6 +5223,7 @@ pub fn keep_written(
             marked: card,
             version,
             uses,
+            scripts: &[],
         },
         Ok(said),
         false,
@@ -4913,6 +5386,9 @@ pub fn keep_asked(
         });
     }
     let (version, uses) = capped(&files.toml)?;
+    // Its code only with a task step to run it, and that step's file one
+    // it wrote (#6307).
+    code_matches(&files, &uses)?;
     // A write's words and recipients are the request's own (#6066): the
     // heard line's, for a make by voice.
     if !uses.writes.is_empty() {
@@ -4956,7 +5432,7 @@ pub fn keep_asked(
         keeping,
         &keeping.installed,
         &name,
-        &files.toml,
+        &made_words(&files.toml, &files.scripts),
         MOST_NAME_BYTES,
     )?;
     let marked = if free == name {
@@ -4973,6 +5449,7 @@ pub fn keep_asked(
             marked,
             version,
             uses,
+            scripts: &files.scripts,
         },
         said,
         false,
@@ -4981,6 +5458,18 @@ pub fn keep_asked(
 
 /// The most of a made skill's name, as `lamp-skills` holds a skill's.
 const MOST_NAME_BYTES: usize = 64;
+
+/// A made skill's words as [`free_name`] and [`remember`] know them: its
+/// `skill.toml`, and with code of its own (#6307) each script's path and
+/// text after it, so a changed script is never "you already have that
+/// skill" but another skill.
+fn made_words(toml: &str, scripts: &[(String, String)]) -> String {
+    let mut words = toml.to_owned();
+    for (path, text) in scripts {
+        words.push_str(&format!("\n```{path}\n{text}```\n"));
+    }
+    words
+}
 
 /// What the person hears when the skill asked for is their own made one,
 /// on the lamp already with the same `skill.toml` ([`free_name`]): never a
@@ -5093,6 +5582,8 @@ struct Card<'a> {
     marked: String,
     version: String,
     uses: Uses,
+    /// Its code, under [`SCRIPTS_FOLDER`] (#6307): none but a made skill's.
+    scripts: &'a [(String, String)],
 }
 
 /// A skill added from a file (`crate::upload_skill`, `LAMP_SKILL_UPLOAD`):
@@ -5141,6 +5632,7 @@ pub fn keep_added(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
             marked,
             version,
             uses,
+            scripts: &[],
         },
         Ok(does),
         true,
@@ -5207,6 +5699,7 @@ fn packed_and_kept(
         marked,
         version,
         uses,
+        scripts,
     } = card;
     // A folder of this call's own: two keeps at once in one process (two
     // readers of the same news, as #3662's test runs them) never share
@@ -5225,6 +5718,20 @@ fn packed_and_kept(
         fs::create_dir_all(&out)?;
         fs::write(folder.join("skill.toml"), toml)?;
         fs::write(folder.join("SKILL.md"), &marked)?;
+        // Its code beside them (#6307), each path held to
+        // [`script_path_ok`], so always inside its folder: packed with
+        // them, so the package's SHA-256, what the person's yes is to,
+        // covers every byte of it.
+        for (path, text) in scripts {
+            if !script_path_ok(path) {
+                return Err(io::Error::other("a script's path outside its folder"));
+            }
+            let file = folder.join(path);
+            if let Some(parent) = file.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(file, text)?;
+        }
         Ok::<_, io::Error>(())
     })()
     .map_err(unkept);
@@ -5248,8 +5755,9 @@ fn packed_and_kept(
             version,
             sha256,
             // A write's say-back is never cut (#6066): every recipient
-            // and word is said, bounded by [`MOST_WRITE_PLAIN_CHARS`].
-            description: if uses.writes.is_empty() {
+            // and word is said, bounded by [`MOST_WRITE_PLAIN_CHARS`]; nor
+            // one with code of its own, its grants and its wait (#6307).
+            description: if uses.writes.is_empty() && !uses.code {
                 cut_chars(&description, MOST_DESCRIPTION_CHARS)
             } else {
                 description
@@ -5257,7 +5765,7 @@ fn packed_and_kept(
             uses,
             package: kept_as,
         };
-        let toml_sha256 = hex(&Sha256::digest(toml.as_bytes()));
+        let toml_sha256 = hex(&Sha256::digest(made_words(toml, scripts).as_bytes()));
         remember(&keeping.directory, from, &made, added, &toml_sha256).map_err(unkept)?;
         // A write's exact contents, kept beside it for the person's yes
         // (#6066, [`writes_of`]): the voice's own folder, as the package.
@@ -5541,8 +6049,9 @@ pub fn name_asked(asked: &str) -> String {
 /// skill made twice listed twice pushed out a skill that was on).
 /// Eviction lets go the oldest that is not on, never the one just kept;
 /// with every other one on, all are kept, past the cap. A package another
-/// entry still names stays. `toml_sha256` is its `skill.toml`'s, so a make
-/// of the same words is known as the person's own ([`free_name`]).
+/// entry still names stays. `toml_sha256` is its `skill.toml`'s (with its
+/// code, [`made_words`]), so a make of the same words is known as the
+/// person's own ([`free_name`]).
 fn remember(
     directory: &Path,
     from: &str,
@@ -5731,7 +6240,8 @@ pub fn on_line(made: &Made) -> String {
     // One that sends or writes is said whole, its every recipient and word
     // in its description, and ends as that does: it waits for the
     // person's yes (#6066), never on a word for them to repeat.
-    if !made.uses.writes.is_empty() {
+    // One with code of its own alike (#6307): its grants and its wait.
+    if !made.uses.writes.is_empty() || made.uses.code {
         let mut said = format!("I made {name}: {does}");
         if !said.ends_with(['.', '!', '?']) {
             said.push('.');
@@ -5795,6 +6305,53 @@ pub fn cut_write_line(made: &Made) -> String {
 pub const CUT_WRITE_UNSAID: &str =
     "I couldn't tell you just now what it sends, so it sends nothing yet.";
 
+/// What the lamp says of a made skill with code of its own when the turn
+/// it was made in was cut (#6307), as [`cut_write_line`] for a write: its
+/// say-back never reached the person with its `approve_id`, so no yes can
+/// put it on. Its name, [`RUNS_AFTER_YES`], then [`CUT_CODE_UNSAID`].
+pub fn cut_code_line(made: &Made) -> String {
+    format!(
+        "I made {}.{RUNS_AFTER_YES} {CUT_CODE_UNSAID}",
+        spoken_name(&made.name)
+    )
+}
+
+/// How [`cut_code_line`] ends.
+pub const CUT_CODE_UNSAID: &str =
+    "I couldn't tell you just now what its code may use, so it isn't on.";
+
+/// Why a skill with code of its own is never put on at once ([`put_on`],
+/// #6307): the app's MAKE IT comes before its grants are said, and its yes
+/// is taken by voice only, after its say-back ([`put_on_agreed`]).
+pub const CODE_BY_VOICE: &str = "a skill that runs its own code goes on only once you agree to it out loud; ask me for it by voice";
+
+/// Put the kept skill with code of its own whose SHA-256 is `sha256` on the
+/// lamp, on the person's yes to its say-back (#6307,
+/// `crate::skill_write_yes`): as [`put_on`], by that SHA-256 alone, so only
+/// the very package said back, every byte of its code with it, goes on; a
+/// changed script is another package and asks again. Refused for a kept
+/// skill with no code: this path is its yes alone. Its name once on, or why
+/// not, in plain words.
+pub fn put_on_agreed(keeping: &Keeping, sha256: &str) -> Result<String, String> {
+    let code = index(&keeping.directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256)
+        .is_some_and(|entry| entry["uses"]["code"] == true);
+    if !code {
+        return Err("the lamp no longer has it".into());
+    }
+    let now_unix_ms = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
+    put_on_within(
+        &keeping.directory,
+        &keeping.manage,
+        sha256,
+        now_unix_ms,
+        PUT_ON_WAIT,
+    )
+}
+
 /// How [`manners_plainly`]'s sentence begins.
 const MANNERS_BEGIN: &str = " It starts on its own";
 
@@ -5854,6 +6411,17 @@ pub fn spoken_name(name: &str) -> String {
 /// held again to the cap ([`put_on_within`]). On; or why not, in plain
 /// words, kept beside it.
 pub fn put_on(keeping: &Keeping, made: &Made) -> Result<(), String> {
+    // One with code of its own never goes on at once (#6307): only on the
+    // person's yes to its say-back ([`put_on_agreed`]), so here, where no
+    // yes is (the app's MAKE IT), it is left off and why kept beside it.
+    if made.uses.code {
+        eprintln!(
+            "lamp-voice: a made skill with code of its own was not put on at once: {}",
+            made.name
+        );
+        not_on(&keeping.directory, &made.sha256, CODE_BY_VOICE);
+        return Err(CODE_BY_VOICE.into());
+    }
     let now_unix_ms = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
@@ -10187,5 +10755,446 @@ light = { colour = "green", level = 3, for = "20s" }
         }
         let face = made_with("topic = \"humans/faces/tracked\"\nfor = \"10m\"\n", step);
         assert_eq!(dropped_wait(&face), None);
+    }
+
+    /// A made skill with code of its own (#6307): a photo booth when
+    /// someone comes to the desk.
+    const CODE_TOML: &str = r#"kind = "installable"
+version = "1.0.0"
+grants = ["camera", "light"]
+
+[permissions]
+topics = ["room/presence"]
+
+[trigger]
+topic = "room/presence"
+field = "someone"
+equals = true
+for = "5s"
+cooldown = "1h"
+rearm = "ends"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
+"#;
+
+    const CODE_CARD: &str = "---\nname: photo-booth\ndescription: Takes a photo when I sit down.\n---\n\n# Photo booth\n";
+
+    const MAIN_PY: &str = "from lamp import Lamp\n\nlamp = Lamp.local()\nlamp.camera.capture()\n";
+
+    /// An answer with its two files and `scripts`, each `(path, text)`.
+    fn code_answer(toml: &str, scripts: &[(&str, &str)]) -> String {
+        let mut answer = answer(toml, CODE_CARD);
+        for (path, text) in scripts {
+            answer.push_str(&format!("\n```{path}\n{text}```\n"));
+        }
+        answer
+    }
+
+    /// Every plain string const outside the tests (the lines said, kept and
+    /// shown) has single spaces: a run of spaces, as `CODE_BY_VOICE` once
+    /// had, is said and shown as written (the Reviewer-lead's P2b on #6355).
+    #[test]
+    fn no_said_line_has_a_run_of_spaces() {
+        let source = include_str!("made_skill.rs");
+        let body = source.split("\n#[cfg(test)]\nmod tests {").next().unwrap();
+        let mut checked = 0;
+        for (at, _) in body.match_indices("const ") {
+            let rest = &body[at..];
+            let Some(eq) = rest.find(": &str =") else {
+                continue;
+            };
+            let value = rest[eq + ": &str =".len()..].trim_start();
+            if !value.starts_with('"') || rest[..eq].contains('\n') {
+                continue;
+            }
+            let end = value[1..].find("\";").expect("a closed literal") + 1;
+            // A `\` line end drops the next line's leading spaces.
+            let text = value[1..end]
+                .split("\\\n")
+                .map(str::trim_start)
+                .collect::<String>();
+            assert!(!text.contains("  "), "{}", &rest[..eq]);
+            checked += 1;
+        }
+        assert!(checked > 50, "{checked}");
+    }
+
+    /// The manage helper holds a made package's code again as it puts it on
+    /// (the Reviewer-lead's P3 on #6355): within its count, sizes and
+    /// endings, with its switch, and its task step's file among it.
+    #[test]
+    fn a_packages_code_is_held_again_as_it_goes_on() {
+        set_scripts_here(Some(true));
+        let (_, uses) = put_on_cap(CODE_TOML).unwrap();
+        let held = |files: &[(&str, &str)]| {
+            let two = [("skill.toml", CODE_TOML), ("SKILL.md", CODE_CARD)];
+            let all = two
+                .iter()
+                .chain(files)
+                .map(|(path, text)| (*path, text.as_bytes()));
+            put_on_scripts(CODE_TOML, &uses, all).map_err(|refused| refused.0)
+        };
+        let main = ("scripts/main.py", MAIN_PY);
+        assert_eq!(held(&[main]), Ok(()));
+        assert_eq!(held(&[main, ("scripts/notes.md", "hi\n")]), Ok(()));
+        let big = "x".repeat(MOST_SCRIPT_BYTES + 1);
+        let half = "x".repeat(MOST_SCRIPTS_BYTES / 2);
+        let cases: [&[(&str, &str)]; 9] = [
+            &[],
+            &[("scripts/other.py", MAIN_PY)],
+            &[main, ("scripts/run.sh", "ls\n")],
+            &[main, ("scripts/.hidden.py", "x\n")],
+            &[main, ("elsewhere.py", "x\n")],
+            &[main, ("scripts/a.txt", "\u{1b}[2J")],
+            &[main, ("scripts/big.txt", &big)],
+            &[main, ("scripts/a.txt", &half), ("scripts/b.txt", &half)],
+            &[
+                main,
+                ("scripts/a.txt", "a"),
+                ("scripts/b.txt", "b"),
+                ("scripts/c.txt", "c"),
+                ("scripts/d.txt", "d"),
+            ],
+        ];
+        for files in cases {
+            assert_eq!(held(files), Err(SCRIPTS_NOT_HELD.to_owned()), "{files:?}");
+        }
+        // Not text at all.
+        let two = [
+            ("skill.toml", CODE_TOML.as_bytes()),
+            ("scripts/main.py", &[0xff, 0xfe][..]),
+        ];
+        assert!(put_on_scripts(CODE_TOML, &uses, two).is_err());
+        set_scripts_here(Some(false));
+        assert_eq!(held(&[main]), Err(cant_yet(CODE_OF_ITS_OWN)));
+        set_scripts_here(None);
+    }
+
+    /// Off (#6307): a `scripts/` file in the answer, a `task` step or a
+    /// `grants` list is what the lamp can't do yet, never repaired; the
+    /// brief never offers code.
+    #[test]
+    fn code_is_refused_and_never_offered_with_its_switch_off() {
+        set_scripts_here(Some(false));
+        let cant = Refused(cant_yet(CODE_OF_ITS_OWN), None);
+        assert_eq!(
+            files(&code_answer(TOML, &[("scripts/main.py", MAIN_PY)])).unwrap_err(),
+            cant
+        );
+        assert_eq!(capped_with(CODE_TOML, false).unwrap_err(), cant);
+        let grants_only = TOML.replace(
+            "version = \"1.0.0\"\n",
+            "version = \"1.0.0\"\ngrants = []\n",
+        );
+        assert_eq!(capped_with(&grants_only, false).unwrap_err(), cant);
+        assert_eq!(plainly(CODE_TOML).unwrap_err(), cant);
+        assert_eq!(
+            not_made_line(&cant.0),
+            "I can't do that yet: running code of its own."
+        );
+        let brief = brief("make me a photo booth").unwrap();
+        assert!(!brief.contains("code"), "{brief}");
+        // Its two files alone are taken as before.
+        assert!(files(&answer(TOML, CARD)).unwrap().scripts.is_empty());
+        set_scripts_here(None);
+    }
+
+    /// On (#6307): its code is taken within its bounds, and refused past
+    /// them with lines for a repair: at most four files, each a plain-text
+    /// file under scripts/ of a kind it may be, 8 KiB each and 16 KiB in
+    /// all; run by one task step alone, naming a .py file it wrote; its
+    /// grants only the lamp's, never `skills`, and no write beside it.
+    #[test]
+    fn code_is_taken_within_its_bounds_and_refused_past_them() {
+        set_scripts_here(Some(true));
+        let taken = files(&code_answer(
+            CODE_TOML,
+            &[
+                ("scripts/main.py", MAIN_PY),
+                ("scripts/data/frame.json", "{}\n"),
+            ],
+        ))
+        .unwrap();
+        assert_eq!(
+            taken.scripts,
+            [
+                ("scripts/main.py".to_owned(), MAIN_PY.to_owned()),
+                ("scripts/data/frame.json".to_owned(), "{}\n".to_owned())
+            ]
+        );
+        let refused_for_form = |scripts: &[(&str, &str)]| {
+            let refused = files(&code_answer(CODE_TOML, scripts)).unwrap_err();
+            assert_eq!(refused.0, SCRIPTS_NOT_HELD, "{scripts:?}");
+            assert!(refused.1.unwrap().contains(SCRIPTS_ONLY), "{scripts:?}");
+        };
+        for path in [
+            "scripts/../main.py",
+            "scripts/.main.py",
+            "scripts/a/b/main.py",
+            "scripts/main.sh",
+            "scripts/main",
+            "scripts/",
+        ] {
+            refused_for_form(&[(path, MAIN_PY)]);
+        }
+        refused_for_form(&[("scripts/main.py", "print('\u{7}')\n")]);
+        refused_for_form(&[("scripts/main.py", "x = 1 # \u{202E}evil\n")]);
+        let five: Vec<String> = (0..5).map(|n| format!("scripts/f{n}.py")).collect();
+        let five: Vec<(&str, &str)> = five.iter().map(|path| (path.as_str(), "x = 1\n")).collect();
+        refused_for_form(&five);
+        let big = "x = 1\n".repeat(1_200);
+        refused_for_form(&[
+            ("scripts/a.py", &big),
+            ("scripts/b.py", &big),
+            ("scripts/c.py", &big),
+        ]);
+        assert!(
+            files(&code_answer(
+                CODE_TOML,
+                &[("scripts/main.py", MAIN_PY), ("scripts/main.py", MAIN_PY)]
+            ))
+            .is_err()
+        );
+        // The cap: what its code may use, said by name.
+        let (_, uses) = capped_with(CODE_TOML, false).unwrap();
+        assert!(uses.code);
+        assert_eq!(uses.grants, ["camera", "light"]);
+        assert_eq!(Uses::of_json(&uses.json()), uses);
+        assert!(
+            uses.spoken()
+                .contains("code of its own that may use the camera and its light"),
+            "{}",
+            uses.spoken()
+        );
+        let refused = |toml: &str| capped_with(toml, false).unwrap_err();
+        let unknown = refused(&CODE_TOML.replace("\"light\"]", "\"root\"]"));
+        assert_eq!(unknown.0, SCRIPTS_NOT_HELD);
+        assert!(unknown.1.unwrap().contains("Grants are only body, light"));
+        assert_eq!(
+            refused(&CODE_TOML.replace("\"light\"]", "\"skills\"]")),
+            Refused(cant_yet("code that puts other skills on the lamp"), None)
+        );
+        let twice = format!(
+            "{CODE_TOML}\n[[do]]\ntask = {{ task = \"again\", run = \"scripts/main.py\" }}\n"
+        );
+        assert_eq!(refused(&twice).0, SCRIPTS_NOT_HELD);
+        for (from, to) in [
+            ("run = \"scripts/main.py\"", "run = \"scripts/main.json\""),
+            ("run = \"scripts/main.py\"", "run = \"/usr/bin/python3\""),
+            (
+                "run = \"scripts/main.py\"",
+                "run = \"scripts/main.py\", env = \"x\"",
+            ),
+            (
+                "task = \"take a photo and send it to the app\"",
+                "task = \"\"",
+            ),
+            ("grants = [\"camera\", \"light\"]", "grants = \"camera\""),
+        ] {
+            assert_eq!(
+                refused(&CODE_TOML.replace(from, to)).0,
+                SCRIPTS_NOT_HELD,
+                "{to}"
+            );
+        }
+        set_writes_here(Some(true));
+        let sends = CODE_TOML.replace(
+            "topics = [\"room/presence\"]",
+            "topics = [\"room/presence\"]\nservices = { gmail = \"write\" }",
+        );
+        assert!(refused(&sends).0.starts_with(CANT_YET));
+        set_writes_here(None);
+        // No grants at all is none: its code may use nothing of the lamp's.
+        let none = CODE_TOML.replace("grants = [\"camera\", \"light\"]\n", "");
+        assert!(capped_with(&none, false).unwrap().1.grants.is_empty());
+        set_scripts_here(None);
+    }
+
+    /// A `scripts/` fence begins a block of its own, even inside an open
+    /// `SKILL.md`, its path kept as written: so with the switch off it is
+    /// refused, never kept as the card's words; on, it is a file of code.
+    #[test]
+    fn a_scripts_fence_is_its_own_block_as_written() {
+        let open_card = format!(
+            "```skill.toml\n{CODE_TOML}```\n```SKILL.md\n{CODE_CARD}\
+             ```scripts/Main.py\n{MAIN_PY}```\n"
+        );
+        set_scripts_here(Some(false));
+        assert_eq!(
+            files(&open_card).unwrap_err(),
+            Refused(cant_yet(CODE_OF_ITS_OWN), None)
+        );
+        set_scripts_here(Some(true));
+        let taken = files(&open_card).unwrap();
+        assert_eq!(taken.card, CODE_CARD);
+        assert_eq!(
+            taken.scripts,
+            vec![("scripts/Main.py".to_owned(), MAIN_PY.to_owned())]
+        );
+        set_scripts_here(None);
+    }
+
+    /// A made skill's code's grants are a `do.task`'s (#6305), name for
+    /// name in order, and never the one a script never holds.
+    #[test]
+    fn code_grants_are_a_tasks_grants() {
+        let names = |grants: &[(&str, &str)]| -> Vec<String> {
+            grants.iter().map(|(name, _)| (*name).to_owned()).collect()
+        };
+        assert_eq!(names(&GRANTS), names(&crate::skill_task_yes::GRANTS));
+        assert_eq!(SKILLS_GRANT.0, crate::skill_task_yes::NEVER);
+    }
+
+    /// On (#6307): the say-back says that it runs its own code and what
+    /// for, that the lamp's model wrote it, each grant in plain words, and
+    /// ends on its wait, with no "yes" in it; the lamp's line for it says the
+    /// same whole, never "it's on".
+    #[test]
+    fn codes_say_back_names_its_grants_and_its_code_and_waits() {
+        set_scripts_here(Some(true));
+        let said = plainly(&mannered(CODE_TOML)).unwrap();
+        for part in [
+            "runs its own code to “take a photo and send it to the app”",
+            "The lamp's model wrote its code, and that code may use the camera and its light.",
+        ] {
+            assert!(said.contains(part), "{part}: {said}");
+        }
+        assert!(said.ends_with(RUNS_AFTER_YES), "{said}");
+        assert!(!said.to_lowercase().contains("yes"), "{said}");
+        let none = CODE_TOML.replace("grants = [\"camera\", \"light\"]\n", "");
+        assert!(
+            plainly(&mannered(&none))
+                .unwrap()
+                .contains("that code may use nothing of the lamp's.")
+        );
+        let made = Made {
+            name: "photo-booth".into(),
+            version: "1.0.0".into(),
+            sha256: "0".repeat(64),
+            description: said.clone(),
+            uses: capped_with(CODE_TOML, false).unwrap().1,
+            package: PathBuf::from("photo-booth.tar"),
+        };
+        let line = on_line(&made);
+        assert!(
+            line.starts_with("I made photo booth: when someone"),
+            "{line}"
+        );
+        assert!(!line.contains("it's on"), "{line}");
+        assert!(line.ends_with(RUNS_AFTER_YES.trim()), "{line}");
+        assert!(line.contains(code_said(&made.uses.grants).trim()), "{line}");
+        assert_eq!(
+            cut_code_line(&made),
+            "I made photo booth. It waits for you to agree before it runs any code. I couldn't \
+             tell you just now what its code may use, so it isn't on."
+        );
+        // The brief offers it, still within its bound.
+        let longest = brief(&"x".repeat(MOST_REQUEST_BYTES)).unwrap();
+        assert!(longest.contains("Or code, as above."), "{longest}");
+        assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
+        set_scripts_here(None);
+    }
+
+    /// On (#6307): its code is packed with its two files, so the package's
+    /// SHA-256 covers every byte of it, a changed script another package;
+    /// it is never put on at once (the app's MAKE IT, `put_on`), only on the
+    /// person's yes to that very SHA-256 (`put_on_agreed`), which a skill
+    /// without code never goes on by. Code with no task step to run it, or
+    /// a task step running a file not written, is refused for a repair.
+    #[test]
+    fn code_is_kept_in_its_package_and_goes_on_only_by_its_agreed_sha256() {
+        use std::os::unix::fs::PermissionsExt;
+        set_scripts_here(Some(true));
+        let dir = scratch("made-code");
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\ncat \"$4/skill.toml\" \"$4\"/scripts/*.py > \"$3/$name-1.0.0.tar\" 2>/dev/null\nexit 0\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        let made = keep(
+            &code_answer(CODE_TOML, &[("scripts/main.py", MAIN_PY)]),
+            false,
+            "local:1",
+            &keeping,
+        )
+        .unwrap();
+        assert!(made.uses.code, "{made:?}");
+        let bytes = fs::read_to_string(&made.package).unwrap();
+        assert!(bytes.contains(MAIN_PY), "{bytes}");
+        assert_eq!(made.sha256, hex(&Sha256::digest(bytes.as_bytes())));
+        assert!(
+            made.description.ends_with(RUNS_AFTER_YES),
+            "{}",
+            made.description
+        );
+        // Never at once: no helper is even asked, and why is kept.
+        assert_eq!(put_on(&keeping, &made), Err(CODE_BY_VOICE.to_owned()));
+        assert_eq!(index(&keeping.directory)[0]["not_on"], CODE_BY_VOICE);
+        assert_ne!(index(&keeping.directory)[0]["on"], true);
+        // The yes puts on that SHA-256 alone.
+        let asked = helper(&keeping.manage, r#"{"done": "installed"}"#);
+        assert_eq!(
+            put_on_agreed(&keeping, &made.sha256),
+            Ok("photo-booth".to_owned())
+        );
+        let asked: Value = serde_json::from_str(&asked.join().unwrap()).unwrap();
+        assert_eq!(asked["install_made"], made.sha256.as_str());
+        // A changed script is another package, not on, asked again.
+        let changed = keep(
+            &code_answer(CODE_TOML, &[("scripts/main.py", "print('other')\n")]),
+            false,
+            "local:2",
+            &keeping,
+        )
+        .unwrap();
+        assert_ne!(changed.sha256, made.sha256);
+        // Other words than the one on, its code with them: another skill,
+        // never "you already have that skill".
+        assert_eq!(changed.name, "photo-booth-2");
+        let entry = |sha256: &str| {
+            index(&keeping.directory)
+                .into_iter()
+                .find(|entry| entry["sha256"] == sha256)
+                .unwrap()
+        };
+        assert_eq!(entry(&made.sha256)["on"], true);
+        assert_ne!(entry(&changed.sha256)["on"], true);
+        // A skill with no code never goes on by this path.
+        let plain = keep(&answer(TOML, CARD), false, "local:3", &keeping).unwrap();
+        assert!(put_on_agreed(&keeping, &plain.sha256).is_err());
+        // Code with nothing to run it, or a run naming no file written.
+        let no_task = keep(
+            &code_answer(TOML, &[("scripts/main.py", MAIN_PY)]),
+            false,
+            "local:4",
+            &keeping,
+        )
+        .unwrap_err();
+        assert_eq!(no_task.0, SCRIPTS_NOT_HELD);
+        let elsewhere = keep(
+            &code_answer(CODE_TOML, &[("scripts/other.py", MAIN_PY)]),
+            false,
+            "local:5",
+            &keeping,
+        )
+        .unwrap_err();
+        assert_eq!(elsewhere.0, SCRIPTS_NOT_HELD);
+        let unwritten =
+            keep(&answer(CODE_TOML, CODE_CARD), false, "local:6", &keeping).unwrap_err();
+        assert_eq!(unwritten.0, SCRIPTS_NOT_HELD);
+        set_scripts_here(None);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

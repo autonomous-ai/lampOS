@@ -1409,9 +1409,12 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   pushed by the owner's own paired computer (the developer folder,
   `/var/lib/lampOS/skills-dev`). One put on by hand from a folder or a file,
   or marked `made: here` or `added: file`, does not load, and the journal
-  says why. The made cap (`made_skill::put_on_cap`) refuses a made or added
-  skill with `grants` or a `task` step outright: model-written scripts are
-  #6307's, behind a switch of their own.
+  says why. The made cap (`made_skill::put_on_cap`) refuses an added skill
+  with `grants` or a `task` step outright, and a made one unless
+  `LAMP_MADE_SCRIPTS=on`: model-written scripts are #6307's, behind a
+  switch of their own; with it on, a `made: here` skill put on as a package
+  loads with its task, its script said to come from "the lamp's own model"
+  ("Made by voice", "Code of its own").
 - **Said back, and the yes.** Asked what such a skill uses ("what does my
   photo booth skill use?"), the model calls `make_skill` with only
   `read_back`. The voice asks the manage helper (`{"task_asks": NAME}`,
@@ -2969,6 +2972,99 @@ gone ([switches.md](switches.md)). What happens:
      it is told; with no mark, only the last day's sends.
    - **Taking it off** is unchanged, by voice or in the app; to `lamp-services`
      a removed or changed package waits for a new yes.
+   Code of its own (#6307, #6071 PR 4, last of the five, the first
+   builder's 12:45 condition 4; `LAMP_MADE_SCRIPTS=on` in `lamp-voice`,
+   passed to both routes, in `lamp-skills` and in `lamp-skills-manage@`,
+   `on` only, off unless set and in every product unit; stacked on #6305's
+   `do.task`, `LAMP_SKILL_TASKS`). Off, the making
+   model is never told a skill may carry code (its system prompt and the
+   brief are as before), and a `scripts/…` block in its answer, a `task`
+   step or a `grants` list is answered "I can't do that yet: running code
+   of its own", never repaired. On:
+   - **What it may carry** (`made_skill::files`, `made_skill::capped`): up
+     to 4 more fenced blocks, each named ```` ```scripts/NAME ```` (one or two
+     names deep, letters, digits, `-`, `_` and `.`, never a leading dot, so
+     never `..`; ending `.py`, `.json`, `.txt` or `.md`), plain text (no
+     control character but a tab or a line's end, no format character such
+     as a bidirectional mark), at most 8 KiB each and 16 KiB in all
+     (`MOST_SCRIPTS`, `MOST_SCRIPT_BYTES`, `MOST_SCRIPTS_BYTES`); exactly one
+     `[[do]]` step that is a `task` alone, `task = { task = "take a photo",
+     run = "scripts/main.py" }` (#6305's `do.task`), its words plain and at
+     most 120 characters, its `run` a `.py` file it wrote; and a top-level
+     `grants = [...]` of #6305's grants (`made_skill::GRANTS`, the names of
+     `skill_task_yes::GRANTS`:
+     `body`, `light`, `speak`, `look`, `hear`, `sound`, `air`, `device`,
+     `camera`, `microphone`, `notes`, `speech`; none when absent). `skills`
+     is "I can't do that yet: code that puts other skills on the lamp", and
+     code beside a write is "I can't do that yet: running code of its own
+     and sending on its own in one skill". Anything else past these goes
+     back for repair (`made_skill::SCRIPTS_NOT_HELD`, the repair told the
+     form): code with no `task` step, a `task` with no code or naming a
+     file not written, a fifth file, too much code, a bad name. The system
+     prompt (`make_skill_local::code_rules`) tells the form, the bounds and
+     the grants, that the code reaches the lamp only through the lamp's
+     SDK with those grants and has no other network, and that the lamp
+     says it back and waits for the yes; the brief adds "Or code, as
+     above." (still within 1,160 bytes), and an answer may be up to 37 KiB.
+   - **Packed with its two files**, so the package's SHA-256 covers every
+     byte of its code: a changed script is another package.
+   - **Its task words and grants said back whole** (the code itself is
+     never read out; `made_skill::plainly`, never cut, up to 1,400
+     characters): "When someone comes to the desk, … it runs its own
+     code to “take a photo”, … The lamp's model wrote its code, and that
+     code may use the camera and its light. It waits for you to agree
+     before it runs any code." (`made_skill::code_said`,
+     `made_skill::RUNS_AFTER_YES`; no "yes" in it). The line is "I made
+     photo booth: …", never "it's on"; the app's `uses` carry `code` and
+     `grants`.
+   - **Never on at once.** `made_skill::put_on` refuses it and keeps why
+     (`made_skill::CODE_BY_VOICE`), so the app's MAKE IT keeps it off and
+     says "I made it but couldn't put it on: a skill that runs its own code
+     goes on only once you agree to it out loud; ask me for it by voice."
+     By voice, the make waits for the yes through the write's very wait
+     (`crate::skill_write_yes`, `Asks::code`), with every guard of it: said
+     whole first (the code sentence is what must be heard), only a later
+     heard line on the second route, never the lamp's own echo, 120 s.
+     The one yes (`make_skill_local::code_approve`) puts on exactly the
+     package said back, by its SHA-256 (`made_skill::put_on_agreed`, the
+     manage helper installing only those bytes; a skill with no code never
+     goes on by that path), then, with `LAMP_SKILL_TASKS=on`, reads the
+     skill as it went on (#6305's `task_asks`) and has lamp-control record
+     its task's yes (`task_yes_record`, never lamp-skills' state) for the
+     SHA-256 of its folder then and its grants, only when those are the
+     grants said back and the folder of that name went on as that very
+     package (its `.package.json`'s SHA-256 the one agreed, the helper's
+     `task_asks` `package`), never whatever folder has that name by then: a
+     script changed later asks
+     again, as any `do.task` does. A task not kept (tasks off, the grants
+     not those said, the helper or lamp-control unreachable) leaves the skill on with its
+     code run nowhere, said so (`skill_write_yes::CODE_ON_TASK_WAITS_NEXT`).
+     A turn cut before the say-back says `made_skill::cut_code_line` ("… so
+     it isn't on."), and nothing waits. A skill made with code that is
+     still off has no read-back yet.
+   - **What runs it** is #6305's `do.task`: `lamp-skills` loads a
+     `made: here` skill's task only with `LAMP_MADE_SCRIPTS=on`, and only
+     one that went on as a package, never from the Store, pushed or put on
+     from a folder (`task::made_with_code`, in `task::origin_refuses`); its
+     read-back says its script comes from "the lamp's own model"
+     (`task::FROM_MADE`). Then #6304's one-run token and #6306's hand-over
+     to the lamp's Hermes. The manage helper's `install_made` holds a made
+     skill to the same cap again (`made_skill::put_on_cap`), and its code to
+     the same count, sizes and endings, its task's file among it
+     (`made_skill::put_on_scripts`), so it puts one
+     with code on only with the switch in `lamp-skills-manage@` too;
+     without it, the yes is answered that the lamp's check didn't let it
+     on.
+     Tests: `made_skill::tests::code_is_refused_and_never_offered_with_its_switch_off`,
+     `code_is_taken_within_its_bounds_and_refused_past_them`,
+     `codes_say_back_names_its_grants_and_its_code_and_waits`,
+     `code_is_kept_in_its_package_and_goes_on_only_by_its_agreed_sha256`,
+     `code_grants_are_a_tasks_grants`, `a_scripts_fence_is_its_own_block_as_written`,
+     `a_packages_code_is_held_again_as_it_goes_on`, `no_said_line_has_a_run_of_spaces`;
+     `make_skill_local::tests::code_is_told_to_the_maker_only_with_its_switch`,
+     `a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256`
+     and `a_made_skills_task_is_kept_only_for_the_grants_said_back`;
+     `lamp_skills::task::tests::a_made_skill_carries_a_task_only_with_its_code_on_and_as_a_package`.
    Kept, a skill whose step reads a service not
    linked now (`services_connected`, asked once, at most 500 ms) is still
    kept, and the make tells it: by voice, `needs_link` in the make's

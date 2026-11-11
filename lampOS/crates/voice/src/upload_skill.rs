@@ -107,6 +107,7 @@ pub fn written(card: &str) -> Result<Files, Refused> {
         toml,
         card: card.to_owned(),
         left_out: None,
+        scripts: Vec::new(),
     })
 }
 
@@ -192,6 +193,7 @@ pub fn take(
             toml: toml.to_owned(),
             card: skill_md.to_owned(),
             left_out: None,
+            scripts: Vec::new(),
         },
         None => written(skill_md)?,
     };
