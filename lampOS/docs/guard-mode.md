@@ -12,14 +12,18 @@ Naming a known person (its item 1, the first builder's ruling of 22 Oct)
 is behind its own switch, `LAMP_GUARD_NAMES`, off unless set: without it
 nobody is named.
 
-**Status:** built, with tests; not tried on a lamp, and out of the product's
-install until it is (`install::NOT_PRODUCT_SKILLS`). **Its texts reach the
-phone only with `LAMP_SKILL_MESSAGES=on`** (or `LAMP_MESSAGES=on`) in
+**Status:** built, with tests; played on lamp-9adf (6 and 7 Nov, #1685) from a
+drop-in. An installable skill: its owner puts it on from the Skills Store,
+never the product's install (`install::NOT_PRODUCT_SKILLS`). **Its texts reach
+the phone only with `LAMP_SKILL_MESSAGES=on`** (or `LAMP_MESSAGES=on`) in
 `lamp-cloud` (7 Nov, #1685: the first opens nothing else of texts): they go on
 `messages/out` on the lamp's bus, and `lamp-cloud` carries each up as the
 backend's unasked news, which it keeps for the owner and pushes to their
-phones ([messages.md](messages.md), "Unasked texts"). Off unless set; not
-yet seen on a lamp.
+phones ([messages.md](messages.md), "Unasked texts"). Off unless set; the
+product's `lamp-cloud.service` sets it since 9 Nov (#5752), and its
+`lamp-skills.service` sets `LAMP_GUARD_WORDS_V2=on`. Names, arrivals by sound
+and turning it on from the app stay off in the product until their own lamp
+checks.
 
 ## What it does
 
@@ -395,10 +399,11 @@ off guard" the voice's say service (`LAMP_SAY=on`).
 
 ## Not shown, and open
 
-- Nothing ran on a lamp: the cases are written, not recorded.
+- The cases are written, not recorded. On lamp-9adf (7 Nov) a visit's text
+  left the lamp; the privacy switch closed mid-visit was not played.
 - Delivery to a phone: built (`LAMP_SKILL_MESSAGES=on` or `LAMP_MESSAGES=on`,
-  [messages.md](messages.md)),
-  not yet seen on a lamp and a phone.
+  [messages.md](messages.md)), not yet seen on a phone: the app has no
+  screen where the text shows (#1685, 8 Nov).
 - How the mark and Light out when you leave share the ring when both are
   installed: both ask at skill priority, and which the ring shows is the
   ring's arbitration. Not tried.
