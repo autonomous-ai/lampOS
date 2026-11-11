@@ -2308,6 +2308,48 @@ pub(crate) mod tests {
         }
     }
 
+    /// An "until" or "till" state closes at its time, as a "for" state
+    /// does (Reviewer-lead's HOLD on #5215): words after the time make it
+    /// an explanation of a schedule, not a kept light's claim.
+    #[test]
+    fn an_until_state_explanation_is_no_claim() {
+        for reply in [
+            "Your light will be on until 10 pm each evening on the schedule you set.",
+            "It stays on until ten on weeknights.",
+            "It'll stay on until 10 pm, then dims.",
+            "The light is on until ten every night because of your schedule.",
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply:?}");
+            for end in reply.char_indices().map(|(at, _)| at).chain([reply.len()]) {
+                let prefix = &reply[..end];
+                assert_ne!(
+                    claim_as(prefix, false, true),
+                    Some(Some(Claim::LightKept)),
+                    "premature claim: {prefix:?}"
+                );
+            }
+            assert_eq!(claim_as(reply, true, false), Some(None), "{reply:?}");
+        }
+        for reply in [
+            "The light is on until 10.30, as asked.",
+            "It stays on until ten.",
+            "Keeping it on until 10 pm.",
+            "I'll keep it on until ten.",
+            "The light is on until 10 tonight.",
+            "Your light will be on until noon.",
+        ] {
+            assert_eq!(
+                claim_as(reply, true, true),
+                Some(Some(Claim::LightKept)),
+                "{reply:?}"
+            );
+            for end in reply.char_indices().map(|(at, _)| at).chain([reply.len()]) {
+                let prefix = &reply[..end];
+                assert_ne!(claim_as(prefix, false, true), Some(None), "{prefix:?}");
+            }
+        }
+    }
+
     /// GO-159 (lamp-52e6, 11091): "keep the light on until ten" with the
     /// worded runs on still got its claim 7 of 8 times and the worded guard
     /// never fired, so the model's replies opened with shapes the runs
