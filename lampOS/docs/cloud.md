@@ -162,7 +162,7 @@ lamp says so.
 | `voice.set` (`{"provider"?, "voice", "language"?, "speed"?}`, V1's `tts.set` shape), `character.set` (`{"text"}`) | with `LAMP_CHOSEN_VOICE=on` beside `LAMP_SETTINGS_CHANGE=on` (#5394, [chosen-voice.md](chosen-voice.md)): checked here and handed to root's helper as the names are; `starting` at once, then `success` with `{"provider": "elevenlabs", "voice", "speed": 1.0}` or `{"text"}`, or `failure` with why. `provider` absent or `elevenlabs`; `voice` one of the lamp's voices (every name in `lamp-2-tts-catalog`), `""` for the default; `language` and `speed` are taken and left alone. `text` plain, one line, at most 200 characters, `""` clears. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `voice.get` (`{}`) | with the same switch (#5394): answered at once with what the lamp keeps, read from `/etc/lampOS/setup/voice` and `character` as `language` is read, writing nothing: `{"provider": "elevenlabs", "voice", "text"}`, `""` for none kept and for a kept value that does not fit the rules (the default voice, no words, as the voice takes them). Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `connector.set.<code>`, `connector.remove.<code>`, `services.list` | with `LAMP_SERVICES=on` (Queue #4710, "A person's linked services" below, [services.md](services.md)): a service of the person's linked or unlinked, by V1's codes (`gmail`, `gmail-app`, `google_calendar`, `google_drive`, `notion`, `figma-api`, `figma`, `github`, `linear`, `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot`, `amplitude`); a set's data fetched from the backend, never carried. `starting` at once, then `success` with `{"connector", "scopes"}` (a remove `{"connector"}`) or `failure` with why; `services.list` is `{"connected": [{"code", "account", "expired"}]}`. `can` says `services` for the `connector.*` kinds. Without the switch, V1's "not on this lamp" |
-| `control.code` (`{"grants": [...], "seal_to", "request_id"}`), `control.clients` (`{}`), `control.revoke` (`{"client": "c_1"}`), `control.code_cancel` (`{}`), `control.take_back` (`{}` or `{"client": "c_1"}`) | with `--control-admin-socket` (#5299, "The developer door" below): a pairing code for a developer computer, sealed to the app's one-time key, as `{"sealed": {"v": 1, "enc", "ct"}, "until_unix_ms", "shown", "pin_said"}`, the lamp saying the start of its pin aloud; the code dropped, `{"dropped"}`; the paired computers as `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`; a computer revoked, `{"revoked", "saved"}` (with `why` when `saved` is false); the lamp taken back from one computer or every one, `{"taken": N}`, the computers still paired. `failure` with a short reason the app shows as is. Listed in `can` only while lamp-control's admin socket is there. **Who may ask:** only the lamp's own account channel, the same guard as `faces.add_photo` and `guard.on` (`online::commanded`), and that channel is plain too until broker TLS ("Limit" below). Without the option, V1's "not on this lamp" |
+| `control.code` (`{"grants": [...], "seal_to", "request_id"}`), `control.clients` (`{}`), `control.revoke` (`{"client": "c_1"}`), `control.code_cancel` (`{}`), `control.take_back` (`{}` or `{"client": "c_1"}`), `control.set_grants` (`{"client": "c_1", "grants": [...]}`) | with `--control-admin-socket` (#5299, "The developer door" below): a pairing code for a developer computer, sealed to the app's one-time key, as `{"sealed": {"v": 1, "enc", "ct"}, "until_unix_ms", "shown", "pin_said"}`, the lamp saying the start of its pin aloud; the code dropped, `{"dropped"}`; the paired computers as `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`; a computer revoked, `{"revoked", "saved"}` (with `why` when `saved` is false); the lamp taken back from one computer or every one, `{"taken": N}`, the computers still paired. `failure` with a short reason the app shows as is. Listed in `can` only while lamp-control's admin socket is there. **Who may ask:** only the lamp's own account channel, the same guard as `faces.add_photo` and `guard.on` (`online::commanded`), and that channel is plain too until broker TLS ("Limit" below). Without the option, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### News for the phone, unasked (`messages/out`)
@@ -2375,7 +2375,7 @@ root's `lamp-services` on `/run/lampos-services/admin.sock` (in the unit's
 The services, their reads and writes, the voice's functions and its send
 gate are in [services.md](services.md).
 
-## The developer door (#5299, `control.code`, `control.clients`, `control.revoke`, `control.code_cancel`, `control.take_back`)
+## The developer door (#5299, `control.code`, `control.clients`, `control.revoke`, `control.code_cancel`, `control.take_back`, `control.set_grants`)
 
 **The first time the cloud-facing part can mint pairing codes and revoke
 pairings.** lamp-cloud, which takes the app's commands from the broker, now
@@ -2431,6 +2431,22 @@ app that asks anyway is told `developer access is off on this lamp`.
   The computers stay paired; a revoke is what unpairs one. The journal says
   `control.take_back from the app: N lease(s) taken back from c_1` (or
   `every computer`).
+- **`control.set_grants`** (`{"client": "c_1", "grants": ["body", "camera"]}`):
+  `{"client", "grants", "added", "removed", "saved": true, "shown"}` (`shown`: the lamp's words for every grant it knows, by wire name, as `control.clients` says them once). The computer's
+  grants become **exactly that list**, whole, with no new code: the app
+  pre-ticks what `control.clients` says it has, the owner edits it and taps.
+  **That tap is the consent**, the same channel and guard as a code; a pairing
+  never gains a grant any other way. lamp-control saves it at once; a camera or
+  microphone stream whose grant goes ends at once, the computer's pushed skills
+  are held to the new grants, its notes and clips stay, and its connections
+  close so it reads the new grants at its next `hello` (a program sees `closed`
+  and connects again; lamp-mcp relinks by itself). Refused, in plain words: `no such computer`, `a grant this lamp
+  doesn't know`, `not saved, so the computer keeps the grants it had`, and
+  `client must be a computer's id` / `grants must be a list of names` without
+  asking the lamp. The journal says `control.set_grants from the app: c_1 now
+  has N grant(s), added [...], removed [...]`. The app offers no `camera` or
+  `microphone` tick yet; this kind accepts them like any grant (the first
+  builder's yes, 11 Nov 2026, with them unticked by default).
 - **The seal:** HPKE (RFC 9180), base mode, single shot, with
   DHKEM(X25519, HKDF-SHA256), HKDF-SHA256 and ChaCha20-Poly1305 (ids 0x0020,
   0x0001, 0x0003). `info` is `lampos/v1/control.code`; `aad` is the lamp's
@@ -2440,7 +2456,7 @@ app that asks anyway is told `developer access is off on this lamp`.
   it with a stock HPKE library (CryptoKit's `HPKE`, Tink's `HpkeDecrypt`) and
   drops its key, the code and the pin at `until_unix_ms`. Built from `ring`
   alone (`crate::seal`).
-- **`control.clients`** (`{}`): `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`.
+- **`control.clients`** (`{}`): `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}], "shown": {"body": "can move the lamp's body", …}}`. `shown` is the lamp's words for every grant it knows, by wire name, once per answer (absent from an older lamp-control), so the app never shows a raw wire name for a grant it has no label of its own for.
   Nothing in it is secret, so it is not sealed.
 - **`control.revoke`** (`{"client": "c_1"}`): `{"revoked": true|false, "saved": true}`,
   `revoked` whether it was paired. It takes effect at once either way; when
