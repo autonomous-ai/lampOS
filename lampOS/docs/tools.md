@@ -261,9 +261,24 @@ and none of the skills' own (`crate::use_skill`):
 - **What the session is told:** after the rest of its instruction, "Your
   skills": one line each, its name, its description, and its choice's name
   and words and its yes-or-no's name, each with what its parameter says.
-  At most 4,096 bytes (`SECTION_MOST_BYTES`): skills past that are named
-  alone while their names fit, then left out of the lines; the setup line
-  counts both (`; use_skill's lines: N named alone, M left out`). The Live route keeps that
+  At most 4,096 bytes (`SECTION_MOST_BYTES`). While every line fits they
+  are told whole in the tools file's order, as before. Past it the lines
+  keep that order, but the core skills' (the tools file's `core`:
+  `dance`, `lamp_help`, `set_pose`, `wellbeing_nudges`, and
+  `prepare_to_unplug` and `stay_plugged_in` with `LAMP_UNPLUG=on`) are
+  kept whole first; every other skill is given a short line, its name and
+  its description's first sentence, at most 200 bytes of it
+  (`SHORT_MOST_BYTES`, cut at a word's end with "…"), then its choice's
+  name and words and its yes-or-no's name; then, in order, those short
+  lines are made whole again while there is room. A skill whose short line
+  doesn't fit is named alone while its name fits, then left out of the
+  lines; the setup line counts all three (`; use_skill's lines: S
+  shortened, N named alone, M left out`). With the Skills Store's nine
+  packages installed beside the product's skills (lamp-voice 90525c3717),
+  the lines were 3,989 bytes with `set_pose`, `wellbeing_nudges`,
+  `study_buddy` and `who_was_here` named alone, so the model no longer knew
+  when to call them; now 4,065, every core line whole, six Store skills
+  shortened and none named alone (`use_skill::tests`). The Live route keeps that
   room from the thread as it keeps the room for what it can't do right now;
   the cascade (`LAMP_VOICE_ROUTE=second`) tells it in each turn's system
   message.

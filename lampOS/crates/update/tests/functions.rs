@@ -126,8 +126,11 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
         }
     }
     let skills = lamp_voice::tools::skill_tools(&settings);
-    let (named, left) = lamp_voice::use_skill::cut(lamp_voice::use_skill::offered(&skills));
-    for skill in named.iter().chain(&left) {
+    let cut = lamp_voice::use_skill::cut(
+        lamp_voice::use_skill::offered(&skills),
+        &lamp_voice::tools::core_skills(&settings),
+    );
+    for skill in cut.named_alone.iter().chain(&cut.left_out) {
         println!("{CUT}{skill}");
     }
     let told = lamp_voice::without_a_tool::for_declared(&chat, settings.shutdown_from_app);
