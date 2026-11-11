@@ -149,3 +149,144 @@ fn a_snoozed_skills_hold_is_not_kept() {
     let (_, read) = restarted(skill(dir.path(), stop), &file, BOOT, 1_820);
     assert_eq!(read, 0);
 }
+
+/// A read of a linked service (#5288) after someone has been here 2
+/// minutes: its once a day is in memory only, as a snooze is.
+fn reader(dir: &Path) -> lamp_skills::Skill {
+    let folder = dir.join("evening-calendar");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(
+        folder.join("SKILL.md"),
+        "---\nname: evening-calendar\ndescription: A test.\n---\n",
+    )
+    .unwrap();
+    fs::write(
+        folder.join("skill.toml"),
+        "[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+         for = \"2m\"\ngap = \"1m\"\n[ask]\npolicy = \"nudge\"\n[permissions]\n\
+         topics = [\"room/presence\"]\nspeak = true\n\
+         services = { google_calendar = \"read\" }\n[[do]]\n\
+         read = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }\n",
+    )
+    .unwrap();
+    load(&folder).unwrap()
+}
+
+/// Someone here, or not, every 10 s from `from_s` to `to_s`, the holds kept
+/// at each turn: the seconds the read was made at.
+fn here(engine: &mut Engine, from_s: u64, to_s: u64, someone: bool) -> Vec<u64> {
+    let mut ran = Vec::new();
+    let payload = format!("{{\"someone\":{someone}}}");
+    for at in (from_s..=to_s).step_by(10) {
+        let runs = engine.observe("room/presence", at * 1_000_000, payload.as_bytes(), None);
+        if runs.iter().any(|run| !run.calls.is_empty()) {
+            ran.push(at);
+        }
+        engine.keep_holds(at * 1_000_000);
+    }
+    ran
+}
+
+/// A read's hold is kept until its read is made; from then till its local
+/// midnight none is (the read under way, done, and a new sitting the same
+/// day), so a restart never gives its day's chance back sooner than a hold
+/// begun again (the readers' P3 on #6295).
+#[test]
+fn a_reads_hold_is_not_kept_once_its_read_came_due_today() {
+    // 10:00 UTC on a day, the local time UTC.
+    const MORNING_MS: u64 = 1_762_336_800_000;
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join(holds::FILE);
+    let mut engine = Engine::new(vec![reader(dir.path())], true);
+    engine.clock(0, 0, MORNING_MS);
+    engine.keep_holds_in(file.clone(), BOOT.into(), 0).unwrap();
+    let kept = |at_s: u64| restarted(reader(dir.path()), &file, BOOT, at_s).1;
+    assert!(here(&mut engine, 0, 60, true).is_empty());
+    assert_eq!(kept(65), 1, "its read still to come: kept");
+    assert_eq!(here(&mut engine, 70, 130, true), [120]);
+    assert_eq!(kept(135), 0, "its read under way");
+    engine.done("evening-calendar");
+    assert!(here(&mut engine, 140, 200, true).is_empty());
+    assert_eq!(kept(205), 0, "its read done today");
+    assert!(here(&mut engine, 210, 290, false).is_empty());
+    assert!(here(&mut engine, 300, 400, true).is_empty());
+    assert_eq!(kept(405), 0, "a new sitting, its read made today");
+}
+
+/// The tools' folder is kept through a restart for the holds, and the last
+/// run's `tools.json` with it: let go before the new run's `call.sock` is
+/// bound, so the voice is never offered a tool from before (an update's
+/// dropped one), and written again from what the first load found (the
+/// readers' P3 on #6295).
+#[test]
+fn a_kept_folders_tools_list_is_written_again_at_the_start() {
+    use std::{
+        process::{Child, Command},
+        time::{Duration, Instant},
+    };
+    struct Running(Child);
+    impl Drop for Running {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("hk")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    let skills = root.join("skills");
+    let folder = skills.join("wave");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(
+        folder.join("SKILL.md"),
+        "---\nname: wave\ndescription: A test.\n---\n",
+    )
+    .unwrap();
+    fs::write(
+        folder.join("skill.toml"),
+        "tool = \"wave\"\n[[do]]\nsay = \"Say hello.\"\n[permissions]\nspeak = true\n",
+    )
+    .unwrap();
+    let tools = root.join("tools");
+    fs::create_dir_all(&tools).unwrap();
+    let stale = r#"{"tools":[{"name":"old_wave","description":"Gone in the update."}]}"#;
+    fs::write(tools.join("tools.json"), stale).unwrap();
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                skills.as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--actions-socket".as_ref(),
+                root.join("actions.sock").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--boot-id".as_ref(),
+                BOOT.as_ref(),
+            ])
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !tools.join("call.sock").exists() {
+        assert!(Instant::now() < deadline, "no call.sock");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let read = || fs::read_to_string(tools.join("tools.json")).ok();
+    assert_ne!(read().as_deref(), Some(stale), "the old list let go first");
+    let file = loop {
+        if let Some(text) = read() {
+            break serde_json::from_str::<serde_json::Value>(&text).unwrap();
+        }
+        assert!(Instant::now() < deadline, "no tools file");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(
+        file,
+        serde_json::json!({"tools":[{"name":"wave","description":"A test."}]})
+    );
+}
