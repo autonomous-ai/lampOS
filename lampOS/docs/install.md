@@ -1757,6 +1757,71 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      beside the socket never named; no socket, skipped), the text
      unchanged with it off, both switches' edits together, and the switch
      turned on and off over an installed Hermes.
+   - **A skill's run gets its own network namespace, with two ways out**
+     (#6306, the first builder's design on #6443; behind `LAMP_SKILL_TASKS`
+     as the control socket is). lamp-tasks starts a skill's run with
+     `LAMP_NS_NET=run` (`skill_task::HermesRunner`); it is the only opt-in,
+     and it only takes access away. Harness's own panes never set it, so
+     Hermes started there keeps its network as before. With the switch on,
+     the wrapper is written with these lines too
+     (`hermes_install::wrapper_text(true)`, `WRAPPER_TASKS_EDITS`):
+
+     ```sh
+     if [ "${LAMP_NS_NET-}" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi
+     exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/hermes-ns "$@"
+     ```
+
+     `run` exactly adds `--net` to the first `unshare`, in the same call
+     as `--map-root-user`, so the new network namespace is owned by the new
+     user namespace and its mapped root may bring `lo` up there; any other
+     value is unset, so the namespace script never sees `run` without
+     `--net`. The namespace has only `lo`: no address outside it resolves
+     or connects (`resolv.conf` is still shown, which is harmless: its
+     server is not reachable), and the lamp's abstract unix sockets, which
+     belong to a network namespace, are gone too. The namespace script
+     (`TASKS_EDITS`) then, only with `LAMP_NS_NET=run`:
+
+     ```sh
+     … L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns
+     if [ "${LAMP_NS_NET-}" = run ]; then [ -S "$B" ] && touch "$S/b" && mount --bind "$B" "$S/b" || fail "no $B"; fi
+     if [ "${LAMP_NS_NET-}" = run ]; then mkdir -p "${B%/*}" && touch "$B" && mount --move "$S/b" "$B" && ro "$B" || fail "$B not shown"; fi
+     rm -f "$S/r" "$S/l" "$S/b" && …
+     …
+     if [ "${LAMP_NS_NET-}" = run ]; then
+       I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x "$p" ]; then I=$p; break; fi; done
+       [ -n "$I" ] || fail "no ip: lo not up, the run has no way out"
+       "$I" link set lo up || fail "lo not up"
+       M=$(/usr/bin/unshare --user --map-user="$U" --map-group="$G" /opt/lampOS/tasks/current/lamp-tasks net-relay --listen 127.0.0.1:7741 --to "$B" &)
+       [ "$M" = ready ] || fail "no model relay on 127.0.0.1:7741"
+     fi
+     unset LAMP_NS_NET
+     ```
+
+     It shows lamp-tasks' bridge socket `/run/lampos-tasks/model.sock`, the
+     file alone, read-only, as the control socket is (missing, the run
+     ends: the bridge is served only with the switch on); brings `lo` up
+     (no `ip`, the run ends); and starts `lamp-tasks net-relay` (lamp-tasks'
+     own program, under `/opt`, which is not hidden) in the background,
+     waiting for its `ready` line (none, the run ends). The relay runs as
+     the caller's own ids in a nested user namespace of its own, as Hermes
+     does, so it holds no capability over the namespace's mounts that
+     Hermes could borrow. It listens on `127.0.0.1:7741`, where Hermes's
+     model calls go (`http://127.0.0.1:7741/v1/deepseek`), and pipes each
+     connection to the bridge; outside, lamp-tasks pipes each bridge
+     connection to lamp-cloud's forwarder on TCP `127.0.0.1:7741`
+     (docs/tasks.md, "A skill's task on the lamp's Hermes"). The PID
+     namespace ends the relay with Hermes. So a skill's run has exactly two
+     ways out: `control.sock` (what its one-run token grants) and the
+     model forwarder (what its forwarder token allows). Off, the wrapper
+     and the script are unchanged; OpenClaw's never get any of it. Tests:
+     the wrapper run by `sh` with `LAMP_NS_NET` `run`, unset and other
+     values (`--net` and the variable only with `run`), the script run by
+     `sh` with a net run (each new step failing stops it, `ip` missing or
+     the bridge missing too; with the switch off, the variable changes
+     nothing), the text with every step behind `run`, and OpenClaw's texts
+     with none of it. What only a lamp shows: `--net` with
+     `--map-root-user` as `lampos`, `ip link set lo up` there, and a run's
+     model call answered while `curl https://example.com` fails.
    - **User namespaces checked first:** before anything is made, `lampos`
      must be able to make that namespace: `runuser -u lampos --
      /usr/bin/unshare --map-root-user --mount --pid --kill-child
