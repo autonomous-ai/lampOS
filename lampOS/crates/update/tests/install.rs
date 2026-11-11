@@ -7765,3 +7765,35 @@ fn install_fixes_the_name_servers_and_asks_resolvconf_once() {
     lamp.install().unwrap();
     assert_eq!(refreshed(&lamp), 1, "already fixed: nothing asked");
 }
+
+#[test]
+fn the_clock_falls_back_to_time_servers_that_answer_in_china() {
+    // #6256: Debian's pool first, then Alibaba's, Tencent's and the CN pool,
+    // as fallbacks only, so a server the network gives still wins.
+    let mut lamp = Lamp::new(188, &[]);
+    let done = lamp.install().unwrap();
+    assert!(
+        done.changed
+            .contains(&format!("wrote {}", install::TIMESYNCD_PATH))
+    );
+    let text = fs::read_to_string(lamp.on(install::TIMESYNCD_PATH)).unwrap();
+    let lines: Vec<&str> = text.lines().filter(|line| !line.starts_with('#')).collect();
+    assert_eq!(
+        lines,
+        [
+            "[Time]",
+            "FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org ntp.aliyun.com ntp.tencent.com cn.pool.ntp.org",
+        ]
+    );
+    let restarted = |lamp: &Lamp| {
+        lamp.host
+            .calls
+            .iter()
+            .filter(|call| *call == "refresh systemctl try-restart systemd-timesyncd")
+            .count()
+    };
+    assert_eq!(restarted(&lamp), 1, "{:?}", lamp.host.calls);
+    let again = lamp.install().unwrap();
+    assert_eq!(again.changed, Vec::<String>::new());
+    assert_eq!(restarted(&lamp), 1, "written once: nothing asked again");
+}
