@@ -904,6 +904,37 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   | `lamp_state` | knows what the lamp itself is doing | — | any other topic (`voice/state`, `lamp/health`, …) |
   | `actions` | uses the lamp's own controls | — | `actions` not empty |
 
+- **`needs_link`** (App Only's proposal on #6059; `LAMP_SKILL_LINK_APP=on`
+  in `lamp-cloud`, on in the product): on a row whose `[permissions]
+  services` names a connector not linked now, those connectors as
+  `[{"code": "gmail", "name": "Gmail"}]`, the codes and names a made
+  skill's `needs_link` uses (either Gmail code links the other; an expired
+  link is still linked). `lamp-cloud` asks `lamp-services`' admin socket
+  (`{"op": "list"}`) once a list, only when a row names a service, waiting
+  at most 1 s. Left out when all are linked, with the switch off, or when
+  `lamp-services` can't say: the list is answered all the same.
+
+**A skill that needs a connector, told to the app** (`skills.needs_link`,
+the same switch). When a `skills.install` (from the app or the Store) puts
+on a skill whose row has `needs_link`, or a `skills.made` answer tells an
+app make (not `not_kept`) with a non-empty `needs_link`, `lamp-cloud`
+sends one unasked event on the lamp's account channel, in V1's `data`
+envelope:
+
+```json
+{"type": "data", "kind": "skills.needs_link", "status": "success", "data": {"skill": "desk-tutor", "title": "Desk tutor",
+  "needs": [{"code": "gmail", "name": "Gmail"}], "why": "installed"}}
+```
+
+`why` is `installed` or `made`. An install sends it once; a make once,
+however often the app asks `skills.made` (the last 32 makes are
+remembered, in memory). Codes and names only, never a mail's text. It goes
+only while connected, best effort, at most 8 waiting; the journal says
+`skills.needs_link: handed to the client` or `not handed to the client,
+not tried again`. The app opens that connector's Connect from it. A voice
+make and a made skill's refused read (`why: "made"` from the voice,
+`"refused"`) are not sent yet.
+
 `tests/it/skills_contract.rs` pins the reply's fields by name and type, in
 V1's envelope through JSON, from `Real` over `lampOS/skills/`, and the
 refusal's exact words without the switch.
