@@ -316,7 +316,7 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// the voice's own hello is off in `lamp-voice.service`, and its reminders
 /// and task news wait for the skill's ask (`LAMP_SCHEDULE_SPEAK=skill`,
 /// `LAMP_TASK_NEWS=skill`). Prepare-to-unplug is installed but hidden and
-/// inactive unless `LAMP_UNPLUG=on`.
+/// inactive unless `LAMP_UNPLUG=on`, which the product's units set (#5747).
 pub const PRODUCT_SKILLS: &[&str] = &[
     "welcome-back",
     "reminders",
@@ -587,7 +587,7 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("night-sleep", "SKILL.md"),
     skill_file!("not-feeling-well", "skill.toml"),
     skill_file!("not-feeling-well", "SKILL.md"),
-    // Core skill #1674 is installed but not advertised until LAMP_UNPLUG=on.
+    // Core skill #1674 is installed but not advertised until LAMP_UNPLUG=on (set in the product, #5747).
     skill_file!("prepare-unplug", "skill.toml"),
     skill_file!("prepare-unplug", "SKILL.md"),
     skill_file!("startle", "skill.toml"),

@@ -240,11 +240,12 @@ each line plays exactly as before.
 | The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
 | The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
+| The prepare-unplug skill's lines | `language::UNPLUG_READY`, `UNPLUG_FAILED`, `UNPLUG_STAY`, `UNPLUG_TIMEOUT`, `UNPLUG_CHECK`, `UNPLUG_NOT_OFF`, `UNPLUG_ASK_OFF`, `UNPLUG_UPDATING` (the skill's `[unplug]`, lamp-skills' `UnplugLines::built_in`) | `ready` as guarded `text`, the rest as exact words rendered as written (unplug.md, #5777) | an exact line that is one of them is said in the owner's words, kept or rendered now (`Recordings::rendered`, #5777's P3); `ready` is told to the model in the owner's words, as the first stand's |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, twenty-three today (`FIXED_LINES`), then the English two
+lines first, thirty-four today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders

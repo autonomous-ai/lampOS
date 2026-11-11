@@ -1593,7 +1593,28 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     };
     use std::{io::Write, os::unix::net::UnixDatagram};
 
-    let unplug = lamp_body::unplug::Adapter::from_environment()?;
+    // A kept unplug request holds the body here, up and with no actuator
+    // access, until a reboot clears it: exiting instead restart-looped it
+    // (#5777's P1). systemd hears it ready and alive, and why it is still.
+    let unplug = {
+        let notify = lamp_keeper::Notify::from_environment();
+        let mut said: Option<String> = None;
+        lamp_body::unplug::Adapter::held(|error| {
+            let why = error.to_string();
+            if said.as_deref() != Some(why.as_str()) {
+                eprintln!(
+                    "lamp-body: held, nothing moves: {why}; only a matching cancel before a failure, or a reboot, lets it start (unplug.md)"
+                );
+                notify.status(&format!("held, nothing moves: {why}"));
+                if said.is_none() {
+                    notify.ready();
+                }
+                said = Some(why);
+            }
+            notify.alive();
+            true
+        })?
+    };
     struct SignalMask(SigSet);
     impl Drop for SignalMask {
         fn drop(&mut self) {

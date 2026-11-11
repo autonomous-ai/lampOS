@@ -153,10 +153,18 @@ button's request is not heard.
    warning lights while it is held: [The button held](#the-button-held),
    through [The request](#the-request).
 
+3. **"I'm unplugging you"** (#5763): with `LAMP_UNPLUG=on` and
+   `LAMP_UNPLUG_OFF_SOCKET` set (both in the product), the prepare-unplug
+   skill's confirmed fold asks the change helper the same
+   `{"shutdown":"lamp"}` as the app, so the person hears this runner's line,
+   not "You can unplug me now" from a running lamp (unplug.md, step 7).
+
 Still to come:
 
-3. Voice: "Lamp, turn off", only with a spoken yes, never on a guess. The
-   runner itself says it is going to sleep first (the Say step).
+4. Voice: "Lamp, turn off", only with a spoken yes, never on a guess. The
+   runner itself says it is going to sleep first (the Say step). Its first
+   use is the product's unplug: a confirmed fold asks, and only a spoken
+   yes (`first_stand::is_yes`) sends the helper's request (unplug.md, step 7).
 
 The button (and later the voice) asks through [the request](#the-request); every way is behind `LAMP_SHUTDOWN`.
 
