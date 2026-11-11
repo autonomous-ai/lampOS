@@ -18,8 +18,10 @@ use crate::provider_link::{LinkContext, ProviderLink, ProviderLinkState};
 use crate::provider_worker::{Fault, ProviderOutput};
 use std::time::Duration;
 
-/// How long a check waits for any host to answer.
-pub const PROBE_WITHIN: Duration = Duration::from_secs(2);
+/// How long a check waits for any host to answer: 4 s, so a host that
+/// answers in 3 s across a slow border (#6414) is no outage. Only a failing
+/// check waits this long.
+pub const PROBE_WITHIN: Duration = Duration::from_secs(4);
 /// How often a down link checks again: every 5 s, so the link is back
 /// within seconds of the network (#1844: on lamp-06c1 at 30 s the Wi-Fi
 /// was back 38 s before the lamp knew, 20 Oct 16:15). A check is a bare
