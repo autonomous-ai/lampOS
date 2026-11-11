@@ -226,6 +226,9 @@ document.getElementById('copy').addEventListener('click', async () => {
   let n = 0;
   const ask = async () => {
     try {
+      // On the network the server gives a picture only while a page says the camera is on.
+      window.twinSend?.({ type: 'camera_on' });
+      await new Promise((resolve) => setTimeout(resolve, 150));
       const response = await fetch(withToken(`/camera.jpg`) + `&n=${n++}`);
       if (response.ok) { const old = image.src; image.src = URL.createObjectURL(await response.blob()); if (old.startsWith('blob:')) URL.revokeObjectURL(old); image.hidden = false; note.textContent = ''; }
       else { image.hidden = true; note.textContent = decodeURIComponent(response.headers.get('x-reason') ?? 'no picture'); }
