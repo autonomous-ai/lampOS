@@ -2131,9 +2131,21 @@ gone ([switches.md](switches.md)). What happens:
 2. **The brief** (`made_skill::brief`): fixed words, the skill format and
    what a made skill may use, then the person's request.
    - A time of day is asked for as the trigger's own window,
-     `during = { from = "22:00", to = "22:30" }`, not as a `[quiet]` window
-     around it. The brief once said the latter, and #2813's rerun on
-     lamp-0c89 got a 23.5 h `[quiet]` to fire around 22:00.
+     `during = { from = "HH:MM", to = "HH:MM" }` "if asked", not as a
+     `[quiet]` window around it. The brief once said the latter, and
+     #2813's rerun on lamp-0c89 got a 23.5 h `[quiet]` to fire around 22:00.
+   - It shows each field's form with no value of its own: no time, no
+     gesture, no words (`body = { gesture }`, `say = { text }`), and
+     "[[do]] only steps asked". It once showed `22:00` to `22:30`,
+     `gesture = "nod"` and `"Hi!"`, and on lamp-52e6 (11 Nov, Fifth's row on
+     #6249) "say hello when I come back to my desk" was made with a 22:00 to
+     22:30 window, a glow and a nod nobody asked for. So each make is sent
+     only its own ask: the fixed system words, and a brief of the fixed
+     words and this request (`a_second_make_is_sent_only_its_own_ask`: two
+     makes in one conversation, the second sent nothing of the first). The
+     `request` argument the voice's model passes is "in the person's own
+     words for this ask, nothing else: never a time, step or trigger of an
+     earlier skill or turn".
    - It says `skill.toml` has no `name` key: the name is SKILL.md's, and
      `name =` in `skill.toml` fails the check as an unknown field. That was
      what failed #2813's rerun on lamp-0c89.
@@ -2141,8 +2153,8 @@ gone ([switches.md](switches.md)). What happens:
      the model is asked nothing then.
    - Nothing else of the conversation goes with it.
    - It names the triggers and gestures only as "one [trigger] as listed
-     (coming to the desk is room/presence)" and `gesture = "nod"` "or one
-     listed": the system prompt lists each (`TRIGGER_MEANINGS`,
+     (coming to the desk is room/presence)" and `body = { gesture }`: the
+     system prompt lists each (`TRIGGER_MEANINGS`,
      `made_skill::gesture_names`). So the longest brief is 1,160 bytes
      (`MOST_BRIEF_BYTES`, 1,340 before) and a repair's check lines 735
      (`MOST_REPAIR_BYTES`, 560 before), the six triggers' meanings whole

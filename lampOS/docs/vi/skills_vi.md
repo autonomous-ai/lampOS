@@ -38,9 +38,25 @@ sau:
    - Yêu cầu tối đa 480 byte; dài hơn thì bị từ chối, không bao giờ bị cắt,
      và khi đó không hỏi mô hình gì cả.
    - Không có gì khác của cuộc trò chuyện đi kèm.
+   - Giờ trong ngày được hỏi là khung giờ riêng của trigger,
+     `during = { from = "HH:MM", to = "HH:MM" }` "if asked", không phải một
+     khung `[quiet]` bao quanh nó.
+   - Bản hướng dẫn chỉ cho thấy dạng của từng trường, không kèm giá trị
+     nào: không giờ, không cử chỉ, không lời nói (`body = { gesture }`,
+     `say = { text }`), và "[[do]] only steps asked". Trước đây nó cho thấy
+     `22:00` đến `22:30`, `gesture = "nod"` và `"Hi!"`, và trên lamp-52e6
+     (11/11, hàng kiểm tra của Fifth trên #6249) "say hello when I come back
+     to my desk" được tạo với khung 22:00 đến 22:30, một lần sáng đèn và một
+     cái gật đầu mà không ai yêu cầu. Vì vậy mỗi lần tạo chỉ được gửi yêu
+     cầu của chính nó: chữ system cố định, và bản hướng dẫn gồm chữ cố định
+     cùng yêu cầu này (`a_second_make_is_sent_only_its_own_ask`: hai lần tạo
+     trong cùng một cuộc trò chuyện, lần thứ hai không được gửi gì của lần
+     đầu). Đối số `request` mà mô hình của giọng nói truyền là "in the
+     person's own words for this ask, nothing else: never a time, step or
+     trigger of an earlier skill or turn".
    - Bản hướng dẫn chỉ nêu trigger và cử chỉ là "one [trigger] as listed
-     (coming to the desk is room/presence)" và `gesture = "nod"` "or one
-     listed": system prompt liệt kê từng cái (`TRIGGER_MEANINGS`,
+     (coming to the desk is room/presence)" và `body = { gesture }`: system
+     prompt liệt kê từng cái (`TRIGGER_MEANINGS`,
      `made_skill::gesture_names`). Vì vậy bản hướng dẫn dài nhất là 1.160
      byte (`MOST_BRIEF_BYTES`, trước là 1.340) và các dòng kiểm tra của một
      lần sửa là 735 byte (`MOST_REPAIR_BYTES`, trước là 560), đủ chỗ cho

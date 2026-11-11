@@ -335,7 +335,7 @@ fn parameters(writes: bool) -> Value {
         "properties": {
             "request": {
                 "type": "string",
-                "description": "What the skill should do and when, in the person's own words, nothing else."
+                "description": "What this skill should do and when, in the person's own words for this ask, nothing else: never a time, step or trigger of an earlier skill or turn."
             }
         },
         "required": ["request"]
@@ -1307,6 +1307,15 @@ light = { dim = 1 }
     /// Only this fixture's authenticated chat requests consume scripted replies.
     /// Foreign probes have bounded readers; malformed authenticated chats fail.
     pub(crate) fn service(replies: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<usize>) {
+        let (url, served) = service_sent(replies);
+        let count = std::thread::spawn(move || served.join().unwrap().len());
+        (url, count)
+    }
+
+    /// [`service`], giving back each authenticated chat's body as sent.
+    pub(crate) fn service_sent(
+        replies: Vec<(u16, String)>,
+    ) -> (String, std::thread::JoinHandle<Vec<String>>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         listener.set_nonblocking(true).unwrap();
@@ -1321,7 +1330,7 @@ light = { dim = 1 }
                 use tokio::io::AsyncWriteExt;
                 let listener = tokio::net::TcpListener::from_std(listener).unwrap();
                 let mut readers = tokio::task::JoinSet::<FixtureRead>::new();
-                let mut count = 0;
+                let mut sent = Vec::new();
                 for (status, text) in replies {
                     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
                     let (mut socket, body) = loop {
@@ -1338,8 +1347,8 @@ light = { dim = 1 }
                             }
                         }
                     };
-                    count += 1;
                     let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
+                    sent.push(body.to_owned());
                     assert!(body.contains(made_skill::BRIEF_HEAD), "{body}");
                     assert!(!body.contains("\"tools\""), "{body}");
                     let reply = if status == 200 {
@@ -1362,7 +1371,7 @@ light = { dim = 1 }
                         Ok(Ok(_)) => {}
                     }
                 }
-                count
+                sent
             })
         });
         (url, served)
@@ -1601,6 +1610,75 @@ light = { dim = 1 }
         assert_eq!(entry["on"], true);
         assert_eq!(asked.join().unwrap()["install_made"], entry["sha256"]);
         assert_eq!(served.join().unwrap(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Fifth's row on #6249 (lamp-52e6, 11 Nov): a hello skill was made
+    /// with a 22:00 to 22:30 window, a glow and a nod nobody asked for, the
+    /// brief's own shown values. Two makes in one conversation: the second
+    /// model is sent its own ask alone, in a brief with no time, gesture or
+    /// words of anyone's, and the same fixed system words as the first;
+    /// nothing of the first make, its window or its colour goes with it.
+    #[test]
+    fn a_second_make_is_sent_only_its_own_ask() {
+        let (root, keeping) = keeping("this-ask");
+        let first_toml = "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n\
+            topics = [\"room/presence\"]\nlight = true\n\n[trigger]\ntopic = \"room/presence\"\n\
+            field = \"someone\"\nequals = true\ncooldown = \"1h\"\n\
+            during = { from = \"22:00\", to = \"23:00\" }\n\n[ask]\npolicy = \"nudge\"\n\n\
+            [[do]]\nlight = { colour = \"blue\", level = 3, for = \"20s\" }\n";
+        let second_toml = "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n\
+            topics = [\"room/stood_up\"]\nbody = true\n\n[trigger]\ntopic = \"room/stood_up\"\n\
+            field = \"sitting_s\"\nabove = 0\ncooldown = \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n\
+            [[do]]\nbody = { gesture = \"nod\" }\n";
+        let answer = |toml: &str, name: &str| {
+            format!(
+                "```skill.toml\n{toml}```\n\n```SKILL.md\n---\nname: {name}\n\
+                 description: {name}\n---\n\n# {name}\n```\n"
+            )
+        };
+        let (url, served) = service_sent(vec![
+            (200, answer(first_toml, "blue-at-ten")),
+            (200, answer(second_toml, "nod-on-standing")),
+        ]);
+        let helper = manage_helper(&keeping.manage);
+        let first_ask = "glow blue at 10 pm when I'm at my desk";
+        let second_ask = "nod when I stand up";
+        let first = make(first_ask, &keeping, chat_at(url.clone()), NOW);
+        assert_eq!(first["made"], "blue-at-ten", "{first}");
+        assert!(first["next"].as_str().unwrap().contains("22:00"), "{first}");
+        let _ = take_said_line();
+        helper.join().unwrap();
+        std::fs::remove_file(&keeping.manage).unwrap();
+        let helper = manage_helper(&keeping.manage);
+        let second = make(second_ask, &keeping, chat_at(url), NOW + 60_000);
+        assert_eq!(second["made"], "nod-on-standing", "{second}");
+        assert_eq!(second["on"], true, "{second}");
+        helper.join().unwrap();
+        // What it does, before the lamp's own manners ("never from 22:00 to
+        // 08:00"), which every made skill has.
+        let said = second["next"].as_str().unwrap();
+        let does = said.split(" It starts on its own").next().unwrap();
+        assert!(does.contains("it nods"), "{said}");
+        assert!(!does.contains("22:") && !does.contains("blue"), "{said}");
+        let _ = take_said_line();
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 2);
+        let messages = |body: &str| {
+            let body: Value = serde_json::from_str(body).unwrap();
+            let messages = body["messages"].as_array().unwrap().clone();
+            assert_eq!(messages.len(), 2, "{body}");
+            let content = |at: usize| messages[at]["content"].as_str().unwrap().to_owned();
+            (content(0), content(1))
+        };
+        let (first_system, first_brief) = messages(&sent[0]);
+        let (second_system, second_brief) = messages(&sent[1]);
+        assert_eq!(first_brief, made_skill::brief(first_ask).unwrap());
+        assert_eq!(second_brief, made_skill::brief(second_ask).unwrap());
+        assert_eq!(second_system, first_system);
+        for earlier in ["22:", "10 pm", "blue", "I'm at my desk", "blue-at-ten"] {
+            assert!(!second_brief.contains(earlier), "{earlier}: {second_brief}");
+        }
         let _ = std::fs::remove_dir_all(&root);
     }
 
