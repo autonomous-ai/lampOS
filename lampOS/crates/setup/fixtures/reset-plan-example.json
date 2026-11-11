@@ -15,6 +15,7 @@
     "/var/lib/lampos-eyes/owner-voice.json.new",
     "/var/lib/lampos-tasks/store",
     "/var/lib/lampos-tasks/targets.json",
+    "/var/lib/lampos-tasks/harnesses/lamp-tasks",
     "/var/lib/lampos-tasks/.harness/auth",
     "/var/lib/lampos-tasks/.harness/connections",
     "/var/lib/lampos-tasks/.harness/computer-id",
