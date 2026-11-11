@@ -83,6 +83,9 @@ NoNewPrivileges=yes
 # functions until this restarted (lamp-4ace, 19 Oct 04:33).
 RuntimeDirectory=lampos-skills
 RuntimeDirectoryMode=0755
+# Kept through a restart (an update's), not a stop: holds.json there keeps a long held trigger's start,
+# so a 50- or 90-minute nudge does not begin again at each update; tmpfs, so never across a reboot.
+RuntimeDirectoryPreserve=restart
 # Its own state, made by systemd for its user and writable under ProtectSystem=strict.
 StateDirectory=lampos-skills-state
 StateDirectoryMode=0700
