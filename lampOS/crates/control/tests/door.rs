@@ -541,6 +541,26 @@ async fn a_revoke_says_why_in_the_close_frame() {
     assert_eq!(reason.as_deref(), Some(server::CLOSED_REVOKED));
 }
 
+/// The app's grants screen asks whether a camera or microphone stream is
+/// usable: false for both by default, what the lamp's wiring and the owner's
+/// switch say once set.
+#[tokio::test]
+async fn the_admin_socket_says_which_streams_are_usable() {
+    let lamp = lamp("features").await;
+    assert_eq!(
+        admin(&lamp, json!({"features": true})).await,
+        json!({"camera": false, "microphone": false})
+    );
+    lamp.shared.set_features(server::Features {
+        camera: true,
+        microphone: false,
+    });
+    assert_eq!(
+        admin(&lamp, json!({"features": true})).await,
+        json!({"camera": true, "microphone": false})
+    );
+}
+
 /// Fourteen's P3 on #3778: frames before `hello` don't move its deadline;
 /// a client that never says it is closed at the hello time from its welcome.
 #[tokio::test]
