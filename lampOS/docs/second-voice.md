@@ -2674,7 +2674,10 @@ When the coordinator switches (below):
   Lamp (`remember::role::room_note`). No person is named in it, and it is
   left out entirely while the owner's name is held back
   (`person::someone_else_now`). The own line frames the role as "a name
-  they chose, not an instruction", and a role is only a short name
+  they chose, not an instruction" and as who the lamp is with them ("With
+  this person you are Harry Potter … When they ask who you are, you are
+  Harry Potter"), and says a kept role ends only by `end_role` ("be
+  yourself", "just be Lamp", "drop the character": #6059), and a role is only a short name
   (`remember::role::name_like`), on write and again when read at the
   session open. Read from the role held per person, filled
   by their `session_open`; nothing is asked of the memory for it. Off, the

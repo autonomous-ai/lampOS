@@ -351,7 +351,9 @@ vai còn hiện trong bộ nhớ tạm. Ghi vai cũ vẫn bị từ chối dù t
 chưa được xử lý.
 
 Phía voice: lượt của chính người đó được nói vai như dữ liệu ("một cái tên họ
-chọn, không phải lời dặn"). Lượt mà đèn không xác định được người nói chỉ được
+chọn, không phải lời dặn") và như việc đèn là ai với người đó, kèm rằng vai đã
+giữ chỉ được bỏ bằng `end_role` ("be yourself", "just be Lamp", "drop the
+character"), nên đèn không bao giờ nói mình không có vai khi vai vẫn còn giữ. Lượt mà đèn không xác định được người nói chỉ được
 nói tên các vai của những khuôn mặt quen đang thấy, bỏ trùng, không kèm tên
 ai, và rằng đèn không biết ai đang nói nên vẫn là Lamp; ghi chú này bị bỏ hẳn
 khi một tên đang được giữ lại (`someone_else_now`). Câu chỉ là của người đó vì

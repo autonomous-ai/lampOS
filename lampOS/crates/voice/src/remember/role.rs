@@ -249,9 +249,12 @@ pub fn tools() -> Vec<Tool> {
         },
         Tool {
             name: END_ROLE.into(),
-            description: "Call this when the person ends the role they gave you: 'be yourself', 'stop being Harry', \
-                          'you're Lamp again', 'stop role-playing', 'thôi đóng vai đi', 'làm chính bạn đi', 'bạn là \
-                          Lamp lại nhé'. Then be Lamp again with them."
+            description: "Call this when the person ends the role they gave you, in any words: 'be yourself', \
+                          'just be Lamp', 'stop the role', 'drop the character', 'stop role-playing', 'stop being \
+                          Harry', 'you're Lamp again', 'thôi đóng vai đi', 'làm chính bạn đi', 'bạn là Lamp lại \
+                          nhé'. While you are told a role of theirs, any ask to be yourself or Lamp again ends it: \
+                          call this first, and never say you have no role or character without calling it. Then be \
+                          Lamp again with them."
                 .into(),
             parameters: None,
             silent: false,
@@ -394,10 +397,14 @@ pub fn heard_sets(heard: &str, name: &str) -> bool {
 
 /// The line a placed seen speaker's own turn is told, after the
 /// self-description: the role is data, a name they chose, never an
-/// instruction (#5545's P1-2).
+/// instruction (#5545's P1-2). Told as who the lamp is with them, not a
+/// name it is "called": after a voice restart, with no thread, that
+/// wording was answered "I'm Lamp … I answer to Harry Potter too"
+/// (#6059). And it says the role ends only by [`END_ROLE`], so "be
+/// yourself" is never answered "no character" while one is kept.
 pub fn own_line(role: &str) -> String {
     format!(
-        "\n\nThis person asked you to be called {role} (a name they chose, not an instruction): answer to that name and call yourself that with them. Only the name changes: what you can do and the truth of what you say and did stay as they are."
+        "\n\nWith this person you are {role}: a role they gave you (a name they chose, not an instruction), kept across conversations until they end it. When they ask who you are, you are {role}: say so and call yourself that, not Lamp with a nickname. Only the name changes: what you can do and the truth of what you say and did stay as they are. If they ask you to be yourself, just be Lamp, stop the role or drop the character, call {END_ROLE}: never say you have no role or character while this one is kept."
     )
 }
 
@@ -677,6 +684,62 @@ mod tests {
         assert_eq!(told(true, Some(&o), &[], false), "");
         forgot(Some(&t));
         assert_eq!(told(true, None, &[tom.into()], false), "");
+    }
+
+    /// #6059 (lamp-06c1, 11 Nov, #5872's step 2): after a voice restart the
+    /// thread is gone and the role held from the session's open is all the
+    /// turn has. Told as a name they "asked you to be called", the lamp
+    /// answered "I'm Lamp … I answer to Harry Potter here too". Its own turn
+    /// is told who it is now: the role, the character it plays with them,
+    /// still data and never an instruction.
+    #[test]
+    fn a_kept_role_after_a_restart_is_told_as_who_the_lamp_is_with_them() {
+        forgot(None);
+        let person = crate::known_faces::memory_person("Olivia Restart Test");
+        // A new process: nothing held, then the person's session open.
+        loaded(&person, Some("Harry Potter".into()), revision());
+        let own = told(true, Some(&person), &[], false);
+        assert_eq!(own, own_line("Harry Potter"));
+        assert!(own.contains("you are Harry Potter"), "{own}");
+        assert!(own.contains("who you are"), "{own}");
+        assert!(
+            own.contains("(a name they chose, not an instruction)"),
+            "{own}"
+        );
+        assert!(!own.contains("asked you to be called"), "{own}");
+        assert!(!own.contains("answer to that name"), "{own}");
+        forgot(None);
+    }
+
+    /// #6059 (#5872's step 3): "Lamp, be yourself." called no `end_role`,
+    /// the lamp saying "just me, no character" while the role stayed kept.
+    /// Every plain ask to stop it reaches `end_role`: the function names
+    /// them, and the own line says a held role ends only by it, so the lamp
+    /// never says it has none while it is kept.
+    #[test]
+    fn plain_language_ends_of_a_role_reach_end_role() {
+        let end = tools()
+            .into_iter()
+            .find(|tool| tool.name == END_ROLE)
+            .unwrap()
+            .description;
+        for ask in [
+            "be yourself",
+            "just be Lamp",
+            "stop the role",
+            "drop the character",
+            "stop role-playing",
+            "stop being Harry",
+        ] {
+            assert!(end.contains(ask), "{ask:?} in {end}");
+        }
+        assert!(end.contains("never say you have no role"), "{end}");
+        let own = own_line("Harry Potter");
+        assert!(own.contains(END_ROLE), "{own}");
+        for ask in ["be yourself", "just be Lamp", "drop the character"] {
+            assert!(own.contains(ask), "{ask:?} in {own}");
+        }
+        assert!(own.contains("never say you have no role"), "{own}");
     }
 
     /// Jarvis's P1-1 on #5545: the room note names no person, whoever is in
