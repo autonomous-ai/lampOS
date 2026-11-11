@@ -294,6 +294,15 @@ hàm nào (`calls=none`): `start_agent_task` bắt buộc có `task`, còn
 lamp-tasks không bao giờ chạy. Khi bật cả hai công tắc (`LAMP_TASKS_REPLY_NAMED`
 của giọng nói và `lamp-tasks --reply-named`):
 
+- **Chỉ cho chủ đèn.** Chỉ chủ đèn, khi chính họ nói ra, mới được mở hay
+  hỏi một phiên, giống cách các dịch vụ kiểm tra một lần đọc
+  (`services::owner_of`, `agent_tasks::Asker`; trong phòng riêng thì ai nói
+  cũng được). Người khác trong phòng được trả "only the lamp's owner can
+  open or ask about their sessions", và một dòng không ai nói (chỉ mô hình
+  tự gọi) cũng bị từ chối. Khi đó lamp-tasks không được hỏi gì, nên không
+  lộ tên, trạng thái hay việc của phiên nào (P1 của Reviewer-lead trên
+  #6422).
+
 - **Yêu cầu.** Giọng nói gửi lên socket riêng của giọng nói:
   `{"op":"session","look":"voice-<request>-look-<n>","target":"<bí danh>","session":"<lời người nói>","join":true|false}`.
   `target` được chọn như khi giao việc: target của chính đèn nếu việc làm ở
@@ -303,16 +312,24 @@ của giọng nói và `lamp-tasks --reply-named`):
   chạy trên một lane riêng (`SessionLane`, `Cli::session_lane`), cạnh lane giao
   việc, tối đa 4 lần cùng lúc, mỗi câu trả lời giữ 60 s. Giọng nói hỏi lại
   bằng cùng `look` mỗi 250 ms, tối đa 16 s (`LOOK_WAIT`; giới hạn của
-  lamp-tasks là `LOOK_BOUND`, 15 s). Xong thì có `"found"` (`state`, `name`,
+  lamp-tasks là `LOOK_BOUND`, 15 s). Việc hỏi lại dừng (`cancelled`) ngay
+  khi lượt nói kết thúc: phạm vi bộ nhớ của yêu cầu bị thu hồi khi lượt hết
+  hoặc khi người dùng nói chen vào. Route không có phạm vi thì chỉ dừng theo
+  các giới hạn trên. Xong thì có `"found"` (`state`, `name`,
   `ask`, `about` cắt ở một từ, tối đa 160 ký tự, `last_active_unix_ms`,
   `resumed`, `on`) hoặc `"code"`. `Cli::look_session` tìm phiên giống hệt lúc
-  giao việc vào một phiên có tên (`find_named`). Nó không gõ gì, không route
-  và không mở phiên mới.
+  giao việc vào một phiên có tên (`find_named`). Nó không gõ gì và không
+  route. Điều duy nhất nó có thể khởi động là mở lại một phiên đã đóng được
+  gọi đúng tên, như dưới đây.
 - **Mở (`join`).** Đây là `start_agent_task` có `session` mà không có `task`,
   và chỉ chạy khi người dùng tự nói ra. Một phiên đang chạy và rảnh thì được
-  mở như đang có. Phiên đang bận thì nói là bận. Phiên đã dừng thì được mở lại
-  bằng `harness resume` khi bật `LAMP_TASKS_RESUME_CLOSED`, nếu không thì trả
-  `session_stopped`. Mô hình nhận `{"open":true,"session":…,"where":…,"next":…}`.
+  mở như đang có. Phiên đang bận thì nói là bận. Phiên đã dừng và được gọi
+  đúng tên thì được mở lại bằng `harness resume` khi bật
+  `LAMP_TASKS_RESUME_CLOSED`, việc này khởi động lại agent của nó trên máy
+  đó; nếu không thì trả `session_stopped`. Phiên đã dừng mà chỉ tìm ra nhờ
+  tên nói gần đúng thì không bao giờ được mở lại: đèn nói đó là phiên gần
+  nhất, đã đóng, và hỏi người dùng có phải phiên đó không, muốn mở lại thì
+  nói đúng tên của nó. Mô hình nhận `{"open":true,"session":…,"where":…,"next":…}`.
   `next` bảo nói rằng phiên đã mở và hỏi phiên nên làm gì. Điều người dùng nhờ
   tiếp theo sẽ đi vào phiên đó qua `start_agent_task` kèm session ấy, được đọc
   lại và chờ một tiếng "có" như mọi lần giao việc vào phiên có tên.
@@ -324,25 +341,37 @@ của giọng nói và `lamp-tasks --reply-named`):
 - **Không đoán.** Không phiên nào khớp thì nói thẳng. Nhiều phiên khớp thì hỏi
   lại người dùng. Phiên đã đóng, phiên bận, máy tính offline và danh sách không
   đọc được thì mỗi trường hợp có vài lời riêng.
-- **Tên nói gần đúng.** Một từ bị nghe nhầm hoặc viết sai vẫn tìm ra phiên gần
-  nhất (`near_name`), ví dụ "costumer survey" hay "survay" cho "Customer
-  Survey". Cách này chỉ dùng khi tên, thư mục và việc đã làm đều không khớp.
+- **Tên nói gần đúng.** Chỉ khi xem một phiên (không bao giờ khi giao việc
+  gõ vào phiên), một từ bị nghe nhầm hoặc viết sai vẫn tìm ra phiên gần
+  nhất (`near_session`, `near_name`), ví dụ "costumer survey" hay "survay"
+  cho "Customer Survey". Cách này chỉ dùng khi trên mọi máy, tên, thư mục và
+  việc đã làm đều không khớp: mọi máy được đọc trước, nên một phiên gọi
+  đúng tên trên máy tính luôn thắng một phiên gần đúng trên đèn ("test":
+  "Test runner" của Mac, không phải "Text formatter" của đèn). Câu trả lời
+  có `"near":true`, và giọng nói nêu tên phiên tìm được để người dùng biết
+  là phiên nào. Khi giao việc gõ vào một phiên, chỉ tên đúng mới được nhận,
+  vì câu đọc lại dùng lời của người dùng nên tiếng "có" không bắt được một
+  lựa chọn gần đúng (P2 của Reviewer-lead trên #6422).
   Mỗi từ nói ra phải khớp với một từ của tên, theo đúng thứ tự: hoặc là phần
   đầu của từ đó, hoặc là cả từ nhưng lệch một chút (thiếu, thừa hay sai một
   chữ, hoặc hai chữ cạnh nhau bị đảo). Từ 4–7 chữ được lệch tối đa 1 chữ, từ
   từ 8 chữ trở lên được lệch tối đa 2. Từ dưới 4 chữ thì không được lệch.
-  Phiên có ít chữ lệch nhất được chọn, hai phiên gần ngang nhau là
-  `session_ambiguous`. "api" vẫn không bao giờ khớp "rapid-prototype".
+  Phiên có ít chữ lệch nhất được chọn, hai phiên gần ngang nhau, trên một
+  máy hay hai máy, là `session_ambiguous`. "api" vẫn không bao giờ khớp "rapid-prototype".
 - **Schema.** Khi bật công tắc, `start_agent_task` không có `required`: chỉ có
   session là đủ, không có cả hai thì trả "Say what the work is.". Mô tả của
   `session` thêm "Sent with no task, it opens it.".
   `check_agent_task` thêm `session` và một câu. Khi tắt, cả hai giữ nguyên từng
   chữ, kể cả `required: ["task"]`.
 - **Test:** `tests/harness.rs` `a_name_said_nearly_right_finds_the_one_closest_session`,
+  `a_name_as_it_is_on_a_computer_beats_a_near_one_on_the_lamp`,
+  `a_near_name_never_reopens_a_closed_session`,
   `a_named_session_is_looked_at_to_open_or_say_how_it_is_with_nothing_typed`;
   `tests/runtime.rs` `a_look_at_a_named_session_answers_at_once_and_is_asked_again_for_what_it_found`;
   `agent_tasks::tests::with_reply_named_a_session_alone_opens_it_and_needs_no_task`,
-  `agent_tasks::tests::with_reply_named_a_check_names_a_session_and_is_told_its_own_state`.
+  `agent_tasks::tests::with_reply_named_a_check_names_a_session_and_is_told_its_own_state`,
+  `agent_tasks::tests::a_named_session_is_opened_or_told_only_to_the_lamps_owner`,
+  `agent_tasks::tests::a_look_stops_asking_again_once_its_turn_is_over`.
 - **Chưa chạy trên đèn:** cả luồng với giọng phát từ Mac, và người dùng phải chờ
   bao lâu khi các phiên được liệt kê. Ngày 10/11 trên lamp-c0a4, lần tìm phiên
   khi giao việc mất 15,2 s vì có hai máy offline. Một lần tìm phiên ở đây cũng
