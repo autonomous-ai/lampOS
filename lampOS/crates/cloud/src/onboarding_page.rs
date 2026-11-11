@@ -19,8 +19,9 @@
 //!   app's words) in [`ADDED_FIRST`] for the page's first, [`ADDED_MORE`]
 //!   after. An id not installed gets nothing; the lamp installs nothing.
 //!   A #6076 app (`onboarding_page_version` < 2) sends its picks as it
-//!   leaves: several ids in one message end the page, done with the first
-//!   installed id's line, or at once with no line if none is installed.
+//!   leaves: an `added` of none or several ids ends the page, done with
+//!   the first installed id's line, or at once with no line if none is
+//!   installed.
 //! - **create:** nothing here: lamp-voice says the made skill's own line
 //!   (`made_skill::on_line`, "I made <Name>, and it's on.").
 //! - **done:** [`DONE`], once.
@@ -238,13 +239,13 @@ impl Pages {
         }
         let open = self.open.as_mut().ok_or(PAGE)?;
         if page == Page::Add {
-            let ids: Vec<&str> = data
-                .get("added")
-                .and_then(Value::as_array)
+            let added = data.get("added").and_then(Value::as_array);
+            let ids: Vec<&str> = added
                 .map(|ids| ids.iter().filter_map(Value::as_str).collect())
                 .unwrap_or_default();
-            // Several ids at once are a #6076 app's picks on leaving: the
-            // page ends with them (a per-tap app sends one).
+            // An `added` of none or several ids is a #6076 app's picks on
+            // leaving: the page ends with them (a per-tap app sends one).
+            let left = added.is_some_and(|added| added.len() != 1);
             let before = open.added;
             for &id in &ids {
                 if let Some(name) = name(id) {
@@ -257,7 +258,7 @@ impl Pages {
                     open.added += 1;
                 }
             }
-            open.end |= ids.len() > 1 && open.added == before;
+            open.end |= left && open.added == before;
         }
         Ok(json!({}))
     }
@@ -638,8 +639,9 @@ mod tests {
         );
     }
 
-    /// #6366: a #6076 app's picks sent on leaving (several ids) still end
-    /// the page: with the first installed id's line, else at once, no line.
+    /// #6366: a #6076 app's picks sent on leaving (none or several ids)
+    /// still end the page: with the first installed id's line, else at
+    /// once, no line. A page opened with no `added` waits for taps.
     #[test]
     fn an_old_apps_picks_on_leaving_end_the_page() {
         let mut pages = Pages::default();
@@ -652,6 +654,18 @@ mod tests {
                 )
                 .unwrap();
         };
+        pages
+            .open(&json!({"page": "add"}), Seen::default(), installed)
+            .unwrap();
+        assert!(pages.done(Seen::default()).is_none());
+        leave(&mut pages, json!([]));
+        assert_eq!(
+            pages.done(Seen::default()),
+            Some((Some(json!({"page": "add"})), String::new()))
+        );
+        pages
+            .open(&json!({"page": null}), Seen::default(), none)
+            .unwrap();
         leave(&mut pages, json!(["glow-green", "glow-red"]));
         assert_eq!(
             pages.done(Seen::default()),
