@@ -234,6 +234,8 @@ refusals in the lamp's own words, and its status.
 | `lamp.request(op, **fields)` | `lamp.request(op, fields)` | — | Sends any op as written in `control.schema.json` and awaits its reply | the op's | the op's | the reply | the op's | the op's |
 | `await lamp.close()` | `await lamp.close()` | — | Releases this computer's leases and closes | — | — | — | — | works today (9 Nov 2026) |
 
+**On the lamp itself, with no pairing.** A program that runs on the lamp as the one user the owner turned on (the local agent, [docs/control.md](../docs/control.md), "The local agent") needs no `lamp pair`: with no pairing found, and no `host` asked for, `Lamp.connect()` (Python and JavaScript, and so the CLI and `lamp-mcp`) uses the socket `/run/lampos-agent/agent.sock` (`LAMPOS_AGENT_SOCKET` names another), says `hello` with no key, and holds exactly the grants the owner left that user: body, light, speak, look and skills at first, never the camera, the microphone, what the lamp says, its logs or its speaker unless the owner gives them in the app. A pairing, when there is one, is used as before; a program of any other user is refused by the lamp before it says a word.
+
 ### State (`get`)
 
 Op `get` takes `state`, a list of names. Each name comes back under `state`.

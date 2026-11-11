@@ -1,8 +1,7 @@
 # lamp-mcp
 
 One paired lampOS lamp as MCP tools, for an agent on your own computer: Claude
-Code, Claude Desktop, or any MCP client. It runs on your computer, never on the
-lamp, and reaches the lamp only through the [`lampos`](https://github.com/autonomous-ai/lampOS/tree/lamp-voice/lampOS/sdk/python) SDK and the
+Code, Claude Desktop, or any MCP client. It runs on your computer (or, for a coding agent on the lamp itself, as the local agent's own user, below), and reaches the lamp only through the [`lampos`](https://github.com/autonomous-ai/lampOS/tree/lamp-voice/lampOS/sdk/python) SDK and the
 pairing `lamp pair` made. The protocol is [docs/control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md).
 
 ```sh
@@ -10,6 +9,8 @@ pip install ./sdk/python ./sdk/mcp   # from lampOS/ in a checkout of the lamp-vo
 lamp pair 12345678 --pin 3f9a… --host lamp-xxxx.local  # once, with the code and the lamp's pin the app shows
 claude mcp add lamp -- lamp-mcp
 ```
+
+**On the lamp itself:** a coding agent that runs on the lamp as the user the owner turned on needs no `lamp pair`: `lamp-mcp` finds the local agent's socket (`/run/lampos-agent/agent.sock`) when there is no pairing (see the [guide](../GUIDE.md)).
 
 **On a customer lamp today (stable 11450, promoted 10 Nov, lamp-voice `135bc417d4`):** lamp-control is on every lamp,
 and answers once the owner turns on developer access in the app. Five gaps,
