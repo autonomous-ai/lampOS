@@ -3303,16 +3303,14 @@ lamp-update's own unit (on by default on a product lamp: its
 `PRODUCT_DEFAULT` is on, the product owner's decision, 10 Nov; another
 lamp needs `on`; install.md, "Hermes on the lamp"); a round with that
 switch on and Harness already
-there starts the same unit for Hermes. Hermes's install starts only in
-its window (`hermes_schedule::window`): not in the first round after
-lamp-update starts, not while the setup walk is under way, only after
-10 min with the voice resting and nobody heard, and then right after the
-walk ended, by day for a lamp that never tried (one that just took the
-update), or 01:00 to 05:00 local. While it runs, a thread of `serve`
+there starts the same unit for Hermes. Hermes's install starts in any
+reached round, the first too (`hermes_schedule::window`, the lead's rule,
+V2 15:44 on #5978), with no quiet stretch and no night window; only
+never while the setup walk is under way. While it runs, a thread of `serve`
 freezes the unit (its own `cgroup.freeze`; `systemctl freeze` is refused for a oneshot still activating) as soon as the voice is not quiet,
-thaws it after 10 quiet min, stops it after 30 min frozen in all
+thaws it once the voice has rested 5 s, stops it after 40 min frozen in all
 (`interrupted`) and stops it at once when the voice's privacy lease is
-lost (`privacy_lost`); both are tried in the next open window. The unit
+lost (`privacy_lost`); both are tried in the next round. The unit
 has `MemoryHigh=600M` and `CPUQuota=100%` too, so the voice keeps its privacy reading through the `products` stage (lamp-c0a4, 11 Nov: above 1.4 GB available all through). `check-units` compares it with its own text
 as "the updater's", and a round never takes it for a part's unit. Its
 record, `harness-install.json`, is said on `update/status` as `harness`.

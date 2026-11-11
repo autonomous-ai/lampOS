@@ -287,7 +287,7 @@ fn round(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesInstall> {
         false,
         systemd,
         at,
-        Ok(crate::hermes_schedule::Window::Night),
+        Ok(crate::hermes_schedule::Window::Reached),
         &mut quiet(),
     )
 }
@@ -313,7 +313,7 @@ fn round_with_skills(lamp: &Lamp, systemd: &mut Fake, at: u64) -> Option<HermesI
         true,
         systemd,
         at,
-        Ok(crate::hermes_schedule::Window::Night),
+        Ok(crate::hermes_schedule::Window::Reached),
         &mut quiet(),
     )
 }
