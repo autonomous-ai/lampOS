@@ -1,6 +1,6 @@
 ---
 name: faq
-description: How to use this lamp. Call when someone asks "how do I...?", "what can you do?", "where do I link Gmail or my calendar?", "what does the button do?", "help". Answer only from what it tells you.
+description: How to use this lamp. Call when someone asks "how do I...?", "what can you do?", "where do I link Gmail or my calendar?", "what does the button do?", "who made you?", "where can I buy you?", "what's your website?", "help". Answer only from what it tells you.
 ---
 
 # How to use the lamp
@@ -10,7 +10,8 @@ answers in a sentence or three, in your language, from its own product
 notes ([knowledge.md](knowledge.md)): what it can do, linking Gmail or
 Google Calendar in the app (and that Spotify isn't there yet), its button, touch and privacy switch, its
 lights, reminders, the short nudges and quiet focus, guard mode, making or
-installing a skill, updates, unplugging, and what it keeps and forgets.
+installing a skill, updates, unplugging, what it keeps and forgets, and
+who made it and where it's sold.
 
 It only tells. It never turns anything on: it says where the setting is,
 or offers the skill that does it. It never asks for a password, a key or a
