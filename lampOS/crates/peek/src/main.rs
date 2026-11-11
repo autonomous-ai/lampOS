@@ -11,7 +11,9 @@ use lamp_peek::{
     monitor::{self, Conn, Monitor},
     monitor_mode,
     serve::{self, Peek},
-    switched_on, units,
+    switched_on,
+    timeline::Timeline,
+    units,
     watch::{self, Seen},
 };
 use std::{
@@ -90,7 +92,11 @@ fn run(
     } else {
         "read-only"
     };
-    let seen = Arc::new(Mutex::new(Seen::default()));
+    // Words heard and said are kept in monitor mode only.
+    let seen = Arc::new(Mutex::new(Seen {
+        timeline: Timeline::new(monitor.is_some()),
+        ..Seen::default()
+    }));
     let stop = Arc::new(AtomicBool::new(false));
     let watching = thread::Builder::new()
         .name("lamp-peek-watch".into())
