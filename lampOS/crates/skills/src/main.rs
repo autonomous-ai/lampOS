@@ -3468,7 +3468,7 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
             Ok(Progress::Ready) if std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).is_some() => {
                 let socket = std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).unwrap_or_default();
                 return match yes_to_turn_off(skill, sockets, bus) {
-                    Ok(()) => turn_off(skill, sockets, bus, &request, since, Path::new(&socket)),
+                    Ok(()) => turn_off(sockets, bus, &request, since, Path::new(&socket)),
                     Err(why) => {
                         let line = sockets
                             .may
@@ -3559,15 +3559,34 @@ fn stay_call((name, args, _, reply, admission): ToolAsk, engine: &Engine, runner
 /// body waits a further 3 s before any motion. A line never begun cancels
 /// nothing: a person mid-unplug must hear it before the arm moves.
 fn stay(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
+    stay_even_unsaid(sockets, bus, request, line, false)
+}
+
+/// [`stay`], and with `unsaid_too` the cancel is published even when the
+/// line never began (refused, expired, the voice not reached): a turn-off
+/// that failed never leaves the lamp kept folded.
+fn stay_even_unsaid(
+    sockets: &Sockets,
+    bus: &Bus,
+    request: &str,
+    line: &str,
+    unsaid_too: bool,
+) -> String {
     let mut cancelled = None;
-    let outcome = say(
-        &sockets.say,
-        "staying plugged in",
-        &sockets.may.skill,
-        exact(line, 8),
-        &[],
-        || cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us())),
-    );
+    let outcome = match sockets.may.refuses(&Call::Say(String::new())) {
+        Some(refused) if unsaid_too => refused,
+        _ => say(
+            &sockets.say,
+            "staying plugged in",
+            &sockets.may.skill,
+            exact(line, 8),
+            &[],
+            || cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us())),
+        ),
+    };
+    if unsaid_too && cancelled.is_none() {
+        cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
+    }
     match cancelled {
         Some(Ok(())) if failed_after_cancel(bus, request) => format!(
             "{outcome}; cancel published for {request}; it then failed: {}",
@@ -3803,15 +3822,9 @@ fn yes_to_turn_off(skill: &str, sockets: &Sockets, bus: &Bus) -> Result<(), Stri
 /// the helper asked to turn the lamp off, as the app's Turn off asks. Its
 /// runner (`lamp-setup shutdown-now`) says the last words, stops every
 /// part, lets the arm go, lights green, syncs and powers off. Refused or
-/// not reached: the `not_off` note, and the latch kept, as for any failure.
-fn turn_off(
-    skill: &str,
-    sockets: &Sockets,
-    bus: &Bus,
-    request: &str,
-    since: u64,
-    socket: &Path,
-) -> String {
+/// not reached: the `not_off` note, and it stands up as after "never mind",
+/// the cancel published even if the note never began.
+fn turn_off(sockets: &Sockets, bus: &Bus, request: &str, since: u64, socket: &Path) -> String {
     let asked = || -> io::Result<serde_json::Value> {
         let mut stream = UnixStream::connect(socket)?;
         stream.set_write_timeout(Some(TURN_OFF_WAIT))?;
@@ -3848,24 +3861,19 @@ fn turn_off(
         Ok(answer) => format!("the turn-off was not taken: {answer}"),
         Err(error) => format!("the turn-off could not be asked: {error}"),
     };
-    if let Some(refused) = sockets.may.refuses(&Call::Say(String::new())) {
-        return format!("unplug: {why}; {refused}");
-    }
+    // Not off: the note, then it stands up as a "never mind" makes it, even
+    // when the note never began; a kept request would hold it folded until
+    // a reboot (lamp-52e6, build 11913).
     let note = sockets
         .may
         .unplug
         .as_ref()
         .map(|lines| lines.not_off.clone())
         .unwrap_or_default();
-    let said = say(
-        &sockets.say,
-        "unplug: not turned off",
-        skill,
-        exact(&note, 8),
-        &[],
-        || {},
-    );
-    format!("unplug: {why}; {said}")
+    format!(
+        "unplug: not turned off: {why}; {}",
+        stay_even_unsaid(sockets, bus, request, &note, true)
+    )
 }
 
 fn say_unplug_ready(
@@ -6061,6 +6069,45 @@ mod tests {
         let outcome = stay(&sockets, &bus, "r1", &unplug_lines().stay);
         assert!(outcome.contains("nothing cancelled"), "{outcome}");
         assert!(cancels(&bus).is_none());
+    }
+
+    /// lamp-52e6 on build 11913: a turn-off not taken left the request
+    /// kept, and the lamp folded until a reboot. Not off, it says so and
+    /// stands up as after "never mind".
+    #[test]
+    fn a_turn_off_not_taken_says_not_off_then_stands() {
+        let dir = tempfile::Builder::new()
+            .prefix("uo")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = turn_off(&sockets, &bus, "r1", 0, &dir.path().join("no-helper.sock"));
+        assert!(outcome.contains("unplug: not turned off"), "{outcome}");
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert_eq!(heard.join().unwrap(), [(unplug_lines().not_off, false)]);
+        assert!(cancels(&bus).is_some());
+    }
+
+    /// The same when the note never begins (it expired, or the voice was
+    /// not reached): the request is still cancelled, never kept.
+    #[test]
+    fn a_turn_off_not_taken_stands_even_when_its_note_expires() {
+        let dir = tempfile::Builder::new()
+            .prefix("ue")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = turn_off(&sockets, &bus, "r1", 0, &dir.path().join("no-helper.sock"));
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert!(cancels(&bus).is_some());
     }
 
     #[test]
