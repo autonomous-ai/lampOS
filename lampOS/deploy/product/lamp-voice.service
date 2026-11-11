@@ -222,6 +222,9 @@ Environment=LAMP_LIGHT_TOLD=on
 # A reply claiming a light, volume or timer action no call made is asked again once, then said not done: on lamp-52e6
 # "Timer set. It rings at 9:39 am." (9928) and "Louder."/"Brighter."/"Cooler." came with no call (#5215).
 Environment=LAMP_ACTION_CLAIM_CHECKED=on
+# The owner's line is told which services are linked in the app, so "what can you do with my calendar?"
+# is answered from it, not as the app's job (#5523).
+Environment=LAMP_SERVICES_TOLD=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # Talk over the lamp's own line (a say, a reminder, news) in a busy room is let go and the line goes on; its name,
