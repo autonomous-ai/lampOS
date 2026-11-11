@@ -1,0 +1,98 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>model collisions</title>
+<style>body{font:13px/1.4 ui-monospace,monospace;margin:16px}pre{white-space:pre-wrap}</style>
+<!--
+  Does the lamp's kinematic model (src/lamp.model.json) pass its own arm through the base or the table?
+  It poses the real CAD (robots/lamp/hardware/cad/glb/lamp.glb) at home (deg 0, the folded lamp), at the stand
+  (shoulder 49.5, elbow 46.1) and over the arm's legal range (shoulder 0 to 50, elbow 0 to 54: lamp-body's
+  'arm inside its window between the fold and the stand'), for the model as shipped and for each other sign of the
+  shoulder and the elbow, and counts the arm's and the head's vertices inside the base's box (shrunk 4 mm) or below
+  the table plane. The turntable ('Solid2*') and the wire sit inside the base by design and are left out.
+  Run it from the repository root (the page reads three.js from the twin's vendored copy and the CAD):
+      python3 -m http.server 8921 --bind 127.0.0.1        then open
+      http://127.0.0.1:8921/lampOS/sdk/js/tools/model-collisions.html
+  About 40 s. The shipped signs must show 0 at home, at the stand and over the window (a model change that
+  puts the shade through the base shows up here: the old shoulder sign -1 had 64 vertices inside the base and
+  12 below the table at home). Needs Git LFS for lamp.glb.
+-->
+<script type="importmap">{ "imports": { "three": "../examples/twin/vendor/three/three.module.min.js", "three/addons/": "../examples/twin/vendor/three/jsm/" } }</script>
+<pre id="out">posing the CAD...</pre>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const model = await (await fetch('../src/lamp.model.json')).json();
+const gltf = await new GLTFLoader().loadAsync('../../../../robots/lamp/hardware/cad/glb/lamp.glb');
+const scene = gltf.scene;
+scene.updateMatrixWorld(true);
+const bones = {};
+const rest = {};
+scene.traverse((n) => { for (const j of model.joints) if (n.name === j.bone) { bones[j.name] = n; rest[j.name] = n.quaternion.clone(); } });
+const meshes = [];
+scene.traverse((n) => { if (n.isMesh) meshes.push(n); });
+const baseMeshes = meshes.filter((m) => m.parent?.name === model.base_mesh);
+const moving = meshes.filter((m) => !baseMeshes.includes(m) && !/^Solid2(_\d+)?$/.test(m.name) && !/wire/.test(m.name));
+const v = new THREE.Vector3();
+const verts = (m, step) => {
+  const out = [];
+  const pos = m.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i += step) {
+    v.fromBufferAttribute(pos, i);
+    if (m.isSkinnedMesh) m.applyBoneTransform(i, v);
+    out.push(v.clone().applyMatrix4(m.matrixWorld));
+  }
+  return out;
+};
+function setPose(cal, deg) {
+  for (const j of model.joints) {
+    const c = cal[j.name];
+    bones[j.name].quaternion.copy(rest[j.name]).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...j.axis), THREE.MathUtils.degToRad(c.sign * ((deg[j.name] ?? 0) - c.zero_deg))));
+  }
+  scene.updateMatrixWorld(true);
+  for (const m of meshes) if (m.skeleton) m.skeleton.update();
+}
+const baseBox = new THREE.Box3();
+for (const m of baseMeshes) for (const p of verts(m, 4)) baseBox.expandByPoint(p);
+const inner = baseBox.clone().expandByScalar(-0.004);
+const tableY = baseBox.min.y;
+function measure(cal, deg, step) {
+  setPose(cal, deg);
+  let inBase = 0;
+  let belowTable = 0;
+  let lowest = 1;
+  let depth = 0;
+  for (const m of moving) {
+    for (const p of verts(m, step)) {
+      if (baseBox.containsPoint(p)) depth = Math.max(depth, Math.min(p.x - baseBox.min.x, baseBox.max.x - p.x, p.y - baseBox.min.y, baseBox.max.y - p.y, p.z - baseBox.min.z, baseBox.max.z - p.z));
+      if (inner.containsPoint(p)) inBase++;
+      if (p.y < tableY - 0.002) belowTable++;
+      lowest = Math.min(lowest, p.y - tableY);
+    }
+  }
+  return { inBase, belowTable, lowest: +(lowest * 1000).toFixed(0), depth: +(depth * 1000).toFixed(0) };
+}
+const shipped = Object.fromEntries(model.joints.map((j) => [j.name, { sign: j.sign, zero_deg: j.zero_deg }]));
+const lines = [`base box ${JSON.stringify([baseBox.min.toArray(), baseBox.max.toArray()].map((a) => a.map((x) => +x.toFixed(3))))}; shipped shoulder sign ${shipped.shoulder.sign}, elbow sign ${shipped.elbow.sign}`, ''];
+const result = {};
+for (const ss of [shipped.shoulder.sign, -shipped.shoulder.sign]) for (const se of [shipped.elbow.sign, -shipped.elbow.sign]) {
+  const cal = JSON.parse(JSON.stringify(shipped));
+  cal.shoulder.sign = ss;
+  cal.elbow.sign = se;
+  const home = measure(cal, { shoulder: 0, elbow: 0 }, 40);
+  const stand = measure(cal, { shoulder: 49.5, elbow: 46.1 }, 40);
+  let bad = 0;
+  let cells = 0;
+  for (let s = 0; s <= 50.01; s += 5) for (let e = 0; e <= 54.01; e += 5.4) {
+    const r = measure(cal, { shoulder: s, elbow: e }, 200);
+    cells++;
+    if (r.inBase > 0 || r.belowTable > 0) bad++;
+  }
+  const name = `shoulder ${ss > 0 ? '+1' : '-1'} elbow ${se > 0 ? '+1' : '-1'}${ss === shipped.shoulder.sign && se === shipped.elbow.sign ? '  (shipped)' : ''}`;
+  result[name] = { home, stand, window: `${bad}/${cells} poses collide` };
+  lines.push(`${name}: home in-base ${home.inBase} (deepest ${home.depth} mm), below table ${home.belowTable}, lowest ${home.lowest} mm | stand in-base ${stand.inBase}, below table ${stand.belowTable} | fold..stand ${bad}/${cells} collide`);
+}
+document.getElementById('out').textContent = lines.join('\n');
+window.__result = result;
+document.title = 'done';
+</script>
