@@ -668,6 +668,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "b3fc8a01c4e8efb457ddbf784bff558bc6bd52d2a4c1770f7512f79c78789041", // the owner's local agent switch: its drop-in (agent.conf)
     "74178b7911c982cc32f3210b78b1bc9a6120fd2f5ddc52ff83e367e2f8e9090a", // #5750: the faces from photos' staging copy
     "4687f342dab4edfd70004ff4d6f18a54a6113e6ba6f2d5e9f63a86ef185a3687", // #5394: the chosen voice and character words
     "fa963c7f7e338734ee8e0bee6fd6e47b5f5a7fe9493cd957def3c68200c21c19", // the owner's developer setting (lamp-control's drop-in) forgotten on reset

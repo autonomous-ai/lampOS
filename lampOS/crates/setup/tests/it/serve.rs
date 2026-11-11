@@ -69,6 +69,7 @@ impl Root {
             language: self.0.join("etc/setup/language"),
             own_keys: self.0.join("etc/own"),
             control_dropin: self.0.join("etc/lamp-control.service.d/developer.conf"),
+            agent_dropin: self.0.join("etc/lamp-control.service.d/agent.conf"),
             consent: self.0.join("var/consent"),
             web_start: vec![],
             web_stop: vec![],

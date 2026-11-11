@@ -123,6 +123,10 @@ pub mod owner_place;
 /// `docs/chosen-voice.md`).
 pub mod chosen_voice;
 
+/// The local agent's user, group, socket folder and drop-in text (the owner's
+/// switch, `docs/control.md`).
+pub mod local_agent;
+
 /// The face expressions and room sounds yeses, kept for the eyes and the
 /// ears, given by voice or in the app (#5500, `docs/onboarding.md`).
 pub mod consent;

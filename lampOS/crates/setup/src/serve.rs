@@ -64,6 +64,9 @@ fn default_own_keys() -> PathBuf {
 fn default_control_dropin() -> PathBuf {
     crate::change::CONTROL_DROPIN.into()
 }
+fn default_agent_dropin() -> PathBuf {
+    crate::change::AGENT_DROPIN.into()
+}
 fn default_consent() -> PathBuf {
     lamp_msgs::consent::FOLDER.into()
 }
@@ -143,6 +146,11 @@ pub struct Config {
     /// there, root's, 0644. The reset's plan removes it.
     #[serde(default = "default_control_dropin")]
     pub control_dropin: PathBuf,
+    /// lamp-control's second drop-in, the owner's local agent switch from the
+    /// app (`crate::change`): the user, group and folder of the agent's socket
+    /// while it is there, root's, 0644. The reset's plan removes it.
+    #[serde(default = "default_agent_dropin")]
+    pub agent_dropin: PathBuf,
     /// The folder of the owner's face expressions and room sounds yeses
     /// (`lamp_msgs::consent::FOLDER`, 0750 `root:lampos`), written from the
     /// app's `consent.set` (`crate::change`, #5500) and by the voice's
@@ -170,7 +178,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 24] = [
+pub const FIELDS: [&str; 25] = [
     "listen",
     "marker",
     "credential",
@@ -190,6 +198,7 @@ pub const FIELDS: [&str; 24] = [
     "language",
     "own_keys",
     "control_dropin",
+    "agent_dropin",
     "consent",
     "web_start",
     "web_stop",
@@ -228,6 +237,7 @@ impl Config {
             &self.language,
             &self.own_keys,
             &self.control_dropin,
+            &self.agent_dropin,
             &self.consent,
         ] {
             if !path.is_absolute() {
@@ -903,6 +913,12 @@ impl Files<'_> {
     pub fn control_dropin(&mut self, bytes: &[u8]) -> io::Result<()> {
         let temporary = stage(&self.0.control_dropin, bytes, 0o644)?;
         put_in_place(&temporary, &self.0.control_dropin)
+    }
+
+    /// lamp-control's second drop-in (the local agent switch), as the first.
+    pub fn agent_dropin(&mut self, bytes: &[u8]) -> io::Result<()> {
+        let temporary = stage(&self.0.agent_dropin, bytes, 0o644)?;
+        put_in_place(&temporary, &self.0.agent_dropin)
     }
 }
 
