@@ -849,7 +849,7 @@ mod tests {
         let mail = json!({
             "op":"service_record","person":OWNER,"key":"mail","service":"gmail",
             "action":"send_mail","status":"done",
-            "detail":{"to":["octaviabmu@gmail.com"],"subject":"Đi chơi Chủ nhật","text":"See you"},
+            "detail":{"to":["octavia@example.com"],"subject":"Đi chơi Chủ nhật","text":"See you"},
             "asked_unix_ms":NOW,"changed_unix_ms":NOW,
         });
         send(&mut store, mail);

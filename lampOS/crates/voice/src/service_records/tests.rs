@@ -316,7 +316,7 @@ fn a_read_keeps_metadata_and_a_masked_excerpt_or_no_result() {
     fresh();
     let args = json!({"service":"gmail","what":"search","query":"party"});
     let told = json!({"source":"Gmail","quoted":[
-        {"id":"m1","from":"Octavia <octaviabmu@gmail.com>","subject":"Hamburger party","date":"Tue, 10 Nov 2026 15:30:00 +0700","text":"Bring the buns on Sunday please, and the pickles too, I will bring the rest of the food and drinks for everyone at the party."},
+        {"id":"m1","from":"Octavia <octavia@example.com>","subject":"Hamburger party","date":"Tue, 10 Nov 2026 15:30:00 +0700","text":"Bring the buns on Sunday please, and the pickles too, I will bring the rest of the food and drinks for everyone at the party."},
         {"id":"m2","from":"Bank","subject":"Your statement","date":"Tue, 10 Nov 2026 09:00:00 +0700","text":"Use code 482913 to sign in"},
         "a security mail, left out",
     ]});
@@ -331,7 +331,7 @@ fn a_read_keeps_metadata_and_a_masked_excerpt_or_no_result() {
     let found = record.detail["found"].as_array().unwrap();
     assert_eq!(found.len(), 2);
     assert_eq!(found[0]["title"], "Hamburger party");
-    assert_eq!(found[0]["from"], "Octavia <octaviabmu@gmail.com>");
+    assert_eq!(found[0]["from"], "Octavia <octavia@example.com>");
     let excerpt = found[0]["excerpt"].as_str().unwrap();
     assert!(excerpt.len() <= EXCERPT_BYTES && excerpt.starts_with("Bring the buns"));
     assert!(found[1].get("excerpt").is_none(), "{}", found[1]);

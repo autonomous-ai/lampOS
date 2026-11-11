@@ -428,8 +428,13 @@ pub fn memory_forgot_waiting(forgot: &mut crate::bus_out::ForgotIn, now_us: u64)
     // as [`memory_forgot_from`] drops them with the summary on: an app's
     // forget of a person reaches them here too (Jarvis's P3 on #6073), so
     // what the records tell (`LAMP_SERVICE_RECORDS_TOLD`) never keeps them.
+    // A role goes with its person's everything (`LAMP_MEMORY_ROLE`), and so
+    // do the mail contacts planned for their waiting write
+    // (`LAMP_SERVICE_CONTACTS`), as with the summary on.
     for person in &forgotten {
+        crate::remember::role::forgot(person.as_deref());
         crate::service_records::forgot(person.as_deref());
+        crate::service_contacts::forgot(person.as_deref());
     }
     let forgets = forgotten
         .iter()
