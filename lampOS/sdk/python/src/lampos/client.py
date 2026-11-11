@@ -21,6 +21,7 @@ import os
 import re
 import socket
 import ssl
+import stat
 import sys
 import unicodedata
 import warnings
@@ -119,6 +120,33 @@ async def _open(host: str, port: int, pin: str) -> ClientConnection:
 # lamp-control's control socket for a skill's run: the same WebSocket door over a unix socket, no TLS, no pairing,
 # let in by a one-run token (docs/control.md, "The control socket"). Not the local agent's socket.
 LOCAL_SOCKET = "/run/lampos-control/control.sock"
+
+
+# The local agent's socket (docs/control.md, "The local agent"): where a
+# program of the user the owner named, on the lamp itself, reaches the door
+# with no pairing. `LAMPOS_AGENT_SOCKET` names another place.
+AGENT_SOCKET = "/run/lampos-agent/agent.sock"
+AGENT_SOCKET_ENV = "LAMPOS_AGENT_SOCKET"
+
+
+def _agent_socket() -> str | None:
+    """The agent socket's path if there is one here (a socket file), else None."""
+    path = os.environ.get(AGENT_SOCKET_ENV) or AGENT_SOCKET
+    try:
+        return path if stat.S_ISSOCK(os.stat(path).st_mode) else None
+    except OSError:
+        return None
+
+
+async def _open_local(path: str) -> ClientConnection:
+    """The door's WebSocket on the agent socket: no TLS and no pin; the socket's
+    own check (the kernel's word on who connects) is what lets this program in."""
+    return await unix_connect(
+        path,
+        f"ws://lamp.local/v{schema.VERSION}",
+        max_size=1 << 20,
+        ping_interval=KEEPALIVE_S,
+    )
 
 
 async def _welcome(ws: ClientConnection) -> dict:
@@ -556,13 +584,25 @@ class Lamp:
         say hello."""
         keyring = keyring or Keyring()
         pairing = keyring.pairing(lamp)
+        local = None
         if pairing is None:
-            raise NotPaired("no pairing here for that lamp: run `lamp pair` first")
-        ws = await _open(host or pairing.host, pairing.port, pairing.fp)
+            # On the lamp itself, as the user the owner turned on: no pairing,
+            # the agent socket. Never when a `host` was asked for.
+            local = None if host else _agent_socket()
+            if local is None:
+                raise NotPaired("no pairing here for that lamp: run `lamp pair` first")
+            ws = await _open_local(local)
+        else:
+            ws = await _open(host or pairing.host, pairing.port, pairing.fp)
         try:
             welcome = await _welcome(ws)
-            sig = keyring.hello(welcome["nonce_bytes"])
-            hello = {"id": 0, "op": "hello", "client": pairing.client, "sig": b64(sig)}
+            if local is not None:
+                # The socket's peer check has already said who this is: a
+                # well-formed client and signature, neither read.
+                hello = {"id": 0, "op": "hello", "client": "c_0", "sig": b64(bytes(64))}
+            else:
+                sig = keyring.hello(welcome["nonce_bytes"])
+                hello = {"id": 0, "op": "hello", "client": pairing.client, "sig": b64(sig)}
             debug.frame("->", hello)
             await ws.send(json.dumps(hello))
             reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
