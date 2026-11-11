@@ -311,6 +311,9 @@ pub trait Effects {
     /// The skills a person put on from a package removed,
     /// [`remove_installed_skills`] in [`SKILLS`]; how many.
     fn remove_installed_skills(&mut self) -> io::Result<usize>;
+    /// Hermes's and OpenClaw's per-person files removed and both programs
+    /// kept, [`forget_agents`] in [`AGENT_FOLDERS`] (#6343); how many.
+    fn forget_agents(&mut self) -> io::Result<usize>;
 }
 
 /// The product's skills folder (`lamp_update::product_skills::FOLDER`).
@@ -415,6 +418,157 @@ fn remove_installed_skills_with(
     Ok(skills)
 }
 
+/// One of the lamp's agents' folders (#6343): what in it is the program,
+/// kept, and the folders the program makes, emptied and kept; everything
+/// else in it is the person's and removed.
+pub struct AgentFolder {
+    pub folder: &'static str,
+    pub keep: &'static [&'static str],
+    pub empty: &'static [&'static str],
+}
+
+/// Hermes's (`lamp_update::hermes_install::PLACE`, `HERMES_HOME`) and
+/// OpenClaw's (`lamp_update::openclaw_install::PLACE`, `STATE`) folders,
+/// each by what it keeps, never by what it removes (#6343): Hermes keeps
+/// its sessions, memories, keys, databases, pastes and caches under names
+/// that change between its releases, and a name the reset does not know is
+/// the person's, so it is removed. Not plan paths: a plan empties a path
+/// and keeps it, and a plan of 64 paths at most has no room for each.
+/// Kept, and why:
+/// - Hermes's home: `.hermes` (below), `.local` (the `hermes` command and
+///   its Python), `.cache` and `.npm` (download caches), the shell's
+///   `.bashrc` and `.profile`;
+/// - `HERMES_HOME`: the checkout `hermes-agent`, `tools` (uv, ffmpeg),
+///   `installs`, the public model lists' caches, and `config.yaml`, which
+///   holds lamp-update's install-time settings (no update check, no
+///   language servers: `hermes_install::CONFIG`) and Harness's `hooks:`
+///   block, written by neither again before a reinstall; lamp-tasks merges
+///   the lamp's provider into it at each start and takes any other
+///   provider's address and key out. Its key file `.env` is removed, and
+///   written again by lamp-tasks with the forwarder's new token;
+/// - emptied in `HERMES_HOME`: the folders the installer makes
+///   (`stage_config`), the bundled skills among them, which Hermes copies
+///   back at its next start, as it writes `SOUL.md` again when missing;
+/// - OpenClaw's folder: its Node (`node`), its package (`npm`, `pkg` of
+///   earlier installs), npm's cache `.npm`, `.cache`, the lamp's own
+///   gateway token `gateway-token`, and `state` (below);
+/// - OpenClaw's state: `openclaw.json`, its settings, whose `gateway`
+///   block (the token's auth) lamp-update writes only at an install;
+///   lamp-tasks merges its keys in at each start.
+pub const AGENT_FOLDERS: [AgentFolder; 4] = [
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes",
+        keep: &[".hermes", ".local", ".cache", ".npm", ".bashrc", ".profile"],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-hermes/.hermes",
+        keep: &[
+            "hermes-agent",
+            "tools",
+            "installs",
+            "config.yaml",
+            "models_dev_cache.json",
+            "models_dev_cache.etag",
+            "provider_models_cache.json",
+        ],
+        empty: &[
+            "cron",
+            "sessions",
+            "logs",
+            "pairing",
+            "hooks",
+            "image_cache",
+            "audio_cache",
+            "memories",
+            "skills",
+        ],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-openclaw",
+        keep: &[
+            "node",
+            "npm",
+            "pkg",
+            ".npm",
+            ".cache",
+            "gateway-token",
+            "state",
+        ],
+        empty: &[],
+    },
+    AgentFolder {
+        folder: "/var/lib/lampos-openclaw/state",
+        keep: &["openclaw.json"],
+        empty: &[],
+    },
+];
+
+/// The person's files in each of [`AGENT_FOLDERS`] under `root` (`/` on a
+/// lamp) removed, the program kept; how many entries were removed or
+/// emptied. A folder that is missing, or a link, is passed over, so a lamp
+/// without Hermes or OpenClaw removes nothing; nothing is followed through
+/// a link. Run again after a cut, it finishes what is left.
+pub fn forget_agents(root: &Path) -> io::Result<usize> {
+    if !root.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the reset's agents' root must be absolute",
+        ));
+    }
+    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+    let mut removed = 0;
+    for agent in &AGENT_FOLDERS {
+        let dir = match open_dir(&root.join(agent.folder.trim_start_matches('/'))) {
+            Ok(dir) => dir,
+            Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+                continue;
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let mut names = Vec::new();
+        for entry in rustix::fs::Dir::read_from(&dir)? {
+            let name = entry?.file_name().to_owned();
+            let bytes = name.as_bytes();
+            if bytes != b"."
+                && bytes != b".."
+                && !agent.keep.iter().any(|kept| kept.as_bytes() == bytes)
+            {
+                names.push(name);
+            }
+        }
+        for name in names {
+            let stat = match rustix::fs::statat(&dir, name.as_c_str(), AtFlags::SYMLINK_NOFOLLOW) {
+                Ok(stat) => stat,
+                Err(rustix::io::Errno::NOENT) => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let emptied = agent
+                .empty
+                .iter()
+                .any(|kept| kept.as_bytes() == name.as_bytes());
+            if is_dir(&stat) {
+                let child = rustix::fs::openat(&dir, name.as_c_str(), flags, Mode::empty())?;
+                let had = rustix::fs::Dir::read_from(&child)?
+                    .filter_map(Result::ok)
+                    .any(|entry| !matches!(entry.file_name().to_bytes(), b"." | b".."));
+                empty(&child)?;
+                if emptied {
+                    rustix::fs::fsync(&child)?;
+                    removed += usize::from(had);
+                    continue;
+                }
+                rustix::fs::unlinkat(&dir, name.as_c_str(), AtFlags::REMOVEDIR)?;
+            } else {
+                rustix::fs::unlinkat(&dir, name.as_c_str(), AtFlags::empty())?;
+            }
+            removed += 1;
+        }
+        rustix::fs::fsync(&dir)?;
+    }
+    Ok(removed)
+}
+
 /// What a part keeps in `/run` past its own stop: the tmpfiles' folders (the
 /// bus's latest messages, which can say a person's name or words, the app's
 /// photos for the eyes, and the eyes' sitting kept across a restart) and each
@@ -465,6 +619,9 @@ impl Effects for System {
     fn remove_installed_skills(&mut self) -> io::Result<usize> {
         remove_installed_skills(Path::new(SKILLS)).map(|removed| removed.len())
     }
+    fn forget_agents(&mut self) -> io::Result<usize> {
+        forget_agents(Path::new("/"))
+    }
 }
 
 /// `argv` run and killed with its children once `most` has passed
@@ -493,6 +650,9 @@ pub enum Step {
     /// count, never by name, since a made skill's name is the person's words
     /// and the journal outlives the reset (Reviewer-two's P3 on the branch).
     InstalledSkillsRemoved,
+    /// Hermes's and OpenClaw's per-person files removed, [`forget_agents`]
+    /// (#6343): by count, never by name.
+    AgentsForgotten,
     /// Setup and what a boot starts, started in place of a reboot (#4500).
     Started,
     Rebooting,
@@ -772,10 +932,14 @@ pub const STARTERS: [&str; 8] = [
 /// Wi-Fi file; Third on #3579). And `lamp-peek`, an office lamp's page,
 /// which a reboot kept off by its setup condition: a start in place would
 /// leave it holding port 80 from setup's page (#4536); stopped, it is not
-/// started again until the lamp next boots. Patterns name only loaded
+/// started again until the lamp next boots. And OpenClaw's gateway
+/// (`lamp_update::openclaw_install::UNIT`, #6226), always on under
+/// `multi-user.target` and writing its state as it runs: stopped before
+/// [`forget_agents`] empties that state (#6343), started again by the
+/// lamp's next boot or the updater's next round. Patterns name only loaded
 /// units (no product lamp has `lamp-peek`), and none matches
 /// `lamp-setup-wipe.service`, the reset's own unit.
-pub const WRITERS: [&str; 11] = [
+pub const WRITERS: [&str; 12] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
@@ -787,6 +951,7 @@ pub const WRITERS: [&str; 11] = [
     "lamp-update-apply.service",
     "lamp-setup-wifi-restore.service",
     "lamp-peek.service",
+    "lamp-openclaw-gateway.service",
 ];
 
 /// Units as [`listed`] gives them: each name, and whether it is active.
@@ -1066,6 +1231,13 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
     if removed > 0 {
         eprintln!("lamp-setup: reset: removed {removed} skills put on from a package");
         steps.push(Step::InstalledSkillsRemoved);
+    }
+    let forgotten = effects.forget_agents()?;
+    if forgotten > 0 {
+        eprintln!(
+            "lamp-setup: reset: removed {forgotten} of Hermes's and OpenClaw's per-person files"
+        );
+        steps.push(Step::AgentsForgotten);
     }
     // Already gone after `reset`; this covers a journal found without one.
     if remove_if_present(&plan.marker)? {
