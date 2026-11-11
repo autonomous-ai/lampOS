@@ -234,6 +234,9 @@ pub struct Outcome {
 /// by every connection.
 pub struct Door {
     lamp: Value,
+    /// The file the owner's language is read from at each welcome and hello
+    /// (`language`); none, as in tests, says English.
+    language_file: Option<PathBuf>,
     codes: Codes,
     /// The grants the owner chose with the code out.
     code_grants: BTreeSet<Grant>,
@@ -359,6 +362,7 @@ impl Door {
     ) -> Self {
         Self {
             lamp: json!({"id": id, "name": name, "v": VERSION}),
+            language_file: None,
             codes: Codes::new(),
             code_grants: BTreeSet::new(),
             media_dropped: Vec::new(),
@@ -440,6 +444,26 @@ impl Door {
     pub fn journal_event(&mut self, client: &str, kind: &str, now_us: u64) {
         let line = format!("{}: event {kind} sent", self.who(client));
         self.journal.line(client, now_us, &line);
+    }
+
+    /// The owner's language read from `file` (the product's
+    /// `/etc/lampOS/setup/language`) for the welcome's and the hello's
+    /// `lamp`, at each: `language` is `en` without it.
+    pub fn with_language_file(mut self, file: PathBuf) -> Self {
+        self.language_file = Some(file);
+        self
+    }
+
+    /// The `lamp` object the welcome and the hello carry: id, name, version
+    /// and the owner's language (always one of [`crate::language::CODES`]).
+    fn lamp_info(&self) -> Value {
+        let mut lamp = self.lamp.clone();
+        let language = self
+            .language_file
+            .as_deref()
+            .map_or(crate::language::CODES[0], crate::language::read);
+        lamp["language"] = json!(language);
+        lamp
     }
 
     /// Every rate lifted but the refused actions' guard and the phrase
@@ -544,7 +568,7 @@ impl Door {
         let welcome = json!({
             "ev": "welcome",
             "nonce": base64::engine::general_purpose::STANDARD.encode(nonce),
-            "lamp": self.lamp,
+            "lamp": self.lamp_info(),
         });
         (session, welcome)
     }
@@ -1255,7 +1279,7 @@ impl Door {
         ok(
             re,
             json!({
-                "lamp": self.lamp,
+                "lamp": self.lamp_info(),
                 "grants": grants,
                 "limits": limits,
             }),
@@ -1900,7 +1924,7 @@ mod tests {
         assert_eq!(welcome["ev"], "welcome");
         assert_eq!(
             welcome["lamp"],
-            json!({"id": "lamp-75c9", "name": "Lamp", "v": 1})
+            json!({"id": "lamp-75c9", "name": "Lamp", "v": 1, "language": "en"})
         );
         // Before anything: only pair and hello.
         let outcome = door.handle(
@@ -2368,6 +2392,51 @@ mod tests {
         assert_eq!(limits["say_max_bytes"], 900);
         assert!(limits.get("say_max_chars").is_none());
         assert!(limits.get("take_max_ms").is_none());
+    }
+
+    /// The welcome and the hello both say the owner's language, read at each
+    /// connection: English with no file, the file's code with one, and a
+    /// change shows on the next connection with no restart.
+    #[test]
+    fn welcome_and_hello_say_the_owners_language_read_at_each_connection() {
+        let computer = Computer::new(41);
+        let (door, _, mut fake) = paired(&computer, &[Grant::Light]);
+        let mut door = door;
+        fn said(door: &mut Door, computer: &Computer, fake: &mut Fake, at: u64) -> (Value, Value) {
+            let (mut session, welcome) = door.open();
+            let hello = door.handle(&mut session, &computer.hello_frame(&welcome), fake, S, at);
+            (
+                welcome["lamp"]["language"].clone(),
+                reply(&hello)["lamp"]["language"].clone(),
+            )
+        }
+        assert_eq!(
+            said(&mut door, &computer, &mut fake, 1),
+            ("en".into(), "en".into()),
+            "no file"
+        );
+        let file =
+            std::env::temp_dir().join(format!("lampos-door-language-{}", std::process::id()));
+        std::fs::write(&file, "vi\n").unwrap();
+        let mut door = door.with_language_file(file.clone());
+        assert_eq!(
+            said(&mut door, &computer, &mut fake, 2),
+            ("vi".into(), "vi".into()),
+            "vi"
+        );
+        std::fs::write(&file, "ko\n").unwrap();
+        assert_eq!(
+            said(&mut door, &computer, &mut fake, 3),
+            ("ko".into(), "ko".into()),
+            "changed"
+        );
+        std::fs::write(&file, "klingon\n").unwrap();
+        assert_eq!(
+            said(&mut door, &computer, &mut fake, 4),
+            ("en".into(), "en".into()),
+            "unknown"
+        );
+        let _ = std::fs::remove_file(&file);
     }
 
     /// Hello's `hold_max_ms` keeps its meaning, a light's longest `for_ms`

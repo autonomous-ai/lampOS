@@ -312,7 +312,12 @@ first start, and the client pins it at pairing.
 **Frames:** UTF-8 JSON, one message per text frame. The lamp's first frame
 on every connection is a welcome, carrying a nonce of 32 random bytes made for
 that connection, which pairing's proof and hello's signature cover:
-`{"ev":"welcome","at":"…","nonce":"<base64>","lamp":{"id":"lamp-75c9","name":"…","v":1}}`.
+`{"ev":"welcome","at":"…","nonce":"<base64>","lamp":{"id":"lamp-75c9","name":"…","v":1,"language":"en"}}`.
+The hello's answer carries the same `lamp`. `language` is the owner's language (`en`, `vi`,
+`ja`, `zh` or `ko`) from the file the setup writes (`/etc/lampOS/setup/language`, or the
+file `LAMP_LANGUAGE_FILE` names), read at each welcome and hello, so a change shows on the
+next connection; a missing, empty or unknown value says `en`, as the voice reads it
+(`crate::language`). A program's own lines follow it (`lamp.language` in the SDKs).
 - A request: `{"id": 7, "op": "...", ...}`. `id` is the client's, a whole
   number, echoed as `re`. Every op but `pair` and `hello` needs `hello`
   first on the connection.

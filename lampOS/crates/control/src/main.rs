@@ -183,7 +183,11 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         clients,
         Some(clients_path),
     )
-    .with_quiet_hours(session::Quiet::new(local_time).with_window(window));
+    .with_quiet_hours(session::Quiet::new(local_time).with_window(window))
+    .with_language_file(std::env::var_os("LAMP_LANGUAGE_FILE").map_or_else(
+        || PathBuf::from(lamp_control::language::PATH),
+        PathBuf::from,
+    ));
     if rates_off {
         door = door.with_rates_off();
     }

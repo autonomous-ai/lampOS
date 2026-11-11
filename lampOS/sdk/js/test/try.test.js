@@ -94,7 +94,9 @@ test('a stimulus runs lamp-sim with an argument array and the lamp folder last; 
   // A move needs the body lease and the sound clip is `lamp.sound`, not `play` (blue's two bugs on the person's app).
   socket.send(JSON.stringify({ type: 'call', id: 7, name: 'move', args: {} }));
   socket.send(JSON.stringify({ type: 'call', id: 8, name: 'sound', args: {} }));
-  await until(() => results.length >= 8);
+  // The owner's language the lamp said in hello (the fake lamp's default is English), read as `lamp.language`.
+  socket.send(JSON.stringify({ type: 'call', id: 9, name: 'language', args: {} }));
+  await until(() => results.length >= 9);
   const by = Object.fromEntries(results.map((r) => [r.id, r]));
   assert.equal(by[1].ok, true);
   assert.equal(by[3].ok, false);
@@ -106,6 +108,7 @@ test('a stimulus runs lamp-sim with an argument array and the lamp folder last; 
   assert.match(by[6].answer, /^bad_request: name: one of nod/);
   assert.match(by[7].call, /^lamp\.withLease\(\['body'\], \(\) => lamp\.movePoses\(/);
   assert.equal(by[8].call, "lamp.sound('hum')");
+  assert.deepEqual([by[9].ok, by[9].call], [true, 'lamp.language // "en"']);
 });
 
 test('a frame over the cap closes that socket and the server still answers the next one', async (t) => {

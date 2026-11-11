@@ -90,6 +90,15 @@ test('pairing keeps the key private and the lamp pinned', async (t) => {
   assert.ok(!readFileSync(join(keyring.folder, 'lamps.json'), 'utf8').includes(fake.code));
 });
 
+test('the lamp\'s language comes from hello and is English when it says none', async () => {
+  for (const [said, shown] of [['en', 'en'], ['vi', 'vi'], ['ko', 'ko'], [null, 'en'], ['klingon', 'en']]) {
+    await withLamp({ language: said }, async (lamp) => {
+      assert.equal(lamp.language, shown, String(said));
+      assert.equal(lamp.info.language, said ?? undefined, String(said));
+    });
+  }
+});
+
 test('a wrong code is refused and nothing is kept', async (t) => {
   const fake = await started(t);
   const keyring = new Keyring(folder());
