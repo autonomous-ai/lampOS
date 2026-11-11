@@ -110,6 +110,20 @@ pub const OFFLINE_VOICE_ENVIRONMENT: &str = "LAMP_OFFLINE_VOICE";
 /// unless set.
 pub const SERVICE_DOWN_LINE_ENVIRONMENT: &str = "LAMP_SERVICE_DOWN_LINE";
 const DIAGNOSTIC_SHUTDOWN_GRACE: Duration = Duration::from_millis(750);
+/// `TimeoutStopSec` of `deploy/product/lamp-voice.service`: systemd kills
+/// what is left of the voice this long after its SIGTERM. Checked against
+/// the unit by a test.
+#[cfg(test)]
+const UNIT_STOP_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a runtime's teardown waits for the end-of-turn worker's exit to
+/// be confirmed (#6406). The worker is killed after its own grace (300 ms)
+/// if it has not gone; under load, mid-inference or still loading its model,
+/// that kill, the reap and the reader's last read took over the old 500 ms
+/// (lamp-52e6, 11 Nov), and a requested restart exited failed. A late
+/// confirmed exit is a clean one; only one still unconfirmed after this
+/// wait fails the cleanup. With the other workers' shared grace it stays
+/// well inside the unit's 5 s `TimeoutStopSec`.
+const ENDPOINT_EXIT_WAIT: Duration = Duration::from_millis(1_500);
 const INPUT_LEASE_US: u64 = 100_000;
 
 /// Only explicitly scoped unit-test scenarios replace this clock. Child
@@ -2895,7 +2909,7 @@ impl Rig {
         if let Some((event, teardown)) = self
             .endpoint
             .take()
-            .and_then(|endpoint| endpoint.finish(remaining.max(Duration::from_millis(500))))
+            .and_then(|endpoint| endpoint.finish(remaining.max(ENDPOINT_EXIT_WAIT)))
         {
             let _ = record(trace, event);
             if let Err(error) = teardown {
@@ -17571,6 +17585,21 @@ mod tests {
         wire::CaptureTiming,
     };
     use lamp_turn_owner::BoundaryGuard;
+
+    /// #6406: the endpoint worker's exit wait, after the other workers'
+    /// longest shared grace, leaves at least half of the unit's stop timeout
+    /// for the rest of the stop, and the timeout is the unit's.
+    #[test]
+    fn the_endpoint_exit_wait_stays_well_inside_the_units_stop_timeout() {
+        let unit = include_str!("../../../deploy/product/lamp-voice.service");
+        assert!(
+            unit.lines()
+                .any(|line| line == format!("TimeoutStopSec={}s", UNIT_STOP_TIMEOUT.as_secs())),
+            "lamp-voice.service's TimeoutStopSec is not {UNIT_STOP_TIMEOUT:?}"
+        );
+        assert!(DIAGNOSTIC_SHUTDOWN_GRACE + ENDPOINT_EXIT_WAIT <= UNIT_STOP_TIMEOUT / 2);
+        assert!(ENDPOINT_EXIT_WAIT > Duration::from_millis(500));
+    }
 
     #[test]
     fn ring_lifetime_includes_startup_and_shutdown_around_maximum_active_session() {
