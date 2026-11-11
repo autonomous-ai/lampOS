@@ -87,6 +87,7 @@ func (c *MQTT) Connect(ctx context.Context) error {
 
 	cfg := autopaho.ClientConfig{
 		ServerUrls:                    []*url.URL{serverURL},
+		TlsCfg:                        c.opts.TLSConfig(),
 		KeepAlive:                     c.opts.KeepAlive,
 		CleanStartOnInitialConnection: true,
 		SessionExpiryInterval:         60,
