@@ -258,6 +258,7 @@ impl SessionLane for ScriptSessions {
             last_active_unix_ms: None,
             resumed: None,
             on: None,
+            near: false,
         })
     }
 }
