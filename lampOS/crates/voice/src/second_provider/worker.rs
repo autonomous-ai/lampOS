@@ -12713,7 +12713,8 @@ pub(crate) const KEPT_CALL_RESULT: &str = "(done earlier; its result was not kep
 /// With `keeps_calls`, an exchange whose turn ran functions has them before
 /// the lamp's words: an assistant message with the calls (each with the
 /// arguments it was kept with, `second_provider::kept_args`; no words),
-/// each call's result as [`KEPT_CALL_RESULT`], as a chat round with calls
+/// each call's result as [`KEPT_CALL_RESULT`], or a service write's status
+/// ([`crate::thread::KeptCall::result`]), as a chat round with calls
 /// goes. The person's words, or the note, stay first.
 fn messages_marked(
     exchange: crate::thread::Recent,
@@ -12736,6 +12737,11 @@ fn messages_marked(
         messages.push(Message::system(SAID_IN_THE_ROOM.to_owned()));
     }
     if keeps_calls && !exchange.calls.is_empty() {
+        let results: Vec<&str> = exchange
+            .calls
+            .iter()
+            .map(|call| call.result.unwrap_or(KEPT_CALL_RESULT))
+            .collect();
         let calls: Vec<crate::second_provider::net::ToolCall> = exchange
             .calls
             .into_iter()
@@ -12750,7 +12756,8 @@ fn messages_marked(
         messages.extend(
             calls
                 .into_iter()
-                .map(|call| Message::tool(call.id, KEPT_CALL_RESULT)),
+                .zip(results)
+                .map(|(call, result)| Message::tool(call.id, result)),
         );
     }
     messages.push(Message::assistant(exchange.lamp));
@@ -21694,6 +21701,7 @@ mod tests {
                 id: "kept-7-0".into(),
                 name: "volume_down".into(),
                 args: serde_json::json!({}),
+                result: None,
             }],
             ..crate::thread::Recent::default()
         };
@@ -21751,6 +21759,7 @@ mod tests {
                 id: "kept-3-0".into(),
                 name: "light_colour".into(),
                 args: serde_json::json!({"colour": "red"}),
+                result: None,
             }],
             ..crate::thread::Recent::default()
         };
@@ -21878,6 +21887,99 @@ mod tests {
                 ),
                 Message::tool("kept-7-0", KEPT_CALL_RESULT),
                 Message::assistant("Timer set. It rings at 9:34 am."),
+            ]
+        );
+    }
+
+    /// lamp-06c1 at 11913 (11 Nov): the second write of a kind in a
+    /// conversation was read back by the model itself, no call, copying
+    /// the earlier read-backs told as words alone. A thread with a write
+    /// prepared and then sent tells each as a `service_write` call with no
+    /// one's words in it and its status as its result, before the lamp's
+    /// words.
+    #[test]
+    fn a_kept_service_write_reaches_the_next_turns_history_as_a_call() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let now = Instant::now();
+        let asked = serde_json::json!({"service": "google_calendar", "action": "create_event",
+            "title": "lamp night test", "start": "2026-11-12T21:00:00+07:00"});
+        let yes =
+            serde_json::json!({"service": "google_calendar", "send_id": "v1-1", "said": "yes"});
+        let read_back = "Add an event to your Google Calendar (primary): \"lamp night test\". Shall I go ahead?";
+        let keep = |request: u64, args: &serde_json::Value, told: serde_json::Value| {
+            let kept = crate::second_provider::kept_args(crate::services::WRITE, args)
+                .expect("a write's call is kept");
+            let result = crate::second_provider::kept_result(crate::services::WRITE, &told);
+            crate::thread::THREAD.lock().unwrap().called_told(
+                request,
+                crate::services::WRITE,
+                &kept,
+                result,
+            );
+        };
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person("Add lamp night test tomorrow at 9 PM.", true, now);
+        }
+        keep(
+            7,
+            &asked,
+            serde_json::json!({"read_back": read_back, "send_id": "v1-1", "sent": false}),
+        );
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .lamp_for(7, read_back, now, None);
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .person("Yes.", true, now);
+        keep(8, &yes, serde_json::json!({"sent": true}));
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .lamp_for(8, "Added.", now, None);
+        let recent = crate::thread::THREAD.lock().unwrap().recent_for(
+            None,
+            now,
+            HISTORY_WITHIN,
+            HISTORY_EXCHANGES,
+        );
+        let told: Vec<Message> = recent
+            .into_iter()
+            .flat_map(|exchange| messages_told(exchange, true))
+            .collect();
+        crate::thread::THREAD.lock().unwrap().forget();
+        let call = |id: &str, args: serde_json::Value| crate::second_provider::net::ToolCall {
+            id: id.into(),
+            name: crate::services::WRITE.into(),
+            args,
+            extra: None,
+        };
+        assert_eq!(
+            told,
+            [
+                Message::user("Add lamp night test tomorrow at 9 PM."),
+                Message::assistant_calls(
+                    None,
+                    &[call(
+                        "kept-7-0",
+                        serde_json::json!({"service": "google_calendar", "action": "create_event"})
+                    )]
+                ),
+                Message::tool("kept-7-0", crate::second_provider::WRITE_PREPARED),
+                Message::assistant(read_back),
+                Message::user("Yes."),
+                Message::assistant_calls(
+                    None,
+                    &[call(
+                        "kept-8-0",
+                        serde_json::json!({"service": "google_calendar", "send_id": "v1-1"})
+                    )]
+                ),
+                Message::tool("kept-8-0", crate::second_provider::WRITE_DONE),
+                Message::assistant("Added."),
             ]
         );
     }
