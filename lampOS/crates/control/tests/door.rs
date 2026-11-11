@@ -3147,3 +3147,27 @@ async fn a_runs_connection_says_why_it_closed() {
         Some(lamp_control::runs::CLOSED_ENDED)
     );
 }
+
+/// The agent's record is kept before anything runs on it: when it cannot be
+/// written, the record made in memory is taken out again, so the error is
+/// told on a retry too and no unsaved record is ever used (eighth's P3 on #6380).
+#[test]
+fn a_local_record_that_could_not_be_kept_is_not_left_in_memory() {
+    let missing = std::env::temp_dir()
+        .join(format!("lamp-control-nokeep-{}", std::process::id()))
+        .join("no-such-folder")
+        .join("clients.json");
+    let mut door = session::Door::new(
+        "lamp-test",
+        "Lamp",
+        [0u8; 32],
+        pairing::Clients::default(),
+        Some(missing),
+    );
+    assert!(door.ensure_local("agent", 1).is_err());
+    assert!(door.clients().clients.is_empty(), "nothing left in memory");
+    assert!(
+        door.ensure_local("agent", 2).is_err(),
+        "told again, not taken as made"
+    );
+}

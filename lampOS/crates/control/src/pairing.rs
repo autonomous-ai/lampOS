@@ -446,8 +446,9 @@ impl Clients {
     /// Removes a client: whether it was there.
     pub fn revoke(&mut self, id: &str) -> bool {
         // The local agent keeps its record with no grants, so a restart
-        // cannot make it again with the first grants: only the owner's
-        // switch or `set_grants` widens it.
+        // cannot make it again with the first grants: only `set_grants` (the
+        // owner's app changing what a computer may do) widens it; turning the
+        // agent's socket off and on does not.
         if let Some(local) = self
             .clients
             .iter_mut()

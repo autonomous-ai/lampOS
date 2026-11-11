@@ -54,10 +54,14 @@ pub fn bind(path: &Path, gid: u32) -> std::io::Result<tokio::net::UnixListener> 
             .mode(0o755)
             .create(parent)?;
     }
+    // Only our own old socket is removed (a failed removal is not fatal: the
+    // bind then fails with the reason, and no socket is served).
     let _ = std::fs::remove_file(path);
     let listener = tokio::net::UnixListener::bind(path)?;
-    // The mode and the group before anything connects: the socket is made
-    // 0600 under lamp-control's umask first.
+    // The mode and the group are set right after the bind, and nothing serves
+    // the socket before they are: the file is made with the process's umask
+    // (not necessarily 0600) for those few instructions, which the folder's
+    // own mode and the peer-uid check cover.
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o660))?;
     std::os::unix::fs::chown(path, None, Some(gid))?;
     Ok(listener)
