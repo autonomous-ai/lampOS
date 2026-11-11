@@ -12,6 +12,7 @@ fn told(name: &str) -> Value {
     let short = |result: &str, say: &str| json!({"result": result, "next": crate::second_provider::probe::tools::SHORT_NEXT, "say": say});
     match name {
         "light_brighter" => short("My light is a step brighter.", "Brighter."),
+        "light_warmer" => short("My light is a step warmer.", "Warmer."),
         "volume_up" => short("My volume is now 70 out of 100; it was 50.", "Louder."),
         "light_colour" => short("My light is blue now.", "Done."),
         "set_timer" => {
@@ -322,6 +323,53 @@ fn a_step_word_claimed_twice_with_no_call_says_it_was_not_done() {
     );
     assert_eq!(went.said, said(&["Louder."]));
     assert_eq!(went.ran, ["volume_up"]);
+}
+
+/// 12104's core w2 (lamp-52e6, 12 Nov): "I'll warm it up a touch." came
+/// with `calls=none` and was said, so nothing warmed. With the switch the
+/// promise is held and the model asked once more; the retry's call answers
+/// with its own line, and a second promise with no call is the line that
+/// it wasn't done. Off: said as it came.
+#[test]
+fn a_change_promised_with_no_call_is_held_and_asked_again() {
+    let heard = "Lamp, make it a bit warmer.";
+    let promise = "I'll warm it up a touch.";
+    let went = claimed(true, heard, saying(promise), vec![calling("light_warmer")]);
+    assert_eq!(went.said, said(&["Warmer."]), "{went:?}");
+    assert_eq!(went.ran, ["light_warmer"], "{went:?}");
+    assert!(told_claim(&went), "{went:?}");
+    let went = claimed(true, heard, saying(promise), vec![saying(promise)]);
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    assert_eq!((went.asked, went.ran.len()), (2, 0));
+    let went = claimed(false, heard, saying(promise), vec![calling("light_warmer")]);
+    assert_eq!(went.said, said(&[promise]), "{went:?}");
+    assert_eq!((went.asked, went.ran.len()), (1, 0));
+    // Not a promise of a change: never this guard's ask. "I'll tell you
+    // when it's done." is said as it came; "I'll remember that." is the
+    // remember guard's own (its note, not this one's).
+    let went = claimed(
+        true,
+        "Lamp, thanks.",
+        saying("I'll tell you when it's done."),
+        vec![],
+    );
+    assert_eq!(
+        went.said,
+        said(&["I'll tell you when it's done."]),
+        "{went:?}"
+    );
+    assert_eq!(went.asked, 1);
+    let went = claimed(
+        true,
+        "Lamp, thanks.",
+        saying("I'll remember that."),
+        vec![saying("Okay.")],
+    );
+    assert!(!told_claim(&went), "{went:?}");
 }
 
 /// A turn that made the call is untouched, byte for byte: the claim beside
