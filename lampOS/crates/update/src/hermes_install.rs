@@ -101,9 +101,10 @@ use std::{
 /// The switch, in lamp-update's own unit: `on` exactly.
 pub const SWITCH: &str = "LAMP_HERMES_ON_LAMP";
 /// Whether a lamp installed as the product installs Hermes with [`SWITCH`]
-/// unset: on, the product owner's decision (10 Nov), under the first
-/// builder's schedule ([`crate::hermes_schedule`]: a quiet window, frozen
-/// while someone speaks, stopped when the privacy reading is lost); `off`
+/// unset: on, the product owner's decision (10 Nov), under the lead's
+/// schedule ([`crate::hermes_schedule`]: the first round reached but for
+/// the setup walk, frozen while someone speaks, stopped when the privacy
+/// reading is lost); `off`
 /// turns it off. Any other lamp with it unset is off.
 pub const PRODUCT_DEFAULT: bool = true;
 /// The skills switch (#6128), in lamp-update's own unit: `on` exactly
