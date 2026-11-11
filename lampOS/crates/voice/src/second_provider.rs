@@ -11500,6 +11500,7 @@ fn against_the_lamps_answer<R>(
                 request: *of,
                 words,
                 until_us,
+                read_back: crate::services::reads_back_in(*of),
             })
             .as_ref(),
     )
@@ -11531,6 +11532,9 @@ fn own_yes_echo_of(
                 request: *of,
                 words,
                 until_us,
+                // `yes_echo` judges a made skill's say-back by its own
+                // rules; a service read-back's hold is `judge`'s alone.
+                read_back: false,
             })
             .as_ref(),
     )
