@@ -186,3 +186,56 @@ cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng
 - **Test** (`agent_tasks`): `harness_status_is_declared_and_run_only_with_its_switch`,
   `harness_status_says_the_sign_in_the_computers_and_the_work_as_counts`,
   `harness_status_refused_says_it_lightly`.
+
+## Chính đèn, với OpenClaw (#6226)
+
+`LAMP_OPENCLAW_ON_LAMP=on`, chỉ cùng `--engines-from-machines`; tắt nếu không
+đặt. OpenClaw là engine mặc định của đèn (khi lần đọc ngưỡng RAM của first
+builder đạt; trước đó, phần tasks của đèn chọn Hermes khi thiếu bộ nhớ
+(#6226)): nó thay Hermes làm target riêng của đèn, đúng vai trò của Hermes
+(`tasks.md`, "The lamp itself, with Hermes"), và Hermes vẫn chọn được. Phần
+lamp-tasks là phần của một coder khác trong #6226; ở đây mô tả phần của voice.
+
+- **Engine nào:** `LAMP_LAMP_ENGINE` là `openclaw` hoặc `hermes`, không đặt
+  thì `openclaw`, mặc định khi lần đọc ngưỡng RAM của first builder đạt;
+  trước đó, phần tasks của đèn chọn Hermes khi thiếu bộ nhớ (#6226). Target
+  của đèn vẫn là `lamp`, với engine đó; khi engine được chọn chưa cài mà
+  engine kia đã cài, dùng engine kia.
+- **Khởi động** như Harness khởi động OpenClaw:
+  `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
+  chế độ quyền và không định tuyến model (OpenClaw tự chọn model, theo phần
+  cài đặt bên dưới).
+- **Voice** (`agent_tasks`, `task_news`): đọc engine của target của đèn từ
+  `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
+  nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the
+  lamp"; nếu là `hermes` thì "Hermes" như trước. Khi chưa đọc targets, voice
+  nói OpenClaw, mặc định (khi lần đọc ngưỡng RAM của first builder đạt; trước
+  đó, phần tasks của đèn chọn Hermes khi thiếu bộ nhớ (#6226)). `who`
+  "OpenClaw" hoặc "Hermes", khi đèn có target của mình, là của đèn, không bao
+  giờ của máy tính. OpenClaw cũng là một agent mà voice có thể gọi tên trên
+  máy tính, nghe được là "OpenClaw", "open claw", "open clause", "open
+  close", "open clow" hoặc "open klaw". Tin về việc do engine nào làm trên
+  đèn cũng được kể là làm ngay tại đèn.
+- **Chỉ thấy trong test:** `agent_tasks::tests::new_work_goes_to_openclaw_on_the_lamp`,
+  `agent_tasks::tests::with_the_lamps_target_the_hand_over_says_what_goes_where`,
+  `agent_tasks::tests::with_named_only_the_words_name_an_agent_not_set_up`,
+  `task_news::tests::work_done_by_openclaw_on_the_lamp_is_told_as_done_here`.
+  Chưa thấy trên đèn.
+
+## Cài đặt của OpenClaw trên đèn (#6226)
+
+Khi `LAMP_OPENCLAW_ON_LAMP` bật, lamp-tasks lúc khởi động gộp những gì
+OpenClaw trên đèn cần vào `<state>/openclaw.json`
+(`/var/lib/lampos-openclaw/state`, JSON5), đúng như `hermes_config` làm cho
+Hermes, và giữ mọi khóa khác (trong đó có khối `gateway` của lamp-update). Đây
+là phần của một coder khác trong #6226; thiết kế:
+
+- `models`: `mode: "merge"`, với provider `lampos`: `baseUrl`
+  `http://127.0.0.1:7741/v1/deepseek` (forwarder của lamp-cloud, docs/cloud.md),
+  `apiKey` `"${LAMP_HERMES_TOKEN}"` (wrapper export nó từ file token của
+  forwarder), `api` `"openai-completions"`, và một model, `deepseek-flash`
+  (model duy nhất của forwarder). Target loopback có thể cần
+  `request.allowPrivateNetwork: true` trên provider.
+- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`.
+- Các khóa skill của đèn, và hướng dẫn (`AGENTS.md`) ghi trong workspace của
+  OpenClaw (`<state>/workspace`), như với Hermes.

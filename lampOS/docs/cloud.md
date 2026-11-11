@@ -2536,7 +2536,7 @@ adds the key itself (`lamp_cloud::hermes_llm`).
 - **Off** unless `LAMP_HERMES_ON_LAMP=on` or `LAMP_OPENCLAW_ON_LAMP=on` in
   lamp-cloud's environment (the product's `lamp-cloud.service` sets both,
   #5978, #6226), and only while lamp-cloud runs (`LAMP_CLOUD=on`).
-- **OpenClaw on the lamp** (#6226), the lamp's default engine, is served by
+- **OpenClaw on the lamp** (#6226), the lamp's default engine (once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226)), is served by
   the same forwarder: the same port, the same token file and the same
   paths. Its provider `lampos` has the base
   `http://127.0.0.1:7741/v1/deepseek`, the model `deepseek-flash` and the

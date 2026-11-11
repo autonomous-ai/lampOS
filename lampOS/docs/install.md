@@ -1875,7 +1875,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `lamp-update.service`'s environment, read as `LAMP_HERMES_ON_LAMP` is:
    set, on only when `on` exactly; unset, on on a lamp installed as the
    product, off on any other lamp; no product unit sets it). OpenClaw is
-   the lamp's default engine under Harness (Harness's engine id
+   the lamp's default engine under Harness (once the first builder's RAM-floor read passes; until then the lamp's tasks part picks Hermes when memory is short (#6226); Harness's engine id
    `openclaw`), installed beside Hermes in exactly Hermes's role and under
    the same rules: the same schedule (window, freeze while the voice is
    not quiet, stop on a lost privacy reading, the one-shot's bounds), the
