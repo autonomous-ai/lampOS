@@ -226,8 +226,8 @@ jobs:
         # starts (the Studio VM, run 40799231439, 29 Oct): apt waits up to 5 min.
         run: |
           # The runner's mirror can stop resolving (azure.archive.ubuntu.com, #6429):
-          # then point the sources at Ubuntu's own mirror and try once more.
-          if ! sudo apt-get -o DPkg::Lock::Timeout=300 update; then
+          # apt-get update exits 0 on fetch failures unless --error-on=any; then point the sources at Ubuntu's own mirror and try once more.
+          if ! sudo apt-get -o DPkg::Lock::Timeout=300 --error-on=any update; then
             if [ "$(dpkg --print-architecture)" = amd64 ]; then u=http://archive.ubuntu.com/ubuntu; else u=http://ports.ubuntu.com/ubuntu-ports; fi
             echo "::warning::apt-get update failed; retrying with $u"
             for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
@@ -398,8 +398,8 @@ jobs:
         # starts (the Studio VM, run 40799231439, 29 Oct): apt waits up to 5 min.
         run: |
           # The runner's mirror can stop resolving (azure.archive.ubuntu.com, #6429):
-          # then point the sources at Ubuntu's own mirror and try once more.
-          if ! sudo apt-get -o DPkg::Lock::Timeout=300 update; then
+          # apt-get update exits 0 on fetch failures unless --error-on=any; then point the sources at Ubuntu's own mirror and try once more.
+          if ! sudo apt-get -o DPkg::Lock::Timeout=300 --error-on=any update; then
             if [ "$(dpkg --print-architecture)" = amd64 ]; then u=http://archive.ubuntu.com/ubuntu; else u=http://ports.ubuntu.com/ubuntu-ports; fi
             echo "::warning::apt-get update failed; retrying with $u"
             for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
