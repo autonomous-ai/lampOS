@@ -709,6 +709,23 @@ pub fn about(name: &str) -> String {
     )
 }
 
+/// Said with a Google Drive file list that found nothing. The product's
+/// Drive link holds `drive.file` alone, so Google shows the lamp only the
+/// files it made or that were opened with it; a file made elsewhere is
+/// hidden, and "nothing found" would say it isn't there (11 Nov, a
+/// tester's lamp: a file made outside the lamp was never found).
+pub const DRIVE_ONLY_OWN: &str = "The lamp sees only the Google Drive files it made or that were opened with it, so to find another file, open it with the lamp first.";
+
+/// `result`, a read's quoted answer, told why when it is a Google Drive
+/// file list that found nothing ([`DRIVE_ONLY_OWN`]).
+pub fn drive_none_told(code: &str, args: &Value, mut result: Value) -> Value {
+    let none = result["quoted"].as_array().is_some_and(Vec::is_empty);
+    if none && code == "google_drive" && text(args, "what") == Some("files") {
+        result["nothing_found_why"] = json!(DRIVE_ONLY_OWN);
+    }
+    result
+}
+
 /// Keys whose values are ids, never read for security text.
 const ID_KEYS: &[&str] = &["id", "parent"];
 

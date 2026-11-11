@@ -1091,7 +1091,15 @@ holds `https://www.googleapis.com/auth/drive.file`, `openid`,
 `userinfo.email` and `userinfo.profile`, never `drive.readonly` (Backend2,
 9 Nov 16:06). So the lamp makes files under that `drive.file` link, and
 it sees, reads and finds only the files it made or the owner picked for
-it, not the rest of their Drive. A write is prepared only when the link's
+it, not the rest of their Drive. Wider access is not planned. A `files`
+read (a find with `query`, or the newest files) that comes back empty
+says so beside its empty `quoted`, in `nothing_found_why`
+(`reads::DRIVE_ONLY_OWN`): "The lamp sees only the Google Drive files it
+made or that were opened with it, so to find another file, open it with
+the lamp first." Without it the lamp said nothing was found, as if the file
+weren't there (11 Nov, a tester's lamp: a file made outside the lamp was
+never found). A find that lists files, and any other service's empty read,
+carries no such key. A write is prepared only when the link's
 `scopes` hold `https://www.googleapis.com/auth/drive` or
 `https://www.googleapis.com/auth/drive.file` (`writes::drive_may_write`,
 each scope taken whole); otherwise, and when a link records no scopes at
