@@ -51,6 +51,9 @@ pub const WAIT: Duration = Duration::from_secs(3);
 /// The most bytes read of lamp-control's answer: 16 computers' rows at most.
 const ANSWER_MOST: u64 = 64 * 1024;
 
+/// How long `system.info` waits for lamp-control's `features`.
+const FEATURES_WAIT: Duration = Duration::from_millis(300);
+
 /// A code lasts this long on lamp-control (`pairing::CODE_FOR_US`), for an
 /// older lamp-control that doesn't say `until_unix_ms`.
 const CODE_FOR_MS: u64 = 5 * 60 * 1_000;
@@ -88,6 +91,35 @@ impl Door {
     pub fn here(&self) -> bool {
         self.socket.exists()
     }
+}
+
+/// `system.info`'s `developer`: `{"camera": bool, "microphone": bool}`, whether a
+/// camera or microphone stream is usable on this lamp (wired, and the owner's
+/// switch for the microphone), asked of lamp-control; `None` while its admin
+/// socket is gone (developer access off), so the app offers no grants screen.
+/// A lamp-control that can't say (an older one) reads as both false: the ticks
+/// stay off rather than promise a stream the lamp may refuse.
+pub fn developer(door: &Door) -> Option<Value> {
+    if !door.here() {
+        return None;
+    }
+    // `system.info` is answered on the broker's loop and must never hold its keepalive: lamp-control answers
+    // at once, so a short bound is enough, and one that hangs reads as both false.
+    let told = ask_within(
+        &door.socket,
+        &json!({"features": true}),
+        "system.info",
+        &mut |_| {},
+        FEATURES_WAIT,
+    )
+    .ok();
+    let flag = |key: &str| {
+        told.as_ref()
+            .and_then(|told| told.get(key))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    };
+    Some(json!({"camera": flag("camera"), "microphone": flag("microphone")}))
 }
 
 /// `kind`, one of [`KINDS`], with the app's `data`: its reply's `data`, or
@@ -421,6 +453,17 @@ fn ask(
     kind: &str,
     say: &mut dyn FnMut(&str),
 ) -> Result<Value, String> {
+    ask_within(socket, asked, kind, say, WAIT)
+}
+
+/// [`ask`], waiting at most `wait` for lamp-control's answer.
+fn ask_within(
+    socket: &Path,
+    asked: &Value,
+    kind: &str,
+    say: &mut dyn FnMut(&str),
+    wait: Duration,
+) -> Result<Value, String> {
     let mut stream = UnixStream::connect(socket).map_err(|error| {
         say(&format!(
             "{kind} from the app: lamp-control not reached: {error}"
@@ -428,8 +471,8 @@ fn ask(
         OFF.to_owned()
     })?;
     let mut exchanged = || -> std::io::Result<String> {
-        stream.set_read_timeout(Some(WAIT))?;
-        stream.set_write_timeout(Some(WAIT))?;
+        stream.set_read_timeout(Some(wait))?;
+        stream.set_write_timeout(Some(wait))?;
         stream.write_all(format!("{asked}\n").as_bytes())?;
         let mut line = String::new();
         BufReader::new((&stream).take(ANSWER_MOST)).read_line(&mut line)?;
@@ -786,6 +829,35 @@ mod tests {
         }
         assert!(asked.try_recv().is_err());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// `developer` says what lamp-control says about its streams; an older
+    /// lamp-control (an error) reads as both false; no socket, none.
+    #[test]
+    fn developer_says_which_streams_are_usable() {
+        let dir = folder("developer");
+        let (door, asked) = admin(&dir, |_| json!({"camera": true, "microphone": false}));
+        assert_eq!(
+            developer(&door),
+            Some(json!({"camera": true, "microphone": false}))
+        );
+        assert_eq!(asked.recv().unwrap(), json!({"features": true}));
+        let _ = std::fs::remove_dir_all(dir);
+        let dir = folder("developer-old");
+        let (door, _asked) = admin(
+            &dir,
+            |_| json!({"error": "ask for code, cancel_code, take_back, revoke or clients"}),
+        );
+        assert_eq!(
+            developer(&door),
+            Some(json!({"camera": false, "microphone": false}))
+        );
+        let _ = std::fs::remove_dir_all(dir);
+        let gone = Door {
+            socket: PathBuf::from("/nowhere/admin.sock"),
+            device_id: "d-42".into(),
+        };
+        assert_eq!(developer(&gone), None);
     }
 
     /// No socket: the door is off, said plainly, and not `here`.

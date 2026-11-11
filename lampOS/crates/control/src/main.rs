@@ -391,6 +391,11 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         },
         _ => None,
     };
+    // What the app's grants screen may offer: wired streams (and the microphone's switch).
+    let features = server::Features {
+        camera: sight.is_some(),
+        microphone: hearing.is_some() && microphone,
+    };
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
         let lamp = parts::Lamp::new(body, light, say, clock_id, events)
             .watching(watching)
@@ -437,6 +442,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         Some(_) => return Err("--remote is on or off".to_owned()),
     };
     shared.set_remote(remote);
+    shared.set_features(features);
     eprintln!(
         "lamp-control: {}",
         if remote {

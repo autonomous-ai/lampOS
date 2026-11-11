@@ -484,6 +484,14 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             if lamp.recovery() {
                 info["recovery"] = json!(true);
             }
+            // `developer` (App Only's C): only while lamp-control's admin socket is
+            // there (developer access on); whether a camera or microphone stream
+            // is usable, so the app's grants screen can disable that tick.
+            if let Some(door) = lamp.control()
+                && let Some(developer) = crate::control::developer(&door)
+            {
+                info["developer"] = developer;
+            }
             // `reset` (#2937): a lamp that can't tell says none, so the
             // app reads it as before, the 5 s hold.
             if let Some(reset) = lamp.reset() {
@@ -1255,6 +1263,8 @@ pub mod tests {
         assert_eq!(info["network"]["interface"], "wlan0");
         // `account` only while signed out; a lamp signed in says what it did.
         assert!(info.get("account").is_none(), "{info}");
+        // `developer` only where lamp-control's admin socket is: none here.
+        assert!(info.get("developer").is_none(), "{info}");
         let mut out = Fake {
             account: Some("signed_out"),
             ..Fake::default()
