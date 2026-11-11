@@ -296,16 +296,46 @@ enum Extra {
         replaced_by: String,
     },
     /// `LAMP_SERVICE_RECORDS`: a known person's records, the latest change
-    /// first (`Days::service_records`).
+    /// first (`Days::service_records`); with `about` (the voice's
+    /// `LAMP_SERVICE_RECORDS_TOLD`, a recall's words), those its words
+    /// match, the best first, whatever their age
+    /// (`Days::service_records_about`).
     ServiceRecords {
         #[serde(default)]
         person: Who,
         #[serde(default)]
         limit: Option<u64>,
+        #[serde(default)]
+        about: Option<String>,
     },
     /// `LAMP_SERVICE_RECORDS`: the records about a forget's key words
     /// removed (`Days::service_records_forget`).
     ServiceRecordsForget {
+        #[serde(default)]
+        person: Who,
+        about: Vec<Vec<String>>,
+    },
+    /// The voice's `LAMP_SERVICE_CONTACTS` (connector records, PR 1c): a
+    /// known person's mail contact saved, new or replacing the address
+    /// kept for that name (`Days::service_contact_put`).
+    ServiceContact {
+        #[serde(default)]
+        person: Who,
+        name: String,
+        address: String,
+        at_unix_ms: u64,
+    },
+    /// `LAMP_SERVICE_CONTACTS`: a known person's contacts, or the one of
+    /// `name` (`Days::service_contacts`).
+    ServiceContacts {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        name: Option<String>,
+    },
+    /// `LAMP_SERVICE_CONTACTS`: the contacts about a forget's key words
+    /// removed (`Days::service_contacts_forget`).
+    ServiceContactsForget {
         #[serde(default)]
         person: Who,
         about: Vec<Vec<String>>,
@@ -1098,9 +1128,32 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             )?;
             json!({"ok":true,"status":kept})
         }
-        Extra::ServiceRecords { person, limit } => {
+        Extra::ServiceRecords {
+            person,
+            limit,
+            about,
+        } => {
             let limit = limit.unwrap_or(crate::service_records::LIST_MOST as u64) as usize;
-            json!({"ok":true,"records":store.service_records(&one(person)?, limit)?})
+            let records = match about {
+                Some(about) => store.service_records_about(&one(person)?, &about, limit)?,
+                None => store.service_records(&one(person)?, limit)?,
+            };
+            json!({"ok":true,"records":records})
+        }
+        Extra::ServiceContact {
+            person,
+            name,
+            address,
+            at_unix_ms,
+        } => {
+            let kept = store.service_contact_put(&one(person)?, &name, &address, at_unix_ms)?;
+            json!({"ok":true,"kept":kept})
+        }
+        Extra::ServiceContacts { person, name } => {
+            json!({"ok":true,"contacts":store.service_contacts(&one(person)?, name.as_deref())?})
+        }
+        Extra::ServiceContactsForget { person, about } => {
+            json!({"ok":true,"removed":store.service_contacts_forget(&one(person)?, &about)?})
         }
         Extra::ServiceRecordsForget { person, about } => {
             json!({"ok":true,"removed":store.service_records_forget(&one(person)?, &about)?})
@@ -1152,6 +1205,9 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_record",
             "service_records",
             "service_records_forget",
+            "service_contact",
+            "service_contacts",
+            "service_contacts_forget",
         ];
         const OLD: &[&str] = &[
             "append",

@@ -144,7 +144,7 @@ pub const AFTER_READ: &str = "Not done: after reading from a linked service, I d
 /// alone ([`brief`]).
 pub const BRIEF_NOTE: &str = "Someone else may be here: say only how many there are, who they are from and what they are about, never what they say.";
 /// What the model is told after a write is prepared.
-const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I send it?\" (in Vietnamese \"Gửi không?\"); for an event or a file, \"Shall I go ahead?\" (in Vietnamese \"Làm không?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't send: say it's cancelled, or prepare the changed one anew.";
+pub(crate) const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I send it?\" (in Vietnamese \"Gửi không?\"); for an event or a file, \"Shall I go ahead?\" (in Vietnamese \"Làm không?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't send: say it's cancelled, or prepare the changed one anew.";
 /// What the model is told after a Gmail draft is prepared (`save_draft`):
 /// it is saved, never sent, so the lamp asks "Shall I save it?".
 pub const SAVE_READ_BACK_NEXT: &str = "Nothing is saved yet, and nothing is ever sent. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I save it?\" (in Vietnamese \"Lưu không?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't save: say it's cancelled, or prepare the changed one anew.";
@@ -220,6 +220,31 @@ pub fn tools(folder: &Path) -> Vec<Tool> {
                     .and_then(Value::as_object_mut)
             {
                 properties.remove("said");
+                // A name alone is filled in from the owner's saved
+                // contacts (`LAMP_SERVICE_CONTACTS`).
+                if crate::service_contacts::on()
+                    && let Some(to) = properties.get_mut("to").and_then(Value::as_object_mut)
+                {
+                    let said = to
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_owned();
+                    to.insert(
+                        "description".into(),
+                        json!(format!("{said} {}", crate::service_contacts::TO_NOTE).trim()),
+                    );
+                }
+                // Redo from a record (`LAMP_SERVICE_REDO`): offered only on.
+                if crate::service_records::redo::on() {
+                    properties.insert(
+                        crate::service_records::redo::FIELD.into(),
+                        json!({
+                            "type": "string",
+                            "description": crate::service_records::redo::DESCRIPTION,
+                        }),
+                    );
+                }
             }
             tool
         })
@@ -1043,6 +1068,15 @@ pub fn gate(
         if !turn.seen_owner {
             return Err(json!({ "error": NOT_SEEN_SAYING }));
         }
+        // Redone from a record (`LAMP_SERVICE_REDO`): every saved detail
+        // filled in, only what the call gave laid over it; the read-back
+        // and its send below stay as for any write.
+        if call.name == WRITE
+            && let Err(why) =
+                crate::service_records::redo::fill(turn.owner.unwrap_or_default(), &mut call.args)
+        {
+            return Err(json!({ "error": why }));
+        }
         return Ok(call);
     };
     let Some(kept) = pending.take() else {
@@ -1189,6 +1223,10 @@ pub fn answered(
                 READ_BACK_NEXT
             });
             *pending = Some(kept);
+            // A follow-up to a sent mail (`LAMP_SERVICE_REDO`): said plainly.
+            if let Some(note) = crate::service_records::redo::note(owner, &call.args) {
+                told["follow_up"] = json!(note);
+            }
         }
         // An id with nothing to read back is never sent.
         (Some(_), _) => {
@@ -1281,7 +1319,8 @@ fn owner_among(
 }
 
 /// Whether the owner is the only face the eyes see now
-/// (`known_faces::most_faces_lately`); no count is not alone.
+/// (`known_faces::most_faces_lately`); no count is not alone. One of the
+/// checks for the owner's service records told in full ([`records_in_full`]).
 fn owner_alone() -> bool {
     crate::known_faces::most_faces_lately() == Some(1)
 }
@@ -1329,6 +1368,40 @@ pub(crate) fn owner_hears(
         || owner_seen_saying(heard, private_room, owner_of(lease).as_deref(), |owner| {
             seen_saying_owner(request, owner).0
         })
+}
+
+/// Whether the owner's service records are told in full
+/// (`service_records::told`), as a read is said in full: in the private
+/// room, or [`read_in_full`]'s three checks. `likeness` is asked only for
+/// the owner seen saying the line alone in view.
+pub(crate) fn told_in_full(
+    private_room: bool,
+    alone: bool,
+    seen_owner: bool,
+    likeness: impl FnOnce() -> Option<f32>,
+) -> bool {
+    private_room || (alone && seen_owner && read_in_full(alone, likeness(), seen_owner))
+}
+
+/// [`told_in_full`] for the line `request` of the owner `owner` (memory
+/// id): the read's checks, its voice asked once of the second route's
+/// judge (the owner's enrolled print when they have one, else the
+/// conversation's voice) and never waited for, so a print not made yet
+/// tells the brief form; no judge, brief.
+pub(crate) fn records_in_full(request: u64, owner: &str) -> bool {
+    told_in_full(
+        crate::person::private_room(),
+        owner_alone(),
+        seen_saying_owner(request, owner).0,
+        || {
+            let ask = if crate::owner_voice::enrolled(owner).is_some() {
+                VoiceAsk::Owner(request)
+            } else {
+                VoiceAsk::Conversation(request)
+            };
+            judge().and_then(|judge| judge(ask))
+        },
+    )
 }
 
 /// Whether the owner's face (memory id `owner`) was seen saying the line
@@ -1521,6 +1594,12 @@ pub fn run(
     let private_room = crate::person::private_room();
     let owner = owner_of(lease);
     let judge = judge();
+    // A write redone from a record made before the voice started: read from
+    // the memory first, off the gate's lock, for the owner's line alone
+    // (`LAMP_SERVICE_REDO`).
+    if call.name == WRITE && heard {
+        crate::service_records::redo::bring(owner.as_deref(), &call.args);
+    }
     // A send, with the model's id.
     let send_id = given_send_id(call).is_some();
     // With the owner's enrolled print (`LAMP_SAME_VOICE_FOR=services`,
@@ -1584,7 +1663,7 @@ pub fn run(
         other_seen,
     };
     let gated = kept::pending(|pending| gate(pending, call, request, &turn, now));
-    let call = match gated {
+    let mut call = match gated {
         Ok(call) => call,
         Err(told) => {
             eprintln!(
@@ -1611,6 +1690,17 @@ pub fn run(
             }
             return (told, true);
         }
+    };
+    // A mail's names filled in from the owner's saved contacts, before it
+    // is prepared (`LAMP_SERVICE_CONTACTS`): the read-back says the
+    // address. A name with none saved prepares nothing.
+    let filled = if call.name == WRITE && !send_id {
+        match crate::service_contacts::fill(owner.as_deref(), &mut call.args) {
+            Ok(filled) => filled,
+            Err(told) => return (told, true),
+        }
+    } else {
+        Vec::new()
     };
     // The waiting write this sends, whose record its answer settles.
     // The owner a read's record is kept for, taken before the answer's
@@ -1646,12 +1736,28 @@ pub fn run(
         }
     }
     if answered {
+        if call.name == WRITE && !send_id && crate::service_contacts::on() {
+            // The contacts its send would save, named only from the
+            // owner's own lines or the draft's greeting.
+            let lines = owner
+                .as_deref()
+                .map(|owner| owner_lines(owner, request, now))
+                .unwrap_or_default();
+            crate::service_contacts::plan(owner.as_deref(), &call.args, &filled, &lines, &mut told);
+        }
         let owner = owner.as_deref().unwrap_or_default();
         kept::pending(|pending| {
             self::answered(pending, &call, request, &mut told, Instant::now(), owner);
         });
         if send_id {
             keep_send_of(attempt, sends.as_deref(), Got::Answered(&told));
+            // The read-back confirmed and sent: its contacts saved
+            // (`LAMP_SERVICE_CONTACTS`).
+            if told.get("sent").and_then(Value::as_bool) == Some(true)
+                && let Some(sends) = &sends
+            {
+                crate::service_contacts::sent(sends);
+            }
         }
         if call.name == READ {
             // Its record from the whole answer, before any brief: the
@@ -1688,6 +1794,25 @@ pub fn run(
         return (crate::tools::unavailable(), false);
     }
     (told, answered)
+}
+
+/// The owner's own lines of the last ten minutes, and the line heard in
+/// `request` (`thread::Thread::heard_for`): where a mail contact's name may come from
+/// (`LAMP_SERVICE_CONTACTS`), never the lamp's words or a service's.
+fn owner_lines(owner: &str, request: u64, now: Instant) -> Vec<String> {
+    crate::thread::THREAD
+        .lock()
+        .map(|thread| {
+            let mut lines: Vec<String> = thread
+                .recent_for(Some(owner), now, Duration::from_secs(600), 8)
+                .into_iter()
+                .map(|recent| recent.person)
+                .filter(|said| !said.is_empty())
+                .collect();
+            lines.extend(thread.heard_for(request, now));
+            lines
+        })
+        .unwrap_or_default()
 }
 
 /// Why the gate refused a call that was no send, for its record

@@ -3496,6 +3496,8 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
     // counted, so a forget of someone who kept only records still says it
     // removed something.
     let count = count + crate::service_records::empty(tx, person)?;
+    // And their mail contacts (the voice's `LAMP_SERVICE_CONTACTS`).
+    let count = count + crate::service_contacts::empty(tx, person)?;
     tx.execute(
         "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],
