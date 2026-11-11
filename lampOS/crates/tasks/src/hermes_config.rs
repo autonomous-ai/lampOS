@@ -629,15 +629,23 @@ pub fn write(hermes_home: &Path, port: u16, token: &str) -> io::Result<Written> 
 /// `HERMES_HOME`.
 pub const GUIDANCE_FILE: &str = "AGENTS.md";
 
-/// What [`GUIDANCE_FILE`] says: where the lamp's skills are, how to run
-/// one's tool ([`crate::skill_call`]), and the owner's rules for them.
+/// What [`GUIDANCE_FILE`] says to Hermes: [`guidance_for`] it.
 pub fn guidance() -> String {
+    guidance_for("Hermes", "~/.hermes")
+}
+
+/// What [`GUIDANCE_FILE`] says to the lamp's own `engine` (its name, as
+/// "Hermes" or "OpenClaw"), whose own settings are in `own_home`: where the
+/// lamp's skills are, how to run one's tool ([`crate::skill_call`]), and
+/// the owner's rules for them. The same words for every lamp engine
+/// (#6226), only the name and its home differ.
+pub fn guidance_for(engine: &str, own_home: &str) -> String {
     let program = crate::skill_call::PROGRAM;
     format!(
         "\
 # Working on the lamp
 
-You are Hermes, running on the lamp itself as the user `lampos`. The lamp's \
+You are {engine}, running on the lamp itself as the user `lampos`. The lamp's \
 voice (a fast model) hands you the longer tasks a person asks for; you work \
 on its behalf. lampOS writes this file; changes to it are written over.
 
@@ -647,7 +655,7 @@ on its behalf. lampOS writes this file; changes to it are written over.
 does and when) and a `skill.toml` (its triggers, steps and tool). They are in \
 your skills list as external skills. The folder is read-only and owned by the \
 lamp: never edit, move or copy files there, and never copy them into \
-`~/.hermes` or anywhere else.
+`{own_home}` or anywhere else.
 - Skills with a tool can be run by you, the same way the voice runs them: \
 `{program} skill list` shows them as JSON, and \
 `{program} skill call NAME '{{\"choice\":\"value\"}}'` runs one and prints \
@@ -672,6 +680,12 @@ lamp is the person's step, never yours.
 /// folder or a file that is a link, or a file that isn't a regular one, is
 /// refused and left as it is.
 pub fn write_guidance(folder: &Path) -> io::Result<bool> {
+    write_guidance_text(folder, &guidance())
+}
+
+/// `text` in `folder`'s [`GUIDANCE_FILE`], as [`write_guidance`] writes
+/// Hermes' guidance: only when it differs, never through a link.
+pub(crate) fn write_guidance_text(folder: &Path, text: &str) -> io::Result<bool> {
     if !fs::symlink_metadata(folder)?.is_dir() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -679,11 +693,10 @@ pub fn write_guidance(folder: &Path) -> io::Result<bool> {
         ));
     }
     let path = folder.join(GUIDANCE_FILE);
-    let text = guidance();
     if read_or_empty(&path)? == text {
         return Ok(false);
     }
-    replace(&path, &text)?;
+    replace(&path, text)?;
     Ok(true)
 }
 
