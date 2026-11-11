@@ -76,6 +76,8 @@ pub struct HandOver {
     pub task: String,
     pub run: String,
     pub folder: PathBuf,
+    /// The folder's SHA-256 as lamp-skills read it: checked for its form and
+    /// kept for the record; lamp-tasks does not hash the folder again.
     pub sha256: String,
     pub grants: Vec<String>,
 }
@@ -303,7 +305,7 @@ impl Tokens for ControlTokens {
 
     fn end(&self, run: &str) {
         if let Err(why) = self.ask(&json!({"end": {"run": run}})) {
-            // The token still ends at its own time (10 minutes at most).
+            // The token still ends at its own time (RUN_LIFETIME, 30 minutes).
             eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
         }
     }
@@ -325,8 +327,7 @@ pub fn run_id() -> String {
 }
 
 /// One run for the lamp's own Hermes: its words, the skill's folder, and
-/// what its environment is given.
-#[derive(Debug)]
+/// what its environment is given. Its `Debug` never shows the token.
 pub struct SkillRun {
     pub skill: String,
     pub prompt: String,
@@ -336,6 +337,32 @@ pub struct SkillRun {
     /// When the runner ends the run, done or not: its token's life
     /// ([`RUN_LIFETIME`]).
     pub deadline: Duration,
+}
+
+impl std::fmt::Debug for SkillRun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let env: Vec<(&str, &str)> = self
+            .env
+            .iter()
+            .map(|(name, value)| {
+                (
+                    *name,
+                    if *name == TOKEN_ENV {
+                        ".."
+                    } else {
+                        value.as_str()
+                    },
+                )
+            })
+            .collect();
+        f.debug_struct("SkillRun")
+            .field("skill", &self.skill)
+            .field("prompt", &self.prompt)
+            .field("folder", &self.folder)
+            .field("env", &env)
+            .field("deadline", &self.deadline)
+            .finish()
+    }
 }
 
 impl SkillRun {
@@ -375,7 +402,9 @@ impl SkillRun {
 /// Runs one task on the lamp's own Hermes (target `lamp`) and waits for its
 /// end: the task's number, or why it didn't run or end well. A runner ends
 /// the run at [`SkillRun::deadline`], and holds the run off the network
-/// itself (hermes-ns), never by the prompt's words alone.
+/// itself (hermes-ns), never by the prompt's words alone. The run's
+/// environment is cleared to [`SkillRun::env`] alone: nothing of
+/// lamp-tasks' own environment reaches Hermes.
 pub trait Runner {
     fn run(&self, run: &SkillRun) -> Result<u64, String>;
 }
@@ -846,5 +875,18 @@ mod tests {
     fn the_token_is_never_in_a_debug_line() {
         let token = RunToken::new("secret-value".into());
         assert_eq!(format!("{token:?}"), "RunToken(..)");
+    }
+
+    #[test]
+    fn a_runs_debug_line_never_shows_its_token() {
+        let hand = HandOver::parse(&line(|_| {}), Path::new(SKILLS)).unwrap();
+        let run = SkillRun::of(&hand, &RunToken::new("secret-value".into()));
+        let shown = format!("{run:?}");
+        assert!(!shown.contains("secret-value"), "{shown}");
+        assert!(
+            shown.contains(&format!("(\"{TOKEN_ENV}\", \"..\")")),
+            "{shown}"
+        );
+        assert!(shown.contains(CONTROL_SOCKET), "{shown}");
     }
 }
