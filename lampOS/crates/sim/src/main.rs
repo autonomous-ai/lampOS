@@ -121,13 +121,17 @@ fn servo(dir: &Path) -> std::io::Result<()> {
         link.display(),
         port.slave.display()
     );
-    port.serve(&mut found_bus(), &link, || false)
+    port.serve(&mut found_bus()?, &link, || false)
 }
 
 /// Servos found folded at the counts of lamp-fc4b's measured home: base yaw,
 /// shoulder, elbow, head roll, head pitch.
-fn found_bus() -> Bus {
-    Bus::new([2028, 2048, 1946, 2085, 1817], [(0, 4095); 5])
+fn found_bus() -> std::io::Result<Bus> {
+    // The limits the servos store: all 0..=4095 unless `LAMP_SIM_SERVO_RANGES` says (README).
+    let ranges =
+        lamp_sim::servo::ranges_from(std::env::var("LAMP_SIM_SERVO_RANGES").ok().as_deref())
+            .map_err(std::io::Error::other)?;
+    Ok(Bus::new([2028, 2048, 1946, 2085, 1817], ranges))
 }
 
 /// Why `lamp-body` would refuse an ancestor of its lock folder, the rule of
@@ -203,7 +207,7 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     let link = dir.join("servo");
     let _ = std::fs::remove_file(&link);
     symlink(&port.slave, &link)?;
-    let mut servo_bus = found_bus();
+    let mut servo_bus = found_bus()?;
     let servo_pose = servo_bus.pose();
     let mut threads = vec![spawn_named("servo bus", move || {
         let _ = port.serve(&mut servo_bus, &link, || false);

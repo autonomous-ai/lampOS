@@ -232,6 +232,50 @@ pub struct Bus {
     pose: Pose,
 }
 
+/// What every servo stores unless told otherwise: the full 0..=4095, which `lamp-body` takes
+/// as "no range stored" and keeps its own guard for.
+pub const FULL: (u16, u16) = (0, 4095);
+
+/// lamp-75c9's stored angle limits, read by the lamp's own `lamp-body` (a unit test comment at
+/// #6184's head, `a_lamps_reach_is_90_percent_of_its_hardware_from_the_pose_on_each_side`: "75c9's
+/// own ranges, read on 10 Nov: yaw 820-3268 from 2012, roll 897-3153 from 2059, pitch 1457-3029
+/// from 1791"). Only those three are known: the shoulder and the elbow stay at [`FULL`] (their
+/// reach comes from the arm's window, not stored ranges).
+pub const RANGES_75C9: [(u16, u16); 5] = [(820, 3268), FULL, FULL, (897, 3153), (1457, 3029)];
+
+/// The stored ranges asked of lamp-sim (`LAMP_SIM_SERVO_RANGES`): none or `full`, every servo at
+/// [`FULL`]; `75c9`, [`RANGES_75C9`]; or a list `joint=LOW-HIGH,...` (joints `yaw`, `shoulder`,
+/// `elbow`, `roll`, `pitch`), the rest at [`FULL`].
+pub fn ranges_from(spec: Option<&str>) -> Result<[(u16, u16); 5], String> {
+    let spec = spec.map(str::trim).unwrap_or("");
+    match spec {
+        "" | "full" => return Ok([FULL; 5]),
+        "75c9" => return Ok(RANGES_75C9),
+        _ => {}
+    }
+    let mut ranges = [FULL; 5];
+    for part in spec.split(',') {
+        let bad = || format!("LAMP_SIM_SERVO_RANGES: {part:?} is not joint=LOW-HIGH");
+        let (joint, range) = part.trim().split_once('=').ok_or_else(bad)?;
+        let k = ["yaw", "shoulder", "elbow", "roll", "pitch"]
+            .iter()
+            .position(|name| *name == joint.trim())
+            .ok_or_else(|| format!("LAMP_SIM_SERVO_RANGES: no joint {joint:?}"))?;
+        let (low, high) = range.split_once('-').ok_or_else(bad)?;
+        let (low, high) = (
+            low.trim().parse::<u16>().map_err(|_| bad())?,
+            high.trim().parse::<u16>().map_err(|_| bad())?,
+        );
+        if low >= high || high > 4095 {
+            return Err(format!(
+                "LAMP_SIM_SERVO_RANGES: {part:?}: LOW below HIGH, HIGH at most 4095"
+            ));
+        }
+        ranges[k] = (low, high);
+    }
+    Ok(ranges)
+}
+
 impl Bus {
     /// A bus of servos 1 to 5, found at `found` counts, free inside `limits`.
     pub fn new(found: [u16; 5], limits: [(u16, u16); 5]) -> Self {
@@ -551,5 +595,26 @@ mod tests {
         assert!((47.0..=50.0).contains(&heat(1)), "shoulder {}", heat(1));
         assert!((51.0..=55.0).contains(&heat(2)), "elbow {}", heat(2));
         assert_eq!(heat(0), AMBIENT);
+    }
+
+    #[test]
+    fn stored_ranges_default_to_full_and_take_75c9s_or_a_list() {
+        assert_eq!(ranges_from(None).unwrap(), [FULL; 5]);
+        assert_eq!(ranges_from(Some("full")).unwrap(), [FULL; 5]);
+        assert_eq!(ranges_from(Some("75c9")).unwrap(), RANGES_75C9);
+        assert_eq!(
+            ranges_from(Some("yaw=820-3268, pitch=1457-3029")).unwrap(),
+            [(820, 3268), FULL, FULL, FULL, (1457, 3029)]
+        );
+        for bad in [
+            "yaw",
+            "yaw=5",
+            "nose=1-2",
+            "yaw=9-3",
+            "yaw=1-5000",
+            "yaw=a-b",
+        ] {
+            assert!(ranges_from(Some(bad)).is_err(), "{bad}");
+        }
     }
 }
