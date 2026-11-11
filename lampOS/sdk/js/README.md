@@ -176,7 +176,7 @@ node conformance/examples.js --sim ~/.lampsim/b --lamp-sim target/debug/lamp-sim
 
 `--sim DIR` is the virtual lamp's folder: the examples that wait for the room get it from `lamp-sim people|hear|hand|air`
 (someone arriving, a heard phrase, a hand, the air), and are skipped without it. What is left (a camera, a skill
-folder, a look at a face) is in `NOT_YET` with what each waits for.
+folder, a look at a face) is in `NOT_YET` with what each waits for. A row that fails is run once more and said (`first run FAILED ...`, then `ok (on its rerun)`), so a loaded machine's missed debounce does not fail a run and a flaky row stays visible; `--no-rerun` turns it off.
 
 ## Pair with a real lamp
 

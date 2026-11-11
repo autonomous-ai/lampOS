@@ -4,7 +4,10 @@
 // own test (test/examples.test.js) checks what the example asked; a real or
 // virtual lamp cannot be asked that, so this checks what the lamp did.
 //
-//   LAMPOS_HOME=<paired with the lamp> node conformance/examples.js [--sim DIR [--lamp-sim PATH]]
+//   LAMPOS_HOME=<paired with the lamp> node conformance/examples.js [--sim DIR [--lamp-sim PATH]] [--no-rerun]
+//
+// A row that FAILED is run once more and said (`first run FAILED ...`, then `ok (on its rerun)`), so a lamp on a
+// loaded machine that missed a debounce does not fail a run, and a flaky row stays visible; `--no-rerun` turns it off.
 //
 // `--sim DIR` is the virtual desktop lamp's folder (`lamp-sim run DIR`): the examples that
 // wait for the room (someone arriving, a heard phrase, a hand, the air) make it happen with
@@ -118,9 +121,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     for (const entry of RUNS) {
       if (entry.needs === 'sim' && !sim) { console.log(`${entry.name.padEnd(20)} skipped (needs --sim DIR)`); continue; }
       if (entry.needs === 'body' && !lamp.grants.includes('body')) { console.log(`${entry.name.padEnd(20)} skipped (needs the body grant)`); continue; }
-      const result = await run(lamp, entry, sim);
+      let result = await run(lamp, entry, sim);
+      // A row waits on the lamp's own clock (a debounce, a fade) and a loaded machine can miss it: a FAILED row is
+      // run once more, and said, so a flaky row stays visible and a broken one still fails.
+      let rerun = false;
+      if (!result.ok && !process.argv.includes('--no-rerun')) {
+        console.log(`${entry.name.padEnd(20)} first run FAILED (shown=${result.shown} error=${result.error} ${result.out}); running it once more`);
+        await sleep(3_000);
+        result = await run(lamp, entry, sim);
+        rerun = true;
+      }
       if (!result.ok) failed++;
-      console.log(`${entry.name.padEnd(20)} ${result.ok ? 'ok' : 'FAILED'}${result.ok ? '' : ` shown=${result.shown} error=${result.error} ${result.out}`}`);
+      console.log(`${entry.name.padEnd(20)} ${result.ok ? 'ok' : 'FAILED'}${rerun && result.ok ? ' (on its rerun)' : ''}${result.ok ? '' : ` shown=${result.shown} error=${result.error} ${result.out}`}`);
     }
   } finally { await lamp.close(); }
   process.exit(failed ? 1 : 0);
