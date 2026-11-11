@@ -2438,7 +2438,10 @@ fn a_lamp_never_signed_in_hands_work_to_its_own_engine() {
     let id = prepared["id"].clone();
     let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
     assert_eq!(s.trusted(confirm)["ok"], true);
-    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    // Handed to Harness (the script gives every launch one agent id, so
+    // this second is kept uncertain as a reused id: only where it went is
+    // looked at).
+    s.wait(&id, |v| !v["task"]["dispatch"]["finished"].is_null());
     assert_eq!(
         s.counts.launched_on.lock().unwrap().last(),
         Some(&(COMPUTER.to_owned(), EngineKind::Openclaw))
