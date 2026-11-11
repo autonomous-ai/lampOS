@@ -431,6 +431,91 @@ async fn a_revoke_the_file_cannot_take_yet_says_so() {
     std::fs::remove_dir(lamp.dir.join("clients.json.new")).unwrap();
 }
 
+/// The app's `control.set_grants` on the admin socket: a computer's grants
+/// change with no new code, the answer says what moved, the file keeps it,
+/// the computer's connection closes (it reads its grants at its next hello),
+/// and a refusal (no such computer, an unknown grant, a file that won't take
+/// it) changes nothing.
+#[tokio::test]
+async fn the_admin_socket_changes_a_computers_grants() {
+    let lamp = lamp("set-grants").await;
+    let mut socket = paired(&lamp, json!(["light"]), 12).await;
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    let client = listed["clients"][0]["id"].as_str().unwrap().to_owned();
+    // Refusals first: nothing changes.
+    let none = admin(
+        &lamp,
+        json!({"set_grants": {"client": "c_nobody", "grants": ["light"]}}),
+    )
+    .await;
+    assert_eq!(none["error"], "no such computer", "{none}");
+    let unknown = admin(
+        &lamp,
+        json!({"set_grants": {"client": client, "grants": ["light", "teleport"]}}),
+    )
+    .await;
+    assert!(
+        unknown["error"].as_str().unwrap().starts_with("grants:"),
+        "{unknown}"
+    );
+    std::fs::create_dir(lamp.dir.join("clients.json.new")).unwrap();
+    let unsaved = admin(
+        &lamp,
+        json!({"set_grants": {"client": client, "grants": ["light", "camera"]}}),
+    )
+    .await;
+    assert!(
+        unsaved["error"].as_str().unwrap().starts_with("not saved"),
+        "{unsaved}"
+    );
+    std::fs::remove_dir(lamp.dir.join("clients.json.new")).unwrap();
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    assert_eq!(listed["clients"][0]["grants"], json!(["light"]));
+    // The words for every grant, once per answer, for an app that has no label of its own.
+    assert_eq!(
+        listed["shown"]["camera"],
+        lamp_control::protocol::Grant::Camera.shown()
+    );
+    // The whole list is asked for: a request with no `grants` changes nothing.
+    let missing = admin(&lamp, json!({"set_grants": {"client": client}})).await;
+    assert!(
+        missing["error"]
+            .as_str()
+            .unwrap()
+            .contains("the whole list"),
+        "{missing}"
+    );
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    assert_eq!(listed["clients"][0]["grants"], json!(["light"]));
+    // Now the change: camera gained, saved, said.
+    let set = admin(
+        &lamp,
+        json!({"set_grants": {"client": client, "grants": ["light", "camera"]}}),
+    )
+    .await;
+    assert_eq!(set["client"], json!(client), "{set}");
+    assert_eq!(set["added"], json!(["camera"]), "{set}");
+    assert_eq!(set["removed"], json!([]), "{set}");
+    assert_eq!(set["saved"], true, "{set}");
+    assert_eq!(
+        set["shown"]["microphone"],
+        lamp_control::protocol::Grant::Microphone.shown()
+    );
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    assert_eq!(listed["clients"][0]["grants"], json!(["light", "camera"]));
+    // Its connection is closed, so it reads the new grants at its next hello.
+    let ended = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            match socket.next().await {
+                None | Some(Err(_) | Ok(Message::Close(_))) => return,
+                Some(Ok(_)) => continue,
+            }
+        }
+    })
+    .await;
+    assert!(ended.is_ok(), "the computer's connection closed");
+}
+
 /// Fourteen's P3 on #3778: frames before `hello` don't move its deadline;
 /// a client that never says it is closed at the hello time from its welcome.
 #[tokio::test]
