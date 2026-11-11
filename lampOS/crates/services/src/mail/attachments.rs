@@ -26,6 +26,7 @@ use super::{
 };
 use crate::net;
 use serde_json::Value;
+use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 /// The most attachments a mail's read names.
@@ -853,7 +854,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
     /// (nothing marked read).
     pub async fn part(&mut self, uid: u32, section: &str, most: usize) -> Result<Vec<u8>, Failure> {
         if section.is_empty() || !section.chars().all(|c| c.is_ascii_digit() || c == '.') {
-            return Err(Failure::Unreached);
+            self.step = "FETCH";
+            return Err(self.broke(Failure::Unreached, "a part that can't be named"));
         }
         let most = most.min(PDF_FETCH);
         let usual = self.literal_most;
@@ -889,8 +891,36 @@ pub async fn read_attachment<S: AsyncRead + AsyncWrite + Unpin>(
     id: &str,
     pick: &Pick,
 ) -> Result<Option<MailItem>, Failure> {
-    let (folder, uid) = super::imap_id(id).ok_or(Failure::Unreached)?;
+    read_attachment_told(stream, user, pass, id, pick, super::WITHIN)
+        .await
+        .map_err(super::read_failed)
+}
+
+/// [`read_attachment`] within `within`, a failure with its step and why.
+pub(crate) async fn read_attachment_told<S: AsyncRead + AsyncWrite + Unpin>(
+    stream: S,
+    user: &str,
+    pass: &str,
+    id: &str,
+    pick: &Pick,
+    within: Duration,
+) -> Result<Option<MailItem>, (Failure, String)> {
     let mut imap = Imap::new(stream);
+    let read = tokio::time::timeout(within, attachment_on(&mut imap, user, pass, id, pick)).await;
+    imap.told(read, within)
+}
+
+async fn attachment_on<S: AsyncRead + AsyncWrite + Unpin>(
+    imap: &mut Imap<S>,
+    user: &str,
+    pass: &str,
+    id: &str,
+    pick: &Pick,
+) -> Result<Option<MailItem>, Failure> {
+    let Some((folder, uid)) = super::imap_id(id) else {
+        imap.step = "the mail's id";
+        return Err(imap.broke(Failure::Unreached, "an id that names no mail"));
+    };
     imap.greet().await?;
     imap.login(user, pass).await?;
     if !imap.examine_named(folder).await? {

@@ -414,7 +414,21 @@ giữ gì.
   mỗi thư 300 ký tự; `message {id}` (id mà một danh sách đưa ra) đến 3,000.
   Nội dung lấy từ phần văn bản thuần trước, nếu không
   thì từ HTML đã bỏ thẻ; quoted-printable, base64 và các từ RFC 2047 được giải
-  mã. 5 s để kết nối, 20 s cho toàn bộ trao đổi.
+  mã. 5 s để kết nối, 20 s cho toàn bộ trao đổi. `UID SEARCH` chỉ giữ các
+  UID mới nhất mà lần đọc cần: câu trả lời của một hộp thư bận, một dòng
+  chứa mọi UID (UID của Gmail dài tới bảy chữ số, nên 64 KB chỉ chứa khoảng
+  8.000), được đọc hết tới 16 MB và chỉ giữ những UID đó, thay vì bị từ chối
+  ở giới hạn dòng 64 KB (11/11, hộp thư bận của một người thử đọc ra "Gmail
+  couldn't be reached" trong khi cùng lần đăng nhập đó đã lưu được một bản
+  nháp). Một lần đọc thất bại được nói với người dùng là "Gmail couldn't be
+  reached"; journal ghi bước nào và vì sao: "a Gmail read failed at SEARCH:
+  a tagged NO [CANNOT]", "… at FETCH: a literal of 2000000 bytes, over
+  LITERAL_MOST (1048576 bytes)", "… at connecting: no TLS within 5 s". Nó
+  nêu tên lệnh, giới hạn và kích thước đã tới, hoặc trạng thái của máy chủ
+  và mã trong ngoặc vuông, không bao giờ là văn bản của máy chủ, một địa
+  chỉ, một tiêu đề, tên một hộp thư hay các từ tìm kiếm. Với đăng nhập
+  Google, journal ghi bước (danh sách, lần lấy một thư), mã HTTP của Gmail,
+  và lời của chính đèn cho lý do.
 - **Ghi:** SMTP qua TLS đến `smtp.gmail.com:465`: `EHLO`, `AUTH PLAIN` (nếu
   không thì `LOGIN`), `MAIL`, `RCPT` cho mỗi người nhận, `DATA`, `QUIT`. Một
   thư văn bản thuần bằng UTF-8, thân thư ở dạng base64, gửi từ chính tài
