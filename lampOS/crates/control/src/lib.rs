@@ -38,5 +38,6 @@ pub mod server;
 pub mod services;
 pub mod session;
 pub mod sounds;
+pub mod speaker;
 pub mod task_yes;
 pub mod watch;

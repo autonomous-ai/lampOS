@@ -136,6 +136,10 @@ pub type Binary = Arc<dyn Fn(&str, Media, Option<u64>, &[u8]) -> bool + Send + S
 pub enum Media {
     Camera,
     Microphone,
+    /// Not a frame to a computer: the one kind that goes the other way. It
+    /// names the speaker's stream, so a re-pairing without its grant ends it
+    /// as it ends the camera's and the microphone's.
+    Speaker,
 }
 
 impl Media {
@@ -144,6 +148,7 @@ impl Media {
         match self {
             Self::Camera => crate::protocol::Grant::Camera,
             Self::Microphone => crate::protocol::Grant::Microphone,
+            Self::Speaker => crate::protocol::Grant::Speaker,
         }
     }
 }
@@ -214,6 +219,8 @@ pub struct Lamp {
     next_say: u64,
     /// The microphone, the ears' blocks on the bus; none without the bus.
     microphone: Option<crate::microphone::Microphone>,
+    /// The speaker, through the voice and the bus; none without both.
+    speaker: Option<Arc<crate::speaker::Speaker>>,
     /// Each computer's motion handed to the body and not yet told, when
     /// the body's `body/gesture` is read (#4209, `crate::motion_done`).
     motions: Option<Arc<Mutex<crate::motion_done::Motions>>>,
@@ -320,6 +327,7 @@ impl Lamp {
             says: Says::default(),
             next_say: 0,
             microphone: None,
+            speaker: None,
             motions: None,
             asking: None,
         }
@@ -501,6 +509,14 @@ impl Lamp {
                 .room(room)
                 .marking(mark, drawn),
         );
+        self
+    }
+
+    /// `speaker.stream` through `speaker`, built by the caller with this
+    /// lamp's watch ([`crate::speaker::gates`]); given too to the server,
+    /// which hands it each binary frame.
+    pub fn speaking(mut self, speaker: Arc<crate::speaker::Speaker>) -> Self {
+        self.speaker = Some(speaker);
         self
     }
 
@@ -1529,6 +1545,21 @@ impl Parts for Lamp {
                     .ok_or_else(|| not_here("the microphone"))?
                     .stream(client, *on, events)
             }
+            Op::SpeakerStream { on, sample_rate } => {
+                let events = self.events.clone();
+                let speaker = self
+                    .speaker
+                    .clone()
+                    .ok_or_else(|| not_here("the speaker"))?;
+                // The stream is the connection's own: its frames come on it.
+                let conn = self.asking.ok_or_else(|| {
+                    Error::new(
+                        ErrorCode::Refused,
+                        "a speaker stream needs its own connection",
+                    )
+                })?;
+                speaker.stream(conn, client, client, *on, *sample_rate, events)
+            }
             Op::Express { feeling, strength } => self.express(client, re, feeling, *strength),
             Op::Sound { name } => self.sound(client, re, name),
             // The door sends a recorded move as a `move` (session.rs).
@@ -1598,6 +1629,10 @@ impl Parts for Lamp {
                 .microphone
                 .as_ref()
                 .is_some_and(|microphone| microphone.streaming(client, turn)),
+            Media::Speaker => self
+                .speaker
+                .as_ref()
+                .is_some_and(|speaker| speaker.streaming(client)),
         }
     }
 
@@ -1608,6 +1643,7 @@ impl Parts for Lamp {
                 .microphone
                 .as_ref()
                 .and_then(|microphone| microphone.newest_turn(client)),
+            Media::Speaker => None,
         }
     }
 
@@ -1623,10 +1659,18 @@ impl Parts for Lamp {
                     microphone.end(client);
                 }
             }
+            Media::Speaker => {
+                if let Some(speaker) = &self.speaker {
+                    speaker.end_client(client);
+                }
+            }
         }
     }
 
     fn stop(&mut self, client: &str, _: u64) {
+        if let Some(speaker) = &self.speaker {
+            speaker.end_client(client);
+        }
         if let Some(camera) = &mut self.camera {
             camera.end(client);
         }
