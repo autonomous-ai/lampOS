@@ -248,8 +248,11 @@ pub const NOT_APPROVED: &str = "Not approved: nothing waits for a yes now, or th
 /// heard whole (it waits on).
 pub const NOT_SAID_WHOLE: &str =
     "Not approved yet: what it sends was not said in full, or it was cut. Nothing is sent.";
-/// What the model is told when the yes came on the Live route.
-pub const NOT_HERE: &str = "Not approved: on this voice I can't take that yes. Say nothing is sent yet, and that they can ask me what that skill sends (\"what does my … skill send?\") to hear it again and say yes then.";
+/// What the model is told when the yes came on the Live route: nothing
+/// sent, and the yes taken on the lamp's other voice, never here, where
+/// asking again ends at `make_skill_local::yes_not_here` (App Only's P3 on
+/// #6250).
+pub const NOT_HERE: &str = "Not approved: this live voice can't take that yes. Say plainly that nothing was sent, and that I take that yes only on my other voice: in a normal conversation with me, not this live one.";
 /// What the model is told once approved.
 pub const APPROVED_NEXT: &str =
     "Say only, in the conversation's language, that it will now send as it said.";
@@ -557,9 +560,16 @@ mod tests {
                 "{line}"
             );
         }
-        // The way to a yes now: asking what the skill sends.
-        for line in [NOT_APPROVED, NOT_HERE] {
-            assert!(line.contains("what does my … skill send?"), "{line}");
+        // The way to a yes now: asking what the skill sends; on the Live
+        // route, which can't take one, the lamp's other voice, never
+        // asking again there (App Only's P3 on #6250).
+        assert!(
+            NOT_APPROVED.contains("what does my … skill send?"),
+            "{NOT_APPROVED}"
+        );
+        assert!(!NOT_HERE.contains("what does my"), "{NOT_HERE}");
+        for words in ["nothing was sent", "my other voice", "not this live one"] {
+            assert!(NOT_HERE.contains(words), "{NOT_HERE}");
         }
         let app_yes = [
             "yes in the app",

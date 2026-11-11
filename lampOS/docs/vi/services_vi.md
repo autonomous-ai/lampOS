@@ -2008,10 +2008,13 @@ năng được cài đúng package đó, `approved` khi nội dung của mọi l
 đồng ý của một package đã đổi bị bỏ, như lúc gửi); `lamp-skills` bị từ chối
 (`SKILL_READS_AND_WRITES_ONLY`), và khi công tắc tắt thì bị từ chối. Kiểm thử
 `whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`. Giọng
-nói chỉ hỏi nó cho một lần đọc lại đầy đủ: trong phòng riêng hoặc cho chủ
-đèn được thấy đang nói dòng đó (`services::owner_hears`, chốt chặn của một
-lần đọc đầy đủ); với người khác chỉ có tên kỹ năng và việc nó gửi, không
-hỏi gì ([skills_vi.md](skills_vi.md), "Đọc lại, và đồng ý khi đó").
+nói chỉ hỏi nó cho một lần đọc lại đầy đủ: trong phòng riêng, hoặc ngoài
+phòng riêng, cho chủ đèn được thấy đang nói dòng đó, là khuôn mặt duy nhất
+trong tầm nhìn và đúng giọng của họ từ 0.55 trở lên trên route có bộ phán
+giọng (`services::owner_hears`, qua `services::said_whole`, cũng là quy tắc
+duy nhất của một lần đọc đầy đủ); với người khác chỉ có tên kỹ năng và việc
+nó gửi, không hỏi gì ([skills_vi.md](skills_vi.md), "Đọc lại, và đồng ý khi
+đó").
 
 **Phía giọng nói** ([skills_vi.md](skills_vi.md), "Made by voice", cho
 toàn bộ):
@@ -2061,8 +2064,11 @@ toàn bộ):
   `skill_write_approve`, và ứng dụng không có lời đồng ý nào. Nên giọng
   nói không bao giờ bảo ai vào ứng dụng để đồng ý: một lời đồng ý bị từ
   chối được bảo hỏi đèn kỹ năng đó gửi gì ("what does my … skill send?")
-  để nghe lại và đồng ý khi đó (`skill_write_yes::NOT_APPROVED`,
-  `NOT_HERE`; HOLD của Thirteen trên #6223). Danh sách của ứng dụng chỉ hiện `uses.sends_to`
+  để nghe lại và đồng ý khi đó (`skill_write_yes::NOT_APPROVED`; HOLD của
+  Thirteen trên #6223), còn một lời đồng ý trên route Live, nơi không nhận
+  lời đồng ý, được bảo nói rằng chưa gửi gì và lời đồng ý được nhận ở giọng
+  kia của đèn, trong một cuộc trò chuyện bình thường với đèn, không phải
+  cuộc live này (`NOT_HERE`; P3 của App Only trên #6250). Danh sách của ứng dụng chỉ hiện `uses.sends_to`
   ("sends to …") của kỹ năng tự tạo khi ứng dụng làm (chữ của nó nằm trong
   ứng dụng).
 - Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh

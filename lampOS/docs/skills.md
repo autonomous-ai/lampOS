@@ -2627,14 +2627,20 @@ gone ([switches.md](switches.md)). What happens:
      to it, so it sends as it says." (`made_skill::approved_line`), and
      nothing is asked or awaited. One that sends nothing is said so ("…
      doesn't send or write anything"); none of that name on the lamp is
-     said so, with the names on. Another package of it installed than the
+     said so, with the names on only to a line the owner hears (below);
+     to anyone else `"on": []` and only that there is no skill by that
+     name, since a made skill's name can carry a person's (Thirteen's P3
+     on #6250). Another package of it installed than the
      one made is said to have changed since it was made, to ask again in a
      moment (`make_skill_local::changed_since_made`).
-     **Who hears it** (App Only's P2 on #6230): a skill that sends or
-     writes is read back whole, recipients and words, only in the private
-     room or to the owner seen saying the line
-     (`services::owner_hears`, the very gate a services read in full is
-     held to: `services::owner_seen_saying`). To anyone else only its name
+     **Who hears it** (App Only's P2s on #6230 and #6250): a skill that
+     sends or writes is read back whole, recipients and words, only in the
+     private room or, outside it, to the owner seen saying the line, the
+     one face in view and in their voice at 0.55 or more on the judge route
+     (`services::owner_hears`, through `services::said_whole`, the very rule
+     a services read in full is held to). A silent guest in view, a voice
+     under the bar, or the Live route, which has no judge, is not it. To
+     anyone else only its name
      and that it sends ("leaving mail sends something on its own; only its
      owner can hear what.", `make_skill_local::sends_unsaid`): nothing is
      asked of `lamp-services` and no wait starts. **Where** (App Only's
@@ -2644,16 +2650,20 @@ gone ([switches.md](switches.md)). What happens:
      wait starts, and a make's wait already pending is kept.
      **No yes in the app** (Thirteen's HOLD on #6223): the app has none
      (`lamp-cloud` has no kind for `skill_write_approve`), so a yes refused
-     (`NOT_APPROVED`, `NOT_HERE`) is told to say that they can ask the lamp
-     what the skill sends ("what does my … skill send?") to hear it again
-     and say yes then, never to go to the app.
+     (`NOT_APPROVED`) is told to say that they can ask the lamp what the
+     skill sends ("what does my … skill send?") to hear it again and say
+     yes then, never to go to the app. A yes on the Live route (`NOT_HERE`;
+     App Only's P3 on #6250) is told to say that nothing was sent and that
+     the lamp takes that yes only on its other voice, in a normal
+     conversation with it, not this live one.
      Tests: `a_waiting_write_skill_read_back_is_said_whole_and_a_later_yes_approves`,
      `a_cut_or_echoed_read_back_approves_nothing`,
      `a_read_back_declined_or_unanswered_stays_unapproved`,
      `an_approved_write_skill_read_back_is_said_and_asks_nothing`,
      `a_read_back_of_no_write_skill_or_none_says_so_plainly`,
      `the_read_back_is_offered_with_writes_alone_within_the_bounds`,
-     `a_read_back_is_said_whole_only_in_the_private_room_or_to_the_owner_seen`,
+     `a_read_back_is_said_whole_only_in_the_private_room_or_to_the_owner_alone_and_heard`,
+     `services::tests::said_whole_is_a_read_in_full_and_always_in_the_private_room`,
      `a_read_back_on_a_route_with_no_yes_starts_no_wait`,
      `skill_write_yes::tests::no_line_sends_the_person_to_the_app_for_a_yes`,
      and `lamp-services`'
