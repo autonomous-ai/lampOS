@@ -3755,6 +3755,16 @@ pub fn serve(
         );
     }
     engine = engine.resuming_after_wordless_cut_ins(wordless_resumes);
+    // Each chat request of a cut-in's turn journals its prompt, the words
+    // people said among it: a debug switch for test lamps, never while
+    // private or muted (`LAMP_CUT_IN_PROMPT_LOG=on`, #6218).
+    let prompt_log = crate::cut_in_prompt_log::on();
+    if prompt_log {
+        eprintln!(
+            "lamp-voice second: each chat request of a turn begun over the lamp's answer journals each message's role and first 80 characters, the words people said among them; a debug switch for test lamps only, silent while private or muted (LAMP_CUT_IN_PROMPT_LOG)"
+        );
+    }
+    engine = engine.logging_cut_in_prompts(prompt_log);
     // An answer to the lamp's own question is never left in silence by an
     // empty reply: the lamp asks to hear it again, once
     // (`LAMP_ANSWER_ASK_AGAIN=on`, Queue #4710 item 3). It reads the

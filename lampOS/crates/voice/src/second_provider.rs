@@ -1572,6 +1572,16 @@ struct Shared {
     wordless_resumes: bool,
     /// The run of wordless cuts, by the engine's clock (`LAMP_CUT_IN_WORDLESS_RESUMES`).
     wordless_cuts: Mutex<crate::cut_in_wordless::Cuts>,
+    /// Each chat request of a cut-in's turn writes its prompt's journal
+    /// block ([`crate::cut_in_prompt_log`], `LAMP_CUT_IN_PROMPT_LOG`).
+    prompt_log: bool,
+    /// The newest requests begun over the lamp's audible answer, with
+    /// [`Self::prompt_log`] only, at most [`BEGUN_OVER_KEPT`].
+    begun_over: Mutex<std::collections::VecDeque<u64>>,
+    /// The privacy switch closed or the microphone muted, as the worker's
+    /// authority last said ([`Engine::privacy`]; so too before any): no
+    /// prompt's words are journaled ([`Self::prompt_log`]).
+    private_now: AtomicBool,
     /// The newest request whose turn called [`crate::made_skill::MAKE`],
     /// and when, by the engine's clock: while that make is under way, or its
     /// line is still to be said ([`crate::make_skill_local::pending`]), and
@@ -4339,6 +4349,9 @@ impl Engine {
                 wordless_asked_at: Mutex::new(None),
                 wordless_resumes: false,
                 wordless_cuts: Mutex::default(),
+                prompt_log: false,
+                begun_over: Mutex::default(),
+                private_now: AtomicBool::new(true),
                 made_by: Mutex::new(None),
                 heard_of_cut: Mutex::new(None),
                 wordless_said: Mutex::new(None),
@@ -4491,6 +4504,11 @@ impl Engine {
     /// installed authority; a change from the last tells
     /// [`Self::forgetting_on_privacy`]'s hook.
     pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
+        // The camera or the microphone not allowed: the privacy switch
+        // closed, or a mute (`LAMP_CUT_IN_PROMPT_LOG` stays silent).
+        self.shared
+            .private_now
+            .store(!(now.0 && now.2), Ordering::SeqCst);
         if self.privacy.replace(now).is_some_and(|was| was != now) {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).
@@ -5702,6 +5720,17 @@ impl Engine {
         self
     }
 
+    /// Each chat request of a turn begun over the lamp's audible answer
+    /// writes its prompt's journal block: its counts, then each message's
+    /// role and first 80 characters (`LAMP_CUT_IN_PROMPT_LOG=on`, a debug
+    /// switch for test lamps, #6218), never while private or muted.
+    pub fn logging_cut_in_prompts(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.prompt_log = on;
+        }
+        self
+    }
+
     /// A cut-in that ended the lamp's answer and came back with no words is
     /// answered [`crate::cut_in_wordless::LINE`], in a quiet room only, the
     /// model not asked (`LAMP_CUT_IN_WORDLESS_ASKS`). Before any turn only.
@@ -6354,6 +6383,9 @@ impl Engine {
                         room.began_over_the_lamp(request);
                     }
                 });
+                if over_the_lamps_voice {
+                    self.shared.begun_over_the_lamp(request);
+                }
                 if let Some(hearing) = &self.shared.hearing {
                     hearing(
                         request,
@@ -12518,6 +12550,55 @@ async fn event_line(
     Some(line)
 }
 
+/// How many requests begun over the lamp's answer are kept for
+/// [`Shared::begun_over`]: a turn asks its chat soon after its line begins.
+const BEGUN_OVER_KEPT: usize = 8;
+
+impl Shared {
+    /// `request` began over the lamp's audible answer: kept, with
+    /// `LAMP_CUT_IN_PROMPT_LOG`, for its turn's prompt block.
+    fn begun_over_the_lamp(&self, request: u64) {
+        if !self.prompt_log {
+            return;
+        }
+        if let Ok(mut begun) = self.begun_over.lock() {
+            if begun.len() == BEGUN_OVER_KEPT {
+                begun.pop_front();
+            }
+            begun.push_back(request);
+        }
+    }
+
+    /// Whether `request`'s turn journals its prompt: the switch on and the
+    /// line begun over the lamp's audible answer.
+    fn logs_prompt_of(&self, request: u64) -> bool {
+        self.prompt_log
+            && self
+                .begun_over
+                .lock()
+                .is_ok_and(|begun| begun.contains(&request))
+    }
+
+    /// The journal block for one chat request of a cut-in's turn
+    /// ([`crate::cut_in_prompt_log`]), unless private or muted now.
+    fn log_prompt(&self, (request, round): (u64, usize), messages: &[Message], told: ChatTold) {
+        // As the chat is sent ([`LettingGo`]).
+        let messages = forgotten_notes_let_go(messages.to_vec());
+        let private = self.private_now.load(Ordering::SeqCst);
+        let asked = crate::cut_in_prompt_log::Asked {
+            request,
+            round,
+            measured: (!private)
+                .then(|| self.services.measured(&messages, told))
+                .flatten(),
+            messages: &messages,
+        };
+        if let Some(block) = crate::cut_in_prompt_log::told(true, true, private, &asked) {
+            eprintln!("{block}");
+        }
+    }
+}
+
 /// The turn's chat: every function, or none of memory's for a line held
 /// only by a gap ([`held_by_gap`]).
 fn chat_for(
@@ -12612,6 +12693,10 @@ impl Services for LettingGo {
     }
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
         self.0.declares(messages, without, name)
+    }
+    fn measured(&self, messages: &[Message], told: ChatTold) -> Option<(usize, usize)> {
+        self.0
+            .measured(&forgotten_notes_let_go(messages.to_vec()), told)
     }
     fn speak(
         &self,
@@ -13863,6 +13948,8 @@ async fn answer(
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
+    // Each round's prompt journaled for a cut-in (`LAMP_CUT_IN_PROMPT_LOG`).
+    let logs_prompt = heard && shared.logs_prompt_of(request);
     let looking = matches!(asked, Asker::Written { looking: true, .. });
     let searching = matches!(asked, Asker::Written { search: true, .. });
     let quoted = matches!(asked, Asker::Written { quoted: true, .. });
@@ -14595,6 +14682,14 @@ async fn answer(
             } else {
                 told_for(scope.as_ref())
             };
+            if logs_prompt {
+                // Round 1 begun early is asked as it was begun.
+                let asked = match &prepared {
+                    Some(prepared) if round == 1 && !quoted => &prepared.messages,
+                    _ => &messages,
+                };
+                shared.log_prompt((request, round), asked, told);
+            }
             let mut stream = match prepared.take() {
                 // A quoted line's every round declares no function at all.
                 _ if quoted => match watch.clone() {

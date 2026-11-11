@@ -111,6 +111,9 @@ struct Script {
     turns_begun: AtomicUsize,
     /// Each listener's results' words as they come ([`Listener::said`]).
     said: Mutex<VecDeque<Vec<String>>>,
+    /// Each chat measured for a cut-in's prompt block
+    /// ([`Services::measured`], `LAMP_CUT_IN_PROMPT_LOG`): its messages' words.
+    measured: Mutex<Vec<Vec<String>>>,
 }
 
 #[derive(Default)]
@@ -340,6 +343,15 @@ impl Services for Script {
 
     fn declares(&self, _messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
         Some(!without.contains(&name))
+    }
+
+    fn measured(&self, messages: &[Message], _told: ChatTold) -> Option<(usize, usize)> {
+        let words = messages
+            .iter()
+            .map(|message| message.words().unwrap_or_default().to_owned())
+            .collect();
+        self.measured.lock().unwrap().push(words);
+        Some((1_000, 2))
     }
 
     fn warm(&self) -> BoxFuture<'static, ()> {
@@ -4019,6 +4031,58 @@ async fn a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear() {
         *answered.lock().unwrap(),
         [(1, "clear"), (2, "over the lamp")]
     );
+}
+
+/// #6218 step 1 (`LAMP_CUT_IN_PROMPT_LOG`): a line begun over the lamp's
+/// audible answer has its chat request measured for its prompt's journal
+/// block, with the switch on and the lamp neither private nor muted; off, a
+/// line begun in the clear, the privacy switch closed or a mute, never.
+/// Nothing the lamp says changes.
+#[tokio::test(start_paused = true)]
+async fn a_cut_ins_chat_request_is_journaled_only_with_the_switch_and_never_private() {
+    async fn measured(
+        on: bool,
+        over: bool,
+        privacy: (bool, bool),
+    ) -> (Vec<Vec<String>>, Vec<String>) {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [Ok(
+                    "Hold on, Lamp, make the light a little warmer".to_owned()
+                )]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built.logging_cut_in_prompts(on);
+        engine.privacy((privacy.0, 1, privacy.1, 1));
+        engine.submit(if over { start_over(1) } else { start(1) });
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        let measured = script.measured.lock().unwrap().clone();
+        (measured, out)
+    }
+    let (asked, out) = measured(true, true, (true, true)).await;
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert_eq!(
+        asked[0].last().map(String::as_str),
+        Some("Hold on, Lamp, make the light a little warmer")
+    );
+    assert!(out.contains(&"said:Sure.".to_owned()), "{out:?}");
+    let (_, plain) = measured(false, true, (true, true)).await;
+    assert_eq!(plain, out, "the switch changes nothing the lamp does");
+    for (on, over, privacy) in [
+        (false, true, (true, true)),
+        (true, false, (true, true)),
+        (true, true, (false, false)),
+        (true, true, (true, false)),
+    ] {
+        let (asked, _) = measured(on, over, privacy).await;
+        assert!(asked.is_empty(), "{on} {over} {privacy:?}: {asked:?}");
+    }
 }
 
 /// `LAMP_FIRST_SECONDS_QUIET` (lamp-c0a4's run 1 on #3864): every line the

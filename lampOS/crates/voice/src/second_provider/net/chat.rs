@@ -532,6 +532,20 @@ impl Chat {
             .any(|tool| tool.name == name)
     }
 
+    /// A request's bytes and tool count on `messages`, as
+    /// [`Self::send_watched`] would make it now and its journal line counts
+    /// them (`LAMP_CUT_IN_PROMPT_LOG`, #6218).
+    pub fn measured(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+    ) -> (usize, usize) {
+        let body = self.body_without(messages, only, without);
+        let tools = body["tools"].as_array().map_or(0, Vec::len);
+        (body.to_string().len(), tools)
+    }
+
     /// The request as [`Self::send`] makes it, for a probe that makes it
     /// by hand (`probe-cascade --wire`): its URL, its authorization and
     /// its body.
