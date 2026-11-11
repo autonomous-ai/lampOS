@@ -210,6 +210,11 @@ asyncio.run(main())
   owner chose might; an app that listens (`hear`) or reads the air needs more:
   `FakeLamp(grants="all")` is every grant the protocol names, or name your own.
 
+  A program that waits minutes (a stuffy-air spell)
+  cannot be tested at its real pace: read the wait from an environment
+  variable with the real value as its default (`DESK_STUFFY_AFTER_S` in the
+  desk-health example) and run the test with one second; the example tests do.
+
   `lampos.testing.FakeLamp(grants=...)` is the same fake
   lamp: `emit(event, **fields)`, `refuse_next(op, code, why)`,
   `done(re)`, `lease_event(lease, state, why)`, and `requests` /

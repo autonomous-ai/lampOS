@@ -297,6 +297,11 @@ await lamp.closed();
   `FakeLamp.start({ grants: 'all' })` is every grant the protocol names, or
   name your own.
 
+  A program that waits minutes (a stuffy-air spell)
+  cannot be tested at its real pace: read the wait from an environment variable
+  with the real value as its default (`DESK_STUFFY_AFTER_S` in the
+  desk-health example) and run the test with one second; the example tests do.
+
   `FakeLamp` from `lampos/testing` is the same fake lamp:
   `emit`, `refuseNext`, `done`, `leaseEvent`, `requests`, `received`. Its
   `light` keeps lamp-control's pattern levels (a `breathe` at level 1 is refused)
