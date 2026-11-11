@@ -27,7 +27,7 @@ import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
 import { checked, describe, findControl, findStimulus } from './controls.js';
-import { newToken, originOk, tokenOk } from './guard.js';
+import { hostOk, newToken, originOk, tokenOk } from './guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const options = parse(process.argv.slice(2));
@@ -187,13 +187,27 @@ function snapshot() {
   return seeing;
 }
 
+// With --lan the one network address the twin prints; a Host or an Origin is accepted only if it is that or loopback.
+const lanIp = lan ? lanAddress() : undefined;
+const lanHost = lanIp ? `${lanIp}:${port}` : undefined;
+let cameraAskedAt = 0;
 const server = createServer((request, response) => {
+  if (lan && !hostOk(request.headers.host, port, lanHost)) {
+    response.writeHead(403).end('not the address the twin printed\n');
+    return;
+  }
   if (!tokenOk(request.url, token)) {
     response.writeHead(403).end('the twin needs the URL it printed, with its token\n');
     return;
   }
   const pathname = new URL(request.url, 'http://localhost').pathname;
   if (pathname === '/camera.jpg') {
+    // On the network the room's picture is given only while a page that has the camera on says so (a token alone,
+    // with no page showing the camera, gets none).
+    if (lan && Date.now() - cameraAskedAt > 3_000) {
+      response.writeHead(403, { 'x-reason': encodeURIComponent('the camera is shown only while a page has it on') }).end();
+      return;
+    }
     snapshot().then(
       (jpeg) => response.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store' }).end(jpeg),
       (why) => response.writeHead(503, { 'content-type': 'text/plain', 'x-reason': encodeURIComponent(String(why.message ?? why)) }).end(),
@@ -210,7 +224,7 @@ const server = createServer((request, response) => {
 const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 server.on('upgrade', (request, socket, head) => {
   const path = new URL(request.url, 'http://localhost').pathname;
-  if (path !== '/live' || !tokenOk(request.url, token) || !originOk(request.headers.origin, port, lan ? request.headers.host : undefined)) {
+  if (path !== '/live' || !tokenOk(request.url, token) || !originOk(request.headers.origin, port, lanHost) || (lan && !hostOk(request.headers.host, port, lanHost))) {
     socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
     return;
   }
@@ -230,14 +244,14 @@ wss.on('connection', (page) => {
     }
     if (message.type === 'drag') drag(message.joint, Number(message.deg));
     if (message.type === 'let_go') release();
+    if (message.type === 'camera_on') cameraAskedAt = Date.now();
     if (stimDir && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message);
   });
   page.on('close', () => pages.delete(page));
 });
 server.listen(port, lan ? '0.0.0.0' : '127.0.0.1', () => {
   console.log(`the twin: http://localhost:${port}/?t=${token}`);
-  const address = lan ? lanAddress() : undefined;
-  if (address) console.log(`on your network: http://${address}:${port}/?t=${token}`);
+  if (lanIp) console.log(`on your network: http://${lanIp}:${port}/?t=${token}`);
 });
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
