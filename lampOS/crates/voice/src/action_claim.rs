@@ -223,6 +223,10 @@ pub enum Claim {
     /// A reminder snoozed ("Snoozing it for five minutes.", [`SNOOZED`]):
     /// only `snooze_reminder` makes it.
     Snoozed,
+    /// A skill said made in `make_skill`'s own line ([`made_claim`]: "I
+    /// made lamp test event: …", "I made x, and it's on."): only a
+    /// `make_skill` makes it.
+    Made,
 }
 
 impl Claim {
@@ -245,6 +249,7 @@ impl Claim {
             // refused or empty one removed nothing (Thirteen's P2-1 on #5942).
             Self::Forgot => false,
             Self::Snoozed => name == "snooze_reminder",
+            Self::Made => name == crate::made_skill::MAKE,
         }
     }
 
@@ -258,6 +263,7 @@ impl Claim {
             Self::LightKept => "keeping the light on or off until a time",
             Self::Forgot => "a forget",
             Self::Snoozed => "a reminder snoozed",
+            Self::Made => "a skill made",
         }
     }
 
@@ -271,6 +277,7 @@ impl Claim {
             Self::LightKept => "light kept",
             Self::Forgot => "forget",
             Self::Snoozed => "snooze",
+            Self::Made => "made",
         }
     }
 }
@@ -419,12 +426,79 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
     if let Some(kind) = judge(found, Claim::ReminderTime) {
         return Some(Some(kind));
     }
+    if let Some(kind) = judge(made_claim(&text, ended), Claim::Made) {
+        return Some(Some(kind));
+    }
     match runs_claim(&SNOOZED, &text, ended, true, false) {
         Some(Some(kind)) => return Some(Some(kind)),
         None => undecided = true,
         Some(None) => {}
     }
     if undecided { None } else { Some(None) }
+}
+
+/// How `make_skill`'s own lines open (`made_skill::on_line`, its made but
+/// not on line).
+const MADE_OPENS: &str = "i made ";
+
+/// A made skill's line with nothing put on: "I made it but couldn't put it
+/// on: …".
+const MADE_NOT_ON: &str = "it but couldn't put it on";
+
+/// What follows a made skill's name in its line: ", and it's on" when it
+/// went on, or the wait of one that writes said after its bare name ("I
+/// made leaving mail. It waits for you to agree …").
+const MADE_AFTER_NAME: [&str; 2] = [", and it's on", ". it waits for you to agree"];
+
+/// The most words a made skill's name is read for before its line's mark.
+const MADE_NAME_WORDS: usize = 8;
+
+/// Whether `text` (already [`normalised`]) is or opens with `make_skill`'s
+/// own line (C-make, Fourteen on lamp-9adf, 11 Nov 21:28: "I made lamp test
+/// event … It waits for you to agree" with `calls=none`, a line begun
+/// inside the lamp's own answer): "I made", a name of at most
+/// [`MADE_NAME_WORDS`] words, then a ':' (a line that says what it does),
+/// one of [`MADE_AFTER_NAME`], or [`MADE_NOT_ON`]. "I made a mistake." and
+/// "I made it warmer." are not one. `Some(true)`, it is; `None`, not known
+/// from the text so far.
+fn made_claim(text: &str, ended: bool) -> Option<bool> {
+    let open = |part: &str, whole: &str| -> Option<bool> {
+        if part.starts_with(whole) {
+            Some(true)
+        } else if !ended && whole.starts_with(part) {
+            None
+        } else {
+            Some(false)
+        }
+    };
+    let Some(rest) = text.strip_prefix(MADE_OPENS) else {
+        return if !ended && MADE_OPENS.starts_with(text) {
+            None
+        } else {
+            Some(false)
+        };
+    };
+    match open(rest, MADE_NOT_ON) {
+        Some(false) => {}
+        found => return found,
+    }
+    let Some(at) = rest.find(['.', '!', '?', ':', ',']) else {
+        let words = rest.split_whitespace().count();
+        return if ended || words > MADE_NAME_WORDS {
+            Some(false)
+        } else {
+            None
+        };
+    };
+    let name = rest[..at].split_whitespace().count();
+    if name == 0 || name > MADE_NAME_WORDS {
+        return Some(false);
+    }
+    let after = &rest[at..];
+    if after.starts_with(':') {
+        return Some(true);
+    }
+    any_of(MADE_AFTER_NAME.iter().map(|whole| open(after, whole)))
 }
 
 /// [`claim`], and with `worded` ([`WORDED_ENVIRONMENT`]) the worded claims
@@ -1722,6 +1796,63 @@ fn runs_claim(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    /// C-make (Fourteen, lamp-9adf, 11 Nov 21:28): `make_skill`'s own line
+    /// said with no `make_skill` in the turn is a claim only a make backs.
+    #[test]
+    fn a_skill_said_made_is_a_claim_only_a_make_backs() {
+        let none = serde_json::Value::Null;
+        for reply in [
+            "I made lamp test event: adds lamp test to your calendar from 21:00 to 22:00. It waits for you to agree before it sends anything.",
+            "I made lamp test event. It waits for you to agree before it sends anything.",
+            "I made evening dim, and it's on: it dims the light at ten.",
+            "I made x, and it\u{2019}s on.",
+            "I made it but couldn't put it on: a skill called evening dim is already on the lamp.",
+        ] {
+            assert_eq!(claim(reply, true), Some(Some(Claim::Made)), "{reply}");
+            assert_eq!(
+                claim_as(reply, true, true),
+                Some(Some(Claim::Made)),
+                "{reply}"
+            );
+            assert!(!stands(Claim::Made, reply, false, []), "{reply}");
+            assert!(
+                !stands(Claim::Made, reply, false, [("service_write", &none)]),
+                "{reply}"
+            );
+            assert!(
+                stands(
+                    Claim::Made,
+                    reply,
+                    false,
+                    [(crate::made_skill::MAKE, &none)]
+                ),
+                "{reply}"
+            );
+        }
+        // Undecided while it streams, until the name's mark comes.
+        assert_eq!(claim("I ma", false), None);
+        assert_eq!(claim("I made lamp test", false), None);
+        assert_eq!(claim("I made x, and it", false), None);
+        // Not one: a mistake, a light made warmer, a refusal, a question,
+        // a long sentence, or "made" later in the reply.
+        for reply in [
+            "I made a mistake.",
+            "I made a mistake, sorry.",
+            "I couldn't make that: a skill can't hear what is said.",
+            "I made x?",
+            "I made sure the light stays on whenever you come home in the evening: nothing changed.",
+            "Yesterday I made evening dim: it dims the light at ten.",
+            "I'll make it.",
+        ] {
+            assert_eq!(claim(reply, true), Some(None), "{reply}");
+        }
+        assert_eq!(
+            claim_as("I made it warmer.", true, true),
+            Some(Some(Claim::LightOrVolume))
+        );
+        assert_eq!(claim("I made it warmer.", true), Some(None));
+    }
 
     /// C88: a forget said done, and what says nothing went.
     #[test]
