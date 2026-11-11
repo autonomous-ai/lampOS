@@ -826,14 +826,21 @@ pub fn close_before_answer(
     // (a stop only when developer access is off as well).
     let (files, what, restart): (Vec<&Path>, &str, bool) =
         match parse(line.trim_end_matches(['\n', '\r']), config) {
-            Ok(Change::Control(false)) if there(&config.control_dropin) => (
-                vec![
-                    config.control_dropin.as_path(),
-                    config.agent_dropin.as_path(),
-                ],
-                "developer access",
-                false,
-            ),
+            // The agent's drop-in first, the developer's last: a removal that
+            // fails then leaves the retry on this path. An agent drop-in left
+            // with no developer one beside it is cleared too.
+            Ok(Change::Control(false))
+                if there(&config.control_dropin) || there(&config.agent_dropin) =>
+            {
+                (
+                    vec![
+                        config.agent_dropin.as_path(),
+                        config.control_dropin.as_path(),
+                    ],
+                    "developer access",
+                    false,
+                )
+            }
             Ok(Change::LocalAgent(false)) if there(&config.agent_dropin) => (
                 vec![config.agent_dropin.as_path()],
                 "the local agent",
@@ -845,14 +852,15 @@ pub fn close_before_answer(
         Ok(lock) => lock,
         Err(_) => return Some((json!({ "refused": CLOSE_INSTALLING }), None)),
     };
+    // A removal that fails does not stop the rest: the unit is still reloaded
+    // and stopped (or restarted), so the door is not left open with its drop-in
+    // half gone, and the failure is then answered in words.
+    let mut failed = None;
     for file in files {
         if there(file)
             && let Err(error) = remove(file)
         {
-            return Some((
-                json!({"refused": format!("the change could not be saved: {}", error.kind())}),
-                None,
-            ));
+            failed.get_or_insert(error.kind());
         }
     }
     let (verb, did) = if restart {
@@ -863,6 +871,12 @@ pub fn close_before_answer(
     let stopped = systemd
         .systemctl(&["daemon-reload"])
         .and_then(|()| systemd.systemctl(&[verb, CONTROL_UNIT]));
+    if let Some(kind) = failed {
+        return Some((
+            json!({"refused": format!("the change could not be saved: {kind}")}),
+            None,
+        ));
+    }
     let (data, said) = match stopped {
         Ok(()) => (
             json!({"on": false, "closed": true}),
