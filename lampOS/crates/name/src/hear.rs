@@ -86,6 +86,11 @@ pub struct Score {
     pub name: f32,
     pub stop: Option<f32>,
     pub rescue: Option<f32>,
+    /// How many steps before the one it is given in the name's score is
+    /// of (#6114): 0 for the first grid's own, and for a later grid's on
+    /// time; more for one a woken grid gave late ([`Grids::first`]). A
+    /// hearing is dated by the sound it is of, not by when its score came.
+    pub late: u32,
 }
 
 type Plan = Arc<TypedRunnableModel>;
@@ -519,7 +524,8 @@ impl Grids {
                 } else {
                     self.late(at + 1, later)
                 };
-                if let Some(taken) = taken {
+                if let Some(mut taken) = taken {
+                    taken.late = u32::try_from(step - (at + 1)).unwrap_or(u32::MAX);
                     best = higher(best, taken);
                 }
                 self.later[grid].pop_front();
@@ -545,6 +551,12 @@ fn higher(one: Score, other: Score) -> Score {
         name: one.name.max(other.name),
         stop: max(one.stop, other.stop),
         rescue: max(one.rescue, other.rescue),
+        // The name's score is dated by the step it is of: the higher one's.
+        late: if other.name > one.name {
+            other.late
+        } else {
+            one.late
+        },
     }
 }
 
@@ -693,6 +705,7 @@ impl Stream {
                     name: *score.first().ok_or("name.onnx: no score")?,
                     stop,
                     rescue,
+                    late: 0,
                 },
             ));
         }
@@ -943,6 +956,7 @@ mod tests {
             name,
             stop: None,
             rescue: None,
+            late: 0,
         }
     }
 
@@ -1006,6 +1020,7 @@ mod tests {
             name,
             stop: Some(stop),
             rescue: None,
+            late: 0,
         };
         let mut both = Grids::new(2);
         both.hearing_at(0.9);
@@ -1030,8 +1045,11 @@ mod tests {
         stopped.later(1, 0, stop(0.97, 0.99));
         assert_eq!(
             stopped.first(stop(0.0, 0.0)),
-            stop(0.97, 0.0),
-            "the stop let go, the name kept"
+            Score {
+                late: 9,
+                ..stop(0.97, 0.0)
+            },
+            "the stop let go, the name kept, of step 1 given at step 10"
         );
         // A forget keeps the bars.
         woken.forget();
@@ -1043,6 +1061,61 @@ mod tests {
         // One grid: every score as it came.
         let mut one = Grids::new(1);
         assert_eq!(one.first(score(0.3)).name, 0.3);
+    }
+
+    /// #6114: a step's score says how many steps back the sound its name's
+    /// score is of: 0 for the first grid's own and a later grid's on time,
+    /// and for one a woken grid gave late, the steps between. lamp-name
+    /// dates a hearing by it, so a name the fine grids caught a second late
+    /// is still placed where it was said.
+    #[test]
+    fn a_late_score_says_how_many_steps_back_its_sound_is() {
+        let mut grids = Grids::new(2);
+        assert_eq!(grids.first(score(0.2)).late, 0, "the first grid's own");
+        grids.later(1, 0, score(0.96));
+        assert_eq!(
+            grids.first(score(0.1)),
+            Score {
+                late: 0,
+                ..score(0.96)
+            }
+        );
+        // The fine grids woke on "Lamp" at step 1 and caught up 14 steps
+        // (1.1 s) later: their best is of step 2, given at step 16.
+        for _ in 2..16 {
+            grids.first(score(0.3));
+        }
+        grids.later(1, 1, score(0.94));
+        assert_eq!(
+            grids.first(score(0.3)),
+            Score {
+                late: 14,
+                ..score(0.94)
+            }
+        );
+        // When the first grid's own is higher, the step is its own.
+        grids.later(1, 5, score(0.5));
+        assert_eq!(
+            grids.first(score(0.8)),
+            Score {
+                late: 0,
+                ..score(0.8)
+            }
+        );
+        // And it is the name's step that counts, not the stop's.
+        let mut both = Grids::new(2);
+        for _ in 0..5 {
+            both.first(score(0.0));
+        }
+        both.later(
+            1,
+            0,
+            Score {
+                stop: Some(0.99),
+                ..score(0.0)
+            },
+        );
+        assert_eq!(both.first(score(0.1)).late, 0);
     }
 
     /// Reviewer-two on #2759: the woken grids' queue holds at most
@@ -1131,11 +1204,13 @@ mod tests {
             name: 0.2,
             stop: Some(0.7),
             rescue: None,
+            late: 0,
         };
         let other = Score {
             name: 0.9,
             stop: Some(0.1),
             rescue: Some(0.4),
+            late: 0,
         };
         assert_eq!(
             higher(one, other),
@@ -1143,6 +1218,7 @@ mod tests {
                 name: 0.9,
                 stop: Some(0.7),
                 rescue: Some(0.4),
+                late: 0,
             }
         );
     }

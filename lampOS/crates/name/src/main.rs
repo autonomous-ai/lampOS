@@ -756,8 +756,14 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                             total_steps += scores.len() as u64;
                             // Each score is of a step counted back from the
                             // newest whole one, as in `check`.
-                            let first = hearer.steps() as u64 + 1 - scores.len() as u64;
+                            let newest = hearer.steps() as u64;
+                            let first = newest + 1 - scores.len() as u64;
                             for (step, score) in (first..).zip(scores) {
+                                // #6114: the sound this score is of, the
+                                // newest step having just come: a woken
+                                // grid's score given `late` steps on is of
+                                // sound that much older.
+                                let of = sound_at(now, newest - step + u64::from(score.late));
                                 // A stop is said at once, while it is heard.
                                 if let (Some(stop), Some(stops), Some(publisher)) =
                                     (score.stop, stops.as_mut(), stop_heard.as_mut())
@@ -768,9 +774,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                     log(&format!("heard a stop word: score={:.3}", heard.score));
                                 }
                                 let judged = judged(&mut rescue, step, &score);
-                                name_said = name_said.or(hearings.score(judged, now));
+                                name_said = name_said.or(hearings.score_of(judged, of, now));
                                 if let Some(nears) = nears.as_mut() {
-                                    near_said = near_said.or(nears.score(judged, now));
+                                    near_said = near_said.or(nears.score_of(judged, of, now));
                                 }
                                 if let Some(line) = under_bars.score(judged, now) {
                                     log(&line);
@@ -937,6 +943,15 @@ fn run(arguments: &Arguments) -> io::Result<()> {
 
 /// The score the hearing rule judges: the name's, or with a rescue,
 /// what [`Rescue::score`] makes of it and the rescue model's.
+/// The sound of a step `back` steps before the one that came `now`: each
+/// step is 80 ms ([`lamp_name::hear::STEP`] at 16 kHz). `now` when the
+/// clock can't reach that far back.
+fn sound_at(now: Instant, back: u64) -> Instant {
+    let step_us = lamp_name::hear::STEP as u64 * 1_000_000 / 16_000;
+    now.checked_sub(Duration::from_micros(step_us.saturating_mul(back)))
+        .unwrap_or(now)
+}
+
 fn judged(rescue: &mut Option<Rescue>, step: u64, score: &lamp_name::hear::Score) -> f32 {
     match (rescue.as_mut(), score.rescue) {
         (Some(rescue), Some(trained)) => rescue.score(step, score.name, trained),
@@ -1107,11 +1122,12 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
                 {
                     println!("{file}\tstop\t{:.2}\t{:.4}", seconds(step), heard.score);
                 }
+                let of = step.saturating_sub(u64::from(score.late));
                 let score = judged(&mut rescue, step, &score);
                 if score > highest {
-                    (highest, at_step) = (score, step);
+                    (highest, at_step) = (score, of);
                 }
-                said(hearings.score(score, at(step)), step);
+                said(hearings.score_of(score, at(of), at(step)), step);
             }
             if heard.rested {
                 said(hearings.cut(at(newest)), newest);
@@ -1677,6 +1693,7 @@ mod tests {
             name,
             stop: None,
             rescue: None,
+            late: 0,
         };
         let start = Instant::now();
         let at = |ms: u64| start + Duration::from_millis(ms);
@@ -1748,6 +1765,7 @@ mod tests {
                             name: 0.1,
                             stop: Some(0.99),
                             rescue: None,
+                            late: 0,
                         },
                     );
                 }
@@ -1756,6 +1774,7 @@ mod tests {
                     name,
                     stop: Some(0.1),
                     rescue: None,
+                    late: 0,
                 });
                 said += usize::from(
                     stops

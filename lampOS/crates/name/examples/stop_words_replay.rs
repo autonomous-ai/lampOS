@@ -648,6 +648,7 @@ mod tests {
                         name: 0.0,
                         stop: Some(if loud { 0.99 } else { 0.01 }),
                         rescue: None,
+                        late: 0,
                     });
                 }
             }
