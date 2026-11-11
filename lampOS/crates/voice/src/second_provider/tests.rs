@@ -18634,6 +18634,7 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
                 other_seen: false,
                 asker_seen: false,
                 plain_yes: false,
+                run_owner_likeness: None,
             };
             let told = crate::services::gate(
                 &mut pending,
