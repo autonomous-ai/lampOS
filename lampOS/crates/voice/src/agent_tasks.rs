@@ -2241,8 +2241,17 @@ fn plain_words(text: &str) -> Vec<String> {
 /// ("Yes?") or more than six words is not. Kept small on purpose: a line this misreads costs a second
 /// yes, one it takes wrongly would start work on the person's computer.
 fn plain_yes(words: &str) -> bool {
+    plain_yes_with(words, &[], &[])
+}
+
+/// [`plain_yes`] with `more_yes` words and `more_phrases` also taken as a
+/// yes, lower case: the one deterministic plain-yes test, shared with a
+/// linked-service send after a read in its request
+/// (`services::plain_yes`, which adds the read-back's own "send it" and
+/// "gửi đi"). With none, exactly [`plain_yes`].
+pub(crate) fn plain_yes_with(words: &str, more_yes: &[&str], more_phrases: &[&[&str]]) -> bool {
     const YES: [&str; 7] = ["yes", "yeah", "yep", "yup", "sure", "ok", "okay"];
-    const PHRASES: [[&str; 2]; 3] = [["go", "ahead"], ["do", "it"], ["please", "do"]];
+    const PHRASES: [&[&str]; 3] = [&["go", "ahead"], &["do", "it"], &["please", "do"]];
     const BESIDE: [&str; 3] = ["please", "lamp", "hey"];
     if words.trim_end().ends_with('?') {
         return false;
@@ -2251,16 +2260,24 @@ fn plain_yes(words: &str) -> bool {
     if words.is_empty() || words.len() > 6 {
         return false;
     }
+    let starts = |at: usize, phrase: &[&str]| {
+        words.len() - at >= phrase.len()
+            && phrase
+                .iter()
+                .zip(&words[at..])
+                .all(|(said, got)| said == got)
+    };
     let mut yes = false;
     let mut at = 0;
     while at < words.len() {
         if let Some(phrase) = PHRASES
             .iter()
-            .find(|phrase| words[at..].starts_with(&phrase.map(str::to_owned)))
+            .chain(more_phrases)
+            .find(|phrase| starts(at, phrase))
         {
             yes = true;
             at += phrase.len();
-        } else if YES.contains(&words[at].as_str()) {
+        } else if YES.contains(&words[at].as_str()) || more_yes.contains(&words[at].as_str()) {
             yes = true;
             at += 1;
         } else if BESIDE.contains(&words[at].as_str()) {

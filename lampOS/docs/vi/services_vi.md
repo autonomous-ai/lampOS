@@ -1298,20 +1298,21 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   lần ghi đang chờ bị quên trước. Khi câu trả lời có `read_back` và `send_id`,
   id đó được giữ cùng với yêu cầu mà nó đến, dịch vụ, phần đọc lại, và chủ
   đèn đã yêu cầu, và mô hình được báo "Nothing is sent yet. Say read_back in
-  full, word for word, leaving nothing out, then ask, short, "Shall I send
-  it?" (in Vietnamese "Gửi không?"); for an event or a file, "Shall I go ahead?"
-  (in Vietnamese "Làm không?"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline,
-  wait or change it, don't send: say it's cancelled, or prepare the changed
-  one anew."; một id không có
+  full, word for word, then ask, short, "Shall I send it?" (in Vietnamese
+  "Gửi không?"); for an event or a file, "Shall I go ahead?" (in Vietnamese
+  "Làm không?"). If they agree, in any words, call service_write with its
+  send_id now, reading nothing first. If they cancel, decline, wait or change
+  it, don't send: say it's cancelled, or prepare the changed one anew."
+  ("now, reading nothing first": trên đèn của một người thử ngày 11/11, mô
+  hình đã đọc lịch khi người đó nói "Yes." trước khi gửi); một id không có
   phần đọc lại bị bỏ và không bao giờ được gửi. Một lệnh ghi được chuẩn bị
   với `action` `save_draft` được giữ là một bản nháp (`Pending::draft`), và
   mô hình được báo thay vào đó `SAVE_READ_BACK_NEXT`, "Nothing is saved yet,
-  and nothing is ever sent. Say read_back in full, word for word, leaving
-  nothing out, then ask, short, "Shall I save it?" (in Vietnamese "Lưu
-  không?"). If they agree, in any words,
-  call service_write again with its send_id. If they cancel, decline, wait or
-  change it, don't save: say it's cancelled, or prepare the changed one
-  anew."
+  and nothing is ever sent. Say read_back in full, word for word, then ask,
+  short, "Shall I save it?" (in Vietnamese "Lưu không?"). If they agree, in
+  any words, call service_write with its send_id now, reading nothing first.
+  If they cancel, decline, wait or change it, don't save: say it's
+  cancelled, or prepare the changed one anew."
 - **Những gì đèn đã nói về nó:** mọi lời đèn nói trong yêu cầu đó sau khi lần
   ghi được chuẩn bị được giữ cùng nó, đúng như đã nói, trên cả hai tuyến
   (`thread::Thread::lamp_for` → `services::lamp_said`), để tính giờ một câu
@@ -1368,6 +1369,17 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   khác đã biết hay một khuôn mặt khác thì huỷ nó, `OTHER_VOICE`: "Not sent,
   and cancelled: I send only when the voice saying "send" is the one that
   asked for it. Say it was not sent." Khi chưa có bản in (câu quá ngắn), lần
+  gửi vẫn đi khi thấy chính khuôn mặt của người yêu cầu nói câu đó và không
+  thấy khuôn mặt nào khác nói (`Turn.asker_seen`,
+  `services::seen_saying_owner`, với `LAMP_SECOND_SPEAKING_FACE` và
+  `LAMP_EYES_SPEAKING`): trên đèn của một người thử ngày 11/11, một tiếng
+  "Yes" nhanh ngay sau phần đọc lại không có bản in. Nhật ký ghi "a send in
+  the echo tail with no print: the asker's face seen saying it: sent". Chỉ
+  có khuôn mặt của họ trong khung hình mà không thấy ai nói (dấu của luật
+  một khuôn mặt) thì không đủ: nó không phân biệt được câu đồng ý của họ với
+  chính câu "Shall I send it?" của đèn vọng lại khi họ ngồi im (P1 của
+  Reviewer-lead trên #6367), nên không câu đồng ý nào chạy trên một câu như
+  thế, như `LAMP_PERSON_SCOPE_ONE_FACE_READS` nói. Nếu không, lần
   ghi chờ thêm một lần thử, chỉ một lần: mô hình được báo `NO_PRINT_YET`,
   "Not sent yet: I couldn't hear whose voice that was.", kèm `SAY_IT_LONGER`
   là điều cần nói tiếp (nhờ họ nói "go ahead and send it", và chỉ gửi lại nếu
@@ -1426,10 +1438,25 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   đó, rằng nếu họ huỷ, từ chối hay bảo chờ thì nó không gửi và nói đã huỷ, và
   rằng một thay đổi là một `service_write` mới với toàn bộ thư đã đổi, không
   bao giờ hỏi lại điều nó đã giữ. Kết quả đọc vẫn riêng tư như trước.
-- **Mọi lệnh gọi khác làm quên nó:** một lệnh gọi dịch vụ không có `send_id`
-  trong một yêu cầu khác, hoặc đèn nói trong một yêu cầu khác thứ hai, sẽ bỏ
-  lần ghi đang chờ. Nhật ký ghi lý do: "a waiting write dropped: another call
-  (prepared in request N)", "… dropped: the lamp answered another request".
+- **Mọi lệnh gọi khác làm quên nó, trừ một lần đọc trên một câu đồng ý
+  đơn thuần:** một lệnh gọi dịch vụ không có `send_id` trong một yêu cầu
+  khác, hoặc đèn nói trong một yêu cầu khác thứ hai, sẽ bỏ lần ghi đang chờ.
+  Ngoại lệ duy nhất là một câu đồng ý đơn thuần (`services::plain_yes`,
+  `Turn.plain_yes`): phép thử tất định của `agent_tasks`
+  (`agent_tasks::plain_yes_with`: tối đa sáu từ, không phải câu hỏi, chỉ có
+  từ đồng ý bên cạnh "please", "lamp" hay "hey") cộng với chính lời của phần
+  đọc lại "send it", "gửi đi", "gửi", "có" và "ừ". Trên một câu như thế, một
+  lần đọc (`service_read`, `services_connected`) giữ lần ghi, và lần gửi của
+  nó sau lần đọc trong cùng yêu cầu ấy vẫn đi (`services::sends_waiting`,
+  "Sau một lần đọc" ở dưới); một lần chuẩn bị mới vẫn bỏ nó. Trên đèn của
+  một người thử ngày 11/11, mô hình đã đọc lịch khi người đó nói "Yes.", lần
+  ghi bị bỏ, và phải yêu cầu lại sự kiện. Trên mọi câu khác ("What's on my
+  calendar tomorrow?") một lần đọc bỏ lần ghi như trước, nên không gì một lần
+  đọc đưa ra có thể khiến nó được gửi (P1 của App Only trên #6367: lời của
+  một lời mời yêu cầu gửi). Phép thử từ chỉ cho lần ghi đi qua một lần đọc;
+  chính việc gửi vẫn do mô hình phán đoán. Nhật ký ghi lý do: "a waiting
+  write dropped: another call (prepared in request N)", "… dropped: the lamp
+  answered another request".
 - **Câu trả lời cho phần đọc lại là cơ hội duy nhất** (P2 của Thirteen trên
   #6009). Khi đèn đã trả lời yêu cầu ngay sau phần đọc lại (`Pending.other`)
   mà không có lần gửi nào trong đó, mọi yêu cầu sau bỏ lần ghi trước lệnh gọi
@@ -1439,7 +1466,15 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   chờ, hay điều khác ("What time is it?" → "It's three."). Một câu "Yes,
   send it." sau đó gặp `NOTHING_WAITING`, không lượt sau nào được nói về lần
   ghi, và mô hình chuẩn bị lại. Lần gửi của chính yêu cầu đó, sau những lời
-  như "Sure, sending it now.", vẫn đi.
+  như "Sure, sending it now.", vẫn đi. Một câu không có từ nào (một tiếng
+  ồn), hoặc một câu mà câu trả lời chỉ từ chối nên những lời nó cắt ngang
+  được trả lời thay cho nó (`LAMP_CUT_ASK_ANSWERED`), không phải là câu trả
+  lời như thế (`services::answered_in_place`, `Pending.in_place`, như lời
+  đèn hỏi lại cũng không phải): trên đèn của một người thử ngày 11/11, một
+  tiếng ồn 0 từ đã cắt câu trả lời của đèn cho câu đồng ý, được trả lời thay
+  cho nó, và câu đồng ý kế tiếp đã bỏ lần ghi. Một câu có lời riêng được trả
+  lời thay cho một câu bị giữ (một câu hỏi thật bị cắt ngang) vẫn tính là một
+  yêu cầu khác (P3 của Reviewer-lead trên #6367).
 - **Tiếng vọng của chính đèn không phải câu của người nói** (#5846). Một câu
   mà tuyến thứ hai giữ lại là lời của chính đèn vọng lại (`own_echo`,
   `Echo::Held`) được báo qua thread (`Thread::own_echo_held` →
@@ -1540,7 +1575,13 @@ bị bỏ cùng `says_send`), và nó được lưu, không bao giờ được g
   "Not done: after reading from a linked service, I do nothing else in the
   same turn, so nothing a mail or a page says can make me act. …": không lưu
   vào bộ nhớ, nhắc việc, hành động của executive, `use_skill` hay
-  `service_write` (`tools::run_call_with_scope`).
+  `service_write` (`tools::run_call_with_scope`). Ngoại lệ duy nhất là lần
+  gửi của lệnh ghi đang chờ, với chính `send_id` của nó, đã được chuẩn bị và
+  đọc lại trong một yêu cầu trước, trên một câu đồng ý đơn thuần
+  (`services::sends_waiting`, `services::said_plain_yes`): chính lời của người
+  đó đã đồng ý, và nó đi đúng như đã chuẩn bị, qua cổng gửi. Trên mọi câu
+  khác lần gửi bị từ chối với `AFTER_READ`, nên lời của một lần đọc không
+  bao giờ khiến nó được gửi.
 - **Không gì của nó được giữ.** Lần trao đổi của yêu cầu đó chỉ giữ
   "(read from a linked service; not kept)" cho lời của đèn
   (`thread::Thread::private_for`, `PRIVATE_SAID`), dù đèn nói trước hay sau
@@ -2611,7 +2652,12 @@ khung hình thì ngắn gọn), một câu bắt đầu đè lên phần đọc 
 cắt, một lần gửi bị từ
 chối và quên trừ khi mọi luật đều đúng (cùng lượt, quá hai phút, send_id
 khác), một lần gửi nói đè lên phần đọc lại thì bị từ chối, một lệnh
-gọi khác hay đèn trả lời hai lần làm quên lần ghi, chỉ câu nói được nghe của chủ đèn chạm đến một dịch vụ (khách, cả
+gọi khác hay đèn trả lời hai lần làm quên lần ghi, một lần đọc trên một câu
+đồng ý đơn thuần vẫn giữ nó và lần gửi trong cùng yêu cầu vẫn đi (và bị từ
+chối với `AFTER_READ` trên mọi câu khác), một câu đồng ý nhanh không có bản in được
+gửi khi thấy người yêu cầu nói nó và được giữ thêm một lần thử khi chỉ có
+khuôn mặt họ trong khung hình, một tiếng ồn được trả lời thay
+câu đồng ý không phải một yêu cầu khác, chỉ câu nói được nghe của chủ đèn chạm đến một dịch vụ (khách, cả
 phòng, một câu bị giữ hay thu hẹp, không có phạm vi và một lượt chạy theo
 lịch đều bị từ chối, cả đọc lẫn ghi), không gì khác chạy sau một lần đọc
 trong cùng yêu cầu, một lần đọc rút gọn còn ai gửi và về việc gì khi có thể có
