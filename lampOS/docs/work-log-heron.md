@@ -690,3 +690,8 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
   - Backend3 keeps all five listed. The test installs are removed.
 - **16:39–16:42 #6295's row on fc4b: PASS.** A face was seen from 16:39:31. After `systemctl restart lamp-skills` at 16:40:59, the journal said "hold-test: its hold taken back … held 88 s". One green glow came at 16:41:31, 120 s into the sitting. hold-test is removed, and QUIET is posted on #3336.
   - Lesson: the head was still tilted down from Study Buddy's reading pose, so the camera saw no face until my person leaned into the frame.
+- **17:20 Study Buddy 1.0.1 and Focus Timer 1.0.1 recheck on fc4b: PASS.** A mode change within a run now sets its light at once: break warm 2, rest warm 2. P3: rest's `stretching` doesn't play on a re-call. Lesson again: check the Mac's output device before every play (EarPods ate the first four lines).
+- **17:3x #6365 READ-OK** `cd0bda725d` (6793299780). The setup finish starts wanted, inactive, non-oneshot parts while `lampos.target` is active; a round starts the parts it added.
+  - fc4b's lamp-addons, lamp-control and lamp-mood are wanted and inactive. They get started at each setup finish but exit 0 again with their switch off.
+  - P3: the "started X" log line overclaims.
+  - I ran only `--test round product_adds` (9 passed); the full round suite ran past 18 minutes and I stopped it.
