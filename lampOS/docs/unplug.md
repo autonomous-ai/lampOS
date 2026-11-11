@@ -1,7 +1,12 @@
 # Preparing to unplug (#1674)
 
-The core `prepare-unplug` skill runs when the person explicitly asks to unplug
-or turn off the lamp. It is installed with the product, but its tool is not
+The core `prepare-unplug` skill runs when the person tells the lamp they are
+unplugging it, will unplug it, or are turning it off. Its description names the
+present tense too ("I'm unplugging you now", "I'm going to unplug you") and asks
+for the call before any words: with "will unplug" alone, lamp-52e6 heard "Lamp,
+I'm unplugging you now." twice and answered in words with no call (#5747). A
+deterministic trigger on the heard words is a follow-up; Skills has no trigger
+on heard text today, so the call is still the model's. It is installed with the product, but its tool is not
 advertised unless Skills runs with `LAMP_UNPLUG=on`. Body, Expression and Voice
 need the same opt-in. The code's default stays off; the product's four units
 set it on since #5747, after lamp-52e6's row 1 on #1699 (20 Oct).
