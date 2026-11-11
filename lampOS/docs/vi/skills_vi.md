@@ -307,6 +307,54 @@ sau:
      trigger đã nêu, và câu nói lại có nêu nó. Quyền viết inline hoặc dạng
      có dấu chấm, hay `topics` trải trên nhiều dòng, được trả lại nguyên
      như khi đến, và bước kiểm tra nói lý do.
+   - **Điều không áp dụng được thì bị bỏ ra** (lamp-74ff, 11/11
+     09:48-09:50: "nod when I stand up", yêu cầu từ app, trượt cả ba lần
+     sửa, hai lần liền: `speak = true` mà không nói gì, một `for` trên
+     trigger `room/stood_up` và một `for` cạnh cái gật đầu; lamp-9adf,
+     11/11 10:01: "say hello when I come back to my desk" bị từ chối vì
+     "room/presence, its for"). Trước hết, `made_skill::tidied` bỏ ra: (a)
+     `for` của một bước body cạnh `gesture` mà không có `mood` (cử chỉ chỉ
+     chạy một lần; `lamp-skills` từ chối "a body mood goes with its for,
+     and a for with a mood"); (b) `for` hoặc `absent_for` trên trigger
+     `room/stood_up` (một tin nhắn mỗi lần đứng dậy, không bao giờ kéo
+     dài), và trên mọi trigger một `for` hoặc `absent_for` bằng không
+     (`"0s"`, `"0m"`, `"0ms"`), điều `lamp-skills` đọc như không có; (c)
+     `speak = true` trong `[permissions]` khi không có bước say, không có
+     tiếng ngân (`cue`) và không đọc gì, điều giới hạn từ chối ("it asks
+     for its voice but never says anything"). Mỗi việc chỉ bỏ ra: một
+     dòng, hoặc một mục của bảng một dòng cùng dấu phẩy của nó, chỉ nhận
+     khi văn bản sau đó đọc ra đúng kỹ năng đó trừ đúng trường ấy; kỹ năng
+     giữ mọi bước, trigger và quyền nó dùng và không được thêm gì. Kỹ năng
+     viết kiểu khác (ví dụ khóa có dấu chấm) được trả lại nguyên như khi
+     đến, để bước kiểm tra nói lý do. Mỗi việc ghi một dòng nhật ký:
+     `lamp-voice: a made skill tidied: <what>`. Cử chỉ cạnh mood, một
+     `for` thật sự giữ, và giọng nói cạnh say, tiếng ngân hay việc đọc thì
+     không bị đụng tới. System prompt của mô hình tạo kỹ năng
+     (`MORE_STEPS`) nói giống vậy: `{ gesture = "nod" }` không có `for`
+     (cử chỉ chạy một lần), `mood = "reading"` với `for = "1m"` (tối đa
+     2m), đứng dậy không có `for` hay `absent_for`, `speak = true` chỉ đi
+     với bước say hoặc cue hay việc đọc, và mỗi bước `[[do]]` một loại
+     (chào hỏi là một bước say).
+   - **Body và màu chỉ được nói khi `lamp-skills` nhận, và lần sửa được
+     dặn đúng phần bị lỗi.** `plainly` chỉ nói `for` của mood khi lớn hơn
+     0 và tối đa 2m, `for` chỉ khi có mood, màu chỉ khi thuộc danh sách
+     của đèn (`lamp_msgs::Light::COLOURS`, cùng danh sách
+     `lamp_skills::light_call` dùng) và mức từ 1 đến 5. Một bước không
+     nói được thì được dặn cách viết, mỗi loại trong bước được xét riêng
+     (`made_skill::step_hint`), không bao giờ dặn dạng của một loại vốn
+     đúng (lamp-9adf, 11/11 10:01: một bước gồm cử chỉ, đèn có màu đèn
+     không có và một câu say đúng chỉ được dặn dạng của say, và lặp mãi):
+     dạng say (`SAY_TEXT_PART`), tiếng ngân (`SOUND_PART`), dim
+     (`LIGHT_PART`), các màu (`colour is one of yellow, red, ...`), body
+     (`BODY_PART`: `body = { gesture = "nod" } takes no for; only mood =
+     "reading" takes for, at most 2m`), và, với bước có hơn một loại, `one
+     kind a [[do]] step: a light, a body and a say each a step of its own`
+     (`ONE_KIND_PART`); nhiều gợi ý thì sau một dấu hai chấm, ngăn bằng dấu
+     chấm phẩy, tối đa 200 byte. Bước được gợi ý về dim, body hay màu bị
+     từ chối trước `lamp-skills pack`, để một lần sửa được dặn đủ; bước chỉ
+     có lỗi hơn một loại thì vẫn qua bước kiểm tra trước. `for` của
+     trigger không nói được thì được dặn dạng của nó (`its for, like "5m":
+     s, m or h, above 0`).
    - Kiểm thử cho giới hạn đã bỏ (#6066):
      `a_made_skill_may_use_whatever_a_skill_can_declare`,
      `every_kind_a_skill_can_declare_is_kept_and_said`,
@@ -314,8 +362,16 @@ sau:
      trigger `voice/heard` trong
      `what_it_cant_say_is_refused_with_lines_for_a_repair`,
      `a_dim_step_is_said_only_as_lamp_skills_takes_it`,
-     `a_made_skills_trigger_topic_is_granted`, và trong `tests/it/made.rs`
-     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` (`lamp-skills
+     `a_made_skills_trigger_topic_is_granted`,
+     `a_made_gestures_for_is_tidied_and_a_moods_kept`,
+     `a_made_getting_ups_for_and_absent_for_are_tidied`,
+     `a_made_skills_voice_asked_with_nothing_said_is_tidied`,
+     `a_body_step_is_said_only_as_lamp_skills_takes_it`,
+     `a_repair_is_told_the_part_of_a_step_that_failed`,
+     `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`, và
+     trong `tests/it/made.rs`
+     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` và
+     `a_made_nod_when_i_stand_up_is_tidied_and_packed` (`lamp-skills
      pack` thật).
    Việc đọc một dịch vụ liên kết
    (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
@@ -674,8 +730,9 @@ sau:
      green'). Lần sửa nêu phần không nói được, chỉ bằng các khóa và topic
      của trigger, không bao giờ giá trị ("Can't be said plainly: trigger
      topic humans/faces/tracked, keys gap, near"), và journal ghi như vậy:
-     `lamp-voice: a made skill can't be said plainly: <part>`. Lỗi của
-     trigger kèm các trigger được phép và nghĩa của từng cái
+     `lamp-voice: a made skill can't be said plainly: <part>`; phần của
+     một bước, chỉ trong lần sửa, có thêm cách viết loại bị lỗi trong bước
+     đó (`step_hint`, ở trên). Lỗi của trigger kèm các trigger được phép và nghĩa của từng cái
      (`SAYABLE_TRIGGERS`): có người đến hoặc quay lại bàn là
      `room/presence`, `someone`, `true` (quay lại sau khi bàn trống một
      lúc: `when = "appears"`, `absent_for`); rời bàn là `false`; đèn yên
@@ -881,7 +938,12 @@ lời "có" nói thành tiếng (#5977; nút MAKE IT của ứng dụng là lờ
   dụng hiện ngay.
 - Khi đã giữ, kỹ năng được bật ngay qua helper quản lý, như bằng giọng nói,
   rồi đèn nói một câu ngắn qua dịch vụ nói, vào lúc thích hợp trong vòng một
-  giờ (`app_make::say_line`), gửi dưới dạng `note` nói bằng ngôn ngữ của
+  giờ (`app_make::say_line`), với mức khẩn (`app_make::LINE_PRIORITY`,
+  `URGENT_FROM` của dịch vụ nói: một giây sau lượt nói cuối của đèn thay vì
+  cả 15 s yên lặng, mọi cổng khác giữ nguyên, nên vẫn chờ khi đèn đang nói
+  hay có người đang được nghe; người builder đầu tiên, 11/11 10:16: một lời
+  từ chối đến khoảng 30 s sau khi tạo; test
+  `an_app_makes_own_line_is_asked_urgent`), gửi dưới dạng `note` nói bằng ngôn ngữ của
   cuộc trò chuyện, giữ nguyên các tên (`made_skill::in_their_language`;
   character của giọng nói vốn đã nói ngôn ngữ của chủ; note vượt 900 byte
   của dịch vụ nói thì gửi dạng `text`, nguyên văn): "I made evening dim, and it's on: <what it does>, using its light.", hoặc "I

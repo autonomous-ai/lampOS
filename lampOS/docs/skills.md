@@ -2409,6 +2409,53 @@ gone ([switches.md](switches.md)). What happens:
      gains nothing its trigger didn't name, and the said-back line names
      it. Grants written inline or dotted, or `topics` over several lines,
      are given back as they came, and the check says why.
+   - **What can't apply is taken out** (lamp-74ff, 11 Nov 09:48-09:50:
+     "nod when I stand up", asked from the app, failed all three repairs
+     twice: `speak = true` with nothing said, a `for` on its
+     `room/stood_up` trigger and a `for` beside its nod; lamp-9adf, 11 Nov
+     10:01: "say hello when I come back to my desk" refused on
+     "room/presence, its for"). First of all, `made_skill::tidied` takes
+     out: (a) a body step's `for` beside a `gesture` with no `mood` (a
+     gesture plays once; `lamp-skills` refuses "a body mood goes with its
+     for, and a for with a mood"); (b) a `for` or `absent_for` on a
+     `room/stood_up` trigger (one message a getting up, which never
+     lasts), and on any trigger a `for` or `absent_for` of nothing
+     (`"0s"`, `"0m"`, `"0ms"`), which `lamp-skills` reads as none; (c)
+     `speak = true` in `[permissions]` with no say step, no hum (`cue`)
+     and no read, which the cap refuses ("it asks for its voice but never
+     says anything"). Each only removes: a line, or one entry of a
+     one-line table with its comma, taken only when the text then reads as
+     the same skill without that one field; the skill keeps every step,
+     trigger and grant it uses and gains nothing. A skill written
+     otherwise (dotted keys, say) is given back as it came, for the check
+     to say why. Each is journaled: `lamp-voice: a made skill tidied:
+     <what>`. A gesture beside a mood, a `for` that holds, and a voice
+     beside a say, a hum or a read are untouched. The making model's
+     system prompt (`MORE_STEPS`) says the same: `{ gesture = "nod" }`
+     with no `for` (a gesture plays once), `mood = "reading"` with
+     `for = "1m"` (at most 2m), a getting up with no `for` or
+     `absent_for`, `speak = true` only with a say or cue step or a read,
+     and each `[[do]]` step one kind (saying hello is one say step).
+   - **A body and a colour are said only as `lamp-skills` takes them,
+     and a repair is told the part that failed.** `plainly` says a mood's
+     `for` only above 0 and at most 2m, a `for` only with a mood, a colour
+     only from the light's own list (`lamp_msgs::Light::COLOURS`, the one
+     `lamp_skills::light_call` holds it to) and a level 1 to 5. A step it
+     can't say is told how to write it, each kind in it judged on its own
+     (`made_skill::step_hint`), never the form of a kind that was fine
+     (lamp-9adf, 11 Nov 10:01: a gesture, a light of a colour the light
+     hasn't and a fine say in one step was told only the say's form, and
+     looped): a say's form (`SAY_TEXT_PART`), the hum (`SOUND_PART`), a dim
+     (`LIGHT_PART`), the colours (`colour is one of yellow, red, ...`), a
+     body (`BODY_PART`: `body = { gesture = "nod" } takes no for; only
+     mood = "reading" takes for, at most 2m`), and, for a step of more than
+     one kind, `one kind a [[do]] step: a light, a body and a say each a
+     step of its own` (`ONE_KIND_PART`); several after one colon, by
+     semicolons, at most 200 bytes. A step hinted for a dim, a body or a
+     colour is refused before `lamp-skills pack`, so one repair is told
+     all of it; one of more than one kind alone still goes to the check
+     first. A trigger's `for` it can't say is told its form (`its for,
+     like "5m": s, m or h, above 0`).
    - Tests for the lifted cap (#6066):
      `a_made_skill_may_use_whatever_a_skill_can_declare`,
      `every_kind_a_skill_can_declare_is_kept_and_said`,
@@ -2416,8 +2463,16 @@ gone ([switches.md](switches.md)). What happens:
      `voice/heard` trigger's "can't yet" in
      `what_it_cant_say_is_refused_with_lines_for_a_repair`,
      `a_dim_step_is_said_only_as_lamp_skills_takes_it`,
-     `a_made_skills_trigger_topic_is_granted`, and in `tests/it/made.rs`
-     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` (the real
+     `a_made_skills_trigger_topic_is_granted`,
+     `a_made_gestures_for_is_tidied_and_a_moods_kept`,
+     `a_made_getting_ups_for_and_absent_for_are_tidied`,
+     `a_made_skills_voice_asked_with_nothing_said_is_tidied`,
+     `a_body_step_is_said_only_as_lamp_skills_takes_it`,
+     `a_repair_is_told_the_part_of_a_step_that_failed`,
+     `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`, and in
+     `tests/it/made.rs`
+     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` and
+     `a_made_nod_when_i_stand_up_is_tidied_and_packed` (the real
      `lamp-skills pack`).
    The read of a linked service (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
@@ -2654,8 +2709,8 @@ gone ([switches.md](switches.md)). What happens:
      plainly: trigger topic humans/faces/tracked, keys gap, near",
      "[[do]] step 1, light (dim, for)", "parts while"), and the journal
      says the same: `lamp-voice: a made skill can't be said plainly:
-     <part>`; a dim or `relative` light's part is followed, in the repair
-     alone, by how to write it (`LIGHT_PART`, above). A trigger's refusal goes on with the triggers it can have,
+     <part>`; a step's part is followed, in the repair alone, by how to
+     write the kind in it that failed (`step_hint`, above). A trigger's refusal goes on with the triggers it can have,
      each with what it means (`SAYABLE_TRIGGERS`): someone comes or comes
      back to the desk is `room/presence`, `someone`, `true` (back after a
      while away: `when = "appears"`, `absent_for`); the desk left,
@@ -3036,7 +3091,12 @@ to say aloud what it made; without either the app socket isn't started
    it is put on at once through the manage helper, as by voice
    (`made_skill::put_on`, "Made by voice", step 8), and the lamp says one
    short line through the say service's own asks at a good moment within
-   an hour (`app_make::say_line`), sent as a `note` told in the language
+   an hour (`app_make::say_line`), asked urgent (`app_make::LINE_PRIORITY`,
+   the say service's `URGENT_FROM`: a second after the lamp's last turn
+   rather than its whole 15 s quiet, every other gate kept, so it waits
+   while the lamp speaks or someone is heard; the first builder, 11 Nov
+   10:16: a refusal came about 30 s after the make; test
+   `an_app_makes_own_line_is_asked_urgent`), sent as a `note` told in the language
    of the conversation with the names kept as written
    (`made_skill::in_their_language`; the voice's character already speaks
    the owner's language; a note past the say service's 900 bytes is sent
