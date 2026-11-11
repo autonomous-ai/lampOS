@@ -338,7 +338,12 @@ links, replaced_by)`, khóa `(person, key)`, tạo `IF NOT EXISTS`,
   `octaviab@example.com`); "email" là "mail"; các từ nhỏ ("the", "that",
   "did", "you") không khớp gì, nên chỉ có những từ đó thì không tìm thấy gì.
 - `service_records_forget {person, about}` xóa các bản ghi có mọi từ khóa
-  của một chủ đề (chữ thường, bỏ dấu, số ít): `{ok:true,removed}`.
+  của một chủ đề (chữ thường, bỏ dấu, số ít): `{ok:true,removed}`. Với
+  `all: true` nó xóa mọi bản ghi của `person`, không đọc `about`, và một
+  bản ghi được hỏi trước đó bị từ chối như sau `forget_all`; voice gửi nó
+  khi quên tất cả cho id chủ của dịch vụ nếu đó không phải id của người nói
+  (phòng riêng). `service_contacts_forget` với `all: true` xóa mọi liên hệ
+  thư của `person` như vậy.
 - **Bản ghi được hỏi trước một lần quên bị từ chối** `forgotten`: khi
   `asked_unix_ms` trước lần `forget_all` hay `forget_person` mới nhất của
   người đó (hoặc `forget_all` của mọi người), lưu trong

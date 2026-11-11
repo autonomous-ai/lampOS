@@ -447,6 +447,19 @@ impl Days {
     /// compared lower case and without accents, removed: how many. A
     /// record's words are its service, action, reason and every text of
     /// its detail. Nothing at the service is undone.
+    /// Every service record of `person` removed (`service_records_forget`
+    /// with `all`), as forget everything removes them, and a put asked
+    /// before it refused: the voice's forget everything for the services'
+    /// owner id when it is not the speaker's own (the private room).
+    pub fn service_records_forget_all(&mut self, person: &Person) -> Result<u64> {
+        owner_only(person)?;
+        let tx = self.db.transaction()?;
+        let removed = empty(&tx, Some(person))?;
+        mark_forgot(&tx, Some(person), self.now)?;
+        tx.commit()?;
+        Ok(removed)
+    }
+
     pub fn service_records_forget(
         &mut self,
         person: &Person,
@@ -801,6 +814,28 @@ mod tests {
         assert_eq!(every["ok"], true, "{every}");
         assert!(records(&mut store, OWNER).is_empty());
         assert!(records(&mut store, OTHER).is_empty());
+    }
+
+    /// `service_records_forget` with `all` takes every record of that
+    /// person and no one else's, and refuses a put asked before it: the
+    /// voice's forget everything for the services' owner id in the private
+    /// room (the switch-on row on lamp-06c1, 11 Nov).
+    #[test]
+    fn a_records_forget_with_all_takes_every_record_of_that_person() {
+        let (_scratch, mut store) = Scratch::new("forget-records-all");
+        send(&mut store, put(OWNER, "a", "done", "", NOW));
+        send(&mut store, put(OWNER, "b", "cancelled", "", NOW));
+        send(&mut store, put(OTHER, "c", "done", "", NOW));
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"service_records_forget","person":OWNER,"all":true}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot, json!({"ok":true,"removed":2}));
+        assert!(records(&mut store, OWNER).is_empty());
+        assert_eq!(records(&mut store, OTHER).len(), 1);
+        let late = send_at(&mut store, put(OWNER, "a", "done", "", NOW), NOW + 1_500);
+        assert_eq!(late["error"], "forgotten", "{late}");
     }
 
     /// A forget about a thing takes the records that have each of its key
