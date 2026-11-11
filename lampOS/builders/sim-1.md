@@ -25,6 +25,18 @@ Never `lamp-voice`, and never another builder's branch.
 - Log: `lampOS/docs/work-log-sim-1.md`
 - Tasks: the virtual desktop lamp, design first, with sim-2
 
+## Pair programming (from 11 Nov 13:39, the person's rule)
+
+sim-1 is the **driver** of a pair with sim-2: it writes the code, runs the
+gates and makes the commits. sim-2 is the **navigator**: it reads every change,
+plans the next step, keeps the task list, and is the only one of the two who
+talks to the lead (reviews, hand-offs, push asks, status) and who posts the
+pair's PRs, read asks and NEXT TRAINs (within its own hourly limit). sim-1
+sends nothing to the lead's inbox: it hands each finished commit to sim-2 (a
+tmux line to its pane, or `~/harnesses/lead/sim/notes.md`) and talks with it
+directly; sim-1 posts on GitHub only the reads of other builders' pull requests,
+when asked. The open work is the pair's, tracked by sim-2.
+
 ## It may
 
 - Change the crates and folders above, and the documents that belong to
