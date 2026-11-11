@@ -1,7 +1,9 @@
 name: lampOS virtual lamp
 
 # The SDKs against the virtual desktop lamp (lampOS/crates/sim, docs/simulator-lamp.md),
-# on every pull request that could change what a program sees: the real
+# on the pull requests that could change what a program sees (the first builder's list, #6059
+# 12:14 GMT+7: sim, body, control, skills, the SDKs, the control doc and schema, the model, the two
+# tools; a change elsewhere is the ARM64 and clippy runs', not this one's): the real
 # lamp-control and lamp-body run unchanged on lamp-sim's simulated servos, ring
 # and voice, and the JS SDK's tour, a Python SDK round trip and every SDK
 # example (conformance/examples.js --sim) run against them, with no special
@@ -13,8 +15,10 @@ on:
   pull_request:
     branches: [lamp-voice]
     paths:
-      - 'lampOS/crates/**'
-      - 'lampOS/Cargo.*'
+      - 'lampOS/crates/sim/**'
+      - 'lampOS/crates/body/**'
+      - 'lampOS/crates/control/**'
+      - 'lampOS/crates/skills/**'
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
       - 'lampOS/docs/lamp.model.json'
@@ -24,8 +28,10 @@ on:
   push:
     branches: [lamp-voice]
     paths:
-      - 'lampOS/crates/**'
-      - 'lampOS/Cargo.*'
+      - 'lampOS/crates/sim/**'
+      - 'lampOS/crates/body/**'
+      - 'lampOS/crates/control/**'
+      - 'lampOS/crates/skills/**'
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
       - 'lampOS/docs/lamp.model.json'
