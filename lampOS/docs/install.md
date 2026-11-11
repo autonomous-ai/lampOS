@@ -1046,6 +1046,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    V1's Jev client does (#811 point 2).
    It never writes `/etc/lampOS/body/lamp.env`, and says that the body waits
    for it.
+   **Name servers** (#6256): in `/etc/resolvconf.conf` it replaces the first
+   `name_servers*` line with
+   `name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8"`, drops any
+   other, keeps every other line (one is added to a file with none, or none
+   there), then runs `resolvconf -u`; a file already so is left, nothing run.
+   openresolv puts `name_servers=` before the router's, and glibc asks the
+   first of its three first and waits 5 s on one that is dropped, as
+   1.1.1.1 is in China; appended, the router's comes first, then AliDNS and
+   DNSPod, which answer in China and elsewhere; in the hotspot, with no
+   router, these three. `scripts/imager/build-orangepi-v2.sh` writes the
+   same line, a test holding the two equal. A failed `resolvconf -u` is
+   said; the next lease lists them. Only install writes it, not a round:
+   a lamp already in a home gets it from its next `lamp-update install`.
 7. Records the build and the folders it made in
    `/var/lib/lampos-update/state.json`, as a round does, under the same
    lock, before systemd is asked anything. It reads them as a round does

@@ -820,6 +820,42 @@ pub fn store_key_setting(deploy: &Path) -> Result<Option<manifest::Setting>, Str
     Ok(Some(manifest::Setting::new(STORE_KEY_SETTING, &text)))
 }
 
+/// openresolv's settings: which name servers `/etc/resolv.conf` lists.
+pub const RESOLVCONF_PATH: &str = "/etc/resolvconf.conf";
+/// The name servers after the router's (#6256): AliDNS and DNSPod, which
+/// answer in China and everywhere else, then Cloudflare's and Google's.
+/// Appended, never `name_servers=`, which openresolv puts before the
+/// router's: glibc asks only the first three, the first one first, and
+/// waits 5 s on one that is dropped. With no router (the hotspot) the list
+/// is these. `scripts/imager/build-orangepi-v2.sh` writes the same line.
+pub const NAME_SERVERS: &str = r#"name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8""#;
+
+/// `/etc/resolvconf.conf` as install leaves it, from what it holds now
+/// (`None`: no file): every other line kept, the first `name_servers*` line
+/// [`NAME_SERVERS`] and any other one gone, or [`NAME_SERVERS`] last when
+/// there is none. A file install already fixed comes back unchanged.
+pub fn resolvconf_fixed(now: Option<&str>) -> String {
+    let mut fixed = String::new();
+    let mut placed = false;
+    for line in now.unwrap_or_default().lines() {
+        if line.trim_start().starts_with("name_servers") {
+            if !placed {
+                fixed.push_str(NAME_SERVERS);
+                fixed.push('\n');
+                placed = true;
+            }
+            continue;
+        }
+        fixed.push_str(line);
+        fixed.push('\n');
+    }
+    if !placed {
+        fixed.push_str(NAME_SERVERS);
+        fixed.push('\n');
+    }
+    fixed
+}
+
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
 pub const TMPFILES_PATH: &str = "/etc/tmpfiles.d/lampos.conf";
@@ -1063,6 +1099,9 @@ pub trait Host {
     fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String>;
     /// `systemctl restart` of one unit.
     fn restart(&mut self, unit: &str) -> Result<(), String>;
+    /// `argv` run to its end: what install asks after changing a system
+    /// file that is not the product's (`resolvconf -u`, #6256).
+    fn refresh(&mut self, argv: &[&str]) -> Result<(), String>;
     /// The sha256 of the `lamp-update` running this install, as hex: install
     /// writes the units it carries itself ([`PRODUCT`]), so one that is not
     /// the build's own is said ([`not_the_builds_updater`], #3733).
@@ -1143,6 +1182,11 @@ impl Host for System {
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
         run(Command::new("systemctl").args(["restart", unit]))
+    }
+
+    fn refresh(&mut self, argv: &[&str]) -> Result<(), String> {
+        let (program, args) = argv.split_first().ok_or("nothing to run")?;
+        run(Command::new(program).args(args))
     }
 
     fn running_sha256(&mut self) -> Result<String, String> {
@@ -1824,6 +1868,7 @@ pub fn install(
             "the body waits for this lamp's own poses in /etc/lampOS/body/lamp.env (docs/install.md)",
         );
     }
+    name_servers(config, host, &mut changed, say)?;
 
     let before = state.clone();
     let build = Build {
@@ -1880,6 +1925,36 @@ pub fn install(
         sequence: manifest.sequence,
         changed,
     })
+}
+
+/// [`NAME_SERVERS`] into [`RESOLVCONF_PATH`] ([`resolvconf_fixed`]), then
+/// `resolvconf -u` so `/etc/resolv.conf` lists them now (#6256). Nothing
+/// when the file holds them already. A file that cannot be read is said
+/// and left; a `resolvconf -u` that fails is said: the next lease or boot
+/// lists them.
+fn name_servers(
+    config: &Install,
+    host: &mut dyn Host,
+    changed: &mut Vec<String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    let now = match fs::read_to_string(config.on(RESOLVCONF_PATH)) {
+        Ok(text) => Some(text),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => {
+            say(&format!("{RESOLVCONF_PATH} kept, unread: {error}"));
+            return Ok(());
+        }
+    };
+    let fixed = resolvconf_fixed(now.as_deref());
+    if now.as_deref() == Some(fixed.as_str()) {
+        return Ok(());
+    }
+    put(config, RESOLVCONF_PATH, fixed.as_bytes(), 0o644, changed)?;
+    if let Err(why) = host.refresh(&["resolvconf", "-u"]) {
+        say(&format!("resolvconf -u: {why}"));
+    }
+    Ok(())
 }
 
 /// The line install says when the `lamp-update` running it, by its sha256
