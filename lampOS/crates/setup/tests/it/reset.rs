@@ -2712,10 +2712,22 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
     let files = [
         // Hermes's home: the program, kept.
         ("var/lib/lampos-hermes/.local/bin/hermes", true),
-        ("var/lib/lampos-hermes/.cache/uv/x", true),
-        ("var/lib/lampos-hermes/.npm/_cacache/x", true),
+        (
+            "var/lib/lampos-hermes/.local/share/uv/python/cpython-3.11/bin/python3",
+            true,
+        ),
+        // Hermes's HOME, where its tools write: the person's.
+        ("var/lib/lampos-hermes/.cache/uv/x", false),
+        ("var/lib/lampos-hermes/.cache/downloads/report.pdf", false),
+        ("var/lib/lampos-hermes/.npm/_cacache/x", false),
         ("var/lib/lampos-hermes/.bashrc", true),
         ("var/lib/lampos-hermes/.profile", true),
+        (
+            "var/lib/lampos-hermes/.local/lib/python3.11/site-packages/mine.py",
+            false,
+        ),
+        ("var/lib/lampos-hermes/.local/share/uv/tools/mine/x", false),
+        ("var/lib/lampos-hermes/.local/state/x", false),
         (
             "var/lib/lampos-hermes/.hermes/hermes-agent/run_agent.py",
             true,
@@ -2812,6 +2824,12 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, b"x").unwrap();
     }
+    // A token a tool appended to the shell's file goes with it.
+    fs::write(
+        root.path("var/lib/lampos-hermes/.bashrc"),
+        b"export PATH=\"$HOME/.local/bin:$PATH\"\nexport GITHUB_TOKEN=ghp_person\n",
+    )
+    .unwrap();
     // The kept settings as the lamp writes them, already cut.
     fs::write(
         root.path("var/lib/lampos-hermes/.hermes/config.yaml"),
@@ -2842,6 +2860,34 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
         assert!(hermes.join(folder).is_dir(), "{folder}");
         assert_eq!(fs::read_dir(hermes.join(folder)).unwrap().count(), 0);
     }
+    let home = root.path("var/lib/lampos-hermes");
+    for folder in [".cache", ".npm"] {
+        assert!(home.join(folder).is_dir(), "{folder}");
+        assert_eq!(fs::read_dir(home.join(folder)).unwrap().count(), 0);
+    }
+    for gone in [".local/lib", ".local/state", ".local/share/uv/tools"] {
+        assert!(!home.join(gone).exists(), "{gone}");
+    }
+    // The shell's files are the installer's text again: the token is gone.
+    for shell in [".bashrc", ".profile"] {
+        assert_eq!(
+            fs::read_to_string(home.join(shell)).unwrap(),
+            reset::HERMES_SHELL_TEXT,
+            "{shell}"
+        );
+    }
+    let installer = std::str::from_utf8(lamp_update::hermes_install::INSTALLER).unwrap();
+    let line = reset::HERMES_SHELL_TEXT
+        .trim()
+        .strip_prefix("# Hermes Agent command\n")
+        .unwrap();
+    assert!(installer.contains(&format!("SHELL_PATH_LINE='{line}'")));
+    assert!(installer.contains("printf '\\n# Hermes Agent command\\n%s\\n' \"$line\" >> \"$rc\""));
+    // What `hermes_install::present` reads in the folder stays.
+    assert!(
+        root.path(lamp_update::hermes_install::HERMES.trim_start_matches('/'))
+            .exists()
+    );
     for gone in ["runtime", "cache", "sandboxes"] {
         assert!(!hermes.join(gone).exists(), "{gone}");
     }
@@ -2869,6 +2915,9 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
         folders,
         [
             lamp_update::hermes_install::PLACE,
+            "/var/lib/lampos-hermes/.local",
+            "/var/lib/lampos-hermes/.local/share",
+            "/var/lib/lampos-hermes/.local/share/uv",
             lamp_update::hermes_install::HERMES_HOME,
             "/var/lib/lampos-openclaw",
             "/var/lib/lampos-openclaw/state",
@@ -2942,7 +2991,7 @@ fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
     let config = hermes.join("config.yaml");
     fs::write(
         &config,
-        "model:\n  provider: custom:lamp\n  default: deepseek-flash\nupdates:\n  check: false\nmcp_servers:\n  mine:\n    command: /home/me/server\nskills:\n  external_dirs:\n  - /var/lib/lampOS/skills\n  - /home/me/skills\nhooks:\n  pre_tool_call:\n  - command: /usr/lib/harness/hook pre\n    timeout: 5\n# a person's note\n\npersonality: pirate\nlsp:\n  enabled: false\n",
+        "model:\n  provider: custom:lamp\n  default: deepseek-flash\nupdates:\n  check: false\nmcp_servers:\n  mine:\n    command: /home/me/server\nskills:\n  external_dirs:\n  - /var/lib/lampOS/skills\n  - /home/me/skills\nhooks:\n  on_session_start:\n  - command: harness hook hermes session-start\n    timeout: 10\n  - command: curl https://hooks.example/T0K3N\n  pre_tool_call:\n  - command: /home/me/hook.sh\n  post_tool_call:\n  - matcher: '*'\n    command: harness hook hermes tool\n# a person's note\n\npersonality: pirate\nlsp:\n  enabled: false\n",
     )
     .unwrap();
     fs::set_permissions(&config, fs::Permissions::from_mode(0o640)).unwrap();
@@ -2956,9 +3005,17 @@ fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
     let cut = fs::read_to_string(&config).unwrap();
     assert_eq!(
         cut,
-        "updates:\n  check: false\nplugins:\n  auto_update_check_hours: 0\nlsp:\n  enabled: false\nterminal:\n  oneshot_completion_wait_seconds: 0\nhooks:\n  pre_tool_call:\n  - command: /usr/lib/harness/hook pre\n    timeout: 5\n"
+        "updates:\n  check: false\nplugins:\n  auto_update_check_hours: 0\nlsp:\n  enabled: false\nterminal:\n  oneshot_completion_wait_seconds: 0\nhooks:\n  on_session_start:\n  - command: harness hook hermes session-start\n    timeout: 10\n  post_tool_call:\n  - matcher: '*'\n    command: harness hook hermes tool\n"
     );
-    for gone in ["mcp_servers", "/home/me", "personality", "model:", "note"] {
+    for gone in [
+        "mcp_servers",
+        "/home/me",
+        "personality",
+        "model:",
+        "note",
+        "T0K3N",
+        "pre_tool_call",
+    ] {
         assert!(!cut.contains(gone), "{gone}");
     }
     assert_eq!(
