@@ -355,6 +355,18 @@ pairing's current grants.
 | `lamp.skills()`; CLI `lamp skill list` | `lamp.skills()` | `lamp_skills()` | Op `skill.list`: this computer's pushed skills | `skills` | one at a time for a computer; 6 a minute with the rates on | `[{name, version, sha256, on, held, pushed_at}, ...]` | `refused` "skill push is not on this lamp"; `busy` "this computer's last skill request is still with the lamp's skill helper"; `busy` "the lamp's skill helper is busy: try again" | works today (10 Nov 2026, 11091) |
 | `lamp.remove_skill(name)`; CLI `lamp skill remove NAME` | `lamp.removeSkill(name)` | `lamp_skill_remove(name)` | Op `skill.remove`: takes one of this computer's skills off the lamp | `skills` | as `skill.list` | ok | as `skill.list` | works today (10 Nov 2026, 11091) |
 
+### A skill run's linked services (control socket only)
+
+A skill's task run on the lamp's own Hermes (#6432) holds a one-run token on the control
+socket, and may read one of the person's linked services, or prepare a write to it, when the
+owner's yes named its grant: `<code>-read` or `<code>-write` (such as `gmail-read`,
+`google_calendar-write`). A paired computer never holds one. No service token reaches the run.
+
+| Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
+|---|---|---|---|---|---|---|---|---|
+| `await lamp.service_read(service, args)` | `lamp.serviceRead(service, args)` | — | Op `service.read`: one read through lamp-services' `service_read`, `args` as it takes them | `<service>-read` | the run's token; 20 s | `result`: quoted data from the service (a security mail left out) | `off` "a skill's linked services are off on this lamp (LAMP_SKILL_TASKS)"; `no_grant`; `refused` with lamp-services' words ("isn't linked to this lamp yet") | in development: off by default (11 Nov 2026), not yet run on a lamp |
+| `await lamp.service_write(service, args)` | `lamp.serviceWrite(service, args)` | — | Op `service.write`: a write only prepared, read back and held 2 minutes for the person's spoken yes, which sends it; never `send_id` or `said` | `<service>-write` | the run's token; one write waiting at a time; 3 sends a day a skill, 10 for every skill | `result`: `read_back`, `sent: false`, `held: true`, `next` (no `send_id`) | as `service.read`; `bad_request` for `send_id` or `said`; `refused` "another write waits for the person's yes" | in development: off by default (11 Nov 2026); the voice's read-back of a run's write is not built yet |
+
 ### Device, volume, air, stop
 
 | Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
