@@ -68,7 +68,7 @@ fn file(config: &Config) -> (bool, String) {
 
 /// When the setup walk ended (#5978, the Hermes install's window): the
 /// voice's onboarding file's `done_at_unix_ms`, which the walk sets once,
-/// as it first hands out its done line, and keeps through a redo. None
+/// once its first done line has played, and keeps through a redo. None
 /// while a walk is under way, before it ended, for a walk ended before it
 /// was dated, or a file that can't be read.
 pub fn ended_at_unix_ms(config: &Config) -> Option<u64> {

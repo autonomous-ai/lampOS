@@ -77,7 +77,7 @@ pub struct Moment {
     pub quiet: Result<(), String>,
     /// The setup walk under way (`crate::walk::under_way`).
     pub walk_under_way: bool,
-    /// When the setup walk handed out its done line, Unix ms (its progress
+    /// When the setup walk's done line finished playing, Unix ms (its progress
     /// file's `done_at_unix_ms`); none before it, or for a lamp whose voice
     /// does not walk.
     pub walk_ended_unix_ms: Option<u64>,
