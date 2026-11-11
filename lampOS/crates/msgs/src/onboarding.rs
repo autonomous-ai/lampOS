@@ -43,7 +43,7 @@ pub struct OnboardingPending {
     /// leads by talk. Absent from an older voice: false.
     #[serde(default)]
     pub walk: bool,
-    /// When the setup walk handed out its done line, in Unix ms, as committed
+    /// When the setup walk's done line finished playing, in Unix ms, as committed
     /// in its progress file: kept through a redo, gone after a factory reset,
     /// and absent for a walk set up before it was dated or not yet ended.
     /// lamp-cloud tells the app once from it (`onboarding.done`).

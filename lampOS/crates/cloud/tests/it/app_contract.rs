@@ -50,6 +50,8 @@ const READ: &[(&str, &str, Type)] = &[
     // This lamp takes `onboarding.page` and sends `onboarding.page_done`
     // (#6076), with the same switch.
     ("system.info", "onboarding_page_supported", Type::Flag),
+    // Which page contract (#6366): 2 is per-tap Add and the `done` page.
+    ("system.info", "onboarding_page_version", Type::Whole),
     ("volume.get", "volume", Type::Percent),
     ("volume.get", "raw", Type::Whole),
     ("volume.get", "max_volume", Type::Whole),

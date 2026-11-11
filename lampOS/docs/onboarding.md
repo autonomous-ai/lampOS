@@ -289,16 +289,21 @@ when the last step in `order` ends done, skipped or failed (#5499, Thirteen's
 P2 on #5504: with `who_you_are` last, a no to the name or the face still
 hears it). After a name-only end it follows `NAME_ONLY`.
 
-**The walk's end is dated once, for the app** (#5812). The first done line
-handed out keeps when, in Unix ms, in the progress file
-(`Progress::done_at_unix_ms`). A redo of one step or of the whole walk keeps
-it (`Progress::redone`), so a later done line never dates it again; a
+**The walk's end is dated once, for the app** (#5812). The first done line,
+once it has finished playing or been cut (#6353, the app went on while the
+lamp still spoke), keeps when, in Unix ms, in the progress file
+(`Progress::done_at_unix_ms`); until then `Progress::done_waits_closing`
+says it waits. A done line never said (a turn never begun, a restart, a
+redo, or said again too often) dates it at once. A redo of one step or of
+the whole walk keeps it (`Progress::redone`), so a later done line never dates it again; a
 factory reset wipes it with the file, so a new owner's walk is dated anew. A
 walk set up before it was dated, or not yet ended, has none.
 `onboarding/pending` carries what is committed on disk as `done_at_unix_ms`
 (left out while unknown), and lamp-cloud tells the app once from it
 (`onboarding.done`, [cloud.md](cloud.md), "Setup done, told to the app").
-Test: `onboarding::tests::the_walks_end_is_dated_once_and_kept`.
+Tests: `onboarding::tests::the_walks_end_is_dated_once_and_kept`,
+`the_walks_end_is_dated_once_its_closing_has_played`,
+`a_cut_closing_ends_the_walk_at_the_cut`.
 
 **Each walk step's end is dated, for the app** (#5979). A walk takes an id,
 `Progress::walk_id`, the Unix ms its first step is asked. A redo of one step
@@ -313,7 +318,7 @@ order they ended, with the walk's own outcome (`done`, `skipped`, `failed` or
 `not_available`; never `later`, which is offered again). No names, no words.
 lamp-cloud tells the app each end once (`onboarding.step`, [cloud.md](cloud.md),
 "Each setup step, told to the app"). After the walk, the app's own pages (Try,
-Add, Create) are said done by the lamp and go on by themselves (#6076,
+Add, Create, done) each get one line from the lamp (#6076, #6353,
 `onboarding.page` and `onboarding.page_done`, [cloud.md](cloud.md), "The app's
 onboarding pages, done on the lamp"). Test:
 `onboarding::tests::the_walks_steps_end_in_order_under_one_walk_id`.

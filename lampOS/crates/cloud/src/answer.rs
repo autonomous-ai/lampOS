@@ -190,11 +190,11 @@ pub trait Lamp {
         crate::onboarding_page::PAGES
             .lock()
             .map_err(|_| "the page cannot be kept".to_owned())?
-            .open(data, None, None)
+            .open(data, crate::onboarding_page::Seen::default(), |_| None)
     }
 
-    /// The open page done now, its line handed to the voice: the reply's
-    /// `data` (#6076).
+    /// The open page's line due now handed to the voice, and the reply's
+    /// `data` when the page is done with it (#6076, #6353).
     fn onboarding_page_done(&mut self) -> Option<Value> {
         None
     }
@@ -492,6 +492,8 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 info["onboarding_step_supported"] = json!(true);
                 // And `onboarding.page`, its page done pushed (#6076).
                 info["onboarding_page_supported"] = json!(true);
+                // Which page contract (#6366): 2 is per-tap Add and `done`.
+                info["onboarding_page_version"] = json!(crate::onboarding_page::VERSION);
             }
             some(info)
         }
@@ -1260,6 +1262,9 @@ pub mod tests {
         // switch, and `onboarding.page` answered only then.
         assert_eq!(told["onboarding_page_supported"], true);
         assert!(info.get("onboarding_page_supported").is_none(), "{info}");
+        // #6366: the page contract's version beside it, same switch.
+        assert_eq!(told["onboarding_page_version"], 2);
+        assert!(info.get("onboarding_page_version").is_none(), "{info}");
         assert!(answer(&mut will, "onboarding.page", &json!({"page": "create"})).is_ok());
         assert!(
             answer(
