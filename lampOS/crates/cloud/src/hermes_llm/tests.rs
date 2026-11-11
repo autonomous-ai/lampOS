@@ -238,6 +238,33 @@ fn starts_are_capped_per_minute() {
     assert!(started.take(now + Duration::from_secs(61)));
 }
 
+/// #6226: the forwarder serves Hermes or OpenClaw on the lamp, with either
+/// switch exactly `on`; neither on, nothing is served.
+#[test]
+fn either_engines_switch_serves_the_forwarder() {
+    assert!(on_from(Some("on"), None));
+    assert!(on_from(None, Some("on")));
+    assert!(on_from(Some("on"), Some("on")));
+    assert!(on_from(Some("off"), Some("on")));
+    assert!(!on_from(None, None));
+    assert!(!on_from(Some("off"), Some("off")));
+    assert!(!on_from(Some("ON"), Some("yes")));
+    assert_eq!(OPENCLAW_SWITCH, "LAMP_OPENCLAW_ON_LAMP");
+}
+
+/// #6226: the product's lamp-cloud unit turns on both engines' switch.
+#[test]
+fn the_product_unit_turns_on_both_switches() {
+    let unit = include_str!("../../../../deploy/product/lamp-cloud.service");
+    for switch in [SWITCH, OPENCLAW_SWITCH] {
+        assert!(
+            unit.lines()
+                .any(|line| line == format!("Environment={switch}=on")),
+            "{switch}"
+        );
+    }
+}
+
 #[test]
 fn the_relay_is_the_voices_deepseek() {
     assert_eq!(relay_base(None), COMPANY_DEEPSEEK);
