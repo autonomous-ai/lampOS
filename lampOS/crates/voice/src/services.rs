@@ -2419,7 +2419,7 @@ mod tests {
         assert!(WRITE_RULE.contains("A mail draft: gmail's action save_draft"));
         assert!(WRITE_RULE.contains("if refused, say what the call said."));
         assert!(lamp_services::writes::NO_DRAFTS.contains(
-            "I can't save a draft yet. I can read it back and send it when you say 'send it'."
+            "I can't save a draft yet. I can read it to you and send it when you say yes."
         ));
         assert!(WRITE_RULE.contains("never a remember"));
         assert!(!WRITE_RULE.contains("No draft yet"));

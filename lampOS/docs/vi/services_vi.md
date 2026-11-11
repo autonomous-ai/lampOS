@@ -494,7 +494,7 @@ giữ gì.
   một `save_draft` bị từ chối trước khi bất cứ gì được giữ hay gọi, với
   `writes::NO_DRAFTS`, "this Gmail link can't save drafts: only one linked
   with an app password can. Say "I can't save a draft yet. I can read it
-  back and send it when you say 'send it'."", và `drafts` với "this Gmail
+  to you and send it when you say yes."", và `drafts` với "this Gmail
   link reads no drafts: only one linked with an app password does" (liên
   kết không có `gmail.compose`).
 - **Scope** nó cần từ Google: `gmail.readonly` cho profile, danh sách (có
@@ -1236,7 +1236,7 @@ bị và đọc lại như mọi lệnh ghi và được lưu vào Drafts của 
 liên kết Gmail bằng đăng nhập Google (`gmail-app`, hay `gmail` tạo bằng nó)
 không có `gmail.compose` và không lưu nháp: `save_draft` của nó bị từ chối
 với lý do của chính lệnh gọi, mang câu cần nói, "I can't save a draft yet. I
-can read it back and send it when you say 'send it'." Sau mọi phần đọc lại
+can read it to you and send it when you say yes." Sau mọi phần đọc lại
 đèn hỏi ngắn (chủ đèn, 10/11), và mô hình xét mọi câu trả lời. Vì mọi lời
 đồng ý đều gửi nó (#6009), đèn hỏi chứ không bảo người ta phải nói câu nào:
 "Shall I send it?" ("Gửi không?"), với một bản nháp "Shall I save it?" ("Lưu
