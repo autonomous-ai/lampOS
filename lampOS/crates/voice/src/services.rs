@@ -1248,6 +1248,41 @@ pub fn read_in_full(alone: bool, likeness: Option<f32>, seen_owner: bool) -> boo
         && likeness.is_some_and(|likeness| likeness >= crate::same_voice::SERVICES_SAME_FROM)
 }
 
+/// Whether a heard line (`heard`: someone spoke it) is the owner's own,
+/// seen: in the private room (`private_room`) any heard line; outside it,
+/// the owner (`owner`, [`owner_of`]) seen saying it (`seen`, the eyes'
+/// [`seen_saying_owner`]). What a read in full is held to, and a made
+/// skill's read-back said whole ([`owner_hears`]).
+pub(crate) fn owner_seen_saying(
+    heard: bool,
+    private_room: bool,
+    owner: Option<&str>,
+    seen: impl FnOnce(&str) -> bool,
+) -> bool {
+    if private_room {
+        heard
+    } else {
+        owner.filter(|_| heard).is_some_and(seen)
+    }
+}
+
+/// Whether what only the owner may hear is said to the line `request`
+/// (`heard`, its memory scope `lease`): the private room, or the owner
+/// seen saying it, as a read in full is held ([`owner_seen_saying`]).
+/// A made skill's read-back is said whole only then
+/// (`make_skill_local::read_back`; App Only's P2 on #6230).
+pub(crate) fn owner_hears(
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> bool {
+    let private_room = crate::person::private_room();
+    private_room
+        || owner_seen_saying(heard, private_room, owner_of(lease).as_deref(), |owner| {
+            seen_saying_owner(request, owner).0
+        })
+}
+
 /// Whether the owner's face (memory id `owner`) was seen saying the line
 /// `request`, and whether another face was: what the eyes read of it
 /// (`speaking_faces::line_seen`), with `LAMP_SECOND_SPEAKING_FACE` and
@@ -1449,14 +1484,9 @@ pub fn run(
         || owner
             .as_deref()
             .is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some());
-    let seen_owner = if private_room {
-        heard
-    } else {
-        owner
-            .as_deref()
-            .filter(|_| heard)
-            .is_some_and(|owner| seen_saying_owner(request, owner).0)
-    };
+    let seen_owner = owner_seen_saying(heard, private_room, owner.as_deref(), |owner| {
+        seen_saying_owner(request, owner).0
+    });
     // The waiting write: the line that prepared it, who asked, and whether
     // this line began in the echo tail of the lamp's words with any of them.
     let (prepared, asker, echo_tail) = kept::pending(|pending| {
