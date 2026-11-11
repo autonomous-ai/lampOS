@@ -268,6 +268,16 @@ fn main() {
         println!("{line}");
         std::process::exit(status);
     }
+    // `lamp-tasks net-relay ...` (#6306): inside a skill run's own network
+    // namespace, started by its namespace script before Hermes; the run's
+    // model calls on 127.0.0.1:7741 piped to lamp-tasks' bridge socket.
+    if args.first().map(String::as_str) == Some("net-relay") {
+        if let Err(error) = lamp_tasks::net_bridge::relay_main(&args[1..]) {
+            eprintln!("lamp-tasks net-relay: {error}");
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
     // Its log lines never block it or end it, and its last ones reach the
     // journal (`lamp_ipc::log_relay`).
     let _log = lamp_ipc::log_relay::guard();

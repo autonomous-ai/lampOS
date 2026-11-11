@@ -15,7 +15,7 @@ sha2.workspace = true
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
 rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
-rustix = { version = "1", features = ["fs", "process", "time", "net", "event", "pipe"] }
+rustix = { version = "1", features = ["fs", "process", "time", "net", "event", "pipe", "stdio"] }
 getrandom = "0.4"
 signal-hook = "0.4"
 

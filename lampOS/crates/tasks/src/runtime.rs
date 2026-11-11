@@ -3614,6 +3614,18 @@ pub fn serve<C: Clock>(
         None if skill_tasks => eprintln!("tasks: a skill's tasks stay off: no HOME"),
         _ => {}
     }
+    // A skill run's one way to the model (#6306): its namespace has only
+    // `lo`, and its relay pipes to this socket, piped on to lamp-cloud's
+    // forwarder. Served while the switch is on; one not bound leaves a
+    // run's namespace script failing closed, the rest as it is.
+    match crate::net_bridge::Bridge::lamp().start(skill_tasks, stop.clone()) {
+        Ok(Some(_)) => eprintln!(
+            "tasks: a skill run's model calls are bridged on {}",
+            crate::net_bridge::MODEL_SOCKET
+        ),
+        Ok(None) => {}
+        Err(error) => eprintln!("tasks: a skill run's model bridge is not there: {error}"),
+    }
     let dir = config.dir.clone();
     let from_machines = config
         .set_up_later

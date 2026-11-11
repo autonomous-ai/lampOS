@@ -8,6 +8,7 @@ pub mod gateway;
 pub mod harness;
 pub mod hermes_config;
 pub mod hold;
+pub mod net_bridge;
 pub mod now;
 pub mod openclaw_config;
 pub mod progress;
