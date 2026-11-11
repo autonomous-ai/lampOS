@@ -1642,6 +1642,14 @@ impl<P: Persistence> Engine<P> {
                     "Progress is not read; the service runs without --progress.",
                 ));
             }
+            // A look at a named session is held by the service, on a lane
+            // of its own (#6274): one that reaches here is not looked at.
+            Request::Session { .. } => {
+                return Err(err(
+                    "unsupported",
+                    "Looks at a named session are held by the service.",
+                ));
+            }
             // The sign-in, too, is held by the service, and only with
             // `--sign-in-by-code` (#1676).
             Request::SignInStart {}
