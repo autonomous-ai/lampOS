@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-10 12:42 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
+Written by the first builder from the team's review page at 2026-11-11 12:37 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
 
-**Build 92.8% over 75 rows. Quality 68.8% over 17 rows.** For later (mood, and texting from the app): 46.8% over 4 rows, not in the build figure.
+**Build 93.0% over 75 rows. Quality 69.4% over 17 rows.** For later (mood, and texting from the app): 46.8% over 4 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -16,7 +16,7 @@ Written by the first builder from the team's review page at 2026-11-10 12:42 (+0
 | Speed: tool turns and comma pauses | 1.00 | #799 #782 | second, fourth |  |
 | Who is talking, and when not to answer | 1.00 | #753 #792 #800 | fourth, second | #800 behind switches |
 | Privacy switch closes both microphones | 1.00 | #795 | — |  |
-| Faces: remember, hello by name | 0.93 | #759 #775 | first | 24 Oct 09:4x, up from 0.92: with LAMP_REMEMBER_SPEAKER (off), a request to remember a face needs one face positively read as speaking it, and missing or conflicting evidence refuses (#3318, Third, merged 9ed44f88c). |
+| Faces: remember, hello by name | 0.95 | #759 #775 | first | 11 Nov 12:3x, up from 0.93: on stable 11716 (09:18) with LAMP_FACE_REFOUND on (#5916): on lamp-52e6 the lead turned away and stepped out, came back, asked his name, and the lamp knew him at once and kept his words as his… |
 | Hand work to Claude Code or Codex, and its news | 1.00 | #751 #765 #798 #733 | seventh |  |
 | Backup voice when Gemini is down | 1.00 | #778 #754 | sixth | The relay chat it uses has been down since 02:29 |
 | Gives way to a hand; wakes after power | 1.00 | #780 #790 #702 #703 #701 | fifth | Arm-goal guard merged (#1192) |
@@ -56,7 +56,7 @@ Written by the first builder from the team's review page at 2026-11-10 12:42 (+0
 | Shows its feelings in body and light, as V1’s emotions did | 0.50 | #3504 #3691 #4020 | jarvis | 29 Oct 06:3x, up from 0: this row was stale. |
 | Joys: sways to music, watches you leave, core skills | 0.70 | #1669 #1707 #1748 #2832 #2833 #2834 | sixth, fifth, nine | 6 Nov 17:3x, down from 0.80: music sway has nothing to read: LAMP_EARS_CLASSES is in no product unit; |
 | Dance when asked | 1.00 | #999 | jarvis | Built (the Dance skill, V1’s dance clips) |
-| Bedtime and Morning as a skill, with night caps on light and volume | 0.75 | #1672 #1732 #2803 #2804 | jarvis | 6 Nov 17:3x, down from 0.85: the skill ships off and its night caps are off in the product; |
+| Bedtime and Morning as a skill, with night caps on light and volume | 0.85 | #1672 #1732 #2803 #2804 | jarvis | 11 Nov 12:3x, up from 0.75: on for customers in stable 11716 with its night caps (#5771). |
 | “What do you see?” and showing it a page | 1.00 | #836 #842 | seventh | Built |
 | Seeing someone speak (is the face it looks at talking?) | 0.94 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, sixth | 24 Oct 09:4x, up from 0.92: built and merged, all off unless set: with LAMP_EYES_SPEAKING_DROP_OUTLIER the eyes drop one misread look from a speaking window instead of voiding it (#3313, #3317), and with LAMP_EYES_SPEAKI… |
 | The eye: looks toward you, blinks, a face for each state | 1.00 | #712 | first | Built (ring eye, asleep face) |
@@ -79,7 +79,7 @@ Written by the first builder from the team's review page at 2026-11-10 12:42 (+0
 | Notices your activity and posture | 1.00 | — | — | Built and tried on lamp-4ace 20 Oct 01:23: with LAMP_ACTIVITY on the eyes say what the person at the desk is doing on room/activity (away in an empty room); |
 | Habits and wellbeing nudges beyond Stretch break, as skills | 1.00 | — | — | 20 Oct 11:46, built: all four tried on lamp-52e6 with the lead (row 12: rest your eyes, a sip of water, stand up, wind down), each passed with its skill done. |
 | Text your lamp from your phone, in the Autonomous app *(for later: not in the build figure)* | 0.70 | #1396 #1673 #1726 #1742 #2836 | mobile, backend, fourth | 20 Oct 11:3x, up from 0.25: on lamp-0c89 from a phone, a texted reminder was set and said at the lamp 2 min later, and a moving skill was refused from a text; |
-| Email, calendar and other connectors, through hand-overs | 0.80 | #751 #2740 #2820 #2821 | eighth, el, subdarren | 6 Nov 17:3x, up from 0.70: a Calendar skill made by voice read and said the next event on 9adf at 10300, and a Gmail read returned a mail at 10336. |
+| Email, calendar and other connectors, through hand-overs | 0.85 | #751 #2740 #2820 #2821 | eighth, el, subdarren | 11 Nov 12:3x, up from 0.80: on stable 11716, a waiting mail, event or Drive write goes out on a natural “yes” (#6009); |
 | Guard mode, an installable skill | 0.75 | #2562 #2827 #2828 | jarvis, nine | 6 Nov 17:3x, down from 0.85: it is in neither the product list nor the Store, its switches are off, and the 9adf run was on a drop-in. |
 | “Was anyone here while I was out?”, an installable skill | 0.85 | #1989 #2019 | — | 6 Nov 22:3x, down, as Build now counts what a customer gets: `who-was-here` isn’t in the product’s install, and the Store lists it but doesn’t offer it (Backend2, 21:49), so a customer can’t get it. |
 | Music to relax, an installable skill | 0.60 | #1685 #2792 #2793 | second, sixth, first, nine | 6 Nov 17:3x, down from 0.70: LAMP_REQUESTED_AUDIO is in no product unit and the skill isn’t in the product or the Store; |
@@ -105,7 +105,7 @@ Written by the first builder from the team's review page at 2026-11-10 12:42 (+0
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.85 | 0.85 | 9 Nov 10:2x, back up from 0.8: #5498’s fix (a stale oldest reminder no longer silences every later one, ec2be29dbc) is on stable since 10686, and on 10824 a one-minute timer rang and was said on lamp-52e6 (Fifth, 07:20) … |
-| Onboarding, as a first-time person meets it | 0.65 | 0.90 | 10 Nov 00:4x, up from 0.55: stable 11091 (promoted 9 Nov 23:01) carries the new walk (#5809). |
+| Onboarding, as a first-time person meets it | 0.75 | 0.90 | 10 Nov 20:3x, up from 0.65: on the promoted 11372 (lamp-52e6, 16:41–16:51) Seventh’s scene A passed: every step word heard and none made up (#5995’s strip now runs in the worker), the face question said word for word (#6… |
 | Remembers you: your name and what you told it | 0.75 | 0.90 | 10 Nov 00:4x, up from 0.7: Friday’s batch on stock 10824 pooled 0.85 (from 0.80); |
 | A good companion | 0.70 | 0.90 | 6 Nov 11:1x, down from 0.75, on stable 10441: the core-verifier counts one claimed action not done (lamp-52e6, 04:24, 10441’s voice: “I’ve kept the light on until ten.” with no call and no schedule item), so claimed-not-… |
 | Both microphones | 0.60 | 0.80 | 6 Nov 17:3x, down from 0.65: tester lamps on 10226 had name lines with no words (220c 29/36, a63e 17/33), and 4ace’s lines came back empty 138 of 153 on 6 Nov; |
