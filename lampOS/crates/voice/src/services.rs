@@ -19,13 +19,17 @@
 //!   owner, 10 Nov): the same write is sent by a call with its `send_id` in
 //!   a later request, within [`PENDING_FOR`], its read-back not cut or
 //!   talked over, whoever says it, but a line begun in the echo tail of the
-//!   lamp's words with any of them, which needs the asker's voice
-//!   ([`Turn::in_echo_tail`], [`OTHER_VOICE`]); any other send cancels it. A
+//!   lamp's words with any of them, which needs the asker's voice, or with
+//!   no print yet their face seen saying it ([`Turn::in_echo_tail`],
+//!   [`Turn::asker_seen`], [`OTHER_VOICE`]); any other send cancels it. A
 //!   Gmail draft (`save_draft`, [`Pending::draft`]) goes the same way, saved,
-//!   never sent. One pending write at a time, dropped by another call or the
-//!   lamp answering a second other request. A line held as the lamp's own
-//!   words heard back is no line of the person's ([`own_echo_held`]).
-//! - **After a read, nothing else in that request** ([`after_read`]), and
+//!   never sent. One pending write at a time, dropped by another call or
+//!   the lamp answering a second other request; a read on a line that is a
+//!   plain yes keeps it ([`plain_yes`]). A line held as the lamp's own words
+//!   heard back is no line of the person's ([`own_echo_held`]).
+//! - **After a read, nothing else in that request** ([`after_read`]) but
+//!   another read or, on a plain yes, the waiting write's own send
+//!   ([`sends_waiting`]), and
 //!   the read's words are kept nowhere in the thread
 //!   (`thread::Thread::private_for`); with others maybe in view, a read is
 //!   cut to who and what about ([`brief`]).
@@ -144,10 +148,10 @@ pub const AFTER_READ: &str = "Not done: after reading from a linked service, I d
 /// alone ([`brief`]).
 pub const BRIEF_NOTE: &str = "Someone else may be here: say only how many there are, who they are from and what they are about, never what they say.";
 /// What the model is told after a write is prepared.
-pub(crate) const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I send it?\" (in Vietnamese \"Gửi không?\"); for an event or a file, \"Shall I go ahead?\" (in Vietnamese \"Làm không?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't send: say it's cancelled, or prepare the changed one anew.";
+pub(crate) const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, then ask, short, \"Shall I send it?\" (in Vietnamese \"Gửi không?\"); for an event or a file, \"Shall I go ahead?\" (in Vietnamese \"Làm không?\"). If they agree, in any words, call service_write with its send_id now, reading nothing first. If they cancel, decline, wait or change it, don't send: say it's cancelled, or prepare the changed one anew.";
 /// What the model is told after a Gmail draft is prepared (`save_draft`):
 /// it is saved, never sent, so the lamp asks "Shall I save it?".
-pub const SAVE_READ_BACK_NEXT: &str = "Nothing is saved yet, and nothing is ever sent. Say read_back in full, word for word, leaving nothing out, then ask, short, \"Shall I save it?\" (in Vietnamese \"Lưu không?\"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline, wait or change it, don't save: say it's cancelled, or prepare the changed one anew.";
+pub const SAVE_READ_BACK_NEXT: &str = "Nothing is saved yet, and nothing is ever sent. Say read_back in full, word for word, then ask, short, \"Shall I save it?\" (in Vietnamese \"Lưu không?\"). If they agree, in any words, call service_write with its send_id now, reading nothing first. If they cancel, decline, wait or change it, don't save: say it's cancelled, or prepare the changed one anew.";
 /// What the model is told to say once a write was sent.
 pub const SENT_NEXT: &str = "Say only that it was sent, in the conversation's language.";
 /// What the model is told to say once a draft was saved: a draft is never
@@ -384,6 +388,13 @@ pub struct Pending {
     /// ([`line_in_echo_tail`]): a send in one needs the asker's voice
     /// ([`Turn::in_echo_tail`]).
     pub echo_tail: VecDeque<u64>,
+    /// The newest requests since, at most [`IDS_KEPT`], whose lines heard
+    /// no words, or only declined so cut words were answered in their place
+    /// ([`answered_in_place`]): the lamp's words in one are no answer of a
+    /// new request's, so it is never [`other`](Self::other), as
+    /// [`asked_again`](Self::asked_again) is not (lamp-29e7, 11 Nov: a noise
+    /// answered in the yes's place dropped the write on the next yes).
+    pub in_place: VecDeque<u64>,
     /// A Gmail draft (`save_draft`): saved, never sent; its read-back asks
     /// "Shall I save it?" ([`SAVE_READ_BACK_NEXT`]).
     pub draft: bool,
@@ -419,6 +430,7 @@ impl Pending {
             asked_again: None,
             print_asked: false,
             echo_tail: VecDeque::new(),
+            in_place: VecDeque::new(),
             draft: false,
         }
     }
@@ -503,9 +515,11 @@ pub fn said_in(pending: &mut Option<Pending>, request: u64, words: &str, now: In
         }
         kept.spoken_from.get_or_insert(now);
         kept.spoken_at = Some(now);
-    } else if kept.asked_again == Some(request) {
-        // The lamp asking once more for the words ([`NO_PRINT_YET`]): no
-        // other request, so the line after it may still send.
+    } else if kept.asked_again == Some(request) || kept.in_place.contains(&request) {
+        // The lamp asking once more for the words ([`NO_PRINT_YET`]), or
+        // answering a line of no words or one that only declined
+        // ([`answered_in_place`]): no other request, so the line after it
+        // may still send.
         kept.spoken_at = Some(now);
     } else if *kept.other.get_or_insert(request) != request {
         eprintln!(
@@ -566,6 +580,82 @@ const IDS_KEPT: usize = 8;
 /// asker's voice ([`Turn::in_echo_tail`], Thirteen's option 1 on #6009).
 pub fn line_in_echo_tail(request: u64) {
     kept::pending(|pending| echo_tail_in(pending, request));
+}
+
+/// The line of `request` heard no words, or its answer only declined so
+/// the words it cut short are answered in its place (`second_provider`,
+/// `LAMP_CUT_ASK_ANSWERED`): the lamp's words in it answer no new request
+/// of the person's, so they never make it the read-back's one answer
+/// ([`Pending::other`], [`answered_without_send`]), and the next line may
+/// still send (lamp-29e7, 11 Nov: a 0-word noise cut the lamp's answer to
+/// the yes, was answered in its place, and the next yes dropped the write).
+/// A line with words of its own answered in a held line's place, a real
+/// question cut short, is never marked: it counts as another request (the
+/// Reviewer-lead's P3 on #6367), and a real answer with no send ends it.
+pub fn answered_in_place(request: u64) {
+    kept::pending(|pending| in_place_in(pending, request));
+}
+
+/// [`answered_in_place`] on `pending`: a line after the one that prepared
+/// the write, each once.
+pub fn in_place_in(pending: &mut Option<Pending>, request: u64) {
+    let Some(kept) = pending.as_mut() else {
+        return;
+    };
+    if request <= kept.request || kept.in_place.contains(&request) {
+        return;
+    }
+    if kept.in_place.len() == IDS_KEPT {
+        kept.in_place.pop_front();
+    }
+    kept.in_place.push_back(request);
+}
+
+/// Whether `call` in `request` is the send of the write waiting now, with
+/// its own `send_id`, prepared in an earlier request, in a line that is a
+/// plain yes (`yes`, [`said_plain_yes`]): a read in that same request does
+/// not stop it (`tools::run_call_with_scope`, [`after_read`]). The person's
+/// own words agreed, not the model's reading of them, so nothing the read
+/// gave can make it send (App Only's P1 on #6367: an invite's words asking
+/// for the send after "What's on my calendar tomorrow?"), and what it sends
+/// was read back before the read and goes exactly as prepared ([`gate`]).
+pub fn sends_waiting(call: &ToolCall, request: u64, yes: bool) -> bool {
+    yes && given_send_id(call).is_some_and(|send_id| {
+        kept::pending(|pending| {
+            pending
+                .as_ref()
+                .is_some_and(|kept| kept.send_id == send_id && kept.request < request)
+        })
+    })
+}
+
+/// The yes words a read-back's own question invites, beside
+/// `agent_tasks`' plain yes ([`plain_yes`]).
+const SEND_YES: [&str; 3] = ["gửi", "có", "ừ"];
+/// The yes phrases a read-back's own question invites ("go ahead" is
+/// `agent_tasks`' already).
+const SEND_PHRASES: [&[&str]; 2] = [&["send", "it"], &["gửi", "đi"]];
+
+/// Whether `words` are a plain yes and nothing else: `agent_tasks`' one
+/// deterministic test (`agent_tasks::plain_yes_with`: at most six words, no
+/// question, only yes words beside "please", "lamp" or "hey"), with the
+/// read-back's own "send it", "gửi đi", "gửi", "có" and "ừ". Only such a
+/// line keeps a waiting write past a read in its request and lets its send
+/// through after it ([`gate`], [`sends_waiting`]); no word list decides the
+/// send itself, which stays the model's.
+pub fn plain_yes(words: &str) -> bool {
+    crate::agent_tasks::plain_yes_with(words, &SEND_YES, &SEND_PHRASES)
+}
+
+/// Whether the person's line in `request`, as this process's thread has it
+/// (`thread::Thread::heard_for`), is a plain yes ([`plain_yes`]).
+pub fn said_plain_yes(request: u64) -> bool {
+    let now = Instant::now();
+    crate::thread::THREAD
+        .lock()
+        .ok()
+        .and_then(|thread| thread.heard_for(request, now))
+        .is_some_and(|words| plain_yes(&words))
 }
 
 /// Whether the lamp's words in `request` read back a write waiting now: it
@@ -849,6 +939,16 @@ pub struct Turn<'a> {
     /// Another face than the asker's was seen speaking through this line;
     /// asked only for a send [`in_echo_tail`](Self::in_echo_tail).
     pub other_seen: bool,
+    /// The asker's own face was seen saying this line
+    /// ([`seen_saying_owner`], no other face seen saying it); asked only for
+    /// a send [`in_echo_tail`](Self::in_echo_tail): with no voice print yet,
+    /// it sends ([`gate`]). Never their face only in view: that can't tell
+    /// their yes from the lamp's own "Shall I send it?" heard back while they
+    /// sit silent (the Reviewer-lead's P1 on #6367).
+    pub asker_seen: bool,
+    /// The person's line is a plain yes ([`plain_yes`]): only then does a
+    /// read in a later request than the waiting write's keep it ([`gate`]).
+    pub plain_yes: bool,
 }
 
 /// The non-empty `send_id` the model gave a write, if any.
@@ -994,8 +1094,10 @@ fn refused_send(pending: &mut Option<Pending>, send_id: Option<&str>, why: &str)
 /// The call to send on, or what the model is told instead. Only a heard
 /// line calls a service at all, and only the owner's reads or prepares a
 /// write. Any call in a request other than the pending write's forgets it,
-/// unless it is that write's own send; a send that is refused forgets it
-/// too.
+/// unless it is that write's own send, or a read (`service_read`,
+/// `services_connected`) on a line that is a plain yes ([`Turn::plain_yes`]),
+/// so a "Yes." whose model checks the calendar first still sends (lamp-29e7,
+/// 11 Nov). A send that is refused forgets it too.
 ///
 /// A send needs only (the owner, 10 Nov: the model decides whether the
 /// person confirmed or cancelled, never a word list): a write waiting, for
@@ -1010,7 +1112,8 @@ fn refused_send(pending: &mut Option<Pending>, send_id: Option<&str>, why: &str)
 /// lamp's own "Yes." or "Send it." heard back, too short for `own_echo` to
 /// hold. It needs [`Turn::alike`] at `same_voice::SERVICES_SAME_FROM` or
 /// over and no other face seen saying it, else [`OTHER_VOICE`] cancels it;
-/// with no print yet it waits for one more try ([`NO_PRINT_YET`]).
+/// with no print yet it sends when the asker's own face was seen saying it
+/// ([`Turn::asker_seen`]), else it waits for one more try ([`NO_PRINT_YET`]).
 pub fn gate(
     pending: &mut Option<Pending>,
     call: &ToolCall,
@@ -1020,7 +1123,11 @@ pub fn gate(
 ) -> Result<ToolCall, Value> {
     answered_without_send(pending, request);
     let send_id = given_send_id(call);
+    // Another write drops it; so does any other call, but on a line that
+    // is a plain yes ([`Turn::plain_yes`]): there a read first keeps it for
+    // the send after it (lamp-29e7, 11 Nov).
     if send_id.is_none()
+        && (call.name == WRITE || !turn.plain_yes)
         && let Some(kept) = pending.as_ref().filter(|kept| kept.request != request)
     {
         eprintln!(
@@ -1135,6 +1242,14 @@ pub fn gate(
             _ if turn.other_seen => return other("another face was seen saying send"),
             Some(alike) if alike >= crate::same_voice::SERVICES_SAME_FROM => {}
             Some(_) => return other("another voice said send"),
+            // No print, but the asker's own face seen saying it: theirs, not
+            // the lamp's words heard back (lamp-29e7, 11 Nov: a fast "Yes"
+            // right after the read-back is too short for a print).
+            None if turn.asker_seen => {
+                eprintln!(
+                    "lamp-voice: request {request}: a send in the echo tail with no print: the asker's face seen saying it: sent"
+                );
+            }
             None if !kept.print_asked => {
                 *pending = Some(Pending {
                     asked_again: Some(request),
@@ -1688,11 +1803,15 @@ pub fn run(
             )
         );
     }
-    let other_seen = in_echo_tail
-        && !private_room
-        && asker
-            .as_deref()
-            .is_some_and(|asker| seen_saying_owner(request, asker).1);
+    // Whose faces the eyes read saying this line: the asker's alone, or
+    // another's.
+    let (asker_seen, other_seen) = asker
+        .as_deref()
+        .filter(|_| in_echo_tail && !private_room)
+        .map_or((false, false), |asker| seen_saying_owner(request, asker));
+    // Asked only while a write from an earlier request waits.
+    let plain_yes =
+        heard && prepared.is_some_and(|prepared| prepared < request) && said_plain_yes(request);
     let turn = Turn {
         heard,
         owner: owner.as_deref(),
@@ -1701,6 +1820,8 @@ pub fn run(
         in_echo_tail,
         alike,
         other_seen,
+        asker_seen,
+        plain_yes,
     };
     let gated = kept::pending(|pending| gate(pending, call, request, &turn, now));
     let mut call = match gated {
@@ -3288,13 +3409,229 @@ mod tests {
         assert_eq!(pending, None);
         let refused = gate(&mut pending, &send("s1"), 13, &heard(), at(now));
         assert_eq!(refused.unwrap_err()["error"], NOTHING_WAITING);
-        // Any other services call forgets it too.
+        // Any other services call forgets it too, on a line that is no
+        // plain yes.
         let mut pending = waiting(now);
         let read = call(READ, json!({"service":"gmail","what":"recent"}));
         gate(&mut pending, &read, 11, &heard(), now).unwrap();
         assert_eq!(pending, None);
         let refused = gate(&mut pending, &send("s1"), 12, &heard(), now);
         assert_eq!(refused.unwrap_err()["error"], NOTHING_WAITING);
+    }
+
+    /// lamp-29e7, 11 Nov: on "Yes." the model read the calendar first, and
+    /// the write was dropped. On a line that is a plain yes, a read, the
+    /// services list or any other function in its request keeps the waiting
+    /// write, and its send after the read, in that request, sends it; a new
+    /// prepare still drops it. On any other line ("What's on my calendar
+    /// tomorrow?") a read drops it as before, and its send after the read is
+    /// refused by the after-read rule (App Only's P1 on #6367: a read's words
+    /// never make the send). The read-back's answer tells the model to send
+    /// now, reading nothing first.
+    #[test]
+    fn a_read_on_a_plain_yes_keeps_the_waiting_write_for_its_send() {
+        let now = Instant::now();
+        let yes = || Turn {
+            plain_yes: true,
+            ..heard()
+        };
+        for (why, first) in [
+            (
+                "a read",
+                call(READ, json!({"service":"google_calendar","what":"week"})),
+            ),
+            ("the services list", call(CONNECTED, json!({}))),
+            ("another function", call("set_light", json!({}))),
+        ] {
+            let mut pending = waiting(now);
+            let _ = gate(&mut pending, &first, 11, &yes(), at(now));
+            assert!(pending.is_some(), "{why}: kept");
+            let sent = gate(&mut pending, &send("s1"), 11, &yes(), at(now))
+                .unwrap_or_else(|told| panic!("{why}: {told}"));
+            assert_eq!(sent.args["send_id"], "s1", "{why}");
+            assert_eq!(pending, None, "{why}: sent once");
+            let again = gate(&mut pending, &send("s1"), 11, &yes(), at(now));
+            assert_eq!(again.unwrap_err()["error"], NOTHING_WAITING, "{why}");
+        }
+        // Not a plain yes: the read drops it.
+        let mut pending = waiting(now);
+        let read = call(READ, json!({"service":"google_calendar","what":"tomorrow"}));
+        gate(&mut pending, &read, 11, &heard(), at(now)).unwrap();
+        assert_eq!(pending, None, "dropped");
+        // The send after a read in its request is let past the after-read
+        // rule only on a plain yes, with the waiting write's own id, from an
+        // earlier request.
+        kept::pending(|kept| *kept = waiting(now));
+        read_answered(11);
+        assert!(after_read(11));
+        assert!(sends_waiting(&send("s1"), 11, true));
+        assert!(!sends_waiting(&send("s1"), 11, false), "no plain yes");
+        assert!(!sends_waiting(&send("s2"), 11, true), "another id");
+        assert!(
+            !sends_waiting(&send("s1"), 10, true),
+            "the read-back's own request"
+        );
+        let plain = call(WRITE, json!({"service":"gmail","action":"send_mail"}));
+        assert!(!sends_waiting(&plain, 11, true), "a new write");
+        kept::pending(|kept| *kept = None);
+        assert!(!sends_waiting(&send("s1"), 11, true), "nothing waiting");
+        // A new prepare in a later request drops it, even on a plain yes,
+        // even one refused.
+        for turn in [
+            yes(),
+            Turn {
+                seen_owner: false,
+                ..yes()
+            },
+        ] {
+            let mut pending = waiting(now);
+            let _ = gate(&mut pending, &plain, 12, &turn, at(now));
+            assert_eq!(pending, None);
+        }
+        // What a plain yes is: agent_tasks' test, with the read-back's own
+        // words.
+        for said in [
+            "Yes.",
+            "Yes, send it.",
+            "Okay lamp, go ahead.",
+            "Send it please.",
+            "ok",
+            "Gửi đi.",
+            "Gửi.",
+            "Có.",
+            "Ừ, gửi đi.",
+        ] {
+            assert!(plain_yes(said), "{said}");
+        }
+        for said in [
+            "What's on my calendar tomorrow?",
+            "Yes?",
+            "Yes, but check my calendar first.",
+            "Send it to Bob instead.",
+            "Không.",
+            "",
+        ] {
+            assert!(!plain_yes(said), "{said}");
+        }
+        for told in [READ_BACK_NEXT, SAVE_READ_BACK_NEXT] {
+            assert!(
+                told.contains("with its send_id now, reading nothing first"),
+                "{told}"
+            );
+        }
+    }
+
+    /// lamp-29e7, 11 Nov: a fast one-word "Yes" right after the read-back,
+    /// in its echo tail, had no voice print. With the asker's own face seen
+    /// saying it, it sends. Their face only in view, nobody seen speaking
+    /// ("send it" may be the lamp's own "Shall I send it?" heard back while
+    /// they sit silent, the Reviewer-lead's P1 on #6367), it waits for one
+    /// more try, as before, and a second with no print is cancelled. A known
+    /// other voice or another face seen saying it still cancels.
+    #[test]
+    fn a_fast_yes_with_no_print_sends_only_when_the_asker_is_seen_saying_it() {
+        let now = Instant::now();
+        let tail = |alike, other_seen, asker_seen| Turn {
+            in_echo_tail: true,
+            alike,
+            other_seen,
+            asker_seen,
+            ..heard()
+        };
+        let mut pending = waiting(now);
+        let sent = gate(
+            &mut pending,
+            &send("s1"),
+            11,
+            &tail(None, false, true),
+            at(now),
+        )
+        .expect("the asker seen saying it sends");
+        assert_eq!(sent.args["said"], "send");
+        assert_eq!(pending, None);
+        // The one face in view, nobody seen speaking, "send it": one more
+        // try, nothing sent; a second the same is cancelled.
+        let mut pending = waiting(now);
+        let asked = gate(
+            &mut pending,
+            &send("s1"),
+            11,
+            &tail(None, false, false),
+            at(now),
+        )
+        .unwrap_err();
+        assert_eq!(asked["error"], NO_PRINT_YET);
+        assert!(pending.is_some(), "kept for one more try");
+        let refused = gate(
+            &mut pending,
+            &send("s1"),
+            12,
+            &tail(None, false, false),
+            at(now),
+        );
+        assert_eq!(refused.unwrap_err()["error"], OTHER_VOICE);
+        assert_eq!(pending, None);
+        for (why, alike, other_seen) in [
+            ("another voice", Some(0.3), false),
+            ("another face seen saying it", None, true),
+        ] {
+            let mut pending = waiting(now);
+            let refused = gate(
+                &mut pending,
+                &send("s1"),
+                11,
+                &tail(alike, other_seen, true),
+                at(now),
+            );
+            assert_eq!(refused.unwrap_err()["error"], OTHER_VOICE, "{why}");
+            assert_eq!(pending, None, "{why}");
+        }
+    }
+
+    /// lamp-29e7, 11 Nov: a 0-word noise cut the lamp's answer to the yes
+    /// and was answered in its place, and the next yes dropped the write as
+    /// "the lamp answered request 51 after its read-back with no send". A
+    /// line of no words, or one that only declined, is no other request:
+    /// the yes after it sends. A real answer with no send, or a real
+    /// question answered in a held line's place, unmarked, still ends the
+    /// write (Thirteen's P2 on #6009, the Reviewer-lead's P3 on #6367).
+    #[test]
+    fn a_wordless_or_in_place_answer_is_no_other_request() {
+        let now = Instant::now();
+        let mut pending = waiting(now);
+        in_place_in(&mut pending, 10);
+        in_place_in(&mut pending, 11);
+        in_place_in(&mut pending, 11);
+        assert_eq!(pending.as_ref().unwrap().in_place, VecDeque::from([11]));
+        said_in(&mut pending, 11, "Where was I…", at(now));
+        assert_eq!(pending.as_ref().unwrap().other, None, "no other request");
+        let sent = gate(&mut pending, &send("s1"), 12, &heard(), at(now))
+            .expect("the yes after a noise sends");
+        assert_eq!(sent.args["send_id"], "s1");
+        // Through the thread, as the lamp says it.
+        let mut thread = crate::thread::Thread::default();
+        kept::pending(|kept| *kept = waiting(now));
+        answered_in_place(11);
+        thread.lamp_for(
+            11,
+            "Um, excuse me, did anyone say something?",
+            at(now),
+            None,
+        );
+        assert!(
+            waiting_note(12, Some("ann"), at(now)).is_some(),
+            "still told"
+        );
+        let mut pending = kept::pending(Option::take);
+        assert!(gate(&mut pending, &send("s1"), 12, &heard(), at(now)).is_ok());
+        // A real answer with no send, then a yes: dropped.
+        let mut pending = waiting(now);
+        said_in(&mut pending, 11, "It's three.", at(now));
+        let refused = gate(&mut pending, &send("s1"), 12, &heard(), at(now));
+        assert_eq!(refused.unwrap_err()["error"], NOTHING_WAITING);
+        let mut none = None;
+        in_place_in(&mut none, 11);
+        assert_eq!(none, None);
     }
 
     /// A write prepared in request 96, its read-back said in full with the
