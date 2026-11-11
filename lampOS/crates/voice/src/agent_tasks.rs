@@ -3248,8 +3248,12 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
         .filter(|said| ["yes", "offline", "no"].contains(said))
         .unwrap_or("unknown");
     // Each computer once, in the tasks part's alias order, with the agents
-    // it has: its own name where the tasks part has one, else its alias.
-    let mut computers: Vec<(String, Vec<&'static str>)> = Vec::new();
+    // it has. Its targets are one computer by its own name where the tasks
+    // part has one, else by its alias; it is said by that name only with
+    // `LAMP_TASKS_MACHINE_NAMES` (as [`where_done`]), since a computer named
+    // after its user names a person to whoever is in the room, else by the
+    // first of its aliases (Thirteen's P2 on #6222).
+    let mut computers: Vec<(String, String, Vec<&'static str>)> = Vec::new();
     if let Some(targets) = ask(&socket, &json!({"op":"targets"}), left())
         .filter(|answer| answer.get("ok") == Some(&json!(true)))
     {
@@ -3268,14 +3272,17 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
             let Some(agent) = name_of(engine) else {
                 continue;
             };
-            let computer = target["name"]
-                .as_str()
-                .and_then(status_name)
-                .unwrap_or_else(|| alias_said.to_owned());
-            match computers.iter_mut().find(|(said, _)| *said == computer) {
-                Some((_, agents)) if !agents.contains(&agent) => agents.push(agent),
+            let own = target["name"].as_str().and_then(status_name);
+            let key = own.clone().unwrap_or_else(|| alias_said.to_owned());
+            match computers.iter_mut().find(|(known, _, _)| *known == key) {
+                Some((_, _, agents)) if !agents.contains(&agent) => agents.push(agent),
                 Some(_) => {}
-                None => computers.push((computer, vec![agent])),
+                None => {
+                    let said = own
+                        .filter(|_| place.machine_names)
+                        .unwrap_or_else(|| alias_said.to_owned());
+                    computers.push((key, said, vec![agent]));
+                }
             }
         }
     }
@@ -3292,7 +3299,7 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
     let listed: Vec<Value> = computers
         .iter()
         .take(MOST_STATUS_COMPUTERS)
-        .map(|(computer, agents)| json!({"computer": computer, "agents": agents}))
+        .map(|(_, computer, agents)| json!({"computer": computer, "agents": agents}))
         .collect();
     let mut answered = json!({
         "signed_in": signed_in,
@@ -7334,14 +7341,17 @@ pub(crate) mod tests {
             ]
         );
         assert_eq!(answered["signed_in"], "yes");
+        // `LAMP_TASKS_MACHINE_NAMES` off: one computer per own name, said
+        // by its first alias, never by the name.
         assert_eq!(
             answered["computers"],
             json!([
-                {"computer":"MacBook Air","agents":["Claude Code","Codex"]},
+                {"computer":"office","agents":["Claude Code","Codex"]},
                 {"computer":"lamp","agents":["Hermes"]},
                 {"computer":"studio","agents":["Claude Code"]},
             ])
         );
+        assert!(!answered.to_string().contains("MacBook"), "{answered}");
         assert_eq!(answered["more_computers"], 1);
         assert_eq!(answered["working"], 2);
         let said = answered.to_string();
@@ -7352,6 +7362,44 @@ pub(crate) mod tests {
                 .as_str()
                 .unwrap()
                 .starts_with("signed_in yes:")
+        );
+        std::fs::remove_dir_all(&directory).unwrap();
+
+        // `LAMP_TASKS_MACHINE_NAMES` on: each computer by its own name.
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-status-n-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                (
+                    "request.sock",
+                    json!({"ok":true,"store_id":"s1","revision":3,"signed_in":"yes","summary":{}}),
+                ),
+                (
+                    "request.sock",
+                    json!({"ok":true,"targets":[
+                        {"alias":"office","engine":"claude","name":"MacBook Air"},
+                        {"alias":"office-codex","engine":"codex","name":"MacBook Air"},
+                        {"alias":"lamp","engine":"hermes"}]}),
+                ),
+                ("request.sock", json!({"ok":false,"error":"progress_off"})),
+            ],
+        );
+        let named = Place {
+            harness_status: true,
+            machine_names: true,
+            ..serving_place(&directory)
+        };
+        let (answered, ok) = run_for(&named, &[], &call, 3, true, PEER_WAIT);
+        assert!(ok, "{answered}");
+        assert_eq!(
+            answered["computers"],
+            json!([
+                {"computer":"MacBook Air","agents":["Claude Code","Codex"]},
+                {"computer":"lamp","agents":["Hermes"]},
+            ])
         );
         std::fs::remove_dir_all(&directory).unwrap();
 
