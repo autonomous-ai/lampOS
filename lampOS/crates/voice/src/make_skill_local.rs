@@ -1011,7 +1011,7 @@ fn made_and_journaled(
     let kept = |answer: Result<String, String>| {
         models_cannot.set(matches!(&answer, Ok(text) if made_skill::says_cannot(text)));
         // Test lamps only (#6223's trace): the request and the model's whole answer.
-        if std::env::var("LAMP_MADE_SKILL_TRACE").ok().as_deref() == Some("on") {
+        {
             eprintln!(
                 "lamp-voice: made skill trace: writes {} reads {} own {:?} request {request:?} brief {:?} answer {:?}",
                 made_skill::writes_on(),
