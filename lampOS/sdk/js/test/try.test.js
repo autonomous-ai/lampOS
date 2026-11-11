@@ -2,7 +2,7 @@
 // button run as `lamp-sim <verb> ... DIR` with an argument array, and one SDK call per call button.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -177,6 +177,18 @@ test('on the network the camera picture is given only while a page says it is on
     asked.end();
   });
   assert.equal(status, 403);
+});
+
+test('with --lan the twin listens on loopback and the printed address, never on every interface', async (t) => {
+  if (!existsSync('/proc/net/tcp')) return t.skip('needs /proc/net/tcp (Linux)');
+  const { port } = await started(t, () => ['--lan']);
+  const wanted = Number(port).toString(16).toUpperCase().padStart(4, '0');
+  const bound = readFileSync('/proc/net/tcp', 'utf8').split('\n').slice(1)
+    .map((line) => line.trim().split(/\s+/))
+    .filter((columns) => columns[3] === '0A' && columns[1]?.endsWith(`:${wanted}`))
+    .map((columns) => columns[1].split(':')[0]);
+  assert.ok(bound.includes('0100007F'), `listening on 127.0.0.1: ${bound}`);
+  assert.equal(bound.includes('00000000'), false, `not on every interface: ${bound}`);
 });
 
 test('a held hand is one touch: repeats within 0.8 s are the same stroke and fork nothing', async (t) => {
