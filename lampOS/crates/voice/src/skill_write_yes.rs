@@ -201,6 +201,29 @@ pub fn waiting_note(request: u64, now: Instant) -> Option<String> {
     })
 }
 
+/// Whether the wait `id` is one begun by [`wait_for_yes_noted`].
+pub fn noted(id: &str) -> bool {
+    kept::waiting(|waiting| {
+        waiting
+            .as_ref()
+            .is_some_and(|waiting| waiting.noted && waiting.id == id)
+    })
+}
+
+/// The wait `id`, begun by [`wait_for_yes_noted`], dropped: its yes was
+/// not the owner's (#6307). Whether one was.
+pub fn drop_noted(id: &str) -> bool {
+    kept::waiting(|waiting| {
+        let noted = waiting
+            .as_ref()
+            .is_some_and(|waiting| waiting.noted && waiting.id == id);
+        if noted {
+            *waiting = None;
+        }
+        noted
+    })
+}
+
 /// Whether a made skill's writes wait for the yes at `now`: the echo hold
 /// is on ([`crate::second_provider`]).
 pub fn awaited(now: Instant) -> bool {

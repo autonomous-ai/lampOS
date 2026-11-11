@@ -1455,7 +1455,7 @@ fn owner_among(
 /// Whether the owner is the only face the eyes see now
 /// (`known_faces::most_faces_lately`); no count is not alone. One of the
 /// checks for the owner's service records told in full ([`records_in_full`]).
-fn owner_alone() -> bool {
+pub(crate) fn owner_alone() -> bool {
     crate::known_faces::most_faces_lately() == Some(1)
 }
 
@@ -1467,6 +1467,64 @@ pub fn read_in_full(alone: bool, likeness: Option<f32>, seen_owner: bool) -> boo
     seen_owner
         && alone
         && likeness.is_some_and(|likeness| likeness >= crate::same_voice::SERVICES_SAME_FROM)
+}
+
+/// Whether what only the owner may hear may be said with no line asking
+/// for it (a skill run's write read back, #6432): in the private room
+/// (`private_room`) always; outside it, the owner seen (`owner_in_view`,
+/// the eyes' known face) and the one face in view (`alone`,
+/// [`owner_alone`]), as [`said_whole`] holds a read, with no line to judge
+/// a voice by.
+pub(crate) fn owner_sees_alone(
+    private_room: bool,
+    owner_in_view: bool,
+    alone: impl FnOnce() -> bool,
+) -> bool {
+    private_room || (owner_in_view && alone())
+}
+
+/// [`owner_sees_alone`] now: the private room (`person::private_room`),
+/// the eyes' known face one of the owners (`person::owner_ids`), and
+/// [`owner_alone`]. A made skill with code from the app is said back only
+/// then (#6307, `make_skill_local::app_code_asked`).
+pub(crate) fn owner_sees_alone_now() -> bool {
+    let private_room = crate::person::private_room();
+    let owner_in_view = !private_room
+        && crate::known_faces::known_from_environment()
+            .map(|name| crate::known_faces::memory_person(&name))
+            .is_some_and(|seen| crate::person::owner_ids().contains(&seen));
+    owner_sees_alone(private_room, owner_in_view, owner_alone)
+}
+
+/// Whether a yes with no asker's line before it (a skill run's write,
+/// #6432; a made skill with code from the app, #6307) is the owner's: the
+/// owner seen saying it (`seen_owner`, [`owner_seen_saying`]: in the
+/// private room any heard line), or the line in the owner's voice at
+/// `same_voice::SERVICES_SAME_FROM` or over (`likeness`, asked only when
+/// not seen). Anyone else's is [`OTHER_VOICE`].
+pub(crate) fn owners_yes(seen_owner: bool, likeness: impl FnOnce() -> Option<f32>) -> bool {
+    seen_owner || likeness().is_some_and(|alike| alike >= crate::same_voice::SERVICES_SAME_FROM)
+}
+
+/// [`owners_yes`] for the heard line `request` (`heard`, its memory scope
+/// `lease`): its owner ([`owner_of`], else the lamp's first owner) seen
+/// saying it, or their voice by the second route's judge.
+pub(crate) fn owners_yes_now(
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> bool {
+    let private_room = crate::person::private_room();
+    let owner = owner_of(lease);
+    let seen_owner = owner_seen_saying(heard, private_room, owner.as_deref(), |owner| {
+        seen_saying_owner(request, owner).0
+    });
+    owners_yes(seen_owner, || {
+        let owner = owner.or_else(|| crate::person::owner_ids().into_iter().next());
+        owner
+            .filter(|_| heard)
+            .and_then(|owner| owner_likeness(judge().as_ref(), request, Some(&owner)))
+    })
 }
 
 /// Whether a heard line (`heard`: someone spoke it) is the owner's own,
