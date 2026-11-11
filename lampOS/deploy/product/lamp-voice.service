@@ -356,6 +356,10 @@ Environment=LAMP_TASKS_SIGN_IN_APP=on
 # lamp-tasks.service's --reply-named types the work into that session, never a new one. With the lamp's own Hermes
 # (#5978, LAMP_HERMES_ON_LAMP there), a named session is looked for on the lamp first, then the computers.
 Environment=LAMP_TASKS_REPLY_NAMED=on
+# "Is Harness signed in?", "which computers do you have?", "what can you hand work to?" answered from lamp-tasks'
+# own status, targets and work under way, with no Harness call; each computer said by its alias only (#6061, #6222).
+# The owner's ask, 11 Nov: on in the product.
+Environment=LAMP_TASKS_HARNESS_STATUS=on
 Environment=LAMP_CUT_KEEPS_NAME=on
 Environment=LAMP_SELFTEST_SPEAKER=on
 # Each stall of 50 ms or more in the voice's loops, with what held it, in /run/lampos-voice (#1179): cheap, and
