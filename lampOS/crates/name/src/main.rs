@@ -1097,8 +1097,9 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
         let mut hearings = Hearings::new(DEFAULT_LEAST);
         let mut stops = stop_least.map(Stops::new);
         let (mut highest, mut at_step) = (0f32, 0u64);
-        // The first score is of the first 2.03 s; each later one of 80 ms more.
-        let seconds = |step: u64| 2.03 + step.saturating_sub(1) as f64 * 0.08;
+        // Each score is of the file's sound to the end of its step, the
+        // first 80 ms after the start's silence (`quiet::LEAD`, #6114).
+        let seconds = |step: u64| step as f64 * 0.08;
         let clock = Instant::now();
         // The file's own time, not this machine's.
         let at = |step: u64| clock + Duration::from_millis(80 * step);
