@@ -963,6 +963,73 @@ pub fn forgot_about(person: &str, about: &[Vec<String>]) {
     });
 }
 
+/// The memory answered a forget about a mail contact of `person`'s that
+/// removed `addresses`: the records held here sent to one of them go too,
+/// and their waiting changes, so none is told or written again (step 5d on
+/// lamp-06c1, 11 Nov).
+pub fn forgot_sent_to(person: &str, addresses: &[String]) {
+    if addresses.is_empty() {
+        return;
+    }
+    let sent_to = |record: &Record| {
+        record.person == person
+            && recipients(&record.detail)
+                .iter()
+                .any(|address| addresses.contains(address))
+    };
+    let gone: Vec<String> = kept::ledger(|ledger| {
+        let gone: Vec<String> = ledger
+            .records
+            .iter()
+            .filter(|record| sent_to(record))
+            .map(|record| record.key.clone())
+            .collect();
+        ledger.records.retain(|record| !gone.contains(&record.key));
+        ledger.forgets += 1;
+        for receipt in &mut ledger.receipts {
+            if receipt
+                .record
+                .as_ref()
+                .is_some_and(|key| gone.contains(key))
+            {
+                receipt.record = None;
+            }
+        }
+        gone
+    });
+    kept::outbox(|outbox| {
+        outbox
+            .waiting
+            .retain(|record| !gone.contains(&record.key) && !sent_to(record));
+    });
+}
+
+/// The mail addresses a record's `detail` was sent to, as the memory reads
+/// them: its `to`, `cc` and `bcc`, each a list or a comma-separated text,
+/// `Name <address>` read as its address, lower case.
+fn recipients(detail: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    for key in ["to", "cc", "bcc"] {
+        let entries: Vec<&str> = match detail.get(key) {
+            Some(Value::String(text)) => text.split(',').collect(),
+            Some(Value::Array(list)) => list.iter().filter_map(Value::as_str).collect(),
+            _ => Vec::new(),
+        };
+        for entry in entries {
+            let entry = entry.trim();
+            let address = match (entry.rfind('<'), entry.ends_with('>')) {
+                (Some(open), true) => &entry[open + 1..entry.len() - 1],
+                _ => entry,
+            };
+            let address = address.trim().to_lowercase();
+            if !address.is_empty() {
+                out.push(address);
+            }
+        }
+    }
+    out
+}
+
 /// How many forgets ran: the list after a start ([`told::merge`]) is
 /// dropped when one ran since it was asked.
 pub fn forgets() -> u64 {

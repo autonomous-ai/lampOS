@@ -690,6 +690,8 @@ unchanged.
   `service_records_forget` whose subjects it matches (held in memory only,
   the last 64, since its words say what was forgotten). So a change the voice
   sent before a forget, taken after it, is never kept; one asked after it is.
+  So is one sent to (`to`, `cc` or `bcc`) an address a
+  `service_contacts_forget` removed after it was asked (held the same way).
 
 Only a known person (`p-` id) has records: the room, a rules scope or any
 other id is refused `bad_person`. They are kept until forgotten: the day's
@@ -722,8 +724,14 @@ Created `IF NOT EXISTS`, `user_version` unchanged.
   key word of any subject of `about` in their name, their address or the
   words "contact", "address", "email" and "mail", compared as the records'
   forget compares them; one-letter words ("Octavia's" gives an "s") are
-  passed over: `{ok:true,removed}`. With `all: true` it removes every
-  contact of `person` instead, as the records' forget does.
+  passed over: `{ok:true,removed,records,addresses}`. In the same
+  transaction it removes every service record of that person sent to a
+  removed address (its detail's `to`, `cc` or `bcc`, a list or a
+  comma-separated text, `Name <address>` read as the address), whatever the
+  record's words: `records` counts them and `addresses` names the removed
+  addresses, so the voice drops its own copies too. Otherwise a `done` mail
+  told to the model brought the forgotten address back. With `all: true` it removes every contact of
+  `person` instead, as the records' forget does (`{ok:true,removed}`).
 
 Only a known person (`p-` id) has contacts (`bad_person` otherwise). Kept
 until forgotten: no expiry, tidy or nightly pass reads this table;
