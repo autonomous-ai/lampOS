@@ -985,6 +985,13 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             .map(lamp_update::hermes_schedule::Watcher::frozen)
             .unwrap_or_default(),
         pending: Default::default(),
+        // OpenClaw beside Hermes: said while its record is there, unless
+        // LAMP_OPENCLAW_ON_LAMP=off.
+        openclaw_on: lamp_update::engines::openclaw_on(
+            std::env::var(lamp_update::engines::OPENCLAW_SWITCH)
+                .ok()
+                .as_deref(),
+        ),
     });
     if let Some(engines) = &engines {
         app_check = app_check.map(|check| {
