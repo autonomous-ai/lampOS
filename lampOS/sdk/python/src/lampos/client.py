@@ -463,6 +463,7 @@ class Lamp:
         self.grants: list[str] = hello.get("grants", [])
         self.limits: dict = hello.get("limits", {})
         self._next_id = 1
+        self.close_reason: str | None = None  # why the lamp closed the connection, when it said
         self._waiting: dict[int, asyncio.Future] = {}
         self._done: dict[int, asyncio.Future] = {}
         self._handlers: dict[str, list[Handler]] = defaultdict(list)
@@ -729,6 +730,13 @@ class Lamp:
             # The lamp went away without a close (a restart, its Wi-Fi):
             # `wait_closed` returns, and the waiting requests fail below.
             pass
+        # When the lamp said why it closed ("grants changed by the owner",
+        # "this computer was revoked by the owner", "the lamp restarts"), one
+        # line says it, so a developer is not left guessing.
+        why = getattr(self._ws, "close_reason", None)
+        if why:
+            self.close_reason = why
+            _log.warning("the lamp closed the connection: %s", why)
 
     async def _frames(self) -> None:
         try:

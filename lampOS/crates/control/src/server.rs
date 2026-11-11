@@ -29,7 +29,9 @@ use tokio::net::{TcpListener, UnixListener};
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
+use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 
 use crate::cert::Identity;
 use crate::parts::Media;
@@ -39,6 +41,12 @@ use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
 pub const FRAME_MAX: usize = 64 * 1024;
+/// What the close frame says when the owner revoked the computer.
+pub const CLOSED_REVOKED: &str = "this computer was revoked by the owner";
+/// What the close frame says when the owner changed the computer's grants (`set_grants`): it connects again
+/// and reads its new grants at its next `hello`.
+pub const CLOSED_GRANTS: &str = "grants changed by the owner";
+
 /// Binary frames (camera frames, microphone blocks) queued for one
 /// connection at most; past that one is dropped.
 pub const FRAMES_QUEUED: usize = 4;
@@ -187,6 +195,9 @@ pub struct Shared {
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
+    /// Why the lamp ended a connection (a revoke, a change of grants), by connection:
+    /// said in the close frame, so the computer's SDK can log why it was cut off.
+    close_reasons: Mutex<HashMap<u64, &'static str>>,
     /// What the helper is told of pairings, one at a time in the door's
     /// order, by one thread started at the first (Reviewer-two on #3504: a
     /// late wider grant change must never be served after a newer narrower
@@ -209,6 +220,7 @@ impl Shared {
             manage: Mutex::new(None),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
+            close_reasons: Mutex::new(HashMap::new()),
         })
     }
 
@@ -357,6 +369,7 @@ impl Shared {
                 manage: Mutex::new(None),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
+                close_reasons: Mutex::new(HashMap::new()),
             }
         })
     }
@@ -622,11 +635,16 @@ impl Shared {
     /// Closes every connection of `client` at once, a listener's included:
     /// dropping its outbox ends the connection once what's queued (its
     /// leases' `lost`) is sent (harness-reviewer's P2 on #3778).
-    fn close_client(&self, client: &str) {
-        self.open
-            .lock()
-            .expect("open")
-            .retain(|_, open| open.client.as_deref() != Some(client));
+    fn close_client(&self, client: &str, why: &'static str) {
+        let mut open = self.open.lock().expect("open");
+        let mut reasons = self.close_reasons.lock().expect("close reasons");
+        open.retain(|id, each| {
+            let ours = each.client.as_deref() == Some(client);
+            if ours {
+                reasons.insert(*id, why);
+            }
+            !ours
+        });
     }
 }
 
@@ -1161,7 +1179,19 @@ async fn connection<S>(
             }
         }
     }
-    let _ = socket.close(None).await;
+    // The close frame says why when the lamp cut the connection (a revoke, a
+    // change of the computer's grants): one line the SDKs log.
+    let why = shared
+        .close_reasons
+        .lock()
+        .expect("close reasons")
+        .remove(&id);
+    let _ = socket
+        .close(why.map(|why| CloseFrame {
+            code: CloseCode::Normal,
+            reason: why.into(),
+        }))
+        .await;
     shared.open.lock().expect("open").remove(&id);
     let now = shared.now_us();
     let changes = shared.door.lock().expect("door").closed(&session, now);
@@ -1327,7 +1357,7 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
                             .media_end(client, *media);
                     }
                     shared.tell_helper();
-                    shared.close_client(client);
+                    shared.close_client(client, CLOSED_GRANTS);
                 }
                 json!({"client": client, "grants": set.grants, "added": set.added, "removed": set.removed, "saved": true, "shown": Grant::shown_all()})
             }
@@ -1361,7 +1391,7 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
             }),
         };
         // Refused in memory either way, so its connections go now.
-        shared.close_client(client);
+        shared.close_client(client, CLOSED_REVOKED);
         return answer;
     }
     if asked.get("clients").is_some() {
