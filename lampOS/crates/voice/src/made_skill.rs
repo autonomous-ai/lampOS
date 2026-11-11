@@ -267,10 +267,10 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
          kind = \"installable\", version = \"1.0.0\", no name key; [permissions] \
          light/body/speak = true, its topic, any other, as used; one [trigger] as listed \
          (coming to the desk is room/presence), with for, cooldown, rearm = \"ends\", \
-         during = {{ from = \"22:00\", to = \"22:30\" }}; \
-         [ask] policy = \"nudge\" or listed; [[do]] as listed: light = {{ colour, level \
-         1-5, for }}, body = {{ gesture = \"nod\" }}, say = {{ text = \
-         \"Hi!\" }} (exact words, asker's language) or cue = \"hum\".{read} SKILL.md: \
+         during = {{ from = \"HH:MM\", to = \"HH:MM\" }} if asked; \
+         [ask] policy = \"nudge\" or listed; [[do]] only steps asked: light = \
+         {{ colour, level 1-5, for }}, body = {{ gesture }}, say = {{ text }} (exact \
+         words, asker's language) or cue = \"hum\".{read} SKILL.md: \
          front matter name (lowercase, hyphens), description. \
          {REQUEST_MARK}{request}"
     ))
@@ -5597,11 +5597,19 @@ light = { dim = 1 }
         let asked = brief("make me a skill  that dims\nthe light at 10 pm").unwrap();
         assert!(asked.ends_with("Request: make me a skill that dims the light at 10 pm"));
         // A time of day is the trigger's own window (#2813's rerun on
-        // lamp-0c89: a 23.5 h [quiet] around 22:00, as the brief once said).
+        // lamp-0c89: a 23.5 h [quiet] around 22:00, as the brief once said),
+        // shown as its form with no time in it: a brief that showed 22:00 to
+        // 22:30, a nod and a "Hi!" had a hello skill made with that window, a
+        // glow and a nod nobody asked for (Fifth's row on #6249, 11 Nov).
         assert!(
-            asked.contains("during = { from = \"22:00\", to = \"22:30\" }"),
+            asked.contains("during = { from = \"HH:MM\", to = \"HH:MM\" }"),
             "{asked}"
         );
+        let unasked = brief("nod when I stand up").unwrap();
+        for value in ["22:", "\"nod\"", "Hi!"] {
+            assert!(!unasked.contains(value), "{value}: {unasked}");
+        }
+        assert!(unasked.contains("only steps asked"), "{unasked}");
         assert!(!asked.contains("from its end to its start"), "{asked}");
         // The name is SKILL.md's alone: a `name =` in skill.toml fails
         // lamp-skills' check as an unknown field (Mobile on lamp-0c89, #2813).
