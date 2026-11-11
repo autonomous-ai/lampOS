@@ -28,5 +28,9 @@ for p in "$@"; do
   git rev-list origin/lamp-voice..$head > $tmp/commits 2>/dev/null || { echo "#$p: its commits can't be listed"; exit 1; }
   two=$(cat $tmp/b $tmp/c | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $tmp/q --pr $p --pr-commits $tmp/commits $heads)
   [[ $two == none || $two == met* ]] || { echo "#$p: TWO READS ${two:-unread}"; exit 1; }
+  # 11 Nov 16:4x (first builder): the default-on check again, as the train bot's (lib.sh, coord_default_on).
+  coord_product_change $head; pc=$?
+  (( pc == 2 )) && { echo "#$p: its diff from lamp-voice can't be read for the default-on check"; exit 1; }
+  (( pc == 0 )) && ! coord_default_on $head $tmp/c $wf && { echo "#$p changes the product's defaults, and the first builder's DEFAULT-ON isn't on its head"; exit 1; }
 done
 exit 0

@@ -88,11 +88,13 @@ def quoted(body, pos):
     return fence is not None or bool(FENCE_RE.match(body[start:]))
 
 
-def parse_marker(body):
-    """The comment's marker: (kind, sha, rest, first_line) or None. kind is READ-OK or HOLD; sha may be "";
-    first_line is True when the marker opens the comment."""
+def parse_marker(body, kinds=("READ-OK", "HOLD")):
+    """The comment's marker: (kind, sha, rest, first_line) or None. kind is one of kinds (READ-OK or HOLD unless
+    given); sha may be ""; first_line is True when the marker opens the comment. 11 Nov 16:4x (first builder): with
+    kinds=("DEFAULT-ON",), the first builder's default-on marker, read by the same rules as a READ-OK."""
     body = body.lstrip()
-    m = re.match(r"\W*(READ-OK|HOLD)\b\W*(?:#\d+\W+)?([0-9a-f]{7,40})?\s*(.*)", body)
+    alt = "|".join(re.escape(k) for k in kinds)
+    m = re.match(r"\W*(" + alt + r")\b\W*(?:#\d+\W+)?([0-9a-f]{7,40})?\s*(.*)", body)
     if m and not quoted(body, m.start(1)):
         return m.group(1), m.group(2) or "", m.group(3), True
     # A marker after a signature ("reviewer-two, 10:08, to ...: HOLD 4931fff80 ..."), in the first 400 characters,
@@ -101,7 +103,7 @@ def parse_marker(body):
     # to by its comment's id ("the records for HOLD 6385086855", #3387): each held its PR under the replier's name.
     # 3 Nov 15:4x: nor a possessive's ("the Reviewer-lead's READ-OK e2b57f1f48 was on this head", the Reviewer-lead's
     # 15:14 read of #5068): it counted as the writer's own READ-OK and cleared the bot's "HOLD train N".
-    m = next((x for x in re.finditer(r"\b(READ-OK|HOLD)\*{0,2}\s+(?:#\d+\s+)?`?([0-9a-f]{9,40})`?\b\s*(.*)", body[:400])
+    m = next((x for x in re.finditer(r"\b(" + alt + r")\*{0,2}\s+(?:#\d+\s+)?`?([0-9a-f]{9,40})`?\b\s*(.*)", body[:400])
               if not x.group(2).isdigit()
               and not re.search(r"(?i)(\b(your|for|the|that|this|their|his|her|its)|['’]s)\s+\**$", body[:x.start()])
               # 27 Oct 05:3x: nor one in brackets, the HOLD a reply answers ("Friday, to Reviewer-two (HOLD
@@ -253,6 +255,23 @@ def held_note(comments, writers, pr=None, lifted_path=None):
     return " ".join([ok] + ["%s=%s" % (k, v[:10] or "-") for k, v in sorted(holds.items())])
 
 
+def default_on_shas(comments, writers):
+    """11 Nov 16:4x (first builder): the commits named by writers' `DEFAULT-ON <sha>` markers, oldest first. A PR that
+    changes the product's defaults (deploy/product, skills, install.rs's lists) trains only with one on its head or a
+    same-patch head (lib.sh, coord_default_on): #6189 and #6331 rode trains 794 and 806 on their READ-OKs alone, with
+    no default-on read. The marker reads as a READ-OK does (first line, or after a signature in the first 400
+    characters with a 9+ character sha; never quoted, in brackets, after a possessive or in a fence); one with no
+    sha counts for nothing."""
+    out = []
+    for c in comments:
+        if not is_writer(c, writers):
+            continue
+        mk = parse_marker(c["body"], kinds=("DEFAULT-ON",))
+        if mk and mk[1]:
+            out.append(mk[1])
+    return out
+
+
 def ignored_reads(comments, writers):
     """6 Nov (the PM's ask on #5542): the READ-OK markers skipped because their login is not a writer, which was silent,
     as lines "READ-OK <sha7> by <login> ignored: not a writer" (oldest first, one per login and commit)."""
@@ -294,9 +313,15 @@ def main():
     # ignored_reads' lines, one a line.
     held = "--held" in sys.argv[1:]
     ignored = "--ignored" in sys.argv[1:]
-    writers, args = writers_from_args([a for a in sys.argv[1:] if a not in ("--held", "--ignored")])
+    default_on = "--default-on" in sys.argv[1:]
+    writers, args = writers_from_args([a for a in sys.argv[1:] if a not in ("--held", "--ignored", "--default-on")])
     comments = [json.loads(line) for line in sys.stdin if line.strip()]
     pr = args[0] if args else None
+    # 11 Nov 16:4x (first builder): --default-on prints the commits writers' DEFAULT-ON markers name, one a line, oldest
+    # first (lib.sh's coord_default_on decides which count for the head).
+    if default_on:
+        for sha in default_on_shas(comments, writers): print(sha)
+        return
     if ignored:
         for line in ignored_reads(comments, writers): print(line)
         return
