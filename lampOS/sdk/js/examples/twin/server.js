@@ -329,7 +329,7 @@ function parse(args) {
 // that eases each joint to where it was last sent, said 25 times a second
 // as lamp-control's `body.state` says it.
 async function fakeBody() {
-  const fakeLamp = await FakeLamp.start({ name: 'Fake lamp (twin)', grants: ['body', 'light', 'speak', 'look', 'camera', 'skills'] });
+  const fakeLamp = await FakeLamp.start({ name: 'Fake lamp (twin)', grants: ['body', 'light', 'speak', 'look', 'notes', 'camera', 'skills'] });
   // A keyring of its own, so the fake's pairing never sits beside a real lamp's.
   const folder = mkdtempSync(join(tmpdir(), 'lampos-twin-'));
   process.on('exit', () => rmSync(folder, { recursive: true, force: true }));

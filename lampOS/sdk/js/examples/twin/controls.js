@@ -45,6 +45,9 @@ const select = (name, options, def, extra = {}) => ({ name, label: name, type: '
 const number = (name, min, max, def, extra = {}) => ({ name, label: name, type: 'number', min, max, default: def, ...extra });
 const text = (name, max, def, extra = {}) => ({ name, label: name, type: 'text', max, default: def, ...extra });
 
+// The held light of `hold_light` (its `stop()`), one at a time: this app has one lamp and one hand on it.
+let held = null;
+
 export const CONTROLS = [
   { id: 'gesture', group: 'Body', label: 'Gesture', fields: [select('name', GESTURES, 'nod')],
     run: async ({ lamp }, a) => { await lamp.gesture(a.name); return `lamp.gesture(${q(a.name)})`; } },
@@ -76,6 +79,32 @@ export const CONTROLS = [
     } },
   { id: 'light_off', group: 'Light', label: 'Light off', fields: [number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => { await lamp.lightOff({ forMs: a.for_ms }); return `lamp.lightOff({ forMs: ${a.for_ms} })`; } },
+  // Notes: this computer's own small notes kept on the lamp (grant `notes`, no lease). The refusals (a bad key, a value over
+  // 16 KiB, a second write at once) come back in the lamp's words.
+  { id: 'notes_set', group: 'Notes', label: 'Keep a note', fields: [text('key', 64, 'try'), text('value', 16_384, '{"hello": "world"}')],
+    run: async ({ lamp }, a) => {
+      let value;
+      try { value = JSON.parse(a.value); } catch { throw refuse('value: JSON, such as {"hello": "world"} or "text" or 3'); }
+      await lamp.notesSet(a.key, value);
+      return `lamp.notesSet(${q(a.key)}, ${q(value)})`;
+    } },
+  { id: 'notes_get', group: 'Notes', label: 'Read a note', fields: [text('key', 64, 'try')],
+    run: async ({ lamp }, a) => `lamp.notesGet(${q(a.key)}) -> ${q((await lamp.notesGet(a.key, null)) ?? null)}` },
+  { id: 'notes_delete', group: 'Notes', label: 'Delete a note', fields: [text('key', 64, 'try')],
+    run: async ({ lamp }, a) => `lamp.notesDelete(${q(a.key)}) -> ${q(await lamp.notesDelete(a.key))}` },
+  { id: 'notes_list', group: 'Notes', label: 'List the notes', fields: [text('prefix', 64, '', { optional: true })],
+    run: async ({ lamp }, a) => `lamp.notesList(${q(a.prefix ?? '')}) -> ${q(await lamp.notesList(a.prefix ?? ''))}` },
+  // A light kept on past the 30 s one ask lasts: asked again at half the lamp's hold limit until stopped. One hold at a
+  // time here (a new one ends the last); a later refusal ends it and is said on the server's log.
+  { id: 'hold_light', group: 'Light', label: 'Hold a light',
+    fields: [select('colour', COLOURS, 'warm'), number('level', 1, 5, 2, { integer: true }), select('pattern', ['', ...PATTERNS], '', { optional: true })],
+    run: async ({ lamp }, a) => {
+      held?.stop();
+      held = await lamp.holdLight(a.colour, a.level, a.pattern || undefined, { onError: (error) => { held = null; console.error(`try-it: the held light ended: ${error?.message ?? error}`); } });
+      return `lamp.holdLight(${q(a.colour)}, ${a.level}${a.pattern ? `, ${q(a.pattern)}` : ''})`;
+    } },
+  { id: 'hold_light_stop', group: 'Light', label: 'Stop the held light', fields: [],
+    run: async () => { const was = held !== null; held?.stop(); held = null; return `held.stop() (${was ? 'a held light ended' : 'none was held'})`; } },
   { id: 'say', group: 'Voice', label: 'Say', fields: [text('text', 200, 'Hello, I am the virtual lamp.')],
     run: async ({ lamp }, a) => { await lamp.say(a.text); return `lamp.say(${q(a.text)})`; } },
   // The computer's own turn: the lamp's voice takes the prompt as if it were said to it; `done` follows, and
