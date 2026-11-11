@@ -1928,29 +1928,41 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      A lamp that had the earlier `npm install --global` layout finds no
      package at the new path, so its next install sets the old one aside
      and installs from the lockfile.
-   - **The namespace and the PID namespace:** the wrapper runs
-     `unshare --map-root-user --mount --propagation private`, a user and
-     mount namespace only. Unlike Hermes's wrapper there is no `--pid
-     --kill-child --mount-proc`: OpenClaw 2026.11.2 refuses to open its
+   - **The namespace and the PID namespace:** one PID namespace for the
+     Gateway and all its panes. OpenClaw 2026.11.2 refuses to open its
      state database from a PID namespace other than its Gateway's
      (`GatewayLockNamespaceError: cannot verify Gateway ownership from this
-     process (different PID namespace)`), so with one each, every Harness
-     pane exited at once on lamp-c0a4 and no task was delivered
-     (`dispatch uncertain stopped_before_message`); without them the pane
-     connects (lamp-c0a4, 11 Nov). So OpenClaw shares the lamp's PID
-     namespace and sees the lamp's process list (names and command lines
-     under the lamp's `/proc`). It still reaches no file, socket or device
-     beyond what its mount namespace shows: from its own user namespace,
-     the kernel's ptrace check refuses it other processes' `/proc/<pid>/root`,
-     `cwd` and `environ` (checked in Docker, 11 Nov: a same-user process
-     outside the namespace, all three refused). **What it loses:** it runs
-     as `lampos`, the user every lamp service runs as, so it can send those
-     services signals (`kill -0` succeeded in the same check); its own PID
-     namespace prevented that. A PID namespace shared by the Gateway and its
-     panes (the panes joining the Gateway's) would close it again; that is
-     a follow-up, not built. `openclaw-ns` itself reads only
+     process (different PID namespace)`), so with one per call, as Hermes
+     has, every Harness pane exited at once on lamp-c0a4 and no task was
+     delivered (`dispatch uncertain stopped_before_message`). So:
+     - The gateway's unit sets `LAMP_OPENCLAW_GATEWAY=on`, and with it the
+       wrapper runs `unshare --map-root-user --mount --pid --fork
+       --kill-child --mount-proc --propagation private
+       /usr/local/lib/lampos/openclaw-ns`: a user, mount and PID namespace
+       of its own with its own `/proc`, as Hermes's.
+     - Any other call (a Harness pane) takes the gateway's main process
+       from systemd (`systemctl show -p MainPID`, never a file OpenClaw
+       could write), checks it is `lampos`'s and in another user namespace,
+       and joins its namespaces: `nsenter --user --mount
+       --pid=/proc/<pid>/ns/pid_for_children --preserve-credentials`, then
+       the caller's own ids in a nested user namespace, as `openclaw-ns`
+       ends. The Gateway lock then sees one namespace.
+     - With no gateway running (or its main process not in a namespace of
+       its own), a call fails closed: `openclaw: its gateway
+       (lamp-openclaw-gateway.service) is not running in its own
+       namespaces`. It never runs in a namespace of its own nor in the
+       lamp's. A gateway restart ends its panes with its namespace.
+
+     So OpenClaw sees only OpenClaw's processes and, though it runs as
+     `lampos` as every lamp service does, can signal none of them. Checked
+     on lamp-c0a4 (11 Nov, 18:2x) from inside a pane's namespaces: `/proc`
+     listed 7 processes (the Gateway as pid 1, its workers and the check
+     itself), and `kill -0` on lamp-tasks, lamp-voice, lamp-cloud and
+     Harness's daemon each said `No such process`. The install's own
+     steps (`npm ci`, `openclaw --version`) run with the gateway's flags,
+     in a PID namespace of their own. `openclaw-ns` itself reads only
      `/proc/self/uid_map` and `findmnt` (`/proc/self/mountinfo`), which are
-     the calling process's own in either case.
+     the calling process's own.
    - **The Gateway:** OpenClaw's TUI panes need a running Gateway, and
      Harness never starts or configures one.
      `lamp-openclaw-gateway.service` runs `openclaw gateway run` through
