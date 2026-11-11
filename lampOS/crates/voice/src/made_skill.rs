@@ -1241,7 +1241,10 @@ pub fn paced_asked(text: &str, asked: &[(u32, u32)]) -> String {
 /// its voice but never says anything"); and a `when` `lamp-skills`
 /// doesn't know on a `room/stood_up` or `controls/pet` trigger, one
 /// message each, which none reads the same (lamp-0c89, 11 Nov 10:35: "nod
-/// when I stand up" refused on "room/stood_up, its when"). Each only removes: the skill keeps every step,
+/// when I stand up" refused on "room/stood_up, its when"); and a blink's
+/// gap, a light step that turns it `out` with a `for` beside a step that
+/// lights it, taken out whole ([`blink_gap`], lamp-9adf, 11 Nov 20:5x).
+/// Each only removes: the skill keeps every step,
 /// trigger and grant it uses, and gains nothing. Each removal is a line or
 /// an entry of a one-line table taken out, taken only when the text then
 /// reads as the same skill without that one field; a skill written
@@ -1347,6 +1350,29 @@ pub fn tidied(text: &str) -> String {
             what,
         );
     }
+    // (e) A blink's gap: a light step that turns it `out` with a `for`
+    // beside a step that lights it (lamp-9adf, 11 Nov 20:5x: "blink the
+    // light green twice when I arrive" failed all three repairs on "out
+    // takes no colour, dim, level, for, pattern or no_brighter"). The gap
+    // can't be played, so the whole step is taken out and the lit step
+    // plays once; [`keep_asked`] says the blinking was left out.
+    while let Some(index) = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .filter(|steps| steps.iter().any(lights))
+        .and_then(|steps| steps.iter().position(blink_gap))
+    {
+        let Some((tidied, expected)) = step_taken_out(&text, &table, index) else {
+            break;
+        };
+        eprintln!(
+            "lamp-voice: a made skill tidied: [[do]] step {}, a blink's gap: light out with more \
+             than over and until",
+            index + 1
+        );
+        text = tidied;
+        table = expected;
+    }
     // (d) Its voice asked with nothing to say: no say step, no sound and
     // no read, as [`capped`] holds it.
     let steps = || {
@@ -1380,6 +1406,83 @@ pub fn tidied(text: &str) -> String {
         );
     }
     text
+}
+
+/// Whether a `[[do]]` step is a blink's gap ([`tidied`]): a step of a light
+/// alone that turns it `out` with more beside it than `over` and `until`,
+/// which `lamp-skills` refuses ("out takes ... only over and until").
+fn blink_gap(step: &toml::Value) -> bool {
+    step.as_table()
+        .filter(|step| step.len() == 1)
+        .and_then(|step| step.get("light"))
+        .and_then(toml::Value::as_table)
+        .is_some_and(|light| {
+            light.get("out").and_then(toml::Value::as_bool) == Some(true)
+                && light
+                    .keys()
+                    .any(|key| !matches!(key.as_str(), "out" | "over" | "until"))
+        })
+}
+
+/// Whether a `[[do]]` step lights the light: a light step that isn't `out`.
+fn lights(step: &toml::Value) -> bool {
+    step.get("light")
+        .and_then(toml::Value::as_table)
+        .is_some_and(|light| light.get("out").and_then(toml::Value::as_bool) != Some(true))
+}
+
+/// Whether a made skill has a blink's gap beside a lit step, which
+/// [`tidied`] takes out: told as left out, never dropped without a word.
+fn blink_gapped(text: &str) -> bool {
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return false;
+    };
+    table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|steps| steps.iter().any(lights) && steps.iter().any(blink_gap))
+}
+
+/// `text` with its `index`th `[[do]]` step taken out, and the table it then
+/// reads as, if that step is written under a `[[do]]` header of its own:
+/// the header and every line to the next header but its own `[do.…]`
+/// tables, or to the end ([`tidied`]). Any other form, or a cut that reads
+/// as anything else, is `None`.
+fn step_taken_out(text: &str, table: &toml::Table, index: usize) -> Option<(String, toml::Table)> {
+    let mut expected = table.clone();
+    let steps = expected.get_mut("do")?.as_array_mut()?;
+    if index >= steps.len() {
+        return None;
+    }
+    steps.remove(index);
+    let (mut start, mut seen, mut from, mut to) = (0, 0, None, text.len());
+    for line in text.split_inclusive('\n') {
+        let head = line.trim_start();
+        if head.starts_with('[') && !head.starts_with("[do.") {
+            if from.is_some() {
+                to = start;
+                break;
+            }
+            let rest = head.strip_prefix("[[do]]").map(str::trim_start);
+            if rest.is_some_and(|rest| rest.is_empty() || rest.starts_with('#')) {
+                if seen == index {
+                    from = Some(start);
+                }
+                seen += 1;
+            }
+        }
+        start += line.len();
+    }
+    let from = from?;
+    let tidied = if to == text.len() {
+        // The last step: the blank lines before it go with it.
+        format!("{}\n", text[..from].trim_end())
+    } else {
+        format!("{}{}", &text[..from], &text[to..])
+    };
+    toml::from_str::<toml::Table>(&tidied)
+        .is_ok_and(|read| read == expected)
+        .then_some((tidied, expected))
 }
 
 /// `text` with `parent`'s `key` taken out, and the table it then reads as,
@@ -4729,10 +4832,25 @@ pub fn keep_asked(
     // A getting up's wait, which [`tidied`] takes out: said with what it
     // does, never dropped without a word (App Only's P2 on #6249).
     let waited = dropped_wait(&files.toml);
+    let blinked = blink_gapped(&files.toml);
     // A say's pace set, never refused (#6062): the text checked, said and
     // packed is the paced one.
     files.toml = paced_asked(&files.toml, asked);
     let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
+    // A blink's gap, which [`tidied`] takes out: the blinking said as left
+    // out, with whatever else the model left out.
+    if blinked
+        && !blink_gapped(&files.toml)
+        && !files
+            .left_out
+            .as_deref()
+            .is_some_and(|what| what.to_lowercase().contains("blink"))
+    {
+        files.left_out = Some(match files.left_out.take() {
+            Some(what) => cut_chars(&format!("blinking, {what}"), MOST_CANNOT_CHARS),
+            None => "blinking".to_owned(),
+        });
+    }
     let (version, uses) = capped(&files.toml)?;
     // A write's words and recipients are the request's own (#6066): the
     // heard line's, for a make by voice.
@@ -9590,6 +9708,59 @@ light = { colour = "green", level = 3, for = "20s" }
             tidied(&all),
             made_with(stood, "body = { gesture = \"nod\" }")
         );
+    }
+
+    /// lamp-9adf, 11 Nov 20:5x: "blink the light green twice when I
+    /// arrive" was written as a pulse and an `out` step with a `for`, the
+    /// blink's gap, which `lamp-skills` refuses; all three repairs failed.
+    /// The gap is taken out whole and the pulse kept; an `out` alone, or
+    /// with only `over` and `until`, is kept, and so is a gap with no lit
+    /// step beside it, for the check to say why.
+    #[test]
+    fn a_made_blinks_gap_is_taken_out_and_a_plain_out_kept() {
+        let face = "topic = \"humans/faces/tracked\"\n";
+        let pulse = "light = { colour = \"green\", level = 3, for = \"2s\", pattern = { kind = \"pulse\" } }";
+        let gap = "\n\n[[do]]\nlight = { out = true, for = \"500ms\" }";
+        let blink = made_with(face, &format!("{pulse}{gap}"));
+        let kept = made_with(face, pulse);
+        assert!(blink_gapped(&blink) && !blink_gapped(&kept));
+        assert_eq!(tidied(&blink), kept);
+        // Twice over, as "twice" may be written: both gaps go.
+        let twice = made_with(face, &format!("{pulse}{gap}\n\n[[do]]\n{pulse}{gap}"));
+        assert_eq!(
+            tidied(&twice),
+            made_with(face, &format!("{pulse}\n\n[[do]]\n{pulse}"))
+        );
+        // The gap first, with a table of its own: taken out up to the pulse.
+        let first = made_with(
+            face,
+            &format!("[do.light]\nout = true\nfor = \"1s\"\n\n[[do]]\n{pulse}"),
+        );
+        assert_eq!(tidied(&first), kept);
+        // Paced, so checked and said, it pulses green.
+        let paced_blink = paced(&blink);
+        assert!(capped_with(&paced_blink, false).is_ok(), "{paced_blink}");
+        assert!(!paced_blink.contains("out = true"), "{paced_blink}");
+        // A plain out, with its fade or not, and a gap alone: untouched.
+        for step in [
+            format!("{pulse}\n\n[[do]]\nlight = {{ out = true }}"),
+            format!(
+                "{pulse}\n\n[[do]]\nlight = {{ out = true, over = \"30s\", until = \"ends\" }}"
+            ),
+            "light = { out = true, for = \"500ms\" }".to_owned(),
+            "light = { out = true, for = \"500ms\" }\n\n[[do]]\ncue = \"hum\"".to_owned(),
+        ] {
+            let text = made_with(face, &step);
+            assert!(!blink_gapped(&text), "{step}");
+            assert_eq!(tidied(&text), text, "{step}");
+        }
+        // Written inline: as it came, for the check to say why.
+        let inline = format!(
+            "do = [{{ {pulse} }}, {{ light = {{ out = true, for = \"1s\" }} }}]\n{}",
+            kept.replace(&format!("\n\n[[do]]\n{pulse}\n"), "\n")
+        );
+        assert!(blink_gapped(&inline), "{inline}");
+        assert_eq!(tidied(&inline), inline);
     }
 
     /// A body step [`plainly`] can't say is refused with how to write one,

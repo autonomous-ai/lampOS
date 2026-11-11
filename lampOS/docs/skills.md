@@ -2589,10 +2589,23 @@ gone ([switches.md](switches.md)). What happens:
      when, which is "appears", "present" or left out`; (d) `speak = true`
      in `[permissions]` with no say, hum (`cue`) or `sound` step and no
      read, which the cap refuses ("it asks for its voice but never says
-     anything"). Each only removes: a line, or one entry of a
-     one-line table with its comma, taken only when the text then reads as
-     the same skill without that one field; the skill keeps every step,
-     trigger and grant it uses and gains nothing. A skill written
+     anything"); (e) a blink's gap: a `[[do]]` step of a light alone that
+     turns it `out` with anything beside it but `over` and `until`, like
+     `light = { out = true, for = "500ms" }`, beside a step that lights it
+     (lamp-9adf, 11 Nov 20:5x: "blink the light green twice when I arrive"
+     was written as a pulse and such a step, and every repair was refused
+     "out takes no colour, dim, level, for, pattern or no_brighter: only
+     over and until"). An `out` never takes a `for`, so the gap can't be
+     played: the whole step is taken out (its `[[do]]` header to the next
+     header but its own `[do.…]` tables), the pulse plays once, and the
+     say-back ends "The maker notes what it couldn't do: blinking." (put
+     before the model's own left-out words, unless those already say a
+     blink). A plain `{ out = true }`, one with only `over` and `until`, and
+     an `out` with a `for` with no lit step beside it are untouched, for
+     the check to say why. Each only removes: a line, or one entry of a
+     one-line table with its comma, or for (e) one step, taken only when
+     the text then reads as the same skill without that one field or step;
+     the skill keeps every trigger and grant it uses and gains nothing. A skill written
      otherwise (dotted keys, say) is given back as it came, for the check
      to say why. Each is journaled: `lamp-voice: a made skill tidied:
      <what>`. A gesture beside a mood, a `for` that holds, and a voice
@@ -2637,10 +2650,12 @@ gone ([switches.md](switches.md)). What happens:
      `a_repair_is_told_the_part_of_a_step_that_failed`,
      `a_triggers_for_of_nothing_is_tidied_and_one_that_holds_kept`,
      `a_getting_ups_unknown_when_is_tidied_and_another_topics_named`,
-     `a_getting_ups_wait_taken_out_is_said`, and in
+     `a_getting_ups_wait_taken_out_is_said`,
+     `a_made_blinks_gap_is_taken_out_and_a_plain_out_kept`, and in
      `tests/it/made.rs`
-     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed` and
-     `a_made_nod_when_i_stand_up_is_tidied_and_packed` (the real
+     `a_made_dim_a_step_at_ten_is_granted_its_clock_and_packed`,
+     `a_made_nod_when_i_stand_up_is_tidied_and_packed` and
+     `a_made_blinks_gap_is_taken_out_and_packed` (the real
      `lamp-skills pack`).
    The read of a linked service (proposal #5288's
    read half, `LAMP_SKILL_READS=on` in `lamp-voice` and
