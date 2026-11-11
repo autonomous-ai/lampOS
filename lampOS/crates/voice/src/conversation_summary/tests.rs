@@ -778,6 +778,61 @@ fn a_forget_from_the_app_drops_the_held_service_records_with_the_summary_off() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
+/// With the running summary off, memory's forget of a person from the app
+/// also ends the role they asked the lamp to play (`LAMP_MEMORY_ROLE`) and
+/// drops the mail contacts planned for their waiting write
+/// (`LAMP_SERVICE_CONTACTS`), as [`memory_forgot_from`] does with it on.
+#[test]
+fn a_forget_from_the_app_ends_the_role_and_planned_contacts_with_the_summary_off() {
+    use crate::remember::role;
+    use crate::service_contacts as contacts;
+    let root = std::path::PathBuf::from(format!("/tmp/lvs-forgot-role-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+    let mut memory = bus
+        .publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            "memory",
+        )
+        .unwrap();
+    let person = crate::remember::person_id("Octavia role");
+    role::hold(&person, Some("Harry Potter".to_owned()));
+    assert_eq!(role::cached(&person).as_deref(), Some("Harry Potter"));
+    contacts::on_for_test(true);
+    crate::service_records::on_for_test(true);
+    contacts::plan(
+        Some(&person),
+        &serde_json::json!({
+            "service": "gmail",
+            "action": "send_mail",
+            "to": ["octavia@example.com"],
+            "text": "Hi Octavia, see you Sunday.",
+        }),
+        &[],
+        &[],
+        &mut serde_json::json!({"send_id": "s1", "read_back": "To Octavia."}),
+    );
+    let theirs = || contacts::planned().iter().any(|plan| plan.person == person);
+    assert!(theirs(), "planned");
+    memory
+        .publish_json(
+            1,
+            &lamp_msgs::MemoryForgot {
+                person: Some(person.clone()),
+            },
+        )
+        .unwrap();
+    memory_forgot_waiting(&mut forgot, 1_000_000);
+    assert_eq!(role::cached(&person), None, "the role ended");
+    assert!(!theirs(), "the planned contacts dropped");
+    contacts::on_for_test(false);
+    crate::service_records::on_for_test(false);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 /// The reviewer-lead's P2 on #4479: memory's forget from the app
 /// (`memory/forgot`) reaches the conversation as a voice-tool forget does:
 /// a person's, the room's ("everyone") or every person's drops the thread,
