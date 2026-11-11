@@ -3111,6 +3111,150 @@ fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
     assert_eq!(fs::read(root.path("outside")).unwrap(), b"{}");
 }
 
+/// Every path under `at`, with a file's bytes or a link's target, never
+/// followed.
+fn snapshot(at: &Path, found: &mut Vec<(PathBuf, Vec<u8>)>) {
+    for entry in fs::read_dir(at).unwrap() {
+        let path = entry.unwrap().path();
+        let meta = fs::symlink_metadata(&path).unwrap();
+        if meta.file_type().is_symlink() {
+            let target = fs::read_link(&path).unwrap();
+            found.push((path, target.into_os_string().into_encoded_bytes()));
+        } else if meta.is_dir() {
+            found.push((path.clone(), Vec::new()));
+            snapshot(&path, found);
+        } else {
+            found.push((path.clone(), fs::read(&path).unwrap()));
+        }
+    }
+}
+
+/// `forget-agents --dry-run` changes nothing and lists what the reset then
+/// does: each path the real run takes away is under a listed removal, each
+/// listed one is gone, each kept or emptied one is there, and a cut names
+/// keys, never values (#6343).
+#[test]
+fn the_agents_dry_run_changes_nothing_and_lists_what_the_reset_does() {
+    let root = Root::new();
+    for (file, text) in [
+        ("var/lib/lampos-hermes/.local/bin/hermes", "x"),
+        ("var/lib/lampos-hermes/.local/lib/python3/mine.py", "x"),
+        ("var/lib/lampos-hermes/.cache/uv/x", "x"),
+        (
+            "var/lib/lampos-hermes/.bashrc",
+            "export GITHUB_TOKEN=ghp_person\n",
+        ),
+        (
+            "var/lib/lampos-hermes/.hermes/hermes-agent/run_agent.py",
+            "x",
+        ),
+        ("var/lib/lampos-hermes/.hermes/.env", "KEY=sk-person"),
+        ("var/lib/lampos-hermes/.hermes/sessions/s1.json", "{}"),
+        (
+            "var/lib/lampos-hermes/.hermes/config.yaml",
+            "updates:\n  check: false\nmcp_servers:\n  mine:\n    command: secret-server\n",
+        ),
+        ("var/lib/lampos-hermes.old/.hermes/.env", "KEY=old"),
+        (
+            "var/lib/lampos-openclaw/state/openclaw.json",
+            r#"{"gateway":{"port":1},"channels":{"telegram":{"botToken":"123:abc"}}}"#,
+        ),
+        ("var/lib/lampos-openclaw/state/workspace/USER.md", "me"),
+        ("var/lib/lampos-openclaw/gateway-token", "t"),
+    ] {
+        let path = root.path(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    let var = root.path("var");
+    let mut before = Vec::new();
+    snapshot(&var, &mut before);
+    let plan = reset::plan_agents(&root.0).unwrap();
+    let mut after_plan = Vec::new();
+    snapshot(&var, &mut after_plan);
+    assert_eq!(before, after_plan, "a dry run changes nothing");
+    let lines: Vec<String> = plan.iter().map(ToString::to_string).collect();
+    let text = lines.join("\n");
+    for secret in ["ghp_person", "sk-person", "secret-server", "123:abc"] {
+        assert!(!text.contains(secret), "{secret}");
+    }
+    let line = |kind: &str, file: &str| format!("{kind} {}", root.path(file).display());
+    for expected in [
+        line("keep", "var/lib/lampos-hermes/.local/bin"),
+        line("remove", "var/lib/lampos-hermes/.local/lib"),
+        line("empty", "var/lib/lampos-hermes/.cache"),
+        line("cut", "var/lib/lampos-hermes/.bashrc"),
+        line("remove", "var/lib/lampos-hermes/.hermes/.env"),
+        line("empty", "var/lib/lampos-hermes/.hermes/sessions"),
+        line("remove", "var/lib/lampos-hermes.old"),
+        line("remove", "var/lib/lampos-openclaw/state/workspace"),
+        line("keep", "var/lib/lampos-openclaw/gateway-token"),
+    ] {
+        assert!(
+            lines.iter().any(|listed| listed.starts_with(&expected)),
+            "{expected} in {text}"
+        );
+    }
+    assert!(text.contains(&format!(
+        "cut {} (keys: kept updates, plugins, lsp, terminal; dropped mcp_servers)",
+        root.path("var/lib/lampos-hermes/.hermes/config.yaml").display()
+    )));
+    assert!(text.contains(&format!(
+        "cut {} (keys: kept gateway; dropped channels)",
+        root.path("var/lib/lampos-openclaw/state/openclaw.json").display()
+    )));
+    // The real run does what was listed.
+    assert!(reset::forget_agents(&root.0).unwrap() > 0);
+    let mut after = Vec::new();
+    snapshot(&var, &mut after);
+    let removals: Vec<&PathBuf> = plan
+        .iter()
+        .filter_map(|step| match step {
+            reset::AgentStep::Remove(path) => Some(path),
+            _ => None,
+        })
+        .collect();
+    for (path, _) in &before {
+        let gone = !after.iter().any(|(there, _)| there == path);
+        let listed = removals.iter().any(|removed| path.starts_with(removed))
+            || plan.iter().any(|step| {
+                matches!(step, reset::AgentStep::Empty(emptied) if path.starts_with(emptied) && path != emptied)
+            });
+        assert_eq!(gone, listed, "{}", path.display());
+    }
+    for step in &plan {
+        match step {
+            reset::AgentStep::Remove(path) => assert!(fs::symlink_metadata(path).is_err()),
+            reset::AgentStep::Keep(path) | reset::AgentStep::Cut { path, .. } => {
+                assert!(fs::symlink_metadata(path).is_ok(), "{}", path.display());
+            }
+            reset::AgentStep::Empty(path) => {
+                assert_eq!(fs::read_dir(path).unwrap().count(), 0);
+            }
+        }
+    }
+    // The command prints the same lines, and refuses to run without --dry-run.
+    let out = std::process::Command::new(PROGRAM)
+        .args(["forget-agents", "--dry-run", "--root"])
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let printed = String::from_utf8(out.stdout).unwrap();
+    let again: Vec<String> = reset::plan_agents(&root.0)
+        .unwrap()
+        .iter()
+        .map(|step| format!("{step}\n"))
+        .collect();
+    assert_eq!(printed, again.concat());
+    let refused = std::process::Command::new(PROGRAM)
+        .args(["forget-agents", "--root"])
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+}
+
 /// A reset finished after a power cut stops OpenClaw's gateway first, as the
 /// reset itself does: it starts at boot outside the lamp's target and would
 /// write its state while the reset empties it (#6343). A stop that fails

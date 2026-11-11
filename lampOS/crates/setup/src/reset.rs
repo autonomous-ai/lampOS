@@ -16,9 +16,10 @@ use rustix::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    ffi::OsStr,
     fs::{self, File, OpenOptions},
     io::{self, Write},
-    os::unix::fs::OpenOptionsExt,
+    os::unix::{ffi::OsStrExt, fs::OpenOptionsExt},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -540,12 +541,74 @@ pub const AGENT_FOLDERS: [AgentFolder; 8] = [
     },
 ];
 
+/// What a reset does to one entry of the agents' folders (#6343), as
+/// [`plan_agents`] lists it and [`forget_agents`] does it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AgentStep {
+    /// Kept as it is: the program.
+    Keep(PathBuf),
+    /// Removed, a folder with all it holds.
+    Remove(PathBuf),
+    /// A folder emptied and kept.
+    Empty(PathBuf),
+    /// A kept file cut to the lamp's own keys: the top-level key names it
+    /// keeps and drops, never their values.
+    Cut {
+        path: PathBuf,
+        kept: Vec<String>,
+        dropped: Vec<String>,
+    },
+}
+
+impl std::fmt::Display for AgentStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AgentStep::Keep(path) => write!(f, "keep {}", path.display()),
+            AgentStep::Remove(path) => write!(f, "remove {}", path.display()),
+            AgentStep::Empty(path) => write!(f, "empty {}", path.display()),
+            AgentStep::Cut {
+                path,
+                kept,
+                dropped,
+            } => write!(
+                f,
+                "cut {} (keys: kept {}; dropped {})",
+                path.display(),
+                if kept.is_empty() {
+                    "none".into()
+                } else {
+                    kept.join(", ")
+                },
+                if dropped.is_empty() {
+                    "none".into()
+                } else {
+                    dropped.join(", ")
+                },
+            ),
+        }
+    }
+}
+
 /// The person's files in each of [`AGENT_FOLDERS`] under `root` (`/` on a
-/// lamp) removed, the program kept; how many entries were removed or
-/// emptied. A folder that is missing, or a link, is passed over, so a lamp
+/// lamp) removed, the program kept; how many entries were removed, emptied
+/// or cut. A folder that is missing, or a link, is passed over, so a lamp
 /// without Hermes or OpenClaw removes nothing; nothing is followed through
 /// a link. Run again after a cut, it finishes what is left.
 pub fn forget_agents(root: &Path) -> io::Result<usize> {
+    walk_agents(root, true, &mut Vec::new())
+}
+
+/// What [`forget_agents`] would do under `root`, one step an entry, with
+/// nothing changed (`lamp-setup forget-agents --dry-run`): the same walk and
+/// the same decisions, only not acted on, so the listing cannot drift from
+/// the reset. Nothing is followed through a link.
+pub fn plan_agents(root: &Path) -> io::Result<Vec<AgentStep>> {
+    let mut steps = Vec::new();
+    walk_agents(root, false, &mut steps)?;
+    Ok(steps)
+}
+
+fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result<usize> {
     if !root.is_absolute() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -555,7 +618,8 @@ pub fn forget_agents(root: &Path) -> io::Result<usize> {
     let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
     let mut removed = 0;
     for agent in &AGENT_FOLDERS {
-        let dir = match open_dir(&root.join(agent.folder.trim_start_matches('/'))) {
+        let folder = root.join(agent.folder.trim_start_matches('/'));
+        let dir = match open_dir(&folder) {
             Ok(dir) => dir,
             Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
                 continue;
@@ -566,14 +630,18 @@ pub fn forget_agents(root: &Path) -> io::Result<usize> {
         for entry in rustix::fs::Dir::read_from(&dir)? {
             let name = entry?.file_name().to_owned();
             let bytes = name.as_bytes();
-            if bytes != b"."
-                && bytes != b".."
-                && !agent.keep.iter().any(|kept| kept.as_bytes() == bytes)
-            {
+            if bytes == b"." || bytes == b".." {
+                continue;
+            }
+            if agent.keep.iter().any(|kept| kept.as_bytes() == bytes) {
+                steps.push(AgentStep::Keep(folder.join(OsStr::from_bytes(bytes))));
+            } else {
                 names.push(name);
             }
         }
+        names.sort();
         for name in names {
+            let path = folder.join(OsStr::from_bytes(name.as_bytes()));
             let stat = match rustix::fs::statat(&dir, name.as_c_str(), AtFlags::SYMLINK_NOFOLLOW) {
                 Ok(stat) => stat,
                 Err(rustix::io::Errno::NOENT) => continue,
@@ -588,42 +656,60 @@ pub fn forget_agents(root: &Path) -> io::Result<usize> {
                 let had = rustix::fs::Dir::read_from(&child)?
                     .filter_map(Result::ok)
                     .any(|entry| !matches!(entry.file_name().to_bytes(), b"." | b".."));
-                empty(&child)?;
                 if emptied {
-                    rustix::fs::fsync(&child)?;
+                    steps.push(AgentStep::Empty(path));
+                    if act {
+                        empty(&child)?;
+                        rustix::fs::fsync(&child)?;
+                    }
                     removed += usize::from(had);
                     continue;
                 }
-                rustix::fs::unlinkat(&dir, name.as_c_str(), AtFlags::REMOVEDIR)?;
+                steps.push(AgentStep::Remove(path));
+                if act {
+                    empty(&child)?;
+                    rustix::fs::unlinkat(&dir, name.as_c_str(), AtFlags::REMOVEDIR)?;
+                }
             } else {
-                rustix::fs::unlinkat(&dir, name.as_c_str(), AtFlags::empty())?;
+                steps.push(AgentStep::Remove(path));
+                if act {
+                    rustix::fs::unlinkat(&dir, name.as_c_str(), AtFlags::empty())?;
+                }
             }
             removed += 1;
         }
-        rustix::fs::fsync(&dir)?;
+        if act {
+            rustix::fs::fsync(&dir)?;
+        }
     }
     removed += usize::from(remove_whole(
         root,
         Path::new(lamp_update::hermes_install::ASIDE),
+        act,
+        steps,
     )?);
-    removed += usize::from(cut_kept(
-        root,
+    let kept = Kept { root, act };
+    removed += usize::from(kept.cut(
         lamp_update::hermes_install::HERMES_HOME,
         "config.yaml",
         cut_hermes_config,
+        yaml_keys,
+        steps,
     )?);
-    removed += usize::from(cut_kept(
-        root,
+    removed += usize::from(kept.cut(
         OPENCLAW_STATE,
         "openclaw.json",
         cut_openclaw_config,
+        json_keys,
+        steps,
     )?);
     for shell in [".bashrc", ".profile"] {
-        removed += usize::from(cut_kept(
-            root,
+        removed += usize::from(kept.cut(
             lamp_update::hermes_install::PLACE,
             shell,
             |_| Some(HERMES_SHELL_TEXT.as_bytes().to_vec()),
+            |_| Vec::new(),
+            steps,
         )?);
     }
     Ok(removed)
@@ -644,31 +730,46 @@ const OPENCLAW_STATE: &str = "/var/lib/lampos-openclaw/state";
 /// A kept settings file larger than this is not read but removed.
 const MOST_KEPT: u64 = 1 << 20;
 
-/// `path` under `root` removed whole, a link as a link, nothing followed on
-/// the way; whether there was one. A missing parent or entry, or a parent
-/// reached only through a link, is passed over, as [`forget_agents`] passes
-/// over its folders; any other error is returned, so the reset fails closed.
-fn remove_whole(root: &Path, path: &Path) -> io::Result<bool> {
+/// `path` under `root` removed whole (when `act`), a link as a link,
+/// nothing followed on the way; whether there was one. A missing parent or
+/// entry, or a parent reached only through a link, is passed over, as
+/// [`forget_agents`] passes over its folders; any other error is returned,
+/// so the reset fails closed.
+fn remove_whole(
+    root: &Path,
+    path: &Path,
+    act: bool,
+    steps: &mut Vec<AgentStep>,
+) -> io::Result<bool> {
     let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
         return Err(io::Error::other("a removed path has a parent and a name"));
     };
-    let parent = match open_dir(&root.join(parent.strip_prefix("/").unwrap_or(parent))) {
+    let parent_path = root.join(parent.strip_prefix("/").unwrap_or(parent));
+    let parent = match open_dir(&parent_path) {
         Ok(parent) => parent,
         Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
             return Ok(false);
         }
         Err(error) => return Err(error.into()),
     };
-    remove_at(&parent, name)
+    let there = remove_at(&parent, name, act)?;
+    if there {
+        steps.push(AgentStep::Remove(parent_path.join(name)));
+    }
+    Ok(there)
 }
 
-/// `name` in `dir` removed, a folder with all it holds; whether it was there.
-fn remove_at(dir: &OwnedFd, name: impl rustix::path::Arg + Copy) -> io::Result<bool> {
+/// `name` in `dir` removed (when `act`), a folder with all it holds;
+/// whether it was there.
+fn remove_at(dir: &OwnedFd, name: impl rustix::path::Arg + Copy, act: bool) -> io::Result<bool> {
     let stat = match rustix::fs::statat(dir, name, AtFlags::SYMLINK_NOFOLLOW) {
         Ok(stat) => stat,
         Err(rustix::io::Errno::NOENT) => return Ok(false),
         Err(error) => return Err(error.into()),
     };
+    if !act {
+        return Ok(true);
+    }
     if is_dir(&stat) {
         let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
         let child = rustix::fs::openat(dir, name, flags, Mode::empty())?;
@@ -681,78 +782,128 @@ fn remove_at(dir: &OwnedFd, name: impl rustix::path::Arg + Copy) -> io::Result<b
     Ok(true)
 }
 
-/// A kept settings file `name` in `folder` under `root` cut by `cut` to the
-/// lamp's own keys, in place, its owner and mode kept; whether it changed.
-/// A file that is not a regular one, is too large, or that `cut` can't read
-/// (`None`) is removed: a reset fails toward wiping. The cut is written
-/// beside it as `NAME.cut` and renamed over it, so a cut stopped half-way
-/// leaves the old file whole and the leftover, a name the folder does not
-/// keep, is removed by the next run. A missing folder or file is nothing to
-/// do.
-fn cut_kept(
-    root: &Path,
-    folder: &str,
-    name: &str,
-    cut: fn(&[u8]) -> Option<Vec<u8>>,
-) -> io::Result<bool> {
-    use std::io::Read;
-    let dir = match open_dir(&root.join(folder.trim_start_matches('/'))) {
-        Ok(dir) => dir,
-        Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+/// The top-level key names of a YAML file as [`cut_hermes_config`] reads
+/// it: column-0 `key:` lines.
+fn yaml_keys(text: &[u8]) -> Vec<String> {
+    String::from_utf8_lossy(text)
+        .lines()
+        .filter(|line| !line.starts_with([' ', '#', '-']))
+        .filter_map(top_key)
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The top-level key names of a JSON object.
+fn json_keys(text: &[u8]) -> Vec<String> {
+    match serde_json::from_slice(text) {
+        Ok(serde_json::Value::Object(all)) => all.keys().cloned().collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// The kept settings files' cut, acted on or only listed.
+struct Kept<'a> {
+    root: &'a Path,
+    act: bool,
+}
+
+impl Kept<'_> {
+    /// A kept settings file `name` in `folder` under the root cut by `cut`
+    /// to the lamp's own keys, in place, its owner and mode kept; whether it
+    /// changed. A file that is not a regular one, is too large, or that
+    /// `cut` can't read (`None`) is removed: a reset fails toward wiping.
+    /// The cut is written beside it as `NAME.cut` and renamed over it, so a
+    /// cut stopped half-way leaves the old file whole and the leftover, a
+    /// name the folder does not keep, is removed by the next run. A missing
+    /// folder or file is nothing to do. `keys` names the top-level keys for
+    /// the step listed, never their values.
+    fn cut(
+        &self,
+        folder: &str,
+        name: &str,
+        cut: fn(&[u8]) -> Option<Vec<u8>>,
+        keys: fn(&[u8]) -> Vec<String>,
+        steps: &mut Vec<AgentStep>,
+    ) -> io::Result<bool> {
+        use std::io::Read;
+        let folder = self.root.join(folder.trim_start_matches('/'));
+        let path = folder.join(name);
+        let dir = match open_dir(&folder) {
+            Ok(dir) => dir,
+            Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+                return Ok(false);
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let stat = match rustix::fs::statat(&dir, name, AtFlags::SYMLINK_NOFOLLOW) {
+            Ok(stat) => stat,
+            Err(rustix::io::Errno::NOENT) => return Ok(false),
+            Err(error) => return Err(error.into()),
+        };
+        // Listed again below with what is done to it.
+        steps.retain(|step| *step != AgentStep::Keep(path.clone()));
+        let regular =
+            rustix::fs::FileType::from_raw_mode(stat.st_mode) == rustix::fs::FileType::RegularFile;
+        if !regular || stat.st_size as u64 > MOST_KEPT {
+            steps.push(AgentStep::Remove(path));
+            return remove_at(&dir, name, self.act);
+        }
+        let file = rustix::fs::openat(
+            &dir,
+            name,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )?;
+        let mut text = Vec::new();
+        File::from(file)
+            .take(MOST_KEPT + 1)
+            .read_to_end(&mut text)?;
+        let Some(new) = cut(&text) else {
+            steps.push(AgentStep::Remove(path));
+            return remove_at(&dir, name, self.act);
+        };
+        if new == text {
+            steps.push(AgentStep::Keep(path));
             return Ok(false);
         }
-        Err(error) => return Err(error.into()),
-    };
-    let stat = match rustix::fs::statat(&dir, name, AtFlags::SYMLINK_NOFOLLOW) {
-        Ok(stat) => stat,
-        Err(rustix::io::Errno::NOENT) => return Ok(false),
-        Err(error) => return Err(error.into()),
-    };
-    let regular =
-        rustix::fs::FileType::from_raw_mode(stat.st_mode) == rustix::fs::FileType::RegularFile;
-    if !regular || stat.st_size as u64 > MOST_KEPT {
-        return remove_at(&dir, name);
+        let kept = keys(&new);
+        let dropped = keys(&text)
+            .into_iter()
+            .filter(|key| !kept.contains(key))
+            .collect();
+        steps.push(AgentStep::Cut {
+            path,
+            kept,
+            dropped,
+        });
+        if !self.act {
+            return Ok(true);
+        }
+        let staged = format!("{name}.cut");
+        match rustix::fs::unlinkat(&dir, staged.as_str(), AtFlags::empty()) {
+            Ok(()) | Err(rustix::io::Errno::NOENT) => {}
+            Err(error) => return Err(error.into()),
+        }
+        let mode = Mode::from_raw_mode(stat.st_mode);
+        let out = rustix::fs::openat(
+            &dir,
+            staged.as_str(),
+            OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            mode,
+        )?;
+        rustix::fs::fchown(
+            &out,
+            Some(rustix::fs::Uid::from_raw(stat.st_uid)),
+            Some(rustix::fs::Gid::from_raw(stat.st_gid)),
+        )?;
+        rustix::fs::fchmod(&out, mode)?;
+        let mut out = File::from(out);
+        out.write_all(&new)?;
+        out.sync_all()?;
+        rustix::fs::renameat(&dir, staged.as_str(), &dir, name)?;
+        rustix::fs::fsync(&dir)?;
+        Ok(true)
     }
-    let file = rustix::fs::openat(
-        &dir,
-        name,
-        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-        Mode::empty(),
-    )?;
-    let mut text = Vec::new();
-    File::from(file)
-        .take(MOST_KEPT + 1)
-        .read_to_end(&mut text)?;
-    let Some(new) = cut(&text) else {
-        return remove_at(&dir, name);
-    };
-    if new == text {
-        return Ok(false);
-    }
-    let staged = format!("{name}.cut");
-    match rustix::fs::unlinkat(&dir, staged.as_str(), AtFlags::empty()) {
-        Ok(()) | Err(rustix::io::Errno::NOENT) => {}
-        Err(error) => return Err(error.into()),
-    }
-    let mode = Mode::from_raw_mode(stat.st_mode);
-    let out = rustix::fs::openat(
-        &dir,
-        staged.as_str(),
-        OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-        mode,
-    )?;
-    rustix::fs::fchown(
-        &out,
-        Some(rustix::fs::Uid::from_raw(stat.st_uid)),
-        Some(rustix::fs::Gid::from_raw(stat.st_gid)),
-    )?;
-    rustix::fs::fchmod(&out, mode)?;
-    let mut out = File::from(out);
-    out.write_all(&new)?;
-    out.sync_all()?;
-    rustix::fs::renameat(&dir, staged.as_str(), &dir, name)?;
-    rustix::fs::fsync(&dir)?;
-    Ok(true)
 }
 
 /// Hermes's `config.yaml` cut to what the lamp wrote (#6343): the keys of
