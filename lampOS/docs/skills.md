@@ -2767,6 +2767,11 @@ gone ([switches.md](switches.md)). What happens:
    never a fixed English sentence); from the app, `needs_link: [{"code", "name"}]` in
    `skills.made`. With `lamp-services` not answering, neither, and the
    make stands ([services.md](services.md), "Not linked when it is made").
+   With `LAMP_SKILL_LINK_APP=on` in `lamp-cloud` (on in the product), the
+   app is also sent `skills.needs_link` once a make, `why: "made"`, and
+   every skill's `skills.list` row, an installed one's too, carries
+   `needs_link` while a service it names isn't linked, so the app opens
+   that connector's Connect ([cloud.md](cloud.md), "The skills page").
 5. **Checked.** The card is marked `made: here` (`lamp-cloud`'s "Made on
    this lamp" group) and by its maker, `made_by: voice` or `made_by: app`
    (`made_skill::Maker`, from what it is kept as made from: an app's ask's

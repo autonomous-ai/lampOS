@@ -79,6 +79,10 @@ Environment=LAMP_APP_UPDATE=on
 # The app's connectors (Queue #4710): a link set or removed through lamp-services' admin socket. Reads, and
 # sends, which lamp-services.service sets on (LAMP_SERVICES_WRITE=on); the same line there and in lamp-voice.service.
 Environment=LAMP_SERVICES=on
+# A skill that needs a connector not linked, told to the app so it opens that Connect (#6059, the owner's ask):
+# skills.list rows carry needs_link, from lamp-services' admin list, and an install or an app make that lands one
+# sends skills.needs_link on the account channel, codes and names only.
+Environment=LAMP_SKILL_LINK_APP=on
 # On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
 Environment=LAMP_SHUTDOWN=on
 Environment=LAMP_APP_RESTART=on

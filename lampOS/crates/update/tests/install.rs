@@ -1896,6 +1896,28 @@ fn the_product_adds_a_skill_from_a_file_on_a_spoken_yes() {
     }
 }
 
+/// A skill that needs a connector not linked is told to the app (#6059):
+/// on in lamp-cloud, once, beside the services' switch it asks.
+#[test]
+fn the_product_tells_the_app_a_skill_needs_a_connector() {
+    let cloud = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-cloud.service")
+        .unwrap()
+        .1;
+    let service = section(cloud, "Service");
+    for line in [
+        "Environment=LAMP_SKILL_LINK_APP=on",
+        "Environment=LAMP_SERVICES=on",
+    ] {
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "lamp-cloud lacks {line}"
+        );
+    }
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still

@@ -148,6 +148,7 @@ fn the_skills_page_reads_the_agreed_reply_and_its_refusal() {
         manage: root.join("m.sock"),
         store: false,
         addons: false,
+        link: None,
     }));
     let started = Instant::now();
     let on = sent(&mut real);
@@ -282,6 +283,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
         manage,
         store: false,
         addons: false,
+        link: None,
     }));
     let before = sent(&mut real)["data"]["skills"].as_array().unwrap().len();
 
@@ -397,6 +399,7 @@ fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
         manage: root.join("m.sock"),
         store: false,
         addons: false,
+        link: None,
     }));
     let rows = |real: &mut Real| sent(real)["data"]["skills"].as_array().unwrap().clone();
     let tutor = |real: &mut Real| {

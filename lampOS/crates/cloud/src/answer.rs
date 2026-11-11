@@ -707,7 +707,15 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 .make_skill()
                 .or_else(|| lamp.write_skill())
                 .ok_or_else(|| not_here(kind))?;
-            crate::make_skill::made(&socket, data)
+            let told = crate::make_skill::made(&socket, data)?;
+            // A made skill that needs a connector not linked: told to the
+            // app once a make (`LAMP_SKILL_LINK_APP`).
+            if lamp.skills().is_some_and(|places| places.link.is_some())
+                && let Some(told) = &told
+            {
+                crate::skills::note_made(told);
+            }
+            Ok(told)
         }
         // A skill written in the app (`LAMP_SKILL_WRITTEN=on`): its text
         // goes to lamp-voice as written, kept there with no model; only a
@@ -1969,6 +1977,7 @@ pub mod tests {
             manage: std::path::PathBuf::from("/nowhere/manage.sock"),
             store,
             addons: false,
+            link: None,
         }
     }
 
