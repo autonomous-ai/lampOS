@@ -180,9 +180,8 @@ on a jazz vocal (60 s and 22 s in), never on the empty office, and not on an
 upbeat track whose 60 s held under the bar too often. Each skill keeps one
 case made of that run's own scores.
 
-The first of them, the music sway (`skills/music-sway`, #2834), is installed
-off in the product (`install::PRODUCT_SKILLS_OFF`) until its lamp row after a
-full update is seen. The product's `lamp-ears.service` sets
+The first of them, the music sway (`skills/music-sway`, #2834), is on in
+the product since #5770. The product's `lamp-ears.service` sets
 `LAMP_EARS_CLASSES` since 9 Nov (#5748), with YAMNet's two files from our own
 conversion (below) in `models.json`. Music sway reads
 `scores.music` and does nothing without this topic. It never sways to the

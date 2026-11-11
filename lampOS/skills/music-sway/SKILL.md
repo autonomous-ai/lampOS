@@ -35,9 +35,8 @@ It hears music by the ears' room sound scores (`ears/classes`, only with
 on the lamp itself, from the room microphone, keeping no sound. Without them
 it does nothing.
 
-A core skill, installed off on product lamps until its lamp check has
-passed; the product's ears score room sounds since the sound-class model
-ships with the update.
+A core skill, on on product lamps: the product's ears score room sounds
+since the sound-class model ships with the update.
 
 If asked about it: "When there's music on, I sometimes sway along a little.
 It's the music, not you; I'll stop if you'd rather."

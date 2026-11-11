@@ -722,10 +722,10 @@ skills".)
 `/var/lib/lampOS/skills` (since 19 October: Welcome back, Reminders, Task
 news, Stretch break, Stuffy air and Dance, plus Bedtime and Morning, on
 since #5753, `install::PRODUCT_SKILLS`, which
-is every core skill; Music sway, Light out, Smoky air, Dusty air and Feelings are installed
+is every core skill; Light out, Smoky air, Dusty air and Feelings are installed
 disabled until their lamp checks or replays, `install::PRODUCT_SKILLS_OFF`
 (Pose came with the product since #4135, Light show since #5745, Light
-scenes and Point the light since #5744);
+scenes and Point the light since #5744, Music sway since #5770);
 Desk tutor and its marks wait for a Live session to take their functions, and the
 other installable skills and the parked Laugh glance are left out,
 `install::NOT_PRODUCT_SKILLS`), and the product voice with the say service
@@ -1664,7 +1664,7 @@ and version and held to the add-on limits, for a judge. Without
 | Onboarding | core | Every lamp's first meeting: the walk's steps and their order are this skill's own file (`skills/onboarding/skill.toml`), which the voice reads once when it starts, checked by the same validator Skills loads and packages a core skill with ([onboarding.md](onboarding.md)) |
 | Startle (#2822) | core | A creature glances at a sudden sound, a bang or something dropped, then lets it go. Its move is this skill's own file (`[startle]`), which `lamp-expression serve` reads once when it starts ([expression.md](expression.md), "The startle: a glance at a sudden sound") |
 | Watch you leave (#1669 (e)) | core | A pet watches you go: a small base turn toward the side the sitter left by, held about 2 s, then back; on in the product since #2834, with the eyes' `LAMP_ACTIVITY=place` ([creature.md](creature.md), "You leave") |
-| Music sway (#1669) | core | Once, a slight sway when music has played a while, never while the lamp speaks or listens, at night, or more than twice an hour. On `ears/classes`, which the product's ears say with the YAMNet released with the update (#6232); installed disabled (`install::PRODUCT_SKILLS_OFF`) until its lamp row is seen ([creature.md](creature.md), "Music") |
+| Music sway (#1669) | core | Once, a slight sway when music has played a while, never while the lamp speaks or listens, at night, or more than twice an hour. On `ears/classes`, which the product's ears say with the YAMNet released with the update (#6232); on in the product since #5770 ([creature.md](creature.md), "Music") |
 | Look for things | installable | "Where are my keys?" (#1685): the owner's call, 19 Oct: an installable skill, and the whole search is fine since a person asked. The desk first, then two places either side, five looks at most, the head down over the desk throughout; the model's look finds the thing, since the eyes find faces only. Not in the product's install: not yet tried on a lamp, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
 | Guard mode (#1685) | installable | Turned on by voice while the person is out; texts them about visits to the desk ([guard-mode.md](guard-mode.md)). From the Skills Store, never the product's install (`NOT_PRODUCT_SKILLS`); its texts reach the phone only with `LAMP_SKILL_MESSAGES=on` (or `LAMP_MESSAGES=on`) in `lamp-cloud`, which the product's unit sets since #5752 ([messages.md](messages.md), "Unasked texts") |
 | A sip of water, Rest your eyes, Stand up, Wind down (#1685) | core (since 25 Oct) | The wellbeing nudges beyond Stretch break, each with one short line the voice words (the owner, 25 Oct: "talk to the user"), only when nothing has been heard or said for 5 s and the lamp itself has been quiet 30 s, beside: a slow blue breath after 90 minutes at the desk (10:00 to 17:00); a small tilt and a shade softer light after 45 (09:00 to 20:00, once an hour); a turn and a tilt after 100 minutes of Stretch break's sitting (08:00 to 20:00); a droop and a shade of dim until they leave, in the hour before bedtime (its `[active]`, 22:00 to 23:00 as it comes, never from bedtime on, the night then Bedtime and Morning's). Each has `most_a_day`, `[active]`, `[quiet]`, `[rest]`, Stretch break's `[[while]]` on `room/activity` (never while someone reads or writes head down, #1678; nothing without the eyes' `LAMP_ACTIVITY`), a second on its `sitting_s` (above the trigger's `for`, `unknown = "holds"`: the sitting is the sitter's own, since the eyes begin it again when someone else sits down, so a face in the chair for 90 minutes that was two people is no 90-minute sitting; cases `a-sip-when-the-eyes-say-the-same-sitting` and `not-when-someone-else-sat-down`), one shared `[stop]`, `wellbeing_nudges` (the one that came last, or `all`), and `[budget] group = "wellbeing"`, `per_hour = 1`, with Stretch break: one an hour between them. In the product's install (`PRODUCT_SKILLS`) since 25 Oct, on |
@@ -1684,7 +1684,7 @@ list in [v1-verdicts.md](v1-verdicts.md), "The owner's scope decisions,
 2026-10-19".
 
 A core skill comes with the lamp: `lamp-update install` writes it (on
-the product, thirty-one folders: twenty-five enabled (Bedtime and Morning since #5753), the five of `PRODUCT_SKILLS_OFF` disabled, and Comfort break disabled by its own file, on by its `[present]`), and a core
+the product, thirty-one folders: twenty-six enabled (Bedtime and Morning since #5753), the four of `PRODUCT_SKILLS_OFF` disabled, and Comfort break disabled by its own file, on by its `[present]`), and a core
 skill's file taken away or changed by hand is written again at the next
 install and the next update round: a core skill's files are the build's,
 not the person's (#1722; [updates.md](updates.md), "The product's
