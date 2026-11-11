@@ -6,6 +6,7 @@
 // Every message is docs/control.schema.json's. Names the schema enumerates are
 // checked before sending, and a refusal rejects with its typed error.
 import { createHash } from 'node:crypto';
+import { statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { WebSocket } from './ws.js';
@@ -57,9 +58,21 @@ function shortPhrase(phrases) {
 // lamp-control's control socket for a skill's run (docs/control.md, "The control socket"), not the local agent's.
 const LOCAL_SOCKET = '/run/lampos-control/control.sock';
 
+// The local agent's socket (docs/control.md, "The local agent"): where a program of
+// the user the owner named, on the lamp itself, reaches the door with no pairing.
+// `LAMPOS_AGENT_SOCKET` names another place.
+export const AGENT_SOCKET = '/run/lampos-agent/agent.sock';
+
+function agentSocket() {
+  const path = process.env.LAMPOS_AGENT_SOCKET || AGENT_SOCKET;
+  try { return statSync(path).isSocket() ? path : null; } catch { return null; }
+}
+
 // One connection: its frames as they come, and the first frame, which must be
 // the lamp's welcome. The certificate is checked against `pin` before any
 // frame is sent.
+// With `socketPath`: a unix socket, no TLS and no pin. The agent socket's own check (the kernel's word on
+// who connects) is what lets this program in; the control socket's is its owner check and the run's token.
 function open(host, port, pin, socketPath) {
   return new Promise((resolve, reject) => {
     if (!socketPath && !isPin(pin)) {
@@ -407,7 +420,6 @@ export class Lamp {
     return pairing;
   }
 
-  // Connect to a paired lamp (by its id, or the only one paired) and say hello.
   // Connect to lamp-control's control socket on the lamp itself, as a skill's run: the same door as a paired
   // computer's, over a unix socket, let in by the run's one-run `token` (default `LAMP_CONTROL_TOKEN`) with exactly
   // the grants the owner's yes for that skill named. `path` defaults to `LAMP_CONTROL_SOCKET`, then
@@ -430,13 +442,23 @@ export class Lamp {
     return new Lamp(ws, welcome, reply, frames);
   }
 
+  // Connect to a paired lamp (by its id, or the only one paired) and say hello.
   static async connect(lamp, { host, keyring = new Keyring() } = {}) {
     const pairing = keyring.pairing(lamp);
-    if (!pairing) throw new NotPaired('no pairing here for that lamp: run `lamp pair` first');
-    const { ws, welcome, next, frames } = await open(host ?? pairing.host, pairing.port, pairing.fp);
+    // With no pairing, on the lamp itself, as the user the owner turned on: the
+    // agent socket. Never when a `host` was asked for.
+    const local = pairing || host ? null : agentSocket();
+    if (!pairing && !local) throw new NotPaired('no pairing here for that lamp: run `lamp pair` first');
+    const { ws, welcome, next, frames } = local
+      ? await open(null, null, null, local)
+      : await open(host ?? pairing.host, pairing.port, pairing.fp);
     let reply;
     try {
-      const hello = { id: 0, op: 'hello', client: pairing.client, sig: b64(keyring.hello(welcome.nonceBytes)) };
+      // On the agent socket the peer check has already said who this is: a
+      // well-formed client and signature, neither read.
+      const hello = local
+        ? { id: 0, op: 'hello', client: 'c_0', sig: b64(Buffer.alloc(64)) }
+        : { id: 0, op: 'hello', client: pairing.client, sig: b64(keyring.hello(welcome.nonceBytes)) };
       debug.frame('->', hello);
       ws.send(JSON.stringify(hello));
       reply = await next();
