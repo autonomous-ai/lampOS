@@ -54,22 +54,30 @@ function shortPhrase(phrases) {
   return new byCode.bad_request(`phrases: ${JSON.stringify(short)} is too short: ${PHRASE_MIN_LETTERS} letters at least`);
 }
 
+// lamp-control's control socket for a skill's run (docs/control.md, "The control socket"), not the local agent's.
+const LOCAL_SOCKET = '/run/lampos-control/control.sock';
+
 // One connection: its frames as they come, and the first frame, which must be
 // the lamp's welcome. The certificate is checked against `pin` before any
 // frame is sent.
-function open(host, port, pin) {
+function open(host, port, pin, socketPath) {
   return new Promise((resolve, reject) => {
-    if (!isPin(pin)) {
+    if (!socketPath && !isPin(pin)) {
       reject(new WrongLamp("no pin to check the lamp by: the 64 hex the owner's app shows with the code"));
       return;
     }
     // The lamp's certificate is its own, self-signed: it is checked against its
     // pin (the full SHA-256 the owner's app shows), not a CA.
-    const ws = new WebSocket(`wss://${host}:${port}/v${schema.VERSION}`, { rejectUnauthorized: false, maxPayload: 1 << 20 });
+    // With `socketPath` (lamp-control's control socket on the lamp itself) the door is a unix socket: no TLS, no
+    // pin; the socket's owner check and the run's token are the trust.
+    const ws = socketPath
+      ? new WebSocket(`ws+unix://${socketPath}:/v${schema.VERSION}`, { maxPayload: 1 << 20 })
+      : new WebSocket(`wss://${host}:${port}/v${schema.VERSION}`, { rejectUnauthorized: false, maxPayload: 1 << 20 });
     const frames = [];
     let wake = null;
     let seen = null;
     ws.on('upgrade', (response) => {
+      if (socketPath) return;
       seen = pinOf(response.socket.getPeerCertificate(true).raw);
       if (seen !== pin) {
         ws.terminate();
@@ -311,6 +319,9 @@ export class Lamp {
     this.info = hello.lamp ?? welcome.lamp;
     this.grants = hello.grants ?? [];
     this.limits = hello.limits ?? {};
+    // The run this connection is for, when the lamp says (a token's `hello`).
+    this.run = hello.run ?? null;
+    this.skill = hello.skill ?? null; // and the skill it runs for
     this.nextId = 1;
     // The hand this connection's head follows, if any (`followHand`).
     this.following = null;
@@ -397,6 +408,28 @@ export class Lamp {
   }
 
   // Connect to a paired lamp (by its id, or the only one paired) and say hello.
+  // Connect to lamp-control's control socket on the lamp itself, as a skill's run: the same door as a paired
+  // computer's, over a unix socket, let in by the run's one-run `token` (default `LAMP_CONTROL_TOKEN`) with exactly
+  // the grants the owner's yes for that skill named. `path` defaults to `LAMP_CONTROL_SOCKET`, then
+  // `/run/lampos-control/control.sock`. No pairing and no pin. A missing, wrong or ended token is refused
+  // `no_grant`; `lamp.run` is the run the lamp says this is.
+  static async local(token, { path } = {}) {
+    token ??= process.env.LAMP_CONTROL_TOKEN;
+    if (!token) throw new byCode.no_grant('no token for this run: pass one, or set LAMP_CONTROL_TOKEN');
+    path ??= process.env.LAMP_CONTROL_SOCKET || LOCAL_SOCKET;
+    const { ws, welcome, next, frames } = await open(undefined, undefined, undefined, path);
+    let reply;
+    try {
+      // The usual hello with no key: client c_0, a zero signature, and the token.
+      const hello = { id: 0, op: 'hello', client: 'c_0', sig: b64(Buffer.alloc(64)), token };
+      debug.frame('->', hello);
+      ws.send(JSON.stringify(hello));
+      reply = await next();
+    } catch (error) { ws.close(); throw error; }
+    if (!reply.ok) { ws.close(); throw fromReply(reply.error); }
+    return new Lamp(ws, welcome, reply, frames);
+  }
+
   static async connect(lamp, { host, keyring = new Keyring() } = {}) {
     const pairing = keyring.pairing(lamp);
     if (!pairing) throw new NotPaired('no pairing here for that lamp: run `lamp pair` first');

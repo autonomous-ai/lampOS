@@ -28,7 +28,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable
 
-from websockets.asyncio.client import ClientConnection, connect as ws_connect
+from websockets.asyncio.client import ClientConnection, connect as ws_connect, unix_connect
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from . import debug, errors, schema
@@ -114,6 +114,11 @@ async def _open(host: str, port: int, pin: str) -> ClientConnection:
         await ws.close()
         raise WrongLamp(f"the certificate at {host} is not the lamp's: {seen[:16]}..., not {pin[:16]}...")
     return ws
+
+
+# lamp-control's control socket for a skill's run: the same WebSocket door over a unix socket, no TLS, no pairing,
+# let in by a one-run token (docs/control.md, "The control socket"). Not the local agent's socket.
+LOCAL_SOCKET = "/run/lampos-control/control.sock"
 
 
 async def _welcome(ws: ClientConnection) -> dict:
@@ -464,6 +469,9 @@ class Lamp:
         self.limits: dict = hello.get("limits", {})
         self._next_id = 1
         self.close_reason: str | None = None  # why the lamp closed the connection, when it said
+        # The run this connection is for, when the lamp says (a token's `hello`).
+        self.run: str | None = hello.get("run")
+        self.skill: str | None = hello.get("skill")  # and the skill it runs for
         self._waiting: dict[int, asyncio.Future] = {}
         self._done: dict[int, asyncio.Future] = {}
         self._handlers: dict[str, list[Handler]] = defaultdict(list)
@@ -555,6 +563,35 @@ class Lamp:
             welcome = await _welcome(ws)
             sig = keyring.hello(welcome["nonce_bytes"])
             hello = {"id": 0, "op": "hello", "client": pairing.client, "sig": b64(sig)}
+            debug.frame("->", hello)
+            await ws.send(json.dumps(hello))
+            reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+            debug.frame("<-", reply)
+        except BaseException:
+            await ws.close()
+            raise
+        if not reply.get("ok"):
+            await ws.close()
+            raise from_reply(reply.get("error", {}))
+        return cls(ws, welcome, reply)
+
+    @classmethod
+    async def local(cls, token: str | None = None, *, path: str | None = None) -> "Lamp":
+        """Connect to lamp-control's control socket on the lamp itself, as a skill's run: the same door as a paired
+        computer's, over a unix socket, let in by the run's one-run `token` (default: `LAMP_CONTROL_TOKEN` in the
+        environment) with exactly the grants the owner's yes for that skill named. `path` defaults to
+        `LAMP_CONTROL_SOCKET`, then `/run/lampos-control/control.sock`. No pairing and no certificate pin: the
+        socket's owner check and the token are the trust. A missing, wrong or ended token is refused `no_grant`
+        in the lamp's words; `lamp.run` is the run the lamp says this is."""
+        token = token or os.environ.get("LAMP_CONTROL_TOKEN")
+        if not token:
+            raise BY_CODE["no_grant"]("no token for this run: pass one, or set LAMP_CONTROL_TOKEN")
+        path = path or os.environ.get("LAMP_CONTROL_SOCKET") or LOCAL_SOCKET
+        ws = await unix_connect(path, uri=f"ws://localhost/v{schema.VERSION}", max_size=1 << 20, ping_interval=KEEPALIVE_S)
+        try:
+            welcome = await _welcome(ws)
+            # The usual hello with no key: client c_0 and a zero signature, and the token.
+            hello = {"id": 0, "op": "hello", "client": "c_0", "sig": b64(bytes(64)), "token": token}
             debug.frame("->", hello)
             await ws.send(json.dumps(hello))
             reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))

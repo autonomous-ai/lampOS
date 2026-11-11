@@ -41,7 +41,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, generate_private_key
 from cryptography.x509.oid import NameOID
-from websockets.asyncio.server import ServerConnection, serve
+from websockets.asyncio.server import ServerConnection, serve, unix_serve
 from websockets.exceptions import ConnectionClosed
 
 from . import schema
@@ -508,7 +508,16 @@ class FakeLamp:
         face_look: bool = True,
         face: dict[str, float] | None = None,
         app_reach: bool = False,
+        local: bool = False,
     ):
+        # `local`: also serve lamp-control's control socket (a unix socket, `local_path`) for a skill's run,
+        # where a one-run token from `mint_token` is what lets a connection in (`Lamp.local`).
+        self.local = local
+        self.local_path: str | None = None
+        self._local_server = None
+        self._local_dir: tempfile.TemporaryDirectory | None = None
+        self._local_ws: set[int] = set()
+        self.tokens: dict[str, dict[str, Any]] = {}
         self.code = code
         # True says `motion_done` in hello's limits and ends a gesture or a
         # move with a `done`, as lamp-control reading the body's word does
@@ -639,6 +648,10 @@ class FakeLamp:
             context.load_cert_chain(cert_path, key_path)
         self._server = await serve(self._serve, self.host, 0, ssl=context)
         self.port = self._server.sockets[0].getsockname()[1]
+        if self.local:
+            self._local_dir = tempfile.TemporaryDirectory()
+            self.local_path = os.path.join(self._local_dir.name, "control.sock")
+            self._local_server = await unix_serve(self._serve_local, self.local_path)
         return self
 
     async def __aexit__(self, *_exc) -> None:
@@ -650,6 +663,10 @@ class FakeLamp:
         self._connected.clear()
         self._server.close()
         await self._server.wait_closed()
+        if self._local_server is not None:
+            self._local_server.close()
+            await self._local_server.wait_closed()
+            self._local_dir.cleanup()
         for folder in self._folders:
             shutil.rmtree(folder, ignore_errors=True)
         self._folders.clear()
@@ -892,6 +909,29 @@ class FakeLamp:
 
     # The protocol.
 
+    def mint_token(self, grants: tuple[str, ...] | list[str], run: str = "run-1", skill: str = "skill") -> str:
+        """A one-run token for `run` with exactly `grants`, as lamp-control mints one from the owner's yes for a
+        skill (`Lamp.local(token)` on `local_path`). One live token a run: a second mint replaces the first."""
+        for token in [t for t, held in self.tokens.items() if held["run"] == run]:
+            self.tokens.pop(token)
+        token = b64(os.urandom(32)).replace("+", "-").replace("/", "_").rstrip("=")
+        self.tokens[token] = {"grants": list(grants), "run": run, "skill": skill}
+        return token
+
+    async def end_run(self, run: str) -> None:
+        """The run ended: its token is no good and its connections close, saying why."""
+        for token in [t for t, held in self.tokens.items() if held["run"] == run]:
+            self.tokens.pop(token)
+        for ws in [ws for ws in list(self._connections) if self._client_of.get(id(ws), "").endswith(f"_{run}")]:
+            await ws.close(1000, "the run ended")
+
+    async def _serve_local(self, ws: ServerConnection) -> None:
+        self._local_ws.add(id(ws))
+        try:
+            await self._serve(ws)
+        finally:
+            self._local_ws.discard(id(ws))
+
     async def _serve(self, ws: ServerConnection) -> None:
         nonce = os.urandom(32)
         client: str | None = None
@@ -941,6 +981,9 @@ class FakeLamp:
                     await self._refuse(ws, id_, "bad_request", "frames: each frame is five whole counts")
                     continue
                 op = request.get("op")
+                if op == "pair" and id(ws) in self._local_ws:
+                    await self._refuse(ws, id_, "bad_request", "this socket is not for pairing: it is a skill run's")
+                    continue
                 if op == "pair":
                     await self._pair(ws, request, nonce)
                     continue
@@ -984,6 +1027,8 @@ class FakeLamp:
         await self._ok(ws, request["id"], client=client, grants=self.grants)
 
     async def _hello(self, ws, request: dict, nonce: bytes) -> str | None:
+        if id(ws) in self._local_ws or "token" in request:
+            return await self._hello_token(ws, request)
         paired = self.clients.get(request["client"])
         try:
             if paired is None:
@@ -996,6 +1041,29 @@ class FakeLamp:
         limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
         await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=limits)
         return request["client"]
+
+    async def _hello_token(self, ws, request: dict) -> str | None:
+        """A hello on the control socket: a live one-run token and no key (client c_0, a zero signature)."""
+        if id(ws) not in self._local_ws:
+            # As lamp-control's other doors: a token is no part of hello there.
+            await self._refuse(ws, request["id"], "bad_request", "token: only on a skill run's socket")
+            return None
+        # The hello an SDK sends here, exactly: client c_0 and the zero signature beside the token. A real client's id or
+        # signature is refused, not ignored, as lamp-control does (bad_request).
+        if request.get("client") != "c_0" or request.get("sig") != base64.b64encode(bytes(64)).decode():
+            await self._refuse(ws, request["id"], "bad_request", "on this socket hello is client c_0, a zero sig and the token")
+            await ws.close()
+            return None
+        held = self.tokens.get(request.get("token", ""))
+        if held is None:
+            await self._refuse(ws, request["id"], "no_grant", "no token for this run")
+            await ws.close()
+            return None
+        client = f"t_{held['run']}"
+        self.clients[client] = {"key": b"", "name": f"skill (run {held['run']})", "grants": held["grants"]}
+        limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
+        await self._ok(ws, request["id"], lamp=self.lamp, grants=held["grants"], limits=limits, run=held["run"], skill=held["skill"])
+        return client
 
     # The grant each event and state needs, as lamp-control's own (#3736).
     EVENT_GRANT = {
