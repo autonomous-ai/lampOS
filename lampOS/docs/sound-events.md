@@ -9,9 +9,9 @@ below). Third's privacy read of its two-second retention found no P1 or P2
 (19 October); its scores still need the empty-room and busy-room
 measurement, and the owner's word, before any unit sets it. The product's
 `lamp-ears.service` sets it since 9 Nov (the lead's ask on #5748), with
-`LAMP_EARS_CLASSES_MODEL=/opt/lampOS/ears/models/yamnet.onnx`; the model's
-files are not shipped yet (below), so a product lamp publishes `invalid_model`
-until they are. Without the switch Ears publishes levels and sudden changes,
+`LAMP_EARS_CLASSES_MODEL=/opt/lampOS/ears/models/yamnet.onnx`, where
+`models.json` places our own conversion's two files (#6232, below); a lamp
+without them publishes `invalid_model`. Without the switch Ears publishes levels and sudden changes,
 not music or laughter.
 
 ## Purpose and boundaries
@@ -116,10 +116,12 @@ privacy-owner read before any unit sets the switch.
 YAMNet is one candidate: TensorFlow's maintained implementation classifies
 521 AudioSet classes with MobileNet-v1, accepting 16 kHz mono audio. The existing
 Rust inference stack and model/operator compatibility still need a concrete
-check. The switch-gated publisher pins Qualcomm AI Hub's YAMNet ONNX float
-export, release v0.59.0, for evaluation only. The weights' distribution
-review is below ("Where the weights come from"); until the first builder has
-read it they are not committed, released or deployed.
+check. The switch-gated publisher first pinned Qualcomm AI Hub's YAMNet ONNX
+float export, release v0.59.0, for evaluation only. After the weights'
+distribution review below ("Where the weights come from", READ-OK on #6119)
+it pins our own conversion of Google's `yamnet.h5` instead (#6232), released
+in `models-2026-11-11` and placed by `models.json`; the measurements on this
+page were taken with Qualcomm's export, whose scores ours matches.
 
 Primary sources:
 - [TensorFlow YAMNet tutorial](https://www.tensorflow.org/hub/tutorials/yamnet)
@@ -252,7 +254,7 @@ this document (Speech, Music, Laughter, Walk/footsteps, and the door group).
   remaining link then has a written licence: Apache 2.0 for Google's weights
   and code, and MIT for the conversion script.
 
-**What the `models-2026-11-xx` release carries beside the two files.**
+**What the `models-2026-11-11` release carries beside the two files.**
 - Apache 2.0's text, with a NOTICE that says:
   - the weights are Google's YAMNet, from `yamnet.h5` (link and sha256), and
     converted by us to ONNX (the commands above);
@@ -269,6 +271,43 @@ this document (Speech, Music, Laughter, Walk/footsteps, and the door group).
 
 The recommendation above doesn't depend on either.
 
+**Our conversion (#6232, 11 November 2026).** Done as recommended, by
+`lampOS/tools/yamnet-convert.sh WORKDIR` (every input pinned in it; the
+Python half is `tools/yamnet-convert.py`, run with `python -I`):
+- **Input:** `yamnet.h5` from the URL above, 15,296,092 bytes, sha256
+  `13c3308955bbfaef262f175ac9c40e47b134573a93984f009220dd7cc12a1744`, the
+  same from two downloads into separate folders at 14:00 and 16:25 (+07).
+- **Sources:** torch_audioset at `daed697ddcd1d2f7304cc3c2b1b4295ac7e304e4`
+  (its `YAMNet` module and `convert_yamnet.py`'s weight mapping; its
+  `TFYamn` check is written for an older YAMNet API and isn't run), and
+  Google's YAMNet code, tensorflow/models at
+  `c14bf9ad91962cf189f9f58db2132c06247fcd53`, as the reference.
+- **Tools:** Python 3.11.13, tensorflow 2.18.0, tf_keras 2.18.0, torch
+  2.5.1 (`torch.onnx.export`, opset 17, TorchScript exporter), onnx 1.17.0,
+  onnxruntime 1.20.1, h5py 3.12.1, numpy 1.26.4, pyyaml 6.0.2; made on an
+  Apple Silicon Mac. Two runs gave byte-identical files.
+- **Output:** `yamnet.onnx` 29,489 bytes, sha256
+  `c7e501792262e7335b309e67ed68f8e99773a869719397b479593a82fa69657d`, and
+  `yamnet.data` 14,917,924 bytes, sha256
+  `26771b4915f21765ec6605f89cfb6da9121631c2e1c6a1e767d9ef95248cc6bd`;
+  input `patch` `[1, 1, 96, 64]`, output `logits` `[1, 521]`. `classes.rs`
+  pins them, `model_id` `yamnet-h5-lampos-2026-11-11`.
+- **Against Google's Keras model** with the same `yamnet.h5`, on Google's
+  own patches of five synthesized 4 s clips (silence, a 440 Hz tone, white
+  noise, a chord progression with a kick, and a vowel-formant pulse train;
+  no recording of anyone), 40 patches: the largest logit difference is
+  6.1e-4 (on silence, whose logits are far below zero; 8.4e-5 on the rest),
+  the largest score difference 2.4e-6; the script fails over 1e-3. Keras
+  tops music at Music (0.984) and the vowels at Speech (0.981).
+- **In lamp-ears' own code** (tract-onnx 0.23.8): the five scores it
+  publishes on those patches are within 4.6e-6 of Keras's (Qualcomm's
+  export: 4.3e-6). `score_wav` over the five clips (35 windows) prints the
+  same scores to its two decimals with either model, and the same verdicts;
+  silence scores speech 8.63e-8 and music 7.07e-15, as before. So the
+  thresholds above, set on Qualcomm's export, hold. The model-backed test
+  passes with it (load 98 ms, a patch 2.8 ms on the Mac). The 21 October
+  clips (#1669) weren't on the Mac and were not rerun.
+
 ## The publisher behind LAMP_EARS_CLASSES
 
 `lamp-ears` with `LAMP_EARS_CLASSES=on` (exactly `on`) and
@@ -283,8 +322,10 @@ exists: no queue, thread or model.
 
 **Model.** `LAMP_EARS_CLASSES_MODEL` is the absolute path to `yamnet.onnx`,
 with `yamnet.data` beside it. Both are pinned in the code by size and
-SHA256 (graph 25,789 bytes `970ea63f…6471`, weights 14,915,108 bytes
-`1d6dff48…7ed31`; `model_id` `yamnet-qai-v0.59.0`). They are read once,
+SHA256 (graph 29,489 bytes `c7e50179…657d`, weights 14,917,924 bytes
+`26771b49…c6bd`; `model_id` `yamnet-h5-lampos-2026-11-11`, our conversion
+above). The product's `lamp-ears.service` names
+`/opt/lampOS/ears/models/yamnet.onnx`, where `models.json` places both. They are read once,
 checked, and parsed from the checked bytes in memory, so a file swapped
 after the check is never loaded. A missing, relative or mismatched model
 publishes `invalid_model` every 500 ms and retains no audio. Loading and

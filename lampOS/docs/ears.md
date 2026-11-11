@@ -276,8 +276,8 @@ the person's stored yes (`/var/lib/lampOS/consent/room-sounds.json`,
 `classes::start`); otherwise one journal line says no classifier runs. `LAMP_EARS_CLASSES_MODEL` is the absolute path to
 `yamnet.onnx`, with `yamnet.data` beside it; both must match their pinned
 SHA256 or the topic says `invalid_model`. The product's `lamp-ears.service`
-sets both (`/opt/lampOS/ears/models/yamnet.onnx`); the files are not in
-`models.json` yet, so a product lamp says `invalid_model` until they ship.
+sets both (`/opt/lampOS/ears/models/yamnet.onnx`), and `models.json` places
+the two files there (our own conversion, #6232, sound-events.md).
 
 Capture offers each admitted block, from the same post-read callback as the
 PCM export, to a bounded queue of 500 ms; it never waits, and a full queue

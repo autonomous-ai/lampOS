@@ -392,12 +392,11 @@ pub const PRODUCT_SKILLS: &[&str] = &[
 /// default and its cases. A skill leaves this list once its lamp check has
 /// passed; until then a person or a trial turns it on on the lamp itself.
 pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
-    // #2834's music sway: nothing to read in the product yet.
+    // #2834's music sway: its lamp row with the product's ears is owed.
     (
         "music-sway",
-        "it reads `ears/classes`, which the ears say only with `LAMP_EARS_CLASSES=on` and a \
-         pinned YAMNet (#1669), and no product unit sets either nor does install ship the model: \
-         off until the sound classes ship (#5748) and its lamp row after a full update is seen",
+        "it reads `ears/classes`, which the product's ears say since #5748 with the pinned \
+         YAMNet that install places (#6232): off until its lamp row after a full update is seen",
     ),
     (
         "light-out",

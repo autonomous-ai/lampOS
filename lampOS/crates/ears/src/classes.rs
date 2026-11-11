@@ -105,17 +105,17 @@ pub fn room_sounds_yes(path: &Path) -> bool {
         .is_ok_and(|value| value.get("room_sounds").and_then(|v| v.as_str()) == Some("yes"))
 }
 
-/// Qualcomm AI Hub's YAMNet ONNX float export, release v0.59.0
-/// (`yamnet-onnx-float.zip`): the graph and its external weights beside it.
-pub const MODEL_ID: &str = "yamnet-qai-v0.59.0";
-const GRAPH_BYTES: u64 = 25_789;
-const GRAPH_SHA256: &str = "970ea63f4dc1aa33c86ef7d61d854319fdfe6bdd078f5b3d674ee1db5dd96471";
+/// Our own conversion of Google's `yamnet.h5` (#6232,
+/// `tools/yamnet-convert.sh`): the graph and its external weights beside it,
+/// released in `models-2026-11-11` and placed by `models.json`.
+pub const MODEL_ID: &str = "yamnet-h5-lampos-2026-11-11";
+const GRAPH_BYTES: u64 = 29_489;
+const GRAPH_SHA256: &str = "c7e501792262e7335b309e67ed68f8e99773a869719397b479593a82fa69657d";
 /// The graph names its weights by this file name, beside it.
 pub const DATA_NAME: &str = "yamnet.data";
-const DATA_BYTES: u64 = 14_915_108;
-const DATA_SHA256: &str = "1d6dff488da4712190e10f1c841252aa58011381132d0126dcd5ee56a4e7ed31";
-/// AudioSet indices in the bundled label map (`yamnet_class_map.csv`, as
-/// qai-hub-models v0.59.0's `labels/yamnet_labels.txt`): Speech, Music,
+const DATA_BYTES: u64 = 14_917_924;
+const DATA_SHA256: &str = "26771b4915f21765ec6605f89cfb6da9121631c2e1c6a1e767d9ef95248cc6bd";
+/// AudioSet indices in Google's label map (`yamnet_class_map.csv`): Speech, Music,
 /// Laughter, and "Walk, footsteps" (#2562).
 const SPEECH: usize = 0;
 const MUSIC: usize = 132;
