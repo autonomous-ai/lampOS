@@ -932,6 +932,7 @@ async fn connection<S>(
     // Set once from the welcome: frames before `hello` buy no more time
     // (Fourteen's P3 on #3778).
     let mut quiet_until = tokio::time::Instant::now() + hello;
+    let mut speaker = crate::speaker::Player::default();
     if socket
         .send(Message::text(welcome.to_string()))
         .await
@@ -951,8 +952,23 @@ async fn connection<S>(
                             }
                             continue;
                         }
-                        Some(Ok(Message::Binary(_))) => {
-                            let _ = socket.send(Message::text(crate::protocol::refused(None, &crate::protocol::Error::new(crate::protocol::ErrorCode::BadRequest, "text frames only")).to_string())).await;
+                        // LOCAL DEMO ONLY: a speak-granted computer's binary
+                        // frames are 16 kHz mono S16LE for the speaker.
+                        Some(Ok(Message::Binary(pcm))) => {
+                            let speaks = session.client().is_some_and(|client| {
+                                shared
+                                    .door
+                                    .lock()
+                                    .expect("door")
+                                    .clients()
+                                    .get(client)
+                                    .is_some_and(|paired| paired.grants.contains(&crate::protocol::Grant::Speak))
+                            });
+                            if speaks {
+                                speaker.play(&pcm);
+                            } else {
+                                let _ = socket.send(Message::text(crate::protocol::refused(None, &crate::protocol::Error::new(crate::protocol::ErrorCode::BadRequest, "text frames only")).to_string())).await;
+                            }
                             continue;
                         }
                         _ => break,

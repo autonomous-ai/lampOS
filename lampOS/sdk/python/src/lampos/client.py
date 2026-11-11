@@ -899,6 +899,12 @@ class Lamp:
     # The microphone (the `microphone` grant): the ears' own sound, never
     # while the lamp is private, only on the lamp's own network.
 
+    async def speaker_write(self, pcm: bytes) -> None:
+        """LOCAL DEMO ONLY (a lamp-control built for the call demo): play
+        `pcm`, 16 kHz mono signed 16-bit little-endian, on the lamp's speaker
+        at once, at the person's volume. Needs the `speak` grant."""
+        await self._ws.send(pcm)
+
     async def microphone_stream(self, on: bool = True) -> dict:
         """The room's sound as `microphone.audio` events
         (`lamp.on("microphone.audio", ...)`), one each 20 ms block: mono,

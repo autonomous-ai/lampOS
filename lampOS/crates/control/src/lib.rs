@@ -30,4 +30,5 @@ pub mod rate;
 pub mod server;
 pub mod session;
 pub mod sounds;
+pub mod speaker;
 pub mod watch;

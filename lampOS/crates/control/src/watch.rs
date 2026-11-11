@@ -349,6 +349,22 @@ impl Watch {
                 out.push(event);
                 out
             }
+            // LOCAL DEMO ONLY (lamp-e82d): the product's head pads say a tap
+            // or a stroke on `controls/touch` only (#711), never on
+            // `controls/gesture`, so a program's `touch` never came.
+            "controls/touch" => {
+                if payload["enabled"] == false {
+                    return Vec::new();
+                }
+                let place = payload["name"].as_str().unwrap_or("head");
+                let kind = match payload["gesture"].as_str().unwrap_or_default() {
+                    "tap" => "tap",
+                    "stroke" => "pet",
+                    "hold" => "hold",
+                    _ => return Vec::new(),
+                };
+                vec![Out::Event(EventKind::Touch, json!({"kind": kind, "where": place}))]
+            }
             // Every change is said by lamp-actions, the speaker's only
             // writer: told when it differs from the one before, so the first
             // heard (the one kept on the bus) is state, not news.

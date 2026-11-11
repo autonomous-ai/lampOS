@@ -334,7 +334,8 @@ impl Door {
         clients_path: Option<PathBuf>,
     ) -> Self {
         Self {
-            lamp: json!({"id": id, "name": name, "v": VERSION}),
+            // LOCAL DEMO ONLY: the owner's language, for a program's own lines.
+            lamp: json!({"id": id, "name": name, "v": VERSION, "language": std::fs::read_to_string("/etc/lampOS/setup/language").ok().map(|text| text.trim().to_owned()).filter(|text| !text.is_empty()).unwrap_or_else(|| "en".to_owned())}),
             codes: Codes::new(),
             code_grants: BTreeSet::new(),
             media_dropped: Vec::new(),
