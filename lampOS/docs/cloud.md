@@ -2525,15 +2525,26 @@ app that asks anyway is told `developer access is off on this lamp`.
 
 ## Hermes' DeepSeek, forwarded on the lamp (#5978, `LAMP_HERMES_ON_LAMP`)
 
+This forwarder now serves OpenClaw on the lamp too (#6226, below).
+
 Hermes on the lamp (#5978) asks the lamp's own DeepSeek, through the
 Autonomous relay, with the same key the voice uses, without that key ever
 being in a file Hermes (user `lampos`) can read. lamp-cloud already holds the
 key (its unit's `LoadCredential=key`), so it forwards Hermes' requests and
 adds the key itself (`lamp_cloud::hermes_llm`).
 
-- **Off** unless `LAMP_HERMES_ON_LAMP=on` in lamp-cloud's environment (the
-  product's `lamp-cloud.service` sets it, with lamp-tasks', #5978), and only while lamp-cloud runs
-  (`LAMP_CLOUD=on`).
+- **Off** unless `LAMP_HERMES_ON_LAMP=on` or `LAMP_OPENCLAW_ON_LAMP=on` in
+  lamp-cloud's environment (the product's `lamp-cloud.service` sets both,
+  #5978, #6226), and only while lamp-cloud runs (`LAMP_CLOUD=on`).
+- **OpenClaw on the lamp** (#6226), the lamp's default engine, is served by
+  the same forwarder: the same port, the same token file and the same
+  paths. Its provider `lampos` has the base
+  `http://127.0.0.1:7741/v1/deepseek`, the model `deepseek-flash` and the
+  token as `${LAMP_HERMES_TOKEN}` (docs/tasks.md, "OpenClaw's settings on
+  the lamp"). Its requests go on the voice's key and are billed as
+  Hermes's are. Shown only in tests
+  (`hermes_llm::tests::either_engines_switch_serves_the_forwarder`,
+  `hermes_llm::tests::the_product_unit_turns_on_both_switches`).
 - **Where:** `127.0.0.1:7741`, loopback only, and a peer that isn't loopback
   is never answered. 7741 is used by no other lampOS part and by neither of
   Hermes' own ports (8642, 8645).
