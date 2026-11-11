@@ -90,6 +90,20 @@ description: An example of the form only: glows cyan when someone comes back to 
 When someone is back at the lamp, it glows cyan for a moment.
 ```";
 
+/// How a light "blinks" or "flashes" in a made skill, and what `out` is,
+/// told the model with the other light steps: the format has no blink or
+/// flash (`lamp_skills::light_call` takes a breathe, candle or pulse
+/// pattern only), and `out` takes nothing but `over` and `until`. On
+/// lamp-9adf, 11 Nov 17:0x, "blink the light green twice when I arrive"
+/// was written as an `out` step with a colour and a pattern, and refused on
+/// the first answer and on every repair ("out takes no colour, dim, level,
+/// for, pattern or no_brighter: only over and until").
+const BLINK: &str = "A light never blinks or flashes: for a blink or a flash, write one \
+     colour step with a soft pulse, light = { colour = \"green\", level = 3, for = \"5s\", \
+     pattern = { kind = \"pulse\" } } (a pulse needs level 2 to 5 and plays once), and say \
+     the blinking as left out. { out = true } only turns the light off: beside it only over \
+     and until.";
+
 /// The check's lines a repair carries when the answer was [`EXAMPLE`]
 /// given back: what the model is told, once.
 const EXAMPLE_GIVEN_BACK: &str =
@@ -143,7 +157,7 @@ fn system_with(reads: bool) -> String {
          lamp's own timer, not a skill; a skill runs at a time only each day or on named \
          days of the week, by the clock trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
          the request asks with the light, the head, a few exact words it says, its hum, or a \
-         read as below, on one of the triggers below. {more} To speak, a skill has speak = \
+         read as below, on one of the triggers below. {more} {BLINK} To speak, a skill has speak = \
          true in [permissions], cooldown = \"1h\" or longer, and one [[do]] step say = {{ text = \
          \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
          language the person asked in, said as written. Its one sound is a soft hum: a [[do]] \
@@ -2823,6 +2837,38 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(made.name, "example-only");
         assert!(system().contains(EXAMPLE));
         assert!(system().contains("never answer with it"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 11 Nov 17:0x: "blink the light green twice when I
+    /// arrive" was written as an `out` step with a colour and a pattern and
+    /// failed every repair. The model is told how a blink is written and
+    /// what `out` is, and a skill written so is kept (lamp-skills loads the
+    /// same step: `a_blink_asked_of_a_made_skill_is_a_pulse_and_never_an_out_with_a_colour`).
+    #[test]
+    fn the_system_prompt_says_how_a_light_blinks_and_that_out_only_turns_it_off() {
+        for reads in [true, false] {
+            let system = system_with(reads);
+            assert!(
+                system.contains(&format!("{} {BLINK} To speak", made_skill::MORE_STEPS)),
+                "{system}"
+            );
+        }
+        let step = "light = { colour = \"green\", level = 3, for = \"5s\", pattern = { kind = \
+                    \"pulse\" } }";
+        assert!(BLINK.contains(step), "{BLINK}");
+        assert!(BLINK.contains("{ out = true } only turns the light off: beside it only over"));
+        let (root, keeping) = keeping("blink");
+        let blink = EXAMPLE
+            .replace(
+                "light = { colour = \"cyan\", level = 2, for = \"25s\" }",
+                step,
+            )
+            .replace("example-only", "green-on-arrival")
+            .replace("An example of the form only: glows cyan", "Pulses green");
+        assert!(blink.contains(step), "{blink}");
+        let made = made_skill::keep(&blink, false, "local:1", &keeping).unwrap();
+        assert_eq!(made.name, "green-on-arrival");
         let _ = std::fs::remove_dir_all(&root);
     }
 
