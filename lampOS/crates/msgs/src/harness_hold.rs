@@ -42,6 +42,20 @@ pub enum HarnessHold {
     Lifted,
 }
 
+/// The line a held launcher carries before its `exec` line (#5957): `harness
+/// update` refused, with one line on stderr and exit 1, before Harness runs.
+/// The daemon's hold (`ADAPTER_UPDATE_DISABLE`) holds only its own
+/// self-update; `harness update` from a shell (by hand, or an agent's
+/// terminal tool, as the tasks user) installs the newest Harness whatever
+/// it says, which put lamp-c0a4 above the pin on 11 Nov. lamp-update moves
+/// Harness to the pin itself and never calls it. Harness takes its command
+/// from its first argument (`const [, , cmd, ...rest] = process.argv`,
+/// openharness `cli/src/cli.ts`), so only that is read. Written and taken
+/// out with the hold by every writer of the launcher: lamp-tasks
+/// (crates/tasks/src/hold.rs) and lamp-update
+/// (crates/update/src/harness_install/launcher.rs).
+pub const REFUSE_UPDATE: &str = "case \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac";
+
 /// The `--channel-url` in `exec_start`, lamp-update's `ExecStart` as its
 /// unit file has it or as `systemctl show --property=ExecStart --value`
 /// gives it (the same words, in `argv[]=… ;`).
