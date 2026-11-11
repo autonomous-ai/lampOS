@@ -67,9 +67,21 @@ jobs:
       - name: system packages
         run: |
           # The runner's mirror can stop resolving (azure.archive.ubuntu.com, #6429):
-          # apt-get update exits 0 on fetch failures unless --error-on=any; then point the sources at Ubuntu's own mirror and try once more.
+          # apt-get update exits 0 on fetch failures unless --error-on=any; then point the sources at a mirror that answers and try once more.
           if ! sudo apt-get --error-on=any update; then
-            if [ "$(dpkg --print-architecture)" = amd64 ]; then u=http://archive.ubuntu.com/ubuntu; else u=http://ports.ubuntu.com/ubuntu-ports; fi
+            # Every *.ubuntu.com name stopped resolving on GitHub's runners (11 Nov), so
+            # take the first mirror outside that domain that serves this release.
+            if [ "$(dpkg --print-architecture)" = amd64 ]; then
+              ms="http://mirrors.edge.kernel.org/ubuntu http://mirrors.ocf.berkeley.edu/ubuntu"
+            else
+              ms="http://mirrors.ocf.berkeley.edu/ubuntu-ports http://ftp.tu-chemnitz.de/pub/linux/ubuntu-ports"
+            fi
+            c=$(. /etc/os-release; echo "$VERSION_CODENAME")
+            u=
+            for m in $ms; do
+              if curl -sfI -m 15 "$m/dists/$c/InRelease" >/dev/null; then u=$m; break; fi
+            done
+            [ -n "$u" ] || { echo "::error::no fallback mirror answers"; exit 1; }
             echo "::warning::apt-get update failed; retrying with $u"
             for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
               [ -f "$f" ] && sudo sed -i -E "s#mirror\+file:/etc/apt/apt-mirrors\.txt|https?://[a-z0-9.-]*(archive\.ubuntu\.com/ubuntu|ports\.ubuntu\.com/ubuntu-ports)/?#$u#g" "$f"
