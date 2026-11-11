@@ -1685,6 +1685,29 @@ pub(crate) fn records_forgotten(told: (Value, bool), records: Option<u64>) -> (V
     }
 }
 
+/// A forget about's answer `told` with the mail contacts it removed too
+/// (`LAMP_SERVICE_CONTACTS`): none, as it was; some, how many, and that
+/// nothing already sent is undone. Never a name or an address.
+pub(crate) fn contacts_forgotten(told: (Value, bool), contacts: Option<u64>) -> (Value, bool) {
+    let Some(contacts) = contacts.filter(|contacts| *contacts > 0) else {
+        return told;
+    };
+    let (mut answer, answered) = told;
+    let note = format!(
+        "{contacts} saved mail address(es) are forgotten too: a name alone no longer fills them in. Mail already sent stays sent: forgetting does not undo it."
+    );
+    if answer["forgotten"] == true {
+        answer["contacts"] = json!(contacts);
+        answer["contacts_note"] = json!(note);
+        (answer, answered)
+    } else {
+        (
+            json!({"forgotten": true, "contacts": contacts, "note": note}),
+            true,
+        )
+    }
+}
+
 /// The Days memory's socket, when this worker has the Days client: where
 /// the service records are written (`crate::service_records`).
 #[cfg(not(test))]
@@ -9960,6 +9983,7 @@ impl DaysClient {
                 && let Some(person) = person
             {
                 role::forgot(Some(person));
+                crate::service_contacts::forgot(Some(person));
             }
             if call.name == FORGET_EVERYTHING && crate::rules::on() {
                 let rules = json!({"op":"forget_all","person":crate::rules::scope(person)});
@@ -10244,8 +10268,51 @@ impl DaysClient {
         named: bool,
     ) -> (Value, bool) {
         let records = self.forget_records_about(about, person, until);
+        let contacts = self.forget_contacts_about(about, person, until);
         let told = self.forget_kept_about(about, person, until, lease, named);
-        records_forgotten(told, records)
+        contacts_forgotten(records_forgotten(told, records), contacts)
+    }
+
+    /// `LAMP_SERVICE_CONTACTS`: a known person's mail contacts about
+    /// `about` removed in the memory (`service_contacts_forget`), with the
+    /// switch on or off: how many went, `None` with no known person or no
+    /// answer.
+    /// The contacts the voice planned for their waiting writes go too.
+    fn forget_contacts_about(
+        &self,
+        about: &Value,
+        person: Option<&str>,
+        until: Instant,
+    ) -> Option<u64> {
+        // Asked with the switch off too: contacts saved while it was on stay
+        // in the memory until forgotten (Thirteen's P2 on #6122). An older
+        // memory answers `unknown_op`, and none are said removed.
+        let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
+        let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
+            .into_iter()
+            .map(|(_, words)| words)
+            .collect();
+        if words.is_empty() {
+            return None;
+        }
+        let left = until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())?;
+        let answer = bounded_exchange(
+            &self.socket,
+            &json!({"op":"service_contacts_forget","person":person,"about":words}),
+            left,
+        )?;
+        let removed = answer["removed"]
+            .as_u64()
+            .filter(|_| answer["ok"] == true)?;
+        if removed > 0 {
+            crate::service_contacts::forgot_about(person);
+        }
+        eprintln!(
+            "lamp-voice provider: a forget about removed {removed} mail contacts (LAMP_SERVICE_CONTACTS)"
+        );
+        Some(removed)
     }
 
     /// `LAMP_SERVICE_RECORDS`: a known person's service records about
@@ -10706,13 +10773,77 @@ impl DaysClient {
             }
         }
         let mut told = json!({"found":found,"untrusted":true,"scope":BOTH_SCOPE});
-        if ids.is_empty() {
+        // Their service records that the words fit, whatever their age
+        // (`LAMP_SERVICE_RECORDS_TOLD`).
+        let taken = told.to_string().len();
+        let records = deadline.checked_sub(started.elapsed()).and_then(|left| {
+            self.records_recalled(request, person, left, (now, zone), lease, taken)
+        });
+        if let Some(records) = records {
+            told["service_records"] = records;
+        } else if ids.is_empty() {
             told["note"] = json!("Nothing about that in what I remember.");
         }
         if partial {
             mark_partial_span(&mut told);
         }
         Some((told, ids))
+    }
+
+    /// `LAMP_SERVICE_RECORDS_TOLD`: `person`'s service records that a
+    /// recall's words fit, searched in the memory whatever their age
+    /// (`service_records` with `about`), as `service_records::told`
+    /// tells them. Only for a line that passes the services' owner check
+    /// (`services::owner_of`, never the one-face rule) as `person`'s; without
+    /// the read's checks not had (`services::records_in_full`), the status
+    /// only.
+    /// None with the switch off, no words, or no answer in `left`; at most
+    /// what is left of the answer's room past `room_taken`.
+    fn records_recalled(
+        &self,
+        request: &Value,
+        person: &str,
+        left: Duration,
+        (now, zone): (u64, Option<&LocalTime>),
+        lease: Option<&crate::memory_scope::ScopeLease>,
+        room_taken: usize,
+    ) -> Option<Value> {
+        use crate::service_records::told;
+        if !told::on() {
+            return None;
+        }
+        let about = request["query"]
+            .as_str()
+            .map(str::trim)
+            .filter(|about| !about.is_empty())?;
+        let owner = crate::services::owner_of(lease)?;
+        if told::person_for(&owner).as_deref() != Some(person) {
+            return None;
+        }
+        let in_full = crate::services::records_in_full(lease?.key().request, &owner);
+        let answer = exchange_within(
+            &self.socket,
+            &told::about_request(person, about),
+            left,
+            lease,
+            told::FOUND_ANSWER_BYTES,
+        )?;
+        let offset = zone.map_or(0, |zone| zone.offset_minutes_at(now));
+        // Within what the recall's answer has room for.
+        let room = lamp_gemini::MAX_TOOL_JSON_BYTES
+            .saturating_sub(room_taken + 64)
+            .min(told::RECALL_BYTES);
+        let found = told::recall_told(&answer, in_full, now, offset, room)?;
+        eprintln!(
+            "lamp-voice provider: a recall is told {} service record(s), {} (LAMP_SERVICE_RECORDS_TOLD)",
+            found["records"].as_array().map_or(0, Vec::len),
+            if in_full {
+                "in full"
+            } else {
+                "the status only"
+            }
+        );
+        Some(found)
     }
 
     /// Nonblocking handoff. Provenance is captured here, never when a queued
@@ -17726,6 +17857,41 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// A contact saved while `LAMP_SERVICE_CONTACTS` was on is still
+    /// forgotten with it off: the forget about asks the memory to remove it,
+    /// and the model is told how many went (Thirteen's P2 on #6122).
+    #[test]
+    fn a_forget_about_with_the_contacts_switch_off_still_removes_the_saved_ones() {
+        const OWNER: &str = "p-0123456789abcdef";
+        crate::service_records::on_for_test(false);
+        crate::service_contacts::on_for_test(false);
+        let (socket, served) = memory(
+            "contacts-forget-about-off",
+            2,
+            |request| match request["op"].as_str() {
+                Some("service_contacts_forget") => json!({"ok":true,"removed":1}),
+                Some("forget_mark") => json!({"ok":true}),
+                Some("kept") => json!({"ok":true,"entries":[]}),
+                _ => json!({"ok":false}),
+            },
+        );
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about":"Octavia's address"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(OWNER),
+        );
+        assert!(answered, "{told}");
+        served.join().unwrap();
+        // The removed count is the memory's answer to the contacts forget.
+        assert_eq!(told["contacts"], 1, "{told}");
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
     /// The same for forget everything: the person's waiting record goes
     /// before the forget is sent, so one whose answer is lost (it may have
     /// emptied the memory) leaves nothing to write after it; answered, the
@@ -23541,11 +23707,13 @@ mod tests {
             std::env::temp_dir().join(format!("lamp-remember-{name}-{}.sock", std::process::id()));
         let _ = std::fs::remove_file(&socket);
         let listener = UnixListener::bind(&socket).unwrap();
-        // With the records switch off on this test's thread, the forget
-        // about's own records forget (sent whatever the switch, Thirteen's
-        // P2 on #6073) is answered but neither counted nor given back, so
-        // the forget tests written before it read what they did.
+        // With the records (or contacts) switch off on this test's thread,
+        // the forget about's own records (or contacts) forget, sent whatever
+        // the switch (Thirteen's P2 on #6073 and #6122), is answered but
+        // neither counted nor given back, so the forget tests written before
+        // it read what they did.
         let records_on = crate::service_records::on();
+        let contacts_on = crate::service_contacts::on();
         let served = std::thread::spawn(move || {
             let mut read = Vec::new();
             while read.len() < requests {
@@ -23556,7 +23724,9 @@ mod tests {
                     .unwrap();
                 let request: Value = serde_json::from_str(&line).unwrap();
                 let wrote = stream.write_all(format!("{}\n", answer(&request)).as_bytes());
-                if !records_on && request["op"] == "service_records_forget" {
+                if (!records_on && request["op"] == "service_records_forget")
+                    || (!contacts_on && request["op"] == "service_contacts_forget")
+                {
                     // An answer the test's fake never meant for it may be
                     // let go unread.
                     continue;
