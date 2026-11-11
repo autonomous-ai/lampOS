@@ -18,7 +18,11 @@
 //! that doesn't pass is said as not made, and nothing is kept.
 //!
 //! [`made_skill::MAKE`] is the voice's own, whether or not a tasks part is
-//! there: a computer's agent is never handed a skill to make.
+//! there: a computer's agent is never handed a skill to make. With
+//! `LAMP_MAKE_SKILL_AGENT=on` (off, in no product unit) a voice make the
+//! lamp's model didn't make goes to the lamp's own agent, OpenClaw or
+//! Hermes, when the lamp has one ([`crate::make_skill_agent`]): DeepSeek
+//! then gets one try and no repairs, and the agent gets them.
 use crate::made_skill::{self, Keeping, Made, Refused};
 use crate::second_provider::net::{self, Chat, ChatEvent, Message};
 use serde_json::{Value, json};
@@ -39,6 +43,17 @@ pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
 /// begun at 89 s, guarded by one answer alone, could end near 149 s while
 /// the voice's `make_skill` held the turn).
 pub const ROUND_WITHIN: Duration = WRITE_WITHIN.saturating_mul(2);
+
+/// The longest a make goes on: [`MAKE_WITHIN`], and with
+/// `LAMP_MAKE_SKILL_AGENT` the agent's own part after it
+/// ([`crate::make_skill_agent::MAKE_WITHIN`]).
+pub fn longest_make() -> Duration {
+    if crate::make_skill_agent::on() {
+        MAKE_WITHIN + crate::make_skill_agent::MAKE_WITHIN
+    } else {
+        MAKE_WITHIN
+    }
+}
 
 /// Whether a repair begun `elapsed` into a make still ends within
 /// [`MAKE_WITHIN`], its answer asked twice at worst.
@@ -642,7 +657,7 @@ pub fn make_in(
             .and_then(|thread| thread.heard_for(made_in, std::time::Instant::now()))
             .unwrap_or_default()
     });
-    make_with(
+    make_with_by(
         made_in,
         heard.as_deref(),
         request,
@@ -650,6 +665,7 @@ pub fn make_in(
         chat,
         now_unix_ms,
         || crate::services::linked_codes(std::path::Path::new(crate::services::FOLDER)),
+        crate::make_skill_agent::Agent::for_voice().as_ref(),
     )
 }
 
@@ -663,6 +679,31 @@ pub fn make_with(
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     now_unix_ms: u64,
     linked: impl FnOnce() -> Option<Vec<String>>,
+) -> Value {
+    make_with_by(
+        made_in,
+        heard,
+        request,
+        keeping,
+        chat,
+        now_unix_ms,
+        linked,
+        None,
+    )
+}
+
+/// [`make_with`], with the lamp's agent `agent` to hand a make DeepSeek
+/// didn't make to (`LAMP_MAKE_SKILL_AGENT`, [`crate::make_skill_agent`]).
+#[allow(clippy::too_many_arguments)]
+fn make_with_by(
+    made_in: u64,
+    heard: Option<&str>,
+    request: &str,
+    keeping: &Keeping,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    now_unix_ms: u64,
+    linked: impl FnOnce() -> Option<Vec<String>>,
+    agent: Option<&crate::make_skill_agent::Agent>,
 ) -> Value {
     let brief = match made_skill::brief(request) {
         Ok(brief) => brief,
@@ -681,6 +722,7 @@ pub fn make_with(
         keeping,
         chat,
         &format!("{FROM}{now_unix_ms}"),
+        agent,
     );
     // An ask by voice that made nothing, for the opt-in health report's
     // counts: one atomic add here, written later (`crate::made_counts`).
@@ -1023,7 +1065,7 @@ pub fn make_kept(
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     from: &str,
 ) -> Result<Made, Refused> {
-    make_kept_heard(request, None, brief, keeping, chat, from)
+    make_kept_heard(request, None, brief, keeping, chat, from, None)
 }
 
 /// [`make_kept`] by voice: a write held to `heard`, the line the person
@@ -1035,13 +1077,15 @@ fn make_kept_heard(
     keeping: &Keeping,
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     from: &str,
+    agent: Option<&crate::make_skill_agent::Agent>,
 ) -> Result<Made, Refused> {
-    let (made, line) = made_and_journaled(request, heard, brief, keeping, chat, from);
+    let (made, line) = made_and_journaled_by(request, heard, brief, keeping, chat, from, agent);
     eprintln!("{line}");
     made
 }
 
 /// [`make_kept`]'s make, and the journal's line for it ([`kept_line`]).
+#[cfg(test)]
 fn made_and_journaled(
     request: &str,
     heard: Option<&str>,
@@ -1049,6 +1093,20 @@ fn made_and_journaled(
     keeping: &Keeping,
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     from: &str,
+) -> (Result<Made, Refused>, String) {
+    made_and_journaled_by(request, heard, brief, keeping, chat, from, None)
+}
+
+/// [`made_and_journaled`], with the lamp's agent `agent` to hand a make
+/// DeepSeek didn't make to ([`handed_to_agent`]).
+fn made_and_journaled_by(
+    request: &str,
+    heard: Option<&str>,
+    brief: String,
+    keeping: &Keeping,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    from: &str,
+    agent: Option<&crate::make_skill_agent::Agent>,
 ) -> (Result<Made, Refused>, String) {
     let began = std::time::Instant::now();
     let chat = Arc::new(chat);
@@ -1084,32 +1142,38 @@ fn made_and_journaled(
             }
         }
     };
-    let mut made = kept(ask(Arc::clone(&chat), brief));
+    // With the switch and an agent on the lamp, DeepSeek gets one try and
+    // no repairs; what it doesn't make goes to the agent, which gets the
+    // repairs. Without either, DeepSeek's repairs stay as they are.
+    let engine = agent.and_then(|agent| agent.engine().map(|engine| (agent, engine)));
+    if agent.is_some() && engine.is_none() {
+        eprintln!("lamp-voice: a skill made here: no agent on the lamp: DeepSeek makes it alone");
+    }
+    let mut made = kept(ask(Arc::clone(&chat), brief.clone()));
     // Refused by the lamp's check, by `plainly`, as TOML that can't be
     // read, or the example given back: its lines go back to the model, up
     // to [`MOST_REPAIRS`] times (`made_skill::repair_brief`; the owner,
     // 10 Nov: "re-run it yourself until it works"), each begun only while
     // one more round, two answers at worst, still fits [`MAKE_WITHIN`].
-    for round in 1..=MOST_REPAIRS {
-        let Err(Refused(why, Some(lines))) = &made else {
-            break;
-        };
-        if !round_fits(began.elapsed()) {
-            eprintln!(
-                "lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}: no time left, \
-                 not asked"
-            );
-            break;
-        }
-        let Ok(repair) = made_skill::repair_brief(request, lines) else {
-            break;
-        };
-        // What was refused, in the lamp's own words: the part itself (its
-        // keys and topic, or the check's first line) is journaled where it
-        // was refused, never the model's lines.
-        eprintln!("lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}: {why}");
-        made = kept(ask(Arc::clone(&chat), repair));
+    if engine.is_none() {
+        made = repaired(
+            made,
+            request,
+            "",
+            || round_fits(began.elapsed()),
+            |repair| kept(ask(Arc::clone(&chat), repair)),
+        );
     }
+    let made = match engine {
+        Some((agent, engine)) if made.is_err() => {
+            handed_to_agent(made, request, &brief, agent, engine, &kept)
+        }
+        Some(_) => {
+            eprintln!("lamp-voice: a skill made here: made by DeepSeek");
+            made
+        }
+        None => made,
+    };
     let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
     // The person hears the lamp's own reason in everyday words, the
     // journal's line above keeping it whole (the owner, 11 Nov: reasons
@@ -1121,6 +1185,89 @@ fn made_and_journaled(
         made => made,
     };
     (made, line)
+}
+
+/// A refused `made`'s repairs: its check's lines go back to the writer
+/// (`again`), up to [`MOST_REPAIRS`] times, each begun only while `fits`.
+/// `by` names the writer in the journal ("" for DeepSeek, as before).
+fn repaired(
+    mut made: Result<Made, Refused>,
+    request: &str,
+    by: &str,
+    fits: impl Fn() -> bool,
+    mut again: impl FnMut(String) -> Result<Made, Refused>,
+) -> Result<Made, Refused> {
+    for round in 1..=MOST_REPAIRS {
+        let Err(Refused(why, Some(lines))) = &made else {
+            break;
+        };
+        if !fits() {
+            eprintln!(
+                "lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}{by}: no time left, \
+                 not asked"
+            );
+            break;
+        }
+        let Ok(repair) = made_skill::repair_brief(request, lines) else {
+            break;
+        };
+        // What was refused, in the lamp's own words: the part itself (its
+        // keys and topic, or the check's first line) is journaled where it
+        // was refused, never the model's lines.
+        eprintln!("lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}{by}: {why}");
+        made = again(repair);
+    }
+    made
+}
+
+/// A make DeepSeek didn't make (`deepseek`), handed to the lamp's agent
+/// `agent`, called `engine` (`LAMP_MAKE_SKILL_AGENT`): the same system
+/// prompt and `brief`, its answer through the same checks (`kept`) and
+/// with repairs of its own, each begun only while one more answer fits
+/// the agent's [`crate::make_skill_agent::MAKE_WITHIN`]. With no answer
+/// from it at first (none within its 45 s, or no agent after all),
+/// DeepSeek's failure stands, as without the switch.
+fn handed_to_agent(
+    deepseek: Result<Made, Refused>,
+    request: &str,
+    brief: &str,
+    agent: &crate::make_skill_agent::Agent,
+    engine: &str,
+    kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
+) -> Result<Made, Refused> {
+    eprintln!("lamp-voice: a skill made here: DeepSeek failed: handed to the agent ({engine})");
+    agent.say_waiting();
+    let began = std::time::Instant::now();
+    let write = |brief: &str| {
+        agent
+            .write(&system(), brief)
+            .map_err(|why| why.to_string())
+            .and_then(|text| whole(text).map_err(|why| why.to_string()))
+    };
+    let first = match write(brief) {
+        Ok(text) => text,
+        Err(why) => {
+            eprintln!(
+                "lamp-voice: a skill made here: the agent ({engine}) made none ({why}): \
+                 DeepSeek's failure stands"
+            );
+            // No answer of the agent's was taken, so whether the last was a
+            // `cannot:` is still DeepSeek's (`models_cannot`).
+            return deepseek;
+        }
+    };
+    let made = repaired(
+        kept(Ok(first)),
+        request,
+        " by the agent",
+        || began.elapsed() + agent.within <= agent.make_within,
+        |repair| kept(write(&repair)),
+    );
+    match &made {
+        Ok(_) => eprintln!("lamp-voice: a skill made here: made by the agent ({engine})"),
+        Err(_) => eprintln!("lamp-voice: a skill made here: the agent's ({engine}) wasn't kept"),
+    }
+    made
 }
 
 /// The journal's line for a make that took `ms`: kept, or not kept and
@@ -3082,6 +3229,102 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A skill's answer the lamp can't say plainly: refused by the check
+    /// with its lines, so a repair would follow.
+    fn faces() -> String {
+        good().replace(
+            "topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n",
+            "topic = \"humans/faces/tracked\"\nnear = 0.14\n",
+        )
+    }
+
+    /// `LAMP_MAKE_SKILL_AGENT` (#6059's proposal): a stub tasks part whose
+    /// `lamp` target runs Hermes, answering each hand-over from `answers`.
+    fn agent_answering(answers: Vec<Option<String>>) -> crate::make_skill_agent::tests::StubTasks {
+        let answers = std::sync::Mutex::new(answers.into_iter());
+        crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(move |rules: &str| {
+                // The same system prompt and brief DeepSeek is sent.
+                assert!(rules.starts_with(&system()), "{rules}");
+                assert!(rules.contains(made_skill::BRIEF_HEAD), "{rules}");
+                answers.lock().unwrap().next().flatten()
+            }),
+        )
+    }
+
+    fn made_by(
+        keeping: &Keeping,
+        url: String,
+        agent: Option<&crate::make_skill_agent::Agent>,
+        now: u64,
+    ) -> Value {
+        make_with_by(0, None, REQUEST, keeping, chat_at(url), now, || None, agent)
+    }
+
+    /// With the switch and an agent on the lamp, DeepSeek's answer kept is
+    /// the make: the agent is never asked.
+    #[test]
+    fn deepseek_kept_hands_nothing_to_the_agent() {
+        let (root, keeping) = keeping("agent-not-asked");
+        let tasks = agent_answering(vec![Some(good())]);
+        let (url, served) = service(vec![(200, good())]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.prepares(), 0);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner, 11 Nov: with an agent on the lamp, DeepSeek gets one try
+    /// and no repairs. Its one answer refused, the make goes to the agent at
+    /// once, whose answer goes through the same checks and is kept; the
+    /// agent gets the repairs.
+    #[test]
+    fn deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair() {
+        let (root, keeping) = keeping("agent-asked");
+        let tasks = agent_answering(vec![Some(faces()), Some(good())]);
+        let (url, served) = service(vec![(200, faces())]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        // DeepSeek asked once, no repair; the agent's first answer refused
+        // and repaired by the agent itself.
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.prepares(), 2);
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// With the switch but no agent on the lamp, DeepSeek keeps its
+    /// repairs and its failure stands, as without the switch; with the
+    /// agent never answering (its 45 s, short here), DeepSeek's failure
+    /// stands too.
+    #[test]
+    fn no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today() {
+        let (root, keeping) = keeping("agent-none");
+        let none = crate::make_skill_agent::tests::stub(None, std::sync::Arc::new(|_: &str| None));
+        let (url, served) = service(vec![(200, faces()); 1 + MOST_REPAIRS]);
+        let told = made_by(&keeping, url, Some(&none.agent()), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+        );
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
+        assert_eq!(none.prepares(), 0);
+        let silent = agent_answering(vec![None]);
+        let (url, served) = service(vec![(200, faces())]);
+        let told = made_by(&keeping, url, Some(&silent.agent()), NOW + 1);
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(silent.prepares(), 1);
+        assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }
 

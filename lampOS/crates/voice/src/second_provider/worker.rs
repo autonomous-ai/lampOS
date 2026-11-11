@@ -2073,6 +2073,11 @@ pub fn serve(
     // A skill made by the lamp's own model asks this worker's chat.
     if files.tools.make_skill {
         crate::make_skill_local::set_config(config.clone());
+        // And, with `LAMP_MAKE_SKILL_AGENT`, a make it didn't make goes to
+        // the lamp's agent through this worker's tasks part.
+        if let Some(place) = &files.tools.tasks {
+            crate::make_skill_agent::set_tasks_dir(place.directory.clone());
+        }
     }
     if own_key_report(own_keys_on, config.hosted.own_deepseek.is_some()).is_some() {
         report_own_key(
