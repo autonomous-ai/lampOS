@@ -16,6 +16,8 @@ export function tokenOk(url, token) {
 }
 
 // The page's own origin only: http://localhost:PORT or http://127.0.0.1:PORT.
-export function originOk(origin, port) {
-  return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`;
+export function originOk(origin, port, host) {
+  // `host`, only when the twin is on the LAN (--lan): the page's own origin is whatever address it was
+  // opened at, so an Origin equal to the Host the request came to is the page itself; any other website's is not.
+  return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}` || (Boolean(host) && origin === `http://${host}`);
 }

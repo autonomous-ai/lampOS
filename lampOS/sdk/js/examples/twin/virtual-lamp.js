@@ -4,7 +4,7 @@
 // on it. The twin, the SDK and lamp-mcp then see a lamp like any other.
 //
 //   node examples/twin/virtual-lamp.js [--lamp-sim PATH] [--bin-dir DIR] [--dir DIR]
-//        [--port N] [--twin-port N] [--glb PATH] [--camera=always] [--microphone] [--no-open] [--browser]
+//        [--port N] [--twin-port N] [--glb PATH] [--camera=always] [--microphone] [--no-open] [--browser] [--try]
 //
 // --lamp-sim PATH   the lamp-sim binary (default: `lamp-sim` on the PATH)
 // --bin-dir DIR     where lamp-body and lamp-control are (default: beside lamp-sim)
@@ -12,6 +12,8 @@
 // --port N          the lamp's door, on 127.0.0.1 (default 7731)
 // --twin-port N     the twin's page (default 8737)
 // --glb PATH        the rigged CAD for the twin (default: the repository's, which needs `git lfs pull`)
+// --try             the try-it app (see try.js): the page on the LAN too, with a control panel, stimuli and
+//                   an event log; no camera or microphone grant
 // --browser         open the default browser's tab, not a window of its own (the default is a
 //                   chromeless Chrome/Chromium/Edge window, the browser's own tab when none is installed)
 // It pairs a fresh keyring under DIR/sdk each start (the lamp makes a new
@@ -27,12 +29,14 @@ import { Keyring, Lamp } from '../../src/index.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const GRANTS = 'body,light,speak,look,hear,sound,air,device,camera,microphone';
+// The try-it app's lamp has no camera or microphone grant: a picture of the room would sit on the LAN page.
+const TRY_GRANTS = 'body,light,speak,look,hear,sound,air,device';
 
 export function parseArguments(args) {
   const out = { flags: [] };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--no-open' || arg === '--browser' || arg === '--microphone' || arg.startsWith('--camera=')) out.flags.push(arg);
+    if (arg === '--no-open' || arg === '--browser' || arg === '--try' || arg === '--microphone' || arg.startsWith('--camera=')) out.flags.push(arg);
     else if (arg.startsWith('--') && args[i + 1] !== undefined) out[arg.slice(2)] = args[++i];
     else throw new Error(`unknown argument ${arg}`);
   }
@@ -128,39 +132,46 @@ export async function start(options, log = console.log) {
   }
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   chmodSync(dir, 0o700);
+  const tryApp = options.flags.includes('--try');
   const children = [];
   const stop = () => { for (const child of children) child.kill('SIGTERM'); };
   try {
-    const lamp = spawn(lampSim, ['run', dir, ...binDir, '--listen', `127.0.0.1:${port}`, ...options.flags.filter((f) => f !== '--no-open' && f !== '--browser')], { stdio: ['ignore', 'inherit', 'inherit'] });
+    const lamp = spawn(lampSim, ['run', dir, ...binDir, '--listen', `127.0.0.1:${port}`, ...options.flags.filter((f) => f !== '--no-open' && f !== '--browser' && f !== '--try')], { stdio: ['ignore', 'inherit', 'inherit'] });
     children.push(lamp);
     const ended = new Promise((_, reject) => lamp.on('close', (code) => reject(new Error(`lamp-sim ended (${code})`))));
     ended.catch(() => {});
     await Promise.race([listening(port, 60_000), ended]);
     // lamp-control answers on its admin socket a moment after its door opens.
-    const given = pairingFrom(await outputOf(lampSim, ['code', dir, ...binDir, '--grants', GRANTS]));
+    const given = pairingFrom(await outputOf(lampSim, ['code', dir, ...binDir, '--grants', tryApp ? TRY_GRANTS : GRANTS]));
     const home = join(dir, 'sdk');
     rmSync(home, { recursive: true, force: true });
     const pairing = await Lamp.pair(given.code, '127.0.0.1', { pin: given.pin, port, name: 'virtual lamp viewer', keyring: new Keyring(home) });
     log(`paired with ${pairing.name} as ${pairing.client}; your own programs: LAMPOS_HOME=${home}`);
-    const twin = spawn(process.execPath, [fileURLToPath(new URL('server.js', import.meta.url)), '--port', String(options['twin-port'] ?? 8737), ...(options.glb ? ['--glb', options.glb] : [])], {
+    const twin = spawn(process.execPath, [fileURLToPath(new URL('server.js', import.meta.url)), '--port', String(options['twin-port'] ?? 8737), ...(options.glb ? ['--glb', options.glb] : []),
+      ...(tryApp ? ['--lan', '--stim-dir', dir, '--lamp-sim', lampSim] : [])], {
       env: { ...process.env, LAMPOS_HOME: home }, stdio: ['ignore', 'pipe', 'inherit'],
     });
     children.push(twin);
-    const url = await new Promise((resolve, reject) => {
+    // The twin prints its local URL, and with --lan the one on this computer's network too.
+    const urls = await new Promise((resolve, reject) => {
       let text = '';
+      let timer;
       twin.stdout.on('data', (chunk) => {
         text += chunk;
-        const found = /http:\/\/localhost:\d+\/\?t=\S+/.exec(text);
-        if (found) resolve(found[0]);
+        const local = /http:\/\/localhost:\d+\/\?t=\S+/.exec(text)?.[0];
+        const network = /on your network: (http:\/\/[\d.]+:\d+\/\?t=\S+)/.exec(text)?.[1];
+        if (local && (network || !tryApp)) resolve({ local, network });
+        else if (local) timer ??= setTimeout(() => resolve({ local }), 1500);
       });
       twin.on('close', (code) => reject(new Error(`the twin ended (${code})`)));
     });
+    const url = urls.local;
     log(`the virtual lamp: ${url}`);
     if (!options.flags.includes('--no-open')) openBrowser(url, { window: !options.flags.includes('--browser') }).catch(() => {});
     // Rejects when the lamp or the twin ends; a caller that stops them itself need not look.
     const closed = Promise.race([ended, new Promise((_, reject) => twin.on('close', () => reject(new Error('the twin ended'))))]);
     closed.catch(() => {});
-    return { url, home, stop, closed };
+    return { url, network: urls.network, home, stop, closed };
   } catch (error) {
     stop();
     throw error;
