@@ -315,8 +315,9 @@ fn run() -> Result<()> {
             let place=lamp_voice::agent_tasks::Place{directory:"/nonexistent".into(),target:lamp_voice::agent_tasks::DEFAULT_TARGET.into(),who:false,lead_in,asked,accounts:false,machine_names:false,needs:None,staff_note:false,named_only:false,correct:false,sign_in:false,sign_in_app:false,questions,now:false,one_yes:false,reply_named:false,harness_status:false};
             // With the switch, each session is told after the persona what a lamp's would be (#854).
             let note=lamp_voice::agent_tasks::session_note(&place).unwrap_or_default();
-            let colour=lamp_gemini::Tool{name:"light_colour".into(),description:"Set the colour of your own light when you are asked to.".into(),parameters:Some(serde_json::json!({"type":"object","properties":{"colour":{"type":"string","enum":["white","warm","red","green","blue","purple"]}},"required":["colour"]})),silent:false};
-            let tools:Vec<lamp_gemini::Tool>=lamp_voice::tools::declared(&lamp_voice::tools::Settings{decline:true,exec:None,memory:None,clock:false,..Default::default()}).into_iter().chain([colour]).chain(lamp_voice::agent_tasks::tools(&place)).collect();
+            // The lamp's own light functions, as the actions part declares them, so a step warmer is told apart from the colour warm (#6456).
+            let light=lamp_actions::catalog(false,true).into_iter().map(|function|lamp_gemini::Tool{name:function.name.into(),description:function.description.into(),parameters:function.parameters,silent:false});
+            let tools:Vec<lamp_gemini::Tool>=lamp_voice::tools::declared(&lamp_voice::tools::Settings{decline:true,exec:None,memory:None,clock:false,..Default::default()}).into_iter().chain(light).chain(lamp_voice::agent_tasks::tools(&place)).collect();
             let mut results=Vec::new();
             tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(async {
                 use lamp_gemini::Event;
