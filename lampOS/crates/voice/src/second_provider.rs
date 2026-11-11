@@ -120,6 +120,40 @@ pub const CUE_AFTER: Duration = Duration::from_millis(1_500);
 /// clip is ready. The deadline from the words is the configured cue delay
 /// plus this interval: 4.5 s with [`CUE_AFTER`], 7 s with [`CUE_AFTER_MOST`].
 pub const BEGIN_WITHIN_AFTER_CUE: Duration = Duration::from_secs(3);
+/// In mainland China (#6414) a chat's first event crosses a slower border:
+/// [`BEGIN_WITHIN`] is 5 s there and [`BEGIN_WITHIN_AFTER_CUE`] 4 s.
+pub const CN_BEGIN_WITHIN: Duration = Duration::from_secs(5);
+pub const CN_BEGIN_WITHIN_AFTER_CUE: Duration = Duration::from_secs(4);
+/// Where the voice reads the region the backend places the lamp in (#6414):
+/// the file lamp-cloud keeps in its state folder from the ping's reply,
+/// `CN` or empty. Unset: [`REGION_FILE`].
+pub const REGION_FILE_ENVIRONMENT: &str = "LAMP_REGION_FILE";
+pub const REGION_FILE: &str = "/var/lib/lampos-cloud/region";
+
+/// Whether the region file's text (`None`: missing or unreadable) places
+/// the lamp in mainland China.
+pub fn in_china(region: Option<&str>) -> bool {
+    region.is_some_and(|region| region.trim() == "CN")
+}
+
+/// The region file's text, from [`REGION_FILE_ENVIRONMENT`] or
+/// [`REGION_FILE`].
+pub fn region_from_file() -> Option<String> {
+    let path = std::env::var_os(REGION_FILE_ENVIRONMENT)
+        .unwrap_or_else(|| std::ffi::OsString::from(REGION_FILE));
+    std::fs::read_to_string(path).ok()
+}
+
+/// A spoken turn's first-round bounds, without and with the wait's sound:
+/// [`BEGIN_WITHIN`] and [`BEGIN_WITHIN_AFTER_CUE`], or their longer China
+/// values.
+pub fn begin_limits(in_china: bool) -> (Duration, Duration) {
+    if in_china {
+        (CN_BEGIN_WITHIN, CN_BEGIN_WITHIN_AFTER_CUE)
+    } else {
+        (BEGIN_WITHIN, BEGIN_WITHIN_AFTER_CUE)
+    }
+}
 /// With it, the wait sound comes this many milliseconds after the words in
 /// place of [`CUE_AFTER`], from [`CUE_AFTER_LEAST`] to [`CUE_AFTER_MOST`]
 /// (Fourth's breakdown of the silences on lamp-4ace, #2602, 21 Oct 20:41).
@@ -1542,6 +1576,9 @@ struct Shared {
     /// The lamp's own written turns may begin as late as
     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
     written_wait: bool,
+    /// A first round's bounds, without and with the wait's sound
+    /// ([`begin_limits`], [`Engine::in_china`]).
+    begin: (Duration, Duration),
     /// With `LAMP_SECOND_CHAT_SECOND_TRY=on`: how long after the words a first
     /// round with no response head goes once more ([`Engine::trying_the_chat_twice`]).
     second_try: Option<Duration>,
@@ -4348,6 +4385,7 @@ impl Engine {
                 declined_in_place: Mutex::new(None),
                 asked_person: None,
                 written_wait: false,
+                begin: begin_limits(false),
                 second_try: None,
                 #[cfg(test)]
                 second_try_journal: None,
@@ -5627,6 +5665,16 @@ impl Engine {
     pub fn waiting_for_written(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.written_wait = on;
+        }
+        self
+    }
+
+    /// In mainland China (#6414): a first round may begin as late as
+    /// [`CN_BEGIN_WITHIN`], or [`CN_BEGIN_WITHIN_AFTER_CUE`] after the wait's
+    /// sound. Before any turn only.
+    pub fn in_china(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.begin = begin_limits(on);
         }
         self
     }
@@ -11901,12 +11949,13 @@ enum Asker {
 
 /// How long a turn's first round may take to begin, when it has no wait's
 /// sound and is no look: [`WRITTEN_BEGIN_WITHIN`] for one the lamp wrote
-/// itself with `written_wait`, else [`BEGIN_WITHIN`].
-fn begin_within(heard: bool, written_wait: bool) -> Duration {
+/// itself with `written_wait`, else `spoken` ([`BEGIN_WITHIN`], or
+/// [`CN_BEGIN_WITHIN`] in mainland China).
+fn begin_within(heard: bool, written_wait: bool, spoken: Duration) -> Duration {
     if !heard && written_wait {
         WRITTEN_BEGIN_WITHIN
     } else {
-        BEGIN_WITHIN
+        spoken
     }
 }
 
@@ -14792,9 +14841,9 @@ async fn answer(
                 let say = say.keeping(shared.second_try_journal.clone());
                 // The wait below, which is the most this round can be answered in.
                 let limit = if shared.cues.is_some() && heard {
-                    shared.cue_after + BEGIN_WITHIN_AFTER_CUE
+                    shared.cue_after + shared.begin.1
                 } else {
-                    begin_within(heard, shared.written_wait)
+                    begin_within(heard, shared.written_wait, shared.begin.0)
                 };
                 let (racing, kept) = second_try::race(
                     stream,
@@ -14872,7 +14921,7 @@ async fn answer(
                     } else if looking {
                         LOOK_BEGIN_WITHIN
                     } else {
-                        begin_within(heard, shared.written_wait)
+                        begin_within(heard, shared.written_wait, shared.begin.0)
                     };
                     // The wait sound stays timed from the line's end (or a
                     // resend), not from a held face save's end: the person
@@ -14899,7 +14948,7 @@ async fn answer(
                                 );
                                 reached(&writing_times, |times| &mut times.cue);
                                 cue(shared, request, clip).await?;
-                                shared.cue_after + BEGIN_WITHIN_AFTER_CUE
+                                shared.cue_after + shared.begin.1
                             }
                             // No sound ready yet (the first turn after a
                             // start, its clips still rendering): the same
@@ -14907,7 +14956,7 @@ async fn answer(
                             // chat that begins late is answered (#3755: the
                             // first turn after a restart had 3 s, the rest
                             // 4.5 s, while its chat was coldest).
-                            None => shared.cue_after + BEGIN_WITHIN_AFTER_CUE,
+                            None => shared.cue_after + shared.begin.1,
                         };
                         next = tokio::time::timeout_at(at(bound), stream.next()).await;
                     }

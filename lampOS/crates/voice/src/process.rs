@@ -2009,6 +2009,8 @@ fn second_route_worker_environment(
         crate::second_config::KEY_TERMS_ENV,
         // The owner's language (#4473): the worker's speech and character.
         crate::language::FILE_ENVIRONMENT,
+        // The region file (#6414): a lamp in China waits longer for a first round.
+        crate::second_provider::REGION_FILE_ENVIRONMENT,
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
@@ -3178,6 +3180,8 @@ mod tests {
                     "/etc/lampOS/person/name"
                 } else if name == crate::language::FILE_ENVIRONMENT {
                     "/etc/lampOS/setup/language"
+                } else if name == crate::second_provider::REGION_FILE_ENVIRONMENT {
+                    "/var/lib/lampos-cloud/region"
                 } else if name == crate::task_news::TOLD_ENVIRONMENT {
                     "/var/lib/lampOS/voice/tasks-told"
                 } else if name == crate::second_config::CREDENTIALS_ENV {
@@ -3468,6 +3472,7 @@ mod tests {
                     "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
+                    "LAMP_REGION_FILE=/var/lib/lampos-cloud/region",
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_REMINDERS_ASKED=on",

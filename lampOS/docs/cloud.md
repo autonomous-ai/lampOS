@@ -89,7 +89,13 @@ against lamp-06c1.
   channels) or a new `device_id` replaces the account: the connection is made
   again with it, and the rotated login is kept in `lamp-cloud`'s own state
   folder (`/var/lib/lampos-cloud/rotated.json`, 0600), preferred over
-  setup's while its device id is the same. A failing ping is said once, and
+  setup's while its device id is the same. The reply's `region` (`""` or
+  `"CN"`; anything else reads as `""`, #6414) is no part of the account, so
+  it never reconnects the broker: on a change it is written to `region` in
+  the same folder (`/var/lib/lampos-cloud/region`, 0644, written whole and
+  renamed into place) and the journal says `the backend places the lamp in
+  region "CN"`. It is kept across boots and read at start, so only a change
+  is written; the voice reads it (`second-voice.md`). A failing ping is said once, and
   once when it answers again. When the lamp's address moves, the HTTP
   client is made afresh, as V1 drops its idle connections.
 

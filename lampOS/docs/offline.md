@@ -247,8 +247,10 @@ internet, not the relay, and nothing in #830 depends on the relay.
 
 - **`lamp-health serve --online on --reach-probe on`** (`crates/health/src/reach.rs`):
   while the voice's link is down, and only then, a TCP connection to
-  1.1.1.1:443 and 8.8.8.8:443 at once, any answering is enough, at most
-  every 30 s (`PROBE_EVERY`), the try bounded at 2 s (`PROBE_WITHIN`), on its
+  223.5.5.5:443, 1.1.1.1:443 and 8.8.8.8:443 at once (223.5.5.5 for a lamp
+  in mainland China, #6414), any answering is enough, at most
+  every 30 s (`PROBE_EVERY`), the try bounded at 4 s (`PROBE_WITHIN`; a
+  host answering in 3 s across a slow border still counts), on its
   own thread so the loop never waits; nothing is sent on a connection made.
   Its verdict goes in `lamp/online` (`parts::with_reach`): the internet
   answering is `online: true`, `from: "reach"`; not answering is `online:
