@@ -456,7 +456,7 @@ heard line only, nothing kept.
   `save_draft` is refused before anything is held or called, with
   `writes::NO_DRAFTS`, "this Gmail link can't save drafts: only one linked
   with an app password can. Say "I can't save a draft yet. I can read it
-  back and send it when you say 'send it'."", and `drafts` with "this Gmail
+  to you and send it when you say yes."", and `drafts` with "this Gmail
   link reads no drafts: only one linked with an app password does" (the
   link holds no `gmail.compose`).
 - **Scopes** it needs from Google: `gmail.readonly` for the profile, the
@@ -1166,8 +1166,8 @@ as any write and saved in Gmail's Drafts when the person agrees, in any
 words (above, "Drafts"), never sent. A Google sign-in's Gmail link
 (`gmail-app`, or `gmail` made with one) holds no `gmail.compose` and saves
 none: its `save_draft` is refused with the call's own reason, which carries
-the line to say, "I can't save a draft yet. I can read it back and send it
-when you say 'send it'." After any read-back the lamp asks short (the owner,
+the line to say, "I can't save a draft yet. I can read it to you and send it
+when you say yes." After any read-back the lamp asks short (the owner,
 10 Nov), and the model judges any answer. Since any yes sends it (#6009),
 the lamp asks rather than names words to say: "Shall I send it?" ("Gửi
 không?"), a draft "Shall I save it?" ("Lưu không?"), an event or a file
