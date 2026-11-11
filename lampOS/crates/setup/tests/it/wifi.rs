@@ -561,6 +561,54 @@ fn a_name_that_is_not_found_in_time_is_waited_for_once_and_never_twice() {
     assert_eq!(LOOKUPS.load(Ordering::SeqCst), 1);
 }
 
+#[test]
+fn the_internet_checks_tls_with_the_backend_setup_was_given_not_gemini() {
+    // #6256: Gemini is blocked in China; the product's relay is not.
+    use lamp_setup::wifi::{DEFAULT_REACH, reach_address};
+    for (given, address) in [
+        (
+            "https://campaign-api.autonomous.ai/api/v1/ai/v1",
+            "campaign-api.autonomous.ai:443",
+        ),
+        ("https://backend.example/v1", "backend.example:443"),
+        (
+            "https://backend.example:8443/api/v1",
+            "backend.example:8443",
+        ),
+        ("http://user:secret@backend.example", "backend.example:443"),
+        ("backend.example/v1", "backend.example:443"),
+        ("https://[2001:db8::1]/v1", "[2001:db8::1]:443"),
+        ("https://[2001:db8::1]:8443", "[2001:db8::1]:8443"),
+        (" https://backend.example?mqtt=true ", "backend.example:443"),
+        ("", DEFAULT_REACH),
+        ("https://", DEFAULT_REACH),
+    ] {
+        assert_eq!(reach_address(given), address, "{given:?}");
+    }
+    assert!(!DEFAULT_REACH.contains("googleapis"));
+}
+
+fn hangs(_: &str) -> io::Result<Vec<SocketAddr>> {
+    thread::sleep(Duration::from_secs(30));
+    Ok(vec![])
+}
+
+#[test]
+fn a_hanging_lookup_fails_the_check_at_5_s_not_3_s() {
+    // #6256: a slow first lookup, or a far server, gets 5 s, not V1's 3 s.
+    let began = Instant::now();
+    let reached = Reach::with_lookup(
+        "lamp-setup-hangs.invalid:443",
+        lamp_setup::wifi::REACH_TIMEOUT,
+        hangs,
+    )
+    .check();
+    let took = began.elapsed();
+    assert!(!reached);
+    assert!(took >= Duration::from_millis(4900), "{took:?}");
+    assert!(took < Duration::from_secs(6), "{took:?}");
+}
+
 /// The first builder's P3 7 on #2617: wpa_supplicant 2.10 ends a line at a
 /// `#` after a closing quote, so a password holding `"` and then `#` would
 /// be cut. Such a password is written as its 64-hex PSK, which holds any
