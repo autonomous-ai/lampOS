@@ -1030,6 +1030,11 @@ pub fn parts() -> Vec<Part> {
 pub trait Host {
     /// A system user with its own group, no login and no home, in `groups`.
     fn add_user(&mut self, name: &str, groups: &[String]) -> Result<(), String>;
+    /// The local agent's user (`docs/control.md`, "The local agent"): the
+    /// group `group` made if the image has none, and `user` made in it with a
+    /// home of its own and a shell, which a coding agent needs, and no
+    /// password. Never `lampos`.
+    fn add_agent_user(&mut self, user: &str, group: &str) -> Result<(), String>;
     /// `systemctl daemon-reload`, then `systemctl enable` each unit.
     fn enable(&mut self, units: &[String]) -> Result<(), String>;
     /// `systemd-tmpfiles --create` of one file.
@@ -1087,6 +1092,23 @@ impl Host for System {
             command.args(["--groups", &groups.join(",")]);
         }
         run(command.arg(name))
+    }
+
+    fn add_agent_user(&mut self, user: &str, group: &str) -> Result<(), String> {
+        // `groupadd` ends 9 when the group is there already: made only if not.
+        let there = fs::read_to_string("/etc/group").is_ok_and(|text| {
+            text.lines()
+                .any(|line| line.split(':').next() == Some(group))
+        });
+        if !there {
+            run(Command::new("groupadd").args(["--system", group]))?;
+        }
+        let mut command = Command::new("useradd");
+        command.args(["--create-home", "--user-group", "--shell", "/bin/bash"]);
+        run(command.arg(user))?;
+        // `useradd --groups` did not put the user in the group on lamp-75c9
+        // (12:57 run, 11 Nov): said again, as its own step.
+        run(Command::new("usermod").args(["--append", "--groups", group, user]))
     }
 
     fn enable(&mut self, units: &[String]) -> Result<(), String> {
@@ -1959,6 +1981,20 @@ fn before_units(
         if !has_user(config, user) {
             host.add_user(user, &groups)?;
             changed.push(format!("made the user {user}"));
+        }
+    }
+    // The local agent's user and group, on every lamp (a round never makes a
+    // user, so one already in a home gets them when `install` runs again): nothing listens on its socket until the owner
+    // turns the switch on in the app. The names are constants, never `lampos`.
+    {
+        use lamp_msgs::local_agent::{GROUP, USER as AGENT};
+        if !has_user(config, AGENT) {
+            host.add_agent_user(AGENT, GROUP)?;
+            // Said now as well as listed: a lamp-update that is not the
+            // build's own hands over by `exec` below, which drops this list
+            // (the run on lamp-75c9, 11 Nov: the user was made, no line came).
+            say(&format!("made the user {AGENT} in the group {GROUP}"));
+            changed.push(format!("made the user {AGENT} in the group {GROUP}"));
         }
     }
 

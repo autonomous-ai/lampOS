@@ -2370,7 +2370,8 @@ fn run_not_emptied_reboots_instead_of_starting_in_place() {
 
 /// What starting in place empties is every folder a part keeps in `/run`
 /// past its stop, and only those: each `/run/lampos-*` folder the product's
-/// tmpfiles make (but the locks, which hold no one's words), and each
+/// tmpfiles make (but the locks and the local agent's socket folder, which
+/// hold no one's words), and each
 /// product unit's `RuntimeDirectory=` with `RuntimeDirectoryPreserve=yes`.
 /// A unit that starts keeping its folder fails this until it is named.
 #[test]
@@ -2382,7 +2383,9 @@ fn what_starting_in_place_empties_is_every_folder_kept_in_run_past_a_stop() {
         .filter_map(|line| line.strip_prefix("d "))
         .filter_map(|rest| rest.split_whitespace().next())
         .filter(|folder| {
-            folder.starts_with("/run/lampos-") && !folder.starts_with("/run/lampos-locks")
+            folder.starts_with("/run/lampos-")
+                && !folder.starts_with("/run/lampos-locks")
+                && *folder != lamp_msgs::local_agent::SOCKET_DIR
         })
         .map(String::from)
         .collect();
