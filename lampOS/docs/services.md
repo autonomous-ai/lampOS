@@ -1245,7 +1245,9 @@ Calendar's edits are given in `event_id`'s.
   draft_id a save_draft or a drafts read gave, like draft12", so no other
   mailbox is ever touched. A redo of a saved draft from its record
   (`LAMP_SERVICE_REDO`) is refused with the way to change it
-  (`redo::DRAFT_DONE`), never saved again beside it.
+  (`redo::DRAFT_DONE`), never saved again beside it; `update_draft` or
+  `delete_draft` with `from_record` naming that record fills its
+  `draft_id` from the record ("Redo or edit from a record", below).
 - **Read back from the draft as it is now.** Without `send_id`, the lamp
   first reads that one draft by its id (`EXAMINE` of Drafts and its UID,
   read-only, as `message {id}`). None there (sent, deleted or changed in
@@ -2709,13 +2711,18 @@ after a cancelled event needs nothing repeated, and "move it to 8 PM" or
   model is told to "call service_write with action update_event (or
   delete_event) and the record's event_id, or from_record set to its key"
   instead (`redo::EVENT_DONE`). `event_id`'s description in `tools.json`
-  says the same. A `done` Gmail draft (`save_draft` or
-  `update_draft`) is refused with the way to change it,
-  `redo::DRAFT_DONE`: `update_draft` or `delete_draft` with its
-  `draft_id`, the record's result id, when listed
-  (`LAMP_GMAIL_DRAFT_EDITS`), never saved again beside the old one. A read,
-  any other `done` write, and a record whose text was cut with no new text
-  given are refused too.
+  says the same. A `done` Gmail draft (`save_draft` or `update_draft`) is
+  never saved again beside the old one. While lamp-services' `tools.json`
+  lists `update_draft` (`LAMP_GMAIL_DRAFT_EDITS=on`, a switch of
+  lamp-services alone, so the voice reads it from the write's own words
+  each time it reads the functions), it is refused with the way to change
+  it, `redo::DRAFT_DONE`: "call service_write with action update_draft (or
+  delete_draft) and from_record set to its key, giving only what changed".
+  Otherwise (off in the product) the refusal names no action the lamp
+  doesn't have, `redo::DRAFT_DONE_OFF`: "Not done: that draft is already
+  saved in their Gmail Drafts, and changing a saved draft isn't on this
+  lamp. Say so plainly." A read, any other `done` write, and a record whose
+  text was cut with no new text given are refused too.
 - **A made event moved or cancelled.** `update_event` or `delete_event`
   with `from_record` naming a `done` Google Calendar `create_event` or
   `update_event` record is that event's edit, not a redo: its `event_id`
@@ -2726,6 +2733,21 @@ after a cancelled event needs nothing repeated, and "move it to 8 PM" or
   or cancelling a calendar event", above, with `LAMP_CALENDAR_EDITS` on).
   A record with no `result_id` is refused: "Not done: that record keeps no
   event id, so the event can't be found from it. …" (`NO_EVENT_ID`).
+  `from_record`'s description says so in one sentence.
+- **A saved draft changed or deleted.** The same for Gmail, while
+  `update_draft` is listed: `update_draft` or `delete_draft` with
+  `from_record` naming a `done` Gmail `save_draft` or `update_draft` record
+  is that draft's change, its `draft_id` the record's `result_id` (its id
+  in Drafts, `draft12`) and only what the call gave laid on; the services
+  carry the rest from the draft as Drafts has it, read it back and save or
+  delete it only on a yes ("Changing or deleting a saved Gmail draft",
+  above). A record with no `result_id` is refused: "Not done: that record
+  keeps no draft id, so the draft can't be found from it. …"
+  (`NO_DRAFT_ID`). Only then does `from_record`'s description add "A Gmail
+  draft they saved (done) likewise, with action update_draft (or
+  delete_draft): its draft_id is filled in." (`redo::DRAFT_NOTE`, kept
+  short: with both edits listed `service_write` is near the link's 4,096
+  bytes). Not listed, such a call is refused with `redo::DRAFT_DONE_OFF`.
 - **Linked.** The new record's `links` name the old one, and the old one
   gets `replaced_by` (its final status stays), both written to the memory.
 - **Only the owner's.** Only the owner's own records are found. A record
