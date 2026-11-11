@@ -5738,29 +5738,29 @@ fn openclaw_is_offered_only_by_a_harness_from_0_6_11() {
     }
 }
 
-/// #6274: a name said nearly right, one word misheard or misspelt by the
-/// speech to text ("costumer survey" for "Customer Survey", "survay"),
-/// still finds the one closest session; two as close are asked about,
-/// never guessed. A word under four letters takes no slip, and "api" still
-/// never fits "rapid-prototype".
+/// #6274: a name said nearly right, one word misheard or misspelt, finds
+/// the one closest session when a look at it (`look_session`) finds
+/// nothing by its name, folder or work: one slip in a word of 4 to 7
+/// letters, two from 8, none under 4 ("api" never fits
+/// "rapid-prototype"); two as close are asked about. The hand-over that
+/// types into a session takes a name as it is only (the Reviewer-lead's
+/// P2 on #6422): its read-back says the person's own words, so a near
+/// pick could not be caught by their yes.
 #[test]
 fn a_name_said_nearly_right_finds_the_one_closest_session() {
-    let named = |session: &str, rows: Value| {
+    let looked = |session: &str, rows: Value| {
         let mut rig = Rig::new();
         rig.config.reply_named = true;
         rig.plan(json!({
             "machines":{"default":true},
             "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]})),
-            "reply":step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"})),
+            "reply":{"default":true},
         }));
-        let mut request = launch();
-        request.session = Some(session.into());
-        bare(rig.cli().launch(&request))
+        rig.cli()
+            .look_session(&launch().target, session, false)
+            .map(|seen| (seen.name.unwrap_or_default(), seen.near))
     };
-    let joined = LaunchOutcome::Joined {
-        agent_id: AGENT.into(),
-        session: None,
-    };
+    let survey = || Ok(("Customer Survey".to_owned(), true));
     let rows = json!([
         ps_row(AGENT, "Customer Survey", "idle", Some("/w/survey")),
         ps_row(OTHER, "login fix", "idle", Some("/w/auth")),
@@ -5774,31 +5774,148 @@ fn a_name_said_nearly_right_finds_the_one_closest_session() {
         // Two slips in a word of eight letters or more.
         "custommmer",
     ] {
-        assert_eq!(named(said, rows.clone()), joined, "{said}");
+        assert_eq!(looked(said, rows.clone()), survey(), "{said}");
     }
+    // As it is: found so, not near.
+    assert_eq!(
+        looked("customer survey", rows.clone()),
+        Ok(("Customer Survey".to_owned(), false))
+    );
     // Two slips in a shorter word, or a slip in a word under four letters:
     // not that session.
-    assert_eq!(named("svrvay", rows.clone()), not_sent("session_not_found"));
+    let none = || Err("session_not_found".to_owned());
+    assert_eq!(looked("svrvay", rows.clone()), none());
     let short = json!([ps_row(AGENT, "docs", "idle", None)]);
-    assert_eq!(named("dox", short), not_sent("session_not_found"));
+    assert_eq!(looked("dox", short), none());
     // Never "api" for "rapid-prototype" (the Reviewer-lead's P2 on #5779).
     let near = json!([ps_row(AGENT, "rapid-prototype", "idle", Some("/w/rapid"))]);
-    assert_eq!(named("api", near), not_sent("session_not_found"));
+    assert_eq!(looked("api", near), none());
     // Two as close: asked about, never guessed.
     let two = json!([
         ps_row(AGENT, "Customer Survey", "idle", None),
         ps_row(OTHER, "Customer Surveys", "idle", None),
     ]);
-    assert_eq!(named("costumer survey", two), not_sent("session_ambiguous"));
+    assert_eq!(
+        looked("costumer survey", two),
+        Err("session_ambiguous".to_owned())
+    );
     // The closer of two is the one.
     let closer = json!([
         ps_row(OTHER, "Customers Survey", "idle", None),
         ps_row(AGENT, "Customer Survey", "idle", None),
     ]);
-    assert_eq!(named("costumer survey", closer), joined);
-    // Found so and busy: busy, as by its whole name.
-    let busy = json!([ps_row(AGENT, "Customer Survey", "working", None)]);
-    assert_eq!(named("costumer survey", busy), not_sent("session_busy"));
+    assert_eq!(looked("costumer survey", closer), survey());
+    // The hand-over that types: a name said nearly right is no session of
+    // theirs, nothing typed.
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":rows,"next":[]})),
+        "reply":step(json!({"ok":true,"name":"x","id":AGENT,"message":"m1","state":"queued"})),
+    }));
+    let mut request = launch();
+    request.session = Some("costumer survey".into());
+    assert_eq!(
+        bare(rig.cli().launch(&request)),
+        not_sent("session_not_found")
+    );
+    assert!(
+        rig.calls().iter().all(|call| call["args"][0] != "reply"),
+        "typed into a near pick"
+    );
+}
+
+/// #6274, the Reviewer-lead's P2 on #6422: "open the costumer survey one"
+/// never reopens a closed session found only by a name said nearly right:
+/// it is told as closed, the closest found, and only its name said as it
+/// is reopens it (`LAMP_TASKS_RESUME_CLOSED`), nothing resumed before.
+#[test]
+fn a_near_name_never_reopens_a_closed_session() {
+    let mut rig = Rig::new();
+    rig.config.reply_named = true;
+    rig.config.resume_closed = true;
+    let stopped = json!([stopped_row(
+        AGENT,
+        "Customer Survey",
+        "2026-11-10T05:00:00.000Z"
+    )]);
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"desk-pc","harnesses":stopped,"next":[]})),
+        "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+        "resume":step(json!({"ok":true,"name":"Customer Survey","id":AGENT,"state":"idle","resumed":true,"effect":"x","next":[]})),
+        "reply":{"default":true},
+        "new":{"default":true},
+    }));
+    let seen = rig
+        .cli()
+        .look_session(&launch().target, "costumer survey", true)
+        .unwrap();
+    assert_eq!(
+        (seen.state.as_str(), seen.resumed, seen.near),
+        ("stopped", None, true)
+    );
+    let verbs: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    // Read only: its list, and its last ask (`show`), never `resume`.
+    assert!(
+        verbs.iter().all(|verb| verb == "ps" || verb == "show"),
+        "{verbs:?}"
+    );
+}
+
+/// #6274, the Reviewer-lead's P2 on #6422: a near match on the lamp's own
+/// machine never wins before the computers are read. Every machine is
+/// listed, a session named as it is anywhere beats any near one ("test":
+/// the Mac's "Test runner", not the lamp's "Text formatter"), and near
+/// ones as close on two machines are asked about.
+#[test]
+fn a_name_as_it_is_on_a_computer_beats_a_near_one_on_the_lamp() {
+    const LAPTOP: &str = "fedcba9876543210fedcba9876543210";
+    let ps = |rows: Value| step(json!({"you":null,"machine":"m","harnesses":rows,"next":[]}));
+    let looked = |session: &str, each: Vec<Value>| {
+        let mut rig = Rig::new();
+        rig.config.reply_named = true;
+        rig.config.session_machines = Some(Arc::new(Mutex::new(SessionMachines {
+            lamp: Some(MACHINE.into()),
+            computers: vec![("office".into(), LAPTOP.into(), EngineKind::Claude)],
+            offline: Default::default(),
+        })));
+        rig.plan(json!({"machines":{"default":true},"ps":{"each":each},"show":{"default":true}}));
+        let mut target = launch().target;
+        target.engine = EngineKind::Hermes;
+        target.project = "/var/lib/lampos-hermes/lamp-tasks".into();
+        let seen = rig.cli().look_session(&target, session, false);
+        let lists = rig
+            .calls()
+            .iter()
+            .filter(|call| call["args"][0] == "ps")
+            .count();
+        (
+            seen.map(|seen| (seen.name.unwrap_or_default(), seen.on, seen.near)),
+            lists,
+        )
+    };
+    let lamp = json!([ps_row(AGENT, "Text formatter", "idle", None)]);
+    let mac = json!([ps_row(OTHER, "Test runner", "idle", None)]);
+    let (seen, lists) = looked("test", vec![ps(lamp.clone()), ps(mac)]);
+    assert_eq!(
+        seen,
+        Ok(("Test runner".to_owned(), Some("office".to_owned()), false))
+    );
+    assert_eq!(lists, 2);
+    // Near only on the lamp: found there, but only once the Mac was read.
+    let (seen, lists) = looked("test", vec![ps(lamp.clone()), ps(json!([]))]);
+    assert_eq!(seen, Ok(("Text formatter".to_owned(), None, true)));
+    assert_eq!(lists, 2);
+    // As near on both: asked about.
+    let mac = json!([ps_row(OTHER, "Tent formatter", "idle", None)]);
+    let (seen, _) = looked("test", vec![ps(lamp), ps(mac)]);
+    assert_eq!(seen, Err("session_ambiguous".to_owned()));
 }
 
 /// #6274: a look at the session the person named, with no words to type.
