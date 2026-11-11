@@ -7069,14 +7069,6 @@ impl Engine {
                 if !self.begin(request, session) {
                     return;
                 }
-                // A skill with code of its own made from the app, said back
-                // here (#6307): its yes awaited from this request on, as a
-                // voice make's is. Never an add-on's quoted line.
-                let text = if quoted {
-                    text
-                } else {
-                    crate::make_skill_local::app_code_asked_here(request, text)
-                };
                 // A search's own turn: the search a push may end goes on
                 // from now, the walk's looks included (#2904).
                 if search {

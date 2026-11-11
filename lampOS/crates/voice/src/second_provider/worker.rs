@@ -13095,6 +13095,24 @@ pub async fn run(
                 break;
             };
             if gate.admits(monotonic_us(), &command)? {
+                // A skill with code of its own made from the app, said back
+                // in this written request (#6307): its yes awaited from it
+                // on, as a voice make's is, or, outside the private room
+                // with the owner not seen alone, not said back. Before the
+                // thread keeps the note. Never an add-on's quoted line.
+                let mut command = command;
+                if let ProviderInput::Written {
+                    request,
+                    text,
+                    quoted: false,
+                    ..
+                } = &mut command
+                {
+                    *text = crate::make_skill_local::app_code_asked_here(
+                        *request,
+                        std::mem::take(text),
+                    );
+                }
                 // A written request is kept for the thread as the note it
                 // is, with the answer to it (`Thread::written`).
                 sign_in_written(&command);

@@ -3038,7 +3038,17 @@ gone ([switches.md](switches.md)). What happens:
      answer, each later heard line is told its `approve_id` in a note
      (`skill_write_yes::waiting_note`). The yes is then taken exactly as
      a voice make's, below. Said only on the Live route, or never said,
-     nothing waits and it stays off.
+     nothing waits and it stays off. It follows `LAMP_PRIVATE_ROOM` as a
+     skill run's write does: off, it is said back only to the owner seen
+     alone (`services::owner_sees_alone`: the eyes' known face an owner
+     and the one face in view); otherwise the turn says only that it
+     stays off (`made_skill::not_on_line` of `CODE_BY_VOICE`), and nothing
+     waits. Off, its yes is taken only from the owner seen saying it or
+     in the owner's voice at `same_voice::SERVICES_SAME_FROM`
+     (`services::owners_yes`); anyone else's is
+     `services::OTHER_VOICE`, its wait is dropped and the skill stays off
+     (`make_skill_local::app_code_yes_refused`). On, any heard line is
+     the owner's, as before.
      By voice, the make waits for the yes through the write's very wait
      (`crate::skill_write_yes`, `Asks::code`), with every guard of it: said
      whole first (the code sentence is what must be heard), only a later

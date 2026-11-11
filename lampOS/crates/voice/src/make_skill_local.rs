@@ -896,7 +896,11 @@ fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
 /// answer or a later one, a later heard line, the echo hold, this route),
 /// its id told to each later heard line
 /// ([`crate::skill_write_yes::waiting_note`]), and the turn ends as a voice
-/// make's does ([`crate::skill_write_yes::then_wait`]). With
+/// make's does ([`crate::skill_write_yes::then_wait`]). Outside the
+/// private room it is said back only to the owner seen alone
+/// (`sees_alone`, `services::owner_sees_alone`, as a skill run's write
+/// is): else the turn says only that it stays off
+/// ([`made_skill::CODE_BY_VOICE`]) and nothing waits. With
 /// `LAMP_MADE_SCRIPTS` off, or any other text, the text as it is.
 pub fn app_code_asked(
     directory: &std::path::Path,
@@ -904,6 +908,7 @@ pub fn app_code_asked(
     text: String,
     now_unix_ms: u64,
     now: std::time::Instant,
+    sees_alone: impl FnOnce() -> bool,
 ) -> String {
     if !made_skill::scripts_on() {
         return text;
@@ -915,6 +920,12 @@ pub fn app_code_asked(
     };
     if !text.contains(&made_skill::on_line(&made)) {
         return text;
+    }
+    if !sees_alone() {
+        eprintln!(
+            "lamp-voice: request {request}: a skill with code of its own made from the app is not said back: the owner isn't seen alone (#6307)"
+        );
+        return made_skill::in_their_language(&made_skill::not_on_line(made_skill::CODE_BY_VOICE));
     }
     let id = crate::skill_write_yes::wait_for_yes_noted(code_asks(&made), request, now);
     eprintln!(
@@ -938,7 +949,25 @@ pub fn app_code_asked_here(request: u64, text: String) -> String {
         text,
         crate::app_make::now_unix_ms(),
         std::time::Instant::now(),
+        crate::services::owner_sees_alone_now,
     )
+}
+
+/// The yes `id` to a made skill with code from the app
+/// ([`app_code_asked`]) not the owner's (`owners_yes`,
+/// `services::owners_yes`: outside the private room the owner seen saying
+/// it or in their voice, as a skill run's write's send): its wait dropped,
+/// the skill left off, and the model told [`crate::services::OTHER_VOICE`].
+/// None for any other id, or the owner's yes.
+pub fn app_code_yes_refused(id: &str, owners_yes: impl FnOnce() -> bool) -> Option<Value> {
+    if !crate::skill_write_yes::noted(id) || owners_yes() {
+        return None;
+    }
+    crate::skill_write_yes::drop_noted(id);
+    eprintln!(
+        "lamp-voice: a skill with code of its own made from the app stays off: not the owner's yes (#6307)"
+    );
+    Some(json!({ "error": crate::services::OTHER_VOICE }))
 }
 
 /// The person's yes to a made skill with code of its own (#6307), once its
@@ -1714,6 +1743,12 @@ pub fn answer(
     // The person's yes to a made skill's writes (#6066): the waiting
     // skill's, in a later heard line, approved by the voice itself.
     if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
+        // One made from the app with code (#6307): only the owner's yes.
+        if let Some(refused) = app_code_yes_refused(id, || {
+            crate::services::owners_yes_now(request, heard, lease)
+        }) {
+            return refused;
+        }
         return crate::skill_write_yes::approve(
             id,
             request,

@@ -1701,19 +1701,34 @@ mod tests {
         // Another written line, or the switch off: nothing waits.
         let now = std::time::Instant::now();
         let dir = &keeping.directory;
-        let other = "Say good evening.".to_owned();
-        let left =
-            crate::make_skill_local::app_code_asked(dir, 4, other.clone(), now_unix_ms(), now);
-        assert_eq!(left, other);
+        let asked_in = |request: u64, text: &str, alone: bool| {
+            crate::make_skill_local::app_code_asked(
+                dir,
+                request,
+                text.to_owned(),
+                now_unix_ms(),
+                now,
+                || alone,
+            )
+        };
+        let other = "Say good evening.";
+        assert_eq!(asked_in(4, other, true), other);
         made_skill::set_scripts_here(Some(false));
-        let off = crate::make_skill_local::app_code_asked(dir, 4, note.clone(), now_unix_ms(), now);
-        assert_eq!(off, note);
+        assert_eq!(asked_in(4, &note, true), note);
         assert!(!yes::awaited(now));
         made_skill::set_scripts_here(Some(true));
+        // Outside the private room, another person present (the owner not
+        // seen alone): not said back, only that it stays off; nothing waits.
+        let unsaid = asked_in(4, &note, false);
+        assert_eq!(
+            unsaid,
+            made_skill::in_their_language(&made_skill::not_on_line(made_skill::CODE_BY_VOICE))
+        );
+        assert!(!unsaid.contains("camera"), "{unsaid}");
+        assert!(!yes::awaited(now));
         // Said on the second route in request 5: its yes awaited, the
         // model told how to take it, and each later heard line its id.
-        let turn =
-            crate::make_skill_local::app_code_asked(dir, 5, note.clone(), now_unix_ms(), now);
+        let turn = asked_in(5, &note, true);
         let (head, wait) = turn.split_at(note.len());
         assert_eq!(head, note);
         let id = wait.split('"').nth(1).unwrap().to_owned();
@@ -1730,17 +1745,42 @@ mod tests {
             yes::approve(&id, 5, true, true, now, never)["error"],
             yes::NOT_APPROVED
         );
-        let turn =
-            crate::make_skill_local::app_code_asked(dir, 5, note.clone(), now_unix_ms(), now);
+        let turn = asked_in(5, &note, true);
         let id = turn.rsplit('"').nth(1).unwrap().to_owned();
         let early = yes::approve(&id, 6, true, true, now, never);
         assert_eq!(early["error"], yes::NOT_SAID_WHOLE, "{early}");
         yes::lamp_said(6, line);
-        // A later spoken yes: exactly that package on, its task kept.
+        // The private room off: a plain yes the owner wasn't seen saying,
+        // in no owner's voice, is another's: refused, its wait dropped, and
+        // the skill stays off. In the owner's voice it would be theirs.
+        let yes_in = |private_room: bool, likeness: Option<f32>| {
+            let seen = crate::services::owner_seen_saying(true, private_room, None, |_| false);
+            move || crate::services::owners_yes(seen, || likeness)
+        };
+        assert!(yes_in(false, Some(0.6))());
+        assert_eq!(
+            crate::make_skill_local::app_code_yes_refused(&id, yes_in(false, None)),
+            Some(json!({ "error": crate::services::OTHER_VOICE }))
+        );
+        assert!(!yes::awaited(now));
+        assert_eq!(
+            yes::approve(&id, 7, true, true, now, never)["error"],
+            yes::NOT_APPROVED
+        );
+        assert_ne!(made_skill::entries(dir)[0]["on"], true);
+        // The private room on: the same yes is the owner's, and exactly
+        // that package goes on, its task kept.
+        let turn = asked_in(8, &note, true);
+        let id = turn.rsplit('"').nth(1).unwrap().to_owned();
+        yes::lamp_said(8, line);
+        assert_eq!(
+            crate::make_skill_local::app_code_yes_refused(&id, yes_in(true, None)),
+            None
+        );
         let asked = manage_helper(&keeping.manage);
         crate::skill_task_yes::set_on_here(Some(true));
         let folder = "cd".repeat(32);
-        let agreed = yes::approve(&id, 7, true, true, now, |asks| {
+        let agreed = yes::approve(&id, 9, true, true, now, |asks| {
             assert!(asks.code, "{asks:?}");
             crate::make_skill_local::code_approve(
                 &keeping,
@@ -1754,9 +1794,7 @@ mod tests {
         assert_eq!(asked.join().unwrap()["install_made"], sha256.as_str());
         assert_eq!(status(&keeping.directory, Some("r1"), at)["state"], "on");
         // On: said again, nothing more waits.
-        let again =
-            crate::make_skill_local::app_code_asked(dir, 8, note.clone(), now_unix_ms(), now);
-        assert_eq!(again, note);
+        assert_eq!(asked_in(10, &note, true), note);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_scripts_here(None);
         let _ = fs::remove_dir_all(&root);
