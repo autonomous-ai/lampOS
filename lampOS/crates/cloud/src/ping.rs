@@ -5,6 +5,7 @@
 use crate::account::{Account, PingMqtt};
 use crate::wire::Identity;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// V1's `StatusReportInterval`.
@@ -85,6 +86,66 @@ pub struct Reply {
     pub device_id: String,
     #[serde(default)]
     pub mqtt: Option<PingMqtt>,
+    /// Where the backend places the lamp: `""` or `"CN"` (#6414). Anything
+    /// that is not a short code of letters reads as `""`, so a strange value
+    /// never loses the rest of the reply.
+    #[serde(default, deserialize_with = "region_code")]
+    pub region: String,
+}
+
+fn region_code<'de, D: serde::Deserializer<'de>>(from: D) -> Result<String, D::Error> {
+    Ok(match serde_json::Value::deserialize(from)? {
+        serde_json::Value::String(code)
+            if code.len() <= 8 && code.chars().all(|c| c.is_ascii_alphabetic()) =>
+        {
+            code.to_ascii_uppercase()
+        }
+        _ => String::new(),
+    })
+}
+
+/// The region a ping's reply last said, kept in `region` in lamp-cloud's
+/// state folder for the voice to read (#6414): 0644, written whole (a new
+/// file renamed over it), and only when it changes. Kept across boots, so
+/// a start compares with what the last run wrote.
+pub struct Region {
+    path: PathBuf,
+    kept: String,
+}
+
+impl Region {
+    pub fn at(path: PathBuf) -> Self {
+        let kept = std::fs::read_to_string(&path)
+            .map(|text| text.trim().to_owned())
+            .unwrap_or_default();
+        Self { path, kept }
+    }
+
+    /// Takes a reply's region: `None` when it is the one kept, else what
+    /// writing it came to. A failed write is not tried again until the
+    /// region changes once more, so the journal says it once.
+    pub fn take(&mut self, region: &str) -> Option<std::io::Result<()>> {
+        if region == self.kept {
+            return None;
+        }
+        self.kept = region.to_owned();
+        Some(write_region(&self.path, region))
+    }
+}
+
+fn write_region(path: &Path, region: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let beside = path.with_extension("new");
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o644)
+        .open(&beside)?;
+    file.write_all(format!("{region}\n").as_bytes())?;
+    file.sync_all()?;
+    std::fs::rename(&beside, path)
 }
 
 pub fn reply(body: &[u8]) -> Option<Reply> {
@@ -237,6 +298,45 @@ mod tests {
             serde_json::to_value(Payload::of(&identity)).unwrap(),
             "nothing else changes"
         );
+    }
+
+    /// #6414: a reply's region, missing or strange, never loses the reply.
+    #[test]
+    fn a_reply_reads_with_its_region_without_one_or_with_a_strange_one() {
+        let with = reply(br#"{"status":"ok","region":"CN"}"#).unwrap();
+        assert_eq!(with.region, "CN");
+        assert_eq!(reply(br#"{"status":"ok"}"#).unwrap().region, "");
+        for strange in ["5", "null", r#"["CN"]"#, r#""C N""#, r#""../x""#] {
+            let body = format!(r#"{{"status":"ok","device_id":"d-43","region":{strange}}}"#);
+            let read = reply(body.as_bytes()).unwrap();
+            assert_eq!(
+                (read.region.as_str(), read.device_id.as_str()),
+                ("", "d-43")
+            );
+        }
+    }
+
+    #[test]
+    fn the_region_is_written_only_when_it_changes_and_read_back_at_start() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("lamp-cloud-region-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("region");
+        let mut region = Region::at(path.clone());
+        assert!(region.take("").is_none(), "nothing kept is no region");
+        assert!(!path.exists());
+        assert!(region.take("CN").unwrap().is_ok());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "CN\n");
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode & 0o044, 0o044, "readable by others: {mode:o}");
+        assert!(region.take("CN").is_none(), "unchanged: not written");
+        // A new start reads what was kept.
+        let mut again = Region::at(path.clone());
+        assert!(again.take("CN").is_none());
+        assert!(again.take("").unwrap().is_ok());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "\n");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

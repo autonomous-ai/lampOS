@@ -3856,6 +3856,19 @@ pub fn serve(
         );
     }
     engine = engine.waiting_for_written(written_wait);
+    // A lamp the backend places in mainland China waits longer for a first
+    // round (#6414); read once at the worker's start.
+    let in_china =
+        crate::second_provider::in_china(crate::second_provider::region_from_file().as_deref());
+    if in_china {
+        let (spoken, after_cue) = crate::second_provider::begin_limits(true);
+        eprintln!(
+            "lamp-voice second: region CN: a first round may begin as late as {} ms, {} ms after the wait's sound",
+            spoken.as_millis(),
+            after_cue.as_millis()
+        );
+    }
+    engine = engine.in_china(in_china);
     // A first round with no response head goes once more on a new connection
     // (`LAMP_SECOND_CHAT_SECOND_TRY=on`; #4710).
     let second_try = crate::second_provider::second_try_on(
