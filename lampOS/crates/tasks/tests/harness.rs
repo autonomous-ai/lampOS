@@ -7,7 +7,8 @@ use lamp_tasks::harness::{
     WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_engines, parse_machines,
     parse_ps, parse_wait, parse_watch_line, this_computer,
 };
-use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, targets_from_machines};
+use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, SESSION_INDEX_FILE, targets_from_machines};
+use lamp_tasks::session_index;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -116,6 +117,7 @@ impl Rig {
             absolute_folder: false,
             new_folder: None,
             new_folder_only: None,
+            session_index: None,
             journal: None,
             calls: None,
             session_machines: None,
@@ -6044,4 +6046,358 @@ fn a_named_session_is_looked_at_to_open_or_say_how_it_is_with_nothing_typed() {
         Err("reply_named_off".to_owned())
     );
     assert!(rig.calls().is_empty());
+}
+
+/// #6274, the first builder's ruling of 11 Nov: the sessions the lamp
+/// itself started or handed work to, kept in an index of their id, name
+/// and last use only (`lamp_tasks::session_index`), in the tasks folder.
+fn indexed(rig: &mut Rig) -> PathBuf {
+    let file = rig.root.path().join(SESSION_INDEX_FILE);
+    rig.config.session_index = Some(file.clone());
+    file
+}
+
+/// What `harness show --json` gives of a session by its id, as Harness
+/// 0.6.12 answers it: its name and state among the rest.
+fn shown_as(id: &str, name: &str, state: &str) -> Value {
+    step(json!({"name":name,"id":id,"agent":"Hermes","machine":"lamp","state":state,
+        "startedBy":"you","folder":"/var/lib/lampos-hermes/lamp-tasks","branch":null,
+        "ask":"Find the Christmas dates","answer":"Done.","truncated":false,"tools":1,"next":[]}))
+}
+
+/// The verbs called, in turn, each with the id it named if any.
+fn verbs_named(rig: &Rig) -> Vec<String> {
+    rig.calls()
+        .iter()
+        .map(|call| {
+            let args = call["args"].as_array().unwrap();
+            let verb = args[0].as_str().unwrap().to_owned();
+            match args.iter().filter_map(Value::as_str).find(|arg| *arg == AGENT || *arg == OTHER) {
+                Some(id) => format!("{verb} {}", &id[..8]),
+                None => verb,
+            }
+        })
+        .collect()
+}
+
+/// #6274: a session the lamp started more than seven days ago is no longer
+/// in `harness ps --all`, so "open the Christmas dates one" found nothing.
+/// Its id and name in the index find it: `show <id>` says it is there and
+/// how, and it is opened or reopened by its id as a listed one is (resume
+/// only with `LAMP_TASKS_RESUME_CLOSED`, the hand-over typed after it).
+#[test]
+fn an_older_session_not_listed_is_found_by_its_name_through_the_index() {
+    let none = || step(json!({"you":null,"machine":"lamp","harnesses":[],"next":[]}));
+    let lamp_side = |rig: &mut Rig, show: Value| {
+        let file = indexed(rig);
+        session_index::record(&file, MACHINE, AGENT, Some("Christmas dates"), 1_000);
+        session_index::record(&file, MACHINE, OTHER, Some("Login fix"), 2_000);
+        rig.config.reply_named = true;
+        rig.config.resume_closed = true;
+        rig.plan(json!({
+            "machines":{"default":true},
+            "ps":none(),
+            "show":{"by_arg":{AGENT:show}},
+            "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+            "resume":step(json!({"ok":true,"name":"Christmas dates","id":AGENT,"state":"idle","resumed":true,"effect":"x","next":[]})),
+            "reply":step(json!({"ok":true,"name":"Christmas dates","id":AGENT,"message":"m1","state":"queued"})),
+        }));
+        file
+    };
+    // Open it, stopped: reopened by its id.
+    let mut rig = Rig::new();
+    let file = lamp_side(&mut rig, shown_as(AGENT, "Christmas dates", "stopped"));
+    let seen = rig
+        .cli()
+        .look_session(&launch().target, "the christmas dates one", true)
+        .unwrap();
+    assert_eq!(
+        (seen.state.as_str(), seen.resumed, seen.near, seen.name.as_deref()),
+        ("idle", Some(true), false, Some("Christmas dates"))
+    );
+    assert_eq!(
+        verbs_named(&rig),
+        ["ps", "show 11111111", "--help", "resume 11111111"]
+    );
+    // Opened, so used now: later than the 1 000 it was kept with.
+    let kept = session_index::read(&file);
+    let entry = kept[MACHINE].iter().find(|entry| entry.id == AGENT).unwrap();
+    assert!(entry.last_used > 1_000, "{entry:?}");
+    // Idle: open as it is, nothing reopened.
+    let mut rig = Rig::new();
+    lamp_side(&mut rig, shown_as(AGENT, "Christmas dates", "idle"));
+    let seen = rig
+        .cli()
+        .look_session(&launch().target, "christmas dates", true)
+        .unwrap();
+    assert_eq!((seen.state.as_str(), seen.resumed), ("idle", None));
+    assert_eq!(verbs_named(&rig), ["ps", "show 11111111"]);
+    // A hand-over that names it: reopened by its id, and the words typed.
+    let mut rig = Rig::new();
+    lamp_side(&mut rig, shown_as(AGENT, "Christmas dates", "stopped"));
+    let mut request = launch();
+    request.session = Some("christmas dates".into());
+    let outcome = rig.cli().launch(&request);
+    assert!(
+        matches!(&outcome, LaunchOutcome::Joined { agent_id, session: Some(session) }
+            if agent_id == AGENT && session.resumed == Some(true)),
+        "{outcome:?}"
+    );
+    assert_eq!(
+        verbs_named(&rig),
+        ["machines", "ps", "show 11111111", "--help", "resume 11111111", "reply 11111111"]
+    );
+    // Without the switch: said stopped, nothing reopened or typed.
+    let mut rig = Rig::new();
+    lamp_side(&mut rig, shown_as(AGENT, "Christmas dates", "stopped"));
+    rig.config.resume_closed = false;
+    assert_eq!(
+        rig.cli()
+            .look_session(&launch().target, "christmas dates", true),
+        Err("session_stopped".to_owned())
+    );
+    assert_eq!(verbs_named(&rig), ["ps", "show 11111111"]);
+}
+
+/// #6274: a session listed by `ps --all` is found there as before, never
+/// read again through the index; and the index never finds what the lamp
+/// did not start or hand work to.
+#[test]
+fn a_listed_session_is_found_as_before_and_the_index_only_adds() {
+    let mut rig = Rig::new();
+    let file = indexed(&mut rig);
+    session_index::record(&file, MACHINE, AGENT, Some("Christmas dates"), 1_000);
+    rig.config.reply_named = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"lamp","harnesses":[
+            ps_row(AGENT, "Christmas dates", "idle", None)
+        ],"next":[]})),
+        "show":{"default":true},
+    }));
+    let seen = rig
+        .cli()
+        .look_session(&launch().target, "christmas dates", false)
+        .unwrap();
+    assert_eq!(seen.state, "idle");
+    assert_eq!(verbs_named(&rig), ["ps"]);
+    let mut rig = Rig::new();
+    indexed(&mut rig);
+    rig.config.reply_named = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"lamp","harnesses":[],"next":[]})),
+        "show":{"default":true},
+    }));
+    assert_eq!(
+        rig.cli()
+            .look_session(&launch().target, "christmas dates", false),
+        Err("session_not_found".to_owned())
+    );
+    assert_eq!(verbs_named(&rig), ["ps"]);
+}
+
+/// #6274: an indexed session `show` says is no longer there
+/// (`UNKNOWN_HARNESS`, `GONE`) is dropped from the index, and the lookup
+/// goes on: none other fits, so `session_not_found`; a later lookup reads
+/// nothing for it.
+#[test]
+fn an_indexed_session_that_is_gone_is_dropped() {
+    for code in ["UNKNOWN_HARNESS", "GONE"] {
+        let mut rig = Rig::new();
+        let file = indexed(&mut rig);
+        session_index::record(&file, MACHINE, AGENT, Some("Christmas dates"), 1_000);
+        session_index::record(&file, MACHINE, OTHER, Some("Login fix"), 2_000);
+        rig.config.reply_named = true;
+        rig.plan(json!({
+            "machines":{"default":true},
+            "ps":step(json!({"you":null,"machine":"lamp","harnesses":[],"next":[]})),
+            "show":{"by_arg":{AGENT:{"stdout":format!("{}\n", json!({"error":code,"detail":"No harness named that."})),"exit":1}}},
+        }));
+        assert_eq!(
+            rig.cli()
+                .look_session(&launch().target, "christmas dates", true),
+            Err("session_not_found".to_owned()),
+            "{code}"
+        );
+        let kept = session_index::read(&file);
+        let ids: Vec<&str> = kept[MACHINE].iter().map(|entry| entry.id.as_str()).collect();
+        assert_eq!(ids, [OTHER], "{code}");
+        // A show that only failed (a timeout, a computer away) drops nothing.
+        let mut rig = Rig::new();
+        let file = indexed(&mut rig);
+        session_index::record(&file, MACHINE, AGENT, Some("Christmas dates"), 1_000);
+        rig.config.reply_named = true;
+        rig.plan(json!({
+            "machines":{"default":true},
+            "ps":step(json!({"you":null,"machine":"lamp","harnesses":[],"next":[]})),
+            "show":{"by_arg":{AGENT:{"stdout":format!("{}\n", json!({"error":"DISCONNECTED"})),"exit":1}}},
+        }));
+        assert!(
+            rig.cli()
+                .look_session(&launch().target, "christmas dates", true)
+                .is_err()
+        );
+        assert_eq!(session_index::read(&file)[MACHINE].len(), 1);
+    }
+}
+
+/// #6274: two indexed sessions that both fit what was said, and are both
+/// still there, are asked about, never guessed; one of them gone leaves the
+/// other.
+#[test]
+fn an_ambiguous_index_match_is_asked_about() {
+    let looked = |show_other: Value| {
+        let mut rig = Rig::new();
+        let file = indexed(&mut rig);
+        session_index::record(&file, MACHINE, AGENT, Some("Christmas dates"), 1_000);
+        session_index::record(&file, MACHINE, OTHER, Some("Christmas cards"), 2_000);
+        rig.config.reply_named = true;
+        rig.config.resume_closed = true;
+        rig.plan(json!({
+            "machines":{"default":true},
+            "ps":step(json!({"you":null,"machine":"lamp","harnesses":[],"next":[]})),
+            "show":{"by_arg":{
+                AGENT:shown_as(AGENT, "Christmas dates", "stopped"),
+                OTHER:show_other,
+            }},
+            "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+            "resume":step(json!({"ok":true,"name":"x","id":AGENT,"state":"idle","resumed":true,"effect":"x","next":[]})),
+        }));
+        let seen = rig.cli().look_session(&launch().target, "christmas", true);
+        let resumed = rig.calls().iter().any(|call| call["args"][0] == "resume");
+        (seen.map(|seen| seen.name), resumed)
+    };
+    assert_eq!(
+        looked(shown_as(OTHER, "Christmas cards", "idle")),
+        (Err("session_ambiguous".to_owned()), false)
+    );
+    let gone = json!({"stdout":format!("{}\n", json!({"error":"UNKNOWN_HARNESS"})),"exit":1});
+    assert_eq!(
+        looked(gone),
+        (Ok(Some("Christmas dates".to_owned())), true)
+    );
+}
+
+/// #6274, the Reviewer-lead's P2 on #6422 held for the index too: a name
+/// said nearly right finds an indexed session for a look only, said as it
+/// stands (closed, and closest), never reopened; the hand-over that types
+/// takes a name as it is only.
+#[test]
+fn the_index_never_makes_a_near_name_reopen_a_closed_session() {
+    let rig_for = |rig: &mut Rig| {
+        let file = indexed(rig);
+        session_index::record(&file, MACHINE, AGENT, Some("Christmas dates"), 1_000);
+        rig.config.reply_named = true;
+        rig.config.resume_closed = true;
+        rig.plan(json!({
+            "machines":{"default":true},
+            "ps":step(json!({"you":null,"machine":"lamp","harnesses":[],"next":[]})),
+            "show":{"by_arg":{AGENT:shown_as(AGENT, "Christmas dates", "stopped")}},
+            "--help":{"stdout":"Commands:\n  resume   Reopen a closed harness\n"},
+            "resume":step(json!({"ok":true,"name":"x","id":AGENT,"state":"idle","resumed":true,"effect":"x","next":[]})),
+            "reply":{"default":true},
+        }));
+    };
+    let mut rig = Rig::new();
+    rig_for(&mut rig);
+    let seen = rig
+        .cli()
+        .look_session(&launch().target, "chrismas dates", true)
+        .unwrap();
+    assert_eq!(
+        (seen.state.as_str(), seen.resumed, seen.near),
+        ("stopped", None, true)
+    );
+    assert!(
+        rig.calls().iter().all(|call| call["args"][0] != "resume"),
+        "{:?}",
+        verbs_named(&rig)
+    );
+    let mut rig = Rig::new();
+    rig_for(&mut rig);
+    let mut request = launch();
+    request.session = Some("chrismas dates".into());
+    assert_eq!(
+        bare(rig.cli().launch(&request)),
+        not_sent("session_not_found")
+    );
+    assert!(
+        rig.calls()
+            .iter()
+            .all(|call| call["args"][0] != "resume" && call["args"][0] != "reply"),
+        "{:?}",
+        verbs_named(&rig)
+    );
+}
+
+/// #6274: the lamp keeps each session it starts (`new`, its id under
+/// `agent.id`) and each it types into or opens, with the time it was
+/// used; the name a later list shows (the agent's own title) replaces the
+/// lamp-made one, never with anything of its work.
+#[test]
+fn the_lamp_keeps_the_sessions_it_starts_and_their_names_as_listed() {
+    let mut rig = Rig::new();
+    let file = indexed(&mut rig);
+    rig.new_step(step(created()));
+    assert!(matches!(
+        rig.cli().launch(&launch()),
+        LaunchOutcome::Created { .. }
+    ));
+    let kept = session_index::read(&file);
+    assert_eq!(kept[MACHINE].len(), 1);
+    assert_eq!(kept[MACHINE][0].id, AGENT);
+    // A lamp-made name says nothing a person would say: none kept.
+    assert_eq!(kept[MACHINE][0].name, "");
+    assert!(kept[MACHINE][0].last_used > 0);
+    // Its title, once a list shows it.
+    rig.config.reply_named = true;
+    let mut row = ps_row(AGENT, "Christmas dates", "idle", None);
+    row["asks"] = json!(["Find the Christmas dates for the school"]);
+    rig.plan(json!({
+        "machines":{"default":true},
+        "ps":step(json!({"you":null,"machine":"lamp","harnesses":[row],"next":[]})),
+    }));
+    rig.cli()
+        .look_session(&launch().target, "anything else", false)
+        .unwrap_err();
+    let kept = session_index::read(&file);
+    assert_eq!(kept[MACHINE][0].name, "Christmas dates");
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(!text.contains("school"), "{text}");
+    assert_eq!(
+        fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+}
+
+/// #6274: the index is a file of the tasks folder (`--dir`), which the
+/// lamp's reset wipes whole: the product's unit names
+/// `/var/lib/lampos-tasks/store` as `--dir`, and the product's reset plan
+/// lists that folder.
+#[test]
+fn the_index_lives_in_the_tasks_folder_the_reset_wipes() {
+    let dir = PathBuf::from("/var/lib/lampos-tasks/store");
+    let mut cli = CliConfig::new(fixture());
+    HarnessSwitches {
+        reply_named: true,
+        ..Default::default()
+    }
+    .apply(&mut cli, &dir, false);
+    assert_eq!(cli.session_index, Some(dir.join(SESSION_INDEX_FILE)));
+    let unit = include_str!("../../../deploy/product/lamp-tasks.service");
+    assert!(
+        unit.contains("--reply-named") && unit.contains(" --dir /var/lib/lampos-tasks/store "),
+        "the product's unit"
+    );
+    let plan: Value =
+        serde_json::from_str(include_str!("../../setup/fixtures/reset-plan-product.json")).unwrap();
+    assert!(
+        plan["wipe"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|path| path == "/var/lib/lampos-tasks/store"),
+        "the reset plan wipes the tasks folder"
+    );
 }
