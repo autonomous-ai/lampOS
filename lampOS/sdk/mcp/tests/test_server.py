@@ -28,8 +28,13 @@ ALL = {
 # The schema's ops a tool doesn't send itself: pairing and hello are the
 # SDK's, before any tool; leases go with each body tool; the camera's stream
 # is for a program, not a tool (`lamp_camera_snapshot` gives one picture), and
-# so is the microphone's.
-NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream", "microphone.stream"}
+# so is the microphone's. A linked service's read and write are a skill
+# run's alone, on lamp-control's run socket with its one-run token (#6432):
+# a paired computer is refused them, so no tool sends them.
+NOT_A_TOOL = {
+    "pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream", "microphone.stream",
+    "service.read", "service.write",
+}
 # Offered only with both body and look.
 FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}
 # Offered only with hear (starting a turn with speak too).
