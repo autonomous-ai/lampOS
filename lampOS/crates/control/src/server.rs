@@ -34,7 +34,7 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use crate::cert::Identity;
 use crate::parts::Media;
 use crate::protocol::{EventKind, Grant, Op};
-use crate::session::{Door, Parts, event_of};
+use crate::session::{Door, Parts, SetGrantsRefused, event_of};
 use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
@@ -1195,6 +1195,13 @@ async fn connection<S>(
 ///   `{"taken": N}`: every lease of that computer, or of every computer, is
 ///   lost as `taken_by_owner_app` and its holder told; the computers stay
 ///   paired;
+/// - `{"set_grants": {"client": "c_…", "grants": [...]}}` → `{"client",
+///   "grants", "added", "removed", "saved": true}`: the computer's grants
+///   become exactly that list, with no new code (the app's `control.set_grants`,
+///   the owner's tap being the consent); saved at once, or an `error` and the
+///   old grants kept. A stream whose grant goes ends at once, its pushed skills
+///   are held to the new grants and its connections close so it reads them at
+///   its next `hello`;
 /// - `{"cancel_code": true}` → `{"dropped": true|false}`: the code out is
 ///   dropped, so nobody can pair with it (the app's answer to a spoken check
 ///   that doesn't match), and whether there was one;
@@ -1226,6 +1233,15 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
             }
         });
     }
+}
+
+/// Grants as a journal line says them: their wire names, comma separated.
+fn grant_names(grants: &[Grant]) -> String {
+    grants
+        .iter()
+        .map(|grant| json!(grant).as_str().unwrap_or_default().to_owned())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn admin_answer(shared: &Shared, line: &str) -> Value {
@@ -1272,6 +1288,50 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
             client.unwrap_or("every computer")
         );
         return json!({"taken": taken});
+    }
+    if let Some(Value::Object(set)) = asked.get("set_grants") {
+        let Some(Value::String(client)) = set.get("client") else {
+            return json!({"error": "set_grants: client: a computer's id"});
+        };
+        // The whole list is asked for, so it must be there: a missing `grants` is a slip that would take
+        // every grant from the computer; none is an explicit `[]`.
+        let Some(asked_grants) = set.get("grants").cloned() else {
+            return json!({"error": "set_grants: grants: the whole list, [] for none"});
+        };
+        let grants: Result<BTreeSet<Grant>, _> = serde_json::from_value(asked_grants);
+        let grants = match grants {
+            Ok(grants) => grants,
+            Err(error) => return json!({"error": format!("grants: {error}")}),
+        };
+        let set = shared.door.lock().expect("door").set_grants(client, grants);
+        return match set {
+            Err(SetGrantsRefused::NoSuchComputer) => json!({"error": "no such computer"}),
+            Err(SetGrantsRefused::NotSaved(error)) => json!({
+                "error": format!("not saved, so the computer keeps the grants it had: {error}")
+            }),
+            Ok(set) => {
+                if !set.added.is_empty() || !set.removed.is_empty() {
+                    eprintln!(
+                        "lamp-control: the owner's app changed the grants of {client}: added [{}], removed [{}]",
+                        grant_names(&set.added),
+                        grant_names(&set.removed)
+                    );
+                    // A stream whose grant went ends now; its pushed skills are
+                    // held to the new grants; its connections close, so it reads
+                    // the new grants at its next hello.
+                    for media in &set.media {
+                        shared
+                            .parts
+                            .lock()
+                            .expect("parts")
+                            .media_end(client, *media);
+                    }
+                    shared.tell_helper();
+                    shared.close_client(client);
+                }
+                json!({"client": client, "grants": set.grants, "added": set.added, "removed": set.removed, "saved": true, "shown": Grant::shown_all()})
+            }
+        };
     }
     if asked.get("cancel_code") == Some(&json!(true)) {
         let dropped = shared.door.lock().expect("door").cancel_code();
@@ -1320,9 +1380,11 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
                 })
             })
             .collect();
-        return json!({"clients": clients});
+        // The words for every grant this build knows, once: the app shows them for
+        // a grant it has no label of its own for.
+        return json!({"clients": clients, "shown": Grant::shown_all()});
     }
-    json!({"error": "ask for code, cancel_code, take_back, revoke or clients"})
+    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke or clients"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`

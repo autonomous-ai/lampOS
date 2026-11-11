@@ -8,6 +8,7 @@
 //!                    [--camera-opens-on-demand]
 //!                    [--microphone on|off]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
+//! lamp-control grants CLIENT --grants body,light [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
 //! lamp-control clients [--admin-socket PATH]
 //! ```
@@ -88,12 +89,28 @@ fn run(arguments: &[String]) -> Result<(), String> {
                 .collect();
             ask(&admin, &serde_json::json!({"code": {"grants": grants}}))
         }
+        Some("grants") => {
+            // A keeper's way to change a paired computer's grants at the lamp,
+            // as the app's `control.set_grants` does: the whole list, no new code.
+            let client = arguments.get(1).ok_or("grants CLIENT --grants a,b")?;
+            // The whole list, so it must be given: `--grants ""` is none; a missing flag is a slip.
+            let grants: Vec<String> = option(arguments, "--grants")
+                .ok_or("grants CLIENT --grants a,b (the whole list; --grants \"\" for none)")?
+                .split(',')
+                .filter(|grant| !grant.is_empty())
+                .map(str::to_owned)
+                .collect();
+            ask(
+                &admin,
+                &serde_json::json!({"set_grants": {"client": client, "grants": grants}}),
+            )
+        }
         Some("revoke") => {
             let client = arguments.get(1).ok_or("revoke CLIENT")?;
             ask(&admin, &serde_json::json!({"revoke": client}))
         }
         Some("clients") => ask(&admin, &serde_json::json!({"clients": true})),
-        _ => Err("serve, code, revoke or clients (see docs/control.md)".to_owned()),
+        _ => Err("serve, code, grants, revoke or clients (see docs/control.md)".to_owned()),
     }
 }
 

@@ -334,6 +334,13 @@ impl Clients {
         Ok((id, before))
     }
 
+    /// Replaces the grants of the computer `id` (its unknown grants stay as
+    /// they were): the grants it had, or `None` when no such computer.
+    pub fn set_grants(&mut self, id: &str, grants: BTreeSet<Grant>) -> Option<BTreeSet<Grant>> {
+        let client = self.clients.iter_mut().find(|client| client.id == id)?;
+        Some(std::mem::replace(&mut client.grants, grants))
+    }
+
     /// Puts back what an [`Clients::add`] replaced (or removes what it added),
     /// when keeping the change failed.
     pub fn undo_add(&mut self, id: &str, before: Option<Client>) {

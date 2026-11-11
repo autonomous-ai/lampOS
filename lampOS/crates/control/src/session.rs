@@ -155,6 +155,26 @@ pub struct Revoked {
     pub saved: std::io::Result<()>,
 }
 
+/// What [`Door::set_grants`] did.
+#[must_use]
+#[derive(Debug, PartialEq, Eq)]
+pub struct GrantsSet {
+    /// The grants the computer has now.
+    pub grants: BTreeSet<Grant>,
+    pub added: Vec<Grant>,
+    pub removed: Vec<Grant>,
+    /// The streams its pairing no longer grants, to end at once.
+    pub media: Vec<Media>,
+}
+
+/// Why [`Door::set_grants`] changed nothing.
+#[derive(Debug, PartialEq, Eq)]
+pub enum SetGrantsRefused {
+    NoSuchComputer,
+    /// The file would not take it, so the computer keeps the grants it had.
+    NotSaved(String),
+}
+
 /// One connection's own state.
 #[derive(Debug)]
 pub struct Session {
@@ -596,6 +616,49 @@ impl Door {
                 .client_gone(client, LeaseWhy::TakenByOwnerApp, now_us),
             None => self.leases.lose(None, LeaseWhy::TakenByOwnerApp, now_us),
         }
+    }
+
+    /// The owner's app changes the grants of a paired computer to `grants`,
+    /// whole, without a new code (`control.set_grants`): the owner's tap is the
+    /// consent, as it is for a code; nothing else ever gives a pairing a grant.
+    /// Saved at once (the old grants put back when the file won't take them);
+    /// a stream whose grant goes is to end now, and its pushed skills are held
+    /// to the new grants, as a re-pair does. The server closes the computer's
+    /// connections so it reads its new grants at its next `hello`.
+    pub fn set_grants(
+        &mut self,
+        client: &str,
+        grants: BTreeSet<Grant>,
+    ) -> Result<GrantsSet, SetGrantsRefused> {
+        let Some(before) = self.clients.set_grants(client, grants.clone()) else {
+            return Err(SetGrantsRefused::NoSuchComputer);
+        };
+        let added: Vec<Grant> = grants.difference(&before).copied().collect();
+        let removed: Vec<Grant> = before.difference(&grants).copied().collect();
+        if added.is_empty() && removed.is_empty() {
+            return Ok(GrantsSet {
+                grants,
+                added,
+                removed,
+                media: Vec::new(),
+            });
+        }
+        if let Err(error) = self.save() {
+            self.clients.set_grants(client, before);
+            return Err(SetGrantsRefused::NotSaved(error.to_string()));
+        }
+        self.new_rev(client);
+        self.tell_helper_grants(client, &grants);
+        let media: Vec<Media> = [Media::Camera, Media::Microphone]
+            .into_iter()
+            .filter(|media| removed.contains(&media.grant()))
+            .collect();
+        Ok(GrantsSet {
+            grants,
+            added,
+            removed,
+            media,
+        })
     }
 
     /// The owner revokes `client`: its leases end, told. Whether it was
@@ -1692,6 +1755,110 @@ mod tests {
             fake.stopped.is_empty(),
             "only the camera, not its light or leases"
         );
+    }
+
+    /// The owner's app changes a paired computer's grants, whole, with no new
+    /// code: a grant gained works at once for the computer's open connection
+    /// (the lamp reads grants at each op), a grant lost is refused at once and
+    /// its stream is to end, and the same list changes nothing.
+    #[test]
+    fn the_owners_app_changes_a_computers_grants_without_a_new_code() {
+        let computer = Computer::new(43);
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Light]);
+        let id = pairing::client_id(&computer.key());
+        let snapshot = r#"{"id":9,"op":"camera.snapshot"}"#;
+        let refused = door.handle(&mut session, snapshot, &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&refused), Some("no_grant"));
+        // Camera gained.
+        let set = door
+            .set_grants(&id, [Grant::Light, Grant::Camera].into())
+            .expect("a paired computer");
+        assert_eq!(set.added, [Grant::Camera]);
+        assert!(set.removed.is_empty() && set.media.is_empty());
+        let after = door.handle(&mut session, snapshot, &mut fake, 3 * S, 1);
+        assert_ne!(code_of(&after), Some("no_grant"), "{after:?}");
+        // The same list: nothing changes.
+        let same = door
+            .set_grants(&id, [Grant::Light, Grant::Camera].into())
+            .expect("a paired computer");
+        assert!(same.added.is_empty() && same.removed.is_empty() && same.media.is_empty());
+        // Camera lost, microphone gained: the camera's stream is to end.
+        let set = door
+            .set_grants(&id, [Grant::Light, Grant::Microphone].into())
+            .expect("a paired computer");
+        assert_eq!(set.added, [Grant::Microphone]);
+        assert_eq!(set.removed, [Grant::Camera]);
+        assert_eq!(set.media, [Media::Camera]);
+        let refused = door.handle(&mut session, snapshot, &mut fake, 4 * S, 1);
+        assert_eq!(code_of(&refused), Some("no_grant"));
+        // Another computer's id, or none, is refused and nothing changes.
+        assert_eq!(
+            door.set_grants("c_nobody", [Grant::Body].into()),
+            Err(SetGrantsRefused::NoSuchComputer)
+        );
+        assert_eq!(
+            door.clients().clients[0].grants,
+            [Grant::Light, Grant::Microphone].into()
+        );
+    }
+
+    /// Grants this build does not know (a newer lamp-control's, kept in the file) survive a change of grants.
+    #[test]
+    fn a_change_of_grants_keeps_the_ones_this_build_does_not_know() {
+        let newer = pairing::Client {
+            id: "c_newer".to_owned(),
+            name: "laptop".to_owned(),
+            key: "k".to_owned(),
+            grants: [Grant::Light].into(),
+            unknown_grants: ["teleport".to_owned()].into(),
+            paired_at: 1,
+        };
+        let mut door = Door::new(
+            "lamp-75c9",
+            "Lamp",
+            PIN,
+            Clients {
+                clients: vec![newer],
+            },
+            None,
+        );
+        let _ = door
+            .set_grants("c_newer", [Grant::Body].into())
+            .expect("a paired computer");
+        let kept = &door.clients().clients[0];
+        assert_eq!(kept.grants, [Grant::Body].into());
+        assert_eq!(kept.unknown_grants, ["teleport".to_owned()].into());
+    }
+
+    /// A client with no key at all (the lamp's own local agent) has its grants
+    /// changed like any other: `set_grants` reads and writes only the grants,
+    /// never the key, and its key stays empty.
+    #[test]
+    fn a_client_with_an_empty_key_can_have_its_grants_changed() {
+        let local = pairing::Client {
+            id: "c_local".to_owned(),
+            name: "local agent".to_owned(),
+            key: String::new(),
+            grants: [Grant::Light].into(),
+            unknown_grants: BTreeSet::new(),
+            paired_at: 1,
+        };
+        let mut door = Door::new(
+            "lamp-75c9",
+            "Lamp",
+            PIN,
+            Clients {
+                clients: vec![local],
+            },
+            None,
+        );
+        let set = door
+            .set_grants("c_local", [Grant::Light, Grant::Notes].into())
+            .expect("a client with an empty key");
+        assert_eq!(set.added, [Grant::Notes]);
+        let kept = &door.clients().clients[0];
+        assert_eq!(kept.key, "");
+        assert_eq!(kept.grants, [Grant::Light, Grant::Notes].into());
     }
 
     /// As the camera's: a computer re-paired without the microphone has its
