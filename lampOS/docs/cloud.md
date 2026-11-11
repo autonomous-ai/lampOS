@@ -701,9 +701,8 @@ hears it beside the app's checks: a tap for Hermes, on and missing or
 failed, ends the wait between rounds (one said during a round is kept), and
 the status says `waiting`. An unknown engine, Hermes off, or Hermes not
 missing is dropped with a journal line. The next round's Hermes step then
-opens `Window::Asked`: never in the first round after lamp-update starts
-nor while the setup walk is under way, but past the quiet stretch and the
-clock windows, and a recent failure does not hold it (a tap is a
+opens `Window::Asked`: never while the setup walk is under way (as any
+round's, #5978), and a recent failure does not hold it (a tap is a
 deliberate retry; an install under way is still left alone). The install
 is the same one-shot, with its memory and disk floors, its freeze while
 someone speaks and its stop when the privacy reading is lost. The tap is
