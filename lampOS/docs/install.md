@@ -1957,7 +1957,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        of its own with its own `/proc`, as Hermes's.
      - Any other call (a Harness pane) takes the gateway's main process
        from systemd (`systemctl show -p MainPID`, never a file OpenClaw
-       could write), checks it is `lampos`'s and in another user namespace,
+       could write), checks it is `lampos`'s, in another user namespace and
+       still in the unit's cgroup (so a pid reused after the gateway
+       stopped is never taken for it),
        and joins its namespaces: `nsenter --user --mount
        --pid=/proc/<pid>/ns/pid_for_children --preserve-credentials`, then
        the caller's own ids in a nested user namespace, as `openclaw-ns`
@@ -1967,6 +1969,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        (lamp-openclaw-gateway.service) is not running in its own
        namespaces`. It never runs in a namespace of its own nor in the
        lamp's. A gateway restart ends its panes with its namespace.
+       `LAMP_OPENCLAW_GATEWAY=on` set by any other `lampos` caller only gives
+       that caller namespaces of its own, never a way into the lamp's.
+     - The wrapper sets `OPENCLAW_NO_AUTO_UPDATE=1`, so OpenClaw never
+       checks for or offers an update of its own: lamp-update's pinned
+       lockfile is the only way it changes, as Hermes's `updates.check
+       false`.
 
      So OpenClaw sees only OpenClaw's processes and, though it runs as
      `lampos` as every lamp service does, can signal none of them. Checked
