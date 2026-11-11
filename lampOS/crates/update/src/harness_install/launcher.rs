@@ -20,7 +20,7 @@
 //! start. Which lamp that is, is decided in `lamp_msgs::harness_hold`, for
 //! both.
 use crate::install::{HARNESS_HOME, Runner};
-use lamp_msgs::harness_hold::{HarnessHold, harness_hold};
+use lamp_msgs::harness_hold::{HarnessHold, REFUSE_UPDATE, harness_hold};
 use rustix::{
     fs::{self as rfs, AtFlags, Mode, OFlags},
     io::Errno,
@@ -84,10 +84,12 @@ pub fn own_exec_start(run: &mut Runner) -> Option<String> {
 /// `text`, a Harness launcher, in Harness's pinned shape: every
 /// `export ADAPTER_UPDATE_DISABLE=` and `export HARNESS_ENV_FILE=` line
 /// before its first `exec` line taken out, then `export
-/// ADAPTER_UPDATE_DISABLE=true` and `export HARNESS_ENV_FILE=<env_file>`
-/// put just before it. The `exec` line and every other line are kept as
-/// they are, so a launcher already pinned comes back byte for byte. `None`
-/// when there is no `exec` line. The same text as lamp-tasks' own.
+/// ADAPTER_UPDATE_DISABLE=true`, `export HARNESS_ENV_FILE=<env_file>` and
+/// the line refusing `harness update` (`REFUSE_UPDATE`, #5957) put just
+/// before it, that line taken out first too. The `exec` line and every
+/// other line are kept as they are, so a launcher already pinned comes back
+/// byte for byte. `None` when there is no `exec` line. The same text as
+/// lamp-tasks' own.
 pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
     shaped(text, Some(env_file))
 }
@@ -109,6 +111,7 @@ fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
         let line_text = line.trim();
         if line_text.starts_with(&format!("export {DISABLE}="))
             || line_text.starts_with(&format!("export {ENV_FILE}="))
+            || line_text == REFUSE_UPDATE
         {
             continue;
         }
@@ -117,6 +120,8 @@ fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
     if let Some(env_file) = env_file {
         pinned.push_str(&format!("export {DISABLE}=true\n"));
         pinned.push_str(&format!("export {ENV_FILE}={env_file}\n"));
+        pinned.push_str(REFUSE_UPDATE);
+        pinned.push('\n');
     }
     for line in &lines[exec..] {
         pinned.push_str(line);

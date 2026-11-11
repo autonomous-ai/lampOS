@@ -37,7 +37,7 @@
 //! so Harness's own updater runs and these lamps are the canary for its
 //! releases. Which lamp that is, is decided once, for lamp-update too, in
 //! `lamp_msgs::harness_hold`; every other lamp keeps the hold as before.
-use lamp_msgs::harness_hold::HarnessHold;
+use lamp_msgs::harness_hold::{HarnessHold, REFUSE_UPDATE};
 use std::{
     collections::BTreeMap,
     ffi::OsString,
@@ -225,17 +225,19 @@ fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// `text`, a Harness launcher, in Harness's pinned shape: every
 /// `export ADAPTER_UPDATE_DISABLE=` and `export HARNESS_ENV_FILE=` line
 /// before its first `exec` line taken out, then `export
-/// ADAPTER_UPDATE_DISABLE=true` and `export HARNESS_ENV_FILE=<env_file>`
-/// put just before it. The `exec` line and every other line are kept as
-/// they are, so a launcher already pinned comes back byte for byte. `None`
-/// when there is no `exec` line.
+/// ADAPTER_UPDATE_DISABLE=true`, `export HARNESS_ENV_FILE=<env_file>` and
+/// the line refusing `harness update` ([`REFUSE_UPDATE`], #5957) put just
+/// before it, that line taken out first too. The `exec` line and every
+/// other line are kept as they are, so a launcher already pinned comes back
+/// byte for byte. `None` when there is no `exec` line.
 pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
     launcher_shaped(text, Some(env_file))
 }
 
 /// `text`, a Harness launcher, with the hold taken out (#6300): every
 /// `export ADAPTER_UPDATE_DISABLE=` and `export HARNESS_ENV_FILE=` line
-/// before its first `exec` line taken out, every other line kept, so one
+/// and the [`REFUSE_UPDATE`] line before its first `exec` line taken out,
+/// so Harness's own `update` runs on a canary lamp, every other line kept, so one
 /// with neither comes back byte for byte. `None` when there is no `exec`
 /// line.
 pub fn unpinned_launcher(text: &str) -> Option<String> {
@@ -252,6 +254,7 @@ fn launcher_shaped(text: &str, env_file: Option<&str>) -> Option<String> {
         let line_text = line.trim();
         if line_text.starts_with(&format!("export {DISABLE}="))
             || line_text.starts_with(&format!("export {ENV_FILE}="))
+            || line_text == REFUSE_UPDATE
         {
             continue;
         }
@@ -260,6 +263,8 @@ fn launcher_shaped(text: &str, env_file: Option<&str>) -> Option<String> {
     if let Some(env_file) = env_file {
         pinned.push_str(&format!("export {DISABLE}=true\n"));
         pinned.push_str(&format!("export {ENV_FILE}={env_file}\n"));
+        pinned.push_str(REFUSE_UPDATE);
+        pinned.push('\n');
     }
     for line in &lines[exec..] {
         pinned.push_str(line);
@@ -607,7 +612,7 @@ mod tests {
     /// Harness's launcher as its installer writes it without `--no-updates`.
     const UNPINNED: &str = "#!/bin/sh\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
     /// The same, pinned.
-    const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+    const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
     const ENV_AT: &str = "/var/lib/lampos-tasks/harness-hold.env";
 
     #[test]
@@ -621,13 +626,59 @@ mod tests {
         assert_eq!(
             pinned_launcher(other, ENV_AT).unwrap(),
             format!(
-                "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE={ENV_AT}\nexec node cli.js \"$@\"\n"
+                "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE={ENV_AT}\n{REFUSE_UPDATE}\nexec node cli.js \"$@\"\n"
             )
         );
         // An exec line Harness's update rewrote is kept as it is.
         let updated = PINNED.replace("0.5.39", "0.5.57");
         assert_eq!(pinned_launcher(&updated, ENV_AT).unwrap(), updated);
         assert_eq!(pinned_launcher("#!/bin/sh\necho hi\n", ENV_AT), None);
+    }
+
+    /// #5957: the pinned launcher, run by `/bin/sh` as Harness's is,
+    /// refuses `harness update` before Harness runs (one line on stderr,
+    /// exit 1), and runs every other command, `update` as a later word
+    /// too. Unpinned, the line goes with the hold.
+    #[test]
+    fn the_pinned_launcher_refuses_harness_update_and_runs_the_rest() {
+        let launcher = pinned_launcher("#!/bin/sh\nexec echo ran \"$@\"\n", ENV_AT).unwrap();
+        let run = |args: &[&str]| {
+            std::process::Command::new("/bin/sh")
+                .arg("-c")
+                .arg(&launcher)
+                .arg("harness")
+                .args(args)
+                .output()
+                .unwrap()
+        };
+        for refused in [
+            &["update"][..],
+            &["update", "--force"],
+            &["update", "--json"],
+        ] {
+            let out = run(refused);
+            assert_eq!(out.status.code(), Some(1), "{refused:?}");
+            assert!(out.stdout.is_empty(), "{refused:?}: Harness ran");
+            assert_eq!(
+                String::from_utf8_lossy(&out.stderr),
+                "harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\n"
+            );
+        }
+        for (args, said) in [
+            (&["ps", "--all", "--json"][..], "ran ps --all --json\n"),
+            (&[], "ran\n"),
+            (&["reply", "lamp-1", "update"], "ran reply lamp-1 update\n"),
+            (&["updates"], "ran updates\n"),
+            (&["--update"], "ran --update\n"),
+        ] {
+            let out = run(args);
+            assert_eq!(out.status.code(), Some(0), "{args:?}");
+            assert_eq!(String::from_utf8_lossy(&out.stdout), said);
+        }
+        assert_eq!(
+            unpinned_launcher(&launcher).unwrap(),
+            "#!/bin/sh\nexec echo ran \"$@\"\n"
+        );
     }
 
     fn launcher_in(home: &Path, text: &str, mode: u32) -> PathBuf {
