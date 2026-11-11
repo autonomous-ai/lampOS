@@ -372,6 +372,47 @@ def _hex_rgb(text: Any) -> bool:
     )
 
 
+# lamp_msgs::Light::TINTS: the ten colours' tints, to name the light nearest a computer's own pixels.
+_TINTS = (
+    ("yellow", (1.0, 0.80, 0.0)),
+    ("red", (1.0, 0.0, 0.0)),
+    ("green", (0.0, 1.0, 0.12)),
+    ("blue", (0.0, 0.22, 1.0)),
+    ("cyan", (0.0, 0.90, 1.0)),
+    ("purple", (0.62, 0.0, 1.0)),
+    ("orange", (1.0, 0.34, 0.0)),
+    ("pink", (1.0, 0.22, 0.42)),
+    ("white", (1.0, 0.88, 0.72)),
+    ("warm", (1.0, 0.55, 0.0)),
+)
+
+
+def _rgb(text: str) -> tuple[int, int, int]:
+    return int(text[1:3], 16), int(text[3:5], 16), int(text[5:7], 16)
+
+
+def _drawn_pixels(given: list[str], brightness: int | None) -> list[tuple[int, int, int]]:
+    """Each pixel at `brightness` (0 to 100, 100 when none), as lamp-control asks the
+    ring for them (parts.rs `own_light`): the channel times the share, rounded."""
+    share = (100 if brightness is None else min(brightness, 100)) / 100
+    return [tuple(int(channel * share + 0.5) for channel in _rgb(pixel)) for pixel in given]
+
+
+def _nearest_light(pixels: list[tuple[int, int, int]]) -> dict:
+    """The named light nearest a computer's own pixels (parts.rs `nearest_light`):
+    the tint of the mean of the lit ones, at the brightest channel's level."""
+    brightest = max((max(pixel) for pixel in pixels), default=0)
+    if brightest == 0:
+        return {"on": False, "colour": "warm", "level": 1}
+    lit = [pixel for pixel in pixels if any(pixel)]
+    mean = [sum(pixel[at] for pixel in lit) / len(lit) for at in range(3)]
+    top = max(max(mean), 1.0)
+    tint = [channel / top for channel in mean]
+    colour = min(_TINTS, key=lambda named: sum((named[1][at] - tint[at]) ** 2 for at in range(3)))[0]
+    level = min(max(int(brightest / 255 * 5 + 0.5), 1), 5)
+    return {"on": True, "colour": colour, "level": level}
+
+
 def light_refusal(request: dict) -> str | None:
     """lamp-control's refusal of a computer's `light` (protocol.rs), in its
     words, as `bad_request`, in its order; None for one it takes. Only for a
@@ -526,7 +567,7 @@ class FakeLamp:
         self.notes: dict[str, dict[str, Any]] = {}
         # The newest light a computer asked for, and until when (the fake's
         # `clock`): what the ring shows while it lasts (`light_state`).
-        self.shown: tuple[dict, float] | None = None
+        self.shown: tuple[dict, float, list[str] | None] | None = None
         # Each pulse the ring would play, and each it would drop as a second
         # within a minute from the same computer: (client, the light request).
         self.pulses_played: list[tuple[str, dict]] = []
@@ -676,10 +717,18 @@ class FakeLamp:
         if before != now:
             await self.emit("volume.changed", **now)
 
-    def _show(self, request: dict) -> None:
-        """The ring shows a computer's light while it lasts."""
-        light = {"on": True, "colour": request["colour"], "level": request["level"]}
-        self.shown = (light, self.clock() + request["for_ms"] / 1000)
+    def _show(self, request: dict, pixels: list[str] | None = None) -> None:
+        """The ring shows a computer's light while it lasts; with `pixels`, a
+        computer's own colours (each `#rrggbb`, as asked of the ring): the nearest
+        named light beside them, and `shows.pixels` while it lasts (docs/control.md)."""
+        if pixels is None:
+            light = {"on": True, "colour": request["colour"], "level": request["level"]}
+        else:
+            drawn = _drawn_pixels(pixels, request.get("brightness"))
+            light = _nearest_light(drawn)
+            self.shown_pixels = pixels
+            pixels = ["#{:02x}{:02x}{:02x}".format(*pixel) for pixel in drawn]
+        self.shown = (light, self.clock() + request.get("for_ms", 30_000) / 1000, pixels)
 
     def light_state(self) -> dict:
         """`get`'s light, as lamp-control answers it (Nine's light/drawn): the
@@ -692,6 +741,8 @@ class FakeLamp:
         own = dict(self.state.get("light") or {})
         if self.shown is not None and self.shown[1] > self.clock():
             own["shows"] = dict(self.shown[0])
+            if self.shown[2] is not None:
+                own["shows"]["pixels"] = list(self.shown[2])
         elif any(key in own for key in ("on", "colour", "level")):
             own["shows"] = {key: own[key] for key in ("on", "colour", "level") if key in own}
         return own or None
@@ -1221,7 +1272,7 @@ class FakeLamp:
                 self.requests.remove(request)
                 await self._refuse(ws, id_, "bad_request", "pixels: 32 of them, one per pixel of the ring")
                 return
-            self.shown_pixels = given
+            self._show(request, list(given))
             await self._ok(ws, id_, to="ring", pixels=len(given))
         elif op == "light":
             # As lamp-control's parts.rs: the pattern checked first, then to the

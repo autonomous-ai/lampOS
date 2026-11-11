@@ -144,7 +144,10 @@ asyncio.run(main())
   by those names, as lamp-control answers them: `{"presence": {...},
   "lamp": {...}}`. Behaviour change: it used to return the whole reply.
   `light` is the person's own (`on`, `colour`, `level`) with `shows`, what the
-  ring draws now; the fake's `shows` is the newest light asked while it lasts.
+  ring draws now; the fake's `shows` is the newest light asked while it lasts. `shows.pixels` (32 of `#rrggbb`,
+  optional) is there only while a computer holds its own pixels (`ring`, `light_rgb`) and the ring draws that light:
+  each as asked of the ring (at the `brightness`; the ring's own ceiling may draw it dimmer), and the nearest named
+  light beside them. The fake says them as lamp-control does.
 - **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`, and the turn and mute calls
   `start_turn`, `end_turn`, `set_listening`. Each returns when the lamp has taken it;
