@@ -866,6 +866,31 @@ jobs:
           cd "$RUNNER_TEMP/promoted"
           cargo run --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --bin lampos-notes -- --sequence "$PROMOTE_SEQUENCE"
 
+  # A full run that fails opens an issue (or comments on the open one), so a
+  # realtime test broken by a merge is not left unseen: no other run has it.
+  report-full-run-failure:
+    needs: [arm64, arm64-release, arm64-test]
+    if: failure() && inputs.full && !inputs.promote_sequence
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: 'lampOS: the full ARM64 run failed'
+      BODY: >-
+        The full ARM64 run (realtime tests included) failed on ${{ github.ref_name }} at
+        ${{ github.sha }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+        Pull requests and merges skip the realtime group (lampOS/docs/realtime-tests.md),
+        so the change that broke it may have passed its own run.
+        The full run builds cold and lamp-voice's publication build uses the cache (#6021):
+        if a test fails here that passed in lamp-voice's run of the same commit, publication
+        goes back to cold until it is explained.
+    steps:
+      - run: |
+          n=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number -q '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --body "$BODY"; else gh issue create --title "$TITLE" --body "$BODY"; fi
+
   # After a promotion, the same build on the CDN: its files and models under
   # lampos/stable/<sequence>/, the signed manifest pointed at them, signed
   # again with the same key. Off until the owner sets vars.LAMPOS_CDN_MIRROR to
@@ -921,28 +946,3 @@ jobs:
           # The same branch-restricted environment secret `publish` signs with.
           LAMPOS_UPDATE_KEY: ${{ secrets.LAMPOS_UPDATE_KEY }}
         run: python3 -I .github/scripts/lampos-mirror.py mirror
-
-  # A full run that fails opens an issue (or comments on the open one), so a
-  # realtime test broken by a merge is not left unseen: no other run has it.
-  report-full-run-failure:
-    needs: [arm64, arm64-release, arm64-test]
-    if: failure() && inputs.full && !inputs.promote_sequence
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      TITLE: 'lampOS: the full ARM64 run failed'
-      BODY: >-
-        The full ARM64 run (realtime tests included) failed on ${{ github.ref_name }} at
-        ${{ github.sha }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
-        Pull requests and merges skip the realtime group (lampOS/docs/realtime-tests.md),
-        so the change that broke it may have passed its own run.
-        The full run builds cold and lamp-voice's publication build uses the cache (#6021):
-        if a test fails here that passed in lamp-voice's run of the same commit, publication
-        goes back to cold until it is explained.
-    steps:
-      - run: |
-          n=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number -q '.[0].number')
-          if [ -n "$n" ]; then gh issue comment "$n" --body "$BODY"; else gh issue create --title "$TITLE" --body "$BODY"; fi
