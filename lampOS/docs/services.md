@@ -206,8 +206,8 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   only `service_read`: any other name gets "a skill may only read a linked
   service" (`serve::Services::skill_tool`). With `LAMP_SKILL_WRITES=on`
   it may call `skill_write` too, a made skill's write the owner said yes
-  to, and the voice alone `skill_write_approve` and `skill_writes_sent`
-  ("A made skill's write", below).
+  to, and the voice alone `skill_write_approve`, `skill_writes_sent` and
+  `skill_writes_approved` ("A made skill's write", below).
 
 Each door answers at most 8 connections at once ("busy" past it), and a peer
 has 5 s to send its line and take the answer. The unit is a plain service,
@@ -1892,6 +1892,16 @@ subject or title. The voice reads it with `skill_writes_sent`, its own
 call like the yes, as `{"sent": [{"skill", "service", "at", "to"}]}`, to
 tell the owner "I sent your arrival mail to boss at 18:02" the next time
 they are seen, as below.
+
+**Whether it is approved** (`skill_writes_approved`, the voice's own
+call, to read a waiting skill back). `{"skill", "writes": [...],
+"sha256"}` as the yes takes them; answered `{"on", "approved"}`: `on` when
+the skill is installed as that package, `approved` when every write's
+content is approved for it and its service is linked now under the link
+approved, as a send holds it. It approves nothing (a changed package's
+approvals are dropped, as at a send); `lamp-skills` is refused it
+(`SKILL_READS_AND_WRITES_ONLY`), and with the switch off it is refused. Test
+`whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`.
 
 **The voice's side** ([skills.md](skills.md), "Made by voice", for the
 whole):

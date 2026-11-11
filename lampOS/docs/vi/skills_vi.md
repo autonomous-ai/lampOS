@@ -435,6 +435,39 @@ sau:
      trong 1,5 s đuôi, bị giữ dù dài bao nhiêu, có tên đèn hay là câu hỏi,
      dù `LAMP_SECOND_OWN_ECHO` bật hay tắt và cả trong phòng riêng; yêu cầu
      của nó được ghi lại và việc đồng ý trong đó bị từ chối.
+   - **Đọc lại, và đồng ý khi đó** (chủ đèn, 11/11;
+     `make_skill_local::read_back`): một kỹ năng ghi vẫn còn chờ lời đồng
+     ý (lượt tạo nó bị cắt, khi đó không có câu trả lời, hoặc một lời
+     "không") được nghe lại khi hỏi "what does my leaving mail skill
+     send?" hoặc "read me my leaving mail skill". Mô hình gọi `make_skill`
+     chỉ với `read_back`, tên kỹ năng (chỉ được đưa khi có
+     `LAMP_SKILL_WRITES`; bỏ "my" và "skill", `made_skill::name_asked`), và
+     giọng nói tìm kỹ năng đã giữ đang bật trên đèn có tên đó. Nếu chưa
+     được đồng ý cho những gì nó gửi bây giờ, theo `lamp-services`
+     (`skill_writes_approved`, lệnh gọi riêng của giọng nói, không đồng ý
+     gì; không biết được thì tính là chưa đồng ý), câu của chính lần tạo
+     (`made_skill::on_line`, "I made leaving mail: … It waits for you to
+     agree before it sends anything.") được nói nguyên văn, và các lần ghi
+     của nó lại chờ lời đồng ý qua đúng cơ chế chờ của lần tạo,
+     `approve_id`: một lời đồng ý bình thường ở một dòng nghe được sau đó
+     đồng ý như lúc tạo, với mọi chốt chặn của lần tạo (nói đủ và không bị
+     cắt, nên đọc lại bị cắt rồi một lời đồng ý là `NOT_SAID_WHOLE`; giữ
+     tiếng vọng; route thứ hai; package đã đọc lại; liên kết). Một lời
+     "không", hoặc không trả lời, thì không gọi gì: nó vẫn chưa được đồng
+     ý. Đã được đồng ý rồi thì câu đọc lại kết thúc bằng "You agreed to it,
+     so it sends as it says." (`made_skill::approved_line`), và không hỏi
+     hay chờ gì. Một kỹ năng không gửi gì thì được nói vậy ("… doesn't send
+     or write anything"); không có kỹ năng nào tên đó trên đèn, hoặc một
+     package khác của nó đang được cài, thì được nói vậy, kèm tên các kỹ
+     năng đang bật. Kiểm thử:
+     `a_waiting_write_skill_read_back_is_said_whole_and_a_later_yes_approves`,
+     `a_cut_or_echoed_read_back_approves_nothing`,
+     `a_read_back_declined_or_unanswered_stays_unapproved`,
+     `an_approved_write_skill_read_back_is_said_and_asks_nothing`,
+     `a_read_back_of_no_write_skill_or_none_says_so_plainly`,
+     `the_read_back_is_offered_with_writes_alone_within_the_bounds`, và của
+     `lamp-services`
+     `whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`.
    - **"I sent …"** (`crate::skill_writes_told`): route thứ hai hỏi
      `skill_writes_sent` ngoài đường đi của dòng, tối đa 5 s một lần, khi
      có một dòng nghe được, và dòng nghe được tiếp theo được báo mỗi lần

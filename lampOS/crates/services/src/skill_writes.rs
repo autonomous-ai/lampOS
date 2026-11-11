@@ -65,6 +65,10 @@ pub const FUNCTION: &str = "skill_write";
 pub const APPROVE: &str = "skill_write_approve";
 /// The voice's call: the owner's sent-log.
 pub const SENT: &str = "skill_writes_sent";
+/// The voice's call, to read a waiting skill back: whether a skill's
+/// writes are approved for its installed package under the link it has now
+/// (`serve::Services::skill_writes_approved`). It approves nothing.
+pub const APPROVED: &str = "skill_writes_approved";
 /// In the store folder: each approved write's hash, skill and link.
 pub const APPROVED_FILE: &str = "skill-writes-approved.json";
 /// In the store folder: when each skill's write was sent, for the bounds.
