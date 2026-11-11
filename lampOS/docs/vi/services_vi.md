@@ -144,7 +144,7 @@ dịch vụ.
 | `LAMP_CALENDAR_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_event` và `delete_event` của `service_write` trả lời "changing or cancelling a calendar event is off on this lamp" trước khi bất cứ gì được đọc, giữ hay gửi, và `tools.json` chỉ liệt kê `create_event` cho Google Calendar ("Đổi hoặc huỷ một sự kiện lịch", bên dưới) |
 | `LAMP_GMAIL_DRAFT_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_draft` và `delete_draft` của `service_write` là action không biết, được trả lời bằng danh sách lệnh ghi của Gmail như mọi action khác ("gmail writes: send_mail …, save_draft …") trước khi bất cứ gì được đọc, giữ hay lưu, và `tools.json` chỉ liệt kê `send_mail` và `save_draft` cho Gmail ("Đổi hoặc xoá một bản nháp Gmail đã lưu", bên dưới) |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
-| `LAMP_SKILL_WRITES=on` (#6066; tắt trong mọi unit sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
+| `LAMP_SKILL_WRITES=on` (#6066; bật trong bốn unit của sản phẩm từ 11/11) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 | `LAMP_SKILL_TASKS=on` (#6432; tắt trong mọi unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
 
@@ -2035,18 +2035,19 @@ Khi `lamp-services` không trả lời được (không có socket, không trả
 bị từ chối), `needs_link` bị bỏ ra và không nói gì; việc tạo không bao giờ
 hỏng vì nó.
 
-## Một kỹ năng tự tạo ghi vào dịch vụ (#6066, `LAMP_SKILL_WRITES`, tắt)
+## Một kỹ năng tự tạo ghi vào dịch vụ (#6066, `LAMP_SKILL_WRITES`, bật trong sản phẩm)
 
 Chủ đèn đã bỏ quy tắc (b) của #6066 vào ngày 10/11: một kỹ năng tự tạo tự
 khởi động có thể gửi một thư, thêm một sự kiện lịch, hoặc mở một issue, một
 task hay một bình luận trên một dịch vụ đã liên kết, dù lúc đó không ai yêu
 cầu. Nửa runtime là `lamp_services::skill_writes` và
 `lamp_skills::service_write`; việc tạo, câu nói lại, lời đồng ý và "I sent
-…" của giọng nói ở bên dưới ("Phía giọng nói"); unit sản phẩm làm sau. Mọi
+…" của giọng nói ở bên dưới ("Phía giọng nói"). Mọi
 thứ đều tắt trừ khi `LAMP_SKILL_WRITES=on` (đúng `on`) có trong môi trường
 của `lamp-services`, `lamp-skills` và `lamp-skills-manage@`, nơi nạp kỹ
-năng khi cài nó, và của `lamp-voice`, nơi chuyển nó cho cả hai route. Mọi
-unit sản phẩm để nó tắt.
+năng khi cài nó, và của `lamp-voice`, nơi chuyển nó cho cả hai route. Bốn
+unit sản phẩm bật nó từ 11/11 (chủ đèn yêu cầu, để người thử dùng được
+#6142 và #6066); một drop-in với `LAMP_SKILL_WRITES=off` tắt nó.
 
 **Bước.** Trong `skill.toml` ([skills.md](../skills.md)):
 
@@ -2278,7 +2279,6 @@ toàn bộ):
   ứng dụng).
 - Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
   bạ, nên mô hình tạo kỹ năng xin địa chỉ.
-- Một unit sản phẩm đặt `LAMP_SKILL_WRITES=on`.
 
 ## Lượt chạy của một kỹ năng trên Hermes của đèn (#6432, `LAMP_SKILL_TASKS`, tắt)
 

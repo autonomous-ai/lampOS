@@ -51,6 +51,10 @@ Environment=LAMP_SERVICES_WRITE=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): the lamp-skills.service cgroup
 # onto the tools socket for service_read alone, any other call refused. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# A made skill's write (#6066, #6142): its one fixed write sent, with LAMP_SERVICES_WRITE above, only when the
+# owner's yes holds that content's SHA-256, at most 3 a skill and 10 in all a day, never a public post. On in the
+# product (owner, 11 Nov).
+Environment=LAMP_SKILL_WRITES=on
 ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services
 Restart=on-failure
 RestartSec=5s
