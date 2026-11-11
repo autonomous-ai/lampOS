@@ -2167,6 +2167,24 @@ order is kept. A written turn is the same from the chat on.
     answer cut and kept as heard is followed in the history by
     `cut_in_told::CUT_HERE`, so a later "go on", told no note, says where
     it was and goes on from the cut (`worker::messages`).
+  - **A cut-in's prompt, for diagnosis** (`LAMP_CUT_IN_PROMPT_LOG=on`, off
+    unless set and in no product unit; #6218 step 1): a debug switch for
+    test lamps only, since it puts the words people said in the journal.
+    Each chat request of a turn whose line began over the lamp's audible
+    answer (`over_the_lamps_voice`, kept by request in `Shared::begun_over`)
+    writes one block, every round, just before the chat goes (round 1
+    begun early, `LAMP_SECOND_PREPARED`, as it was begun): `request N chat
+    round R: a cut-in's prompt, M messages, T tools, B bytes` (counted as
+    the `chat request` line counts them, `Services::measured`), then one
+    line a message, its index, role and length and its first 80
+    characters (`cut_in_prompt_log::PREFIX_CHARS`), newlines as `⏎`, cut on
+    a character boundary, and an assistant's call names. A sign-in's code
+    and email are taken out (`sign_in::scrub`) and any other run of four
+    or more digits shows as `####`. It writes nothing while the worker's
+    authority has the camera or the microphone not allowed (the privacy
+    switch closed, or a mute), nor before its first authority. Nothing the
+    lamp says or does changes: it shows what the model is given when a cut-in
+    late in a long conversation gets no call.
   - **A line that may follow on** (`LAMP_FOLLOWS_ON=on`, the Start's
     `follows_on`): told `follows_on::NOTE`, unless its End marks a short
     sound or the rule judged it in a busy room (`Heeding::judged_busy`;

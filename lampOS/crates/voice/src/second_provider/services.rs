@@ -85,6 +85,13 @@ pub trait Services: Send + Sync + 'static {
         let _ = (messages, without, name);
         None
     }
+    /// A chat request's bytes and tool count on `messages`, told as `told`
+    /// says, as it would be sent now, for a debug journal block
+    /// (`LAMP_CUT_IN_PROMPT_LOG`, #6218). None, from services that cannot say.
+    fn measured(&self, messages: &[Message], told: ChatTold) -> Option<(usize, usize)> {
+        let _ = (messages, told);
+        None
+    }
     /// `text` spoken, as 24 kHz mono packets; dropping it stops the download.
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>>;
     /// As [`Services::speak`], a piece of `turn`'s answer, which the voice
@@ -1063,6 +1070,14 @@ impl Services for Net {
 
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
         Some(self.chat.declares(messages, without, name))
+    }
+
+    fn measured(&self, messages: &[Message], told: ChatTold) -> Option<(usize, usize)> {
+        Some(match told {
+            ChatTold::Every => self.chat.measured(messages, None, &[]),
+            ChatTold::Only(only) => self.chat.measured(messages, Some(only), &[]),
+            ChatTold::Without(without) => self.chat.measured(messages, None, without),
+        })
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
