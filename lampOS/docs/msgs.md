@@ -60,6 +60,7 @@ publishers declare them with their own `declaration()`.
 |---|---|---|---|---|
 | `Audio` | `mic1/audio`, `mic2/audio` | event | 20 ms | A block's header: sample rate, channels, sample format, the block's count. The samples follow it in the payload as they are (`Audio::block`), under the encoding `json+pcm` |
 | `Audio` | `mic2/sleep_audio` | event | 20 ms | The same blocks, from the voice's sleep capture only while a hand's sleep listens for its name alone (`LAMP_SLEEP_HEARS_NAME`, migrate-P2), never on `mic2/audio`. The voice publishes only while every subscriber is the name listener (`lamp-name --sleep-source`); any other stops it. `sleep_audio_topics()` lists it ([name.md](name.md#while-it-sleeps-migrate-p2)) |
+| `Audio` | `speaker/audio` | event | 100 ms | A computer's sound for the lamp's speaker (`speaker.stream`, control.md "The speaker"): the same header and `json+pcm` payload as a microphone's block, 24 kHz mono S16LE, in blocks of 10 to 100 ms. lamp-control publishes it and the voice reads it only while it holds that computer's open stream |
 | `ImageRef` | `camera/image` | latest | 500 ms | The absolute path of the newest frame's file, its width, height and encoding, and when it was captured |
 | `BodyLimits` | `body/limits` | latest | 10 s | What the body may do, joint by joint, in its servos' counts (4,096 a turn): each joint's `name` (as `JointState`'s), `min` and `max`, `home` (where it was found at start, the frame a computer's degrees count from), and the arm's `folded` and `stand` poses on a lamp that may stand; `speed` (counts/s) and `acceleration` (counts/s²) of the head and base; the `force` cap of 1,000; `heat_stop` (°C); and `stands`. Said once the body has found where it is, and every 10 s; nothing here can be raised from outside the body (control.md, `get` `body`) |
 | `JointState` | `body/joint_states` | latest | 100 ms | ROS's `sensor_msgs/JointState`: `name`, `position` (rad), `velocity` (rad/s), and `effort`, which here is the share of its full strength each servo reports (0 to 1) and not ROS's newton metres. And `commanded` (rad), which ROS's has not |
@@ -125,7 +126,7 @@ added after that table was written and are not in it: this table is where
 they are listed. `lamp/pause` is not one of the first topics either:
 `keeper_topics()` lists it, and `declaration_of()` recognizes it. Nor is
 `memory/rules` or `memory/forgot`: `memory_topics()` lists them; nor `name/rising` or `name/near`, which
-`name_topics()` lists; nor `stop/heard`, which `stop_topics()` lists; nor `mic2/sleep_audio`, which `sleep_audio_topics()` lists.
+`name_topics()` lists; nor `stop/heard`, which `stop_topics()` lists; nor `mic2/sleep_audio`, which `sleep_audio_topics()` lists; nor `speaker/audio`, which `speaker_audio_topics()` lists.
 `first_topics()` has them with the others. `lamp/health` and
 `board/state` are the only first topics with a lifespan: a kept report of
 how things are must not outlive whoever wrote it. Many later topics declare
