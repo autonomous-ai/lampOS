@@ -143,7 +143,8 @@ too.
 | Close during inference | The core returns at once; the worker is killed after the grace period | `close_during_inference_never_waits` |
 | Cancel with an answer in flight | The answer is discarded; the slot frees when it arrives | `cancelled_answers_are_never_delivered` |
 | Close with an answer on its way | Nothing is delivered after close; the answer counts as discarded or lost | `no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way` |
-| Worker exit not confirmed by a native wait, or not within the teardown bound | No replacement starts; runtime cleanup fails, so a physical mute is not restartable | `unconfirmed_endpoint_exit_fails_mute_cleanup_and_never_reopens_service`, with the control `confirmed_endpoint_exit_keeps_the_restartable_mute` |
+| Worker exit not confirmed by a native wait, or not within the teardown bound (1.5 s, #6406) | No replacement starts; runtime cleanup fails, so a physical mute is not restartable | `unconfirmed_endpoint_exit_fails_mute_cleanup_and_never_reopens_service`, with the control `confirmed_endpoint_exit_keeps_the_restartable_mute` |
+| Worker exit confirmed late on a requested stop (killed after its grace, then reaped, inside the 1.5 s bound) | A clean stop: the cleanup succeeds, the restart guard and the mute go back as for any clean stop. The bound was 500 ms until #6406; a slow kill, reap and last read under load overran it on lamp-52e6 and the restart exited failed. It stays well inside the unit's 5 s `TimeoutStopSec` (`the_endpoint_exit_wait_stays_well_inside_the_units_stop_timeout`) | `a_late_but_confirmed_endpoint_exit_is_a_clean_requested_stop` |
 | Long idle | The worker stays ready with the same process; only a request in flight is timed | `an_idle_worker_stays_ready_across_a_long_quiet`, `worker_process_stays_ready_and_bounded_across_idle_and_repeated_checks` |
 
 The process tests (`crates/turn-end-wire/tests/process.rs`) re-execute their
