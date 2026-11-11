@@ -104,8 +104,11 @@ pub async fn once(
 
 /// Pings every `every` with the newest account and identity until
 /// `accounts` closes. `key` is the bearer. `keep` is given each account a
-/// reply moved to, before it is sent on. `login`, with `LAMP_SIGNED_OUT=on`,
-/// is told what each ping's answer says of the login.
+/// reply moved to, before it is sent on. `region` is given each reply's
+/// region (`ping::Region`, #6414): no part of the account, so it never
+/// moves the broker. `login`, with `LAMP_SIGNED_OUT=on`, is told what each
+/// ping's answer says of the login.
+#[allow(clippy::too_many_arguments)]
 pub async fn pings(
     accounts: watch::Sender<Option<Account>>,
     identity: watch::Receiver<Identity>,
@@ -113,6 +116,7 @@ pub async fn pings(
     every: Duration,
     say: &mut impl Say,
     keep: &mut impl FnMut(&Account),
+    region: &mut impl FnMut(&str),
     mut login: Option<&mut Login>,
 ) {
     let mut client = match client() {
@@ -155,9 +159,11 @@ pub async fn pings(
                     if failing.take().is_some() {
                         say.line("the backend's ping answers again");
                     }
-                    if let Some(next) =
-                        ping::reply(&body).and_then(|reply| ping::after(&account, &reply))
-                    {
+                    let reply = ping::reply(&body);
+                    if let Some(reply) = &reply {
+                        region(&reply.region);
+                    }
+                    if let Some(next) = reply.and_then(|reply| ping::after(&account, &reply)) {
                         keep(&next);
                         say.line(&format!(
                             "the backend gave a new broker: {}:{}",
@@ -283,6 +289,7 @@ mod tests {
                 Duration::from_millis(20),
                 &mut say,
                 &mut keep,
+                &mut |_: &str| {},
                 None,
             )
             .await;
@@ -361,6 +368,7 @@ mod tests {
                 Duration::from_millis(2),
                 &mut say,
                 &mut |_: &Account| {},
+                &mut |_: &str| {},
                 Some(&mut login),
             )
             .await;
