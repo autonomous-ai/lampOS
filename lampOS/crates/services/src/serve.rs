@@ -73,6 +73,12 @@ pub const RUN_HELD: &str = "Nothing is sent. The lamp reads it back to the perso
 pub const RUN_ANSWER_MOST: usize = 7 * 1024;
 /// What a skill run's read that was cut to fit carries as its `cut`.
 pub const RUN_CUT: &str = "the rest is longer than a run can read";
+
+/// The most texts [`run_read_fitted`] cuts for one read: past it, a read of
+/// many short texts is given back as it stands and refused as too long, so
+/// a wide read never costs a pass over its whole size per text (SubDarren's
+/// P3 on #6455).
+pub const RUN_CUTS_MOST: usize = 256;
 /// What a skill's call to anything but a read is told.
 pub const SKILL_READS_ONLY: &str = "a skill may only read a linked service";
 /// What a skill's call to anything but a read or its approved write is
@@ -1996,7 +2002,7 @@ pub fn run_read_fitted(result: Value) -> Value {
         other => json!({"quoted": other}),
     };
     result["cut"] = json!(RUN_CUT);
-    loop {
+    for _ in 0..RUN_CUTS_MOST {
         let over = (line(&result) + 1).saturating_sub(RUN_ANSWER_MOST);
         if over == 0 {
             return result;
@@ -2017,6 +2023,7 @@ pub fn run_read_fitted(result: Value) -> Value {
         let out = ((over + 3) * length).div_ceil(written.max(1));
         cut_text(text, length.saturating_sub(out.max(1)));
     }
+    result
 }
 
 /// `text` kept to its first `most` bytes at a character's edge, with "…"
@@ -2658,6 +2665,26 @@ mod tests {
 
     /// #6432: a multibyte text is cut at a character's edge, never inside
     /// one.
+    /// #6432 (SubDarren's P3 on #6455): a read of more short texts than
+    /// [`RUN_CUTS_MOST`] cuts is given back after them, still over its
+    /// bound, so [`Services::run_tool`] refuses it as too long.
+    #[test]
+    fn a_wide_runs_read_stops_after_its_most_cuts() {
+        let wide: Vec<Value> = (0..2 * RUN_CUTS_MOST)
+            .map(|index| json!(format!("{index:04}{}", "w".repeat(60))))
+            .collect();
+        let read = run_read_fitted(json!({"source": "Web", "quoted": wide}));
+        assert_eq!(read["cut"], RUN_CUT);
+        assert!(run_answer_line(&read) >= RUN_ANSWER_MOST);
+        let cut = read["quoted"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|text| text.as_str().unwrap().ends_with('…'))
+            .count();
+        assert!(cut > 0 && cut <= RUN_CUTS_MOST, "{cut}");
+    }
+
     #[test]
     fn a_runs_read_is_cut_at_a_characters_edge() {
         let mut two = "日本".to_owned();

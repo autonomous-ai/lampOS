@@ -2340,6 +2340,9 @@ lẫn lượt chạy đều không giữ token nào.
   các văn bản dài nhất tại ranh giới ký tự với "…" ở cuối mỗi đoạn, và kết
   quả có thêm `"cut":"the rest is longer than a run can read"`
   (`serve::run_read_fitted`; các lần đọc của giọng nói không bị cắt như vậy).
+  Tối đa 256 văn bản bị cắt (`serve::RUN_CUTS_MOST`): một lần đọc có nhiều
+  văn bản ngắn hơn thế bị từ chối là quá dài, không bao giờ duyệt lại cả
+  kết quả cho từng văn bản.
 - **Một lần ghi** chỉ được chuẩn bị: cùng đường `service_write` như của
   giọng nói, đọc lại và giữ 2 phút (`writes::HOLD`), mỗi lúc một lần. Lượt
   chạy nhận `read_back`, `sent: false`, `held: true` và một `next` nói rằng

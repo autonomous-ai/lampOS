@@ -2243,7 +2243,9 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   read, such as a long mail's text, has its longest texts cut at a
   character's edge with "…" after each, and the result gets
   `"cut":"the rest is longer than a run can read"` (`serve::run_read_fitted`;
-  the voice's reads are not cut so).
+  the voice's reads are not cut so). At most 256 texts are cut
+  (`serve::RUN_CUTS_MOST`): a read of more short texts than that is
+  refused as too long, never walked once per text.
 - **A write** is only prepared: the same `service_write` path as the
   voice's, read back and held 2 minutes (`writes::HOLD`), one at a time.
   The run is answered `read_back`, `sent: false`, `held: true` and a `next`
