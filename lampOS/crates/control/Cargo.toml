@@ -32,6 +32,9 @@ serde_json.workspace = true
 ring = "0.17"
 base64 = "0.22"
 sha2.workspace = true
+# The owner's yes to a skill's task read and written never through a link
+# (`O_NOFOLLOW`, `task_yes`), as lamp-skills reads its own files.
+libc = "0.2"
 # A computer's clip checked at upload as the voice checks it (`sounds`).
 hound.workspace = true
 # The door on the network: WebSocket over TLS 1.3, the lamp's own

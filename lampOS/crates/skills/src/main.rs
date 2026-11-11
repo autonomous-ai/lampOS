@@ -35,7 +35,7 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
                      [--tools-dir DIR] [--state-dir DIR] [--boot-id ID] [--clock-control PATH] \
                      [--known-file PATH] (or LAMP_SKILLS_KNOWN_FILE) [--daily-state PATH] (or LAMP_SKILLS_DAILY_FILE)\n       \
-                     [--dev-dir DIR] (or LAMP_SKILLS_DEV_DIR)\n       \
+                     [--dev-dir DIR] (or LAMP_SKILLS_DEV_DIR) [--tasks-socket PATH] (or LAMP_SKILLS_TASKS_SOCKET)\n       \
                      [--zone system|NAME | --utc-offset-minutes N] [--trust-clock]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] [--state-dir DIR] SKILL_DIR|PACKAGE.tar\n       \
@@ -52,6 +52,10 @@ const KNOWN_ENVIRONMENT: &str = "LAMP_SKILLS_KNOWN_FILE";
 /// The developer folder, as the product unit passes it; `--dev-dir` wins
 /// when both are given.
 const DEV_DIR_ENVIRONMENT: &str = "LAMP_SKILLS_DEV_DIR";
+/// lamp-tasks' socket for a skill's `do.task` (#6305, its hand-over #6306),
+/// as a unit would pass it; `--tasks-socket` wins when both are given. No
+/// unit passes either yet: a task is then said not handed over.
+const TASKS_SOCKET_ENVIRONMENT: &str = "LAMP_SKILLS_TASKS_SOCKET";
 /// Where the product keeps its skills (`deploy/product/lamp-skills.service`):
 /// the core ones `lamp-update install` writes and the installable ones.
 const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
@@ -181,6 +185,7 @@ fn main() -> ExitCode {
     let mut clock_control = None;
     let mut known_file = None;
     let mut dev_dir = None;
+    let mut tasks_socket = None;
     let mut daily_state = None;
     let mut trust_clock = false;
     let mut offset = None;
@@ -246,6 +251,7 @@ fn main() -> ExitCode {
             "--clock-control" => clock_control = Some(value),
             "--known-file" => known_file = Some(value),
             "--dev-dir" => dev_dir = Some(value),
+            "--tasks-socket" => tasks_socket = Some(value),
             "--daily-state" if daily_state.is_none() => daily_state = Some(value),
             _ => {
                 eprintln!("{USAGE}");
@@ -281,6 +287,7 @@ fn main() -> ExitCode {
     // the daily journal comes: an `Environment=` line an older binary
     // ignores, never a flag that would end it.
     let dev_dir = flag_or_environment(dev_dir, DEV_DIR_ENVIRONMENT);
+    let tasks_socket = flag_or_environment(tasks_socket, TASKS_SOCKET_ENVIRONMENT);
     let ask = std::env::var("LAMP_SKILLS_ASK").unwrap_or_default();
     let options = Options {
         tools,
@@ -297,6 +304,7 @@ fn main() -> ExitCode {
         local_time,
         known_file,
         dev_dir,
+        tasks_socket,
     };
     match serve(&dir, root, &sockets, &options) {
         Ok(()) => ExitCode::SUCCESS,
@@ -650,6 +658,9 @@ struct Options {
     /// the lamp (`lamp-eyes --known-file`), for a watch to tell a known face
     /// from one it does not know, and the person who asked from anyone else.
     known_file: Option<PathBuf>,
+    /// `--tasks-socket` or `LAMP_SKILLS_TASKS_SOCKET`: lamp-tasks' socket a
+    /// skill's `do.task` is handed over on (#6305, #6306).
+    tasks_socket: Option<PathBuf>,
 }
 
 /// A skip of the clock asked on `--clock-control`, and where to say it is
@@ -1144,6 +1155,11 @@ fn serve(
         permissions: RefCell::new(HashMap::new()),
         unplug: RefCell::default(),
         made: RefCell::default(),
+        tasks: RefCell::new(Tasks {
+            of: HashMap::new(),
+            state: options.state.clone(),
+            socket: options.tasks_socket.clone(),
+        }),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
             // Arrivals by sound only with LAMP_GUARD_SOUNDS=on (#2562), and
@@ -1367,6 +1383,18 @@ fn serve(
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
                     .collect();
                 *runner.made.borrow_mut() = made_here(&skills, dir);
+                // A pushed skill's folder is the developer folder's.
+                runner.tasks.borrow_mut().of = skills
+                    .iter()
+                    .filter(|skill| skill.task_step().is_some())
+                    .filter_map(|skill| {
+                        let folder = match &skill.pushed_by {
+                            Some(_) => options.dev_dir.as_deref()?.join(&skill.name),
+                            None => dir.join(&skill.name),
+                        };
+                        Some((skill.name.clone(), (folder, skill.grants.clone())))
+                    })
+                    .collect();
                 if let Some(counting) = &counting {
                     *runner.runs.borrow_mut() = skills
                         .iter()
@@ -1838,6 +1866,9 @@ struct Runner {
     /// The skills made on this lamp, as of the last load (#6062): their
     /// says are asked quoted, with no functions ([`say_ask`]).
     made: RefCell<HashSet<String>>,
+    /// The skills with a `do.task` (#6305), as of the last load, and where
+    /// their tasks are handed over.
+    tasks: RefCell<Tasks>,
     /// By skill, the looks its search under way has taken (#1685).
     looks: RefCell<HashMap<String, u32>>,
     /// The watches (guard mode), their marks and their texts.
@@ -1845,6 +1876,17 @@ struct Runner {
     /// With `LAMP_ADDONS=on`: where the add-ons' proposals are written, and
     /// their limits (`docs/addons.md`).
     proposals: Option<Arc<Mutex<Proposals>>>,
+}
+
+/// The skills with a `do.task` (#6305): by skill, its folder and its
+/// grants, as of the last load; and the program's `--state-dir`, where the
+/// runs' ledger is (the owner's yes is lamp-control's), and lamp-tasks'
+/// socket.
+#[derive(Default)]
+struct Tasks {
+    of: HashMap<String, (PathBuf, Vec<String>)>,
+    state: Option<PathBuf>,
+    socket: Option<PathBuf>,
 }
 
 /// `addon/proposal`, written for the add-ons, and what they proposed lately.
@@ -2519,6 +2561,28 @@ fn start(
     // runs (`lamp_skills::usage`): one atomic add, nothing waited on.
     if let Some(runs) = runner.runs.borrow().get(&skill) {
         runs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    // A task handed to the lamp's agent (#6305) goes on its own thread, as
+    // long as lamp-tasks takes to answer (its run's end, at most
+    // `task::RUN_MOST`): the run's other steps (light, cue, say) are made
+    // at once beside it, and its outcome is the journal's.
+    let (tasks, calls): (Vec<Call>, Vec<Call>) = calls
+        .into_iter()
+        .partition(|call| matches!(call, Call::Task(_)));
+    let handed = !tasks.is_empty();
+    for call in tasks {
+        let Call::Task(step) = call else { continue };
+        hand_task(&skill, *step, &runner.tasks.borrow());
+    }
+    if handed && calls.is_empty() {
+        let _ = made.send(());
+        let _ = runner.finished.send(SkillEvent {
+            skill,
+            stage: SkillStage::Done,
+            why: "its do.task goes on on its own".into(),
+            allowed: None,
+        });
+        return made_rx;
     }
     // A read of a linked service (#5288) is its skill's whole run: on a
     // thread of its own, as long as its gate's wait, and nothing is made
@@ -4970,6 +5034,46 @@ fn read_service(
     service_read::run(read, &mut room)
 }
 
+/// A skill's `do.task` that came due (#6305, [`lamp_skills::task`]),
+/// handed over on a thread of its own ([`lamp_skills::task::hand`]): only
+/// with the switch on and the owner's yes for its folder as it is now and
+/// its grants, one at a time a skill, within the day's bounds. The journal
+/// says what became of it, never the task's words.
+fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
+    let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
+        eprintln!("lamp-skills: skill:{skill}: do.task: not handed over: its folder is not known");
+        return;
+    };
+    let (state, socket, skill) = (tasks.state.clone(), tasks.socket.clone(), skill.to_owned());
+    std::thread::spawn(move || {
+        // The owner's yes is lamp-control's, only asked here.
+        let place = lamp_skills::task::Place {
+            state: state.as_deref(),
+            control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
+            socket: socket.as_deref(),
+        };
+        let said =
+            lamp_skills::task::hand(&skill, &step, &folder, &grants, place, unix_ms(), hand_over);
+        eprintln!("lamp-skills: skill:{skill}: {said}");
+    });
+}
+
+/// One hand-over line to lamp-tasks at `socket`, and its answer, read when
+/// the run ends, at most [`lamp_skills::task::RUN_MOST`] later.
+fn hand_over(socket: &Path, line: &str) -> Result<String, String> {
+    let exchange = || -> io::Result<String> {
+        let mut stream = UnixStream::connect(socket)?;
+        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+        stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
+        stream.write_all(format!("{line}\n").as_bytes())?;
+        let mut answer = String::new();
+        BufReader::new(stream.take(8_192)).read_line(&mut answer)?;
+        Ok(answer)
+    };
+    let answer = exchange().map_err(|error| format!("lamp-tasks couldn't be reached: {error}"))?;
+    lamp_skills::task::answered(&answer)
+}
+
 /// A skill's write to a linked service that came due (#6066,
 /// [`lamp_skills::service_write`]): held to its permissions and its switch,
 /// then sent as its exact content on `lamp-services`' tools socket, which
@@ -5331,6 +5435,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Ends => "its trigger ended".into(),
         Call::ServiceRead(_) => "read: made by its own run, behind its gate".into(),
         Call::ServiceWrite(_) => "write: made by its own run, as the owner said yes".into(),
+        Call::Task(_) => "do.task: handed over on its own, beside the run".into(),
         Call::Remind(remind) => {
             // One set at a time, all skills: the list read for the same
             // words and the set it allows are never split by another's.
@@ -6209,6 +6314,7 @@ mod tests {
             looks: RefCell::default(),
             unplug: RefCell::default(),
             made: RefCell::default(),
+            tasks: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),
@@ -6615,6 +6721,7 @@ mod tests {
                     ends: RefCell::default(),
                     unplug: RefCell::default(),
                     made: RefCell::default(),
+                    tasks: RefCell::default(),
                     local_time: None,
                     trust_clock: false,
                     clock_waiting: Cell::new(false),
@@ -6695,6 +6802,7 @@ mod tests {
             ends: RefCell::default(),
             unplug: RefCell::default(),
             made: RefCell::default(),
+            tasks: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),
