@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
-import { checked, describe, findControl, findStimulus } from './controls.js';
+import { checked, describe, findControl, findStimulus, logIt } from './controls.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
@@ -167,9 +167,7 @@ if (stimDir) {
   listenFor('good night lamp').catch((error) => console.log(`not listening for a phrase: ${error.message}`));
   for (const event of [...schema.events.filter((e) => e !== 'body.state' && e !== 'time' && e !== 'phrase.heard'), 'lease', 'done']) {
     lamp.on(event, (frame) => {
-      const now = Date.now();
-      if (now - (quiet.get(event) ?? 0) < 200) return;
-      quiet.set(event, now);
+      if (!logIt(event, Date.now(), quiet)) return;
       const { ev: _ev, at: _at, ...rest } = frame ?? {};
       tell({ type: 'event', event, frame: rest });
     }).catch((error) => console.log(`not subscribed to ${event}: ${error.code ?? ''} ${error.message}`));

@@ -73,7 +73,7 @@ const panel = el('section', { id: 'panel' },
   el('h2', { textContent: 'What the lamp says' }),
   el('p', { className: 'sub', textContent: table.camera || table.microphone
     ? `${[table.camera && 'Camera', table.microphone && 'Microphone'].filter(Boolean).join(' and ')} ON for this run: the page can show the room to anyone on your network with this link (plain HTTP). The lamp sees the room only while it stands up (press a gesture first); folded down its picture is black.`
-    : 'Camera and microphone are off: the lamp sees and hears only what the buttons above make.' }),
+    : 'Camera and microphone are off: the lamp sees and hears only what the buttons above make. The log shows each line the lamp says out loud (lamp.said, the speech grant).' }),
   events,
 );
 // The panel first, the joint sliders (still there) folded away below it.

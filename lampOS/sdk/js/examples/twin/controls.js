@@ -78,6 +78,11 @@ export const CONTROLS = [
     run: async ({ lamp }, a) => { await lamp.lightOff({ forMs: a.for_ms }); return `lamp.lightOff({ forMs: ${a.for_ms} })`; } },
   { id: 'say', group: 'Voice', label: 'Say', fields: [text('text', 200, 'Hello, I am the virtual lamp.')],
     run: async ({ lamp }, a) => { await lamp.say(a.text); return `lamp.say(${q(a.text)})`; } },
+  // The computer's own turn: the lamp's voice takes the prompt as if it were said to it; `done` follows, and
+  // ending it gives the turn back (with none of this computer's, the lamp's own `busy` shows).
+  { id: 'turn_start', group: 'Voice', label: 'Ask the lamp (start a turn)', fields: [text('prompt', 200, 'What can you do?')],
+    run: async ({ lamp }, a) => { await lamp.startTurn(a.prompt); return `lamp.startTurn(${q(a.prompt)})`; } },
+  { id: 'turn_end', group: 'Voice', label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
   // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
   { id: 'sound', group: 'Voice', label: 'Sound (hum)', fields: [], run: async ({ lamp }) => { await lamp.sound('hum'); return "lamp.sound('hum')"; } },
   { id: 'skill_push', group: 'Skills', label: 'Push the try-wave skill', fields: [],
@@ -121,6 +126,15 @@ export const describe = () => ({
   controls: CONTROLS.map(({ id, group, label, fields }) => ({ id, group, label, fields })),
   stimuli: STIMULI.map(({ id, group, label, fields }) => ({ id, group, label, fields })),
 });
+
+// Whether the event log shows this event now: every line the lamp says (lamp.said) is shown, however fast they come
+// (a dropped line would be a line the page never saw); the others are thinned to one in 200 ms per event name.
+export function logIt(event, now, quiet) {
+  if (event === 'lamp.said') return true;
+  if (now - (quiet.get(event) ?? 0) < 200) return false;
+  quiet.set(event, now);
+  return true;
+}
 
 export const findControl = (id) => CONTROLS.find((c) => c.id === id);
 export const findStimulus = (id) => STIMULI.find((s) => s.id === id);
