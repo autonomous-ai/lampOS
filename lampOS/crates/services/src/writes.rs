@@ -122,7 +122,7 @@ pub const ACTIONS: &[(&str, &str)] = &[
 /// Google sign-in's (`gmail-app`, or `gmail` made with one). Its own words
 /// are the voice's interim line (#5962), so the person still hears the
 /// send it offers.
-pub const NO_DRAFTS: &str = "this Gmail link can't save drafts: only one linked with an app password can. Say \"I can't save a draft yet. I can read it back and send it when you say 'send it'.\"";
+pub const NO_DRAFTS: &str = "this Gmail link can't save drafts: only one linked with an app password can. Say \"I can't save a draft yet. I can read it to you and send it when you say yes.\"";
 /// Google Drive's one write: a new file in My Drive, its metadata and its
 /// content in one `multipart/related` upload, answered with its id, name
 /// and link. Drive turns a `text/plain` part into a Google Doc and a
