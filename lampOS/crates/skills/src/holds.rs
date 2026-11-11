@@ -16,10 +16,20 @@
 //! back at the start only on the same boot, for the same skill and the same
 //! trigger, written within that trigger's own `gap` of now; the engine then
 //! wants the next message to hold, or drops it ([`crate::Engine`]).
-use crate::Trigger;
+//!
+//! Beside them, the nudges' limits a restart would otherwise forget
+//! ([`Limits`]): each skill's runs today, its last run, its `[rest]` and its
+//! snooze, and each `[budget]` group's runs within the hour and its members
+//! waiting for it. Taken back on the same boot only, so a hold kept for a
+//! skill they hold back is still held back as long as on a lamp that never
+//! restarted. Each time in the file is on the monotonic clock, so it means
+//! the same after a restart; `daily.json` keeps only which daily chances
+//! were claimed, none of these.
+use crate::{Nudge, Trigger};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::BTreeMap,
     fs,
     io::{self, Read, Write},
     os::unix::fs::OpenOptionsExt,
@@ -35,8 +45,14 @@ pub const KEPT_FROM_US: u64 = 60_000_000;
 /// file says it was still held within this long; at once when a hold
 /// begins, ends or changes otherwise.
 pub const WRITE_EVERY_US: u64 = 30_000_000;
-const VERSION: u32 = 1;
-/// The most holds kept, and the largest file read.
+/// Version 2 added [`Limits`]. A version-1 file (holds only, none of a
+/// skill its limits held back) is still read: without limits it takes back
+/// nothing a limit would have held. A program before version 2 refuses this
+/// one, so a hold kept for a held-back skill is never taken back without
+/// the limit that holds it.
+const VERSION: u32 = 2;
+/// The most holds kept, and the largest file read; the most skills and
+/// groups whose limits are kept, each.
 const MOST_HOLDS: usize = 256;
 const MOST_BYTES: u64 = 64 * 1024;
 
@@ -75,20 +91,92 @@ impl Hold {
     }
 }
 
+/// The nudges' limits that live in memory only, kept beside the holds:
+/// by skill and by `[budget]` group, each time on the monotonic clock.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub(crate) struct Limits {
+    #[serde(default)]
+    pub(crate) skills: BTreeMap<String, SkillLimits>,
+    #[serde(default)]
+    pub(crate) groups: BTreeMap<String, GroupLimits>,
+}
+
+impl Limits {
+    /// The same limits but for when each waiting member was last held back:
+    /// that changes at every message a member waits, and only says the wait
+    /// is still live ([`crate::BUDGET_WAIT_LIVE_US`]); who waits, and since
+    /// when, decide first come, first served.
+    fn same_but_waits_seen(&self, other: &Limits) -> bool {
+        self.skills == other.skills
+            && self.groups.len() == other.groups.len()
+            && self.groups.iter().zip(&other.groups).all(|(a, b)| {
+                a.0 == b.0
+                    && a.1.began_us == b.1.began_us
+                    && a.1.waits.len() == b.1.waits.len()
+                    && a.1
+                        .waits
+                        .iter()
+                        .zip(&b.1.waits)
+                        .all(|(a, b)| a.0 == b.0 && a.1.0 == b.1.0)
+            })
+    }
+
+    fn truncate(&mut self) {
+        while self.skills.len() > MOST_HOLDS {
+            self.skills.pop_last();
+        }
+        while self.groups.len() > MOST_HOLDS {
+            self.groups.pop_last();
+        }
+    }
+}
+
+/// One skill's limits.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub(crate) struct SkillLimits {
+    /// Its runs counted for `most_a_day`: the local day they are of, and
+    /// how many. Kept only on that day.
+    pub(crate) day: Option<(i64, u32)>,
+    /// When it last started as a member of its group: what a stop without
+    /// `all` stops.
+    pub(crate) ran_us: Option<u64>,
+    /// Snoozed until then.
+    pub(crate) snoozed_until_us: Option<u64>,
+    /// Its `[rest]`: its last nudge, whether that is still being judged,
+    /// the runs nobody noticed in a row, and until when it rests.
+    pub(crate) rest: Option<Nudge>,
+}
+
+/// One `[budget]` group's limits.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub(crate) struct GroupLimits {
+    /// When its runs within the last hour began, oldest first.
+    pub(crate) began_us: Vec<u64>,
+    /// Each member waiting for its hour: since when, and when it was last
+    /// held back for it.
+    pub(crate) waits: BTreeMap<String, (u64, u64)>,
+}
+
 #[derive(Serialize, Deserialize)]
 struct Kept {
     version: u32,
     boot: String,
     written_us: u64,
     holds: Vec<Hold>,
+    #[serde(default)]
+    limits: Limits,
 }
 
 /// The holds read at the start: when the file was written, and what.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Restored {
     pub read_us: u64,
     pub written_us: u64,
     pub holds: Vec<Hold>,
+    /// The nudges' limits kept with them.
+    pub(crate) limits: Limits,
 }
 
 /// A trigger's fingerprint: the SHA-256 of what the program read of it,
@@ -104,7 +192,7 @@ pub fn fingerprint(trigger: &Trigger) -> String {
 pub struct Keeper {
     file: PathBuf,
     boot: String,
-    written: Option<(u64, Vec<Hold>)>,
+    written: Option<(u64, Vec<Hold>, Limits)>,
     faulted: bool,
 }
 
@@ -139,10 +227,12 @@ impl Keeper {
         };
         let kept: Kept = serde_json::from_str(&text)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        if kept.version != VERSION
+        if !(1..=VERSION).contains(&kept.version)
             || kept.boot != self.boot
             || kept.written_us > now_us
             || kept.holds.len() > MOST_HOLDS
+            || kept.limits.skills.len() > MOST_HOLDS
+            || kept.limits.groups.len() > MOST_HOLDS
         {
             return Ok(None);
         }
@@ -150,20 +240,24 @@ impl Keeper {
             read_us: now_us,
             written_us: kept.written_us,
             holds: kept.holds,
+            limits: kept.limits,
         }))
     }
 
-    /// `holds` written at `now_us` when they differ from the last written
-    /// but for when each was last seen holding, or, while any is kept,
-    /// [`WRITE_EVERY_US`] after the last write. A write that fails removes
-    /// the file, so a hold dropped since is never taken back; the first
-    /// failure is said.
-    pub fn keep(&mut self, mut holds: Vec<Hold>, now_us: u64) {
+    /// `holds` and `limits` written at `now_us` when they differ from the
+    /// last written but for when each hold was last seen holding and each
+    /// waiting member last held back, or, while any hold is kept,
+    /// [`WRITE_EVERY_US`] after the last write. A write
+    /// that fails removes the file, so a hold dropped since, or a limit
+    /// older than now, is never taken back; the first failure is said.
+    pub(crate) fn keep(&mut self, mut holds: Vec<Hold>, mut limits: Limits, now_us: u64) {
         holds.truncate(MOST_HOLDS);
+        limits.truncate();
         let due = match &self.written {
             None => true,
-            Some((at, before)) => {
-                before.len() != holds.len()
+            Some((at, before, kept_limits)) => {
+                !kept_limits.same_but_waits_seen(&limits)
+                    || before.len() != holds.len()
                     || before
                         .iter()
                         .zip(&holds)
@@ -179,6 +273,7 @@ impl Keeper {
             boot: self.boot.clone(),
             written_us: now_us,
             holds,
+            limits,
         };
         match write(&self.file, &kept) {
             Ok(()) => self.faulted = false,
@@ -201,7 +296,7 @@ impl Keeper {
             }
         }
         // Tried again at the next change or the next cadence, not at once.
-        self.written = Some((now_us, kept.holds));
+        self.written = Some((now_us, kept.holds, kept.limits));
     }
 }
 
@@ -258,15 +353,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join(FILE);
         let mut keeper = Keeper::new(file.clone(), "boot-a".into());
-        keeper.keep(vec![hold(10, 10)], 10);
+        keeper.keep(vec![hold(10, 10)], Limits::default(), 10);
         let first = fs::read(&file).unwrap();
-        keeper.keep(vec![hold(10, 20_000_000)], 20_000_000);
+        keeper.keep(vec![hold(10, 20_000_000)], Limits::default(), 20_000_000);
         assert_eq!(fs::read(&file).unwrap(), first, "only seen again: not due");
-        keeper.keep(vec![hold(10, 31_000_000)], 31_000_000);
+        keeper.keep(vec![hold(10, 31_000_000)], Limits::default(), 31_000_000);
         let read = keeper.read(32_000_000).unwrap().unwrap();
         assert_eq!(read.written_us, 31_000_000);
         assert_eq!(read.holds, vec![hold(10, 31_000_000)]);
-        keeper.keep(vec![hold(40_000_000, 40_000_000)], 40_000_000);
+        keeper.keep(
+            vec![hold(40_000_000, 40_000_000)],
+            Limits::default(),
+            40_000_000,
+        );
         assert_eq!(
             keeper.read(41_000_000).unwrap().unwrap().written_us,
             40_000_000
@@ -274,7 +373,7 @@ mod tests {
         assert!(keeper.read(39_000_000).unwrap().is_none(), "written later");
         let other = Keeper::new(file.clone(), "boot-b".into());
         assert!(other.read(50_000_000).unwrap().is_none(), "another boot");
-        keeper.keep(Vec::new(), 41_000_000);
+        keeper.keep(Vec::new(), Limits::default(), 41_000_000);
         assert!(keeper.read(42_000_000).unwrap().unwrap().holds.is_empty());
         fs::write(&file, "not json").unwrap();
         assert!(keeper.read(42_000_000).is_err());
@@ -288,16 +387,47 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join(FILE);
         let mut keeper = Keeper::new(file.clone(), "boot-a".into());
-        keeper.keep(vec![hold(10, 10)], 10);
+        keeper.keep(vec![hold(10, 10)], Limits::default(), 10);
         assert_eq!(keeper.read(11).unwrap().unwrap().holds.len(), 1);
         std::os::unix::fs::symlink(dir.path().join("elsewhere"), dir.path().join("holds.new"))
             .unwrap();
-        keeper.keep(Vec::new(), 20);
+        keeper.keep(Vec::new(), Limits::default(), 20);
         assert!(!file.exists(), "the old holds removed");
         assert!(keeper.read(21).unwrap().is_none());
         assert!(
             !dir.path().join("elsewhere").exists(),
             "never through the link"
         );
+    }
+
+    /// The limits are written at once when they change, with no hold kept,
+    /// and read back; a version-1 file (holds only) is read with none, and
+    /// a later version is refused.
+    #[test]
+    fn limits_written_at_a_change_and_an_older_file_read_without_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(FILE);
+        let mut keeper = Keeper::new(file.clone(), "boot-a".into());
+        keeper.keep(Vec::new(), Limits::default(), 10);
+        let mut limits = Limits::default();
+        limits
+            .skills
+            .entry("sip".into())
+            .or_default()
+            .snoozed_until_us = Some(99);
+        limits
+            .groups
+            .entry("wellbeing".into())
+            .or_default()
+            .began_us = vec![5];
+        keeper.keep(Vec::new(), limits.clone(), 11);
+        let read = keeper.read(12).unwrap().unwrap();
+        assert_eq!((read.written_us, read.limits), (11, limits));
+        let old = r#"{"version":1,"boot":"boot-a","written_us":3,"holds":[]}"#;
+        fs::write(&file, old).unwrap();
+        assert_eq!(keeper.read(4).unwrap().unwrap().limits, Limits::default());
+        let new = r#"{"version":3,"boot":"boot-a","written_us":3,"holds":[]}"#;
+        fs::write(&file, new).unwrap();
+        assert!(keeper.read(4).unwrap().is_none());
     }
 }
