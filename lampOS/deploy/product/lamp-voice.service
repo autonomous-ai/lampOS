@@ -352,6 +352,10 @@ Environment=LAMP_TASKS_NAMED_ONLY=on
 # call on 5 Nov: on once the app's sign-in screen is in a TestFlight build.
 Environment=LAMP_TASKS_SIGN_IN=on
 Environment=LAMP_TASKS_SIGN_IN_APP=on
+# A session the person names for the work (#5535; "the book program one"): start_agent_task takes it, and
+# lamp-tasks.service's --reply-named types the work into that session, never a new one. With the lamp's own Hermes
+# (#5978, LAMP_HERMES_ON_LAMP there), a named session is looked for on the lamp first, then the computers.
+Environment=LAMP_TASKS_REPLY_NAMED=on
 Environment=LAMP_CUT_KEEPS_NAME=on
 Environment=LAMP_SELFTEST_SPEAKER=on
 # Each stall of 50 ms or more in the voice's loops, with what held it, in /run/lampos-voice (#1179): cheap, and
