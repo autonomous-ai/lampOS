@@ -21,7 +21,7 @@ from typing import Any
 # Fields replaced wherever they appear in a frame.
 # A note's key and value and a list's prefix are the program's own: `key` was
 # secret already (the pairing key), and `value` and `prefix` join it.
-SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix"})
+SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix", "token"})
 # Fields given only as a summary: a said text or a turn's prompt, a pushed
 # skill part's bytes, a camera picture.
 SUMMARISED = frozenset({"text", "prompt", "data", "jpeg"})

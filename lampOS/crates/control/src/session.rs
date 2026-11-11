@@ -194,6 +194,10 @@ pub struct Session {
     /// peer check has already said who it is (docs/control.md, "The local
     /// agent").
     local: Option<String>,
+    /// Set for a connection that came by the run socket: its `hello` must
+    /// hold a one-run token (`crate::runs`), and says nothing else of who it
+    /// is.
+    run_socket: bool,
 }
 
 /// What a computer beyond the lamp's own network is told when it asks for
@@ -281,6 +285,8 @@ pub struct Door {
     /// Revokes taken in memory but not yet in the file: written out by the
     /// next save that succeeds.
     unsaved_revokes: BTreeSet<String>,
+    /// The skill runs going now, by their token (`crate::runs`).
+    runs: crate::runs::Runs,
     /// The SHA-256 of the lamp's own TLS certificate, which every pairing
     /// proof is made over.
     pin: [u8; 32],
@@ -399,6 +405,7 @@ impl Door {
             phrases_held: BTreeMap::new(),
             random: SystemRandom::new(),
             unsaved_revokes: BTreeSet::new(),
+            runs: crate::runs::Runs::default(),
             pin,
             quiet: None,
             push_folder: None,
@@ -589,6 +596,7 @@ impl Door {
             remote: false,
             connection: None,
             local: None,
+            run_socket: false,
         };
         use base64::Engine as _;
         let welcome = json!({
@@ -606,6 +614,59 @@ impl Door {
         let (mut session, welcome) = self.open();
         session.local = Some(client.to_owned());
         (session, welcome)
+    }
+
+    /// A connection that came by the run socket, whose peer the socket has
+    /// already checked: its `hello` is taken only with a live one-run token.
+    pub fn open_run(&mut self) -> (Session, Value) {
+        let (mut session, welcome) = self.open();
+        session.run_socket = true;
+        (session, welcome)
+    }
+
+    /// A one-run token for run `run` of `skill`, with `grants` (what the
+    /// owner's yes named), until `for_ms` from `now_us`: the run, and its
+    /// client now known to the door. Another token for the same run replaces
+    /// the first, and the connections of that run are told to close
+    /// (the caller does it with [`crate::runs::Run::client`]).
+    pub fn mint_run(
+        &mut self,
+        token: &str,
+        run: &str,
+        skill: &str,
+        grants: BTreeSet<Grant>,
+        for_ms: Option<u64>,
+        now_us: u64,
+    ) -> Result<crate::runs::Run, String> {
+        let live = self.runs.mint(token, run, skill, grants, for_ms, now_us)?;
+        self.clients
+            .add_run(&live.client, skill, live.grants.clone(), now_us / 1_000_000);
+        Ok(live)
+    }
+
+    /// Ends run `run` (and, when `serial` is given, only if it is still that
+    /// mint): the run, if it was going. Its client is gone from the door.
+    pub fn end_run(&mut self, run: &str, serial: Option<u64>) -> Option<crate::runs::Run> {
+        let ended = match serial {
+            Some(serial) => self.runs.end_if(run, serial),
+            None => self.runs.end(run),
+        }?;
+        self.clients.end_run(&ended.client);
+        Some(ended)
+    }
+
+    /// Ends every run whose time is past: the runs, their clients gone.
+    pub fn sweep_runs(&mut self, now_us: u64) -> Vec<crate::runs::Run> {
+        let ended = self.runs.expire(now_us);
+        for run in &ended {
+            self.clients.end_run(&run.client);
+        }
+        ended
+    }
+
+    /// The run `token` holds now.
+    fn run_of(&self, token: &str, now_us: u64) -> Option<crate::runs::Run> {
+        self.runs.of(token, now_us).cloned()
     }
 
     /// The local agent `user`'s record, made on the first start with the
@@ -850,12 +911,16 @@ impl Door {
             return outcome;
         }
         match &op {
-            Op::Pair { .. } if session.local.is_some() => {
+            Op::Pair { .. } if session.local.is_some() || session.run_socket => {
                 return reply_refused(
                     Some(re),
                     Error::new(
                         ErrorCode::BadRequest,
-                        "this socket is not for pairing: it is the local agent's",
+                        if session.run_socket {
+                            "this socket is not for pairing: it is a skill run's"
+                        } else {
+                            "this socket is not for pairing: it is the local agent's"
+                        },
                     ),
                 );
             }
@@ -866,8 +931,15 @@ impl Door {
                 }
                 return outcome;
             }
-            Op::Hello { client, sig } => {
-                return self.hello(session, re, client, sig, parts.motion_done());
+            Op::Hello { client, sig, token } => {
+                return self.hello(
+                    session,
+                    re,
+                    client,
+                    (sig, token.as_deref()),
+                    now_us,
+                    parts.motion_done(),
+                );
             }
             _ => {}
         }
@@ -1341,9 +1413,11 @@ impl Door {
         session: &mut Session,
         re: u64,
         client: &str,
-        sig: &str,
+        proof: (&str, Option<&str>),
+        now_us: u64,
         motion_done: bool,
     ) -> Outcome {
+        let (sig, token) = proof;
         // One hello a connection, so its count of open connections stays
         // right (the Reviewer-lead's P3: a second id kept the first's
         // leases open after it closed).
@@ -1351,6 +1425,56 @@ impl Door {
             return reply_refused(
                 Some(re),
                 Error::new(ErrorCode::BadRequest, "hello once a connection"),
+            );
+        }
+        // By the run socket: a live one-run token and nothing else; the run's
+        // own client and the grants the token names. Any other way in, a
+        // token is no part of hello.
+        if session.run_socket {
+            // The hello an SDK sends here, exactly: the placeholder id and the
+            // zero signature beside the token. A real client's id or signature
+            // is not this socket's way in and is refused, not ignored.
+            if client != crate::runs::HELLO_CLIENT || sig != crate::runs::hello_sig() {
+                let mut outcome = reply_refused(
+                    Some(re),
+                    Error::new(
+                        ErrorCode::BadRequest,
+                        "on this socket hello is client c_0, a zero sig and the token",
+                    ),
+                );
+                outcome.close = true;
+                return outcome;
+            }
+            let run = token.and_then(|token| self.run_of(token, now_us));
+            let Some(run) = run else {
+                let mut outcome = reply_refused(
+                    Some(re),
+                    Error::new(ErrorCode::NoGrant, crate::runs::NO_TOKEN),
+                );
+                outcome.close = true;
+                return outcome;
+            };
+            *self.open.entry(run.client.clone()).or_default() += 1;
+            session.client = Some(run.client.clone());
+            let limits = limits(
+                self.quiet.as_ref().and_then(|quiet| quiet.window),
+                self.rates.lifted(),
+            );
+            return ok(
+                re,
+                json!({
+                    "lamp": self.lamp,
+                    "grants": run.grants,
+                    "limits": limits,
+                    "run": run.run,
+                    "skill": run.skill,
+                }),
+            );
+        }
+        if token.is_some() {
+            return reply_refused(
+                Some(re),
+                Error::new(ErrorCode::BadRequest, "token: only on a skill run's socket"),
             );
         }
         // By the agent socket: no key, no signature; the record the socket
@@ -1887,6 +2011,7 @@ mod tests {
             PIN,
             Clients {
                 clients: vec![newer],
+                ..Clients::default()
             },
             None,
         );
@@ -1923,6 +2048,7 @@ mod tests {
             PIN,
             Clients {
                 clients: vec![local],
+                ..Clients::default()
             },
             None,
         );

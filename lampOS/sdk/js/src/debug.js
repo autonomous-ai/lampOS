@@ -11,7 +11,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 // Fields replaced wherever they appear in a frame.
 // A note's key and value and a list's prefix are the program's own: `key` was
 // secret already (the pairing key), and `value` and `prefix` join it.
-export const SECRET = new Set(['proof', 'sig', 'key', 'nonce', 'pin', 'fp', 'value', 'prefix']);
+export const SECRET = new Set(['proof', 'sig', 'key', 'nonce', 'pin', 'fp', 'value', 'prefix', 'token']);
 // Fields given only as a summary: a said text or a turn's prompt, a pushed
 // skill part's bytes, a camera picture.
 export const SUMMARISED = new Set(['text', 'prompt', 'data', 'jpeg']);
