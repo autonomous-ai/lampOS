@@ -766,7 +766,16 @@ sau:
     theo ngôn ngữ của cuộc trò chuyện, tên skill `voice-make`, vào lúc thích
     hợp trong vòng một giờ, hỏi lại một lần nếu bị bỏ). Lượt còn đang chờ
     thì nhận câu trả lời như trước, và không có gì đi qua dịch vụ nói. Khi
-    dịch vụ nói tắt, câu không được nói. Trong lúc đang tạo, hoặc câu của
+    dịch vụ nói tắt, câu không được nói. Một kỹ năng gửi hoặc ghi, đã tạo
+    và đã bật, không bao giờ được nói "it's on" ở đó (P2 của App Only trên
+    #6142): lượt đó chưa từng đưa mô hình câu đọc lại hay `approve_id` của
+    nó, nên không lời "có" nào sau đó được nhận, và câu của nó là
+    `made_skill::cut_write_line`, "I made leaving mail. It waits for you to
+    agree before it sends anything. I couldn't tell you just now what it
+    sends, so it sends nothing yet." (không có chữ nào để nhắc lại, không có
+    "yes"; kiểm thử
+    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). Trong lúc
+    đang tạo, hoặc câu của
     nó chưa được nói (`make_skill_local::Pending`), và tối đa 2 phút sau
     lời gọi (`make_skill_local::MAKE_WITHIN`, thời gian dài nhất một lần
     tạo chạy; câu có thể chờ tới một giờ để được nói, nhưng câu hỏi không bị

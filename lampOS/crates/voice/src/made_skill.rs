@@ -4735,6 +4735,24 @@ pub fn on_line(made: &Made) -> String {
     }
 }
 
+/// What the lamp says of a made skill that sends or writes when the turn
+/// it was made in was cut (App Only's P2 on #6142): said through the say
+/// service, its say-back never told the voice's model with its
+/// `approve_id`, so no yes the person gives later can approve it
+/// (`crate::skill_write_yes`). Its name and that it waits for the yes, in
+/// [`WAITS_FOR_YES`]'s words, then that what it sends wasn't said, so it
+/// sends nothing yet: never "it's on" alone, and no word to repeat.
+pub fn cut_write_line(made: &Made) -> String {
+    format!(
+        "I made {}.{WAITS_FOR_YES} {CUT_WRITE_UNSAID}",
+        spoken_name(&made.name)
+    )
+}
+
+/// How [`cut_write_line`] ends.
+pub const CUT_WRITE_UNSAID: &str =
+    "I couldn't tell you just now what it sends, so it sends nothing yet.";
+
 /// How [`manners_plainly`]'s sentence begins.
 const MANNERS_BEGIN: &str = " It starts on its own";
 
