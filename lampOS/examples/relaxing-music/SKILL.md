@@ -15,8 +15,9 @@ Voice owns both the confirmation and playback; a Stop, interruption, privacy
 closure or speaker mute cancels the request. Reopening privacy or unmuting
 does not restart it. The skill never changes volume, light or body position.
 
-`LAMP_REQUESTED_AUDIO=on` is required by the requested-audio feature. The
-feature is off by default, and installing the package does not turn it on.
+`LAMP_REQUESTED_AUDIO=on` is required by the requested-audio feature. It is
+off unless set and on in the product's units (#5749); installing the package
+does not turn it on.
 Messages-origin requests are refused, including messages with `speak=true`.
 
 The source directory is a template, not a complete installed skill. See
