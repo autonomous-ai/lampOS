@@ -1290,6 +1290,34 @@ reset's watcher, skills, tasks and voice, and the change, keys and Wi-Fi
 helpers' sockets. `lamp-setup` itself stops being started once the
 marker is there; `lamp-update` and `lamp-records` don't wait for it.
 
+**The parts a target already up leaves behind (`lamp_setup::parts`).** When
+`lampos.target` is already active as the marker comes, the path's start of
+it does nothing, so its `Wants=` are not pulled in again. A part its own
+condition skipped at boot, before the marker was there, then stayed dead
+until the next reboot. A tester's lamp showed it with `lamp-services`: it
+was skipped at boot by `ConditionPathExists=/var/lib/lampos-setup/done`, the
+path fired when setup finished, and the part stayed dead for five days,
+until an update round restarted it. The app showed accounts linked, and the
+links went nowhere. So, just after the marker is written, setup
+(`Save::start_parts`, only on a first setup, never in recovery's
+network-only run) does three things:
+
+1. It reads what the target wants (`systemctl show --property=Wants --value
+   -- lampos.target`). Those are the units enabled into it.
+2. It reads how each of them and the target are (`systemctl show
+   --property=Id,ActiveState,Type`).
+3. If the target is active, it starts each wanted unit that is `inactive`,
+   is not a template, and whose `Type=` is not `oneshot`, with `systemctl
+   start --no-block -- <unit>`. `lamp-services.service` goes first.
+
+Each start writes one log line: `started <unit>, which lampos.target wants
+and was not running`, or `<unit> could not be started (…); it starts at the
+next boot`. A running part is never restarted. A failed part is left, and so
+is a one-shot, which reads as inactive once it has run and would run again.
+When the target is not active, the path's start of it pulls in every part,
+and nothing more is done. The two reads are bounded at 5 s each, and each
+start returns once systemd has the job (5 s at most). None of it fails setup.
+
 ```sh
 systemctl is-active lampos.target lamp-voice lamp-setup-reset lamp-policy
 systemctl is-active lamp-setup        # active for up to 10 minutes after setup, so the page can follow the lamp; inactive after that

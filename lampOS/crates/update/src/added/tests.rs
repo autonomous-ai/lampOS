@@ -65,3 +65,51 @@ fn users_and_groups_the_lamp_lacks_are_named_and_root_needs_none() {
         ["user lampos-new", "group lampos-new", "group video"]
     );
 }
+
+#[test]
+fn a_kept_switch_starts_its_added_long_running_parts_of_the_lamp_lamp_services_first() {
+    let part = "[Service]\nType=simple\nExecStart=/x\n[Install]\nWantedBy=lampos.target\n";
+    let added: Vec<(String, String)> = [
+        ("lamp-mood.service", part),
+        // Enabled into the lamp, a long-running part: started, and first.
+        ("lamp-services.service", part),
+        // A one-shot part of the lamp: started, it would run again.
+        (
+            "lamp-air-clock.service",
+            "[Service]\nType=simple\nType=oneshot\nExecStart=/x\n[Install]\nWantedBy=lampos.target\n",
+        ),
+        // Wanted by other targets: the waking face, recovery.
+        (
+            "lamp-waking.service",
+            "[Service]\nExecStart=/x\n[Install]\nWantedBy=sysinit.target\n",
+        ),
+        (
+            "lamp-setup-recover.service",
+            "[Service]\nExecStart=/x\n[Install]\nWantedBy=multi-user.target\n",
+        ),
+        // A timed service, a template, a socket and a timer.
+        (
+            "lamp-records.service",
+            "[Service]\nType=oneshot\nExecStart=/x\n",
+        ),
+        ("lamp-a@.service", "[Service]\nExecStart=/x\n"),
+        (
+            "lamp-a.socket",
+            "[Socket]\nListenStream=/x\n[Install]\nWantedBy=lampos.target\n",
+        ),
+        (
+            "lamp-a.timer",
+            "[Timer]\nOnBootSec=1\n[Install]\nWantedBy=lampos.target\n",
+        ),
+        // A part whose link is not there: not enabled.
+        ("lamp-off.service", part),
+    ]
+    .into_iter()
+    .map(|(name, text)| (name.to_owned(), text.to_owned()))
+    .collect();
+    assert_eq!(
+        to_start(&added, |name| name != "lamp-off.service"),
+        ["lamp-services.service", "lamp-mood.service"]
+    );
+    assert!(to_start(&added, |_| false).is_empty());
+}

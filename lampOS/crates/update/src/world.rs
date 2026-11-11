@@ -42,6 +42,13 @@ pub trait Systemd {
     fn start_unit(&mut self, unit: &str) -> Result<(), String> {
         Err(format!("{unit} cannot be started here"))
     }
+    /// `systemctl start --no-block` of a part a kept switch added and
+    /// enabled (crate::added::to_start), outside any watch: returns once
+    /// systemd has the job, never waiting for the part to come up.
+    /// Refused unless a world can.
+    fn start_added(&mut self, unit: &str) -> Result<(), String> {
+        Err(format!("{unit} cannot be started here"))
+    }
     /// `systemctl show` of [`crate::writer_unit::PROPERTIES`] for the
     /// settings writer's one-shot, [`crate::writer_unit::UNIT`], and only
     /// it. A systemd that cannot say refuses: the unit is then never started.
@@ -264,6 +271,10 @@ impl Systemd for Systemctl {
 
     fn start_unit(&mut self, unit: &str) -> Result<(), String> {
         run(&["start", unit], self.restart_within)
+    }
+
+    fn start_added(&mut self, unit: &str) -> Result<(), String> {
+        run(&["start", "--no-block", "--", unit], JOURNAL_WITHIN)
     }
 
     fn stop(&mut self, unit: &str) -> Result<(), String> {

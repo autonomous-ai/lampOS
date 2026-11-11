@@ -1,7 +1,7 @@
 //! A product unit the lamp lacks, added by a round (#3689 item 2b): with
-//! its part when the part is new, enabled as `install` enables it and, as
-//! install leaves it, not started, and taken away again with a build put
-//! back.
+//! its part when the part is new, enabled as `install` enables it, never
+//! started inside the watch, a long-running part of `lampos.target` started
+//! once the watch passed, and taken away again with a build put back.
 use super::*;
 
 const MOOD: &str = "lamp-mood.service";
@@ -134,7 +134,8 @@ fn link(lamp: &Lamp, path: &str) -> Option<String> {
 }
 
 #[test]
-fn a_new_part_its_timer_and_a_helper_of_a_part_the_lamp_has_are_added_and_enabled_not_started() {
+fn a_new_part_its_timer_and_a_helper_of_a_part_the_lamp_has_are_added_and_enabled_and_the_part_started()
+ {
     let mut lamp = product_lamp();
     publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
@@ -169,12 +170,102 @@ fn a_new_part_its_timer_and_a_helper_of_a_part_the_lamp_has_are_added_and_enable
         );
     }
     assert!(!lamp.exists("/etc/systemd/system/multi-user.target.wants"));
-    // As install leaves them: enabled for the next start, not started now.
+    // The new part of lampos.target is started once the watch passed, not
+    // left for the next start; the timer, the socket, the timed service and
+    // the template are, as install leaves them.
+    assert_eq!(
+        lamp.calls(),
+        ["reload", &format!("start --no-block {MOOD}")]
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line == &format!("started {MOOD}, added by build 2")),
+        "{:?}",
+        lamp.said
+    );
+    // A round with nothing to switch starts nothing.
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(lamp.calls().len(), 2);
+}
+
+/// A part added and enabled that already runs is never restarted, and one
+/// that is not enabled, or a lamp whose `lampos.target` does not run (not
+/// set up), starts none.
+#[test]
+fn an_added_part_already_running_disabled_or_on_a_lamp_not_running_is_not_started() {
+    // Running already (started by something else before the watch ended).
+    let mut lamp = product_lamp();
+    lamp.systemd.units.insert(
+        MOOD.into(),
+        Running {
+            active: "active".into(),
+            sub: "running".into(),
+            pid: 7,
+            ..Running::default()
+        },
+    );
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    // Restarted and watched as any running part; never started again.
+    assert_eq!(lamp.calls(), ["reload", &format!("restart {MOOD}")]);
+
+    // lampos.target not running: the part starts with it.
+    let mut lamp = product_lamp();
+    lamp.systemd.units.remove("lampos.target");
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.calls(), ["reload"]);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("start with lampos.target, which is not running")),
+        "{:?}",
+        lamp.said
+    );
+
+    // Its [Install] names no lampos.target: never enabled into the lamp.
+    let mut lamp = product_lamp();
+    let binaries = binaries("eyes 1", "mood 1");
+    let binaries: Vec<(&str, &str)> = binaries
+        .iter()
+        .map(|(name, text)| (*name, text.as_str()))
+        .collect();
+    let unwanted = mood().replace("WantedBy=lampos.target", "WantedBy=sysinit.target");
+    publish(
+        &mut lamp,
+        manifest::ADDS_UPDATER,
+        &binaries,
+        &[(MOOD, unwanted)],
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
     assert_eq!(lamp.calls(), ["reload"]);
 }
 
+/// A start systemd refuses is said, and the build is kept.
 #[test]
-fn an_added_unit_that_ends_at_once_holds_nothing_back_since_it_is_not_started() {
+fn an_added_part_whose_start_fails_is_said_and_the_round_stays_switched() {
+    let mut lamp = product_lamp();
+    lamp.systemd.start_refused = Some("Unit lamp-mood.service is masked".into());
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(
+        lamp.calls(),
+        ["reload", &format!("start --no-block {MOOD}")]
+    );
+    assert!(
+        lamp.said.iter().any(|line| line
+            == &format!(
+                "{MOOD} could not be started (Unit lamp-mood.service is masked); it starts at the next boot"
+            )),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
+}
+
+#[test]
+fn an_added_unit_that_ends_at_once_holds_nothing_back_since_it_is_started_after_the_watch() {
     // The waking face, the Wi-Fi restore and recovery end at once when they
     // have nothing to do; one started and watched would read as stopped.
     let mut lamp = product_lamp();
@@ -188,7 +279,12 @@ fn an_added_unit_that_ends_at_once_holds_nothing_back_since_it_is_not_started() 
         )
         .is_some()
     );
-    assert_eq!(lamp.calls(), ["reload"]);
+    // Started only once the watch passed and the build was kept.
+    assert_eq!(
+        lamp.calls(),
+        ["reload", &format!("start --no-block {MOOD}")]
+    );
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
 }
 
 #[test]

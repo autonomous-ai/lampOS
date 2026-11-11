@@ -2688,6 +2688,7 @@ impl Run<'_, '_> {
             ));
         }
         self.start_recover_if_on();
+        self.start_added(&backs, build.sequence);
         self.prune(state);
         match held {
             Some(why) => {
@@ -2730,6 +2731,69 @@ impl Run<'_, '_> {
             Err(why) => self.say(&format!(
                 "{RECOVER_UNIT} could not be started ({why}); it starts at the next boot"
             )),
+        }
+    }
+
+    /// The long-running parts of `lampos.target` this switch added and
+    /// enabled (crate::added::to_start), each started once here with
+    /// `--no-block`: after the watch passed and the build is kept, so a part
+    /// that ends at once can never put a build back. Without this a part a
+    /// round adds, lamp-services among them, stays dead until the lamp's
+    /// next start, and an account the app shows linked goes nowhere. Only
+    /// while `lampos.target` runs (the lamp is set up), and only a part
+    /// that is inactive: a running one is never restarted, a failed one is
+    /// left. A start that fails is said and the round stays switched.
+    fn start_added(&mut self, backs: &[Back], sequence: u64) {
+        let added: Vec<(String, String)> = backs
+            .iter()
+            .filter(|back| back.added.is_some())
+            .filter_map(|back| {
+                let path = format!("{}/{}", added::UNITS, back.unit);
+                let text = fs::read_to_string(self.config.on(&path)).ok()?;
+                Some((back.unit.clone(), text))
+            })
+            .collect();
+        let picked = added::to_start(&added, |unit| {
+            let link = format!("{}/{}.wants/{unit}", added::UNITS, added::LAMP);
+            fs::symlink_metadata(self.config.on(&link)).is_ok()
+        });
+        if picked.is_empty() {
+            return;
+        }
+        let mut asked = picked.clone();
+        asked.push(added::LAMP.to_owned());
+        let states = match self.world.systemd.states(&asked) {
+            Ok(states) => states,
+            Err(why) => {
+                self.say(&format!(
+                    "the parts build {sequence} added are not started: systemd cannot say how they are ({why}); they start at the next boot"
+                ));
+                return;
+            }
+        };
+        let active = |unit: &str| {
+            states
+                .iter()
+                .find(|state| state.unit == unit)
+                .map(|state| state.active.clone())
+        };
+        if active(added::LAMP).as_deref() != Some("active") {
+            self.say(&format!(
+                "the parts build {sequence} added start with {}, which is not running",
+                added::LAMP
+            ));
+            return;
+        }
+        for unit in picked {
+            if active(&unit).as_deref() != Some("inactive") {
+                continue;
+            }
+            match self.world.systemd.start_added(&unit) {
+                Ok(()) => self.say(&format!("started {unit}, added by build {sequence}")),
+                Err(why) => self.say(&format!(
+                    "{unit} could not be started ({why}); it starts at the next boot"
+                )),
+            }
         }
     }
 

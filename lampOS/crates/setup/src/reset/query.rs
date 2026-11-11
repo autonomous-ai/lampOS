@@ -12,7 +12,7 @@ use std::{
 pub(crate) const QUERY_WITHIN: Duration = Duration::from_secs(5);
 const MAX_OUTPUT: usize = 64 * 1024;
 
-pub(super) fn read(argv: &[String]) -> io::Result<String> {
+pub(crate) fn read(argv: &[String]) -> io::Result<String> {
     let (program, args) = argv
         .split_first()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "empty reset query"))?;

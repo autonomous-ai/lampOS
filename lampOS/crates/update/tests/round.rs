@@ -440,6 +440,17 @@ impl Systemd for FakeSystemd {
         Ok(())
     }
 
+    fn start_added(&mut self, unit: &str) -> Result<(), String> {
+        self.calls
+            .borrow_mut()
+            .push(format!("start --no-block {unit}"));
+        if let Some(why) = &self.start_refused {
+            return Err(why.clone());
+        }
+        self.start(unit);
+        Ok(())
+    }
+
     fn stop(&mut self, unit: &str) -> Result<(), String> {
         self.calls.borrow_mut().push(format!("stop {unit}"));
         self.units.remove(unit);
