@@ -497,7 +497,8 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   says its quoted words as they are rather than nothing (journal: `the
   onboarding line's own words are said`; lamp-52e6, 28 Oct 16:42; `docs/onboarding.md`,
   "Exact lines"). One the walk marks as its own (`onboarding::own_words`,
-  how_you_sound's sentence prompts, #3769) asks no chat at all: its words are said at
+  how_you_sound's sentence prompts, #3769; a face from a photo's ask in
+  English, `photo_faces::turn`, #5907) asks no chat at all: its words are said at
   once. A full look
   (`LAMP_LOOK_FULL=on`) whose still never came arrives as the no-look note
   without `look`, and is a look all the same: 5 s, then the line.
@@ -2167,6 +2168,24 @@ order is kept. A written turn is the same from the chat on.
     answer cut and kept as heard is followed in the history by
     `cut_in_told::CUT_HERE`, so a later "go on", told no note, says where
     it was and goes on from the cut (`worker::messages`).
+  - **A cut-in's prompt, for diagnosis** (`LAMP_CUT_IN_PROMPT_LOG=on`, off
+    unless set and in no product unit; #6218 step 1): a debug switch for
+    test lamps only, since it puts the words people said in the journal.
+    Each chat request of a turn whose line began over the lamp's audible
+    answer (`over_the_lamps_voice`, kept by request in `Shared::begun_over`)
+    writes one block, every round, just before the chat goes (round 1
+    begun early, `LAMP_SECOND_PREPARED`, as it was begun): `request N chat
+    round R: a cut-in's prompt, M messages, T tools, B bytes` (counted as
+    the `chat request` line counts them, `Services::measured`), then one
+    line a message, its index, role and length and its first 80
+    characters (`cut_in_prompt_log::PREFIX_CHARS`), newlines as `⏎`, cut on
+    a character boundary, and an assistant's call names. A sign-in's code
+    and email are taken out (`sign_in::scrub`) and any other run of four
+    or more digits shows as `####`. It writes nothing while the worker's
+    authority has the camera or the microphone not allowed (the privacy
+    switch closed, or a mute), nor before its first authority. Nothing the
+    lamp says or does changes: it shows what the model is given when a cut-in
+    late in a long conversation gets no call.
   - **A line that may follow on** (`LAMP_FOLLOWS_ON=on`, the Start's
     `follows_on`): told `follows_on::NOTE`, unless its End marks a short
     sound or the rule judged it in a busy room (`Heeding::judged_busy`;
@@ -2637,6 +2656,14 @@ When the coordinator switches (below):
   `worker::known_person_for`, from the turn's own lease: only a turn told by
   it (`LAMP_SECOND_SCOPED_CONTEXT`), never one with no lease or told by
   presence, such as an add-on's say.
+  - **Nobody known** (#5750, with the same switch): with a face in the
+    eyes' newest look (`humans/faces/tracked`) and no known file nor an
+    unsure hold of one, any turn is told "(The face at the lamp is not
+    anyone the lamp knows.)" (`worker::nobody_known_told`). So "who is
+    this?" is answered "I don't know them" with no call, and a face from a
+    photo still waiting for its yes stays unnamed. Nothing else about who
+    anyone is goes with it. A known face in its first second, before the
+    eyes decide, reads as nobody known.
   - **Why:** without it, the second route reads the known face only to
     choose whose memory to use. A name kept with `remember_my_face`, in
     the eyes, is recognised but never said back. That's Fourth's replay of

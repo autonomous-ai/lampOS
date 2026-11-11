@@ -111,6 +111,9 @@ struct Script {
     turns_begun: AtomicUsize,
     /// Each listener's results' words as they come ([`Listener::said`]).
     said: Mutex<VecDeque<Vec<String>>>,
+    /// Each chat measured for a cut-in's prompt block
+    /// ([`Services::measured`], `LAMP_CUT_IN_PROMPT_LOG`): its messages' words.
+    measured: Mutex<Vec<Vec<String>>>,
 }
 
 #[derive(Default)]
@@ -340,6 +343,15 @@ impl Services for Script {
 
     fn declares(&self, _messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
         Some(!without.contains(&name))
+    }
+
+    fn measured(&self, messages: &[Message], _told: ChatTold) -> Option<(usize, usize)> {
+        let words = messages
+            .iter()
+            .map(|message| message.words().unwrap_or_default().to_owned())
+            .collect();
+        self.measured.lock().unwrap().push(words);
+        Some((1_000, 2))
     }
 
     fn warm(&self) -> BoxFuture<'static, ()> {
@@ -3997,7 +4009,12 @@ async fn a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear() {
     let mut engine = waiting(None, vec![vec![], vec![]]).hearing(hearing(&began));
     spoken_turn(&mut engine);
     // The wait sound's first packet: it is sounding when the line begins.
-    while !matches!(engine.next().await, ProviderOutput::Audio { .. }) {}
+    loop {
+        if let ProviderOutput::Audio { spoken, .. } = engine.next().await {
+            assert!(!spoken, "a wait cue cannot establish spoken confirmation");
+            break;
+        }
+    }
     engine.submit(start_over(2));
     assert_eq!(
         *began.lock().unwrap(),
@@ -4019,6 +4036,58 @@ async fn a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear() {
         *answered.lock().unwrap(),
         [(1, "clear"), (2, "over the lamp")]
     );
+}
+
+/// #6218 step 1 (`LAMP_CUT_IN_PROMPT_LOG`): a line begun over the lamp's
+/// audible answer has its chat request measured for its prompt's journal
+/// block, with the switch on and the lamp neither private nor muted; off, a
+/// line begun in the clear, the privacy switch closed or a mute, never.
+/// Nothing the lamp says changes.
+#[tokio::test(start_paused = true)]
+async fn a_cut_ins_chat_request_is_journaled_only_with_the_switch_and_never_private() {
+    async fn measured(
+        on: bool,
+        over: bool,
+        privacy: (bool, bool),
+    ) -> (Vec<Vec<String>>, Vec<String>) {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [Ok(
+                    "Hold on, Lamp, make the light a little warmer".to_owned()
+                )]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built.logging_cut_in_prompts(on);
+        engine.privacy((privacy.0, 1, privacy.1, 1));
+        engine.submit(if over { start_over(1) } else { start(1) });
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        let measured = script.measured.lock().unwrap().clone();
+        (measured, out)
+    }
+    let (asked, out) = measured(true, true, (true, true)).await;
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert_eq!(
+        asked[0].last().map(String::as_str),
+        Some("Hold on, Lamp, make the light a little warmer")
+    );
+    assert!(out.contains(&"said:Sure.".to_owned()), "{out:?}");
+    let (_, plain) = measured(false, true, (true, true)).await;
+    assert_eq!(plain, out, "the switch changes nothing the lamp does");
+    for (on, over, privacy) in [
+        (false, true, (true, true)),
+        (true, false, (true, true)),
+        (true, true, (false, false)),
+        (true, true, (true, false)),
+    ] {
+        let (asked, _) = measured(on, over, privacy).await;
+        assert!(asked.is_empty(), "{on} {over} {privacy:?}: {asked:?}");
+    }
 }
 
 /// `LAMP_FIRST_SECONDS_QUIET` (lamp-c0a4's run 1 on #3864): every line the
@@ -8722,7 +8791,6 @@ async fn a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_cal
 #[tokio::test(start_paused = true)]
 async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room() {
     let _one = crate::provider_worker::tests::one_thread();
-    let photo = crate::photo_faces::note("Lan");
     for (lamp_said, heard, called) in [
         (
             "Someone added your face from a photo, as Lan. Shall I remember you?",
@@ -8758,14 +8826,8 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
         };
         let script = Arc::new(Script {
             heard: Mutex::new([Ok(heard.to_owned())].into()),
-            chats: Mutex::new(
-                [
-                    vec![text(lamp_said), Ok(ChatEvent::Done)],
-                    answer,
-                    vec![text("Okay."), Ok(ChatEvent::Done)],
-                ]
-                .into(),
-            ),
+            // The ask is the lamp's own line: no chat for it (#5907).
+            chats: Mutex::new([answer, vec![text("Okay."), Ok(ChatEvent::Done)]].into()),
             ..Script::default()
         });
         let (engine, calls, _) = scripted(script.clone());
@@ -8787,7 +8849,12 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
             kept.lock().unwrap().push((request, verdict));
             verdict
         }));
-        // The lamp asks, as the coordinator has it say the photo's note.
+        // The lamp asks, as the coordinator has it say the photo's ask.
+        let photo = match called {
+            Some(_) => crate::photo_faces::turn("Lan", None),
+            None => crate::onboarding::said_as_is(lamp_said).unwrap(),
+        };
+        assert_eq!(crate::onboarding::own_words(&photo), Some(lamp_said));
         let drain = async |engine: &mut Engine| {
             while let Ok(event) = tokio::time::timeout(Duration::from_secs(3), engine.next()).await
             {
@@ -8825,6 +8892,115 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
+/// The words a turn's labels say.
+fn said_in(labels: &[String]) -> Vec<&str> {
+    labels
+        .iter()
+        .filter_map(|label| label.strip_prefix("said:"))
+        .collect()
+}
+
+/// lamp-52e6, 10 Nov, S3 (#5907): the photo's ask, a written turn the
+/// model wrote from the thread, came out as "I didn't catch that. Try once
+/// more when I stop talking.", naming neither the person nor the photo. The
+/// ask is the lamp's own line: said in its words, the chat never asked,
+/// however ready the model is with a line from before.
+#[tokio::test(start_paused = true)]
+async fn the_photo_ask_is_said_in_its_words_never_a_line_the_model_has_ready() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [vec![
+                text("I didn't catch that. Try once more when I stop talking."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, calls, _) = scripted(script.clone());
+    engine.submit(written(1, &crate::photo_faces::turn("Walter", None)));
+    let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+    assert_eq!(
+        said_in(&labels),
+        ["Someone added your face from a photo, as Walter. Shall I remember you?"],
+        "{labels:?}"
+    );
+    assert!(labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+    assert!(script.asked.lock().unwrap().is_empty());
+    assert!(calls.lock().unwrap().is_empty());
+}
+
+/// lamp-52e6, 10 Nov, S4 then S5 (#5907): a no let Walter's photo go; the
+/// same name's photo added again was asked as "I already asked, and you said
+/// no — so it's let go", and the yes after it was read against that no and
+/// never called `photo_face_yes`. A new photo is a new ask in its own words,
+/// with no chat, so the next yes answers it: no, then the second ask, then
+/// yes, call `photo_face_no` and `photo_face_yes` in that order.
+#[tokio::test(start_paused = true)]
+async fn a_photo_added_again_after_a_no_is_asked_anew_and_its_yes_is_taken() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("No, thank you.".to_owned()),
+                Ok("Yes, please.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        crate::photo_faces::NO,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Okay, I've let it go."), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        crate::photo_faces::YES,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Great, I'll know you now."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, calls, _) = scripted(script.clone());
+    let ask = "Someone added your face from a photo, as Walter. Shall I remember you?";
+    let mut asks = Vec::new();
+    for (written_at, spoken_at) in [(1, 2), (3, 4)] {
+        engine.submit(written(
+            written_at,
+            &crate::photo_faces::turn("Walter", None),
+        ));
+        let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+        asks.push(said_in(&labels).join(" "));
+        engine.submit(start(spoken_at));
+        engine.submit(audio(spoken_at, 1));
+        engine.submit(end(spoken_at));
+        turn_within(&mut engine, Duration::from_secs(10)).await;
+    }
+    assert_eq!(asks, [ask, ask]);
+    let names: Vec<String> = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(name, _, _)| name.clone())
+        .collect();
+    assert_eq!(names, [crate::photo_faces::NO, crate::photo_faces::YES]);
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        4,
+        "only the spoken turns ask"
+    );
 }
 
 /// Every function that keeps, reads, forgets or says yes for someone, the
@@ -18290,32 +18466,31 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
     }
 }
 
-/// A waiting read-back's own "yes, send it" returned by the room never
-/// sends it (App Only's and Thirteen's P1s on #6009): alone within the tail
-/// it is held; after an ASR filler ("Um, yes, send it.") or a person's own
-/// word ("Okay, yes, send it.") its run is taken out, so the model gets only
-/// "Um," or "Okay,". A line too short to hold ("Yes.", "Send it.") reaches
-/// the model whole, but begun in the tail with the lamp's words it is marked
-/// (Thirteen's option 1), and the model's send on it goes only in the
-/// asker's voice: the lamp's own, or no print twice, never sends. A line past
-/// the tail is anyone's agreement, as the owner settled.
+/// A waiting read-back's own words returned by the room never send it (App
+/// Only's and Thirteen's P1s on #6009). The read-back ends by asking, "Shall
+/// I send it?", so a line with a word of the person's begun after it is an
+/// answer to the lamp's question and reaches the model whole: "Yes, send
+/// it.", "Um, yes, send it.". (Nothing but the lamp's own words there is
+/// held: [`a_read_backs_own_words_in_its_tail_are_held_and_never_sent`].)
+/// Begun in the tail with the lamp's words ("send it" is in both), it is
+/// marked (Thirteen's option 1), and the model's send on it goes only in the
+/// asker's voice: the lamp's own, or no print twice, never sends. A "Yes."
+/// or a line past the tail is anyone's agreement, as the owner settled.
 #[tokio::test(start_paused = true)]
 async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
-    const READ_BACK: &str = "Send an email to Bob saying hi. Say 'yes, send it' to send it.";
+    const READ_BACK: &str = "Send an email to Bob saying hi. Shall I send it?";
     // The line's first sound read at 100 s on the monotonic clock.
     const BEGAN_US: u64 = 100_000_000;
-    for (heard, waits, after_tail, model_gets) in [
-        ("Okay, yes, send it.", true, false, Some("Okay,")),
-        ("Um, yes, send it.", true, false, Some("Um,")),
-        ("Yes, send it.", true, false, None),
-        ("Yes, send it.", false, false, None),
-        ("Send it.", true, false, Some("Send it.")),
-        ("Yes.", true, false, Some("Yes.")),
-        ("Yes, send it.", true, true, Some("Yes, send it.")),
-        ("Send it.", true, true, Some("Send it.")),
-        ("Yes.", true, true, Some("Yes.")),
+    for (heard, after_tail, marked) in [
+        ("Okay, yes, send it.", false, true),
+        ("Um, yes, send it.", false, true),
+        ("Yes, send it.", false, true),
+        ("Yes.", false, false),
+        ("Yes, send it.", true, false),
+        ("Send it.", true, false),
+        ("Yes.", true, false),
     ] {
-        let why = format!("{heard} waits {waits} after the tail {after_tail}");
+        let why = format!("{heard} after the tail {after_tail}");
         let script = Arc::new(Script {
             heard: Mutex::new([Ok("Email Bob hi.".to_owned()), Ok(heard.to_owned())].into()),
             chats: Mutex::new(
@@ -18340,7 +18515,7 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
         );
         kept.service = "gmail".to_owned();
         kept.spoken_from = Some(std::time::Instant::now() - Duration::from_secs(60));
-        crate::services::pending_for_test(waits.then_some(kept));
+        crate::services::pending_for_test(Some(kept));
         // The read-back played to its end 0.3 s before the line began, or
         // 3 s before it: past the 1.5 s tail.
         let ended_ago_us = if after_tail { 3_000_000 } else { 300_000 };
@@ -18359,20 +18534,9 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
         engine.submit(end(2));
         let labels = turn(&mut engine).await;
         let asked = script.asked.lock().unwrap().len();
-        assert_eq!(
-            asked,
-            if model_gets.is_some() { 2 } else { 1 },
-            "{why}: {labels:?}"
-        );
-        let Some(model_gets) = model_gets else {
-            crate::services::pending_for_test(None);
-            continue;
-        };
+        assert_eq!(asked, 2, "{why}: {labels:?}");
         let last = format!("{:?}", script.asked.lock().unwrap()[1].last());
-        assert!(last.contains(model_gets), "{why}: {last}");
-        if model_gets != heard {
-            assert!(!last.to_lowercase().contains("send it"), "{why}: {last}");
-        }
+        assert!(last.contains(heard), "{why}: {last}");
         assert!(
             labels.contains(&"said:Sent.".to_owned()),
             "{why}: {labels:?}"
@@ -18382,7 +18546,7 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
         // to the asker's (the lamp's own sounds unlike it, or gives no print).
         let pending = crate::services::pending_for_test_take();
         let in_echo_tail = pending.as_ref().is_some_and(|kept| kept.in_echo_tail(2));
-        assert_eq!(in_echo_tail, !after_tail, "{why}");
+        assert_eq!(in_echo_tail, marked, "{why}");
         let send_on = |mut pending: Option<crate::services::Pending>, alike, request| {
             let send = lamp_gemini::ToolCall {
                 id: "c".to_owned(),
@@ -18407,7 +18571,7 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
             );
             (told, pending)
         };
-        if after_tail {
+        if !marked {
             // Any voice, or none known.
             for alike in [None, Some(0.1), Some(0.9)] {
                 let (told, _) = send_on(pending.clone(), alike, 2);
@@ -18445,6 +18609,110 @@ async fn the_lamps_own_send_phrase_heard_back_never_agrees_for_the_person() {
             assert_eq!(left, None, "{why}: sent once");
         }
     }
+}
+
+/// App Only's and Thirteen's P1s on #6206, in the private room, where a
+/// send's voice is never judged (`alike` 1.0): a read-back ends on a
+/// question, and a late piece of its tail heard back reads as a yes ("send
+/// it.", "go ahead.", "Gửi nhé."). Begun in its tail, a line of nothing but
+/// its words is held as its echo: the model never hears it, so nothing is
+/// sent, and the write still waits for the person's own yes. "Yes, send it."
+/// there, with a word of the person's, still reaches the model, marked as in
+/// the tail with the lamp's words.
+#[tokio::test(start_paused = true)]
+async fn a_read_backs_own_words_in_its_tail_are_held_and_never_sent() {
+    // The line's first sound read at 100 s on the monotonic clock, 0.3 s
+    // after the read-back would have played to its end.
+    const BEGAN_US: u64 = 100_000_000;
+    crate::person::set_private_room_for_test(Some(true));
+    for (read_back, heard, held) in [
+        (
+            "Send an email to Bob saying hi. Shall I send it?",
+            "send it.",
+            true,
+        ),
+        (
+            "Send an email to Bob saying hi. Shall I send it?",
+            "Shall I send it?",
+            true,
+        ),
+        (
+            "Add Dentist at six to your calendar. Shall I go ahead?",
+            "go ahead.",
+            true,
+        ),
+        ("Gửi thư cho Bob: chào bạn. Gửi nhé?", "Gửi nhé.", true),
+        ("Gửi thư cho Bob: chào bạn. Gửi không?", "Gửi không.", true),
+        (
+            "Send an email to Bob saying hi. Shall I send it?",
+            "Yes, send it.",
+            false,
+        ),
+    ] {
+        let why = format!("{heard} after {read_back}");
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Email Bob hi.".to_owned()), Ok(heard.to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![text(read_back), Ok(ChatEvent::Done)],
+                    vec![text("Sent."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.holding_own_echo(true);
+        spoken_turn(&mut engine);
+        turn(&mut engine).await;
+        let mut kept = crate::services::Pending::new(
+            "s1",
+            1,
+            std::time::Instant::now(),
+            "Send an email to Bob saying hi.",
+            "ann",
+        );
+        kept.service = "gmail".to_owned();
+        kept.spoken_from = Some(std::time::Instant::now() - Duration::from_secs(60));
+        crate::services::pending_for_test(Some(kept));
+        engine
+            .shared
+            .said_until_us
+            .store(BEGAN_US - 300_000, Ordering::Relaxed);
+        engine.submit(start(2));
+        engine.submit(ProviderInput::Audio {
+            request: 2,
+            privacy_generation: 1,
+            sequence: 1,
+            read_completed_at_us: BEGAN_US,
+            samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+        });
+        engine.submit(end(2));
+        let labels = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        let pending = crate::services::pending_for_test_take();
+        if held {
+            // The model never hears it: no send is called on it, and the
+            // write still waits, the line not counted as the person's.
+            assert_eq!(asked, 1, "{why}: {labels:?}");
+            assert!(
+                !labels.contains(&"said:Sent.".to_owned()),
+                "{why}: {labels:?}"
+            );
+            let kept = pending.expect(&why);
+            assert!(!kept.in_echo_tail(2), "{why}");
+            assert_eq!(kept.echoes, 1, "{why}");
+            continue;
+        }
+        assert_eq!(asked, 2, "{why}: {labels:?}");
+        let last = format!("{:?}", script.asked.lock().unwrap()[1].last());
+        assert!(last.contains(heard), "{why}: {last}");
+        assert!(
+            pending.expect(&why).in_echo_tail(2),
+            "{why}: marked in the tail with the lamp's words"
+        );
+    }
+    crate::person::set_private_room_for_test(None);
 }
 
 /// #4004 (the Reviewer-lead's P2): the lamp's own "Stop it!" heard back over

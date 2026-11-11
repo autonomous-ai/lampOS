@@ -88,7 +88,11 @@ jobs:
           def fetch(url, most):
               if not url.startswith("https://"):
                   fail(f"not https: {url}")
-              with urllib.request.urlopen(url, timeout=120) as answer:
+              # cdn.autonomous.ai answers Python's own User-Agent
+              # ("Python-urllib/3.x") with 403, so name the workflow instead.
+              asked = urllib.request.Request(
+                  url, headers={"User-Agent": "lampos-harness-pin/1 (GitHub Actions)"})
+              with urllib.request.urlopen(asked, timeout=120) as answer:
                   data = answer.read(most + 1)
               if len(data) > most:
                   fail(f"over {most} bytes: {url}")
@@ -137,25 +141,45 @@ jobs:
           )
           if len(entries) != 4:
               fail(f"product.rs names {len(entries)} manifests, not 4")
-          # Each manifest's file name, from its own version.
+          # Each manifest's file name, from its own version: (prefix, its
+          # platforms' key, whether a linux-arm64 entry may be missing).
+          # Harness's managed tmux is for a Mac alone (its installer uses the
+          # system's tmux on Linux, `tmux_runs`, and the lamp's image has
+          # one), so its manifest names darwin builds only, as the 0.6.2 pin's
+          # copy already did: it is copied as it is, with no file to check.
           names = {
-              "HARNESS_RUNTIME_METADATA_URL": ("runtime-node", lambda d: d["node"][ARCH]),
-              "HARNESS_TMUX_METADATA_URL": ("runtime-tmux", lambda d: d["tmux"][ARCH]),
-              "HARNESS_GRID_METADATA_URL": ("runtime-grid", lambda d: d["grid"][ARCH]),
-              "HARNESS_TUI_MANIFEST_URL": ("tui", lambda d: d["builds"][ARCH]),
+              "HARNESS_RUNTIME_METADATA_URL": ("runtime-node", "node", False),
+              "HARNESS_TMUX_METADATA_URL": ("runtime-tmux", "tmux", True),
+              "HARNESS_GRID_METADATA_URL": ("runtime-grid", "grid", False),
+              "HARNESS_TUI_MANIFEST_URL": ("tui", "builds", False),
           }
           new_files = {}
+          no_arch = []
           for env, old, url in entries:
               if env not in names:
                   fail(f"an unknown manifest in product.rs: {env}")
-              prefix, entry_of = names[env]
+              prefix, key, may_lack = names[env]
               data = fetch(url, 1 << 20)
               manifest = json.loads(data)
-              entry = entry_of(manifest)
-              version = entry.get("version") or manifest.get("version")
+              builds = manifest.get(key)
+              if not isinstance(builds, dict) or not builds:
+                  fail(f"{env}: no '{key}' builds")
+              entry = builds.get(ARCH)
+              if entry is None and not may_lack:
+                  fail(f"{env}: no {ARCH} build")
+              if entry is None:
+                  # Its version from the builds it names, which must agree.
+                  versions = {b.get("version") for b in builds.values() if isinstance(b, dict)}
+                  version = versions.pop() if len(versions) == 1 else None
+              else:
+                  version = entry.get("version") or manifest.get("version")
               if not version or not re.fullmatch(r"[0-9A-Za-z.\-]+", version):
                   fail(f"{env}: no plain version")
-              checked(env, entry)
+              if entry is None:
+                  no_arch.append(env)
+                  print(f"{env}: no {ARCH} build (the lamp uses its image's own); copied as it is")
+              else:
+                  checked(env, entry)
               new_files[env] = (old, f"{prefix}-{version}.metadata.json", data)
 
           cli_file = f"cli-{newest}.metadata.json"
@@ -215,7 +239,8 @@ jobs:
           for env, (_, new, _) in new_files.items():
               serve[env] = new
           out(changed="true", pinned=pinned, newest=newest, installer=installer_file,
-              serve=" ".join(f"{env}={name}" for env, name in serve.items()))
+              serve=" ".join(f"{env}={name}" for env, name in serve.items()),
+              no_arch=" ".join(no_arch) or "none")
           PY
 
       - name: lamp-update's harness_install tests
@@ -273,6 +298,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PINNED: ${{ steps.pin.outputs.pinned }}
           NEWEST: ${{ steps.pin.outputs.newest }}
+          NO_ARCH: ${{ steps.pin.outputs.no_arch }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -eu
@@ -295,6 +321,7 @@ jobs:
 
           **Checked in the workflow's run** ($RUN):
           - every linux-arm64 file those manifests name, against its sha256 (and size);
+          - manifests with no linux-arm64 build, copied as they are (the lamp uses its image's own): $NO_ARCH;
           - \`cargo test --locked -p lamp-update --lib harness_install\`;
           - the pinned install on ARM64 from those copies on 127.0.0.1: \`harness version\` says $NEWEST, and \`harness --help\` runs.
 

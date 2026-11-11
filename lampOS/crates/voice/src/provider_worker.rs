@@ -1045,6 +1045,11 @@ pub enum ProviderOutput {
         waiting_for_barrier: bool,
     },
     Audio {
+        /// Provider answer audio: Second speech packets or Live model output,
+        /// never a locally injected wait cue or announcement.
+        /// Older workers omit it and therefore cannot establish this proof.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        spoken: bool,
         request: u64,
         sequence: u64,
         /// Wrapper event observation, not a socket-read or acoustic timestamp.
@@ -4897,6 +4902,9 @@ fn forward_origin(
                     .checked_add(1)
                     .ok_or_else(|| io::Error::other("provider output counter exhausted"))?;
                 push(ProviderOutput::Audio {
+                    // Live model answer output; this path never injects the
+                    // Second route's local wait cue or announcement.
+                    spoken: true,
                     request: lineage.request.get(),
                     sequence: *output_sequence,
                     provider_event_at_us,
@@ -7623,6 +7631,54 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn live_model_audio_retains_answer_provenance_when_forwarded() {
+        let mut output = VecDeque::new();
+        forward(
+            Event::Audio {
+                lineage: lamp_gemini::Lineage {
+                    session: lamp_gemini::SessionId::new(7).unwrap(),
+                    request: RequestId::new(23).unwrap(),
+                },
+                sequence: 1,
+                pcm: vec![7; PACKET_SAMPLES + 1],
+            },
+            &mut output,
+            &mut 0,
+            &mut DiscardLog::default(),
+        )
+        .unwrap();
+        assert_eq!(output.len(), 2);
+        assert!(output.iter().all(|event| matches!(event,
+            Outbound::Output(ProviderOutput::Audio { request: 23, spoken: true, samples, .. })
+                if !samples.is_empty()
+        )));
+    }
+
+    #[test]
+    fn audio_spoken_provenance_defaults_false_and_roundtrips_true() {
+        let mut value = serde_json::json!({
+            "kind": "audio", "request": 1, "sequence": 1,
+            "provider_event_at_us": 1, "source_frames": 1,
+            "source_offset": 0, "samples": [7]
+        });
+        let legacy: ProviderOutput = serde_json::from_value(value.clone()).unwrap();
+        assert!(matches!(
+            legacy,
+            ProviderOutput::Audio { spoken: false, .. }
+        ));
+        assert!(
+            serde_json::to_value(&legacy)
+                .unwrap()
+                .get("spoken")
+                .is_none()
+        );
+        value["spoken"] = serde_json::json!(true);
+        let speech: ProviderOutput = serde_json::from_value(value).unwrap();
+        assert!(matches!(speech, ProviderOutput::Audio { spoken: true, .. }));
+        assert_eq!(serde_json::to_value(&speech).unwrap()["spoken"], true);
+    }
+
+    #[test]
     fn started_wire_retains_actual_source_session_and_requires_it_on_decode() {
         let mut output = VecDeque::new();
         forward(
@@ -7709,6 +7765,7 @@ pub(crate) mod tests {
         let mut queue = VecDeque::new();
         for sequence in 0..MAX_QUEUED_OUTPUT - 4 {
             queue.push_back(Outbound::Output(ProviderOutput::Audio {
+                spoken: true,
                 request: 1,
                 sequence: sequence as u64 + 1,
                 provider_event_at_us: NOW,
@@ -10008,6 +10065,7 @@ pub(crate) mod tests {
         let mut output = VecDeque::new();
         for sequence in 1..=MAX_QUEUED_OUTPUT {
             output.push_back(Outbound::Output(ProviderOutput::Audio {
+                spoken: true,
                 request: 6,
                 sequence: sequence as u64,
                 provider_event_at_us: NOW,

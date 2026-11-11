@@ -15,11 +15,15 @@
 //! - `/status`: each unit, its running build against its release, and its
 //!   last error line ([`units`]).
 //!
+//! In monitor mode (`LAMP_PEEK=monitor`, [`monitor`]) the same views open
+//! to the local network by a one-time code from the app, not a token.
+//!
 //! It reads and never writes: no publisher, no setting, no button. Its one
 //! mark on the lamp is the subscriber socket each reader of an event topic
 //! has.
 use std::net::SocketAddr;
 
+pub mod monitor;
 pub mod page;
 pub mod serve;
 pub mod turns;
@@ -45,6 +49,12 @@ pub const DEFAULT_SESSIONS: &str = "/var/lib/lampOS/voice/sessions";
 /// Whether the switch is on: `on` and nothing else.
 pub fn switched_on(value: Option<&str>) -> bool {
     value == Some("on")
+}
+
+/// Whether the switch asks for monitor mode ([`monitor`]): `monitor` and
+/// nothing else.
+pub fn monitor_mode(value: Option<&str>) -> bool {
+    value == Some("monitor")
 }
 
 /// Whether the page may answer on `listen`: this machine always, anywhere
@@ -85,6 +95,15 @@ mod tests {
         for value in [None, Some(""), Some("1"), Some("ON"), Some("off")] {
             assert!(!switched_on(value), "{value:?}");
         }
+    }
+
+    #[test]
+    fn only_monitor_asks_for_monitor_mode() {
+        assert!(monitor_mode(Some("monitor")));
+        for value in [None, Some(""), Some("on"), Some("MONITOR"), Some("off")] {
+            assert!(!monitor_mode(value), "{value:?}");
+        }
+        assert!(!switched_on(Some("monitor")));
     }
 
     #[test]

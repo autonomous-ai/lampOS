@@ -2148,7 +2148,8 @@ looking.
 
 ### A face from a photo (`--photo-dir`, faces from a photo)
 
-Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
+Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given (the product unit
+gives `--photo-dir /run/lampos-photos` since 9 Nov, #5750), which needs the
 recogniser (`--recogniser`, `--people`, `--who-socket`). On a lamp the
 folder is `/run/lampos-photos` (`lampos`'s, 0700), made at boot by the
 product's tmpfiles and belonging to neither the eyes' unit nor lamp-cloud's
@@ -2180,7 +2181,9 @@ kept **unconfirmed**, until its person says yes at the lamp:
   `people.json`. An older build never reads it, so never takes it for
   someone who asked. At most 20. It's **never named, counted, greeted or
   used for "who is this?"**: recognition, the known file, `humans/familiar`
-  and the hello read the people's file only. The answer is
+  and the hello read the people's file only. With such a face at the lamp the
+  second voice is told only that it is not anyone the lamp knows
+  (`worker::nobody_known_told`, #5750). The answer is
   `{"added":NAME,"unconfirmed":true}`. A face already someone's who asked is
   theirs: `{"remembered":NAME}` for the same name, `known_as` for another.
 - **When it's at the lamp:** recognition finds nobody who asked, but an
@@ -2253,15 +2256,25 @@ kept **unconfirmed**, until its person says yes at the lamp:
     five at most, as one remembered at the lamp keeps, and the remembering's
     own answers. A yes the store refuses (`full`)
     leaves it unconfirmed as it was.
-  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`).
+  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`); `{"let_go":false}`
+    when there was no such face, and `storage` when the deletion couldn't be
+    saved. The voice says "let go" only on `{"let_go":true}`.
   - **No answer:** once asked, a face not seen for 20 s, the meeting over,
     is let go (`photo::unanswered`, `MEETING_GAP_US`).
   - **"Forget my face"** deletes it too.
 - **Never confirmed:** deleted 30 days after it was added
   (`UNCONFIRMED_FOR_S`), looked at once a second. A `.from-photos` file that
   can't be read is removed, so no print sits out of that reach.
-- **The product reset** wipes `<people>.from-photos` with `people.json`
-  (`reset-plan-product.json`).
+- **A deletion not saved** (a no, a meeting's end, the 30 days, "forget my
+  face") deletes nothing: the face stays in memory as on disk, and the next
+  no, look or forget tries again (`photo::Unconfirmeds::let_go`, `expire`).
+- **Its staging copy** `<people>.from-photos.new`: a save writes it, then
+  renames it over the file. A write or rename that fails removes it, and one
+  a crash left is removed at the next start (`Unconfirmeds::open`). One that
+  can't be removed then is tried again on every look, about once a second,
+  whether or not any face from a photo is kept (`expire`).
+- **The product reset** wipes `<people>.from-photos` and
+  `<people>.from-photos.new` with `people.json` (`reset-plan-product.json`).
 - **The answers** are the voice's: `photos_off`, `not_a_name`, `unreadable`
   (no file, a link, too large, not a JPEG), `no_face`, `too_far`,
   `two_faces`, `known_as`, `full`, `not_here`, `not_asked`, `not_that_face`,
@@ -2283,7 +2296,14 @@ socket; `crates/voice/src/photo_faces.rs`):
   was asked isn't asked again, even after the voice restarts. The
   voice then says, once, as its own written turn (`photo_face_ask`): "Someone
   added your face from a photo, as NAME. Shall I remember you?" It doesn't
-  use the name as theirs unless they agree.
+  use the name as theirs unless they agree. In English these are the lamp's
+  own words, said as they are with no chat (`photo_faces::turn`,
+  `onboarding::said_as_is`), so nothing in the thread changes them: on
+  lamp-52e6 (10 Nov, #5907) the model, writing the ask, once said "I didn't
+  catch that. Try once more when I stop talking." and, for a photo added
+  again after a no, "I already asked, and you said no", and the yes after
+  that was never taken. In another language, or for a name with a `"`, the
+  model still says the question in its own words.
 - **Their spoken answer** calls `photo_face_yes` or `photo_face_no`. These
   run in the provider's worker, a process apart from the coordinator that
   asked, so they take the face from the eyes, the unconfirmed one

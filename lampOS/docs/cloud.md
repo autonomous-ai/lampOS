@@ -342,7 +342,9 @@ Pinned in `tests/it/app_contract.rs` with the stand-in helper.
 
 Off unless `LAMP_PHOTO_FACES=on`, with the photo folder
 (`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`) and
-the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
+the eyes' request socket (`LAMP_EYES_WHO_SOCKET`). On in the product
+since 9 Nov (#5750): lamp-cloud's, the eyes' and the voice's product units
+set all of it, pinned by `crates/update/tests/install.rs`.
 
 - **The folder is `/run/lampos-photos`**, `lampos`'s at 0700, made at boot
   by the product's tmpfiles (`deploy/product/lampos.conf`), and lamp-cloud's
@@ -354,8 +356,9 @@ the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
   restart: then read-only to lamp-cloud under `ProtectSystem=strict`, and
   every `faces.add_photo` failed until lamp-cloud restarted (reviewer-two
   and Reviewer-lead on #2263, Mobile on lamp-0c89).
-- **A lamp switching it on** sets both units, each in a drop-in. lamp-cloud's
-  takes the three variables:
+- **A lamp switching it on** without the product units (a lamp-4ace or a
+  moved lamp) sets both units, each in a drop-in. lamp-cloud's takes the
+  three variables:
 
       [Service]
       Environment=LAMP_PHOTO_FACES=on
@@ -2466,7 +2469,7 @@ key (its unit's `LoadCredential=key`), so it forwards Hermes' requests and
 adds the key itself (`lamp_cloud::hermes_llm`).
 
 - **Off** unless `LAMP_HERMES_ON_LAMP=on` in lamp-cloud's environment (the
-  product unit doesn't set it yet), and only while lamp-cloud runs
+  product's `lamp-cloud.service` sets it, with lamp-tasks', #5978), and only while lamp-cloud runs
   (`LAMP_CLOUD=on`).
 - **Where:** `127.0.0.1:7741`, loopback only, and a peer that isn't loopback
   is never answered. 7741 is used by no other lampOS part and by neither of

@@ -157,6 +157,7 @@ impl Test {
             &mut self.cloud,
             &mut self.reply,
             &ProviderOutput::Audio {
+                spoken: true,
                 request,
                 sequence: self.sequence + 1,
                 provider_event_at_us: received_at,

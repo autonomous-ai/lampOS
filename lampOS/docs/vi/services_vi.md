@@ -22,13 +22,15 @@ lúc 14:11 ngày 3 Nov 2026):
   được mở ở chế độ chỉ-đọc.
 - **Ghi chỉ khi trực tiếp**, sau công tắc riêng: do chủ đèn yêu cầu tại đèn,
   được đọc lại đầy đủ (nơi nó đến, mọi người nhận, ai có thể thấy, toàn bộ
-  nội dung), rồi đèn nói "Say 'yes, send it' to send it." ("Nói 'gửi đi' để
-  gửi nhé."); mô hình quyết định câu trả lời là xác nhận hay huỷ, bằng bất kỳ
+  nội dung), rồi đèn hỏi "Shall I send it?" ("Gửi không?"; với một bản nháp:
+  "Shall I save it?"; với một sự kiện hay một tệp: "Shall I go ahead?"); mô
+  hình quyết định câu trả lời là xác nhận hay huỷ, bằng bất kỳ
   lời nào (chủ đèn, 10/11), và gửi bằng `send_id` của lần ghi trong vòng hai
   phút, dù ai nói; không danh sách từ nào trong đèn quyết định việc đó. Chỉ
   một câu trả lời bắt đầu trong 1,5 s đuôi tiếng vọng của lời đèn, có chung
-  bất kỳ từ nào với lời đó, mới phải là giọng của người đã yêu cầu, nên chính
-  lời của đèn vọng lại không bao giờ gửi được.
+  bất kỳ từ nào với lời đó, mới phải là giọng của người đã yêu cầu, và một
+  câu ở đó chỉ gồm chính lời của phần đọc lại bị giữ là tiếng vọng của nó,
+  nên chính lời của đèn vọng lại không bao giờ gửi được.
 - **Các hàng rào**: chỉ câu nói được nghe của chính chủ đèn mới chạm đến một
   dịch vụ ("Ai dùng được chúng", bên dưới); token chỉ đi đến các host của
   chính dịch vụ của nó, qua HTTPS, không theo chuyển hướng; các lượt chạy
@@ -229,8 +231,9 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   chỉ `service_read`: mọi tên khác nhận "a skill may only read a linked
   service" (`serve::Services::skill_tool`). Với `LAMP_SKILL_WRITES=on` nó
   còn được gọi `skill_write`, lần ghi của kỹ năng tự tạo mà chủ đèn đã đồng
-  ý, và chỉ giọng nói được gọi `skill_write_approve` và `skill_writes_sent`
-  ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới).
+  ý, và chỉ giọng nói được gọi `skill_write_approve`, `skill_writes_sent`
+  và `skill_writes_approved` ("Một kỹ năng tự tạo ghi vào dịch vụ", bên
+  dưới).
 
 Mỗi cửa trả lời tối đa 8 kết nối cùng lúc ("busy" khi vượt quá), và một peer
 có 5 s để gửi dòng của nó và nhận câu trả lời. Unit là một service thường,
@@ -1215,9 +1218,9 @@ Mô hình được nói về `service_write`, trước tiên trong mô tả củ
 draft, write or reply to a mail or message is one, never a remember. A mail
 draft: gmail's action save_draft; if refused, say what the call said. Call it
 first without send_id: it sends nothing and gives a read_back. Say it in full,
-word for word, then "Say 'yes, send it' to send it." (Vietnamese "Nói 'gửi đi'
-để gửi nhé."; a draft: "save it"). If they agree, in any words, call it again
-with its send_id; if they cancel or wait, don't send and say it's cancelled.
+word for word, then ask "Shall I send it?" (Vietnamese "Gửi không?"; a draft:
+"Shall I save it?"). If they agree, in any words, call it again with its
+send_id; if they cancel or wait, don't send and say it's cancelled.
 Never say a read-back no call gave in this turn. Never say you can't use their
 services: refuse only for a reason a call gave."
 
@@ -1229,14 +1232,22 @@ liên kết Gmail bằng đăng nhập Google (`gmail-app`, hay `gmail` tạo b�
 không có `gmail.compose` và không lưu nháp: `save_draft` của nó bị từ chối
 với lý do của chính lệnh gọi, mang câu cần nói, "I can't save a draft yet. I
 can read it back and send it when you say 'send it'." Sau mọi phần đọc lại
-đèn hỏi ngắn (chủ đèn, 10/11), "Say 'yes, send it' to send it." (với một bản
-nháp: "save it"), và mô hình xét mọi câu trả lời. Nó không bao giờ là một `remember`: trên
+đèn hỏi ngắn (chủ đèn, 10/11), và mô hình xét mọi câu trả lời. Vì mọi lời
+đồng ý đều gửi nó (#6009), đèn hỏi chứ không bảo người ta phải nói câu nào:
+"Shall I send it?" ("Gửi không?"), với một bản nháp "Shall I save it?" ("Lưu
+không?"), với một sự kiện hay một tệp "Shall I go ahead?" ("Làm không?"),
+hai câu sau được báo cùng lần ghi đã chuẩn bị (`SAVE_READ_BACK_NEXT`,
+`READ_BACK_NEXT`). Câu hỏi tiếng Việt kết thúc bằng "không?", không bao giờ
+bằng "nhé?": "Gửi nhé." vọng lại, mất dấu "?" qua bộ chuyển giọng nói thành
+chữ, nghe như lời đồng ý của một người (P1 của App Only trên #6206). Trên lamp-9adf ngày 11/11 (bản dựng 11710) đèn vẫn nói
+"Say 'yes, send it' to send it." sau phần đọc lại một sự kiện lịch, và "Sure.
+Do it." đã gửi nó. Nó không bao giờ là một `remember`: trên
 lamp-3e83 ngày 10 tháng 11, mô hình gọi `remember` ba lần cho một bản nháp
 trước khi ghi, và bản nháp kết thúc bằng "shall I send it?". Trên lamp-29e7
 ngày 9 tháng 11, "Draft a new email for me" bị từ chối mà không có lệnh gọi nào
 ("I cannot touch your mail") và, khi được hỏi tại sao, "Because I'm a lamp.";
 luật không nói gì về nháp, cũng không nói lý do của một lời từ chối đến từ
-đâu. Toàn bộ luật cùng luật chung là 997 trong 1,024 byte của mô tả, chừa 26
+đâu. Toàn bộ luật cùng luật chung là 975 trong 1,024 byte của mô tả, chừa 48
 byte cho lời riêng của `lamp-services` cho hàm ghi: chỉ những câu trọn vẹn,
 nên danh sách "action, by service: …" của nó được nói trên tham số `action`.
 
@@ -1282,17 +1293,17 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   lần ghi đang chờ bị quên trước. Khi câu trả lời có `read_back` và `send_id`,
   id đó được giữ cùng với yêu cầu mà nó đến, dịch vụ, phần đọc lại, và chủ
   đèn đã yêu cầu, và mô hình được báo "Nothing is sent yet. Say read_back in
-  full, word for word, leaving nothing out, then say "Say 'yes, send it' to
-  send it." (in Vietnamese "Nói 'gửi đi' để gửi nhé."). If they agree, in any
-  words, call service_write again with its send_id. If they cancel, decline,
+  full, word for word, leaving nothing out, then ask, short, "Shall I send
+  it?" (in Vietnamese "Gửi không?"); for an event or a file, "Shall I go ahead?"
+  (in Vietnamese "Làm không?"). If they agree, in any words, call service_write again with its send_id. If they cancel, decline,
   wait or change it, don't send: say it's cancelled, or prepare the changed
   one anew."; một id không có
   phần đọc lại bị bỏ và không bao giờ được gửi. Một lệnh ghi được chuẩn bị
   với `action` `save_draft` được giữ là một bản nháp (`Pending::draft`), và
   mô hình được báo thay vào đó `SAVE_READ_BACK_NEXT`, "Nothing is saved yet,
   and nothing is ever sent. Say read_back in full, word for word, leaving
-  nothing out, then say "Say 'yes, save it' to save it as a draft." (in
-  Vietnamese "Nói 'lưu đi' để lưu nháp nhé."). If they agree, in any words,
+  nothing out, then ask, short, "Shall I save it?" (in Vietnamese "Lưu
+  không?"). If they agree, in any words,
   call service_write again with its send_id. If they cancel, decline, wait or
   change it, don't save: say it's cancelled, or prepare the changed one
   anew."
@@ -1340,7 +1351,10 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   câu đến, dù `LAMP_SECOND_OWN_ECHO` bật hay không, và được giữ cùng lần ghi
   đang chờ: `services::line_in_echo_tail`, `Pending.echo_tail`,
   `Turn.in_echo_tail`), có thể là chính lời của đèn vọng lại, dù ngắn đến đâu:
-  "Yes." hay "Send it." quá ngắn để `own_echo` giữ lại (`HELD_LEAST`, 3). Lần
+  câu "Yes, send it." của một người có chung "send it" với câu "Shall I send
+  it?" của phần đọc lại (một câu chỉ gồm lời của phần đọc lại thì `own_echo`
+  giữ lại dù ngắn đến đâu, ở dưới; phép kiểm tra này vẫn áp dụng khi công
+  tắc tắt). Lần
   gửi đó chỉ đi khi giọng của câu là giọng người đã yêu cầu: `Turn.alike`, so
   với bản in giọng đã đăng ký của người đó (`VoiceAsk::Owner`) hoặc nếu không
   thì với câu đã chuẩn bị lần ghi (`VoiceAsk::Alike`), từ
@@ -1444,20 +1458,31 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   đầu tiên, và chủ đèn phải nói "send" năm lần.
 - **Chính lời của phần đọc lại vọng lại không bao giờ đồng ý thay người
   nói** (P1 của App Only và Thirteen trên #6009). Phần đọc lại của một lệnh
-  ghi đang chờ được `own_echo` xét như mọi câu của đèn: trong 1,5 s đuôi của
-  nó, "Yes, send it." do phòng vọng lại bị giữ, và "Um, yes, send it." (một
-  từ đệm của ASR) bị bỏ đoạn lời của đèn, nên mô hình chỉ nhận "Um," và
-  không bao giờ nhận lời đồng ý của đèn. Một tiếng vọng ngắn hơn, "Yes." hay
-  "Send it.", không bị giữ (`own_echo` giữ một câu có từ 3 từ của đèn trở
-  lên, `HELD_LEAST`, và bỏ các đoạn từ 2 từ trở lên, `STRIP_RUN`) và đến mô
-  hình nguyên vẹn; điều giữ đèn không gửi theo nó là phép kiểm tra giọng của
-  lần gửi trong đuôi ("Trong đuôi tiếng vọng của đèn, phải là giọng người đã
-  yêu cầu", ở trên): giọng của chính đèn không phải giọng người đã yêu cầu,
-  và hai lần không có bản in thì huỷ. Người nói đúng từng chữ ngay khi đèn
-  vừa dứt bị giữ một lần và nói lại (lamp-3e83, 10/11); người thêm một từ
-  ("Okay, yes, send it.") đến mô hình là "Okay,", và lần gửi khi đó đi nếu là
-  giọng người đã yêu cầu; người bắt đầu sau đuôi đến mô hình như đã nói, và
-  lần gửi đi dù ai nói.
+  ghi đang chờ được `own_echo` xét như mọi câu của đèn, và bị giữ nhiều hơn:
+  một câu chỉ gồm lời của nó (mỗi từ nằm trong một chuỗi ít nhất 2 từ mà
+  phần đọc lại nói theo đúng thứ tự), dù ngắn đến đâu, bắt đầu đè lên giọng
+  đèn hay trong 1,5 s đuôi, bị giữ là tiếng vọng của nó dù phần đọc lại kết
+  thúc bằng một câu hỏi, "Shall I send it?", điều vốn cho tiếng vọng của
+  một câu hỏi thường bắt đầu sau nó đi qua (P1 của App Only và Thirteen trên
+  #6206). Một mẩu muộn của phần cuối, "send it.", "go ahead.", "save it."
+  hay "Gửi nhé.", nghe như lời đồng ý, và trong phòng riêng không giọng nào
+  được xét cho một lần gửi. Lời của đèn là một phần đọc lại khi có một lần
+  ghi đang chờ được chuẩn bị trong yêu cầu của lời đó, hay đèn đã hỏi lại
+  lời đồng ý của nó ở đó (`services::reads_back_in`,
+  `own_echo::Said::read_back`); tiếng vọng của mọi câu trả lời khác không bị
+  giữ nhiều hơn trước. Lời đồng ý của chính người đó đến ở câu kế tiếp. Một
+  câu có một từ của người nói, "Yes, send it." hay "Um, yes, send it.", bắt
+  đầu trong đuôi, là câu trả lời cho câu hỏi của đèn và đến mô hình nguyên
+  vẹn; điều giữ đèn không gửi theo chính lời của nó ở đó là phép kiểm tra
+  giọng của lần gửi trong đuôi ("Trong đuôi tiếng vọng của đèn, phải là
+  giọng người đã yêu cầu", ở trên): câu như vậy có chung "send it" với phần
+  đọc lại nên được đánh dấu, giọng của chính đèn không phải giọng người đã
+  yêu cầu, và hai lần không có bản in thì huỷ. Một câu "Yes." đơn lẻ mà đèn
+  không nói thì không bị đánh dấu, và đi dù ai nói, như mọi câu bắt đầu sau
+  đuôi. Đến ngày 11/11 phần đọc lại còn kết thúc bằng
+  "Say 'yes, send it' to send it.": người nói đúng câu đó ngay khi đèn vừa dứt
+  bị giữ một lần và nói lại (lamp-3e83, 10/11), và "Okay, yes, send it." đến
+  mô hình là "Okay,".
 - **Sau một lần gửi** mô hình được báo một câu cố định: "Say only that it was
   sent, in the conversation's language." khi dịch vụ trả lời `sent: true`;
   "Say only that the file was made in their Google Drive, with its name from
@@ -1967,6 +1992,16 @@ Nó không giữ nội dung, chủ đề hay tiêu đề. Giọng nói đọc n�
 `{"sent": [{"skill", "service", "at", "to"}]}`, để nói với chủ đèn "I sent
 your arrival mail to boss at 18:02" vào lần tới thấy họ, như bên dưới.
 
+**Đã được đồng ý chưa** (`skill_writes_approved`, lệnh gọi riêng của
+giọng nói, để đọc lại một kỹ năng đang chờ). `{"skill", "writes": [...],
+"sha256"}` như lời đồng ý nhận; trả lời `{"on", "approved"}`: `on` khi kỹ
+năng được cài đúng package đó, `approved` khi nội dung của mọi lần ghi đều
+được đồng ý cho package đó và dịch vụ của nó hiện vẫn được liên kết dưới
+đúng liên kết đã đồng ý, như lúc gửi kiểm tra. Nó không đồng ý gì (các lần
+đồng ý của một package đã đổi bị bỏ, như lúc gửi); `lamp-skills` bị từ chối
+(`SKILL_READS_AND_WRITES_ONLY`), và khi công tắc tắt thì bị từ chối. Kiểm thử
+`whether_a_skills_writes_are_approved_is_told_to_the_voice_alone`.
+
 **Phía giọng nói** ([skills_vi.md](skills_vi.md), "Made by voice", cho
 toàn bộ):
 
@@ -2310,9 +2345,10 @@ khai báo và định tuyến chỉ khi có công tắc và thư mục, luật �
 định, chủ đèn, 10/11), một id bịa ra thì huỷ và một lệnh gọi không có id thì
 chuẩn bị lại, mọi câu ngay sau phần đọc lại được chờ là câu trả lời của nó,
 lần gửi của một người khác đã biết hay một người nói khác gửi lần ghi đang
-chờ, đèn nói "Say 'yes, send it' to send it." và ghi chú chờ đưa send_id,
+chờ, đèn hỏi "Shall I send it?" ("Gửi không?") và ghi chú chờ đưa send_id,
 một câu "Yes, send it." sau phần đọc lại đó không bao giờ bị giữ là tiếng vọng
-của đèn (lamp-3e83), một lần gửi sau một câu khác mà đèn chưa trả lời hay sau một phần đọc lại không
+của đèn (lamp-3e83), và trong phòng riêng chính "send it.", "go ahead." hay
+"Gửi nhé." của nó bắt đầu trong đuôi bị giữ và không bao giờ được gửi, một lần gửi sau một câu khác mà đèn chưa trả lời hay sau một phần đọc lại không
 được nói trọn vẫn gửi, câu trả lời cho phần đọc lại không có lần gửi ("Okay,
 cancelled.", "It's three.") kết thúc lần ghi nên một lần gửi sau đó không thấy
 gì, còn lần gửi của chính câu trả lời đó vẫn đi,

@@ -28,7 +28,10 @@ export const RUNS = [
   { name: 'ci-light.js', args: ['pass'], shows: async (lamp) => (await colour(lamp)) === 'green' },
   { name: 'pomodoro.js', args: [], shows: async (lamp) => (await colour(lamp)) === 'warm' },
   { name: 'ring-walk.js', args: ['50'], shows: async () => true },
-  { name: 'curious.js', args: [], needs: 'body', shows: async () => true },
+  // Its move takes about 3 s under a body lease it gives back at its end: wait for its own words, or the runner
+  // kills it mid-move and the lease stays (a client's lease ends when its LAST connection closes, and this runner's
+  // own connection stays open), which a later row meets as `busy`.
+  { name: 'curious.js', args: [], needs: 'body', shows: async (_lamp, _before, out) => /looked:|not now:/.test(out) },
   { name: 'ask-the-person.js', args: [], shows: async () => true },
   {
     name: 'greet.js', args: [], needs: 'sim',
@@ -56,6 +59,12 @@ export const RUNS = [
     shows: async (lamp) => (await colour(lamp)) === 'orange',
   },
   {
+    name: 'touch.js', args: [], needs: 'sim',
+    // `lamp-sim touch tap` is the head's tap; the example says what it answered, and a tap lights the ring warm.
+    nudge: async (sim) => { await sim('touch', 'tap'); },
+    shows: async (lamp, before, out) => /tap/.test(out) && (await colour(lamp)) === 'warm',
+  },
+  {
     name: 'follow-hand.js', args: [], needs: 'sim',
     nudge: async (sim) => { await sim('hand'); },
     // The hand comes and goes; the example follows it and says it let go (it prints that when the lamp says the hand is gone).
@@ -69,7 +78,7 @@ export const RUNS = [
 export const NOT_YET = {
   'camera.js': 'the camera open (lamp-sim --camera)', 'follow.js': 'someone arriving, then a look at a face the lamp does not take yet', 'push-skill.js': 'a skill folder and skill push on the lamp', 'tour.js': 'a run of its own (conformance.js covers its steps)',
   'notes.js': 'a note kept across runs, then its count shown as the light (no black-box row yet; test/examples.test.js checks its asks)',
-  'touch.js': 'a tap or pet on the head (lamp-sim has no touch stand-in yet)', 'heat-watch.js': 'a joint over its limit (not tried against lamp-sim yet)', 'visitors.js': 'an arrival (lamp-sim people 0, a 5 s wait, people 1), then the phrase (lamp-sim hear); no black-box row yet', 'desk-health.js': 'stuffy air for a wait, then clear (a run against lamp-sim: DESK_STUFFY_AFTER_S short, lamp-sim air; no black-box row yet)',
+  'heat-watch.js': 'a joint over its limit (not tried against lamp-sim yet)', 'visitors.js': 'an arrival (lamp-sim people 0, a 5 s wait, people 1), then the phrase (lamp-sim hear); no black-box row yet', 'desk-health.js': 'stuffy air for a wait, then clear (a run against lamp-sim: DESK_STUFFY_AFTER_S short, lamp-sim air; no black-box row yet)',
 };
 
 async function run(lamp, { name, args, nudge, shows }, sim) {

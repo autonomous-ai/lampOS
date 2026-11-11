@@ -1507,6 +1507,13 @@ impl Reply {
         });
     }
 
+    /// Called after the current request and packet bounds have been checked.
+    /// Text alone cannot prove speech: TTS may leave a piece unsaid.
+    fn append_provider_packet(&mut self, samples: Vec<i16>, received_at_us: u64, spoken: bool) {
+        self.media.spoken_audio |= spoken && !samples.is_empty();
+        self.append_provider_audio(samples, received_at_us);
+    }
+
     fn append_provider_audio(&mut self, samples: Vec<i16>, received_at_us: u64) {
         self.media.confirmation_retired_at_us = None;
         if !samples.is_empty()
@@ -8518,6 +8525,7 @@ fn conversation_with_gate_inner(
                 }
                 ProviderOutput::Audio {
                     request,
+                    spoken,
                     sequence,
                     provider_event_at_us,
                     source_frames,
@@ -8594,7 +8602,7 @@ fn conversation_with_gate_inner(
                             )?;
                         }
                         let received_frames = samples.len();
-                        current.append_provider_audio(samples, received_at_us);
+                        current.append_provider_packet(samples, received_at_us, spoken);
                         record(
                             trace,
                             json!({"kind":"provider_audio_enqueued","turn":request,
@@ -13519,7 +13527,8 @@ fn conversation_with_gate_inner(
             )?;
         }
         // A face added from a photo at the lamp, unconfirmed: asked once,
-        // gently, as the lamp's own written turn, while it is quiet (#1968).
+        // gently, as the lamp's own written turn, while it is quiet (#1968);
+        // in English its fixed words, never the model's (#5907).
         // The person's spoken yes or no is theirs to give; no answer in the
         // meeting is the eyes' to let go.
         if let Some(watch) = photo_faces.as_ref()
@@ -13538,7 +13547,7 @@ fn conversation_with_gate_inner(
                     owner,
                     reply,
                     &mut provider_queue,
-                    &crate::photo_faces::note(&name),
+                    &crate::photo_faces::turn(&name, crate::language::at_start()),
                     false,
                     "photo_face_ask",
                     provider_session,
@@ -18522,6 +18531,7 @@ mod tests {
     fn provider_audio(sequence: u64, samples: Vec<i16>) -> ProviderOutput {
         ProviderOutput::Audio {
             request: 1,
+            spoken: true,
             sequence,
             provider_event_at_us: monotonic_us(),
             source_frames: samples.len(),
@@ -19922,6 +19932,31 @@ mod tests {
                 discarded(affected, PlaybackDiscardReason::StaleOwner, false),
             )
             .unwrap();
+            let discard = (0..trace.len())
+                .map(|row| &trace[row])
+                .find(|row| row["kind"] == "playback_discarded")
+                .unwrap();
+            assert_eq!(discard["expected_cancellation"], true, "{reason}");
+        }
+    }
+
+    /// #5764, lamp-52e6 on 10 Nov: relaxing music was playing when the
+    /// speaker was muted. Its recording was revoked, the speaker dropped the
+    /// 360 frames still queued as a stale owner's, and that discard ended the
+    /// voice. A revoked recording's discard, or a privacy gap's, is its own.
+    #[test]
+    fn a_requested_recording_revoked_mid_play_drops_its_audio_without_ending_the_voice() {
+        for reason in ["requested_audio_revoked", "privacy_gap"] {
+            let (mut owner, current, _) = active_reply();
+            let affected = current.owner;
+            let mut reply = Some(current);
+            let mut trace = SessionState::default();
+            cancel_reply(&mut owner, &mut reply, &mut trace, reason).unwrap();
+            let mut event = discarded(affected, PlaybackDiscardReason::StaleOwner, false);
+            if let WorkerEvent::PlaybackDiscarded { queued_frames, .. } = &mut event {
+                *queued_frames = 360;
+            }
+            handle_playback_discard(&mut owner, &mut reply, &mut trace, event).unwrap();
             let discard = (0..trace.len())
                 .map(|row| &trace[row])
                 .find(|row| row["kind"] == "playback_discarded")

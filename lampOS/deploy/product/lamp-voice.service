@@ -617,6 +617,10 @@ Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
+# A face added from the app's photo is asked about once at the lamp, as its own turn while quiet, and the person's
+# spoken yes or no is told to the eyes (photo_face_yes, photo_face_no; never a written request); never named
+# before they agree (#1968's consent; on with the eyes' --photo-dir and lamp-cloud's, #5750).
+Environment=LAMP_PHOTO_FACES=on
 # The name typed at setup (lamp-setup writes it; a reset and the owner's own "forget everything" wipe it,
 # #4461), told to the model (docs/setup.md, #806). No file, no name.
 Environment=LAMP_PERSON_NAME=/etc/lampOS/person/name
