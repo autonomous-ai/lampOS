@@ -187,6 +187,9 @@ pub struct Shared {
     ahead_us: AtomicU64,
     pin: String,
     limits: Mutex<Limits>,
+    /// Where the owner's yes for a skill is read, once the run socket is on:
+    /// none, and no token is minted (`crate::runs`).
+    yes: Mutex<Option<Arc<dyn crate::runs::SkillYes>>>,
     /// Open connections by address, handshakes included.
     peers: Mutex<HashMap<std::net::IpAddr, usize>>,
     /// The manage helper's socket, root's, which installs, lists and
@@ -209,6 +212,89 @@ pub struct Shared {
 }
 
 impl Shared {
+    /// The owner's yes for skills is read through `yes`: from now a one-run
+    /// token can be minted (docs/control.md, "The run socket").
+    pub fn set_skill_yes(&self, yes: Arc<dyn crate::runs::SkillYes>) {
+        *self.yes.lock().expect("yes") = Some(yes);
+    }
+
+    /// `{"mint": {"skill", "run", "expires_in_ms"?}}` on the admin socket:
+    /// lamp-control reads the owner's yes itself and names exactly its grants.
+    fn mint(&self, asked: &Value, now: u64) -> Value {
+        let (Some(skill), Some(run)) = (asked["skill"].as_str(), asked["run"].as_str()) else {
+            return json!({"error": "mint: a skill and a run, both text"});
+        };
+        if !crate::runs::plain(skill) || !crate::runs::plain(run) {
+            return json!({"error": "mint: a skill and a run of plain characters, at most 64"});
+        }
+        let for_ms = match asked.get("expires_in_ms") {
+            None | Some(Value::Null) => None,
+            Some(value) => match value.as_u64() {
+                Some(ms) if ms > 0 => Some(ms),
+                _ => return json!({"error": "mint: expires_in_ms is a whole number above 0"}),
+            },
+        };
+        let Some(yes) = self.yes.lock().expect("yes").clone() else {
+            return json!({"error": "skill runs are off on this lamp"});
+        };
+        let grants = match yes.grants(skill) {
+            Ok(grants) if !grants.is_empty() => grants,
+            Ok(_) => return json!({"error": "the owner's yes names no grant for this skill"}),
+            Err(why) => return json!({"error": why}),
+        };
+        let Some(token) = crate::runs::new_token(&ring::rand::SystemRandom::new()) else {
+            return json!({"error": "no token could be made"});
+        };
+        let live = match self
+            .door
+            .lock()
+            .expect("door")
+            .mint_run(&token, run, skill, grants, for_ms, now)
+        {
+            Ok(live) => live,
+            Err(why) => {
+                eprintln!("lamp-control: run {run} of skill {skill}: no token made: {why}");
+                return json!({"error": why});
+            }
+        };
+        // A token minted again for a run that had one: its old connections end.
+        self.close_client(&live.client, crate::runs::CLOSED_AGAIN);
+        let names = grant_names(&live.grants.iter().copied().collect::<Vec<_>>());
+        let expires_in_ms = live.until_us.saturating_sub(now) / 1_000;
+        eprintln!(
+            "lamp-control: run {run} of skill {skill}: a token for [{names}], {} s",
+            expires_in_ms / 1_000
+        );
+        json!({"token": token, "run": run, "skill": skill, "grants": live.grants, "expires_in_ms": expires_in_ms})
+    }
+
+    /// Ends a run: its connections close, what it asked for that still goes
+    /// stops, as its `stop` would.
+    fn end_run(&self, run: &str, serial: Option<u64>, now: u64, why: &str) -> bool {
+        let ended = self.door.lock().expect("door").end_run(run, serial);
+        let Some(ended) = ended else {
+            return false;
+        };
+        self.parts.lock().expect("parts").gone(&ended.client, now);
+        self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
+        eprintln!("lamp-control: run {run} of skill {}: {why}", ended.skill);
+        true
+    }
+
+    /// Ends every run whose time has come.
+    pub fn sweep_runs(&self) {
+        let now = self.now_us();
+        let ended = self.door.lock().expect("door").sweep_runs(now);
+        for run in ended {
+            self.parts.lock().expect("parts").gone(&run.client, now);
+            self.close_client(&run.client, crate::runs::CLOSED_ENDED);
+            eprintln!(
+                "lamp-control: run {} of skill {}: its time is up",
+                run.run, run.skill
+            );
+        }
+    }
+
     /// The local agent `user`'s record, made if the lamp had none; its id
     /// (`Door::ensure_local`).
     pub fn ensure_local(&self, user: &str, wall_s: u64) -> std::io::Result<String> {
@@ -225,6 +311,7 @@ impl Shared {
             ahead_us: AtomicU64::new(0),
             pin,
             limits: Mutex::new(Limits::default()),
+            yes: Mutex::new(None),
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
             task_yes: Mutex::new(None),
@@ -381,6 +468,7 @@ impl Shared {
                 ahead_us: AtomicU64::new(0),
                 pin,
                 limits: Mutex::new(Limits::default()),
+                yes: Mutex::new(None),
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
                 task_yes: Mutex::new(None),
@@ -952,7 +1040,7 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             })
             .await;
             if let Ok(Some(socket)) = opened {
-                connection(socket, shared, remote, None).await;
+                connection(socket, shared, remote, None, false).await;
             }
         });
     }
@@ -1027,7 +1115,73 @@ pub async fn serve_agent(
             )
             .await;
             if let Ok(Ok(socket)) = opened {
-                connection(socket, shared, false, Some(client)).await;
+                connection(socket, shared, false, Some(client), false).await;
+            }
+            held.fetch_sub(1, Ordering::AcqRel);
+        });
+    }
+}
+
+/// The run socket (docs/control.md, "The run socket"): the same WebSocket
+/// protocol on a unix socket with no TLS, for one named user (the one that
+/// runs lamp-tasks' work), and only for a connection that then says `hello`
+/// with a live one-run token. The kernel names the peer (`SO_PEERCRED`); any
+/// other uid is closed before a byte is read. Runs whose time is past end here
+/// too, once a second.
+pub async fn serve_run(
+    listener: tokio::net::UnixListener,
+    named_uid: u32,
+    user: String,
+    shared: Arc<Shared>,
+) {
+    let sweeper = shared.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            sweeper.sweep_runs();
+        }
+    });
+    let held = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    loop {
+        let (stream, _) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(_) => {
+                tokio::time::sleep(ACCEPT_BACKOFF).await;
+                continue;
+            }
+        };
+        let cred = match stream.peer_cred() {
+            Ok(cred) => cred,
+            Err(error) => {
+                eprintln!("lamp-control: run socket: refused a peer: no credentials: {error}");
+                continue;
+            }
+        };
+        if !agent_peer_ok(cred.uid(), named_uid) {
+            eprintln!(
+                "lamp-control: run socket: refused uid {} (pid {}): only {user} (uid {named_uid})",
+                cred.uid(),
+                cred.pid().unwrap_or(-1)
+            );
+            continue;
+        }
+        if held.fetch_add(1, Ordering::AcqRel) >= AGENT_MAX {
+            held.fetch_sub(1, Ordering::AcqRel);
+            continue;
+        }
+        let (shared, held) = (shared.clone(), held.clone());
+        tokio::spawn(async move {
+            let within = shared.limits.lock().expect("limits").handshake;
+            let config = WebSocketConfig::default()
+                .max_message_size(Some(FRAME_MAX))
+                .max_frame_size(Some(FRAME_MAX));
+            let opened = tokio::time::timeout(
+                within,
+                tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
+            )
+            .await;
+            if let Ok(Ok(socket)) = opened {
+                connection(socket, shared, false, None, true).await;
             }
             held.fetch_sub(1, Ordering::AcqRel);
         });
@@ -1054,6 +1208,7 @@ async fn connection<S>(
     shared: Arc<Shared>,
     remote: bool,
     local: Option<String>,
+    run: bool,
 ) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
@@ -1072,6 +1227,7 @@ async fn connection<S>(
         let mut door = shared.door.lock().expect("door");
         match &local {
             Some(client) => door.open_local(client),
+            None if run => door.open_run(),
             None => door.open(),
         }
     };
@@ -1477,6 +1633,15 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
                 }
                 json!({"client": client, "grants": set.grants, "added": set.added, "removed": set.removed, "saved": true, "shown": Grant::shown_all()})
             }
+        };
+    }
+    if let Some(mint) = asked.get("mint") {
+        return shared.mint(mint, now);
+    }
+    if let Some(end) = asked.get("end") {
+        return match end["run"].as_str() {
+            Some(run) => json!({"ended": shared.end_run(run, None, now, "ended")}),
+            None => json!({"error": "end: a run, as text"}),
         };
     }
     if asked.get("cancel_code") == Some(&json!(true)) {

@@ -378,9 +378,16 @@ pub enum Op {
         proof: String,
     },
     /// Every connection: the client's id and its signature over the lamp's
-    /// nonce.
+    /// nonce. On the run socket only, `token` is the one-run token the
+    /// connection holds (the id and the signature are then not read: an SDK
+    /// sends `c_0` and 64 zero bytes).
     #[serde(rename = "hello")]
-    Hello { client: String, sig: String },
+    Hello {
+        client: String,
+        sig: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        token: Option<String>,
+    },
     #[serde(rename = "subscribe")]
     Subscribe {
         events: Vec<EventKind>,
@@ -654,7 +661,12 @@ impl Op {
                     return Err("proof: an HMAC-SHA256, 32 bytes as base64".to_owned());
                 }
             }
-            Self::Hello { client, sig } => {
+            Self::Hello { client, sig, token } => {
+                if let Some(token) = token
+                    && !crate::runs::token_shape(token)
+                {
+                    return Err("token: the one-run token, 43 characters".to_owned());
+                }
                 if !client_id(client) {
                     return Err("client: the id pairing gave, c_ and 1 to 32 hex".to_owned());
                 }
