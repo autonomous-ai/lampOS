@@ -338,8 +338,16 @@ pub enum Words {
     /// words as sent.
     Exact(String),
     /// An exact text's samples, played as the lamp's own line once the
-    /// person isn't talking ([`may_play_exact`]).
-    ExactSound(Vec<i16>),
+    /// person isn't talking ([`may_play_exact`]), with the words they say
+    /// when it is one of the lamp's fixed lines
+    /// ([`crate::language::is_fixed`]): kept in the thread as the lamp's
+    /// line once it is `spoken`, so the model's next turn knows the lamp
+    /// said it. None for a clip or any other words (a computer's, the
+    /// pairing pin, a service's read), which never reach the model.
+    ExactSound {
+        samples: Vec<i16>,
+        text: Option<String>,
+    },
     /// A paired computer's own clip (docs/control.md, "Sounds"), by its
     /// path under lamp-control's clips folder ([`CLIPS_ENVIRONMENT`]),
     /// until the client's thread reads it ([`read_clip`]) into an
@@ -378,7 +386,7 @@ impl Words {
             | Self::Cached(_)
             | Self::Sound(_)
             | Self::Exact(_)
-            | Self::ExactSound(_)
+            | Self::ExactSound { .. }
             | Self::ClipAt(_)
             | Self::TurnStart { .. }
             | Self::TurnEnd(_)
@@ -785,7 +793,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
                     .into(),
             );
         }
-    } else if skill == "prepare-unplug" && matches!(words, Words::Text(_)) {
+    } else if skill == "prepare-unplug" && matches!(words, Words::Text(_)) && !wire.exact {
+        // Its exact words (#5777) are its other lines, never the readiness
+        // claim, which is a model's text with its guard.
         return Err("prepare-unplug text requires unplug_request".into());
     }
     // A made skill's say (#6062): its exact text alone, never a note, never
@@ -1122,6 +1132,8 @@ pub struct Ticket {
     cancel: Cancel,
     /// For `voice/line` (#4209).
     line: LineMeta,
+    /// An exact line's words ([`Words::ExactSound`]), none for anything else.
+    said: Option<String>,
 }
 
 impl Ticket {
@@ -1155,6 +1167,11 @@ impl Ticket {
 
     pub fn skill(&self) -> &str {
         &self.skill
+    }
+
+    /// The words of the exact line it asked, if it was one with words.
+    pub fn said(&self) -> Option<&str> {
+        self.said.as_deref()
     }
 
     /// Whether its asker cancelled it on its own connection
@@ -1206,6 +1223,7 @@ impl Ticket {
                 who: false,
                 question: false,
                 line: Default::default(),
+                said: None,
             },
             answered,
         )
@@ -1654,7 +1672,14 @@ impl Says {
     /// rendered already ([`Words::ExactSound`]).
     #[cfg(test)]
     pub(crate) fn exact_for_test(skill: &str, samples: Vec<i16>) -> (Self, mpsc::Receiver<Answer>) {
-        Self::words_for_test(skill, Words::ExactSound(samples), NORMAL_PRIORITY)
+        Self::words_for_test(
+            skill,
+            Words::ExactSound {
+                samples,
+                text: None,
+            },
+            NORMAL_PRIORITY,
+        )
     }
 
     /// [`Self::exact_for_test`] with the words it was rendered from and who
@@ -1667,8 +1692,14 @@ impl Says {
         source: lamp_msgs::LineSource,
         samples: Vec<i16>,
     ) -> (Self, mpsc::Receiver<Answer>) {
-        let (mut says, answered) =
-            Self::words_for_test(skill, Words::ExactSound(samples), NORMAL_PRIORITY);
+        let (mut says, answered) = Self::words_for_test(
+            skill,
+            Words::ExactSound {
+                samples,
+                text: None,
+            },
+            NORMAL_PRIORITY,
+        );
         says.waiting[0].request.line = LineMeta {
             by: by.map(str::to_owned),
             said: Some((text.to_owned(), source)),
@@ -1817,7 +1848,7 @@ impl Says {
                     | Words::Cached(_)
                     | Words::Sound(_)
                     | Words::Exact(_)
-                    | Words::ExactSound(_)
+                    | Words::ExactSound { .. }
                     | Words::ClipAt(_)
                     | Words::TurnStart { .. }
                     | Words::TurnEnd(_)
@@ -1898,6 +1929,7 @@ impl Says {
                 who: false,
                 question: false,
                 line: Default::default(),
+                said: None,
             },
         ))
     }
@@ -1921,6 +1953,7 @@ impl Says {
                 who: false,
                 question: false,
                 line: waiting.request.line,
+                said: None,
             },
         ))
     }
@@ -1945,16 +1978,16 @@ impl Says {
     /// Whether an exact line waits to be said, without taking it.
     pub fn exact_waiting(&mut self, now_us: u64) -> bool {
         self.expire(now_us);
-        self.next_of(|request| matches!(request.words, Words::ExactSound(_)))
+        self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))
             .is_some()
     }
 
     /// The exact line to say next, taken.
     pub fn take_exact(&mut self, now_us: u64) -> Option<(Vec<i16>, Ticket)> {
         self.expire(now_us);
-        let index = self.next_of(|request| matches!(request.words, Words::ExactSound(_)))?;
+        let index = self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))?;
         let waiting = self.waiting.remove(index);
-        let Words::ExactSound(samples) = waiting.request.words else {
+        let Words::ExactSound { samples, text } = waiting.request.words else {
             unreachable!("next_of chose an exact line");
         };
         Some((
@@ -1969,6 +2002,7 @@ impl Says {
                 who: false,
                 question: false,
                 line: waiting.request.line,
+                said: text,
             },
         ))
     }
@@ -2043,6 +2077,7 @@ impl Says {
                 who,
                 question,
                 line: Default::default(),
+                said: None,
             },
             quoted,
         ))
@@ -2078,6 +2113,7 @@ impl Says {
             who: false,
             question: false,
             line: Default::default(),
+            said: None,
         })
     }
 
@@ -2102,6 +2138,7 @@ impl Says {
             who: false,
             question: false,
             line: Default::default(),
+            said: None,
         })
     }
 
@@ -2250,7 +2287,10 @@ fn serve_client(
                     request.words = Words::Sound(read_skill_sound(path, &folders.sounds)?);
                 }
                 Words::ClipAt(path) => {
-                    request.words = Words::ExactSound(read_clip(path, &folders.clips)?);
+                    request.words = Words::ExactSound {
+                        samples: read_clip(path, &folders.clips)?,
+                        text: None,
+                    };
                 }
                 Words::Recording(name) => {
                     request.words = Words::Sound(recordings.samples(name)?);
@@ -2260,8 +2300,12 @@ fn serve_client(
                     request.words = Words::Sound(recordings.cached(text)?);
                 }
                 Words::Exact(text) => {
-                    request.line.said = Some((text.clone(), lamp_msgs::LineSource::Exact));
-                    request.words = Words::ExactSound(recordings.rendered(text)?);
+                    let (samples, said) = recordings.rendered(text)?;
+                    request.line.said = Some((said.to_owned(), lamp_msgs::LineSource::Exact));
+                    request.words = Words::ExactSound {
+                        samples,
+                        text: crate::language::is_fixed(text).then(|| said.to_owned()),
+                    };
                 }
                 // A fixed line asked as text, the first stand's (#4710),
                 // in the owner's words (#4473 (c)).
@@ -2661,11 +2705,20 @@ impl Recordings {
     }
 
     /// A paired computer's exact `text` rendered now, never kept, or why not.
-    pub fn rendered(&self, text: &str) -> Result<Vec<i16>, String> {
-        self.cache
+    /// A fixed line (the unplug lines, #5777's P3) is said in the owner's
+    /// words, kept or rendered now, as a text's are; English as written.
+    pub fn rendered<'a>(&self, text: &'a str) -> Result<(Vec<i16>, &'a str), String> {
+        let cache = self
+            .cache
             .as_ref()
-            .ok_or_else(|| "the speech service is off (no speech cache)".to_owned())?
-            .render_once(text)
+            .ok_or_else(|| "the speech service is off (no speech cache)".to_owned())?;
+        match cache.owners_words(text) {
+            Some((_, owners)) => cache
+                .kept(owners)
+                .map_or_else(|| cache.render_once(owners), Ok)
+                .map(|samples| (samples, owners)),
+            None => cache.render_once(text).map(|samples| (samples, text)),
+        }
     }
 
     /// The samples of a cached `text`, kept or rendered now, or why not:
@@ -3686,6 +3739,58 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// #5777's P3: an exact line that is one of the fixed lines (the unplug
+    /// lines) is said in the owner's words, kept or rendered now; English
+    /// and any other exact words are said as written.
+    #[test]
+    fn an_exact_fixed_line_is_said_in_the_owners_language() {
+        use crate::language::Language;
+        let dir = std::env::temp_dir().join(format!("lamp-say-exact-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let cache = |language: Option<Language>, sub: &str| {
+            Recordings::none().with_cache(Some(Arc::new(
+                tts_cache::TtsCache::new(
+                    dir.join(sub),
+                    "Ngan",
+                    crate::language::SPEECH_MODEL,
+                    language.map_or("en", Language::code),
+                    Box::new(|text: &str| Ok(vec![text.chars().count() as i16; 2_400])),
+                )
+                .speaking(language),
+            )))
+        };
+        let sound = |text: &str| vec![text.chars().count() as i16; 2_400];
+        let stay = crate::language::UNPLUG_STAY;
+        let vietnamese = cache(Some(Language::Vietnamese), "vi");
+        assert_eq!(
+            vietnamese.rendered(stay).unwrap(),
+            (
+                sound("Được rồi, mình ở lại nhé."),
+                "Được rồi, mình ở lại nhé."
+            )
+        );
+        assert_eq!(
+            vietnamese
+                .rendered(crate::language::UNPLUG_FAILED)
+                .unwrap()
+                .0,
+            sound(
+                Language::Vietnamese
+                    .fixed(crate::language::UNPLUG_FAILED)
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            vietnamese.rendered("Hello.").unwrap(),
+            (sound("Hello."), "Hello.")
+        );
+        assert_eq!(
+            cache(None, "en").rendered(stay).unwrap(),
+            (sound(stay), stay)
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// #3697: the shutdown's line, warmed at start, reaches the voice as a
     /// sound from the cache with no further render (no network), as the
     /// shutdown asks for it. The helper is this test's own user here.
@@ -3926,6 +4031,14 @@ mod tests {
         );
         assert!(parse(&ready.replace("prepare-unplug", "other")).is_err());
         assert!(parse(&ready.replace("request-1", "../wrong")).is_err());
+        // #5777: the skill's other lines are exact words, never a note the
+        // model may decline (lamp-52e6, 10 Nov): no readiness, no guard.
+        let stay = parse(
+            r#"{"skill":"prepare-unplug","text":"Okay, I'll stay.","exact":true,"priority":8,"expires_in_ms":30000}"#,
+        )
+        .unwrap();
+        assert!(matches!(&stay.words, Words::Exact(text) if text == "Okay, I'll stay."));
+        assert_eq!(stay.unplug_request, None);
     }
 
     #[test]

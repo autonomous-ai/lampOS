@@ -13457,7 +13457,7 @@ fn unplug_words_are_the_granted_skills_own() {
     .unwrap_err();
     assert!(why.contains("only with that grant"), "{why}");
     // A line that isn't words.
-    let check = "check = \"Say exactly: I can't get up by myself; I need to be checked.\"";
+    let check = "check = \"I can't get up by myself; I need to be checked.\"";
     for bad in [
         "\"\"".to_owned(),
         "\"a\\u0007b\"".to_owned(),
@@ -13847,6 +13847,348 @@ fn unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt()
             .unwrap(),
         request
     );
+}
+
+/// What the product's `prepare-unplug` asks before it turns the lamp off,
+/// as its `skill.toml` words it (#5774's P2).
+const ASK_OFF: &str = "Shall I turn myself off now";
+/// What it says when an update holds the turn-off (#5763's call (a), point
+/// 5; #5777's P2: it stands up and asks to be told again).
+const UPDATING: &str = "ask me again once it's done";
+/// The change helper's refusal while an update installs.
+const INSTALLING: &str = "an update is being installed: try again once it is done";
+
+/// A lamp-skills with `LAMP_UNPLUG=on` and a turn-off socket (the product's
+/// setup change helper, #5763's P1), driven to a confirmed fold: a running
+/// lamp, its storage still written, must never say "You can unplug me now".
+/// The helper answers each line with the next of `answers` (the last again
+/// after them). `heard`, when given, is a line the person says that many ms
+/// after the lamp asks whether to turn off (past the echo tail at 1.5 s, or
+/// inside it). With `busy`, the room is busy throughout. Runs `for_s`
+/// seconds; returns what the helper was asked, every say asked, and whether
+/// the fold was cancelled (the lamp stood up).
+fn unplug_with_turn_off(
+    answers: &[serde_json::Value],
+    heard: Option<(&str, u64)>,
+    busy: bool,
+    for_s: u64,
+) -> (Vec<String>, Vec<serde_json::Value>, bool) {
+    use lamp_body::unplug::{Phase, Request, State};
+    use lamp_bus::Kind;
+    use serde_json::{Value, json};
+    let dir = tempfile::Builder::new()
+        .prefix("uf")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let skills = dir.path().join("skills");
+    copy(
+        &skills_root().join("prepare-unplug"),
+        &skills.join("prepare-unplug"),
+    );
+    let root = dir.path().join("bus");
+    let bus = Bus::new(&root).unwrap();
+    let tools = dir.path().join("tools");
+    let say_socket = dir.path().join("say.sock");
+    let say = UnixListener::bind(&say_socket).unwrap();
+    say.set_nonblocking(true).unwrap();
+    let off_socket = dir.path().join("change.sock");
+    let helper = UnixListener::bind(&off_socket).unwrap();
+    helper.set_nonblocking(true).unwrap();
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
+            .args([
+                "--dir".as_ref(),
+                skills.as_os_str(),
+                "--bus-root".as_ref(),
+                root.as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--say-socket".as_ref(),
+                say_socket.as_os_str(),
+            ])
+            .env("LAMP_UNPLUG", "on")
+            .env(lamp_skills::unplug::OFF_SOCKET_ENVIRONMENT, &off_socket)
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("tools.json").exists() || !tools.join("call.sock").exists() {
+        assert!(Instant::now() < deadline, "skill never became available");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let mut voice = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut room = bus
+        .publisher_declared(
+            lamp_msgs::RoomState::TOPIC,
+            &lamp_msgs::RoomState::declaration(),
+            "voice",
+        )
+        .unwrap();
+    if busy {
+        room.publish_json(
+            lamp_ipc::monotonic_us(),
+            &lamp_msgs::RoomState {
+                state: lamp_msgs::Room::Busy,
+            },
+        )
+        .unwrap();
+    }
+    let mut caller = UnixStream::connect(tools.join("call.sock")).unwrap();
+    caller
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    writeln!(
+        caller,
+        "{}",
+        json!({"op":"call","name":"prepare_to_unplug","args":{}})
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(caller).read_line(&mut line).unwrap();
+    let response: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let request = loop {
+        if let Some(message) = bus.latest(Request::TOPIC).unwrap() {
+            break message.parse::<Request>().unwrap();
+        }
+        assert!(Instant::now() < deadline, "no body request");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let mut body = bus
+        .publisher_declared(State::TOPIC, &State::declaration(), "body")
+        .unwrap();
+    let mut expression = bus
+        .publisher(
+            lamp_skills::unplug::EXPRESSION_TOPIC,
+            Kind::Latest,
+            "expression",
+        )
+        .unwrap();
+    expression.expires_after(Some(Duration::from_millis(500)));
+    let mut ring = bus
+        .publisher(lamp_skills::unplug::RING_TOPIC, Kind::Latest, "ring")
+        .unwrap();
+    ring.expires_after(Some(Duration::from_millis(500)));
+    let state = State {
+        request: request.request.clone(),
+        phase: Phase::Ready,
+        why: String::new(),
+    };
+    let asleep = json!({"request":request.request,"asleep":true});
+    let (mut asked, mut said) = (Vec::new(), Vec::new());
+    let mut answers = answers.iter();
+    let mut answer = answers.next().unwrap().clone();
+    let mut heard_at = None;
+    // Every say asked and every helper line, answered, for `for_s` s of proof.
+    let until = Instant::now() + Duration::from_secs(for_s);
+    while Instant::now() < until {
+        let now = lamp_ipc::monotonic_us();
+        // The body keeps its proof until a cancel stands it up.
+        if bus
+            .latest(lamp_body::unplug::CANCEL_TOPIC)
+            .unwrap()
+            .is_none()
+        {
+            body.publish_json(now, &state).unwrap();
+            expression.publish_json(now, &asleep).unwrap();
+            ring.publish_json(now, &asleep).unwrap();
+        }
+        if let Ok((stream, _)) = helper.accept() {
+            stream.set_nonblocking(false).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            asked.push(line.trim().to_owned());
+            writeln!(&stream, "{answer}").unwrap();
+            if let Some(next) = answers.next() {
+                answer = next.clone();
+            }
+        }
+        if let Ok((stream, _)) = say.accept() {
+            stream.set_nonblocking(false).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let ask: Value = serde_json::from_str(&line).unwrap();
+            // #5777 (lamp-52e6, 10 Nov 12:43): the chat model refused the
+            // ask as a note ("it isn't mine to say") and the stay note was
+            // dropped as user_interrupted. Every line is the voice's exact
+            // words, never a note the model may decline or reword.
+            assert_eq!(ask["exact"], true, "{ask}");
+            assert!(ask.get("note").is_none(), "{ask}");
+            if let Some((_, after_ms)) = heard
+                && ask["text"]
+                    .as_str()
+                    .is_some_and(|text| text.contains(ASK_OFF))
+            {
+                heard_at = Some(Instant::now() + Duration::from_millis(after_ms));
+            }
+            said.push(ask);
+            // Begun, then spoken, as the voice answers: a stay cancels at its begun.
+            writeln!(&stream, "{}", json!({"event":"begun"})).unwrap();
+            writeln!(&stream, "{}", json!({"outcome":"spoken"})).unwrap();
+        }
+        if let (Some(at), Some((text, _))) = (heard_at, heard)
+            && Instant::now() >= at
+        {
+            heard_at = None;
+            voice
+                .publish_json(
+                    lamp_ipc::monotonic_us(),
+                    &Speech {
+                        text: text.into(),
+                        finished: true,
+                        locale: None,
+                        request: None,
+                    },
+                )
+                .unwrap();
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let stood = bus
+        .latest(lamp_body::unplug::CANCEL_TOPIC)
+        .unwrap()
+        .is_some();
+    (asked, said, stood)
+}
+
+/// Each say's note, or its text, in order.
+fn notes(said: &[serde_json::Value]) -> Vec<String> {
+    said.iter()
+        .map(|ask| {
+            ask["note"]
+                .as_str()
+                .or(ask["text"].as_str())
+                .unwrap_or_default()
+                .to_owned()
+        })
+        .collect()
+}
+
+/// #5774's P2: a confirmed fold turns the lamp off only after it asked and
+/// heard a spoken yes, the lamp's one yes (`first_stand::is_yes`). The ask
+/// is said before the runner, which says the last words itself.
+#[test]
+fn a_lamp_with_a_turn_off_socket_turns_off_at_the_fold_only_after_a_spoken_yes() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"done":{"shutting_down":true}})],
+        Some(("yes", 1_700)),
+        false,
+        5,
+    );
+    let notes = notes(&said);
+    assert_eq!(notes.len(), 1, "{notes:?}");
+    assert!(notes[0].contains(ASK_OFF), "{notes:?}");
+    assert!(notes.iter().all(|note| !note.contains("unplug me now")));
+    assert_eq!(asked, [r#"{"shutdown":"lamp"}"#], "said: {notes:?}");
+    assert!(!stood);
+}
+
+/// #5774's P2: a false fold (a TV's "I'm unplugging you", "I'm unplugging
+/// the kettle") that hears no yes never powers off: it says it will stay
+/// and stands up, as a "never mind" does.
+#[test]
+fn a_fold_that_hears_no_yes_stands_up_and_never_turns_off() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"done":{"shutting_down":true}})],
+        Some(("no, the kettle", 1_700)),
+        false,
+        5,
+    );
+    let notes = notes(&said);
+    assert!(asked.is_empty(), "asked {asked:?}, said {notes:?}");
+    // Said as written in the skill's file, word for word (#5777).
+    assert_eq!(
+        notes,
+        [
+            "My arm is folded. Shall I turn myself off now? Say yes, and I will.",
+            "Okay, I'll stay."
+        ]
+    );
+    assert_eq!(said[1]["priority"], 8, "{said:?}");
+    assert!(stood, "{notes:?}");
+}
+
+#[test]
+fn a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"refused":"the change helper is busy"})],
+        Some(("yes, go ahead", 1_700)),
+        false,
+        5,
+    );
+    assert_eq!(asked, [r#"{"shutdown":"lamp"}"#]);
+    let notes = notes(&said);
+    assert!(notes.iter().all(|note| !note.contains("unplug me now")));
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    assert!(notes[1].contains("please don't unplug me yet"), "{notes:?}");
+    let _ = stood;
+}
+
+/// #5777's P2: an update holds the turn-off, and an install round restarts
+/// lamp-skills, so no wait for it may live in lamp-skills (one did: after
+/// "keep me plugged in" a restart left the lamp folded, never off and never
+/// up). Refused for an update, the lamp says it can't turn off yet, stands
+/// up at once and asks to be told again: nothing is left waiting, so a
+/// restart mid-update leaves nothing undone. The helper is asked once.
+#[test]
+fn a_turn_off_held_by_an_update_stands_up_at_once_and_asks_to_be_told_again() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[
+            serde_json::json!({"refused": INSTALLING}),
+            serde_json::json!({"done":{"shutting_down":true}}),
+        ],
+        Some(("yes", 1_700)),
+        false,
+        6,
+    );
+    let notes = notes(&said);
+    assert_eq!(asked, [r#"{"shutdown":"lamp"}"#], "said: {notes:?}");
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    assert!(notes[1].contains(UPDATING), "{notes:?}");
+    assert!(stood, "the fold was left latched: {notes:?}");
+}
+
+/// #5777's P3: a yes in a busy room (`room/state`) is not taken: the lamp
+/// stays and stands up, never off.
+#[test]
+fn a_yes_in_a_busy_room_stands_up_and_never_turns_off() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"done":{"shutting_down":true}})],
+        Some(("yes", 1_700)),
+        true,
+        5,
+    );
+    let notes = notes(&said);
+    assert!(asked.is_empty(), "asked {asked:?}, said {notes:?}");
+    assert!(notes[1].contains("Okay, I'll stay"), "{notes:?}");
+    assert!(stood);
+}
+
+/// #5777's P3: a yes heard inside the ask's echo tail (1.5 s) is the lamp's
+/// own, never taken; with no other line in the 30 s wait the lamp stays and
+/// stands up.
+#[test]
+fn a_yes_in_the_echo_tail_is_not_taken_and_the_wait_ends_standing_up() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"done":{"shutting_down":true}})],
+        Some(("yes", 500)),
+        false,
+        34,
+    );
+    let notes = notes(&said);
+    assert!(asked.is_empty(), "asked {asked:?}, said {notes:?}");
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    assert!(notes[1].contains("Okay, I'll stay"), "{notes:?}");
+    assert!(stood);
 }
 
 #[test]

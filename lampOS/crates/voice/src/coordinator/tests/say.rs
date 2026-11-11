@@ -1036,6 +1036,104 @@ fn an_exact_line_waits_for_the_person_then_is_played_to_spoken() {
     assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
 }
 
+/// lamp-52e6, 10 Nov: a skill's exact ask played to `spoken` never reached
+/// the chat's history, so the next ask to unplug was answered from the
+/// model's own last words ("I'm preparing to fold") with no call. Once
+/// spoken, the line is the lamp's own in the next chat request's history.
+#[test]
+fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
+    let line = "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
+    let (mut says, answered) = crate::say::Says::words_for_test(
+        "unplug",
+        crate::say::Words::ExactSound {
+            samples: vec![400; 480],
+            text: Some(line.to_owned()),
+        },
+        crate::say::NORMAL_PRIORITY,
+    );
+    let mut owner = resting_owner();
+    let (mut reply, mut pending, mut trace) = (None, None, SessionState::default());
+    let admission = InputAdmission::default();
+    let now_is = crate::say::SoundNow {
+        conversing: false,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(take_exact(
+        &mut says, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+    let mut played = play_sound(&mut owner, &mut reply, &mut pending, &mut trace, 2);
+    played
+        .peer
+        .control
+        .send(WorkerEvent::SpeechRetired {
+            owner: played.last.permit.owner(),
+            sequence: played.last.chunk_sequence,
+            final_sample: PlaybackCursor {
+                epoch: 1,
+                frame: played.cursor,
+            },
+            observed_at_us: monotonic_us(),
+        })
+        .unwrap();
+    service_speaker_control(
+        &mut played.speaker,
+        &mut owner,
+        &mut reply,
+        &mut pending,
+        &mut played.mask,
+        &mut played.snapshot,
+        &mut 0,
+        &mut 16,
+        &mut trace,
+        &mut None,
+    )
+    .unwrap();
+    let current = reply.as_mut().unwrap();
+    owner.complete_turn(now(), current.owner).unwrap();
+    let snapshot = owner.snapshot(now()).unwrap();
+    // The voice's thread is a global other tests write to, and their turns
+    // are numbered as this one is: a fresh thread just before, and the line
+    // looked for among the room's history, not as the whole of it.
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    current.answer_say(&pending, snapshot);
+    let (_, history) = crate::second_provider::worker::thread_and_history(0, None, None, None);
+    assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
+    assert!(
+        history.contains(&crate::second_provider::net::Message::assistant(line)),
+        "{history:?}"
+    );
+}
+
+/// An exact line's event says the words it plays.
+#[test]
+fn an_exact_lines_event_carries_its_text() {
+    let line = "Okay, I'll stay.";
+    let (mut says, _answered) = crate::say::Says::words_for_test(
+        "unplug",
+        crate::say::Words::ExactSound {
+            samples: vec![400; 480],
+            text: Some(line.to_owned()),
+        },
+        crate::say::NORMAL_PRIORITY,
+    );
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let now_is = crate::say::SoundNow {
+        conversing: false,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(take_exact(
+        &mut says, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    let row = trace
+        .iter()
+        .find(|row| row["kind"] == "exact_line")
+        .expect("an exact_line event");
+    assert_eq!(row["text"], line, "{row}");
+}
+
 /// lamp-75c9, 2 Nov, 19:15: in a busy office the voice hears speech most of
 /// the time, none of it to the lamp. An exact line plays through it: the
 /// room's speech and a candidate line being heard, with no turn and no

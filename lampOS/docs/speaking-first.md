@@ -762,7 +762,7 @@ shutdown is said from the cache even with no network then. The cache is
 made once per process and shared: the coordinator reads the sleep line
 from it once per conversation (`TtsCache::kept`), a file read only, never
 a render. With an owner's language other than English (#4473 (c),
-second-voice.md, "The fixed lines"), its twenty-three fixed lines in that language
+second-voice.md, "The fixed lines"), its thirty-four fixed lines in that language
 are warmed first, then these two, and a cached `text` that is one of them
 is played in the owner's words when kept, its English otherwise; a plain
 `text` that is one of them (the first stand's) is told to the model in the
