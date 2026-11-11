@@ -4045,6 +4045,39 @@ fn the_stand_ins_code_is_held_until_its_release_file_appears() {
     link.answer(true).unwrap();
 }
 
+/// #5198: the app's QR sign-in is Harness's own `login --qr --json`, run
+/// as the code's is: its link read in place of the code, then the same
+/// question, answer and result.
+#[test]
+fn the_qr_sign_in_runs_login_qr_and_reads_its_link() {
+    use lamp_tasks::sign_in::{Done, Event, Method};
+    let rig = Rig::new();
+    rig.plan(json!({"login":{"code_flow":true}}));
+    let mut link = rig.cli().sign_in(Method::Qr).unwrap();
+    let qr = Event::Qr {
+        url: "https://harness.autonomous.ai/signin#k=hnq_abcDEF123".into(),
+        expires_in: 120,
+    };
+    assert_eq!(
+        sign_in_lines(link.as_mut(), Duration::from_secs(10), false),
+        [
+            Ok(qr.clone()),
+            Ok(qr),
+            Ok(Event::Confirm {
+                email: "someone@example.com".into()
+            })
+        ]
+    );
+    assert_eq!(rig.calls()[0]["args"], json!(["login", "--qr", "--json"]));
+    link.answer(true).unwrap();
+    assert_eq!(
+        sign_in_lines(link.as_mut(), Duration::from_secs(10), true),
+        [Ok(Event::Result(Done::Success {
+            email: Some("someone@example.com".into())
+        }))]
+    );
+}
+
 /// #1676: a Harness before 0.4.23 doesn't know `--code`; the sign-in ends
 /// saying so, not merely that it ended. Stopped early, the program goes.
 #[test]

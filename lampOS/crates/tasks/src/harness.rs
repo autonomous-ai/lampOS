@@ -2513,7 +2513,7 @@ impl Cli {
     }
 
     /// Harness's own sign-in by `method` (#5198): `harness login --code
-    /// --json`, the only method for now.
+    /// --json`, or `--qr --json` for the app's QR (Harness 0.6.16).
     pub fn sign_in(
         &self,
         method: crate::sign_in::Method,
@@ -2532,6 +2532,7 @@ impl Cli {
                 "login",
                 match method {
                     crate::sign_in::Method::Code => "--code",
+                    crate::sign_in::Method::Qr => "--qr",
                 },
                 "--json",
             ])
