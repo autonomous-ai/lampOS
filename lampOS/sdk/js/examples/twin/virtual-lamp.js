@@ -30,8 +30,9 @@ import { Keyring, Lamp } from '../../src/index.js';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const GRANTS = 'body,light,speak,look,hear,sound,air,device,camera,microphone';
 // The try-it app's lamp has no camera or microphone grant unless that is asked for (`--camera`, `--microphone`):
-// a picture of the room would sit on the LAN page.
-const TRY_GRANTS = 'body,light,speak,look,hear,sound,air,device,skills';
+// a picture of the room would sit on the LAN page. It has `speech`, so the log shows each line the lamp says
+// (lamp.said).
+export const TRY_GRANTS = 'body,light,speak,look,hear,sound,air,device,skills,speech';
 export function grantsFor(flags, tryApp) {
   if (!tryApp) return GRANTS;
   const camera = flags.some((f) => f === '--camera' || f.startsWith('--camera='));
