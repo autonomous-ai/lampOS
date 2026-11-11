@@ -1387,7 +1387,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          and the move is refused (`upgrade`, nothing stopped or installed,
          journaled `a kept copy waits at …`) until it is cleared by hand;
          this is looked at before anything is stopped. The new copy is made at `<kept>.new` and
-         renamed only once whole. Then the installer runs.
+         renamed only once whole. Once kept, `~/.harness/runtime/current-node`
+         is taken away (#6302): Harness's installer reuses the Node it names,
+         so a moved lamp would stay on its older Node (22) while a fresh
+         install gets the pin's (24, which OpenClaw needs). Without it, the
+         installer takes the Node the pinned runtime manifest names, served
+         from loopback and checked by its sha256; a put-back restores the
+         kept `current-node`. Then the installer runs.
        - **Put back on failure:** the installer failing, or `harness
          version` not the pinned one after it, puts the kept copy back (as
          `lampos`) and records `failed` with `upgrade` and `from_version`,

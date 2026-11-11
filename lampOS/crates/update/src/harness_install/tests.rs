@@ -2181,6 +2181,145 @@ fn keep_then_put_back_restores_the_older_harness() {
     );
 }
 
+/// The Node the pinned runtime manifest names for a lamp (linux-arm64).
+fn pinned_node() -> String {
+    let manifest: serde_json::Value = serde_json::from_slice(product::MANIFESTS[0].bytes).unwrap();
+    manifest["node"]["linux-arm64"]["version"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
+/// A runner for a move on a real Harness home `h`: KEEP, PUT_BACK and
+/// LET_GO run in a real shell; the installer does what Harness's does with
+/// Node (#6302): it reuses the Node `current-node` names, else takes the
+/// one the pinned runtime manifest names (`node_step`, its result).
+fn node_mover(
+    log: Rc<RefCell<Vec<String>>>,
+    h: String,
+    node_step: Result<String, String>,
+) -> impl FnMut(&[String]) -> Result<String, String> {
+    let now = Rc::new(RefCell::new("0.4.25"));
+    move |argv: &[String]| {
+        log.borrow_mut().push(argv.join(" "));
+        if argv[0] == "id" {
+            return Ok("990\n".into());
+        }
+        let last = argv.last().unwrap();
+        if [KEEP, PUT_BACK, LET_GO].contains(&last.as_str()) {
+            if !sh_in(last, &h).success() {
+                return Err("exit status: 1".into());
+            }
+            if last == PUT_BACK {
+                *now.borrow_mut() = "0.4.25";
+            }
+            return Ok(String::new());
+        }
+        if install::runs_installer(argv) {
+            let current = format!("{h}/.harness/runtime/current-node");
+            if fs::metadata(&current).is_err() {
+                node_step.clone()?;
+                let node = pinned_node();
+                fs::write(
+                    &current,
+                    format!("{h}/.harness/runtime/node-{node}-linux-arm64/bin/node\n"),
+                )
+                .unwrap();
+            }
+            *now.borrow_mut() = product::VERSION;
+            return Ok(String::new());
+        }
+        if last == "version" {
+            return Ok(format!("harness {}\n", now.borrow()));
+        }
+        Ok(String::new())
+    }
+}
+
+/// #6302: a move from an older Harness whose runtime names an older Node
+/// ends on the Node the pinned runtime manifest names, served from
+/// loopback (checked by its sha256), not on the older one, and `installed`.
+#[test]
+fn a_move_ends_on_the_pinned_node() {
+    let lamp = Lamp::new();
+    asked_to_move(&lamp, "0.4.25");
+    let (_home, h) = harness_home("old.js");
+    let old = format!("{h}/.harness/runtime/node-v22.0.0-linux-arm64/bin/node\n");
+    fs::write(format!("{h}/.harness/runtime/current-node"), &old).unwrap();
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let mut run = node_mover(log.clone(), h.clone(), Ok(String::new()));
+    let mut lines = Vec::new();
+    let said = moved(&lamp, &mut run, &mut lines);
+    assert_eq!(
+        (said.install.as_str(), said.version.as_deref()),
+        ("installed", Some(product::VERSION)),
+        "{lines:?}"
+    );
+    assert_eq!(
+        fs::read_to_string(format!("{h}/.harness/runtime/current-node")).unwrap(),
+        format!(
+            "{h}/.harness/runtime/node-{}-linux-arm64/bin/node\n",
+            pinned_node()
+        )
+    );
+    assert!(
+        log.borrow()
+            .iter()
+            .any(|line| install::runs_installer(
+                &line.split(' ').map(str::to_owned).collect::<Vec<_>>()
+            ) && line.contains("HARNESS_RUNTIME_METADATA_URL=http://127.0.0.1")),
+        "the pinned runtime manifest is handed over: {:?}",
+        log.borrow()
+    );
+}
+
+/// #6302: the pinned Node not taken (its download or sha256 failing in the
+/// installer) records `failed` with `upgrade`, and the older Harness and
+/// its `current-node` are put back.
+#[test]
+fn a_failed_node_step_puts_the_older_node_back() {
+    let lamp = Lamp::new();
+    asked_to_move(&lamp, "0.4.25");
+    let (_home, h) = harness_home("old.js");
+    let old = format!("{h}/.harness/runtime/node-v22.0.0-linux-arm64/bin/node\n");
+    fs::write(format!("{h}/.harness/runtime/current-node"), &old).unwrap();
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let mut run = node_mover(
+        log.clone(),
+        h.clone(),
+        Err("Node download failed checksum verification".into()),
+    );
+    let mut lines = Vec::new();
+    let said = moved(&lamp, &mut run, &mut lines);
+    assert_eq!(
+        said,
+        HarnessInstall {
+            revision: said.revision,
+            ..HarnessInstall::upgrade_failed("0.4.25", 5)
+        },
+        "{lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("checksum verification")),
+        "the reason is said: {lines:?}"
+    );
+    assert!(
+        lines.iter().any(|line| line == "Harness 0.4.25 put back"),
+        "{lines:?}"
+    );
+    assert_eq!(
+        fs::read_to_string(format!("{h}/.harness/runtime/current-node")).unwrap(),
+        old
+    );
+    assert!(Path::new(&format!("{h}/.harness/cli/old.js")).exists());
+    assert!(
+        !Path::new(&format!("{h}/{KEPT}")).exists(),
+        "let go once put back"
+    );
+}
+
 /// #5957 (P2-1): a kept copy without its CLI folder stops PUT_BACK before
 /// it removes anything: `set -e` does not stop at a failed `a` in `a && b`.
 #[test]
