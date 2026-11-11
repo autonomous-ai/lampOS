@@ -931,7 +931,9 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   lamp's own folder has): shown with `can_remove` and `can_turn_off` false, and
   `camera_allowed` the owner's yes to its seeing the picture (null when it asks
   none). It is what `skills.share` also takes, when it is on, loads, and is not
-  held. A core skill that says `made: here` is still
+  held. `skills.list` and each `skills.share` read the whole `skills-dev` folder
+  with `load_each` (the list is capped by `MOST_SKILLS`): fine at today's sizes,
+  to look at again if that folder grows. A core skill that says `made: here` is still
   core. Nothing writes `made: here` yet: the lamp skill creator will, when
   it makes one.
 - **`sha256`** (#2801): for a skill put on from a package (from the Skills
@@ -1314,7 +1316,7 @@ since 30 Oct.
   Reviewer-lead's P2 on #4948). The package carries no time, so the same
   files pack to the same bytes. `name` must be a skill made on this lamp (`made:
   here`, the page's `made_here` group) that is on; else "only a skill made
-  on this lamp can be shared" or "turn the skill on before sharing it".
+  on this lamp, or one a paired computer pushed, can be shared" or "turn the skill on before sharing it".
   **Or a skill a paired computer pushed** (`lamp skill push`, in
   `/var/lib/lampOS/skills-dev` beside the lamp's folder, with its
   `.pushed.json`): shared when it loads, is on, and, if it sees the

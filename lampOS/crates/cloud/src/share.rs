@@ -40,7 +40,8 @@ pub const WITHIN: Duration = Duration::from_secs(30);
 /// The longest a reason from the Store is passed on, in characters.
 const REASON_MOST: usize = 300;
 
-pub const NOT_MADE_HERE: &str = "only a skill made on this lamp can be shared";
+pub const NOT_MADE_HERE: &str =
+    "only a skill made on this lamp, or one a paired computer pushed, can be shared";
 pub const NOT_ON: &str = "turn the skill on before sharing it";
 /// A pushed skill that sees the camera's picture, before the owner said yes to it.
 pub const PUSHED_HELD: &str =
