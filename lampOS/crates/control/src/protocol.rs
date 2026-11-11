@@ -119,6 +119,34 @@ pub enum Grant {
 }
 
 impl Grant {
+    /// Every grant this build knows, in the pairing screen's order.
+    pub const ALL: [Grant; 13] = [
+        Self::Body,
+        Self::Light,
+        Self::Speak,
+        Self::Look,
+        Self::Hear,
+        Self::Sound,
+        Self::Skills,
+        Self::Air,
+        Self::Device,
+        Self::Camera,
+        Self::Microphone,
+        Self::Notes,
+        Self::Speech,
+    ];
+
+    /// The words for every grant this build knows, by wire name: what the
+    /// owner's app shows for a grant it has no label of its own for, so the
+    /// words never drift from the lamp's (`control.clients`, `control.set_grants`).
+    pub fn shown_all() -> serde_json::Value {
+        Self::ALL
+            .iter()
+            .map(|grant| (grant_wire(*grant), serde_json::json!(grant.shown())))
+            .collect::<serde_json::Map<_, _>>()
+            .into()
+    }
+
     /// What the pairing screen says the owner is granting, word for word:
     /// the owner's admin socket gives these with the code, and the app
     /// shows them. `skills` says that what it puts on keeps running after
@@ -148,6 +176,14 @@ impl Grant {
             }
         }
     }
+}
+
+/// A grant's wire name.
+fn grant_wire(grant: Grant) -> String {
+    serde_json::json!(grant)
+        .as_str()
+        .unwrap_or_default()
+        .to_owned()
 }
 
 /// An event a client may subscribe to.
@@ -1472,6 +1508,48 @@ mod tests {
         ] {
             assert!(parse(&subscribe(fine)).is_ok(), "{fine}");
         }
+    }
+
+    /// `Grant::ALL` is every grant the schema names (`$defs.grant` in control.schema.json), so a grant added to
+    /// one and forgotten in the other is caught here, and `shown_all` says it.
+    #[test]
+    fn grant_all_is_the_schemas_grant_list() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
+        let named: std::collections::BTreeSet<String> = schema["$defs"]["grant"]["enum"]
+            .as_array()
+            .expect("the schema's grant list")
+            .iter()
+            .map(|grant| grant.as_str().unwrap().to_owned())
+            .collect();
+        let ours: std::collections::BTreeSet<String> = Grant::ALL
+            .iter()
+            .map(|grant| json!(grant).as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ours, named);
+        assert_eq!(
+            Grant::shown_all()
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>(),
+            named
+        );
+    }
+
+    /// `Grant::ALL` names every grant once, and `shown_all` says each one's words by wire name.
+    #[test]
+    fn shown_all_says_every_grant_by_its_wire_name() {
+        let all: std::collections::BTreeSet<_> = Grant::ALL.iter().collect();
+        assert_eq!(all.len(), Grant::ALL.len(), "each once");
+        let shown = Grant::shown_all();
+        let shown = shown.as_object().expect("a map");
+        assert_eq!(shown.len(), Grant::ALL.len());
+        for grant in Grant::ALL {
+            assert_eq!(shown[json!(grant).as_str().unwrap()], grant.shown());
+        }
+        assert_eq!(shown["microphone"], Grant::Microphone.shown());
     }
 
     /// Fourteen's note on #3869: the pairing screen's words are pinned,
