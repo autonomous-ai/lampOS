@@ -69,6 +69,9 @@ func (u *captureUplink) Reply(ch, text string, _ bool) error {
 	return nil
 }
 func (u *captureUplink) Typing(string, bool) error { return nil }
+func (u *captureUplink) ReplyInThread(ch, _, _, text string, sealed bool) error {
+	return u.Reply(ch, text, sealed)
+}
 func (u *captureUplink) snapshot() [][2]string {
 	u.mu.Lock()
 	defer u.mu.Unlock()
