@@ -501,7 +501,12 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   (`/run/lampos-memory/memory.sock`, 0600 to memory's user, or
   `LAMP_MEMORY_FORGET_SOCKET`'s narrow one). So it runs as root; `lampos`
   only where memory's narrow socket is open and named. Any other user is
-  refused before a socket is touched. Stricter than the app's: a name the
+  refused before a socket is touched. Memory's socket is checked first
+  (`access(2)`, write, as the real user): one this user can't open, or
+  that isn't there, is refused before the eyes are asked anything, naming
+  the socket and saying to run as root or name the narrow one, so the face
+  never goes while memory keeps the person (Reviewer-lead's P3 on #6580).
+  Stricter than the app's: a name the
   eyes don't list (`{"list":true,"waiting":true}`, any case) is refused
   with the names they know, and nothing is forgotten, so a mistyped name
   never forgets a by-name id. It prints one line, `removed: ` and the app's
@@ -526,7 +531,8 @@ switch. `online.rs`: only the lamp's own account channel commands it
 sockets unless given absolute, an unknown name refused with nothing asked to
 forget, a known one in any case removed from the eyes (in their spelling) and
 memory with each id said, a waiting face removed, memory's refusal a failure,
-and eyes that don't answer refused.
+memory out of reach refused before the eyes are asked, and eyes that don't
+answer refused.
 
 ## The lamp's timers and reminders (#2195, `schedule.list`, `schedule.cancel`)
 
