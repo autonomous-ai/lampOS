@@ -168,12 +168,18 @@ pub const CPU_QUOTA_MOST_PERCENT: u64 = 300;
 pub const CPU_QUOTA_PERCENT: u64 = 300;
 /// [`CPU_QUOTA_PERCENT`] as the unit's line.
 pub const CPU_QUOTA: &str = "CPUQuota=300%";
+/// The least `TasksMax` (Heron on #6566): past the cap a fork or a new
+/// thread in the part fails, lamp-tasks' own included, and a tool-heavy run
+/// (Python, Node, a browser's threads) can pass 100 at once, more than the
+/// measured spoken task showed. 512 still stops a fork bomb.
+pub const TASKS_MAX_LEAST: u64 = 512;
 /// `TasksMax`: [`MEASURED_REST_TASKS`] plus two deltas to [`MEASURED_TASKS`],
-/// each with half again, rounded up to 10: 91 + 2 × 53 = 197, so 200. Past
-/// it a fork or a new thread in the part fails; nothing running is killed.
-pub const TASKS_MAX: u64 = 200;
+/// each with half again, rounded up to 10 (91 + 2 × 53 = 197, so 200), and
+/// never below [`TASKS_MAX_LEAST`]: 512. Past it a fork or a new thread in
+/// the part fails; nothing running is killed.
+pub const TASKS_MAX: u64 = 512;
 /// [`TASKS_MAX`] as the unit's line.
-pub const TASKS_MAX_LINE: &str = "TasksMax=200";
+pub const TASKS_MAX_LINE: &str = "TasksMax=512";
 /// The folder a skill's script is in (#6305, `lamp_skills::task::SCRIPTS`).
 pub const SCRIPTS: &str = "scripts";
 /// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`).
@@ -2004,7 +2010,7 @@ mod tests {
         );
         assert_eq!(
             TASKS_MAX,
-            two_tasks_cap(MEASURED_REST_TASKS, MEASURED_TASKS, 10)
+            two_tasks_cap(MEASURED_REST_TASKS, MEASURED_TASKS, 10).max(TASKS_MAX_LEAST)
         );
         assert_eq!(half_again(2 * 120, 10), 360);
         assert_eq!(
