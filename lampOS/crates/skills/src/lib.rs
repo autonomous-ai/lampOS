@@ -2244,6 +2244,15 @@ impl Skill {
             [(_, Step::Call(Call::ServiceRead(_)))]
         )
     }
+
+    /// Whether its run is a write to a linked service, its only step
+    /// (#6066): nothing else of it is seen or heard.
+    fn writes_a_service(&self) -> bool {
+        matches!(
+            self.steps.as_slice(),
+            [(_, Step::Call(Call::ServiceWrite(_)))]
+        )
+    }
 }
 
 /// The line a trigger's field must stay past for a while before the trigger
@@ -5922,6 +5931,11 @@ struct Watch {
     visited_us: Option<u64>,
     /// This time it holds has had its chance.
     spent: bool,
+    /// This time's run was a write that waited for the owner's yes, and
+    /// its cooldown was given back ([`Engine::unwritten`]): `spent` holds
+    /// it, as it holds a trigger that runs once each time, until it holds
+    /// again.
+    unwritten: bool,
     /// Since when this time's chance has waited for the trigger's
     /// `[[while]]` conditions (`wait`).
     waiting_us: Option<u64>,
@@ -6142,6 +6156,10 @@ pub struct Engine {
     /// tool's run) clears it, so its unsaid say gives nothing back (#5207,
     /// Fourteen's and Thirteen's P2 on #5237).
     unsaid_from: HashMap<String, u64>,
+    /// By a skill whose only step is a write (#6066), what its latest
+    /// start spent: given back if the write waits for the owner's yes
+    /// ([`Engine::unwritten`]).
+    unwritten: HashMap<String, Spent>,
     /// Each resting skill's last nudge and how many in a row went unnoticed.
     nudges: HashMap<String, Nudge>,
     /// Until when each snoozed skill starts nothing itself, by skill: in
@@ -6199,6 +6217,25 @@ pub struct Engine {
     holds: Option<holds::Keeper>,
     /// The holds read at the start, taken back at the first load of skills.
     restoring: Option<holds::Restored>,
+}
+
+/// What a write skill's start spent, as it was before (#6066): what
+/// [`Engine::unwritten`] gives back.
+#[derive(Clone, Debug)]
+struct Spent {
+    /// When it started: its cooldown's, its group's and its hold's mark.
+    at_us: u64,
+    /// The trigger that started it, and since when that one held.
+    index: usize,
+    since_us: Option<u64>,
+    /// Its trigger's last run, its day's count and its last in its group.
+    ran_us: Option<u64>,
+    day: Option<(i64, u32)>,
+    group_ran: Option<u64>,
+    /// Its group, where it spent a place in the hour.
+    group: Option<String>,
+    /// Its `[rest]` watch before it, once one was begun for it.
+    nudge: Option<Option<Nudge>>,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -6381,6 +6418,7 @@ impl Engine {
             word_windows: HashMap::new(),
             group_ran: HashMap::new(),
             unsaid_from: HashMap::new(),
+            unwritten: HashMap::new(),
             nudges: HashMap::new(),
             snoozed: HashMap::new(),
             off: BTreeSet::new(),
@@ -7102,6 +7140,11 @@ impl Engine {
     /// watched for as it is started.
     pub fn made(&mut self, skill: &str, now_us: u64) {
         if let Some(skill) = self.skills.iter().find(|known| known.name == skill) {
+            if skill.rest.is_some()
+                && let Some(spent) = self.unwritten.get_mut(&skill.name)
+            {
+                spent.nudge = Some(self.nudges.get(&skill.name).copied());
+            }
             nudged(&mut self.nudges, &self.latest, skill, now_us);
             if skill.reads_a_service() {
                 read_made(&mut self.reads, self.clock, &skill.name, now_us);
@@ -7155,6 +7198,59 @@ impl Engine {
             self.group_ran.remove(skill);
         }
         Some(group)
+    }
+
+    /// `skill`'s run was its write, told "not sent: waiting for the
+    /// owner's yes" ([`service_write::waiting`]): it did nothing, so what
+    /// its start spent is given back (lamp-9adf, 12 Nov: an unapproved mail
+    /// held an approved skill of its group back for the hour). Its place in
+    /// its group's hour and its gap, its cooldown, its day's count for
+    /// `most_a_day` and its `[rest]` watch are as before it started. Only
+    /// this time its trigger holds has had its chance: it comes again the
+    /// next time it holds, never at the trigger's next message. Whether
+    /// anything was given back.
+    pub fn unwritten(&mut self, skill: &str) -> bool {
+        let Some(spent) = self.unwritten.remove(skill) else {
+            return false;
+        };
+        if let Some(watch) = self.watches.get_mut(&(skill.to_owned(), spent.index))
+            && watch.ran_us == Some(spent.at_us)
+        {
+            watch.ran_us = spent.ran_us;
+            if watch.since_us == spent.since_us {
+                watch.spent = true;
+                watch.unwritten = true;
+            }
+        }
+        match spent.day {
+            Some(day) => self.day_runs.insert(skill.to_owned(), day),
+            None => self.day_runs.remove(skill),
+        };
+        if let Some(group) = &spent.group
+            && let Some(began) = self.group_runs.get_mut(group)
+            && let Some(at) = began.iter().position(|at| *at == spent.at_us)
+        {
+            began.remove(at);
+        }
+        if self.group_ran.get(skill) == Some(&spent.at_us) {
+            match spent.group_ran {
+                Some(at) => self.group_ran.insert(skill.to_owned(), at),
+                None => self.group_ran.remove(skill),
+            };
+        }
+        if self.unsaid_from.get(skill) == Some(&spent.at_us) {
+            self.unsaid_from.remove(skill);
+        }
+        match spent.nudge {
+            Some(Some(nudge)) => {
+                self.nudges.insert(skill.to_owned(), nudge);
+            }
+            Some(None) => {
+                self.nudges.remove(skill);
+            }
+            None => {}
+        }
+        true
     }
 
     /// Until when `skill` rests after runs nobody noticed, if it does.
@@ -8194,6 +8290,7 @@ impl Engine {
                     watch.since_us = Some(now_us);
                     watch.away_us = now_us - watch.visited_us.unwrap_or(started);
                     watch.spent = false;
+                    watch.unwritten = false;
                     watch.waiting_us = None;
                     watch.yielded_us = None;
                     watch.stood_in_us = None;
@@ -8217,7 +8314,7 @@ impl Engine {
                 // Once each time it holds: a chance held back now waits for
                 // the next time.
                 let once = trigger.when == When::Appears || trigger.rearm;
-                if once && watch.spent {
+                if (once || watch.unwritten) && watch.spent {
                     continue;
                 }
                 if watch.disarmed {
@@ -8855,6 +8952,27 @@ impl Engine {
                     question["there_s"] = json!(held_us / 1_000_000);
                 }
                 if acts {
+                    // A write's start, as it was before: given back if the
+                    // write waits for the owner's yes (#6066).
+                    if skill.writes_a_service() {
+                        self.unwritten.insert(
+                            skill.name.clone(),
+                            Spent {
+                                at_us: now_us,
+                                index,
+                                since_us: watch.since_us,
+                                ran_us: watch.ran_us,
+                                day: self.day_runs.get(&skill.name).copied(),
+                                group_ran: self.group_ran.get(&skill.name).copied(),
+                                group: skill
+                                    .budget
+                                    .as_ref()
+                                    .filter(|_| nudge)
+                                    .map(|(group, _)| group.clone()),
+                                nudge: None,
+                            },
+                        );
+                    }
                     watch.ran_us = Some(now_us);
                     watch.said.clear();
                     instead = trigger.instead_of.as_ref();
@@ -8906,6 +9024,9 @@ impl Engine {
                     // Asked of the Policy, a run is watched for once it is
                     // made ([`Engine::made`]): a no shows nothing to ignore.
                     if nudge && !(self.ask_policy || asks_anyway(skill, self.skip_ask)) {
+                        if let Some(spent) = self.unwritten.get_mut(&skill.name) {
+                            spent.nudge = Some(self.nudges.get(&skill.name).copied());
+                        }
                         nudged(&mut self.nudges, &self.latest, skill, now_us);
                     }
                     // Its end is told even if the Policy says no: with no
@@ -10578,6 +10699,83 @@ mod tests {
             .contains("LAMP_SKILL_WRITES")
         );
         service_write::set_on_here(None);
+    }
+
+    /// Lamp 9adf, 12 Nov: a made skill whose only step is a write still
+    /// waiting for the owner's yes did nothing, so it spends nothing. Its
+    /// group's hour, its cooldown, its day's count and its `[rest]` count
+    /// are given back: it comes again the next time its trigger holds, and
+    /// an approved skill of its group is not held back by it. Asked of the
+    /// Policy or not.
+    #[test]
+    fn a_write_waiting_for_the_owners_yes_spends_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        service_write::set_on_here(Some(true));
+        let waiting = ARRIVAL_WRITE
+            .replace(
+                "version = \"1.0.0\"\n",
+                "version = \"1.0.0\"\nmost_a_day = 1\n",
+            )
+            .replace("equals = true\n", "equals = true\ncooldown = \"1h\"\n")
+            + "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\
+               [rest]\nafter_ignored = 1\nwithin = \"10s\"\n";
+        let waiting = load(&write_skill(dir.path(), "back-at-desk-email", &waiting)).unwrap();
+        let approved = load(&write_skill(
+            dir.path(),
+            "back-to-desk-hello",
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\n\
+             equals = true\n[ask]\npolicy = \"nudge\"\n[permissions]\nspeak = true\n\
+             topics = [\"room/presence\"]\n[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\
+             [[do]]\nsay = { text = \"Welcome back.\" }\n",
+        ))
+        .unwrap();
+        service_write::set_on_here(None);
+        for policy in [false, true] {
+            let mut engine = Engine::new(vec![waiting.clone(), approved.clone()], !policy);
+            if policy {
+                engine = engine.asking_the_policy();
+            }
+            let ran = |engine: &mut Engine, second: u64, presence: &str| -> Vec<String> {
+                let now = second * 1_000_000;
+                let runs = engine.observe("room/presence", now, presence.as_bytes(), None);
+                let mut ran = Vec::new();
+                for run in runs
+                    .into_iter()
+                    .filter(|run| !run.calls.is_empty() || run.ask.is_some())
+                {
+                    // Asked of the Policy, its yes makes it.
+                    if run.ask.is_some() {
+                        engine.made(&run.skill, now);
+                    }
+                    // The write came back "not sent: waiting for the
+                    // owner's yes".
+                    if run.skill == "back-at-desk-email" {
+                        assert!(engine.unwritten(&run.skill), "policy {policy}");
+                    }
+                    ran.push(run.skill);
+                }
+                ran
+            };
+            let here = r#"{"present":true,"someone":false}"#;
+            assert_eq!(ran(&mut engine, 0, here), ["back-at-desk-email"]);
+            // Its trigger still holding: not again until it holds again.
+            assert!(ran(&mut engine, 5, here).is_empty(), "policy {policy}");
+            // Past its [rest]'s while, nobody noticed: not counted.
+            ran(&mut engine, 20, r#"{"present":false,"someone":false}"#);
+            assert_eq!(engine.resting_until("back-at-desk-email", 20_000_000), None);
+            // Back: its cooldown, its day's one and the hour are its own.
+            assert_eq!(
+                ran(&mut engine, 40, here),
+                ["back-at-desk-email"],
+                "policy {policy}"
+            );
+            // The approved skill of its group runs.
+            assert_eq!(
+                ran(&mut engine, 60, r#"{"present":true,"someone":true}"#),
+                ["back-to-desk-hello"],
+                "policy {policy}"
+            );
+        }
     }
 
     const PHOTO_BOOTH: &str = "version = \"1.0.0\"\ngrants = [\"camera\", \"light\"]\n\

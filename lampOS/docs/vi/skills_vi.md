@@ -871,9 +871,30 @@ sau:
    tối đa 3 lần mỗi kỹ năng và
    10 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào. Liên kết mất hoặc thuộc
    tài khoản khác thì dừng các lần ghi của kỹ năng cho đến khi `lamp-skills`
-   khởi động lại. Journal chỉ giữ kết quả, không bao giờ có người nhận hay
-   nội dung ([services_vi.md](services_vi.md), "Một kỹ năng tự tạo ghi vào
-   dịch vụ").
+   khởi động lại. **Một lần ghi đang chờ lời đồng ý không tiêu gì**
+   (lamp-9adf, 12/11: một thư chưa được đồng ý của nhóm `wellbeing` đã
+   tiêu giờ của nhóm, và một kỹ năng đã được đồng ý cùng nhóm bị bỏ qua,
+   `its wellbeing group's hour is spent`). `lamp-skills` không đọc được
+   lời đồng ý trước khi chạy (chỉ giọng nói hỏi `skill_writes_approved`),
+   nên trigger vẫn kích hoạt, Policy vẫn được hỏi như trước, và lần ghi
+   tới `lamp-services`; khi kết quả đúng là "not sent: waiting for the
+   owner's yes" (`service_write::waiting`), những gì lần khởi động đã tiêu
+   được trả lại (`Engine::unwritten`): chỗ trong giờ của nhóm `[budget]`
+   và `gap` của nó, `cooldown` của trigger, lượt đếm trong ngày của
+   `most_a_day` và lần theo dõi `[rest]` (một lần ghi không gửi không bao
+   giờ bị tính là bị phớt lờ), và nó không còn là lần chạy sau cùng của
+   nhóm cho `[stop]`. Chỉ lần giữ hiện tại của trigger vẫn được tính là đã
+   có cơ hội: kỹ năng chạy lại ở lần trigger giữ kế tiếp, không bao giờ ở
+   tin nhắn kế tiếp của trigger, nên một trigger `present` không có
+   `rearm` không hỏi Policy ở mỗi tin nhắn. Không có gì được thấy hay nghe
+   (lần ghi là bước duy nhất của kỹ năng), và không gì được trả lại cho
+   lời từ chối khác hay một lần gửi. Ngày của trigger một lần mỗi ngày vẫn
+   được giữ là đã nhận. Journal ghi `SKILL sent nothing: its group's hour,
+   cooldown, day's count and rest are given back`. Test:
+   `a_write_waiting_for_the_owners_yes_spends_nothing`. Journal chỉ giữ kết
+   quả, không bao giờ có người nhận hay nội dung
+   ([services_vi.md](services_vi.md), "Một kỹ năng tự tạo ghi vào dịch
+   vụ").
 
    Bước `remind` (`lamp-skills`, `remind`, #6066; bảng bước trong
    [skills.md](../skills.md), `do.remind`): `{ at = "HH:MM", words = "..." }`
