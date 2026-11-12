@@ -1159,6 +1159,7 @@ fn serve(
             of: HashMap::new(),
             state: options.state.clone(),
             socket: options.tasks_socket.clone(),
+            say: sockets.say.clone(),
         }),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
@@ -1897,13 +1898,15 @@ struct Runner {
 
 /// The skills with a `do.task` (#6305): by skill, its folder and its
 /// grants, as of the last load; and the program's `--state-dir`, where the
-/// runs' ledger is (the owner's yes is lamp-control's), and lamp-tasks'
-/// socket.
+/// runs' ledger is (the owner's yes is lamp-control's), lamp-tasks'
+/// socket, and the voice's say service, which asks for a missing yes aloud
+/// (#6071's V2).
 #[derive(Default)]
 struct Tasks {
     of: HashMap<String, (PathBuf, Vec<String>)>,
     state: Option<PathBuf>,
     socket: Option<PathBuf>,
+    say: PathBuf,
 }
 
 /// `addon/proposal`, written for the add-ons, and what they proposed lately.
@@ -5094,14 +5097,17 @@ fn read_service(
 /// A skill's `do.task` that came due (#6305, [`lamp_skills::task`]),
 /// handed over on a thread of its own ([`lamp_skills::task::hand`]): only
 /// with the switch on and the owner's yes for its folder as it is now and
-/// its grants, one at a time a skill, within the day's bounds. The journal
-/// says what became of it, never the task's words.
+/// its grants, one at a time a skill, within the day's bounds; with no yes,
+/// the voice is asked to say the read-back and ask for it (`task_yes`,
+/// [`lamp_skills::task::ask_yes`]). The journal says what became of it,
+/// never the task's words.
 fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
         eprintln!("lamp-skills: skill:{skill}: do.task: not handed over: its folder is not known");
         return;
     };
     let (state, socket, skill) = (tasks.state.clone(), tasks.socket.clone(), skill.to_owned());
+    let say_socket = tasks.say.clone();
     std::thread::spawn(move || {
         // The owner's yes is lamp-control's, only asked here.
         let place = lamp_skills::task::Place {
@@ -5109,8 +5115,24 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
             control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
             socket: socket.as_deref(),
         };
-        let said =
-            lamp_skills::task::hand(&skill, &step, &folder, &grants, place, unix_ms(), hand_over);
+        // The yes asked aloud: the voice builds the read-back itself from
+        // the skill on the lamp; this asks only for it, by the skill's name.
+        let ask = json!({
+            "task_yes": true,
+            "priority": lamp_voice::say::NORMAL_PRIORITY,
+            "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
+        });
+        let say_yes = || say(&say_socket, "say", &skill, ask, &[], || {});
+        let said = lamp_skills::task::hand(
+            &skill,
+            &step,
+            &folder,
+            &grants,
+            place,
+            unix_ms(),
+            hand_over,
+            say_yes,
+        );
         eprintln!("lamp-skills: skill:{skill}: {said}");
     });
 }

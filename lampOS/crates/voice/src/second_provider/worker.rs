@@ -13229,6 +13229,11 @@ pub async fn run(
                         *request,
                         std::mem::take(text),
                     );
+                    // A skill's task with no yes, said back unasked as its
+                    // trigger fired (#6071's V2): its yes awaited from this
+                    // request on, only for the very note the say service
+                    // kept.
+                    *text = crate::skill_task_yes::asked_in_here(*request, std::mem::take(text));
                 }
                 // A written request is kept for the thread as the note it
                 // is, with the answer to it (`Thread::written`).

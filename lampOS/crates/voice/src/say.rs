@@ -116,6 +116,15 @@
 //!   `nothing_held`. Only [`TURN_SKILL`], with nothing else in the line
 //!   ([`crate::control_mute`]).
 //!
+//! - **A skill's task's yes** (#6071's V2): `task_yes: true`, alone with a
+//!   priority under [`URGENT_FROM`] and an expiry, asks the voice to say the
+//!   read-back of the skill `skill`'s `do.task` and ask for the owner's yes.
+//!   The words are never the asker's: the client's thread reads the skill
+//!   on the lamp and builds the note
+//!   ([`crate::skill_task_yes::asked_aloud_here`]), or refuses with why
+//!   (the lamp's quiet hours, the owner not seen alone outside the private
+//!   room, agreed already); the Live route refuses it as it is taken.
+//!
 //! Onboarding is also a source-owned request: only `skill: onboarding` with
 //! `from: onboarding` and a nonzero `invitation` can ask for it. The coordinator
 //! takes the exact invitation through [`Says::take_onboarding`]; no ID is a
@@ -388,6 +397,13 @@ pub enum Words {
     Stream {
         by: String,
     },
+    /// `lamp-skills` asks the voice to say the read-back of the skill
+    /// `skill`'s task and ask for the owner's yes, its trigger fired with no
+    /// yes for its folder (`task_yes: true`, #6071's V2): turned on the
+    /// client's thread into the note the voice builds itself from the
+    /// skill on the lamp ([`crate::skill_task_yes::asked_aloud_here`]), or
+    /// refused with why; never queued as it is.
+    TaskYes,
 }
 
 impl Words {
@@ -410,7 +426,8 @@ impl Words {
             | Self::TurnStart { .. }
             | Self::TurnEnd(_)
             | Self::Listen(_)
-            | Self::Stream { .. } => None,
+            | Self::Stream { .. }
+            | Self::TaskYes => None,
         }
     }
 }
@@ -611,6 +628,10 @@ struct Wire {
     /// The hello's one question its note asks (#5207): only with `who`.
     #[serde(default)]
     question: bool,
+    /// The read-back of the skill's task and its yes, asked unasked
+    /// ([`Words::TaskYes`]): alone, with a priority and an expiry only.
+    #[serde(default)]
+    task_yes: bool,
 }
 
 // Missing is allowed for other sources, but an explicit null is not an ID.
@@ -690,6 +711,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     let Some(expires_in_ms) = wire.expires_in_ms else {
         return Err("not a say request".into());
     };
+    if wire.task_yes {
+        return parse_task_yes(skill, expires_in_ms, &wire);
+    }
     if let Some(line) = wire.quoted {
         if wire.note.is_some()
             || wire.text.is_some()
@@ -906,6 +930,53 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     })
 }
 
+/// A `task_yes` ask, checked: alone, with a priority under urgent and an
+/// expiry only.
+fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Request, String> {
+    if wire.note.is_some()
+        || wire.text.is_some()
+        || wire.quoted.is_some()
+        || wire.from.is_some()
+        || wire.task.is_some()
+        || wire.invitation.is_some()
+        || wire.sound.is_some()
+        || wire.clip.is_some()
+        || wire.recording.is_some()
+        || wire.cue.is_some()
+        || wire.cache
+        || wire.exact
+        || wire.made
+        || wire.quiet
+        || wire.unplug_request.is_some()
+        || wire.by.is_some()
+        || wire.who
+        || wire.question
+    {
+        return Err("task_yes goes alone, with a priority and expires_in_ms".into());
+    }
+    let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
+    if priority >= URGENT_FROM {
+        return Err(format!("task_yes's priority is 0 to {}", URGENT_FROM - 1));
+    }
+    if !(1..=LONGEST_EXPIRY_MS).contains(&expires_in_ms) {
+        return Err(format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"));
+    }
+    Ok(Request {
+        skill,
+        words: Words::TaskYes,
+        priority,
+        expires_in_ms,
+        start_before_us: wire.start_before_us,
+        task: None,
+        invitation: None,
+        unplug_request: None,
+        who: false,
+        question: false,
+        line: Default::default(),
+        quiet: false,
+    })
+}
+
 /// A `turn` ask, checked: lamp-control's alone, a start with at most its
 /// prompt (`text`, under a text's rules), the earlier turn it may continue
 /// (`after`, nonzero) and an expiry, an end with only its `id`. Nothing
@@ -928,6 +999,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         || wire.exact
         || wire.made
         || wire.who
+        || wire.task_yes
         || wire.priority.is_some()
     {
         return Err("turn goes with text, expires_in_ms, after or id only".into());
@@ -1073,6 +1145,7 @@ fn asks_for_more(wire: &Wire) -> bool {
         || wire.made
         || wire.who
         || wire.stream.is_some()
+        || wire.task_yes
 }
 
 /// A request handed to the voice, with where its answer goes and when it
@@ -2514,6 +2587,13 @@ fn serve_client(
                     {
                         request.words = Words::Text(owners.to_owned());
                     }
+                }
+                // A skill's task's read-back, asked unasked (#6071's V2):
+                // built here from the skill on the lamp, on this thread,
+                // never on the voice's loop; not said whole here, refused.
+                Words::TaskYes => {
+                    request.words =
+                        Words::Note(crate::skill_task_yes::asked_aloud_here(&request.skill)?);
                 }
                 Words::Quoted(_) if !ADDON_SAY.load(std::sync::atomic::Ordering::Relaxed) => {
                     return Err(format!("add-on says are off ({ADDON_SAY_ENVIRONMENT})"));
@@ -5434,6 +5514,30 @@ mod tests {
         let (turn, _, _, quoted) = says.take(0).unwrap();
         assert!(!quoted);
         assert_eq!(turn, format!("{AS_WRITTEN} Welcome back!"));
+    }
+
+    /// #6071's V2: lamp-skills' ask for a skill's task's read-back is
+    /// `task_yes`, alone, under urgent; it has no words of its own, so it
+    /// is never a turn as it is (the client's thread builds its note).
+    #[test]
+    fn a_tasks_yes_is_asked_alone_and_carries_no_words_of_its_own() {
+        let asked =
+            parse(r#"{"skill":"photo-booth","task_yes":true,"priority":5,"expires_in_ms":60000}"#)
+                .unwrap();
+        assert_eq!(asked.words, Words::TaskYes);
+        assert_eq!(asked.priority, 5);
+        assert!(asked.words.turn().is_none());
+        for refused in [
+            r#"{"skill":"a","task_yes":true,"note":"It uses nothing.","expires_in_ms":5000}"#,
+            r#"{"skill":"a","task_yes":true,"text":"Hi.","expires_in_ms":5000}"#,
+            r#"{"skill":"a","task_yes":true,"from":"tasks","expires_in_ms":5000}"#,
+            r#"{"skill":"a","task_yes":true,"who":true,"expires_in_ms":5000}"#,
+            r#"{"skill":"a","task_yes":true,"priority":9,"expires_in_ms":5000}"#,
+            r#"{"skill":"a","task_yes":true}"#,
+            r#"{"skill":"control","task_yes":true,"turn":"start","expires_in_ms":5000}"#,
+        ] {
+            assert!(parse(refused).is_err(), "{refused}");
+        }
     }
 
     /// #2530 part 2: an add-on's line is `quoted`, alone, at most 300 bytes

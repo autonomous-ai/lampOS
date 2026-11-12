@@ -2207,8 +2207,31 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 - **Mỗi lần chạy:** các bước khác (đèn, cue, say) chạy ngay. Tắt công tắc:
   không giao gì, journal ghi lý do. Bật: thư mục được băm lại và hỏi
   lamp-control; không có "có" thì chờ, "có" cho byte hay grant khác thì hỏi
-  lại, không hỏi được lamp-control thì không giao gì; một tác vụ một lúc mỗi
+  lại (cả hai trường hợp đèn tự hỏi thành tiếng, xem dưới), không hỏi được
+  lamp-control thì không giao gì và không hỏi gì; một tác vụ một lúc mỗi
   kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ.
+- **Tự hỏi thành tiếng khi tác vụ đến lượt** (V2 của #6071): lần chạy bị từ
+  chối vì thiếu cái "có" thì lamp-skills nhờ say service của giọng nói
+  (`{"skill": NAME, "task_yes": true, "priority": 5, "expires_in_ms":
+  60000}`, `task::ask_yes`). Yêu cầu không mang lời nào: trên luồng client
+  của say service, giọng nói tự đọc kỹ năng trên đèn qua manage helper và
+  lamp-control, rồi dựng đúng câu nói lại như khi được hỏi
+  (`skill_task_yes::asked_aloud`). Nó từ chối, không nói gì, trong giờ yên
+  lặng của đèn, ngoài `LAMP_PRIVATE_ROOM` khi không thấy chủ đèn ở một mình,
+  khi công tắc tắt, hoặc khi đã đồng ý. Nếu không, câu nói đi qua mọi cổng
+  của một say của kỹ năng, như lượt riêng của đèn mà không ai nói. Ghi chú
+  được giữ cho worker của route thứ hai trong
+  `/run/lampos-voice/task-asked.json` (0600, tối đa hai phút), và chỉ đúng
+  ghi chú đó mới bắt đầu việc chờ (`skill_task_yes::asked_in`). Việc chờ là
+  của read-back, đủ mọi cổng: nói trọn trước, một câu nghe được sau đó, giữ
+  tiếng vọng, `YES_WITHIN`, `approve_id` được ghi chú ở các câu nghe sau, và
+  chỉ cái "có" của chủ đèn. Route Live không bao giờ bắt đầu nó. Khi có
+  "có", lamp-control ghi đúng SHA-256 thư mục và các grant đó, và tác vụ
+  chạy ở lần kích hoạt kế tiếp. Giới hạn (`task-asks.json` trong
+  `--state-dir` của lamp-skills): một SHA-256 đã nói thì không hỏi lại
+  trước một ngày; tối đa 3 lần hỏi đã nói cho mọi kỹ năng trong 24 giờ; lần
+  không nói được thì thử lại sau ít nhất 10 phút, ở lần kích hoạt sau;
+  script đổi là SHA-256 khác nên hỏi lại.
 - **Giao cho lamp-tasks** (#6306 xây): một dòng `{"op": "skill_task", ...}`
   trên `--tasks-socket` (hoặc `LAMP_SKILLS_TASKS_SOCKET`; unit lamp-skills
   của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`). `folder` là thư
