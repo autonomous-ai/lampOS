@@ -288,6 +288,11 @@ struct SkillFile {
     /// What a `do.task`'s script may reach through lamp-control, each one
     /// of its grants ([`task::grants_of`], #6305): only beside a `do.task`.
     grants: Option<Vec<String>>,
+    /// The variables' names its `do.task`'s run needs, their values given
+    /// in the app and kept by lamp-services (`LAMP_SKILL_SECRETS`,
+    /// `lamp_services::skill_secrets`): only beside a `do.task`, never a
+    /// value. lamp-tasks reads them through lamp-services, not here.
+    secrets: Option<Vec<String>>,
     #[serde(rename = "do", default)]
     steps: Vec<StepFile>,
 }
@@ -4315,6 +4320,22 @@ fn manifest(
         }
         (_, grants) => task::grants_of(&grants.unwrap_or_default())?,
     };
+    if let Some(secrets) = file.secrets.take() {
+        if tasks == 0 {
+            return Err("secrets: what a do.task's run needs, only beside one".into());
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        if secrets.len() > lamp_services::skill_secrets::MOST_NAMES
+            || !secrets.iter().all(|name| {
+                lamp_services::skill_secrets::name_ok(name) && seen.insert(name.as_str())
+            })
+        {
+            return Err(format!(
+                "secrets: at most {} variables' names (A-Z, 0-9 and _, 3 to 64, not the run's own), once each",
+                lamp_services::skill_secrets::MOST_NAMES
+            ));
+        }
+    }
     for step in file.steps {
         if let Some(read) = step.read {
             steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
@@ -11241,6 +11262,33 @@ mod tests {
                 "{PHOTO_BOOTH}[[do]]\ntask = {{ task = \"again\", run = \"scripts/main.py\" }}\n"
             ),
             "one do.task step",
+        );
+        // A skill's keys' names (`LAMP_SKILL_SECRETS`): beside its task,
+        // plain names, once each, never the run's own.
+        let named = task_skill(
+            dir.path(),
+            "keys-named",
+            &PHOTO_BOOTH.replace(
+                "tool = ",
+                "secrets = [\"GEMINI_API_KEY\", \"TELEGRAM_BOT_TOKEN\"]\ntool = ",
+            ),
+        );
+        assert!(load(&named).is_ok());
+        for (name, secrets) in [
+            ("keys-reserved", "[\"LAMP_CONTROL_TOKEN\"]"),
+            ("keys-twice", "[\"GOOD_KEY\", \"GOOD_KEY\"]"),
+            ("keys-lower", "[\"good_key\"]"),
+        ] {
+            refused(
+                name,
+                PHOTO_BOOTH.replace("tool = ", &format!("secrets = {secrets}\ntool = ")),
+                "secrets: at most 16",
+            );
+        }
+        refused(
+            "keys-alone",
+            "version = \"1.0.0\"\nsecrets = [\"GOOD_KEY\"]\ntool = \"x_y\"\n[permissions]\nlight = true\n[[do]]\nlight = { colour = \"warm\" }\n".into(),
+            "secrets: what a do.task's run needs, only beside one",
         );
         refused(
             "not-alone",
