@@ -1435,7 +1435,19 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   ("Made by voice", "Code of its own").
 - **Said back, and the yes.** Asked what such a skill uses ("what does my
   photo booth skill use?"), the model calls `make_skill` with only
-  `read_back`. The voice asks the manage helper (`{"task_asks": NAME}`,
+  `read_back`. A name the helper doesn't know is looked for among the
+  skills pushed from a computer (`skills-dev/<name>/` with a `skill.toml`,
+  beside the installed skills; `skill_task_yes::pushed_named`): the exact
+  name first, else the one alone whose name matches with number words as
+  digits and dashes left out ("skill two" is `skill-2`, "deskcheck"
+  `desk-check`; `made_skill::name_digits`); two that match only so find
+  neither. That one is then asked of the helper (lamp-52e6, 12 Nov,
+  row-6413b3). A miss journals the name asked, as a skill's name is
+  written and nothing else ("no skill with a task by the name asked:
+  desk-check"; the made skills' miss likewise). Tests:
+  `a_pushed_skill_with_a_task_is_found_by_its_spoken_name`,
+  `two_pushed_alike_find_neither_and_a_miss_journals_the_name_asked`.
+  The voice asks the manage helper (`{"task_asks": NAME}`,
   from the app's link or the voice), which reads the skill on the lamp now:
   its task, its grants, where its script came from and the SHA-256 of its
   folder (`task::folder_sha256`: every file, hidden ones too, but the
