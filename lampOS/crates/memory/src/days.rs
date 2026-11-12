@@ -3271,7 +3271,8 @@ fn versions(db: &Connection) -> Result<()> {
 
 /// What goes with a targeted `selective` forget of a kept thing or an
 /// observation (the doomed rows: it and its versions), by each version's
-/// distinctive words ([`search::content_words`]):
+/// distinctive words ([`search::content_words`]), without the
+/// observation writer's opening verbs for the linked walk ([`OPENERS`]):
 /// - reached from them through old source links, through rows that stay as
 ///   well as rows that go, every exchange or observation, of any scope,
 ///   that carries one word of any version;
@@ -3326,6 +3327,29 @@ enum Read {
 /// only ones [`search::splits_unlike_index`] can be true of.
 const NOT_ASCII: &str = "*[^\u{1}-\u{7f}]*";
 
+/// The verbs the observation writer opens an observation with, which say
+/// nothing of what it is about: the generic verbs of [`tidy::about_words`]
+/// ("Likes …", "Prefers …", "Wants …", "Enjoys …") and the "Asked …" of
+/// [`tidy::only_asked`] ("Asked the lamp to remind them …"), with "ask",
+/// "asks" and "wanted". In [`search::content_words`]' form when used. Only
+/// [`selective_rows`]' linked walk leaves them out; search keeps them.
+const OPENERS: &[&str] = &[
+    "want",
+    "wants",
+    "wanted",
+    "ask",
+    "asks",
+    "asked",
+    "like",
+    "likes",
+    "liked",
+    "prefer",
+    "prefers",
+    "preferred",
+    "enjoy",
+    "enjoys",
+];
+
 /// [`selective_descendants`] for the doomed rows' `texts`, reading what
 /// `read` says: how many rows it checked word by word.
 fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read) -> Result<u64> {
@@ -3345,7 +3369,18 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
         .map(|text| literal(text))
         .filter(|text| !text.is_empty())
         .collect();
-    let any: BTreeSet<String> = own.iter().flatten().cloned().collect();
+    // The linked walk's words leave out the observation writer's opening
+    // verbs ([`OPENERS`]): "Wants the light a little warmer." took every
+    // linked "Wants …" observation (C136). A fact of nothing but them keeps
+    // them, so the walk is never wider than before. Copies still need every
+    // word of a version, openers included.
+    let all: BTreeSet<String> = own.iter().flatten().cloned().collect();
+    let openers: BTreeSet<String> = OPENERS
+        .iter()
+        .flat_map(|word| search::content_words(word))
+        .collect();
+    let distinct: BTreeSet<String> = all.difference(&openers).cloned().collect();
+    let any = if distinct.is_empty() { all } else { distinct };
     let doom = |rid: i64| db.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid]);
     // Read when the index found it (`hit`), or its words may be held
     // otherwise; every row read, with `Read::Every`.
@@ -4139,6 +4174,111 @@ mod tests {
         for id in [longer, among, unrelated] {
             assert!(store.record(&person, id).unwrap().is_some(), "{id}");
         }
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// C136 (lamp-06c1, 12 Nov): forgetting "Wants the light a little
+    /// warmer." took five calendar asks and a story line linked to it,
+    /// each only sharing the observation writer's opening "Wants". An
+    /// opening verb is no word of the fact: the linked rows with the fact's
+    /// own words, and its copies, still go.
+    #[test]
+    fn a_forget_takes_no_linked_observation_on_an_opening_verb_alone() {
+        let (dir, mut store, person, now) = scratch("selective-openers");
+        fn observe(store: &Days, person: &Person, at: u64, text: &str, sources: &[u64]) -> u64 {
+            ensure_person(&store.db, person).unwrap();
+            let id = next_id(&store.db, person).unwrap();
+            insert_record(
+                &store.db,
+                &Record {
+                    id,
+                    person: person.as_str().into(),
+                    kind: "observation".into(),
+                    at_unix_ms: at,
+                    heard: String::new(),
+                    said: String::new(),
+                    text: text.into(),
+                    category: Some(tidy::Category::Thread),
+                    source_ids: sources.to_vec(),
+                    supersedes: None,
+                    active: true,
+                },
+                &store.local,
+                store.now,
+            )
+            .unwrap();
+            id
+        }
+        let light = observe(
+            &store,
+            &person,
+            now,
+            "Wants the light a little warmer.",
+            &[],
+        );
+        let shown = store
+            .append(&person, now + 1, "Add an event at 10PM", "Done", &[light])
+            .unwrap();
+        let event = observe(
+            &store,
+            &person,
+            now + 2,
+            "Wants an event 'x' at 10PM.",
+            &[shown],
+        );
+        let story = observe(
+            &store,
+            &person,
+            now + 3,
+            "Wants a long story at bedtime.",
+            &[shown],
+        );
+        let asked = observe(
+            &store,
+            &person,
+            now + 4,
+            "Asked the lamp to remind them at 9PM.",
+            &[shown],
+        );
+        let linked = observe(
+            &store,
+            &person,
+            now + 5,
+            "Likes the light dim at night.",
+            &[shown],
+        );
+        let copy = observe(
+            &store,
+            &person,
+            now + 6,
+            "Wants the light a little warmer.",
+            &[],
+        );
+        store.forget(&person, light).unwrap();
+        for id in [light, linked, copy] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        for id in [shown, event, story, asked] {
+            assert!(store.record(&person, id).unwrap().is_some(), "{id}");
+        }
+
+        // A fact of nothing but an opening verb keeps the walk on it, as
+        // before: no wider.
+        let bare = store
+            .append(&person, now + 7, "I want it", "Sure", &[])
+            .unwrap();
+        let wants = store.remember(&person, now + 8, "Wants it").unwrap();
+        let after = store
+            .append(&person, now + 9, "Do you still want it?", "Yes", &[wants])
+            .unwrap();
+        let other = store
+            .append(&person, now + 10, "Is it late?", "A little", &[wants])
+            .unwrap();
+        store.forget(&person, wants).unwrap();
+        assert!(store.record(&person, after).unwrap().is_none());
+        assert!(store.record(&person, other).unwrap().is_some());
+        assert!(store.record(&person, bare).unwrap().is_none());
         drop(store);
         fs::remove_dir_all(dir).unwrap();
     }
