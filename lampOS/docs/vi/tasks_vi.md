@@ -677,7 +677,10 @@ out the details", câu mô hình hiểu là được rút gọn). `start_agent_t
 kiểm tra bằng mã (`agent_tasks::whole_ask`), có hay không có công tắc, trước
 khi hỏi phần tasks:
 
-- **Lời đã nghe.** Lời của request như thread giữ (`thread::heard_for`). Tin
+- **Lời đã nghe.** Chỉ câu của chính request (`thread::heard_in_own_line`:
+  câu được giữ cho nó, hoặc câu trong lượt trao đổi của nó), không bao giờ là
+  lời mới nhất nghe được từ lần trả lời trước, vì đó có thể là câu của người
+  khác (#6537). Tin
   nhắn gõ, câu do đèn tự viết, hay request không nghe được gì thì không kiểm
   tra; một câu "yes" đơn thuần cũng không, và một câu có hơn một phần tư từ
   nội dung không phải ASCII thuần (lời nhờ tiếng Việt được giao bằng tiếng
@@ -688,9 +691,16 @@ khi hỏi phần tasks:
   nơi chốn "lamp", "computer", "mac", "macbook", "laptop", và mọi dạng tên
   agent giọng nói biết (`KINDS`), so cả cụm nên "open" trong "open the file"
   vẫn giữ. Số đọc bằng chữ là chữ số ("five" là "5", `NUMBER_WORDS`), nên
-  "fruits dot md" và "fruits.md" là cùng từ; các từ khác so theo gốc.
+  "fruits dot md" và "fruits.md" là cùng từ; các từ khác so theo gốc. Chỉ
+  tính các từ sau tên agent cuối cùng (hoặc chữ "agent"): phần trước đó
+  thường là lời nói bâng quơ ("ugh, work was rough today, anyway have Claude
+  fix the login bug"), và lời bâng quơ không bao giờ được đẩy vào task gửi
+  ra khỏi đèn (#6537, bài đọc quyền riêng tư).
 - **Quy tắc.** Khi nghe được ít nhất `WHOLE_ASK_FEWEST` (4) từ nội dung, một
-  task giữ dưới `WHOLE_ASK_SHARE` (một nửa) số từ đó bị từ chối, nêu các từ
-  bị bỏ và bảo gọi lại với toàn bộ lời nhờ. Mỗi request chỉ từ chối một lần:
+  task giữ dưới `WHOLE_ASK_SHARE` (một nửa) số từ đó bị từ chối: "Nothing
+  was prepared: the task looks shorter than what the person asked of the
+  agent. If part of the task was left out (a count, a list or a file name),
+  call start_agent_task again now with the whole task; leave out anything
+  said that is not part of it." Các từ bị bỏ không bao giờ được nêu lại. Mỗi request chỉ từ chối một lần:
   lần gọi thứ hai trong cùng request được cho qua, nên người dùng không bao
   giờ bị kẹt.
