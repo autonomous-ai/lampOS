@@ -626,6 +626,7 @@ mod tests {
             }),
             harness: None,
             round: None,
+            refused: None,
             engines: None,
         }
     }
@@ -1411,6 +1412,7 @@ mod tests {
             }),
             harness: None,
             round: None,
+            refused: None,
             engines: None,
         };
         // Reason and start time as lamp-update may one day say them, with

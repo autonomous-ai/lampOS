@@ -1214,6 +1214,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 app_check.forget(&mut say);
                 if app_check.wait(ears.as_mut(), every, &mut say) {
                     eprintln!("lamp-update: the app asked for a check: a round now");
+                    // The owner's retry of a refused build (#6266) drops its
+                    // refusal before the round.
+                    let retries = app_check.take_retries();
+                    lamp_update::app_check::drop_refusals(
+                        &lamp_update::records::Records::new(records.clone()),
+                        &retries,
+                        &mut say,
+                    );
                 }
             }
             None => {
