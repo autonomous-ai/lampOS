@@ -7,7 +7,7 @@
 //! `voice/line` as it begins, as the real voice does, so `lamp.said` reaches
 //! a computer holding `speech`.
 use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{LineBy, LineSource, SaidLine, SpeakerVolume};
+use lamp_msgs::{Audio, LineBy, LineSource, SaidLine, SpeakerVolume};
 use serde_json::{Value, json};
 use std::{
     io::{BufRead, BufReader, Write},
@@ -38,8 +38,9 @@ pub fn serve_say(path: &Path, bus: &Bus) -> std::io::Result<()> {
     let listener = UnixListener::bind(path)?;
     for stream in listener.incoming().flatten() {
         let lines = Arc::clone(&lines);
+        let bus = bus.clone();
         thread::spawn(move || {
-            let _ = say(stream, &lines);
+            let _ = say(stream, &lines, &bus);
         });
     }
     Ok(())
@@ -75,15 +76,150 @@ fn tell(lines: &Mutex<Publisher>, asked: &Value) {
     let _ = lines.publish_json(lamp_ipc::monotonic_us(), &line);
 }
 
+/// How often the voice tells lamp-control how its stream is doing (`stats`).
+const STATS_EVERY: Duration = Duration::from_secs(1);
+/// How long the stream waits for a block before it looks at the socket again.
+const BLOCK_WAIT: Duration = Duration::from_millis(50);
+
+/// The host program that plays the stream's raw sound (24 kHz mono S16LE on its standard input), the first of the host's players
+/// that starts: `paplay`, `aplay`, `ffplay`. None (`LAMP_SIM_SPEAKER=silent`, or no player): the blocks are counted, not played.
+fn speaker_player() -> Option<std::process::Child> {
+    if std::env::var("LAMP_SIM_SPEAKER").is_ok_and(|v| v == "silent") {
+        return None;
+    }
+    let players: [(&str, &[&str]); 3] = [
+        (
+            "paplay",
+            &["--raw", "--rate=24000", "--format=s16le", "--channels=1"],
+        ),
+        (
+            "aplay",
+            &[
+                "-q", "-t", "raw", "-f", "S16_LE", "-r", "24000", "-c", "1", "-",
+            ],
+        ),
+        (
+            "ffplay",
+            &[
+                "-nodisp",
+                "-autoexit",
+                "-loglevel",
+                "quiet",
+                "-f",
+                "s16le",
+                "-ar",
+                "24000",
+                "-ac",
+                "1",
+                "-i",
+                "-",
+            ],
+        ),
+    ];
+    for (program, args) in players {
+        if let Ok(mut child) = Command::new(program)
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            // A player that is installed but fails at once (no sound server) is passed over for the next.
+            thread::sleep(Duration::from_millis(150));
+            if matches!(child.try_wait(), Ok(None)) {
+                return Some(child);
+            }
+        }
+    }
+    None
+}
+
+/// The voice's side of `speaker.stream`: lamp-control asks on the say socket (`{"skill":"control","stream":{"by":CLIENT}}`), the
+/// voice answers `{"event":"stream","state":"open"}` and then reads `speaker/audio` (lamp-control publishes each block of the
+/// computer's sound there, 24 kHz mono S16LE) while the connection stays open, playing it on the host if there is a player and
+/// telling `stats` each second (with the blocks and milliseconds heard: lamp-control reads only its three counters). Dropping the
+/// connection ends the stream. A topic nobody declared (the owner's switch is off) is refused in words.
+fn speaker_stream(
+    mut stream: UnixStream,
+    asked: &Value,
+    bus: &Bus,
+    mut player: Option<std::process::Child>,
+) -> std::io::Result<()> {
+    let by = asked["stream"]["by"]
+        .as_str()
+        .unwrap_or("a computer")
+        .to_owned();
+    let mut blocks = match bus.subscribe_typed(Audio::SPEAKER_TOPIC, "sim_speaker", Audio::TYPE) {
+        Ok(blocks) => blocks,
+        Err(error) => {
+            return writeln!(
+                stream,
+                "{}",
+                json!({"event": "stream", "state": "refused", "why": format!("the sim's speaker is not on the bus: {error}")})
+            );
+        }
+    };
+    writeln!(stream, "{}", json!({"event": "stream", "state": "open"}))?;
+    // The door closing its end is the end of the stream.
+    let closed = Arc::new(AtomicBool::new(false));
+    {
+        let (reader, closed) = (stream.try_clone()?, Arc::clone(&closed));
+        thread::spawn(move || {
+            for _ in BufReader::new(reader).lines().map_while(Result::ok) {}
+            closed.store(true, Ordering::SeqCst);
+        });
+    }
+    let (mut heard, mut samples, mut next_stats) =
+        (0u64, 0u64, std::time::Instant::now() + STATS_EVERY);
+    while !closed.load(Ordering::SeqCst) {
+        if let Ok(Some(message)) = blocks.recv(BLOCK_WAIT)
+            && let Ok((header, bytes)) = Audio::split(&message.payload)
+            && header.sample_rate == Audio::SPEAKER_SAMPLE_RATE
+            && header.channels == 1
+            && bytes.len() % 2 == 0
+        {
+            heard += 1;
+            samples += (bytes.len() / 2) as u64;
+            if let Some(child) = player.as_mut()
+                && let Some(stdin) = child.stdin.as_mut()
+                && stdin.write_all(bytes).is_err()
+            {
+                // The player ended: go on counting.
+                player = None;
+            }
+        }
+        if std::time::Instant::now() >= next_stats {
+            next_stats += STATS_EVERY;
+            let ms = samples * 1000 / u64::from(Audio::SPEAKER_SAMPLE_RATE);
+            if writeln!(stream, "{}", json!({"event": "stats", "buffered_ms": 0, "underruns": 0, "limited": 0, "blocks": heard, "ms": ms})).is_err() {
+                break;
+            }
+        }
+    }
+    if let Some(mut child) = player {
+        drop(child.stdin.take());
+        let _ = child.wait();
+    }
+    eprintln!(
+        "lamp-sim: the speaker stream of {by} ended: {heard} blocks, {} ms",
+        samples * 1000 / u64::from(Audio::SPEAKER_SAMPLE_RATE)
+    );
+    Ok(())
+}
+
 /// One line is spoken at a time.
 static SPEAKING: Mutex<()> = Mutex::new(());
 
-fn say(mut stream: UnixStream, lines: &Mutex<Publisher>) -> std::io::Result<()> {
+fn say(mut stream: UnixStream, lines: &Mutex<Publisher>, bus: &Bus) -> std::io::Result<()> {
     let mut line = String::new();
     BufReader::new(stream.try_clone()?).read_line(&mut line)?;
     let Ok(asked) = serde_json::from_str::<Value>(&line) else {
         return Ok(());
     };
+    // A computer's own sound for the speaker (`speaker.stream`): not a line to say.
+    if asked["stream"].is_object() {
+        return speaker_stream(stream, &asked, bus, speaker_player());
+    }
     // The cancel line, whenever it comes, on this connection.
     let cancelled = Arc::new(AtomicBool::new(false));
     {
@@ -771,6 +907,118 @@ mod tests {
                 volume: 30,
                 muted: false
             })
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn scratch_bus(name: &str) -> (std::path::PathBuf, Bus) {
+        let dir = std::env::temp_dir().join(format!("lsp-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let bus = Bus::new(dir.join("bus")).unwrap();
+        (dir, bus)
+    }
+
+    #[test]
+    fn a_speaker_stream_is_opened_counted_told_in_stats_and_ends_when_the_door_closes() {
+        let (dir, bus) = scratch_bus("stream");
+        let mut publisher = bus
+            .publisher_declared(
+                Audio::SPEAKER_TOPIC,
+                &Audio::speaker_declaration(),
+                "control",
+            )
+            .unwrap();
+        let (door, voice) = UnixStream::pair().unwrap();
+        let served = bus.clone();
+        let ended = thread::spawn(move || {
+            let asked = json!({"skill": "control", "stream": {"by": "c_9"}, "expires_in_ms": 5000});
+            speaker_stream(voice, &asked, &served, None).unwrap();
+        });
+        let mut lines = BufReader::new(door.try_clone().unwrap());
+        let mut next = || -> Value {
+            let mut line = String::new();
+            lines.read_line(&mut line).unwrap();
+            serde_json::from_str(&line).unwrap()
+        };
+        // The first line is the voice's yes, as lamp-control reads it.
+        assert_eq!(next(), json!({"event": "stream", "state": "open"}));
+        // Three 100 ms blocks of 24 kHz mono S16LE, and one that is not the speaker's rate (dropped, not counted).
+        let block = |rate: u32, sequence: u64| {
+            Audio {
+                sample_rate: rate,
+                channels: 1,
+                sample_format: Audio::S16LE.to_owned(),
+                sequence,
+            }
+            .block(&vec![0u8; 4_800])
+            .unwrap()
+        };
+        for sequence in 0..3 {
+            publisher
+                .publish_bytes(
+                    lamp_ipc::monotonic_us(),
+                    Audio::ENCODING,
+                    &block(24_000, sequence),
+                )
+                .unwrap();
+        }
+        publisher
+            .publish_bytes(lamp_ipc::monotonic_us(), Audio::ENCODING, &block(16_000, 3))
+            .unwrap();
+        // The stats line says what was heard, and carries lamp-control's three counters.
+        let stats = next();
+        assert_eq!(stats["event"], "stats");
+        assert_eq!(
+            (
+                stats["buffered_ms"].as_u64(),
+                stats["underruns"].as_u64(),
+                stats["limited"].as_u64()
+            ),
+            (Some(0), Some(0), Some(0))
+        );
+        assert_eq!(
+            (stats["blocks"].as_u64(), stats["ms"].as_u64()),
+            (Some(3), Some(300))
+        );
+        // The door closing its end ends the stream.
+        drop(lines);
+        drop(door);
+        ended.join().unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_speaker_topic_declared_as_another_type_is_refused_in_words() {
+        let (dir, bus) = scratch_bus("refused");
+        // Another program has declared the topic as something else: the
+        // typed subscription is refused (an undeclared topic is not: it waits).
+        let _other = bus
+            .publisher_declared(
+                Audio::SPEAKER_TOPIC,
+                &lamp_msgs::Light::declaration(),
+                "other",
+            )
+            .unwrap();
+        let (door, voice) = UnixStream::pair().unwrap();
+        speaker_stream(
+            voice,
+            &json!({"skill": "control", "stream": {"by": "c_9"}}),
+            &bus,
+            None,
+        )
+        .unwrap();
+        let mut line = String::new();
+        BufReader::new(door).read_line(&mut line).unwrap();
+        let said: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            (said["event"].as_str(), said["state"].as_str()),
+            (Some("stream"), Some("refused"))
+        );
+        assert!(
+            said["why"]
+                .as_str()
+                .unwrap()
+                .starts_with("the sim's speaker is not on the bus")
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
