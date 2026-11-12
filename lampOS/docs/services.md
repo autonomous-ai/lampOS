@@ -123,7 +123,7 @@ connected apps.
 | `LAMP_GMAIL_DRAFT_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_draft` and `delete_draft` are unknown actions, answered with Gmail's list of writes as any other ("gmail writes: send_mail …, save_draft …") before anything is read, held or saved, and `tools.json` lists only `send_mail` and `save_draft` for Gmail ("Changing or deleting a saved Gmail draft", below) |
 | `LAMP_SERVICES_LINKED_TOOLS=on` (#6218, off in the product until its rows) | `lamp-services` | `tools.json` names every service the lamp can link, linked or not, with every read's and write's fields (about 7.8 KB of the voice's request). On, it names only the linked ones: their codes in the `service` enums, their lines in what each reads and writes, and only the fields those lines name (`service`, `what`, `action`, `send_id`, `said` always). A read or a write no linked service has is left out, so with nothing linked the voice is offered `services_connected` alone, which still says what the lamp can link. It is written at start and again after each link, unlink and wipe on the admin socket, one write at a time under a lock (the newest list always wins, and the file is never torn), and the voice reads it for each request, so a link counts from the next turn. Measured offline on the product's spoken turn: 49,064 B with every service, 46,522 B with Gmail and Calendar, 45,539 B with Gmail alone, 43,249 B with nothing linked. **Off in every product unit until a privacy condition is met (#6476 read):** the file is declared on every request, whoever speaks, so with the switch on a guest's line, the room's, a held one, an app text and a scheduled turn would see the linked codes, where "The voice is told what is linked" keeps them to the owner's line. It is turned on only after non-owner lines are given the whole catalog (or `services_connected` alone), or after the memory and privacy owner accepts in writing that linked names reach every line, with this row saying so |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
-| `LAMP_SKILL_WRITES=on` (#6066; off in every product unit) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
+| `LAMP_SKILL_WRITES=on` (#6066; on in the product's four units since 11 Nov) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 | `LAMP_SKILL_TASKS=on` (#6432; on in the product units) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
 
@@ -1954,18 +1954,20 @@ When `lamp-services` can't say (no socket, no answer in time, a
 refusal), `needs_link` is left out and nothing is said; the make never
 fails for it.
 
-## A made skill's write (#6066, `LAMP_SKILL_WRITES`, off)
+## A made skill's write (#6066, `LAMP_SKILL_WRITES`, on in the product)
 
 The owner lifted #6066's rule (b) on 10 Nov: a made skill that starts
 itself may send a mail, add a calendar event, or open an issue, a task or
 a comment on a linked service with nobody asking at that moment. The
 runtime half is `lamp_services::skill_writes` and
 `lamp_skills::service_write`; the voice's make, say-back, yes and "I
-sent …" are below ("The voice's side"); the product unit comes later.
+sent …" are below ("The voice's side").
 All of it is off unless `LAMP_SKILL_WRITES=on` (exactly `on`) is in the
 environment of `lamp-services`, `lamp-skills` and `lamp-skills-manage@`,
 which loads a skill as it installs it, and of `lamp-voice`, which passes
-it to both its routes. Every product unit leaves it off.
+it to both its routes. The four product units set it on since 11 Nov
+(the owner's ask, so the testers can try #6142 and #6066); a drop-in with
+`LAMP_SKILL_WRITES=off` turns it off.
 
 **The step.** In `skill.toml` ([skills.md](skills.md)):
 
@@ -2186,7 +2188,6 @@ whole):
   only once the app does (its text lives in the app).
 - A contact named without an address: the lamp keeps no contact book, so
   the making model asks for the address.
-- A product unit that sets `LAMP_SKILL_WRITES=on`.
 
 ## A skill's run on the lamp's Hermes (#6432, `LAMP_SKILL_TASKS`, on in the product)
 
