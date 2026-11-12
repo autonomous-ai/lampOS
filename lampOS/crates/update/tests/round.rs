@@ -5222,6 +5222,55 @@ fn a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles() {
     assert_eq!(lamp.state()["settings"][TMPFILES_CONF], sha(&new));
 }
 
+/// #6607: lamp-update's own switch file. A lamp in a home has none, and its
+/// unit lacks the switches, so both read off. A build carrying the file
+/// waits while the settings writer is older than this lamp-update; once it
+/// is refreshed, the round writes the file, and the switches read again
+/// after that round are on and differ from the start's: lamp-update starts
+/// itself again (`switches::restart_for`), with no reboot.
+#[test]
+fn a_round_writes_update_env_after_the_writer_refresh_and_the_switches_turn_on() {
+    use lamp_update::switches::{UpdateSwitches, restart_for, update_switches};
+    let (mut lamp, _) = lamp_with_settings();
+    let unset = |_: &str| None;
+    let started = update_switches(&lamp.root, true, unset);
+    assert_eq!(started, UpdateSwitches::default());
+    let on = lamp_update::install::UPDATE_SETTING.1;
+    publish_settings(&mut lamp, 2, vec![Setting::new(manifest::UPDATE_ENV, on)]);
+    let back = lamp
+        .root
+        .join(lamp_update::own::BACK.trim_start_matches('/'));
+    fs::create_dir_all(back.parent().unwrap()).unwrap();
+    fs::write(&back, "old writer").unwrap();
+    lamp.config.writer_from = Some(lamp_update::writer_swap::Running::new(
+        b"lamp-update 1".to_vec(),
+    ));
+    let waits = lamp.round();
+    assert!(
+        matches!(&waits, Outcome::Refused(why) if why.contains("settings writer is older")
+            && why.contains(manifest::UPDATE_ENV)),
+        "{waits:?}"
+    );
+    assert!(!lamp.exists(manifest::UPDATE_ENV));
+    assert!(!restart_for(
+        started,
+        update_switches(&lamp.root, true, unset)
+    ));
+    // Refreshed to it, the round writes the file.
+    fs::write(&back, "lamp-update 1").unwrap();
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(manifest::UPDATE_ENV), on);
+    let now = update_switches(&lamp.root, true, unset);
+    assert_eq!(
+        now,
+        UpdateSwitches {
+            engines: true,
+            tasks: true
+        }
+    );
+    assert!(restart_for(started, now));
+}
+
 /// The first builder on #4710: a lamp installed before a build turned the
 /// Skills Store on keeps install's `store.env`, off. A round writes the
 /// build's while the lamp's copy is the one install wrote, restarts the part

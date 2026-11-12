@@ -614,12 +614,13 @@ that build could never be promoted. Now:
   A newer head refuses as stale, as before.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 11 (2 reads models, 3 settings, 4 image, 5 reset plans,
+`manifest::UPDATER` is 12 (2 reads models, 3 settings, 4 image, 5 reset plans,
 6 product service units, 7 a part's templates, sockets and timers, 8 a
 product unit the lamp lacks added, 9 the switch in the build's own order,
 which every product build asks for: `ORDER_UPDATER`, #4582, 10 the Skills
 Store's switch file among the settings: `STORE_ENV_UPDATER`, 11 the models
-switch file among the settings: `MODELS_ENV_UPDATER`). With its product deploy tree, this workflow now
+switch file among the settings: `MODELS_ENV_UPDATER`, 12 lamp-update's own
+switch file among the settings: `UPDATE_ENV_UPDATER`, #6607). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
@@ -1971,7 +1972,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 11; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
+before the field climbs first. The current `UPDATER` is 12; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
 without models doesn't write the field and is byte for byte what it was.
 The publish (`.github/scripts/lampos-publish.py`) passes `--models` with
 the product's `deploy/product/models.json`, so every published build
@@ -2287,7 +2288,7 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 11; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 12; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`,
 `/etc/lampOS/skills/store.env` (from updater 10), `/etc/lampOS/models.env`
@@ -2352,12 +2353,16 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   updater 12 (`manifest::UPDATE_ENV_UPDATER`, #6607): `LAMP_APP_ENGINES=on`
   and `LAMP_SKILL_TASKS=on`. No round rewrites lamp-update's own unit, so
   these lines in `lamp-update.service` never reached a lamp already in a
-  home. lamp-update reads each switch once at its start
-  (`switches::update_switch`): set in its environment, `on` exactly, and
+  home. lamp-update reads each switch at its start
+  (`switches::update_switches`): set in its environment, `on` exactly, and
   that always wins; not set there at all, this file, by the models switch
-  file's rule; a missing or garbled file is off. A round places it as it
-  does `models.env`, so the switches take effect when lamp-update next
-  starts, after the round. Install doesn't write it. A build carrying it asks
+  file's rule (`LAMP_SKILL_TASKS` from the file only on a product lamp); a
+  missing or garbled file is off. A round places it as it does
+  `models.env`. After each `serve` round lamp-update reads them again, and
+  when they differ from its start's (the round wrote or changed the file,
+  as the promote round that first carries it does) it starts itself again
+  in its own place with the same options (`switches::restart_for`), so they
+  take effect with no reboot. Install doesn't write it. A build carrying it asks
   for updater 12 and waits for the writer's refresh the same way. Every
   future lamp-update switch goes in this file, never only in the unit.
 - **Root, small.** At the switch, after the journal and normally before any
@@ -2494,7 +2499,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 11. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 12. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,
