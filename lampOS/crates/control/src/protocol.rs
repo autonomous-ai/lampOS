@@ -1783,6 +1783,61 @@ mod tests {
         }
     }
 
+    /// Every op the door takes has an entry in the schema, and the schema names no op the door
+    /// does not take: a new `Op` forgotten in `docs/control.schema.json` (as `speaker.stream`
+    /// was, for a while) is caught here. The door's ops are read from this file's own `enum Op`
+    /// (each variant carries a `#[serde(rename = "...")]`, which the second assertion holds to),
+    /// the schema's from the `op` const of every request in `$defs.request`.
+    #[test]
+    fn every_op_the_door_takes_has_a_schema_entry() {
+        let source = include_str!("protocol.rs");
+        let start = source.find("pub enum Op {").expect("enum Op");
+        let body = &source[start..];
+        let body = &body[..body.find("\n}\n").expect("end of enum Op")];
+        let variants = body
+            .lines()
+            .filter(|line| {
+                line.starts_with("    ")
+                    && !line.starts_with("     ")
+                    && line
+                        .trim_start()
+                        .starts_with(|c: char| c.is_ascii_uppercase())
+                    && (line.ends_with(" {") || line.ends_with(','))
+            })
+            .count();
+        let ours: std::collections::BTreeSet<String> = body
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("#[serde(rename = \""))
+            .map(|rest| rest.split('"').next().unwrap().to_owned())
+            .collect();
+        assert_eq!(
+            variants,
+            ours.len(),
+            "every variant of Op carries a serde rename, so its wire name is read here"
+        );
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
+        let defs = &schema["$defs"];
+        let named: std::collections::BTreeSet<String> = defs["request"]["oneOf"]
+            .as_array()
+            .expect("the schema's request list")
+            .iter()
+            .map(|entry| {
+                let name = entry["$ref"].as_str().unwrap().rsplit('/').next().unwrap();
+                defs[name]["properties"]["op"]["const"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("request {name} has no op const"))
+                    .to_owned()
+            })
+            .collect();
+        let missing: Vec<_> = ours.difference(&named).collect();
+        let extra: Vec<_> = named.difference(&ours).collect();
+        assert!(
+            missing.is_empty() && extra.is_empty(),
+            "ops the door takes with no schema entry: {missing:?}; schema ops the door does not take: {extra:?}"
+        );
+    }
+
     /// `Grant::ALL` is every grant the schema names (`$defs.grant` in control.schema.json), so a grant added to
     /// one and forgotten in the other is caught here, and `shown_all` says it.
     #[test]
