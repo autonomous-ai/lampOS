@@ -2309,6 +2309,45 @@ fn input_limits_and_parser_ambiguity_are_refused_before_any_process() {
     assert!(rig.calls().is_empty());
 }
 
+/// Every name the hold adds to Harness's environment is one `Cli::new`
+/// takes: held, with a pinned grid (#6283) and both lamp engines, so a held
+/// lamp's lamp-tasks still starts (12171 on a held lamp: "invalid_environment").
+#[test]
+fn a_held_lamps_whole_environment_is_taken() {
+    let rig = Rig::new();
+    let mut config = rig.config.clone();
+    let grid = rig
+        .root
+        .path()
+        .join(".harness/runtime/grid-0.3.63-linux-arm64/bin/grid");
+    std::fs::create_dir_all(grid.parent().unwrap()).unwrap();
+    std::fs::write(&grid, "#!/bin/sh\n").unwrap();
+    std::fs::write(
+        rig.root.path().join(lamp_tasks::hold::CURRENT_GRID),
+        format!("{}\n", grid.display()),
+    )
+    .unwrap();
+    let engines = rig.root.path().join("engines");
+    lamp_tasks::hold::env_file(
+        &mut config.environment,
+        true,
+        Some(&engines),
+        Some(&engines),
+    )
+    .unwrap();
+    for name in [
+        lamp_tasks::hold::ENV_FILE,
+        lamp_tasks::hold::DISABLE,
+        lamp_tasks::hold::GRID_BIN,
+        lamp_tasks::hold::HERMES_HOME,
+        lamp_tasks::hold::OPENCLAW_STATE_DIR,
+        lamp_tasks::hold::SHELL,
+    ] {
+        assert!(config.environment.contains_key(name), "{name}");
+    }
+    assert!(Cli::new(config, "stable".into()).is_ok());
+}
+
 #[test]
 fn missing_or_competing_environment_and_unsafe_sessions_are_refused() {
     let rig = Rig::new();
