@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lamp twin</title>
 <style>
-  :root { --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --soft: #6b6862; --line: #dcd8d0; --accent: #c8742c; }
+  :root { --view-w: 75%; --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --soft: #6b6862; --line: #dcd8d0; --accent: #c8742c; }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #161513; --panel: #201f1c; --ink: #ece9e3; --soft: #9a968e; --line: #34322e; --accent: #e3954f; }
   }
@@ -38,6 +38,28 @@
   #sees .sub { margin: 6px 0 0; }
   #log { font-size: 12px; color: var(--soft); margin-top: 12px; white-space: pre-wrap; }
   @media (max-width: 720px) { body { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; } aside { border-left: 0; border-top: 1px solid var(--line); } }
+  /* The try-it page (body.try, set when panel.js loads): three columns, the view's width the ONE variable --view-w, the other two
+     sharing the rest; the columns scroll alone, so the view stays in sight; long text wraps, never widens a column. */
+  body.try { grid-template-columns: var(--view-w) minmax(0, 1fr) minmax(0, 1fr); overflow-x: hidden; }
+  body.try > * { min-width: 0; }
+  body.try #view { overflow: hidden; }
+  body.try aside { padding: 10px 8px; overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; font-size: 13px; }
+  body.try .joint .facts, body.try details label { overflow-wrap: anywhere; }
+  body.try details label { grid-template-columns: 52px minmax(0, 1fr) 48px; }
+  body.try #sees img { max-width: 100%; height: auto; }
+  body.try #log { font-size: 12px; overflow-wrap: anywhere; }
+  /* A real lamp's banner (panel.js adds body.real) spans all three columns on a row of its own above them. */
+  body.try #realbanner { grid-column: 1 / -1; }
+  body.try.real { grid-template-rows: auto minmax(0, 1fr); }
+  /* At 900 px the two small columns are 112 px each (the view takes 75%), and narrower they only shrink, so below 900 px it is one column, in the order the view, the buttons, then the events, the camera and the log; the view is capped at about half the screen so the first buttons are in sight; the banner stays on top. */
+  @media (max-width: 900px) {
+    body.try { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; height: auto; }
+    body.try.real { grid-template-rows: none; }
+    body.try #realbanner { order: -1; }
+    body.try #view { order: 0; height: min(50vh, 420px); min-height: 0; }
+    body.try aside#side { order: 1; overflow-y: visible; border-left: 0; border-top: 1px solid var(--line); }
+    body.try aside#col-log { order: 2; overflow-y: visible; border-left: 0; border-top: 1px solid var(--line); }
+  }
 </style>
 <script type="importmap">
 { "imports": {
@@ -48,7 +70,7 @@
 </head>
 <body>
 <div id="view"><div id="status">loading the lamp…</div></div>
-<aside>
+<aside id="side">
   <h1>Lamp twin</h1>
   <p class="sub"><span id="ring"></span><span id="lampline">waiting for body.state</span><span id="speaking">speaking</span></p>
   <div id="joints"></div>
@@ -113,6 +135,8 @@ const resize = () => {
   camera.updateProjectionMatrix();
 };
 addEventListener('resize', resize);
+// The view's column can change size without the window changing (the try-it page's layout arrives after this runs).
+new ResizeObserver(resize).observe(view);
 resize();
 
 // The light: a glow where the head's light is, coloured as the ring draws

@@ -24,25 +24,28 @@ document.head.append(el('style', { textContent: `
   #panel { margin-top: 10px; font-size: 13px; }
   #panel h2 { font-size: 13px; margin: 12px 0 6px; color: var(--soft); text-transform: uppercase; letter-spacing: .04em; }
   #panel h3 { font-size: 12px; margin: 8px 0 2px; color: var(--soft); font-weight: 600; }
-  #panel .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; align-items: center; }
-  #panel .row label { display: inline-flex; gap: 4px; align-items: center; color: var(--soft); }
+  /* A row in a column of about 170 px: its button first, its inputs under it at the column's width, its marks under those; every label wraps. */
+  #panel .row { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; align-items: stretch; }
+  #panel .row > button { text-align: left; white-space: normal; overflow-wrap: anywhere; height: auto; }
+  #panel .fields { display: flex; flex-direction: column; gap: 4px; }
+  #panel .row label { display: flex; flex-direction: column; gap: 2px; align-items: stretch; color: var(--soft); overflow-wrap: anywhere; }
   #panel button { cursor: pointer; }
-  #panel input[type=text] { flex: 1; min-width: 120px; }
-  #panel input[type=number] { width: 64px; }
+  #panel input[type=text], #panel select { width: 100%; min-width: 0; }
+  #panel input[type=number] { width: 100%; min-width: 0; }
+  #panel .marks { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  #panel .marks .note { flex: 1 1 80px; min-width: 0; }
   #panel .mark { font-size: 11px; padding: 1px 6px; opacity: .7; } #panel .on-pass { background: #2e7d32; color: #fff; opacity: 1; } #panel .on-fail { background: #c62828; color: #fff; opacity: 1; }
-  #panel .note { max-width: 160px; font-size: 11px; }
+  #panel .note { font-size: 11px; }
   #panel .world button { border-style: dashed; }
-  #panel .why { flex-basis: 100%; font-size: 11px; color: #b26a00; margin: -2px 0 2px 2px; }
+  #panel .why { font-size: 11px; color: #b26a00; overflow-wrap: anywhere; }
   #panel button:disabled { opacity: .5; cursor: not-allowed; }
-  /* The page is a grid (the view, the side): the banner takes a row of its own across both. */
-  body.real { grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
-  @media (max-width: 720px) { body.real { grid-template-rows: auto 55vh auto; overflow: auto; } }
   #realbanner { grid-column: 1 / -1; position: sticky; top: 0; z-index: 10; background: #b71c1c; color: #fff; padding: 6px 10px; font: 600 13px system-ui, sans-serif; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   #realbanner small { font-weight: 400; flex-basis: 100%; }
   #realbanner button { background: #fff; color: #b71c1c; border: 0; border-radius: 4px; padding: 4px 12px; font-weight: 700; cursor: pointer; }
-  #panel .hint { flex-basis: 100%; font-size: 11px; color: var(--soft); margin: -2px 0 2px 2px; }
-  #panel img.shot { flex-basis: 100%; max-width: 320px; border-radius: 6px; border: 1px solid var(--line); }
-  #events { height: 220px; overflow: auto; font: 12px/1.35 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; white-space: pre-wrap; }
+  #panel .hint { font-size: 11px; color: var(--soft); overflow-wrap: anywhere; }
+  #panel img.shot { width: 100%; max-width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); }
+  #events { height: 40vh; min-height: 160px; overflow-y: auto; overflow-x: hidden; font: 12px/1.35 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #col-log h2 { font-size: 13px; margin: 12px 0 6px; color: var(--soft); text-transform: uppercase; letter-spacing: .04em; }
   #events .ok { color: var(--accent); } #events .no { color: #d9534f; } #events .ev { color: var(--soft); }
 ` }));
 
@@ -107,9 +110,9 @@ const exportBar = el('div', { className: 'row' }, ticked,
 function row(entry, kind) {
   const inputs = entry.fields.map((field) => [field, input(field)]);
   const values = () => Object.fromEntries(inputs.map(([field, node]) => [field.name, field.type === 'number' ? Number(node.value) : node.value]));
-  const children = inputs.map(([field, node]) => (field.type === 'text' ? node : el('label', {}, field.label ?? field.name, node)));
+  const fields = el('div', { className: 'fields' }, ...inputs.map(([field, node]) => (field.type === 'text' ? node : el('label', {}, field.label ?? field.name, node))));
   const node = el('div', { className: 'row' });
-  children.push(el('button', {
+  const children = [el('button', {
     textContent: entry.label,
     disabled: Boolean(entry.disabled),
     onclick: () => {
@@ -118,7 +121,7 @@ function row(entry, kind) {
       rowOf.set(counter + 1, node);
       send({ type: kind, id: ++counter, name: entry.id, args: values() });
     },
-  }));
+  }), ...(inputs.length ? [fields] : [])];
   // What the row does that its label does not say, under it (textContent: never markup).
   if (typeof entry.hint === 'string') children.push(el('div', { className: 'hint', textContent: entry.hint }));
   // A row the lamp or the run cannot do: drawn, off, with its reason, and no PASS/FAIL (it is n/a in the export).
@@ -126,7 +129,7 @@ function row(entry, kind) {
     node.append(...children, el('div', { className: 'why', textContent: `n/a: ${entry.disabled}` }));
     return node;
   }
-  node.append(...children, ...marks(`${kind === 'stim' ? 'stim' : 'call'}:${entry.id}`));
+  node.append(...children, el('div', { className: 'marks' }, ...marks(`${kind === 'stim' ? 'stim' : 'call'}:${entry.id}`)));
   return node;
 }
 
@@ -149,12 +152,19 @@ const say = (cls, text) => {
 
 // On a real lamp a strip that stays on every load: whose lamp this is, what it granted, and a STOP that is always there.
 if (table.mode === 'real') {
+  // The banner is a row of its own above the three columns (index.html: body.real).
   document.body.classList.add('real');
   document.body.prepend(el('div', { id: 'realbanner' },
     `REAL LAMP: ${table.lamp.name || table.lamp.id} (${table.lamp.id}) at ${table.host}`,
     el('button', { id: 'realstop', textContent: 'STOP', onclick: () => send({ type: 'call', id: ++counter, name: 'stop', args: {} }) }),
     el('small', { textContent: `granted: ${(table.grants ?? []).join(', ') || 'nothing'}` })));
 }
+
+// The columns of the try-it page (index.html's body.try): the view, then the events with the camera and the twin's log, then the buttons.
+document.body.classList.add('try');
+const side = document.getElementById('side');
+const logColumn = el('aside', { id: 'col-log' });
+side.before(logColumn);
 
 const panel = el('section', { id: 'panel' },
   el('h2', { textContent: 'The lamp, through the SDK' }),
@@ -165,13 +175,17 @@ const panel = el('section', { id: 'panel' },
     el('h2', { textContent: 'The room (not the SDK)' }),
     el('p', { className: 'sub', textContent: 'The room starts empty. The lamp calls someone an arrival only after 5 s with nobody there.' }),
     ...section(table.stimuli, 'stim')),
+);
+// The events, the camera and the twin's own log in the middle column.
+logColumn.append(
   el('h2', { textContent: 'What the lamp says' }),
   el('p', { className: 'sub', textContent: table.camera || table.microphone
     ? `${[table.camera && 'Camera', table.microphone && 'Microphone'].filter(Boolean).join(' and ')} ON for this run: the page can show the room to anyone on your network with this link (plain HTTP). The lamp sees the room only while it stands up (press a gesture first); folded down its picture is black.`
-    : 'Camera and microphone are off: the lamp sees and hears only what the buttons above make. The log shows each line the lamp says out loud (lamp.said, the speech grant).' }),
+    : 'Camera and microphone are off: the lamp sees and hears only what the buttons make. The log shows each line the lamp says out loud (lamp.said, the speech grant).' }),
   events,
+  ...[document.getElementById('sees'), document.getElementById('log')].filter(Boolean),
 );
-// The panel first, the joint sliders (still there) folded away below it.
+// The buttons first in the right-hand column, the joint sliders (still there) folded away below them.
 const joints = document.getElementById('joints');
 const fold = el('details', {}, el('summary', { textContent: 'Joints (drag a slider to move the body)' }));
 joints.before(panel);
