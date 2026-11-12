@@ -659,17 +659,46 @@ agent (`lamp_tasks::skill_make`).
   `skill-task.sock`, tạo như các socket khác của nó. Nó chỉ nhận dòng từ
   `lamp-voice.service` chạy bằng root, theo tên người gọi mà kernel cho;
   người gọi khác bị đóng mà không được trả lời. Mỗi lần chỉ chạy một lần
-  tạo; lần thứ hai bị từ chối `busy`.
+  tạo; lần thứ hai bị từ chối `busy`. Socket được mở theo
+  `LAMP_SKILL_TASKS`, không chỉ khi việc giao được bật: công tắc giao,
+  `LAMP_MAKE_SKILL_AGENT`, chỉ thuộc về lamp-voice (đặt trong unit của
+  lamp-voice, và kiểm tra unit giữ nó ở đó), nên lamp-tasks không thấy
+  được; một socket không ai giao lần tạo thì không nhận gì, vì chỉ
+  lamp-voice chạy bằng root được gọi nó. Khi khởi động, lamp-tasks quét
+  bỏ các thư mục `make-*` (cùng home của chúng) mà một lamp-tasks dừng
+  giữa chừng để lại (`skill_make::sweep`).
 - **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
   vẹn (`MakeLine::parse`): không có trường nào khác, luật (system prompt và
   brief) tối đa 48 KiB và không có NUL, `within_ms` từ 1 đến 120 giây.
-- **Lần chạy:** Hermes của đèn được khởi động đúng như một lần chạy
-  `do.task` của kỹ năng (`skill_task::HermesRunner`, đường của row-6443),
-  qua wrapper namespace của nó: chỉ thư mục riêng, thư mục làm việc và các
-  kỹ năng, và chỉ `control.sock` của lamp-control, không bao giờ
-  `admin.sock`. Không token nào được tạo và môi trường của lần chạy không có
-  gì riêng: một lần tạo không có quyền nào. Lần chạy bị giết khi hết
-  `within_ms`, cùng cả nhóm tiến trình.
+- **Lần chạy: chỉ Hermes** (quyết định của first builder, 12/11 19:14):
+  Hermes của đèn được khởi động đúng như một lần chạy `do.task` của kỹ
+  năng (`skill_task::HermesRunner` bên trong `skill_make::MakeHermes`,
+  đường của row-6443), qua wrapper namespace của nó: chỉ thư mục riêng,
+  thư mục làm việc và các kỹ năng, và chỉ `control.sock` của lamp-control,
+  không bao giờ `admin.sock`. Hiện chỉ Hermes có trình chạy namespace, nên
+  một lần tạo không bao giờ chạy bằng engine khác; giọng nói chỉ giao lần
+  tạo khi target `lamp` là Hermes. Không token nào được tạo và môi trường
+  của lần chạy chỉ mang home riêng của nó: một lần tạo không có quyền nào.
+  Lần chạy bị giết khi hết `within_ms`, cùng cả nhóm tiến trình.
+- **Một home mới của riêng nó:** mỗi lần tạo có `make-<run id>/home`,
+  0700, mới và trống ngoài cấu hình nhà cung cấp,
+  `home/.hermes/config.yaml` (`hermes_config::merge_config` với cổng của
+  bộ chuyển tiếp, khóa được gọi bằng tên biến, `LAMP_HERMES_TOKEN`, không
+  bao giờ là một khóa), và không có gì từ bộ nhớ, phiên hay trạng thái của
+  Hermes. Lần chạy nhận `HOME`, `HERMES_HOME` (`home/.hermes`) và
+  `LAMP_NS_HOME` trỏ tới đó. Wrapper của lamp-update chỉ nhận
+  `LAMP_NS_HOME` khi đường dẫn khớp
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home` và không có
+  `..` (`WRAPPER_HOME_LINE`), rồi script namespace đặt `HOME` thành nó và
+  mount lại thư mục lâu dài của Hermes ở chế độ chỉ đọc (`NS_HOME_LINE`).
+  Home bị xóa cùng thư mục của lần tạo dù lần tạo kết thúc thế nào: có câu
+  trả lời, thất bại, quá hạn hay panic.
+- **Dấu của wrapper, cách ly hay không:** trước mỗi lần tạo, lamp-tasks
+  kiểm tra `/usr/local/bin/hermes` có `WRAPPER_HOME_LINE` và
+  `/usr/local/lib/lampos/hermes-ns` có `NS_HOME_LINE`; nếu không, lần tạo
+  bị từ chối `no_namespace` trước khi bất cứ gì được tạo. Cho tới khi một
+  vòng lamp-update viết lại wrapper và script, mọi lần tạo đều bị từ chối
+  như vậy và vẫn là của DeepSeek.
 - **Mạng của nó (`LAMP_MAKE_AGENT_NET`, không unit nào đặt):** mặc định giữ
   mạng, như agent của V1 (yêu cầu của chủ sở hữu, 12/11; quyết định của first
   builder còn chờ trên Queue #6059). Khi đó mô hình được gọi qua bộ chuyển
@@ -683,22 +712,32 @@ agent (`lamp_tasks::skill_make`).
   (thư mục mà lần chạy kỹ năng bắt đầu trong đó, namespace của Hermes cho
   thấy), 0700, luật nằm trong `rules.md`, 0600. Lần chạy bắt đầu ở đó và được
   bảo ghi câu trả lời vào `answer.md` ở đó và không gì khác. Khi lần chạy đã
-  kết thúc, `answer.md` được đọc (một tệp thường, không bao giờ đi theo liên
-  kết, tối đa 20 KiB). Thư mục bị xóa dù lần tạo kết thúc thế nào.
+  kết thúc, `answer.md` được đọc bằng `openat` từ descriptor riêng của thư
+  mục, lấy khi thư mục được tạo, `O_NOFOLLOW` trên từng phần (một tệp
+  thường, không bao giờ đi theo liên kết, tối đa 20 KiB), nên một thư mục bị
+  thay bằng liên kết không bao giờ được đọc qua. Thư mục bị xóa dù lần tạo
+  kết thúc thế nào.
 - **Các câu trả lời:** `{"ok":true,"started":true}` khi lần chạy sắp bắt đầu
   (giọng nói chỉ nói câu chờ khi đó), rồi `{"ok":true,"answer"}`. Nếu không,
   một lời từ chối: `off`, `bad_request`, `too_long`, `busy`, `not_held_off`,
-  `run_failed` hoặc `no_answer`. Giọng nói không giao gì khi gặp `off`,
-  `not_held_off` hoặc không có socket (bản cũ). Nhật ký chỉ ghi mã kết quả,
+  `no_namespace`, `run_failed` hoặc `no_answer`. Giọng nói không giao gì
+  khi gặp `off`, `not_held_off`, `no_namespace` hoặc không có socket (bản
+  cũ). Nhật ký chỉ ghi mã kết quả,
   không bao giờ ghi luật hay câu trả lời.
 - **Kiểm thử:** `skill_make::tests`: một lần tạo chạy trong thư mục riêng,
-  luật nằm ở đó và câu trả lời được đọc lại, không có môi trường riêng, thư
-  mục bị xóa; lần chạy không cách ly được thì không khởi động gì và không tạo
-  thư mục; không có câu trả lời, câu trả lời là liên kết, công tắc tắt và mọi
-  dòng sai đều bị từ chối; lần tạo được khởi động như một lần chạy kỹ năng
-  cách ly, qua wrapper phải có các dòng mạng, với `LAMP_NS_NET=run`, không có
-  token và không có admin socket trong môi trường, trong thư mục của lần
-  tạo; văn bản namespace của lamp-update chỉ cho thấy `control.sock` và
+  luật nằm ở đó và câu trả lời được đọc lại, môi trường chỉ có home riêng,
+  thư mục bị xóa; home của mỗi lần tạo lúc bắt đầu chỉ có cấu hình nhà cung
+  cấp, lần tạo thứ hai không bao giờ thấy những gì lần đầu để lại trong
+  home, và home biến mất sau câu trả lời, thất bại, quá hạn và panic; lần
+  chạy không cách ly được hoặc không có dòng make-home thì không khởi động
+  gì và không tạo thư mục; không có câu trả lời, câu trả lời là liên kết,
+  thư mục bị thay bằng liên kết, công tắc tắt và mọi dòng sai đều bị từ
+  chối; lần tạo được khởi động qua wrapper và script phải có các dòng
+  make-home dù cách ly hay không, và các dòng mạng khi cách ly, với
+  `LAMP_NS_NET=run` chỉ khi cách ly, không có token và không có admin
+  socket trong môi trường, trong thư mục của lần tạo, với `HOME` và
+  `HERMES_HOME` riêng; các dòng đúng từng chữ của lamp-update; thư mục tạo
+  cũ được quét bỏ khi khởi động; văn bản namespace của lamp-update chỉ cho thấy `control.sock` và
   không bao giờ nhắc `admin.sock`; chỉ lamp-voice chạy bằng root được giao
   một lần tạo; socket nói `started`, rồi câu trả lời; mặc định giữ mạng mà
   vẫn không cho thấy admin socket, và `held` cho `LAMP_NS_NET=run`.

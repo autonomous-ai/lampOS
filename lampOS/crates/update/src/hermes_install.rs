@@ -445,7 +445,26 @@ pub const ONE_RUN_LINES: &str = one_run_lines!();
 /// namespace is owned by the new user namespace (one `unshare(2)` with
 /// `CLONE_NEWUSER`), and the variable passed on to [`NS`]; any other
 /// value is unset, so [`NS`] never sees `run` without `--net`.
-const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
+/// Where a voice make's own home may be (`lamp_tasks::skill_make`, #6643,
+/// the first builder's 19:14 ruling): a fresh, empty folder in the make's
+/// folder in lamp-tasks' work folder, removed after. With [`TASKS_SWITCH`]
+/// on, [`wrapper_text`] takes [`HOME_ENV`] only when it names one of these
+/// (never with `..`), and [`ns_text`] then makes it Hermes's `HOME`, with
+/// `HERMES_HOME` under it, and Hermes's lasting folder ([`PLACE`])
+/// read-only, so a make never reads or leaves memory, sessions or state
+/// there. Any other value is unset: Hermes started any other way is as
+/// before.
+pub const MAKE_HOME_GLOB: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home";
+/// The variable a voice make's run names its own home in ([`MAKE_HOME_GLOB`]).
+pub const HOME_ENV: &str = "LAMP_NS_HOME";
+/// The line [`wrapper_text`] adds for [`HOME_ENV`], after the token is
+/// exported: lamp-tasks checks it is there before it starts a make.
+pub const WRAPPER_HOME_LINE: &str = "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n";
+/// The line [`ns_text`] adds for [`HOME_ENV`], before the ids are dropped:
+/// lamp-tasks checks it is there before it starts a make.
+pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then [ -d \"$LAMP_NS_HOME\" ] || fail \"no $LAMP_NS_HOME\"; ro \"$H\"; HOME=$LAMP_NS_HOME; fi\nunset LAMP_NS_HOME\n";
+
+const WRAPPER_TASKS_EDITS: [(&str, &str); 3] = [
     (
         "# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.\n",
         concat!(
@@ -460,6 +479,14 @@ const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
         "unset T\n\
          if [ \"${LAMP_NS_NET-}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n\
          exec /usr/bin/unshare --map-root-user $N --mount ",
+    ),
+    (
+        "LAMP_NS_UID LAMP_NS_GID\nunset T\n",
+        concat!(
+            "LAMP_NS_UID LAMP_NS_GID\n",
+            "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n",
+            "unset T\n"
+        ),
     ),
 ];
 
@@ -649,7 +676,7 @@ const SKILLS_EDITS: [(&str, &str); 6] = [
 /// moved back as the skills are (skipped when the folder is not there),
 /// so a pushed skill's script is there for its run; Hermes started any
 /// other way (Harness's panes) never sees it.
-const TASKS_EDITS: [(&str, &str); 6] = [
+const TASKS_EDITS: [(&str, &str); 7] = [
     (
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n",
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n\
@@ -693,6 +720,13 @@ const TASKS_EDITS: [(&str, &str); 6] = [
          \x20 [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n\
          fi\n\
          unset LAMP_NS_NET\n",
+    ),
+    (
+        "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\n",
+        concat!(
+            "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\n",
+            "if [ -n \"${LAMP_NS_HOME-}\" ]; then [ -d \"$LAMP_NS_HOME\" ] || fail \"no $LAMP_NS_HOME\"; ro \"$H\"; HOME=$LAMP_NS_HOME; fi\nunset LAMP_NS_HOME\n"
+        ),
     ),
 ];
 

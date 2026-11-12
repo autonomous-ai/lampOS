@@ -3067,17 +3067,44 @@ as a Harness task with the agent's own tools
   `skill-task.sock`, made as its other sockets are. It takes lines only
   from `lamp-voice.service` run as root, as the kernel names the caller; any
   other caller is closed with no answer. One make runs at a time; a second
-  is refused `busy`.
+  is refused `busy`. It is bound with `LAMP_SKILL_TASKS`, not only when
+  the hand-over is on: the hand-over's switch, `LAMP_MAKE_SKILL_AGENT`, is
+  lamp-voice's alone (set in lamp-voice's unit, and the unit census keeps
+  it there), so lamp-tasks can't see it; a socket no one hands a make to
+  takes nothing, since only root lamp-voice may call it. As it starts,
+  lamp-tasks sweeps the `make-*` folders (and their homes) a lamp-tasks
+  stopped mid-make left (`skill_make::sweep`).
 - **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
   (`MakeLine::parse`): no other field, the rules (the system prompt and the
   brief) at most 48 KiB with no NUL, `within_ms` from 1 to 120 s.
-- **The run:** the lamp's Hermes started exactly as a skill's `do.task`
-  run is (`skill_task::HermesRunner`, row-6443's path), through its
-  namespace wrapper: only its own folder, its work folder and the skills,
-  and lamp-control's `control.sock` alone, never `admin.sock`. No token is
-  minted and the run's environment has nothing of its own: a make has no
-  grants. The run is killed at `within_ms`, its whole process group with
-  it.
+- **The run: Hermes only** (the first builder's ruling, 12 Nov 19:14):
+  the lamp's Hermes started exactly as a skill's `do.task` run is
+  (`skill_task::HermesRunner` inside `skill_make::MakeHermes`, row-6443's
+  path), through its namespace wrapper: only its own folder, its work
+  folder and the skills, and lamp-control's `control.sock` alone, never
+  `admin.sock`. Only Hermes has a namespace runner today, so a make is
+  never run by another engine; the voice hands a make over only when the
+  `lamp` target is Hermes. No token is minted and the run's environment
+  carries only its own home: a make has no grants. The run is killed at
+  `within_ms`, its whole process group with it.
+- **A fresh home of its own:** each make gets `make-<run id>/home`, 0700,
+  new and empty but for the provider config,
+  `home/.hermes/config.yaml` (`hermes_config::merge_config` with the
+  forwarder's port, its key named by its variable, `LAMP_HERMES_TOKEN`,
+  never a key), and nothing of Hermes's memory, sessions or state. The run
+  gets `HOME`, `HERMES_HOME` (`home/.hermes`) and `LAMP_NS_HOME` set to it.
+  lamp-update's wrapper takes `LAMP_NS_HOME` only for a path matching
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home` with no
+  `..` (`WRAPPER_HOME_LINE`), and its namespace script then sets `HOME` to
+  it and remounts Hermes's lasting folder read-only (`NS_HOME_LINE`). The
+  home goes with the make's folder however the make ends: answered,
+  failed, past its deadline or a panic.
+- **The wrapper's mark, held or not:** before every make, lamp-tasks
+  checks that `/usr/local/bin/hermes` carries `WRAPPER_HOME_LINE` and
+  `/usr/local/lib/lampos/hermes-ns` carries `NS_HOME_LINE`; otherwise the
+  make is refused `no_namespace` before anything is made. Until a
+  lamp-update round has rewritten the wrapper and the script, every make
+  is refused so and stays DeepSeek's.
 - **Its network (`LAMP_MAKE_AGENT_NET`, set in no unit):** kept by default,
   as V1's agent had it (the owner's ask, 12 Nov; the first builder's ruling
   pending on Queue #6059). The model is then reached at lamp-cloud's
@@ -3091,22 +3118,30 @@ as a Harness task with the agent's own tools
   a skill's run starts in, which Hermes's namespace shows), 0700, with the
   rules in `rules.md`, 0600. The run starts there and is told to write its
   answer to `answer.md` there and nothing else. Once the run has ended,
-  `answer.md` is read (a regular file, never followed as a link, at most
-  20 KiB). The folder is removed however the make ends.
+  `answer.md` is read with `openat` from the folder's own descriptor,
+  taken as the folder was made, `O_NOFOLLOW` on each part (a regular file,
+  never followed as a link, at most 20 KiB), so a folder swapped for a link
+  is never read through. The folder is removed however the make ends.
 - **The answers:** `{"ok":true,"started":true}` once the run is about to
   start (the voice says its waiting line only then), then
   `{"ok":true,"answer"}`. Otherwise one refusal: `off`, `bad_request`,
-  `too_long`, `busy`, `not_held_off`, `run_failed` or `no_answer`. The
-  voice hands nothing over on `off`, `not_held_off` or no socket (an older
-  build). The journal says only the outcome's code, never the rules or the
+  `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed` or
+  `no_answer`. The voice hands nothing over on `off`, `not_held_off`,
+  `no_namespace` or no socket (an older build). The journal says only the outcome's code, never the rules or the
   answer.
 - **Tests:** `skill_make::tests`: a make runs in its own folder, its rules
-  there and its answer read back, no environment of its own, the folder
-  removed; a run not held off starts nothing and makes no folder; no
-  answer, an answer that is a link, the switch off and every bad line are
-  refused; the make started as a held-off skill run, through a wrapper
-  that must carry the network lines, with `LAMP_NS_NET=run`, no token and
-  no admin socket in its environment, in its make's folder; lamp-update's
+  there and its answer read back, only its home in its environment, the
+  folder removed; each make's home holds only the provider config at its
+  start, a second make never sees what the first left in its home, and the
+  home is gone after an answer, a failure, a deadline and a panic; a run
+  not held off or with no make-home line starts nothing and makes no
+  folder; no answer, an answer that is a link, a folder swapped for a
+  link, the switch off and every bad line are refused; the make started
+  through a wrapper and script that must carry the make-home lines held or
+  not, and the network lines held, with `LAMP_NS_NET=run` only held, no
+  token and no admin socket in its environment, in its make's folder,
+  with its own `HOME` and `HERMES_HOME`; the lines are lamp-update's own,
+  word for word; old make folders are swept at the start; lamp-update's
   namespace text shows `control.sock` alone and never names `admin.sock`;
   only lamp-voice as root may hand a make over; the socket says `started`,
   then the answer; the default keeps the network and still shows no admin

@@ -6,7 +6,16 @@
 //! row-6443's path), through its namespace wrapper: only its own folder,
 //! its work folder and the skills, lamp-control's `control.sock` alone and
 //! never `admin.sock`. Its terminal and tools work only inside that
-//! namespace. No token is minted: a make has no grants.
+//! namespace. No token is minted: a make has no grants. Hermes only
+//! ([`MakeHermes`], the first builder's ruling, 12 Nov 19:14): only Hermes
+//! has a namespace runner today. Held or not, the wrapper and the namespace
+//! script must carry lamp-update's make-home lines ([`WRAPPER_HOME_LINE`],
+//! [`NS_HOME_LINE`]), or the make is refused [`NO_NAMESPACE`].
+//!
+//! Each make has a fresh home of its own, `make-<run id>/home`, 0700, as
+//! `HOME` and `HERMES_HOME`: empty but for the provider config (its key
+//! named by its variable, never a key), never Hermes's memory, sessions or
+//! state, with Hermes's lasting folder read-only; it goes with the make.
 //!
 //! Its network ([`NET_SWITCH`], the owner's ask, 12 Nov): kept by default,
 //! as V1's agent had it. `LAMP_MAKE_AGENT_NET=held` exactly gives the
@@ -22,22 +31,27 @@
 //!   one a skill's run starts in, shown to Hermes in its namespace), 0700,
 //!   with the rules in [`RULES_FILE`], 0600. The run starts there and is
 //!   told to write its answer to [`ANSWER_FILE`] there and nothing else.
-//!   The answer is read back (a regular file, never a link, at most
+//!   The answer is read back with `openat` from the folder's own
+//!   descriptor, `O_NOFOLLOW` (a regular file, never a link, at most
 //!   [`MOST_ANSWER_BYTES`]) once the run has ended and its whole process
 //!   group is gone, and the folder removed however the make ends. The
 //!   voice puts the answer through the same checks as DeepSeek's.
 //! - **The answers**: `{"ok":true,"started":true}` once the run is about
 //!   to start (so the voice says its waiting line only then), then
 //!   `{"ok":true,"answer"}`; or one refusal: `off`, `bad_request`,
-//!   `too_long`, `busy`, `not_held_off`, `run_failed` or `no_answer`.
+//!   `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed` or
+//!   `no_answer`.
 //! - **The socket** ([`MakeHandOvers`]): with `LAMP_SKILL_TASKS` on (the
 //!   switch lamp-update's namespace edits are written with), `serve` binds
-//!   [`MAKE_SOCKET`] for lamp-voice alone, as root, one make at a time.
+//!   [`MAKE_SOCKET`] for lamp-voice alone, as root, one make at a time,
+//!   sweeping old make folders first ([`sweep`]). It is not bound only
+//!   when the hand-over is on: that switch, `LAMP_MAKE_SKILL_AGENT`, is
+//!   lamp-voice's alone (set in its unit, which the unit census keeps), so
+//!   lamp-tasks can't see it.
 use crate::protocol::refusal;
 use crate::skill_task::{NOT_HELD_OFF, Runner, SkillRun, read_line_within, run_id, write_answer};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -130,9 +144,13 @@ pub fn prompt(folder: &Path) -> String {
     )
 }
 
-/// The run of a make in `folder`: its words, no environment of its own (no
-/// token, no grant), at most `within`, started in its folder.
+/// The run of a make in `folder`: its words, at most `within`, started in
+/// its folder, with its own fresh home ([`HOME_FOLDER`]) as `HOME`,
+/// `HERMES_HOME` under it and [`HOME_ENV`] naming it, and nothing else of
+/// its own (no token, no grant).
 pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
+    let home = folder.join(HOME_FOLDER);
+    let shown = |path: &Path| path.to_string_lossy().into_owned();
     SkillRun {
         // The make's own run id, from its folder's name (`make-<run id>`).
         run: folder
@@ -144,62 +162,160 @@ pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
         skill: "make".into(),
         prompt: prompt(folder),
         folder: folder.to_path_buf(),
-        env: Vec::new(),
+        env: vec![
+            ("HOME", shown(&home)),
+            (crate::hold::HERMES_HOME, shown(&home.join(HERMES_FOLDER))),
+            (HOME_ENV, shown(&home)),
+        ],
         deadline: within,
         start_in: Some(folder.to_path_buf()),
     }
 }
 
-/// A make's folder, removed however the make ends.
-struct MadeFolder(PathBuf);
+/// A make's own home in its folder (the first builder's 19:14 ruling on
+/// #6643): a fresh, empty folder, 0700, the run's `HOME`, removed with the
+/// make.
+pub const HOME_FOLDER: &str = "home";
+/// Hermes's own folder in it, `HERMES_HOME`, holding only its provider
+/// config ([`CONFIG_FILE`]).
+pub const HERMES_FOLDER: &str = ".hermes";
+/// The provider config copied in: the lamp's provider, its key a
+/// variable's name only (`key_env`, [`crate::hermes_config::TOKEN_ENV`]),
+/// never a key, memory, sessions or state.
+pub const CONFIG_FILE: &str = "config.yaml";
+/// The variable naming the make's home to Hermes's wrapper
+/// (`lamp_update::hermes_install::HOME_ENV`).
+pub const HOME_ENV: &str = "LAMP_NS_HOME";
+/// The namespace script Hermes's wrapper runs (`lamp_update::hermes_install::NS`).
+pub const NS: &str = "/usr/local/lib/lampos/hermes-ns";
+/// The wrapper's line for a make's home (`lamp_update::hermes_install::WRAPPER_HOME_LINE`,
+/// held equal to it by a test): its mark, checked before every make, held or not.
+pub const WRAPPER_HOME_LINE: &str = "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n";
+/// The namespace script's line for it (`lamp_update::hermes_install::NS_HOME_LINE`).
+pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then [ -d \"$LAMP_NS_HOME\" ] || fail \"no $LAMP_NS_HOME\"; ro \"$H\"; HOME=$LAMP_NS_HOME; fi\nunset LAMP_NS_HOME\n";
+/// Said when Hermes's wrapper or namespace script has no make-home line.
+pub const NO_NAMESPACE: &str = "the lamp's Hermes can't be given a make's own home yet (its wrapper or namespace script has no make-home line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
+
+/// A make's folder, held open from when it was made, and removed however
+/// the make ends: an answer, a failure, its deadline or a panic.
+struct MadeFolder {
+    path: PathBuf,
+    fd: rustix::fd::OwnedFd,
+}
 
 impl Drop for MadeFolder {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        let _ = std::fs::remove_dir_all(&self.path);
     }
 }
 
-/// The folder and its rules, made 0700 and 0600 before a byte is written.
-fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
+const DIR_FLAGS: rustix::fs::OFlags = rustix::fs::OFlags::DIRECTORY
+    .union(rustix::fs::OFlags::NOFOLLOW)
+    .union(rustix::fs::OFlags::RDONLY)
+    .union(rustix::fs::OFlags::CLOEXEC);
+
+/// Folder `name` made 0700 in `at` and opened, never through a link.
+fn folder_in(at: &rustix::fd::OwnedFd, name: &str) -> std::io::Result<rustix::fd::OwnedFd> {
+    use rustix::fs::{Mode, fchmod, mkdirat, openat};
+    mkdirat(at, name, Mode::from_raw_mode(0o700))?;
+    let fd = openat(at, name, DIR_FLAGS, Mode::empty())?;
+    fchmod(&fd, Mode::from_raw_mode(0o700))?;
+    Ok(fd)
+}
+
+/// File `name` made new, 0600, in `at` with `text`, never through a link.
+fn file_in(at: &rustix::fd::OwnedFd, name: &str, text: &str) -> std::io::Result<()> {
+    use rustix::fs::{Mode, OFlags, openat};
     use std::io::Write;
-    let folder = work.join(format!("{FOLDER_HEAD}{}", run_id()));
-    std::fs::DirBuilder::new().mode(0o700).create(&folder)?;
-    let made = MadeFolder(folder);
-    std::fs::set_permissions(&made.0, std::fs::Permissions::from_mode(0o700))?;
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(made.0.join(RULES_FILE))?
-        .write_all(rules.as_bytes())?;
+    let fd = openat(
+        at,
+        name,
+        OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        Mode::from_raw_mode(0o600),
+    )?;
+    std::fs::File::from(fd).write_all(text.as_bytes())
+}
+
+/// The make's folder in `work` with its rules, and its fresh home with
+/// only the provider config: each folder 0700 and each file 0600, made
+/// before a byte is written, each part opened from the one above, never
+/// through a link.
+fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
+    use rustix::fs::{Mode, open};
+    let name = format!("{FOLDER_HEAD}{}", run_id());
+    let at = open(work, DIR_FLAGS, Mode::empty())?;
+    let fd = folder_in(&at, &name)?;
+    let made = MadeFolder {
+        path: work.join(&name),
+        fd,
+    };
+    file_in(&made.fd, RULES_FILE, rules)?;
+    let home = folder_in(&made.fd, HOME_FOLDER)?;
+    let hermes = folder_in(&home, HERMES_FOLDER)?;
+    let config = crate::hermes_config::merge_config("", crate::runtime::HERMES_FORWARDER_PORT)
+        .map_err(|_| std::io::Error::other("the provider config was not made"))?;
+    file_in(&hermes, CONFIG_FILE, &config)?;
     Ok(made)
 }
 
-/// The answer the run wrote: a regular file, never a link, of at most
-/// [`MOST_ANSWER_BYTES`] of text.
-fn answer_read(folder: &Path) -> Option<String> {
+/// The answer the run wrote, read from the make's folder as it was made
+/// (its descriptor, so a folder swapped for a link is never followed): a
+/// regular file, never a link, of at most [`MOST_ANSWER_BYTES`] of text.
+fn answer_read(folder: &rustix::fd::OwnedFd) -> Option<String> {
+    use rustix::fs::{Mode, OFlags, openat};
     use std::io::Read;
-    let path = folder.join(ANSWER_FILE);
-    let meta = std::fs::symlink_metadata(&path).ok()?;
+    let fd = openat(
+        folder,
+        ANSWER_FILE,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK,
+        Mode::empty(),
+    )
+    .ok()?;
+    let file = std::fs::File::from(fd);
+    let meta = file.metadata().ok()?;
     if !meta.file_type().is_file() || meta.len() > MOST_ANSWER_BYTES {
         return None;
     }
     let mut text = String::new();
-    std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
-        .open(&path)
-        .ok()?
-        .take(MOST_ANSWER_BYTES + 1)
+    file.take(MOST_ANSWER_BYTES + 1)
         .read_to_string(&mut text)
         .ok()?;
     (!text.trim().is_empty() && text.len() as u64 <= MOST_ANSWER_BYTES).then_some(text)
 }
 
+/// Make folders an earlier lamp-tasks left in `work` (stopped while a make
+/// ran), removed as it starts: only folders named `make-*`, never a link.
+pub fn sweep(work: &Path) {
+    let Ok(entries) = std::fs::read_dir(work) else {
+        return;
+    };
+    let mut swept = 0;
+    for entry in entries.flatten() {
+        if entry.file_name().to_string_lossy().starts_with(FOLDER_HEAD)
+            && entry.file_type().is_ok_and(|kind| kind.is_dir())
+            && std::fs::remove_dir_all(entry.path()).is_ok()
+        {
+            swept += 1;
+        }
+    }
+    if swept > 0 {
+        eprintln!("[lamp-tasks] skill make: {swept} old make folder(s) removed");
+    }
+}
+
+/// The refusal's code for why a run can't start.
+fn not_started(why: &str) -> &'static str {
+    match why {
+        NOT_HELD_OFF => "not_held_off",
+        NO_NAMESPACE => "no_namespace",
+        _ => "run_failed",
+    }
+}
+
 /// lamp-tasks' answer to one make `line`: with the switch `on`, the line
 /// checked, the run's namespace checked ([`Runner::ready`]), its folder
-/// made in `work`, `started` told, the run made and waited for, its answer
-/// read and the folder removed; else the refusal.
+/// and fresh home made in `work`, `started` told, the run made and waited
+/// for, its answer read and the folder removed; else the refusal.
 pub fn answer(
     line: &[u8],
     on: bool,
@@ -210,7 +326,7 @@ pub fn answer(
     if !on {
         return refusal(
             "off",
-            "a skill run's held-off namespace is off on this lamp (LAMP_SKILL_TASKS)",
+            "a skill run's namespace is off on this lamp (LAMP_SKILL_TASKS)",
         );
     }
     let make = match MakeLine::parse(line) {
@@ -218,7 +334,7 @@ pub fn answer(
         Err((code, why)) => return refusal(code, &why),
     };
     if let Err(why) = runner.ready() {
-        return refusal("not_held_off", &why);
+        return refusal(not_started(&why), &why);
     }
     let folder = match put(work, &make.rules) {
         Ok(folder) => folder,
@@ -231,11 +347,10 @@ pub fn answer(
     };
     started();
     // A make has no token to end.
-    let ran = runner.run(&make_run(&folder.0, make.within()), &|| {});
+    let ran = runner.run(&make_run(&folder.path, make.within()), &|| {});
     match ran {
-        Err(why) if why == NOT_HELD_OFF => refusal("not_held_off", &why),
-        Err(why) => refusal("run_failed", &why),
-        Ok(_) => match answer_read(&folder.0) {
+        Err(why) => refusal(not_started(&why), &why),
+        Ok(_) => match answer_read(&folder.fd) {
             Some(text) => json!({"ok": true, "answer": text}),
             None => refusal("no_answer", NO_ANSWER),
         },
@@ -248,10 +363,11 @@ pub fn caller_may(caller: Option<&lamp_ipc::caller::Caller>) -> bool {
     caller.is_some_and(|caller| caller.uid == 0 && caller.unit.as_deref() == Some(CALLER_UNIT))
 }
 
-/// The switch for a make's network (the owner's ask, 12 Nov: the agent
-/// keeps the network during a make, as V1's did; the first builder's
-/// ruling pending on Queue #6059): exactly [`NET_HELD`] holds the run off
-/// it ([`crate::skill_task::NET_ENV`] `run`: only `lo` and the kernel's
+/// The switch for a make's network: the first builder's 19:14 ruling on
+/// #6643 keeps it (the owner's ask, as V1's agent had it), on the
+/// condition that each make has a fresh home and work folder, dropped
+/// after ([`put`]). Exactly [`NET_HELD`] holds the run off it
+/// ([`crate::skill_task::NET_ENV`] `run`: only `lo` and the kernel's
 /// `@NONE` tunnels, the model through `model.sock`); unset or anything
 /// else, the run keeps the lamp's network. Set in no unit.
 pub const NET_SWITCH: &str = "LAMP_MAKE_AGENT_NET";
@@ -264,23 +380,60 @@ pub fn held(value: Option<&str>) -> bool {
     value == Some(NET_HELD)
 }
 
+/// The lamp's Hermes for a make, and only Hermes: it alone has a namespace
+/// runner today ([`crate::skill_task::HermesRunner`]); the voice hands a
+/// make over only when the lamp's agent is Hermes. Before every make,
+/// held or not, its wrapper and namespace script must carry the make-home
+/// lines ([`WRAPPER_HOME_LINE`], [`NS_HOME_LINE`]: lamp-update's, so the
+/// wrapper is its namespacing one, never Hermes's own program), and, held,
+/// the network lines too.
+pub struct MakeHermes {
+    pub hermes: crate::skill_task::HermesRunner,
+    /// Hermes's wrapper ([`crate::skill_task::HERMES`]).
+    pub wrapper: PathBuf,
+    /// Its namespace script ([`NS`]).
+    pub ns: PathBuf,
+}
+
+impl Runner for MakeHermes {
+    fn ready(&self) -> Result<(), String> {
+        self.hermes.ready()?;
+        let has = |path: &Path, line: &str| {
+            std::fs::read_to_string(path).is_ok_and(|text| text.contains(line))
+        };
+        if !(has(&self.wrapper, WRAPPER_HOME_LINE) && has(&self.ns, NS_HOME_LINE)) {
+            return Err(NO_NAMESPACE.into());
+        }
+        Ok(())
+    }
+
+    fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        self.ready()?;
+        self.hermes.run(run, end_token)
+    }
+}
+
 /// The lamp's Hermes for a make ([`crate::skill_task::HermesRunner::lamp`]),
 /// started through its namespace wrapper either way (only its own folder,
-/// its work folder and the skills, `control.sock` alone of lamp-control's
-/// and never `admin.sock`). `held`: with [`crate::skill_task::NET_ENV`]
-/// `run`, refused when the wrapper can't hold it off. Not held: without
-/// it, so the wrapper keeps the lamp's network, as Harness's own panes do
-/// (the model then reached at lamp-cloud's forwarder, the one
-/// `model.sock` pipes to).
-pub fn lamp_runner(home: &Path, held: bool) -> crate::skill_task::HermesRunner {
-    let mut runner = crate::skill_task::HermesRunner::lamp(home);
+/// read-only for a make, its work folder and the skills, `control.sock`
+/// alone of lamp-control's and never `admin.sock`), with the make's own
+/// home. `held`: with [`crate::skill_task::NET_ENV`] `run`, refused when
+/// the wrapper can't hold it off. Not held: without it, so the wrapper
+/// keeps the lamp's network, as Harness's own panes do (the model then
+/// reached at lamp-cloud's forwarder, the one `model.sock` pipes to).
+pub fn lamp_runner(home: &Path, held: bool) -> MakeHermes {
+    let mut hermes = crate::skill_task::HermesRunner::lamp(home);
     if !held {
-        runner
+        hermes
             .env
             .retain(|(name, _)| name != crate::skill_task::NET_ENV);
-        runner.held_by = None;
+        hermes.held_by = None;
     }
-    runner
+    MakeHermes {
+        hermes,
+        wrapper: PathBuf::from(crate::skill_task::HERMES),
+        ns: PathBuf::from(NS),
+    }
 }
 
 /// The voice's makes served: one line a connection, answered with
@@ -310,7 +463,7 @@ impl MakeHandOvers {
         let runner = lamp_runner(home, held);
         Self {
             socket: PathBuf::from(MAKE_SOCKET),
-            work: runner.folder.clone(),
+            work: runner.hermes.folder.clone(),
             runner: Arc::new(runner),
             caller: caller_may,
         }
@@ -326,6 +479,8 @@ impl MakeHandOvers {
         if !on {
             return Ok(None);
         }
+        // What a lamp-tasks stopped mid-make left, before any make of its own.
+        sweep(&self.work);
         let (listener, binding) = crate::runtime::bind(&self.socket)?;
         let served = std::thread::Builder::new()
             .name("tasks-skill-make".into())
@@ -441,16 +596,21 @@ mod tests {
     use std::sync::Mutex;
 
     /// One run as a test's runner saw it: its rules, folder, own
-    /// environment and deadline.
-    type SeenRun = (String, PathBuf, Vec<(&'static str, String)>, Duration);
+    /// environment, deadline and what its home held at its start.
+    type SeenRun = (
+        String,
+        PathBuf,
+        Vec<(&'static str, String)>,
+        Duration,
+        Vec<String>,
+    );
 
     /// What a test's runner saw of a make's runs, kept by it.
     #[derive(Default)]
     struct Seen(Mutex<Vec<SeenRun>>);
-    use crate::skill_task::{
-        ADMIN_SOCKET, HERMES, HermesRunner, NET_ENV, NET_RUN, TOKEN_ENV, WRAPPER_NET_LINES,
-    };
+    use crate::skill_task::{ADMIN_SOCKET, HERMES, NET_ENV, NET_RUN, TOKEN_ENV, WRAPPER_NET_LINES};
     use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::fs::PermissionsExt;
 
     fn line(rules: &str, within_ms: u64) -> Vec<u8> {
         json!({"op":"skill_make","rules":rules,"within_ms":within_ms})
@@ -463,6 +623,8 @@ mod tests {
         answer: Option<&'static str>,
         seen: Seen,
         ready: Result<(), String>,
+        /// What the run ends with, after it wrote in its home.
+        result: Result<u64, String>,
     }
 
     impl Runner for Writing {
@@ -472,16 +634,21 @@ mod tests {
 
         fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
             let folder = run.start_in.clone().unwrap();
+            let home = folder.join(HOME_FOLDER);
             self.seen.0.lock().unwrap().push((
                 std::fs::read_to_string(folder.join(RULES_FILE)).unwrap(),
                 folder.clone(),
                 run.env.clone(),
                 run.deadline,
+                listing(&home),
             ));
+            // What a run leaves in its home: never seen by the next make.
+            std::fs::write(home.join("memory.md"), "LEFT BEHIND").unwrap();
+            std::fs::write(home.join(HERMES_FOLDER).join("state.db"), "S").unwrap();
             if let Some(answer) = self.answer {
                 std::fs::write(folder.join(ANSWER_FILE), answer).unwrap();
             }
-            Ok(0)
+            self.result.clone()
         }
     }
 
@@ -490,7 +657,25 @@ mod tests {
             answer,
             seen: Seen::default(),
             ready: Ok(()),
+            result: Ok(0),
         }
+    }
+
+    /// What a make's own home held when its run began: every path in it.
+    fn listing(home: &Path) -> Vec<String> {
+        let mut found = Vec::new();
+        let mut folders = vec![home.to_path_buf()];
+        while let Some(folder) = folders.pop() {
+            for entry in std::fs::read_dir(&folder).unwrap().flatten() {
+                let path = entry.path();
+                found.push(path.strip_prefix(home).unwrap().display().to_string());
+                if entry.file_type().unwrap().is_dir() {
+                    folders.push(path);
+                }
+            }
+        }
+        found.sort();
+        found
     }
 
     #[test]
@@ -511,33 +696,116 @@ mod tests {
         );
         assert_eq!(started, 1);
         let seen = runner.seen.0.lock().unwrap();
-        let (rules, folder, env, deadline) = &seen[0];
+        let (rules, folder, env, deadline, _) = &seen[0];
         assert_eq!(rules, "SYSTEM\n\nBRIEF");
         assert!(folder.starts_with(work.path()), "{folder:?}");
-        // No token, no grant, no socket of its own: a make has none.
-        assert!(env.is_empty(), "{env:?}");
+        // Its own home and nothing else: no token, no grant, no socket.
+        let home = folder.join(HOME_FOLDER).display().to_string();
+        assert_eq!(
+            env,
+            &vec![
+                ("HOME", home.clone()),
+                ("HERMES_HOME", format!("{home}/.hermes")),
+                (HOME_ENV, home),
+            ]
+        );
         assert_eq!(*deadline, Duration::from_secs(3));
         // The folder is gone once the answer is in.
         assert!(!folder.exists());
         assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
     }
 
-    /// A run that can't be held off the network starts nothing and makes
-    /// no folder; one with no answer, or an answer that is a link, is
-    /// `no_answer`; the switch off and a bad line refuse before anything.
+    /// The first builder's 19:14 ruling on #6643: each make starts with a
+    /// fresh, empty home but for the provider config (a variable's name for
+    /// its key, never a key), never sees what an earlier make left in its
+    /// home, and its home is gone after however it ended: answered, failed
+    /// or past its deadline.
     #[test]
-    fn no_held_off_run_no_make_and_no_answer_is_refused() {
+    fn each_make_has_a_fresh_home_dropped_after() {
         let work = tempfile::tempdir().unwrap();
-        let mut not_held = writing(Some("x"));
-        not_held.ready = Err(NOT_HELD_OFF.into());
-        let mut started = false;
-        let refused = answer(&line("R", 2_000), true, work.path(), &not_held, &mut || {
-            started = true
+        for result in [
+            Ok(0),
+            Err("the lamp's Hermes ended with status 1".to_owned()),
+            Err("the run was ended at its deadline, 2 s".to_owned()),
+            Ok(0),
+        ] {
+            let mut runner = writing(Some("A"));
+            runner.result = result.clone();
+            let answered = answer(&line("R", 2_000), true, work.path(), &runner, &mut || {});
+            assert_eq!(answered["ok"], result.is_ok(), "{answered}");
+            let seen = runner.seen.0.lock().unwrap();
+            let (_, folder, _, _, at_start) = &seen[0];
+            assert_eq!(
+                at_start,
+                &vec![".hermes".to_owned(), ".hermes/config.yaml".to_owned()],
+                "only the provider config, never what an earlier make left"
+            );
+            assert!(!folder.exists(), "dropped after {result:?}");
+            assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
+        }
+        // The provider config names its key's variable, never a key.
+        let made = put(work.path(), "R").unwrap();
+        let config = std::fs::read_to_string(
+            made.path
+                .join(HOME_FOLDER)
+                .join(HERMES_FOLDER)
+                .join(CONFIG_FILE),
+        )
+        .unwrap();
+        assert!(
+            config.contains("key_env: \"LAMP_HERMES_TOKEN\""),
+            "{config}"
+        );
+        assert!(config.contains("127.0.0.1:7741"), "{config}");
+        assert!(!config.contains("tok_"), "{config}");
+        use std::os::unix::fs::MetadataExt;
+        for (path, mode) in [
+            (made.path.clone(), 0o700),
+            (made.path.join(HOME_FOLDER), 0o700),
+            (made.path.join(HOME_FOLDER).join(HERMES_FOLDER), 0o700),
+            (made.path.join(RULES_FILE), 0o600),
+        ] {
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().mode() & 0o777,
+                mode,
+                "{path:?}"
+            );
+        }
+        let path = made.path.clone();
+        drop(made);
+        assert!(!path.exists());
+        // A panic while the make runs drops it too.
+        let panicking = std::panic::catch_unwind(|| {
+            let made = put(work.path(), "R").unwrap();
+            let _keep = &made;
+            panic!("in the run");
         });
-        assert_eq!(refused["error"], "not_held_off");
-        assert!(!started);
-        assert!(not_held.seen.0.lock().unwrap().is_empty());
+        assert!(panicking.is_err());
         assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
+    }
+
+    /// A run that can't be held off the network, or whose namespace has no
+    /// make-home line, starts nothing and makes no folder; one with no
+    /// answer, or an answer that is a link, is `no_answer`; the switch off
+    /// and a bad line refuse before anything.
+    #[test]
+    fn no_namespace_no_make_and_no_answer_is_refused() {
+        let work = tempfile::tempdir().unwrap();
+        for (why, code) in [
+            (NOT_HELD_OFF, "not_held_off"),
+            (NO_NAMESPACE, "no_namespace"),
+        ] {
+            let mut refusing = writing(Some("x"));
+            refusing.ready = Err(why.into());
+            let mut started = false;
+            let refused = answer(&line("R", 2_000), true, work.path(), &refusing, &mut || {
+                started = true
+            });
+            assert_eq!(refused["error"], code);
+            assert!(!started);
+            assert!(refusing.seen.0.lock().unwrap().is_empty());
+            assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
+        }
         let silent = writing(None);
         let refused = answer(&line("R", 2_000), true, work.path(), &silent, &mut || {});
         assert_eq!(refused["error"], "no_answer");
@@ -555,105 +823,149 @@ mod tests {
             assert_eq!(refused["ok"], false, "{refused}");
         }
         assert_eq!(silent.seen.0.lock().unwrap().len(), 1);
-        let linked = tempfile::tempdir().unwrap();
-        std::fs::write(linked.path().join("secret"), "SECRET").unwrap();
-        assert_eq!(answer_read(linked.path()), None);
-        std::os::unix::fs::symlink(
-            linked.path().join("secret"),
-            linked.path().join(ANSWER_FILE),
-        )
-        .unwrap();
-        assert_eq!(answer_read(linked.path()), None, "never through a link");
+        // The answer is read from the folder as made, never through a link.
+        let made = put(work.path(), "R").unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        std::fs::write(elsewhere.path().join("secret"), "SECRET").unwrap();
+        assert_eq!(answer_read(&made.fd), None);
+        std::os::unix::fs::symlink(elsewhere.path().join("secret"), made.path.join(ANSWER_FILE))
+            .unwrap();
+        assert_eq!(answer_read(&made.fd), None, "never through a link");
+        std::fs::remove_file(made.path.join(ANSWER_FILE)).unwrap();
+        std::fs::write(made.path.join(ANSWER_FILE), "MINE").unwrap();
+        // The folder swapped for a link after it was made: still its own.
+        let moved = work.path().join("moved");
+        std::fs::rename(&made.path, &moved).unwrap();
+        std::fs::write(elsewhere.path().join(ANSWER_FILE), "THEIRS").unwrap();
+        std::os::unix::fs::symlink(elsewhere.path(), &made.path).unwrap();
+        assert_eq!(answer_read(&made.fd).as_deref(), Some("MINE"));
+        drop(made);
+        std::fs::remove_dir_all(&moved).unwrap();
+    }
+
+    /// Stand-ins for lamp-update's wrapper and namespace script, with the
+    /// lines given.
+    fn namespace(dir: &Path, wrapper: &str, ns: &str) -> (PathBuf, PathBuf) {
+        let (w, n) = (dir.join("hermes"), dir.join("hermes-ns"));
+        std::fs::write(&w, wrapper).unwrap();
+        std::fs::write(&n, ns).unwrap();
+        (w, n)
     }
 
     /// The make's run is the lamp's Hermes exactly as a skill's run is
-    /// started (row-6443's path): through its wrapper, which must hold it
-    /// off the network, with `LAMP_NS_NET=run` and nothing of the admin
-    /// socket or a token; started in its make's folder with the make's
-    /// words. A wrapper without the network lines starts nothing.
+    /// started (row-6443's path), through its wrapper: held, with
+    /// `LAMP_NS_NET=run`; never a token or the admin socket; started in its
+    /// make's folder with its own home. Held or not, the wrapper and the
+    /// namespace script must carry the make-home lines, lamp-update's own
+    /// (so never Hermes's own program); held, the network lines too.
     #[test]
-    fn a_make_is_started_as_a_held_off_skill_run() {
-        let home = tempfile::tempdir().unwrap();
+    fn a_make_is_started_through_the_marked_namespace_held_or_not() {
+        let dir = tempfile::tempdir().unwrap();
         let lamp = MakeHandOvers::lamp(Path::new("/var/lib/lampos-tasks"));
         assert_eq!(
             lamp.work,
             Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp")
         );
-        let hermes = HermesRunner::lamp(home.path());
-        assert_eq!(hermes.held_by.as_deref(), Some(Path::new(HERMES)));
-        assert!(
-            hermes
-                .env
-                .contains(&(NET_ENV.to_owned(), NET_RUN.to_owned()))
-        );
-        // As lamp-tasks starts it, with a stand-in for the wrapper that
-        // keeps what it was given.
-        let wrapper = home.path().join("hermes");
-        let work = home.path().join("work");
+        let work = dir.path().join("work");
         std::fs::create_dir(&work).unwrap();
-        let runner = HermesRunner {
-            program: PathBuf::from("/bin/sh"),
-            args: vec![
-                "-c".into(),
-                format!(
-                    "pwd > {seen}/cwd; env > {seen}/env; printf '%s' \"$1\" > {seen}/words; \
-                     cp {RULES_FILE} {seen}/rules; printf 'ANSWER' > {ANSWER_FILE}",
-                    seen = home.path().display()
-                ),
-                "sh".into(),
-            ],
-            folder: work.clone(),
-            env: hermes.env.clone(),
-            tick: Duration::from_millis(10),
-            held_by: Some(wrapper.clone()),
+        let script = format!(
+            "pwd > {seen}/cwd; env > {seen}/env; printf '%s' \"$1\" > {seen}/words; \
+             ls -A \"$HOME\" > {seen}/home; cp {RULES_FILE} {seen}/rules; \
+             printf 'ANSWER' > {ANSWER_FILE}",
+            seen = dir.path().display()
+        );
+        let make = |held: bool, wrapper: &str, ns: &str| {
+            let (w, n) = namespace(dir.path(), wrapper, ns);
+            let mut runner = lamp_runner(dir.path(), held);
+            runner.hermes.program = PathBuf::from("/bin/sh");
+            runner.hermes.args = vec!["-c".into(), script.clone(), "sh".into()];
+            runner.hermes.folder = work.clone();
+            runner.hermes.tick = Duration::from_millis(10);
+            if held {
+                runner.hermes.held_by = Some(w.clone());
+            }
+            runner.wrapper = w;
+            runner.ns = n;
+            let _ = std::fs::remove_file(dir.path().join("env"));
+            answer(&line("RULES", 5_000), true, &work, &runner, &mut || {})
         };
-        let mut started = false;
-        let refused = answer(&line("RULES", 5_000), true, &work, &runner, &mut || {
-            started = true
-        });
-        assert_eq!(refused["error"], "not_held_off", "no wrapper: {refused}");
-        assert!(!started && !home.path().join("env").exists());
-        std::fs::write(
-            &wrapper,
-            format!(
-                "#!/bin/sh\nunset T\n{}{}--pid hermes-ns \"$@\"\n",
-                WRAPPER_NET_LINES[0], WRAPPER_NET_LINES[1]
-            ),
-        )
-        .unwrap();
-        let answered = answer(&line("RULES", 5_000), true, &work, &runner, &mut || {});
-        assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}));
-        let env = std::fs::read_to_string(home.path().join("env")).unwrap();
-        assert!(env.contains("LAMP_NS_NET=run"), "{env}");
-        assert!(!env.contains(TOKEN_ENV), "{env}");
-        assert!(!env.contains(ADMIN_SOCKET), "{env}");
-        assert!(!env.contains("CARGO"), "{env}");
-        let cwd = std::fs::read_to_string(home.path().join("cwd")).unwrap();
-        assert!(
-            Path::new(cwd.trim())
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .starts_with(FOLDER_HEAD),
-            "{cwd}"
-        );
-        let words = std::fs::read_to_string(home.path().join("words")).unwrap();
-        assert!(
-            words.contains(ANSWER_FILE) && words.contains(RULES_FILE),
-            "{words}"
-        );
-        assert_eq!(
-            std::fs::read_to_string(home.path().join("rules")).unwrap(),
-            "RULES"
-        );
-        assert_eq!(
-            std::fs::read_dir(&work).unwrap().count(),
-            0,
-            "folder removed"
-        );
-        // The namespace it is held in shows control.sock alone and never
-        // names admin.sock in what it runs: lamp-update's own text.
+        let net = format!("{}{}", WRAPPER_NET_LINES[0], WRAPPER_NET_LINES[1]);
+        let marked =
+            format!("#!/bin/sh\n{WRAPPER_HOME_LINE}unset T\n{net}--pid hermes-ns \"$@\"\n");
+        // Not held: Hermes's own program, or a wrapper or script without
+        // the make-home line, starts nothing.
+        for (wrapper, ns) in [
+            ("#!/usr/bin/env python3\n# hermes\n", NS_HOME_LINE),
+            (net.as_str(), NS_HOME_LINE),
+            (marked.as_str(), "#!/bin/sh\n"),
+        ] {
+            let refused = make(false, wrapper, ns);
+            assert_eq!(refused["error"], "no_namespace", "{refused}");
+            assert!(!dir.path().join("env").exists(), "nothing started");
+        }
+        // Held: the network lines too.
+        let unheld = format!("#!/bin/sh\n{WRAPPER_HOME_LINE}unset T\n");
+        let refused = make(true, &unheld, NS_HOME_LINE);
+        assert_eq!(refused["error"], "not_held_off", "{refused}");
+        assert!(!dir.path().join("env").exists());
+        for held in [false, true] {
+            let answered = make(held, &marked, NS_HOME_LINE);
+            assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}), "{held}");
+            let env = std::fs::read_to_string(dir.path().join("env")).unwrap();
+            assert_eq!(env.contains("LAMP_NS_NET=run"), held, "{env}");
+            assert!(!env.contains(TOKEN_ENV), "{env}");
+            assert!(!env.contains(ADMIN_SOCKET), "{env}");
+            assert!(!env.contains("CARGO"), "{env}");
+            let cwd = std::fs::read_to_string(dir.path().join("cwd")).unwrap();
+            let cwd = Path::new(cwd.trim());
+            assert!(
+                cwd.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with(FOLDER_HEAD),
+                "{cwd:?}"
+            );
+            // pwd names the folder through /private on macOS; the home is
+            // the same folder's.
+            let home = work
+                .join(cwd.file_name().unwrap())
+                .join(HOME_FOLDER)
+                .display()
+                .to_string();
+            let lines: Vec<&str> = env.lines().collect();
+            assert!(lines.contains(&format!("HOME={home}").as_str()), "{env}");
+            assert!(lines.contains(&format!("HERMES_HOME={home}/.hermes").as_str()));
+            assert!(lines.contains(&format!("LAMP_NS_HOME={home}").as_str()));
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join("home")).unwrap(),
+                ".hermes\n"
+            );
+            let words = std::fs::read_to_string(dir.path().join("words")).unwrap();
+            assert!(words.contains(ANSWER_FILE) && words.contains(RULES_FILE));
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join("rules")).unwrap(),
+                "RULES"
+            );
+            assert_eq!(std::fs::read_dir(&work).unwrap().count(), 0, "removed");
+        }
+        // The lines are lamp-update's own, word for word.
         let source = include_str!("../../update/src/hermes_install.rs");
+        for (name, line) in [
+            ("WRAPPER_HOME_LINE", WRAPPER_HOME_LINE),
+            ("NS_HOME_LINE", NS_HOME_LINE),
+        ] {
+            assert!(
+                source.contains(&format!("pub const {name}: &str = {line:?};")),
+                "{name}"
+            );
+        }
+        assert!(source.contains(&format!("pub const NS: &str = {NS:?};")));
+        assert!(source.contains(&format!("pub const HOME_ENV: &str = {HOME_ENV:?};")));
+        assert!(
+            WRAPPER_HOME_LINE
+                .contains("/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home")
+        );
+        // The namespace shows control.sock alone and never names admin.sock.
         let tasks_edits = source
             .split("const TASKS_EDITS")
             .nth(1)
@@ -668,10 +980,11 @@ mod tests {
         assert!(script.contains("@NONE"));
     }
 
-    /// The owner's ask (12 Nov): by default a make's run keeps the network,
-    /// still in Hermes's namespace, so `control.sock` alone and never
-    /// `admin.sock`; `LAMP_MAKE_AGENT_NET=held` exactly gives the strict
-    /// held-off run, `LAMP_NS_NET=run`.
+    /// The first builder's 19:14 ruling: by default a make's run keeps the
+    /// network, still in Hermes's namespace, so `control.sock` alone and
+    /// never `admin.sock`; `LAMP_MAKE_AGENT_NET=held` exactly gives the
+    /// strict held-off run, `LAMP_NS_NET=run`. Both check the wrapper's
+    /// mark.
     #[test]
     fn the_default_keeps_the_network_and_held_holds_it_off() {
         for value in [None, Some(""), Some("HELD"), Some("on"), Some("run")] {
@@ -680,29 +993,33 @@ mod tests {
         assert!(held(Some("held")));
         let home = Path::new("/var/lib/lampos-tasks");
         let kept = lamp_runner(home, false);
-        assert_eq!(kept.program, Path::new(HERMES), "through its namespace");
+        assert_eq!(
+            kept.hermes.program,
+            Path::new(HERMES),
+            "through its namespace"
+        );
+        assert_eq!(kept.wrapper, Path::new(HERMES));
+        assert_eq!(kept.ns, Path::new(NS));
         assert!(
-            kept.env.iter().all(|(name, _)| name != NET_ENV),
+            kept.hermes.env.iter().all(|(name, _)| name != NET_ENV),
             "{:?}",
-            kept.env
+            kept.hermes.env
         );
         assert!(
-            kept.env
+            kept.hermes
+                .env
                 .iter()
                 .all(|(name, value)| !value.contains("admin.sock") && name != TOKEN_ENV)
         );
-        assert_eq!(kept.ready(), Ok(()));
         let strict = lamp_runner(home, true);
-        assert_eq!(strict.program, Path::new(HERMES));
+        assert_eq!(strict.hermes.program, Path::new(HERMES));
         assert!(
             strict
+                .hermes
                 .env
                 .contains(&(NET_ENV.to_owned(), NET_RUN.to_owned()))
         );
-        assert_eq!(strict.held_by.as_deref(), Some(Path::new(HERMES)));
-        // A make's run itself carries no socket or token, either way.
-        let run = make_run(Path::new("/tmp/make-x"), Duration::from_secs(5));
-        assert!(run.env.is_empty());
+        assert_eq!(strict.hermes.held_by.as_deref(), Some(Path::new(HERMES)));
         // Either way the namespace shows control.sock alone, never the
         // admin socket: its bind is the file, not the folder, and not
         // only with LAMP_NS_NET=run.
@@ -713,6 +1030,36 @@ mod tests {
         // The kept run reaches the model at lamp-cloud's forwarder, the one
         // model.sock pipes to.
         assert!(source.contains("pub const RELAY_LISTEN: &str = \"127.0.0.1:7741\";"));
+    }
+
+    /// Make folders an earlier lamp-tasks left are swept as the socket is
+    /// started; nothing else in the work folder is.
+    #[test]
+    fn old_make_folders_are_swept_at_the_start() {
+        let dir = tempfile::Builder::new()
+            .prefix("tms-")
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .unwrap();
+        let work = dir.path().join("work");
+        std::fs::create_dir_all(work.join("make-task-1/home/.hermes")).unwrap();
+        std::fs::write(work.join("make-task-1/rules.md"), "R").unwrap();
+        std::fs::create_dir(work.join("other")).unwrap();
+        std::fs::write(work.join("make-notes.md"), "kept").unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let handle = MakeHandOvers {
+            socket: dir.path().join("skill-make.sock"),
+            work: work.clone(),
+            runner: Arc::new(writing(None)),
+            caller: |_| true,
+        }
+        .start(true, stop.clone())
+        .unwrap()
+        .unwrap();
+        assert!(!work.join("make-task-1").exists());
+        assert!(work.join("other").exists() && work.join("make-notes.md").exists());
+        stop.store(true, Ordering::Release);
+        handle.join().unwrap();
     }
 
     #[test]
