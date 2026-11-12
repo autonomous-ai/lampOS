@@ -1207,8 +1207,16 @@ sau:
     một lần tạo không có `request`, hoặc một `choice` không có
     `clash_id`, không tạo gì và được báo "nothing was made: a new skill
     needs request, what it should do and when"
-    (`make_skill_local::NO_REQUEST`). Lựa chọn chỉ được nhận trong một câu
-    nghe được sau câu tạo, trong 5 phút (`made_clash::CLASH_WITHIN`), và
+    (`make_skill_local::NO_REQUEST`). Lịch sử của đường thứ hai giữ
+    lời của các lượt trước, không giữ các lần gọi, nên `clash_id` báo
+    trong chính câu trả lời của lần tạo đã mất ở câu kế tiếp của người
+    dùng (P1 của Reviewer-lead trên #6614): mỗi câu nghe được sau đó trên
+    đường này, khi xung đột còn chờ và trong 5 phút, được kèm một ghi chú
+    có `clash_id` và nguyên văn câu hỏi, dặn gọi `make_skill` chỉ với
+    `clash_id` đó và `choice` (`made_clash::waiting_note`, cạnh
+    `skill_write_yes::waiting_note`); không có ở chính câu tạo, khi không
+    có gì chờ, quá 5 phút hoặc khi đã được trả lời. Lựa chọn chỉ được nhận
+    trong một câu nghe được sau câu tạo, trong 5 phút (`made_clash::CLASH_WITHIN`), và
     chỉ của chủ đèn, kiểm như một lời "có" (`services::owners_yes_now`:
     với `LAMP_PRIVATE_ROOM` bật, bất kỳ câu nghe được nào). "Thay" gỡ một
     kỹ năng, nên lựa chọn được canh như lời "có" của kỹ năng đã tạo (P2
@@ -1238,7 +1246,10 @@ sau:
     `an_echoed_unsaid_or_live_replace_is_refused`,
     `replace_never_leaves_both_off`,
     `cancel_and_expiry_forget_the_made_one`,
-    `a_make_with_no_request_is_refused_plainly`.
+    `a_make_with_no_request_is_refused_plainly`,
+    `the_waiting_note_shows_only_while_a_clash_waits`,
+    `keep_both_on_the_next_line_goes_on_with_the_clash_id`,
+    `no_clash_note_when_nothing_waits`.
 
 Một câu "đã tạo" mà không có lần tạo nào đứng sau thì không bao giờ được nói
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): câu trả lời mở đầu

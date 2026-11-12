@@ -5,6 +5,7 @@ mod action_claim;
 mod after_forget;
 mod chat_second_try;
 mod checking_line;
+mod clash_note;
 mod cut_to_a_person;
 mod decline_silent;
 mod dont_know;

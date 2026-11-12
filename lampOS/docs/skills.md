@@ -3605,8 +3605,17 @@ gone ([switches.md](switches.md)). What happens:
     `request` is no longer required (`made_clash::chosen`); a make with no
     `request`, or a `choice` with no `clash_id`, makes nothing and is told
     "nothing was made: a new skill needs request, what it should do and
-    when" (`make_skill_local::NO_REQUEST`). A choice is taken only in a
-    later heard line than the make's, within 5 minutes
+    when" (`make_skill_local::NO_REQUEST`). The second route's
+    history keeps past exchanges' words, not their calls, so the
+    `clash_id` told in the make's own answer is gone by the person's next
+    line (the Reviewer-lead's P1 on #6614): each later heard line on that
+    route, while the clash waits and within 5 minutes, is told a note with
+    its `clash_id` and its question word for word, and to call
+    `make_skill` with only that `clash_id` and `choice`
+    (`made_clash::waiting_note`, beside `skill_write_yes::waiting_note`);
+    none in the make's own line, none when nothing waits, past 5 minutes
+    or once answered. A choice is taken only in a later heard line than
+    the make's, within 5 minutes
     (`made_clash::CLASH_WITHIN`), and only the owner's, held as a yes is
     (`services::owners_yes_now`: with `LAMP_PRIVATE_ROOM` on, any heard
     line). Replace takes a skill off, so the choice is guarded as a made
@@ -3637,7 +3646,10 @@ gone ([switches.md](switches.md)). What happens:
     `an_echoed_unsaid_or_live_replace_is_refused`,
     `replace_never_leaves_both_off`,
     `cancel_and_expiry_forget_the_made_one`,
-    `a_make_with_no_request_is_refused_plainly`.
+    `a_make_with_no_request_is_refused_plainly`,
+    `the_waiting_note_shows_only_while_a_clash_waits`,
+    `keep_both_on_the_next_line_goes_on_with_the_clash_id`,
+    `no_clash_note_when_nothing_waits`.
 
 A made line said with no make behind it is never said
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): a reply that
