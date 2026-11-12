@@ -149,6 +149,55 @@ impl Stops {
 mod tests {
     use super::*;
 
+    /// #6114, cause 1 (hold-off): one call whose score dips under the
+    /// name's bar and rises again inside [`HOLD_OFF`] is said as near at its
+    /// best (0.972, 52e6 on 12391 at 18:23:08) while the name tracker, held
+    /// off after the dip, never sees that best. A hearing the near bar says
+    /// at the name's bar is the name's too, at the same score.
+    #[test]
+    fn issue_6114_a_near_hearing_at_the_names_bar_is_a_name_hearing_too() {
+        let start = Instant::now();
+        let (mut name, mut nears) = (Hearings::new(0.9), Hearings::new(0.5));
+        let (mut heard, mut near) = (Vec::new(), Vec::new());
+        for (step, score) in [0.2, 0.93, 0.7, 0.972, 0.6, 0.2, 0.1]
+            .into_iter()
+            .enumerate()
+        {
+            let at = start + Duration::from_millis(80 * step as u64);
+            heard.extend(name.score(score, at));
+            near.extend(nears.score(score, at));
+        }
+        let near_best = near.iter().map(|n| n.score).fold(0.0f32, f32::max);
+        let name_best = heard.iter().map(|n| n.score).fold(0.0f32, f32::max);
+        assert!(near_best >= 0.9, "{near:?}");
+        assert_eq!(name_best, near_best, "name {heard:?}, near {near:?}");
+    }
+
+    /// #6114, cause 3 (late scores held off by when they came): a woken
+    /// grid's scores come in one batch, dated by their sound. A stray
+    /// hearing early in the batch closes at the batch's arrival, and the
+    /// hold-off then counts from the arrival, so a call whose sound is a
+    /// second and a half later in the same batch is never heard.
+    #[test]
+    fn issue_6114_a_late_call_after_a_stray_in_the_same_batch_is_heard() {
+        let start = Instant::now();
+        let came = start + Duration::from_millis(2_400);
+        let mut name = Hearings::new(0.9);
+        let mut heard = Vec::new();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        for (sound, score) in [
+            (0, 0.95),
+            (80, 0.3),
+            (1_500, 0.97),
+            (1_580, 0.98),
+            (1_660, 0.3),
+        ] {
+            heard.extend(name.score_of(score, at(sound), came));
+        }
+        heard.extend(name.tick(came + Duration::from_secs(1)));
+        assert_eq!(heard.len(), 2, "the stray and the call: {heard:?}");
+    }
+
     fn ms(n: u64) -> Duration {
         Duration::from_millis(n)
     }
