@@ -1018,6 +1018,7 @@ mod tests {
                 sent = Some(line.to_owned());
                 answered("{\"ok\":true,\"id\":9}")
             },
+            || -> String { panic!("asked aloud") },
         );
         assert_eq!(said, "do.task: handed to lamp-tasks: its run ended, task 9");
         let line: serde_json::Value = serde_json::from_str(&sent.unwrap()).unwrap();
