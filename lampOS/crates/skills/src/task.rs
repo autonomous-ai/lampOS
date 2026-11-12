@@ -533,6 +533,31 @@ pub struct Place<'a> {
     pub socket: Option<&'a Path>,
 }
 
+/// The folder a skill's task is handed over from: `name` under the lamp's
+/// skills `root`, or, for one the owner's computer pushed (`pushed`), under
+/// the developer folder `dev` (on a lamp [`crate::PUSHED_DIR`]), the one
+/// other place lamp-tasks and lamp-control take. `None` for a pushed skill
+/// with no developer folder, or a name that is not a plain one.
+pub fn folder_of(
+    root: &Path,
+    dev: Option<&Path>,
+    name: &str,
+    pushed: bool,
+) -> Option<std::path::PathBuf> {
+    let mut parts = Path::new(name).components();
+    if !matches!(
+        (parts.next(), parts.next()),
+        (Some(Component::Normal(part)), None) if part == name && !name.starts_with('.')
+    ) {
+        return None;
+    }
+    Some(if pushed {
+        dev?.join(name)
+    } else {
+        root.join(name)
+    })
+}
+
 /// The `do.task` `step` of the skill `skill` in `folder`, declaring
 /// `grants`, handed over at `now_ms` through `send` (the socket and the
 /// line; lamp-tasks' answer), or why not: the journal's words. With the
@@ -960,6 +985,82 @@ mod tests {
         };
         assert!(hand("photo-booth", &step, &folder, &grants, none, 6, never).contains("#6306"));
         lamp_control.join().unwrap();
+        set_on_here(None);
+    }
+
+    /// A skill the owner's computer pushed is handed over from its own
+    /// folder in the developer folder (`skills-dev/<name>`), hashed there
+    /// with the lamp's `.pushed.json` left out; a changed script asks
+    /// again. No other folder is ever named.
+    #[test]
+    fn a_pushed_skills_task_is_handed_over_from_its_developer_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let (root, dev) = (dir.path().join("skills"), dir.path().join("skills-dev"));
+        let state = dir.path().join("state");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&state).unwrap();
+        let pushed = folder(&dev);
+        let unpushed = folder_sha256(&pushed).unwrap();
+        fs::write(pushed.join(crate::PUSHED_FROM), r#"{"computer":"desk"}"#).unwrap();
+        assert_eq!(folder_sha256(&pushed).unwrap(), unpushed);
+        assert_eq!(
+            folder_of(&root, Some(&dev), "photo-booth", true),
+            Some(pushed.clone())
+        );
+        assert_eq!(
+            folder_of(&root, Some(&dev), "photo-booth", false),
+            Some(root.join("photo-booth"))
+        );
+        // No developer folder, or a name that leaves either: none.
+        assert_eq!(folder_of(&root, None, "photo-booth", true), None);
+        for name in ["../photo-booth", "a/b", ".", "..", "", ".hidden", "/etc"] {
+            assert_eq!(folder_of(&root, Some(&dev), name, true), None, "{name}");
+            assert_eq!(folder_of(&root, Some(&dev), name, false), None, "{name}");
+        }
+        let step = step(&pushed, "scripts/main.py").unwrap();
+        let grants = vec!["light".to_owned()];
+        let socket = dir.path().join("tasks.sock");
+        let control_socket = dir.path().join("control.sock");
+        let place = Place {
+            state: Some(&state),
+            control: &control_socket,
+            socket: Some(&socket),
+        };
+        let lamp_control = control(
+            &control_socket,
+            vec![
+                serde_json::json!({"agreed": true}),
+                serde_json::json!({"agreed": false, "why": "changed"}),
+            ],
+        );
+        set_on_here(Some(true));
+        let mut sent = None;
+        let said = hand(
+            "pushed-booth",
+            &step,
+            &pushed,
+            &grants,
+            place,
+            1,
+            |_, line| {
+                sent = Some(line.to_owned());
+                answered("{\"ok\":true,\"id\":3}")
+            },
+        );
+        assert_eq!(said, "do.task: handed to lamp-tasks: its run ended, task 3");
+        let line: serde_json::Value = serde_json::from_str(&sent.unwrap()).unwrap();
+        assert_eq!(line["folder"], pushed.to_string_lossy().as_ref());
+        assert_eq!(line["sha256"], unpushed.as_str());
+        fs::write(pushed.join(SCRIPTS).join("main.py"), "print('changed')\n").unwrap();
+        let never = |_: &Path, _: &str| -> Result<String, String> { panic!("handed over") };
+        assert_eq!(
+            hand("pushed-booth", &step, &pushed, &grants, place, 2, never),
+            CHANGED
+        );
+        let asked = lamp_control.join().unwrap();
+        let check = |at: usize| asked[at][lamp_voice::skill_task_yes::CHECK]["sha256"].clone();
+        assert_eq!(check(0), unpushed.as_str());
+        assert_ne!(check(1), unpushed.as_str());
         set_on_here(None);
     }
 }

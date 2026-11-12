@@ -928,9 +928,11 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         "/dev/shm",
         "/run/systemd/resolve",
         SKILLS_SOCKET,
+        PUSHED,
     ] {
         fs::create_dir_all(at(made)).unwrap();
     }
+    let pushed = at(PUSHED);
     fs::write(&resolv, "nameserver 127.0.0.53\n").unwrap();
     let control = at(CONTROL_SOCKET);
     let control_folder = at("/run/lampos-control");
@@ -1043,6 +1045,8 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         when_tasks(format!("mount --bind {control} {stage}/l")),
         when_net(format!("touch {stage}/b")),
         when_net(format!("mount --bind {bridge} {stage}/b")),
+        when_net(format!("mkdir -m 0700 {stage}/p")),
+        when_net(format!("mount --bind {pushed} {stage}/p")),
         Some(format!(
             "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
             at("/run")
@@ -1082,11 +1086,17 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         when_net(format!(
             "mount -o remount,bind,ro,nosuid,nodev,relatime {bridge}"
         )),
+        when_net(format!("mkdir -p {pushed}")),
+        when_net(format!("mount --move {stage}/p {pushed}")),
+        when_net(format!(
+            "mount -o remount,bind,ro,nosuid,nodev,relatime {pushed}"
+        )),
         Some(if tasks {
             format!("rm -f {stage}/r {stage}/l {stage}/b")
         } else {
             format!("rm -f {stage}/r")
         }),
+        when_net(format!("rmdir {stage}/p")),
         Some(if skills {
             format!("rmdir {stage}/h {stage}/w {stage}/k {stage}/c {stage}")
         } else {
@@ -1142,6 +1152,12 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
             "{lines:#?}"
         );
         assert!(!lines.iter().any(|line| line.contains("net-relay")));
+        // Nor the pushed skills, there on this root: only a skill's run
+        // sees them.
+        assert!(
+            !lines.iter().any(|line| line.contains(&pushed)),
+            "{lines:#?}"
+        );
     }
     // Never lamp-control's owner socket, either way.
     assert!(
@@ -1162,6 +1178,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         .chain([resolv.clone()])
         .chain(tasks.then(|| control.clone()))
         .chain(netted.then(|| bridge.clone()))
+        .chain(netted.then(|| pushed.clone()))
         .collect();
     assert_eq!(
         shown,
@@ -1209,6 +1226,12 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         format!("mount --move {stage}/b"),
         format!("findmnt -no VFS-OPTIONS -M {bridge}"),
         format!("remount,bind,ro,nosuid,nodev,relatime {bridge}"),
+        format!("mkdir -m 0700 {stage}/p"),
+        format!("--bind {pushed}"),
+        format!("mount --move {stage}/p"),
+        format!("findmnt -no VFS-OPTIONS -M {pushed}"),
+        format!("remount,bind,ro,nosuid,nodev,relatime {pushed}"),
+        format!("rmdir {stage}/p"),
         "ip link set lo up".to_owned(),
         "net-relay".to_owned(),
     ];
@@ -1266,6 +1289,16 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         assert!(String::from_utf8_lossy(&out.stderr).contains(&format!("no {bridge}")));
         assert!(!lines.iter().any(|line| line.ends_with(" chat -q a b")));
         let _bridge = std::os::unix::net::UnixListener::bind(&bridge).unwrap();
+        // No pushed skills on this lamp: skipped, and Hermes still runs.
+        fs::remove_dir(&pushed).unwrap();
+        let (out, lines) = run("");
+        assert!(out.status.success(), "{lines:#?}");
+        assert!(lines.iter().any(|line| line.ends_with(" chat -q a b")));
+        assert!(
+            !lines.iter().any(|line| line.contains(&pushed)),
+            "{lines:#?}"
+        );
+        fs::create_dir_all(&pushed).unwrap();
     }
     if tasks {
         // A lamp with no control socket (lamp-control not serving): skipped,
@@ -1301,6 +1334,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         [at(PLACE), at(WORK), at(SKILLS), resolv.clone()]
             .iter()
             .chain(netted.then_some(&bridge))
+            .chain(netted.then_some(&pushed))
             .map(String::as_str)
             .collect::<Vec<_>>()
     );
@@ -2134,9 +2168,11 @@ fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
 fn a_net_run_shows_the_bridge_brings_lo_up_and_starts_the_relay() {
     let on = ns_text(false, true);
     for line in [
-        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns\n",
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n",
         "if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n",
         "if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n",
+        "if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]; then mkdir -m 0700 \"$S/p\" && mount --bind \"$P\" \"$S/p\" || fail \"no $P\"; else P=; fi\n",
+        "if [ -n \"$P\" ]; then mkdir -p \"$P\" && mount --move \"$S/p\" \"$P\" && ro \"$P\" || fail \"$P not shown\"; fi\n",
         "  I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x \"$p\" ]; then I=$p; break; fi; done\n",
         "  [ -n \"$I\" ] || fail \"no ip: lo not up, the run has no way out\"\n",
         "  \"$I\" link set lo up || fail \"lo not up\"\n",
@@ -2289,7 +2325,7 @@ fn both_switches_on_make_both_edits() {
     assert!(both.contains("mount --move \"$S/c\" \"$C\" && ro \"$C\""));
     assert!(both.contains("mount --move \"$S/l\" \"$L\" && ro \"$L\""));
     assert!(both.contains(
-        " C=/run/lampos-skills L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S="
+        " C=/run/lampos-skills L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S="
     ));
     assert!(!both.contains("admin.sock"));
     assert_eq!(

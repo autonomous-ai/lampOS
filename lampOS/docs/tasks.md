@@ -2286,7 +2286,11 @@ for each run, and is answered once the run ends
 - **The line:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
   Every field is needed and no other is taken. `skill` is a skill's name
   (`a-z`, `0-9`, `-`, `_`, at most 64), `folder` is exactly
-  `/var/lib/lampOS/skills/<skill>` (the skills Hermes sees read-only),
+  `/var/lib/lampOS/skills/<skill>` (the skills Hermes sees read-only) or,
+  for a skill the owner's computer pushed, `/var/lib/lampOS/skills-dev/<skill>`
+  (`skill_task::PUSHED`, shown read-only to a skill's run alone), compared
+  as written (a `..` or any other folder is refused "the skill's folder is
+  not its own among the lamp's skills"),
   `run` is a file under the skill's `scripts/` (each part only `A-Z a-z 0-9
   . _ -`, never starting with `.`, so no `..`, no hidden part, no newline,
   backtick or space; not absolute), `task` is 1 to 500 bytes with no
