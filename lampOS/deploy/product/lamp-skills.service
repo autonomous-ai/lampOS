@@ -52,6 +52,10 @@ Environment=LAMP_UNPLUG_OFF_SOCKET=/run/lampos-setup-change/change.sock
 # The owner's language, as the voice reads it (#4473): the turn-off's spoken yes is heard by English words only, so
 # an owner who speaks another language is never asked for one, and the lamp stays (#5777, unplug.md step 7).
 Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
+# A made skill's write (#6066, #6142): a skill with one fixed write step loads, and its write goes out through
+# lamp-services only after the owner's yes to its content, at most three a day, never a public post. On in the
+# product (owner, 11 Nov).
+Environment=LAMP_SKILL_WRITES=on
 # The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,
 # systemd 252). One newline, never empty: an empty SetCredential= in a unit file fails the start at CREDENTIALS
