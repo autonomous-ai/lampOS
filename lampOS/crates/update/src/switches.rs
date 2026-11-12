@@ -251,6 +251,43 @@ pub fn update_switch(root: &std::path::Path, switch: &str, env: Option<&std::ffi
     }
 }
 
+/// lamp-update's own switches as one read gives them (#6607).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct UpdateSwitches {
+    /// `LAMP_APP_ENGINES` (crate::engines::SWITCH), on any lamp.
+    pub engines: bool,
+    /// `LAMP_SKILL_TASKS` (crate::hermes_install::TASKS_SWITCH): set in the
+    /// environment, on any lamp; from the carried file only on a product
+    /// lamp (`product`), as before the file.
+    pub tasks: bool,
+}
+
+/// Both of lamp-update's switches, each by [`update_switch`], `env` giving
+/// a variable's value in lamp-update's environment. Read at start, and
+/// again after each round: a round that writes or changes
+/// `/etc/lampOS/update.env` leaves them differing from the start's, and
+/// lamp-update then starts itself again ([`restart_for`]), so a lamp whose
+/// promote round first placed the file takes them with no reboot.
+pub fn update_switches(
+    root: &std::path::Path,
+    product: bool,
+    env: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> UpdateSwitches {
+    let engines = crate::engines::SWITCH;
+    let tasks = crate::hermes_install::TASKS_SWITCH;
+    let tasks_env = env(tasks);
+    UpdateSwitches {
+        engines: update_switch(root, engines, env(engines).as_deref()),
+        tasks: (tasks_env.is_some() || product) && update_switch(root, tasks, tasks_env.as_deref()),
+    }
+}
+
+/// Whether lamp-update must start itself again after a round: its
+/// switches as read now differ from those it started with.
+pub fn restart_for(started: UpdateSwitches, now: UpdateSwitches) -> bool {
+    started != now
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -481,5 +518,49 @@ mod tests {
         assert!(update_switch(root.path(), tasks, None));
         std::fs::write(&at, b"LAMP_APP_ENGINES=on\ngarbage\n").unwrap();
         assert!(!update_switch(root.path(), engines, None));
+    }
+
+    /// #6607 (P2 of the first read): no file when lamp-update starts, as on a
+    /// lamp whose promote round first carries it; the round writes the file;
+    /// read again, the switches differ, so lamp-update starts itself again
+    /// and takes them with no reboot. A second read after that asks nothing.
+    #[test]
+    fn a_round_that_writes_the_update_switch_file_restarts_lamp_update() {
+        let root = tempfile::tempdir().unwrap();
+        let unset = |_: &str| None;
+        let started = update_switches(root.path(), true, unset);
+        assert_eq!(started, UpdateSwitches::default());
+        // The round writes the build's file.
+        let at = root
+            .path()
+            .join(crate::manifest::UPDATE_ENV.trim_start_matches('/'));
+        std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+        std::fs::write(
+            &at,
+            include_bytes!("../../../deploy/product/settings/update.env"),
+        )
+        .unwrap();
+        let now = update_switches(root.path(), true, unset);
+        assert_eq!(
+            now,
+            UpdateSwitches {
+                engines: true,
+                tasks: true
+            }
+        );
+        assert!(restart_for(started, now));
+        // Started again with the file there: nothing more is asked.
+        assert!(!restart_for(now, update_switches(root.path(), true, unset)));
+        // Skill tasks from the file only on a product lamp; set, on any.
+        let other = update_switches(root.path(), false, unset);
+        assert!(other.engines && !other.tasks);
+        let set = |name: &str| (name == crate::hermes_install::TASKS_SWITCH).then(|| "on".into());
+        assert!(update_switches(root.path(), false, set).tasks);
+        // The environment set still wins: off there holds it off.
+        let off = |_: &str| Some("off".into());
+        assert_eq!(
+            update_switches(root.path(), true, off),
+            UpdateSwitches::default()
+        );
     }
 }

@@ -919,6 +919,21 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
         on.then_some(wanted.pin)
     };
+    // lamp-update's own switches (#6607): set in its environment, or not set
+    // there, from the carried /etc/lampOS/update.env (no round rewrites this
+    // unit); skill tasks from the file only on a product lamp. Read here once,
+    // and again after each round: a round that writes or changes the file
+    // starts lamp-update again (below), so they take effect with no reboot.
+    let switches_product = lamp_update::harness_install::product::product_lamp(
+        &config.root,
+        &config.on(&config.units),
+    );
+    let read_switches = || {
+        lamp_update::switches::update_switches(&config.root, switches_product, |name| {
+            std::env::var_os(name)
+        })
+    };
+    let switches = read_switches();
     // Hermes on the lamp (#5978): only with Harness's install on too, as it
     // rides on Harness's one-shot.
     let hermes = {
@@ -942,14 +957,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             hermes::SKILLS_PRODUCT_DEFAULT,
         );
         // A skill's tasks (#6306): LAMP_SKILL_TASKS, the switch lamp-tasks reads,
-        // read once here: set in lamp-update's environment, `on` exactly; not set,
-        // the carried /etc/lampOS/update.env decides (#6607: no round rewrites this
-        // unit). On, Hermes is shown lamp-control's control socket alone, read-only.
-        let tasks = lamp_update::switches::update_switch(
-            &config.root,
-            hermes::TASKS_SWITCH,
-            std::env::var_os(hermes::TASKS_SWITCH).as_deref(),
-        );
+        // as read above (#6607). On, Hermes is shown lamp-control's control socket
+        // alone, read-only.
+        let tasks = switches.tasks;
         let shown = hermes::Shown { skills, tasks };
         if acts && wanted && harness.is_none() {
             say("Hermes on the lamp: off, as Harness before the sign-in is off");
@@ -1006,16 +1016,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // reading stops it; one watch for Hermes's and OpenClaw's both (#6226).
     let hermes_watch = (matches!(hermes, Some((true, _))) || matches!(openclaw, Some((true, _))))
         .then(|| lamp_update::hermes_schedule::Watcher::start(&bus_root, &records));
-    // The lamp's agents for the app (#6240): LAMP_APP_ENGINES, read once here:
-    // set in lamp-update's environment, `on` exactly; not set, the carried
-    // /etc/lampOS/update.env decides (#6607: no round rewrites this unit).
-    // Hermes's state on update/status, and the app's tap heard beside the app's checks.
-    let engines = lamp_update::switches::update_switch(
-        &config.root,
-        lamp_update::engines::SWITCH,
-        std::env::var_os(lamp_update::engines::SWITCH).as_deref(),
-    )
-    .then(|| lamp_update::engines::Engines {
+    // The lamp's agents for the app (#6240): LAMP_APP_ENGINES, as read above
+    // (#6607). Hermes's state on update/status, and the app's tap heard beside
+    // the app's checks.
+    let engines = switches.engines.then(|| lamp_update::engines::Engines {
         hermes_on: matches!(hermes, Some((true, _))),
         frozen: hermes_watch
             .as_ref()
@@ -1250,6 +1254,29 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         if command != "serve" {
             println!("{text}");
             return ExitCode::from(status(&outcome));
+        }
+        // A round that wrote or changed /etc/lampOS/update.env (#6607): this
+        // program starts again in its own place, with the same options, so
+        // its switches take effect with no reboot. An exec that fails returns
+        // here, and the switches wait for the next start.
+        if lamp_update::switches::restart_for(switches, read_switches()) {
+            eprintln!("lamp-update: {text}");
+            eprintln!(
+                "lamp-update: {} changed: lamp-update starts again",
+                lamp_update::manifest::UPDATE_ENV
+            );
+            match std::env::current_exe() {
+                Ok(program) => {
+                    let error = Command::new(&program)
+                        .args(std::env::args_os().skip(1))
+                        .exec();
+                    eprintln!(
+                        "lamp-update: {} cannot be started: {error}",
+                        program.display()
+                    );
+                }
+                Err(error) => eprintln!("lamp-update: its own program is not known: {error}"),
+            }
         }
         // A round that says what the one before said is not said again.
         if text != last {
