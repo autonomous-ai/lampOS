@@ -13,8 +13,11 @@ name: lampOS on ARM64
 # cores: one serial run took about 20 of the job's 30 minutes. lamp-voice's
 # push and a train's pull request (#6512) split their tests across three, in
 # parallel: on one runner they were
-# 17.5 of its 27 minutes (#6320). Doc tests, the two tests with their own
-# harness, the binaries' artifact and the cache come from the first runner only.
+# 17.5 of its 27 minutes (#6320). One job builds the release once and packs
+# the test binaries as a nextest archive; the test runners only download and
+# run it, with no compile (#6512: three runners each built the same release in
+# 43145807401). Doc tests, the two tests with their own harness, the binaries'
+# artifact and the cache come from the build job only.
 #
 # The realtime group (tests that wait on the real clock, 977 s of the 1,191 s
 # of test time on 2026-10-15; nextest group `realtime` in
@@ -67,10 +70,9 @@ name: lampOS on ARM64
 # may read (its own, its base's or main's; the reviewer on #2454).
 #
 # Without the realtime group a pull request's tests run on one runner, as many
-# at once as it has cores: each runner compiles every test binary again
-# (about 5 of its 10 minutes on 2026-10-15). lamp-voice's push tests every
+# at once as it has cores. lamp-voice's push tests every
 # crate, 17.5 minutes on one runner by 11 Nov (42969353741), so it takes three,
-# each building from the cache in parallel (#6320); on the Studio's one slot it
+# each running the build job's archive in parallel (#6320, #6512); on the Studio's one slot it
 # keeps one. The full run keeps four, one test at a time, for the realtime tests.
 
 # Not on every push to every builder's branch: with nine builders and four
@@ -200,27 +202,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 -I .github/scripts/lampos-route.py sweep
 
+  # Builds the release once, with its test binaries packed as a nextest
+  # archive the test job's runners run (#6512).
   arm64:
     needs: route
     # Also when route was skipped (not asked) or failed: then GitHub-hosted.
     if: ${{ !cancelled() && !inputs.promote_sequence }}
-    name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
+    # lampos-promote and merge-when-green.sh read these jobs by this name's start.
+    name: lampOS — build and test on Linux ARM64 (build)
     # Any attempt after the first goes GitHub-hosted, whichever re-run button:
     # "Re-run failed jobs" doesn't re-run route, so its attempt-1 answer would
     # send the job back to the Studio (40813878711 attempts 2 and 3, 29 Oct;
     # Fourth on #3997).
     runs-on: ${{ github.run_attempt == '1' && fromJSON(needs.route.outputs.runner || '"ubuntu-22.04-arm"') || 'ubuntu-22.04-arm' }}
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        # Four for a full run (every test, one at a time); three for lamp-voice's
-        # push, a train's pull request (first/train-*, #6512) or a run by hand that
-        # asks for three, except on the Studio's one slot; otherwise one.
-        shard: >-
-          ${{ fromJSON(inputs.full && '[1, 2, 3, 4]'
-          || ((github.event_name == 'push' || startsWith(github.head_ref, 'first/train-') || inputs.shards == '3') && needs.route.outputs.studio != 'true') && '[1, 2, 3]'
-          || '[1]') }}
+    outputs:
+      picked: ${{ steps.scope.outputs.filter }}
     steps:
       - name: system packages
         # A fresh runner's unattended-upgrades can hold dpkg's lock as the job
@@ -265,10 +262,8 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: artifact provenance regression (offline, disposable Cargo workspace)
-        if: matrix.shard == 1
         run: python3 -B -I .github/scripts/lampos-publish-artifact-test.py
       - name: stable promotion tests (offline, disposable test key)
-        if: matrix.shard == 1
         run: cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
       - name: restore the cache
         id: cache
@@ -306,11 +301,24 @@ jobs:
         working-directory: lampOS
         # Keep Cargo's current-target records outside the restored target cache.
         run: cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics > arm64-build.jsonl
+      # Every test binary of the workspace, built here once; the test job's runners
+      # run it without compiling (#6512).
+      - name: build the test binaries into a nextest archive
+        working-directory: lampOS
+        run: cargo nextest archive --locked --release --workspace --archive-file "$RUNNER_TEMP/lampos-tests.tar.zst"
+      - uses: actions/upload-artifact@v4
+        timeout-minutes: 10
+        with:
+          name: lampos-arm64-tests
+          path: ${{ runner.temp }}/lampos-tests.tar.zst
+          retention-days: 1
+          # Already zstd.
+          compression-level: 0
+          overwrite: true
       - name: every built lamp-* binary is classified for the lamp-os package
         working-directory: lampOS
         run: bash tools/package-binaries-test.sh && bash tools/package-binaries.sh deploy/package-binaries.json target/release
       - name: build the two selected artifact examples without filename collisions
-        if: matrix.shard == 1
         working-directory: lampOS
         # Both controls and expression have replay_cost. Export expression's
         # planner tool from a separate target directory; the workspace gate
@@ -321,39 +329,18 @@ jobs:
           cargo build --locked --release -p lamp-expression --example replay_cost \
             --target-dir target/lampos-artifact-examples --message-format=json-render-diagnostics > arm64-expression-example.jsonl
       - name: publication CLI rehearsal (local test key and simulated GitHub only)
-        if: matrix.shard == 1
         run: python3 -I .github/scripts/lampos-publish-cli-test.py --updater lampOS/target/release/lamp-update
       - name: which crates a pull request tests
         id: scope
         if: github.event_name == 'pull_request'
         run: python3 -I .github/scripts/lampos-pr-crates.py
-      - name: test (full run, every test one at a time; otherwise without the realtime group, in parallel)
-        working-directory: lampOS
-        # The two tests with their own harness (harness = false) cannot be listed by nextest; the first runner runs them below.
-        # Profile `pr` skips the realtime group (lampOS/.config/nextest.toml); the -E below is intersected with it.
-        # A full run uses `default`: every test, one at a time. A pull request's picked crates narrow the -E.
-        # On the Studio's 20-vCPU VM, 8 at a time: at 20, tests with a real 2 s bound were starved
-        # (runs 40803036942 and 40807983463, 29 Oct); GitHub-hosted's 4 cores pass every one.
-        env:
-          PICKED: ${{ steps.scope.outputs.filter }}
-        run: |
-          echo "cores: $(nproc)"
-          filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'
-          if [ -n "$PICKED" ]; then filter="$filter & ($PICKED)"; fi
-          cargo nextest run --locked --release --workspace \
-            --profile ${{ inputs.full && 'default' || 'pr' }} \
-            --no-tests=pass -j ${{ inputs.full && '1' || (needs.route.outputs.studio == 'true' && '8' || 'num-cpus') }} \
-            --partition hash:${{ matrix.shard }}/${{ strategy.job-total }} \
-            -E "$filter"
       - name: doc tests and the own-harness tests (nextest runs neither)
-        if: matrix.shard == 1
         working-directory: lampOS
         run: |
           cargo test --locked --release --workspace --doc -- --test-threads=1
           cargo test --locked --release -p lamp-ipc --test relay_signals
           cargo test --locked --release -p lamp-turn-end-wire --test process
       - name: export only current Cargo targets and their SHA-256
-        if: matrix.shard == 1
         run: >-
           python3 -B -I .github/scripts/lampos-publish-artifact.py --workspace lampOS
           --build-log lampOS/arm64-build.jsonl
@@ -361,7 +348,6 @@ jobs:
           --build-log lampOS/arm64-expression-example.jsonl
           --out lampOS/arm64-out
       - uses: actions/upload-artifact@v4
-        if: matrix.shard == 1
         # A bad route from the Studio crawled at 9 KB/s once: fail in minutes, not at the job's 90.
         timeout-minutes: 10
         with:
@@ -376,13 +362,13 @@ jobs:
       # there, and hosted runs would restore a target built on another host.
       - name: discard the isolated example target before saving the cache
         if: >-
-          ${{ !cancelled() && matrix.shard == 1 && runner.environment == 'github-hosted' && (github.ref == 'refs/heads/lamp-voice'
+          ${{ !cancelled() && runner.environment == 'github-hosted' && (github.ref == 'refs/heads/lamp-voice'
           || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
         # The CI artifact has independent, checksummed copies of both examples.
         run: rm -rf -- lampOS/target/lampos-artifact-examples
       - name: save the cache
         if: >-
-          ${{ !cancelled() && matrix.shard == 1 && runner.environment == 'github-hosted' && (github.ref == 'refs/heads/lamp-voice'
+          ${{ !cancelled() && runner.environment == 'github-hosted' && (github.ref == 'refs/heads/lamp-voice'
           || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
         timeout-minutes: 10
         uses: actions/cache/save@v4
@@ -394,11 +380,90 @@ jobs:
           # The cold full run skipped restore, so it has no cache outputs.
           key: ${{ steps.cache.outputs.cache-primary-key || format('lampos-arm64-u2204-{0}-{1}', hashFiles('lampOS/Cargo.lock'), github.sha) }}
 
+  # Runs the build job's nextest archive, its share of it on each runner: no compile here.
+  arm64-test:
+    needs: [route, arm64]
+    if: ${{ !cancelled() && !inputs.promote_sequence && needs.arm64.result == 'success' }}
+    name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
+    # As the build job: the route's runner on the first attempt, GitHub-hosted after.
+    runs-on: ${{ github.run_attempt == '1' && fromJSON(needs.route.outputs.runner || '"ubuntu-22.04-arm"') || 'ubuntu-22.04-arm' }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # Four for a full run (every test, one at a time); three for lamp-voice's
+        # push, a train's pull request (first/train-*, #6512) or a run by hand that
+        # asks for three, except on the Studio's one slot; otherwise one.
+        shard: >-
+          ${{ fromJSON(inputs.full && '[1, 2, 3, 4]'
+          || ((github.event_name == 'push' || startsWith(github.head_ref, 'first/train-') || inputs.shards == '3') && needs.route.outputs.studio != 'true') && '[1, 2, 3]'
+          || '[1]') }}
+    steps:
+      - name: system packages
+        # A fresh runner's unattended-upgrades can hold dpkg's lock as the job
+        # starts (the Studio VM, run 40799231439, 29 Oct): apt waits up to 5 min.
+        run: |
+          # The runner's mirror can stop resolving (azure.archive.ubuntu.com, #6429):
+          # apt-get update exits 0 on fetch failures unless --error-on=any; then point the sources at a mirror that answers and try once more.
+          if ! sudo apt-get -o DPkg::Lock::Timeout=300 --error-on=any update; then
+            # Every *.ubuntu.com name stopped resolving on GitHub's runners (11 Nov), so
+            # take the first mirror outside that domain that serves this release.
+            if [ "$(dpkg --print-architecture)" = amd64 ]; then
+              ms="http://mirrors.edge.kernel.org/ubuntu http://mirrors.ocf.berkeley.edu/ubuntu"
+            else
+              ms="http://mirrors.ocf.berkeley.edu/ubuntu-ports http://ftp.tu-chemnitz.de/pub/linux/ubuntu-ports"
+            fi
+            c=$(. /etc/os-release; echo "$VERSION_CODENAME")
+            u=
+            for m in $ms; do
+              if curl -sfI -m 15 "$m/dists/$c/InRelease" >/dev/null; then u=$m; break; fi
+            done
+            [ -n "$u" ] || { echo "::error::no fallback mirror answers"; exit 1; }
+            echo "::warning::apt-get update failed; retrying with $u"
+            for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
+              [ -f "$f" ] && sudo sed -i -E "s#mirror\+file:/etc/apt/apt-mirrors\.txt|https?://[a-z0-9.-]*(archive\.ubuntu\.com/ubuntu|ports\.ubuntu\.com/ubuntu-ports)/?#$u#g" "$f"
+            done
+            sudo apt-get -o DPkg::Lock::Timeout=300 update
+          fi
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
+      - uses: actions/checkout@v4
+        with:
+          # The tests read the source tree (fixtures, docs, the nextest config).
+          fetch-depth: 2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: actions/download-artifact@v4
+        with:
+          name: lampos-arm64-tests
+          path: ${{ runner.temp }}
+      - name: test (full run, every test one at a time; otherwise without the realtime group, in parallel)
+        working-directory: lampOS
+        # The two tests with their own harness (harness = false) cannot be listed by nextest; the build job runs them.
+        # Profile `pr` skips the realtime group (lampOS/.config/nextest.toml); the -E below is intersected with it.
+        # A full run uses `default`: every test, one at a time. A pull request's picked crates narrow the -E.
+        # On the Studio's 20-vCPU VM, 8 at a time: at 20, tests with a real 2 s bound were starved
+        # (runs 40803036942 and 40807983463, 29 Oct); GitHub-hosted's 4 cores pass every one.
+        env:
+          PICKED: ${{ needs.arm64.outputs.picked }}
+        run: |
+          echo "cores: $(nproc)"
+          filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'
+          if [ -n "$PICKED" ]; then filter="$filter & ($PICKED)"; fi
+          # The archive extracts to target/, where the build job's paths (CARGO_BIN_EXE_*) point.
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/lampos-tests.tar.zst" \
+            --workspace-remap . --extract-to . --extract-overwrite \
+            --profile ${{ inputs.full && 'default' || 'pr' }} \
+            --no-tests=pass -j ${{ inputs.full && '1' || (needs.route.outputs.studio == 'true' && '8' || 'num-cpus') }} \
+            --partition hash:${{ matrix.shard }}/${{ strategy.job-total }} \
+            -E "$filter"
+
   # Pull requests restore lamp-voice's newest build (see the top), which
   # lamp-voice's own run saves. When that run is on the Studio, which saves
   # nothing, this job builds the same targets here instead, from the last
   # cache, and saves them under the same key. Nothing waits on it: publish
-  # needs only the ARM64 job.
+  # needs only the ARM64 jobs.
   cache:
     needs: route
     if: ${{ !cancelled() && github.event_name == 'push' && needs.route.outputs.studio == 'true' && github.run_attempt == '1' }}
@@ -479,13 +544,13 @@ jobs:
 
   publish:
     name: lampOS — sign and publish the tested lamp-voice artifact
-    needs: arm64
+    needs: [arm64, arm64-test]
     # Off until the owner explicitly activates publication. Manual runs and PRs
     # never enter this job; download-artifact defaults to this successful run.
     # The ARM64 job's own result, not the implicit success(): a skipped job
     # anywhere upstream (route, on other branches) skips this one too (probed on
     # devops007/needs-probe, run 40358296675).
-    if: ${{ !cancelled() && needs.arm64.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on' }}
+    if: ${{ !cancelled() && needs.arm64.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on' && needs.arm64-test.result == 'success' }}
     # The owner must configure branch-only lamp-voice protection before storing
     # the signing key here; naming an environment does not create its rules.
     environment: lampos-update-publish
@@ -595,7 +660,7 @@ jobs:
   # A full run that fails opens an issue (or comments on the open one), so a
   # realtime test broken by a merge is not left unseen: no other run has it.
   report-full-run-failure:
-    needs: arm64
+    needs: [arm64, arm64-test]
     if: failure() && inputs.full && !inputs.promote_sequence
     runs-on: ubuntu-latest
     permissions:
