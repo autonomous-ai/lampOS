@@ -10197,6 +10197,10 @@ async fn spoken(
             request,
             Instant::now(),
         ))
+        // A made skill that clashes with one on the lamp, waiting for the
+        // person's choice (#6593): its clash_id and question, for the same
+        // reason (the Reviewer-lead's P1 on #6614).
+        .chain(crate::made_clash::waiting_note(request, Instant::now()))
         .chain(records)
         .chain(read_ids)
         .chain(remembered)
