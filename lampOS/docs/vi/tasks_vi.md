@@ -1183,8 +1183,19 @@ của giọng nói và `lamp-tasks --reply-named`):
     trên socket của giọng nói `{"op":"forget_sessions"}`
     (`agent_tasks::forget_sessions_with_everything`); lamp-tasks xóa file và
     trả `{"forgotten":true|false}`. Câu trả lời giọng nói nói với người dùng
-    vẫn như cũ.
+    vẫn như cũ. Một lần hand-over hoặc xem session còn đang chạy lúc lệnh
+    quên đến có thể ghi lại đúng session đó sau lệnh quên: đó là một lần
+    dùng sau khi quên, như mọi lần dùng sau đó.
+  - Khi đăng xuất: khi `harness auth status` đọc ra là đã đăng xuất
+    (`Cli::signed_in_here`), index bỏ các session của máy trong tài khoản, vì
+    lần đăng nhập sau có thể là tài khoản khác. Index giữ các session trên id
+    riêng của máy này, là id Harness dùng để chạy việc khi chưa đăng nhập
+    (`session_index::forget_machines`). Khi đã đăng nhập hoặc offline, index
+    giữ hết.
   - Test: `tests/harness.rs`
+    `signed_out_the_account_machines_sessions_are_let_go`;
+    `tests/session_index.rs` `forgetting_machines_keeps_only_those_kept`;
+    `tests/harness.rs`
     `an_older_session_not_listed_is_found_by_its_name_through_the_index`,
     `a_listed_session_is_found_as_before_and_the_index_only_adds`,
     `an_indexed_session_that_is_gone_is_dropped`,
