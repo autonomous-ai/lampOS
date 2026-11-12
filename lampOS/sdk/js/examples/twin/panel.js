@@ -3,6 +3,8 @@
 // lamp's own events. Nothing here is written per feature: a new SDK call is a new entry in controls.js.
 const send = (message) => window.twinSend?.(message);
 let counter = 0;
+// The row each press came from, for a picture it asks to show (answered to this page only, under that row).
+const rowOf = new Map();
 const el = (tag, props = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
   for (const child of children) node.append(child);
@@ -18,6 +20,7 @@ document.head.append(el('style', { textContent: `
   #panel input[type=text] { flex: 1; min-width: 120px; }
   #panel input[type=number] { width: 64px; }
   #panel .world button { border-style: dashed; }
+  #panel img.shot { flex-basis: 100%; max-width: 320px; border-radius: 6px; border: 1px solid var(--line); }
   #events { height: 220px; overflow: auto; font: 12px/1.35 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; white-space: pre-wrap; }
   #events .ok { color: var(--accent); } #events .no { color: #d9534f; } #events .ev { color: var(--soft); }
 ` }));
@@ -42,8 +45,10 @@ function row(entry, kind) {
   const inputs = entry.fields.map((field) => [field, input(field)]);
   const values = () => Object.fromEntries(inputs.map(([field, node]) => [field.name, field.type === 'number' ? Number(node.value) : node.value]));
   const children = inputs.map(([field, node]) => (field.type === 'text' ? node : el('label', {}, field.label ?? field.name, node)));
-  children.push(el('button', { textContent: entry.label, onclick: () => send({ type: kind, id: ++counter, name: entry.id, args: values() }) }));
-  return el('div', { className: 'row' }, ...children);
+  const node = el('div', { className: 'row' });
+  children.push(el('button', { textContent: entry.label, onclick: () => { rowOf.set(counter + 1, node); send({ type: kind, id: ++counter, name: entry.id, args: values() }); } }));
+  node.append(...children);
+  return node;
 }
 
 // The entries of one list, under a small heading for each group in the order they first appear.
@@ -51,6 +56,8 @@ function section(entries, kind) {
   const nodes = [];
   let group;
   for (const entry of entries) {
+    // A camera or microphone row only when the lamp has that grant.
+    if (entry.needs && !table[entry.needs]) continue;
     if (entry.group !== group) { group = entry.group; nodes.push(el('h3', { textContent: group })); }
     nodes.push(row(entry, kind));
   }
@@ -83,7 +90,20 @@ joints.before(panel);
 panel.after(fold);
 fold.append(joints);
 
+// A picture the lamp gave for a press: under its row, replacing the last, in memory only (a blob URL), never logged.
+function showPicture({ id, jpeg }) {
+  const node = rowOf.get(id);
+  if (!node || typeof jpeg !== 'string') return;
+  let image = node.querySelector('img.shot');
+  if (!image) { image = el('img', { className: 'shot', alt: 'what the lamp sent' }); node.append(image); }
+  const bytes = Uint8Array.from(atob(jpeg), (c) => c.charCodeAt(0));
+  const old = image.src;
+  image.src = URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));
+  if (old.startsWith('blob:')) URL.revokeObjectURL(old);
+}
+
 window.addEventListener('twin-message', ({ detail }) => {
+  if (detail.type === 'picture') showPicture(detail);
   if (detail.type === 'result') say(detail.ok ? 'ok' : 'no', `${detail.call} -> ${detail.answer}`);
   if (detail.type === 'event') say('ev', `event ${detail.event} ${JSON.stringify(detail.frame)}`);
 });

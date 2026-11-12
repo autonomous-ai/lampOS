@@ -118,13 +118,15 @@ const refuse = (why) => new LampError(why, { code: 'bad_request' });
 const said = (id, call, ok, answer) => tell({ type: 'result', id, call, ok, answer });
 let stimulating = Promise.resolve();
 const lastStimulus = new Map();
-async function press(message) {
+async function press(message, page) {
   const { id, name, args = {} } = message;
   try {
     if (message.type === 'call') {
       const control = findControl(name);
       if (!control) throw refuse(`no button ${name}`);
-      const call = await control.run({ lamp, release, listenFor }, checked(control.fields, args));
+      // A picture goes to the page that pressed, as one message to it: not through `tell`, never logged, never kept.
+      const show = (jpeg) => page?.send(JSON.stringify({ type: 'picture', id, jpeg: Buffer.from(jpeg).toString('base64') }));
+      const call = await control.run({ lamp, release, listenFor, show }, checked(control.fields, args));
       said(id, call, true, 'taken');
     } else {
       const stimulus = findStimulus(name);
@@ -286,7 +288,7 @@ wss.on('connection', (page) => {
     if (message.type === 'drag') drag(message.joint, Number(message.deg));
     if (message.type === 'let_go') release();
     if (message.type === 'camera_on') cameraAskedAt = Date.now();
-    if (stimDir && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message);
+    if (stimDir && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message, page);
   });
   page.on('close', () => pages.delete(page));
 });
