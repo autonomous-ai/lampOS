@@ -1278,6 +1278,10 @@ fn worker_command(
             role,
             var(crate::made_skill::SCRIPTS_ENVIRONMENT).as_deref(),
         ))
+        .envs(agent_services_worker_environment(
+            role,
+            var(crate::made_skill::AGENT_SERVICES_ENVIRONMENT).as_deref(),
+        ))
         .envs(skill_loose_worker_environment(
             role,
             var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
@@ -1362,6 +1366,18 @@ fn skill_writes_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::WRITES_ENVIRONMENT, "on"))
+}
+
+// The lamp's agent's connectors (`LAMP_AGENT_SERVICES`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` makes a
+// service skill as a `do.task` and says its service grants back
+// (`made_skill::agent_services_here`).
+fn agent_services_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::AGENT_SERVICES_ENVIRONMENT, "on"))
 }
 
 // A made skill's code (#6307), passed the same narrow way: the exact `on`,
@@ -2536,6 +2552,10 @@ mod tests {
             ),
             (
                 crate::made_skill::SCRIPTS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::AGENT_SERVICES_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (
