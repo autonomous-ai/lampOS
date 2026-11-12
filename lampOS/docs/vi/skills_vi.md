@@ -561,7 +561,11 @@ sau:
      send?" hoặc "read me my leaving mail skill". Mô hình gọi `make_skill`
      chỉ với `read_back`, tên kỹ năng (chỉ được đưa khi có
      `LAMP_SKILL_WRITES`; bỏ "my" và "skill", `made_skill::name_asked`), và
-     giọng nói tìm kỹ năng đã giữ đang bật trên đèn có tên đó. Nếu chưa
+     giọng nói tìm kỹ năng đã giữ đang bật trên đèn có tên đó, một con số
+     nói bằng chữ khớp với chữ số của nó theo cả hai chiều ("lamp test
+     email two" tìm thấy `lamp-test-email-2`, từ không đến chín mươi chín,
+     `made_skill::name_digits`; task của một kỹ năng được hỏi lại theo chữ
+     số khi tên như đã nói không có task nào). Nếu chưa
      được đồng ý cho những gì nó gửi bây giờ, theo `lamp-services`
      (`skill_writes_approved`, lệnh gọi riêng của giọng nói, không đồng ý
      gì; không biết được thì tính là chưa đồng ý), câu của chính lần tạo

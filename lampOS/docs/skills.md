@@ -2907,7 +2907,11 @@ gone ([switches.md](switches.md)). What happens:
      `read_back`, the skill's name (offered with `LAMP_SKILL_WRITES`, or
      with `LAMP_SKILL_TASKS` for a skill's task, "A skill's task" above;
      "my" and "skill" dropped, `made_skill::name_asked`), and the voice
-     finds the kept skill on the lamp of that name. Not approved for what
+     finds the kept skill on the lamp of that name, a number said in
+     words matching its digits either way ("lamp test email two" finds
+     `lamp-test-email-2`, zero to ninety-nine, `made_skill::name_digits`;
+     a skill's task is asked again by its digits when the name as said
+     has none). Not approved for what
      it sends now, as `lamp-services` tells it (`skill_writes_approved`,
      the voice's own call, which approves nothing; not told counts as not
      approved), its make's own line (`made_skill::on_line`, "I made leaving
