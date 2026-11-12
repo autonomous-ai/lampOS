@@ -3442,3 +3442,69 @@ async fn the_apps_set_grants_without_speaker_ends_its_stream() {
         "the stream ended with its grant"
     );
 }
+
+/// lamp-75c9, 13 Nov: a second `speaker.stream` of a computer whose first one
+/// plays replaces it, and the replaced stream's end went to the client from the
+/// request's own thread, under the door's lock, which its journal line takes
+/// again: the door then answered nothing for 8 minutes (a thread dump showed
+/// the main thread in a futex wait and the admin socket's revoke hanging).
+#[tokio::test]
+async fn a_second_speaker_stream_replaces_the_first_and_the_door_still_answers() {
+    // A door that deadlocks blocks this runtime's only thread, so no timeout
+    // below can fire: a watchdog thread ends the process instead of a hang.
+    let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let watching = finished.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(30));
+        if !watching.load(std::sync::atomic::Ordering::SeqCst) {
+            eprintln!("the door deadlocked on a second speaker stream");
+            std::process::abort();
+        }
+    });
+    let (lamp, _blocks, speaker) = speaking_lamp("speaker-replace-answers").await;
+    let mut first = paired(&lamp, json!(["speaker"]), 7).await;
+    let on = send(
+        &mut first,
+        json!({"id": 3, "op": "speaker.stream", "on": true, "sample_rate": 24000}),
+    )
+    .await;
+    assert_eq!(on["ok"], true, "{on}");
+    // The same computer's second connection asks for a stream: answered, not
+    // hung, and the first is told it was replaced.
+    let mut second = hello_again(&lamp, 7).await;
+    let replaced = tokio::time::timeout(
+        Duration::from_secs(3),
+        send(
+            &mut second,
+            json!({"id": 2, "op": "speaker.stream", "on": true, "sample_rate": 24000}),
+        ),
+    )
+    .await
+    .expect("the door answered the second stream");
+    assert_eq!(replaced["ok"], true, "{replaced}");
+    let ended = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let event = next(&mut first).await;
+            if event["ev"] == "speaker.ended" {
+                return event;
+            }
+        }
+    })
+    .await
+    .expect("the replaced stream was told");
+    assert_eq!(ended["why"], "replaced");
+    // And the door still answers: a third connection says hello, and the
+    // admin socket lists its clients.
+    let _third = tokio::time::timeout(Duration::from_secs(3), hello_again(&lamp, 7))
+        .await
+        .expect("hello is still answered");
+    let clients = tokio::time::timeout(
+        Duration::from_secs(3),
+        admin(&lamp, json!({"clients": true})),
+    )
+    .await
+    .expect("the admin socket still answers");
+    assert!(clients["clients"].is_array(), "{clients}");
+    assert!(speaker.streaming(clients["clients"][0]["id"].as_str().unwrap()));
+    finished.store(true, std::sync::atomic::Ordering::SeqCst);
+}
