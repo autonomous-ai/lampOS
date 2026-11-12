@@ -146,7 +146,7 @@ dịch vụ.
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
 | `LAMP_SKILL_WRITES=on` (#6066; bật trong bốn unit của sản phẩm từ 11/11) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
-| `LAMP_SKILL_TASKS=on` (#6432; tắt trong mọi unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
+| `LAMP_SKILL_TASKS=on` (#6432; bật trong các unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -2280,7 +2280,7 @@ toàn bộ):
 - Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
   bạ, nên mô hình tạo kỹ năng xin địa chỉ.
 
-## Lượt chạy của một kỹ năng trên Hermes của đèn (#6432, `LAMP_SKILL_TASKS`, tắt)
+## Lượt chạy của một kỹ năng trên Hermes của đèn (#6432, `LAMP_SKILL_TASKS`, bật trong sản phẩm)
 
 Một kỹ năng dùng một dịch vụ đã liên kết được Hermes của đèn chạy với dịch
 vụ đó làm một công cụ, như ở V1: một lượt chạy `do.task` (#6417,
@@ -2414,8 +2414,8 @@ lẫn lượt chạy đều không giữ token nào.
   này (`services::answered`); vượt giới hạn của kỹ năng hay bị từ chối thì
   "chưa gửi".
 - **Chưa làm (nói ra để không ai đọc code thành nhiều hơn):** lamp-control
-  chưa giữ lời đồng ý cho kỹ năng nào (`SkillYes` của #6408), nên chưa token
-  nào được tạo, và chưa unit sản phẩm nào đặt `LAMP_SKILL_TASKS`. Một lời từ
+  chưa giữ lời đồng ý cho kỹ năng nào (`SkillYes` của #6408; #6509 thêm nó),
+  nên chưa token nào được tạo; các unit sản phẩm đặt `LAMP_SKILL_TASKS` (12/11). Một lời từ
   chối bằng những từ khác ngoài lời từ chối đơn giản chỉ bỏ lần ghi đang
   chờ của giọng nói, còn việc giữ của chương trình này hết hạn sau 2 phút. Bộ điều phối không biết tuyến nào trả lời:
   trên tuyến Live lời đọc lại vẫn được nói nhưng lời đồng ý của nó là "không

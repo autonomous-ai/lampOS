@@ -124,7 +124,7 @@ connected apps.
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_WRITES=on` (#6066; on in the product's four units since 11 Nov) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
-| `LAMP_SKILL_TASKS=on` (#6432; off in every product unit) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
+| `LAMP_SKILL_TASKS=on` (#6432; on in the product units) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -2188,7 +2188,7 @@ whole):
 - A contact named without an address: the lamp keeps no contact book, so
   the making model asks for the address.
 
-## A skill's run on the lamp's Hermes (#6432, `LAMP_SKILL_TASKS`, off)
+## A skill's run on the lamp's Hermes (#6432, `LAMP_SKILL_TASKS`, on in the product)
 
 A skill that uses a linked service is run by the lamp's Hermes with that
 service as a tool, as in V1: a `do.task` run (#6417, lamp-tasks) holds a
@@ -2316,8 +2316,8 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   model is told "sent" only from this program's answer `sent: true`
   (`services::answered`); over the skills' bounds or refused, "not sent".
 - **Not yet (said so the code is not read as more):** lamp-control keeps
-  no skill yes yet (#6408's `SkillYes`), so no token is minted, and no
-  product unit sets `LAMP_SKILL_TASKS`. A no in other words than a plain
+  no skill yes yet (#6408's `SkillYes`; #6509 adds it), so no token is
+  minted; the product units set `LAMP_SKILL_TASKS` (12 Nov). A no in other words than a plain
   no drops the voice's waiting write only, and this program's hold lapses
   after its 2 minutes. The coordinator does not know which route answers: on the Live route the
   read-back is said but its yes is "not done on this voice". Tests:

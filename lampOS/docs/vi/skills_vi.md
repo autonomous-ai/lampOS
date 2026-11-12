@@ -1821,15 +1821,16 @@ trong `src/holds.rs` (`a_failed_write_leaves_no_hold_to_take_back`,
 đầy đủ ở [skills.md](../skills.md),
 "A hold kept across a restart".
 
-## Tác vụ của kỹ năng (`do.task`, #6305, `LAMP_SKILL_TASKS`, tắt)
+## Tác vụ của kỹ năng (`do.task`, #6305, `LAMP_SKILL_TASKS`, bật trong sản phẩm)
 
 Phần 2 của #6071 (theo các điều kiện của first builder ở đó): một kỹ năng
 phản ứng ngay bằng các bước của chính nó và giao phần chậm hơn cho agent của
 đèn, một script trong thư mục `scripts/` của chính kỹ năng. Tắt trừ khi
 `LAMP_SKILL_TASKS=on`, trong `lamp-skills`, manage helper của nó,
 `lamp-voice` (truyền cho cả hai route) và `lamp-control` (bản thân nó cũng
-bật, `LAMP_CONTROL=on`), nơi giữ cái "có"; không unit sản phẩm nào đặt nó, và nó
-tắt cho tới khi các hàng của #6308 đạt. Chi tiết đầy đủ ở
+bật, `LAMP_CONTROL=on`), nơi giữ cái "có"; các unit sản phẩm đặt nó ở cả bốn
+nơi đó (12/11), và ở lamp-services, lamp-tasks và lamp-update, những nơi phục
+vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 [skills.md](../skills.md), "A skill's task".
 
 - **Bước:** `[[do]] task = { task = "...", run = "scripts/main.py" }`, đứng

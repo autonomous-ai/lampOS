@@ -55,6 +55,9 @@ Environment=LAMP_SKILL_READS=on
 # owner's yes holds that content's SHA-256, at most 3 a skill and 10 in all a day, never a public post. On in the
 # product (owner, 11 Nov).
 Environment=LAMP_SKILL_WRITES=on
+# A skill's run on the lamp's Hermes (#6432, services.md): the lamp-control.service cgroup onto the tools socket
+# for service_read and service_write alone, by the run's grants; a write still waits for the person's yes.
+Environment=LAMP_SKILL_TASKS=on
 ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services
 Restart=on-failure
 RestartSec=5s
