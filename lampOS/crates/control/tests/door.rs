@@ -541,23 +541,24 @@ async fn a_revoke_says_why_in_the_close_frame() {
     assert_eq!(reason.as_deref(), Some(server::CLOSED_REVOKED));
 }
 
-/// The app's grants screen asks whether a camera or microphone stream is
-/// usable: false for both by default, what the lamp's wiring and the owner's
-/// switch say once set.
+/// The app's grants screen asks whether a camera, microphone or speaker stream
+/// is usable: false for all by default, what the lamp's wiring and the owner's
+/// switches say once set.
 #[tokio::test]
 async fn the_admin_socket_says_which_streams_are_usable() {
     let lamp = lamp("features").await;
     assert_eq!(
         admin(&lamp, json!({"features": true})).await,
-        json!({"camera": false, "microphone": false})
+        json!({"camera": false, "microphone": false, "speaker": false})
     );
     lamp.shared.set_features(server::Features {
         camera: true,
         microphone: false,
+        speaker: true,
     });
     assert_eq!(
         admin(&lamp, json!({"features": true})).await,
-        json!({"camera": true, "microphone": false})
+        json!({"camera": true, "microphone": false, "speaker": true})
     );
 }
 
