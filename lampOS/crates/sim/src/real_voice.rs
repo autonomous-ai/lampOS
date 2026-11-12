@@ -435,10 +435,10 @@ pub fn second_keys(keys: &crate::keys::Keys) -> Result<SecondKeys<'_>, String> {
         }
     };
     if let Some(url) = &keys.deepseek_url
-        && !url.expose().trim().starts_with("https://")
+        && !service_url_ok(url.expose().trim())
     {
         return Err(
-            "own.deepseek_url must start with https:// (your DeepSeek key is sent there; nothing is started)"
+            "own.deepseek_url must be an https:// address with a host and no ? # or @ (your DeepSeek key is sent there)"
                 .to_owned(),
         );
     }
@@ -455,6 +455,50 @@ pub fn second_keys(keys: &crate::keys::Keys) -> Result<SecondKeys<'_>, String> {
             missing.join(", ")
         )),
     }
+}
+
+/// The model the second route asks DeepSeek for: lamp-voice's own default (`second_config.rs` `DEEPSEEK_MODEL`).
+const DEEPSEEK_MODEL: &str = "deepseek-flash";
+
+/// A service address as lamp-voice takes one (`second_config.rs` `checked_url`): `https://` and a host, at most 2048 bytes, no
+/// `?`, `#` or `@`. Said here first, so a typo gets one plain line and the stand-in voice, not lamp-voice's error at its start.
+fn service_url_ok(url: &str) -> bool {
+    let host = url
+        .strip_prefix("https://")
+        .map(|rest| rest.split('/').next().unwrap_or(""));
+    url.len() <= 2048 && !url.contains(['?', '#', '@']) && host.is_some_and(|host| !host.is_empty())
+}
+
+/// `path` with every symbolic link resolved as far as it exists (the rest, not yet made, follows as written): the place a file
+/// really goes, whatever a link says.
+fn resolved(path: &Path) -> PathBuf {
+    let mut rest = Vec::new();
+    let mut at = path.to_path_buf();
+    loop {
+        if let Ok(found) = fs::canonicalize(&at) {
+            return rest
+                .iter()
+                .rev()
+                .fold(found, |joined, name| joined.join(name));
+        }
+        match (
+            at.parent().map(Path::to_path_buf),
+            at.file_name().map(OsStr::to_owned),
+        ) {
+            (Some(parent), Some(name)) => {
+                rest.push(name);
+                at = parent;
+            }
+            _ => return path.to_path_buf(),
+        }
+    }
+}
+
+/// Whether `path`, links resolved, is `product` or anywhere under `folder`.
+fn under_product(path: &Path, product: &Path, folder: Option<&Path>) -> bool {
+    let path = resolved(path);
+    let product = resolved(product);
+    path == product || folder.is_some_and(|folder| path.starts_with(resolved(folder)))
 }
 
 /// The product's own second-route file. lamp-sim never names it: lamp-voice WRITES it when it is asked for exactly
@@ -488,21 +532,23 @@ pub fn prepare_second(setup: &Setup, keys: &SecondKeys) -> io::Result<Launch> {
     }
     // The file the voice is told to read, and the folder it takes its credentials from, are in the key's folder: neither may
     // be the product's file nor anywhere under the product's own folder, checked before anything is written.
+    // Links are resolved first: a key folder that is a symbolic link into the product's folder is the product's place.
     let config_path = home.path.join("second.json");
     let product = product_second_path();
-    let product_folder = Path::new(&product)
-        .ancestors()
-        .nth(2)
-        .map(Path::to_path_buf);
-    let under_product = |path: &Path| {
-        path == Path::new(&product)
-            || product_folder
-                .as_deref()
-                .is_some_and(|folder| path.starts_with(folder))
-    };
-    if under_product(&config_path) || under_product(&home.path) {
+    let product_folder = Path::new(&product).ancestors().nth(2);
+    if under_product(&config_path, Path::new(&product), product_folder)
+        || under_product(&home.path, Path::new(&product), product_folder)
+    {
         return Err(io::Error::other(
             "the second route's configuration and credentials may not be the product's own",
+        ));
+    }
+    // And the address the key is sent to, again (second_keys said it first): before any key file is written.
+    if let Some(url) = keys.deepseek_url
+        && !service_url_ok(url.expose().trim())
+    {
+        return Err(io::Error::other(
+            "own.deepseek_url must be an https:// address with a host and no ? # or @",
         ));
     }
     let voice = dir.join("voice");
@@ -524,7 +570,9 @@ pub fn prepare_second(setup: &Setup, keys: &SecondKeys) -> io::Result<Launch> {
         .map_or("https://api.deepseek.com", |url| url.expose().trim());
     let second = serde_json::json!({
         "llm_base_url": deepseek_base,
-        "llm_model": "deepseek-chat",
+        // One name for the model: lamp-voice's own default for `LAMP_SECOND_CHAT=deepseek` (the file requires a name; the chat
+        // asks this one). A test ties it to lamp-voice's `DEEPSEEK_MODEL`.
+        "llm_model": DEEPSEEK_MODEL,
         "llm_credential_file": deepseek,
         "deepgram_credential_file": deepgram,
         "tts_provider": keys.speech.name(),
@@ -1531,11 +1579,141 @@ mod tests {
             OWN[3],
         ]);
         let why = second_keys(&plain).err().unwrap();
-        assert!(why.contains("must start with https://"), "{why}");
+        assert!(why.contains("must be an https:// address"), "{why}");
         assert!(
             !why.contains("test-not-real"),
             "no value in the words: {why}"
         );
         assert!(second_keys(&keys_with(&OWN)).is_ok());
+    }
+
+    #[test]
+    fn a_deepseek_address_is_checked_as_lamp_voice_checks_it_and_the_line_is_one() {
+        for bad in [
+            "http://deepseek.test-not-real.invalid",
+            "https://",
+            "https:///path",
+            "https://deepseek.test-not-real.invalid/v1?x=1",
+            "https://deepseek.test-not-real.invalid/v1#frag",
+            "https://user@deepseek.test-not-real.invalid",
+        ] {
+            let found = keys_with(&[OWN[0], ("LAMPOS_VOICE_DEEPSEEK_URL", bad), OWN[2], OWN[3]]);
+            let why = second_keys(&found)
+                .err()
+                .unwrap_or_else(|| panic!("{bad} was taken"));
+            assert!(
+                why.contains("own.deepseek_url must be an https:// address"),
+                "{bad}: {why}"
+            );
+            assert!(
+                !why.contains("nothing is started"),
+                "the line says one thing: {why}"
+            );
+            assert!(!why.contains("test-not-real"), "no value in the words");
+        }
+        let long = format!(
+            "https://deepseek.test-not-real.invalid/{}",
+            "a".repeat(2100)
+        );
+        assert!(
+            second_keys(&keys_with(&[
+                OWN[0],
+                ("LAMPOS_VOICE_DEEPSEEK_URL", &long),
+                OWN[2],
+                OWN[3]
+            ]))
+            .is_err()
+        );
+        assert!(second_keys(&keys_with(&OWN)).is_ok());
+        // The same rule is held again before any key file is written (a SecondKeys built by hand, not through second_keys).
+        let dir = folder("url-again");
+        let run = runtime("url-again-run");
+        let home = key_home(&dir, Some(run.as_os_str()));
+        let found = keys_with(&[
+            OWN[0],
+            (
+                "LAMPOS_VOICE_DEEPSEEK_URL",
+                "http://plain.test-not-real.invalid",
+            ),
+            OWN[2],
+            OWN[3],
+        ]);
+        let by_hand = SecondKeys {
+            deepseek: found.deepseek.as_ref().unwrap(),
+            deepseek_url: found.deepseek_url.as_ref(),
+            deepgram: found.deepgram.as_ref().unwrap(),
+            speech: Speech::ElevenLabs,
+            speech_key: found.elevenlabs.as_ref().unwrap(),
+        };
+        let setup = Setup {
+            dir: &dir,
+            bin: Path::new("/bin-dir"),
+            bus_root: Path::new("/lamp/bus"),
+            model: DEFAULT_MODEL,
+            speaker: "default",
+            unix_ms: 1,
+            home: &home,
+        };
+        assert!(prepare_second(&setup, &by_hand).is_err());
+        assert!(
+            !home.path.exists() && !dir.join("voice").exists(),
+            "no key file, no folder"
+        );
+        let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
+    }
+
+    #[test]
+    fn the_models_name_is_lamp_voices_own_default_for_the_deepseek_chat() {
+        let voice_source = include_str!("../../voice/src/second_config.rs");
+        assert!(
+            voice_source.contains(&format!(
+                "pub const DEEPSEEK_MODEL: &str = \"{DEEPSEEK_MODEL}\";"
+            )),
+            "lamp-voice's DEEPSEEK_MODEL is no longer the name second.json asks"
+        );
+        let dir = folder("model-name");
+        let run = runtime("model-name-run");
+        let home = key_home(&dir, Some(run.as_os_str()));
+        prep_second(&dir, &home, &OWN).unwrap();
+        let second: serde_json::Value =
+            serde_json::from_slice(&fs::read(home.path.join("second.json")).unwrap()).unwrap();
+        assert_eq!(second["llm_model"], DEEPSEEK_MODEL);
+        let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
+    }
+
+    #[test]
+    fn a_key_folder_that_is_a_link_into_the_products_folder_is_the_products() {
+        use std::os::unix::fs::symlink;
+        let base = folder("link");
+        let product_folder = base.join("etc").join("lampOS");
+        let product = product_folder.join("voice").join("second.json");
+        fs::create_dir_all(product.parent().unwrap()).unwrap();
+        // A plain path outside is fine.
+        let outside = base.join("run").join("keys");
+        assert!(!under_product(&outside, &product, Some(&product_folder)));
+        // A link made inside the run folder that points into the product's folder is not, whether the folder it names exists
+        // or not yet, and not through a second link either.
+        let link = base.join("link-in");
+        symlink(product.parent().unwrap(), &link).unwrap();
+        assert!(
+            under_product(&link.join("mine"), &product, Some(&product_folder)),
+            "through a link, a folder not yet made"
+        );
+        assert!(
+            under_product(&link, &product, Some(&product_folder)),
+            "the link itself"
+        );
+        let second = base.join("link-two");
+        symlink(&link, &second).unwrap();
+        assert!(
+            under_product(&second.join("mine"), &product, Some(&product_folder)),
+            "through two links"
+        );
+        // The product's file itself, through a link to the file.
+        let to_file = base.join("link-file");
+        fs::write(&product, "x").unwrap();
+        symlink(&product, &to_file).unwrap();
+        assert!(under_product(&to_file, &product, Some(&product_folder)));
+        let _ = fs::remove_dir_all(&base);
     }
 }
