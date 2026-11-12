@@ -20,7 +20,13 @@ thời tiết được giữ.
 
 Điều kiện của first builder (#3504): để sót một bản sao là lỗi quan trọng
 nhất, nên lượt có liên kết bị xóa chỉ cần trùng một từ, chấp nhận xóa thừa vài
-lượt không liên quan. Lượt không liên kết phải chứa đủ mọi từ, nếu không
+lượt không liên quan. Từ trùng ấy không bao giờ là động từ mở đầu của bộ ghi
+quan sát (`days::OPENERS`: want, ask, like, prefer, enjoy và các dạng của
+chúng, như `tidy` coi là chung chung): trên lamp-06c1 (12/11, C136), quên
+«Wants the light a little warmer.» từng xóa năm quan sát lịch «Wants an event
+…» và một câu «Wants a long story …» có liên kết, chỉ vì chữ «want». Ghi chú
+chỉ gồm những động từ đó thì vẫn giữ chúng, nên lượt đi không bao giờ rộng hơn
+trước; tìm kiếm và quy tắc bản sao dưới đây cũng vẫn giữ chúng. Lượt không liên kết phải chứa đủ mọi từ, nếu không
 «màu yêu thích là tím» sẽ xóa mọi câu có chữ «yêu thích».
 
 Mã chuẩn hóa chữ hoa/thường và `đ`, bỏ từ quá ngắn hoặc quá thông dụng, coi
