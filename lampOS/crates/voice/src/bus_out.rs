@@ -292,13 +292,19 @@ impl NameIn {
     /// The same for `topic`: `name/heard`, each hearing when it is over, or
     /// `name/rising`, its first sign as the name is said (#782).
     pub fn on_topic(root: &Path, topic: &str) -> io::Result<Self> {
+        Self::on_topic_as(root, topic, SOURCE)
+    }
+
+    /// The same as subscriber `name`, for a second reader of a topic
+    /// another of the voice's own already reads as `voice`.
+    pub fn on_topic_as(root: &Path, topic: &str, name: &str) -> io::Result<Self> {
         let kind = if topic == lamp_msgs::StopHeard::TOPIC {
             lamp_msgs::StopHeard::TYPE
         } else {
             lamp_msgs::NameHeard::TYPE
         };
         Ok(Self {
-            heard: Bus::new(root)?.subscribe_typed(topic, SOURCE, kind)?,
+            heard: Bus::new(root)?.subscribe_typed(topic, name, kind)?,
             looked_at_us: None,
         })
     }
@@ -311,13 +317,18 @@ impl NameIn {
 
     /// The same for `topic`.
     pub fn from_environment_on(topic: &str) -> Option<Self> {
+        Self::from_environment_as(topic, SOURCE)
+    }
+
+    /// The same as subscriber `name`.
+    pub fn from_environment_as(topic: &str, name: &str) -> Option<Self> {
         if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
             return None;
         }
         let root = std::env::var_os(lamp_bus::ROOT_VARIABLE)
             .filter(|root| !root.is_empty())
             .unwrap_or_else(|| lamp_bus::DEFAULT_ROOT.into());
-        match Self::on_topic(Path::new(&root), topic) {
+        match Self::on_topic_as(Path::new(&root), topic, name) {
             Ok(names) => Some(names),
             Err(error) => {
                 eprintln!("lamp-voice: the lamp's name is not taken from the bus: {error}");

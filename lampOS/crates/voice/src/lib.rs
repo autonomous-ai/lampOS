@@ -77,6 +77,7 @@ pub mod diagnostics;
 pub mod dont_know;
 pub mod early_words;
 pub mod expression_out;
+pub mod faint_named;
 pub mod first_output;
 pub mod fixture_provider;
 pub mod follows_face;
