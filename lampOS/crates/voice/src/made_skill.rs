@@ -6733,12 +6733,46 @@ fn made_of(directory: &Path, entry: &Value) -> Option<Made> {
 /// read it back (`make_skill_local::read_back`); none when no skill kept
 /// here and put on has that name.
 pub fn kept_on_named(directory: &Path, asked: &str) -> Option<Made> {
-    let asked = name_asked(asked);
-    index(directory)
-        .into_iter()
+    let on = index(directory);
+    let entry = named_among(&on, asked)?;
+    made_of(directory, entry)
+}
+
+/// The kept skills on the lamp that `asked` names only once number words
+/// are digits, when two or more do and none is named exactly ("room one
+/// light two" with `room-1-light-two` and `room-one-light-2` both on): they
+/// sound the same said back, so the person is asked which (Fourteen's P2
+/// on #6573, the first builder's ruling; "skill two" with `skill-2` and
+/// `skill-two` takes the exact one). Empty when one alone or none matches.
+pub fn kept_on_alike(directory: &Path, asked: &str) -> Vec<String> {
+    let on = index(directory);
+    if named_among(&on, asked).is_some() {
+        return Vec::new();
+    }
+    let digits = name_digits(&name_asked(asked));
+    let alike: Vec<String> = on
+        .iter()
         .filter(|entry| entry["on"] == true)
-        .find(|entry| entry["name"].as_str() == Some(asked.as_str()))
-        .and_then(|entry| made_of(directory, &entry))
+        .filter_map(|entry| entry["name"].as_str())
+        .filter(|name| name_digits(name) == digits)
+        .map(str::to_owned)
+        .collect();
+    if alike.len() > 1 { alike } else { Vec::new() }
+}
+
+/// The on entry of `index` that `asked` names: the exact name first, else
+/// the one alone whose name matches with number words as digits
+/// ([`name_digits`]). None for two that match only so ([`kept_on_alike`]).
+fn named_among<'a>(index: &'a [Value], asked: &str) -> Option<&'a Value> {
+    let asked = name_asked(asked);
+    let digits = name_digits(&asked);
+    let on = || index.iter().filter(|entry| entry["on"] == true);
+    let named = |entry: &Value| entry["name"].as_str().unwrap_or_default().to_owned();
+    on().find(|entry| named(entry) == asked).or_else(|| {
+        let mut by_digits = on().filter(|entry| name_digits(&named(entry)) == digits);
+        let first = by_digits.next()?;
+        by_digits.next().is_none().then_some(first)
+    })
 }
 
 /// The names of the kept skills on the lamp.
@@ -6774,6 +6808,68 @@ pub fn name_asked(asked: &str) -> String {
         words = rest;
     }
     words.join("-")
+}
+
+/// A written name (`lamp-test-email-2`, as [`name_asked`] writes one) with
+/// each number said in words written as digits, the same on both sides of
+/// a match: speech gives "lamp test email two" for a skill named with a
+/// `2` (lamp-9adf, 12 Nov, #6223's rows). Zero to nineteen, the tens to
+/// ninety, and a tens word with a unit after it as one number ("twenty
+/// one" is `21`); any other word is left as it is.
+pub fn name_digits(name: &str) -> String {
+    const UNITS: [&str; 20] = [
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen",
+    ];
+    const TENS: [&str; 8] = [
+        "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+    ];
+    let unit = |word: &str| UNITS.iter().position(|said| *said == word);
+    let tens = |word: &str| {
+        TENS.iter()
+            .position(|said| *said == word)
+            .map(|at| 20 + 10 * at)
+    };
+    let words: Vec<&str> = name.split('-').collect();
+    let mut out: Vec<String> = Vec::with_capacity(words.len());
+    let mut at = 0;
+    while at < words.len() {
+        let word = words[at];
+        if let Some(tens) = tens(word) {
+            match words.get(at + 1).and_then(|next| unit(next)) {
+                Some(one) if (1..=9).contains(&one) => {
+                    out.push((tens + one).to_string());
+                    at += 2;
+                }
+                _ => {
+                    out.push(tens.to_string());
+                    at += 1;
+                }
+            }
+        } else {
+            out.push(unit(word).map_or_else(|| word.to_owned(), |number| number.to_string()));
+            at += 1;
+        }
+    }
+    out.join("-")
 }
 
 /// Keep `made` in the index, as made from `from`, and let the oldest
@@ -7355,6 +7451,103 @@ fn cut_chars(text: &str, most: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A number said in words is its digits on both sides (#6223's rows on
+    /// lamp-9adf, 12 Nov: "lamp test email two" found no
+    /// `lamp-test-email-2`); any other word is left as it is.
+    #[test]
+    fn a_number_said_in_words_is_its_digits() {
+        for (said, written) in [
+            ("lamp-test-email-two", "lamp-test-email-2"),
+            ("lamp-test-email-2", "lamp-test-email-2"),
+            ("zero-one-nine", "0-1-9"),
+            ("ten-eleven-nineteen", "10-11-19"),
+            ("twenty-one-mail", "21-mail"),
+            ("thirty-mail", "30-mail"),
+            ("ninety-nine", "99"),
+            ("twenty-ten", "20-10"),
+            ("someone-tone-twofold", "someone-tone-twofold"),
+            ("leaving-mail", "leaving-mail"),
+            ("", ""),
+        ] {
+            assert_eq!(name_digits(said), written, "{said}");
+        }
+    }
+
+    /// The kept skill named with digits is found by the number said in
+    /// words, and one named in words by the digits; an off one never.
+    #[test]
+    fn a_kept_skill_is_found_by_its_number_said_either_way() {
+        let dir = std::env::temp_dir().join(format!("made-digits-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        for package in ["a.zip", "b.zip", "c.zip"] {
+            fs::write(dir.join(package), b"").unwrap();
+        }
+        fs::write(
+            dir.join(INDEX),
+            serde_json::to_vec(&json!([
+                {"name": "lamp-test-email-2", "package": "a.zip", "on": true},
+                {"name": "one-more-mail", "package": "b.zip", "on": true},
+                {"name": "lamp-test-email-3", "package": "c.zip", "on": false},
+            ]))
+            .unwrap(),
+        )
+        .unwrap();
+        let found = |asked: &str| kept_on_named(&dir, asked).map(|made| made.name);
+        assert_eq!(
+            found("lamp test email two").as_deref(),
+            Some("lamp-test-email-2")
+        );
+        assert_eq!(
+            found("my Lamp Test Email 2 skill").as_deref(),
+            Some("lamp-test-email-2")
+        );
+        assert_eq!(found("1 more mail").as_deref(), Some("one-more-mail"));
+        assert_eq!(found("one more mail").as_deref(), Some("one-more-mail"));
+        assert_eq!(found("lamp test email three"), None, "off");
+        assert_eq!(found("lamp test email four"), None);
+        // Two on that match only by digits: the exact name, else neither.
+        for package in ["d.zip", "e.zip"] {
+            fs::write(dir.join(package), b"").unwrap();
+        }
+        fs::write(
+            dir.join(INDEX),
+            serde_json::to_vec(&json!([
+                {"name": "skill-2", "package": "d.zip", "on": true},
+                {"name": "skill-two", "package": "e.zip", "on": true},
+            ]))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(found("skill two").as_deref(), Some("skill-two"));
+        assert_eq!(found("skill 2").as_deref(), Some("skill-2"));
+        assert_eq!(found("skill-2").as_deref(), Some("skill-2"));
+        fs::write(
+            dir.join(INDEX),
+            serde_json::to_vec(&json!([
+                {"name": "skill-2", "package": "d.zip", "on": true},
+                {"name": "skill-two", "package": "e.zip", "on": true},
+                {"name": "room-1-light-two", "package": "a.zip", "on": true},
+                {"name": "room-one-light-2", "package": "b.zip", "on": true},
+            ]))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(found("room one light two"), None, "two by digits alone");
+        assert_eq!(
+            kept_on_alike(&dir, "room one light two"),
+            ["room-1-light-two", "room-one-light-2"]
+        );
+        assert_eq!(
+            found("room 1 light two").as_deref(),
+            Some("room-1-light-two")
+        );
+        assert!(kept_on_alike(&dir, "room 1 light two").is_empty(), "exact");
+        assert!(kept_on_alike(&dir, "skill two").is_empty(), "exact");
+        assert!(kept_on_alike(&dir, "skill three").is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     /// What a made skill does, as [`plainly`] says it, before how often it
     /// starts on its own.

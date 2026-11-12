@@ -263,7 +263,7 @@ pub fn unread(spoken: &str) -> String {
 pub fn read_back(
     name: &str,
     asking: Asking,
-    asks: impl FnOnce(&str) -> Result<Option<TaskAsks>, String>,
+    mut asks: impl FnMut(&str) -> Result<Option<TaskAsks>, String>,
     now: Instant,
 ) -> Option<Value> {
     let request = asking.request;
@@ -271,7 +271,18 @@ pub fn read_back(
         return Some(json!({ "error": READ_BACK_NOT_ASKED }));
     }
     let asked = crate::made_skill::name_asked(name);
-    let task = match asks(&asked) {
+    // A number said in words ("store test two") is asked again as its
+    // digits (`store-test-2`) when the name as said has no task
+    // (`made_skill::name_digits`, #6223's rows).
+    let digits = crate::made_skill::name_digits(&asked);
+    let (asked, found) = match asks(&asked) {
+        Ok(None) if digits != asked => {
+            let found = asks(&digits);
+            (digits, found)
+        }
+        found => (asked, found),
+    };
+    let task = match found {
         Ok(Some(task)) => task,
         Ok(None) => return None,
         Err(why) => {
@@ -564,6 +575,42 @@ mod tests {
         assert!(read_back("evening dim", asking(12), |_| Ok(None), now).is_none());
         let told = read_back("photo booth", asking(13), |_| Err("busy".into()), now).unwrap();
         assert!(told["next"].as_str().unwrap().contains("can't read back"));
+    }
+
+    /// A number said in words is asked again as its digits when the name as
+    /// said has no task (#6223's rows: "two" for a `2`); a name with no
+    /// number in words is asked once.
+    #[test]
+    fn a_skill_named_with_a_digit_is_read_back_by_the_number_said() {
+        let now = Instant::now();
+        let mut asked = Vec::new();
+        let told = read_back(
+            "photo booth two",
+            asking(14),
+            |name| {
+                asked.push(name.to_owned());
+                Ok((name == "photo-booth-2").then(|| TaskAsks {
+                    name: "photo-booth-2".into(),
+                    ..booth(true)
+                }))
+            },
+            now,
+        )
+        .unwrap();
+        assert_eq!(asked, ["photo-booth-two", "photo-booth-2"]);
+        assert!(told.get("error").is_none(), "{told}");
+        let mut asked = Vec::new();
+        let told = read_back(
+            "evening dim",
+            asking(15),
+            |name| {
+                asked.push(name.to_owned());
+                Ok(None)
+            },
+            now,
+        );
+        assert!(told.is_none());
+        assert_eq!(asked, ["evening-dim"], "asked once");
     }
 
     /// A skill made or added here carrying `grants` or a `task` step is
