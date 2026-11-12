@@ -24,6 +24,7 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         || crate::agent_tasks::is_tool(name)
         || crate::known_faces::is_tool(name)
         || crate::rules::is_tool(name)
+        || crate::action_claim::unplug_tool(name, &Value::Null).is_some()
         || matches!(
             name,
             "light_on"

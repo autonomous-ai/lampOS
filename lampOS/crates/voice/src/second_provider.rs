@@ -14865,6 +14865,21 @@ async fn answer(
         // note's read still reached the chat).
         notes.retain(|note| crate::services::waiting_note_stands(note));
         let mut messages = cut_event(shared, told).messages();
+        // Whether the lamp's last words are the prepare-unplug skill's
+        // turn-off ask (#6457): an unplug claim then is dropped, not asked
+        // again, as the skill says its own line for the answer. Read from
+        // the exchanges already here: no wait, no call.
+        let unplug_asked = messages
+            .iter()
+            .rev()
+            .filter(|message| message.role == "assistant")
+            .find_map(|message| message.words().filter(|words| !words.trim().is_empty()))
+            .is_some_and(|last| {
+                crate::action_claim::asked_to_turn_off(
+                    last,
+                    shared.fixed(crate::language::UNPLUG_ASK_OFF),
+                )
+            });
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
             match prepared.misfit(&messages, &notes, &said) {
@@ -15777,7 +15792,7 @@ async fn answer(
                                             turn_called
                                                 .iter()
                                                 .map(|(name, args)| (name.as_str(), args)),
-                                            crate::action_claim::forgot_in(&call_statuses),
+                                            &call_statuses,
                                         ) =>
                                     {
                                         action_held.take().unwrap_or_default()
@@ -16309,11 +16324,26 @@ async fn answer(
                         .map(|(name, args)| (name.as_str(), args))
                         .chain(calls.iter().map(|call| (call.name.as_str(), &call.args)))
                 };
-                let forgot = crate::action_claim::forgot_in(&call_statuses);
                 let unmade = crate::action_claim::claim_on(&held, true, worded_turn, forget_turn)
                     .flatten()
                     .filter(|kind| {
-                        !crate::action_claim::stands_on(*kind, &held, read_asked, called(), forgot)
+                        !crate::action_claim::stands_on(
+                            *kind,
+                            &held,
+                            read_asked,
+                            called(),
+                            &call_statuses,
+                        )
+                    });
+                // An unplug's act said (#6457): while the skill's turn-off
+                // ask is open its answer is the skill's own line, so the
+                // words are dropped with no ask again; said in the round
+                // that calls an unplug tool, they ran ahead of it, and the
+                // next round speaks from its answer.
+                let unplug_said = unmade == Some(crate::action_claim::Claim::Unplug);
+                let unplug_calling = unplug_said
+                    && calls.iter().any(|call| {
+                        crate::action_claim::unplug_tool(&call.name, &call.args).is_some()
                     });
                 // A forget said done is told its own note (C88).
                 let forget_said = unmade == Some(crate::action_claim::Claim::Forgot);
@@ -16352,6 +16382,26 @@ async fn answer(
                                 queue.push(sentence).await?;
                             }
                         }
+                    }
+                    Some(_) if unplug_said && unplug_asked => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply claims an unplug action while the skill's ask is open: not said, its {} call(s) run (LAMP_ACTION_CLAIM_CHECKED)",
+                            calls.len()
+                        );
+                        text.clear();
+                        if calls.is_empty() {
+                            for sentence in offered(&mut offer_hold, false, request, round) {
+                                queue.push(sentence).await?;
+                            }
+                            return Ok(());
+                        }
+                    }
+                    Some(_) if unplug_calling => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says an unplug action before its call ran: not said, its {} call(s) run, no note (LAMP_ACTION_CLAIM_CHECKED)",
+                            calls.len()
+                        );
+                        text.clear();
                     }
                     Some(_) if forget_calling => {
                         eprintln!(
@@ -17195,7 +17245,12 @@ async fn answer(
                         scope.as_ref(),
                     );
                 }
-                call_statuses.push(after_forget::status(&call.name, &answer.told));
+                // A `use_skill` that ran an unplug tool is kept under that
+                // tool's name, for the unplug claim's outcome (#6457).
+                call_statuses.push(after_forget::status(
+                    crate::action_claim::unplug_tool(&call.name, &call.args).unwrap_or(&call.name),
+                    &answer.told,
+                ));
                 if crate::remember::is_forget(&call.name) {
                     context_epoch = shared.send_content_epoch.load(Ordering::Acquire);
                     messages = after_forget::context(

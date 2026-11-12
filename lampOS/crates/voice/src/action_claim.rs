@@ -38,6 +38,20 @@
 //!   …" and "I'll remember that." are none. "It" or "that" turned off or
 //!   down may be an alarm, so a `cancel_reminder` or `snooze_reminder`
 //!   backs it too, never a set ([`Claim::OffOrDown`]).
+//! - the unplug's own acts in the model's words ([`UNPLUGGED`], #6457: on
+//!   lamp-52e6 at 12200, 12 Nov, "No." to the turn-off ask got a `use_skill`
+//!   that ran no skill and "Staying on, then — standing back up.", and
+//!   "Yes." got `calls=none` and "Still preparing — give it a moment, it
+//!   isn't confirmed safe to unplug yet."): folding or preparing to fold,
+//!   staying on or standing up, turning off, and "safe to unplug", bare or
+//!   after a lead-in, closing at the sentence's end, never on a '?'. Only an
+//!   outcome backs it ([`Claim::Unplug`], [`unplug_in`]): a
+//!   `prepare_to_unplug` or `stay_plugged_in` call, by its name or through
+//!   `use_skill` naming it ([`unplug_tool`]), whose answer is no error. While
+//!   the skill's turn-off ask is open (the lamp's last line is
+//!   `language::UNPLUG_ASK_OFF`, [`asked_to_turn_off`]) such words are
+//!   dropped, with no ask again and no [`NOT_DONE_LINE`]: the skill says its
+//!   own exact line for that answer.
 //!
 //! Such a claim stands when its turn made a call of its kind
 //! ([`Claim::made_by`]); otherwise it is held, the model is asked once more
@@ -243,6 +257,11 @@ pub enum Claim {
     /// `snooze_reminder` makes it (the Reviewer-lead's P3 on #6467); a set
     /// never does.
     OffOrDown,
+    /// The unplug's own acts said ([`UNPLUGGED`]: "I'm preparing to fold.",
+    /// "Staying on, then — standing back up."): only a `prepare_to_unplug`
+    /// or `stay_plugged_in` that ran ([`unplug_in`]) makes it, never a call
+    /// by its name.
+    Unplug,
 }
 
 impl Claim {
@@ -271,6 +290,9 @@ impl Claim {
                 Self::LightOrVolume.made_by(name)
                     || matches!(name, "cancel_reminder" | "snooze_reminder")
             }
+            // Only by its outcome ([`unplug_in`]): a `use_skill` that ran no
+            // skill backs nothing (#6457, case B).
+            Self::Unplug => false,
         }
     }
 
@@ -286,6 +308,7 @@ impl Claim {
             Self::Snoozed => "a reminder snoozed",
             Self::Made => "a skill made",
             Self::OffOrDown => "turning something off or down",
+            Self::Unplug => "preparing to be unplugged, staying on or turning off",
         }
     }
 
@@ -301,6 +324,7 @@ impl Claim {
             Self::Snoozed => "snooze",
             Self::Made => "made",
             Self::OffOrDown => "off or down",
+            Self::Unplug => "unplug",
         }
     }
 }
@@ -464,6 +488,11 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
         None => undecided = true,
         Some(None) => {}
     }
+    match runs_claim(&UNPLUGGED, &text, ended, true, true) {
+        Some(Some(kind)) => return Some(Some(kind)),
+        None => undecided = true,
+        Some(None) => {}
+    }
     if undecided { None } else { Some(None) }
 }
 
@@ -578,19 +607,66 @@ pub fn claim_on(reply: &str, ended: bool, worded: bool, forget: bool) -> Option<
     }
 }
 
-/// [`stands`], and a forget said done ([`Claim::Forgot`]) only with
-/// `forgot` (a forget removed something in the turn, [`forgot_in`]).
+/// [`stands`], and the claims judged by outcome by the turn's kept
+/// `statuses` (`after_forget::status`): a forget said done
+/// ([`Claim::Forgot`]) only when a forget removed something ([`forgot_in`]),
+/// an unplug's act ([`Claim::Unplug`]) only when an unplug call ran
+/// ([`unplug_in`]).
 pub fn stands_on<'a>(
     kind: Claim,
     reply: &str,
     read: bool,
     calls: impl IntoIterator<Item = (&'a str, &'a serde_json::Value)>,
-    forgot: bool,
+    statuses: &[serde_json::Value],
 ) -> bool {
-    if kind == Claim::Forgot {
-        return forgot;
+    match kind {
+        Claim::Forgot => forgot_in(statuses),
+        Claim::Unplug => unplug_in(statuses),
+        _ => stands(kind, reply, read, calls),
     }
-    stands(kind, reply, read, calls)
+}
+
+/// The prepare-unplug skill's "never mind" tool, as lamp-skills names it
+/// (`lamp_skills::unplug::STAY_TOOL`; the voice does not link lamp-skills).
+pub const STAY_TOOL: &str = "stay_plugged_in";
+
+/// The unplug tool a call of `name` with `args` runs: `prepare_to_unplug`
+/// or [`STAY_TOOL`], by its own name or through `use_skill` naming it.
+pub fn unplug_tool(name: &str, args: &serde_json::Value) -> Option<&'static str> {
+    let named = if name == crate::use_skill::NAME {
+        args["skill"].as_str()?
+    } else {
+        name
+    };
+    [crate::without_a_tool::UNPLUG_TOOL, STAY_TOOL]
+        .into_iter()
+        .find(|tool| *tool == named)
+}
+
+/// Whether an unplug call ran in the turn, by the outcomes the turn keeps
+/// of its calls (`after_forget::status`, kept under [`unplug_tool`]'s name):
+/// a `prepare_to_unplug` or [`STAY_TOOL`] whose answer is no error and no
+/// `ok` false. lamp-skills sends every refusal as an error.
+pub fn unplug_in(statuses: &[serde_json::Value]) -> bool {
+    statuses.iter().any(|status| {
+        let outcome = &status["outcome"];
+        status["tool"]
+            .as_str()
+            .is_some_and(|tool| unplug_tool(tool, &serde_json::Value::Null).is_some())
+            && outcome.get("error").is_none()
+            && outcome["ok"] != false
+    })
+}
+
+/// Whether the lamp's last words `last` end with the skill's turn-off ask
+/// (`language::UNPLUG_ASK_OFF`, or `line`, the same said in the owner's
+/// language): its answer is the skill's own (#6457).
+pub fn asked_to_turn_off(last: &str, line: &str) -> bool {
+    let last = normalised(last);
+    let last = last.trim_end();
+    [crate::language::UNPLUG_ASK_OFF, line]
+        .into_iter()
+        .any(|ask| last.ends_with(normalised(ask).trim_end()))
 }
 
 /// Whether a forget run in the turn removed something, by the outcomes the
@@ -1924,6 +2000,61 @@ const PROMISED: [(&str, Claim); 123] = [
     ),
 ];
 
+/// The unplug's own acts in the model's words (#6457), read as [`PROMISED`]'s
+/// runs are: folding or preparing to fold ("I'm preparing to fold — please
+/// wait before you pull the plug.", "Still preparing."), staying on or
+/// standing up ("Staying on, then — standing back up.", "I'll stay plugged
+/// in."), turning off ("I'm turning myself off."), and readiness opening
+/// the reply ("Safe to unplug me now."). Each closes at the sentence's end,
+/// never on a '?'. Not "It's safe to unplug me.": a reply opening "It's" is
+/// decided no claim at its first word, as the other runs keep it.
+/// "Okay, I'll stay." (the skill's own line), "Should I fold?" and "I can't
+/// turn myself off." are none.
+const UNPLUGGED: [(&str, Claim); 36] = [
+    ("i'm|still preparing $", Claim::Unplug),
+    ("i'm still preparing $", Claim::Unplug),
+    ("i'm|still|now preparing to fold|unplug $", Claim::Unplug),
+    ("i'm still preparing to fold|unplug $", Claim::Unplug),
+    ("preparing to fold $", Claim::Unplug),
+    ("i'm getting ready to fold|unplug $", Claim::Unplug),
+    ("i'm folding $", Claim::Unplug),
+    ("i'm folding up|down|now $", Claim::Unplug),
+    ("folding up|down|now $", Claim::Unplug),
+    ("i'll fold $", Claim::Unplug),
+    ("i'll fold up|down|now $", Claim::Unplug),
+    ("i will fold $", Claim::Unplug),
+    ("let me fold $", Claim::Unplug),
+    ("let me fold up|down|now $", Claim::Unplug),
+    ("staying on|put $", Claim::Unplug),
+    ("staying plugged in $", Claim::Unplug),
+    ("i'm staying on|put $", Claim::Unplug),
+    ("i'm staying plugged in $", Claim::Unplug),
+    ("i'll stay on|put $", Claim::Unplug),
+    ("i'll stay plugged in $", Claim::Unplug),
+    ("i will stay on|put $", Claim::Unplug),
+    ("i will stay plugged in $", Claim::Unplug),
+    ("standing|getting back up $", Claim::Unplug),
+    ("standing up $", Claim::Unplug),
+    ("i'm standing|getting back up $", Claim::Unplug),
+    ("i'm standing up $", Claim::Unplug),
+    ("i'll stand back up $", Claim::Unplug),
+    ("i'll stand up $", Claim::Unplug),
+    (
+        "i'm|now turning|switching|shutting myself off|down $",
+        Claim::Unplug,
+    ),
+    (
+        "turning|switching|shutting myself off|down $",
+        Claim::Unplug,
+    ),
+    ("i'll turn|switch|shut myself off|down $", Claim::Unplug),
+    ("i will turn|switch|shut myself off|down $", Claim::Unplug),
+    ("i'm|now shutting down $", Claim::Unplug),
+    ("safe to unplug $", Claim::Unplug),
+    ("safe to unplug me $", Claim::Unplug),
+    ("safe to unplug me now $", Claim::Unplug),
+];
+
 /// A reminder said as snoozed (C68), read as [`WORDED`]'s runs are, bare or
 /// after one of [`LEAD_INS`], with the strict lines under
 /// [`ENVIRONMENT`] alone: "Snoozing it for five minutes.", "Okay, snoozed.",
@@ -2426,6 +2557,101 @@ pub(crate) mod tests {
         assert_eq!(forget_claim("Okay. I'll forget that.", false), Some(false));
     }
 
+    /// #6457, 12200 on lamp-52e6 (12 Nov): the unplug's acts in the model's
+    /// own words are claims; questions, a refusal and the skill's own line
+    /// are not.
+    #[test]
+    fn the_unplugs_acts_in_the_models_words_are_claims() {
+        for reply in [
+            // Case B: "No." to the turn-off ask.
+            "Staying on, then \u{2014} standing back up.",
+            // Case D: "Yes." to it.
+            "Still preparing \u{2014} give it a moment, it isn't confirmed safe to unplug yet.",
+            // 12104's case D: "I'm unplugging you now." with `calls=none`.
+            "I'm preparing to fold \u{2014} please wait before you pull the plug.",
+            "Okay, I'll stay plugged in.",
+            "I'm turning myself off.",
+            "Standing back up.",
+            "Safe to unplug me now.",
+        ] {
+            assert_eq!(claim(reply, true), Some(Some(Claim::Unplug)), "{reply}");
+        }
+        for reply in [
+            "Should I fold?",
+            "I can't turn myself off.",
+            crate::language::UNPLUG_STAY,
+            "Staying on?",
+            "I'm preparing dinner plans for you.",
+        ] {
+            assert_eq!(claim(reply, true), Some(None), "{reply}");
+        }
+        assert_eq!(claim("Staying on, then", false), None);
+    }
+
+    /// #6457: an unplug claim stands only on a `prepare_to_unplug` or
+    /// `stay_plugged_in` that ran, by its name or through `use_skill`; a
+    /// `use_skill` that ran no skill (case B) and a refused call back none.
+    #[test]
+    fn an_unplug_claim_stands_only_on_a_call_that_ran() {
+        let reply = "Staying on, then \u{2014} standing back up.";
+        let status = |tool: &str, outcome: serde_json::Value| serde_json::json!({"tool": tool, "outcome": outcome});
+        let none = serde_json::Value::Null;
+        // B: the `use_skill` named no unplug tool, kept as another call.
+        let b = [status("other_call", serde_json::json!({"error": true}))];
+        assert!(!stands_on(
+            Claim::Unplug,
+            reply,
+            false,
+            [("use_skill", &none)],
+            &b
+        ));
+        assert!(!Claim::Unplug.made_by(STAY_TOOL));
+        assert!(!stands_on(
+            Claim::Unplug,
+            reply,
+            false,
+            [(STAY_TOOL, &none)],
+            &[]
+        ));
+        let refused = [status(STAY_TOOL, serde_json::json!({"error": true}))];
+        assert!(!unplug_in(&refused));
+        assert!(!unplug_in(&[status(
+            STAY_TOOL,
+            serde_json::json!({"ok": false})
+        )]));
+        let ran = [status(STAY_TOOL, serde_json::json!({}))];
+        assert!(stands_on(Claim::Unplug, reply, false, [], &ran));
+        assert!(unplug_in(&[status(
+            crate::without_a_tool::UNPLUG_TOOL,
+            serde_json::json!({"ok": true})
+        )]));
+        // Its name, direct or through `use_skill`; never another skill.
+        let named = |skill: &str| serde_json::json!({"skill": skill});
+        assert_eq!(unplug_tool(STAY_TOOL, &none), Some(STAY_TOOL));
+        assert_eq!(
+            unplug_tool(crate::use_skill::NAME, &named("prepare_to_unplug")),
+            Some(crate::without_a_tool::UNPLUG_TOOL)
+        );
+        assert_eq!(unplug_tool(crate::use_skill::NAME, &named("dance")), None);
+        assert_eq!(unplug_tool(crate::use_skill::NAME, &none), None);
+        assert_eq!(unplug_tool("dance", &none), None);
+    }
+
+    /// #6457: the skill's turn-off ask is open while it ends the lamp's last
+    /// words.
+    #[test]
+    fn the_turn_off_ask_is_read_from_the_lamps_last_words() {
+        let ask = crate::language::UNPLUG_ASK_OFF;
+        assert!(asked_to_turn_off(ask, ask));
+        assert!(asked_to_turn_off(
+            &format!("I'm preparing to fold. {ask} "),
+            "other"
+        ));
+        assert!(asked_to_turn_off("Translated ask.", "Translated ask."));
+        assert!(!asked_to_turn_off(crate::language::UNPLUG_STAY, ask));
+        assert!(!asked_to_turn_off(&format!("{ask} Okay."), ask));
+    }
+
     /// C88: a forget said done stands only beside a forget that removed
     /// something, or a face's or a rule's forget.
     #[test]
@@ -2444,15 +2670,15 @@ pub(crate) mod tests {
             reply,
             false,
             [("recall", &none)],
-            false
+            &[]
         ));
-        assert!(stands_on(Claim::Forgot, reply, false, [], true));
+        assert!(stands_on(Claim::Forgot, reply, false, [], &[status(true)]));
         // A face's or a rule's forget never backs it by its name alone
         // (Thirteen's P2-1 on #5942): only by what it answered.
         for name in [crate::known_faces::FORGET, crate::rules::FORGET_RULE] {
             assert!(!Claim::Forgot.made_by(name), "{name}");
             assert!(
-                !stands_on(Claim::Forgot, reply, false, [(name, &none)], false),
+                !stands_on(Claim::Forgot, reply, false, [(name, &none)], &[]),
                 "{name}"
             );
         }
