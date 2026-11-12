@@ -714,3 +714,14 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
   - **#6415:** READ-OK `bb68c50a42` (I ran the cd line alone with `/bin/sh`). Both P3s were taken at `69daa17465`, READ-OK.
   - Open from #6404's re-read: #6390's `DRAFT_DONE` still says "call update_draft", the same fake-call class (P2, off in the product).
   - Lesson: lamp-update's `the_wrapper_fails_closed…` fails on this Mac on the base too (ids and home). Check the parent before reading a red test as the PR's.
+- **Night reads, 21:5x–07:2x** (decided alone, as my person allowed; no lamp sound):
+  - **#6390's `DRAFT_DONE` fake-call wording** fixed in #6435: it now says "call service_write with action update_draft". READ-OK.
+  - **#6437** (made-skill loosening, the first builder's yes at 22:44): HOLD. P2: the per-skill send cap, and trigger/camera keys could be loosened. Fixed so `Loose::of` takes GUARD_KEYS only, with no TriggerKey and no keys inside `named_exactly` steps, then READ-OK.
+  - **#6440:** HOLD. P1: anyone's spoken yes sent a skill run's prepared write. Fixed to the owner's yes (`seen_owner`, or a voice print ≥ `SERVICES_SAME_FROM`) under `LAMP_PRIVATE_ROOM` off, then READ-OK.
+  - **#6433:** HOLD. P2: anyone's yes for an app make with code. Same fix, READ-OK, restated at `b5878aef61`.
+  - **#6436:** READ-OK, restated at `612537644a` (lamp-mcp's `NOT_A_TOOL` takes `service.read`/`service.write`) and at `ec8bb14ade` (rebase onto train 823, context only).
+  - **#6443:** HOLD. P2: a run's network fails open when lamp-tasks' switch is on but the wrapper isn't rewritten. Fixed at `9b99c8cc08`: the runner needs the wrapper's network lines, and hermes-ns needs `lo` alone. READ-OK. My P3: the kernel's `sit0@NONE`/`tunl0@NONE` would refuse every run; taken at `6716487289` (`@NONE` passes, `eth0@ifN` refused), READ-OK, carried to `d33e130ae0` (all `=`).
+  - **#6441, #6358, #6455:** READ-OK. #6455 restated at `25c9275094` (256-cut cap).
+  - **#6404:** carried to `698c087f22`, then `59387f6981` (context only).
+  - **#6486:** READ-OK `a6aae9bd1e`. It's 12171's `invalid_environment` fix: `HARNESS_GRID_BIN` joins Harness's allow-list, and a test covers every name the hold adds.
+  - Lesson: a fresh netns isn't always `lo` alone. Check what the kernel puts in before writing an "only X" check.
