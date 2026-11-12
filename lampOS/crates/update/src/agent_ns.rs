@@ -17,6 +17,11 @@
 //! [`HOOK_SHIM`] is root's, 0755, in [`BIN`] (root's, 0755), written with
 //! an engine's namespace script and taken out with the last of them
 //! ([`remove_hook_shim`]).
+//!
+//! [`wrapper`]: the one wrapper and namespace script for every engine
+//! Harness reports (#6510 Part 1, step 1).
+pub mod wrapper;
+
 use crate::records::write_whole;
 use std::{
     fs,
