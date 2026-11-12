@@ -1,6 +1,7 @@
 ---
 name: pose
 description: Call when someone asks the lamp to change its height - "get lower", "sit down", "you're too tall", "stand up tall", "back to normal". pose = lower to get lower, sit to sit down low, normal to stand up tall or go back to normal. The lamp cannot stand taller than its usual height. Asked to stand taller than that, do not call it; say so in words, "This is as tall as I stand." Only when asked.
+when: When asked to get lower, sit down, or stand back up to normal height. Asked to stand taller than usual, do not call it; say in words that this is as tall as you stand. Only when asked.
 ---
 
 # Pose

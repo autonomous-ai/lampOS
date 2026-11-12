@@ -21,6 +21,9 @@ pub const READ_TOPICS: [&str; 5] = [
 /// The second reserved tool of `prepare-unplug`: "never mind". It is
 /// declared whenever the skill is loaded and refused with no latch in force.
 pub const STAY_TOOL: &str = "stay_plugged_in";
+/// `stay_plugged_in`'s when, in short, with `LAMP_USE_SKILL_SUMMARY` on
+/// (#6218): at most `WHEN_MOST_BYTES`, its say-nothing rule kept.
+pub const STAY_WHEN: &str = "Only after unplug preparation began and they say they won't unplug you after all (never mind, stay on). Say nothing yourself; the lamp says it will stay.";
 const STAY_DESCRIPTION: &str = "Call only when, after you began preparing to be unplugged, the person says they will not unplug you after all (for example: never mind, don't unplug, I'm not unplugging you, stay on). The lamp says it will stay, then stands up again by itself. Do not say anything yourself.";
 /// Unbroken minutes Ready, with Skills still up, before the lamp gets back up.
 pub const STAY_ENVIRONMENT: &str = "LAMP_UNPLUG_STAY_MIN";

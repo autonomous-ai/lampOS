@@ -15403,3 +15403,149 @@ light = { colour = "warm" }
         assert_eq!((seen.looked, seen.lights.len()), (None, 0));
     }
 }
+
+/// The `when` lines (#6218, `LAMP_USE_SKILL_SUMMARY`): off, the tools file
+/// is as before, with no `when`; on, it maps exactly the tools that have
+/// one, a skill's, the wellbeing skills' `[stop]` function's and
+/// `stay_plugged_in`'s.
+#[test]
+fn the_when_lines_come_only_with_the_summary_switch() {
+    use lamp_skills::{WHEN_MOST_BYTES, tools_file_summary, tools_file_with, unplug};
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    // A comfort break ships off and `load_all` leaves it out; the water
+    // skill is on, so its `[stop]` function is told.
+    for name in ["dance", "faq", "pose", "prepare-unplug", "sip-of-water"] {
+        copy(&skills_root().join(name), &skills.join(name));
+    }
+    skill_with(
+        &skills,
+        "a-wave",
+        "tool = \"wave\"\n[permissions]\nbody = true\nspeak = true\n[[do]]\nsay = \"Say you will.\"\n",
+    );
+    let (loaded, errors) = load_all(&skills);
+    assert!(errors.is_empty(), "{errors:?}");
+    let off = tools_file_summary(&loaded, false, false, false);
+    assert_eq!(off, tools_file_with(&loaded, false, false));
+    assert!(off.get("when").is_none(), "{off}");
+    let on = tools_file_summary(&loaded, false, false, true);
+    let mut without = on.clone();
+    without.as_object_mut().unwrap().remove("when");
+    assert_eq!(without, off, "on adds the when lines only");
+    let when = on["when"].as_object().unwrap();
+    let names: Vec<&str> = when.keys().map(String::as_str).collect();
+    assert_eq!(
+        names,
+        [
+            "dance",
+            "lamp_help",
+            "prepare_to_unplug",
+            "set_pose",
+            unplug::STAY_TOOL,
+            "wellbeing_nudges"
+        ],
+        "every tool with a when, and not wave"
+    );
+    assert_eq!(when[unplug::STAY_TOOL], unplug::STAY_WHEN);
+    for (tool, line) in when {
+        let line = line.as_str().unwrap();
+        assert!(
+            !line.is_empty() && line.len() <= WHEN_MOST_BYTES,
+            "{tool}: {line}"
+        );
+    }
+    // A skill with no when loads as before, and adds no when.
+    let wave = loaded.iter().find(|skill| skill.name == "a-wave").unwrap();
+    assert_eq!(wave.when, None);
+    let alone = tools_file_summary(std::slice::from_ref(wave), false, false, true);
+    assert!(alone.get("when").is_none(), "{alone}");
+}
+
+/// Every product skill's `when` and every `[stop]` `when` is at most
+/// [`lamp_skills::WHEN_MOST_BYTES`], and the wellbeing skills say the same.
+#[test]
+fn every_when_in_the_repo_is_within_its_bound() {
+    // Every skill, a disabled one too (a comfort break ships off).
+    let loaded: Vec<lamp_skills::Skill> = lamp_skills::load_each(&skills_root())
+        .into_iter()
+        .map(|(folder, skill)| skill.unwrap_or_else(|why| panic!("{}: {why}", folder.display())))
+        .collect();
+    let mut stops = std::collections::BTreeSet::new();
+    for skill in &loaded {
+        let stop = skill.stop.as_ref().and_then(|stop| stop.when.as_deref());
+        for line in skill.when.iter().map(String::as_str).chain(stop) {
+            assert!(
+                line.len() <= lamp_skills::WHEN_MOST_BYTES,
+                "{}: {line}",
+                skill.name
+            );
+        }
+        if let Some(stop) = &skill.stop
+            && stop.tool == "wellbeing_nudges"
+        {
+            stops.insert(stop.when.clone());
+        }
+    }
+    // Each of the eight wellbeing skills loaded, and all say one when.
+    assert_eq!(
+        loaded
+            .iter()
+            .filter(|skill| skill
+                .stop
+                .as_ref()
+                .is_some_and(|stop| stop.tool == "wellbeing_nudges"))
+            .count(),
+        8
+    );
+    assert_eq!(stops.len(), 1, "{stops:?}");
+    assert!(stops.iter().all(Option::is_some));
+}
+
+/// A `when` over [`lamp_skills::WHEN_MOST_BYTES`] is refused at load, in
+/// `SKILL.md` or in `[stop]`; one at the bound loads.
+#[test]
+fn a_when_over_its_bound_is_refused() {
+    let most = lamp_skills::WHEN_MOST_BYTES;
+    let dir = tempfile::tempdir().unwrap();
+    let skill = skill_with(
+        dir.path(),
+        "a-wave",
+        "tool = \"wave\"\n[permissions]\nbody = true\nspeak = true\n[[do]]\nsay = \"Say you will.\"\n",
+    );
+    let front = |when: &str| {
+        fs::write(
+            skill.join("SKILL.md"),
+            format!("---\nname: a-wave\ndescription: A test.\nwhen: {when}\n---\n"),
+        )
+        .unwrap();
+        load(&skill)
+    };
+    assert_eq!(
+        front(&"w".repeat(most)).unwrap().when,
+        Some("w".repeat(most))
+    );
+    let refused = front(&"w".repeat(most + 1)).unwrap_err();
+    assert!(
+        refused.contains("SKILL.md's when is at most 200 bytes"),
+        "{refused}"
+    );
+
+    let folder = dir.path().join("comfort-break");
+    copy(&skills_root().join("comfort-break"), &folder);
+    let toml = fs::read_to_string(folder.join("skill.toml")).unwrap();
+    let from = toml
+        .lines()
+        .find(|line| line.starts_with("when = \"When asked to snooze"))
+        .unwrap()
+        .to_owned();
+    fs::write(
+        folder.join("skill.toml"),
+        toml.replace(&from, &format!("when = \"{}\"", "w".repeat(most + 1))),
+    )
+    .unwrap();
+    let refused = load(&folder).unwrap_err();
+    assert!(
+        refused.contains("[stop] when is at most 200 bytes"),
+        "{refused}"
+    );
+}

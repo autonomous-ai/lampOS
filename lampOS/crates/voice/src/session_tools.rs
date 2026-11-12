@@ -403,9 +403,10 @@ pub fn not_ready(tools: &[Tool], settings: &Settings) -> Option<String> {
 pub fn told_after(tools: &[Tool], settings: &Settings) -> Option<String> {
     let mut told = not_ready(tools, settings).unwrap_or_default();
     if tools.iter().any(|tool| tool.name == crate::use_skill::NAME) {
-        told.push_str(&crate::use_skill::section(
+        told.push_str(&crate::use_skill::section_told(
             crate::use_skill::offered(&crate::tools::skill_tools(settings)),
             &crate::tools::core_skills(settings),
+            &crate::tools::skill_whens(settings),
         ));
     }
     told.push_str(&crate::without_a_tool::for_declared(
@@ -550,9 +551,10 @@ fn skills_note(tools: &[Tool], settings: &Settings) -> String {
         ));
     }
     if reach.is_some() {
-        let cut = crate::use_skill::cut(
+        let cut = crate::use_skill::cut_told(
             crate::use_skill::offered(&skills),
             &crate::tools::core_skills(settings),
+            &crate::tools::skill_whens(settings),
         );
         if !cut.is_empty() {
             note.push_str(&format!(
