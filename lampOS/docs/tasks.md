@@ -2011,9 +2011,10 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     stopgap is gone.)
   - **Never begun, told and closed** (#6577): the lamp's own OpenClaw
     task, handed over in this boot, still read idle with nothing asked,
-    no answer and no tool used `OPENCLAW_BEGIN_WITHIN_MS` (180 s,
-    unmeasured until the slowest real first prompt on a lamp with Harness
-    0.6.41, times two, replaces it) after it was accepted, and so at every
+    no answer and no tool used `OPENCLAW_BEGIN_WITHIN_MS` (130 s: the
+    slowest real first prompt seen, 65.1 s on lamp-fc4b with Harness
+    0.6.16 on 12 Nov, times two; 0.6.41's reading is still to come) after
+    it was accepted, and so at every
     read since, is kept as `failed` (`engine::never_began`, one journal
     line). The voice then tells it as any failed task, in one plain
     sentence that it stopped without finishing, and its empty harness is

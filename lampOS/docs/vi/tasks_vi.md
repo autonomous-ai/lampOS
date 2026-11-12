@@ -591,8 +591,9 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   tạm thời của #6504, đóng rồi khởi động lại, đã bỏ.)
 - **Chưa bao giờ bắt đầu: báo và đóng** (#6577): một việc giao cho OpenClaw
   của chính đèn, trong lần khởi động này, mà sau khi được nhận
-  `OPENCLAW_BEGIN_WITHIN_MS` (180 s, chưa đo; sẽ thay bằng lần câu hỏi đầu
-  chậm nhất thật trên một đèn có Harness 0.6.41, nhân hai) vẫn đọc là rảnh,
+  `OPENCLAW_BEGIN_WITHIN_MS` (130 s: lần câu hỏi đầu chậm nhất thật đã thấy,
+  65,1 s trên lamp-fc4b với Harness 0.6.16 ngày 12/11, nhân hai; số đo với
+  0.6.41 sẽ có sau) vẫn đọc là rảnh,
   chưa được hỏi, chưa có câu trả lời và chưa dùng công cụ nào, và mọi lần đọc
   từ đó cũng vậy, thì được giữ là `failed` (`engine::never_began`, một dòng
   journal). Giọng nói báo nó như mọi việc lỗi, một câu ngắn rằng việc đã dừng
