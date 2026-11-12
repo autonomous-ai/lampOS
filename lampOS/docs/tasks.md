@@ -1907,7 +1907,16 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     second route, with the tasks part, a spoken line whose own words name
     an agent for the work, read exactly as above (the doer only, from the
     lamp's engines while the lamp has its target and the staff, Claude Code
-    when none is read; a mention such as "What is Hermes?" names nothing),
+    when none is read; a mention such as "What is Hermes?" names nothing;
+    an agent only called by name first in the line, "Hermes, …", counts
+    only when the rest of the line asks for work: a work verb such as
+    write, make, fix, list or look (`WORK_VERBS`), or at least
+    `WHOLE_ASK_FEWEST` (4) ask words beside the words of consent, as
+    `new_ask` counts them, `agent_tasks::asks_for_work`; so "Hermes, what
+    time is it?", "Hermes, how are you?", "Hey Hermes, tell me a joke." and
+    "Codex, what can you do?" name nothing and are answered as normal, while
+    "Hermes, write a poem about rain into rain.md" names Hermes; "ask/have/
+    tell Hermes to …" count as before; Thirteen's P2 on #6572),
     has its round 1 words held to the round's end
     (`agent_tasks::named_for_work`, `Engine::catching_named_agents`). If
     round 1 answers in words alone, with no call, those words are not said:
@@ -2002,7 +2011,10 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     words set from "on my computer") goes to the lamp while the lamp has
     its target, never to a computer that isn't there; with the switch
     `LAMP_TASKS_WHO` off, where the staff are never read, it goes to the
-    configured target as before. Tests:
+    configured target as before. Until a staff read has come back (none
+    made yet, or every one so far failed), the staff are empty, which
+    counts as none paired: `computer` leaves `where`. A later read that
+    fails keeps the staff last read. Tests:
     `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
     `agent_tasks::tests::no_computer_paired_a_computer_named_goes_to_the_lamp`,
     `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
