@@ -282,8 +282,8 @@ refusal), and nothing is started new in any case:
   where, as `where` says it, and ask whether to start it there, so the
   person hears the session before their yes (the Reviewer-lead's P2 on
   #5784 at de9bebdb41). The session is kept with the
-  task waiting for its yes. With `LAMP_TASKS_ONE_YES`, a yes in the turn
-  that prepared it never starts a task for a named session, whatever the
+  task waiting for its yes. A yes in the turn that prepared it (#5169,
+  #6547 A) never starts a task for a named session, whatever the
   read-back said: which session a line said can't be told from its words
   ("docs" inside "the docs archive session" is not the "docs" session,
   and Harness may hold both), so it always waits for a second yes, to the
@@ -1883,20 +1883,76 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     work to Hermes; never do it yourself"), and the journal says
     `request N: named agent, no start_agent_task: asked again`, then what
     came of it (`…: asked again: start_agent_task called`, `…: still no
-    call, said as it came`, or `…: called <names>, not start_agent_task`).
-    Once a request (`agent_tasks::AskedAgain`, the last 8 requests kept):
-    the second answer is said as it came, and a request asked again before
-    is said with `…: asked again before, said as it came`; it never loops.
+    call, said it wasn't done`, or `…: called <names>, not start_agent_task`).
+    It is asked again only once the join window (`JOIN_WITHIN`, 3 s from
+    the answer's start, about the line's end) has passed with no newer line
+    begun: a paused ask's second half begun within it joins the first
+    (`LAMP_JOIN_CUT_WORDS`), and the first half is never asked again nor
+    handed over alone (W3's P1 on #6572: "Make a file called beach.md." was
+    handed over and the rest, 3392 ms later, was not joined). A newer line
+    begun in the window ends the turn, journalled `…: a newer line began
+    within the join window: not asked again`. Once a request
+    (`agent_tasks::AskedAgain`, the last 8 requests kept): round 2's words
+    are held too, said beside a call; answered in words alone again, they
+    are not said and the plain line "Sorry, I didn't do that. Could you ask
+    me again?" (`action_claim::NOT_DONE_LINE`, in the owner's language) is
+    said instead. A request asked again before is said with `…: asked
+    again before, said as it came`; it never loops.
     A round 1 that calls anything (`start_agent_task`, `not_for_me`, a
     skill) goes on as before, its words said at the round's end; a line
     naming no agent is untouched and streams as before. The Live route is
     not caught. Tests: `second_provider::tests::agent_tasks_named`
     (`named_with_no_start_is_asked_again_once`,
-    `named_with_no_start_twice_is_said_the_second_time`,
+    `named_with_no_start_twice_says_it_was_not_done`,
     `named_with_start_is_untouched`,
     `not_named_and_a_question_about_an_agent_are_untouched`,
-    `a_request_asked_again_before_is_not_asked_again`),
+    `a_request_asked_again_before_is_not_asked_again`,
+    `a_paused_ask_is_joined_and_never_asked_again_half_said`),
     `agent_tasks::tests::a_named_agent_is_the_doer_and_asked_again_once_a_request`.
+  - **A read-back with no call: asked again once (#6547 C).** On 52e6 on
+    12 Nov the lamp often said "I'll have Hermes on the lamp … Shall I start
+    it?" with no call, so nothing was prepared. On the second route, with
+    the tasks part, a spoken round 1 that calls nothing and whose answer
+    reads a task back (`agent_tasks::speaks_a_read_back`: it ends with a
+    question holding "start", "begin", "hand", "send", "go" or "kick", and
+    names an agent the voice knows, "agent", or the computer; "Shall I
+    start a timer?" is none) is asked again the same way, named agent or
+    not, after the same join window, once a request
+    (`agent_tasks::AskedAgain`). Its words were said as they streamed (the
+    person heard the read-back and may say yes to it in the window; that
+    yes is a newer line and ends this turn), so the note
+    (`agent_tasks::read_back_no_start_note`) says to call
+    `start_agent_task` with the task as said back and to say nothing more
+    unless it could not be prepared; held words (a round held for another
+    reason) are not said. The journal says `request N: read back, no
+    start_agent_task: asked again` and what came of it, as above; a second
+    words-only answer is not said and `NOT_DONE_LINE` is. Tests:
+    `second_provider::tests::agent_tasks_named`
+    (`a_words_only_read_back_is_asked_again_for_the_call`,
+    `a_read_back_twice_says_it_was_not_done_and_never_loops`,
+    `an_answer_that_is_no_read_back_is_untouched`),
+    `agent_tasks::tests::a_read_back_is_told_from_other_answers`.
+  - **A new ask while a task waits replaces it (#6547 B).** Before,
+    `pending_note` told the model not to call `start_agent_task` again
+    while a task waited (`CONFIRM_WITHIN`, 120 s), so a new ask was only
+    read back and the yes started the old task. Now the note reads the
+    line's own words: a line that is no plain yes (`plain_yes`), no plain no
+    (`services::plain_no`) and holds at least `WHOLE_ASK_FEWEST` (4) ask
+    words (`ask_words`, as #6527's) is a new ask. Its note says a
+    `start_agent_task` with it replaces the task waiting, which will not
+    start, and the task waiting is marked replaced (`SUPERSEDED`; journal
+    `lamp-voice: tasks: request N: a new ask while task <id> waits: …`).
+    With or without `LAMP_TASKS_CORRECT`, the new ask's `start_agent_task`
+    then replaces it and cancels it with the tasks part's `cancel` op, as
+    the correction does, and a yes starts only the new one. A
+    `confirm_agent_task` after the new ask with no new task prepared
+    cancels the old one too and starts nothing (journal `…: a yes after a
+    new ask: task <id> is cancelled, not started`). A yes, a no or a short
+    line ("What was that?") keeps the note as before. Any such line counts,
+    a question that is no work at all too ("What's the weather in Paris
+    tomorrow?"): after it, no yes starts the task that waited. Tests:
+    `agent_tasks::tests::a_new_ask_while_a_task_waits_replaces_it_and_the_yes_starts_the_new_one`,
+    `agent_tasks::tests::a_yes_after_a_new_ask_never_starts_the_old_task`.
   - **No computer in `where` without a pairing (#6547 (1c)).** With no
     computer paired (no staff: the test the description already uses),
     `where`'s `enum` is `["lamp"]` alone and its description never names
@@ -3611,7 +3667,21 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
     clears it, so the note goes with it);
   - "yes, and also …" isn't shown cleanly yet.
 
-### One yes for a read-back said in words (#5169, off unless `LAMP_TASKS_ONE_YES=on`)
+### One yes for a read-back said in words (#5169; on in the product for a yes to a words-only read-back, #6547 A)
+
+Since #6547 A, with no switch and no off switch, a yes to the lamp's
+words-only read-back in the same exchange, within `CONFIRM_WITHIN`,
+prepares and starts the task: `confirm_agent_task` with nothing prepared
+answers the "Nothing is prepared yet …" line below when the yes is a plain
+yes heard right after a question the lamp asked within 120 s, not cut
+(`agent_tasks::yes_to_a_question`), and the same-turn rule below
+(`yes_in_the_same_turn`) applies with the switch or without it. It holds
+every bound below: only a yes to the lamp's line just before it, which
+reads this task back whole. A yes to an older line, past 120 s, or after
+a cut starts nothing new. `LAMP_TASKS_ONE_YES` itself now changes only
+`start_agent_task`'s description (the call first) and its `task` words.
+Tests: `one_yes_to_a_words_only_read_back_prepares_and_starts_it`,
+`one_yes_counts_only_inside_the_exchange_and_the_window`.
 
 On lamp-c0a4 on 4 November the product voice often said the task back in
 words ("Claude Code will write … Shall I start it?") without calling
@@ -3644,7 +3714,8 @@ tasks flags; it needs only the tasks part):
   (`a_short_ask_is_enough_only_with_the_one_yes_switch`).
 - `confirm_agent_task` with nothing prepared answers "Nothing is prepared
   yet: call start_agent_task now with the task you said back, then call
-  confirm_agent_task again." Without the switch it answers "There is no task
+  confirm_agent_task again." Without the switch it answers so after a
+  plain yes to a question just asked (#6547 A), else "There is no task
   waiting to be started." as before.
 - A yes in the request that prepared the task may start it
   (`agent_tasks::yes_in_the_same_turn`) only when all of these hold. If any
@@ -3720,7 +3791,7 @@ tasks flags; it needs only the tasks part):
 
 The guard that a yes must come after a read-back stays. This rule only
 recognizes a read-back said in words, before the call. Without the switch
-every description, answer and line is byte-for-byte as before
+every description is byte-for-byte as before
 (`the_one_yes_switch_changes_only_the_read_back_and_task_words`). Tests:
 `a_yes_in_the_turn_that_prepared_counts_only_after_its_read_back_in_words`,
 `one_yes_starts_only_a_task_read_back_whole`,

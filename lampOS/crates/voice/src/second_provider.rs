@@ -1464,6 +1464,9 @@ pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 /// (`crate::agent_tasks::declined`, #6582): with its request and words, the
 /// task dropped and the note it gets, or nothing.
 pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
+/// [`TaskNote`] with the request's own words too: a new ask while a task
+/// waits replaces it (#6547 B, `crate::agent_tasks::pending_note`).
+pub type WaitingNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// The note a spoken line gets from its own words: at setup, a line that
 /// spells the person's name is told the read-back to say, the name as a
 /// word (`crate::onboarding::spelled_name_note_now`, #5580 row 2).
@@ -1819,7 +1822,7 @@ struct Shared {
     /// Whether lamp-name heard the name in a request's line (#3504 N4).
     name_fired: Option<NameFired>,
     /// With the tasks part: the note that a prepared task waits for a yes.
-    task_waiting: Option<TaskNote>,
+    task_waiting: Option<WaitingNote>,
     /// With the tasks part: a heard plain no drops the task waiting (#6582).
     task_declined: Option<TaskDeclined>,
     /// With the setup walk: a line that spells the person's name, told how
@@ -6329,7 +6332,7 @@ impl Engine {
     /// this route's history keeps the words of its last exchanges, not its
     /// calls, so without it a yes was taken as a new hand-over (#1712).
     /// Before any turn only.
-    pub fn noting_a_task_waiting(mut self, note: TaskNote) -> Self {
+    pub fn noting_a_task_waiting(mut self, note: WaitingNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_waiting = Some(note);
         }
@@ -10093,7 +10096,12 @@ async fn spoken(
         .task_declined
         .as_ref()
         .and_then(|declined| declined(request, &text))
-        .or_else(|| shared.task_waiting.as_ref().and_then(|note| note(request)))
+        .or_else(|| {
+            shared
+                .task_waiting
+                .as_ref()
+                .and_then(|note| note(request, &text))
+        })
         // A plain no to a skill run's write read back drops it at once
         // (#6432).
         .or_else(|| crate::services::run_declined(request, &text))
@@ -14456,6 +14464,12 @@ async fn answer(
         .as_ref()
         .filter(|_| heard && !quoted)
         .and_then(|named| named(&said));
+    // With the tasks part, a spoken round 1 that hands nothing over while
+    // its words name an agent or read a task back is asked again once
+    // (#6547 (1b), C), and only once the join window from about the line's
+    // end has passed, so a paused ask is never handed over half said.
+    let catching = shared.named_agent.is_some() && heard && !quoted;
+    let join_ends = tokio::time::Instant::now() + JOIN_WITHIN;
     // Whether the line began with the lamp's name and asks for no silence
     // to be broken (`LAMP_NO_WORDS_AGAIN`): "Lamp, stop." or "Lamp, never
     // mind." is rightly answered with nothing (the Reviewer-lead's P2 on
@@ -15073,9 +15087,10 @@ async fn answer(
         // non-memory actions may still have their content-free confirmation.
         let mut confirmed_other_call = carried.other;
         let mut keep_claim_asked = false;
-        // Whether the turn was asked again for a named agent with no
-        // `start_agent_task` (#6547 (1b)): what came of it is journalled once.
-        let mut named_outcome_owed = false;
+        // Whether the turn was asked again for a named agent or a read-back
+        // with no `start_agent_task` (#6547 (1b), C), and which: what came of
+        // it is journalled once.
+        let mut catch_owed: Option<&'static str> = None;
         // Told before the round after one whose claim went unsaid beside
         // other calls, once those calls are answered: what the model is
         // told of a keep claim, or of a face claim (#5141 row 8).
@@ -15784,41 +15799,100 @@ async fn answer(
             // below or the model is asked once more; "not for me" written as
             // the reply is the decline itself. Else they go on as streamed,
             // now as one piece. Later rounds hold nothing.
-            // The line's words named an agent for the work and round 1
-            // answered in words alone (#6547 (1b)): those words are not said,
-            // and the turn is asked again once, told to hand the work over.
-            // Once a request ([`crate::agent_tasks::AskedAgain`]): a second
-            // such answer is said.
-            if let Some(agent) = named_agent.as_deref() {
-                let start = crate::agent_tasks::START;
-                if round == 1 && calls.is_empty() && decline_held.is_some() {
+            // The line's words named an agent for the work (round 1's words
+            // held), or round 1's answer read a task back
+            // ([`crate::agent_tasks::speaks_a_read_back`]), and it called
+            // nothing (#6547 (1b), C): nothing is prepared, so a yes would
+            // start nothing. Once the join window has passed with no newer
+            // line begun (a paused ask's second half joins its first, never
+            // handed over half said: W3's P1 on #6572), the turn is asked
+            // again once to call `start_agent_task`; held words are not
+            // said. A newer line begun meanwhile ends this turn (what it
+            // said stands, so a yes in that line still finds a read-back
+            // said). Asked again
+            // and answered in words once more, the plain line that it wasn't
+            // done is said instead, and nothing loops. Once a request
+            // ([`crate::agent_tasks::AskedAgain`]).
+            let start = crate::agent_tasks::START;
+            if catching && round == 1 && calls.is_empty() {
+                let named_held = named_agent.is_some() && decline_held.is_some();
+                if named_held || crate::agent_tasks::speaks_a_read_back(&text) {
+                    let what = if named_held {
+                        "named agent"
+                    } else {
+                        "read back"
+                    };
                     if round < MAX_ROUNDS && shared.named_asked_again.first(request) {
+                        // A read-back said as it streamed: its last words
+                        // ("Shall I start it?") go out now, before the wait,
+                        // as they would at the round's end.
+                        if decline_held.is_none()
+                            && let Some(rest) = split.finish()
+                            && let Some(rest) = said_quietly(
+                                &mut quiet,
+                                &mut offer_hold,
+                                rest,
+                                remember_ran,
+                                request,
+                            )
+                        {
+                            queue.push(rest).await?;
+                        }
+                        tokio::time::sleep_until(join_ends).await;
+                        let newer = shared
+                            .begun
+                            .lock()
+                            .ok()
+                            .and_then(|begun| *begun)
+                            .is_some_and(|(latest, _)| latest > request);
+                        if newer {
+                            shared.named_ask_said(format!(
+                                "lamp-voice second: request {request}: {what}, no {start}: a newer line began within the join window: not asked again"
+                            ));
+                            // The turn ends with what was said; held words
+                            // are not. A joined line's turn is dropped
+                            // before this, as a pause's is.
+                            return Ok(());
+                        }
                         shared.named_ask_said(format!(
-                            "lamp-voice second: request {request}: named agent, no {start}: asked again"
+                            "lamp-voice second: request {request}: {what}, no {start}: asked again"
                         ));
-                        decline_held = None;
-                        named_outcome_owed = true;
-                        messages.push(Message::system(crate::agent_tasks::named_no_start_note(
-                            agent,
-                        )));
+                        let note = match named_agent.as_deref() {
+                            Some(agent) if named_held => {
+                                crate::agent_tasks::named_no_start_note(agent)
+                            }
+                            _ => {
+                                crate::agent_tasks::read_back_no_start_note(decline_held.is_none())
+                            }
+                        };
+                        // Round 2's words are held to its end too: said
+                        // beside a call, or else not at all.
+                        decline_held = Some(String::new());
+                        catch_owed = Some(what);
+                        messages.push(Message::system(note));
                         continue;
                     }
                     shared.named_ask_said(format!(
-                        "lamp-voice second: request {request}: named agent, no {start}: asked again before, said as it came"
+                        "lamp-voice second: request {request}: {what}, no {start}: asked again before, said as it came"
                     ));
-                } else if std::mem::take(&mut named_outcome_owed) {
-                    let came = if calls.iter().any(|call| call.name == start) {
-                        format!("{start} called")
-                    } else if calls.is_empty() {
-                        "still no call, said as it came".to_owned()
-                    } else {
-                        let names: Vec<&str> =
-                            calls.iter().map(|call| call.name.as_str()).collect();
-                        format!("called {}, not {start}", names.join(", "))
-                    };
-                    shared.named_ask_said(format!(
-                        "lamp-voice second: request {request}: named agent, no {start}: asked again: {came}"
-                    ));
+                }
+            } else if let Some(what) = catch_owed.take() {
+                let came = if calls.iter().any(|call| call.name == start) {
+                    format!("{start} called")
+                } else if calls.is_empty() {
+                    "still no call, said it wasn't done".to_owned()
+                } else {
+                    let names: Vec<&str> = calls.iter().map(|call| call.name.as_str()).collect();
+                    format!("called {}, not {start}", names.join(", "))
+                };
+                shared.named_ask_said(format!(
+                    "lamp-voice second: request {request}: {what}, no {start}: asked again: {came}"
+                ));
+                if calls.is_empty() {
+                    decline_held = None;
+                    queue
+                        .push(shared.fixed(crate::action_claim::NOT_DONE_LINE).to_owned())
+                        .await?;
                 }
             }
             if let Some(held) = decline_held.take() {

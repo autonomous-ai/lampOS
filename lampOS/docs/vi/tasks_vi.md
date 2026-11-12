@@ -584,21 +584,91 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   start_agent_task now to hand the work to Hermes; never do it yourself"),
   và journal ghi `request N: named agent, no start_agent_task: asked
   again`, rồi kết quả (`…: asked again: start_agent_task called`, `…: still
-  no call, said as it came`, hoặc `…: called <tên>, not start_agent_task`).
-  Mỗi request chỉ một lần (`agent_tasks::AskedAgain`, giữ 8 request gần
-  nhất): câu trả lời thứ hai được nói như nó đến, và request đã hỏi lại
-  trước đó được nói kèm dòng `…: asked again before, said as it came`;
-  không bao giờ lặp. Vòng 1 có gọi bất kỳ hàm nào (`start_agent_task`,
+  no call, said it wasn't done`, hoặc `…: called <tên>, not start_agent_task`).
+  Chỉ hỏi lại khi cửa sổ nối câu (`JOIN_WITHIN`, 3 s tính từ lúc bắt đầu
+  trả lời, khoảng cuối câu nói) đã qua mà không có câu mới nào bắt đầu:
+  nửa sau của một lời nhờ có ngắt nghỉ, bắt đầu trong cửa sổ đó, được nối
+  vào nửa đầu (`LAMP_JOIN_CUT_WORDS`), và nửa đầu không bao giờ bị hỏi lại
+  hay giao việc một mình (P1 của W3 trên #6572: "Make a file called
+  beach.md." đã được giao, phần còn lại đến sau 3392 ms và không được
+  nối). Câu mới bắt đầu trong cửa sổ sẽ kết thúc lượt này, journal ghi
+  `…: a newer line began within the join window: not asked again`. Mỗi
+  request chỉ một lần (`agent_tasks::AskedAgain`, giữ 8 request gần nhất):
+  lời của vòng 2 cũng bị giữ, chỉ nói khi có gọi hàm; nếu vẫn chỉ trả lời
+  bằng lời, lời đó không được nói mà đèn nói câu rõ ràng "Sorry, I didn't
+  do that. Could you ask me again?" (`action_claim::NOT_DONE_LINE`, theo
+  ngôn ngữ của chủ đèn). Request đã hỏi lại trước đó được nói kèm dòng
+  `…: asked again before, said as it came`; không bao giờ lặp. Vòng 1 có gọi bất kỳ hàm nào (`start_agent_task`,
   `not_for_me`, một skill) thì như trước, lời của nó được nói khi hết vòng;
   câu không nêu agent nào thì không bị đụng tới và vẫn phát luồng như
   trước. Route Live không được bắt. Test:
   `second_provider::tests::agent_tasks_named`
   (`named_with_no_start_is_asked_again_once`,
-  `named_with_no_start_twice_is_said_the_second_time`,
+  `named_with_no_start_twice_says_it_was_not_done`,
   `named_with_start_is_untouched`,
   `not_named_and_a_question_about_an_agent_are_untouched`,
-  `a_request_asked_again_before_is_not_asked_again`),
+  `a_request_asked_again_before_is_not_asked_again`,
+  `a_paused_ask_is_joined_and_never_asked_again_half_said`),
   `agent_tasks::tests::a_named_agent_is_the_doer_and_asked_again_once_a_request`.
+- **Đọc lại việc mà không gọi hàm: hỏi lại một lần (#6547 C).** Trên 52e6
+  ngày 12/11 đèn hay nói "I'll have Hermes on the lamp … Shall I start
+  it?" mà không gọi hàm, nên chưa có gì được chuẩn bị. Ở route thứ hai,
+  khi có phần tasks, một vòng 1 được nói ra không gọi hàm nào và câu trả
+  lời là một lời đọc lại việc (`agent_tasks::speaks_a_read_back`: kết thúc
+  bằng một câu hỏi có "start", "begin", "hand", "send", "go" hoặc "kick",
+  và nêu một agent mà voice biết, "agent", hoặc máy tính; "Shall I start a
+  timer?" thì không phải) cũng được hỏi lại như trên, dù có nêu tên agent
+  hay không, sau cùng cửa sổ nối câu, mỗi request một lần
+  (`agent_tasks::AskedAgain`). Lời của nó đã được nói khi phát luồng
+  (người nghe đã nghe lời đọc lại và có thể nói yes trong cửa sổ; tiếng
+  yes đó là câu mới và kết thúc lượt này), nên ghi chú
+  (`agent_tasks::read_back_no_start_note`) bảo gọi `start_agent_task` với
+  đúng việc đã đọc lại và không nói thêm gì trừ khi không chuẩn bị được;
+  lời bị giữ (vòng bị giữ vì lý do khác) thì không được nói. Journal ghi
+  `request N: read back, no start_agent_task: asked again` và kết quả như
+  trên; câu trả lời chỉ bằng lời lần thứ hai không được nói, đèn nói
+  `NOT_DONE_LINE`. Test: `second_provider::tests::agent_tasks_named`
+  (`a_words_only_read_back_is_asked_again_for_the_call`,
+  `a_read_back_twice_says_it_was_not_done_and_never_loops`,
+  `an_answer_that_is_no_read_back_is_untouched`),
+  `agent_tasks::tests::a_read_back_is_told_from_other_answers`.
+- **Lời nhờ mới khi đang có việc chờ thì thay việc đó (#6547 B).** Trước
+  đây `pending_note` bảo model không gọi lại `start_agent_task` khi có việc
+  đang chờ (`CONFIRM_WITHIN`, 120 s), nên lời nhờ mới chỉ được đọc lại và
+  tiếng yes khởi động việc cũ. Giờ ghi chú đọc chính lời của câu: câu không
+  phải yes đơn thuần (`plain_yes`), không phải no đơn thuần
+  (`services::plain_no`) và có ít nhất `WHOLE_ASK_FEWEST` (4) từ nhờ việc
+  (`ask_words`, như của #6527) là một lời nhờ mới. Ghi chú của nó nói một
+  lần gọi `start_agent_task` với lời nhờ đó sẽ thay việc đang chờ, việc cũ
+  sẽ không chạy, và việc đang chờ được đánh dấu là đã bị thay
+  (`SUPERSEDED`; journal `lamp-voice: tasks: request N: a new ask while
+  task <id> waits: …`). Có hay không có `LAMP_TASKS_CORRECT`,
+  `start_agent_task` của lời nhờ mới sẽ thay và hủy việc cũ bằng op
+  `cancel` của phần tasks, như khi sửa lời nhờ, và tiếng yes chỉ khởi động
+  việc mới. Một `confirm_agent_task` sau lời nhờ mới mà chưa có việc mới
+  nào được chuẩn bị cũng hủy việc cũ và không khởi động gì (journal `…: a
+  yes after a new ask: task <id> is cancelled, not started`). Yes, no hay
+  câu ngắn ("What was that?") giữ ghi chú như trước. Mọi câu như vậy đều
+  tính, kể cả một câu hỏi không phải việc gì ("What's the weather in Paris
+  tomorrow?"): sau câu đó, không tiếng yes nào khởi động việc đang chờ nữa.
+  Test:
+  `agent_tasks::tests::a_new_ask_while_a_task_waits_replaces_it_and_the_yes_starts_the_new_one`,
+  `agent_tasks::tests::a_yes_after_a_new_ask_never_starts_the_old_task`.
+- **Một tiếng yes cho lời đọc lại chỉ bằng lời (#6547 A, bật trong sản
+  phẩm, không có công tắc tắt).** Một tiếng yes đáp lại lời đọc lại chỉ
+  bằng lời của đèn, ngay trong lượt trao đổi đó và trong `CONFIRM_WITHIN`
+  (120 s), sẽ chuẩn bị và khởi động việc: `confirm_agent_task` khi chưa có
+  gì được chuẩn bị trả lời "Nothing is prepared yet: call start_agent_task
+  now with the task you said back, then call confirm_agent_task again."
+  khi đó là một tiếng yes đơn thuần nghe ngay sau câu hỏi của đèn trong
+  120 s và không bị cắt (`agent_tasks::yes_to_a_question`), và quy tắc
+  cùng lượt (`yes_in_the_same_turn`, #5169) áp dụng dù có hay không có
+  `LAMP_TASKS_ONE_YES`, với mọi giới hạn của nó: chỉ yes cho câu ngay
+  trước đó của đèn, câu đọc lại đủ việc này. Yes cho một câu cũ hơn, quá
+  120 s, hoặc sau khi bị cắt không khởi động gì mới. `LAMP_TASKS_ONE_YES`
+  giờ chỉ đổi mô tả của `start_agent_task` (gọi hàm trước) và lời của
+  `task`. Test: `one_yes_to_a_words_only_read_back_prepares_and_starts_it`,
+  `one_yes_counts_only_inside_the_exchange_and_the_window`.
 - **Không có máy tính trong `where` khi chưa ghép đôi (#6547 (1c)).** Khi
   chưa ghép máy tính nào (không có staff: cùng phép thử mà phần mô tả đã
   dùng), `enum` của `where` chỉ còn `["lamp"]` và phần mô tả của nó không
