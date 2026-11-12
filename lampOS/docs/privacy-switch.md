@@ -133,7 +133,13 @@ end the worker. The muted wait and switch-off behavior are unchanged. See
 recovery and the capture authority's existing lease tail.
 
 The existing physical gate still requires observations younger than 50 ms and
-60 ms of continuously fresh open-switch evidence before reopening. Voice's
+60 ms of continuously fresh open-switch evidence before reopening. In the
+selected route's wait, an observation already 50 ms old when a look reads it
+only closes that gate; the look goes on to the fresher ones queued behind it,
+and only a look that ends its read with no fresh observation ends the wait as
+unreadable (#5224: lamp-06c1's muted boot read one queued since its worker's
+Ready, and its first look ended the wait although fresh ones were behind it).
+Voice's
 durable software mute remains a separate inhibit. A closed switch cancels the
 active serve cycle; verified cleanup precedes the next observation-only wait
 and a fresh full runtime. Opening the switch never restores old PCM, replies
