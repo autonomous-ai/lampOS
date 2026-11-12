@@ -110,6 +110,12 @@ pub fn status(kept: Option<lamp_bus::Message>, engines: bool) -> Result<Option<V
     if let Some(harness) = status.harness.filter(lamp_msgs::HarnessInstall::check) {
         reply["harness"] = json!(harness);
     }
+    // A refused build (#6266), only one lamp-update could have said: the update
+    // that is blocked, its fixed reason, and the app may retry it (`update.check`
+    // with `retry` set to `sequence`).
+    if let Some(refused) = status.refused.filter(lamp_msgs::UpdateRefused::check) {
+        reply["refused"] = json!(refused);
+    }
     if let Some(round) = status.round.filter(|round| {
         status.now != "idle" && round.step_started_at_unix_ms >= round.started_at_unix_ms
     }) {
@@ -238,7 +244,12 @@ impl Checks {
     /// [`TOO_SOON`] within [`UpdateCheck::AGAIN_AFTER`] of the last one
     /// taken, and with [`NOT_LISTENING`] when no running lamp-update reads
     /// it; that one does not count as asked.
-    pub fn ask(&mut self, bus: Option<&Bus>, now: Instant) -> Result<(), String> {
+    pub fn ask(
+        &mut self,
+        bus: Option<&Bus>,
+        now: Instant,
+        retry: Option<u64>,
+    ) -> Result<(), String> {
         if self
             .last
             .is_some_and(|last| now.saturating_duration_since(last) < UpdateCheck::AGAIN_AFTER)
@@ -258,7 +269,7 @@ impl Checks {
             ),
         };
         let published = publisher
-            .publish_json(lamp_ipc::monotonic_us(), &UpdateCheck {})
+            .publish_json(lamp_ipc::monotonic_us(), &UpdateCheck { retry })
             .map_err(|_| NOT_LISTENING.to_owned())?;
         if published.delivered == 0 {
             return Err(NOT_LISTENING.to_owned());
@@ -312,6 +323,7 @@ mod tests {
             last: None,
             harness: None,
             round: None,
+            refused: None,
             engines: Some(std::collections::BTreeMap::from([
                 ("hermes".into(), engine("failed", Some("no_memory"))),
                 ("other".into(), engine("failed", Some("/var/lib/x"))),
@@ -370,6 +382,7 @@ mod tests {
         says.publish_json(
             0,
             &UpdateStatus {
+                refused: None,
                 engines: None,
                 ..idle
             },
@@ -426,23 +439,99 @@ mod tests {
         let bus = Bus::new(root.path()).unwrap();
         let mut checks = Checks::default();
         let now = Instant::now();
-        assert_eq!(checks.ask(None, now), Err(NOT_LISTENING.to_owned()));
-        assert_eq!(checks.ask(Some(&bus), now), Err(NOT_LISTENING.to_owned()));
+        assert_eq!(checks.ask(None, now, None), Err(NOT_LISTENING.to_owned()));
+        assert_eq!(
+            checks.ask(Some(&bus), now, None),
+            Err(NOT_LISTENING.to_owned())
+        );
         let mut update = bus
             .subscribe_typed(UpdateCheck::TOPIC, "update", UpdateCheck::TYPE)
             .unwrap();
         // A publisher already made finds a new subscriber at its next look.
         std::thread::sleep(Duration::from_millis(250));
-        assert_eq!(checks.ask(Some(&bus), now), Ok(()));
+        assert_eq!(checks.ask(Some(&bus), now, None), Ok(()));
         let heard = update.recv(Duration::from_secs(1)).unwrap().unwrap();
-        assert_eq!(heard.parse::<UpdateCheck>().unwrap(), UpdateCheck {});
+        assert_eq!(
+            heard.parse::<UpdateCheck>().unwrap(),
+            UpdateCheck::default()
+        );
         let soon = now + UpdateCheck::AGAIN_AFTER - Duration::from_millis(1);
-        assert_eq!(checks.ask(Some(&bus), soon), Err(TOO_SOON.to_owned()));
+        assert_eq!(checks.ask(Some(&bus), soon, None), Err(TOO_SOON.to_owned()));
         assert!(update.recv(Duration::from_millis(100)).unwrap().is_none());
         assert_eq!(
-            checks.ask(Some(&bus), now + UpdateCheck::AGAIN_AFTER),
+            checks.ask(Some(&bus), now + UpdateCheck::AGAIN_AFTER, None),
             Ok(())
         );
         assert!(update.recv(Duration::from_secs(1)).unwrap().is_some());
+    }
+
+    /// The owner's retry of a refused build (#6266) reaches lamp-update in the
+    /// check, and a plain check carries none.
+    #[test]
+    fn a_retry_travels_in_the_check() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = Bus::new(root.path()).unwrap();
+        let mut checks = Checks::default();
+        let mut update = bus
+            .subscribe_typed(UpdateCheck::TOPIC, "update", UpdateCheck::TYPE)
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(250));
+        let now = Instant::now();
+        assert_eq!(checks.ask(Some(&bus), now, Some(12226)), Ok(()));
+        let heard = update.recv(Duration::from_secs(1)).unwrap().unwrap();
+        assert_eq!(
+            heard.parse::<UpdateCheck>().unwrap(),
+            UpdateCheck { retry: Some(12226) }
+        );
+    }
+
+    /// `status` says the refused build lamp-update says, by its fixed name, and
+    /// leaves out one whose name lamp-update could not have said.
+    #[test]
+    fn the_status_says_the_blocked_update_and_why() {
+        let said = |reason: &str| {
+            let mut status = UpdateStatus {
+                running: None,
+                now: "idle".into(),
+                last: None,
+                harness: None,
+                round: None,
+                refused: Some(lamp_msgs::UpdateRefused {
+                    sequence: 12226,
+                    reason: reason.into(),
+                    at_unix_ms: 5,
+                }),
+                engines: None,
+            };
+            status.running = None;
+            status
+        };
+        let folder = tempfile::tempdir().unwrap();
+        let bus = Bus::new(folder.path()).unwrap();
+        let mut publisher = bus
+            .publisher_declared(UpdateStatus::TOPIC, &UpdateStatus::declaration(), "update")
+            .unwrap();
+        for (reason, kept) in [
+            ("held", true),
+            ("part_unwell", true),
+            ("a path /etc/x", false),
+        ] {
+            publisher
+                .publish_json(lamp_ipc::monotonic_us(), &said(reason))
+                .unwrap();
+            let message = bus
+                .subscribe_typed(UpdateStatus::TOPIC, "cloud", UpdateStatus::TYPE)
+                .unwrap()
+                .latest()
+                .unwrap();
+            let reply = status(message, false).unwrap().unwrap();
+            assert_eq!(reply.get("refused").is_some(), kept, "{reason}: {reply}");
+            if kept {
+                assert_eq!(
+                    reply["refused"],
+                    json!({"sequence": 12226, "reason": reason, "at_unix_ms": 5})
+                );
+            }
+        }
     }
 }

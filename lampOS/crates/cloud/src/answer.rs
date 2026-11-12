@@ -267,7 +267,13 @@ pub trait Lamp {
     /// #4153, `crate::update::Checks`), at `now`: at most once a minute, and
     /// only when a running lamp-update reads it. Only with
     /// `LAMP_APP_UPDATE=on`.
-    fn check_update(&mut self, _now: std::time::Instant) -> Result<(), String> {
+    /// With `retry` set to a refused build's sequence (#6266): lamp-update
+    /// drops that refusal before the round.
+    fn check_update(
+        &mut self,
+        _now: std::time::Instant,
+        _retry: Option<u64>,
+    ) -> Result<(), String> {
         Err(not_here("update.check"))
     }
 
@@ -800,7 +806,17 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let status = crate::update::status(lamp.update_status(), lamp.engines_page())?
                 .unwrap_or_default();
             crate::update::idle(&status)?;
-            lamp.check_update(std::time::Instant::now())?;
+            // The owner's retry of a refused build (#6266): its sequence, a whole
+            // number, which lamp-update drops the refusal of before the round.
+            let retry = match data.get("retry") {
+                None | Some(Value::Null) => None,
+                Some(value) => Some(
+                    value
+                        .as_u64()
+                        .ok_or("retry must be the refused build's sequence, a whole number")?,
+                ),
+            };
+            lamp.check_update(std::time::Instant::now(), retry)?;
             some(crate::update::started(status))
         }
         // The app's install of a missing agent (#6240): only one lamp-update
@@ -1059,8 +1075,12 @@ pub mod tests {
                 .ok()
                 .flatten()
         }
-        fn check_update(&mut self, now: std::time::Instant) -> Result<(), String> {
-            self.update_checks.ask(self.update_bus.as_ref(), now)
+        fn check_update(
+            &mut self,
+            now: std::time::Instant,
+            retry: Option<u64>,
+        ) -> Result<(), String> {
+            self.update_checks.ask(self.update_bus.as_ref(), now, retry)
         }
         fn engines_page(&self) -> bool {
             self.update_page && self.update_checks.engines()
@@ -2015,6 +2035,7 @@ pub mod tests {
                 last: None,
                 harness: None,
                 round: None,
+                refused: None,
                 engines: None,
             },
         )
@@ -2035,6 +2056,52 @@ pub mod tests {
         assert_eq!(
             answer(&mut lamp, "update.check", &json!({})),
             Err(not_here("update.check"))
+        );
+    }
+
+    /// The owner's retry of a refused build (#6266) is `update.check`'s `retry`:
+    /// a whole number, else refused and nothing is sent.
+    #[test]
+    fn a_retry_is_a_whole_number_or_refused() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            ..lamp()
+        };
+        let mut update = bus
+            .subscribe_typed(
+                lamp_msgs::UpdateCheck::TOPIC,
+                "update",
+                lamp_msgs::UpdateCheck::TYPE,
+            )
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        for bad in [json!("12226"), json!(1.5), json!(-3), json!(true)] {
+            assert_eq!(
+                answer(&mut lamp, "update.check", &json!({"retry": bad})),
+                Err("retry must be the refused build's sequence, a whole number".to_owned()),
+                "{bad}"
+            );
+        }
+        assert!(
+            update
+                .recv(std::time::Duration::from_millis(100))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            answer(&mut lamp, "update.check", &json!({"retry": 12226})).is_ok(),
+            "a whole number is taken"
+        );
+        let heard = update
+            .recv(std::time::Duration::from_secs(1))
+            .unwrap()
+            .expect("the retry is on the bus");
+        assert_eq!(
+            heard.parse::<lamp_msgs::UpdateCheck>().unwrap(),
+            lamp_msgs::UpdateCheck { retry: Some(12226) }
         );
     }
 
@@ -2074,6 +2141,7 @@ pub mod tests {
             last: None,
             harness: None,
             round: None,
+            refused: None,
             engines: Some(std::collections::BTreeMap::from([(
                 "hermes".to_owned(),
                 lamp_msgs::EngineInstall {
