@@ -4734,8 +4734,9 @@ bytes, as above):
   manage helper's `install_made` with the package's files: exactly its
   three).
 - **Its grants are read from the file**, conservatively, by plain words:
-  `light` (light, flash, LED, glow), `speak` (say, speak, aloud, announce),
-  `sound` (sound, beep, chime), `camera` (camera, photo, picture, snapshot,
+  `light` (light, flash, LED, glow), `speak` (say, speak, aloud, announce,
+  and a sound, beep or chime it plays), `sound` (hearing kinds of sound: a
+  clap or a knock), `camera` (camera, photo, picture, snapshot,
   selfie) and `net` (a URL, HTTP, an API, a webhook or an endpoint), never
   more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on`;
   off, such a file is refused ("it reaches the internet, which a skill's
@@ -4754,11 +4755,11 @@ bytes, as above):
   when you ask for it, the lamp's agent follows the file, and it changes
   the light, speaks and plays sounds, uses the camera and reaches the
   internet. The first time it runs, I'll ask you to agree." With grants
-  only of `light`, `sound`, `body` and `speak`, the voice records its
+  only of `light`, `speak` and `body` (#6659's at-once set), the voice records its
   task's yes with lamp-control as it goes on (`upload_agent::went_on`,
   `task_yes_record`, the folder as the manage helper reads it) and the
-  line ends at what it uses. With the camera, the microphone, a send or
-  `net`, it keeps its spoken yes once (the first builder's 19:14 line):
+  line ends at what it uses. With `sound` (hearing), the microphone, the
+  camera, a send or `net`, it keeps its spoken yes once (the first builder's 19:14 line):
   the model's first call of its tool is answered with the task's say-back
   and the wait for the yes (`upload_agent::first_run`, the task-yes path
   above), and nothing runs; on the yes the model is told to call it again

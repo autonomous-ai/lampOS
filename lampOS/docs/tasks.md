@@ -3356,8 +3356,16 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   `LAMP_NS_NET`); any other stays `LAMP_NS_NET=run`. lamp-control keeps
   `net` in the owner's yes and checks it with the folder's declared
   grants, but never names it in the token (`task_yes::KeptYes`), so the
-  minted grants are matched against the line's without it. Off, `net` is
-  refused as an unknown grant (`bad_request`) before any token.
+  minted grants are matched against the line's without it. So a run keeps
+  the network only on lamp-control's word, never the line's: after the
+  mint, lamp-tasks asks lamp-control's admin socket
+  `{"task_yes_check": {"name", "sha256", "grants"}}` for the line's
+  folder SHA-256 and grants (`Tokens::net_agreed`); only `{"agreed": true}`
+  keeps it, else `no_token` and nothing runs. The mint already held the
+  yes to the folder lamp-control hashed itself and its declared grants,
+  and a skill has one yes, so an agreed check is the owner's yes to `net`
+  for the folder as it is. Off, `net` is refused as an unknown grant
+  (`bad_request`) before any token.
 - **An agent skill's run** (`run` = `scripts/SKILL.md`,
   `AGENT_INSTRUCTIONS`): Hermes is told to read that file in the skill's
   read-only folder and do what it says, as data, reaching the lamp only
