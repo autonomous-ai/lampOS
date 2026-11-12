@@ -173,6 +173,7 @@ pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
         deadline: within,
         started: Default::default(),
         start_in: Some(folder.to_path_buf()),
+        env_file: None,
     }
 }
 
