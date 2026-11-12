@@ -4073,37 +4073,45 @@ the same code for both writers.
   said "Check the weather now, please."
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`).
-- **How the agent is reached.** The way the voice hands it any work
-  (`crate::agent_tasks`, #5978, #6226): prepared for the `lamp` target on
-  the tasks part's request socket and confirmed at once on the voice's own
-  socket (the person's spoken ask is the ask), then read from the task's
-  observations, which `lamp-tasks serve --push-wait` keeps as soon as the
-  agent ends its turn, looked at every 0.5 s. No new transport. The tasks
-  part takes 2,000 bytes of text and the system prompt is longer, so the
-  system prompt and the brief go in a file of their own,
-  `/run/lampos-make-skill/make-<random>.md` (16 bytes from the kernel's
-  random source), which the task names: the folder 0750 and the file 0640,
-  both of the local agents' group `lamp-agents` (the installer makes it,
-  with the `lampagent` user), the file removed once the answer is in; with
-  no such group, 0700 and 0600, journaled. The second route's worker
-  sweeps any `make-*.md` left there as it starts. The person's own
-  addresses (a write's own recipients) never go in the file: each is a
-  placeholder there (`own1.lamp@example.invalid`), put back in the agent's
-  answer before the checks. The task's text begins as a brief does
-  (`made_skill::is_brief`), so its answer, or its failed hand-over, is
-  never told as news, and neither "how is my task going" nor "what are my
-  agents doing" ever names it (`agent_tasks` `check` and `tasks_now` skip
-  it). Once read, the answer is marked told, so `--close-told` closes the
-  agent's session.
-- **A silent agent.** An agent that doesn't answer in 45 s has its task
-  sent `cancel`, its tries bounded by one 1.5 s deadline. The tasks part
-  takes a cancel only for work not yet handed to the agent and has no op
-  that ends work the agent has, so such work is left running, journaled,
-  and its news, a brief's, is never told.
-- **The agent's tools.** The agent runs with its own tools during a make:
-  there is no tools-off mode yet. The product turns the switch on all the
-  same, at the owner's ask (12 Nov: skills DeepSeek can't make go through
-  the agent).
+- **How the agent is reached: in a skill run's namespace** (#6643, the
+  first builder's guard, 12 Nov 18:15). The make goes to lamp-tasks' make
+  socket, `/run/lampos-tasks/skill-make.sock` (`lamp_tasks::skill_make`,
+  [tasks.md](tasks.md), "A voice make in a skill run's namespace"), never
+  to a Harness task with the agent's own tools. Its one line,
+  `{"op":"skill_make","rules","within_ms"}`, carries the system prompt and
+  the brief as one text. lamp-tasks runs the lamp's Hermes exactly as a
+  skill's `do.task` run is started (`skill_task::HermesRunner`, row-6443's
+  path), through its namespace wrapper: only its own folder, its work
+  folder and the skills, and lamp-control's `control.sock` but never
+  `admin.sock`. Its terminal and tools work only inside that namespace,
+  and no token is minted.
+- **Its network: `LAMP_MAKE_AGENT_NET`** (set in no unit; the owner's ask,
+  12 Nov, the first builder's ruling pending on Queue #6059). By default
+  the run keeps the network, as V1's agent did, and reaches the model at
+  lamp-cloud's forwarder on `127.0.0.1:7741`, the one `model.sock` pipes
+  to. Exactly `held` gives the strict run, `LAMP_NS_NET=run`: only `lo` and
+  the kernel's `@NONE` tunnels, and the model only through `model.sock`.
+  Held, a Hermes wrapper without the network lines is refused
+  (`not_held_off`).
+- **Its answer.** The run starts in a make's
+  folder of its own (`make-<run id>` in the lamp's work folder, 0700, the
+  rules in `rules.md`, 0600) and writes its answer to `answer.md` there.
+  lamp-tasks reads that back once the run has ended (a regular file, never
+  a link, at most 20 KiB), removes the folder however the make ends, and
+  answers the voice. The voice puts the answer through the same checks as
+  DeepSeek's. The person's own addresses (a write's own recipients) never
+  go in the rules: each is a placeholder there
+  (`own1.lamp@example.invalid`), put back in the agent's answer before the
+  checks.
+- **No make run, no hand-over.** When lamp-tasks can't give that run (an
+  older build with no make socket, `LAMP_SKILL_TASKS` off, or held and a
+  Hermes wrapper without the network lines), the make is not handed over
+  (`NotWritten::NoMakeRun`). DeepSeek's one answer's failure stands and is
+  said plainly. The journal says "can't be run in a skill run's namespace
+  here".
+- **A silent agent.** lamp-tasks kills the run's whole process group at
+  its 45 s. The voice waits that long and a little more (at most 5 s), and
+  its failure stands.
 - **Bounds.** Each of the agent's answers within 45 s
   (`make_skill_agent::WRITE_WITHIN`); a repair is begun only while one
   more answer fits the agent's 120 s (`make_skill_agent::MAKE_WITHIN`).
@@ -4114,7 +4122,7 @@ the same code for both writers.
   240 s, which the second route's wait for a make's line follows
   (`make_skill_local::longest_make`).
 - **What is heard.** "I'll make it now" is said at once, unchanged. Once
-  the agent's first hand-over is taken, the lamp says "Let me think about
+  lamp-tasks says the agent's first make run starts, the lamp says "Let me think about
   that a little longer." through the say service
   (`app_make::say_waiting_at`, once, not begun after 15 s); never when the
   hand-over failed at once, nor when the turn was cut already. The made
@@ -4140,14 +4148,17 @@ the same code for both writers.
   `the_agents_own_cannot_is_said_as_the_lamps_line`,
   `own_addresses_are_placeholders_for_the_agent`,
   `agent_tasks::tests::a_check_after_a_make_handed_to_the_agent_tells_the_persons_task`,
-  and `make_skill_agent::tests` (the rules in a file of the agents' group,
-  the task a brief within 2,000 bytes, confirmed and told; no `lamp` target
-  is no agent; a silent agent times out and is sent `cancel`; a cancel
-  always answered busy ends in time; old rules files swept).
+  `a_make_whose_make_run_is_refused_stays_deepseeks`,
+  `a_say_handing_the_ask_back_goes_to_the_agent_and_a_reminder_stays`,
+  `make_skill_agent::tests` (the rules sent as one `skill_make` line and
+  the answer read back, never a `prepare`; an older lamp-tasks or a make run
+  refused is never handed over; no `lamp` target is no agent; a silent
+  run times out), and lamp-tasks' `skill_make::tests` (see
+  [tasks.md](tasks.md)).
 - **Not yet shown on a lamp:** its row, the 16 makes (twelve simple, four
   known DeepSeek failures) on a lamp with an agent, comparing kept, the
-  say-back and the time with DeepSeek's. Whether the agent's user is in
-  `lamp-agents` on a lamp.
+  say-back and the time with DeepSeek's; and a `curl` from inside a make's run, answered by default and failing with `held`
+  ([tasks.md](tasks.md)).
 
 ##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, off)
 

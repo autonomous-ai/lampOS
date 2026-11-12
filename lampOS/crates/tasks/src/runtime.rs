@@ -4005,6 +4005,16 @@ pub fn serve<C: Clock>(
                 }
                 Err(error) => eprintln!("tasks: a skill's tasks stay off: {error}"),
             }
+            // A voice make handed to the lamp's Hermes runs in the same
+            // namespace as a skill's run (#6643, the first
+            // builder's guard): with the same switch, or not at all.
+            match crate::skill_make::MakeHandOvers::lamp(&home).start(true, stop.clone()) {
+                Ok(_) => eprintln!(
+                    "tasks: a voice make's runs are taken on {}",
+                    crate::skill_make::MAKE_SOCKET
+                ),
+                Err(error) => eprintln!("tasks: a voice make's runs stay off: {error}"),
+            }
         }
         None if skill_tasks => eprintln!("tasks: a skill's tasks stay off: no HOME"),
         _ => {}
