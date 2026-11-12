@@ -1017,6 +1017,23 @@ started once its answer is told:
       closed: the news path never said so.
   - **Or by a speech claim:** its telling played, or isn't known to have
     (`spoken` or `uncertain`). One still `claimed` is being played: not yet.
+  - **Or on the lamp's own agent, told or not (#6530):** a task handed to
+    the target `lamp` (Hermes or OpenClaw on the lamp itself, not a session
+    joined on a computer) is closed once its newest answer is kept from an
+    agent `idle` with an answer, on the lamp's own ask, without waiting for
+    the telling (`closes_untold`). Nobody sits at the lamp's own harness to
+    go on with it. On 52e6 (12226) a Hermes turn done in 10 s had its news
+    cut short (`user_interrupted`), so it was never told, and its chat
+    stayed open 7+ min in `epoll_wait`. The news doesn't need the session:
+    the voice tells the answer kept in the store, so the close can't cut it,
+    and a close of this kind isn't counted as told in the record
+    (`Engine::recent`). With the watch's 30 s looks and its 10 s confirming
+    look, the close comes about 10 to 40 s after the last turn. A computer's
+    harness still waits for its telling, since the person may be at that
+    screen. Test:
+    `the_lamps_own_agent_is_closed_once_done_its_news_untold` (one still
+    working, or idle with no answer yet, is left open; one done is closed
+    untold; a computer's waits).
   - **`ask` doesn't count:** Harness's `ask` is what the agent was last
     asked, the lamp's own task text, so it plays no part here.
   - **Left to the person:** an agent that waits for them (`needs-input`).
