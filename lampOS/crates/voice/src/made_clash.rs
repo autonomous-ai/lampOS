@@ -9,7 +9,10 @@
 //! put on ([`found`]): nothing is put on, and the model is told the other
 //! skill's spoken name and to ask, word for word, whether to replace it,
 //! keep both (they may take turns: nothing makes either win yet) or cancel
-//! ([`asked`]). Their answer, in a later line the owner said, comes back as
+//! ([`asked`]). Each later heard line on the second route is told the
+//! clash's id and question while it waits ([`waiting_note`]), as that
+//! route's history keeps no call's answer. Their answer, in a later line
+//! the owner said, comes back as
 //! `make_skill` with [`CLASH_ID`] and [`CHOICE`] alone ([`chosen`]):
 //! replace puts the new one on, then takes the other off through the
 //! manage helper's own remove (as the app's remove does); keep puts the new
@@ -317,6 +320,35 @@ pub fn asked(keeping: &Keeping, made: &Made, clash: &Clash, request: u64, now: I
         "shares": clash.shares,
         CLASH_ID: id,
         "next": format!("{} {}", say_whole(&question), then_choose(&id)),
+    })
+}
+
+/// The note a later heard line `request` is told at `now` of the clash
+/// waiting: its id and its fixed question, and how to answer it
+/// ([`then_choose`]'s call). The second route's history keeps past
+/// exchanges' words, not their calls, so the `clash_id` told only in the
+/// make's own answer is gone by the person's next line (the
+/// Reviewer-lead's P1 on #6614: "keep both" found no clash_id and was told
+/// NO_REQUEST, and the made skill was dropped after [`CLASH_WITHIN`]), as
+/// `crate::skill_write_yes::waiting_note` tells a yes's id. None in the
+/// make's own request, none waiting, or past [`CLASH_WITHIN`]; the choice
+/// keeps every guard of [`chosen`].
+pub fn waiting_note(request: u64, now: Instant) -> Option<String> {
+    kept::waiting(|waiting| {
+        let waiting = waiting.as_ref().filter(|waiting| {
+            request > waiting.request && now.saturating_duration_since(waiting.at) <= CLASH_WITHIN
+        })?;
+        Some(format!(
+            "(For you to know, not to answer: the skill {} that the lamp just made is not on: it \
+             clashes with {}, and the lamp asked them: \"{}\" It waits for their choice, \
+             {CLASH_ID} \"{}\". If they choose, in any words, call make_skill with only that \
+             {CLASH_ID} and {CHOICE} \"replace\", \"keep\" or \"cancel\", never a request. If \
+             they say anything else, don't call it: nothing is put on.)",
+            made_skill::spoken_name(&waiting.name),
+            made_skill::spoken_name(&waiting.other),
+            waiting.question,
+            waiting.id
+        ))
     })
 }
 
@@ -965,6 +997,54 @@ mod tests {
         assert_eq!(replaced["on"], true, "{replaced}");
         assert_eq!(*done.lock().unwrap(), ["on", "remove glow-blue-on-return"]);
         assert!(!awaited(now));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's P1 on #6614: a clash's id and question are noted
+    /// on each later line while it waits, and on no line when nothing
+    /// waits, in the make's own request, past [`CLASH_WITHIN`], or once
+    /// it was answered.
+    #[test]
+    fn the_waiting_note_shows_only_while_a_clash_waits() {
+        forget_waiting();
+        let now = Instant::now();
+        assert!(waiting_note(4, now).is_none(), "nothing waits");
+        let (root, keeping) = keeping("clash-note");
+        let clash = Clash {
+            name: "glow-blue-on-return".to_owned(),
+            shares: "the light",
+        };
+        let told = asked(&keeping, &made("glow-green"), &clash, 3, now);
+        let id = told[CLASH_ID].as_str().unwrap().to_owned();
+        assert!(waiting_note(3, now).is_none(), "the make's own request");
+        assert!(waiting_note(2, now).is_none(), "an earlier request");
+        let note = waiting_note(4, now).unwrap();
+        assert!(note.contains(&format!("clash_id \"{id}\"")), "{note}");
+        assert!(note.contains("glow green"), "{note}");
+        assert!(
+            note.contains(
+                "Shall I replace glow blue on return, keep both (they may take turns), or cancel?"
+            ),
+            "{note}"
+        );
+        assert!(note.contains("choice \"replace\", \"keep\" or \"cancel\""));
+        let late = now + CLASH_WITHIN + Duration::from_secs(1);
+        assert!(waiting_note(4, late).is_none(), "expired");
+        assert!(
+            waiting_note(4, now + CLASH_WITHIN).is_some(),
+            "at the bound"
+        );
+
+        // Answered: no note after it.
+        let never = |_: &Keeping, _: &str| -> Result<(), String> { Ok(()) };
+        let off = |_: &Keeping, _: &str| -> Result<String, String> { Ok(String::new()) };
+        let hands = Hands {
+            remove: &never,
+            put_on: &off,
+        };
+        let cancelled = chosen(pick(&id, "cancel", 4, true), || true, now, &hands);
+        assert_eq!(cancelled["cancelled"], true, "{cancelled}");
+        assert!(waiting_note(5, now).is_none(), "answered");
         let _ = std::fs::remove_dir_all(&root);
     }
 
