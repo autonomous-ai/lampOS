@@ -2346,7 +2346,7 @@ fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
     let printer = top.join("unshare");
     fs::write(
         &printer,
-        "#!/bin/sh\necho \"args: $*\"\nenv | grep -E '^(LAMP_CONTROL_TOKEN|LAMP_CONTROL_SOCKET|PYTHONPATH|LAMP_NS_NET)=' | sort\n",
+        "#!/bin/sh\necho \"args: $*\"\nenv | grep -E '^(LAMP_CONTROL_TOKEN|LAMP_CONTROL_SOCKET|PYTHONPATH|LAMP_NS_NET|HERMES_YOLO_MODE)=' | sort\n",
     )
     .unwrap();
     fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
@@ -2388,6 +2388,7 @@ fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
         format!(
             "args: --map-root-user --net --mount --pid --kill-child --mount-proc \
              --propagation private {NS} chat -q a\n\
+             HERMES_YOLO_MODE=1\n\
              LAMP_CONTROL_SOCKET={CONTROL_SOCKET}\n\
              LAMP_CONTROL_TOKEN={secret}\n\
              LAMP_NS_NET=run\n\
@@ -2410,7 +2411,9 @@ fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
     // them: as before, the caller's own LAMP_NS_NET deciding `--net`.
     fs::write(top.join("runs/Run-2"), secret).unwrap();
     for cwd in ["project/lamp", "project", "project/skill-Run-2"] {
-        let (ok, out, err) = run(cwd, &[]);
+        // Hermes's approvals are off only in a skill's run (#6684): one
+        // inherited from elsewhere is dropped.
+        let (ok, out, err) = run(cwd, &[("HERMES_YOLO_MODE", "1")]);
         assert!(ok, "{cwd}: {err}");
         assert_eq!(
             out,
