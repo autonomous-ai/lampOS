@@ -1811,6 +1811,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      case $P in /var/lib/lampos-tasks/harnesses/lamp-tasks/skill-?*) R=${P#/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-} ;; esac
      case $R in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) R= ;; esac
      [ ${#R} -le 64 ] || R=
+     unset HERMES_YOLO_MODE
      if [ -n "$R" ]; then
        F=/run/lampos-tasks/runs/$R
        C=
@@ -1820,6 +1821,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        LAMP_CONTROL_TOKEN=$C LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock PYTHONPATH=/usr/local/lib/lampos/sdk-python LAMP_NS_NET=run
        unset C
        export LAMP_CONTROL_TOKEN LAMP_CONTROL_SOCKET PYTHONPATH LAMP_NS_NET
+       # Nobody answers a skill's run: Hermes asks no approval in it, its hardline list still holds (#6684).
+       HERMES_YOLO_MODE=1
+       export HERMES_YOLO_MODE
      fi
      ```
 
