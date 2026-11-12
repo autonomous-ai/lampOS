@@ -1672,7 +1672,10 @@ skill of that name is on this lamp`; `that skill doesn't need a key of
 that name`; `the value must be 1 to 4096 bytes on one line`; `the key
 could not be kept`; `the key could not be removed`; `the lamp's services
 are not running`; `the lamp's services did not answer in time` (5 s);
-and, off, `not on this lamp: <kind>`. `lamp-cloud` keeps nothing: each
+and, off, `not on this lamp: <kind>`. The app polls `skills.secrets`
+after an upload (whose own answer it sees only as pending) and reads `no
+skill of that name is on this lamp` as not there yet, so those words stay
+exactly as they are. `lamp-cloud` keeps nothing: each
 kind is one line to `lamp-services`' admin socket (`op` `skill_secrets`,
 `skill_secret_set`, `skill_secret_unset`), the value in that line alone,
 never a reply, an error or a journal line. `skills.remove` drops the
