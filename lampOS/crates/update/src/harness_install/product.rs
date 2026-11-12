@@ -45,12 +45,12 @@ pub const PRODUCT_DEFAULT: bool = true;
 
 /// The Harness manifest this build pins for a product lamp: a byte-for-byte
 /// copy of Harness's CDN manifest ([`ORIGIN`]) when it named [`VERSION`].
-pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.16.metadata.json");
+pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.41.metadata.json");
 /// [`MANIFEST`]'s SHA-256, checked by a test and again before each install.
 pub const MANIFEST_SHA256: &str =
-    "72e149ef5e7e674e41b07dab7d95c8bb117bbb80e9987069b484a5254cc52826";
+    "4f34e7fb911d57a714efeb6156b3effe85614f6a14ea937be060b4024fb19cb0";
 /// The Harness version [`MANIFEST`] names (its `cli.version`).
-pub const VERSION: &str = "0.6.16";
+pub const VERSION: &str = "0.6.41";
 /// Where [`MANIFEST`] was copied from: said, never fetched.
 pub const ORIGIN: &str =
     "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json";
