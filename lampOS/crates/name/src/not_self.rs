@@ -135,6 +135,26 @@ mod tests {
         Duration::from_millis(n)
     }
 
+    /// #6114, cause 2 (the lamp began to speak inside the call): the near
+    /// bar's hearing begins at the call's first sound, before the lamp
+    /// spoke; the name's begins later, at its first score over 0.9, after
+    /// the lamp began. One call is let through or passed over as one.
+    #[test]
+    fn issue_6114_one_call_is_judged_once_whichever_bar_it_began_at() {
+        let start = Instant::now();
+        let mut speaking = Speaking::default();
+        speaking.saw(false, start);
+        let near_began = start + ms(1_000);
+        speaking.saw(true, start + ms(1_120));
+        let name_began = start + ms(1_160);
+        let now = start + ms(1_400);
+        assert_eq!(
+            speaking.covers(name_began, now),
+            speaking.covers(near_began, now),
+            "near began {near_began:?}, name began {name_began:?}"
+        );
+    }
+
     /// The two cases asked for on #705: a hearing that began inside the
     /// lamp's reply is passed over, both its first sign and its final word;
     /// one that began just after the reply and its tail goes out.
