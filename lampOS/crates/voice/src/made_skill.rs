@@ -7676,6 +7676,10 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
         if entry["sha256"] == made.sha256.as_str() {
             entry["agent"] = json!(true);
             entry["grants"] = json!(grants);
+            // Its keys' names, for the app (`LAMP_SKILL_SECRETS`).
+            if crate::upload_agent::secrets_on() {
+                entry["secrets"] = json!(crate::upload_agent::secrets_of_toml(&files.toml));
+            }
         }
     }
     write_index(&keeping.directory, &entries).map_err(unkept)?;
@@ -7695,6 +7699,23 @@ pub fn agent_grants(directory: &Path, sha256: &str) -> Option<Vec<String>> {
                 .flatten()
                 .filter_map(|grant| grant.as_str().map(str::to_owned))
                 .collect()
+        })
+}
+
+/// The keys' names the kept agent skill `sha256` in `directory` needs, as
+/// [`keep_agent`] marked its index entry with `LAMP_SKILL_SECRETS` on;
+/// none for another skill or with it off then.
+pub fn agent_secrets(directory: &Path, sha256: &str) -> Option<Vec<String>> {
+    index(directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256 && entry["agent"] == true)
+        .and_then(|entry| {
+            entry["secrets"].as_array().map(|names| {
+                names
+                    .iter()
+                    .filter_map(|name| name.as_str().map(str::to_owned))
+                    .collect()
+            })
         })
 }
 

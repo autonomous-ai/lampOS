@@ -41,12 +41,16 @@
 //!   the task-yes path ([`first_run`], `crate::skill_task_yes`), once.
 //! - **No secret is the lamp's** (the first builder's 19:44 ruling): a key
 //!   or token is never said aloud, asked by voice or kept in the skill's
-//!   folder. Its way in (the app, into root's store as a service's tokens,
-//!   reaching the run as an environment file read once) is a follow-up, so
-//!   for now a file carrying a value that looks like one is refused in
+//!   folder: a file carrying a value that looks like one is refused in
 //!   plain words ([`carries_secret`], [`HAS_SECRET`]), the value never
-//!   journaled. The run's environment has none (lamp-tasks clears it to the
-//!   control socket, the run's token and the SDK's path).
+//!   journaled. With `LAMP_SKILL_SECRETS=on` ([`secrets_on`]) the way in
+//!   is the app's: the file's variables' names are its `secrets`
+//!   ([`lamp_services::skill_secrets::names_in`]), the values are given in
+//!   the app into root's store, and lamp-tasks writes them into the run's
+//!   environment file, read once; the refusal says to take the value out
+//!   and add it in the app ([`HAS_SECRET_VALUE`]), and the tool's note and
+//!   its call say a key is never taken by voice ([`NEVER_BY_VOICE`],
+//!   [`keys_missing`]).
 use crate::made_skill::{self, Files, Keeping, Made, Refused};
 use serde_json::Value;
 use std::path::Path;
@@ -79,6 +83,21 @@ pub const NO_SERVICES: &str = "it uses your linked services, which a skill's tas
 /// What a file carrying a key or token is told: never the value.
 pub const HAS_SECRET: &str = "it carries what looks like a key or a token; a skill added from a \
                               file can't hold one yet, so add it without the key or token";
+/// What it is told with `LAMP_SKILL_SECRETS` on: the value goes in the
+/// app, the name stays in the file.
+pub const HAS_SECRET_VALUE: &str = "its SKILL.md carries a key or token itself: take the value \
+                                    out of the file (leave its name, like GEMINI_API_KEY) and add \
+                                    the value in the app instead";
+/// What a file naming more keys than a skill may need is told.
+pub const TOO_MANY_SECRETS: &str = "it needs more than 16 keys or tokens";
+/// What the tool's note says of a skill that needs keys, with
+/// `LAMP_SKILL_SECRETS` on.
+pub const NEVER_BY_VOICE: &str = " It needs keys added in the app. Never ask for, take or repeat a \
+                                  key or token by voice: if one is offered, say to add it in the \
+                                  app, on the skill's page.";
+/// The switch for a skill's keys given in the app, read here as in
+/// lamp-services, lamp-cloud, lamp-skills and lamp-tasks: `on` only.
+pub const SECRETS_ENVIRONMENT: &str = lamp_services::skill_secrets::ENVIRONMENT;
 
 /// Whether `text` carries a value that looks like a key or a token
 /// ([`looks_secret`]): a run outside a link whole, and in a link or a path
@@ -121,6 +140,22 @@ thread_local! {
     /// The switch as a test of this thread sets it (other crates' tests
     /// too, so not only under `cfg(test)`).
     static ON_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    /// [`SECRETS_ENVIRONMENT`] the same way.
+    static SECRETS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether [`SECRETS_ENVIRONMENT`] is on in this process.
+pub fn secrets_on() -> bool {
+    if let Some(on) = SECRETS_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    lamp_services::skill_secrets::on(std::env::var(SECRETS_ENVIRONMENT).ok().as_deref())
+}
+
+/// [`secrets_on`] for this test's thread alone: tests only.
+#[doc(hidden)]
+pub fn set_secrets_here(on: Option<bool>) {
+    SECRETS_HERE.with(|here| here.set(on));
 }
 
 /// Whether the switch is on in this process.
@@ -407,7 +442,20 @@ pub fn files(card: &str) -> Result<(Files, Vec<String>), Refused> {
         eprintln!(
             "lamp-voice: an agent skill added from a file was refused: it carries a key or token"
         );
-        return Err(Refused::new(HAS_SECRET));
+        return Err(Refused::new(if secrets_on() {
+            HAS_SECRET_VALUE
+        } else {
+            HAS_SECRET
+        }));
+    }
+    // The variables its run needs, by name only (`LAMP_SKILL_SECRETS`).
+    let secrets = if secrets_on() {
+        lamp_services::skill_secrets::names_in(&card)
+    } else {
+        Vec::new()
+    };
+    if secrets.len() > lamp_services::skill_secrets::MOST_NAMES {
+        return Err(Refused::new(TOO_MANY_SECRETS));
     }
     let grants = grants_read(&card);
     if grants
@@ -425,13 +473,26 @@ pub fn files(card: &str) -> Result<(Files, Vec<String>), Refused> {
         .map(|c| if c.is_control() { ' ' } else { c })
         .collect();
     let quoted_grants: Vec<String> = grants.iter().map(|grant| format!("\"{grant}\"")).collect();
+    // Names of `[A-Z0-9_]` only (`name_ok`), so quoted as they are.
+    let secrets_line = if secrets.is_empty() {
+        String::new()
+    } else {
+        let quoted: Vec<String> = secrets.iter().map(|name| format!("\"{name}\"")).collect();
+        format!("secrets = [{}]\n", quoted.join(", "))
+    };
     let toml = format!(
         "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\ntool = \"{tool}\"\n\
-         grants = [{}]\n\n[[do]]\ntask = {{ task = {}, run = \"{INSTRUCTIONS}\" }}\n",
+         grants = [{}]\n{secrets_line}\n[[do]]\ntask = {{ task = {}, run = \"{INSTRUCTIONS}\" }}\n",
         quoted_grants.join(", "),
         toml_string(task.trim()),
     );
-    let note = note(&description, &triggers(&card));
+    let mut note = note(&description, &triggers(&card));
+    if !secrets.is_empty() {
+        note = format!(
+            "{}{NEVER_BY_VOICE}",
+            cut(&note, MOST_NOTE_BYTES - NEVER_BY_VOICE.len())
+        );
+    }
     let lamps_card = format!(
         "---\nname: {name}\ndescription: \"{}\"\n---\n\nAdded from a file in the app. The lamp's agent \
          follows its instructions, kept whole in {INSTRUCTIONS}.\n",
@@ -481,7 +542,9 @@ pub fn capped(text: &str) -> Result<(String, made_skill::Uses), Refused> {
 pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Uses), Refused> {
     let table: toml::Table =
         toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
-    let allowed = ["kind", "version", "needs", "tool", "grants", "do"];
+    let allowed = [
+        "kind", "version", "needs", "tool", "grants", "secrets", "do",
+    ];
     if table.keys().any(|key| !allowed.contains(&key.as_str())) {
         return Err(Refused::new(
             "an agent skill added from a file is a tool and one task, nothing more",
@@ -551,12 +614,113 @@ pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Us
             _ => {}
         }
     }
+    // Its keys' names (`LAMP_SKILL_SECRETS`): plain variables' names,
+    // once each, never a value; read whichever way the switch is, so a
+    // skill kept with it on still loads with it off.
+    if let Some(secrets) = table.get("secrets") {
+        let names = secrets.as_array().map(Vec::as_slice).unwrap_or_default();
+        let mut seen: Vec<&str> = Vec::new();
+        for name in names {
+            let name = name.as_str().unwrap_or_default();
+            if !lamp_services::skill_secrets::name_ok(name) || seen.contains(&name) {
+                return Err(Refused::new(
+                    "an agent skill's secrets are its variables' names, once each",
+                ));
+            }
+            seen.push(name);
+        }
+        if !secrets.is_array() || seen.len() > lamp_services::skill_secrets::MOST_NAMES {
+            return Err(Refused::new(TOO_MANY_SECRETS));
+        }
+    }
     let version = table
         .get("version")
         .and_then(toml::Value::as_str)
         .unwrap_or("1.0.0")
         .to_owned();
     Ok((version, uses))
+}
+
+/// The keys' names an agent skill's kept `skill.toml` needs
+/// ([`lamp_services::skill_secrets::needed_of_toml`]).
+pub fn secrets_of_toml(toml: &str) -> Vec<String> {
+    lamp_services::skill_secrets::needed_of_toml(toml)
+}
+
+/// What the model is told when an agent skill's tool is called while a
+/// key it needs is not in the app (`missing`, names only): nothing runs.
+pub fn keys_missing_line(tool: &str, missing: &[String]) -> String {
+    format!(
+        "{tool} didn't run: it needs {} added in the app first, on the skill's page. Tell the \
+         person that plainly, naming {}. Never ask for the key or token by voice, and never take \
+         or repeat one if they say it: it goes in the app.",
+        missing.join(" and "),
+        if missing.len() == 1 { "it" } else { "them" },
+    )
+}
+
+/// The model's call of `tool`, before it runs (`LAMP_SKILL_SECRETS`): for
+/// an agent skill that needs a key not set in the app, the plain line
+/// ([`keys_missing_line`]) and nothing runs; none when it isn't one, needs
+/// none, has them all, or the lamp's services can't say (then lamp-tasks
+/// refuses the run itself if one is missing). `named` asks lamp-services
+/// for the skill's `{needed, set}`, names only.
+pub fn keys_missing_with(
+    directory: &Path,
+    tool: &str,
+    named: impl FnOnce(&str) -> Option<Value>,
+) -> Option<Value> {
+    if !on() || !secrets_on() {
+        return None;
+    }
+    let name = agent_named(directory, tool)?;
+    let told = named(&name)?;
+    let names = |key: &str| -> Vec<String> {
+        told[key]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|name| name.as_str().map(str::to_owned))
+            .collect()
+    };
+    let set = names("set");
+    let missing: Vec<String> = names("needed")
+        .into_iter()
+        .filter(|name| !set.contains(name))
+        .collect();
+    if missing.is_empty() {
+        return None;
+    }
+    eprintln!(
+        "lamp-voice: an agent skill's tool didn't run: {} of its keys not added in the app",
+        missing.len()
+    );
+    Some(serde_json::json!({"ok": false, "refused": keys_missing_line(tool, &missing)}))
+}
+
+/// How long the voice waits for lamp-services' names before an agent
+/// skill's tool runs: a small file read on the lamp, so a slow answer only
+/// leaves the check to lamp-tasks.
+pub const KEYS_DEADLINE: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// [`keys_missing_with`] on a lamp: the made skills' index, and
+/// lamp-services' tools socket (the voice's own call,
+/// `lamp_services::skill_secrets::NAMES_CALL`).
+pub fn keys_missing(tool: &str) -> Option<Value> {
+    if !on() || !secrets_on() {
+        return None;
+    }
+    let keeping = Keeping::when(true)?;
+    keys_missing_with(&keeping.directory, tool, |skill| {
+        let told = crate::tools::exchange(
+            &Path::new(crate::services::FOLDER).join(crate::tools::CALL_SOCKET),
+            &serde_json::json!({"op": "call",
+                "name": lamp_services::skill_secrets::NAMES_CALL,
+                "args": {"skill": skill}}),
+            KEYS_DEADLINE,
+        )?;
+        (told["ok"] == true).then(|| told["result"].clone())
+    })
 }
 
 /// An agent skill's package files held again as it is put on (lamp-skills'
