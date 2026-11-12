@@ -4619,6 +4619,56 @@ fn close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code() {
     assert!(rig.calls().is_empty());
 }
 
+/// #6510 step 2: a skill run's deadline closes with `harness close --now`,
+/// on the agent's machine by its id, its exit code read as `close`'s. The
+/// same guards as `close`: an id or a machine that isn't one starts no
+/// process, a cloud harness is refused without asking, and no time left is
+/// `close_no_time` with no process.
+#[test]
+fn close_now_passes_now_with_the_same_guards_as_close() {
+    for (exit, said) in [
+        (0, Ok(Closed::Closed)),
+        (5, Ok(Closed::Refused)),
+        (1, Err("close_failed".to_string())),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"close":{"exit":exit}}));
+        assert_eq!(
+            rig.cli().close_now(MACHINE, AGENT, Duration::from_secs(5)),
+            said,
+            "exit {exit}"
+        );
+        let calls = rig.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0]["args"],
+            json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
+        );
+    }
+    let rig = Rig::new();
+    for (machine, agent) in [
+        (MACHINE, "lamp-coffee-poem"),
+        (MACHINE, "--now"),
+        ("office", AGENT),
+    ] {
+        assert!(
+            rig.cli()
+                .close_now(machine, agent, Duration::from_secs(5))
+                .is_err(),
+            "{machine} {agent}"
+        );
+    }
+    assert_eq!(
+        rig.cli().close_now(MACHINE, CLOUD, Duration::from_secs(5)),
+        Ok(Closed::Refused)
+    );
+    assert_eq!(
+        rig.cli().close_now(MACHINE, AGENT, Duration::ZERO),
+        Err("close_no_time".into())
+    );
+    assert!(rig.calls().is_empty());
+}
+
 /// `serve --new-folder` (subdarren-P3 part 1), with its file in the rig.
 fn new_folder_rig() -> Rig {
     let mut rig = Rig::new();
