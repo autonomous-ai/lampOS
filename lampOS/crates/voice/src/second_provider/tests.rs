@@ -5414,7 +5414,7 @@ async fn a_forget_between_the_chats_rounds_keeps_the_waiting_note_from_the_next(
         tools,
         Arc::new(Instant::now),
     )
-    .noting_a_task_waiting(Arc::new(move |_| Some(told.clone())));
+    .noting_a_task_waiting(Arc::new(move |_, _: &str| Some(told.clone())));
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     engine.submit(end(1));
@@ -5455,7 +5455,7 @@ async fn a_forget_while_the_turn_waits_keeps_its_waiting_note_from_the_chat() {
     let (entered, released) = (Mutex::new(Some(entered)), Mutex::new(released));
     let told = note.clone();
     let mut engine = engine
-        .noting_a_task_waiting(Arc::new(move |_| Some(told.clone())))
+        .noting_a_task_waiting(Arc::new(move |_, _: &str| Some(told.clone())))
         .asking_after_events(
             Arc::new(move |_, _, _| {
                 if let Some(entered) = entered.lock().unwrap().take() {
@@ -6882,8 +6882,8 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         Arc::new(Instant::now),
     )
     .announcing(false)
-    .noting_a_task_waiting(Arc::new(|request| {
-        crate::agent_tasks::pending_note(request, std::time::Instant::now())
+    .noting_a_task_waiting(Arc::new(|request, words: &str| {
+        crate::agent_tasks::pending_note(request, words, std::time::Instant::now())
     }));
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
