@@ -22,7 +22,7 @@ def world():
                                    "base": {"ref": "lamp-voice"},
                                    "head": {"sha": HEAD, "ref": "first/train-900", "repo": {"full_name": REPO}}}],
         f"actions/workflows/lampos-arm64.yml/runs?event=pull_request&head_sha={HEAD}&per_page=30": {"workflow_runs": [run]},
-        "actions/runs/7/attempts/1/jobs?per_page=100": {"jobs": [job(reuse.BUILD)] + [job(f"{reuse.ARM64}{i}/3)") for i in (1, 2, 3)]},
+        "actions/runs/7/attempts/1/jobs?per_page=100": {"jobs": [job(reuse.BUILD), job(reuse.RELEASE)] + [job(f"{reuse.ARM64}{i}/3)") for i in (1, 2, 3)]},
         "actions/runs/7/artifacts?per_page=100": {"artifacts": [
             {"name": f"lampos-arm64-{HEAD}", "expired": False},
             {"name": f"lampos-arm64-tested-{TESTED}", "expired": False},
@@ -65,7 +65,7 @@ w[f"commits/{PUSH}/pulls"] = []
 refused(w, "no single pull request")
 
 # A test runner failed, or the run failed or isn't done: not green.
-for change in ("job", "run", "shards", "missing", "skipped", "build"):
+for change in ("job", "run", "shards", "missing", "skipped", "build", "release"):
     w = world()
     jobs = w["actions/runs/7/attempts/1/jobs?per_page=100"]["jobs"]
     if change == "job":
@@ -78,6 +78,8 @@ for change in ("job", "run", "shards", "missing", "skipped", "build"):
         del jobs[2]
     elif change == "skipped":
         jobs[3]["conclusion"] = "skipped"
+    elif change == "release":
+        del jobs[1]
     else:
         del jobs[0]
     refused(w, "no ARM64 run")

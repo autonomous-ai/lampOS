@@ -3,6 +3,7 @@
 
 import argparse
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -483,12 +484,20 @@ class Publisher:
     def verify_assets(self, release, inventory, names=None):
         assets = self.assets(release)
         require(set(assets) == set(inventory), "uploaded asset inventory differs")
-        for name in sorted(inventory if names is None else names):
-            expected = inventory[name]
-            require(assets[name]["size"] == expected["size"], "uploaded asset size differs")
-            downloaded = self.work / "downloaded-asset"
+        self.check_assets(assets, inventory, inventory if names is None else names)
+
+    def check_assets(self, assets, inventory, names):
+        """Each named asset downloaded back and compared byte for byte, four
+        at a time (#6556); every one is checked before this returns."""
+        def check(name):
+            require(assets[name]["size"] == inventory[name]["size"], "uploaded asset size differs")
+            downloaded = self.work / f"downloaded-{name}"
             self.download(assets[name], downloaded)
-            require(file_info(downloaded) == expected, "uploaded asset hash differs")
+            require(file_info(downloaded) == inventory[name], "uploaded asset hash differs")
+            downloaded.unlink()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            for future in [pool.submit(check, name) for name in sorted(names)]:
+                future.result()
 
     def complete_assets(self, tag, release, stage, inventory):
         """This release's assets whole: one cut short by a 5xx inside `gh
@@ -512,11 +521,7 @@ class Publisher:
             self.verify_assets(release, inventory)
             return
         print(f"{tag} lacks {len(missing)} of its assets; checking the rest, then uploading those", file=sys.stderr)
-        for name in sorted(assets):
-            require(assets[name]["size"] == inventory[name]["size"], "uploaded asset size differs")
-            downloaded = self.work / "downloaded-asset"
-            self.download(assets[name], downloaded)
-            require(file_info(downloaded) == inventory[name], "uploaded asset hash differs")
+        self.check_assets(assets, inventory, assets)
         try:
             self.command("gh", "release", "upload", tag, *[stage / name for name in missing], "--repo", REPO)
         except ServerError:

@@ -291,7 +291,8 @@ These tests do not establish a real stable promotion or lamp acceptance.
   tests every crate with the push's profile. When lamp-voice's push is that
   pull request's merge and its tree is the tree that run built and tested,
   the `reuse` job (`.github/scripts/lampos-reuse.py`) names the run, whose
-  build and every test runner passed; the push skips `arm64` and `arm64-test`
+  build, release and every test runner passed; the push skips `arm64`,
+  `arm64-release` and `arm64-test`
   and `publish` downloads `lampos-arm64-<pull request head>` from that run.
   Every artifact carries `TREE`, its build's `HEAD^{tree}`, and publish
   refuses one whose `TREE` is not `github.sha`'s tree. Anything else (not a
