@@ -2061,7 +2061,7 @@ export function ChatSection({ events, isActive }: Props) {
                   if (!chips || chips.length === 0) return null;
                   return <ToolChipGroup chips={chips} live={isActivePending} />;
                 })()}
-                <div data-bubble style={{
+                <div data-bubble dir="auto" style={{
                   padding: "9px 13px",
                   borderRadius: msg.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
                   background: msg.role === "user"

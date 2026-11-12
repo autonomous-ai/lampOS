@@ -13,6 +13,7 @@ const (
 	LangEN     = "en"
 	LangJA     = "ja"
 	LangKO     = "ko"
+	LangAR     = "ar"
 	LangVI     = "vi"
 	LangZhCN   = "zh-CN"
 	LangZhTW   = "zh-TW"
@@ -46,10 +47,10 @@ func LangContextTag() string {
 	return ""
 }
 
-// NormalizeLang maps Japanese and Korean regional codes to their shared phrase pools.
+// NormalizeLang maps Japanese, Korean and Arabic regional codes to their shared phrase pools.
 func NormalizeLang(lang string) string {
 	normalized := strings.ToLower(strings.TrimSpace(lang))
-	for _, base := range []string{LangJA, LangKO} {
+	for _, base := range []string{LangJA, LangKO, LangAR} {
 		if normalized == base || strings.HasPrefix(normalized, base+"-") || strings.HasPrefix(normalized, base+"_") {
 			return base
 		}

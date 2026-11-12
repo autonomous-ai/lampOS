@@ -172,7 +172,7 @@ func newCoTLeakFilter(langCode string) *cotLeakFilter {
 		nonEnglish: code != "" && primary != "en",
 	}
 	switch primary {
-	case "vi", "zh", "ja", "ko", "th":
+	case "vi", "zh", "ja", "ko", "th", "ar":
 		f.nonASCIIScript = true
 	}
 	return f

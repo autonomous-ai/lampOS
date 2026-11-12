@@ -1397,15 +1397,15 @@ type ConfigPublicResponse struct {
 	TapLight        *config.WakeLight `json:"tap_light,omitempty"`
 	TapLightEnabled bool              `json:"tap_light_enabled"`
 	// SleepMode is the effective sleep mode toggle (default false).
-	SleepMode       bool              `json:"sleep_mode"`
-	DeviceID        string            `json:"device_id"`
-	Mac             string            `json:"mac"`
-	NetworkSSID     string            `json:"network_ssid"`
-	MQTTEndpoint    string            `json:"mqtt_endpoint"`
-	MQTTUsername    string            `json:"mqtt_username"`
-	MQTTPort        int               `json:"mqtt_port"`
-	FAChannel       string            `json:"fa_channel"`
-	FDChannel       string            `json:"fd_channel"`
+	SleepMode    bool   `json:"sleep_mode"`
+	DeviceID     string `json:"device_id"`
+	Mac          string `json:"mac"`
+	NetworkSSID  string `json:"network_ssid"`
+	MQTTEndpoint string `json:"mqtt_endpoint"`
+	MQTTUsername string `json:"mqtt_username"`
+	MQTTPort     int    `json:"mqtt_port"`
+	FAChannel    string `json:"fa_channel"`
+	FDChannel    string `json:"fd_channel"`
 
 	// CloudPerception is never omitted so the web can render every toggle.
 	CloudPerception config.CloudPerception `json:"cloud_perception"`
@@ -1548,11 +1548,16 @@ var elevenLabsVoicesByLang = map[string][]string{
 	"vi": {"Ngan", "Linh", "Huyen", "Freya", "Nathan", "Quan"},
 	"ja": {"Shizuka", "Konoha", "Rin", "Asahi", "Hinata", "Hiroki"},
 	"ko": {"Anna Kim", "Selly Han", "Rosa Oh", "Stella", "Hyunbin", "Minho"},
+	"ar": {"Salma", "Sara", "Farah", "Mona", "Haytham", "Anas"},
 	"zh": {"Amy", "Sage", "Xiaoxi", "Yun", "Evan Zhao", "Jin"},
 }
 
 func elevenLabsLanguageBucket(lang string) string {
 	lang = strings.ToLower(strings.TrimSpace(lang))
+	// Exact match plus region: "arn" (Mapudungun) is not Arabic.
+	if lang == "ar" || strings.HasPrefix(lang, "ar-") || strings.HasPrefix(lang, "ar_") {
+		return "ar"
+	}
 	for _, bucket := range []string{"vi", "ja", "ko", "zh"} {
 		if strings.HasPrefix(lang, bucket) {
 			return bucket
@@ -1568,7 +1573,7 @@ func ElevenLabsVoicesForLang(lang string) []string {
 		return append([]string(nil), elevenLabsVoicesByLang[elevenLabsLanguageBucket(lang)]...)
 	}
 	var voices []string
-	for _, bucket := range []string{"en", "vi", "ja", "ko", "zh"} {
+	for _, bucket := range []string{"en", "vi", "ja", "ko", "ar", "zh"} {
 		voices = append(voices, elevenLabsVoicesByLang[bucket]...)
 	}
 	return voices

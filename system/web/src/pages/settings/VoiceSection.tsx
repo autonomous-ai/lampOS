@@ -133,7 +133,7 @@ export function VoiceSection({
               display: "flex", alignItems: "center", justifyContent: "center",
               marginTop: 1,
             }}>{i + 1}</span>
-            <span style={{ fontSize: 13, lineHeight: 1.5, color: C.text }}>{p}</span>
+            <span dir="auto" style={{ fontSize: 13, lineHeight: 1.5, color: C.text }}>{p}</span>
           </div>
         ))}
       </div>

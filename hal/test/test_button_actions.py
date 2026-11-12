@@ -253,6 +253,8 @@ def test_every_mic_phrase_states_which_way_the_toggle_went():
         "en": ("listen", "hear", "ear"),
         "vi": ("nghe", "tai"),
         "ja": ("聞", "耳"),
+        "ko": ("듣", "들", "귀"),
+        "ar": ("ستمع", "استماع", "أذن", "سماع"),
         "zh-CN": ("听", "耳"),
         "zh-TW": ("聽", "耳"),
     }

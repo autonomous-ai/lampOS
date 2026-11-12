@@ -211,6 +211,7 @@ class ContextManagerBase(ABC):
         "zh-CN": "Chinese (Simplified)",
         "zh-TW": "Chinese (Traditional)",
         "ko": "Korean",
+        "ar": "Arabic",
         "ja": "Japanese",
         "fr": "French",
         "de": "German",

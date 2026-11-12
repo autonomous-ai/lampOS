@@ -126,7 +126,9 @@ class HarnessActionTests(unittest.TestCase):
     def test_all_languages_and_config_lookup(self):
         expected_off = {"en": "Harness is off. You’re back with the assistant on your device.", "vi": "Đã tắt Harness, trở về trợ lý trên thiết bị.",
                         "zh-CN": "Harness 已关闭，已切回设备上的助手。", "zh-TW": "Harness 已關閉，已切回裝置上的助理。",
-                        "ja": "Harness をオフにしました。デバイスのアシスタントに戻りました。"}
+                        "ja": "Harness をオフにしました。デバイスのアシスタントに戻りました。",
+                        "ko": "Harness를 껐어요. 기기의 어시스턴트로 돌아왔어요.",
+                        "ar": "تم إيقاف Harness. عدتَ إلى المساعد على جهازك."}
         from hal.presets import SUPPORTED_LANGS
         self.assertEqual(set(expected_off), set(SUPPORTED_LANGS))
         for lang, expected in expected_off.items():
