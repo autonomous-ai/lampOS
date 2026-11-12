@@ -308,18 +308,21 @@ pub fn line(
         match take(place, keeping, skill_toml, skill_md, now_unix_ms) {
             Ok(made) => {
                 eprintln!("lamp-voice: a skill added from a file: kept; put on now");
-                (
-                    json!({"kept": {
-                        "name": made.name,
-                        "description": made.description,
-                        "version": made.version,
-                        "sha256": made.sha256,
-                        "uses": {"light": made.uses.light, "body": made.uses.body, "topics": made.uses.topics},
-                        // An agent skill's grants, said back in the app.
-                        "grants": made_skill::agent_grants(&keeping.directory, &made.sha256),
-                    }}),
-                    Some(made),
-                )
+                let mut kept = json!({
+                    "name": made.name,
+                    "description": made.description,
+                    "version": made.version,
+                    "sha256": made.sha256,
+                    "uses": {"light": made.uses.light, "body": made.uses.body, "topics": made.uses.topics},
+                    // An agent skill's grants, said back in the app.
+                    "grants": made_skill::agent_grants(&keeping.directory, &made.sha256),
+                });
+                // The keys' names it needs, for the app to ask for
+                // (`LAMP_SKILL_SECRETS`); never a value.
+                if let Some(secrets) = made_skill::agent_secrets(&keeping.directory, &made.sha256) {
+                    kept["secrets"] = json!(secrets);
+                }
+                (json!({ "kept": kept }), Some(made))
             }
             Err(Refused(why, _)) => {
                 eprintln!("lamp-voice: a skill added from a file was not kept");

@@ -1342,6 +1342,10 @@ fn worker_command(
             role,
             var(crate::skill_task_yes::NET_ENVIRONMENT).as_deref(),
         ))
+        .envs(skill_secrets_worker_environment(
+            role,
+            var(crate::upload_agent::SECRETS_ENVIRONMENT).as_deref(),
+        ))
         .envs(skill_loose_worker_environment(
             role,
             var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
@@ -1497,6 +1501,17 @@ fn task_net_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::skill_task_yes::NET_ENVIRONMENT, "on"))
+}
+
+// A skill's keys given in the app (`upload_agent::secrets_on`), passed the
+// same narrow way: the exact `on`, to the two routes whose agent skill's
+// tool call checks its keys and whose `make_skill` keeps an upload.
+fn skill_secrets_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::upload_agent::SECRETS_ENVIRONMENT, "on"))
 }
 
 // A made skill loosened (#6059, `made_skill::loose_on`), passed the same
@@ -2760,6 +2775,10 @@ mod tests {
             ),
             (
                 crate::skill_task_yes::NET_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::upload_agent::SECRETS_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (
