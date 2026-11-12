@@ -1536,8 +1536,8 @@ cả hai người viết.
   không bao giờ `admin.sock`. Terminal và công cụ của nó chỉ chạy trong
   namespace đó, và không token nào được tạo.
 - **Mạng của nó: `LAMP_MAKE_AGENT_NET`** (không unit nào đặt; yêu cầu của
-  chủ sở hữu, 12/11, quyết định của first builder còn chờ trên Queue
-  #6059). Mặc định lần chạy giữ mạng, như agent của V1, và gọi mô hình qua
+  chủ sở hữu, 12/11, quyết định của first builder,
+  12/11 19:14). Mặc định lần chạy giữ mạng, như agent của V1, và gọi mô hình qua
   bộ chuyển tiếp của lamp-cloud trên `127.0.0.1:7741`, chính nơi
   `model.sock` nối tới. Đúng giá trị `held` cho lần chạy nghiêm ngặt,
   `LAMP_NS_NET=run`: chỉ `lo` và các tunnel `@NONE` của kernel, và mô hình
@@ -1547,8 +1547,12 @@ cả hai người viết.
   mỗi lần tạo có một home mới, trống, của riêng nó (`make-<run id>/home`,
   0700) làm `HOME` và `HERMES_HOME`, chỉ chứa cấu hình nhà cung cấp (khóa
   được gọi bằng `LAMP_HERMES_TOKEN`, không bao giờ là một khóa), không bao
-  giờ có bộ nhớ, phiên hay trạng thái của Hermes, còn thư mục lâu dài của
-  Hermes chỉ đọc; nó bị xóa cùng lần tạo dù kết thúc thế nào. Cách ly hay
+  giờ có bộ nhớ, phiên hay trạng thái của Hermes, cùng bốn thiết lập Hermes
+  của lamp-update (không kiểm tra cập nhật, không language server, lần chạy
+  kết thúc cùng lượt của nó). Home lâu dài của Hermes (bộ nhớ, phiên, trạng
+  thái) bị che khỏi lần tạo, trừ bản checkout, chỉ đọc; thư mục của Hermes
+  và thư mục làm việc chỉ đọc, phần còn lại của `lamp` bị che, chỉ thư mục
+  của lần tạo ghi được. Nó bị xóa cùng lần tạo dù kết thúc thế nào. Cách ly hay
   không, lamp-tasks kiểm tra trước rằng wrapper và script namespace của
   Hermes có các dòng make-home; đèn mà vòng lamp-update chưa viết lại
   chúng thì bị từ chối (`no_namespace`) và lần tạo vẫn là của DeepSeek.

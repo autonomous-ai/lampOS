@@ -414,6 +414,13 @@ fn the_namespace_script_names_no_engine_and_homes_are_per_engine() {
         assert!(text.contains(MARK));
         assert!(text.contains("H=/var/lib/lampos-agents/$E "));
         assert!(text.contains("HOME=$H\n"));
+        // A voice make's home is Hermes's alone (#6643).
+        assert!(!text.contains("LAMP_NS_HOME%/home"), "{shown:?}");
+        assert_eq!(
+            text.contains("unset LAMP_NS_HOME\n"),
+            shown.tasks,
+            "{shown:?}"
+        );
         assert_eq!(text.matches(super::super::PATH_LINES).count(), 1);
         let last = text.trim_end().lines().last().unwrap();
         assert!(last.ends_with(" \"$X\" \"$@\""), "{last}");

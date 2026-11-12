@@ -3091,23 +3091,32 @@ as a Harness task with the agent's own tools
   new and empty but for the provider config,
   `home/.hermes/config.yaml` (`hermes_config::merge_config` with the
   forwarder's port, its key named by its variable, `LAMP_HERMES_TOKEN`,
-  never a key), and nothing of Hermes's memory, sessions or state. The run
+  never a key, and lamp-update's four Hermes settings, `MAKE_CONFIG`, a
+  test holding them equal to `hermes_install::CONFIG`: no update checks,
+  no language servers, a `chat -q` run that ends with its turn), and
+  nothing of Hermes's memory, sessions or state. The run
   gets `HOME`, `HERMES_HOME` (`home/.hermes`) and `LAMP_NS_HOME` set to it.
   lamp-update's wrapper takes `LAMP_NS_HOME` only for a path matching
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home` with no
   `..` (`WRAPPER_HOME_LINE`), and its namespace script then sets `HOME` to
-  it and remounts Hermes's lasting folder read-only (`NS_HOME_LINE`). The
-  home goes with the make's folder however the make ends: answered,
-  failed, past its deadline or a panic.
+  it, hides Hermes's lasting home (`/var/lib/lampos-hermes/.hermes`:
+  memories, sessions, state) under an empty read-only tmpfs with only its
+  checkout shown again, read-only, leaves Hermes's folder and the work
+  folder read-only, and hides the rest of the work folder's `lamp` under
+  another tmpfs, the make's own folder alone moved back, read-write
+  (`NS_HOME_LINE`; docs/install.md). The home goes with the make's folder
+  however the make ends: answered, failed, past its deadline or a panic.
 - **The wrapper's mark, held or not:** before every make, lamp-tasks
   checks that `/usr/local/bin/hermes` carries `WRAPPER_HOME_LINE` and
   `/usr/local/lib/lampos/hermes-ns` carries `NS_HOME_LINE`; otherwise the
-  make is refused `no_namespace` before anything is made. Until a
+  make is refused `no_namespace` before anything is made; so is a make
+  whose work folder is not `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`
+  (`MAKE_WORK`), the one the wrapper takes a make's home in. Until a
   lamp-update round has rewritten the wrapper and the script, every make
   is refused so and stays DeepSeek's.
 - **Its network (`LAMP_MAKE_AGENT_NET`, set in no unit):** kept by default,
-  as V1's agent had it (the owner's ask, 12 Nov; the first builder's ruling
-  pending on Queue #6059). The model is then reached at lamp-cloud's
+  as V1's agent had it (the owner's ask, 12 Nov; the first builder's ruling,
+  12 Nov 19:14). The model is then reached at lamp-cloud's
   forwarder on `127.0.0.1:7741`, the one `model.sock` pipes to. Exactly
   `held` gives the strict run, `LAMP_NS_NET=run`: only `lo` and the
   kernel's `@NONE` tunnels, the model only through `model.sock`. Held, a
@@ -3141,7 +3150,14 @@ as a Harness task with the agent's own tools
   not, and the network lines held, with `LAMP_NS_NET=run` only held, no
   token and no admin socket in its environment, in its make's folder,
   with its own `HOME` and `HERMES_HOME`; the lines are lamp-update's own,
-  word for word; old make folders are swept at the start; lamp-update's
+  word for word; a work folder other than the wrapper's is refused; the
+  fresh config carries lamp-update's four settings, equal to its own; old
+  make folders are swept at the start; lamp-update's
+  `a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder`
+  (stubbed mounts) and, on Linux,
+  `inside_a_makes_namespace_hermess_lasting_memory_is_not_there` (a real
+  namespace: the lasting memories absent, only the make's folder
+  writable); lamp-update's
   namespace text shows `control.sock` alone and never names `admin.sock`;
   only lamp-voice as root may hand a make over; the socket says `started`,
   then the answer; the default keeps the network and still shows no admin

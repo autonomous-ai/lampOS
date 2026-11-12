@@ -684,24 +684,34 @@ agent (`lamp_tasks::skill_make`).
   0700, mới và trống ngoài cấu hình nhà cung cấp,
   `home/.hermes/config.yaml` (`hermes_config::merge_config` với cổng của
   bộ chuyển tiếp, khóa được gọi bằng tên biến, `LAMP_HERMES_TOKEN`, không
-  bao giờ là một khóa), và không có gì từ bộ nhớ, phiên hay trạng thái của
-  Hermes. Lần chạy nhận `HOME`, `HERMES_HOME` (`home/.hermes`) và
+  bao giờ là một khóa, cùng bốn thiết lập Hermes của lamp-update,
+  `MAKE_CONFIG`, một kiểm thử giữ chúng bằng `hermes_install::CONFIG`:
+  không kiểm tra cập nhật, không language server, lần chạy `chat -q` kết
+  thúc cùng lượt của nó), và không có gì từ bộ nhớ, phiên hay trạng thái
+  của Hermes. Lần chạy nhận `HOME`, `HERMES_HOME` (`home/.hermes`) và
   `LAMP_NS_HOME` trỏ tới đó. Wrapper của lamp-update chỉ nhận
   `LAMP_NS_HOME` khi đường dẫn khớp
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home` và không có
-  `..` (`WRAPPER_HOME_LINE`), rồi script namespace đặt `HOME` thành nó và
-  mount lại thư mục lâu dài của Hermes ở chế độ chỉ đọc (`NS_HOME_LINE`).
+  `..` (`WRAPPER_HOME_LINE`), rồi script namespace đặt `HOME` thành nó,
+  che home lâu dài của Hermes (`/var/lib/lampos-hermes/.hermes`: bộ nhớ,
+  phiên, trạng thái) dưới một tmpfs trống chỉ đọc, chỉ cho thấy lại bản
+  checkout, chỉ đọc, để thư mục của Hermes và thư mục làm việc ở chế độ
+  chỉ đọc, và che phần còn lại của `lamp` trong thư mục làm việc dưới một
+  tmpfs khác, chỉ thư mục của lần tạo được đưa lại, đọc-ghi
+  (`NS_HOME_LINE`; docs/install.md).
   Home bị xóa cùng thư mục của lần tạo dù lần tạo kết thúc thế nào: có câu
   trả lời, thất bại, quá hạn hay panic.
 - **Dấu của wrapper, cách ly hay không:** trước mỗi lần tạo, lamp-tasks
   kiểm tra `/usr/local/bin/hermes` có `WRAPPER_HOME_LINE` và
   `/usr/local/lib/lampos/hermes-ns` có `NS_HOME_LINE`; nếu không, lần tạo
-  bị từ chối `no_namespace` trước khi bất cứ gì được tạo. Cho tới khi một
+  bị từ chối `no_namespace` trước khi bất cứ gì được tạo; lần tạo mà thư
+  mục làm việc không phải `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`
+  (`MAKE_WORK`), nơi wrapper nhận home của lần tạo, cũng vậy. Cho tới khi một
   vòng lamp-update viết lại wrapper và script, mọi lần tạo đều bị từ chối
   như vậy và vẫn là của DeepSeek.
 - **Mạng của nó (`LAMP_MAKE_AGENT_NET`, không unit nào đặt):** mặc định giữ
   mạng, như agent của V1 (yêu cầu của chủ sở hữu, 12/11; quyết định của first
-  builder còn chờ trên Queue #6059). Khi đó mô hình được gọi qua bộ chuyển
+  builder, 12/11 19:14). Khi đó mô hình được gọi qua bộ chuyển
   tiếp của lamp-cloud trên `127.0.0.1:7741`, chính nơi `model.sock` nối tới.
   Đúng giá trị `held` cho lần chạy nghiêm ngặt, `LAMP_NS_NET=run`: chỉ `lo`
   và các tunnel `@NONE` của kernel, mô hình chỉ qua `model.sock`. Khi
@@ -736,8 +746,13 @@ agent (`lamp_tasks::skill_make`).
   make-home dù cách ly hay không, và các dòng mạng khi cách ly, với
   `LAMP_NS_NET=run` chỉ khi cách ly, không có token và không có admin
   socket trong môi trường, trong thư mục của lần tạo, với `HOME` và
-  `HERMES_HOME` riêng; các dòng đúng từng chữ của lamp-update; thư mục tạo
-  cũ được quét bỏ khi khởi động; văn bản namespace của lamp-update chỉ cho thấy `control.sock` và
+  `HERMES_HOME` riêng; các dòng đúng từng chữ của lamp-update; thư mục làm
+  việc khác với của wrapper bị từ chối; cấu hình mới có bốn thiết lập của
+  lamp-update, bằng đúng của nó; thư mục tạo cũ được quét bỏ khi khởi
+  động; `a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder`
+  của lamp-update (mount giả lập) và, trên Linux,
+  `inside_a_makes_namespace_hermess_lasting_memory_is_not_there` (namespace
+  thật: không thấy bộ nhớ lâu dài, chỉ thư mục của lần tạo ghi được); văn bản namespace của lamp-update chỉ cho thấy `control.sock` và
   không bao giờ nhắc `admin.sock`; chỉ lamp-voice chạy bằng root được giao
   một lần tạo; socket nói `started`, rồi câu trả lời; mặc định giữ mạng mà
   vẫn không cho thấy admin socket, và `held` cho `LAMP_NS_NET=run`.

@@ -15,7 +15,11 @@
 //! Each make has a fresh home of its own, `make-<run id>/home`, 0700, as
 //! `HOME` and `HERMES_HOME`: empty but for the provider config (its key
 //! named by its variable, never a key), never Hermes's memory, sessions or
-//! state, with Hermes's lasting folder read-only; it goes with the make.
+//! state; it goes with the make. lamp-update's namespace script hides
+//! Hermes's lasting home from a make (an empty read-only tmpfs over it,
+//! only the checkout shown again, read-only) and the rest of the work
+//! folder's `lamp` (only the make's folder shown, read-write), and leaves
+//! Hermes's folder and the work folder read-only.
 //!
 //! Its network ([`NET_SWITCH`], the owner's ask, 12 Nov): kept by default,
 //! as V1's agent had it. `LAMP_MAKE_AGENT_NET=held` exactly gives the
@@ -183,6 +187,22 @@ pub const HERMES_FOLDER: &str = ".hermes";
 /// variable's name only (`key_env`, [`crate::hermes_config::TOKEN_ENV`]),
 /// never a key, memory, sessions or state.
 pub const CONFIG_FILE: &str = "config.yaml";
+/// lamp-update's four Hermes settings (`lamp_update::hermes_install::CONFIG`,
+/// a test holds them equal), written into each make's fresh config too:
+/// no update checks of its own over the kept network, no language servers,
+/// and a `chat -q` run that ends with its turn, not up to 600 s later
+/// (which `within_ms` would cut, its answer lost as `run_failed`).
+pub const MAKE_CONFIG: [(&str, &str); 4] = [
+    ("updates.check", "false"),
+    ("plugins.auto_update_check_hours", "0"),
+    ("lsp.enabled", "false"),
+    ("terminal.oneshot_completion_wait_seconds", "0"),
+];
+/// The work folder the wrapper takes a make's home in
+/// (`lamp_update::hermes_install::MAKE_HOME_GLOB`'s, `make-*/home` in it):
+/// a make whose work folder is any other is refused [`NO_NAMESPACE`], as
+/// the wrapper would run it in Hermes's lasting home.
+pub const MAKE_WORK: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp";
 /// The variable naming the make's home to Hermes's wrapper
 /// (`lamp_update::hermes_install::HOME_ENV`).
 pub const HOME_ENV: &str = "LAMP_NS_HOME";
@@ -192,7 +212,7 @@ pub const NS: &str = "/usr/local/lib/lampos/hermes-ns";
 /// held equal to it by a test): its mark, checked before every make, held or not.
 pub const WRAPPER_HOME_LINE: &str = "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n";
 /// The namespace script's line for it (`lamp_update::hermes_install::NS_HOME_LINE`).
-pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then [ -d \"$LAMP_NS_HOME\" ] || fail \"no $LAMP_NS_HOME\"; ro \"$H\"; HOME=$LAMP_NS_HOME; fi\nunset LAMP_NS_HOME\n";
+pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" || fail \"no make staging\"\n  mount --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X\n";
 /// Said when Hermes's wrapper or namespace script has no make-home line.
 pub const NO_NAMESPACE: &str = "the lamp's Hermes can't be given a make's own home yet (its wrapper or namespace script has no make-home line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
@@ -252,10 +272,21 @@ fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
     file_in(&made.fd, RULES_FILE, rules)?;
     let home = folder_in(&made.fd, HOME_FOLDER)?;
     let hermes = folder_in(&home, HERMES_FOLDER)?;
-    let config = crate::hermes_config::merge_config("", crate::runtime::HERMES_FORWARDER_PORT)
-        .map_err(|_| std::io::Error::other("the provider config was not made"))?;
-    file_in(&hermes, CONFIG_FILE, &config)?;
+    file_in(&hermes, CONFIG_FILE, &make_config()?)?;
     Ok(made)
+}
+
+/// A make's fresh config: the lamp's provider ([`crate::hermes_config::merge_config`],
+/// its key a variable's name only) and [`MAKE_CONFIG`], each its own
+/// top-level block (the provider config has none of them).
+fn make_config() -> std::io::Result<String> {
+    let mut config = crate::hermes_config::merge_config("", crate::runtime::HERMES_FORWARDER_PORT)
+        .map_err(|_| std::io::Error::other("the provider config was not made"))?;
+    for (key, value) in MAKE_CONFIG {
+        let (block, name) = key.split_once('.').unwrap_or(("", key));
+        config.push_str(&format!("{block}:\n  {name}: {value}\n"));
+    }
+    Ok(config)
 }
 
 /// The answer the run wrote, read from the make's folder as it was made
@@ -389,6 +420,9 @@ pub fn held(value: Option<&str>) -> bool {
 /// the network lines too.
 pub struct MakeHermes {
     pub hermes: crate::skill_task::HermesRunner,
+    /// The work folder the wrapper takes a make's home in ([`MAKE_WORK`]);
+    /// the runner's own must be it.
+    pub make_work: PathBuf,
     /// Hermes's wrapper ([`crate::skill_task::HERMES`]).
     pub wrapper: PathBuf,
     /// Its namespace script ([`NS`]).
@@ -401,7 +435,9 @@ impl Runner for MakeHermes {
         let has = |path: &Path, line: &str| {
             std::fs::read_to_string(path).is_ok_and(|text| text.contains(line))
         };
-        if !(has(&self.wrapper, WRAPPER_HOME_LINE) && has(&self.ns, NS_HOME_LINE)) {
+        if self.hermes.folder != self.make_work
+            || !(has(&self.wrapper, WRAPPER_HOME_LINE) && has(&self.ns, NS_HOME_LINE))
+        {
             return Err(NO_NAMESPACE.into());
         }
         Ok(())
@@ -415,7 +451,8 @@ impl Runner for MakeHermes {
 
 /// The lamp's Hermes for a make ([`crate::skill_task::HermesRunner::lamp`]),
 /// started through its namespace wrapper either way (only its own folder,
-/// read-only for a make, its work folder and the skills, `control.sock`
+/// its lasting home hidden from a make but for the checkout, its work
+/// folder, all but the make's own read-only, and the skills, `control.sock`
 /// alone of lamp-control's and never `admin.sock`), with the make's own
 /// home. `held`: with [`crate::skill_task::NET_ENV`] `run`, refused when
 /// the wrapper can't hold it off. Not held: without it, so the wrapper
@@ -431,6 +468,7 @@ pub fn lamp_runner(home: &Path, held: bool) -> MakeHermes {
     }
     MakeHermes {
         hermes,
+        make_work: PathBuf::from(MAKE_WORK),
         wrapper: PathBuf::from(crate::skill_task::HERMES),
         ns: PathBuf::from(NS),
     }
@@ -757,6 +795,25 @@ mod tests {
             "{config}"
         );
         assert!(config.contains("127.0.0.1:7741"), "{config}");
+        // lamp-update's four settings, the same as its own.
+        for (key, value) in MAKE_CONFIG {
+            let (block, name) = key.split_once('.').unwrap();
+            assert!(
+                config.contains(&format!("\n{block}:\n  {name}: {value}\n")),
+                "{config}"
+            );
+        }
+        let source = include_str!("../../update/src/hermes_install.rs");
+        let theirs = source
+            .split("pub const CONFIG: [(&str, &str); 4] = [\n")
+            .nth(1)
+            .and_then(|rest| rest.split("];").next())
+            .unwrap();
+        let ours: String = MAKE_CONFIG
+            .iter()
+            .map(|(key, value)| format!("    ({key:?}, {value:?}),\n"))
+            .collect();
+        assert_eq!(theirs, ours);
         assert!(!config.contains("tok_"), "{config}");
         use std::os::unix::fs::MetadataExt;
         for (path, mode) in [
@@ -880,6 +937,7 @@ mod tests {
             runner.hermes.program = PathBuf::from("/bin/sh");
             runner.hermes.args = vec!["-c".into(), script.clone(), "sh".into()];
             runner.hermes.folder = work.clone();
+            runner.make_work = work.clone();
             runner.hermes.tick = Duration::from_millis(10);
             if held {
                 runner.hermes.held_by = Some(w.clone());
@@ -903,6 +961,20 @@ mod tests {
             assert_eq!(refused["error"], "no_namespace", "{refused}");
             assert!(!dir.path().join("env").exists(), "nothing started");
         }
+        // A work folder other than the one the wrapper takes a make's
+        // home in: the make would run in Hermes's lasting home.
+        let (w, n) = namespace(dir.path(), &marked, NS_HOME_LINE);
+        let mut elsewhere = lamp_runner(dir.path(), false);
+        elsewhere.hermes.folder = work.clone();
+        (elsewhere.wrapper, elsewhere.ns) = (w, n);
+        assert_eq!(elsewhere.ready(), Err(NO_NAMESPACE.to_owned()));
+        assert_eq!(
+            lamp_runner(Path::new("/var/lib/lampos-tasks"), false)
+                .hermes
+                .folder,
+            Path::new(MAKE_WORK)
+        );
+        assert!(WRAPPER_HOME_LINE.contains(&format!(";; {MAKE_WORK}/make-*/home)")));
         // Held: the network lines too.
         let unheld = format!("#!/bin/sh\n{WRAPPER_HOME_LINE}unset T\n");
         let refused = make(true, &unheld, NS_HOME_LINE);

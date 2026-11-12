@@ -4090,7 +4090,7 @@ the same code for both writers.
   `admin.sock`. Its terminal and tools work only inside that namespace,
   and no token is minted.
 - **Its network: `LAMP_MAKE_AGENT_NET`** (set in no unit; the owner's ask,
-  12 Nov, the first builder's ruling pending on Queue #6059). By default
+  12 Nov, the first builder's ruling, 12 Nov 19:14). By default
   the run keeps the network, as V1's agent did, and reaches the model at
   lamp-cloud's forwarder on `127.0.0.1:7741`, the one `model.sock` pipes
   to. Exactly `held` gives the strict run, `LAMP_NS_NET=run`: only `lo` and
@@ -4101,8 +4101,12 @@ the same code for both writers.
   gets a new, empty home of its own (`make-<run id>/home`, 0700) as `HOME`
   and `HERMES_HOME`, holding only the provider config (its key named by
   `LAMP_HERMES_TOKEN`, never a key), never Hermes's memory, sessions or
-  state, with Hermes's lasting folder read-only; it is removed with the
-  make however it ends. Held or not, lamp-tasks checks first that
+  state, and lamp-update's four Hermes settings (no update checks, no
+  language servers, a run that ends with its turn). Hermes's lasting home
+  (memories, sessions, state) is hidden from the make, but for its
+  checkout, read-only; Hermes's folder and the work folder are read-only
+  and the rest of the work folder's `lamp` hidden, the make's own folder
+  alone writable. It is removed with the make however it ends. Held or not, lamp-tasks checks first that
   Hermes's wrapper and namespace script carry the make-home lines; a lamp
   whose lamp-update round hasn't rewritten them is refused (`no_namespace`)
   and the make stays DeepSeek's.
