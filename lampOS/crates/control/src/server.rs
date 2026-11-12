@@ -1073,8 +1073,11 @@ pub fn is_local_peer(
         .is_some_and(|iface| on_link.holds_on(iface, peer.ip()))
 }
 
-pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared: Arc<Shared>) {
-    let ticking = shared.clone();
+/// The door's own clock, every [`LEASE_TICK`]: the journal's tick and the
+/// leases that lapsed, told. Started by [`serve`], or by `serve` with only
+/// the skills' runs (no door, `LAMP_SKILL_TASKS=on`), where a run's leases
+/// lapse the same way.
+pub fn keep_ticking(ticking: Arc<Shared>) {
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(LEASE_TICK);
         loop {
@@ -1088,6 +1091,10 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             ticking.tell(changes);
         }
     });
+}
+
+pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared: Arc<Shared>) {
+    keep_ticking(shared.clone());
     loop {
         let (stream, peer) = match listener.accept().await {
             Ok(accepted) => accepted,
