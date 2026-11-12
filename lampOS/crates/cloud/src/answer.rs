@@ -2308,6 +2308,7 @@ pub mod tests {
                 last: None,
                 harness: None,
                 round: None,
+                refused: None,
                 engines: Some(std::collections::BTreeMap::from([(
                     "hermes".to_owned(),
                     lamp_msgs::EngineInstall {
