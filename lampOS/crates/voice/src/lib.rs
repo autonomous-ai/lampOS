@@ -181,6 +181,7 @@ pub mod second_look;
 pub mod second_provider;
 pub mod seems_told;
 pub mod service_contacts;
+pub mod service_read_ids;
 pub mod service_records;
 pub mod services;
 pub mod services_told;
