@@ -2002,13 +2002,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `lamp-update.service`'s environment, read as `LAMP_HERMES_ON_LAMP` is:
    set, on only when `on` exactly; unset, on on a lamp installed as the
    product, off on any other lamp; no product unit sets it). OpenClaw is
-   the lamp's default engine under Harness (no memory floor: the owner,
-   #6226, every lamp has 6 GB; Harness's engine id `openclaw`), installed
-   beside Hermes in exactly Hermes's role and under the same rules: the
+   the lamp's second engine under Harness (no memory floor: the owner,
+   #6226, every lamp has 6 GB; Harness's engine id `openclaw`; #6226 made
+   it the default, #6498, the lead's decision, made Hermes the default
+   again), installed beside Hermes in exactly Hermes's role and under the
+   same rules: the
    same schedule (window, freeze while the voice is not quiet, stop on a
    lost privacy reading, the one-shot's bounds), the same user `lampos` in
    its own user and mount namespace, its DeepSeek through lamp-cloud's
-   forwarder, and the lamp's skills. Hermes stays installed and selectable
+   forwarder, and the lamp's skills. Hermes is the lamp's target while it
+   is installed, OpenClaw when it is not or when chosen
    (`LAMP_LAMP_ENGINE` in lamp-tasks, docs/tasks.md). The code is
    `crates/update/src/openclaw_install.rs`.
    - **What lamp-update puts in:** a Node 24 runtime in

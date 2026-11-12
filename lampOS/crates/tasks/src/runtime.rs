@@ -237,8 +237,8 @@ pub struct LampSide {
     pub home: PathBuf,
     pub machines: Arc<Mutex<SessionMachines>>,
     /// The lamp's engines switched on, the one [`LAMP_ENGINE`] chooses
-    /// first (#6226): the lamp's target has the first its look says is
-    /// installed ([`lamp_order`]).
+    /// first (#6226; Hermes unless set, #6498): the lamp's target has the
+    /// first its look says is installed ([`lamp_order`]).
     pub order: Vec<EngineKind>,
     /// What the Harness lane tells the targets (#6226): a Harness too old
     /// for OpenClaw.
@@ -251,9 +251,9 @@ pub struct LampSide {
 }
 
 impl LampSide {
-    /// Both engines on, OpenClaw first ([`LAMP_ENGINE`] unset).
+    /// Both engines on, Hermes first ([`LAMP_ENGINE`] unset, #6498).
     pub fn new(home: PathBuf) -> Self {
-        Self::with_order(home, vec![EngineKind::Openclaw, EngineKind::Hermes])
+        Self::with_order(home, vec![EngineKind::Hermes, EngineKind::Openclaw])
     }
 
     pub fn with_order(home: PathBuf, order: Vec<EngineKind>) -> Self {
@@ -318,13 +318,14 @@ pub fn openclaw_on_lamp(value: Option<&str>) -> bool {
 }
 
 /// Which engine the lamp's own target runs (#6226): `openclaw` or
-/// `hermes`; unset, or any other value, puts `openclaw` first. The other is
+/// `hermes`; unset, or any other value, puts `hermes` first. The other is
 /// used when the chosen one is switched off or not installed.
 ///
-/// OpenClaw first by default is the owner's decision (#6226): every lamp
-/// has 6 GB, so no memory floor is checked; OpenClaw is the lamp's target
-/// while it is installed and the Harness there runs it ([`lamp_order`]),
-/// else Hermes. `hermes` always puts Hermes first.
+/// Hermes first by default is the lead's decision (#6498, back from
+/// #6226's OpenClaw): Hermes is the lamp's target while it is installed,
+/// else OpenClaw, which stays installed beside it ([`lamp_order`]). No
+/// memory floor is checked (#6226: every lamp has 6 GB). `openclaw`
+/// always puts OpenClaw first.
 pub const LAMP_ENGINE: &str = "LAMP_LAMP_ENGINE";
 
 /// The lamp's engines in the order [`LAMP_ENGINE`]'s `chosen` gives, each
@@ -334,10 +335,10 @@ pub fn lamp_engines(
     openclaw: Option<&str>,
     chosen: Option<&str>,
 ) -> Vec<EngineKind> {
-    let order = if chosen == Some("hermes") {
-        [EngineKind::Hermes, EngineKind::Openclaw]
-    } else {
+    let order = if chosen == Some("openclaw") {
         [EngineKind::Openclaw, EngineKind::Hermes]
+    } else {
+        [EngineKind::Hermes, EngineKind::Openclaw]
     };
     order
         .into_iter()
@@ -5242,19 +5243,20 @@ mod tests {
         );
     }
 
-    /// #6226: the lamp's engines in order: OpenClaw first unless
-    /// `LAMP_LAMP_ENGINE=hermes`, each only with its switch on.
+    /// #6498 (#6226's order turned back): the lamp's engines in order:
+    /// Hermes first unless `LAMP_LAMP_ENGINE=openclaw`, each only with its
+    /// switch on.
     #[test]
-    fn the_lamps_engines_are_openclaw_first_unless_hermes_is_chosen() {
+    fn the_lamps_engines_are_hermes_first_unless_openclaw_is_chosen() {
         use EngineKind::{Hermes, Openclaw};
         let on = Some("on");
         for (hermes, openclaw, chosen, want) in [
-            (on, on, None, vec![Openclaw, Hermes]),
-            (on, on, Some("openclaw"), vec![Openclaw, Hermes]),
-            (on, on, Some("other"), vec![Openclaw, Hermes]),
+            (on, on, None, vec![Hermes, Openclaw]),
             (on, on, Some("hermes"), vec![Hermes, Openclaw]),
-            (on, None, None, vec![Hermes]),
-            (None, on, Some("hermes"), vec![Openclaw]),
+            (on, on, Some("other"), vec![Hermes, Openclaw]),
+            (on, on, Some("openclaw"), vec![Openclaw, Hermes]),
+            (None, on, None, vec![Openclaw]),
+            (on, None, Some("openclaw"), vec![Hermes]),
             (Some("off"), Some("ON"), None, vec![]),
         ] {
             assert_eq!(
@@ -5267,7 +5269,7 @@ mod tests {
         assert!(lamp_side(None, None, None, home()).is_none());
         assert!(lamp_side(None, on, None, None).is_none());
         assert_eq!(lamp_side(None, on, None, home()).unwrap().order, [Openclaw]);
-        assert_eq!(LampSide::new(PathBuf::new()).order, [Openclaw, Hermes]);
+        assert_eq!(LampSide::new(PathBuf::new()).order, [Hermes, Openclaw]);
     }
 
     /// #6226: a Harness too old for OpenClaw (before 0.6.11) leaves it
@@ -5276,7 +5278,7 @@ mod tests {
     fn an_old_harness_leaves_openclaw_out() {
         use EngineKind::{Hermes, Openclaw};
         let side = LampSide::new(PathBuf::new());
-        assert_eq!(lamp_order(&side), [Openclaw, Hermes]);
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw]);
         side.gateway.refused.store(true, Ordering::Release);
         assert_eq!(lamp_order(&side), [Hermes]);
         let only = LampSide::with_order(PathBuf::new(), vec![Openclaw]);

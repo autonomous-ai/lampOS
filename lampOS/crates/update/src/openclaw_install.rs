@@ -86,7 +86,8 @@ use std::{
 /// The switch, in lamp-update's own unit: `on` exactly.
 pub const SWITCH: &str = "LAMP_OPENCLAW_ON_LAMP";
 /// Whether a lamp installed as the product installs OpenClaw with
-/// [`SWITCH`] unset: on, the lamp's default engine under Harness (#6226),
+/// [`SWITCH`] unset: on, beside Hermes under Harness (#6226; Hermes the
+/// lamp's default engine, #6498),
 /// under the same schedule as Hermes; `off` turns it off. Any other lamp
 /// with it unset is off.
 pub const PRODUCT_DEFAULT: bool = true;

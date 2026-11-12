@@ -29,9 +29,9 @@ Environment=LAMP_HARNESS_HOLD_UPDATES=on
 # docs/tasks.md); lamp-update installs it in a quiet window, on by default on a product lamp. It needs
 # --engines-from-machines above: that look is how the lamp's own machine is seen to have Hermes.
 Environment=LAMP_HERMES_ON_LAMP=on
-# The same for the lamp's own OpenClaw (#6226), the lamp's engine by default (the owner's decision: every
-# lamp has 6 GB, no memory floor): with both installed the lamp's target is OpenClaw; LAMP_LAMP_ENGINE=hermes
-# picks Hermes, and either falls back to the other when it is not installed. Its Gateway runs always under
+# The same for the lamp's own OpenClaw (#6226; no memory floor, every lamp has 6 GB): with both installed the
+# lamp's target is Hermes, the default again (#6498, the lead's decision); LAMP_LAMP_ENGINE=openclaw picks
+# OpenClaw, and either falls back to the other when it is not installed. Its Gateway runs always under
 # lamp-update's unit; lamp-tasks only waits for it to answer before a launch.
 Environment=LAMP_OPENCLAW_ON_LAMP=on
 # --reply-named (#5535) types the work into the session the person names (lamp-voice.service's LAMP_TASKS_REPLY_NAMED),
