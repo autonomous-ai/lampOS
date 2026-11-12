@@ -56,6 +56,35 @@ pub struct Refusal {
     pub commit: String,
     pub why: String,
     pub at_unix_ms: u64,
+    /// Why, as a fixed name for the app ([`lamp_msgs::UpdateRefused::REASONS`]);
+    /// absent in an entry written before (#6266): [`Refusal::reason`] then reads
+    /// it from `why`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
+
+impl Refusal {
+    /// The refusal's fixed name for the app (#6266): the one kept, or for an
+    /// entry written before, read from its `why`: a part held still by a
+    /// passing local state (`judge::HELD`), switches cut short in a row, or
+    /// `other`.
+    pub fn reason(&self) -> &'static str {
+        let name = self.kind.as_deref().and_then(|kind| {
+            lamp_msgs::UpdateRefused::REASONS
+                .iter()
+                .find(|n| **n == kind)
+        });
+        if let Some(name) = name {
+            return name;
+        }
+        if self.why.contains(crate::judge::HELD) {
+            "held"
+        } else if self.why.ends_with(" times in a row") {
+            "cut_short"
+        } else {
+            "other"
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +132,14 @@ pub struct State {
 }
 
 impl State {
+    /// The owner's retry (#6266): the refusal of `sequence` dropped, so the next
+    /// round takes the build again. Whether there was one.
+    pub fn forget_refusal(&mut self, sequence: u64) -> bool {
+        let before = self.refused.len();
+        self.refused.retain(|refusal| refusal.sequence != sequence);
+        self.refused.len() != before
+    }
+
     pub fn refusal(&self, sequence: u64) -> Option<&Refusal> {
         self.refused
             .iter()
@@ -127,11 +164,17 @@ impl State {
     }
 
     pub fn refuse(&mut self, build: &Build, why: &str) {
+        self.refuse_as(build, why, None);
+    }
+
+    /// [`Self::refuse`] with the fixed name for the app ([`Refusal::reason`]).
+    pub fn refuse_as(&mut self, build: &Build, why: &str, kind: Option<&str>) {
         self.refused.push(Refusal {
             sequence: build.sequence,
             commit: build.commit.clone(),
             why: why.to_owned(),
             at_unix_ms: unix_ms(),
+            kind: kind.map(str::to_owned),
         });
         let extra = self.refused.len().saturating_sub(MOST_REFUSED);
         self.refused.drain(..extra);
@@ -817,6 +860,7 @@ mod tests {
                 commit: "d90cc8b8e".into(),
             }),
             refused: vec![Refusal {
+                kind: None,
                 sequence: 4573,
                 commit: "c902a95cf".into(),
                 why: "lamp-voice.service was not well within a minute".into(),

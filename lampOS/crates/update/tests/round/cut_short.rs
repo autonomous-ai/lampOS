@@ -76,6 +76,7 @@ fn three_cut_shorts_in_a_row_of_the_same_build_refuse_it() {
     assert_eq!(lamp.state()["cut_short"]["times"], 2);
     cut_and_recover(&mut lamp, 2);
     assert_eq!(refused(&lamp), vec![2]);
+    assert_eq!(lamp.state()["refused"][0]["kind"], "cut_short");
     let why = lamp.state()["refused"][0]["why"]
         .as_str()
         .unwrap()
@@ -149,6 +150,7 @@ fn a_part_not_well_after_a_cut_short_is_still_refused_at_once() {
         "{outcome:?}"
     );
     assert_eq!(refused(&lamp), vec![2]);
+    assert_eq!(lamp.state()["refused"][0]["kind"], "part_unwell");
     assert!(matches!(lamp.round(), Outcome::Refused(why) if why.contains("was put back")));
 }
 
@@ -279,4 +281,62 @@ fn a_cut_while_a_cut_short_is_put_back_is_still_only_counted() {
     );
     assert_eq!(refused(&lamp), Vec::<u64>::new());
     assert_eq!(lamp.round(), Outcome::Switched(2));
+}
+
+/// A refused build is said to the app by a fixed name, never its text, and the
+/// owner's retry drops the refusal so the next round takes the build (#6266);
+/// a retry of a build that is not refused changes nothing.
+#[test]
+fn a_refused_build_is_said_by_a_fixed_name_and_the_owners_retry_drops_it() {
+    let mut lamp = Lamp::new();
+    publish_voice(&mut lamp, 2);
+    cut_and_recover(&mut lamp, 2);
+    cut_and_recover(&mut lamp, 2);
+    cut_and_recover(&mut lamp, 2);
+    assert_eq!(refused(&lamp), vec![2]);
+    let said = |lamp: &Lamp| {
+        let state: lamp_update::records::State = serde_json::from_value(lamp.state()).unwrap();
+        lamp_update::status::refused(&state)
+    };
+    let refused_now = said(&lamp).expect("the blocked update is said");
+    assert_eq!(
+        (refused_now.sequence, refused_now.reason.as_str()),
+        (2, "cut_short")
+    );
+    assert!(refused_now.check());
+    // A round now refuses and says so, as before.
+    assert!(matches!(lamp.round(), Outcome::Refused(_)));
+    let records = lamp_update::records::Records::new(lamp.records());
+    let mut told = Vec::new();
+    // Not refused: a plain check, nothing dropped.
+    lamp_update::app_check::drop_refusals(&records, &[9], &mut |line| told.push(line.to_owned()));
+    assert_eq!(refused(&lamp), vec![2], "{told:?}");
+    assert!(
+        told.iter().any(|line| line.contains("not refused")),
+        "{told:?}"
+    );
+    // The owner's retry of build 2: dropped, nothing else.
+    lamp_update::app_check::drop_refusals(&records, &[2], &mut |line| told.push(line.to_owned()));
+    assert_eq!(refused(&lamp), Vec::<u64>::new());
+    assert!(said(&lamp).is_none());
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+}
+
+/// A refusal of a build the lamp already runs or is past blocks nothing and
+/// is not said.
+#[test]
+fn only_a_refusal_newer_than_the_running_build_is_said() {
+    let mut state = lamp_update::records::State::default();
+    let build = |sequence| lamp_update::records::Build {
+        sequence,
+        commit: format!("c{sequence}"),
+    };
+    state.installed = Some(build(5));
+    state.refuse_as(&build(3), "old", Some("other"));
+    assert!(lamp_update::status::refused(&state).is_none());
+    state.refuse_as(&build(6), "a part", Some("part_unwell"));
+    state.refuse_as(&build(7), "lamp-body held, nothing moves: unplug", None);
+    let said = lamp_update::status::refused(&state).unwrap();
+    // The newest, by its fixed name (read from the text for an entry with none).
+    assert_eq!((said.sequence, said.reason.as_str()), (7, "held"));
 }
