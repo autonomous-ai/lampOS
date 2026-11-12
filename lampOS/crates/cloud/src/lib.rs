@@ -32,6 +32,7 @@ pub mod services;
 pub mod settings;
 pub mod share;
 pub mod signed_out;
+pub mod skill_secrets;
 pub mod skills;
 pub mod unasked;
 pub mod update;

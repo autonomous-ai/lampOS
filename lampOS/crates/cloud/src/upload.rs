@@ -630,7 +630,7 @@ impl Uploads {
                 .unwrap_or_default(),
             ..Default::default()
         };
-        Ok(json!({
+        let mut told = json!({
             "upload_id": id,
             "added": "file",
             "uploaded": true,
@@ -642,7 +642,13 @@ impl Uploads {
             // An agent skill's grants, as lamp-voice read them from the
             // file (`LAMP_UPLOAD_TO_AGENT`); null for any other.
             "grants": kept["grants"],
-        }))
+        });
+        // The keys' names it needs, for the app to ask for in its page
+        // (`LAMP_SKILL_SECRETS`), only when lamp-voice says them.
+        if let Some(secrets) = kept.get("secrets").filter(|names| names.is_array()) {
+            told["secrets"] = secrets.clone();
+        }
+        Ok(told)
     }
 
     /// What became of the skill `kept`, asked of lamp-voice every
