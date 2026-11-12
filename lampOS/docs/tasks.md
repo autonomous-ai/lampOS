@@ -1843,19 +1843,20 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
     no permission modes and no model routing (OpenClaw picks its own
     model, from its settings below).
-  - **A lost first prompt** (#6499): the TUI's `--message` can be lost
-    while it pairs with the Gateway, and Harness neither retries nor says
-    so. After `new`, lamp-tasks reads `show`: asked (`ask` set), the task
-    is under way. Idle with no ask, it closes that empty harness and asks
-    `new` once more with the same words, within the same `launch_timeout`.
-    `harness reply` comes only if the second is lost too: it needs the
-    person's own `programs-reply` switch, so a product lamp gets
-    `reply_off` there. A second `new` that fails is uncertain,
-    `openclaw_new_again_failed`. Nothing starts a third time. The second
-    `new` comes only once the first is closed: a close refused or failed
-    is uncertain, `openclaw_not_closed`, with nothing more started, so the
-    task never runs twice. A first `new` that made its folder
-    (`--new <name>`) is asked again in that folder.
+  - **Idle with no ask counts as handed over** (#6499): after a `new`
+    that answered, lamp-tasks reads `show` until the harness is asked or
+    idle, within the same `launch_timeout`. Either way the task is
+    `Created`, as Harness answered it: on the lamp OpenClaw's `show` can
+    read idle with no `ask` seconds after a `new` whose `--message` it did
+    take. Idle with no ask writes one journal line and nothing else:
+    nothing is closed, `new` is not asked again, and nothing is typed in
+    with `harness reply`. A `show` that fails is uncertain, with its code.
+    The real loss, OpenClaw dropping `--message` while the TUI pairs with
+    a cold Gateway, is fixed in Harness 0.6.23
+    (autonomous-ai/openharness#4172: it starts OpenClaw without
+    `--message` and types the task once the pane is ready); a lamp gets it
+    with the Harness pin move (#5957). (#6504's close-and-start-again
+    stopgap is gone.)
   - **The voice** (`agent_tasks`, `task_news`): reads the lamp's target's
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
