@@ -66,5 +66,6 @@ test('a row hint is a string of at most 200 characters, describe() carries it, a
   assert.match(byId('camera_stream').hint, /host camera gives about 6 pictures a second; size changes nothing here/);
   assert.match(describe('real').controls.find((c) => c.id === 'camera_stream').hint, /fast stream gives about 21 to 25/);
   assert.equal(describe('real').controls.find((c) => c.id === 'volume').hint, byId('volume').hint, 'no hintReal: the same hint');
-  assert.deepEqual(Object.keys(byId('stop')).sort(), ['fields', 'group', 'id', 'label'], 'ops, shows, run and hintReal stay off the page');
+  assert.deepEqual(Object.keys(byId('stop')).sort(), ['fields', 'group', 'id', 'label'], 'ops, run and hintReal stay off the page');
+  for (const row of table.controls) for (const key of ['ops', 'run', 'hintReal']) assert.equal(key in row, false, `${row.id}.${key}`);
 });
