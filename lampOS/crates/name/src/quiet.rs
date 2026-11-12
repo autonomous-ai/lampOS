@@ -23,7 +23,12 @@
 //! no score of its own (0.0000 against 0.95 at 2 s, on a clip; on 52e6, the
 //! first "Lamp, …" after a restart with `heard=0`). With the silence before
 //! it, the first 80 ms of sound already gives a score. Silence, not a guess
-//! at the room: digital zeros never sound like the name.
+//! at the room: digital zeros never sound like the name. With no bar the
+//! models' state after it is worked out once, at load
+//! ([`Hearer::with_lead`]), and each start or forget copies it back
+//! ([`Models::lead`]): no model runs on the loop for it (#6462; heard at
+//! every forget, 1.95 s of zeros cost 0.3 to 0.7 s of lamp-4ace, and a
+//! lost block forgets). With a bar it is kept, and heard with the sound.
 use crate::hear::{Hearer, STEP, Score, WINDOW};
 use std::collections::VecDeque;
 
@@ -33,6 +38,12 @@ pub trait Models {
     fn hear(&mut self, samples: &[i16]) -> Result<Vec<Score>, String>;
     /// Start again, as if nothing had been heard.
     fn forget(&mut self);
+    /// Start again, as if `samples` of silence (under a window) had just
+    /// been heard: here by hearing them.
+    fn lead(&mut self, samples: usize) -> Result<(), String> {
+        self.forget();
+        self.hear(&vec![0; samples]).map(|_| ())
+    }
 }
 
 impl Models for Hearer {
@@ -42,6 +53,19 @@ impl Models for Hearer {
 
     fn forget(&mut self) {
         Hearer::forget(self)
+    }
+
+    /// The state after the silence, worked out once at load
+    /// ([`Hearer::with_lead`]), copied back: no model run (#6462). A
+    /// hearer without that lead hears it.
+    fn lead(&mut self, samples: usize) -> Result<(), String> {
+        if samples > 0 && self.led() == samples {
+            self.forget_to_lead();
+            Ok(())
+        } else {
+            self.forget();
+            self.hear(&vec![0; samples]).map(|_| ())
+        }
     }
 }
 
@@ -141,8 +165,9 @@ impl<M: Models> Quiet<M> {
     }
 
     /// [`LEAD`]'s silence, as heard: counted, kept to start the models
-    /// from with a bar, and given to the models at the next block without
-    /// one (so a start or a forget does no work of its own).
+    /// from with a bar, and without one the models are led
+    /// ([`Models::lead`]) at the next block (so a start or a forget does no
+    /// work of its own, and a hearer led at load none at all).
     fn lead(&mut self) {
         self.fed = LEAD;
         if self.bar.is_some() {
@@ -177,8 +202,9 @@ impl<M: Models> Quiet<M> {
     pub fn hear(&mut self, block: &[i16]) -> Result<Heard, String> {
         let Some(bar) = self.bar else {
             if self.lead_due {
-                // A window less a step: never a score of its own.
-                self.models.hear(&vec![0; LEAD])?;
+                // A window less a step: never a score of its own. A copy
+                // of the state after it, for a hearer led at load.
+                self.models.lead(LEAD)?;
                 self.lead_due = false;
             }
             self.fed += block.len();
@@ -284,11 +310,15 @@ mod tests {
     struct Sums {
         samples: Vec<i16>,
         worked: usize,
+        /// Leads taken as a copy, and the longest sound given to `hear`.
+        leads: usize,
+        longest_heard: usize,
     }
 
     impl Models for Sums {
         fn hear(&mut self, samples: &[i16]) -> Result<Vec<Score>, String> {
             let before = steps_by(self.samples.len());
+            self.longest_heard = self.longest_heard.max(samples.len());
             self.samples.extend(samples);
             let scores: Vec<Score> = (before..steps_by(self.samples.len()))
                 .map(|step| {
@@ -314,6 +344,14 @@ mod tests {
 
         fn forget(&mut self) {
             self.samples.clear();
+        }
+
+        /// As a hearer led at load: the state after the silence, never
+        /// heard again.
+        fn lead(&mut self, samples: usize) -> Result<(), String> {
+            self.leads += 1;
+            self.samples = vec![0; samples];
+            Ok(())
         }
     }
 
@@ -504,6 +542,37 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// #6462: with no bar a start and each forget lead the models once, at
+    /// the next block, and the silence is never heard on the loop: each
+    /// block gives the models only itself, and the scores are those of the
+    /// silence heard.
+    #[test]
+    fn a_forget_without_a_bar_leads_the_models_and_hears_no_silence() {
+        let blocks = room(&STRETCHES);
+        let mut led = Quiet::new(Sums::default(), None);
+        let mut scores = Vec::new();
+        for (at, (_, block)) in blocks.iter().enumerate() {
+            if at > 0 && at % 150 == 0 {
+                led.forget();
+                led.forget();
+            }
+            scores.extend(led.hear(block).unwrap().scores);
+        }
+        assert_eq!(led.models().leads, 1 + (blocks.len() - 1) / 150);
+        assert_eq!(led.models().longest_heard, 320);
+        // The same as hearing the silence at each start.
+        let mut heard = Vec::new();
+        let mut alone = Sums::default();
+        for (at, (_, block)) in blocks.iter().enumerate() {
+            if at % 150 == 0 {
+                alone.forget();
+                alone.hear(&vec![0; LEAD]).unwrap();
+            }
+            heard.extend(alone.hear(block).unwrap());
+        }
+        assert_eq!(scores, heard);
     }
 
     /// A block whose loudest sample is exactly at the bar is sound; one a

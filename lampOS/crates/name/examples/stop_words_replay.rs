@@ -144,7 +144,9 @@ fn bars_of(value: &str) -> Result<Vec<f32>> {
 
 fn run(args: Vec<String>) -> Result<()> {
     let options = options(&args)?;
-    let hearer = Hearer::load(&options.models)?.with_stop(&options.models)?;
+    let hearer = Hearer::load(&options.models)?
+        .with_stop(&options.models)?
+        .with_lead(LEAD)?;
     let mut quiet = Quiet::new(hearer, None);
     let mut scratch = Scratch::default();
     let mut all = Vec::new();
