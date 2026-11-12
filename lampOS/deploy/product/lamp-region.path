@@ -1,0 +1,13 @@
+# The region the backend places the lamp in (#6414) to its name and time servers (#6256,
+# lampOS/docs/install.md): each time lamp-cloud writes /var/lib/lampos-cloud/region (written
+# whole and renamed into place, only on a change), lamp-region.service runs once. It runs at
+# boot too, of its own, so a lamp whose region was kept before this unit came still gets it.
+[Unit]
+Description=lampOS: the lamp's region to its name and time servers
+
+[Path]
+PathChanged=/var/lib/lampos-cloud/region
+Unit=lamp-region.service
+
+[Install]
+WantedBy=multi-user.target

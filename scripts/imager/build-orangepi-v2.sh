@@ -166,12 +166,12 @@ net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
 SYSCTL
 
-# resolvconf fallback DNS, so /etc/resolv.conf is never empty in AP mode, appended after the
-# router's (#6256): AliDNS and DNSPod answer in China and elsewhere. The same line lamp-update
-# install writes (NAME_SERVERS in lampOS/crates/update/src/install.rs); a test holds them equal.
-touch /etc/resolvconf.conf
-sed -i '/^[[:space:]]*name_servers/d' /etc/resolvconf.conf
-echo 'name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8"' >> /etc/resolvconf.conf
+# resolvconf fallback DNS, so /etc/resolv.conf is never empty in AP mode.
+if [ -f /etc/resolvconf.conf ]; then
+  grep -q '^name_servers=' /etc/resolvconf.conf || echo 'name_servers="1.1.1.1 8.8.8.8"' >> /etc/resolvconf.conf
+else
+  echo 'name_servers="1.1.1.1 8.8.8.8"' > /etc/resolvconf.conf
+fi
 
 # nginx: installed for setup's free_port, never enabled, and with no site, so a restart by
 # device-ap-mode holds no port.
