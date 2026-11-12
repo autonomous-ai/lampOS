@@ -289,7 +289,9 @@ pub const INSTALL_PATH: &str = "/usr/bin:/bin";
 /// shares `lampos`'s uid with lamp-cloud, so with the lamp's `/proc` it
 /// could open lamp-cloud's `/proc/<pid>/root` (its own mount view, the
 /// credentials there), `environ` and `fd`; in its own PID namespace no
-/// lamp process is there. Nothing else of the caller's changes.
+/// lamp process is there. Nothing else of the caller's changes, but
+/// `HERMES_YOLO_MODE` is unset: Hermes asks its approvals (#6684); with
+/// [`TASKS_SWITCH`] on, [`RUN_LINES`] decide it instead.
 pub const WRAPPER_TEXT: &str = r#"#!/bin/sh
 # lampOS: Hermes on the lamp (#5978; lampOS/docs/install.md, "Hermes on the lamp"). Written by lamp-update.
 # Hermes runs as its caller (lampos, Harness's user), in a user, mount and PID namespace with its own /proc, where it
@@ -301,7 +303,7 @@ T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
 }
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
 export LAMP_HERMES_TOKEN="$T" HERMES_HOME=/var/lib/lampos-hermes/.hermes LAMP_NS_UID LAMP_NS_GID
-unset T
+unset T HERMES_YOLO_MODE
 exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/hermes-ns "$@"
 "#;
 
@@ -383,7 +385,7 @@ const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
         ),
     ),
     (
-        "unset T\nexec /usr/bin/unshare --map-root-user --mount ",
+        "unset T HERMES_YOLO_MODE\nexec /usr/bin/unshare --map-root-user --mount ",
         "unset T\n\
          if [ \"${LAMP_NS_NET-}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n\
          exec /usr/bin/unshare --map-root-user $N --mount ",

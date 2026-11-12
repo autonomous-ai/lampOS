@@ -1839,7 +1839,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      none. The token goes on in the environment only, never an argument,
      with lamp-control's socket and the SDK's `PYTHONPATH`, as
      `HermesRunner` gives them. Any other folder: these lines change
-     nothing. Inside the namespace `/run` is a fresh empty tmpfs, so no
+     nothing. `HERMES_YOLO_MODE` is unset for every start and set to 1
+     only in a run (#6684): nobody is there to answer Hermes's approval
+     prompt, and its hardline list still holds. With the switch off, the
+     wrapper has no run lines, and its own `unset T HERMES_YOLO_MODE`
+     drops the variable for every start. Inside the namespace `/run` is a fresh empty tmpfs, so no
      namespaced session can read another run's token file; a process
      outside a namespace running as `lampos` still could (a known limit).
      Then:
