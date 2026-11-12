@@ -1094,13 +1094,12 @@ mod tests {
                 },
             )
             .unwrap();
+        // Waits on the published phase. The bound only stops a hang: the
+        // worker is a real thread on a 50 ms period, and a loaded CI runner
+        // can starve it for longer than the 2 s this once allowed.
         let until = |want: Phase| {
             let began = std::time::Instant::now();
             loop {
-                assert!(
-                    began.elapsed() < Duration::from_secs(2),
-                    "no {want:?} in 2 s"
-                );
                 if let Some(message) = bus.latest(STATE_TOPIC).unwrap() {
                     let state = message.parse::<State>().unwrap();
                     assert_eq!(state.request, "live-1");
@@ -1109,6 +1108,10 @@ mod tests {
                     }
                     assert_ne!(state.phase, Phase::Failed, "{}", state.why);
                 }
+                assert!(
+                    began.elapsed() < Duration::from_secs(20),
+                    "no {want:?} in 20 s"
+                );
                 thread::sleep(Duration::from_millis(1));
             }
         };
@@ -1132,11 +1135,15 @@ mod tests {
         let stopped = until(Phase::Failed);
         assert!(stopped.why.contains("body stopped"), "{}", stopped.why);
         assert!(adapter.latched());
+        // The worker has published Failed on its stopping tick and broke out
+        // of its loop, so the join only waits for the thread to be
+        // scheduled; the bound catches a worker that never ends, not a slow
+        // runner.
         let began = std::time::Instant::now();
         drop(adapter);
         assert!(
-            began.elapsed() < Duration::from_secs(2),
-            "worker join took 2 s"
+            began.elapsed() < Duration::from_secs(20),
+            "worker join took 20 s"
         );
         std::fs::remove_dir_all(&root).unwrap();
         assert!(!root.exists());
