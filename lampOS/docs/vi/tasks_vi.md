@@ -322,6 +322,14 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     for run <run-id>"). lamp-tasks không giữ gì lần chạy in ra; bản ghi
     phiên của Harness và phiên của Hermes trong `HERMES_HOME` như với mọi
     phiên Harness.
+  - **Khi lamp-tasks dừng** (SIGTERM: khởi động lại, cập nhật), lần chạy
+    đang được chờ cũng kết thúc theo cùng cách, vì daemon của Harness, không
+    phải lamp-tasks, giữ Hermes của nó và nó sẽ chạy tiếp sau lamp-tasks:
+    lệnh dừng huỷ lần chờ, token bị kết thúc, rồi `close --now`, rồi thư
+    mục và file token bị xoá ("the run was ended as lamp-tasks stops").
+    lamp-tasks chờ việc này tối đa 20 giây (`skill_task::STOP_WAIT`) rồi
+    mới thoát. SIGKILL bỏ qua bước này; đó là phần dự phòng bên dưới. Test:
+    `a_skill_run_is_ended_when_lamp_tasks_stops`.
   - **Chưa có SIGKILL dự phòng.** Phần dự phòng trong thiết kế, SIGKILL
     tới pid `unshare` của namespace khi `close --now` lỗi, chưa được xây:
     daemon của Harness khởi động Hermes trong pane riêng, và cả `new` lẫn
