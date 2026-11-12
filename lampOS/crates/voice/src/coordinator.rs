@@ -12869,7 +12869,11 @@ fn conversation_with_gate_inner(
             // the second route's alone: there the turn is asked with no
             // functions (#2530 part 2). The Live
             // session's functions are declared once, so it never takes one.
-            if let Some(why) = quoted_refused(quoted, &rig.provider.role) {
+            // A skill's task's ask said unasked (#6071's V2) likewise: only
+            // the second route takes its yes.
+            if let Some(why) = quoted_refused(quoted, &rig.provider.role)
+                .or_else(|| crate::skill_task_yes::route_refuses(&turn, &rig.provider.role))
+            {
                 eprintln!(
                     "lamp-voice: the skill {}'s quoted say is refused: {why}",
                     ticket.skill()
