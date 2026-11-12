@@ -170,6 +170,11 @@ pub(crate) fn set_writes_here(on: Option<bool>) {
 ///   for a skill that says something or hums ([`mannered_with`]);
 /// - a say's cooldown is at least [`LEAST_LOOSE_SAY_COOLDOWN_SECS`], not an
 ///   hour;
+/// - a skill that neither speaks nor hums has a cooldown of at least a
+///   minute, never raised to an hour ([`LEAST_LOOSE_COOLDOWN_SECS`]), and a
+///   repeat the request asks for ("every five minutes while ...",
+///   [`repeat_asked`]) runs while its trigger holds: no `rearm`, its
+///   cooldown the asked interval ([`say_paced_with`]);
 /// - a step [`plainly`] can't say is said in general words, never a send,
 ///   the camera or the microphone ([`named_exactly`]).
 ///
@@ -202,6 +207,12 @@ pub fn set_loose_here(on: Option<bool>) {
 /// The least cooldown of a made skill that speaks with [`LOOSE_ENVIRONMENT`]
 /// on: a minute, as often as the person asked, never every moment.
 pub const LEAST_LOOSE_SAY_COOLDOWN_SECS: u64 = 60;
+
+/// The least cooldown of a made skill that neither speaks nor hums with
+/// [`LOOSE_ENVIRONMENT`] on, and of a repeat it asked for: a minute, as a
+/// getting up's ([`LEAST_STOOD_UP_COOLDOWN_SECS`]); never the hour the
+/// making model copies from its example ([`say_paced_with`]).
+pub const LEAST_LOOSE_COOLDOWN_SECS: u64 = LEAST_STOOD_UP_COOLDOWN_SECS;
 
 /// The least cooldown of a made skill that speaks, as [`loose_on`] has it.
 fn least_say_cooldown_secs() -> u64 {
@@ -1526,7 +1537,94 @@ pub fn paced_asked(text: &str, asked: &[(u32, u32)]) -> String {
 /// words ([`limits_asked`]), which [`mannered_with`] reads with
 /// [`LOOSE_ENVIRONMENT`] on.
 pub fn paced_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
-    mannered_with(&say_paced(&topic_granted(&tidied(text))), asked, limits)
+    paced_for(text, asked, limits, None)
+}
+
+/// [`paced_with`], with the repeat the request asked for, in seconds
+/// ([`repeat_asked`]): with [`LOOSE_ENVIRONMENT`] on, a skill asked to
+/// repeat "every five minutes while I am at my desk" runs again while its
+/// trigger holds, its `rearm` taken out and its `cooldown` the asked
+/// interval, a minute at least ([`say_paced_with`]).
+pub fn paced_for(text: &str, asked: &[(u32, u32)], limits: bool, repeat: Option<u64>) -> String {
+    mannered_with(
+        &say_paced_with(&topic_granted(&tidied(text)), limits, repeat),
+        asked,
+        limits,
+    )
+}
+
+/// The interval a request asks a skill to repeat at, in seconds, in the
+/// person's own words: "every five minutes", "every 2 hours", "every
+/// minute", "every half hour", "mỗi 10 phút". `None` when it asks for no
+/// repeat ("every time I sit down", "every day at 22:00"). Read with
+/// [`LOOSE_ENVIRONMENT`] on alone ([`say_paced_with`]).
+pub fn repeat_asked(request: &str) -> Option<u64> {
+    const WORDS: [(&str, u64); 21] = [
+        ("a", 1),
+        ("an", 1),
+        ("one", 1),
+        ("two", 2),
+        ("three", 3),
+        ("four", 4),
+        ("five", 5),
+        ("six", 6),
+        ("seven", 7),
+        ("eight", 8),
+        ("nine", 9),
+        ("ten", 10),
+        ("eleven", 11),
+        ("twelve", 12),
+        ("fifteen", 15),
+        ("twenty", 20),
+        ("thirty", 30),
+        ("forty", 40),
+        ("forty-five", 45),
+        ("fifty", 50),
+        ("sixty", 60),
+    ];
+    let unit = |word: &str| -> Option<u64> {
+        match word {
+            "second" | "seconds" | "sec" | "secs" | "giây" => Some(1),
+            "minute" | "minutes" | "min" | "mins" | "phút" => Some(60),
+            "hour" | "hours" | "hr" | "hrs" | "giờ" | "tiếng" => Some(3_600),
+            _ => None,
+        }
+    };
+    let count = |word: &str| -> Option<u64> {
+        word.parse::<u64>()
+            .ok()
+            .filter(|count| *count > 0)
+            .or_else(|| {
+                WORDS
+                    .iter()
+                    .find(|(name, _)| *name == word)
+                    .map(|(_, count)| *count)
+            })
+    };
+    let lower = request.to_lowercase();
+    let words: Vec<&str> = lower
+        .split(|c: char| c.is_whitespace() || (c.is_ascii_punctuation() && c != '-'))
+        .filter(|word| !word.is_empty())
+        .collect();
+    words.iter().enumerate().find_map(|(at, word)| {
+        if !matches!(*word, "every" | "mỗi" | "cứ") {
+            return None;
+        }
+        let next = |by: usize| words.get(at + by).copied().unwrap_or_default();
+        // "every minute", "mỗi tiếng".
+        if let Some(unit) = unit(next(1)) {
+            return Some(unit);
+        }
+        // "every half hour", "every half an hour".
+        if next(1) == "half" {
+            return [next(2), next(3)]
+                .into_iter()
+                .any(|word| unit(word) == Some(3_600))
+                .then_some(1_800);
+        }
+        // "every five minutes", "every 10 min", "mỗi 10 phút".
+        count(next(1))?.checked_mul(unit(next(2))?)
+    })
 }
 
 /// Whether a request asks, in its own words, for a limit on how often a
@@ -1535,7 +1633,7 @@ pub fn paced_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
 /// then are the lamp's manners set ([`mannered_with`]).
 pub fn limits_asked(request: &str) -> bool {
     let request = format!(" {} ", request.to_lowercase());
-    const LIMITS: [&str; 18] = [
+    const LIMITS: [&str; 19] = [
         "at most",
         "no more than",
         "not more than",
@@ -1554,6 +1652,7 @@ pub fn limits_asked(request: &str) -> bool {
         "not too often",
         "don't bother me",
         "rest if",
+        "once an hour",
     ];
     LIMITS.iter().any(|limit| request.contains(limit))
 }
@@ -2455,7 +2554,40 @@ pub fn asked_windows(request: &str) -> Vec<(u32, u32)> {
 }
 
 /// [`paced`]'s limits on speaking (#6062).
+#[cfg(test)]
 fn say_paced(text: &str) -> String {
+    say_paced_with(text, false, None)
+}
+
+/// A cooldown of `secs` as a skill writes it: `"2h"`, `"5m"`, `"90s"`.
+fn cooldown_line(secs: u64) -> String {
+    if secs.is_multiple_of(3_600) {
+        format!("cooldown = \"{}h\"", secs / 3_600)
+    } else if secs.is_multiple_of(60) {
+        format!("cooldown = \"{}m\"", secs / 60)
+    } else {
+        format!("cooldown = \"{secs}s\"")
+    }
+}
+
+/// [`say_paced`], with whether the request asked for limits
+/// ([`limits_asked`]) and the repeat it asked for ([`repeat_asked`]), both
+/// read with [`LOOSE_ENVIRONMENT`] on alone. On (the first builder's ruling
+/// on the lamp-9adf makes of 12 Nov 15:13-15:16):
+///
+/// - a skill that neither speaks nor hums has a cooldown of at least a
+///   minute ([`LEAST_LOOSE_COOLDOWN_SECS`]); a longer one the request
+///   didn't ask for (the making model copies its example's `"1h"`) is set
+///   to a minute when the trigger runs once each time it holds (`rearm`,
+///   `when = "appears"`, a face, a getting up); the air keeps its hour and
+///   a time of day runs once at its minute, so neither is changed;
+/// - a repeat asked ("every five minutes while I am at my desk") runs
+///   while its trigger holds: its `rearm` is taken out and its `cooldown`
+///   is the asked interval, a minute at least (the air's an hour); never
+///   on a time of day or a face coming into view, which run once each time.
+///
+/// Its `[rest]` stays either way ([`mannered_with`]).
+fn say_paced_with(text: &str, limits: bool, repeat: Option<u64>) -> String {
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
     };
@@ -2464,11 +2596,16 @@ fn say_paced(text: &str) -> String {
     };
     let topic = trigger.get("topic").and_then(|topic| topic.as_str());
     let says = says_aloud(&table);
+    let loose = loose_on();
     let mut set: Vec<(&str, String)> = Vec::new();
+    let mut taken: Vec<&str> = Vec::new();
+    let repeat =
+        repeat.filter(|_| loose && ![Some(CLOCK_TOPIC), Some(FACES_TOPIC)].contains(&topic));
     // The air keeps its hour whatever it does: its level hovers about its
     // line. A say elsewhere, with [`LOOSE_ENVIRONMENT`] on, as often as
-    // asked, at most once a minute.
-    let least = if says && loose_on() && topic != Some(AIR_TOPIC) {
+    // asked, at most once a minute; and so anything else on, but a time of
+    // day, which runs once at its minute.
+    let least = if says && loose && topic != Some(AIR_TOPIC) {
         Some((LEAST_LOOSE_SAY_COOLDOWN_SECS, "1m"))
     } else if says {
         Some((LEAST_SAY_COOLDOWN_SECS, "1h"))
@@ -2476,13 +2613,41 @@ fn say_paced(text: &str) -> String {
         Some((LEAST_AIR_COOLDOWN_SECS, "1h"))
     } else if topic == Some(STOOD_UP_TOPIC) {
         Some((LEAST_STOOD_UP_COOLDOWN_SECS, "1m"))
+    } else if loose && topic != Some(CLOCK_TOPIC) {
+        Some((LEAST_LOOSE_COOLDOWN_SECS, "1m"))
     } else {
         None
     };
-    if let Some((least, line)) = least
+    // Once each time its trigger holds: a longer cooldown only spaces runs
+    // the person asked for each time.
+    let once = trigger.contains_key("rearm")
+        || trigger.get("when").and_then(toml::Value::as_str) == Some("appears")
+        || [Some(FACES_TOPIC), Some(STOOD_UP_TOPIC)].contains(&topic);
+    if let Some(every) = repeat {
+        let least = if topic == Some(AIR_TOPIC) {
+            LEAST_AIR_COOLDOWN_SECS
+        } else {
+            LEAST_LOOSE_COOLDOWN_SECS
+        };
+        let every = every.max(least);
+        if cooldown_secs(trigger) != Some(every) {
+            set.push(("cooldown", cooldown_line(every)));
+        }
+        if trigger.contains_key("rearm") {
+            taken.push("rearm");
+        }
+    } else if let Some((least, line)) = least
         && cooldown_secs(trigger).is_none_or(|secs| secs < least)
     {
         set.push(("cooldown", format!("cooldown = \"{line}\"")));
+    } else if loose
+        && !limits
+        && !says
+        && once
+        && ![Some(AIR_TOPIC), Some(CLOCK_TOPIC)].contains(&topic)
+        && cooldown_secs(trigger).is_some_and(|secs| secs > LEAST_LOOSE_COOLDOWN_SECS)
+    {
+        set.push(("cooldown", cooldown_line(LEAST_LOOSE_COOLDOWN_SECS)));
     }
     // A face coming into view: a frame without one and the face again is
     // still the one there, never a new arrival (#6070, CLAUDE.md rule 8).
@@ -2515,18 +2680,28 @@ fn say_paced(text: &str) -> String {
             set.push(("during", line));
         }
     }
-    if set.is_empty() {
+    if set.is_empty() && taken.is_empty() {
         return text.to_owned();
     }
     let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();
     let Some(head) = lines.iter().position(|line| line.trim() == "[trigger]") else {
         return text.to_owned();
     };
-    let end = lines[head + 1..]
-        .iter()
-        .position(|line| line.trim_start().starts_with('['))
-        .map_or(lines.len(), |at| head + 1 + at);
+    let end_of = |lines: &[String]| {
+        lines[head + 1..]
+            .iter()
+            .position(|line| line.trim_start().starts_with('['))
+            .map_or(lines.len(), |at| head + 1 + at)
+    };
     let key_of = |line: &str| line.split_once('=').map(|(key, _)| key.trim().to_owned());
+    // A key taken out (a repeat's `rearm`), its one line, before any is set.
+    for key in taken {
+        let end = end_of(&lines);
+        if let Some(at) = (head + 1..end).find(|&at| key_of(&lines[at]).as_deref() == Some(key)) {
+            lines.remove(at);
+        }
+    }
+    let end = end_of(&lines);
     for (key, line) in set.into_iter().rev() {
         match (head + 1..end).find(|&at| key_of(&lines[at]).as_deref() == Some(key)) {
             Some(at) => lines[at] = line,
@@ -5688,7 +5863,10 @@ pub fn keep_asked(
     let blinked = blink_gapped(&files.toml);
     // A say's pace set, never refused (#6062): the text checked, said and
     // packed is the paced one.
-    files.toml = paced_with(&files.toml, asked, limits_asked(request.request));
+    // A repeat in the request's words, or the heard line's (read with
+    // [`LOOSE_ENVIRONMENT`] on alone).
+    let repeat = repeat_asked(request.request).or_else(|| request.heard.and_then(repeat_asked));
+    files.toml = paced_for(&files.toml, asked, limits_asked(request.request), repeat);
     let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
     // A blink's gap, which [`tidied`] takes out: the blinking said as left
     // out, with whatever else the model left out.
@@ -12137,6 +12315,207 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         );
         // A skill added from a file keeps its own cap.
         assert!(capped_added(&five).is_err());
+    }
+
+    /// A made skill's `skill.toml` as the lamp's own model wrote the three
+    /// makes on lamp-9adf, 12 Nov 15:13-15:16 (loosened): on someone at the
+    /// desk, with `trigger`'s own lines, `permissions` and `steps`, and the
+    /// `[rest]` (and `[quiet]`) it carried.
+    fn desk_made(permissions: &str, trigger: &str, steps: &str, manners: &str) -> String {
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n{permissions}\
+             topics = [\"room/presence\"]\n\n[trigger]\ntopic = \"room/presence\"\n\
+             field = \"someone\"\nequals = true\n{trigger}\n[ask]\npolicy = \"nudge\"\n\n\
+             {steps}{manners}[rest]\nafter_ignored = 2\n"
+        )
+    }
+
+    /// [`paced_for`] as [`keep_asked`] calls it for `request`, as a table.
+    fn paced_request(text: &str, request: &str) -> (String, toml::Table) {
+        let paced = paced_for(
+            text,
+            &asked_windows(request),
+            limits_asked(request),
+            repeat_asked(request),
+        );
+        let table = toml::from_str::<toml::Table>(&paced).unwrap();
+        (paced, table)
+    }
+
+    /// A repeat in the request's own words, in seconds; none for "every
+    /// time" or "every day".
+    #[test]
+    fn a_repeat_is_read_from_the_requests_words() {
+        let asked = [
+            (
+                "every five minutes while I am at my desk, say drink some water",
+                Some(300),
+            ),
+            ("glow every 10 min while I sit here", Some(600)),
+            ("every minute while I'm here, nod", Some(60)),
+            ("every hour while I work, say stretch", Some(3_600)),
+            ("every two hours, say drink", Some(7_200)),
+            ("every half an hour, glow blue", Some(1_800)),
+            ("every half hour, glow blue", Some(1_800)),
+            ("every 30 seconds, nod", Some(30)),
+            ("mỗi 10 phút khi tôi ngồi đây, nhắc uống nước", Some(600)),
+            (
+                "when I come back to my desk, blink the light green twice",
+                None,
+            ),
+            ("every time I sit down, nod", None),
+            ("every day at 22:00, dim the light", None),
+            ("when I sit down, nod at me and then do a backflip", None),
+        ];
+        for (request, secs) in asked {
+            assert_eq!(repeat_asked(request), secs, "{request}");
+        }
+    }
+
+    /// Case 1 of the lamp-9adf makes (12 Nov 15:13): "when I come back to
+    /// my desk, blink the light green twice", written with the example's
+    /// `cooldown = "1h"`. Loosened, a skill that neither speaks nor hums is
+    /// never held to the hour: a minute, its `rearm` and `[rest]` kept, no
+    /// `[quiet]`. Off, as before.
+    #[test]
+    fn loosened_a_silent_made_skill_is_never_held_to_an_hour() {
+        let request = "when I come back to my desk, blink the light green twice";
+        let blink = desk_made(
+            "light = true\n",
+            "cooldown = \"1h\"\nrearm = \"ends\"\n",
+            "[[do]]\nlight = { colour = \"green\", level = 3, for = \"5s\", pattern = { kind = \
+             \"pulse\" } }\n\n",
+            "",
+        );
+        {
+            let _off = LooseHere::set(false);
+            let (paced, table) = paced_request(&blink, request);
+            assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1h"), "{paced}");
+            assert_eq!(table["trigger"]["rearm"].as_str(), Some("ends"));
+            assert!(
+                ["most_a_day", "budget", "rest", "quiet"]
+                    .iter()
+                    .all(|part| table.contains_key(*part))
+            );
+            assert_eq!(paced, paced_with(&blink, &[], false));
+        }
+        let _on = LooseHere::set(true);
+        let (paced, table) = paced_request(&blink, request);
+        assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1m"), "{paced}");
+        assert_eq!(table["trigger"]["rearm"].as_str(), Some("ends"));
+        assert_eq!(table["rest"]["after_ignored"].as_integer(), Some(2));
+        assert!(
+            !["most_a_day", "budget", "quiet"]
+                .iter()
+                .any(|part| table.contains_key(*part)),
+            "{paced}"
+        );
+        assert!(capped(&paced).is_ok(), "{paced}");
+        let said = said_mannered(&paced, &[]).unwrap();
+        assert!(said.contains("at most once a minute"), "{said}");
+        // One with none, or a shorter one, has a minute; the person's own
+        // limit ("once an hour") is kept.
+        for cooldown in ["", "cooldown = \"20s\"\n"] {
+            let text = blink.replace("cooldown = \"1h\"\n", cooldown);
+            let (paced, table) = paced_request(&text, request);
+            assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1m"), "{paced}");
+        }
+        let (_, table) = paced_request(&blink, &format!("{request}, once an hour"));
+        assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1h"));
+        // A trigger that runs again while it holds keeps the cooldown it
+        // wrote: lowered, it would run each minute someone stays.
+        let held = blink.replace("rearm = \"ends\"\n", "");
+        let (_, table) = paced_request(&held, request);
+        assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1h"));
+    }
+
+    /// Case 2 (12 Nov 15:14): "every five minutes while I am at my desk,
+    /// say drink some water", written with `rearm = "ends"`, which says it
+    /// once a stay. Loosened, the repeat asked runs while the trigger holds:
+    /// no `rearm`, its cooldown the asked five minutes; its `[quiet]` (it
+    /// speaks) and `[rest]` kept. Off, as before.
+    #[test]
+    fn loosened_an_asked_repeat_runs_while_its_trigger_holds() {
+        let request = "every five minutes while I am at my desk, say drink some water";
+        let water = |cooldown: &str| {
+            desk_made(
+                "speak = true\n",
+                &format!("for = \"5m\"\ncooldown = \"{cooldown}\"\nrearm = \"ends\"\n"),
+                "[[do]]\nsay = { text = \"Drink some water.\" }\n\n",
+                "[quiet]\nfrom = \"22:00\"\nto = \"08:00\"\n\n",
+            )
+        };
+        {
+            let _off = LooseHere::set(false);
+            let (paced, table) = paced_request(&water("5m"), request);
+            assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1h"), "{paced}");
+            assert_eq!(table["trigger"]["rearm"].as_str(), Some("ends"));
+            assert_eq!(paced, paced_with(&water("5m"), &[], false));
+        }
+        let _on = LooseHere::set(true);
+        for written in ["5m", "1h", "1m"] {
+            let (paced, table) = paced_request(&water(written), request);
+            let trigger = table["trigger"].as_table().unwrap();
+            assert_eq!(trigger["cooldown"].as_str(), Some("5m"), "{paced}");
+            assert_eq!(trigger["for"].as_str(), Some("5m"));
+            assert!(!trigger.contains_key("rearm"), "{paced}");
+            assert_eq!(table["rest"]["after_ignored"].as_integer(), Some(2));
+            assert_eq!(table["quiet"]["from"].as_str(), Some("22:00"));
+            assert!(capped(&paced).is_ok(), "{paced}");
+            let said = said_mannered(&paced, &[]).unwrap();
+            assert!(said.contains("at most once every 5 minutes"), "{said}");
+        }
+        // A repeat of less than a minute is a minute apart.
+        let (paced, table) =
+            paced_request(&water("1m"), "every 30 seconds while I am here, say hi");
+        assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1m"), "{paced}");
+        // Never on a time of day, which runs once at its minute.
+        let clock = made_with(
+            "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+             during = { from = \"22:00\", to = \"22:01\" }\n",
+            "light = { dim = 1 }",
+        );
+        let (paced, table) = paced_request(&clock, "every five minutes at 22:00, dim the light");
+        assert_eq!(table["trigger"]["rearm"].as_str(), Some("ends"), "{paced}");
+    }
+
+    /// Case 3 (12 Nov 15:16): "when I sit down, nod at me and then do a
+    /// backflip", written with `cooldown = "1m"` and `rearm = "ends"`.
+    /// Loosened, it is kept as written, its `[rest]` too; one written with
+    /// the hour is a minute. Off, as before.
+    #[test]
+    fn loosened_a_moving_made_skill_keeps_its_minute_and_rest() {
+        let request = "when I sit down, nod at me and then do a backflip";
+        let nod = |cooldown: &str| {
+            desk_made(
+                "body = true\n",
+                &format!("cooldown = \"{cooldown}\"\nrearm = \"ends\"\n"),
+                "[[do]]\nbody = { gesture = \"nod\" }\n\n[[do]]\nbody = { gesture = \
+                 \"greeting\" }\n\n",
+                "",
+            )
+        };
+        {
+            let _off = LooseHere::set(false);
+            for written in ["1m", "1h"] {
+                let (paced, table) = paced_request(&nod(written), request);
+                assert_eq!(
+                    table["trigger"]["cooldown"].as_str(),
+                    Some(written),
+                    "{paced}"
+                );
+                assert_eq!(paced, paced_with(&nod(written), &[], false));
+            }
+        }
+        let _on = LooseHere::set(true);
+        for written in ["1m", "1h"] {
+            let (paced, table) = paced_request(&nod(written), request);
+            assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1m"), "{paced}");
+            assert_eq!(table["trigger"]["rearm"].as_str(), Some("ends"));
+            assert_eq!(table["rest"]["after_ignored"].as_integer(), Some(2));
+            assert!(!table.contains_key("quiet"), "{paced}");
+            assert!(capped(&paced).is_ok(), "{paced}");
+        }
     }
 
     /// #6059 (4): loosened, a made skill's step that can't be said plainly
