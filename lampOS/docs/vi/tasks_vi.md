@@ -375,6 +375,15 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
   chế độ quyền và không định tuyến model (OpenClaw tự chọn model, theo phần
   cài đặt bên dưới).
+- **Câu hỏi đầu bị mất** (#6499): `--message` của TUI có thể mất khi TUI
+  đang ghép đôi với Gateway, và Harness không thử lại cũng không báo. Sau
+  `new`, lamp-tasks đọc `show`: đã được hỏi (`ask` có giá trị) thì việc đang
+  chạy. Rảnh mà chưa được hỏi thì lamp-tasks đóng harness rỗng đó và gọi
+  `new` thêm một lần với đúng câu đó, trong cùng `launch_timeout`. Chỉ khi lần
+  thứ hai cũng mất mới dùng `harness reply`: lệnh này cần switch
+  `programs-reply` của chính người dùng, nên đèn sản phẩm nhận `reply_off` ở
+  bước đó. `new` lần hai thất bại thì kết quả là uncertain,
+  `openclaw_new_again_failed`. Không bao giờ khởi động lần thứ ba.
 - **Voice** (`agent_tasks`, `task_news`): đọc engine của target của đèn từ
   `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
   nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the
