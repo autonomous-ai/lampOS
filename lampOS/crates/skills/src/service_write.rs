@@ -182,6 +182,13 @@ pub fn outcome(answer: Result<Value, String>, service: &str) -> (String, bool) {
     }
 }
 
+/// Whether a write's outcome is `lamp-services`' "not sent: waiting for
+/// the owner's yes": nothing was made, so its run spends nothing
+/// (`Engine::unwritten`).
+pub fn waiting(outcome: &str) -> bool {
+    outcome == skill_writes::WAITING
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,6 +250,10 @@ mod tests {
         assert!(stops && said.contains("link changed"));
         let (said, stops) = outcome(Err(skill_writes::WAITING.into()), "gmail");
         assert!(!stops && said.contains("owner's yes"));
+        // Waiting for the yes: its run gives back what it spent.
+        assert!(waiting(&said));
+        assert!(!waiting(skill_writes::NOT_APPROVED));
+        assert!(!waiting("sent to gmail"));
         assert_eq!(outcome(Ok(json!({})), "gmail").0, "sent to gmail");
         assert!(!stopped("write-test-skill"));
         stop("write-test-skill");
