@@ -2272,6 +2272,77 @@ Bedtime and Morning stores come as `LAMP_SKILLS_DAILY_FILE` and
 `ExecStart` to the options their binaries took before; a new option joins
 that list only once every channel carries a binary that takes it.
 
+## One agent namespace for every engine (#6510)
+
+#6510 Part 1, step 1 (`crates/update/src/agent_ns/wrapper.rs`, beside the
+shared hook stand-in in `agent_ns.rs`): one wrapper and one namespace
+script for any engine Harness reports on the lamp, with no engine named in
+the code. Built and tested; **not yet written by a round** (writing it for
+every engine Harness reports is the next piece), and not yet on a lamp.
+
+- **Engine names** are data and must be plain: `a-z`, `0-9` and `-`, 1 to
+  32 bytes (`engine_ok`). Anything else is refused before a path or a text
+  is made.
+- **The wrapper**, `/usr/local/bin/<engine>` (root's, 0755), carries
+  `Written by lamp-update.` in its first 512 bytes, the mark lamp-tasks'
+  `LAMP_WRAPPER_MARK` (#6506) looks for. It:
+  - finds the engine's own program on the caller's `PATH` (`lampos`'s, as
+    Harness starts it): the first `<engine>` there that is not the wrapper
+    itself (by `readlink -f`) and carries no mark (so never another
+    lamp-update wrapper or the hook stand-in); only full folders of `PATH`
+    count. None, and it ends. No path to the program is written in any
+    text;
+  - for a skill's run, `LAMP_RUN_ID` set (**provisional name**: Harness
+    passes an engine only a fixed list of variables today, so Harness has
+    to pass it, or the run be found another way, before step 2), checks the
+    id is plain (`a-z`, `0-9`, `-`, at most 64), reads
+    `/run/lampos-tasks/runs/<run-id>` (lamp-tasks' token file, 0600 in
+    `lampos`'s 0700 folder; a link there is never read through) into a
+    shell variable once, deletes the file whatever it held, and ends if
+    there was no token. The token goes on as `LAMP_CONTROL_TOKEN` in the
+    environment only, never in an argument; the run gets `--net` and
+    `LAMP_NS_NET=run`, as Hermes's skill runs do. Without a run, a
+    `LAMP_CONTROL_TOKEN` or `LAMP_NS_NET` from the caller is unset;
+  - writes the hook stand-in's journal line with the engine as its tag;
+  - runs `/usr/local/lib/lampos/agent-ns` through `unshare
+    --map-root-user [--net] --mount --pid --kill-child --mount-proc
+    --propagation private`, with the engine's name and the program's path
+    in `LAMP_NS_ENGINE` and `LAMP_NS_ENGINE_BIN`.
+- **The namespace script**, `/usr/local/lib/lampos/agent-ns` (root's,
+  0755), is Hermes's (`hermes-ns`, "Hermes on the lamp": the same
+  allow-list, hidden `/run`, `/var/lib` and `/etc/lampOS`, private `/tmp`,
+  hidden devices, the skills and `LAMP_SKILL_TASKS` switches, and a skill
+  run's network) with the engine made data. It checks the name again and
+  that the program is a full path to a file, sets `HOME` to the engine's
+  own folder `/var/lib/lampos-agents/<engine>` (`lampos`'s, 0700; the
+  folder above it root's, 0755), binds the program back read-only at its
+  own path, puts the hook stand-in first on `PATH`, and runs the program as
+  the caller's own ids in a nested user namespace. The lampos SDK (#6507,
+  `/usr/local/lib/lampos/sdk-python`) is under `/usr`, which the namespace
+  leaves as it is. A program that needs more than its own file (a Node or
+  Python tree under a hidden folder) is not shown more yet.
+- **Writing** (`write_engine`): the homes folder and the engine's home,
+  the namespace script, the hook stand-in, then the wrapper last, each
+  written whole beside and renamed in. A file at the wrapper's place
+  without the mark (the engine's own program, or anyone else's) or a link
+  there is refused, never replaced. `present` says the wrapper and the
+  script hold this build's text and the home is there; anything else is
+  the engine missing.
+- **Hermes and OpenClaw** keep their own wrappers and namespace scripts
+  ("Hermes on the lamp", "OpenClaw on the lamp") for now; they move onto
+  this one in step 2.
+
+Tests (`agent_ns::wrapper::tests`, on any computer): plain names only; the
+mark in the first 512 bytes; no path to the program in the wrapper; the
+token only assigned and exported; the wrapper run with a stand-in
+`unshare`: the token file read once and deleted, the token in the
+environment and never in argv, a second start of the same run refused, a
+link or a run id that is not plain refused, no token or `--net` without a
+run, the program found past the wrapper and another marked wrapper; the
+namespace script naming no engine, for every switch, with `HOME` per
+engine; `sh -n` on every text; the writer's modes and its refusal to
+replace a file that is not lamp-update's.
+
 ## A hand install's skill folders (`deploy/sync-skills.sh`)
 
 A hand install swaps binaries but not skill folders, so a lamp installed

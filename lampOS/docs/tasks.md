@@ -2436,6 +2436,16 @@ whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
+**Every engine's wrapper (#6510 Part 1, step 1, not yet used):** once a
+skill's run goes through Harness, lamp-update's one wrapper for every
+engine (docs/install.md, "One agent namespace for every engine") is what
+picks up the run's token: with `LAMP_RUN_ID` (a provisional name) set, it
+reads `/run/lampos-tasks/runs/<run-id>` once, deletes it, and gives the
+engine the token as `LAMP_CONTROL_TOKEN` in its environment only, with
+`LAMP_NS_NET=run`; the engine's `HOME` is its own
+`/var/lib/lampos-agents/<engine>`. Hermes's runner above is unchanged
+until step 2.
+
 ## Devin (#1854)
 
 `devin` is Devin's own terminal program on the person's computer, which
