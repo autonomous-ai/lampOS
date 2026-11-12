@@ -60,6 +60,20 @@ queue_post() {
     || say "the Queue (#$COORD_QUEUE_POST) refused the bot's post (full? add the next Queue issue to lib.sh's COORD_QUEUE_ISSUES): $1" >&2
 }
 fine() { grep -qx -- "$1" $said && { grep -vx -- "$1" $said > $said.new; mv $said.new $said; }; return 0; }
+# head_green PR HEAD: 0 when no check on the PR's own head is red (lib.sh, coord_red_checks_jq; one still running is not
+# red); otherwise it says why, once per head, and fails. Checks that can't be read fail it (fail closed). eligible() and
+# build_train() both ask it. 12 Nov (#6556): build_train asks again just before the cherry-pick, as train 836 (#6611)
+# carried #6506, whose ARM64 run on 024930deaa was still running when its round read it and red 6 min before the cut.
+head_green() {
+  local own
+  if ! own=$(gh pr view $1 -R $REPO --json statusCheckRollup 2>/dev/null | jq -r "$coord_red_checks_jq" 2>/dev/null) || [[ -z $own ]]; then
+    once run$1 "#$1 left out: the checks on ${2:0:9} can't be read"; return 1
+  fi
+  fine run$1
+  [[ $own == ok ]] && return 0
+  grep -qx "$1 red $2" $told || { say "#$1 left out: a check on its own head ${2:0:9} is red (${own#red })" >&2; tell "$1 red $2"; }
+  return 1
+}
 eligible() {
   local p head ok sha held two own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
   # 3 Nov 15:4x (the Reviewer-lead's HOLD on #5068): the repo is public, so markers count only from accounts with write
@@ -186,14 +200,7 @@ eligible() {
     # switches census went red on its own head and the bot only saw it as ARM64 at 10:52; an SDK or doc-links check red
     # on a PR's head would have ridden a train and failed it. Read last, so only PRs that pass everything else cost the
     # call; never cached, since a check finishing doesn't move the PR's updatedAt.
-    if ! own=$(gh pr view $p -R $REPO --json statusCheckRollup 2>/dev/null | jq -r "$coord_red_checks_jq" 2>/dev/null) || [[ -z $own ]]; then
-      once run$p "#$p left out: the checks on ${head:0:9} can't be read"; continue
-    fi
-    fine run$p
-    if [[ $own != ok ]]; then
-      grep -qx "$p red $head" $told || { say "#$p left out: a check on its own head ${head:0:9} is red (${own#red })" >&2; tell "$p red $head"; }
-      continue
-    fi
+    head_green $p $head || continue
     # 12 Nov 14:4x (#6556 B): a PR a red non-cargo check of a train sat out (run_train, $sitout) stays out on that head,
     # with no HOLD posted: a push (a new head) brings it back.
     if grep -qx "$p $head" $sitout 2>/dev/null; then
@@ -291,6 +298,7 @@ build_train() {
   if [[ $lane == nc ]]; then body="No-crates train $tn, onto lamp-voice \`$LV\`, built by the train bot (#$COORD_QUEUE_POST, the Queue). Its PRs change no build input, so no ARM64 run: it merges by rebase once the checks that start on it pass.\n"
   else body="Merge train $n, onto lamp-voice \`$LV\`, built by the train bot (#$COORD_QUEUE_POST, the Queue). One ARM64 run, merged by rebase.\n"; fi
   for p in "$@"; do
+    head_green $p $(git rev-parse refs/remotes/pr/$p 2>/dev/null) || continue
     own=(${(f)"$(git -C $wt rev-list --reverse --cherry-pick --right-only --no-merges HEAD...refs/remotes/pr/$p)"})
     [[ -n ${own[1]} ]] || continue
     if git -C $wt cherry-pick $own >/dev/null 2>&1; then

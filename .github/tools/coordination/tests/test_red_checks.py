@@ -179,6 +179,25 @@ class Eligible(Red):
         self.assertIn("issues/8/comments", calls)
         self.assertIn("(0 read from the cache)", r.stdout + r.stderr)
 
+    def test_a_pr_eligible_while_its_run_ran_and_red_by_the_cut_is_left_out(self):
+        # Train 836 (#6611): #6506's ARM64 run on 024930deaa was still running when the round read it (09:22-09:29Z) and
+        # red by the cut (09:35Z); build_train reads each PR's checks again just before cherry-picking it.
+        self.pr(7, [CRATE])
+        h8 = self.pr(8, ["lampOS/crates/x/src/other.rs"])
+        self.heads()
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check("lampOS — build and test on Linux ARM64 (1/1)", "IN_PROGRESS", None)]}))
+        r, lines = self.round(["7", "8"])
+        self.assertEqual(lines[-1], "dry: would carry 7 8 onto " + self.base[:9])
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check("lampOS — build and test on Linux ARM64 (1/1)", conclusion="FAILURE")]}))
+        fn = ('REPO=autonomous-ai/lampOS; SP="$2"; told=$SP/told; touch $told; W=$3/wt; WNC=$3/wtnc; n=835; m=0; LV=x; '
+              'say() { print -r -- "$*"; }; tell() { print -r -- "$1" >> $told; }; once() { say "$2"; }; fine() { :; }; '
+              'source "$1"; eval "$(sed -n -e \'/^head_green()/,/^}/p\' -e \'/^build_train()/,/^}/p\' "$4")"; build_train crates 7 8')
+        b = run(["zsh", "-c", fn, "x", LIB, self.state, self.tmp, BOT], self.work, env=self.env, check=False)
+        out = b.stdout + b.stderr
+        self.assertIn("#8 left out: a check on its own head %s is red (lampOS — build and test on Linux ARM64 (1/1))" % h8[:9], out)
+        self.assertIn("train 836 (#): 7 on x", out)
+        self.assertEqual(self.git("rev-list", "--count", "%s..origin/first/train-836" % self.base).strip(), "1", out)
+
     def test_a_held_pr_is_seen_held_from_the_cache_too(self):
         # A HOLD after the READ-OK moves updatedAt, so the PR is read again and held.
         h7, h8 = self.two()
