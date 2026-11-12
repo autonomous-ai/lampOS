@@ -3050,6 +3050,91 @@ fn a_120_ms_stall_inside_a_pass_is_ridden_and_the_voice_stays_up() {
     }
 }
 
+/// #5611 and #5224, lamp-06c1 at 14:32:11 on 12 Nov (build 12226): after a
+/// muted boot's five-minute wait a hand un-mute started a new session, the
+/// coordinator stalled 274 ms as it began, both workers ended on their
+/// lapsed leases (exit 1), and the voice exited on `privacy.c.p: Connection
+/// refused; verified cleanup failed`, with `LAMP_PRIVACY_RIDES_STALL` off in
+/// the product unit. A session after the wait is a new one, so its stall
+/// lands this early. A 275 ms stall 60 or 100 ms in ends the voice with the
+/// switch off, and is ridden closed with it on: one gap, with the voice up
+/// until the readings stop at 1.5 s. One in the first 40 ms, before the
+/// first reading can go stale, ends nothing either way. So the first pass
+/// needs no seed: on, no stall position here is misjudged.
+#[test]
+fn a_275_ms_stall_as_a_session_begins_ends_it_off_and_is_ridden_on() {
+    let stall_us = 275_000;
+    for stall_at in [60_000, 100_000] {
+        let (ran, began) = stall_run(false, stall_at, stall_us, None);
+        let woke = began + stall_at + stall_us;
+        assert!(gap_marks(&ran, "began").is_empty(), "off at {stall_at}");
+        assert!(
+            (woke..woke + 10_000).contains(&ran.ended_us),
+            "off at {stall_at}: ended {} ms after the stall: {}",
+            ran.ended_us.saturating_sub(woke) / 1_000,
+            ran.error
+        );
+
+        let (ran, began) = stall_run(true, stall_at, stall_us, None);
+        let (stalled, woke) = (began + stall_at, began + stall_at + stall_us);
+        assert_eq!(
+            gap_marks(&ran, "began").len(),
+            1,
+            "on at {stall_at}: {}",
+            ran.error
+        );
+        assert!(ran.trace.iter().any(|row| row["kind"] == "privacy_gap"
+            && row["state"] == "began"
+            && row["stall"] == true));
+        let reopened = gap_marks(&ran, "reopened");
+        assert_eq!(reopened.len(), 1, "on at {stall_at}: {}", ran.error);
+        let open_at = reopened[0].0;
+        // An authority taken at the stall's first instant was published
+        // before it (at 60 ms the 20 ms renewal lands there), and the
+        // camera's side reads that one only as the board wakes: so what is
+        // checked is that nothing in the stall allows either.
+        let held = |at: &u64| (stalled + 1..open_at).contains(at);
+        assert!(
+            ran.capture_grants
+                .iter()
+                .all(|grant| !held(&grant.0) || !grant.1),
+            "on at {stall_at}: the microphones allowed in the stall"
+        );
+        assert!(
+            ran.camera_grants
+                .iter()
+                .all(|grant| !held(&grant.0) || !grant.2),
+            "on at {stall_at}: the camera allowed in the stall"
+        );
+        assert!(
+            ran.capture_grants
+                .iter()
+                .any(|grant| grant.0 >= woke && grant.1),
+            "on at {stall_at}: the microphones never allowed after the stall"
+        );
+        assert!(
+            ran.ended_us >= began + 1_500_000,
+            "on at {stall_at}: {}",
+            ran.error
+        );
+        assert!(
+            !ran.trace.iter().any(|row| row["kind"] == "physical_mute"),
+            "on at {stall_at}: muted"
+        );
+    }
+    // In the first 40 ms nothing has gone stale yet: up either way.
+    for on in [false, true] {
+        for stall_at in [0, 20_000, 40_000] {
+            let (ran, began) = stall_run(on, stall_at, stall_us, None);
+            assert!(
+                ran.ended_us >= began + 1_500_000,
+                "on {on} at {stall_at}: {}",
+                ran.error
+            );
+        }
+    }
+}
+
 /// A coordinator hung past 1.5 s (#5611): with the switch on, the loop ends
 /// at its waking exactly as it does off, on the freshness lost, with no gap
 /// ridden. The workers' own guards end them as before
