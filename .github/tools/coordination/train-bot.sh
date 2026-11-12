@@ -110,12 +110,13 @@ eligible() {
     lhead=${${line#* }%% *}; upd=${line##* }; [[ $lhead == $p || $upd == $lhead ]] && { lhead=""; upd=""; }
     npr=$((npr+1))
     # 12 Nov (#6556 C): a PR's head, comments, reviews and body are kept per PR, keyed by its head and updatedAt, which
-    # GitHub moves on every comment, review, push and body edit. With the key unchanged and the copy under 10 min old,
-    # they are read from the copy, with no call; every verdict is still worked out again from them each round, and the
+    # GitHub moves on every comment, review, push and body edit. With the key unchanged and the copy under COORD_CACHE_MIN
+    # minutes old (default 120; 12 Nov 17:1x: at 10 min no copy ever lived to the next round, which starts 8-14 min
+    # after the last began, so two rounds read 0 of 90 from it), they are read from the copy, with no call; every verdict is still worked out again from them each round, and the
     # Queue, the writers, the hold files and the checks (below) are read fresh. still-eligible.sh reads everything
     # fresh again just before a merge, so a stale copy can at worst put a PR in a train its precheck then drops.
     key="$lhead $upd"; hit=0
-    if [[ -n $lhead && -n $upd && -s $ck/$p.c && $(cat $ck/$p.key 2>/dev/null) == "$key" && -n $(find $ck/$p.key -mmin -10 2>/dev/null) ]]; then
+    if [[ -n $lhead && -n $upd && -s $ck/$p.c && $(cat $ck/$p.key 2>/dev/null) == "$key" && -n $(find $ck/$p.key -mmin -${COORD_CACHE_MIN:-120} 2>/dev/null) ]]; then
       hit=1; nhit=$((nhit+1)); head=$lhead; cp $ck/$p.c $cf
     else
       rm -f $ck/$p.key $ck/$p.c $ck/$p.b

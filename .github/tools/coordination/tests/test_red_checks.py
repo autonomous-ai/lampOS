@@ -3,7 +3,7 @@
 # while the others ran), finds the carried PRs a red non-cargo workflow takes, leaves out a PR whose own head has a red
 # check, and reads unchanged PRs from its per-PR cache. On test_lanes.py's temporary repository and stand-in gh.
 # Run from the repo root: python3 -I -m pytest -q .github/tools/coordination/tests
-import json, os, subprocess, sys, unittest
+import json, os, subprocess, sys, time, unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_lanes
@@ -173,6 +173,23 @@ class Eligible(Red):
         self.assertIn("(2 read from the cache)", r.stdout + r.stderr)
         # The checks are read fresh each round.
         self.assertIn("pr view 7 -R autonomous-ai/lampOS --json statusCheckRollup", calls)
+
+    def test_a_copy_lives_to_the_next_round_but_not_for_hours(self):
+        # 12 Nov 17:1x: at 10 min no copy lived to the next round (8-14 min later), so two live rounds read 0 of 90.
+        h7, h8 = self.two()
+        keyed = ["7 %s 2026-11-12T07:00:00Z" % h7, "8 %s 2026-11-12T07:00:00Z" % h8]
+        self.round(keyed)
+        ck = os.path.join(self.state, "elig-cache")
+        def age(minutes):
+            t = time.time() - minutes * 60
+            for n in (7, 8):
+                os.utime(os.path.join(ck, "%d.key" % n), (t, t))
+        age(30)
+        r, lines = self.round(keyed)
+        self.assertIn("(2 read from the cache)", r.stdout + r.stderr)
+        age(180)
+        r, lines = self.round(keyed)
+        self.assertIn("(0 read from the cache)", r.stdout + r.stderr)
 
     def test_a_new_comment_or_a_new_head_reads_the_pr_again(self):
         h7, h8 = self.two()
