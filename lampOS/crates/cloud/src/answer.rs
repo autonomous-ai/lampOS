@@ -252,6 +252,13 @@ pub trait Lamp {
         None
     }
 
+    /// `lamp-services`' admin socket for an uploaded skill's keys
+    /// (`LAMP_SKILL_SECRETS=on`, `crate::skill_secrets`): there only with
+    /// the switch.
+    fn skill_secrets(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
     /// Whether the app may read the lamp's software update
     /// (`LAMP_APP_UPDATE=on`, #2194, `crate::update`).
     fn update_page(&self) -> bool {
@@ -359,7 +366,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 72] = [
+pub const KINDS: [(&str, Switch); 75] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -417,6 +424,11 @@ pub const KINDS: [(&str, Switch); 72] = [
     (crate::share::KINDS[1], SHARE),
     (crate::share::KINDS[2], SHARE),
     (crate::upload::KIND, |lamp| lamp.upload().is_some()),
+    // An uploaded skill's keys from the app (`LAMP_SKILL_SECRETS`): with
+    // the skills page, while lamp-services' admin socket is there.
+    (crate::skill_secrets::KINDS[0], SKILL_SECRETS),
+    (crate::skill_secrets::KINDS[1], SKILL_SECRETS),
+    (crate::skill_secrets::KINDS[2], SKILL_SECRETS),
     ("update.status", |lamp| lamp.update_page()),
     ("update.check", |lamp| lamp.update_page()),
     // The lamp's agents (#6240): a missing one installed from the app.
@@ -473,6 +485,9 @@ const VOICE: Switch = |lamp| lamp.changes().is_some_and(|c| c.voice_on());
 const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
 /// The switch, and root's change helper for `monitor.set`.
 const MONITOR: Switch = |lamp| lamp.monitor().is_some() && lamp.changes().is_some();
+/// The switch, the skills page, and lamp-services there to ask.
+const SKILL_SECRETS: Switch =
+    |lamp| lamp.skills().is_some() && lamp.skill_secrets().is_some_and(|socket| socket.exists());
 /// The socket given, and lamp-control there to ask.
 const CONTROL: Switch = |lamp| lamp.control().is_some_and(|door| door.here());
 
@@ -746,7 +761,18 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // (#1722), never a core one: the page as it now is.
         "skills.remove" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
-            crate::skills::remove(&places, data).map(Some)
+            let removed = crate::skills::remove(&places, data)?;
+            // Its keys go with it (`LAMP_SKILL_SECRETS`).
+            if let (Some(socket), Some(skill)) = (lamp.skill_secrets(), data["name"].as_str()) {
+                crate::skill_secrets::dropped(&socket, skill);
+            }
+            some(removed)
+        }
+        // An uploaded skill's keys from the owner's app
+        // (`LAMP_SKILL_SECRETS`): to root's lamp-services, names back.
+        kind if crate::skill_secrets::KINDS.contains(&kind) && on(lamp, kind) => {
+            let socket = lamp.skill_secrets().ok_or_else(|| not_here(kind))?;
+            crate::skill_secrets::answer(&socket, kind, data).map(Some)
         }
         // A skill turned off or on on the person's tap (#2815), kept as
         // their own choice: the page as it now is.
@@ -1003,6 +1029,8 @@ pub mod tests {
         pub reset: Option<&'static str>,
         /// The person's own services (Queue #4710), with their switch.
         pub services: Option<std::sync::Arc<crate::services::Services>>,
+        /// lamp-services' admin socket for a skill's keys, with their switch.
+        pub skill_secrets: Option<std::path::PathBuf>,
         /// lamp-control's admin socket (#5299).
         pub control: Option<crate::control::Door>,
         /// The owner's two yeses from the app (#5500), with their switch.
@@ -1137,6 +1165,9 @@ pub mod tests {
         }
         fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
             self.services.clone()
+        }
+        fn skill_secrets(&self) -> Option<std::path::PathBuf> {
+            self.skill_secrets.clone()
         }
         fn control(&self) -> Option<crate::control::Door> {
             self.control.clone()
@@ -1590,6 +1621,75 @@ pub mod tests {
         assert_eq!((&off["by"], &off["held"]), (&json!("app"), &json!(false)));
         assert_eq!(off["at"], off["since"]);
         assert!(off["at"].is_string());
+    }
+
+    /// `LAMP_SKILL_SECRETS`: a skill's keys are kinds only with the switch,
+    /// the page and lamp-services there; then each is asked of it inline,
+    /// and a removed skill's keys are dropped there.
+    #[test]
+    fn a_skills_keys_are_kinds_only_with_their_switch_and_the_page() {
+        use std::io::{BufRead, BufReader, Write};
+        let mut lamp = lamp();
+        let can = |lamp: &Fake| {
+            KINDS
+                .iter()
+                .filter(|(_, switch)| switch(lamp))
+                .map(|(kind, _)| *kind)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            answer(&mut lamp, "skills.secrets", &json!({"skill": "tutor"})),
+            Err("not on this lamp: skills.secrets".to_owned())
+        );
+        let places = crate::skills::tests::places("secrets");
+        crate::skills::tests::helper(&places);
+        lamp.skills = Some(places);
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("admin.sock");
+        lamp.skill_secrets = Some(socket.clone());
+        // No lamp-services there: not named.
+        assert!(!can(&lamp).contains(&"skills.secrets"));
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        assert!(
+            crate::skill_secrets::KINDS
+                .iter()
+                .all(|kind| can(&lamp).contains(kind))
+        );
+        let served = std::thread::spawn(move || {
+            let mut lines = Vec::new();
+            for reply in [
+                json!({"ok": true, "result": {"skill": "tutor", "needed": ["GEMINI_API_KEY"], "set": []}}),
+                json!({"ok": true, "result": {"skill": "tutor"}}),
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                writeln!(&stream, "{reply}").unwrap();
+                lines.push(serde_json::from_str::<Value>(&line).unwrap());
+            }
+            lines
+        });
+        let listed = answer(&mut lamp, "skills.secrets", &json!({"skill": "tutor"}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            listed,
+            json!({"skill": "tutor", "needed": ["GEMINI_API_KEY"], "set": []})
+        );
+        crate::skills::tests::skill(
+            lamp.skills.as_ref().unwrap(),
+            "tutor",
+            "Desk tutor",
+            "",
+            "[permissions]\nbody = true",
+        );
+        answer(&mut lamp, "skills.remove", &json!({"name": "tutor"})).unwrap();
+        let lines = served.join().unwrap();
+        assert_eq!(lines[0], json!({"op": "skill_secrets", "skill": "tutor"}));
+        assert_eq!(
+            lines[1],
+            json!({"op": "skill_secrets_drop", "skill": "tutor"})
+        );
     }
 
     /// #1722: the skills page is answered only with its switch, and

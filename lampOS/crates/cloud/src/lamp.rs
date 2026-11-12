@@ -859,6 +859,10 @@ impl Lamp for Real {
         self.services.clone()
     }
 
+    fn skill_secrets(&self) -> Option<std::path::PathBuf> {
+        crate::skill_secrets::product()
+    }
+
     fn write_skill(&self) -> Option<PathBuf> {
         self.write_skill.clone()
     }
