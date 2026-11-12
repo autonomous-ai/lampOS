@@ -2637,7 +2637,7 @@ không có "send"); một lần đọc là `done` hoặc `no_result`.
   `memory-days_vi.md`).
 - Tắt: không giữ, không ghi gì.
 
-### Báo lại các bản ghi (`LAMP_SERVICE_RECORDS_TOLD`, tắt trừ khi bật; bật trong sản phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, rồi tắt lại ngay đêm đó: khi báo các bản ghi, lamp-9adf tự nói lời đọc lại và nói đã dời lịch, đã gửi thư mà không gọi `service_write`; tắt cho đến khi #6427 qua các dòng kiểm tra)
+### Báo lại các bản ghi (`LAMP_SERVICE_RECORDS_TOLD`, tắt trừ khi bật; bật trong sản phẩm theo quyết định của chủ đèn ngày 11/11, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, rồi tắt lại ngay đêm đó: khi báo các bản ghi, lamp-9adf tự nói lời đọc lại và nói đã dời lịch, đã gửi thư mà không gọi `service_write`; bật lại ngày 12/11, nguyên nhân đã được #6453 sửa và các dòng kiểm tra trên lamp-06c1 đã đạt)
 
 Khi bật thêm `LAMP_SERVICE_RECORDS_TOLD=on` (chỉ tuyến thứ hai; chỉ có tác
 dụng khi `LAMP_SERVICE_RECORDS` bật; kế hoạch bản ghi connector, PR 1b,
