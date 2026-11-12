@@ -1230,7 +1230,8 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 ### Dịch vụ đã liên kết thành task cho agent của đèn (`LAMP_AGENT_SERVICES=on`, tắt)
 
 Yêu cầu của chủ, 12/11. Với `LAMP_AGENT_SERVICES=on` trong `lamp-voice`
-(đúng `on`; `made_skill::AGENT_SERVICES_ENVIRONMENT`) và
+(đặt giống nhau trong lamp-tasks và lamp-skills-manage@,
+[services_vi.md](services_vi.md); đúng `on`; `made_skill::AGENT_SERVICES_ENVIRONMENT`) và
 `LAMP_MADE_SCRIPTS=on` bên cạnh (bước `task` của skill tự làm chịu giới hạn
 đó), một skill làm bằng giọng nói mà đọc hoặc ghi một dịch vụ đã liên kết
 (Gmail, Calendar, GitHub, ...) được làm thành một `do.task` cho agent của
