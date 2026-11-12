@@ -3576,6 +3576,46 @@ gone ([switches.md](switches.md)). What happens:
     on holds nothing, so asking again tries again. The app's MAKE IT is
     not held. Tests: `a_cut_ask_carried_into_the_next_line_makes_one_skill`,
     `only_the_same_ask_is_held_as_made`.
+12. **A clash is said, never loaded silently** (#6593, the first builder's
+    ruling: on lamp-9adf six `glow-*-on-return` skills sat on one arrival,
+    each outranking the others' light, so "glow green when I'm present"
+    showed only some of the time). A voice make, once kept and before it
+    is put on, is held to every skill on the lamp (`made_clash::found`):
+    the skills folder and the pushed one beside it, each by its
+    `skill.toml`, then the made skills kept and on, by the `"clash"` kept
+    with each in `made.json` (`made_clash::signature`). A clash is the
+    same trigger (its topic, and its `field`, `when`, `equals`, `above`,
+    `below`, `present` and `changes`; never its pace or window, so two on
+    one arrival clash whatever their cooldown) and both using the light,
+    or both moving the head (a `[[do]]` step with `light`, or with
+    `body`). Another trigger, or the same one with no shared output, is no
+    clash. On a clash nothing is put on: the model is told the other's
+    spoken name (`clashes_with`), what both use (`shares`), a `clash_id`,
+    and to say the clash in a few words and ask: replace it, keep both
+    (the new one wins), or cancel. A turn cut before that is said "I made
+    NAME, but didn't put it on: OTHER starts at the same moment and uses
+    the light. Ask me again to replace it or to keep both."
+    (`made_clash::cut_line`). The answer comes back as `make_skill` with
+    `clash_id` and `choice` (`replace`, `keep` or `cancel`) alone, so
+    `request` is no longer required (`made_clash::chosen`): only a later
+    heard line than the make's, within 5 minutes
+    (`made_clash::CLASH_WITHIN`), and only the owner's, held as a yes is
+    (`services::owners_yes_now`: with `LAMP_PRIVATE_ROOM` on, any heard
+    line). **Replace** asks the manage helper's own `{"remove": NAME}`, as
+    the app's remove does (a core skill is refused there, and then nothing
+    is put on), drops a made one from `made.json`, and puts the new one on
+    by its SHA-256 (`made_skill::put_on_within`). **Keep** puts the new one
+    on beside it and says "When they start together, NEW wins over OTHER."
+    **Cancel** puts nothing on; the made one stays kept and off. A make
+    with code of its own waits for its yes as before and is not held to
+    clashes; nor is the app's MAKE IT. Open: the ring shows the newest
+    claim of equal priority (`ring_requests`), and lamp-skills starts the
+    runs of one event in its folders' name order, each on a thread of its
+    own, so nothing yet makes the newer one's claim come last; keep's line
+    is the ruling's, not yet enforced. Tests:
+    `a_clash_is_found_and_nothing_is_put_on`,
+    `no_clash_on_another_trigger_or_no_shared_output`,
+    `replace_keep_and_cancel_each_do_what_they_say`.
 
 A made line said with no make behind it is never said
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): a reply that
