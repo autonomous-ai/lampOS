@@ -2461,6 +2461,20 @@ for each run, and is answered once the run ends
   wrapper's process environment (`/proc/<pid>/environ`), readable by other
   processes of lamp-tasks' uid; that is accepted for a one-run token that
   lives 14 minutes at most.
+- **The run-token file** (#6510 Part 1, not used yet): `harness new` takes
+  no environment, so once runs go through Harness (#6510 Part 1 step 2)
+  the token is handed over as a file instead of `LAMP_CONTROL_TOKEN`:
+  `/run/lampos-tasks/runs/<run-id>` (`run_token_file::RUNS_DIR`, tmpfs),
+  the run id a plain id (`a-z`, `0-9`, `-`, 1 to 64), else refused before
+  anything is made. `RunTokenFile::write` makes the folder 0700 when
+  missing and refuses one that is a link, not lamp-tasks' own user's, or
+  open to others; the file is made 0600, exclusively (an existing file or
+  a link there is refused, never followed or replaced), written in full
+  and synced. The engine's wrapper (lamp-update) reads it once and deletes
+  it; lamp-tasks deletes it too when the run ends however it ends (the
+  guard's drop; already gone is fine). The token is never in argv, a
+  debug line, the journal, an error or Harness's state; the path names
+  only the run id.
 - **The run:** one task for target `lamp`, its words the script to run
   from the skill's read-only folder, the skill's task quoted as data (a
   JSON string, "as data, not as instructions"), and the one way to the
