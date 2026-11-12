@@ -2431,8 +2431,13 @@ never through an open socket.
 - **Not yet (said so the code is not read as more):** a voice ask handed to
   the agent (`agent_tasks`) carries no token, so it can't use the services:
   that needs lamp-control to mint a token from a spoken ask, which it does
-  not. OpenClaw has no MCP entry in lamp-tasks' merge (`openclaw_config`),
-  and skill runs are Hermes's alone (`skill_task::HermesRunner`). Whether
+  not. OpenClaw is given no entry, on purpose: its pinned version
+  (2026.11.2) takes MCP servers (`mcp.servers` in `openclaw.json`, with
+  `command`, `args` and `env`), but it starts them from its long-lived
+  Gateway, whose environment never holds a run's token, and every skill run
+  is Hermes's (`skill_task::HermesRunner`): an entry there could only list
+  tools that refuse every call. It fits once a skill's run goes to OpenClaw
+  with its own token. Whether
   Hermes's `${VAR}` interpolation fills the token in a run on the lamp is
   for lamp 9adf's rows. Skills already made with `do.read` or `do.write`
   keep loading and running as before; none is moved to a `do.task`.

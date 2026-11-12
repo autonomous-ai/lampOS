@@ -2532,8 +2532,13 @@ qua một socket mở.
 - **Chưa làm (nói rõ để không đọc mã thành nhiều hơn):** một yêu cầu giọng
   nói giao cho tác tử (`agent_tasks`) không có token, nên chưa dùng được dịch
   vụ: cần lamp-control tạo token từ một yêu cầu nói, điều nó chưa làm.
-  OpenClaw chưa có mục MCP trong bước gộp của lamp-tasks (`openclaw_config`),
-  và lượt chạy kỹ năng chỉ chạy trên Hermes (`skill_task::HermesRunner`).
+  OpenClaw cố ý không được thêm mục nào: bản đã ghim (2026.11.2) nhận máy
+  chủ MCP (`mcp.servers` trong `openclaw.json`, với `command`, `args`,
+  `env`), nhưng khởi động chúng từ Gateway chạy lâu dài, môi trường của nó
+  không bao giờ có token của một lượt chạy, và mọi lượt chạy kỹ năng đều là
+  của Hermes (`skill_task::HermesRunner`): một mục ở đó chỉ liệt kê các công
+  cụ từ chối mọi lời gọi. Nó hợp khi một lượt chạy kỹ năng tới OpenClaw với
+  token riêng.
   Việc Hermes điền token bằng `${VAR}` trong một lượt chạy trên đèn sẽ được
   kiểm ở các hàng của đèn 9adf. Các kỹ năng đã tạo với `do.read` hay
   `do.write` vẫn nạp và chạy như trước; không kỹ năng nào bị chuyển sang
