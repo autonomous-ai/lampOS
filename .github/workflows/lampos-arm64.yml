@@ -11,7 +11,8 @@ name: lampOS on ARM64
 # The full run's tests are split across four runners (cargo-nextest
 # partitions), each still running one test at a time, as on a lamp's few
 # cores: one serial run took about 20 of the job's 30 minutes. lamp-voice's
-# push splits its tests across three, in parallel: on one runner they were
+# push and a train's pull request (#6512) split their tests across three, in
+# parallel: on one runner they were
 # 17.5 of its 27 minutes (#6320). Doc tests, the two tests with their own
 # harness, the binaries' artifact and the cache come from the first runner only.
 #
@@ -214,11 +215,11 @@ jobs:
       fail-fast: false
       matrix:
         # Four for a full run (every test, one at a time); three for lamp-voice's
-        # push or a run by hand that asks for three, except on the Studio's one
-        # slot; otherwise one.
+        # push, a train's pull request (first/train-*, #6512) or a run by hand that
+        # asks for three, except on the Studio's one slot; otherwise one.
         shard: >-
           ${{ fromJSON(inputs.full && '[1, 2, 3, 4]'
-          || ((github.event_name == 'push' || inputs.shards == '3') && needs.route.outputs.studio != 'true') && '[1, 2, 3]'
+          || ((github.event_name == 'push' || startsWith(github.head_ref, 'first/train-') || inputs.shards == '3') && needs.route.outputs.studio != 'true') && '[1, 2, 3]'
           || '[1]') }}
     steps:
       - name: system packages
