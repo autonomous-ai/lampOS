@@ -13,7 +13,10 @@
 package discordrelay
 
 import (
+	"context"
 	"log/slog"
+	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +48,9 @@ const (
 
 	// dedupTTL is how long a seen event id is remembered; the relay can redeliver.
 	dedupTTL = 5 * time.Minute
+
+	// maxJoinedThreads bounds the threads remembered as already joined.
+	maxJoinedThreads = 256
 )
 
 // Gateway is the slice of domain.AgentGateway the relay uses.
@@ -61,6 +67,8 @@ type Uplink interface {
 	// Reply sends the finished reply text for a Discord channel; sealed when the
 	// message it answers arrived sealed.
 	Reply(channelID, text string, sealed bool) error
+	// ReplyInThread is Reply, in a new thread opened on messageID.
+	ReplyInThread(channelID, messageID, threadName, text string, sealed bool) error
 	// Typing shows the typing indicator in a Discord channel; sealed as above.
 	Typing(channelID string, sealed bool) error
 }
@@ -75,6 +83,12 @@ type Relay struct {
 	uplink Uplink
 	runs   map[string]run
 	seen   map[string]time.Time
+	// joined holds the threads the owner has @mentioned the bot in, oldest first.
+	// It is saved to joinedPath (when set) so a restart or update keeps it.
+	joined     []string
+	joinedPath string
+	// guestCalls holds each guest's recent answers, for the hourly limit.
+	guestCalls map[string][]time.Time
 
 	inFlight chan struct{}
 
@@ -82,12 +96,15 @@ type Relay struct {
 	idleWait   time.Duration
 	idlePoll   time.Duration
 	typingTick time.Duration
+	guestModel func(ctx context.Context, text string) (string, error)
 }
 
 type run struct {
 	channelID string
 	sealed    bool
 	at        time.Time
+	// threadOn is the message a new thread may be opened on; empty when not allowed.
+	threadOn string
 }
 
 // ProviderSet wires the relay into the server.
@@ -95,13 +112,15 @@ var ProviderSet = wire.NewSet(ProvideRelay)
 
 // ProvideRelay is the Wire provider for Relay.
 func ProvideRelay(cfg *config.Config, gw domain.AgentGateway) *Relay {
-	return New(cfg, gw)
+	r := New(cfg, gw)
+	r.loadJoined(filepath.Join(config.Dir(), joinedFile))
+	return r
 }
 
 // New builds a Relay. The uplink is installed later with SetUplink, once the MQTT
 // side exists.
 func New(cfg *config.Config, gw Gateway) *Relay {
-	return &Relay{
+	r := &Relay{
 		cfg:        cfg,
 		gw:         gw,
 		runs:       make(map[string]run),
@@ -110,7 +129,10 @@ func New(cfg *config.Config, gw Gateway) *Relay {
 		idleWait:   idleWait,
 		idlePoll:   idlePoll,
 		typingTick: typingInterval,
+		guestCalls: make(map[string][]time.Time),
 	}
+	r.guestModel = r.callGuestModel
+	return r
 }
 
 // SetUplink installs the transport used for replies and typing signals.
@@ -150,16 +172,24 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 	if r.seenBefore(ev.EventID) {
 		return "duplicate"
 	}
+	if r.isGuest(ev.DiscordUserID) {
+		return r.handleGuest(ev)
+	}
 	in := Inbound{
 		AuthorID:    ev.DiscordUserID,
 		BotUserID:   ev.BotUserID,
 		GuildID:     ev.GuildID,
 		Content:     ev.Text,
 		MentionsBot: ev.MentionsBot,
+
+		NoMentionNeeded: r.noMentionNeeded(ev),
 	}
 	text, ok := Accept(in, r.cfg.DiscordUserID, r.cfg.DiscordGuildID)
 	if !ok {
 		return RejectReason(in, r.cfg.DiscordUserID, r.cfg.DiscordGuildID)
+	}
+	if ev.GuildID != "" && ev.ParentChannelID != "" && ev.MentionsBot {
+		r.joinThread(ev.ChannelID)
 	}
 
 	select {
@@ -171,12 +201,57 @@ func (r *Relay) Handle(ev domain.MQTTDiscordEventCommand) string {
 	}
 
 	reqID, runID := r.gw.NextChatRunID()
-	r.addRun(runID, ev.ChannelID, ev.WasSealed)
+	threadOn := ""
+	if ev.GuildID != "" && ev.ParentChannelID == "" {
+		threadOn = ev.EventID
+	}
+	r.addRun(runID, ev.ChannelID, ev.WasSealed, threadOn)
 	// The via marker also tells a runtime that merges concurrent messages into a running
 	// turn to keep this one separate, so its reply is never shared with another message.
-	turn := domain.AppendVia(TurnText(ev.AuthorUsername, ev.DiscordUserID, text), domain.ViaDiscord)
+	body := TurnText(ev.AuthorUsername, ev.DiscordUserID, text)
+	if threadOn != "" {
+		body += threadHint
+	}
+	turn := domain.AppendVia(body, domain.ViaDiscord)
 	go r.send(reqID, runID, ev.ChannelID, ev.WasSealed, turn)
 	return ""
+}
+
+// noMentionNeeded reports whether a server message may reach the agent without an
+// @mention: it is in a channel the owner chose, in a thread of such a channel, or in
+// a thread the bot has already joined. A message addressed to someone else is not for
+// the agent, so it still needs its own @mention.
+func (r *Relay) noMentionNeeded(ev domain.MQTTDiscordEventCommand) bool {
+	if ev.GuildID == "" || ev.MentionsOthers {
+		return false
+	}
+	open, _ := r.cfg.DiscordAccessLists()
+	if slices.Contains(open, ev.ChannelID) {
+		return true
+	}
+	if ev.ParentChannelID == "" {
+		return false
+	}
+	if slices.Contains(open, ev.ParentChannelID) {
+		return true
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Contains(r.joined, ev.ChannelID)
+}
+
+// joinThread remembers a thread as joined, dropping the oldest past the limit.
+func (r *Relay) joinThread(channelID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if slices.Contains(r.joined, channelID) {
+		return
+	}
+	r.joined = append(r.joined, channelID)
+	if len(r.joined) > maxJoinedThreads {
+		r.joined = r.joined[1:]
+	}
+	r.saveJoinedLocked()
 }
 
 // send waits for the agent to be idle, hands it the turn and, meanwhile, keeps the
@@ -241,7 +316,7 @@ func (r *Relay) Finish(runID, text string) {
 	if !ok {
 		return
 	}
-	text = strings.TrimSpace(text)
+	title, text := splitThreadDirective(strings.TrimSpace(text))
 	if text == "" {
 		return
 	}
@@ -250,7 +325,16 @@ func (r *Relay) Finish(runID, text string) {
 		return
 	}
 	go func() {
-		if err := up.Reply(origin.channelID, text, origin.sealed); err != nil {
+		var err error
+		if title != "" && origin.threadOn != "" {
+			// A thread opened on a message takes that message's id, so later
+			// messages there count as a joined thread.
+			r.joinThread(origin.threadOn)
+			err = up.ReplyInThread(origin.channelID, origin.threadOn, title, text, origin.sealed)
+		} else {
+			err = up.Reply(origin.channelID, text, origin.sealed)
+		}
+		if err != nil {
 			slog.Error("discord relay: reply not sent", "component", "discord-relay", "run_id", runID, "error", err)
 			return
 		}
@@ -258,7 +342,7 @@ func (r *Relay) Finish(runID, text string) {
 	}()
 }
 
-func (r *Relay) addRun(runID, channelID string, sealed bool) {
+func (r *Relay) addRun(runID, channelID string, sealed bool, threadOn string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	cutoff := time.Now().Add(-runTTL)
@@ -267,7 +351,7 @@ func (r *Relay) addRun(runID, channelID string, sealed bool) {
 			delete(r.runs, k)
 		}
 	}
-	r.runs[runID] = run{channelID: channelID, sealed: sealed, at: time.Now()}
+	r.runs[runID] = run{channelID: channelID, sealed: sealed, at: time.Now(), threadOn: threadOn}
 }
 
 func (r *Relay) take(runID string) (run, bool) {

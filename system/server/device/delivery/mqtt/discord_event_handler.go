@@ -57,6 +57,13 @@ func (u *discordUplink) Reply(channelID, text string, sealed bool) error {
 	return u.publish(domain.MsgTypeDiscordReply, channelID, map[string]any{"text": text}, sealed)
 }
 
+// ReplyInThread is Reply plus the message to open a thread on and the thread's name.
+func (u *discordUplink) ReplyInThread(channelID, messageID, threadName, text string, sealed bool) error {
+	return u.publish(domain.MsgTypeDiscordReply, channelID, map[string]any{
+		"text": text, "thread_message_id": messageID, "thread_name": threadName,
+	}, sealed)
+}
+
 // Typing publishes {"type":"discord_typing","discord_channel_id":...}, sealed as above.
 func (u *discordUplink) Typing(channelID string, sealed bool) error {
 	return u.publish(domain.MsgTypeDiscordTyping, channelID, nil, sealed)

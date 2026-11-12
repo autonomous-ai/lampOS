@@ -14,12 +14,15 @@ type Inbound struct {
 	GuildID     string // empty for a direct message
 	Content     string
 	MentionsBot bool
+	// NoMentionNeeded is set for a thread the bot is already in or a channel the
+	// owner chose; the owner and server checks still apply.
+	NoMentionNeeded bool
 }
 
 // Accept decides whether a relayed message is for the agent and returns the text
 // to hand it. Only the configured owner is heard. A direct message is always
-// accepted from the owner; a server message needs an @mention of the bot and, when
-// one is configured, the configured server. The bot's own mention is removed from the text.
+// accepted from the owner; a server message must be in the configured server (when
+// one is configured) and needs an @mention of the bot unless NoMentionNeeded is set. The bot's own mention is removed from the text.
 func Accept(in Inbound, allowedUser, allowedGuild string) (string, bool) {
 	if allowedUser == "" || in.AuthorID != allowedUser {
 		return "", false
@@ -31,7 +34,7 @@ func Accept(in Inbound, allowedUser, allowedGuild string) (string, bool) {
 		if allowedGuild != "" && in.GuildID != allowedGuild {
 			return "", false
 		}
-		if !in.MentionsBot {
+		if !in.MentionsBot && !in.NoMentionNeeded {
 			return "", false
 		}
 	}
@@ -52,7 +55,7 @@ func RejectReason(in Inbound, allowedUser, allowedGuild string) string {
 		return "from the bot itself"
 	case in.GuildID != "" && allowedGuild != "" && in.GuildID != allowedGuild:
 		return "from another server"
-	case in.GuildID != "" && !in.MentionsBot:
+	case in.GuildID != "" && !in.MentionsBot && !in.NoMentionNeeded:
 		return "server message without an @mention of the bot"
 	case stripMention(in.Content, in.BotUserID) == "":
 		return "empty message"

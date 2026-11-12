@@ -40,6 +40,12 @@ func (s *Service) AddChannel(ctx context.Context, data domain.AddChannelRequest)
 			c.DiscordManaged = true
 			c.DiscordGuildID = data.DiscordGuildID
 			c.DiscordUserID = data.DiscordUserID
+			if data.DiscordOpenChannels != nil {
+				c.DiscordOpenChannels = data.DiscordOpenChannels
+			}
+			if data.DiscordGuestUserIDs != nil {
+				c.DiscordGuestUserIDs = data.DiscordGuestUserIDs
+			}
 		case domain.ChannelWhatsapp:
 			c.WhatsappUserID = data.WhatsappUserID
 		case domain.ChannelIMessage:

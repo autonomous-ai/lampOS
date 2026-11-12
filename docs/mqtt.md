@@ -329,7 +329,7 @@ for the device here and posts the device's reply. Full behaviour: [discord-relay
 ```
 
 There is no acknowledgement. The device drops the message unless it is from the configured
-`discord_user_id` (a server message must also come from `discord_guild_id` and mention the bot),
+`discord_user_id` (a server message must also come from `discord_guild_id` and mention the bot, unless it is in an open channel or a joined thread; see `discord-relay.md`),
 and ignores an `event_id` it saw in the last 5 minutes. An accepted message runs as a normal
 agent turn. The answer goes up the device channel with the standard envelope plus the channel:
 

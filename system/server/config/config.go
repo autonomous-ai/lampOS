@@ -107,6 +107,12 @@ type Config struct {
 	DiscordManaged bool   `json:"discord_managed" yaml:"discordManaged"`
 	DiscordGuildID string `json:"discord_guild_id" yaml:"discordGuildID"`
 	DiscordUserID  string `json:"discord_user_id" yaml:"discordUserID"`
+	// DiscordOpenChannels lists server channels where the owner need not @mention
+	// the bot.
+	DiscordOpenChannels []string `json:"discord_open_channels,omitempty" yaml:"discordOpenChannels,omitempty"`
+	// DiscordGuestUserIDs lists people who may @mention the bot and get a restricted
+	// answer: no agent, tools, memory or device access.
+	DiscordGuestUserIDs []string `json:"discord_guest_user_ids,omitempty" yaml:"discordGuestUserIDs,omitempty"`
 
 	// WhatsappUserID is the E.164 phone number permitted to DM the device's
 	// WhatsApp account.
@@ -633,6 +639,13 @@ func (c *Config) SetLLMModel(key string) error {
 	return c.WithLockSave(func(c *Config) {
 		c.LLMModel = key
 	})
+}
+
+// DiscordAccessLists returns the open channels and guest ids under the config mutex.
+func (c *Config) DiscordAccessLists() (openChannels, guestUserIDs []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.DiscordOpenChannels, c.DiscordGuestUserIDs
 }
 
 // LLMModelKey returns LLMModel under the config mutex. Use this in goroutines

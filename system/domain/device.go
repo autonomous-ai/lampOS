@@ -182,6 +182,12 @@ type AddChannelRequest struct {
 	DiscordManaged bool   `json:"discord_managed"`
 	DiscordGuildID string `json:"discord_guild_id"`
 	DiscordUserID  string `json:"discord_user_id"`
+	// DiscordOpenChannels lists server channels where the owner need not @mention
+	// the bot. Nil leaves the saved list alone; an empty list clears it.
+	DiscordOpenChannels []string `json:"discord_open_channels,omitempty"`
+	// DiscordGuestUserIDs lists people who may @mention the bot and get a restricted
+	// answer. Nil leaves the saved list alone; an empty list clears it.
+	DiscordGuestUserIDs []string `json:"discord_guest_user_ids,omitempty"`
 
 	// WhatsappUserID is the operator's E.164 phone number (permitted DM caller).
 	WhatsappUserID string `json:"whatsapp_user_id"`
@@ -332,14 +338,19 @@ const (
 
 // MQTTDiscordEventCommand is the fa_channel payload for cmd:"discord_event".
 type MQTTDiscordEventCommand struct {
-	Cmd            string `json:"cmd"`
-	EventID        string `json:"event_id"`
-	DiscordUserID  string `json:"discord_user_id"`
-	GuildID        string `json:"guild_id"`
-	ChannelID      string `json:"discord_channel_id"`
-	AuthorUsername string `json:"author_username"`
-	BotUserID      string `json:"bot_user_id"`
-	MentionsBot    bool   `json:"mentions_bot"`
+	Cmd           string `json:"cmd"`
+	EventID       string `json:"event_id"`
+	DiscordUserID string `json:"discord_user_id"`
+	GuildID       string `json:"guild_id"`
+	ChannelID     string `json:"discord_channel_id"`
+	// ParentChannelID is set only when the message is in a thread: the channel the
+	// thread belongs to.
+	ParentChannelID string `json:"parent_channel_id,omitempty"`
+	AuthorUsername  string `json:"author_username"`
+	BotUserID       string `json:"bot_user_id"`
+	MentionsBot     bool   `json:"mentions_bot"`
+	// MentionsOthers is set when the message addresses another person, a role or everyone.
+	MentionsOthers bool   `json:"mentions_others,omitempty"`
 	Text           string `json:"text"`
 
 	// Enc and Sealed carry the sealed form: every field above is then inside Sealed
@@ -575,6 +586,8 @@ func (r *MQTTAddChannelCommand) ToRequest() AddChannelRequest {
 		req.DiscordManaged, _ = cfg["managed"].(bool)
 		req.DiscordGuildID, _ = cfg["guild_id"].(string)
 		req.DiscordUserID, _ = cfg["user_id"].(string)
+		req.DiscordOpenChannels = stringList(cfg["open_channels"])
+		req.DiscordGuestUserIDs = stringList(cfg["guest_user_ids"])
 	case ChannelSlack:
 		req.SlackBotToken, _ = cfg["bot_token"].(string)
 		req.SlackAppToken, _ = cfg["app_token"].(string)
@@ -1344,6 +1357,8 @@ type ConfigPublicResponse struct {
 	SlackUserID              string   `json:"slack_user_id"`
 	DiscordGuildID           string   `json:"discord_guild_id"`
 	DiscordUserID            string   `json:"discord_user_id"`
+	DiscordOpenChannels      []string `json:"discord_open_channels"`
+	DiscordGuestUserIDs      []string `json:"discord_guest_user_ids"`
 	WhatsappUserID           string   `json:"whatsapp_user_id"`
 	BluebubblesServerURL     string   `json:"bluebubbles_server_url"`
 	BluebubblesUserAddress   string   `json:"bluebubbles_user_address"`
@@ -1434,6 +1449,9 @@ type UpdateConfigRequest struct {
 
 	DiscordGuildID string `json:"discord_guild_id"`
 	DiscordUserID  string `json:"discord_user_id"`
+	// Nil leaves the saved list alone; an empty list clears it.
+	DiscordOpenChannels []string `json:"discord_open_channels,omitempty"`
+	DiscordGuestUserIDs []string `json:"discord_guest_user_ids,omitempty"`
 
 	WhatsappUserID string `json:"whatsapp_user_id"`
 
@@ -1585,4 +1603,19 @@ type MQTTVoiceInputModeAck struct {
 	Status string              `json:"status"`
 	Error  string              `json:"error,omitempty"`
 	Data   *VoiceInputModeData `json:"data,omitempty"`
+}
+
+// stringList reads a JSON array of non-empty strings; nil when the value is not an array.
+func stringList(v any) []string {
+	raw, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok && s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }

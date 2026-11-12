@@ -40,6 +40,8 @@ func (s *Service) GetPublicConfig() domain.ConfigPublicResponse {
 		SlackUserID:              s.config.SlackUserID,
 		DiscordGuildID:           s.config.DiscordGuildID,
 		DiscordUserID:            s.config.DiscordUserID,
+		DiscordOpenChannels:      s.config.DiscordOpenChannels,
+		DiscordGuestUserIDs:      s.config.DiscordGuestUserIDs,
 		WhatsappUserID:           s.config.WhatsappUserID,
 		BluebubblesServerURL:     s.config.BluebubblesServerURL,
 		BluebubblesUserAddress:   s.config.BluebubblesUserAddress,
@@ -464,6 +466,12 @@ func applyChannelPatch(c *config.Config, data domain.UpdateConfigRequest) {
 		}
 		if data.DiscordUserID != "" {
 			c.DiscordUserID = data.DiscordUserID
+		}
+		if data.DiscordOpenChannels != nil {
+			c.DiscordOpenChannels = data.DiscordOpenChannels
+		}
+		if data.DiscordGuestUserIDs != nil {
+			c.DiscordGuestUserIDs = data.DiscordGuestUserIDs
 		}
 	case domain.ChannelWhatsapp:
 		if data.WhatsappUserID != "" {

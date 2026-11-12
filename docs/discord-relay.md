@@ -47,7 +47,7 @@ with the reason, never the text):
 - Discord is set up on the device (`discord_managed` and a `discord_user_id`).
 - The sender is `discord_user_id`.
 - A direct message (`guild_id` empty) is always fine. A server message must come from
-  `discord_guild_id` **and** mention the bot; the mention is removed from the text.
+  `discord_guild_id` **and** mention the bot; the mention is removed from the text. The @mention is not needed in a channel listed in `discord_open_channels`, in a thread of such a channel, or in a thread where the owner has already mentioned the bot (`parent_channel_id` marks a thread). A message that addresses another person, a role or everyone (`mentions_others`) still needs its own mention. The device keeps its joined threads (up to 256) in `discord_threads.json` next to `config.json`, so they survive a restart or an update. The owner and server checks always apply.
 - The `event_id` was not seen in the last 5 minutes (the relay can redeliver).
 
 An accepted message becomes a normal chat turn on the active runtime, whichever it is:
@@ -163,3 +163,8 @@ Presync scripts for Hermes and PicoClaw also strip Discord settings on every run
   chat entry points, and the channel reconcile re-applies "Discord handled by the relay" to the
   new runtime.
 - Telegram, Slack, WhatsApp and iMessage are unchanged.
+
+
+**People other than the owner.** Someone in `discord_guest_user_ids` who @mentions the bot in the connected server gets a short answer from a direct model call, limited to 10 an hour each. The owner sets this list and the open channels on the device's own Settings page, under the Discord channel. The message never reaches the agent, so a guest has no tools, memory, connected accounts or device control, and each message stands alone. It counts toward the owner's usage.
+
+**Threads.** In a server channel the agent can begin a reply with `[[thread: title]]`. The device removes that text and sends `thread_message_id` and `thread_name` with `discord_reply`, and the reply goes in a new thread on the owner's message. If the thread cannot be opened, the reply stays in the channel.

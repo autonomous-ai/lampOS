@@ -45,7 +45,7 @@ nội dung):
 - Thiết bị đã setup Discord (`discord_managed` và có `discord_user_id`).
 - Người gửi là `discord_user_id`.
 - Tin nhắn riêng (`guild_id` rỗng) luôn hợp lệ. Tin nhắn trong server phải đến từ
-  `discord_guild_id` **và** mention bot; phần mention bị gỡ khỏi nội dung.
+  `discord_guild_id` **và** mention bot; phần mention bị gỡ khỏi nội dung. Không cần mention trong kênh có trong `discord_open_channels`, trong thread của kênh đó, hoặc trong thread mà chủ thiết bị đã mention bot (`parent_channel_id` đánh dấu thread). Tin nhắn gửi cho người khác, một role hoặc mọi người (`mentions_others`) vẫn cần mention bot. Thiết bị lưu các thread đã tham gia (tối đa 256) trong `discord_threads.json` cạnh `config.json`, nên chúng vẫn còn sau khi khởi động lại hoặc cập nhật. Kiểm tra chủ thiết bị và server luôn được áp dụng.
 - `event_id` chưa gặp trong 5 phút gần nhất (relay có thể gửi lại).
 
 Tin nhắn được nhận trở thành một lượt chat bình thường trên runtime đang chạy, bất kể runtime nào:
@@ -154,3 +154,8 @@ Script presync của Hermes và PicoClaw cũng gỡ cấu hình Discord mỗi l�
 - Đổi runtime không cần làm gì thêm: relay chỉ nói chuyện với runtime qua các entry point chat chung,
   và channel reconcile áp lại "Discord do relay xử lý" cho runtime mới.
 - Telegram, Slack, WhatsApp và iMessage không đổi.
+
+
+**Người khác ngoài chủ thiết bị.** Người có trong `discord_guest_user_ids` khi mention bot trong server đã kết nối sẽ nhận câu trả lời ngắn từ một lệnh gọi model trực tiếp, tối đa 10 lần mỗi giờ cho mỗi người. Chủ thiết bị đặt danh sách này và các kênh mở trên trang Settings của chính thiết bị, trong phần kênh Discord. Tin nhắn không bao giờ đến agent, nên khách không có công cụ, bộ nhớ, tài khoản đã kết nối hay quyền điều khiển thiết bị, và mỗi tin nhắn là độc lập. Lượt dùng tính vào mức sử dụng của chủ thiết bị.
+
+**Thread.** Trong kênh của server, agent có thể bắt đầu câu trả lời bằng `[[thread: tiêu đề]]`. Thiết bị gỡ phần này và gửi `thread_message_id`, `thread_name` cùng `discord_reply`; câu trả lời được đăng trong thread mới trên tin nhắn của chủ thiết bị. Nếu không mở được thread, câu trả lời vẫn ở trong kênh.
