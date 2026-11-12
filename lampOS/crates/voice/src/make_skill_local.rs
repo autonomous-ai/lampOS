@@ -953,19 +953,21 @@ pub fn app_code_asked_here(request: u64, text: String) -> String {
     )
 }
 
-/// The yes `id` to a made skill with code from the app
-/// ([`app_code_asked`]) not the owner's (`owners_yes`,
+/// The yes `id` to the waiting made skill not the owner's (`owners_yes`,
 /// `services::owners_yes`: outside the private room the owner seen saying
 /// it or in their voice, as a skill run's write's send): its wait dropped,
-/// the skill left off, and the model told [`crate::services::OTHER_VOICE`].
-/// None for any other id, or the owner's yes.
-pub fn app_code_yes_refused(id: &str, owners_yes: impl FnOnce() -> bool) -> Option<Value> {
-    if !crate::skill_write_yes::noted(id) || owners_yes() {
+/// nothing approved, and the model told [`crate::services::OTHER_VOICE`].
+/// Every wait alike: a voice make's writes or code, a read-back's, a task's
+/// and an app make's code (#6307; Heron's P1 on #6558: a voice make's write
+/// approved on anyone's yes would send from the owner's linked account).
+/// None for an id that isn't waiting, or the owner's yes.
+pub fn not_owners_yes_refused(id: &str, owners_yes: impl FnOnce() -> bool) -> Option<Value> {
+    if !crate::skill_write_yes::waits(id) || owners_yes() {
         return None;
     }
-    crate::skill_write_yes::drop_noted(id);
+    crate::skill_write_yes::drop_wait(id);
     eprintln!(
-        "lamp-voice: a skill with code of its own made from the app stays off: not the owner's yes (#6307)"
+        "lamp-voice: a made skill's yes not the owner's: its wait dropped, nothing approved (#6066, #6307)"
     );
     Some(json!({ "error": crate::services::OTHER_VOICE }))
 }
@@ -1743,8 +1745,8 @@ pub fn answer(
     // The person's yes to a made skill's writes (#6066): the waiting
     // skill's, in a later heard line, approved by the voice itself.
     if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
-        // One made from the app with code (#6307): only the owner's yes.
-        if let Some(refused) = app_code_yes_refused(id, || {
+        // Every made skill's wait: only the owner's yes (#6307, #6558).
+        if let Some(refused) = not_owners_yes_refused(id, || {
             crate::services::owners_yes_now(request, heard, lease)
         }) {
             return refused;
@@ -1855,6 +1857,54 @@ pub(crate) mod tests {
     use std::io::{Read, Write};
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
+
+    /// Heron's P1 on #6558: a voice make's write waits for the owner's yes
+    /// only. A visitor's "yes" approves nothing and drops the wait; the
+    /// owner's approves; an id that isn't waiting is left to `approve`.
+    #[test]
+    fn a_voice_made_writes_yes_is_the_owners_only() {
+        use crate::skill_write_yes as yes;
+        const SAID: &str = "mails mai@example.com from your Gmail, subject “Leaving”";
+        let now = std::time::Instant::now();
+        let asks = || yes::Asks {
+            skill: "leaving-mail".to_owned(),
+            sha256: "ab".repeat(32),
+            writes: vec![json!({"service": "gmail", "action": "send_mail",
+                "to": ["mai@example.com"], "subject": "Leaving", "text": "I'm leaving now."})],
+            say_back: SAID.to_owned(),
+            grants: None,
+            code: false,
+        };
+        let never = |_: &yes::Asks| -> Result<Value, String> { panic!("approved") };
+        let id = yes::wait_for_yes(asks(), 4, now);
+        yes::lamp_said(
+            4,
+            &format!("I made leaving mail: when you get up, it {SAID}."),
+        );
+        // A visitor's yes in request 5: refused, the wait dropped.
+        assert_eq!(
+            not_owners_yes_refused(&id, || false),
+            Some(json!({ "error": crate::services::OTHER_VOICE }))
+        );
+        assert!(!yes::awaited(now));
+        assert_eq!(
+            yes::approve(&id, 5, true, true, now, never)["error"],
+            yes::NOT_APPROVED
+        );
+        // The owner's yes: approved.
+        let id = yes::wait_for_yes(asks(), 6, now);
+        yes::lamp_said(
+            6,
+            &format!("I made leaving mail: when you get up, it {SAID}."),
+        );
+        assert_eq!(not_owners_yes_refused(&id, || true), None);
+        let told = yes::approve(&id, 7, true, true, now, |_| {
+            Ok(json!({"approved": 1, "public": []}))
+        });
+        assert_eq!(told["approved"], true, "{told}");
+        // Nothing waiting: not asked whose it is.
+        assert_eq!(not_owners_yes_refused(&id, || panic!("asked whose")), None);
+    }
 
     /// Thirteen's P2 on #5985: with no spoken yes, a `make_skill` call in a
     /// turn nobody spoke (the lamp's own event turn, a hand-over, the
