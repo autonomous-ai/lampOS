@@ -3638,6 +3638,7 @@ mod tests {
             text: "List five fruits that are good when you're sick.".into(),
             target: crate::runtime::LAMP_TARGET.into(),
             session: None,
+            engine: None,
         };
         let id = engine.handle(&request, &clock(at), false).unwrap()["id"]
             .as_u64()
