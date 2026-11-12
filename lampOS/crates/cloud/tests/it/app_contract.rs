@@ -988,6 +988,15 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
     let refused = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
     assert_eq!(refused["status"], "failure", "{refused}");
     assert_eq!(refused["error"], lamp_cloud::update::NOT_MISSING);
+    // #6492: the default agent, its name checked before lamp-tasks is
+    // asked; the reply the app reads carries the refusal's code.
+    let unknown = sent(&mut real, "engines.default", json!({"engine": "gpt"}));
+    assert_eq!(unknown["status"], "failure", "{unknown}");
+    assert_eq!(
+        unknown["error"],
+        lamp_cloud::engine_default::ENGINE_UNKNOWN,
+        "{unknown}"
+    );
 
     says.publish_json(0, &with("failed", None, Some("no_memory")))
         .unwrap();
@@ -1024,6 +1033,7 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
     let told = sent(&mut real, "update.status", json!({}));
     assert!(told["data"].get("engines").is_none(), "{told}");
     assert!(answer(&mut real, "engines.install", &json!({"engine": "hermes"})).is_err());
+    assert!(answer(&mut real, "engines.default", &json!({"engine": "hermes"})).is_err());
     let _ = std::fs::remove_dir_all(root);
 }
 

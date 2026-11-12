@@ -195,6 +195,13 @@ pub fn reply(
             {
                 data["message"] = crate::harness_sign_in::message_for(why).into();
             }
+            // The default agent from the app (#6492): plain words beside
+            // lamp-tasks' code.
+            if let Err(why) = &answered
+                && kind == crate::engine_default::KIND
+            {
+                data["message"] = crate::engine_default::message_for(why).into();
+            }
             data
         }
         Command::Other(cmd) => identity.refused(now, &cmd),
