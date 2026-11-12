@@ -1,0 +1,26 @@
+# The name and time servers for the region the backend places the lamp in (#6256, #6414,
+# lampOS/docs/install.md): China's resolvers (AliDNS, DNSPod) and time servers only on a lamp
+# placed in China; every other lamp's fallback is left as the image has it. lamp-cloud, which
+# learns the region, runs as lampos with no capability and a read-only /etc, so the write is
+# this root one-shot's: at boot, and from lamp-region.path on each change of the region file.
+[Unit]
+Description=lampOS: name and time servers for the lamp's region (lamp-update region)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/lampOS/update/current/lamp-update region
+StandardInput=null
+StandardError=journal
+SyslogIdentifier=lamp-region
+NoNewPrivileges=yes
+ProtectSystem=strict
+# /etc: /etc/resolvconf.conf and the timesyncd drop-in are written whole (a new file renamed
+# into place), and `resolvconf -u` rewrites /etc/resolv.conf; /run/resolvconf is openresolv's.
+ReadWritePaths=/etc -/run/resolvconf
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

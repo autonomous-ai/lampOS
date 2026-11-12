@@ -255,6 +255,17 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-setup-recover.service",
         include_str!("../../../deploy/product/lamp-setup-recover.service"),
     ),
+    // China's name and time servers on a lamp placed in China only
+    // (#6256, #6414, [`region_servers`]): at boot and on each region change.
+    // Its unit is lamp-update's own to a round ([`REGION_UNIT`]).
+    (
+        "lamp-region.service",
+        include_str!("../../../deploy/product/lamp-region.service"),
+    ),
+    (
+        "lamp-region.path",
+        include_str!("../../../deploy/product/lamp-region.path"),
+    ),
 ];
 
 /// The fixed services whose stops Cloud may report. The install fixture
@@ -280,6 +291,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-name.service",
     "lamp-policy.service",
     "lamp-records.service",
+    "lamp-region.service",
     "lamp-schedule.service",
     "lamp-selftest.service",
     "lamp-services.service",
@@ -822,48 +834,122 @@ pub fn store_key_setting(deploy: &Path) -> Result<Option<manifest::Setting>, Str
 
 /// openresolv's settings: which name servers `/etc/resolv.conf` lists.
 pub const RESOLVCONF_PATH: &str = "/etc/resolvconf.conf";
-/// The name servers after the router's (#6256): AliDNS and DNSPod, which
-/// answer in China and everywhere else, then Cloudflare's and Google's.
+/// The name servers after the router's on a lamp the backend places in
+/// China (#6256, #6414): AliDNS and DNSPod, then Cloudflare's and Google's.
 /// Appended, never `name_servers=`, which openresolv puts before the
 /// router's: glibc asks only the first three, the first one first, and
-/// waits 5 s on one that is dropped. With no router (the hotspot) the list
-/// is these. `scripts/imager/build-orangepi-v2.sh` writes the same line.
+/// waits 5 s on one that is dropped, as 1.1.1.1 is in China. Never on any
+/// other lamp: there a lookup its router misses would go to Alibaba and
+/// Tencent (the Reviewer-lead's privacy HOLD on #6386).
 pub const NAME_SERVERS: &str = r#"name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8""#;
+/// The V2 image's line (`scripts/imager/build-orangepi-v2.sh`): every other
+/// lamp's fallback, put back in place of [`NAME_SERVERS`] on a lamp the
+/// backend no longer places in China.
+pub const NAME_SERVERS_IMAGE: &str = r#"name_servers="1.1.1.1 8.8.8.8""#;
 
-/// `/etc/resolvconf.conf` as install leaves it, from what it holds now
-/// (`None`: no file): every other line kept, the first `name_servers*` line
-/// [`NAME_SERVERS`] and any other one gone, or [`NAME_SERVERS`] last when
-/// there is none. A file install already fixed comes back unchanged.
-pub fn resolvconf_fixed(now: Option<&str>) -> String {
+/// `/etc/resolvconf.conf` from what it holds now (`None`: no file), with
+/// `line` in place of the first `name_servers*` line and any other one
+/// gone, or `line` last when there is none; every other line kept. A file
+/// that holds it already comes back unchanged.
+pub fn resolvconf_fixed(now: Option<&str>, line: &str) -> String {
     let mut fixed = String::new();
     let mut placed = false;
-    for line in now.unwrap_or_default().lines() {
-        if line.trim_start().starts_with("name_servers") {
+    for kept in now.unwrap_or_default().lines() {
+        if kept.trim_start().starts_with("name_servers") {
             if !placed {
-                fixed.push_str(NAME_SERVERS);
+                fixed.push_str(line);
                 fixed.push('\n');
                 placed = true;
             }
             continue;
         }
-        fixed.push_str(line);
+        fixed.push_str(kept);
         fixed.push('\n');
     }
     if !placed {
-        fixed.push_str(NAME_SERVERS);
+        fixed.push_str(line);
         fixed.push('\n');
     }
     fixed
 }
 
-/// systemd-timesyncd's drop-in (#6256): Debian's pool, then servers that
-/// answer in China. `FallbackNTP`, never `NTP=`, so a server the network
-/// gives still comes first; timesyncd moves on in seconds from one that
-/// does not answer.
+/// systemd-timesyncd's drop-in, on a lamp the backend places in China only
+/// (#6256, #6414): Debian's pool, then servers that answer in China.
+/// `FallbackNTP`, never `NTP=`, so a server the network gives still comes
+/// first; timesyncd moves on in seconds from one that does not answer.
 pub const TIMESYNCD_PATH: &str = "/etc/systemd/timesyncd.conf.d/lampos.conf";
-pub const TIMESYNCD: &str = "# lamp-update install (#6256): time servers that answer in China too.\n\
+pub const TIMESYNCD: &str = "# lamp-update region (#6256): time servers that answer in China, on a lamp placed there.\n\
 [Time]\n\
 FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org ntp.aliyun.com ntp.tencent.com cn.pool.ntp.org\n";
+
+/// The region file lamp-cloud keeps from the ping's reply (#6414), `CN` or
+/// empty: the voice's `REGION_FILE` (a test holds the two equal; the voice
+/// is not this program's to link).
+pub const REGION_FILE: &str = "/var/lib/lampos-cloud/region";
+
+/// The region's one-shot: it starts `update/current`, so a round never
+/// counts it as a part of its own (`round::installed_units`).
+pub const REGION_UNIT: &str = "lamp-region.service";
+
+/// The name and time servers for the region the backend places the lamp
+/// in (#6256, #6414), read from [`REGION_FILE`]. `CN`: [`NAME_SERVERS`]
+/// in [`RESOLVCONF_PATH`] and [`TIMESYNCD`] written. Anything else, or a
+/// missing or unreadable file: the lamp's fallback is left as it is, but
+/// a [`NAME_SERVERS`] line goes back to [`NAME_SERVERS_IMAGE`] and the
+/// drop-in is removed. `resolvconf -u` and `systemctl try-restart
+/// systemd-timesyncd` run only after a change; one that fails is said.
+/// Run by install and by `lamp-region.service` (at boot, and on each
+/// change of the region file through `lamp-region.path`).
+pub fn region_servers(
+    root: &Path,
+    host: &mut dyn Host,
+    changed: &mut Vec<String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    // As the voice's `in_china`: only `CN`, trimmed.
+    let china = fs::read_to_string(on(root, REGION_FILE)).is_ok_and(|text| text.trim() == "CN");
+    match fs::read_to_string(on(root, RESOLVCONF_PATH)) {
+        Err(error) if error.kind() != io::ErrorKind::NotFound => {
+            say(&format!("{RESOLVCONF_PATH} kept, unread: {error}"));
+        }
+        read => {
+            let now = read.ok();
+            let ours = now
+                .as_deref()
+                .is_some_and(|text| text.lines().any(|line| line.trim() == NAME_SERVERS));
+            let line = if china {
+                Some(NAME_SERVERS)
+            } else {
+                ours.then_some(NAME_SERVERS_IMAGE)
+            };
+            let fixed = line.map(|line| resolvconf_fixed(now.as_deref(), line));
+            if let Some(fixed) = fixed.filter(|fixed| now.as_deref() != Some(fixed)) {
+                put(root, RESOLVCONF_PATH, fixed.as_bytes(), 0o644, changed)?;
+                if let Err(why) = host.refresh(&["resolvconf", "-u"]) {
+                    say(&format!("resolvconf -u: {why}"));
+                }
+            }
+        }
+    }
+    let wrote = changed.len();
+    if china {
+        put(root, TIMESYNCD_PATH, TIMESYNCD.as_bytes(), 0o644, changed)?;
+    } else {
+        match fs::remove_file(on(root, TIMESYNCD_PATH)) {
+            Ok(()) => changed.push(format!("removed {TIMESYNCD_PATH}")),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("{TIMESYNCD_PATH}: {error}")),
+        }
+    }
+    // timesyncd reads it on a restart; one not running is left so, as on a
+    // lamp whose clock is chrony's.
+    if changed.len() > wrote
+        && let Err(why) = host.refresh(&["systemctl", "try-restart", "systemd-timesyncd"])
+    {
+        say(&format!("systemctl try-restart systemd-timesyncd: {why}"));
+    }
+    Ok(())
+}
 
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
@@ -1035,6 +1121,7 @@ pub(crate) fn enabled() -> Vec<String> {
             "lamp-selftest.timer",
             "lamp-update-back.timer",
             "lampos-setup-done.path",
+            "lamp-region.path",
             "lamp-skills-manage.socket",
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
@@ -1606,9 +1693,13 @@ pub struct Install {
 
 impl Install {
     fn on(&self, path: &str) -> PathBuf {
-        self.root
-            .join(path.trim_start_matches('/').trim_end_matches('/'))
+        on(&self.root, path)
     }
+}
+
+/// `path` on the lamp, under `root`.
+fn on(root: &Path, path: &str) -> PathBuf {
+    root.join(path.trim_start_matches('/').trim_end_matches('/'))
 }
 
 /// What an install did.
@@ -1700,7 +1791,7 @@ pub fn install(
     // Each file is written whole; one that fails leaves those before it
     // new and the rest as they were.
     for (path, bytes) in &for_systemd {
-        put(config, path, bytes, 0o644, &mut changed)
+        put(&config.root, path, bytes, 0o644, &mut changed)
             .map_err(|why| format!("units not all written: {why}"))?;
     }
     // The tmpfiles are install's, recorded as the settings are, so a
@@ -1870,28 +1961,23 @@ pub fn install(
              # Written by lamp-update install from the system's zone; setup writes it again.\n\
              LAMP_ZONE={zone}\nLAMP_UTC_OFFSET_MINUTES={offset}\n"
         );
-        put(config, ZONE_PATH, text.as_bytes(), 0o644, &mut changed)?;
+        put(
+            &config.root,
+            ZONE_PATH,
+            text.as_bytes(),
+            0o644,
+            &mut changed,
+        )?;
     }
     if !config.on("/etc/lampOS/body/lamp.env").exists() {
         say(
             "the body waits for this lamp's own poses in /etc/lampOS/body/lamp.env (docs/install.md)",
         );
     }
-    name_servers(config, host, &mut changed, say)?;
-    // Written whole; timesyncd reads it on a restart, and one not running
-    // is left so (`try-restart`), as on a lamp whose clock is chrony's.
-    let wrote = changed.len();
-    put(
-        config,
-        TIMESYNCD_PATH,
-        TIMESYNCD.as_bytes(),
-        0o644,
-        &mut changed,
-    )?;
-    if changed.len() > wrote
-        && let Err(why) = host.refresh(&["systemctl", "try-restart", "systemd-timesyncd"])
-    {
-        say(&format!("systemctl try-restart systemd-timesyncd: {why}"));
+    // Side files, not the product's: a write that fails is said, never the
+    // end of the install.
+    if let Err(why) = region_servers(&config.root, host, &mut changed, say) {
+        say(&format!("the region's name and time servers: {why}"));
     }
 
     let before = state.clone();
@@ -1949,36 +2035,6 @@ pub fn install(
         sequence: manifest.sequence,
         changed,
     })
-}
-
-/// [`NAME_SERVERS`] into [`RESOLVCONF_PATH`] ([`resolvconf_fixed`]), then
-/// `resolvconf -u` so `/etc/resolv.conf` lists them now (#6256). Nothing
-/// when the file holds them already. A file that cannot be read is said
-/// and left; a `resolvconf -u` that fails is said: the next lease or boot
-/// lists them.
-fn name_servers(
-    config: &Install,
-    host: &mut dyn Host,
-    changed: &mut Vec<String>,
-    say: &mut dyn FnMut(&str),
-) -> Result<(), String> {
-    let now = match fs::read_to_string(config.on(RESOLVCONF_PATH)) {
-        Ok(text) => Some(text),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
-        Err(error) => {
-            say(&format!("{RESOLVCONF_PATH} kept, unread: {error}"));
-            return Ok(());
-        }
-    };
-    let fixed = resolvconf_fixed(now.as_deref());
-    if now.as_deref() == Some(fixed.as_str()) {
-        return Ok(());
-    }
-    put(config, RESOLVCONF_PATH, fixed.as_bytes(), 0o644, changed)?;
-    if let Err(why) = host.refresh(&["resolvconf", "-u"]) {
-        say(&format!("resolvconf -u: {why}"));
-    }
-    Ok(())
 }
 
 /// The line install says when the `lamp-update` running it, by its sha256
@@ -2167,7 +2223,7 @@ fn before_units(
         // writer that is gone: cleared once it is in place, the record
         // last (crate::writer_swap::forget_writer, #5539).
         let writer_changed = fs::read(config.on(crate::own::BACK)).map_or(true, |now| now != bytes);
-        put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
+        put(&config.root, crate::own::BACK, &bytes, 0o755, &mut changed)?;
         if crate::writer_swap::forget_writer(
             &config.root,
             records.folder(),
@@ -2491,7 +2547,7 @@ pub fn settings_with_mode(
                 // Its bytes are install's, so its mode is too: a default
                 // written closed by something before install (lamp-cb94's,
                 // 0600) is opened, or the parts run as `lampos` never read it.
-                set_mode(config, path, text.as_bytes(), mode, changed)?;
+                set_mode(&config.root, path, text.as_bytes(), mode, changed)?;
                 state.settings.insert((*path).to_owned(), default);
             }
             // A product skill's file is the build's, never the lamp's own
@@ -2546,7 +2602,7 @@ pub fn settings_with_mode(
         }
         persist(state)?;
         for (path, text, default) in writes {
-            put(config, path, text.as_bytes(), mode, changed)?;
+            put(&config.root, path, text.as_bytes(), mode, changed)?;
             state.settings.insert(path.to_owned(), default);
         }
     }
@@ -2582,7 +2638,7 @@ fn reset_plan(
     match now {
         None if !config.setup => return Ok(()),
         Some(now) if now == new => {
-            set_mode(config, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
+            set_mode(&config.root, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
         }
         _ => {
             let was = state
@@ -2600,7 +2656,7 @@ fn reset_plan(
             .map_err(|error| format!("{path}: {error}"))?;
             state.settings_writing.insert(path.to_owned(), new.clone());
             persist(state)?;
-            put(config, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
+            put(&config.root, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
             state.settings_writing.remove(path);
         }
     }
@@ -2750,15 +2806,15 @@ fn link(
 
 /// A file written whole, only if it is not already exactly this.
 fn put(
-    config: &Install,
+    root: &Path,
     path: &str,
     bytes: &[u8],
     mode: u32,
     changed: &mut Vec<String>,
 ) -> Result<(), String> {
-    let at = config.on(path);
+    let at = on(root, path);
     if fs::read(&at).is_ok_and(|now| now == bytes) {
-        return set_mode(config, path, bytes, mode, changed);
+        return set_mode(root, path, bytes, mode, changed);
     }
     let failed = |error: io::Error| format!("{path}: {error}");
     if let Some(parent) = at.parent() {
@@ -2781,7 +2837,7 @@ fn put(
 /// reviewer on #1293). A link is left as it is: its target is not
 /// install's to open or close (Nine on #1293).
 fn set_mode(
-    config: &Install,
+    root: &Path,
     path: &str,
     bytes: &[u8],
     mode: u32,
@@ -2792,7 +2848,7 @@ fn set_mode(
     let mut file = match fs::OpenOptions::new()
         .read(true)
         .custom_flags(flags.bits() as i32)
-        .open(config.on(path))
+        .open(on(root, path))
     {
         Ok(file) => file,
         Err(error) if error.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) => {
@@ -3436,10 +3492,15 @@ mod tests {
         // Setup, its reset, the waking face, its recovery (#3020) and
         // setup's three helpers (the names', the Wi-Fi's and its boot
         // restore) share one binary, and so do the air and its bus clock,
-        // the skills and their manage helper, and the eyes and their camera
-        // helper (#2892); every other service is a part.
+        // the skills and their manage helper, the eyes and their camera
+        // helper (#2892), and lamp-update and its region one-shot (#6256);
+        // every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(parts.len(), services - 9, "every product service is a part");
+        assert_eq!(
+            parts.len(),
+            services - 10,
+            "every product service is a part"
+        );
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
