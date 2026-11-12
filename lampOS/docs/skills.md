@@ -1384,7 +1384,8 @@ Part 2 of #6071 (the first builder's conditions there): a skill that reacts
 at once with its own steps and hands the slower part to the lamp's agent, a
 script in its own `scripts/` folder. Off unless `LAMP_SKILL_TASKS=on`, in
 `lamp-skills`, its manage helper, `lamp-voice` (passed to both routes) and
-`lamp-control` (itself on, `LAMP_CONTROL=on`), which keeps the owner's yes;
+`lamp-control` (with its developer door or, with this switch on, without it;
+control.md, "A skill's tasks without the door"), which keeps the owner's yes;
 the product units set it in all four (12 Nov), and in lamp-services,
 lamp-tasks and lamp-update, which serve the run (#6432, #6306).
 `lamp_skills::task`, `lamp_skills::package::task_asks`,
