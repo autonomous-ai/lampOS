@@ -238,9 +238,11 @@ pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP
 pub const NO_NAMESPACE: &str = "the lamp's Hermes can't be given a make's own home yet (its wrapper or namespace script has no make-home line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
 /// A make's folder, held open from when it was made, and removed however
-/// the make ends: an answer, a failure, its deadline or a panic.
-struct MadeFolder {
-    path: PathBuf,
+/// the make ends: an answer, a failure, its deadline or a panic. An agent
+/// skill's run starts in one of its own too (`crate::skill_task`,
+/// `LAMP_UPLOAD_TO_AGENT`).
+pub(crate) struct MadeFolder {
+    pub(crate) path: PathBuf,
     fd: rustix::fd::OwnedFd,
 }
 
@@ -283,14 +285,7 @@ fn file_in(at: &rustix::fd::OwnedFd, name: &str, text: &str) -> std::io::Result<
 /// before a byte is written, each part opened from the one above, never
 /// through a link.
 fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
-    use rustix::fs::{Mode, open};
-    let name = format!("{FOLDER_HEAD}{}", run_id());
-    let at = open(work, DIR_FLAGS, Mode::empty())?;
-    let fd = folder_in(&at, &name)?;
-    let made = MadeFolder {
-        path: work.join(&name),
-        fd,
-    };
+    let made = fresh_folder(work, FOLDER_HEAD)?;
     file_in(&made.fd, RULES_FILE, rules)?;
     let home = folder_in(&made.fd, HOME_FOLDER)?;
     let hermes = folder_in(&home, HERMES_FOLDER)?;
@@ -299,6 +294,20 @@ fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
         rustix::fs::symlinkat(target, &hermes, name)?;
     }
     Ok(made)
+}
+
+/// A fresh folder `<head><run id>` in `work`, 0700 before anything is in
+/// it, opened never through a link and removed however its run ends: a
+/// make's, or an agent skill's run's.
+pub(crate) fn fresh_folder(work: &Path, head: &str) -> std::io::Result<MadeFolder> {
+    use rustix::fs::{Mode, open};
+    let name = format!("{head}{}", run_id());
+    let at = open(work, DIR_FLAGS, Mode::empty())?;
+    let fd = folder_in(&at, &name)?;
+    Ok(MadeFolder {
+        path: work.join(&name),
+        fd,
+    })
 }
 
 /// A make's fresh config: the lamp's provider ([`crate::hermes_config::merge_config`],
