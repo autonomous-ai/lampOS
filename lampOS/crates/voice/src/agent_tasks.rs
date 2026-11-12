@@ -3181,6 +3181,85 @@ fn cancel_replaced(
     }
 }
 
+/// What the model is told when the person said a plain no to a task read
+/// back (#6582): it is dropped at once, here and in the tasks part.
+pub const DECLINED_NOTE: &str = "(For you to know: they said no to the task you read back. It is dropped and nothing was started. Say only, in the conversation's language, that you won't start it. Call nothing.)";
+
+/// The person's heard line `words` in `request` said a plain no
+/// (`crate::services::plain_no`: "No.", "No thanks.", "Never mind.",
+/// "Don't.", "Cancel that.") to the task waiting for their yes (#6582): it
+/// is dropped at once. This voice no longer confirms it, so a later yes
+/// starts nothing, and the tasks part is sent its cancel on a thread of its
+/// own, bounded by [`DEADLINE`], so a cancel refused or never answered
+/// never holds the voice. Only a line that could have said yes to it
+/// ([`may_confirm`], heard) drops it. A no with more words in it ("no,
+/// write a poem about tea instead") is not plain: it stays the model's, a
+/// correction as before (#2838). With nothing waiting, nothing is done.
+pub fn declined(place: &Place, request: u64, words: &str) -> Option<String> {
+    let directory = place.directory.clone();
+    declined_with(request, words, Instant::now(), move |id| {
+        let spawned = std::thread::Builder::new()
+            .name("lamp-voice-task-no".into())
+            .spawn(move || {
+                cancel_declined(&directory, request, id, DEADLINE);
+            });
+        if spawned.is_err() {
+            eprintln!(
+                "lamp-voice: tasks: request {request}: no thread to cancel task {id}; it lapses in the tasks part"
+            );
+        }
+    })
+}
+
+/// [`declined`] at `now`, with `cancel` for the tasks part's prepared task.
+fn declined_with(
+    request: u64,
+    words: &str,
+    now: Instant,
+    cancel: impl FnOnce(u64),
+) -> Option<String> {
+    if !crate::services::plain_no(words) {
+        return None;
+    }
+    let dropped = PENDING.lock().ok().and_then(|mut pending| {
+        pending
+            .as_ref()
+            .is_some_and(|waiting| may_confirm(waiting, request, true, now))
+            .then(|| pending.take())
+            .flatten()
+    })?;
+    eprintln!(
+        "lamp-voice: tasks: request {request}: task {} dropped: the person said no to its read-back; this voice no longer confirms it and asks the tasks part to cancel it (#6582)",
+        dropped.id
+    );
+    cancel(dropped.id);
+    Some(DECLINED_NOTE.to_owned())
+}
+
+/// Cancel the prepared task `id` the person said no to, best-effort: the
+/// tasks part's status for its guard, then the same cancel a corrected ask
+/// sends ([`cancel_replaced`]), all within `deadline`. Whether it was.
+fn cancel_declined(directory: &Path, request: u64, id: u64, deadline: Duration) -> bool {
+    let started = Instant::now();
+    let socket = directory.join("request.sock");
+    let cancelled = ask(&socket, &json!({"op":"status"}), deadline)
+        .and_then(|status| guard(&status, format!("voice-{request}-cancel-{}", nonce())))
+        .and_then(|guard| {
+            ask(
+                &socket,
+                &json!({"op":"cancel","guard":guard,"id":id}),
+                deadline.saturating_sub(started.elapsed()),
+            )
+        })
+        .is_some_and(|answer| answer.get("ok") == Some(&json!(true)));
+    if !cancelled {
+        eprintln!(
+            "lamp-voice: tasks: request {request}: task {id} could not be cancelled; this voice no longer confirms it, and it lapses in the tasks part"
+        );
+    }
+    cancelled
+}
+
 /// Run one call. Blocking, for a thread of its own. `heard`: the request the
 /// call came in was something a person said, not something the lamp wrote.
 /// Nobody here is known as the lamp's owner, so a session named is refused
@@ -10885,11 +10964,12 @@ pub(crate) mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
-    /// #2838: a plain "no" calls nothing, so nothing is started and the one
-    /// waiting still waits; a cancel the tasks part refuses, or never
-    /// answers, leaves the corrected ask prepared all the same.
+    /// #2838, with #6582: a plain "no" drops the task waiting at once, so a
+    /// yes after it starts nothing; a cancel the tasks part refuses, or never
+    /// answers, drops it all the same. A cancel refused for a corrected ask
+    /// leaves the correction prepared all the same.
     #[test]
-    fn a_plain_no_starts_nothing_and_a_failed_cancel_keeps_the_correction() {
+    fn a_plain_no_drops_the_task_and_a_failed_cancel_keeps_the_correction() {
         let _one = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -10910,11 +10990,12 @@ pub(crate) mod tests {
                 ("request.sock", status(1)),
                 (
                     "request.sock",
-                    json!({"ok":true,"id":8,"prepared_digest":"tea","revision":2}),
+                    json!({"ok":false,"error":"already_attempted"}),
                 ),
+                ("request.sock", status(1)),
                 (
                     "request.sock",
-                    json!({"ok":false,"error":"already_attempted"}),
+                    json!({"ok":true,"id":8,"prepared_digest":"tea","revision":2}),
                 ),
             ],
         );
@@ -10932,24 +11013,33 @@ pub(crate) mod tests {
             PEER_WAIT,
         );
         assert!(told["prepared"] == json!(true), "{told}");
-        // Request 2, "No.": the model calls nothing. Nothing was started
-        // and the coffee still waits.
-        {
-            let pending = PENDING.lock().unwrap();
-            let pending = pending.as_ref().unwrap();
-            assert_eq!((pending.id, pending.digest.as_str()), (7, "coffee"));
-        }
+        // Request 2, "No.": the coffee is dropped. Its cancel is refused,
+        // and this voice no longer confirms it all the same.
+        let mut cancelled = None;
+        let told = declined_with(2, "No.", Instant::now(), |id| {
+            cancelled = Some(cancel_declined(&directory, 2, id, PEER_WAIT));
+        });
+        assert_eq!(told.as_deref(), Some(DECLINED_NOTE));
+        assert_eq!(cancelled, Some(false));
+        assert!(PENDING.lock().unwrap().is_none());
         let sent: Vec<Value> = seen.try_iter().collect();
         assert!(sent.iter().all(|line| line["op"] != "confirm"), "{sent:?}");
-        // A yes too late is refused, and nothing is sent.
-        PENDING.lock().unwrap().as_mut().unwrap().at -= CONFIRM_WITHIN + Duration::from_secs(1);
-        let (told, _) = run(&place, &call(CONFIRM, json!({})), 3, true, PEER_WAIT);
         assert!(
-            told["error"].as_str().unwrap().starts_with("Not started"),
-            "{told}"
+            sent.iter()
+                .any(|line| line["op"] == "cancel" && line["id"] == json!(7)),
+            "{sent:?}"
         );
+        // A yes after it, within the 120 s, starts nothing and sends nothing.
+        let (told, _) = run(&place, &call(CONFIRM, json!({})), 3, true, PEER_WAIT);
+        assert!(told["error"].is_string(), "{told}");
         assert!(pending_note(3, Instant::now()).is_none());
-        // Nor is a task waiting that long replaced: it is past its yes.
+        // A cancel never answered is bounded, and keeps nothing waiting.
+        let silent = directory.join("silent");
+        std::fs::create_dir_all(&silent).unwrap();
+        let begun = Instant::now();
+        assert!(!cancel_declined(&silent, 3, 7, Duration::from_millis(300)));
+        assert!(begun.elapsed() < Duration::from_secs(2));
+        // A new ask after the no replaces nothing: nothing waits.
         let (told, _) = run(
             &place,
             &call(START, json!({"task":"Write a haiku about tea"})),
@@ -10959,6 +11049,9 @@ pub(crate) mod tests {
         );
         assert!(told["prepared"] == json!(true), "{told}");
         assert!(!told["next"].as_str().unwrap().starts_with(REPLACED_NEXT));
+        let sent: Vec<Value> = seen.try_iter().collect();
+        assert!(sent.iter().all(|line| line["op"] != "confirm"), "{sent:?}");
+        assert!(sent.iter().all(|line| line["op"] != "cancel"), "{sent:?}");
         // Within its time, a cancel refused leaves the correction prepared.
         PENDING.lock().unwrap().as_mut().unwrap().id = 7;
         let _ = std::fs::remove_dir_all(&directory);
@@ -10989,6 +11082,127 @@ pub(crate) mod tests {
         assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 9);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// A task prepared in request 1 for "Write a haiku about coffee", now.
+    fn waiting_coffee(id: u64) -> Pending {
+        Pending {
+            id,
+            digest: "coffee".into(),
+            request: 1,
+            at: Instant::now(),
+            who: "Claude Code",
+            text: "Write a haiku about coffee".into(),
+            correct: true,
+            session: None,
+        }
+    }
+
+    /// #6582: a heard plain no, then a yes within the 120 s: the tasks part
+    /// is sent its cancel, and the yes starts nothing.
+    #[test]
+    fn a_plain_no_then_a_yes_within_the_window_starts_nothing() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-no-then-yes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![
+                (
+                    "request.sock",
+                    json!({"ok":true,"store_id":"s1","revision":1,"summary":{"session_id":"sess"}}),
+                ),
+                ("request.sock", json!({"ok":true,"revision":2})),
+            ],
+        );
+        for no in ["No.", "No thanks.", "Never mind.", "Don't.", "Cancel that."] {
+            *PENDING.lock().unwrap() = Some(waiting_coffee(7));
+            let mut asked = None;
+            let told = declined_with(2, no, Instant::now(), |id| asked = Some(id));
+            assert_eq!(told.as_deref(), Some(DECLINED_NOTE), "{no}");
+            assert_eq!(asked, Some(7), "{no}");
+            assert!(PENDING.lock().unwrap().is_none(), "{no}");
+        }
+        *PENDING.lock().unwrap() = Some(waiting_coffee(7));
+        let told = declined_with(2, "No, never mind.", Instant::now(), |id| {
+            assert!(cancel_declined(&directory, 2, id, PEER_WAIT));
+        });
+        assert_eq!(told.as_deref(), Some(DECLINED_NOTE));
+        let sent: Vec<Value> = seen.try_iter().collect();
+        let ops: Vec<&str> = sent
+            .iter()
+            .map(|line| line["op"].as_str().unwrap())
+            .collect();
+        assert_eq!(ops, ["status", "cancel"], "{sent:?}");
+        assert_eq!(sent[1]["id"], json!(7));
+        assert_eq!(sent[1]["guard"]["store_id"], json!("s1"));
+        assert_eq!(sent[1]["guard"]["revision"], json!(1));
+        // The yes, in the window: nothing is started, nothing is sent.
+        let (told, _) = run(
+            &correcting(&directory, true),
+            &ToolCall {
+                id: "c".into(),
+                name: CONFIRM.into(),
+                args: json!({}),
+            },
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["error"].is_string(), "{told}");
+        assert!(seen.try_iter().next().is_none());
+        assert!(pending_note(3, Instant::now()).is_none());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #6582: a no that says what to do instead is a correction, the
+    /// model's as before (#2838): nothing is dropped or cancelled.
+    #[test]
+    fn a_correction_after_the_read_back_is_not_a_plain_no() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = Some(waiting_coffee(7));
+        for correction in [
+            "No, write a poem about tea instead.",
+            "No, I said tea.",
+            "No, ask Codex.",
+            "No?",
+        ] {
+            let told = declined_with(2, correction, Instant::now(), |_| {
+                panic!("cancelled on {correction:?}")
+            });
+            assert!(told.is_none(), "{correction}");
+        }
+        assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 7);
+        assert!(pending_note(2, Instant::now()).is_some());
+        *PENDING.lock().unwrap() = None;
+    }
+
+    /// #6582: a plain no with nothing waiting, or one that could not have
+    /// said yes to it (the request that prepared it, or past the 120 s),
+    /// does nothing.
+    #[test]
+    fn a_plain_no_with_nothing_pending_does_nothing() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let nothing = declined_with(2, "No.", Instant::now(), |_| panic!("cancelled"));
+        assert!(nothing.is_none());
+        assert!(PENDING.lock().unwrap().is_none());
+        *PENDING.lock().unwrap() = Some(waiting_coffee(7));
+        let same = declined_with(1, "No.", Instant::now(), |_| panic!("cancelled"));
+        assert!(same.is_none());
+        let late = Instant::now() + CONFIRM_WITHIN + Duration::from_secs(1);
+        let past = declined_with(2, "No.", late, |_| panic!("cancelled"));
+        assert!(past.is_none());
+        assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 7);
+        *PENDING.lock().unwrap() = None;
     }
 
     /// #2838: without the switch the note and `next` are exactly as before,
