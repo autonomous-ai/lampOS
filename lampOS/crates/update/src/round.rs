@@ -2935,7 +2935,11 @@ impl Run<'_, '_> {
             .chain(
                 ended
                     .into_iter()
-                    .filter(|unit| state(unit).is_some_and(|state| state.ended_cleanly()))
+                    .filter(|unit| {
+                        state(unit).is_some_and(|state| {
+                            state.ended_cleanly() && !state.skipped_by_condition()
+                        })
+                    })
                     .map(|unit| {
                         (
                             unit,
@@ -2945,7 +2949,11 @@ impl Run<'_, '_> {
             )
             .chain(
                 control
-                    .filter(|_| state(CONTROL_UNIT).is_some_and(|state| state.ended_cleanly()))
+                    .filter(|_| {
+                        state(CONTROL_UNIT).is_some_and(|state| {
+                            state.ended_cleanly() && !state.skipped_by_condition()
+                        })
+                    })
                     .map(|switch| {
                         (
                             CONTROL_UNIT.to_owned(),
