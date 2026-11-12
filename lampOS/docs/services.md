@@ -2314,9 +2314,9 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   "send"), and the model is told to say only "Okay, I won't send it." The
   model is told "sent" only from this program's answer `sent: true`
   (`services::answered`); over the skills' bounds or refused, "not sent".
-- **Not yet (said so the code is not read as more):** lamp-control keeps
-  no skill yes yet (#6408's `SkillYes`), so no token is minted, and no
-  product unit sets `LAMP_SKILL_TASKS`. A no in other words than a plain
+- **Not yet (said so the code is not read as more):** lamp-control mints a
+  token only from the owner's yes (`folder_yes::FolderYes`, #6304), but no
+  product unit sets `LAMP_SKILL_TASKS`, so none is minted on a lamp yet. A no in other words than a plain
   no drops the voice's waiting write only, and this program's hold lapses
   after its 2 minutes. The coordinator does not know which route answers: on the Live route the
   read-back is said but its yes is "not done on this voice". Tests:

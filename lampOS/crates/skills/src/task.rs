@@ -688,6 +688,30 @@ mod tests {
         }
     }
 
+    /// lamp-control hashes a skill's folder itself when it mints a one-run
+    /// token (`lamp_control::folder_yes`, which lamp-skills' own crate can't
+    /// be called from there): both crates hash this same fixture folder to
+    /// this one value, so a change to either definition fails a test in
+    /// each.
+    #[test]
+    fn the_fixture_folder_hashes_to_the_value_lamp_control_holds() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("booth");
+        fs::create_dir_all(folder.join("scripts")).unwrap();
+        fs::write(folder.join("SKILL.md"), "# fixture\n").unwrap();
+        fs::write(folder.join("skill.toml"), "version = \"1.0.0\"\n").unwrap();
+        fs::write(folder.join("scripts/run.py"), "print(1)\n").unwrap();
+        fs::write(folder.join(".hidden"), "x").unwrap();
+        for record in LAMP_RECORDS {
+            fs::write(folder.join(record), "{}").unwrap();
+        }
+        assert_eq!(
+            folder_sha256(&folder).unwrap(),
+            "4f4b9e83e681e2eb0f28bf27547435dced9b803080f253889ee5458f83f17f16",
+            "the same value as lamp_control::folder_yes::FIXTURE_SHA256"
+        );
+    }
+
     /// The folder's hash changes with any file, hidden ones too, but the
     /// lamp's own records at its top; a link refuses it.
     #[test]

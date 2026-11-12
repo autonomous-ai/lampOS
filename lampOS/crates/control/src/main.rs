@@ -8,6 +8,7 @@
 //!                    [--camera-opens-on-demand]
 //!                    [--microphone on|off]
 //!                    [--run-socket PATH] [--run-socket-user USER]
+//!                    [--skills-dir DIR] [--pushed-skills-dir DIR]
 //!                    [--services-socket PATH]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control grants CLIENT --grants body,light [--admin-socket PATH]
@@ -535,7 +536,18 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                         "lamp-control: skill runs (uid {uid}, {user}) may use {} with a one-run token",
                         run_socket.display()
                     );
-                    shared.set_skill_yes(Arc::new(lamp_control::runs::NoYes));
+                    // The owner's yes in --state-dir, held to the skill's folder as it is at
+                    // each mint (#6304): no yes, or a changed folder, is no token.
+                    shared.set_skill_yes(Arc::new(lamp_control::folder_yes::FolderYes::new(
+                        state.clone(),
+                        PathBuf::from(
+                            option(arguments, "--skills-dir")
+                                .unwrap_or_else(|| lamp_control::folder_yes::STORE_DIR.to_owned()),
+                        ),
+                        PathBuf::from(option(arguments, "--pushed-skills-dir").unwrap_or_else(
+                            || lamp_control::folder_yes::PUSHED_DIR.to_owned(),
+                        )),
+                    )));
                     tokio::spawn(server::serve_run(listener, uid, user, shared.clone()));
                 }
                 Err(why) => eprintln!("lamp-control: the run socket for {user}: off: {why}"),

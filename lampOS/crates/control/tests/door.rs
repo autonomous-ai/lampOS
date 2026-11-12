@@ -3171,3 +3171,68 @@ fn a_local_record_that_could_not_be_kept_is_not_left_in_memory() {
         "told again, not taken as made"
     );
 }
+
+// --- The real SkillYes (#6304): a token only for the owner's yes to the folder as it is ---
+
+/// A skill's folder with the fixture's files (`lamp_control::folder_yes::FIXTURE_SHA256`).
+fn fixture_skill(folder: &std::path::Path) {
+    std::fs::create_dir_all(folder.join("scripts")).unwrap();
+    std::fs::write(folder.join("SKILL.md"), "# fixture\n").unwrap();
+    std::fs::write(folder.join("skill.toml"), "version = \"1.0.0\"\n").unwrap();
+    std::fs::write(folder.join("scripts/run.py"), "print(1)\n").unwrap();
+    std::fs::write(folder.join(".hidden"), "x").unwrap();
+}
+
+#[tokio::test]
+async fn a_mint_follows_the_owners_yes_for_the_skills_folder_as_it_is() {
+    use lamp_control::folder_yes::{CHANGED, FIXTURE_SHA256, FolderYes, WAITING};
+    let lamp = lamp("folder-yes").await;
+    let (state, store, pushed) = (
+        lamp.dir.join("yes-state"),
+        lamp.dir.join("yes-store"),
+        lamp.dir.join("yes-pushed"),
+    );
+    for dir in [&state, &store, &pushed] {
+        std::fs::create_dir_all(dir).unwrap();
+    }
+    fixture_skill(&store.join("booth"));
+    lamp.shared.set_skill_yes(Arc::new(
+        FolderYes::new(state.clone(), store.clone(), pushed).with_switch(|| true),
+    ));
+    // No yes: no token, and the words say why.
+    let refused = mint(&lamp, "booth", "r1").await;
+    assert_eq!(refused["error"], WAITING);
+    assert!(refused.get("token").is_none());
+    // The person's yes (kept by the voice's request in lamp-control's state):
+    // a token with exactly the grants the yes named.
+    lamp_control::task_yes::record(
+        &state,
+        &lamp_control::task_yes::Asked {
+            name: "booth".to_owned(),
+            sha256: FIXTURE_SHA256.to_owned(),
+            grants: vec!["light".to_owned(), "camera".to_owned()],
+        },
+        1,
+    )
+    .unwrap();
+    let minted = mint(&lamp, "booth", "r1").await;
+    assert!(minted["token"].is_string(), "{minted}");
+    let mut grants: Vec<&str> = minted["grants"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|grant| grant.as_str().unwrap())
+        .collect();
+    grants.sort_unstable();
+    assert_eq!(grants, ["camera", "light"]);
+    // A script changed since the yes: asked again, no new token.
+    std::fs::write(store.join("booth/scripts/run.py"), "print(2)\n").unwrap();
+    let changed = mint(&lamp, "booth", "r2").await;
+    assert_eq!(changed["error"], CHANGED);
+    assert!(changed.get("token").is_none());
+    // Another skill with no yes is refused, and nothing is minted for a
+    // name that is not a folder.
+    fixture_skill(&store.join("other"));
+    assert_eq!(mint(&lamp, "other", "r3").await["error"], WAITING);
+    assert!(mint(&lamp, "ghost", "r4").await["error"].is_string());
+}
