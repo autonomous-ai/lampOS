@@ -22,6 +22,7 @@ document.head.append(el('style', { textContent: `
   #panel .mark { font-size: 11px; padding: 1px 6px; opacity: .7; } #panel .on-pass { background: #2e7d32; color: #fff; opacity: 1; } #panel .on-fail { background: #c62828; color: #fff; opacity: 1; }
   #panel .note { max-width: 160px; font-size: 11px; }
   #panel .world button { border-style: dashed; }
+  #panel .hint { flex-basis: 100%; font-size: 11px; color: var(--soft); margin: -2px 0 2px 2px; }
   #panel img.shot { flex-basis: 100%; max-width: 320px; border-radius: 6px; border: 1px solid var(--line); }
   #events { height: 220px; overflow: auto; font: 12px/1.35 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; white-space: pre-wrap; }
   #events .ok { color: var(--accent); } #events .no { color: #d9534f; } #events .ev { color: var(--soft); }
@@ -91,6 +92,8 @@ function row(entry, kind) {
   const children = inputs.map(([field, node]) => (field.type === 'text' ? node : el('label', {}, field.label ?? field.name, node)));
   const node = el('div', { className: 'row' });
   children.push(el('button', { textContent: entry.label, onclick: () => { rowOf.set(counter + 1, node); send({ type: kind, id: ++counter, name: entry.id, args: values() }); } }));
+  // What the row does that its label does not say, under it (textContent: never markup).
+  if (typeof entry.hint === 'string') children.push(el('div', { className: 'hint', textContent: entry.hint }));
   node.append(...children, ...marks(`${kind === 'stim' ? 'stim' : 'call'}:${entry.id}`));
   return node;
 }

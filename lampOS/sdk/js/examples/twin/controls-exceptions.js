@@ -8,7 +8,6 @@ export const COVERAGE_EXCEPTIONS = [
   { kind: 'op', name: 'hello', reason: 'SDK internal: Lamp.connect sends it; its answer is lamp.language and the grants' },
   { kind: 'op', name: 'subscribe', reason: 'SDK internal: lamp.on() sends it for the event log' },
   { kind: 'op', name: 'unsubscribe', reason: 'SDK internal: lamp.off() sends it' },
-  { kind: 'op', name: 'listen.set', reason: `${YET} (lamp.setListening)` },
   { kind: 'op', name: 'lease.renew', reason: `${YET} (a Lease renews itself inside withLease; no row asks for it alone)` },
   { kind: 'op', name: 'service.read', reason: 'the virtual lamp has no service to read (needs a <service>-read grant and lamp-services)' },
   { kind: 'op', name: 'service.write', reason: 'the virtual lamp has no service to write (needs a <service>-write grant and lamp-services)' },
