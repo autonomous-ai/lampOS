@@ -2326,8 +2326,15 @@ every engine Harness reports is the next piece), and not yet on a lamp.
   written whole beside and renamed in. A file at the wrapper's place
   without the mark (the engine's own program, or anyone else's) or a link
   there is refused, never replaced. `present` says the wrapper and the
-  script hold this build's text and the home is there; anything else is
-  the engine missing.
+  script hold this build's text, the home is there, and the wrapper is the
+  `<engine>` `lampos`'s login shell finds (`login_finds`: `runuser -l
+  lampos -c 'command -v <engine>'`, as Harness looks: its installer puts
+  `~/.local/bin` before `/usr/local/bin`, so an engine's own program there
+  would run with no namespace); anything else is the engine missing, and
+  one found before the wrapper is not offered.
+- **Names** are `a-z`, `0-9` and `-`, never starting with `-`. A run's
+  token file is read and deleted before the program is looked for, so a
+  wrapper that finds no program leaves none behind.
 - **Hermes and OpenClaw** keep their own wrappers and namespace scripts
   ("Hermes on the lamp", "OpenClaw on the lamp") for now; they move onto
   this one in step 2.
@@ -2341,7 +2348,9 @@ link or a run id that is not plain refused, no token or `--net` without a
 run, the program found past the wrapper and another marked wrapper; the
 namespace script naming no engine, for every switch, with `HOME` per
 engine; `sh -n` on every text; the writer's modes and its refusal to
-replace a file that is not lamp-update's.
+replace a file that is not lamp-update's; no token file left when no
+program is found; an engine found before the wrapper (or none found) not
+present; the login lookup's argv.
 
 ## A hand install's skill folders (`deploy/sync-skills.sh`)
 
