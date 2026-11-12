@@ -1176,7 +1176,21 @@ pub fn install_made_at(
     // own cap: asked for only, never started on its own. A written or made
     // one to its own (`put_on_cap`).
     let added = added_from_file(&card("SKILL.md"));
-    if added {
+    // An agent skill added from a file (`LAMP_UPLOAD_TO_AGENT` on here):
+    // its own cap, and its file and nothing else beside its two.
+    if added
+        && lamp_voice::upload_agent::on()
+        && lamp_voice::upload_agent::is_agent_card(&card("SKILL.md"))
+    {
+        lamp_voice::upload_agent::capped(&card("skill.toml")).and_then(|_| {
+            lamp_voice::upload_agent::package_files_ok(
+                package
+                    .files
+                    .iter()
+                    .map(|(path, bytes)| (path.as_str(), bytes.as_slice())),
+            )
+        })
+    } else if added {
         lamp_voice::made_skill::capped_added(&card("skill.toml")).map(|_| ())
     } else {
         // Its code too, as it was taken (#6307): its count, sizes and
@@ -3104,6 +3118,8 @@ pub fn task_asks(
         }
     } else if crate::task::made_with_code(&folder, pushed) {
         crate::task::FROM_MADE.to_owned()
+    } else if crate::task::agent_from_file(&folder, pushed) {
+        lamp_voice::upload_agent::FROM.to_owned()
     } else {
         "the Skills Store".to_owned()
     };
