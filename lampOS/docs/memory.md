@@ -1851,6 +1851,24 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `a_made_up_about_on_lamp_forget_that_is_dropped_and_the_forget_is_bare`
     and `a_bare_forget_with_nothing_just_given_never_takes_the_newest_keep`.
     With nothing heard, the model's own `about`, if it gave one, names it.
+    A spoken forget whose line is no longer held is never run as the model
+    made it (`remember::forget_unheard`, C134): every forget clears the
+    thread, the request's own line with it, so the model's retry in the
+    same request has no line. With no `source_id` and no `about` it is
+    marked bare and takes the checks above, never their newest keep
+    (`forget_last`) unasked; with either it is unclear and removes nothing.
+    After a forget removes something, nothing is "given just before" any
+    more, so a second "forget that" never takes the next newest keep, of
+    theirs or, on a room's line, the room's. A refusal that asks which
+    carries the fixed flag `ask_which` (`remember::ASK_WHICH`), kept past
+    the after-forget chat reset as `asked_which=true`, so the model asks
+    rather than calling forget again (lamp-06c1, 12 Nov, build 12226: a
+    refused "Lamp, forget that." retried in the same request removed the
+    umbrella). Tests: `remember::tests`
+    `a_second_bare_forget_after_a_refused_one_asks_never_takes_their_newest_keep`,
+    `a_second_bare_forget_after_their_keep_went_removes_nothing_else`,
+    `a_second_bare_forget_on_the_rooms_line_never_takes_the_rooms_next_keep`
+    and `a_forget_whose_line_is_let_go_is_marked_bare_or_unclear`.
   - **What is removed:** what the asker's own scope keeps and what was
     noticed of them (`kept` with `observations`) that has every one of
     those words, as `forget {about}` matches below, each by `forget {id}`,

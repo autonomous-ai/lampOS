@@ -118,6 +118,20 @@ không nghe được gì hoặc các từ của nó có trong phần yêu cầu 
 một `about` chưa từng được nói bị bỏ và lệnh quên được xem là không nêu tên
 (lamp-06c1, 9/11, bản 10824: «Lamp, forget that.» đi kèm một `about` 2 từ,
 chạy đúng như gọi và xóa chiếc khăn mà không hỏi là thứ nào).
+Một lệnh quên nói ra mà câu của nó không còn được giữ thì không bao giờ
+chạy đúng như mô hình gọi (`remember::forget_unheard`, C134): mỗi lệnh quên
+xóa luồng hội thoại, cả câu của chính yêu cầu đó, nên lần gọi lại của mô
+hình trong cùng yêu cầu không còn câu nào. Không có `source_id` và không có
+`about` thì nó được đánh dấu là không nêu tên và đi qua các bước kiểm tra
+ở trên, không bao giờ tự xóa thứ được giữ mới nhất (`forget_last`) mà không
+hỏi; có một trong hai thì nó được xem là không rõ và không xóa gì. Sau khi
+một lệnh quên đã xóa một thứ, không còn gì là «vừa cho ra», nên lệnh «quên
+cái đó» thứ hai không bao giờ xóa thứ mới nhất kế tiếp, của họ hay, trên
+câu của phòng, của phòng. Một lần từ chối để hỏi là thứ nào mang cờ cố
+định `ask_which` (`remember::ASK_WHICH`), được giữ qua lần đặt lại cuộc trò
+chuyện sau lệnh quên dưới dạng `asked_which=true`, nên mô hình hỏi lại thay
+vì gọi quên lần nữa (lamp-06c1, 12/11, bản 12226: «Lamp, forget that.» bị
+từ chối rồi được gọi lại trong cùng yêu cầu đã xóa chiếc ô).
 
 ## Nhật ký dừng sau một lệnh quên, rồi chạy lại
 
