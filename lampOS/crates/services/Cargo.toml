@@ -42,11 +42,18 @@ pdf-extract = "=0.12.1"
 # A PDF's streams inflated once with a running count before lopdf, which
 # inflates them without bound, sees them: the version lopdf itself uses.
 flate2 = "=1.1.11"
+# `lamp-services mcp` (the lamp's agent's MCP server): a skill run's
+# connection to lamp-control's control socket, WebSocket over a unix socket,
+# pinned as lamp-control pins them.
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
+futures-util = { version = "=0.3.34", default-features = false, features = ["std", "sink"] }
 # The lamp's own UTC offset, for the Calendar time fields' example.
 lamp-local-time = { path = "../local-time" }
 
 [dev-dependencies]
 tempfile = "3"
+# The MCP server's test: a stand-in control socket that accepts.
+tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
 
 [lints]
 workspace = true
