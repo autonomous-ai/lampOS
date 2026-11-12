@@ -390,34 +390,67 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   thì `hermes`, mặc định (#6498; #6226 từng là `openclaw`). Target
   của đèn vẫn là `lamp`, với engine đó; khi engine được chọn chưa cài mà
   engine kia đã cài, dùng engine kia.
-- **Có nêu engine hay không, và lựa chọn trong app (#6492):** một `prepare`
-  cho target `lamp` có thể mang `"engine":"hermes"` hoặc
-  `"engine":"openclaw"` (không có thì không ghi; target khác bỏ qua). Có
-  nêu, việc chạy đúng trên engine đó khi nó đang nằm trong thứ tự của đèn
-  (`lamp_order`: đang bật, bỏ OpenClaw khi Harness cũ hơn 0.6.11, và
-  không được biết là thiếu trên đèn); nếu không, `prepare` bị từ chối với
-  `engine_not_here` và không khởi chạy gì: không bao giờ chuyển sang
-  engine kia. Giá trị khác bị từ chối với `engine_unknown`. Không nêu, việc
-  chạy trên engine mặc định của đèn: lựa chọn của chủ trong app khi đã
-  đặt và nằm trong thứ tự, nếu không thì của `LAMP_LAMP_ENGINE`, nếu không
-  thì của bản build. App đặt nó trên route của app (`--app-socket`) với
-  `{"op":"app_engine_default","engine":"hermes"}` (từ chối
-  `engine_unknown`, hoặc `engine_not_installed` khi engine đó không bật ở
-  đây; `engine_default_unsaved` khi không ghi được file), lưu ở
-  `engine-default.json` trong thư mục tasks (`--dir`) dạng
-  `{"version":1,"engine":"hermes"}`, ghi bên cạnh rồi đổi tên đè. Nó có
-  hiệu lực ngay, không cần khởi động lại: thứ tự của đèn đặt nó lên đầu,
-  câu trả lời `targets` báo nó là engine của target `lamp` (để voice gọi
-  đúng tên), và target của đèn được ghi lại ở lần xem kế tiếp.
-  `{"op":"app_engine_default_state"}` đọc nó. Cả hai trả
-  `{"ok":true,"default":"hermes","chosen_in_app":true}` (`default` là null
+- **Các engine của đèn, có nêu hay không, và lựa chọn trong app (#6492).**
+  Không có gì trên đèn được dựng riêng cho từng engine: Harness có nhiều
+  engine, Hermes và OpenClaw chỉ là hai trong số đó. Các engine của đèn là
+  những engine mà lần xem engine của Harness
+  (`harness machines engines <id> --json`, đọc cùng các lần xem máy tính,
+  có giới hạn và làm mới như chúng) báo là đã cài trên chính máy của đèn
+  (máy mà `harness machines` đánh dấu `current`), theo thứ tự của Harness,
+  trong số những engine Harness khởi động được kèm một việc: engine mà
+  lamp-tasks không có tên là engine Harness khởi động không có prompt đầu
+  (`PROMPT_UNSUPPORTED`), nên không bao giờ được đưa ra, và Devin Cloud
+  chạy trong cloud của Devin, không bao giờ trên đèn. `LAMP_HERMES_ON_LAMP`
+  và `LAMP_OPENCLAW_ON_LAMP` chỉ là công tắc tắt: engine có công tắc tắt
+  thì không được đưa ra (OpenClaw cũng không khi Harness cũ hơn 0.6.11);
+  mọi engine khác không có công tắc. Trước khi một lần xem báo về (hoặc khi
+  đăng xuất, #6407), các engine của đèn là những engine đang bật, như
+  trước. Engine mặc định đứng đầu, rồi mọi engine khác theo thứ tự của
+  Harness (`lamp_order`): lựa chọn của chủ trong app khi nó nằm trong số
+  đó, nếu không thì của `LAMP_LAMP_ENGINE` (tên bất kỳ engine nào), nếu
+  không thì của bản build (engine đầu tiên đang bật của `lamp_engines`),
+  nếu không thì engine đầu tiên trong số đó. Mục `lamp` trong câu trả lời
+  `targets` báo engine mặc định là `engine` của nó và liệt kê tất cả, mặc
+  định đứng đầu:
+  `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
+  (không có `engines` khi không có engine nào). Một `prepare` cho target
+  `lamp` có thể mang `"engine"` với tên bất kỳ engine nào (không có thì
+  không ghi; target khác bỏ qua). Có nêu, việc chạy đúng trên engine đó khi
+  nó nằm trong các engine của đèn và không được biết là thiếu ở đó, được
+  chuyển cho Harness theo tên (`harness new <engine>` trong thư mục của
+  đèn, như Harness khởi động engine đó: không có runner riêng cho từng
+  engine ở đây; phần chờ Gateway và kiểm tra mất prompt đầu của OpenClaw,
+  #6226, vẫn theo tên nó vì đó là hành vi Harness đã ghi rõ); nếu không,
+  `prepare` bị từ chối với `engine_not_here` và không khởi chạy gì: không
+  bao giờ chuyển sang engine khác. Tên rỗng hoặc chỉ có khoảng trắng bị từ
+  chối với `engine_unknown`. Không nêu, việc chạy trên engine mặc định.
+  Thư mục của đèn chỉ nhận hướng dẫn của Hermes hoặc OpenClaw cho hai
+  engine đó; engine khác đọc cài đặt riêng của nó, như Harness khởi động
+  nó. App đặt engine mặc định trên route của app (`--app-socket`) với
+  `{"op":"app_engine_default","engine":"claude"}`: nằm trong các engine của
+  đèn thì được lưu và có hiệu lực ngay; rỗng thì `engine_unknown`; không
+  nằm trong số đó thì `engine_not_installed`; `engine_default_unsaved` khi
+  không ghi được file. Nó được lưu ở `engine-default.json` trong thư mục
+  tasks (`--dir`) dạng `{"version":1,"engine":"claude"}`, ghi bên cạnh rồi
+  đổi tên đè, và có hiệu lực ngay, không cần khởi động lại: thứ tự của đèn
+  đặt nó lên đầu, câu trả lời `targets` báo nó là engine của target `lamp`
+  (để voice gọi đúng tên), và target của đèn được ghi lại ở lần xem kế
+  tiếp. `{"op":"app_engine_default_state"}` đọc nó. Cả hai trả
+  `{"ok":true,"default":"claude","chosen_in_app":true}` (`default` là null
   khi đèn không có engine; `chosen_in_app` chỉ true khi lựa chọn của app
-  đang là mặc định). File được đọc khi khởi động; thiếu hoặc không hợp lệ
-  là chưa chọn. Reset của đèn xoá nó cùng thư mục tasks. Có trong test:
+  đang là mặc định). File được đọc khi khởi động; thiếu, không hợp lệ, hoặc
+  nêu một engine Harness khởi động không kèm việc thì là chưa chọn. Một lựa
+  chọn không còn nằm trong các engine của đèn (Harness không còn báo nó,
+  hoặc công tắc của nó tắt) bị bỏ qua, không bị xoá. Reset của đèn xoá nó
+  cùng thư mục tasks. Có trong test:
   `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
   `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
   `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
+  `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
   `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
+  `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
+  `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
+  `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
   `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
 - **Khởi động** như Harness khởi động OpenClaw:
   `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
