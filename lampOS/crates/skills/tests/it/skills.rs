@@ -3083,6 +3083,92 @@ fn an_unknown_holds_condition_holds_only_while_its_topic_has_said_nothing() {
     }
 }
 
+/// #6543: `unknown = "holds_stale"` holds while its topic has said nothing
+/// and on a value that has run out; a fresh value is judged on itself, and
+/// after running out a fresh one begins its `for` from that value, not
+/// from the old one's. `"holds"` still stays closed on a value that ran out.
+#[test]
+fn an_unknown_holds_stale_condition_holds_on_a_topic_never_said_or_run_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |extra: &str| {
+        format!(
+            "[trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+             [[while]]\ntopic = \"memory/rules\"\nfield = \"keep_light_on\"\nnot_equals = true\n{extra}\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ dim = 1 }}\n"
+        )
+    };
+    let stale = skill_with(dir.path(), "stale", &toml("unknown = \"holds_stale\"\n"));
+    let timed = skill_with(
+        dir.path(),
+        "timed",
+        &toml("unknown = \"holds_stale\"\nfor = \"10s\"\n"),
+    );
+    let holds = skill_with(dir.path(), "holds", &toml("unknown = \"holds\"\n"));
+    let high = r#"{"co2_ppm":1300,"feel":"stuffy"}"#;
+    let on = br#"{"keep_light_on":true}"#;
+    let off = br#"{"keep_light_on":false}"#;
+    // (skill, the rules said as (at s, value, lasting ms), when the air
+    // asks, whether it runs.)
+    type Said<'a> = &'a [(u64, &'a [u8], Option<u64>)];
+    let cases: [(&Path, Said, u64, bool, &str); 10] = [
+        (&stale, &[], 1, true, "never said"),
+        (&timed, &[], 1, true, "never said, with for"),
+        (&stale, &[(0, on, None)], 1, false, "fresh, holding not"),
+        (&stale, &[(0, off, None)], 1, true, "fresh, holding"),
+        (&stale, &[(0, on, Some(1_000))], 5, true, "ran out"),
+        (&holds, &[(0, off, Some(1_000))], 5, false, "holds, ran out"),
+        (
+            &stale,
+            &[(0, off, Some(1_000)), (10, on, None)],
+            12,
+            false,
+            "fresh again, holding not",
+        ),
+        (
+            &stale,
+            &[(0, on, Some(1_000)), (10, off, None)],
+            12,
+            true,
+            "fresh again, holding",
+        ),
+        // The old value began the clock at 0 s: 12 s would be long enough
+        // by it, but the clock begins again at the new value's 10 s.
+        (
+            &timed,
+            &[(0, off, Some(1_000)), (10, off, None)],
+            12,
+            false,
+            "fresh again, for not yet",
+        ),
+        (
+            &timed,
+            &[(0, off, Some(1_000)), (10, off, None)],
+            21,
+            true,
+            "fresh again, for since the new value",
+        ),
+    ];
+    for (skill, said, asked, runs, why) in cases {
+        let mut engine = Engine::new(vec![load(skill).unwrap()], true);
+        for (at, value, lasting) in said {
+            engine.observe("memory/rules", at * 1_000_000, value, *lasting);
+        }
+        let ran = !engine
+            .observe("air/state", asked * 1_000_000, high.as_bytes(), None)
+            .is_empty();
+        assert_eq!(ran, runs, "{why}");
+    }
+    // With present it is refused.
+    let bad = skill_with(
+        dir.path(),
+        "bad",
+        "[trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+         [[while]]\ntopic = \"humans/faces/tracked\"\npresent = true\nunknown = \"holds_stale\"\n\
+         [ask]\npolicy = \"nudge\"\n[[do]]\nlight = { dim = 1 }\n",
+    );
+    assert!(load(&bad).unwrap_err().contains("without present"));
+}
+
 /// #1672: `through` goes with a field's `equals` and a `for`, `broken_by`
 /// with `through`, `through` never lists the value it equals, and
 /// `broken_by` names only words heard, the name heard, a push and a touch.

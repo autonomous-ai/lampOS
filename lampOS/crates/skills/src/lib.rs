@@ -768,6 +768,9 @@ struct TestFile {
     /// `"holds"`: it holds while its topic has said nothing yet (#1677: a
     /// rule's topic on a lamp without the rules); a value that has run out
     /// still does not hold. Left out, a silent topic never holds.
+    /// `"holds_stale"` (#6543): it also holds on a value that has run out,
+    /// as a topic gone quiet (`humans/doing`); a fresh value is judged as
+    /// ever, its `for` counted from that value.
     unknown: Option<String>,
     /// Values of the field its clock is carried through (#1672): during a
     /// spell of one of them it does not hold, so nothing runs then, but its
@@ -2415,6 +2418,9 @@ struct Condition {
     for_us: u64,
     /// It holds while its topic has said nothing yet (`unknown = "holds"`).
     unknown_holds: bool,
+    /// It holds too on a value that has run out (`unknown = "holds_stale"`,
+    /// #6543): never said or gone stale, the same.
+    stale_holds: bool,
     /// The values its clock is carried through (`through`, #1672).
     through: Vec<Value>,
     /// The topics that begin its clock again (`broken_by`).
@@ -3859,18 +3865,28 @@ fn manifest(
                 ));
             }
         };
-        let unknown_holds = match condition.unknown.as_deref() {
-            None => false,
-            Some("holds") if condition.lasting.is_none() && condition.present.is_none() => true,
+        let (unknown_holds, stale_holds) = match condition.unknown.as_deref() {
+            None => (false, false),
+            Some("holds") if condition.lasting.is_none() && condition.present.is_none() => {
+                (true, false)
+            }
             Some("holds") => {
                 return Err(format!(
                     "on {}: unknown = \"holds\" goes with a field's test, without for or present",
                     condition.topic
                 ));
             }
+            // A fresh value's `for` counts from that value (#6543).
+            Some("holds_stale") if condition.present.is_none() => (true, true),
+            Some("holds_stale") => {
+                return Err(format!(
+                    "on {}: unknown = \"holds_stale\" goes with a field's test, without present",
+                    condition.topic
+                ));
+            }
             Some(other) => {
                 return Err(format!(
-                    "on {}: unknown is \"holds\" or left out, not {other:?}",
+                    "on {}: unknown is \"holds\", \"holds_stale\" or left out, not {other:?}",
                     condition.topic
                 ));
             }
@@ -3963,6 +3979,7 @@ fn manifest(
             test,
             for_us: condition.lasting.as_deref().map_or(Ok(0), duration_us)?,
             unknown_holds,
+            stale_holds,
             through,
             broken_by,
         });
@@ -7472,6 +7489,10 @@ impl Engine {
     ) -> bool {
         // A topic that has said nothing yet: held only when asked to be.
         if condition.unknown_holds && !latest.contains_key(&condition.topic) {
+            return true;
+        }
+        // One that has run out, too, when asked to (#6543).
+        if condition.stale_holds && Self::fresh(latest, &condition.topic, now_us).is_none() {
             return true;
         }
         Self::fresh(latest, &condition.topic, now_us)

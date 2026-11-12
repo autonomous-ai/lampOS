@@ -1750,6 +1750,15 @@ và `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
 
 Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).
 
+## Điều kiện `[[while]]` khi chủ đề đã hết hạn (`unknown = "holds_stale"`, #6543)
+
+| Giá trị | Ý nghĩa |
+|---------|---------|
+| `unknown = "holds"` | Điều kiện giữ khi chủ đề chưa nói gì (#1677). Một giá trị đã hết hạn vẫn không giữ: `[[while]]` đóng cho tới khi có giá trị mới. Đi với phép thử của một trường, không có `for` hay `present`. Nghĩa này không đổi. |
+| `unknown = "holds_stale"` | Điều kiện giữ khi chủ đề chưa nói gì *và* khi giá trị mới nhất đã hết hạn, như một chủ đề đã im (cho `humans/doing`). Một giá trị còn hạn được xét theo chính nó như mọi khi; một giá trị còn hạn đến sau một giá trị đã hết hạn bắt đầu `for` từ chính nó, không từ giá trị cũ. Vì vậy, với `for`, điều kiện đóng trong khoảng đó khi chủ đề nói lại (ví dụ lamp-seen khởi động lại), dù nó đã giữ trong lúc chủ đề im. Đi với phép thử của một trường, không có `present` (`for` được phép). Chọn thêm: chưa kỹ năng nào dùng. Kiểm thử (`crates/skills/tests/it/skills.rs`): `an_unknown_holds_stale_condition_holds_on_a_topic_never_said_or_run_out` |
+
+Bảng đầy đủ các khóa `[[while]]` ở [skills.md](../skills.md).
+
 ## Socket gọi kỹ năng phân biệt bên gọi (#6128)
 
 `/run/lampos-skills/call.sock` là đường của giọng nói tới các kỹ năng, nhưng
