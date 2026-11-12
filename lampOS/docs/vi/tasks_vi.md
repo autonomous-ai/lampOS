@@ -1027,6 +1027,29 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   Tắt, hoặc không được cấp dịch vụ nào: config không có mục này, như của
   một lần tạo.
 
+### Khóa của một lần chạy, đọc một lần (`LAMP_SKILL_SECRETS`, tắt)
+
+Phán quyết của người xây đầu tiên (19:44 ngày 12/11, #6059): khóa và token
+của một kỹ năng nhập trong app, không bao giờ bằng giọng nói, không bao giờ
+nằm trong thư mục kỹ năng.
+
+- **Hỏi khóa:** trước khi có token, lamp-tasks hỏi socket công cụ của
+  lamp-services (`{"op":"run_secrets","skill"}`), chỉ trả lời cho cgroup của
+  lamp-tasks.service (`skill_keys::ServicesKeys`).
+- **Thiếu một tên:** bị từ chối `missing_secret`, "photo booth didn't run:
+  it needs TELEGRAM_BOT_TOKEN added in the app, on the skill's page", không
+  có token, không gì được chạy. Không hỏi được lamp-services: kỹ năng mà
+  `skill.toml` không có dòng `secrets` vẫn chạy, kỹ năng có thì bị từ chối
+  `no_secrets`.
+- **Tệp:** `.run-env` trong thư mục và home mới riêng của lần chạy
+  (`make-<run id>`, `skill_make::fresh_home`: lần chạy có khóa luôn có nó,
+  qua runner của lần tạo, không có mạng trừ khi được quyền `net`), tạo mới,
+  không qua liên kết, 0400 từ byte đầu, mỗi dòng một `export NAME='value'`.
+- **Đọc một lần:** `/bin/sh` đọc tệp, xóa nó, rồi mới chạy wrapper của
+  Hermes (`skill_keys::LAUNCH`); đọc không được thì không chạy (mã 97).
+  Giá trị không bao giờ nằm trong token, đối số, lời nhờ (chỉ gọi tên biến),
+  dòng nhật ký hay thư mục kỹ năng.
+
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
 Trước đây giọng nói không nói được Harness của đèn đã đăng nhập chưa, hay giao
