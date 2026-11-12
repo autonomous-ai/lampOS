@@ -52,7 +52,7 @@ Environment=LAMP_SERVICES_WRITE=on
 # onto the tools socket for service_read alone, any other call refused. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
 # A made skill's write (#6066, #6142): its one fixed write sent, with LAMP_SERVICES_WRITE above, only when the
-# owner's yes holds that content's SHA-256, at most 3 a skill and 10 in all a day, never a public post. On in the
+# owner's yes holds that content's SHA-256, at most 10 a skill and 30 in all a day, never a public post. On in the
 # product (owner, 11 Nov).
 Environment=LAMP_SKILL_WRITES=on
 # A skill's run on the lamp's Hermes (#6432, services.md): the lamp-control.service cgroup onto the tools socket

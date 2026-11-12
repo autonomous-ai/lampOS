@@ -2123,7 +2123,7 @@ and no text:
    (`writes::scope_missing`), is refused as for the voice. A GitHub
    repository approved as private and public now waits, as above.
 6. **The bounds** (`skill_writes::Ledger`, `skill-writes.json` in the store
-   folder): at most 3 sends a skill and 10 across every skill in any 24
+   folder): at most 10 sends a skill and 30 across every skill in any 24
    hours. Each send is counted before it goes, one at a time, so two at
    once never pass a bound together. A send that then fails still counts.
    The ledger keeps a skill's name and a time, nothing else, so a restart
@@ -2136,13 +2136,13 @@ The write is then sent as the voice's confirmed write is, through the same
 guard and write list, once.
 
 **The journal** keeps counts and outcomes only. "a skill's write to gmail
-was sent (2 of 3 for it today, 5 of 10 for every skill)", "a skill's write
+was sent (2 of 10 for it today, 5 of 30 for every skill)", "a skill's write
 refused: not the approved content (3 since start)", or the refusal's
 words. Never a recipient, a subject or a text. `lamp-skills` writes the
 outcome on its run: "sent to gmail", or the refusal.
 
 **The owner's sent-log** (`skill-writes-sent.json` in the store folder).
-It keeps the last 20 sends, each the skill's name, the service, the time
+It keeps the last 50 sends, each the skill's name, the service, the time
 and who it went to (`skill_writes::sent_to`): a mail's first recipient
 and how many more, an event's guests, an issue's repository or team. A
 recipient is the local part of its address only (a write's addresses are
@@ -2292,8 +2292,8 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   for its yes is refused ("another write waits for the person's yes"),
   so it never drops the person's own. The write is sent only by the
   existing send, the spoken yes through the voice's gate, and then counts
-  against the skills' bounds as a made skill's write does (3 a day a skill,
-  10 across every skill, `skill_writes::Ledger`): over them it is "not sent".
+  against the skills' bounds as a made skill's write does (10 a day a skill,
+  30 across every skill, `skill_writes::Ledger`): over them it is "not sent".
 - **The voice reads it back** (`crates/voice/src/run_write_yes.rs`, with
   `LAMP_SKILL_TASKS=on` in `lamp-voice` too). The coordinator asks this
   program for the run's held write, the voice's own call on the tools
