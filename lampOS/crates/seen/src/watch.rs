@@ -104,10 +104,12 @@ impl Readings {
         }
     }
 
-    /// The gate's inputs at `now_us`, with the opt-in as given.
-    pub fn inputs(&self, opted_in: bool, now_us: u64) -> Inputs {
+    /// The gate's inputs at `now_us`, with the opt-in and whether its on
+    /// line has begun as given.
+    pub fn inputs(&self, opted_in: bool, said_on: bool, now_us: u64) -> Inputs {
         Inputs {
             opted_in,
+            said_on,
             privacy_open: fresh(self.privacy, PRIVACY_LAST_US, now_us).flatten(),
             someone: fresh(self.presence, PRESENCE_LAST_US, now_us).flatten(),
             faces: fresh(self.faces, FACES_LAST_US, now_us).flatten(),
@@ -213,9 +215,10 @@ mod tests {
     #[test]
     fn nothing_heard_is_nothing_known() {
         assert_eq!(
-            Readings::default().inputs(true, 5 * S),
+            Readings::default().inputs(true, true, 5 * S),
             Inputs {
                 opted_in: true,
+                said_on: true,
                 ..Inputs::default()
             }
         );
@@ -223,7 +226,10 @@ mod tests {
 
     #[test]
     fn fresh_readings_open_the_gate() {
-        assert_eq!(may_request(&all_clear(S).inputs(true, S + 10_000)), Ok(()));
+        assert_eq!(
+            may_request(&all_clear(S).inputs(true, true, S + 10_000)),
+            Ok(())
+        );
     }
 
     #[test]
@@ -231,16 +237,16 @@ mod tests {
         let readings = all_clear(S);
         // The privacy lease first, at 50 ms: then not known.
         assert_eq!(
-            may_request(&readings.inputs(true, S + PRIVACY_LAST_US + 1)),
+            may_request(&readings.inputs(true, true, S + PRIVACY_LAST_US + 1)),
             Err(Closed::PrivacyUnknown)
         );
-        let inputs = readings.inputs(true, S + 10 * S);
+        let inputs = readings.inputs(true, true, S + 10 * S);
         assert_eq!(inputs.someone, None);
         assert_eq!(inputs.faces, None);
         assert_eq!(inputs.familiar, None);
         assert_eq!(inputs.asleep, None);
         // A reading from the future (another clock) is not taken.
-        assert_eq!(readings.inputs(true, S - 1).privacy_open, None);
+        assert_eq!(readings.inputs(true, true, S - 1).privacy_open, None);
     }
 
     #[test]
@@ -248,7 +254,7 @@ mod tests {
         let mut readings = all_clear(S);
         readings.privacy(&lease(false), S);
         assert_eq!(
-            may_request(&readings.inputs(true, S)),
+            may_request(&readings.inputs(true, true, S)),
             Err(Closed::PrivacyClosed)
         );
         // An invalid lease is not known, never open.
@@ -256,7 +262,7 @@ mod tests {
         bad.controller_boot = "0".repeat(32);
         readings.privacy(&bad, S);
         assert_eq!(
-            may_request(&readings.inputs(true, S)),
+            may_request(&readings.inputs(true, true, S)),
             Err(Closed::PrivacyUnknown)
         );
     }
@@ -272,11 +278,17 @@ mod tests {
             },
             S,
         );
-        assert_eq!(may_request(&readings.inputs(true, S)), Err(Closed::Nobody));
+        assert_eq!(
+            may_request(&readings.inputs(true, true, S)),
+            Err(Closed::Nobody)
+        );
 
         let mut readings = all_clear(S);
         readings.faces(&Faces { faces: Vec::new() }, S);
-        assert_eq!(may_request(&readings.inputs(true, S)), Err(Closed::Nobody));
+        assert_eq!(
+            may_request(&readings.inputs(true, true, S)),
+            Err(Closed::Nobody)
+        );
 
         let mut readings = all_clear(S);
         readings.faces(
@@ -286,14 +298,14 @@ mod tests {
             S,
         );
         assert_eq!(
-            may_request(&readings.inputs(true, S)),
+            may_request(&readings.inputs(true, true, S)),
             Err(Closed::Stranger)
         );
 
         let mut readings = all_clear(S);
         readings.familiar(&HumanFamiliar { level: None }, S);
         assert_eq!(
-            may_request(&readings.inputs(true, S)),
+            may_request(&readings.inputs(true, true, S)),
             Err(Closed::Stranger)
         );
     }
@@ -340,7 +352,7 @@ mod tests {
             readings.faces(&Faces { faces: Vec::new() }, S + gap / 2);
             one_face(&mut readings, "f2", S + gap);
             renew(&mut readings, S + gap);
-            let inputs = readings.inputs(true, S + gap);
+            let inputs = readings.inputs(true, true, S + gap);
             assert!(inputs.familiar.is_some(), "the level is still fresh");
             assert_eq!(may_request(&inputs), Err(Closed::Stranger), "{gap}");
         }
@@ -350,7 +362,7 @@ mod tests {
         one_face(&mut readings, "f2", S + S / 10);
         renew(&mut readings, S + S / 10);
         assert_eq!(
-            may_request(&readings.inputs(true, S + S / 10)),
+            may_request(&readings.inputs(true, true, S + S / 10)),
             Err(Closed::Stranger)
         );
     }
@@ -369,11 +381,11 @@ mod tests {
         one_face(&mut readings, "f1", S + S);
         renew(&mut readings, 2 * S);
         assert_eq!(
-            may_request(&readings.inputs(true, 2 * S)),
+            may_request(&readings.inputs(true, true, 2 * S)),
             Err(Closed::Stranger)
         );
         regular(&mut readings, 2 * S + 1);
-        assert_eq!(may_request(&readings.inputs(true, 2 * S + 1)), Ok(()));
+        assert_eq!(may_request(&readings.inputs(true, true, 2 * S + 1)), Ok(()));
     }
 
     #[test]
@@ -383,7 +395,11 @@ mod tests {
             let at = S + step * S / 2;
             one_face(&mut readings, "f1", at);
             renew(&mut readings, at);
-            assert_eq!(may_request(&readings.inputs(true, at)), Ok(()), "{at}");
+            assert_eq!(
+                may_request(&readings.inputs(true, true, at)),
+                Ok(()),
+                "{at}"
+            );
         }
     }
 
@@ -393,13 +409,13 @@ mod tests {
         one_face(&mut readings, "f2", 2 * S);
         renew(&mut readings, 2 * S);
         assert_eq!(
-            may_request(&readings.inputs(true, 2 * S)),
+            may_request(&readings.inputs(true, true, 2 * S)),
             Err(Closed::Stranger)
         );
         // The eyes recognise the one now in view as remembered.
         regular(&mut readings, 3 * S);
         renew(&mut readings, 3 * S);
-        assert_eq!(may_request(&readings.inputs(true, 3 * S)), Ok(()));
+        assert_eq!(may_request(&readings.inputs(true, true, 3 * S)), Ok(()));
     }
 
     #[test]
@@ -409,7 +425,7 @@ mod tests {
         one_face(&mut readings, "f1", S + 1);
         renew(&mut readings, S + 1);
         assert_eq!(
-            may_request(&readings.inputs(true, S + 1)),
+            may_request(&readings.inputs(true, true, S + 1)),
             Err(Closed::Stranger)
         );
     }
@@ -418,17 +434,20 @@ mod tests {
     fn asleep_is_read_from_expression() {
         let mut readings = all_clear(S);
         readings.expression(&state(Some(true)), S);
-        assert_eq!(may_request(&readings.inputs(true, S)), Err(Closed::Asleep));
+        assert_eq!(
+            may_request(&readings.inputs(true, true, S)),
+            Err(Closed::Asleep)
+        );
         // Expression planning no idle layer this step says nothing of sleep:
         // awake by its word.
         readings.expression(&state(None), S);
-        assert_eq!(may_request(&readings.inputs(true, S)), Ok(()));
+        assert_eq!(may_request(&readings.inputs(true, true, S)), Ok(()));
         // A disabled Expression says nothing of sleep: not known.
         let mut off = state(Some(false));
         off.enabled = false;
         readings.expression(&off, S);
         assert_eq!(
-            may_request(&readings.inputs(true, S)),
+            may_request(&readings.inputs(true, true, S)),
             Err(Closed::SleepUnknown)
         );
     }
