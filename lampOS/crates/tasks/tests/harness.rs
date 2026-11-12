@@ -6566,6 +6566,7 @@ fn skill_runner(rig: &Rig, engine: Option<EngineKind>) -> HarnessRunner {
         harness: slot,
         held_by: None,
         retry: Duration::from_millis(20),
+        stopping: std::sync::OnceLock::new(),
     }
 }
 
@@ -6720,6 +6721,65 @@ fn a_skill_run_past_its_deadline_is_closed_now() {
     let closes: Vec<Value> = rig
         .calls()
         .into_iter()
+        .filter(|call| call["args"][0] == "close")
+        .collect();
+    assert_eq!(closes.len(), 1, "closed once");
+    assert_eq!(
+        closes[0]["args"],
+        json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
+    );
+    nothing_left(&rig);
+}
+
+/// lamp-tasks' stop mid-run (a restart, an update) ends the run as its
+/// deadline does: the token first, then `close --now`, then its folder and
+/// token file, since Harness's daemon holds its Hermes and would keep it
+/// going past lamp-tasks (Thirteen's P2 on #6684).
+#[test]
+fn a_skill_run_is_ended_when_lamp_tasks_stops() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT),"delay_ms":5000},
+        "close":{"exit":0},
+    }));
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    runner.stop_on(stop.clone());
+    let ended_at = std::cell::Cell::new(None);
+    let end_token = || {
+        if ended_at.get().is_none() {
+            ended_at.set(Some(rig.calls().len()));
+        }
+    };
+    let stopper = {
+        let stop = stop.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            stop.store(true, std::sync::atomic::Ordering::Release);
+        })
+    };
+    let began = Instant::now();
+    let why = runner
+        .run(&skill_run(Duration::from_secs(60)), &end_token)
+        .unwrap_err();
+    stopper.join().unwrap();
+    assert_eq!(why, "the run was ended as lamp-tasks stops");
+    assert!(
+        began.elapsed() < Duration::from_secs(4),
+        "{:?}",
+        began.elapsed()
+    );
+    let before = ended_at.get().expect("the token was ended");
+    let calls = rig.calls();
+    assert!(
+        calls[..before]
+            .iter()
+            .all(|call| call["args"][0] != "close")
+    );
+    let closes: Vec<&Value> = calls
+        .iter()
         .filter(|call| call["args"][0] == "close")
         .collect();
     assert_eq!(closes.len(), 1, "closed once");

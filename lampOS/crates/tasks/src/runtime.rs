@@ -3980,15 +3980,21 @@ pub fn serve<C: Clock>(
     // The Harness a skill's run is started through (#6510 Part 1 step 2):
     // set below once Harness is, as spoken tasks have it.
     let skill_harness: crate::skill_task::SkillHarnessSlot = Arc::default();
+    // Joined at the stop, so a skill's run is ended before the process exits.
+    let mut skill_served: Option<thread::JoinHandle<()>> = None;
+    let skill_stop = stop.clone();
     match std::env::var_os("HOME").map(PathBuf::from) {
         Some(home) if skill_tasks => {
             match crate::skill_task::HandOvers::lamp(&home, skill_harness.clone())
                 .start(true, stop.clone())
             {
-                Ok(_) => eprintln!(
-                    "tasks: a skill's tasks are taken on {}",
-                    crate::skill_task::HAND_OVER_SOCKET
-                ),
+                Ok(served) => {
+                    eprintln!(
+                        "tasks: a skill's tasks are taken on {}",
+                        crate::skill_task::HAND_OVER_SOCKET
+                    );
+                    skill_served = served;
+                }
                 Err(error) => eprintln!("tasks: a skill's tasks stay off: {error}"),
             }
         }
@@ -4074,7 +4080,7 @@ pub fn serve<C: Clock>(
             set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
         );
     }
-    serve_with_adapter(config, clock, stop, move |session| {
+    let served = serve_with_adapter(config, clock, stop, move |session| {
         // The update hold (#5229), off unless set: held, or lifted on a
         // lamp following the lamp-voice feed, the canary (#6300), decided
         // once for every writer below.
@@ -4182,7 +4188,17 @@ pub fn serve<C: Clock>(
             );
         }
         Ok(Production::Cli(Box::new(cli)))
-    })
+    });
+    // A skill's run Harness's daemon holds is ended (its token revoked, its
+    // session closed) before lamp-tasks exits (Thirteen's P2 on #6684);
+    // bounded by `skill_task::STOP_WAIT`.
+    if let Some(skill_served) = skill_served {
+        // Served may have returned before the stop was set (an error at
+        // start-up): set it, or the accept loop would never end.
+        skill_stop.store(true, Ordering::Release);
+        let _ = skill_served.join();
+    }
+    served
 }
 
 /// The machines a `harness machines` look said are offline (`status:

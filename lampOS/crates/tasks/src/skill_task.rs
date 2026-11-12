@@ -629,6 +629,11 @@ impl SkillRun {
 /// namespace's SIGKILL).
 pub trait Runner {
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String>;
+    /// lamp-tasks' own stop ([`HandOvers::start`]'s): a runner whose run
+    /// outlives lamp-tasks (one Harness's daemon holds) ends it when this
+    /// is set, as at its deadline. A runner whose run dies with lamp-tasks
+    /// needs none.
+    fn stop_on(&self, _stop: std::sync::Arc<std::sync::atomic::AtomicBool>) {}
 }
 
 /// Ends the token however the run ends, a panic too, and once only: the
@@ -985,6 +990,12 @@ pub struct HarnessRunner {
     pub held_by: Option<PathBuf>,
     /// How long a failed `wait` rests before it is asked again.
     pub retry: Duration,
+    /// lamp-tasks' stop ([`Runner::stop_on`]): set, a run being waited on
+    /// is ended as at its deadline (revoke, `close --now`, its folder and
+    /// token file removed), since Harness's daemon, not lamp-tasks, holds
+    /// the run's Hermes and it would outlive a lamp-tasks restart
+    /// (Thirteen's P2 on #6684).
+    pub stopping: std::sync::OnceLock<std::sync::Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl HarnessRunner {
@@ -1001,6 +1012,7 @@ impl HarnessRunner {
             harness,
             held_by: Some(PathBuf::from(HERMES)),
             retry: WAIT_RETRY,
+            stopping: std::sync::OnceLock::new(),
         }
     }
 }
@@ -1065,6 +1077,10 @@ fn ended_as(state: &str) -> Result<u64, String> {
 }
 
 impl Runner for HarnessRunner {
+    fn stop_on(&self, stop: std::sync::Arc<std::sync::atomic::AtomicBool>) {
+        let _ = self.stopping.set(stop);
+    }
+
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
         use crate::harness::{Cli, EngineKind, Launch, LaunchOutcome, Target};
         use std::os::unix::fs::DirBuilderExt;
@@ -1157,14 +1173,34 @@ impl Runner for HarnessRunner {
         let agents = [agent];
         let cancel = AtomicBool::new(false);
         let deadline = run.deadline.saturating_sub(began.elapsed());
+        let stopping = self.stopping.get().cloned();
+        let stopped = || {
+            stopping
+                .as_ref()
+                .is_some_and(|stop| stop.load(Ordering::Acquire))
+        };
         let ended = std::thread::scope(|scope| {
             let (done, wakes) = std::sync::mpsc::channel::<()>();
             let cancel = &cancel;
+            let stopped = &stopped;
+            // The deadline, or lamp-tasks' stop, whichever comes first,
+            // cancels the wait.
             scope.spawn(move || {
-                if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) =
-                    wakes.recv_timeout(deadline)
-                {
-                    cancel.store(true, Ordering::Release);
+                let until = std::time::Instant::now() + deadline;
+                loop {
+                    if stopped() {
+                        cancel.store(true, Ordering::Release);
+                        return;
+                    }
+                    let left = until.saturating_duration_since(std::time::Instant::now());
+                    if left.is_zero() {
+                        cancel.store(true, Ordering::Release);
+                        return;
+                    }
+                    match wakes.recv_timeout(left.min(RUN_TICK)) {
+                        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                        _ => return,
+                    }
                 }
             });
             let ended = loop {
@@ -1252,6 +1288,12 @@ pub struct HandOvers {
 }
 
 /// What a second run is told while one runs.
+/// How long lamp-tasks' stop waits for a skill's run to be ended
+/// ([`HandOvers::start`]'s thread, joined by `runtime::serve`): its token
+/// revoked and its session closed `--now`, under lamp-tasks.service's stop
+/// timeout.
+pub const STOP_WAIT: Duration = Duration::from_secs(20);
+
 pub const BUSY: &str = "a skill's task is already running on this lamp; one runs at a time";
 
 impl HandOvers {
@@ -1282,6 +1324,7 @@ impl HandOvers {
             return Ok(None);
         }
         let (listener, binding) = crate::runtime::bind(&self.socket)?;
+        self.runner.stop_on(stop.clone());
         let served = std::thread::Builder::new()
             .name("tasks-skill-task".into())
             .spawn(move || {
@@ -1347,6 +1390,13 @@ impl HandOvers {
                     let _held = held;
                     served.one(&stream, &running);
                 });
+        }
+        // lamp-tasks stops: a run still going is ended through its runner
+        // (revoke, `close --now`, its folder removed) before this returns,
+        // for at most [`STOP_WAIT`], so the process doesn't exit under it.
+        let stopping = std::time::Instant::now();
+        while running.load(Ordering::Acquire) && stopping.elapsed() < STOP_WAIT {
+            std::thread::sleep(ACCEPT_TICK);
         }
     }
 
