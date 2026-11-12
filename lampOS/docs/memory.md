@@ -234,6 +234,9 @@ the app (lamp-cloud's `faces.rs`) and one asked by voice
 The app's removal of a person (lamp-cloud's `face.remove` with `entirely`,
 [cloud.md](cloud.md)) forgets them entirely, not only their face. Memory
 gives the app one narrow call for it and no read access.
+The same removal can be run by hand on the lamp, as root, with no app:
+`lamp-cloud face-remove NAME` asks the main socket for each id
+([cloud.md](cloud.md), "The faces it knows").
 
 - **The request:** `{"op":"forget_person","person":ID}`. With
   `--memory-days`, `Days::forget_person` erases the person's entries and

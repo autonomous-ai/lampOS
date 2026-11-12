@@ -209,6 +209,16 @@ pub fn remove(
     data: &Value,
     schedule: Option<&lamp_actions::schedule::Adapter>,
 ) -> Result<Value, String> {
+    remove_asking(eyes, data, schedule).map(|(told, _)| told)
+}
+
+/// [`remove`], and the `forget_person` asks it made of memory (none for a
+/// face only): what `lamp-cloud face-remove` prints (`crate::face_remove`).
+pub fn remove_asking(
+    eyes: &Eyes,
+    data: &Value,
+    schedule: Option<&lamp_actions::schedule::Adapter>,
+) -> Result<(Value, Vec<Value>), String> {
     // A lamp that takes `entirely` says so in a nameless remove's refusal:
     // that refusal is the app's probe for its two choices (Mobile on
     // #2563). A lamp without the field refuses it plainly.
@@ -275,7 +285,12 @@ pub fn remove(
     if let Some(reminders) = reminders {
         told["reminders"] = reminders;
     }
-    Ok(told)
+    let asked = if entirely && eyes.memory.is_some() {
+        asks
+    } else {
+        vec![]
+    };
+    Ok((told, asked))
 }
 
 /// The reminders each of `asks`' people set, cancelled ([`memory_asks`]'
