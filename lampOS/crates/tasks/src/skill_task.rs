@@ -255,10 +255,14 @@ pub const NET_GRANT: &str = "net";
 /// `LAMP_UPLOAD_TO_AGENT`): a file added in the app, kept whole, which
 /// Hermes follows rather than runs.
 pub const AGENT_INSTRUCTIONS: &str = "scripts/SKILL.md";
-/// How an agent skill's run's own folder's name begins: a fresh one each
-/// run, in the lamp's work folder, removed when it ends
-/// (`crate::skill_make::fresh_folder`).
-pub const AGENT_FOLDER_HEAD: &str = "agent-";
+/// Said when a run that must have a fresh home of its own (an agent
+/// skill's, or one granted [`NET_GRANT`]) has no make runner or work
+/// folder to be given one.
+pub const NO_FRESH_HOME: &str = "this run can't be given a fresh home of its own, so the person's Hermes data stays hidden and nothing was started";
+/// Said for an agent skill's or a `net` run when the make's runner finds
+/// no make-home line in Hermes's wrapper or namespace script
+/// ([`crate::skill_make::NO_NAMESPACE`], said for a make).
+pub const NO_RUN_NAMESPACE: &str = "the lamp's Hermes can't be given an agent run's own home yet (its wrapper or namespace script has no make-home line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
 /// Whether [`NET_SWITCH`]'s `value` is on: `on` exactly.
 pub fn net_on(value: Option<&str>) -> bool {
@@ -966,9 +970,15 @@ pub struct Agent<'a> {
     /// ([`crate::skill_make::lamp_runner`] not held). None: `net` is no
     /// grant.
     pub net: Option<&'a dyn Runner>,
-    /// The lamp's work folder, where an agent skill's run gets a fresh
-    /// folder of its own ([`AGENT_FOLDER_HEAD`]); none starts it in the
-    /// runner's own.
+    /// The runner an agent skill's run without [`NET_GRANT`] goes through:
+    /// the make's, held off the network
+    /// ([`crate::skill_make::lamp_runner`] held), so its fresh home is
+    /// checked taken. None: an agent skill's run is refused.
+    pub held: Option<&'a dyn Runner>,
+    /// The lamp's work folder, where an agent skill's run and a `net` run
+    /// get a fresh folder and home of their own
+    /// ([`crate::skill_make::fresh_home`], `make-<run id>`, Hermes's
+    /// lasting home hidden from them); none: they are refused.
     pub work: Option<&'a Path>,
 }
 
@@ -1017,9 +1027,18 @@ pub fn answer_for(
         Err((code, why)) => return refusal(code, &why),
     };
     let keeps_net = hand.grants.iter().any(|grant| grant == NET_GRANT);
-    let runner = match (keeps_net, agent.net) {
-        (true, Some(open)) => open,
-        _ => runner,
+    // An agent skill's run and a `net` run have Hermes with the person's
+    // words, and a `net` one the network too: each starts in a fresh home
+    // of its own through the make's runner, which checks the wrapper takes
+    // it, never in Hermes's lasting home (its memories and sessions).
+    let fresh_home = keeps_net || hand.run == AGENT_INSTRUCTIONS;
+    let runner = if fresh_home {
+        match (agent.work, if keeps_net { agent.net } else { agent.held }) {
+            (Some(_), Some(make)) => make,
+            _ => return refusal("run_failed", NO_FRESH_HOME),
+        }
+    } else {
+        runner
     };
     let asked: Vec<String> = hand
         .grants
@@ -1027,7 +1046,7 @@ pub fn answer_for(
         .filter(|grant| *grant != NET_GRANT)
         .cloned()
         .collect();
-    run_on_token(&hand.skill, &asked, false, tokens, runner, |run, token| {
+    let told = run_on_token(&hand.skill, &asked, false, tokens, runner, |run, token| {
         // `net` keeps the network only with lamp-control's yes naming it for
         // this folder as it is (the token can't carry it): never on the
         // line's word alone.
@@ -1045,25 +1064,35 @@ pub fn answer_for(
             run,
             token,
         );
-        // An agent skill's run starts in a fresh folder of its own, removed
-        // however it ends, as a make's does.
+        // Its own folder and fresh home, removed however it ends, as a make's.
         let fresh = match agent.work {
-            Some(work) if hand.run == AGENT_INSTRUCTIONS => {
-                match crate::skill_make::fresh_folder(work, AGENT_FOLDER_HEAD) {
-                    Ok(folder) => Some(folder),
-                    Err(error) => {
-                        return Err(refusal(
-                            "run_failed",
-                            &format!("the run's own folder was not made: {error}"),
-                        ));
-                    }
+            Some(work) if fresh_home => match crate::skill_make::fresh_home(work) {
+                Ok(folder) => Some(folder),
+                Err(error) => {
+                    return Err(refusal(
+                        "run_failed",
+                        &format!("the run's own folder was not made: {error}"),
+                    ));
                 }
-            }
+            },
             _ => None,
         };
-        made.start_in = fresh.as_ref().map(|folder| folder.path.clone());
+        if let Some(folder) = &fresh {
+            made.env.extend(crate::skill_make::home_env(&folder.path));
+            made.start_in = Some(folder.path.clone());
+        }
         Ok((made, fresh))
-    })
+    });
+    match told["message"].as_str() {
+        Some(why)
+            if fresh_home
+                && told["error"] == "run_failed"
+                && why == crate::skill_make::NO_NAMESPACE =>
+        {
+            refusal("run_failed", NO_RUN_NAMESPACE)
+        }
+        _ => told,
+    }
 }
 
 /// `skill`'s run asking `grants`: a token minted for a run id of its own,
@@ -2685,7 +2714,11 @@ pub struct HandOvers {
     /// With [`NET_SWITCH`] on, the runner a `net` run goes through
     /// ([`Agent::net`]).
     pub net: Option<std::sync::Arc<dyn Runner + Send + Sync>>,
-    /// The lamp's work folder, for an agent skill's run ([`Agent::work`]).
+    /// The make's runner held off the network, for an agent skill's run
+    /// without `net` ([`Agent::held`]).
+    pub held: Option<std::sync::Arc<dyn Runner + Send + Sync>>,
+    /// The lamp's work folder, for an agent skill's or a `net` run's fresh
+    /// home ([`Agent::work`]).
     pub work: Option<PathBuf>,
 }
 
@@ -2732,6 +2765,9 @@ impl HandOvers {
                 std::sync::Arc::new(crate::skill_make::lamp_runner(home, false))
                     as std::sync::Arc<dyn Runner + Send + Sync>
             }),
+            held: Some(std::sync::Arc::new(crate::skill_make::lamp_runner(
+                home, true,
+            ))),
         }
     }
 
@@ -2845,6 +2881,7 @@ impl HandOvers {
         let place = Place(running);
         let agent = Agent {
             net: self.net.as_deref().map(|net| net as &dyn Runner),
+            held: self.held.as_deref().map(|held| held as &dyn Runner),
             work: self.work.as_deref(),
         };
         let answered = answer_agent(
@@ -3984,6 +4021,7 @@ mod tests {
             runner: std::sync::Arc::new(runner),
             caller,
             net: None,
+            held: None,
             work: None,
         }
         .start(true, stop.clone())
@@ -4084,6 +4122,7 @@ mod tests {
             runner: std::sync::Arc::new(runner),
             caller: |_| true,
             net: None,
+            held: None,
             work: None,
         }
         .start(false, std::sync::Arc::default())
@@ -5240,18 +5279,46 @@ mod tests {
         assert!(lines[0].contains("no session named for it"), "{lines:?}");
     }
 
-    /// A runner that keeps where each run started, and whether that folder
-    /// was there while it ran.
+    /// What a [`WhereRunner`] saw of one run: where it started, whether that
+    /// folder was there, its words, its environment, and whether its fresh
+    /// home held only the provider config and the runtime links
+    /// ([`crate::skill_make::RUNTIME_LINKS`]) while it ran.
+    type WhereSeen = (
+        Option<PathBuf>,
+        bool,
+        String,
+        Vec<(&'static str, String)>,
+        bool,
+    );
+
+    /// A runner that keeps what each run was started with.
     struct WhereRunner {
-        started: RefCell<Vec<(Option<PathBuf>, bool, String)>>,
+        started: RefCell<Vec<WhereSeen>>,
     }
 
     impl Runner for WhereRunner {
         fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
             let there = run.start_in.as_deref().is_some_and(Path::is_dir);
-            self.started
-                .borrow_mut()
-                .push((run.start_in.clone(), there, run.prompt.clone()));
+            let fresh = run.start_in.as_deref().is_some_and(|folder| {
+                let hermes = folder
+                    .join(crate::skill_make::HOME_FOLDER)
+                    .join(crate::skill_make::HERMES_FOLDER);
+                let mut names: Vec<_> = std::fs::read_dir(&hermes)
+                    .map(|entries| entries.flatten().map(|entry| entry.file_name()).collect())
+                    .unwrap_or_default();
+                names.sort();
+                let mut only = vec![crate::skill_make::CONFIG_FILE];
+                only.extend(crate::skill_make::RUNTIME_LINKS.map(|(name, _)| name));
+                only.sort();
+                names == only
+            });
+            self.started.borrow_mut().push((
+                run.start_in.clone(),
+                there,
+                run.prompt.clone(),
+                run.env.clone(),
+                fresh,
+            ));
             Ok(0)
         }
     }
@@ -5262,6 +5329,21 @@ mod tests {
         }
     }
 
+    /// The env a run in `folder` is given for its fresh home.
+    fn home_names(folder: &Path) -> Vec<(&'static str, String)> {
+        let home = folder.join(crate::skill_make::HOME_FOLDER);
+        vec![
+            ("HOME", home.display().to_string()),
+            (
+                crate::hold::HERMES_HOME,
+                home.join(crate::skill_make::HERMES_FOLDER)
+                    .display()
+                    .to_string(),
+            ),
+            (crate::skill_make::HOME_ENV, home.display().to_string()),
+        ]
+    }
+
     /// LAMP_TASK_NET: a run granted `net` goes through the make's runner,
     /// which keeps the network; one with no `net` stays held. With the
     /// switch off, `net` is no grant and the line is refused. The token
@@ -5270,6 +5352,7 @@ mod tests {
     #[test]
     fn the_net_grant_keeps_the_network_and_no_grant_holds_it() {
         assert!(net_on(Some("on")) && !net_on(Some("yes")) && !net_on(None));
+        let work = tempfile::tempdir().unwrap();
         let with_net = line(|value| value["grants"] = json!(["camera", "light", NET_GRANT]));
         // lamp-control's yes doesn't name `net`: refused, nothing run, the
         // token ended.
@@ -5277,7 +5360,8 @@ mod tests {
         let (held, open) = (where_runner(), where_runner());
         let agent = Agent {
             net: Some(&open),
-            work: None,
+            held: None,
+            work: Some(work.path()),
         };
         let told = answer_agent(&with_net, true, skills(), &no_net_yes, &held, &agent);
         assert_eq!(told["error"], "no_token", "{told}");
@@ -5291,7 +5375,8 @@ mod tests {
         let (held, open) = (where_runner(), where_runner());
         let agent = Agent {
             net: Some(&open),
-            work: None,
+            held: None,
+            work: Some(work.path()),
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told, json!({"ok": true, "id": 0}), "{told}");
@@ -5322,43 +5407,162 @@ mod tests {
         );
     }
 
-    /// An agent skill's run (LAMP_UPLOAD_TO_AGENT): Hermes is told to follow
-    /// the file, never to run it; it starts in a fresh folder of its own
-    /// in the work folder, gone when it ends; its environment is the
-    /// socket, the token and the SDK's path alone, so no key of anyone's
-    /// is in it, and the words never ask for one to be written.
+    /// The P1 #6643 closed for a make, closed for a `net` run too: Hermes
+    /// with the network never runs in its lasting home (the person's
+    /// memories and sessions). Its `HOME` and `HERMES_HOME` are its own
+    /// fresh folder's, `make-<run id>/home`, holding only the provider
+    /// config and the runtime links, named to the wrapper by `LAMP_NS_HOME`;
+    /// the folder is gone when it ends. With no work folder or make runner
+    /// it is refused, nothing minted.
     #[test]
-    fn an_agent_run_follows_its_file_in_a_fresh_folder_with_no_key() {
+    fn a_net_run_has_a_fresh_home_of_its_own_never_the_lasting_one() {
         let work = tempfile::tempdir().unwrap();
-        let agent_line = line(|value| value["run"] = json!(AGENT_INSTRUCTIONS));
-        let tokens = FakeTokens::default();
-        let held = where_runner();
+        let with_net = line(|value| value["grants"] = json!(["light", NET_GRANT]));
+        let tokens = FakeTokens {
+            yes: Some(vec!["light".into()]),
+            net_yes: true,
+            ..FakeTokens::default()
+        };
+        let (held, open) = (where_runner(), where_runner());
         let agent = Agent {
-            net: None,
+            net: Some(&open),
+            held: None,
             work: Some(work.path()),
         };
-        let told = answer_agent(&agent_line, true, skills(), &tokens, &held, &agent);
+        let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
-        let started = held.started.borrow();
-        let (folder, there, prompt) = &started[0];
+        let started = open.started.borrow();
+        let (folder, there, _, env, fresh) = &started[0];
         let folder = folder.as_ref().unwrap();
-        assert!(*there && folder.starts_with(work.path()), "{folder:?}");
+        assert!(*there && *fresh, "{folder:?}");
+        assert_eq!(folder.parent(), Some(work.path()));
         assert!(
             folder
                 .file_name()
                 .unwrap()
                 .to_string_lossy()
-                .starts_with(AGENT_FOLDER_HEAD)
+                .starts_with(crate::skill_make::FOLDER_HEAD)
         );
+        for named in home_names(folder) {
+            assert!(env.contains(&named), "{named:?} in {env:?}");
+        }
+        assert!(!folder.exists(), "the run's folder and home are removed");
+        // The run's own HOME wins over the runner's lasting one.
+        let lasting = HermesRunner::lamp(Path::new("/home/lampos"));
+        assert!(
+            lasting
+                .env
+                .iter()
+                .any(|(name, value)| name == "HOME" && value == "/home/lampos")
+        );
+        drop(started);
+        // No work folder: refused before a token.
+        let minted = tokens.minted.borrow().len();
+        let bare = Agent {
+            net: Some(&open),
+            held: None,
+            work: None,
+        };
+        let told = answer_agent(&with_net, true, skills(), &tokens, &held, &bare);
+        assert_eq!(told["error"], "run_failed", "{told}");
+        assert_eq!(told["message"], NO_FRESH_HOME);
+        assert_eq!(tokens.minted.borrow().len(), minted);
+        assert_eq!(open.started.borrow().len(), 1);
+    }
+
+    /// The namespace a fresh home is taken in: the wrapper takes
+    /// `make-*/home` in the make work folder, the one name
+    /// [`crate::skill_make::fresh_home`] gives, and the namespace script
+    /// covers Hermes's lasting home with a tmpfs, puts the checkout back
+    /// read-only, makes the home and the work folder read-only and hides
+    /// the work folder but for the run's own.
+    #[test]
+    fn a_fresh_home_is_taken_with_the_lasting_home_covered() {
+        use crate::skill_make::{FOLDER_HEAD, MAKE_WORK, NS_HOME_LINE, WRAPPER_HOME_LINE};
+        assert!(WRAPPER_HOME_LINE.contains(&format!("{MAKE_WORK}/{FOLDER_HEAD}*/home)")));
+        assert!(WRAPPER_HOME_LINE.contains("export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\""));
+        for cover in [
+            "mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\"",
+            "mount --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\"",
+            "ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"",
+            "mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\"",
+            "mkdir \"$F\" && mount --move \"$X/f\" \"$F\"",
+            "HOME=$LAMP_NS_HOME",
+        ] {
+            assert!(NS_HOME_LINE.contains(cover), "{cover}");
+        }
+        // The lamp's runners are the make's, which check both lines before
+        // every run, in the make work folder, and so are the hand-overs'.
+        let home = Path::new("/var/lib/lampos-tasks");
+        for held in [true, false] {
+            let runner = crate::skill_make::lamp_runner(home, held);
+            assert_eq!(runner.hermes.folder, Path::new(MAKE_WORK));
+        }
+        let lamp = HandOvers::lamp(home, std::sync::Arc::default(), std::sync::Arc::default());
+        assert_eq!(lamp.work.as_deref(), Some(Path::new(MAKE_WORK)));
+        assert!(lamp.held.is_some());
+    }
+
+    /// An agent skill's run (LAMP_UPLOAD_TO_AGENT): Hermes is told to follow
+    /// the file, never to run it; it goes through the make's held runner
+    /// and starts in a fresh folder and home of its own in the work folder,
+    /// gone when it ends; its environment is the socket, the token, the
+    /// SDK's path and its home alone, so no key of anyone's is in it, and
+    /// the words never ask for one to be written. With no held runner it
+    /// is refused, never run in the lasting home.
+    #[test]
+    fn an_agent_run_follows_its_file_in_a_fresh_home_with_no_key() {
+        let work = tempfile::tempdir().unwrap();
+        let agent_line = line(|value| value["run"] = json!(AGENT_INSTRUCTIONS));
+        let tokens = FakeTokens::default();
+        let (runner, held) = (where_runner(), where_runner());
+        let agent = Agent {
+            net: None,
+            held: Some(&held),
+            work: Some(work.path()),
+        };
+        let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
+        assert_eq!(told["ok"], true, "{told}");
+        assert!(runner.started.borrow().is_empty());
+        let started = held.started.borrow();
+        let (folder, there, prompt, env, fresh) = &started[0];
+        let folder = folder.as_ref().unwrap();
+        assert!(*there && *fresh, "{folder:?}");
+        assert_eq!(folder.parent(), Some(work.path()));
         assert!(!folder.exists(), "the run's folder is removed when it ends");
         assert!(prompt.contains("do what it says"), "{prompt}");
         assert!(prompt.contains("Never ask anyone"), "{prompt}");
-        // A script's run starts in the work folder as before.
+        // Its environment: the socket, the token, the SDK and its home.
+        let names: Vec<&str> = env.iter().map(|(name, _)| *name).collect();
+        assert_eq!(
+            names,
+            [
+                SOCKET_ENV,
+                TOKEN_ENV,
+                PYTHONPATH_ENV,
+                "HOME",
+                crate::hold::HERMES_HOME,
+                crate::skill_make::HOME_ENV
+            ]
+        );
+        assert_eq!(env[3..], home_names(folder)[..]);
         drop(started);
-        let told = answer_agent(&line(|_| {}), true, skills(), &tokens, &held, &agent);
+        // A script's run starts in the work folder as before, its runner's.
+        let told = answer_agent(&line(|_| {}), true, skills(), &tokens, &runner, &agent);
         assert_eq!(told["ok"], true);
-        assert!(held.started.borrow()[1].0.is_none());
-        // Its environment: the socket, the token and the SDK, nothing else.
+        assert!(runner.started.borrow()[0].0.is_none());
+        assert_eq!(held.started.borrow().len(), 1);
+        // No held runner: refused, nothing minted or run.
+        let minted = tokens.minted.borrow().len();
+        let bare = Agent {
+            net: None,
+            held: None,
+            work: Some(work.path()),
+        };
+        let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &bare);
+        assert_eq!(told["message"], NO_FRESH_HOME, "{told}");
+        assert_eq!(tokens.minted.borrow().len(), minted);
+        assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
         let hand = HandOver::parse(&agent_line, skills()).unwrap();
         let run = SkillRun::of(
             &hand.skill,
@@ -5367,8 +5571,27 @@ mod tests {
             "run-1",
             &RunToken::new("tok".into()),
         );
-        let names: Vec<&str> = run.env.iter().map(|(name, _)| *name).collect();
-        assert_eq!(names, [SOCKET_ENV, TOKEN_ENV, PYTHONPATH_ENV]);
         assert!(!format!("{run:?}").contains("tok\""));
+        // The make's runner finds no make-home line: told as an agent
+        // run's own home, never a make's, and the folder is gone.
+        let no_lines = Refusing(crate::skill_make::NO_NAMESPACE);
+        let lineless = Agent {
+            net: None,
+            held: Some(&no_lines),
+            work: Some(work.path()),
+        };
+        let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &lineless);
+        assert_eq!(told["message"], NO_RUN_NAMESPACE, "{told}");
+        assert!(NO_RUN_NAMESPACE.contains("an agent run's own home"));
+        assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
+    }
+
+    /// A runner that refuses every run with its words.
+    struct Refusing(&'static str);
+
+    impl Runner for Refusing {
+        fn run(&self, _: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            Err(self.0.into())
+        }
     }
 }

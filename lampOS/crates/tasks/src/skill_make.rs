@@ -156,8 +156,6 @@ pub fn prompt(folder: &Path) -> String {
 /// `HERMES_HOME` under it and [`HOME_ENV`] naming it, and nothing else of
 /// its own (no token, no grant).
 pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
-    let home = folder.join(HOME_FOLDER);
-    let shown = |path: &Path| path.to_string_lossy().into_owned();
     SkillRun {
         // The make's own run id, from its folder's name (`make-<run id>`).
         run: folder
@@ -169,15 +167,23 @@ pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
         skill: "make".into(),
         prompt: prompt(folder),
         folder: folder.to_path_buf(),
-        env: vec![
-            ("HOME", shown(&home)),
-            (crate::hold::HERMES_HOME, shown(&home.join(HERMES_FOLDER))),
-            (HOME_ENV, shown(&home)),
-        ],
+        env: home_env(folder).to_vec(),
         deadline: within,
         started: Default::default(),
         start_in: Some(folder.to_path_buf()),
     }
+}
+
+/// The variables naming a run's fresh home in `folder` ([`fresh_home`]):
+/// `HOME`, `HERMES_HOME` under it and [`HOME_ENV`], the wrapper's mark.
+pub(crate) fn home_env(folder: &Path) -> [(&'static str, String); 3] {
+    let home = folder.join(HOME_FOLDER);
+    let shown = |path: &Path| path.to_string_lossy().into_owned();
+    [
+        ("HOME", shown(&home)),
+        (crate::hold::HERMES_HOME, shown(&home.join(HERMES_FOLDER))),
+        (HOME_ENV, shown(&home)),
+    ]
 }
 
 /// A make's own home in its folder (the first builder's 19:14 ruling on
@@ -285,8 +291,20 @@ fn file_in(at: &rustix::fd::OwnedFd, name: &str, text: &str) -> std::io::Result<
 /// before a byte is written, each part opened from the one above, never
 /// through a link.
 fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
-    let made = fresh_folder(work, FOLDER_HEAD)?;
+    let made = fresh_home(work)?;
     file_in(&made.fd, RULES_FILE, rules)?;
+    Ok(made)
+}
+
+/// A run's own folder in `work`, `make-<run id>`, and its fresh home in it
+/// ([`HOME_FOLDER`], [`HERMES_FOLDER`]) with only the provider config
+/// ([`make_config`]): a make's, and an agent skill's run's or a `net`
+/// run's (`crate::skill_task`), so the wrapper takes it as the run's home
+/// and its namespace script hides Hermes's lasting home, the person's
+/// memories and sessions, from the run ([`WRAPPER_HOME_LINE`],
+/// [`NS_HOME_LINE`]). Removed however the run ends.
+pub(crate) fn fresh_home(work: &Path) -> std::io::Result<MadeFolder> {
+    let made = fresh_folder(work, FOLDER_HEAD)?;
     let home = folder_in(&made.fd, HOME_FOLDER)?;
     let hermes = folder_in(&home, HERMES_FOLDER)?;
     file_in(&hermes, CONFIG_FILE, &make_config()?)?;
@@ -297,9 +315,8 @@ fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
 }
 
 /// A fresh folder `<head><run id>` in `work`, 0700 before anything is in
-/// it, opened never through a link and removed however its run ends: a
-/// make's, or an agent skill's run's.
-pub(crate) fn fresh_folder(work: &Path, head: &str) -> std::io::Result<MadeFolder> {
+/// it, opened never through a link and removed however its run ends.
+fn fresh_folder(work: &Path, head: &str) -> std::io::Result<MadeFolder> {
     use rustix::fs::{Mode, open};
     let name = format!("{head}{}", run_id());
     let at = open(work, DIR_FLAGS, Mode::empty())?;
