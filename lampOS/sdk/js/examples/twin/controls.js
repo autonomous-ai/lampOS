@@ -192,7 +192,7 @@ export const CONTROLS = [
     hint: 'steps the volume once and puts it back (level and mute)', fields: [select('how', ['step down', 'step up', 'mute'], 'step down')],
     run: async ({ lamp }, a) => {
       const before = (await lamp.get('volume')).volume;
-      if (typeof before?.level !== 'number') throw refuse('the lamp did not say its volume: nothing was changed');
+      if (typeof before?.level !== 'number') throw refuse('the lamp did not say its volume (a virtual lamp from an older build does not): nothing was changed');
       const arg = a.how === 'mute' ? { mute: true } : { step: a.how === 'step up' ? 'up' : 'down' };
       let after;
       let back;
@@ -245,6 +245,8 @@ export const CONTROLS = [
       return `lamp.cameraSnapshot() -> a JPEG of ${jpeg.length} bytes, on this page only`;
     } },
   { id: 'camera_stream', group: 'Camera and microphone', needs: 'camera', ops: ['camera.stream'], shows: [], label: 'Camera: a short stream', fields: [number('seconds', 1, 10, 2, { integer: true }), number('fps', 1, 30, 2, { integer: true }), select('size', ['', '640x480', '1280x720'], '', { optional: true })],
+    hint: "fps 1 to 30 (the lamp's limit). The virtual lamp's host camera gives about 6 pictures a second; size changes nothing here. seconds: how long this row keeps the stream on (at most 10)",
+    hintReal: "fps 1 to 30 (the lamp's limit; its fast stream gives about 21 to 25). size: the fast stream's picture size. seconds: how long this row keeps the stream on (at most 10)",
     run: async ({ lamp, show }, a) => {
       let frames = 0;
       let last = null;

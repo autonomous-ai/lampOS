@@ -39,7 +39,7 @@ test('the volume row puts the level back even when the step is refused, and says
   await assert.rejects(run('volume', { how: 'step down' }), /refused: test/);
   assert.deepEqual((await lamp.get('volume')).volume, start);
   lamp.get = async () => ({});
-  await assert.rejects(run('volume'), /did not say its volume: nothing was changed/);
+  await assert.rejects(run('volume'), /the lamp did not say its volume \(a virtual lamp from an older build does not\): nothing was changed/);
 });
 
 test('the listening row holds and lifts the mute', async (t) => {
@@ -62,6 +62,9 @@ test('a row hint is a string of at most 200 characters, describe() carries it, a
   assert.equal(byId('volume').hint, 'steps the volume once and puts it back (level and mute)');
   assert.equal('hint' in byId('gesture'), false, 'a row without one carries none');
   assert.match(describe('real').controls.find((c) => c.id === 'listen').hint, /real lamp's mute/);
+  // The camera row says its real rate for each kind of lamp, the virtual one's first.
+  assert.match(byId('camera_stream').hint, /host camera gives about 6 pictures a second; size changes nothing here/);
+  assert.match(describe('real').controls.find((c) => c.id === 'camera_stream').hint, /fast stream gives about 21 to 25/);
   assert.equal(describe('real').controls.find((c) => c.id === 'volume').hint, byId('volume').hint, 'no hintReal: the same hint');
   assert.deepEqual(Object.keys(byId('stop')).sort(), ['fields', 'group', 'id', 'label'], 'ops, shows, run and hintReal stay off the page');
 });
