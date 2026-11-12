@@ -275,6 +275,11 @@ if (lanChoice?.error && options['lan-address'] !== undefined) {
 const lanIp = lanChoice?.address;
 const lanHost = lanIp ? `${lanIp}:${port}` : undefined;
 let cameraAskedAt = 0;
+// A page that works for seconds between two requests (it parses a 22 MB lamp model, slowly on a loaded computer) reuses its
+// connection; Node closes an idle one after 5 s (6 s on Node 24), and a request that races that close is aborted in the browser
+// ("Failed to fetch", net::ERR_ABORTED, no status: the buttons' import was lost that way). The twin keeps an idle connection
+// open for two minutes instead (the headers timeout above it, as Node asks).
+const IDLE_MS = 120_000;
 const server = createServer((request, response) => {
   if (lan && !hostOk(request.headers.host, port, lanHost)) {
     response.writeHead(403).end('not the address the twin printed\n');
@@ -387,11 +392,15 @@ if (real) {
 // Always on 127.0.0.1. With --lan also on the one address it prints (a second server that hands its requests and
 // upgrades to the first), never on every interface: a second network card or a VPN address does not get the twin.
 // No network address found: loopback only, said.
+server.keepAliveTimeout = IDLE_MS;
+server.headersTimeout = IDLE_MS + 5000;
 server.listen(port, '127.0.0.1', () => {
   console.log(`the twin: http://localhost:${port}/?t=${token}`);
   if (lan && !lanIp) console.log('no network address found: the twin is served on this computer only (127.0.0.1)');
   if (!lanIp) return;
   const network = createServer();
+  network.keepAliveTimeout = IDLE_MS;
+  network.headersTimeout = IDLE_MS + 5000;
   network.on('clientError', dropBadClient);
   network.on('request', (...handed) => server.emit('request', ...handed));
   network.on('upgrade', (...handed) => server.emit('upgrade', ...handed));

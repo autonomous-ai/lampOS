@@ -75,7 +75,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // The token the server printed, on every request (guard.js).
 const token = new URLSearchParams(location.search).get('t') ?? '';
 const withToken = (path) => `${path}?t=${encodeURIComponent(token)}`;
-const model = await (await fetch(withToken('/model.json'))).json();
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const lost = (what) => { const line = document.getElementById('status'); if (line) { line.textContent = `${what} could not load: reload the page`; line.style.color = '#d9534f'; } };
+const model = await retrying((n) => fetch(withToken('/model.json') + (n ? `&again=${n}` : '')).then((r) => r.json()), { wait, said: () => lost("the lamp's description") });
 const view = document.getElementById('view');
 const status = document.getElementById('status');
 const log = (text) => {
@@ -124,7 +126,7 @@ const disc = new THREE.Mesh(new THREE.SphereGeometry(0.012, 24, 16), new THREE.M
 
 const bones = {};
 const rest = {};
-const gltf = await new GLTFLoader().loadAsync(withToken('/lamp.glb'));
+const gltf = await retrying((n) => new GLTFLoader().loadAsync(withToken('/lamp.glb') + (n ? `&again=${n}` : '')), { wait, said: () => lost('the lamp model') });
 scene.add(gltf.scene);
 gltf.scene.traverse((node) => {
   for (const joint of model.joints) if (node.name === joint.bone) { bones[joint.name] = node; rest[joint.name] = node.quaternion.clone(); }
@@ -304,8 +306,43 @@ document.getElementById('copy').addEventListener('click', async () => {
 let ws;
 const send = (message) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
 window.twinSend = send;
-// The try-it panel, when the server has one (--stim-dir): its buttons, its log.
-fetch(withToken('/panel.js')).then((r) => { if (r.ok) import(withToken('/panel.js')); }).catch(() => {});
+// The try-it panel, when the server has one (--stim-dir): its buttons, its log. A first import can still be lost (a browser aborts
+// a request now and then, and then remembers that URL as failed), so it is tried again under another URL (a counter in the
+// query), a few times; and if it never comes, the page says so plainly. (The twin's idle-connection limit was the cause seen:
+// server.js IDLE_MS.)
+// <panel-load>
+// Work a browser can lose (its request aborted, no status): tried again, `tries` times, under another URL (the attempt's number
+// goes in the query); when none comes, `said()` puts a plain line on the page and the last error is thrown, never silence.
+async function retrying(work, { tries = 4, wait, said = () => {} }) {
+  let last;
+  for (let attempt = 0; attempt < tries; attempt += 1) {
+    try { return await work(attempt); } catch (error) { last = error; }
+    await wait(300 * (attempt + 1));
+  }
+  said();
+  throw last;
+}
+async function loadPanel({ probe, load, say, wait, tries = 4 }) {
+  for (let attempt = 0; attempt < tries; attempt += 1) {
+    let present;
+    try { present = await probe(attempt); } catch { present = undefined; }
+    // The server answered that it has no panel (a plain twin): nothing to load, nothing to say.
+    if (present === false) return 'none';
+    if (present === true) {
+      try { await load(attempt); return 'loaded'; } catch { /* the next attempt, under another URL */ }
+    }
+    await wait(300 * (attempt + 1));
+  }
+  say('the buttons could not load: reload the page');
+  return 'failed';
+}
+// </panel-load>
+loadPanel({
+  probe: async (attempt) => (await fetch(withToken('/panel.js') + (attempt ? `&again=${attempt}` : ''))).ok,
+  load: (attempt) => import(withToken('/panel.js') + (attempt ? `&again=${attempt}` : '')),
+  say: (text) => { status.textContent = text; status.style.color = '#d9534f'; },
+  wait,
+});
 function connect() {
   ws = new WebSocket(`ws://${location.host}${withToken('/live')}`);
   ws.onopen = () => { log('connected'); window.dispatchEvent(new CustomEvent('twin-open')); };
