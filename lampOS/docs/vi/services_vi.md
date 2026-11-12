@@ -2212,7 +2212,7 @@ người nhận hay nội dung:
    từ chối như với giọng nói. Repository GitHub được duyệt là riêng tư mà
    giờ công khai thì chờ, như ở trên.
 6. **Giới hạn** (`skill_writes::Ledger`, `skill-writes.json` trong thư mục
-   kho): tối đa 3 lần gửi mỗi kỹ năng và 10 lần cho mọi kỹ năng trong bất
+   kho): tối đa 10 lần gửi mỗi kỹ năng và 30 lần cho mọi kỹ năng trong bất
    kỳ 24 giờ nào. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
    lần cùng lúc không bao giờ cùng vượt giới hạn. Lần gửi thất bại sau đó
    vẫn được đếm. Sổ chỉ giữ tên kỹ năng và thời điểm, nên khởi động lại
@@ -2225,13 +2225,13 @@ Sau đó lần ghi được gửi một lần, như lần ghi đã xác nhận c
 qua cùng bộ chặn và danh sách ghi.
 
 **Journal** chỉ giữ số đếm và kết quả. "a skill's write to gmail was sent
-(2 of 3 for it today, 5 of 10 for every skill)", "a skill's write refused:
+(2 of 10 for it today, 5 of 30 for every skill)", "a skill's write refused:
 not the approved content (3 since start)", hoặc lời từ chối. Không bao giờ
 có người nhận, chủ đề hay nội dung. `lamp-skills` ghi kết quả của lần chạy:
 "sent to gmail", hoặc lời từ chối.
 
 **Nhật ký đã gửi cho chủ đèn** (`skill-writes-sent.json` trong thư mục
-kho). Nó giữ 20 lần gửi gần nhất, mỗi lần gồm tên kỹ năng, dịch vụ, thời
+kho). Nó giữ 50 lần gửi gần nhất, mỗi lần gồm tên kỹ năng, dịch vụ, thời
 điểm và gửi cho ai (`skill_writes::sent_to`): người nhận đầu tiên của thư
 và còn bao nhiêu người nữa, khách mời của sự kiện, repository hay team của
 issue. Người nhận chỉ là phần trước `@` của địa chỉ (địa chỉ trong một lần
@@ -2391,7 +2391,7 @@ lẫn lượt chạy đều không giữ token nào.
   person's yes"), nên nó không bao giờ làm rơi lần ghi của chính người
   dùng. Lần ghi chỉ được gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
   cổng của giọng nói, và khi đó tính vào giới hạn của kỹ năng như lần ghi
-  của kỹ năng tự tạo (3 lần một ngày mỗi kỹ năng, 10 lần cho mọi kỹ năng,
+  của kỹ năng tự tạo (10 lần một ngày mỗi kỹ năng, 30 lần cho mọi kỹ năng,
   `skill_writes::Ledger`): vượt quá thì "not sent".
 - **Giọng nói đọc lại nó** (`crates/voice/src/run_write_yes.rs`, với
   `LAMP_SKILL_TASKS=on` cả trong `lamp-voice`). Bộ điều phối hỏi chương

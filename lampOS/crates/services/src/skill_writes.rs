@@ -76,9 +76,9 @@ pub const LEDGER_FILE: &str = "skill-writes.json";
 /// In the store folder: the owner's sent-log.
 pub const SENT_FILE: &str = "skill-writes-sent.json";
 /// The most sends a skill makes in any 24 hours.
-pub const PER_SKILL: usize = 3;
+pub const PER_SKILL: usize = 10;
 /// The most sends every skill together makes in any 24 hours.
-pub const ALL_SKILLS: usize = 10;
+pub const ALL_SKILLS: usize = 30;
 /// The window the bounds count in, seconds.
 pub const DAY_S: i64 = 86_400;
 /// The most writes approved on the lamp, every skill's together.
@@ -86,7 +86,7 @@ pub const APPROVED_MOST: usize = 50;
 /// The most writes one skill has approved.
 pub const STEPS_MOST: usize = 4;
 /// The most sends the owner's sent-log keeps.
-pub const SENT_MOST: usize = 20;
+pub const SENT_MOST: usize = 50;
 /// The start of a refusal that stops the skill's writes: its link is gone
 /// or another's.
 pub const STOPPED: &str = "stopped: ";
@@ -743,28 +743,37 @@ mod tests {
         for n in 1..=PER_SKILL {
             assert_eq!(ledger.take("a", 1_000).unwrap().0, n);
         }
-        assert!(ledger.take("a", 1_000).unwrap_err().contains("at most 3"));
-        // A day later it may again.
-        assert!(ledger.take("a", 1_000 + DAY_S).is_ok());
-        for skill in ["b", "c", "d"] {
-            for _ in 0..PER_SKILL {
-                ledger.take(skill, 2_000 + DAY_S).unwrap();
-            }
-        }
-        // 1 + 9 = 10 in the window: every skill's bound.
         assert!(
             ledger
-                .take("e", 2_000 + DAY_S)
+                .take("a", 1_000)
                 .unwrap_err()
-                .contains("at most 10")
+                .contains(&format!("at most {PER_SKILL} times"))
+        );
+        // A day later it may again.
+        assert!(ledger.take("a", 1_000 + DAY_S).is_ok());
+        // Other skills fill the window to every skill's bound, each within
+        // its own.
+        let mut left = ALL_SKILLS - 1;
+        for skill in ["b", "c", "d", "e", "f"] {
+            for _ in 0..PER_SKILL.min(left) {
+                ledger.take(skill, 2_000 + DAY_S).unwrap();
+            }
+            left -= PER_SKILL.min(left);
+        }
+        assert_eq!(left, 0);
+        assert!(
+            ledger
+                .take("g", 2_000 + DAY_S)
+                .unwrap_err()
+                .contains(&format!("at most {ALL_SKILLS} times"))
         );
     }
 
     #[test]
-    fn the_sent_log_keeps_the_last_twenty_and_no_text() {
+    fn the_sent_log_keeps_the_last_sends_and_no_text() {
         let dir = tempfile::tempdir().unwrap();
         let log = SentLog::new(dir.path());
-        for at in 0..25 {
+        for at in 0..(SENT_MOST as i64 + 5) {
             log.add(Told {
                 skill: "arrive-mail".into(),
                 service: "gmail".into(),
