@@ -252,7 +252,9 @@ test it.
 
 **Dependencies** (`websockets`, `cryptography`; `zeroconf` to find lamps)
 have lower bounds only, as a library's should: the application that uses
-it pins them.
+it pins them. `cryptography` is loaded only where a key is made or used (a
+pairing), so `import lampos` and `Lamp.local(token)` need only `websockets`:
+`import lampos` no longer needs `cryptography`; only pairing and keys use it.
 
 Tests: `PYTHONPATH=src python3 -m pytest tests` (needs `pytest`; with
 `jsonschema`, the fake lamp checks every request against the schema).
