@@ -551,9 +551,13 @@ impl NoticeDelivery {
         Ok(())
     }
     pub(super) fn gap(&mut self) -> io::Result<()> {
-        let Self::Selected { gaps, .. } = self else {
+        let Self::Selected { gaps, feed, .. } = self else {
             return Err(io::Error::other("notice gap without recording"));
         };
+        // The speaker's queue ran dry: for a stream, an underrun in its stats.
+        if let Some(feed) = feed {
+            feed.underrun();
+        }
         *gaps = gaps
             .checked_add(1)
             .ok_or_else(|| io::Error::other("notice gap counter exhausted"))?;
