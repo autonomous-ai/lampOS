@@ -162,7 +162,9 @@ phần tasks, suốt `CONFIRM_WITHIN` (120 s), nên một tiếng "có" sau đó
 đầu được nó. Nay, trên tuyến thứ hai, một câu nghe được là một tiếng không đơn
 thuần (`services::plain_no`, danh sách giọng nói đã dùng cho tiếng không với
 một lần ghi của kỹ năng: "No.", "No thanks.", "Never mind.", "Don't.",
-"Cancel that.", "Không, thôi.") trong lúc một việc đang chờ, từ một yêu cầu
+"Cancel that.", "Không, thôi.", và "No, don't start it.": "start", "begin",
+"do" và "run" được tính, như "send", chỉ khi đứng sau "don't", phát hiện trên
+lamp-c0a4 ở 12431, nơi "No, don't start it." không được coi là không) trong lúc một việc đang chờ, từ một yêu cầu
 có thể nói có với nó (`may_confirm`), bỏ việc đó (`agent_tasks::declined`,
 gắn vào engine bằng `declining_a_task_waiting`):
 
