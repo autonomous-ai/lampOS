@@ -330,6 +330,12 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     lamp-tasks chờ việc này tối đa 20 giây (`skill_task::STOP_WAIT`) rồi
     mới thoát. SIGKILL bỏ qua bước này; đó là phần dự phòng bên dưới. Test:
     `a_skill_run_is_ended_when_lamp_tasks_stops`.
+  - **Các worker tự dừng** (#6717). Sau lệnh dừng, lamp-tasks chờ tối đa
+    5 giây (`runtime::SHUTDOWN_WAIT`) để owner của store và worker Harness
+    làm xong bước đang làm. Bước của owner có thể gồm một lần ghi store bền
+    vững, mất hơn 300 ms nhiều trên thẻ SD hay ổ đĩa đang tải nặng. Chỉ
+    worker vẫn bận sau thời gian đó mới báo "Tasks worker did not stop;
+    exit this process before restarting".
   - **Chưa có SIGKILL dự phòng.** Phần dự phòng trong thiết kế, SIGKILL
     tới pid `unshare` của namespace khi `close --now` lỗi, chưa được xây:
     daemon của Harness khởi động Hermes trong pane riêng, và cả `new` lẫn
