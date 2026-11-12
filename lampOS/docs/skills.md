@@ -3163,7 +3163,7 @@ gone ([switches.md](switches.md)). What happens:
      not the lamp just says so, with no confirming; `on` only, off unless
      set, in no product unit; in `lamp-voice` passed to both routes, read
      only with `LAMP_MADE_SCRIPTS=on`, `made_skill::code_on_at_once`). The
-     first builder's ruling on #6059 (19:14, and his 19:44 line: "sound"
+     first builder's ruling on #6059 (19:14, and the first builder's 19:44 line: "sound"
      is the lamp's own sounds and voice) draws the line
      (`made_skill::code_goes_on_at_once`): code whose grants are only its
      light, its voice and sounds or its head and arm
@@ -3171,7 +3171,9 @@ gone ([switches.md](switches.md)). What happens:
      is a trigger and needs no grant) goes on at once; code with any other
      grant, above all the camera, the microphone and `sound`, which is
      hearing kinds of sound, not playing them
-     (`made_skill::CODE_YES_GRANTS`), or any send (a write, messages to the
+     (`made_skill::CODE_YES_GRANTS`), code that knows who is at the lamp
+     (`who`, `known_faces`: identity is the camera's privacy, the first
+     builder at 20:16; lamp-control has no grant for it), or any send (a write, messages to the
      phone) keeps its spoken yes exactly as with the switch off. Such a
      make, by voice or from the app's MAKE IT
      (`app_make::put_on_line`), goes on as it is made, through the yes's
@@ -3199,6 +3201,7 @@ gone ([switches.md](switches.md)). What happens:
      `with_the_switch_a_code_make_not_made_or_not_on_says_so_plainly`,
      `with_the_switch_a_send_still_waits_for_its_yes`,
      `with_the_switch_a_voice_code_make_with_the_camera_still_waits_for_its_yes`,
+     `with_the_switch_a_voice_code_make_knowing_who_is_there_still_waits_for_its_yes`,
      `the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone`,
      `app_make::tests::with_the_switch_an_app_make_with_code_goes_on_at_once`,
      `app_make::tests::with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes`,
