@@ -61,6 +61,14 @@ pub const WORKERS: usize = 4;
 pub const CLIENT_QUEUE: usize = 4;
 pub const REQUEST_QUEUE: usize = 16;
 const TICK: Duration = Duration::from_millis(10);
+/// How long a stop waits for the store's owner and the Harness worker to
+/// finish the step each is in (#6717). The owner's step can hold a durable
+/// store write (`synchronous=FULL`, `fullfsync`), which takes well over
+/// 300 ms on an SD card or a loaded disk; a shorter wait reported a worker
+/// that was only finishing its write as one that "did not stop". Each step
+/// is bounded, so a stop that waits is short, and this is far inside
+/// systemd's stop timeout.
+pub const SHUTDOWN_WAIT: Duration = Duration::from_secs(5);
 /// After a `wait` came back with an agent's end, the next on that machine
 /// starts no sooner than this: an agent Harness calls done while the store
 /// still finds it at work is not waited on in a loop.
@@ -4656,9 +4664,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         let _ = worker.join();
     }
     let shutdown = Instant::now();
-    while (!owner.is_finished() || !cli.is_finished())
-        && shutdown.elapsed() < Duration::from_millis(300)
-    {
+    while (!owner.is_finished() || !cli.is_finished()) && shutdown.elapsed() < SHUTDOWN_WAIT {
         thread::sleep(Duration::from_millis(5));
     }
     if !owner.is_finished() || !cli.is_finished() {

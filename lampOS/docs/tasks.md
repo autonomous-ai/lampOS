@@ -2706,6 +2706,12 @@ for each run, and is answered once the run ends
     lamp-tasks stops"). lamp-tasks waits for this, at most 20 s
     (`skill_task::STOP_WAIT`), before it exits. A SIGKILL skips it; that
     is the backstop below. Test: `a_skill_run_is_ended_when_lamp_tasks_stops`.
+  - **The workers' own stop** (#6717). After the stop, lamp-tasks waits
+    up to 5 s (`runtime::SHUTDOWN_WAIT`) for the store's owner and the
+    Harness worker to finish the step each is in. The owner's step can
+    hold a durable store write, which takes well over 300 ms on an SD card
+    or a loaded disk. Only a worker still busy after that is "Tasks worker
+    did not stop; exit this process before restarting".
   - **No SIGKILL backstop yet.** The design's backstop, SIGKILL to the
     namespace's `unshare` pid when `close --now` fails, is not built:
     Harness's daemon starts Hermes in its own pane, and neither `new` nor
