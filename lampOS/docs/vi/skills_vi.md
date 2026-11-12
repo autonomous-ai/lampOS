@@ -1150,6 +1150,30 @@ sau:
     giữ lâu như vậy: first builder trên #6174), một lần cắt không lời
     của câu sau không bao giờ được đáp "Um, excuse me, did anyone say
     something?" (`Shared::quiet_for_a_make`).
+11. **Một lời nhờ chỉ tạo một kỹ năng** (lamp-9adf, 15:13 ngày 12/11:
+    "make me a skill: when I come back to my desk, blink the light green
+    twice" bị cắt khi đang tạo, chữ của nó được mang sang câu sau, và mô
+    hình gọi `make_skill` lần nữa ở đó, nên `green-blink-on-return` và
+    `blink-green-twice` cùng được bật với một trigger và cùng các bước, cái
+    này lấn ánh sáng của cái kia). Một lời gọi `make_skill` bằng giọng nói
+    được so với các lời nhờ trước nó trong cùng thư mục
+    (`make_skill_local::OneAsk`): câu nghe được hoặc request của nó là cùng
+    một lời nhờ với một lời nhờ trước khi chữ của chúng (chữ thường, chữ cái
+    và chữ số) giống nhau, hoặc câu có ít nhất 5 từ nằm trọn, đúng thứ tự,
+    trong câu kia (câu được mang sang có tên đèn hoặc một mảnh trước đó ở
+    đầu, hoặc không có). Khi lần tạo trước còn đang chạy, lời gọi không tạo
+    gì và được báo là đang tạo (`"making": true`), câu của nó vẫn do lần
+    tạo trước nói. Khi lần tạo đó đã được giữ và bật (hoặc đang chờ lời
+    "có"), trong 3 phút (`make_skill_local::ONE_ASK_WITHIN`) và khi kỹ năng
+    vẫn còn được giữ, lời gọi không tạo gì và nhận lại câu trả lời trước,
+    đánh dấu `"already_made": true`: "You already have that skill: <tên>.
+    It's on." (`made_skill::already_have_line`), hoặc, với kỹ năng chờ lời
+    "có" của người dùng, câu đọc lại và `approve_id` của nó lần nữa, để lời
+    "có" mà lượt bị cắt chưa từng hỏi vẫn có thể được hỏi. Một lần tạo bị
+    từ chối hoặc không bật được thì không giữ gì, nên nhờ lại là thử lại.
+    MAKE IT của ứng dụng không bị giữ. Kiểm thử:
+    `a_cut_ask_carried_into_the_next_line_makes_one_skill`,
+    `only_the_same_ask_is_held_as_made`.
 
 Một câu "đã tạo" mà không có lần tạo nào đứng sau thì không bao giờ được nói
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): câu trả lời mở đầu
