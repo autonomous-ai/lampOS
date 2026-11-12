@@ -102,6 +102,21 @@ lamp-sim air pm2_5=41 co2_ppm=1350 DIR   # an air reading, said every 5 s; feel 
 
 Each lamp folder has its own lamp name, `virtual-` and six hex digits of the folder's path, so two virtual lamps are two lamps to a computer's key store. A second `lamp-sim run` on the same address says so and names `--listen`.
 
+## Your own voice keys (for a real voice later)
+
+`lamp-sim voice-keys` says which of a developer's voice keys are set and from where, and never says a key. Nothing uses them yet: this is the reader a real voice will be fed from. The keys come from `~/.config/lampos/voice-keys.toml` (`$XDG_CONFIG_HOME` honoured; `LAMPOS_VOICE_KEYS_FILE` names another file), or from environment variables, which win over the file. An empty value is no key. A missing file is no keys, not an error.
+
+```toml
+[main]
+gemini = "..."          # a Google (Gemini) API key: LAMPOS_VOICE_GEMINI_KEY
+[own]                   # a person's own keys on the voice's second route
+deepseek = "..."        # LAMPOS_VOICE_DEEPSEEK_KEY
+deepseek_url = "https://..."   # optional, LAMPOS_VOICE_DEEPSEEK_URL
+deepgram = "..."        # LAMPOS_VOICE_DEEPGRAM_KEY
+```
+
+The file must be a regular file you own, mode 0600 (or 0400), and not a symbolic link, as lamp-voice demands of its own credential files; otherwise `voice-keys` stops with the refusal and the `chmod 600` line that fixes it (exit 2). A name lamp-sim does not know is refused by its line only (a key pasted where a name belongs would otherwise be echoed), and a known key that is not quoted text by its name and line; a value is never shown. A key is never written, logged or put in a lamp's folder, and its type prints only its name, where it came from and its length.
+
 ## Known gaps
 
 - No ears or eyes models run: hands, sound classes and phrases are made by hand (above); no name, touch or real face events.
