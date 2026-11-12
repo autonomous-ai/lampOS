@@ -360,14 +360,15 @@ cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng
 ## Chính đèn, với OpenClaw (#6226)
 
 `LAMP_OPENCLAW_ON_LAMP=on`, chỉ cùng `--engines-from-machines`; tắt nếu không
-đặt. OpenClaw là engine mặc định của đèn (không có ngưỡng bộ nhớ: chủ sản
-phẩm, #6226, mọi đèn đều có 6 GB): nó thay Hermes làm target riêng của đèn,
-đúng vai trò của Hermes (`tasks.md`, "The lamp itself, with Hermes"), và
-Hermes vẫn chọn được. `lamp_order` (`crates/tasks/src/runtime.rs`) chỉ bỏ
+đặt. OpenClaw là engine thứ hai của đèn (không có ngưỡng bộ nhớ: chủ sản
+phẩm, #6226, mọi đèn đều có 6 GB): nó làm target riêng của đèn, đúng vai trò
+của Hermes (`tasks.md`, "The lamp itself, with Hermes"), khi được chọn hoặc
+khi Hermes chưa cài; Hermes lại là mặc định (#6498, quyết định của lead, thay
+cho OpenClaw của #6226). `lamp_order` (`crates/tasks/src/runtime.rs`) chỉ bỏ
 OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
 
 - **Engine nào:** `LAMP_LAMP_ENGINE` là `openclaw` hoặc `hermes`, không đặt
-  thì `openclaw`, mặc định (không có ngưỡng bộ nhớ, #6226). Target
+  thì `hermes`, mặc định (#6498; #6226 từng là `openclaw`). Target
   của đèn vẫn là `lamp`, với engine đó; khi engine được chọn chưa cài mà
   engine kia đã cài, dùng engine kia.
 - **Khởi động** như Harness khởi động OpenClaw:
@@ -430,7 +431,7 @@ và có `--targets-from-machines`:
   Target của các máy tính ghi trước đó bị bỏ, vì chưa đăng nhập thì không tới
   được. Chưa cài thì target ghi kiểu này trước đó bị xoá; file khác giữ
   nguyên. Engine là engine đầu tiên theo `lamp_order` (đang bật, theo
-  `LAMP_LAMP_ENGINE`: OpenClaw trước nếu không đặt; bỏ OpenClaw khi Harness
+  `LAMP_LAMP_ENGINE`: Hermes trước nếu không đặt, #6498; bỏ OpenClaw khi Harness
   quá cũ) mà đã cài ở đây; không ghi cứng Hermes hay OpenClaw.
 - **Không xem danh sách máy, không `--machine`.** Target mang id của máy này
   được giao không cần `machines --json` trước, và mọi lệnh cho việc của nó

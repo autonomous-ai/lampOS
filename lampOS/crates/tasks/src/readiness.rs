@@ -891,7 +891,7 @@ mod tests {
     }
 
     /// #6226: the lamp's engine is the first of the order installed there:
-    /// OpenClaw by default with both, Hermes when it is chosen first, and
+    /// Hermes by default with both (#6498), OpenClaw when it is chosen first, and
     /// the one installed when only one is; none when neither is switched on.
     #[test]
     fn the_lamps_engine_is_the_first_of_the_order_installed_there() {
@@ -901,8 +901,8 @@ mod tests {
         };
         let listed = [lamp.clone(), machine('b', Some("running"))];
         let id = lamp.machine_id.clone();
-        let default = [EngineKind::Openclaw, EngineKind::Hermes];
-        let hermes_first = [EngineKind::Hermes, EngineKind::Openclaw];
+        let default = [EngineKind::Hermes, EngineKind::Openclaw];
+        let openclaw_first = [EngineKind::Openclaw, EngineKind::Hermes];
         let mut known = Known::default();
         known.listed(&listed, NOW);
         let both = [
@@ -912,11 +912,11 @@ mod tests {
         known.probed(&id, &both, NOW);
         assert_eq!(
             known.lamp_engine(&listed, &default, NOW),
-            Some((id.clone(), EngineKind::Openclaw))
+            Some((id.clone(), EngineKind::Hermes))
         );
         assert_eq!(
-            known.lamp_engine(&listed, &hermes_first, NOW),
-            Some((id.clone(), EngineKind::Hermes))
+            known.lamp_engine(&listed, &openclaw_first, NOW),
+            Some((id.clone(), EngineKind::Openclaw))
         );
         assert_eq!(known.lamp_engine(&listed, &[], NOW), None);
         known.probed(
@@ -938,7 +938,7 @@ mod tests {
             NOW,
         );
         assert_eq!(
-            known.lamp_engine(&listed, &hermes_first, NOW),
+            known.lamp_engine(&listed, &default, NOW),
             Some((id, EngineKind::Openclaw))
         );
     }

@@ -266,10 +266,11 @@ const READ_AGAIN: Duration = Duration::from_secs(30);
 /// Who gets the work when the switch is off: as it always was.
 const CLAUDE_CODE: &str = "Claude Code";
 /// Who does the work on the lamp itself when `lamp-tasks` runs Hermes there
-/// ([`LAMP_TARGET`], #5978).
+/// ([`LAMP_TARGET`], #5978), the lamp's default engine (`LAMP_LAMP_ENGINE`
+/// unset, #6498).
 const HERMES: &str = "Hermes";
 /// Who does the work on the lamp itself when `lamp-tasks` runs OpenClaw
-/// there, the lamp's default engine (`LAMP_LAMP_ENGINE` unset, #6226).
+/// there (#6226; `LAMP_LAMP_ENGINE=openclaw`, or Hermes not installed).
 const OPENCLAW: &str = "OpenClaw";
 /// What the model is told when the work was asked for on the lamp itself
 /// and the lamp has no target of its own (#5978): nothing goes elsewhere.
@@ -346,7 +347,7 @@ pub fn agent_names() -> Vec<&'static str> {
 /// way: a lamp has one or the other. Hermes (#3504, 27 Oct: asked for in a
 /// demo, the work went to Claude Code unsaid) may come as "Hermès", which is
 /// `herms` once plain, or "her mes"; "air mess" is said to the model, never
-/// taken. OpenClaw (#6226), the lamp's own default engine, may come as
+/// taken. OpenClaw (#6226), the lamp's other own engine, may come as
 /// "open claw", "open clause" or "open close", and with a Vietnamese
 /// accent as "open clow", "open clau" or "open klaw".
 const KINDS: [Kind; 7] = [
@@ -446,22 +447,22 @@ fn lamp_there() -> bool {
     LAMP_THERE.load(Ordering::Relaxed)
 }
 
-/// Whether the lamp's own target was last said to run Hermes; else it is
-/// OpenClaw, the lamp's default engine (#6226).
-static LAMP_HERMES: AtomicBool = AtomicBool::new(false);
+/// Whether the lamp's own target was last said to run OpenClaw (#6226);
+/// else it is Hermes, the lamp's default engine (#6498).
+static LAMP_OPENCLAW: AtomicBool = AtomicBool::new(false);
 
 /// Who does the work on the lamp itself, as the person calls them: the
-/// engine of the lamp's own target as last read, OpenClaw until read (the
-/// lamp's default engine, #6226); a test sets its own, on its own thread.
+/// engine of the lamp's own target as last read, Hermes until read (the
+/// lamp's default engine, #6498); a test sets its own, on its own thread.
 fn lamp_name() -> &'static str {
     #[cfg(test)]
     if let Some(name) = tests::LAMP_NAME_HERE.with(std::cell::Cell::get) {
         return name;
     }
-    if LAMP_HERMES.load(Ordering::Relaxed) {
-        HERMES
-    } else {
+    if LAMP_OPENCLAW.load(Ordering::Relaxed) {
         OPENCLAW
+    } else {
+        HERMES
     }
 }
 
@@ -1891,7 +1892,7 @@ fn read_staff(socket: &Path, target: &str, deadline: Duration, who: bool) {
     };
     let lamp = lamp_target_in(&answer);
     LAMP_THERE.store(lamp.is_some(), Ordering::Relaxed);
-    LAMP_HERMES.store(lamp == Some(HERMES), Ordering::Relaxed);
+    LAMP_OPENCLAW.store(lamp == Some(OPENCLAW), Ordering::Relaxed);
     if let Some(names) = names_from(&answer) {
         keep_names(names);
     }
@@ -7288,8 +7289,8 @@ pub(crate) mod tests {
                 .find(|tool| tool.name == START)
                 .unwrap()
         };
-        // The lamp's default engine, OpenClaw (#6226), named the same way.
-        LAMP_NAME_HERE.with(|here| here.set(None));
+        // The lamp's other engine, OpenClaw (#6226), named the same way.
+        LAMP_NAME_HERE.with(|here| here.set(Some(OPENCLAW)));
         let openclaw = start(true);
         assert!(openclaw.validate().is_ok());
         assert!(
@@ -10425,7 +10426,8 @@ pub(crate) mod tests {
         assert!(on.validate().is_ok());
         let said = on.parameters.unwrap()["properties"]["where"].clone();
         assert_eq!(said["enum"], json!(["lamp", "computer"]));
-        assert_eq!(said["description"], where_description(OPENCLAW));
+        // Hermes, the lamp's default engine until read (#6498).
+        assert_eq!(said["description"], where_description(HERMES));
         let where_said = where_description(HERMES);
         for words in [
             "longer than a quick answer",
@@ -10643,7 +10645,7 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&directory);
     }
 
-    /// #6226: with OpenClaw on the lamp, the lamp's default engine, new
+    /// #6226: with OpenClaw on the lamp's own target, new
     /// work naming no machine goes to the lamp and is said as OpenClaw's;
     /// OpenClaw named is the lamp's, never a computer's; the lamp's own
     /// target is never one of the staff.

@@ -1615,8 +1615,8 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
       targets written before go: none can be reached signed out. Not
       installed here, a target written so before is removed; any other
       file is left as it is. The engine is the first in `lamp_order` (the
-      lamp's engines switched on, in `LAMP_LAMP_ENGINE`'s order, OpenClaw
-      first unless set, OpenClaw left out while the Harness here is too old
+      lamp's engines switched on, in `LAMP_LAMP_ENGINE`'s order, Hermes
+      first unless set (#6498), OpenClaw left out while the Harness here is too old
       for it) that is installed here; neither engine is named anywhere else.
       One journal line a change.
     - **No machines look and no `--machine`.** A target naming this
@@ -1830,12 +1830,14 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     own namespace.
 - **The lamp itself, with OpenClaw** (`LAMP_OPENCLAW_ON_LAMP=on`, only
   with `--engines-from-machines`; off unless set, #6226). OpenClaw is the
-  lamp's default engine (no memory floor: the owner, #6226, every lamp has 6 GB): it takes Hermes's place as the lamp's own target
-  in exactly Hermes's role (above), and Hermes stays selectable.
+  lamp's other engine (no memory floor: the owner, #6226, every lamp has 6 GB): it is the lamp's own target
+  in exactly Hermes's role (above) when chosen or when Hermes is not
+  installed; Hermes is the default again (#6498, the lead's decision,
+  back from #6226's OpenClaw).
   `lamp_order` (`crates/tasks/src/runtime.rs`) leaves OpenClaw out only
   while the Harness on the lamp is older than 0.6.11.
   - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
-    `openclaw`, the default (no memory floor, #6226). The lamp's target is still `lamp`, with that engine; when
+    `hermes`, the default (#6498; #6226 had `openclaw`). The lamp's target is still `lamp`, with that engine; when
     the one chosen is not installed but the other is, the other.
   - **Started** as Harness starts OpenClaw:
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
