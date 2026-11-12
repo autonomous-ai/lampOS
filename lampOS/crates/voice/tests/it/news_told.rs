@@ -324,6 +324,39 @@ fn news_heard_whole_closes_the_harness_it_was_of() {
     assert_eq!(place.closed(), [AGENT]);
 }
 
+/// #6530, on a lamp on 12 Nov: news played with gaps was not heard whole,
+/// and its harness stayed open 71 s after the task went idle. Its telling
+/// began, so the tasks part is told at once and closes the harness, though
+/// the turn is not heard whole. Whether it is told once more stays the
+/// voice's own (`task_news`'s unit tests).
+#[test]
+fn news_begun_but_not_heard_whole_closes_the_harness_it_was_of() {
+    let place = Place::new("begun", clock!());
+    let id = place.handed_and_read();
+    let mut news = TaskNews::start_with_clock(
+        place.tasks(),
+        place.root.join("told"),
+        None,
+        false,
+        place.clock.voice,
+    )
+    .unwrap();
+    let key = place.told(&mut news, &id);
+    place.until(|| {
+        fs::read_to_string(place.root.join("told"))
+            .is_ok_and(|told| told.lines().any(|line| line == key))
+    });
+    place.nothing_closed(&id);
+
+    news.begun(5, vec![key.clone()]);
+    news.not_heard(vec![key]);
+    place.until(|| !place.closed().is_empty());
+    let task = place.task(&id);
+    assert!(task["observations"][0]["told"].is_object(), "{task}");
+    place.until(|| place.task(&id)["task"]["close"]["state"] == "closed");
+    assert_eq!(place.closed(), [AGENT]);
+}
+
 /// The reviewer on #1425: news heard while the tasks part is down (here,
 /// restarting) is not lost. It is sent again at the next pass, which the
 /// next piece of news heard brings forward, and the harness is closed. A

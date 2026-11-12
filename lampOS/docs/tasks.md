@@ -600,7 +600,7 @@ inspection evidence, not a playback grant.
 | `sign_in_state` | none | With `serve --sign-in-by-code` only, trusted: the sign-in's code, the email it asks about, or how it ended; `none` before any |
 | `sign_in_asked` | `id`, `request` | With `serve --sign-in-by-code` only, trusted: the voice heard the question "Sign in as …?" said whole for sign-in `id`, in its request `request` (`not_asking`, `not_this_sign_in` otherwise) |
 | `sign_in_answer` | `answer`: `yes` or `no`; `request` | With `serve --sign-in-by-code` only, trusted: the person's spoken answer, in the voice's request `request`, passed on only while Harness asks (`not_asking`), once the question was told in an earlier request (`not_told`) and within two minutes of it (`too_late`) |
-| `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation was heard whole, in its model's own words ([#1390](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
+| `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation began to be told, in its model's own words (#6530; heard whole or not) ([#1390](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
 
 The [protocol](../crates/tasks/src/protocol.rs) and
 [engine](../crates/tasks/src/engine.rs) define the serialized fields and error
@@ -982,12 +982,34 @@ started once its answer is told:
   - **Heard from the voice's news** (`told`): the voice's task news tells it
     as a turn its model says in its own words, so it claims no exact text.
     The turn carries its news keys (the task's, and those told with it).
-    As it ends heard whole, on the proof a skill's say takes for `spoken`
-    (settled and complete, its audio played with no gap, the mic allowed),
-    the voice sends `told` for each on the trusted socket. A turn cut short
-    (a Stop, the person speaking over it, muting) or ended with no audio or
-    a gap sends nothing, and the harness stays open. The news is still kept
-    as told when its turn begins, so it is never told twice.
+    Once its telling begins (#6530), the voice sends `told` for each on the
+    trusted socket: as the model's first words reach the speaker
+    (`TaskNews::begun`), and again as the turn ends heard whole, on the
+    proof a skill's say takes for `spoken` (settled and complete, its audio
+    played with no gap, the mic allowed), for keys added during the turn.
+    Each key is sent once. A turn cut short (a Stop, the person speaking
+    over it, muting) or ended with gaps still sends it once its words began
+    to play; one that played none of its words (no audio, or only a failure
+    notice) sends nothing, and the harness stays open. The news is still
+    kept as told when its turn begins, so it is never told twice.
+    - **Heard whole doesn't decide the close (#6530):** on a lamp on 12 Nov
+      task 18 went idle at 21:21:26 and its news played 21:21:32 to 35 with
+      gaps (`audio_written_with_playback_gaps_unscored`, "was not heard
+      whole: its harness stays open" at 21:21:53). Its harness was closed
+      only at 21:22:37, 71 s after idle. Now `told` is sent as its news
+      begins, and the close (a read, then `harness close`) follows it. Heard whole still decides alone whether the news is
+      told once more (`LAMP_TASK_NEWS_RETELL`, #4342), which reads the answer
+      kept in the store, so needs no open session. The journal says "was
+      not heard whole (…): begun, so its harness closes" or "was cut short
+      (…): begun, so its harness closes".
+    - **Only a finished task closes:** `close_due` closes only an agent
+      `idle` with an answer. One waiting for the person, stopped or failed
+      stays open as before, whatever was told.
+    - **Test:** `news_not_heard_whole_is_never_handed_on`,
+      `news_cut_short_is_never_handed_on`,
+      `news_heard_whole_is_handed_on_as_the_turn_ends` (coordinator) and
+      `news_begun_closes_its_harness_at_once_and_is_still_told_once_more`
+      (`task_news`).
     - **Sent off the coordinator's loop,** on a thread of the news's own.
       If the tasks part can't be reached (restarting, say), it's sent again
       every 10 s, for an hour.
@@ -3381,8 +3403,8 @@ used only to say it.
   (`task_news::waiting`) answer `check_agent_task`. A stop is said plainly. Each piece is told once: its key
   (store, task, observation) goes into `/var/lib/lampOS/voice/tasks-told`
   (`LAMP_TASKS_TOLD`), read again on each pass. With `--close-told`,
-  once its turn is heard whole, a task's observation is also marked `told`
-  in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit).
+  once its telling begins (#6530), a task's observation is also marked
+  `told` in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit).
 - **Told once more when not heard** (#4342, off unless
   `LAMP_TASK_NEWS_RETELL=on`). News is kept as told the moment it is taken
   to tell (`TaskNews::tell`) or answered (`check_agent_task`), before
@@ -3394,7 +3416,7 @@ used only to say it.
   again. With the switch, settled news (done, failed, stopped, or an agent
   waiting for the person, and a hand-over that failed) whose turn was cut
   short or ended not heard whole is told once more. That includes news
-  played through with gaps, whose harness stays open (#4035): on lamp-c0a4
+  played through with gaps (#4035): on lamp-c0a4
   on 3 November such a news, played under someone's words that made no
   request (`audio_written_with_playback_gaps_unscored`), was otherwise
   neither told again nor closed. It is told once more
@@ -3408,8 +3430,9 @@ used only to say it.
   (`task_news` record `retold: true`), it is never told again unasked: not
   heard whole again, it is let go, two tries in all, the first one
   included. Heard whole in the meantime (asked and answered), it is not
-  told again. Heard whole, the tasks part is told as for any news, so its
-  `told` is set. Progress and a sign-in's question are never told again
+  told again. Its harness doesn't wait for it: the tasks part was told when
+  its first telling began, heard whole or not, so its `told` is set and the
+  harness closed (#6530); the retelling reads the answer kept in the store. Progress and a sign-in's question are never told again
   this way (progress is the Policy's to time; a sign-in asks again its own
   way). Off, news not heard whole stays as before: kept as told, said only
   when asked.
