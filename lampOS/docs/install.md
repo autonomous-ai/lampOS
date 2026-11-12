@@ -1702,6 +1702,29 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      scripts are still to be shown there. The relay key never goes into
      Hermes's environment or its folder; only the forwarder's token does
      (Hermes keeps snapshots of its shell's environment under its home).
+   - **Harness's hooks inside the agent namespace** (#6530; the shared
+     agent namespace piece, `crates/update/src/agent_ns.rs`, #6510's "one
+     namespace for every engine", used today by Hermes's and OpenClaw's
+     namespaces). Harness writes an engine's hooks as bare commands
+     (`harness hook hermes session-start`, `harness hook hermes tool`),
+     found by `PATH`. Inside the namespace `/var/lib` is an empty tmpfs, so
+     `/usr/local/bin/harness` (a link into `/var/lib/lampos-tasks/.local/bin`)
+     leads nowhere, and Harness's state is never shown there. Until Harness
+     ships a hook mode for a sandbox (openharness#4194), lamp-update writes a
+     stand-in, `/usr/local/lib/lampos/ns-bin/harness` (root's, 0755, in its
+     own root's 0755 folder), with each engine's namespace script and takes
+     it out with the last of them. It answers `harness hook …` with nothing
+     and exit 0 and refuses anything else with one line; it reads nothing,
+     so it shows no Harness state. The namespace scripts (`hermes-ns`,
+     `openclaw-ns`, and OpenClaw's wrapper before it joins the running
+     gateway's namespaces) put `/usr/local/lib/lampos/ns-bin` first on the
+     `PATH` right before the line that runs the engine. Each start of an
+     engine's wrapper writes one journal line, outside the namespace, with
+     the engine's tag: `Harness hooks aren't available inside the lamp's
+     agent namespace yet (openharness#4194)`; no `logger`, or one failing,
+     never fails the start. A missing or changed stand-in is the engine
+     missing, written again. The stand-in is removed once a sandbox hook
+     mode ships in the pinned Harness.
    - **The lamp's skills, behind their own switch** (#6128;
      `LAMP_HERMES_SKILLS` in `lamp-update.service`'s environment, read as
      `LAMP_HERMES_ON_LAMP` is: set, on only when `on` exactly, so `off`
