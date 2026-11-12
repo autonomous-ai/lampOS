@@ -1,6 +1,6 @@
 ---
 name: point-light
-description: Call when someone asks the lamp to light or look at something on the desk - "light my book", "shine on my notes", "look at my keyboard", "point your light at this". The lamp bends its head down over the desk, lights it and takes a look. Give toward = ahead the first time. After the look, only if the thing is off to the left or the right of the picture, call once more with toward = left or right; never more than once more. Only when asked.
+description: When asked to light or look at something on the desk ("light my book").
 ---
 
 # Point the light

@@ -1,6 +1,6 @@
 ---
 name: light-show
-description: Call when someone asks the lamp for a light show - "do a light show", "party lights", "make it a party", "a light show for this song", "something calm and colourful". The lamp says one short line and plays a show of slow-changing colours for under a minute (party, music or calm to suit the ask), then gives the light back. Only when asked; it stops when someone speaks.
+description: When asked for a light show ("do a light show", "party lights"): one line, then colours.
 ---
 
 # Light show
