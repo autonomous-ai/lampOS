@@ -9175,12 +9175,21 @@ async fn spoken(
     // when fewer, before the model is sent it. Judged before the rule.
     // While a made skill's writes wait for the yes (#6066), a line of only
     // the lamp's own words in their echo tail is held, switch or not, even
-    // in the private room: the say-back heard back is never the yes.
-    let yes_echo = (!empty && !held && crate::skill_write_yes::awaited(std::time::Instant::now()))
+    // in the private room: the say-back heard back is never the yes. So too
+    // while a made skill's clash waits for the person's choice (Heron's P2
+    // on #6614): its question heard back never replaces a skill.
+    let awaited = {
+        let now = std::time::Instant::now();
+        // Both asked, so an expired clash is let go here.
+        let yes = crate::skill_write_yes::awaited(now);
+        crate::made_clash::awaited(now) || yes
+    };
+    let yes_echo = (!empty && !held && awaited)
         .then(|| own_yes_echo_of(&shared, request, &text, &said, &marks))
         .flatten();
     let echo = if let Some(line) = yes_echo {
         crate::skill_write_yes::echo_held(request);
+        crate::made_clash::echo_held(request);
         own_echo::Echo::Held(line)
     } else if shared.own_echo && !empty && !held {
         own_echo_of(&shared, request, &text, &said, &marks)
