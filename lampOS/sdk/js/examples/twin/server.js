@@ -180,8 +180,10 @@ const files = {
   '/': ['text/html; charset=utf-8', () => readFileSync(here('./index.html'))],
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
-  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone') })] } : {}),
+  // `lamp` and `mode` name the checklist's key: the lamp's own id and name from hello, and what this page is driving.
+  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone'), lamp: { id: String(lamp.info?.id ?? 'lamp'), name: String(lamp.info?.name ?? '') }, mode: options.fake ? 'fake' : 'lamp-sim' })] } : {}),
   ...(stimDir ? { '/panel.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./panel.js'))] } : {}),
+  ...(stimDir ? { '/checklist.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./checklist.js'))] } : {}),
 };
 // three.js, vendored (examples/twin/vendor/three, three@0.160.0, MIT), so the page works with no internet.
 // A page's import map cannot carry the `?t=` token, so exactly these files are served without it, from this
