@@ -1905,7 +1905,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   mục của chính kỹ năng: `/var/lib/lampOS/skills/<name>`, hoặc với kỹ năng
   được đẩy lên, `/var/lib/lampOS/skills-dev/<name>` (`task::folder_of`);
   lamp-tasks chỉ nhận đúng hai chỗ đó, lamp-control băm cùng thư mục đó khi
-  đúc token (của kỹ năng trên đèn nếu cả hai cùng tên), với cùng các kiểm
+  đúc token (của kỹ năng trên đèn nếu cả hai cùng tên: bất cứ thứ gì mang
+  tên đó trong `skills/`, kể cả tệp hay liên kết,
+  `task::lamp_has_skill_named`, chặn kỹ năng được đẩy lên ở cả ba dịch vụ), với cùng các kiểm
   tra SHA-256 và grant. Token một lần
   (#6304, lamp-control đúc từ cái "có" nó giữ,
   `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
