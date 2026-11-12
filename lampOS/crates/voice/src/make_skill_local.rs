@@ -233,6 +233,23 @@ fn system_for(reads: bool, agent: bool) -> String {
     } else {
         ("the two fenced blocks", String::new())
     };
+    // A start said to the lamp (#6526), told only with its switch: off, the
+    // model still hears that a skill can't hear what is said, and the
+    // prompt is as before.
+    let (hear, said) = if made_skill::said_on() {
+        (
+            "hear what is said in the room (a request told to the lamp is a [said] start, \
+             below)",
+            format!("\n{}", made_skill::SAID_RULES),
+        )
+    } else {
+        ("hear what is said", String::new())
+    };
+    // Its can't-yet example, with writes on, is then the room's talk alone.
+    let cant_example = match cant_example {
+        "hearing what is said" if made_skill::said_on() => "hearing what is said in the room",
+        other => other,
+    };
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
          and nothing else. Use only the keys and values the request names, written as \
@@ -250,7 +267,7 @@ fn system_for(reads: bool, agent: bool) -> String {
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
          faces): {triggers} A body step is one gesture, one of: {gestures}. Set none of \
          most_a_day, [quiet], [budget] or [rest] unless the request asks {limits} A skill can't yet \
-         hear what is said, know who someone is, {cant_send}: a \
+         {hear}, know who someone is, {cant_send}: a \
          request that needs one, or anything else no step or trigger here or below does, is \
          answered with one line and no blocks: {cannot} then one short sentence said to the \
          person, beginning \"{cant_yet}\" and naming what in plain words (\"{cant_yet} \
@@ -267,7 +284,7 @@ fn system_for(reads: bool, agent: bool) -> String {
          else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
-         {services}{code}"
+         {services}{code}{said}"
     )
 }
 
@@ -6118,6 +6135,29 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     pub(crate) const CODE_CARD: &str =
         "---\nname: photo-booth\ndescription: Takes a photo.\n---\n\n# Photo booth\n";
     const CODE_REQUEST: &str = "make me a photo booth that takes a photo when I sit down";
+
+    /// #6526, with `LAMP_MADE_SKILL_SAID` off: the making model is told a
+    /// skill can't hear what is said, as before, and never of a said start;
+    /// on, it is told the form ([`made_skill::SAID_RULES`]) and that only
+    /// the room's talk is out of reach.
+    #[test]
+    fn a_said_start_is_told_to_the_maker_only_with_its_switch() {
+        made_skill::set_said_here(Some(false));
+        let off = system_with(false);
+        assert!(
+            off.contains("A skill can't yet hear what is said, know who"),
+            "{off}"
+        );
+        assert!(!off.contains("[said]"), "{off}");
+        made_skill::set_said_here(Some(true));
+        let on = system_with(false);
+        assert!(on.ends_with(made_skill::SAID_RULES), "{on}");
+        assert!(
+            on.contains("A skill can't yet hear what is said in the room (a request told"),
+            "{on}"
+        );
+        made_skill::set_said_here(None);
+    }
 
     /// #6307, with `LAMP_MADE_SCRIPTS` off: the making model is never told
     /// a skill may carry code, nor the function that a yes may put one on;

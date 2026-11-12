@@ -716,6 +716,65 @@ fn a_written_skill_passes_the_real_checker_and_is_put_on_only_once_marked() {
     assert_eq!(tools["tools"][0]["name"], "written_study_mode", "{tools}");
 }
 
+/// A made skill with a start said to the lamp (#6526,
+/// `LAMP_MADE_SKILL_SAID`): the real checker packs it, the helper puts it
+/// on once marked, and it loads as a function for the model with no
+/// trigger, described by its `when` line first, whose run keeps its colour
+/// as the person's light. With the switch off in the helper, it is never
+/// put on.
+#[test]
+fn a_said_start_passes_the_real_checker_and_loads_as_a_function_with_its_when_line() {
+    lamp_voice::made_skill::set_said_here(Some(true));
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let toml = "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\nlight = true\n\n\
+                [said]\ntold = \"you're busy\"\nwhen = \"when they say they're busy or in a \
+                meeting\"\n\n[[do]]\nlight = { colour = \"red\" }\n";
+    let answer = format!(
+        "```toml skill.toml\n{toml}```\n\n```markdown SKILL.md\n---\nname: busy\ndescription: \
+         Red when I'm busy.\n---\n\n# Busy\n```\n"
+    );
+    let asked = Asked {
+        request: "when I'm working or in a meeting, I tell the lamp I'm busy, and it turns red",
+        ..Asked::default()
+    };
+    let made = keep_asked(&answer, false, "local:app:1:1", &keeping, &asked).unwrap();
+    assert_eq!(
+        made.description,
+        "When you tell me you're busy, I'll turn red."
+    );
+    let wait = std::time::Duration::from_millis(200);
+    mark(&keeping, &made.sha256);
+    lamp_voice::made_skill::set_said_here(Some(false));
+    let refused = install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap_err();
+    assert!(
+        refused.contains("isn't a skill written in the app"),
+        "{refused}"
+    );
+    lamp_voice::made_skill::set_said_here(Some(true));
+    install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap();
+    let skill = lamp_skills::load(&skills.join("busy")).unwrap();
+    assert_eq!(skill.tool.as_deref(), Some("written_busy"));
+    assert!(skill.triggers.is_empty() && skill.policy.is_empty());
+    assert!(skill.permissions.speak && skill.permissions.light && !skill.permissions.body);
+    assert!(skill.permissions.topics.is_empty());
+    let tools = lamp_skills::tools_file(std::slice::from_ref(&skill));
+    assert_eq!(tools["tools"][0]["name"], "written_busy", "{tools}");
+    assert!(
+        tools["tools"][0]["description"]
+            .as_str()
+            .unwrap()
+            .trim_start_matches('"')
+            .starts_with(
+                "Use it when they say they're busy or in a meeting, a request said to you"
+            ),
+        "{tools}"
+    );
+    lamp_voice::made_skill::set_said_here(None);
+}
+
 /// A made skill on `trigger` with one body `step`, reading presence and
 /// the clock, as the voice's model writes one.
 fn made_body(trigger: &str, step: &str) -> String {
