@@ -2000,6 +2000,58 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      with none of it. What only a lamp shows: `--net` with
      `--map-root-user` as `lampos`, `ip link set lo up` there, and a run's
      model call answered while `curl https://example.com` fails.
+   - **A voice make gets a fresh home, and nothing of Hermes's lasting
+     one** (#6643, the first builder's 19:14 ruling and the HOLDs of 12 Nov
+     19:58 and 20:0x; behind `LAMP_SKILL_TASKS` too). lamp-tasks starts a
+     make's run (`lamp_tasks::skill_make`, docs/tasks.md) with
+     `LAMP_NS_HOME` naming the make's own new home,
+     `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run id>/home`.
+     The wrapper takes it only for that path, never with `..`
+     (`WRAPPER_HOME_LINE`), and points `HERMES_HOME` under it:
+
+     ```sh
+     case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME="$LAMP_NS_HOME/.hermes" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac
+     ```
+
+     The namespace script then (`NS_HOME_LINE`, after the ids are read and
+     before Hermes runs):
+
+     ```sh
+     if [ -n "${LAMP_NS_HOME-}" ]; then
+       F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk
+       [ -d "$LAMP_NS_HOME" ] && [ -n "$W" ] && [ "${F%/*}" = "$W/lamp" ] || fail "no $LAMP_NS_HOME"
+       mkdir -m 0700 "$X" "$X/f" "$X/c" || fail "no make staging"
+       mount --bind "$F" "$X/f" || fail "no $F"
+       mount --bind "$H/.hermes/hermes-agent" "$X/c" || fail "no Hermes checkout"
+       mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
+       mkdir "$H/.hermes/hermes-agent" && mount --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
+       ro "$H/.hermes"; ro "$H"; ro "$W"
+       mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$W/lamp" || fail "$W/lamp not hidden"
+       mkdir "$F" && mount --move "$X/f" "$F" || fail "$F not shown"
+       ro "$W/lamp"
+       rmdir "$X/f" "$X/c" "$X" || fail "make staging left"
+       cd "$F" || fail "$F not visible"
+       HOME=$LAMP_NS_HOME
+     fi
+     unset LAMP_NS_HOME F X
+     ```
+
+     A make keeps the network by default, so Hermes's lasting home
+     (`/var/lib/lampos-hermes/.hermes`: memories, sessions, `state.db`,
+     `.env`) is hidden under an empty read-only tmpfs, with only the
+     checkout (`hermes-agent`, where the program runs from) shown again,
+     read-only; Hermes's folder and the work folder are left read-only, and
+     the rest of the work folder's `lamp` (the Harness project, other runs'
+     folders) is hidden under another tmpfs, with the make's own folder
+     alone moved back, read-write. Each step failing ends it before Hermes
+     runs; a home outside the work folder's `lamp` is refused. Tests: the
+     lines run by `sh` with every mount stubbed (each step in order, each
+     failing stops it, a home elsewhere refused, no make none of it), and,
+     on Linux where a user namespace is allowed, run for real: a `cat` of
+     the lasting `memories` finds nothing, the lasting home shows only the
+     checkout, `lamp` only the make's folder, and only that folder can be
+     written. What only a lamp shows: Hermes running from the checkout with
+     the lasting home hidden.
    - **User namespaces checked first:** before anything is made, `lampos`
      must be able to make that namespace: `runuser -u lampos --
      /usr/bin/unshare --map-root-user --mount --pid --kill-child
@@ -2458,7 +2510,9 @@ yet on a lamp.
   0755), is Hermes's (`hermes-ns`, "Hermes on the lamp": the same
   allow-list, hidden `/run`, `/var/lib` and `/etc/lampOS`, private `/tmp`,
   hidden devices, the skills and `LAMP_SKILL_TASKS` switches, and a skill
-  run's network) with the engine made data. It checks the name again and
+  run's network) with the engine made data, but for a voice make's home
+  (`LAMP_NS_HOME`, #6643), which runs Hermes only: that block is left out
+  and the variable unset. It checks the name again and
   that the program is a full path to a file, sets `HOME` to the engine's
   own folder `/var/lib/lampos-agents/<engine>` (`lampos`'s, 0700; the
   folder above it root's, 0755), binds the program back read-only at its

@@ -3273,3 +3273,231 @@ fn the_run_env_is_written_with_the_entry_points_and_counted_in_present() {
     assert_eq!(mode, 0o644);
     assert!(present(lamp.root(), shown));
 }
+
+/// A make's lines on their own, after [`NS`]'s `fail` and `ro`, with `H`
+/// and `W` (and the staging folder) moved to `base`'s, and `after` once
+/// the lines have run.
+fn make_lines(base: &Path, after: &str) -> String {
+    let ns = ns_text(false, true);
+    let helpers: String = ns
+        .lines()
+        .filter(|line| line.starts_with("fail() ") || line.starts_with("ro() "))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    assert_eq!(helpers.lines().count(), 2);
+    format!(
+        "#!/bin/sh\n{helpers}H={b}/h W={b}/w\n{}{after}",
+        NS_HOME_LINE.replace("/tmp/.lampos-mk", &format!("{}/x", base.display())),
+        b = base.display()
+    )
+}
+
+/// Hermes's lasting home and a lamp-tasks work folder, with a make's folder
+/// in it, under `base`.
+fn a_lamp_with_a_make(base: &Path) -> PathBuf {
+    for (path, text) in [
+        ("h/.hermes/memories/MEMORY.md", "THE OWNER'S MEMORY"),
+        ("h/.hermes/state.db", "STATE"),
+        ("h/.hermes/hermes-agent/run.sh", "echo ran"),
+        ("h/.local/bin/README", "the program"),
+        ("w/top.md", "W"),
+        ("w/lamp/AGENTS.md", "HARNESS PROJECT"),
+        ("w/lamp/make-task-1/rules.md", "R"),
+        ("w/lamp/make-task-1/home/.hermes/config.yaml", "C"),
+    ] {
+        let path = base.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    base.join("w/lamp/make-task-1")
+}
+
+/// #6643's HOLDs (the Reviewer-lead 19:58, SubDarren 20:0x, 12 Nov): for
+/// a make, which keeps the network, the script hides Hermes's lasting
+/// home under an empty tmpfs with only its checkout shown again,
+/// read-only; leaves Hermes's folder and the work folder read-only; hides
+/// the rest of `W/lamp` under another tmpfs, the make's own folder alone
+/// moved back, read-write; and starts Hermes there with the make's home.
+/// Each step failing ends it before Hermes runs; a home outside `W/lamp`
+/// is refused; no make, nothing of this runs.
+#[test]
+fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder() {
+    let folder = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(folder.path()).unwrap();
+    let make = a_lamp_with_a_make(&base);
+    let stubs = base.join("stubs");
+    fs::create_dir_all(&stubs).unwrap();
+    let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
+    for name in ["mount", "findmnt", "mkdir", "rmdir"] {
+        let path = stubs.join(name);
+        fs::write(&path, stub).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let script = base.join("make-lines");
+    fs::write(
+        &script,
+        make_lines(&base, "echo \"HOME=$HOME PWD=$(pwd -P)\"\n"),
+    )
+    .unwrap();
+    let log = base.join("log");
+    let run = |home: Option<&Path>, fail_on: &str| {
+        let _ = fs::remove_file(&log);
+        let mut command = std::process::Command::new("/bin/sh");
+        command
+            .arg(&script)
+            .current_dir(&make)
+            .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+            .env("LOG", &log)
+            .env("FAIL_ON", fail_on)
+            .env("HOME", "/lasting");
+        match home {
+            Some(home) => command.env(HOME_ENV, home),
+            None => command.env_remove(HOME_ENV),
+        };
+        let out = command.output().unwrap();
+        let lines: Vec<String> = fs::read_to_string(&log)
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        (out, lines)
+    };
+    let (h, w, x) = (base.join("h"), base.join("w"), base.join("x"));
+    let (h, w, x, f) = (h.display(), w.display(), x.display(), make.display());
+    let home = make.join("home");
+    let (out, lines) = run(Some(&home), "");
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!("HOME={} PWD={f}\n", home.display())
+    );
+    let ro = |path: String| {
+        [
+            format!("findmnt -no VFS-OPTIONS -M {path}"),
+            format!("mount -o remount,bind,ro,nosuid,nodev,relatime {path}"),
+        ]
+    };
+    let mut wanted = vec![
+        format!("mkdir -m 0700 {x} {x}/f {x}/c"),
+        format!("mount --bind {f} {x}/f"),
+        format!("mount --bind {h}/.hermes/hermes-agent {x}/c"),
+        format!("mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
+        format!("mkdir {h}/.hermes/hermes-agent"),
+        format!("mount --move {x}/c {h}/.hermes/hermes-agent"),
+    ];
+    wanted.extend(ro(format!("{h}/.hermes/hermes-agent")));
+    wanted.extend(ro(format!("{h}/.hermes")));
+    wanted.extend(ro(h.to_string()));
+    wanted.extend(ro(w.to_string()));
+    wanted.push(format!(
+        "mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {w}/lamp"
+    ));
+    wanted.push(format!("mkdir {f}"));
+    wanted.push(format!("mount --move {x}/f {f}"));
+    wanted.extend(ro(format!("{w}/lamp")));
+    wanted.push(format!("rmdir {x}/f {x}/c {x}"));
+    assert_eq!(lines, wanted);
+    for step in [
+        "mkdir -m 0700".to_owned(),
+        format!("--bind {f} "),
+        format!("--bind {h}/.hermes/hermes-agent "),
+        format!("none {h}/.hermes"),
+        format!("mkdir {h}/.hermes/hermes-agent"),
+        format!("--move {x}/c "),
+        format!("relatime {h}/.hermes/hermes-agent"),
+        format!("relatime {h}/.hermes"),
+        format!("relatime {h}"),
+        format!("relatime {w}"),
+        format!("none {w}/lamp"),
+        format!("mkdir {f}"),
+        format!("--move {x}/f "),
+        format!("relatime {w}/lamp"),
+        "rmdir".to_owned(),
+    ] {
+        let (out, _) = run(Some(&home), &step);
+        assert!(!out.status.success(), "{step}");
+        assert!(out.stdout.is_empty(), "Hermes never runs: {step}");
+    }
+    // A home outside the work folder's `lamp`, or missing, is refused
+    // before anything is mounted.
+    let other = base.join("other/make-task-1/home");
+    fs::create_dir_all(&other).unwrap();
+    for home in [other, make.join("gone/home")] {
+        let (out, lines) = run(Some(&home), "");
+        assert!(!out.status.success(), "{home:?}");
+        assert!(lines.is_empty(), "{lines:?}");
+    }
+    // No make: none of it.
+    let (out, lines) = run(None, "");
+    assert!(out.status.success());
+    assert!(lines.is_empty(), "{lines:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!("HOME=/lasting PWD={f}\n")
+    );
+}
+
+/// The same lines run for real in a user and mount namespace of their own
+/// (Linux, where the kernel allows one; skipped otherwise): from inside a
+/// make's namespace, a `cat` of Hermes's lasting memories finds nothing,
+/// its lasting home shows only the checkout, read-only, `W/lamp` shows
+/// only the make's folder, and nothing but the make's folder can be
+/// written.
+#[cfg(target_os = "linux")]
+#[test]
+fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
+    let folder = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(folder.path()).unwrap();
+    let probe = base.join("probe");
+    fs::create_dir(&probe).unwrap();
+    let allowed = std::process::Command::new("unshare")
+        .args(["--map-root-user", "--mount", "--propagation", "private"])
+        .args(["mount", "-t", "tmpfs", "none"])
+        .arg(&probe)
+        .output()
+        .is_ok_and(|out| out.status.success());
+    if !allowed {
+        eprintln!("no user and mount namespace here: skipped");
+        return;
+    }
+    let make = a_lamp_with_a_make(&base);
+    let checks = "\
+        cat \"$H/.hermes/memories/MEMORY.md\" 2>/dev/null && echo SEEN-MEMORY\n\
+        cat \"$H/.hermes/state.db\" 2>/dev/null && echo SEEN-STATE\n\
+        echo \"lasting: $(ls -A \"$H/.hermes\" | tr '\\n' ' ')\"\n\
+        cat \"$H/.hermes/hermes-agent/run.sh\" >/dev/null && echo CHECKOUT\n\
+        cat \"$H/.local/bin/README\" >/dev/null && echo PROGRAM\n\
+        echo \"lamp: $(ls -A \"$W/lamp\" | tr '\\n' ' ')\"\n\
+        cat \"$W/lamp/AGENTS.md\" 2>/dev/null && echo SEEN-PROJECT\n\
+        touch \"$W/lamp/x\" 2>/dev/null && echo WROTE-LAMP\n\
+        touch \"$W/x\" 2>/dev/null && echo WROTE-W\n\
+        touch \"$H/x\" 2>/dev/null && echo WROTE-H\n\
+        touch \"$H/.hermes/x\" 2>/dev/null && echo WROTE-LASTING\n\
+        touch \"$H/.hermes/hermes-agent/x\" 2>/dev/null && echo WROTE-CHECKOUT\n\
+        touch answer.md && touch \"$HOME/.hermes/memory.md\" && echo ANSWERED\n";
+    let script = base.join("make-lines");
+    fs::write(&script, make_lines(&base, checks)).unwrap();
+    let out = std::process::Command::new("unshare")
+        .args([
+            "--map-root-user",
+            "--mount",
+            "--propagation",
+            "private",
+            "/bin/sh",
+        ])
+        .arg(&script)
+        .current_dir(&make)
+        .env(HOME_ENV, make.join("home"))
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "lasting: hermes-agent \nCHECKOUT\nPROGRAM\nlamp: make-task-1 \nANSWERED\n"
+    );
+    // Outside, the make's answer is there and nothing else was touched.
+    assert!(make.join("answer.md").exists());
+    assert!(!base.join("w/lamp/x").exists() && !base.join("h/x").exists());
+}

@@ -428,6 +428,9 @@ pub const NS_EDITS: [(&str, &str); 8] = [
 /// only path in it that is an installer's own.
 pub fn ns_text(shown: Shown) -> String {
     let mut text = hermes_install::ns_text(shown.skills, shown.tasks);
+    // A voice make's home (#6643) runs Hermes only, so its block is left
+    // out of every engine's namespace; a stray `LAMP_NS_HOME` is unset.
+    text = text.replacen(hermes_install::NS_HOME_LINE, "unset LAMP_NS_HOME\n", 1);
     text = text.replacen(hermes_header(), NS_HEADER, 1);
     for (from, to) in NS_EDITS {
         text = text.replacen(from, to, 1);
